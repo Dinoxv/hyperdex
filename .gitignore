@@ -1,14 +1,30 @@
+# ClojureScript build artifacts
+/resources/public/js/
+/.shadow-cljs/
+/node_modules/
+
+# Clojure artifacts
+/target/
+/classes/
+/checkouts/
 pom.xml
 pom.xml.asc
 *.jar
 *.class
-/lib/
-/classes/
-/target/
-/checkouts/
-.lein-deps-sum
-.lein-repl-history
-.lein-plugins/
-.lein-failures
-.nrepl-port
-.cpcache/
+/.lein-*
+/.nrepl-port
+/.cpcache/
+
+# IDE
+.idea/
+*.iml
+.vscode/
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Logs
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
