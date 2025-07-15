@@ -10,7 +10,8 @@
         :asset-path "/js"
         :modules {:main {:init-fn hyperopen.core/init}}
         :devtools {:http-root "resources/public"
-                   :http-port 8080}}
+                   :http-port 8080
+                   :after-load hyperopen.core/reload}}
   
   :release {:target :browser
             :output-dir "resources/public/js"

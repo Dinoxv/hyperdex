@@ -11,7 +11,7 @@
     [:h1.text-4xl.font-bold.text-primary (:title state)]
     [:p.text-lg.text-base-content.opacity-80 (:message state)]
     [:div.card.bg-base-200.shadow-xl.p-6
-     [:p.text-xl.mb-4 "You clicked " (:count state) " times!!"]
+     [:p.text-xl.mb-4 "You clicked " (:count state) " times"]
      [:button.btn.btn-primary.btn-lg
       {:on {:click #(swap! app-state update :count inc)}}
       "Click me!"]]]])
@@ -19,6 +19,10 @@
 (defn render! []
   (d/render (.getElementById js/document "app")
             (app-view @app-state)))
+
+(defn reload []
+  (println "Reloading Hyperopen...")
+  (render!))
 
 (defn init []
   (println "Initializing Hyperopen...")
