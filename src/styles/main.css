@@ -1,0 +1,125 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* Custom CSS for trading interface */
+@layer base {
+  html {
+    @apply h-full;
+  }
+
+  body {
+    @apply h-full bg-trading-bg text-trading-text font-mono antialiased;
+  }
+
+  /* Ensure proper scrolling and layout */
+  * {
+    @apply box-border;
+  }
+}
+
+@layer components {
+  /* Trading specific components */
+  .trading-panel {
+    @apply bg-trading-surface border border-trading-border rounded-lg p-4;
+  }
+
+  .price-positive {
+    @apply text-trading-green;
+  }
+
+  .price-negative {
+    @apply text-trading-red;
+  }
+
+  .trading-button {
+    @apply btn btn-sm font-mono tracking-wide;
+  }
+
+  .trading-input {
+    @apply input input-sm bg-trading-surface border-trading-border text-trading-text font-mono;
+  }
+
+  /* Order book styles */
+  .order-book-row {
+    @apply flex justify-between items-center py-1 px-2 hover:bg-trading-surface/50 transition-colors;
+  }
+
+  .bid-row {
+    @apply hover:bg-trading-green/10;
+  }
+
+  .ask-row {
+    @apply hover:bg-trading-red/10;
+  }
+
+  /* Chart container */
+  .chart-container {
+    @apply bg-trading-surface border border-trading-border rounded-lg overflow-hidden;
+  }
+
+  /* Data table styles */
+  .data-table {
+    @apply table table-xs w-full;
+  }
+
+  .data-table th {
+    @apply bg-trading-surface text-trading-text-secondary uppercase tracking-wider text-xs;
+  }
+
+  .data-table td {
+    @apply border-b border-trading-border text-sm;
+  }
+
+  /* Grid layout for trading interface */
+  .trading-grid {
+    @apply grid grid-cols-4 grid-rows-3 gap-2 h-full;
+    grid-template-areas:
+      "left center center right"
+      "left center center right"
+      "tables tables tables tables";
+  }
+
+  .left-panel {
+    grid-area: left;
+  }
+
+  .center-panel {
+    grid-area: center;
+  }
+
+  .right-panel {
+    grid-area: right;
+  }
+
+  .bottom-tables {
+    grid-area: tables;
+  }
+}
+
+@layer utilities {
+  /* Custom utilities for trading interface */
+  .text-price {
+    @apply font-mono text-sm tabular-nums;
+  }
+
+  .text-volume {
+    @apply font-mono text-xs text-trading-text-secondary tabular-nums;
+  }
+
+  .gradient-green {
+    background: linear-gradient(
+      90deg,
+      transparent 0%,
+      rgba(0, 212, 170, 0.1) 100%
+    );
+  }
+
+  .gradient-red {
+    background: linear-gradient(
+      90deg,
+      transparent 0%,
+      rgba(255, 107, 107, 0.1) 100%
+    );
+  }
+}
