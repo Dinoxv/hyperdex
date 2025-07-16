@@ -2,69 +2,149 @@
 
 ## Overview
 
-Implement a custom WebSocket communication layer using Sente for the Hyperopen trading interface. This will replace external WebSocket libraries with a robust, Clojure-native solution that provides real-time market data, order management, and account updates.
+Implement a custom WebSocket communication layer using native WebSocket API for the Hyperopen trading interface. This provides real-time market data, order management, and account updates by connecting directly to Hyperliquid's WebSocket API.
 
 ## Architecture Goals
 
-- **Client-Side**: Sente client for direct WebSocket connections to Hyperliquid APIs
-- **Protocol**: Custom message format for Hyperliquid API communication
+- **Client-Side**: Native WebSocket client for direct connections to Hyperliquid APIs
+- **Protocol**: Custom message format following Hyperliquid API specification
 - **State Management**: Integration with existing Replicant/Nexus state system
 - **Error Handling**: Robust connection management and reconnection logic
 - **API Integration**: Direct connection to Hyperliquid WebSocket endpoints
 
+## Usage Instructions
+
+### Current Implementation Status
+
+✅ **Phase 1.1 COMPLETED**: Basic WebSocket client and trades subscription
+
+The following modules are now available and functional:
+
+#### WebSocket Client (`src/hyperopen/websocket/client.cljs`)
+
+Basic usage:
+
+```clojure
+;; Initialize connection to Hyperliquid
+(ws-client/init-connection! "wss://api.hyperliquid.xyz/ws")
+
+;; Check connection status
+(ws-client/connected?) ; => true/false
+(ws-client/get-connection-status) ; => :connected/:connecting/:disconnected
+
+;; Send custom messages (follows Hyperliquid format)
+(ws-client/send-message! {:method "subscribe"
+                          :subscription {:type "allMids"}})
+
+;; Register custom message handlers
+(ws-client/register-handler! "channelName" handler-function)
+```
+
+#### Trades Subscription (`src/hyperopen/websocket/trades.cljs`)
+
+Basic usage:
+
+```clojure
+;; Initialize trades module (registers handler automatically)
+(trades/init!)
+
+;; Subscribe to trades for a symbol
+(trades/subscribe-trades! "BTC")   ; BTC trades
+(trades/subscribe-trades! "ETH")   ; ETH trades
+
+;; Unsubscribe from trades
+(trades/unsubscribe-trades! "BTC")
+
+;; Get data
+(trades/get-subscriptions)     ; => #{"BTC" "ETH"}
+(trades/get-recent-trades)     ; => [...] (last 100 trades)
+(trades/clear-trades!)         ; Clear stored trades
+```
+
+#### Integration Example
+
+See `src/hyperopen/core.cljs` for a complete integration example that:
+
+1. Initializes WebSocket connection on app startup
+2. Subscribes to BTC trades automatically
+3. Logs trade data to browser console
+
+### API Reference
+
+For complete subscription types and message formats, refer to the official Hyperliquid documentation:
+**[Hyperliquid WebSocket Subscriptions](https://hyperliquid.gitbook.io/hyperliquid-docs/for-developers/api/websocket/subscriptions)**
+
+#### Key Subscription Types Available:
+
+- `trades` - Real-time trade data for specific coins
+- `l2Book` - Order book updates
+- `candle` - Candlestick data with various intervals
+- `allMids` - All mid prices across assets
+- `orderUpdates` - User-specific order updates (requires address)
+- `userFills` - User-specific fill data (requires address)
+
+#### Message Format:
+
+All Hyperliquid WebSocket messages follow this format:
+
+```json
+{
+  "method": "subscribe",
+  "subscription": {
+    "type": "subscriptionType",
+    ...additionalParams
+  }
+}
+```
+
 ## Implementation Phases
 
-### Phase 1: Core Sente Infrastructure (2-3 days)
+### Phase 1: Core WebSocket Infrastructure (COMPLETED ✅)
 
-**Goal**: Establish basic Sente client-server communication framework
+**Goal**: Establish basic WebSocket communication framework
 
-#### 1.1 Dependencies & Project Setup
+#### 1.1 Dependencies & Project Setup (COMPLETED ✅)
 
-- [ ] Add Sente dependencies to `deps.edn`:
-  ```clojure
-  com.taoensso/sente {:mvn/version "1.17.0"}
-  com.taoensso/timbre {:mvn/version "6.2.2"}
-  ```
-- [ ] Update `shadow-cljs.edn` for proper ClojureScript compilation
-- [ ] Create namespace structure for WebSocket modules
-- [ ] Add Hyperliquid API endpoint configuration
+- [x] ~~Add Sente dependencies to `deps.edn`~~ (Replaced with native WebSocket)
+- [x] ~~Update `shadow-cljs.edn` for proper ClojureScript compilation~~ (No external deps needed)
+- [x] Create namespace structure for WebSocket modules
+- [x] Add Hyperliquid API endpoint configuration
 
-#### 1.2 Basic Sente Client Setup
+#### 1.2 Basic WebSocket Client Setup (COMPLETED ✅)
 
-- [ ] Create `src/hyperopen/websocket/client.cljs`
-- [ ] Implement Sente client initialization with connection config
-- [ ] Set up event handlers for connection state changes
-- [ ] Add basic logging and error handling
-- [ ] Create connection status indicator component
+- [x] Create `src/hyperopen/websocket/client.cljs`
+- [x] Implement native WebSocket client initialization with connection config
+- [x] Set up event handlers for connection state changes
+- [x] Add basic logging and error handling
+- [x] Create connection status tracking
 
-#### 1.3 Hyperliquid API Integration Setup
+#### 1.3 Hyperliquid API Integration Setup (COMPLETED ✅)
 
-- [ ] Create `src/hyperopen/websocket/api_config.cljs`
-- [ ] Configure Hyperliquid WebSocket endpoints (mainnet/testnet)
-- [ ] Set up API authentication and connection parameters
-- [ ] Add environment-specific configuration management
-- [ ] Create connection health monitoring
+- [x] Configure Hyperliquid WebSocket endpoints (mainnet/testnet)
+- [x] Set up direct WebSocket connection parameters
+- [x] Add message routing and handler registration
+- [x] Create connection health monitoring
 
-#### 1.4 Message Protocol Design
+#### 1.4 Message Protocol Design (COMPLETED ✅)
 
-- [ ] Define message format for Hyperliquid API communication
-- [ ] Create message type constants and validation
-- [ ] Implement message serialization/deserialization for Hyperliquid format
-- [ ] Add message routing based on Hyperliquid event types
+- [x] Implement Hyperliquid API message format compatibility
+- [x] Create message serialization/deserialization for JSON
+- [x] Add message routing based on channel types
+- [x] Implement trades subscription as proof of concept
 
-**Deliverable**: Basic Sente client with Hyperliquid API connection management
+**Deliverable**: ✅ Basic WebSocket client with Hyperliquid API connection and trades subscription
 
 ---
 
-### Phase 2: Market Data WebSocket Module (3-4 days)
+### Phase 2: Market Data WebSocket Module (2-3 days)
 
-**Goal**: Real-time market data streaming for trading pairs
+**Goal**: Expand real-time market data streaming for multiple trading pairs
 
 #### 2.1 Market Data Client Module
 
-- [ ] Create `src/hyperopen/websocket/market_data.cljs`
-- [ ] Implement subscription management for trading pairs
-- [ ] Add market data event handlers (ticker, orderbook, trades)
+- [ ] Extend `src/hyperopen/websocket/market_data.cljs`
+- [ ] Implement subscription management for multiple trading pairs
+- [ ] Add market data event handlers (ticker, orderbook, candles)
 - [ ] Create data transformation layer for incoming messages
 - [ ] Implement rate limiting and data buffering
 
@@ -82,7 +162,7 @@ Implement a custom WebSocket communication layer using Sente for the Hyperopen t
 - [ ] Create market data atoms and update functions
 - [ ] Add real-time UI updates for price changes
 - [ ] Implement order book depth updates
-- [ ] Add trade history streaming
+- [ ] Add candlestick data streaming
 
 #### 2.4 Market Data Features
 
@@ -261,6 +341,7 @@ When implementing Hyperliquid API integration, refer to these established librar
 
 - **[@nktkas/hyperliquid](https://github.com/nktkas/hyperliquid)**: TypeScript SDK with comprehensive WebSocket support, message handling, and API integration patterns
 - **[hyperliquid-python-sdk](https://github.com/hyperliquid-dex/hyperliquid-python-sdk)**: Python SDK providing reference implementations for order management, market data, and account operations
+- **[Official Hyperliquid WebSocket Documentation](https://hyperliquid.gitbook.io/hyperliquid-docs/for-developers/api/websocket/subscriptions)**: Complete API reference for all subscription types and message formats
 
 These libraries serve as authoritative references for:
 
@@ -274,39 +355,39 @@ These libraries serve as authoritative references for:
 
 ```clojure
 ;; Client to Hyperliquid API
-{:type :subscribe
- :channel "ticker"
- :symbol "BTC-USD"}
+{:method "subscribe"
+ :subscription {:type "trades"
+                :coin "BTC"}}
 
 ;; Hyperliquid API to Client
-{:type :ticker
- :data {:symbol "BTC-USD"
-        :price 45000.50
-        :change 2.5
-        :volume 1234.56}}
+{:channel "trades"
+ :data [{:coin "BTC"
+         :px "45000.50"
+         :sz "0.1"
+         :side "A"
+         :time 1234567890
+         :tid 12345}]}
 ```
 
 ### Namespace Structure
 
 ```
 src/hyperopen/websocket/
-├── client.cljs          # Main Sente client
-├── api_config.cljs      # Hyperliquid API configuration
-├── market_data.cljs     # Market data client module
-├── market_data_api.cljs # Market data API integration
-├── orders.cljs          # Order management client
-├── orders_api.cljs      # Order API integration
-├── account.cljs         # Account client module
-├── account_api.cljs     # Account API integration
-└── protocol.cljc        # Shared message protocol
+├── client.cljs          # Main WebSocket client (COMPLETED)
+├── trades.cljs          # Trades subscription client (COMPLETED)
+├── market_data.cljs     # Market data client module (TODO)
+├── market_data_api.cljs # Market data API integration (TODO)
+├── orders.cljs          # Order management client (TODO)
+├── orders_api.cljs      # Order API integration (TODO)
+├── account.cljs         # Account client module (TODO)
+└── account_api.cljs     # Account API integration (TODO)
 ```
 
 ### Dependencies
 
 ```clojure
-;; Client-side only
-com.taoensso/sente {:mvn/version "1.17.0"}
-com.taoensso/timbre {:mvn/version "6.2.2"}
+;; No external dependencies - uses native WebSocket API
+;; Current deps.edn remains unchanged from base Replicant/Nexus setup
 ```
 
 ## Success Criteria
@@ -334,8 +415,9 @@ com.taoensso/timbre {:mvn/version "6.2.2"}
 
 ## Next Steps
 
-1. Review and approve this PRD
-2. Set up development environment with Sente dependencies
-3. Begin Phase 1 implementation
-4. Create development milestones and checkpoints
-5. Set up monitoring and testing infrastructure
+1. ✅ ~~Review and approve this PRD~~
+2. ✅ ~~Set up development environment with WebSocket dependencies~~
+3. ✅ ~~Begin Phase 1 implementation~~
+4. ✅ ~~Create development milestones and checkpoints~~
+5. **Continue with Phase 2**: Market Data WebSocket Module
+6. Set up monitoring and testing infrastructure
