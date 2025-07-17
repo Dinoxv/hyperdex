@@ -4,7 +4,7 @@
 ;; Pure presentation components
 
 (defn format-number [n decimals]
-  (when n
+  (when (and n (number? n))
     (.toFixed n decimals)))
 
 (defn format-currency [amount]
