@@ -47,6 +47,31 @@
     (str "00:" (.padStart (str total-minutes) 2 "0") ":"
          (.padStart (str total-seconds) 2 "0"))))
 
+(defn annualized-funding-rate [hourly-rate]
+  (when hourly-rate
+    (* hourly-rate 24 365)))
+
+(defn tooltip [content & [position]]
+  (let [pos (or position "top")]
+    [:div.relative.group
+     [:div (first content)]
+     [:div {:class (str "absolute " 
+                        (case pos
+                          "top" "bottom-full left-1/2 transform -translate-x-1/2 mb-2"
+                          "bottom" "top-full left-1/2 transform -translate-x-1/2 mt-2"
+                          "left" "right-full top-1/2 transform -translate-y-1/2 mr-2"
+                          "right" "left-full top-1/2 transform -translate-y-1/2 ml-2")
+                        " opacity-0 group-hover:opacity-100 transition-opacity duration-200 pointer-events-none z-50")
+             :style {:min-width "max-content"}}
+      [:div.bg-gray-800.text-white.text-xs.rounded.py-1.px-2.whitespace-nowrap
+       (second content)
+       [:div {:class (str "absolute w-0 h-0 border-4 border-transparent "
+                          (case pos
+                            "top" "top-full border-t-gray-800"
+                            "bottom" "bottom-full border-b-gray-800"
+                            "left" "left-full border-l-gray-800"
+                            "right" "right-full border-r-gray-800"))}]]]]))
+
 (defn change-indicator [change-value change-pct]
   (let [is-positive (and change-value (>= change-value 0))
         color-class (if is-positive "text-success" "text-error")]
@@ -113,9 +138,11 @@
       [:div.flex-1
        [:div.flex.flex-col.space-y-1
         [:span.text-xs.text-gray-400 "Funding / Countdown"]
-        [:div.text-sm.font-medium
-         [:span.text-success (format-percentage funding-rate 4)]
-         [:span " / "]
+        [:div.text-sm.font-medium.flex.items-center
+         (tooltip 
+           [[:span.text-success (format-percentage funding-rate 4)]
+            (str "Annualized: " (format-percentage (annualized-funding-rate funding-rate) 2))])
+         [:span.mx-1 "/"]
          [:span (format-funding-countdown)]]]]]]))
 
 (defn active-asset-list [contexts]
