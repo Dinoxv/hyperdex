@@ -1,11 +1,15 @@
 (ns hyperopen.core
   (:require [replicant.dom :as r]
-            [nexus.registry :as nxr]))
+            [nexus.registry :as nxr]
+            [hyperopen.views.active-asset-view :as active-asset-view]
+            [hyperopen.websocket.active-asset-ctx :as active-ctx]))
 
 ;; App state
 (defonce store (atom {:title "Hyperopen"
                       :message "Welcome to Hyperopen - A ClojureScript app with Replicant"
-                      :count 0}))
+                      :count 0
+                      :active-assets {:contexts {}
+                                     :loading false}}))
 
 ;; Effects - handle side effects
 (defn save [_ store path value]
@@ -17,11 +21,19 @@
 
 ;; Pure component - uses actions directly in event handlers
 (defn app-view [state]
-  [:div.min-h-screen.flex.flex-col.items-center.justify-center.bg-base-100.p-8
-   [:div.text-center.space-y-6.max-w-md
-    [:h1.text-4xl.font-bold.text-primary (:title state)]
-    [:p.text-lg.text-base-content.opacity-80 (:message state)]
-    [:div.card.bg-base-200.shadow-xl.p-6
+  [:div.min-h-screen.bg-base-100.p-8
+   [:div.max-w-7xl.mx-auto.space-y-8
+    ;; Header
+    [:div.text-center.space-y-4
+     [:h1.text-4xl.font-bold.text-primary (:title state)]
+     [:p.text-lg.text-base-content.opacity-80 (:message state)]]
+    
+    ;; Active Assets Panel
+    [:div
+     (active-asset-view/active-asset-view (:active-assets state))]
+    
+    ;; Demo Counter Card
+    [:div.card.bg-base-200.shadow-xl.p-6.max-w-md.mx-auto
      [:p.text-xl.mb-4 "You clicked " (:count state) " times"]
      [:button.btn.btn-primary.btn-lg
       {:on {:click [[:actions/increment-count]]}}
