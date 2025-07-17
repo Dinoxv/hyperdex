@@ -140,7 +140,7 @@
         [:span.text-xs.text-gray-400 "Funding / Countdown"]
         [:div.text-sm.font-medium.flex.items-center
          (tooltip 
-           [[:span.text-success (format-percentage funding-rate 4)]
+           [[:span.text-success.cursor-help (format-percentage funding-rate 4)]
             (str "Annualized: " (format-percentage (annualized-funding-rate funding-rate) 2))])
          [:span.mx-1 "/"]
          [:span (format-funding-countdown)]]]]]]))
