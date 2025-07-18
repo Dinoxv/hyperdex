@@ -33,18 +33,31 @@
            :percentage spread-pct})))))
 
 (defn calculate-cumulative-totals [orders]
-  (loop [orders orders
-         total 0
-         result []]
-    (if (empty? orders)
-      result
-      (let [order (first orders)
-            size (:sz order)
-            num-size (if (string? size) (js/parseFloat size) size)
-            new-total (+ total (or num-size 0))]
-        (recur (rest orders)
-               new-total
-               (conj result (assoc order :total new-total)))))))
+  "Given a vector of orders {:px price :sz size}
+   returns the same orders with:
+     :cum-size   – running total size (BTC)
+     :cum-value  – running notional value in quote currency (price*size)
+   Orders must already be sorted in display order."
+  (if (empty? orders)
+    []
+    (loop [remaining orders
+           cum-size 0
+           cum-value 0
+           result []]
+      (if (empty? remaining)
+        result
+        (let [order (first remaining)
+              price (if (string? (:px order)) (js/parseFloat (:px order)) (:px order))
+              size (if (string? (:sz order)) (js/parseFloat (:sz order)) (:sz order))
+              new-cum-size (+ cum-size (or size 0))
+              new-cum-value (+ cum-value (* (or price 0) (or size 0)))
+              updated-order (assoc order 
+                                   :cum-size new-cum-size
+                                   :cum-value new-cum-value)]
+          (recur (rest remaining)
+                 new-cum-size
+                 new-cum-value
+                 (conj result updated-order)))))))
 
 (defn get-max-size [orders]
   (when (seq orders)
@@ -63,7 +76,7 @@
 (defn order-row [order max-size is-ask?]
   (let [price (:px order)
         size (:sz order)
-        total (:total order)
+        cum-size (:cum-size order)
         bar-width (size-bar-width size max-size)
         bar-color (if is-ask? "bg-red-500/30" "bg-green-500/30")
         text-color (if is-ask? "text-red-400" "text-green-400")]
@@ -79,7 +92,7 @@
       [:div.text-right.flex-1
        [:span {:class [text-color]} (or size "0")]]
       [:div.text-right.flex-1
-       [:span {:class [text-color]} (or (format-total total :decimals 8) "0")]]]]))
+       [:span {:class [text-color]} (or (format-total cum-size :decimals 8) "0")]]]]))
 
 ;; Spread component
 (defn spread-row [spread]
@@ -115,15 +128,27 @@
 
 ;; Main order book component
 (defn l2-orderbook-panel [coin orderbook-data]
-  (let [bids (:bids orderbook-data)
-        asks (:asks orderbook-data)
-        best-bid (first bids)
-        best-ask (last asks)
+  (let [raw-bids (:bids orderbook-data)
+        raw-asks (:asks orderbook-data)
+        
+        ;; Sort into display order:
+        ;; Asks: best→worst (lowest→highest). Lowest price = best ask.
+        display-asks (sort-by (comp js/parseFloat :px) < raw-asks)
+        ;; Bids: best→worst (highest→lowest). Highest price = best bid.  
+        display-bids (sort-by (comp js/parseFloat :px) > raw-bids)
+        
+        ;; Calculate cumulative totals in display order
+        asks-with-totals (calculate-cumulative-totals display-asks)
+        bids-with-totals (calculate-cumulative-totals display-bids)
+        
+        ;; Get best prices for spread calculation
+        best-bid (first display-bids)
+        best-ask (first display-asks)  ; first because asks go best→worst now
         spread (calculate-spread best-bid best-ask)
-        asks-with-totals (calculate-cumulative-totals asks)
-        bids-with-totals (calculate-cumulative-totals bids)
-        max-ask-size (get-max-size asks)
-        max-bid-size (get-max-size bids)
+        
+        ;; Calculate max size for bar width
+        max-ask-size (get-max-size display-asks)
+        max-bid-size (get-max-size display-bids)
         max-size (max (or max-ask-size 0) (or max-bid-size 0))]
     [:div.bg-gray-900.rounded-lg.border.border-gray-700.overflow-hidden
      ;; Header
@@ -132,9 +157,9 @@
      ;; Column headers
      (column-headers)
      
-     ;; Asks (sell orders) - top section
+     ;; Asks (sell orders) - top section, rendered worst→best (reversed for display)
      [:div
-      (for [ask asks-with-totals]
+      (for [ask (reverse asks-with-totals)]
         ^{:key (str "ask-" (:px ask))}
         (order-row ask max-size true))]
      
@@ -142,7 +167,7 @@
      (when spread
        (spread-row spread))
      
-     ;; Bids (buy orders) - bottom section
+     ;; Bids (buy orders) - bottom section, rendered best→worst
      [:div
       (for [bid bids-with-totals]
         ^{:key (str "bid-" (:px bid))}
