@@ -6,7 +6,7 @@
   (when price
     (let [num-price (if (string? price) (js/parseFloat price) price)]
       (when (and num-price (number? num-price) (not (js/isNaN num-price)))
-        (.toFixed num-price decimals)))))
+        (.toLocaleString (js/Number. num-price) "en-US" #js {:minimumFractionDigits decimals :maximumFractionDigits decimals})))))
 
 (defn format-size [size]
   (when size
@@ -14,11 +14,11 @@
       (when (and num-size (number? num-size) (not (js/isNaN num-size)))
         (.toLocaleString (js/Number. num-size) "en-US" #js {:maximumFractionDigits 0})))))
 
-(defn format-total [total]
+(defn format-total [total & {:keys [decimals] :or {decimals 0}}]
   (when total
     (let [num-total (if (string? total) (js/parseFloat total) total)]
       (when (and num-total (number? num-total) (not (js/isNaN num-total)))
-        (.toLocaleString (js/Number. num-total) "en-US" #js {:maximumFractionDigits 0})))))
+        (.toLocaleString (js/Number. num-total) "en-US" #js {:maximumFractionDigits decimals})))))
 
 (defn calculate-spread [best-bid best-ask]
   (when (and best-bid best-ask)
@@ -76,11 +76,11 @@
      ;; Content
      [:div.flex.w-full.items-center.justify-between.px-3.relative.z-10
       [:div.text-right.flex-1
-       [:span {:class [text-color]} (or (format-price price 6) "0.000000")]]
+       [:span {:class [text-color]} (or (format-price price 2) "0.000000")]]
       [:div.text-right.flex-1
-       [:span {:class [text-color]} (or (format-size size) "0")]]
+       [:span {:class [text-color]} (or size "0")]]
       [:div.text-right.flex-1
-       [:span {:class [text-color]} (or (format-total total) "0")]]]]))
+       [:span {:class [text-color]} (or (format-total total :decimals 8) "0")]]]]))
 
 ;; Spread component
 (defn spread-row [spread]

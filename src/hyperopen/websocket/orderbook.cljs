@@ -41,14 +41,14 @@
             ;; Update local state
             (swap! orderbook-state assoc-in [:books coin] 
                    {:bids (vec (sort-by :px > bids))  ; Sort bids highest to lowest
-                    :asks (vec (sort-by :px < asks))  ; Sort asks lowest to highest
+                    :asks (vec (sort-by :px > asks))  ; Sort asks highest to lowest
                     :timestamp (:time book-data)})
             ;; Update app store
             (when store
               (js/setTimeout 
                 #(swap! store assoc-in [:orderbooks coin] 
                         {:bids (vec (sort-by :px > bids))
-                         :asks (vec (sort-by :px < asks))
+                         :asks (vec (sort-by :px > asks))
                          :timestamp (:time book-data)})
                 0))
             (println "Updated order book for" coin 
@@ -67,7 +67,7 @@
               asks (second levels)] ; Second array is asks
           (swap! orderbook-state assoc-in [:books coin] 
                  {:bids (vec (sort-by :px > bids))  ; Sort bids highest to lowest
-                  :asks (vec (sort-by :px < asks))  ; Sort asks lowest to highest
+                  :asks (vec (sort-by :px > asks))  ; Sort asks highest to lowest
                   :timestamp (:time book-data)})
           (println "Updated order book for" coin 
                    "- Bids:" (count bids) "Asks:" (count asks)))))))
