@@ -5,28 +5,37 @@
 ;; Pure presentation components
 
 (defn get-available-assets [state]
-  "Get list of available assets from either asset contexts or active assets"
-  (let [asset-contexts (:asset-contexts state)
-        active-assets (get-in state [:active-assets :contexts])]
-    ;; Combine data from both sources, preferring active asset data
-    (->> (concat (keys asset-contexts) (keys active-assets))
-         (distinct)
+  "Get list of available assets from asset contexts"
+  (let [asset-contexts (:asset-contexts state)]
+    (->> (keys asset-contexts)
          (map (fn [coin-key]
                 (let [coin (name coin-key)
-                      active-data (get active-assets coin-key)
                       context-data (get asset-contexts coin-key)]
-                  (merge
-                    {:coin coin
-                     :mark 0.0
-                     :volume24h 0.0
-                     :change24h 0.0
-                     :change24hPct 0.0}
-                    (when context-data
-                      {:funding (:funding context-data)
-                       :info (:info context-data)})
-                    (when active-data
-                      (select-keys active-data [:mark :volume24h :change24h :change24hPct]))))))
-         (filter #(not (nil? (:coin %)))))))
+                  (when context-data
+                    (let [funding (:funding context-data)
+                          mark-px (js/parseFloat (:markPx funding))
+                          prev-day-px (js/parseFloat (:prevDayPx funding))
+                          day-ntl-vlm (js/parseFloat (:dayNtlVlm funding))
+                          open-interest (js/parseFloat (:openInterest funding))
+                          funding-rate (js/parseFloat (:funding funding))
+                          ;; Calculate 24h change
+                          change-24h (when (and mark-px prev-day-px)
+                                      (- mark-px prev-day-px))
+                          change-24h-pct (when (and change-24h prev-day-px (not= prev-day-px 0))
+                                          (* 100 (/ change-24h prev-day-px)))
+                          ;; Calculate open interest in USD
+                          open-interest-usd (when (and open-interest mark-px)
+                                             (* open-interest mark-px))]
+                      {:coin coin
+                       :mark mark-px
+                       :volume24h day-ntl-vlm
+                       :change24h change-24h
+                       :change24hPct change-24h-pct
+                       :openInterest open-interest-usd
+                       :fundingRate funding-rate
+                       :funding funding
+                       :info (:info context-data)})))))
+         (filter #(not (nil? %))))))
 
 (defn format-number [n decimals]
   (when (and n (number? n))
