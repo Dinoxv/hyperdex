@@ -30,6 +30,7 @@
   (swap! store assoc-in [:active-assets :loading] true))
 
 (defn subscribe-orderbook [_ store coin]
+  (println "Subscribing to orderbook for:" coin)
   (orderbook/subscribe-orderbook! coin))
 
 ;; Actions - pure functions that return effects
@@ -51,6 +52,7 @@
 (nxr/register-effect! :effects/save save)
 (nxr/register-effect! :effects/init-websocket init-websocket)
 (nxr/register-effect! :effects/subscribe-active-asset subscribe-active-asset)
+(nxr/register-effect! :effects/subscribe-orderbook subscribe-orderbook)
 (nxr/register-action! :actions/increment-count increment-count)
 (nxr/register-action! :actions/init-websockets init-websockets)
 (nxr/register-action! :actions/subscribe-to-asset subscribe-to-asset)
