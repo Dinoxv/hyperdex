@@ -29,7 +29,7 @@
 ;; Create a handler function that has access to the store
 (defn create-orderbook-data-handler [store]
   (fn [data]
-    (println "Processing order book data:" data)
+    ;;(println "Processing order book data:" data)
     (when (and (map? data) (= (:channel data) "l2Book"))
       (let [book-data (:data data)
             coin (:coin book-data)
@@ -46,31 +46,12 @@
             ;; Update app store
             (when store
               (js/setTimeout 
-                #(swap! store assoc-in [:orderbooks coin] 
-                        {:bids (vec (sort-by :px > bids))
-                         :asks (vec (sort-by :px > asks))
-                         :timestamp (:time book-data)})
-                0))
-            (println "Updated order book for" coin 
-                     "- Bids:" (count bids) "Asks:" (count asks))))))))
-
-;; Handle incoming order book data (legacy function)
-(defn handle-orderbook-data! [data]
-  (println "Processing order book data:" data)
-  (when (and (map? data) (= (:channel data) "l2Book"))
-    (let [book-data (:data data)
-          coin (:coin book-data)
-          levels (:levels book-data)]
-      (when (and coin levels (>= (count levels) 2))
-        ;; Hyperliquid l2Book format: levels = [bids_array, asks_array]
-        (let [bids (first levels)   ; First array is bids
-              asks (second levels)] ; Second array is asks
-          (swap! orderbook-state assoc-in [:books coin] 
-                 {:bids (vec (sort-by :px > bids))  ; Sort bids highest to lowest
-                  :asks (vec (sort-by :px > asks))  ; Sort asks highest to lowest
-                  :timestamp (:time book-data)})
-          (println "Updated order book for" coin 
-                   "- Bids:" (count bids) "Asks:" (count asks)))))))
+               #(swap! store assoc-in [:orderbooks coin] 
+                       {:bids (vec (sort-by :px > bids))
+                        :asks (vec (sort-by :px > asks))
+                        :timestamp (:time book-data)})
+               0))
+            ))))))
 
 ;; Get current subscriptions
 (defn get-subscriptions []
