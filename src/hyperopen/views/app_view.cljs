@@ -29,7 +29,7 @@
     
     ;; Active Assets Panel
     [:div
-     (active-asset-view/active-asset-view (:active-assets state))]
+     (active-asset-view/active-asset-view state)]
     
     ;; L2 Order Book Panel
     [:div.flex.justify-center

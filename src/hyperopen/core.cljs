@@ -14,7 +14,11 @@
                       :websocket {:status :disconnected}
                       :active-assets {:contexts {}
                                      :loading false}
-                      :orderbooks {}}))
+                      :orderbooks {}
+                      :asset-selector {:visible-dropdown nil
+                                      :search-term ""
+                      				  :sort-by :name
+                      				  :sort-direction :asc}}))
 
 ;; Effects - handle side effects
 (defn save [_ store path value]
@@ -47,6 +51,31 @@
   [[:effects/subscribe-active-asset coin]
    [:effects/subscribe-orderbook coin]])
 
+(defn toggle-asset-dropdown [state coin]
+  (let [current-dropdown (get-in state [:asset-selector :visible-dropdown])]
+    [[:effects/save [:asset-selector :visible-dropdown] 
+      (if (= current-dropdown coin) nil coin)]]))
+
+(defn close-asset-dropdown [state]
+  [[:effects/save [:asset-selector :visible-dropdown] nil]])
+
+(defn select-asset [state coin]
+  [[:effects/save [:selected-asset] coin]
+   [:effects/save [:asset-selector :visible-dropdown] nil]])
+
+(defn update-asset-search [state event]
+  (let [search-term (get-in event [:target :value] "")]
+    [[:effects/save [:asset-selector :search-term] search-term]]))
+
+(defn update-asset-sort [state sort-field]
+  (let [current-sort (get-in state [:asset-selector :sort-by])
+        current-direction (get-in state [:asset-selector :sort-direction] :asc)
+        new-direction (if (= current-sort sort-field)
+                       (if (= current-direction :asc) :desc :asc)
+                       :asc)]
+    [[:effects/save [:asset-selector :sort-by] sort-field]
+     [:effects/save [:asset-selector :sort-direction] new-direction]]))
+
 
 
 
@@ -59,6 +88,11 @@
 (nxr/register-action! :actions/increment-count increment-count)
 (nxr/register-action! :actions/init-websockets init-websockets)
 (nxr/register-action! :actions/subscribe-to-asset subscribe-to-asset)
+(nxr/register-action! :actions/toggle-asset-dropdown toggle-asset-dropdown)
+(nxr/register-action! :actions/close-asset-dropdown close-asset-dropdown)
+(nxr/register-action! :actions/select-asset select-asset)
+(nxr/register-action! :actions/update-asset-search update-asset-search)
+(nxr/register-action! :actions/update-asset-sort update-asset-sort)
 (nxr/register-system->state! deref)
 
 ;; Wire up the render loop
