@@ -1,7 +1,7 @@
 (ns hyperopen.core
   (:require [replicant.dom :as r]
             [nexus.registry :as nxr]
-            [hyperopen.views.active-asset-view :as active-asset-view]
+            [hyperopen.views.app-view :as app-view]
             [hyperopen.websocket.active-asset-ctx :as active-ctx]
             [hyperopen.websocket.client :as ws-client]))
 
@@ -39,42 +39,7 @@
 
 
 
-;; Pure component - uses actions directly in event handlers
-(defn app-view [state]
-  [:div.min-h-screen.bg-base-100.p-8
-   [:div.max-w-7xl.mx-auto.space-y-8
-    ;; Header
-    [:div.text-center.space-y-4
-     [:h1.text-4xl.font-bold.text-primary (:title state)]
-     [:p.text-lg.text-base-content.opacity-80 (:message state)]]
-    
-    ;; Controls
-    [:div.flex.justify-center.space-x-4
-     [:button.btn.btn-primary
-      {:on {:click [[:actions/init-websockets]]}}
-      "Connect WebSocket"]
-     [:button.btn.btn-secondary
-      {:on {:click [[:actions/subscribe-to-asset "BTC"]]}}
-      "Subscribe to BTC"]
-     [:button.btn.btn-secondary
-      {:on {:click [[:actions/subscribe-to-asset "ETH"]]}}
-      "Subscribe to ETH"]]
-    
-    ;; WebSocket Status
-    [:div.text-center
-     [:p.text-sm "WebSocket Status: " 
-      [:span.badge.badge-info (name (get-in state [:websocket :status] :disconnected))]]]
-    
-    ;; Active Assets Panel
-    [:div
-     (active-asset-view/active-asset-view (:active-assets state))]
-    
-    ;; Demo Counter Card
-    [:div.card.bg-base-200.shadow-xl.p-6.max-w-md.mx-auto
-     [:p.text-xl.mb-4 "You clicked " (:count state) " times"]
-     [:button.btn.btn-primary.btn-lg
-      {:on {:click [[:actions/increment-count]]}}
-      "Click me!"]]]])
+
 
 ;; Register effects and actions
 (nxr/register-effect! :effects/save save)
@@ -87,7 +52,7 @@
 
 ;; Wire up the render loop
 (r/set-dispatch! #(nxr/dispatch store %1 %2))
-(add-watch store ::render #(r/render (.getElementById js/document "app") (app-view %4)))
+(add-watch store ::render #(r/render (.getElementById js/document "app") (app-view/app-view %4)))
 
 ;; Watch for WebSocket connection status changes
 (add-watch ws-client/connection-state ::ws-status
@@ -96,7 +61,7 @@
 
 (defn reload []
   (println "Reloading Hyperopen...")
-  (r/render (.getElementById js/document "app") (app-view @store)))
+  (r/render (.getElementById js/document "app") (app-view/app-view @store)))
 
 (defn init []
   (println "Initializing Hyperopen...")
