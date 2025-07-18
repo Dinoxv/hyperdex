@@ -34,13 +34,14 @@
     ;; L2 Order Book Panel
     [:div.flex.justify-center
      (let [active-coins (keys (:contexts (:active-assets state)))
-           first-active-coin (first active-coins)
-           orderbook-data (when first-active-coin 
-                           (get-in state [:orderbooks first-active-coin]))]
+           available-orderbook-coins (keys (:orderbooks state))
+           display-coin (or (first active-coins) (first available-orderbook-coins))
+           orderbook-data (when display-coin 
+                           (get-in state [:orderbooks display-coin]))]
        (l2-orderbook-view/l2-orderbook-view 
-         {:coin (or first-active-coin "No Asset Selected")
+         {:coin (or display-coin "No Asset Selected")
           :orderbook orderbook-data
-          :loading (and first-active-coin (nil? orderbook-data))}))]
+          :loading (and display-coin (nil? orderbook-data))}))]
     
     ;; Demo Counter Card
     [:div.card.bg-base-200.shadow-xl.p-6.max-w-md.mx-auto

@@ -3,25 +3,34 @@
 
 ;; Utility functions for formatting
 (defn format-price [price decimals]
-  (when (and price (number? price))
-    (.toFixed price decimals)))
+  (when price
+    (let [num-price (if (string? price) (js/parseFloat price) price)]
+      (when (and num-price (number? num-price) (not (js/isNaN num-price)))
+        (.toFixed num-price decimals)))))
 
 (defn format-size [size]
-  (when (and size (number? size))
-    (.toLocaleString (js/Number. size) "en-US" #js {:maximumFractionDigits 0})))
+  (when size
+    (let [num-size (if (string? size) (js/parseFloat size) size)]
+      (when (and num-size (number? num-size) (not (js/isNaN num-size)))
+        (.toLocaleString (js/Number. num-size) "en-US" #js {:maximumFractionDigits 0})))))
 
 (defn format-total [total]
-  (when (and total (number? total))
-    (.toLocaleString (js/Number. total) "en-US" #js {:maximumFractionDigits 0})))
+  (when total
+    (let [num-total (if (string? total) (js/parseFloat total) total)]
+      (when (and num-total (number? num-total) (not (js/isNaN num-total)))
+        (.toLocaleString (js/Number. num-total) "en-US" #js {:maximumFractionDigits 0})))))
 
 (defn calculate-spread [best-bid best-ask]
   (when (and best-bid best-ask)
-    (let [bid-price (:px best-bid)
-          ask-price (:px best-ask)
-          spread-abs (- ask-price bid-price)
-          spread-pct (* (/ spread-abs bid-price) 100)]
-      {:absolute spread-abs
-       :percentage spread-pct})))
+    (let [bid-price (let [px (:px best-bid)]
+                     (if (string? px) (js/parseFloat px) px))
+          ask-price (let [px (:px best-ask)]
+                     (if (string? px) (js/parseFloat px) px))]
+      (when (and bid-price ask-price (number? bid-price) (number? ask-price))
+        (let [spread-abs (- ask-price bid-price)
+              spread-pct (* (/ spread-abs bid-price) 100)]
+          {:absolute spread-abs
+           :percentage spread-pct})))))
 
 (defn calculate-cumulative-totals [orders]
   (loop [orders orders
@@ -30,18 +39,25 @@
     (if (empty? orders)
       result
       (let [order (first orders)
-            new-total (+ total (:sz order))]
+            size (:sz order)
+            num-size (if (string? size) (js/parseFloat size) size)
+            new-total (+ total (or num-size 0))]
         (recur (rest orders)
                new-total
                (conj result (assoc order :total new-total)))))))
 
 (defn get-max-size [orders]
   (when (seq orders)
-    (apply max (map :sz orders))))
+    (apply max (map (fn [order]
+                     (let [size (:sz order)]
+                       (if (string? size) (js/parseFloat size) size)))
+                   orders))))
 
 (defn size-bar-width [size max-size]
   (when (and size max-size (> max-size 0))
-    (* (/ size max-size) 100)))
+    (let [num-size (if (string? size) (js/parseFloat size) size)]
+      (when (and num-size (number? num-size))
+        (* (/ num-size max-size) 100)))))
 
 ;; Component for individual order row
 (defn order-row [order max-size is-ask?]
@@ -94,9 +110,9 @@
    [:div.text-right.flex-1
     [:span.text-gray-400.text-xs "Price"]]
    [:div.text-right.flex-1
-    [:span.text-gray-400.text-xs "Size (PUMP)"]]
+    [:span.text-gray-400.text-xs "Size"]]
    [:div.text-right.flex-1
-    [:span.text-gray-400.text-xs "Total (PUMP)"]]])
+    [:span.text-gray-400.text-xs "Total"]]])
 
 ;; Main order book component
 (defn l2-orderbook-panel [coin orderbook-data]
