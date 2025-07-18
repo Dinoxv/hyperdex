@@ -4,7 +4,8 @@
             [hyperopen.views.app-view :as app-view]
             [hyperopen.websocket.active-asset-ctx :as active-ctx]
             [hyperopen.websocket.client :as ws-client]
-            [hyperopen.websocket.orderbook :as orderbook]))
+            [hyperopen.websocket.orderbook :as orderbook]
+            [hyperopen.api :as api]))
 
 ;; App state
 (defonce store (atom {:title "Hyperopen"
@@ -18,6 +19,8 @@
 ;; Effects - handle side effects
 (defn save [_ store path value]
   (swap! store assoc-in path value))
+
+
 
 (defn init-websocket [_ store]
   (println "Initializing WebSocket connection...")
@@ -77,5 +80,7 @@
   (active-ctx/init! store)
   ;; Initialize orderbook module
   (orderbook/init! store)
+  ;; Fetch initial market data
+  (api/fetch-asset-contexts! store)
   ;; Trigger initial render by updating the store
   (swap! store identity)) 
