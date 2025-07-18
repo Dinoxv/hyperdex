@@ -66,23 +66,26 @@
                        (if (string? size) (js/parseFloat size) size)))
                    orders))))
 
-(defn size-bar-width [size max-size]
-  (when (and size max-size (> max-size 0))
-    (let [num-size (if (string? size) (js/parseFloat size) size)]
-      (when (and num-size (number? num-size))
-        (* (/ num-size max-size) 100)))))
+(defn get-max-cumulative-size [orders]
+  (when (seq orders)
+    (apply max (map :cum-size orders))))
+
+(defn cumulative-bar-width [cum-size max-cum-size]
+  (when (and cum-size max-cum-size (> max-cum-size 0))
+    (* (/ cum-size max-cum-size) 100)))
 
 ;; Component for individual order row
-(defn order-row [order max-size is-ask?]
+(defn order-row [order max-cum-size is-ask?]
   (let [price (:px order)
         size (:sz order)
         cum-size (:cum-size order)
-        bar-width (size-bar-width size max-size)
+        bar-width (cumulative-bar-width cum-size max-cum-size)
         bar-color (if is-ask? "bg-red-500/30" "bg-green-500/30")
-        text-color (if is-ask? "text-red-400" "text-green-400")]
+        text-color (if is-ask? "text-red-400" "text-green-400")
+        bar-alignment (if is-ask? "justify-end" "justify-start")]
     [:div.flex.items-center.h-8.relative.bg-gray-900
-     ;; Size bar background
-     [:div.absolute.inset-0.flex.items-center
+     ;; Size bar background - positioned based on ask/bid
+     [:div.absolute.inset-0.flex.items-center {:class [bar-alignment]}
       [:div {:class ["h-full" bar-color]
              :style {:width (str bar-width "%")}}]]
      ;; Content
@@ -147,9 +150,9 @@
         spread (calculate-spread best-bid best-ask)
         
         ;; Calculate max size for bar width
-        max-ask-size (get-max-size display-asks)
-        max-bid-size (get-max-size display-bids)
-        max-size (max (or max-ask-size 0) (or max-bid-size 0))]
+        max-ask-cum-size (get-max-cumulative-size asks-with-totals)
+        max-bid-cum-size (get-max-cumulative-size bids-with-totals)
+        max-cum-size (max (or max-ask-cum-size 0) (or max-bid-cum-size 0))]
     [:div.bg-gray-900.rounded-lg.border.border-gray-700.overflow-hidden
      ;; Header
      (orderbook-header coin "0.000001")
@@ -161,7 +164,7 @@
      [:div
       (for [ask (reverse asks-with-totals)]
         ^{:key (str "ask-" (:px ask))}
-        (order-row ask max-size true))]
+        (order-row ask max-cum-size true))]
      
      ;; Spread - middle section
      (when spread
@@ -171,7 +174,7 @@
      [:div
       (for [bid bids-with-totals]
         ^{:key (str "bid-" (:px bid))}
-        (order-row bid max-size false))]]))
+        (order-row bid max-cum-size false))]]))
 
 ;; Empty state
 (defn empty-orderbook []
