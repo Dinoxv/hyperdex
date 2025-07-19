@@ -1,4 +1,5 @@
-(ns hyperopen.views.asset-selector-view)
+(ns hyperopen.views.asset-selector-view
+  (:require [clojure.string :as str]))
 
 ;; Asset selector dropdown component
 
@@ -112,6 +113,34 @@
    [:svg.w-4.h-4.text-gray-400 {:fill "none" :stroke "currentColor" :viewBox "0 0 24 24"}
     [:path {:stroke-linecap "round" :stroke-linejoin "round" :stroke-width 2 :d "M6 18L18 6M6 6l12 12"}]]])
 
+(defn safe-number [value]
+  "Convert value to number, handling NaN and nil cases"
+  (let [num (if (number? value) value (js/parseFloat value))]
+    (if (js/isNaN num) 0 num)))
+
+(defn filter-and-sort-assets [assets search-term sort-by sort-direction]
+  "Apply search filtering and sorting to assets list"
+  (let [;; Filter by search term
+        filtered-assets (if (and search-term (not (str/blank? search-term)))
+                         (filter #(str/includes? 
+                                   (str/lower-case (:coin %))
+                                   (str/lower-case search-term))
+                                 assets)
+                         assets)
+        ;; Sort by the selected field using explicit comparison functions
+        sorted-assets (case sort-by
+                       :name (sort-by :coin filtered-assets)
+                       :price (sort #(< (safe-number (:mark %1)) (safe-number (:mark %2))) filtered-assets)
+                       :volume (sort #(< (safe-number (:volume24h %1)) (safe-number (:volume24h %2))) filtered-assets)
+                       :change (sort #(< (safe-number (:change24hPct %1)) (safe-number (:change24hPct %2))) filtered-assets)
+                       :openInterest (sort #(< (safe-number (:openInterest %1)) (safe-number (:openInterest %2))) filtered-assets)
+                       :funding (sort #(< (safe-number (:fundingRate %1)) (safe-number (:fundingRate %2))) filtered-assets)
+                       filtered-assets)]
+    ;; Apply sort direction
+    (if (= sort-direction :desc)
+      (reverse sorted-assets)
+      sorted-assets)))
+
 (defn asset-selector-dropdown 
   "Asset selector dropdown component
    Props:
@@ -123,15 +152,16 @@
    - :sort-direction - :asc or :desc"
   [{:keys [visible? assets selected-asset search-term sort-by sort-direction]}]
   (when visible?
-    [:div.absolute.top-full.left-0.mt-2.bg-base-100.border.border-base-300.rounded-lg.shadow-lg.z-50 {:style {:width "800px"}}
-     (close-button)
-     [:div.p-4
-      [:div.mb-4
-       [:h3.text-lg.font-semibold.mb-2 "Select Asset"]
-       (search-input search-term)
-       [:div.border-b.border-base-300.mt-3.mb-3]]
-      (sort-controls sort-by sort-direction)
-      (asset-list assets selected-asset)]]))
+    (let [processed-assets (filter-and-sort-assets assets search-term sort-by sort-direction)]
+      [:div.absolute.top-full.left-0.mt-2.bg-base-100.border.border-base-300.rounded-lg.shadow-lg.z-50 {:style {:width "800px"}}
+       (close-button)
+       [:div.p-4
+        [:div.mb-4
+         [:h3.text-lg.font-semibold.mb-2 "Select Asset"]
+         (search-input search-term)
+         [:div.border-b.border-base-300.mt-3.mb-3]]
+        (sort-controls sort-by sort-direction)
+        (asset-list processed-assets selected-asset)]])))
 
 ;; Wrapper component that can be used in active-asset-view
 (defn asset-selector-wrapper [props]

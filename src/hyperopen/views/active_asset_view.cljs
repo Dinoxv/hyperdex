@@ -236,5 +236,8 @@
   (let [active-assets (:active-assets state)
         contexts (:contexts active-assets)
         loading? (:loading active-assets)
-        dropdown-state (get-in state [:asset-selector] {:visible-dropdown nil})]
+        dropdown-state (get-in state [:asset-selector] {:visible-dropdown nil
+                                                         :search-term ""
+                                                         :sort-by :name
+                                                         :sort-direction :asc})]
     (active-asset-panel contexts loading? dropdown-state state))) 
