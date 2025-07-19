@@ -30,12 +30,19 @@
         [:path {:stroke-linecap "round" :stroke-linejoin "round" :stroke-width 2 :d "M19 9l-7 7-7-7"}])])])
 
 (defn sort-controls [sort-by sort-direction]
-  [:div.flex.items-center.space-x-2.mb-4.border-b.border-base-300.pb-3
-   [:span.text-xs.text-gray-400 "Sort by:"]
-   (sort-button "Name" (= sort-by :name) sort-direction :name)
-   (sort-button "Price" (= sort-by :price) sort-direction :price)
-   (sort-button "Volume" (= sort-by :volume) sort-direction :volume)
-   (sort-button "Change" (= sort-by :change) sort-direction :change)])
+  [:div.grid.grid-cols-10.gap-4.items-center.px-4.mb-4
+   ;; Name column (3 cols to match Icon + Symbol)
+   [:div.col-span-3.justify-items-center
+    (sort-button "Name" (= sort-by :name) sort-direction :name)]
+   ;; Price column (2 cols)
+   [:div.col-span-2.justify-items-center
+    (sort-button "Price" (= sort-by :price) sort-direction :price)]
+   ;; Volume column (2 cols)
+   [:div.col-span-2.justify-items-center
+    (sort-button "Volume" (= sort-by :volume) sort-direction :volume)]
+   ;; Change column (3 cols)
+   [:div.col-span-3.justify-items-center
+    (sort-button "Change" (= sort-by :change) sort-direction :change)]])
 
 (defn asset-list-item [asset selected?]
   (let [{:keys [coin mark volume24h change24h change24hPct]} asset
@@ -45,17 +52,19 @@
         safe-change-pct (or change24hPct 0)
         is-positive (>= safe-change 0)
         change-color (if is-positive "text-success" "text-error")]
-    [:div.flex.items-center.justify-between.px-3.py-2.cursor-pointer.rounded.hover:bg-base-200.transition-colors
+    [:div.grid.grid-cols-10.gap-4.items-center.px-4.py-2.cursor-pointer.rounded.hover:bg-base-200.transition-colors
      {:class (when selected? ["bg-primary" "bg-opacity-10" "border" "border-primary"])
       :on {:click [[:actions/select-asset coin]]}}
-     ;; Left side: Icon + Symbol + Price
-     [:div.flex.items-center.space-x-3.flex-1
+     ;; Icon + Symbol (3 cols)
+     [:div.col-span-3.flex.items-center.space-x-3
       [:img.w-6.h-6.rounded-full {:src (str "https://app.hyperliquid.xyz/coins/" coin ".svg") :alt coin}]
-      [:div.font-medium.text-sm coin]
-      [:div.text-xs.text-gray-400 (str "$" (safe-to-fixed safe-mark 2))]]
-     ;; Right side: Volume + Change
-     [:div.flex.items-center.space-x-4.text-right
-      [:div.text-sm.font-medium (str "$" (safe-to-fixed safe-volume 0))]
+      [:div.font-medium.text-sm coin]]
+     ;; Price (2 cols)
+     [:div.col-span-2.text-sm.text-gray-400 (str "$" (safe-to-fixed safe-mark 2))]
+     ;; Volume (2 cols)
+     [:div.col-span-2.text-sm.font-medium.text-right (str "$" (safe-to-fixed safe-volume 0))]
+     ;; Change (3 cols)
+     [:div.col-span-3.text-right
       [:div {:class [change-color "text-sm"]}
        (str (if is-positive "+" "") (safe-to-fixed safe-change 2) " (" (safe-to-fixed safe-change-pct 2) "%)")]]]))
 
@@ -86,12 +95,13 @@
    - :sort-direction - :asc or :desc"
   [{:keys [visible? assets selected-asset search-term sort-by sort-direction]}]
   (when visible?
-    [:div.absolute.top-full.left-0.mt-2.bg-base-100.border.border-base-300.rounded-lg.shadow-lg.z-50.w-96
+    [:div.absolute.top-full.left-0.mt-2.bg-base-100.border.border-base-300.rounded-lg.shadow-lg.z-50 {:style {:width "600px"}}
      (close-button)
      [:div.p-4
       [:div.mb-4
        [:h3.text-lg.font-semibold.mb-2 "Select Asset"]
-       (search-input search-term)]
+       (search-input search-term)
+       [:div.border-b.border-base-300.mt-3.mb-3]]
       (sort-controls sort-by sort-direction)
       (asset-list assets selected-asset)]]))
 
