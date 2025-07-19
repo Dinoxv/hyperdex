@@ -64,13 +64,14 @@
     (sort-button "Funding" (= sort-by :funding) sort-direction :funding)]])
 
 (defn asset-list-item [asset selected?]
-  (let [{:keys [coin mark volume24h change24h change24hPct openInterest fundingRate]} asset
+  (let [{:keys [coin mark volume24h change24h change24hPct openInterest fundingRate info]} asset
         safe-mark (or mark 0)
         safe-volume (or volume24h 0)
         safe-change (or change24h 0)
         safe-change-pct (or change24hPct 0)
         safe-open-interest (or openInterest 0)
         safe-funding-rate (or fundingRate 0)
+        max-leverage (get-in info [:maxLeverage] 0)
         is-positive (>= safe-change 0)
         change-color (if is-positive "text-success" "text-error")
         funding-positive (>= safe-funding-rate 0)
@@ -78,10 +79,14 @@
     [:div.grid.grid-cols-12.gap-3.items-center.px-4.py-2.cursor-pointer.rounded.hover:bg-base-200.transition-colors
      {:class (when selected? ["bg-primary" "bg-opacity-10" "border" "border-primary"])
       :on {:click [[:actions/select-asset coin]]}}
-     ;; Icon + Symbol (2 cols)
+     ;; Icon + Symbol + Leverage (2 cols)
      [:div.col-span-2.flex.items-center.space-x-2
       [:img.w-5.h-5.rounded-full {:src (str "https://app.hyperliquid.xyz/coins/" coin ".svg") :alt coin}]
-      [:div.font-medium.text-sm coin]]
+      [:div.flex.items-center.space-x-2
+       [:div.font-medium.text-sm coin]
+               (when (and max-leverage (> max-leverage 0))
+          [:span.px-2.py-0.5.text-xs.font-medium.bg-primary.text-primary-content.rounded
+           (str max-leverage "x")])]]
      ;; Price (2 cols)
      [:div.col-span-2.text-sm.text-gray-400.text-center (str "$" (safe-to-fixed safe-mark 2))]
      ;; Volume (2 cols)
