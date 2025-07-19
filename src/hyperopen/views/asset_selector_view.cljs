@@ -45,17 +45,18 @@
         safe-change-pct (or change24hPct 0)
         is-positive (>= safe-change 0)
         change-color (if is-positive "text-success" "text-error")]
-    [:div.flex.items-center.justify-between.p-3.cursor-pointer.rounded.hover:bg-base-200.transition-colors
+    [:div.flex.items-center.justify-between.px-3.py-2.cursor-pointer.rounded.hover:bg-base-200.transition-colors
      {:class (when selected? ["bg-primary" "bg-opacity-10" "border" "border-primary"])
       :on {:click [[:actions/select-asset coin]]}}
-     [:div.flex.items-center.space-x-3
+     ;; Left side: Icon + Symbol + Price
+     [:div.flex.items-center.space-x-3.flex-1
       [:img.w-6.h-6.rounded-full {:src (str "https://app.hyperliquid.xyz/coins/" coin ".svg") :alt coin}]
-      [:div
-       [:div.font-medium.text-sm coin]
-       [:div.text-xs.text-gray-400 (str "$" (safe-to-fixed safe-mark 2))]]]
-     [:div.text-right
+      [:div.font-medium.text-sm coin]
+      [:div.text-xs.text-gray-400 (str "$" (safe-to-fixed safe-mark 2))]]
+     ;; Right side: Volume + Change
+     [:div.flex.items-center.space-x-4.text-right
       [:div.text-sm.font-medium (str "$" (safe-to-fixed safe-volume 0))]
-      [:div {:class [change-color "text-xs"]}
+      [:div {:class [change-color "text-sm"]}
        (str (if is-positive "+" "") (safe-to-fixed safe-change 2) " (" (safe-to-fixed safe-change-pct 2) "%)")]]]))
 
 (defn asset-list [assets selected-asset]

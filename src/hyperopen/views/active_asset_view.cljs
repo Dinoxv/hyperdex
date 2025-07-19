@@ -124,10 +124,10 @@
   (let [underlined? (:underlined options)
         value-component (if (:change? options)
                          (change-indicator (:change-value options) (:change-pct options))
-                         [:span value])]
-    [:div.flex.flex-col.space-y-1
-     [:span.text-xs.text-gray-400 {:class (when underlined? ["border-b" "border-dashed" "border-gray-600"])} label]
-     [:div.text-sm.font-medium value-component]]))
+                         [:span.font-medium value])]
+    [:div.text-center
+     [:div.text-xs.text-gray-400.mb-1 {:class (when underlined? ["border-b" "border-dashed" "border-gray-600"])} label]
+     [:div.text-sm value-component]]))
 
 (defn active-asset-row [ctx-data dropdown-state full-state]
   (let [coin (:coin ctx-data)
@@ -140,10 +140,10 @@
         open-interest-usd (format-currency (* open-interest mark))
         funding-rate (:fundingRate ctx-data)
         dropdown-visible? (= (:visible-dropdown dropdown-state) coin)]
-    [:div.relative.flex.items-center.justify-between.p-4.bg-base-200.rounded-lg.border.border-base-300
-     [:div.flex-1.flex.items-center.space-x-6
+    [:div.relative.flex.items-center.justify-between.px-4.py-2.bg-base-200.rounded-lg.border.border-base-300
+     [:div.flex.items-center.space-x-4.w-full
       ;; Asset/Pair column
-      [:div.flex-0.relative
+      [:div.flex-shrink-0.relative.w-20
        (asset-icon coin dropdown-visible?)
        ;; Asset Selector Dropdown
        (when dropdown-visible?
@@ -156,15 +156,15 @@
             :sort-direction (:sort-direction dropdown-state :asc)}))]
       
       ;; Mark column
-      [:div.flex-0
+      [:div.flex-shrink-0.w-24
        (data-column "Mark" (format-currency mark) {:underlined true})]
       
       ;; Oracle column
-      [:div.flex-0
+      [:div.flex-shrink-0.w-24
        (data-column "Oracle" (format-currency oracle) {:underlined true})]
       
       ;; 24h Change column
-      [:div.flex-3
+      [:div.flex-shrink-0.w-32
        (data-column "24h Change" 
                     nil
                     {:change? true
@@ -172,18 +172,18 @@
                      :change-pct change-24h-pct})]
       
       ;; 24h Volume column
-      [:div.flex-0
+      [:div.flex-shrink-0.w-28
        (data-column "24h Volume" (format-currency volume-24h))]
       
       ;; Open Interest column
-      [:div.flex-0
+      [:div.flex-shrink-0.w-32
        (data-column "Open Interest" open-interest-usd {:underlined true})]
       
       ;; Funding / Countdown column
-      [:div.flex-1
-       [:div.flex.flex-col.space-y-1
-        [:span.text-xs.text-gray-400 "Funding / Countdown"]
-        [:div.text-sm.font-medium.flex.items-center
+      [:div.flex-shrink-0.w-36
+       [:div.text-center
+        [:div.text-xs.text-gray-400.mb-1 "Funding / Countdown"]
+        [:div.text-sm.flex.items-center.justify-center
          (tooltip 
            [[:span.text-success.cursor-help (format-percentage funding-rate 4)]
             (str "Annualized: " (format-percentage (annualized-funding-rate funding-rate) 2))])
