@@ -1,32 +1,10 @@
 (ns hyperopen.views.asset-selector-view
-  (:require [clojure.string :as str]))
+  (:require [clojure.string :as str]
+            [hyperopen.utils.formatting :as fmt]))
 
 ;; Asset selector dropdown component
 
-(def large-number-formatter
-  (js/Intl.NumberFormat.
-   "en-US"
-   #js {:style           "currency"
-        :currency        "USD"
-        :minimumFractionDigits 0
-        :maximumFractionDigits 0}))
 
-(defn format-large-currency [amount]
-  (when amount
-    (.format large-number-formatter amount)))
-
-(defn safe-to-fixed [value decimals]
-  "Safely convert a value to fixed decimal places, defaulting to 0 if not a number"
-  (let [num-value (if (and value (number? value)) value 0)]
-    (.toFixed num-value decimals)))
-
-(defn format-percentage [value & [decimals]]
-  (when value
-    (str (safe-to-fixed value (or decimals 2)) "%")))
-
-(defn annualized-funding-rate [hourly-rate]
-  (when hourly-rate
-    (* hourly-rate 24 365)))
 
 (defn tooltip [content & [position]]
   (let [pos (or position "top")]
@@ -116,22 +94,22 @@
           [:span.px-2.py-0.5.text-xs.font-medium.bg-primary.text-primary-content.rounded
            (str max-leverage "x")])]]
      ;; Price (2 cols)
-     [:div.col-span-2.text-sm.text-gray-400.text-center (str "$" (safe-to-fixed safe-mark 2))]
+     [:div.col-span-2.text-sm.text-gray-400.text-center (str "$" (fmt/safe-to-fixed safe-mark 2))]
      ;; Volume (2 cols)
-     [:div.col-span-2.text-sm.font-medium.text-center (format-large-currency safe-volume)]
+     [:div.col-span-2.text-sm.font-medium.text-center (fmt/format-large-currency safe-volume)]
      ;; Change (2 cols)
      [:div.col-span-2.text-center
       [:div {:class [change-color "text-sm"]}
-       (str (if is-positive "+" "") (safe-to-fixed safe-change 2) " (" (safe-to-fixed safe-change-pct 2) "%)")]]
+       (str (if is-positive "+" "") (fmt/safe-to-fixed safe-change 2) " (" (fmt/safe-to-fixed safe-change-pct 2) "%)")]]
      ;; Open Interest (2 cols)
-     [:div.col-span-2.text-sm.font-medium.text-center (format-large-currency safe-open-interest)]
+     [:div.col-span-2.text-sm.font-medium.text-center (fmt/format-large-currency safe-open-interest)]
      ;; Funding Rate (2 cols)
      [:div.col-span-2.text-center
       (tooltip 
         [[:div {:class [funding-color "text-sm" "cursor-help"]
                 :style {:min-width "max-content"}}
-          (str (if funding-positive "+" "") (safe-to-fixed (* safe-funding-rate 100) 4) "%")]
-         (str "Annualized: " (format-percentage (annualized-funding-rate (* safe-funding-rate 100)) 2))]
+          (str (if funding-positive "+" "") (fmt/safe-to-fixed (* safe-funding-rate 100) 4) "%")]
+         (str "Annualized: " (fmt/format-percentage (fmt/annualized-funding-rate (* safe-funding-rate 100)) 2))]
         "bottom")]]))
 
 (defn asset-list [assets selected-asset]
@@ -150,10 +128,7 @@
    [:svg.w-4.h-4.text-gray-400 {:fill "none" :stroke "currentColor" :viewBox "0 0 24 24"}
     [:path {:stroke-linecap "round" :stroke-linejoin "round" :stroke-width 2 :d "M6 18L18 6M6 6l12 12"}]]])
 
-(defn safe-number [value]
-  "Convert value to number, handling NaN and nil cases"
-  (let [num (if (number? value) value (js/parseFloat value))]
-    (if (js/isNaN num) 0 num)))
+
 
 (defn filter-and-sort-assets [assets search-term sort-by sort-direction]
   "Apply search filtering and sorting to assets list"
@@ -167,11 +142,11 @@
         ;; Sort by the selected field using explicit comparison functions
         sorted-assets (case sort-by
                        :name (sort-by :coin filtered-assets)
-                       :price (sort #(< (safe-number (:mark %1)) (safe-number (:mark %2))) filtered-assets)
-                       :volume (sort #(< (safe-number (:volume24h %1)) (safe-number (:volume24h %2))) filtered-assets)
-                       :change (sort #(< (safe-number (:change24hPct %1)) (safe-number (:change24hPct %2))) filtered-assets)
-                       :openInterest (sort #(< (safe-number (:openInterest %1)) (safe-number (:openInterest %2))) filtered-assets)
-                       :funding (sort #(< (safe-number (:fundingRate %1)) (safe-number (:fundingRate %2))) filtered-assets)
+                       :price (sort #(< (fmt/safe-number (:mark %1)) (fmt/safe-number (:mark %2))) filtered-assets)
+                       :volume (sort #(< (fmt/safe-number (:volume24h %1)) (fmt/safe-number (:volume24h %2))) filtered-assets)
+                       :change (sort #(< (fmt/safe-number (:change24hPct %1)) (fmt/safe-number (:change24hPct %2))) filtered-assets)
+                       :openInterest (sort #(< (fmt/safe-number (:openInterest %1)) (fmt/safe-number (:openInterest %2))) filtered-assets)
+                       :funding (sort #(< (fmt/safe-number (:fundingRate %1)) (fmt/safe-number (:fundingRate %2))) filtered-assets)
                        filtered-assets)]
     ;; Apply sort direction
     (if (= sort-direction :desc)

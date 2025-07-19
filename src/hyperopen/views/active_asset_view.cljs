@@ -1,6 +1,7 @@
 (ns hyperopen.views.active-asset-view
   (:require [hyperopen.websocket.active-asset-ctx :as active-ctx]
-            [hyperopen.views.asset-selector-view :as asset-selector]))
+            [hyperopen.views.asset-selector-view :as asset-selector]
+            [hyperopen.utils.formatting :as fmt]))
 
 ;; Pure presentation components
 
@@ -37,65 +38,7 @@
                        :info (:info context-data)})))))
          (filter #(not (nil? %))))))
 
-(defn format-number [n decimals]
-  (when (and n (number? n))
-    (.toFixed n decimals)))
 
-(def usd-formatter
-  (js/Intl.NumberFormat.
-   "en-US"
-   #js {:style           "currency"
-        :currency        "USD"
-        :minimumFractionDigits 2
-        :maximumFractionDigits 2}))
-
-(def large-number-formatter
-  (js/Intl.NumberFormat.
-   "en-US"
-   #js {:style           "currency"
-        :currency        "USD"
-        :minimumFractionDigits 0
-        :maximumFractionDigits 0}))
-
-(defn format-currency [amount]
-  (when amount
-    (.format usd-formatter amount)))
-
-(defn format-large-currency [amount]
-  (when amount
-    (.format large-number-formatter amount)))
-
-(defn format-percentage [value & [decimals]]
-  (when value
-    (str (format-number value (or decimals 2)) "%")))
-
-(defn format-time [seconds]
-  (when seconds
-    (let [hours (js/Math.floor (/ seconds 3600))
-          minutes (js/Math.floor (/ (mod seconds 3600) 60))
-          secs (mod seconds 60)]
-      (str (.padStart (str hours) 2 "0") ":"
-           (.padStart (str minutes) 2 "0") ":"
-           (.padStart (str secs) 2 "0")))))
-
-(defn format-funding-countdown []
-  (let [now (js/Date.)
-        current-minutes (.getMinutes now)
-        current-seconds (.getSeconds now)
-        minutes-until-hour (- 60 current-minutes)
-        seconds-until-minute (- 60 current-seconds)
-        total-minutes (if (zero? seconds-until-minute) 
-                       minutes-until-hour 
-                       (dec minutes-until-hour))
-        total-seconds (if (zero? seconds-until-minute) 
-                       0 
-                       seconds-until-minute)]
-    (str "00:" (.padStart (str total-minutes) 2 "0") ":"
-         (.padStart (str total-seconds) 2 "0"))))
-
-(defn annualized-funding-rate [hourly-rate]
-  (when hourly-rate
-    (* hourly-rate 24 365)))
 
 (defn tooltip [content & [position]]
   (let [pos (or position "top")]
@@ -121,7 +64,7 @@
   (let [is-positive (and change-value (>= change-value 0))
         color-class (if is-positive "text-success" "text-error")]
     [:span {:class color-class} 
-     (str (format-number change-value 2) " / " (format-percentage change-pct))]))
+     (str (fmt/format-number change-value 2) " / " (fmt/format-percentage change-pct))]))
 
 (defn asset-icon [coin dropdown-visible?]
   [:div.flex.items-center.space-x-2.cursor-pointer.hover:bg-base-300.rounded.px-2.py-1.transition-colors
@@ -149,7 +92,7 @@
         change-24h-pct (:change24hPct ctx-data)
         volume-24h (:volume24h ctx-data)
         open-interest (:openInterest ctx-data)
-        open-interest-usd (format-currency (* open-interest mark))
+        open-interest-usd (fmt/format-currency (* open-interest mark))
         funding-rate (:fundingRate ctx-data)
         dropdown-visible? (= (:visible-dropdown dropdown-state) coin)]
     [:div.relative.flex.items-center.justify-between.px-4.py-2.bg-base-200.rounded-lg.border.border-base-300
@@ -169,11 +112,11 @@
       
       ;; Mark column
       [:div.flex-shrink-0.w-24
-       (data-column "Mark" (format-currency mark) {:underlined true})]
+       (data-column "Mark" (fmt/format-currency mark) {:underlined true})]
       
       ;; Oracle column
       [:div.flex-shrink-0.w-24
-       (data-column "Oracle" (format-currency oracle) {:underlined true})]
+       (data-column "Oracle" (fmt/format-currency oracle) {:underlined true})]
       
       ;; 24h Change column
       [:div.flex-shrink-0.w-32
@@ -185,11 +128,11 @@
       
       ;; 24h Volume column
       [:div.flex-shrink-0.w-28
-       (data-column "24h Volume" (format-large-currency volume-24h))]
+       (data-column "24h Volume" (fmt/format-large-currency volume-24h))]
       
       ;; Open Interest column
       [:div.flex-shrink-0.w-32
-       (data-column "Open Interest" (format-large-currency open-interest) {:underlined true})]
+       (data-column "Open Interest" (fmt/format-large-currency open-interest) {:underlined true})]
       
       ;; Funding / Countdown column
       [:div.flex-shrink-0.w-36
@@ -197,10 +140,10 @@
         [:div.text-xs.text-gray-400.mb-1 "Funding / Countdown"]
         [:div.text-sm.flex.items-center.justify-center
          (tooltip 
-           [[:span.text-success.cursor-help (format-percentage funding-rate 4)]
-            (str "Annualized: " (format-percentage (annualized-funding-rate funding-rate) 2))])
+           [[:span.text-success.cursor-help (fmt/format-percentage funding-rate 4)]
+            (str "Annualized: " (fmt/format-percentage (fmt/annualized-funding-rate funding-rate) 2))])
          [:span.mx-1 "/"]
-         [:span (format-funding-countdown)]]]]]]))
+         [:span (fmt/format-funding-countdown)]]]]]]))
 
 (defn active-asset-list [contexts dropdown-state full-state]
   [:div.space-y-2
