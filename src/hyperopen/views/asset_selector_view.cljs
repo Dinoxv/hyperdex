@@ -123,11 +123,7 @@
        ^{:key (:coin asset)}
        (asset-list-item asset (= selected-asset (:coin asset)))))])
 
-(defn close-button []
-  [:button.absolute.top-3.right-3.p-1.rounded.hover:bg-base-200.transition-colors
-   {:on {:click [[:actions/close-asset-dropdown]]}}
-   [:svg.w-4.h-4.text-gray-400 {:fill "none" :stroke "currentColor" :viewBox "0 0 24 24"}
-    [:path {:stroke-linecap "round" :stroke-linejoin "round" :stroke-width 2 :d "M6 18L18 6M6 6l12 12"}]]])
+
 
 
 
@@ -167,10 +163,8 @@
   (when visible?
     (let [processed-assets (filter-and-sort-assets assets search-term sort-by sort-direction)]
       [:div.absolute.top-full.left-0.mt-2.bg-base-100.border.border-base-300.rounded-lg.shadow-lg.z-50 {:style {:width "800px"}}
-       (close-button)
        [:div.p-4
         [:div.mb-4
-         [:h3.text-lg.font-semibold.mb-2 "Select Asset"]
          (search-input search-term)
          [:div.border-b.border-base-300.mt-3.mb-3]]
         (sort-controls sort-by sort-direction)
@@ -179,4 +173,8 @@
 ;; Wrapper component that can be used in active-asset-view
 (defn asset-selector-wrapper [props]
   [:div.relative
-   (asset-selector-dropdown props)]) 
+   (asset-selector-dropdown props)
+   ;; Invisible overlay to handle click-outside-to-close
+   (when (:visible? props)
+     [:div.fixed.inset-0.z-40
+      {:on {:click [[:actions/close-asset-dropdown]]}}])]) 

@@ -102,7 +102,7 @@
        (asset-icon coin dropdown-visible?)
        ;; Asset Selector Dropdown
        (when dropdown-visible?
-         (asset-selector/asset-selector-dropdown
+         (asset-selector/asset-selector-wrapper
            {:visible? dropdown-visible?
             :assets (get-available-assets full-state)
             :selected-asset coin
