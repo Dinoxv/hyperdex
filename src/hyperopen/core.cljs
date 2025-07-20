@@ -5,6 +5,7 @@
             [hyperopen.websocket.active-asset-ctx :as active-ctx]
             [hyperopen.websocket.client :as ws-client]
             [hyperopen.websocket.orderbook :as orderbook]
+            [hyperopen.websocket.webdata2 :as webdata2]
             [hyperopen.api :as api]))
 
 ;; App state
@@ -15,6 +16,7 @@
                       :active-assets {:contexts {}
                                      :loading false}
                       :orderbooks {}
+                      :webdata2 {}
                       :asset-selector {:visible-dropdown nil
                                       :search-term ""
                       				  :sort-by :name
@@ -40,6 +42,10 @@
   (println "Subscribing to orderbook for:" coin)
   (orderbook/subscribe-orderbook! coin))
 
+(defn subscribe-webdata2 [_ store address]
+  (println "Subscribing to WebData2 for address:" address)
+  (webdata2/subscribe-webdata2! address))
+
 ;; Actions - pure functions that return effects
 (defn increment-count [state]
   [[:effects/save [:count] (inc (:count state))]])
@@ -49,7 +55,11 @@
 
 (defn subscribe-to-asset [state coin]
   [[:effects/subscribe-active-asset coin]
+   [:effects/subscribe-webdata2 "0x0000000000000000000000000000000000000000"]
    [:effects/subscribe-orderbook coin]])
+
+(defn subscribe-to-webdata2 [state address]
+  [[:effects/subscribe-webdata2 address]])
 
 (defn toggle-asset-dropdown [state coin]
   (let [current-dropdown (get-in state [:asset-selector :visible-dropdown])]
@@ -84,9 +94,11 @@
 (nxr/register-effect! :effects/init-websocket init-websocket)
 (nxr/register-effect! :effects/subscribe-active-asset subscribe-active-asset)
 (nxr/register-effect! :effects/subscribe-orderbook subscribe-orderbook)
+(nxr/register-effect! :effects/subscribe-webdata2 subscribe-webdata2)
 (nxr/register-action! :actions/increment-count increment-count)
 (nxr/register-action! :actions/init-websockets init-websockets)
 (nxr/register-action! :actions/subscribe-to-asset subscribe-to-asset)
+(nxr/register-action! :actions/subscribe-to-webdata2 subscribe-to-webdata2)
 (nxr/register-action! :actions/toggle-asset-dropdown toggle-asset-dropdown)
 (nxr/register-action! :actions/close-asset-dropdown close-asset-dropdown)
 (nxr/register-action! :actions/select-asset select-asset)
@@ -114,10 +126,14 @@
 
 (defn init []
   (println "Initializing Hyperopen...")
+  ;; initalize websocket client
+  (ws-client/init-connection! "wss://api.hyperliquid.xyz/ws")
   ;; Initialize active asset context with store access
   (active-ctx/init! store)
   ;; Initialize orderbook module
   (orderbook/init! store)
+  ;; Initialize WebData2 module
+  (webdata2/init! store)
   ;; Fetch initial market data
   (api/fetch-asset-contexts! store)
   ;; Trigger initial render by updating the store
