@@ -94,7 +94,7 @@
           [:span.px-2.py-0.5.text-xs.font-medium.bg-primary.text-primary-content.rounded
            (str max-leverage "x")])]]
      ;; Price (2 cols)
-     [:div.col-span-2.text-sm.text-gray-400.text-center (str "$" (fmt/safe-to-fixed safe-mark 2))]
+     [:div.col-span-2.text-sm.text-gray-400.text-center (fmt/format-currency safe-mark)]
      ;; Volume (2 cols)
      [:div.col-span-2.text-sm.font-medium.text-center (fmt/format-large-currency safe-volume)]
      ;; Change (2 cols)
