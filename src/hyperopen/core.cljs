@@ -63,9 +63,8 @@
   [[:effects/save [:selected-asset] coin]
    [:effects/save [:asset-selector :visible-dropdown] nil]])
 
-(defn update-asset-search [state event]
-  (let [search-term (get-in event [:target :value] "")]
-    [[:effects/save [:asset-selector :search-term] search-term]]))
+(defn update-asset-search [state value]
+  [[:effects/save [:asset-selector :search-term] (str value)]])
 
 (defn update-asset-sort [state sort-field]
   (let [current-sort (get-in state [:asset-selector :sort-by])
@@ -94,6 +93,11 @@
 (nxr/register-action! :actions/update-asset-search update-asset-search)
 (nxr/register-action! :actions/update-asset-sort update-asset-sort)
 (nxr/register-system->state! deref)
+
+;; Register placeholder for DOM event values
+(nxr/register-placeholder! :event.target/value
+  (fn [{:replicant/keys [dom-event]}]
+    (some-> dom-event .-target .-value)))
 
 ;; Wire up the render loop
 (r/set-dispatch! #(nxr/dispatch store %1 %2))

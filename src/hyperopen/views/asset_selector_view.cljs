@@ -1,5 +1,6 @@
 (ns hyperopen.views.asset-selector-view
   (:require [clojure.string :as str]
+            [replicant.dom :as r]
             [hyperopen.utils.formatting :as fmt]))
 
 ;; Asset selector dropdown component
@@ -30,9 +31,9 @@
   [:div.relative.mb-4
    [:input.w-full.px-3.py-2.bg-base-200.border.border-base-300.rounded-lg.text-sm.placeholder-gray-400
     {:type "text"
-     :placeholder "Search assets..."
+     :placeholder "Search"
      :value search-term
-     :on {:input [[:actions/update-asset-search]]}}]
+     :on {:input [[:actions/update-asset-search [:event.target/value]]]}}]
    [:div.absolute.inset-y-0.right-0.flex.items-center.pr-3
     [:svg.w-4.h-4.text-gray-400 {:fill "none" :stroke "currentColor" :viewBox "0 0 24 24"}
      [:path {:stroke-linecap "round" :stroke-linejoin "round" :stroke-width 2 :d "m21 21-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"}]]]])
