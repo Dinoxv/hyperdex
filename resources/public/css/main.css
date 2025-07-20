@@ -2582,6 +2582,20 @@ body {
 
 /* Custom utilities for trading interface */
 
+/* Hide scrollbar but keep functionality */
+
+.scrollbar-hide {
+  -ms-overflow-style: none;
+  /* Internet Explorer 10+ */
+  scrollbar-width: none;
+  /* Firefox */
+}
+
+.scrollbar-hide::-webkit-scrollbar {
+  display: none;
+  /* Safari and Chrome */
+}
+
 /* Custom CSS for trading interface */
 
 .hover\:bg-base-200:hover {
