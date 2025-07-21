@@ -6,7 +6,8 @@
             [hyperopen.websocket.client :as ws-client]
             [hyperopen.websocket.orderbook :as orderbook]
             [hyperopen.websocket.webdata2 :as webdata2]
-            [hyperopen.api :as api]))
+            [hyperopen.api :as api]
+            [hyperopen.asset-selector.settings :as asset-selector-settings]))
 
 ;; App state
 (defonce store (atom {:title "Hyperopen"
@@ -76,12 +77,17 @@
 (defn update-asset-search [state value]
   [[:effects/save [:asset-selector :search-term] (str value)]])
 
-(defn update-asset-sort [state sort-field]
+;; --- asset selector sort settings logic moved to asset_selector/settings.cljs ---
+
+(defn update-asset-selector-sort [state sort-field]
   (let [current-sort (get-in state [:asset-selector :sort-by])
         current-direction (get-in state [:asset-selector :sort-direction] :asc)
         new-direction (if (= current-sort sort-field)
                        (if (= current-direction :asc) :desc :asc)
                        :desc)]
+    ;; Persist to localStorage
+    (js/localStorage.setItem "asset-selector-sort-by" (name sort-field))
+    (js/localStorage.setItem "asset-selector-sort-direction" (name new-direction))
     [[:effects/save [:asset-selector :sort-by] sort-field]
      [:effects/save [:asset-selector :sort-direction] new-direction]]))
 
@@ -103,7 +109,7 @@
 (nxr/register-action! :actions/close-asset-dropdown close-asset-dropdown)
 (nxr/register-action! :actions/select-asset select-asset)
 (nxr/register-action! :actions/update-asset-search update-asset-search)
-(nxr/register-action! :actions/update-asset-sort update-asset-sort)
+(nxr/register-action! :actions/update-asset-selector-sort update-asset-selector-sort)
 (nxr/register-system->state! deref)
 
 ;; Register placeholder for DOM event values
@@ -126,6 +132,8 @@
 
 (defn init []
   (println "Initializing Hyperopen...")
+  ;; Restore asset selector sort settings from localStorage
+  (asset-selector-settings/restore-asset-selector-sort-settings! store)
   ;; initalize websocket client
   (ws-client/init-connection! "wss://api.hyperliquid.xyz/ws")
   ;; Initialize active asset context with store access

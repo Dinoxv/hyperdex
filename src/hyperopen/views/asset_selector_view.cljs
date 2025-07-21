@@ -41,7 +41,7 @@
 (defn sort-button [label active? direction sort-field]
   [:button.flex.items-center.space-x-1.px-2.py-1.text-xs.font-medium.rounded.transition-colors
    {:class (if active? ["bg-primary" "text-primary-content"] ["text-gray-400" "hover:text-gray-300"])
-    :on {:click [[:actions/update-asset-sort sort-field]]}}
+    :on {:click [[:actions/update-asset-selector-sort sort-field]]}}
    [:span label]
    (when active?
      [:svg.w-3.h-3 {:fill "none" :stroke "currentColor" :viewBox "0 0 24 24"}
