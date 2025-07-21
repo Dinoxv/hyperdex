@@ -1,5 +1,6 @@
 (ns hyperopen.websocket.webdata2
-  (:require [hyperopen.websocket.client :as ws-client]))
+  (:require [hyperopen.websocket.client :as ws-client]
+            [hyperopen.api :refer [preprocess-webdata2 normalise-asset-contexts]]))
 
 ;; WebData2 state
 (defonce webdata2-state (atom {:subscriptions #{}
@@ -33,16 +34,19 @@
 ;; Create a handler function that has access to the store
 (defn create-webdata2-handler [store]
   (fn [data]
-    (when (map? data)
-      (when (= (:channel data) "webData2")
-        (let [webdata2-data (:data data)]
-          ;; Update local state
-          (swap! webdata2-state assoc :data webdata2-data)
-          ;; Update app store
-          (when store
-            (js/setTimeout 
-             #(swap! store assoc :webdata2 webdata2-data)
-             0)))))))
+    (when (and (map? data)
+               (= "webData2" (:channel data)))
+      (let [webdata2-data  (:data data)
+            base-update    {:webdata2 webdata2-data}
+            full-update    (if (and (map? webdata2-data)
+                                    (:meta        webdata2-data)
+                                    (:assetCtxs   webdata2-data))
+                             {:asset-contexts
+                              (-> webdata2-data
+                                  preprocess-webdata2
+                                  normalise-asset-contexts)}
+                             {})]
+        (swap! store merge base-update full-update)))))
 
 ;; Get current subscriptions
 (defn get-subscriptions []

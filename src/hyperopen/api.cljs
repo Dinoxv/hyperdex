@@ -28,6 +28,17 @@
                            :funding (nth funding idx)}))
                  {}))))
 
+(defn preprocess-webdata2
+  "Given a response map with keys
+     :meta       → {:universe […] :marginTables […]}
+     :assetCtxs  → [ {…} {…} … ]
+   return the [meta assetCtxs] vector that normalise-asset-contexts needs."
+  [{:keys [meta assetCtxs]}]
+  ;; pull out just the universe and marginTables from meta:
+  [ (select-keys meta [:universe :marginTables])
+    ;; ensure it’s a plain vector in case it was some other seq:
+    (vec assetCtxs) ])
+
 (defn fetch-asset-contexts! [store]
   (println "Fetching perpetual asset contexts...")
   (-> (js/fetch "https://api.hyperliquid.xyz/info"
