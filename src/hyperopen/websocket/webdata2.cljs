@@ -1,6 +1,6 @@
 (ns hyperopen.websocket.webdata2
   (:require [hyperopen.websocket.client :as ws-client]
-            [hyperopen.utils.data_normalization :refer [preprocess-webdata2 normalize-asset-contexts]]))
+            [hyperopen.utils.data-normalization :refer [preprocess-webdata2 normalize-asset-contexts]]))
 
 ;; WebData2 state
 (defonce webdata2-state (atom {:subscriptions #{}

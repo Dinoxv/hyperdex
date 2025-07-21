@@ -1,4 +1,4 @@
-(ns hyperopen.utils.data_normalization)
+(ns hyperopen.utils.data-normalization)
 
 (defn normalize-asset-contexts
   "Takes the raw vector `data` returned by /info(type=metaAndAssetCtxs)`

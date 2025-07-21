@@ -1,6 +1,6 @@
 (ns hyperopen.api
   (:require [clojure.string :as str]
-            [hyperopen.utils.data_normalization :refer [normalize-asset-contexts preprocess-webdata2]]))
+            [hyperopen.utils.data-normalization :refer [normalize-asset-contexts preprocess-webdata2]]))
 
 (defn fetch-asset-contexts! [store]
   (println "Fetching perpetual asset contexts...")
