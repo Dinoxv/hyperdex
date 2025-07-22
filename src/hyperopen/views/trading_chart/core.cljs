@@ -1,31 +1,32 @@
 (ns hyperopen.views.trading-chart.core
   (:require [hyperopen.views.trading-chart.utils.chart-interop :as ci]))
 
-;; Minimal basic chart component
-(defn simple-chart-canvas []
+;; Candlestick chart component
+(defn candlestick-chart-canvas []
   (let [mount! (fn [{:keys [:replicant/life-cycle :replicant/node]}]
                  (case life-cycle
                    :replicant.life-cycle/mount
                    (try
-                     (js/console.log "=== MOUNTING SIMPLE CHART ===")
-                     ;; Exactly mirror the JavaScript example
-                     (let [chart (ci/create-simple-chart! node)
-                           line-series (ci/add-line-series! chart)]
-                       (ci/set-simple-data! line-series)
-                       (js/console.log "=== CHART SETUP COMPLETE ==="))
+                     (js/console.log "=== MOUNTING CANDLESTICK CHART ===")
+                     ;; Exactly mirror the JavaScript candlestick example
+                     (let [chart (ci/create-candlestick-chart! node)
+                           candlestick-series (ci/add-candlestick-series! chart)]
+                       (ci/set-candlestick-data! candlestick-series)
+                       (ci/fit-content! chart)
+                       (js/console.log "=== CANDLESTICK CHART SETUP COMPLETE ==="))
                      (catch :default e
-                       (js/console.error "Error in simple chart:" e)))
+                       (js/console.error "Error in candlestick chart:" e)))
                    
                    :replicant.life-cycle/unmount
-                   (js/console.log "Unmounting simple chart")
+                   (js/console.log "Unmounting candlestick chart")
                    
                    nil))]
 
     [:div.w-full.h-96.bg-gray-800
      {:replicant/on-render mount!
-      :style {:width "400px" :height "300px"}}]))
+      :style {:width "600px" :height "400px"}}]))
 
 (defn trading-chart-view [_]
   [:div.w-full.max-w-6xl.mx-auto.p-4
-   [:h1.text-2xl.mb-4 "Simple Chart Test"]
-   (simple-chart-canvas)]) 
+   [:h1.text-2xl.mb-4 "Candlestick Chart Test"]
+   (candlestick-chart-canvas)]) 

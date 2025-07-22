@@ -1,30 +1,42 @@
 (ns hyperopen.views.trading-chart.utils.chart-interop
-  (:require ["lightweight-charts" :refer [createChart LineSeries]]))
+  (:require ["lightweight-charts" :refer [createChart CandlestickSeries]]))
 
-;; Minimal implementation mirroring the JavaScript example exactly
-(defn create-simple-chart! [container]
-  "Create a chart with basic options"
-  (let [chart (createChart container #js {:width 400 :height 300})]
-    (js/console.log "chart created, available methods:" (js/Object.keys chart))
-    chart))
+;; Candlestick chart implementation mirroring the JavaScript example exactly
+(defn create-candlestick-chart! [container]
+  "Create a chart with candlestick options"
+  (let [chartOptions #js {:layout #js {:textColor "black" 
+                                       :background #js {:type "solid" 
+                                                       :color "white"}}}]
+    (let [chart (createChart container chartOptions)]
+      (js/console.log "candlestick chart created, available methods:" (js/Object.keys chart))
+      chart)))
 
-(defn add-line-series! [chart]
-  "Add a line series to the chart"
-  (let [series (.addSeries ^js chart LineSeries)]
-    (js/console.log "line series created, available methods:" (js/Object.keys series))
+(defn add-candlestick-series! [chart]
+  "Add a candlestick series to the chart"
+  (let [seriesOptions #js {:upColor "#26a69a"
+                           :downColor "#ef5350"
+                           :borderVisible false
+                           :wickUpColor "#26a69a"
+                           :wickDownColor "#ef5350"}
+        series (.addSeries ^js chart CandlestickSeries seriesOptions)]
+    (js/console.log "candlestick series created, available methods:" (js/Object.keys series))
     series))
 
-(defn set-simple-data! [series]
-  "Set simple line data exactly like the JavaScript example"
-  (let [data #js [#js {:time "2019-04-11" :value 80.01}
-                  #js {:time "2019-04-12" :value 96.63}
-                  #js {:time "2019-04-13" :value 76.64}
-                  #js {:time "2019-04-14" :value 81.89}
-                  #js {:time "2019-04-15" :value 74.43}
-                  #js {:time "2019-04-16" :value 80.01}
-                  #js {:time "2019-04-17" :value 96.63}
-                  #js {:time "2019-04-18" :value 76.64}
-                  #js {:time "2019-04-19" :value 81.89}
-                  #js {:time "2019-04-20" :value 74.43}]]
-    (js/console.log "setting data:" data)
-    (.setData series data))) 
+(defn set-candlestick-data! [series]
+  "Set candlestick data exactly like the JavaScript example"
+  (let [data #js [#js {:open 10 :high 10.63 :low 9.49 :close 9.55 :time 1642427876}
+                  #js {:open 9.55 :high 10.30 :low 9.42 :close 9.94 :time 1642514276}
+                  #js {:open 9.94 :high 10.17 :low 9.92 :close 9.78 :time 1642600676}
+                  #js {:open 9.78 :high 10.59 :low 9.18 :close 9.51 :time 1642687076}
+                  #js {:open 9.51 :high 10.46 :low 9.10 :close 10.17 :time 1642773476}
+                  #js {:open 10.17 :high 10.96 :low 10.16 :close 10.47 :time 1642859876}
+                  #js {:open 10.47 :high 11.39 :low 10.40 :close 10.81 :time 1642946276}
+                  #js {:open 10.81 :high 11.60 :low 10.30 :close 10.75 :time 1643032676}
+                  #js {:open 10.75 :high 11.60 :low 10.49 :close 10.93 :time 1643119076}
+                  #js {:open 10.93 :high 11.53 :low 10.76 :close 10.96 :time 1643205476}]]
+    (js/console.log "setting candlestick data:" data)
+    (.setData series data)))
+
+(defn fit-content! [chart]
+  "Fit content to the chart viewport"
+  (.fitContent ^js (.timeScale ^js chart))) 
