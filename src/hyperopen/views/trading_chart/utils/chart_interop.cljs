@@ -52,11 +52,11 @@
   
   ;; Create legend div element
   (let [legend (js/document.createElement "div")]
-    ;; Professional trading platform legend styling
-    (set! (.-style legend) "position: absolute; left: 12px; top: 12px; z-index: 100; font-size: 13px; font-family: 'SF Pro Display', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; line-height: 1.4; font-weight: 500; color: #ffffff; background: rgba(0, 0, 0, 0.75); padding: 8px 12px; border-radius: 6px; backdrop-filter: blur(4px); border: 1px solid rgba(255, 255, 255, 0.1); box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);")
+    ;; Fully transparent legend styling (no background, no box-shadow, no border)
+    (set! (.-style legend) "position: absolute; left: 12px; top: 12px; z-index: 100; font-size: 13px; font-family: 'SF Pro Display', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; line-height: 1.4; font-weight: 500; color: #ffffff; padding: 8px 12px; border-radius: 6px; box-shadow: none;")
     
     ;; Set initial content
-    (set! (.-innerHTML legend) "Hover over candles")
+    (set! (.-innerHTML legend) "")
     
     ;; Append to container
     (.appendChild container legend)
@@ -82,7 +82,7 @@
                                             " <span style='color: #888; font-weight: 400;'>C</span> " (format-price c))))
                                (set! (.-innerHTML legend) "No data")))
                            ;; No crosshair point - show hint
-                           (set! (.-innerHTML legend) "Hover over candles")))]
+                           (set! (.-innerHTML legend) "")))]
       
       ;; Subscribe to crosshair move events
       (.subscribeCrosshairMove ^js chart update-legend)
