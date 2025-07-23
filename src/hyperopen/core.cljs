@@ -16,6 +16,7 @@
                       :websocket {:status :disconnected}
                       :active-assets {:contexts {}
                                      :loading false}
+                      :active-asset nil
                       :orderbooks {}
                       :webdata2 {}
                       :asset-selector {:visible-dropdown nil
@@ -37,7 +38,9 @@
 (defn subscribe-active-asset [_ store coin]
   (println "Subscribing to active asset context for:" coin)
   (active-ctx/subscribe-active-asset-ctx! coin)
-  (swap! store assoc-in [:active-assets :loading] true))
+  (swap! store #(-> %
+                    (assoc-in [:active-assets :loading] true)
+                    (assoc-in [:active-asset] coin))))
 
 (defn subscribe-orderbook [_ store coin]
   (println "Subscribing to orderbook for:" coin)
