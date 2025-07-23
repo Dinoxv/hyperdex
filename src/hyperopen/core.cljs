@@ -37,10 +37,11 @@
 
 (defn subscribe-active-asset [_ store coin]
   (println "Subscribing to active asset context for:" coin)
-  (active-ctx/subscribe-active-asset-ctx! coin)
   (swap! store #(-> %
                     (assoc-in [:active-assets :loading] true)
-                    (assoc-in [:active-asset] coin))))
+                    (assoc-in [:active-asset] coin)))
+  (active-ctx/subscribe-active-asset-ctx! coin)
+  (api/fetch-candle-snapshot! store))
 
 (defn subscribe-orderbook [_ store coin]
   (println "Subscribing to orderbook for:" coin)

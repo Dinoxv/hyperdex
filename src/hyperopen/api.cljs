@@ -18,8 +18,9 @@
                    (swap! store assoc-in [:asset-contexts :error] (str %))))))
 
 (defn fetch-candle-snapshot!
-  "Fetch `bars` worth of candles for the active asset at keyword interval (e.g. :1m, :1h)."
-  [store interval bars]
+  "Fetch `bars` worth of candles for the active asset at keyword interval (e.g. :1m, :1h).
+   Defaults to :1d interval and 330 bars if not specified."
+  [store & {:keys [interval bars] :or {interval :1d bars 330}}]
   (let [active-asset (:active-asset @store)]
     (if (nil? active-asset)
       (println "No active asset selected, skipping candle fetch")
