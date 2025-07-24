@@ -42,6 +42,6 @@
             (.then #(.json %))
             (.then #(let [data (js->clj % :keywordize-keys true)]
                       (swap! store assoc-in [:candles active-asset interval] data)
-                      (println "Loaded" (count (get data :data [])) "candles for" active-asset)))
+                      nil))
             (.catch #(do (println "Error fetching" %) 
                          (swap! store assoc-in [:candles active-asset interval :error] (str %))))))))) 

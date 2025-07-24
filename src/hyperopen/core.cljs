@@ -51,6 +51,10 @@
   (println "Subscribing to WebData2 for address:" address)
   (webdata2/subscribe-webdata2! address))
 
+(defn fetch-candle-snapshot [_ store]
+  (println "Fetching candle snapshot for active asset...")
+  (api/fetch-candle-snapshot! store))
+
 ;; Actions - pure functions that return effects
 (defn increment-count [state]
   [[:effects/save [:count] (inc (:count state))]])
@@ -76,7 +80,9 @@
 
 (defn select-asset [state coin]
   [[:effects/save [:selected-asset] coin]
-   [:effects/save [:asset-selector :visible-dropdown] nil]])
+   [:effects/save [:active-asset] coin]
+   [:effects/save [:asset-selector :visible-dropdown] nil]
+   [:effects/fetch-candle-snapshot]])
 
 (defn update-asset-search [state value]
   [[:effects/save [:asset-selector :search-term] (str value)]])
@@ -105,6 +111,7 @@
 (nxr/register-effect! :effects/subscribe-active-asset subscribe-active-asset)
 (nxr/register-effect! :effects/subscribe-orderbook subscribe-orderbook)
 (nxr/register-effect! :effects/subscribe-webdata2 subscribe-webdata2)
+(nxr/register-effect! :effects/fetch-candle-snapshot fetch-candle-snapshot)
 (nxr/register-action! :actions/increment-count increment-count)
 (nxr/register-action! :actions/init-websockets init-websockets)
 (nxr/register-action! :actions/subscribe-to-asset subscribe-to-asset)
