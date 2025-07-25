@@ -5,7 +5,9 @@
   [:div.relative
    [:button.flex.items-center.space-x-1.px-3.py-1.text-sm.font-medium.text-gray-300.hover:text-white.hover:bg-gray-700.rounded.transition-colors
     {:on {:click [[:actions/toggle-timeframes-dropdown]]}}
-    [:span (if timeframes-dropdown-visible "▲" "▼")]]
+    [:span.inline-block.transition-transform.duration-200.ease-in-out
+     {:class (if timeframes-dropdown-visible "rotate-180" "rotate-0")}
+     "▼"]]
    ;; Dropdown menu (toggled with state)
    [:div.absolute.top-full.left-0.mt-1.bg-gray-800.border.border-gray-600.rounded.shadow-lg.z-50.min-w-32
     {:class (if timeframes-dropdown-visible "block" "hidden")}
