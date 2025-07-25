@@ -6,7 +6,7 @@
   "Create a chart with volume pane"
   (let [chartOptions #js {:layout #js {:textColor "#e5e7eb" 
                                        :background #js {:type "solid" 
-                                                       :color "#1f2937"}}
+                                                       :color "rgb(30, 41, 55)"}}
                           :grid #js {:vertLines #js {:color "#374151"}
                                     :horzLines #js {:color "#374151"}}
                           :rightPriceScale #js {:borderColor "#374151"}
@@ -25,7 +25,7 @@
   "Create a chart with common options"
   (let [chartOptions #js {:layout #js {:textColor "#e5e7eb" 
                                        :background #js {:type "solid" 
-                                                       :color "#1f2937"}}
+                                                       :color "rgb(30, 41, 55)"}}
                           :grid #js {:vertLines #js {:color "#374151"}
                                     :horzLines #js {:color "#374151"}}
                           :rightPriceScale #js {:borderColor "#374151"}

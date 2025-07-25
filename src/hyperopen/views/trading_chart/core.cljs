@@ -13,7 +13,8 @@
         selected-timeframe (get-in state [:chart-options :selected-timeframe] :1d)
         chart-type-dropdown-visible (get-in state [:chart-options :chart-type-dropdown-visible])
         selected-chart-type (get-in state [:chart-options :selected-chart-type] :candlestick)]
-    [:div.flex.items-center.bg-gray-900.border-b.border-gray-700.px-4.py-2.w-full.space-x-4
+    [:div.flex.items-center.border-b.border-gray-700.px-4.py-2.w-full.space-x-4
+     {:style {:background-color "rgb(30, 41, 55)"}}
      ;; Left side - Favorite timeframes + dropdown
      [:div.flex.items-center.space-x-1
       ;; Main timeframe buttons
@@ -67,9 +68,10 @@
                    :replicant.life-cycle/unmount
                    nil
                    nil))]
-    [:div.w-full.h-96.bg-gray-800.relative
+    [:div.w-full.h-96.relative
      {:replicant/key (str "chart-" chart-type "-" (hash candle-data))
-      :replicant/on-render mount!}]))
+      :replicant/on-render mount!
+      :style {:background-color "rgb(30, 41, 55)"}}]))
 
 (defn trading-chart-view [state]
   (let [active-asset (:active-asset state)
