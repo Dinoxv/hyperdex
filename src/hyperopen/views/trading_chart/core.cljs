@@ -7,7 +7,7 @@
 (defn chart-top-menu [state]
   (let [timeframes-dropdown-visible (get-in state [:chart-options :timeframes-dropdown-visible])
         selected-timeframe (get-in state [:chart-options :selected-timeframe] :1d)]
-    [:div.flex.items-center.justify-between.bg-gray-900.border-b.border-gray-700.px-4.py-2
+    [:div.flex.items-center.justify-between.bg-gray-900.border-b.border-gray-700.px-4.py-2.w-full
      ;; Left side - Favorite timeframes + dropdown
      [:div.flex.items-center.space-x-1
       ;; Favorite timeframes (with star indicators)
@@ -62,8 +62,7 @@
                    nil))]
     [:div.w-full.h-96.bg-gray-800.relative
      {:replicant/key (str "chart-" (hash candle-data))
-      :replicant/on-render mount!
-      :style {:width "600px" :height "400px"}}]))
+      :replicant/on-render mount!}]))
 
 (defn trading-chart-view [state]
   (let [active-asset (:active-asset state)
@@ -80,8 +79,10 @@
         candle-data (dp/process-candle-data raw-candles)]
     [:div.w-full.max-w-6xl.mx-auto.p-4
      [:h1.text-2xl.mb-4 (str "Candlestick Chart - " (or active-asset "No Asset Selected"))]
-     ;; Add the top menu above the chart
-     (chart-top-menu state)
-     (if has-error?
-       [:div.text-red-500.p-4 "Error fetching chart data."]
-       (candlestick-chart-canvas candle-data))])) 
+     ;; Chart container with consistent width for both menu and chart
+     [:div.w-full
+      ;; Add the top menu above the chart
+      (chart-top-menu state)
+      (if has-error?
+        [:div.text-red-500.p-4 "Error fetching chart data."]
+        (candlestick-chart-canvas candle-data))]])) 
