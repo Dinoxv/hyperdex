@@ -6,7 +6,14 @@
   [{:key :area :label "Area" :icon "📊"}
    {:key :bar :label "Bar" :icon "📊"}
    {:key :baseline :label "Baseline" :icon "📊"}
-   {:key :candlestick :label "Candlestick" :icon "📈"}
+   {:key :candlestick :label "Candlestick" 
+    :icon [:svg.w-4.h-4.inline-block {:viewBox "0 0 32 32" :fill "currentColor" :style {:vertical-align "text-bottom"}}
+           [:defs
+            [:style ".cls-1 { fill: none; }"]]
+           [:path {:d "M26,10H24V6H22v4H20V22h2v4h2V22h2ZM24,20H22V12h2Z"}]
+           [:path {:d "M14,8H12V4H10V8H8V18h2v4h2V18h2Zm-2,8H10V10h2Z"}]
+           [:path {:d "M30,30H4a2,2,0,0,1-2-2V2H4V28H30Z"}]
+           [:rect.cls-1 {:height "32" :width "32"}]]}
    {:key :histogram :label "Histogram" :icon "📊"}
    {:key :line :label "Line" :icon "📈"}])
 
@@ -15,7 +22,7 @@
     [:div.relative
      [:button.flex.items-center.space-x-1.px-3.py-1.text-sm.font-medium.text-gray-300.hover:text-white.hover:bg-gray-700.rounded.transition-colors
       {:on {:click [[:actions/toggle-chart-type-dropdown]]}}
-      [:span (:icon selected-type)]
+      (:icon selected-type)
       [:span (:label selected-type)]
       [:span.inline-block.transition-transform.duration-200.ease-in-out
        {:class (if chart-type-dropdown-visible "rotate-180" "rotate-0")}
