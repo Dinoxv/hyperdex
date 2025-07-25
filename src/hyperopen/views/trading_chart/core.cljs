@@ -13,7 +13,7 @@
         selected-timeframe (get-in state [:chart-options :selected-timeframe] :1d)
         chart-type-dropdown-visible (get-in state [:chart-options :chart-type-dropdown-visible])
         selected-chart-type (get-in state [:chart-options :selected-chart-type] :candlestick)]
-    [:div.flex.items-center.justify-between.bg-gray-900.border-b.border-gray-700.px-4.py-2.w-full
+    [:div.flex.items-center.bg-gray-900.border-b.border-gray-700.px-4.py-2.w-full.space-x-4
      ;; Left side - Favorite timeframes + dropdown
      [:div.flex.items-center.space-x-1
       ;; Main timeframe buttons
@@ -39,16 +39,15 @@
      ;; Vertical divider
      [:div.w-px.h-6.bg-gray-700]
    
-     ;; Center - Chart type and indicators
-     [:div.flex.items-center.space-x-4
-      [:div.flex.items-center.space-x-2
-       ;; Chart type dropdown
-       (chart-type-dropdown {:selected-chart-type selected-chart-type
-                            :chart-type-dropdown-visible chart-type-dropdown-visible})
-       [:button.flex.items-center.space-x-1.px-3.py-1.text-sm.font-medium.text-gray-300.hover:text-white.hover:bg-gray-700.rounded.transition-colors
-        [:span "📈"]
-        [:span "fx Indicators"]
-        [:span "▼"]]]]]))
+     ;; Chart type and indicators section
+     [:div.flex.items-center.space-x-2
+      ;; Chart type dropdown
+      (chart-type-dropdown {:selected-chart-type selected-chart-type
+                           :chart-type-dropdown-visible chart-type-dropdown-visible})
+      [:button.flex.items-center.space-x-1.px-3.py-1.text-sm.font-medium.text-gray-300.hover:text-white.hover:bg-gray-700.rounded.transition-colors
+       [:span "📈"]
+       [:span "fx Indicators"]
+       [:span "▼"]]]]))
 
 ;; Generic chart component that supports all chart types
 (defn chart-canvas [candle-data chart-type]
