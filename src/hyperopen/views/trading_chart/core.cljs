@@ -50,26 +50,26 @@
         [:span "fx Indicators"]
         [:span "▼"]]]]]))
 
-;; Candlestick chart component
-(defn candlestick-chart-canvas [candle-data]
+;; Generic chart component that supports all chart types
+(defn chart-canvas [candle-data chart-type]
   (let [mount! (fn [{:keys [:replicant/life-cycle :replicant/node]}]
                  (case life-cycle
                    :replicant.life-cycle/mount
                    (try
                      ;; Create chart
-                     (let [chart (ci/create-candlestick-chart! node)
-                           candlestick-series (ci/add-candlestick-series! chart)]
-                       (ci/set-candlestick-data! candlestick-series candle-data)
+                     (let [chart (ci/create-chart! node)
+                           series (ci/add-series! chart chart-type)]
+                       (ci/set-series-data! series candle-data chart-type)
                        (ci/fit-content! chart)
-                       ;; Create legend element following TradingView docs
-                       (ci/create-legend! node chart candlestick-series))
+                       ;; Create legend element
+                       (ci/create-legend! node chart series chart-type))
                      (catch :default e
-                       (js/console.error "Error in candlestick chart:" e)))
+                       (js/console.error "Error in chart:" e)))
                    :replicant.life-cycle/unmount
                    nil
                    nil))]
     [:div.w-full.h-96.bg-gray-800.relative
-     {:replicant/key (str "chart-" (hash candle-data))
+     {:replicant/key (str "chart-" chart-type "-" (hash candle-data))
       :replicant/on-render mount!}]))
 
 (defn trading-chart-view [state]
@@ -77,6 +77,7 @@
         candles-map (:candles state)
         ;; Use selected timeframe from state
         selected-timeframe (get-in state [:chart-options :selected-timeframe] :1d)
+        selected-chart-type (get-in state [:chart-options :selected-chart-type] :candlestick)
         api-response (get-in candles-map [active-asset selected-timeframe] {})
         ;; Check for error state
         has-error? (contains? api-response :error)
@@ -84,13 +85,21 @@
         raw-candles (if (vector? api-response)
                       api-response  ; Direct array
                       (get api-response :data []))  ; Wrapped in :data
-        candle-data (dp/process-candle-data raw-candles)]
+        candle-data (dp/process-candle-data raw-candles)
+        chart-type-label (case selected-chart-type
+                          :area "Area Chart"
+                          :bar "Bar Chart"
+                          :baseline "Baseline Chart"
+                          :candlestick "Candlestick Chart"
+                          :histogram "Histogram Chart"
+                          :line "Line Chart"
+                          "Chart")]
     [:div.w-full.max-w-6xl.mx-auto.p-4
-     [:h1.text-2xl.mb-4 (str "Candlestick Chart - " (or active-asset "No Asset Selected"))]
+     [:h1.text-2xl.mb-4 (str chart-type-label " - " (or active-asset "No Asset Selected"))]
      ;; Chart container with consistent width for both menu and chart
      [:div.w-full
       ;; Add the top menu above the chart
       (chart-top-menu state)
       (if has-error?
         [:div.text-red-500.p-4 "Error fetching chart data."]
-        (candlestick-chart-canvas candle-data))]])) 
+        (chart-canvas candle-data selected-chart-type))]])) 
