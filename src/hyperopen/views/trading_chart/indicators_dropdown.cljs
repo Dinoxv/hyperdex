@@ -37,7 +37,7 @@
                   :value (:period config)
                   :min (:min-period indicator-info)
                   :max (:max-period indicator-info)
-                  :on {:change [[:actions/update-indicator-period indicator-id :event.target/value]]}}]]
+                  :on {:change [[:actions/update-indicator-period indicator-id [:event.target/value]]]}}]]
                [:button.px-2.py-1.bg-red-600.hover:bg-red-700.text-white.text-xs.rounded.transition-colors
                 {:on {:click [[:actions/remove-indicator indicator-id]]}}
                 "Remove"]]))]])])]) 
