@@ -120,6 +120,26 @@
   [[:effects/save [:chart-options :selected-chart-type] chart-type]
    [:effects/save [:chart-options :chart-type-dropdown-visible] false]])
 
+(defn toggle-indicators-dropdown [state]
+  (let [current-visible (get-in state [:chart-options :indicators-dropdown-visible])]
+    [[:effects/save [:chart-options :indicators-dropdown-visible] (not current-visible)]]))
+
+(defn add-indicator [state indicator-type params]
+  (let [current-indicators (get-in state [:chart-options :active-indicators] {})
+        new-indicators (assoc current-indicators indicator-type params)]
+    [[:effects/save [:chart-options :active-indicators] new-indicators]]))
+
+(defn remove-indicator [state indicator-type]
+  (let [current-indicators (get-in state [:chart-options :active-indicators] {})
+        new-indicators (dissoc current-indicators indicator-type)]
+    [[:effects/save [:chart-options :active-indicators] new-indicators]]))
+
+(defn update-indicator-period [state indicator-type period-value]
+  (let [current-indicators (get-in state [:chart-options :active-indicators] {})
+        period (js/parseInt period-value)
+        updated-indicators (assoc-in current-indicators [indicator-type :period] period)]
+    [[:effects/save [:chart-options :active-indicators] updated-indicators]]))
+
 
 ;; Register effects and actions
 (nxr/register-effect! :effects/save save)
@@ -141,6 +161,10 @@
 (nxr/register-action! :actions/select-chart-timeframe select-chart-timeframe)
 (nxr/register-action! :actions/toggle-chart-type-dropdown toggle-chart-type-dropdown)
 (nxr/register-action! :actions/select-chart-type select-chart-type)
+(nxr/register-action! :actions/toggle-indicators-dropdown toggle-indicators-dropdown)
+(nxr/register-action! :actions/add-indicator add-indicator)
+(nxr/register-action! :actions/remove-indicator remove-indicator)
+(nxr/register-action! :actions/update-indicator-period update-indicator-period)
 (nxr/register-system->state! deref)
 
 ;; Register placeholder for DOM event values

@@ -197,6 +197,18 @@
       ;; Initialize
       (update-legend nil))))
 
+;; Indicator series functions
+(defn add-indicator-line-series! [chart color]
+  "Add a line series for indicators"
+  (let [seriesOptions #js {:color color
+                           :lineWidth 2}
+        series (.addSeries ^js chart LineSeries seriesOptions)]
+    series))
+
+(defn set-indicator-data! [series data]
+  "Set indicator data for line series - preserves whitespace data points"
+  (.setData series (clj->js data)))
+
 ;; Chart with volume support using separate panes
 (defn create-chart-with-volume-and-series! [container chart-type data]
   "Create a chart with main series and volume series in separate panes"
@@ -221,6 +233,42 @@
     
     ;; Return both chart and series for legend creation
     #js {:chart chart :mainSeries main-series :volumeSeries volume-series}))
+
+;; Enhanced chart creation with indicators support
+(defn create-chart-with-indicators! [container chart-type data indicators]
+  "Create a chart with indicators, main series, and volume series - indicators appear underneath"
+  (let [chart (create-chart! container)
+        indicator-colors ["#FF6B6B" "#4ECDC4" "#45B7D1" "#96CEB4" "#FFEAA7"]
+        ;; Add indicator series FIRST so they appear underneath
+        indicator-series (map-indexed 
+                          (fn [idx indicator]
+                            (let [color (nth indicator-colors (mod idx (count indicator-colors)))
+                                  series (add-indicator-line-series! chart color)]
+                              (set-indicator-data! series (:data indicator))
+                              {:series series :indicator indicator}))
+                          indicators)
+        ;; Add main series to pane 0 (after indicators)
+        main-series (add-series! chart chart-type)
+        ;; Add volume series to pane 1 (separate pane)
+        volume-series (.addSeries ^js chart HistogramSeries 
+                                  #js {:color "#26a69a"
+                                       :priceFormat #js {:type "volume"}}
+                                  1)] ; Pane index 1
+    
+    ;; Set data for main and volume series
+    (set-series-data! main-series data chart-type)
+    (set-volume-data! volume-series data)
+    
+    ;; Configure the volume pane height
+    (let [volume-pane (aget (.panes ^js chart) 1)]
+      (.setHeight ^js volume-pane 150))
+    
+    (fit-content! chart)
+    
+    #js {:chart chart 
+         :mainSeries main-series 
+         :volumeSeries volume-series
+         :indicatorSeries (clj->js indicator-series)}))
 
 ;; Legacy function names for backward compatibility
 (defn create-candlestick-chart! [container]

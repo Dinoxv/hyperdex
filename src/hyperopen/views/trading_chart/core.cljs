@@ -1,8 +1,10 @@
 (ns hyperopen.views.trading-chart.core
   (:require [hyperopen.views.trading-chart.utils.chart-interop :as ci]
             [hyperopen.views.trading-chart.utils.data-processing :as dp]
+            [hyperopen.views.trading-chart.utils.indicators :as indicators]
             [hyperopen.views.trading-chart.timeframe-dropdown :refer [timeframe-dropdown]]
-            [hyperopen.views.trading-chart.chart-type-dropdown :refer [chart-type-dropdown]]))
+            [hyperopen.views.trading-chart.chart-type-dropdown :refer [chart-type-dropdown]]
+            [hyperopen.views.trading-chart.indicators-dropdown :refer [indicators-dropdown]]))
 
 ;; Main timeframes for quick access buttons
 (def main-timeframes [:5m :1h :1d])
@@ -12,7 +14,9 @@
   (let [timeframes-dropdown-visible (get-in state [:chart-options :timeframes-dropdown-visible])
         selected-timeframe (get-in state [:chart-options :selected-timeframe] :1d)
         chart-type-dropdown-visible (get-in state [:chart-options :chart-type-dropdown-visible])
-        selected-chart-type (get-in state [:chart-options :selected-chart-type] :candlestick)]
+        selected-chart-type (get-in state [:chart-options :selected-chart-type] :candlestick)
+        indicators-dropdown-visible (get-in state [:chart-options :indicators-dropdown-visible])
+        active-indicators (get-in state [:chart-options :active-indicators] {})]
     [:div.flex.items-center.border-b.border-gray-700.px-4.py-2.w-full.space-x-4
      {:style {:background-color "rgb(30, 41, 55)"}}
      ;; Left side - Favorite timeframes + dropdown
@@ -45,19 +49,39 @@
       ;; Chart type dropdown
       (chart-type-dropdown {:selected-chart-type selected-chart-type
                            :chart-type-dropdown-visible chart-type-dropdown-visible})
-      [:button.flex.items-center.space-x-1.px-3.py-1.text-sm.font-medium.text-gray-300.hover:text-white.hover:bg-gray-700.rounded.transition-colors
-       [:span "📈"]
-       [:span "fx Indicators"]
-       [:span "▼"]]]]))
+      ;; Indicators dropdown
+      [:div.relative
+       [:button.flex.items-center.space-x-1.px-3.py-1.text-sm.font-medium.rounded.transition-colors
+        {:class (if (seq active-indicators)
+                  ["text-white" "bg-blue-600"]
+                  ["text-gray-300" "hover:text-white" "hover:bg-gray-700"])
+         :on {:click [[:actions/toggle-indicators-dropdown]]}}
+        [:span "📈"]
+        [:span (str "fx Indicators" 
+                   (when (seq active-indicators) 
+                     (str " (" (count active-indicators) ")")))]
+        [:span.inline-block.transition-transform.duration-200.ease-in-out
+         {:class (if indicators-dropdown-visible "rotate-180" "rotate-0")}
+         "▼"]]
+       (indicators-dropdown {:indicators-dropdown-visible indicators-dropdown-visible
+                            :active-indicators active-indicators})]]]))
 
 ;; Generic chart component that supports all chart types with volume
-(defn chart-canvas [candle-data chart-type]
-  (let [mount! (fn [{:keys [:replicant/life-cycle :replicant/node]}]
+(defn chart-canvas [candle-data chart-type active-indicators]
+  (let [;; Calculate indicators data
+        indicators-data (map (fn [[indicator-type config]]
+                              {:type indicator-type
+                               :config config
+                               :data (indicators/calculate-indicator indicator-type candle-data config)})
+                            active-indicators)
+        mount! (fn [{:keys [:replicant/life-cycle :replicant/node]}]
                  (case life-cycle
                    :replicant.life-cycle/mount
                    (try
-                     ;; Create chart with volume support
-                     (let [chart-obj (ci/create-chart-with-volume-and-series! node chart-type candle-data)
+                     ;; Create chart with indicators support
+                     (let [chart-obj (if (seq indicators-data)
+                                       (ci/create-chart-with-indicators! node chart-type candle-data indicators-data)
+                                       (ci/create-chart-with-volume-and-series! node chart-type candle-data))
                            chart (.-chart chart-obj)
                            main-series (.-mainSeries chart-obj)
                            volume-series (.-volumeSeries chart-obj)]
@@ -69,7 +93,7 @@
                    nil
                    nil))]
     [:div.w-full.h-96.relative
-     {:replicant/key (str "chart-" chart-type "-" (hash candle-data))
+     {:replicant/key (str "chart-" chart-type "-" (hash candle-data) "-" (hash active-indicators))
       :replicant/on-render mount!
       :style {:background-color "rgb(30, 41, 55)"}}]))
 
@@ -103,4 +127,4 @@
       (chart-top-menu state)
       (if has-error?
         [:div.text-red-500.p-4 "Error fetching chart data."]
-        (chart-canvas candle-data selected-chart-type))]])) 
+        (chart-canvas candle-data selected-chart-type (get-in state [:chart-options :active-indicators] {})))]])) 
