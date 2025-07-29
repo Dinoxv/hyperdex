@@ -1,8 +1,8 @@
 (ns hyperopen.views.footer-view)
 
 (defn footer-view []
-  [:footer.bg-base-200.border-t.border-base-300.mt-12
-   [:div.max-w-7xl.mx-auto.px-4.py-6
+  [:footer.bg-base-200.border-t.border-base-300.w-full
+   [:div.max-w-7xl.mx-auto.px-8.py-6
     [:div.flex.justify-between.items-center
      ;; Connection Status
      [:div.flex.items-center.space-x-2
