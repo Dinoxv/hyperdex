@@ -12,7 +12,6 @@
 ;; App state
 (defonce store (atom {:title "Hyperopen"
                       :message "Welcome to Hyperopen - A ClojureScript app with Replicant"
-                      :count 0
                       :websocket {:status :disconnected}
                       :active-assets {:contexts {}
                                      :loading false}
@@ -56,10 +55,6 @@
 (defn subscribe-webdata2 [_ store address]
   (println "Subscribing to WebData2 for address:" address)
   (webdata2/subscribe-webdata2! address))
-
-;; Actions - pure functions that return effects
-(defn increment-count [state]
-  [[:effects/save [:count] (inc (:count state))]])
 
 (defn init-websockets [state]
   [[:effects/init-websocket]])
@@ -148,7 +143,6 @@
 (nxr/register-effect! :effects/subscribe-orderbook subscribe-orderbook)
 (nxr/register-effect! :effects/subscribe-webdata2 subscribe-webdata2)
 (nxr/register-effect! :effects/fetch-candle-snapshot fetch-candle-snapshot)
-(nxr/register-action! :actions/increment-count increment-count)
 (nxr/register-action! :actions/init-websockets init-websockets)
 (nxr/register-action! :actions/subscribe-to-asset subscribe-to-asset)
 (nxr/register-action! :actions/subscribe-to-webdata2 subscribe-to-webdata2)

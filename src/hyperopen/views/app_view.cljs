@@ -5,9 +5,9 @@
             [hyperopen.views.footer-view :as footer-view]))
 
 (defn app-view [state]
-  [:div.min-h-screen.bg-base-100.flex.flex-col
+  [:div.h-screen.bg-base-100.flex.flex-col
    ;; Main Content
-   [:div.flex-1.p-8
+   [:div.flex-1.p-8.overflow-auto
     [:div.max-w-7xl.mx-auto.space-y-8
      ;; Header
      [:div.text-center.space-y-4
@@ -49,14 +49,7 @@
            
      ;; Trading Chart Panel
      [:div
-      (trading-chart/trading-chart-view state)]
-     
-     ;; Demo Counter Card
-     [:div.card.bg-base-200.shadow-xl.p-6.max-w-md.mx-auto
-      [:p.text-xl.mb-4 "You clicked " (:count state) " times"]
-      [:button.btn.btn-primary.btn-lg
-       {:on {:click [[:actions/increment-count]]}}
-       "Click me!"]]]]
+      (trading-chart/trading-chart-view state)]]]
    
-   ;; Footer - Outside main container for full width
+   ;; Footer - Pinned to bottom
    (footer-view/footer-view)]) 
