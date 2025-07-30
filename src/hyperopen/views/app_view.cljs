@@ -26,11 +26,6 @@
        {:on {:click [[:actions/subscribe-to-asset "ETH"]]}}
        "Subscribe to ETH"]]
      
-     ;; WebSocket Status
-     [:div.text-center
-      [:p.text-sm "WebSocket Status: " 
-       [:span.badge.badge-info (name (get-in state [:websocket :status] :disconnected))]]]
-     
      ;; Active Assets Panel
      [:div
       (active-asset-view/active-asset-view state)]
@@ -52,4 +47,4 @@
       (trading-chart/trading-chart-view state)]]]
    
    ;; Footer - Pinned to bottom
-   (footer-view/footer-view)]) 
+   (footer-view/footer-view state)]) 
