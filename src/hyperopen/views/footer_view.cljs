@@ -2,7 +2,7 @@
 
 (defn footer-view [state]
   [:footer.bg-base-200.border-t.border-base-300.w-full
-   [:div.max-w-7xl.mx-auto.px-8.py-6
+   [:div.max-w-8xl.mx-auto.px-4.py-2
     [:div.flex.justify-between.items-center
      ;; Connection Status
      [:div.flex.items-center.space-x-2
