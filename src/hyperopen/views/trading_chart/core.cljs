@@ -110,17 +110,8 @@
         raw-candles (if (vector? api-response)
                       api-response  ; Direct array
                       (get api-response :data []))  ; Wrapped in :data
-        candle-data (dp/process-candle-data raw-candles)
-        chart-type-label (case selected-chart-type
-                          :area "Area Chart"
-                          :bar "Bar Chart"
-                          :baseline "Baseline Chart"
-                          :candlestick "Candlestick Chart"
-                          :histogram "Histogram Chart"
-                          :line "Line Chart"
-                          "Chart")]
-    [:div.w-full.max-w-6xl.mx-auto.p-4
-     [:h1.text-2xl.mb-4 (str chart-type-label " - " (or active-asset "No Asset Selected"))]
+        candle-data (dp/process-candle-data raw-candles)]
+    [:div.w-full.mx-auto
      ;; Chart container with consistent width for both menu and chart
      [:div.w-full
       ;; Add the top menu above the chart

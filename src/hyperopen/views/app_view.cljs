@@ -15,6 +15,10 @@
     [:div.w-full
      (active-asset-view/active-asset-view state)]
     
+     ;; Trading Chart Panel
+     [:div
+      (trading-chart/trading-chart-view state)]
+    
     ;; Other content with max width constraint
     [:div.max-w-7xl.mx-auto.px-8.space-y-8
      
