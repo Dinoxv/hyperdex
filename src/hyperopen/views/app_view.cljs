@@ -10,12 +10,13 @@
    ;; Header - Pinned to top
    (header-view/header-view state)
    ;; Main Content
-   [:div.flex-1.p-8.overflow-auto
-    [:div.max-w-7xl.mx-auto.space-y-8
-     
-     ;; Active Assets Panel
-     [:div
-      (active-asset-view/active-asset-view state)]
+   [:div.flex-1.overflow-auto
+    ;; Active Assets Panel - Full width like header
+    [:div.w-full
+     (active-asset-view/active-asset-view state)]
+    
+    ;; Other content with max width constraint
+    [:div.max-w-7xl.mx-auto.px-8.space-y-8
      
      ;; L2 Order Book Panel
      [:div.flex.justify-center

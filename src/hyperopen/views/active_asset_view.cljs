@@ -155,7 +155,7 @@
 
 (defn active-asset-panel [contexts loading? dropdown-state full-state]
   [:div.relative.bg-base-100.rounded-lg.shadow-lg
-   [:div.p-4
+   [:div
     (cond
       loading? (loading-state)
       (empty? contexts) (empty-state)
