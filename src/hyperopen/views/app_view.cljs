@@ -2,10 +2,13 @@
   (:require [hyperopen.views.active-asset-view :as active-asset-view]
             [hyperopen.views.l2-orderbook-view :as l2-orderbook-view]
             [hyperopen.views.trading-chart.core :as trading-chart]
-            [hyperopen.views.footer-view :as footer-view]))
+            [hyperopen.views.footer-view :as footer-view]
+            [hyperopen.views.header-view :as header-view]))
 
 (defn app-view [state]
   [:div.h-screen.bg-base-100.flex.flex-col
+   ;; Header - Pinned to top
+   (header-view/header-view state)
    ;; Main Content
    [:div.flex-1.p-8.overflow-auto
     [:div.max-w-7xl.mx-auto.space-y-8
