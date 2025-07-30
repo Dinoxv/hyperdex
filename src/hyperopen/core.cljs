@@ -177,10 +177,8 @@
   (println "Reloading Hyperopen...")
   (r/render (.getElementById js/document "app") (app-view/app-view @store)))
 
-(defn init []
-  (println "Initializing Hyperopen...")
-  ;; Restore asset selector sort settings from localStorage
-  (asset-selector-settings/restore-asset-selector-sort-settings! store)
+(defn initialize-remote-data-streams! []
+  (println "Initializing remote data streams...")
   ;; initalize websocket client
   (ws-client/init-connection! "wss://api.hyperliquid.xyz/ws")
   ;; Initialize active asset context with store access
@@ -190,6 +188,13 @@
   ;; Initialize WebData2 module
   (webdata2/init! store)
   ;; Fetch initial market data
-  (api/fetch-asset-contexts! store)
+  (api/fetch-asset-contexts! store))
+
+(defn init []
+  (println "Initializing Hyperopen...")
+  ;; Restore asset selector sort settings from localStorage
+  (asset-selector-settings/restore-asset-selector-sort-settings! store)
+  ;; Initialize remote data streams
+  (initialize-remote-data-streams!)
   ;; Trigger initial render by updating the store
   (swap! store identity)) 
