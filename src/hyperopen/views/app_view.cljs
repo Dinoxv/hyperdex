@@ -13,18 +13,6 @@
    [:div.flex-1.p-8.overflow-auto
     [:div.max-w-7xl.mx-auto.space-y-8
      
-     ;; Controls
-     [:div.flex.justify-center.space-x-4
-      [:button.btn.btn-primary
-       {:on {:click [[:actions/init-websockets]]}}
-       "Connect WebSocket"]
-      [:button.btn.btn-secondary
-       {:on {:click [[:actions/subscribe-to-asset "BTC"]]}}
-       "Subscribe to BTC"]
-      [:button.btn.btn-secondary
-       {:on {:click [[:actions/subscribe-to-asset "ETH"]]}}
-       "Subscribe to ETH"]]
-     
      ;; Active Assets Panel
      [:div
       (active-asset-view/active-asset-view state)]
@@ -44,6 +32,20 @@
      ;; Trading Chart Panel
      [:div
       (trading-chart/trading-chart-view state)]]]
+   
+   ;; Controls - Above footer
+   [:div.p-4.bg-base-200.border-t.border-base-300
+    [:div.max-w-7xl.mx-auto
+     [:div.flex.justify-center.space-x-4
+      [:button.btn.btn-primary
+       {:on {:click [[:actions/init-websockets]]}}
+       "Connect WebSocket"]
+      [:button.btn.btn-secondary
+       {:on {:click [[:actions/subscribe-to-asset "BTC"]]}}
+       "Subscribe to BTC"]
+      [:button.btn.btn-secondary
+       {:on {:click [[:actions/subscribe-to-asset "ETH"]]}}
+       "Subscribe to ETH"]]]]
    
    ;; Footer - Pinned to bottom
    (footer-view/footer-view state)]) 
