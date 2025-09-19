@@ -1,4 +1,5 @@
-(ns hyperopen.views.header-view)
+(ns hyperopen.views.header-view
+  (:require [hyperopen.wallet.core :as wallet]))
 
 (defn header-view [state]
   [:header.bg-base-200.border-b.border-base-300.w-full
@@ -31,12 +32,37 @@
        ;; Dropdown menu would go here
        ]]
      
-     ;; Right Section - Connect Button and Icons
+     ;; Right Section - Wallet Status, Connect Button and Icons
      [:div.flex.items-center.space-x-4
+      ;; Wallet Status
+      (let [wallet-state (get-in state [:wallet])
+            is-connected (get wallet-state :connected?)
+            wallet-address (get wallet-state :address)
+            chain-id (get wallet-state :chain-id)
+            wallet-error (get wallet-state :error)
+            is-connecting (get wallet-state :connecting?)]
+        [:div.flex.items-center.gap-2
+         (cond
+           wallet-error             [:span.text-red-600 (str "Wallet error: " wallet-error)]
+           is-connecting            [:span.text-white.opacity-80 "Connecting…"]
+           is-connected             [:div.flex.items-center.gap-1
+                                     [:span.inline-block.px-2.py-1.rounded.bg-teal-700.text-teal-100.text-sm
+                                      (str "Connected " (wallet/short-addr wallet-address))]
+                                     (when chain-id
+                                       [:span.text-sm.text-white.opacity-60
+                                        (str " chain " chain-id)])]
+           :else                    [:span.text-white.opacity-80 "Not connected"])])
       ;; Connect Button
-      [:button.bg-teal-600.hover:bg-teal-700.text-teal-100.px-4.py-2.rounded-lg.font-medium.transition-colors
-       {:on {:click [[:actions/init-websockets]]}}
-       "Connect"]
+      (let [wallet-state (get-in state [:wallet])
+            is-connected (get wallet-state :connected?)
+            is-connecting (get wallet-state :connecting?)]
+        [:button.bg-teal-600.hover:bg-teal-700.text-teal-100.px-4.py-2.rounded-lg.font-medium.transition-colors
+         {:disabled (or is-connected is-connecting)
+          :on {:click [[:actions/connect-wallet]]}}
+         (cond
+           is-connecting "Connecting…"
+           is-connected  "Connected"
+           :else         "Connect Wallet")])
       
       ;; Utility Icons
       [:button.w-10.h-10.bg-base-300.hover:bg-base-400.rounded-lg.flex.items-center.justify-center.transition-colors

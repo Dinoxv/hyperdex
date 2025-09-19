@@ -7,7 +7,8 @@
             [hyperopen.websocket.orderbook :as orderbook]
             [hyperopen.websocket.webdata2 :as webdata2]
             [hyperopen.api :as api]
-            [hyperopen.asset-selector.settings :as asset-selector-settings]))
+            [hyperopen.asset-selector.settings :as asset-selector-settings]
+            [hyperopen.wallet.core :as wallet]))
 
 ;; App state
 (defonce store (atom {:websocket {:status :disconnected}
@@ -16,6 +17,11 @@
                       :active-asset nil
                       :orderbooks {}
                       :webdata2 {}
+                      :wallet {:connected? false
+                               :address    nil
+                               :chain-id   nil
+                               :connecting? false
+                               :error      nil}
                       :asset-selector {:visible-dropdown nil
                                       :search-term ""
                       				  :sort-by :volume
@@ -68,6 +74,10 @@
   (println "Unsubscribing from WebData2 for address:" address)
   (webdata2/unsubscribe-webdata2! address))
 
+(defn connect-wallet [_ store]
+  (println "Connecting wallet...")
+  (wallet/request-connection! store))
+
 (defn init-websockets [state]
   [[:effects/init-websocket]])
 
@@ -77,6 +87,9 @@
 
 (defn subscribe-to-webdata2 [state address]
   [[:effects/subscribe-webdata2 address]])
+
+(defn connect-wallet-action [state]
+  [[:effects/connect-wallet]])
 
 (defn toggle-asset-dropdown [state coin]
   (let [current-dropdown (get-in state [:asset-selector :visible-dropdown])]
@@ -165,9 +178,11 @@
 (nxr/register-effect! :effects/unsubscribe-active-asset unsubscribe-active-asset)
 (nxr/register-effect! :effects/unsubscribe-orderbook unsubscribe-orderbook)
 (nxr/register-effect! :effects/unsubscribe-webdata2 unsubscribe-webdata2)
+(nxr/register-effect! :effects/connect-wallet connect-wallet)
 (nxr/register-action! :actions/init-websockets init-websockets)
 (nxr/register-action! :actions/subscribe-to-asset subscribe-to-asset)
 (nxr/register-action! :actions/subscribe-to-webdata2 subscribe-to-webdata2)
+(nxr/register-action! :actions/connect-wallet connect-wallet-action)
 (nxr/register-action! :actions/toggle-asset-dropdown toggle-asset-dropdown)
 (nxr/register-action! :actions/close-asset-dropdown close-asset-dropdown)
 (nxr/register-action! :actions/select-asset select-asset)
@@ -195,7 +210,8 @@
 ;; Watch for WebSocket connection status changes
 (add-watch ws-client/connection-state ::ws-status
   (fn [_ _ _ new-state]
-    (swap! store assoc-in [:websocket :status] (:status new-state))))
+    ;; Defer store update to next tick to avoid nested renders
+    (js/queueMicrotask #(swap! store assoc-in [:websocket :status] (:status new-state)))))
 
 (defn reload []
   (println "Reloading Hyperopen...")
@@ -220,6 +236,8 @@
   (println "Initializing Hyperopen...")
   ;; Restore asset selector sort settings from localStorage
   (asset-selector-settings/restore-asset-selector-sort-settings! store)
+  ;; Initialize wallet system
+  (wallet/init-wallet! store)
   ;; Initialize remote data streams
   (initialize-remote-data-streams!)
   ;; Trigger initial render by updating the store
