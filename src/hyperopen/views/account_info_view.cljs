@@ -116,48 +116,72 @@
         (balance-row "HYPE" "2,980.83245490" "2,980.83245490" "149,909.61" "+83,888.91 (+50.0%)")]]
       (empty-state "No balance data available"))))
 
-;; Position row component
-(defn position-row [coin size position-value entry-price mark-price pnl-value pnl-percent liq-price margin funding]
-  [:div.grid.grid-cols-11.gap-4.py-3.px-4.hover:bg-base-200.border-b.border-base-300.items-center.text-sm
-   ;; Coin with leverage badge
-   [:div.flex.items-center.space-x-2
-    [:span.font-medium coin]
-    [:span.badge.badge-sm.badge-outline "10x"]]
-   ;; Size
-   [:div.text-right size]
-   ;; Position Value  
-   [:div.text-right "$" (format-currency position-value)]
-   ;; Entry Price
-   [:div.text-right (format-currency entry-price)]
-   ;; Mark Price
-   [:div.text-right (format-currency mark-price)]
-   ;; PNL (ROE %)
-   [:div.text-right
-    [:div 
-     [:span {:class (if (and pnl-value (pos? (js/parseFloat pnl-value)))
-                     "text-success" "text-error")}
-      "$" (format-currency pnl-value)]
-     [:div.text-xs.opacity-70 
-      [:span {:class (if (and pnl-percent (pos? (js/parseFloat pnl-percent)))
+;; Calculate mark price from position data (placeholder - would need market data)
+(defn calculate-mark-price [position-data]
+  ;; For now, use entry price as approximation - in real app would get from market data
+  (:entryPx position-data))
+
+;; Format position size display
+(defn format-position-size [position-data]
+  (let [leverage (get-in position-data [:leverage :value])
+        size (:szi position-data)
+        coin (:coin position-data)]
+    (str leverage "x " size " " coin)))
+
+;; Position row component using real data
+(defn position-row [position-data]
+  (let [pos (:position position-data)
+        coin (:coin pos)
+        leverage (get-in pos [:leverage :value])
+        size (:szi pos)
+        position-value (:positionValue pos)
+        entry-price (:entryPx pos)
+        mark-price (calculate-mark-price pos)
+        pnl-value (:unrealizedPnl pos)
+        pnl-percent (* 100 (js/parseFloat (:returnOnEquity pos)))
+        liq-price (:liquidationPx pos)
+        margin (:marginUsed pos)
+        funding (get-in pos [:cumFunding :allTime])]
+    [:div.grid.grid-cols-11.gap-4.py-3.px-4.hover:bg-base-200.border-b.border-base-300.items-center.text-sm
+     ;; Coin with leverage badge
+     [:div.flex.items-center.space-x-2
+      [:span.font-medium coin]
+      [:span.badge.badge-sm.badge-outline (str leverage "x")]]
+     ;; Size
+     [:div.text-right (format-position-size pos)]
+     ;; Position Value  
+     [:div.text-right "$" (format-currency position-value)]
+     ;; Entry Price
+     [:div.text-right (format-currency entry-price)]
+     ;; Mark Price
+     [:div.text-right (format-currency mark-price)]
+     ;; PNL (ROE %)
+     [:div.text-right
+      [:div 
+       [:span {:class (if (pos? (js/parseFloat pnl-value))
+                       "text-success" "text-error")}
+        "$" (format-currency pnl-value)]
+       [:div.text-xs.opacity-70 
+        [:span {:class (if (pos? pnl-percent)
+                        "text-success" "text-error")}
+         "(" (if (pos? pnl-percent) "+" "") 
+         (.toFixed pnl-percent 2) "%)"]]]]
+     ;; Liq. Price
+     [:div.text-right (if liq-price (format-currency liq-price) "N/A")]
+     ;; Margin
+     [:div.text-right "$" (format-currency margin)]
+     ;; Funding
+     [:div.text-right
+      [:span {:class (if (pos? (js/parseFloat funding))
                       "text-success" "text-error")}
-       "(" (if (and pnl-percent (pos? (js/parseFloat pnl-percent))) "+" "") 
-       (format-currency pnl-percent) "%)"]]]]
-   ;; Liq. Price
-   [:div.text-right (if liq-price (format-currency liq-price) "N/A")]
-   ;; Margin
-   [:div.text-right "$" (format-currency margin)]
-   ;; Funding
-   [:div.text-right
-    [:span {:class (if (and funding (pos? (js/parseFloat funding)))
-                    "text-success" "text-error")}
-     "$" (format-currency funding)]]
-   ;; Close All
-   [:div.text-center
-    [:button.btn.btn-xs.btn-ghost "Limit"]
-    [:button.btn.btn-xs.btn-ghost.ml-1 "Market"]]
-   ;; TP/SL
-   [:div.text-center
-    [:button.btn.btn-xs.btn-ghost "-- / --"]]])
+       "$" (format-currency funding)]]
+     ;; Close All
+     [:div.text-center
+      [:button.btn.btn-xs.btn-ghost "Limit"]
+      [:button.btn.btn-xs.btn-ghost.ml-1 "Market"]]
+     ;; TP/SL
+     [:div.text-center
+      [:button.btn.btn-xs.btn-ghost "-- / --"]]]))
 
 ;; Position table header
 (defn position-table-header []
@@ -187,10 +211,10 @@
        ;; Position table
        [:div
         (position-table-header)
-        ;; Sample position rows - will be replaced with real data
-        (position-row "HYPE" "10x 30.16 HYPE" "19,575.93" "3,043" "49,186" "-1543.76" "-7.31" "2.5485" "1,957.59" "-37.55")
-        (position-row "ETH" "20x 3.2912 ETH" "13,827.32" "4,505.5" "4,201.3" "-1001.02" "-135.0" "N/A" "891.37" "-13.07")
-        (position-row "PUMP" "5x 771,949 PUMP" "4,717.38" "0.006730" "0.006111" "-478.48" "-46.0" "N/A" "943.48" "-16.18")]]
+        ;; Real position rows from data
+        (for [position positions]
+          ^{:key (get-in position [:position :coin])}
+          (position-row position))]]
       (empty-state "No active positions"))))
 
 ;; Placeholder tab content for other tabs
