@@ -187,24 +187,65 @@
      [:div.text-center
       [:button.btn.btn-xs.btn-ghost "-- / --"]]]))
 
-;; Position table header
-(defn position-table-header []
-  [:div.grid.grid-cols-11.gap-4.py-2.px-4.bg-base-200.border-b.border-base-300.text-sm.font-medium.text-base-content
-   [:div "Coin"]
-   [:div.text-right "Size"] 
-   [:div.text-right "Position Value"]
-   [:div.text-right "Entry Price"]
-   [:div.text-right "Mark Price"]
-   [:div.text-right "PNL (ROE %)"]
-   [:div.text-right "Liq. Price"]
-   [:div.text-right "Margin"]
-   [:div.text-right "Funding"]
-   [:div.text-center "Close All"]
-   [:div.text-center "TP/SL"]])
+;; Sort positions by column
+(defn sort-positions-by-column [positions column direction]
+  (let [sort-fn (case column
+                  "Coin" (fn [pos] (:coin (:position pos)))
+                  "Size" (fn [pos] (js/parseFloat (:szi (:position pos))))
+                  "Position Value" (fn [pos] (js/parseFloat (:positionValue (:position pos))))
+                  "Entry Price" (fn [pos] (js/parseFloat (:entryPx (:position pos))))
+                  "Mark Price" (fn [pos] (js/parseFloat (:entryPx (:position pos)))) ; using entry as proxy
+                  "PNL (ROE %)" (fn [pos] (js/parseFloat (:unrealizedPnl (:position pos))))
+                  "Liq. Price" (fn [pos] (let [liq (:liquidationPx (:position pos))]
+                                          (if liq (js/parseFloat liq) js/Number.MAX_VALUE)))
+                  "Margin" (fn [pos] (js/parseFloat (:marginUsed (:position pos))))
+                  "Funding" (fn [pos] (js/parseFloat (get-in (:position pos) [:cumFunding :allTime])))
+                  (fn [pos] 0)) ; default sort
+        sorted-positions (sort-by sort-fn positions)]
+    (if (= direction :desc)
+      (reverse sorted-positions)
+      sorted-positions)))
+
+;; Sortable column header component
+(defn sortable-header [column-name sort-state]
+  (let [current-column (:column sort-state)
+        current-direction (:direction sort-state)
+        is-active (= current-column column-name)
+        sort-icon (when is-active
+                    (if (= current-direction :asc) "↑" "↓"))]
+    [:button.text-sm.font-medium.text-base-content.hover:text-primary.transition-colors.flex.items-center.space-x-1.group
+     {:on {:click [[:actions/sort-positions column-name]]}}
+     [:span column-name]
+     (when sort-icon
+       [:span.text-xs.opacity-70 sort-icon])]))
+
+;; Non-sortable column header
+(defn non-sortable-header [column-name]
+  [:div.text-sm.font-medium.text-base-content column-name])
+
+;; Position table header with sorting
+(defn position-table-header [sort-state]
+  [:div.grid.grid-cols-11.gap-4.py-2.px-4.bg-base-200.border-b.border-base-300
+   [:div.text-left (sortable-header "Coin" sort-state)]
+   [:div.text-right (sortable-header "Size" sort-state)]
+   [:div.text-right (sortable-header "Position Value" sort-state)]
+   [:div.text-right (sortable-header "Entry Price" sort-state)]
+   [:div.text-right (sortable-header "Mark Price" sort-state)]
+   [:div.text-right (sortable-header "PNL (ROE %)" sort-state)]
+   [:div.text-right (sortable-header "Liq. Price" sort-state)]
+   [:div.text-right (sortable-header "Margin" sort-state)]
+   [:div.text-right (sortable-header "Funding" sort-state)]
+   [:div.text-center (non-sortable-header "Close All")]
+   [:div.text-center (non-sortable-header "TP/SL")]])
 
 ;; Positions tab content
-(defn positions-tab-content [webdata2]
-  (let [positions (get-in webdata2 [:clearinghouseState :assetPositions])]
+(defn positions-tab-content [webdata2 sort-state]
+  (let [positions (get-in webdata2 [:clearinghouseState :assetPositions])
+        sorted-positions (if positions
+                          (sort-positions-by-column positions 
+                                                   (:column sort-state) 
+                                                   (:direction sort-state))
+                          [])]
     (if (and positions (seq positions))
       [:div
        ;; Header with count
@@ -214,9 +255,9 @@
        
        ;; Position table
        [:div
-        (position-table-header)
+        (position-table-header sort-state)
         ;; Real position rows from data
-        (for [position positions]
+        (for [position sorted-positions]
           ^{:key (get-in position [:position :coin])}
           (position-row position))]]
       (empty-state "No active positions"))))
@@ -228,10 +269,10 @@
    (empty-state (str (get tab-labels tab-name (name tab-name)) " coming soon"))])
 
 ;; Main tab content renderer
-(defn tab-content [selected-tab webdata2]
+(defn tab-content [selected-tab webdata2 sort-state]
   (case selected-tab
     :balances (balances-tab-content webdata2)
-    :positions (positions-tab-content webdata2)
+    :positions (positions-tab-content webdata2 sort-state)
     :open-orders (placeholder-tab-content :open-orders)
     :twap (placeholder-tab-content :twap)
     :trade-history (placeholder-tab-content :trade-history)
@@ -244,7 +285,8 @@
   (let [selected-tab (get-in state [:account-info :selected-tab] :balances)
         webdata2 (:webdata2 state)
         loading? (get-in state [:account-info :loading] false)
-        error (get-in state [:account-info :error])]
+        error (get-in state [:account-info :error])
+        sort-state (get-in state [:account-info :positions-sort] {:column nil :direction :asc})]
     [:div.bg-base-100.rounded-lg.shadow-lg.overflow-hidden.w-full.max-w-6xl
      ;; Tab navigation
      (tab-navigation selected-tab)
@@ -254,7 +296,7 @@
       (cond
         error (error-state error)
         loading? (loading-spinner)
-        :else (tab-content selected-tab webdata2))]]))
+        :else (tab-content selected-tab webdata2 sort-state))]]))
 
 ;; Main component that takes state and renders the UI
 (defn account-info-view [state]

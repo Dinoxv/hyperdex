@@ -33,7 +33,8 @@
                                       :selected-chart-type :candlestick}
                       :account-info {:selected-tab :balances
                                      :loading false
-                                     :error nil}}))
+                                     :error nil
+                                     :positions-sort {:column nil :direction :asc}}}))
 
 ;; Effects - handle side effects
 (defn save [_ store path value]
@@ -174,6 +175,15 @@
 (defn select-account-info-tab [state tab]
   [[:effects/save [:account-info :selected-tab] tab]])
 
+(defn sort-positions [state column]
+  (let [current-sort (get-in state [:account-info :positions-sort])
+        current-column (:column current-sort)
+        current-direction (:direction current-sort)
+        new-direction (if (and (= current-column column) (= current-direction :asc))
+                       :desc
+                       :asc)]
+    [[:effects/save [:account-info :positions-sort] {:column column :direction new-direction}]]))
+
 
 ;; Register effects and actions
 (nxr/register-effect! :effects/save save)
@@ -204,6 +214,7 @@
 (nxr/register-action! :actions/remove-indicator remove-indicator)
 (nxr/register-action! :actions/update-indicator-period update-indicator-period)
 (nxr/register-action! :actions/select-account-info-tab select-account-info-tab)
+(nxr/register-action! :actions/sort-positions sort-positions)
 (nxr/register-system->state! deref)
 
 ;; Register placeholder for DOM event values
