@@ -172,9 +172,13 @@
      [:div.text-right "$" (format-currency margin)]
      ;; Funding
      [:div.text-right
-      [:span {:class (if (pos? (js/parseFloat funding))
-                      "text-success" "text-error")}
-       "$" (format-currency funding)]]
+      (let [funding-num (js/parseFloat funding)
+            display-funding (if (pos? funding-num) (- funding-num) funding-num)
+            display-text (str "$" (format-currency (str display-funding)))]
+        [:span {:class (if (neg? display-funding)
+                        "text-error" 
+                        "text-success")}
+         display-text])]
      ;; Close All
      [:div.text-center
       [:button.btn.btn-xs.btn-ghost "Limit"]
