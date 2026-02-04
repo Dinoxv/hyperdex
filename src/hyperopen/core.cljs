@@ -6,10 +6,14 @@
             [hyperopen.websocket.client :as ws-client]
             [hyperopen.websocket.orderbook :as orderbook]
             [hyperopen.websocket.webdata2 :as webdata2]
+            [hyperopen.websocket.user :as user-ws]
             [hyperopen.api :as api]
+            [hyperopen.api.trading :as trading-api]
             [hyperopen.asset-selector.settings :as asset-selector-settings]
             [hyperopen.wallet.core :as wallet]
-            [hyperopen.wallet.address-watcher :as address-watcher]))
+            [hyperopen.wallet.address-watcher :as address-watcher]
+            [hyperopen.router :as router]
+            [hyperopen.state.trading :as trading]))
 
 ;; App state
 (defonce store (atom {:websocket {:status :disconnected}
@@ -18,11 +22,18 @@
                       :active-asset nil
                       :orderbooks {}
                       :webdata2 {}
+                      :orders {:open-orders []
+                               :fills []
+                               :fundings []
+                               :ledger []}
                       :wallet {:connected? false
                                :address    nil
                                :chain-id   nil
                                :connecting? false
                                :error      nil}
+                      :router {:path "/trade"}
+                      :order-form (trading/default-order-form)
+                      :funding-ui {:modal nil}
                       :asset-selector {:visible-dropdown nil
                                       :search-term ""
                       				  :sort-by :volume
@@ -39,6 +50,12 @@
 ;; Effects - handle side effects
 (defn save [_ store path value]
   (swap! store assoc-in path value))
+
+(defn push-state [_ _ path]
+  (.pushState js/history nil "" path))
+
+(defn replace-state [_ _ path]
+  (.replaceState js/history nil "" path))
 
 (defn fetch-candle-snapshot [_ store & {:keys [interval bars] :or {interval :1d bars 330}}]
   (println "Fetching candle snapshot for active asset...")
@@ -184,9 +201,51 @@
                        :asc)]
     [[:effects/save [:account-info :positions-sort] {:column column :direction new-direction}]]))
 
+(defn update-order-form [state path value]
+  (let [v (cond
+            (= path [:type]) (keyword value)
+            (= path [:side]) (keyword value)
+            (= path [:tif]) (keyword value)
+            :else value)]
+    [[:effects/save (into [:order-form] path) v]
+     [:effects/save [:order-form :error] nil]]))
+
+(defn submit-order [state]
+  (let [form (:order-form state)
+        market-form (when (= :market (:type form))
+                      (trading/apply-market-price state form))
+        form* (if market-form market-form form)
+        errors (trading/validate-order-form form*)
+        request (trading/build-order-request state form*)]
+    (cond
+      (and (= :market (:type form)) (nil? market-form))
+      [[:effects/save [:order-form :error] "Market price unavailable. Load order book first."]]
+      (seq errors) [[:effects/save [:order-form :error] (first errors)]]
+      (nil? request) [[:effects/save [:order-form :error] "Select an asset and ensure market data is loaded."]]
+      :else [[:effects/save [:order-form :error] nil]
+             [:effects/save [:order-form] form*]
+             [:effects/api-submit-order request]])))
+
+(defn cancel-order [state order]
+  (let [coin (:coin order)
+        oid (:oid order)
+        asset-idx (get-in state [:asset-contexts (keyword coin) :idx])]
+    (if (and asset-idx oid)
+      [[:effects/api-cancel-order {:action {:type "cancel"
+                                            :cancels [{:a asset-idx :o oid}]}}]]
+      [[:effects/save [:orders :cancel-error] "Missing asset or order id."]])))
+
+(defn load-user-data [state address]
+  [[:effects/api-load-user-data address]])
+
+(defn set-funding-modal [state modal]
+  [[:effects/save [:funding-ui :modal] modal]])
+
 
 ;; Register effects and actions
 (nxr/register-effect! :effects/save save)
+(nxr/register-effect! :effects/push-state push-state)
+(nxr/register-effect! :effects/replace-state replace-state)
 (nxr/register-effect! :effects/init-websocket init-websocket)
 (nxr/register-effect! :effects/subscribe-active-asset subscribe-active-asset)
 (nxr/register-effect! :effects/subscribe-orderbook subscribe-orderbook)
@@ -196,6 +255,48 @@
 (nxr/register-effect! :effects/unsubscribe-orderbook unsubscribe-orderbook)
 (nxr/register-effect! :effects/unsubscribe-webdata2 unsubscribe-webdata2)
 (nxr/register-effect! :effects/connect-wallet connect-wallet)
+(nxr/register-effect! :effects/api-submit-order
+  (fn [_ store request]
+    (let [address (get-in @store [:wallet :address])]
+      (if-not address
+        (swap! store assoc-in [:order-form :error] "Connect your wallet before submitting.")
+        (if-not (.-ethereum js/window)
+          (swap! store assoc-in [:order-form :error] "No EVM wallet provider found.")
+        (do
+          (swap! store assoc-in [:order-form :submitting?] true)
+          (-> (trading-api/submit-order! store address (:action request))
+              (.then #(.json %))
+              (.then (fn [resp]
+                       (swap! store assoc-in [:order-form :submitting?] false)
+                       (let [data (js->clj resp :keywordize-keys true)]
+                         (if (= "ok" (:status data))
+                           (swap! store assoc-in [:order-form :error] nil)
+                           (swap! store assoc-in [:order-form :error]
+                                  (str (or (:error data) (:response data) data)))))))
+              (.catch (fn [err]
+                        (swap! store assoc-in [:order-form :submitting?] false)
+                        (swap! store assoc-in [:order-form :error] (str err))))))))))))
+
+(nxr/register-effect! :effects/api-cancel-order
+  (fn [_ store request]
+    (let [address (get-in @store [:wallet :address])]
+      (if-not address
+        (swap! store assoc-in [:orders :cancel-error] "Connect your wallet before cancelling.")
+        (if-not (.-ethereum js/window)
+          (swap! store assoc-in [:orders :cancel-error] "No EVM wallet provider found.")
+        (-> (trading-api/cancel-order! store address (:action request))
+            (.then #(.json %))
+            (.then (fn [resp]
+                     (swap! store assoc-in [:orders :cancel-error] nil)
+                     (swap! store assoc-in [:orders :cancel-response] resp)))
+            (.catch (fn [err]
+                      (swap! store assoc-in [:orders :cancel-error] (str err))))))))))
+
+(nxr/register-effect! :effects/api-load-user-data
+  (fn [_ store address]
+    (when address
+      (api/fetch-frontend-open-orders! store address)
+      (api/fetch-user-fills! store address))))
 (nxr/register-action! :actions/init-websockets init-websockets)
 (nxr/register-action! :actions/subscribe-to-asset subscribe-to-asset)
 (nxr/register-action! :actions/subscribe-to-webdata2 subscribe-to-webdata2)
@@ -215,12 +316,28 @@
 (nxr/register-action! :actions/update-indicator-period update-indicator-period)
 (nxr/register-action! :actions/select-account-info-tab select-account-info-tab)
 (nxr/register-action! :actions/sort-positions sort-positions)
+(nxr/register-action! :actions/update-order-form update-order-form)
+(nxr/register-action! :actions/submit-order submit-order)
+(nxr/register-action! :actions/cancel-order cancel-order)
+(nxr/register-action! :actions/load-user-data load-user-data)
+(nxr/register-action! :actions/set-funding-modal set-funding-modal)
+(nxr/register-action! :actions/navigate
+  (fn [state path & [opts]]
+    (let [p (router/normalize-path path)
+          replace? (boolean (:replace? opts))]
+      (cond-> [[:effects/save [:router :path] p]]
+        replace? (conj [:effects/replace-state p])
+        (not replace?) (conj [:effects/push-state p])))))
 (nxr/register-system->state! deref)
 
 ;; Register placeholder for DOM event values
 (nxr/register-placeholder! :event.target/value
   (fn [{:replicant/keys [dom-event]}]
     (some-> dom-event .-target .-value)))
+
+(nxr/register-placeholder! :event.target/checked
+  (fn [{:replicant/keys [dom-event]}]
+    (some-> dom-event .-target .-checked)))
 
 ;; Wire up the render loop
 (r/set-dispatch! #(nxr/dispatch store %1 %2))
@@ -248,10 +365,22 @@
   (active-ctx/init! store)
   ;; Initialize orderbook module
   (orderbook/init! store)
+  ;; Initialize user websocket handlers
+  (user-ws/init! store)
   ;; Initialize WebData2 module
   (webdata2/init! store)
   ;; Note: WebData2 subscriptions are now managed by address-watcher
   (address-watcher/init-with-webdata2! store webdata2/subscribe-webdata2! webdata2/unsubscribe-webdata2!)
+  ;; Subscribe user streams when address changes
+  (address-watcher/add-handler! (user-ws/create-user-handler user-ws/subscribe-user! user-ws/unsubscribe-user!))
+  ;; Fetch initial user data on address change
+  (address-watcher/add-handler!
+    (reify address-watcher/IAddressChangeHandler
+      (on-address-changed [_ _ new-address]
+        (when new-address
+          (api/fetch-frontend-open-orders! store new-address)
+          (api/fetch-user-fills! store new-address)))
+      (get-handler-name [_] "user-initial-data-handler")))
   ;; Fetch initial market data
   (api/fetch-asset-contexts! store))
 
@@ -261,7 +390,9 @@
   (asset-selector-settings/restore-asset-selector-sort-settings! store)
   ;; Initialize wallet system
   (wallet/init-wallet! store)
+  ;; Initialize router
+  (router/init! store)
   ;; Initialize remote data streams
   (initialize-remote-data-streams!)
   ;; Trigger initial render by updating the store
-  (swap! store identity)) 
+  (swap! store identity))

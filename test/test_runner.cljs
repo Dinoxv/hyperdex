@@ -1,11 +1,13 @@
 (ns test-runner
   (:require [cljs.test :refer-macros [run-tests]]
-            [hyperopen.utils.data-normalization-test]))
+            [hyperopen.utils.data-normalization-test]
+            [hyperopen.state.trading-test]))
 
 (defn run-all-tests
   "Run all test namespaces and return the results"
   []
-  (run-tests 'hyperopen.utils.data-normalization-test))
+  (run-tests 'hyperopen.utils.data-normalization-test
+             'hyperopen.state.trading-test))
 
 (defn -main
   "Entry point for test runner"

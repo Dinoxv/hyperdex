@@ -12,20 +12,27 @@
      ;; Navigation Links
      [:nav.hidden.md:flex.items-center.space-x-8
       [:a.text-cyan-400.font-medium.hover:text-cyan-300.transition-colors
-       {:href "#"} "Trade"]
+       {:href "#"
+        :on {:click [[:actions/navigate "/trade"]]}} "Trade"]
       [:a.text-white.opacity-80.hover:opacity-100.hover:text-white.transition-colors
-       {:href "#"} "Vaults"]
+       {:href "#"
+        :on {:click [[:actions/navigate "/vaults"]]}} "Vaults"]
       [:a.text-white.opacity-80.hover:opacity-100.hover:text-white.transition-colors
-       {:href "#"} "Portfolio"]
+       {:href "#"
+        :on {:click [[:actions/navigate "/portfolio"]]}} "Portfolio"]
       [:a.text-white.opacity-80.hover:opacity-100.hover:text-white.transition-colors
-       {:href "#"} "Staking"]
+       {:href "#"
+        :on {:click [[:actions/navigate "/staking"]]}} "Staking"]
       [:a.text-white.opacity-80.hover:opacity-100.hover:text-white.transition-colors
-       {:href "#"} "Referrals"]
+       {:href "#"
+        :on {:click [[:actions/navigate "/referrals"]]}} "Referrals"]
       [:a.text-white.opacity-80.hover:opacity-100.hover:text-white.transition-colors
-       {:href "#"} "Leaderboard"]
+       {:href "#"
+        :on {:click [[:actions/navigate "/leaderboard"]]}} "Leaderboard"]
       [:div.relative.group
        [:a.text-white.opacity-80.hover:opacity-100.hover:text-white.transition-colors.flex.items-center.space-x-1
-        {:href "#"}
+        {:href "#"
+         :on {:click [[:actions/navigate "/more"]]}}
         [:span "More"]
         [:svg.w-4.h-4 {:viewBox "0 0 20 20" :fill "currentColor"}
          [:path {:fill-rule "evenodd" :d "M5.293 7.293a1 1 0 011.414 0L10 10.586l3.293-3.293a1 1 0 111.414 1.414l-4 4a1 1 0 01-1.414 0l-4-4a1 1 0 010-1.414z" :clip-rule "evenodd"}]]]
@@ -52,6 +59,13 @@
                                        [:span.text-sm.text-white.opacity-60
                                         (str " chain " chain-id)])]
            :else                    [:span.text-white.opacity-80 "Not connected"])])
+      ;; Funding entry points
+      [:button.btn.btn-sm.btn-outline
+       {:on {:click [[:actions/set-funding-modal :deposit]]}}
+       "Deposit"]
+      [:button.btn.btn-sm.btn-outline
+       {:on {:click [[:actions/set-funding-modal :withdraw]]}}
+       "Withdraw"]
       ;; Connect Button
       (let [wallet-state (get-in state [:wallet])
             is-connected (get wallet-state :connected?)

@@ -64,6 +64,17 @@
        (if (pos? num-val) "+" "") formatted "%"])
     [:span.text-base-content "0.00%"]))
 
+(defn format-timestamp [ms]
+  (when ms
+    (let [d (js/Date. ms)]
+      (.toLocaleString d))))
+
+(defn format-side [side]
+  (case side
+    "B" "Buy"
+    "S" "Sell"
+    (or side "-")))
+
 ;; Balance row component
 (defn balance-row [coin total-balance available-balance usdc-value pnl-pct]
   [:div.grid.grid-cols-7.gap-4.py-3.px-4.hover:bg-base-200.border-b.border-base-300.items-center
@@ -268,22 +279,105 @@
    [:div.text-lg.font-medium.mb-4 (get tab-labels tab-name (name tab-name))]
    (empty-state (str (get tab-labels tab-name (name tab-name)) " coming soon"))])
 
+(defn open-orders-tab-content [orders]
+  (if (seq orders)
+    [:div
+     [:div.grid.grid-cols-7.gap-4.py-2.px-4.bg-base-200.border-b.border-base-300.text-sm.font-medium
+      [:div "Coin"]
+      [:div.text-right "Side"]
+      [:div.text-right "Size"]
+      [:div.text-right "Price"]
+      [:div.text-right "Type"]
+      [:div.text-right "Time"]
+      [:div.text-right ""]]
+     (for [o orders]
+       ^{:key (str (:oid o) "-" (:coin o))}
+       [:div.grid.grid-cols-7.gap-4.py-3.px-4.border-b.border-base-300.text-sm
+        [:div (:coin o)]
+        [:div.text-right (format-side (:side o))]
+        [:div.text-right (format-currency (:sz o))]
+        [:div.text-right (format-currency (:px o))]
+        [:div.text-right (or (:type o) "order")]
+        [:div.text-right (format-timestamp (:time o))]
+        [:div.text-right
+         [:button.btn.btn-xs.btn-ghost
+          {:on {:click [[:actions/cancel-order o]]}}
+          "Cancel"]]])]
+    (empty-state "No open orders")))
+
+(defn trade-history-tab-content [fills]
+  (if (seq fills)
+    [:div
+     [:div.grid.grid-cols-6.gap-4.py-2.px-4.bg-base-200.border-b.border-base-300.text-sm.font-medium
+      [:div "Coin"]
+      [:div.text-right "Side"]
+      [:div.text-right "Size"]
+      [:div.text-right "Price"]
+      [:div.text-right "Fee"]
+      [:div.text-right "Time"]]
+     (for [f fills]
+       ^{:key (str (:tid f) "-" (:coin f) "-" (:time f))}
+       [:div.grid.grid-cols-6.gap-4.py-3.px-4.border-b.border-base-300.text-sm
+        [:div (:coin f)]
+        [:div.text-right (format-side (:side f))]
+        [:div.text-right (format-currency (:sz f))]
+        [:div.text-right (format-currency (:px f))]
+        [:div.text-right (format-currency (:fee f))]
+        [:div.text-right (format-timestamp (:time f))]])]
+    (empty-state "No fills")))
+
+(defn funding-history-tab-content [fundings]
+  (if (seq fundings)
+    [:div
+     [:div.grid.grid-cols-5.gap-4.py-2.px-4.bg-base-200.border-b.border-base-300.text-sm.font-medium
+      [:div "Coin"]
+      [:div.text-right "Rate"]
+      [:div.text-right "Payment"]
+      [:div.text-right "Position"]
+      [:div.text-right "Time"]]
+     (for [f fundings]
+       ^{:key (str (:coin f) "-" (:time f))}
+       [:div.grid.grid-cols-5.gap-4.py-3.px-4.border-b.border-base-300.text-sm
+        [:div (:coin f)]
+        [:div.text-right (format-pnl-percentage (* 100 (js/parseFloat (or (:fundingRate f) 0))))]
+        [:div.text-right (format-currency (:payment f))]
+        [:div.text-right (format-currency (:positionSize f))]
+        [:div.text-right (format-timestamp (:time f))]])]
+    (empty-state "No funding history")))
+
+(defn order-history-tab-content [ledger]
+  (if (seq ledger)
+    [:div
+     [:div.grid.grid-cols-4.gap-4.py-2.px-4.bg-base-200.border-b.border-base-300.text-sm.font-medium
+      [:div "Type"]
+      [:div.text-right "Asset"]
+      [:div.text-right "Delta"]
+      [:div.text-right "Time"]]
+     (for [l ledger]
+       ^{:key (str (:time l) "-" (:coin l) "-" (:delta l))}
+       [:div.grid.grid-cols-4.gap-4.py-3.px-4.border-b.border-base-300.text-sm
+        [:div (or (:type l) "event")]
+        [:div.text-right (or (:coin l) "-")]
+        [:div.text-right (format-currency (:delta l))]
+        [:div.text-right (format-timestamp (:time l))]])]
+    (empty-state "No order history")))
+
 ;; Main tab content renderer
 (defn tab-content [selected-tab webdata2 sort-state]
   (case selected-tab
     :balances (balances-tab-content webdata2)
     :positions (positions-tab-content webdata2 sort-state)
-    :open-orders (placeholder-tab-content :open-orders)
+    :open-orders (open-orders-tab-content (get-in webdata2 [:open-orders]))
     :twap (placeholder-tab-content :twap)
-    :trade-history (placeholder-tab-content :trade-history)
-    :funding-history (placeholder-tab-content :funding-history)
-    :order-history (placeholder-tab-content :order-history)
+    :trade-history (trade-history-tab-content (get-in webdata2 [:fills]))
+    :funding-history (funding-history-tab-content (get-in webdata2 [:fundings]))
+    :order-history (order-history-tab-content (get-in webdata2 [:ledger]))
     (empty-state "Unknown tab")))
 
 ;; Account info panel component
 (defn account-info-panel [state]
   (let [selected-tab (get-in state [:account-info :selected-tab] :balances)
-        webdata2 (:webdata2 state)
+        webdata2 (merge (:webdata2 state) (get state :orders))
         loading? (get-in state [:account-info :loading] false)
         error (get-in state [:account-info :error])
         sort-state (get-in state [:account-info :positions-sort] {:column nil :direction :asc})]

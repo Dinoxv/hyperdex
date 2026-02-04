@@ -3,12 +3,18 @@
    [hyperopen.utils.data-normalization :refer [normalize-asset-contexts]]
    [hyperopen.utils.interval :refer [interval-to-milliseconds]]))
 
+(def info-url "https://api.hyperliquid.xyz/info")
+
+(defn- post-info!
+  [body]
+  (js/fetch info-url
+            (clj->js {:method "POST"
+                      :headers {"Content-Type" "application/json"}
+                      :body (js/JSON.stringify (clj->js body))})))
+
 (defn fetch-asset-contexts! [store]
   (println "Fetching perpetual asset contexts...")
-  (-> (js/fetch "https://api.hyperliquid.xyz/info"
-                (clj->js {:method "POST"
-                          :headers {"Content-Type" "application/json"}
-                          :body (js/JSON.stringify (clj->js {"type" "metaAndAssetCtxs"}))}))
+  (-> (post-info! {"type" "metaAndAssetCtxs"})
       (.then #(.json %))
       (.then #(let [data (js->clj % :keywordize-keys true)
                     normalised (normalize-asset-contexts data)]
@@ -35,13 +41,28 @@
                                   "startTime" start
                                   "endTime"   now}})]
         (println "Fetching" bars interval-s "bars for" active-asset)
-        (-> (js/fetch "https://api.hyperliquid.xyz/info"
-                      (clj->js {:method  "POST"
-                                :headers {"Content-Type" "application/json"}
-                                :body    (js/JSON.stringify body)}))
+        (-> (post-info! body)
             (.then #(.json %))
             (.then #(let [data (js->clj % :keywordize-keys true)]
                       (swap! store assoc-in [:candles active-asset interval] data)
                       nil))
             (.catch #(do (println "Error fetching" %) 
                          (swap! store assoc-in [:candles active-asset interval :error] (str %))))))))) 
+
+(defn fetch-frontend-open-orders!
+  [store address]
+  (-> (post-info! {"type" "frontendOpenOrders" "user" address})
+      (.then #(.json %))
+      (.then #(let [data (js->clj % :keywordize-keys true)]
+                (swap! store assoc-in [:orders :open] data)))
+      (.catch #(do (println "Error fetching open orders:" %)
+                   (swap! store assoc-in [:orders :open-error] (str %))))))
+
+(defn fetch-user-fills!
+  [store address]
+  (-> (post-info! {"type" "userFills" "user" address "aggregateByTime" true})
+      (.then #(.json %))
+      (.then #(let [data (js->clj % :keywordize-keys true)]
+                (swap! store assoc-in [:orders :fills] data)))
+      (.catch #(do (println "Error fetching user fills:" %)
+                   (swap! store assoc-in [:orders :fills-error] (str %)))))) 

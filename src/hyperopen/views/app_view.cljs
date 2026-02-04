@@ -1,59 +1,24 @@
 (ns hyperopen.views.app-view
-  (:require [hyperopen.views.active-asset-view :as active-asset-view]
-            [hyperopen.views.l2-orderbook-view :as l2-orderbook-view]
-            [hyperopen.views.trading-chart.core :as trading-chart]
+  (:require [clojure.string :as str]
             [hyperopen.views.footer-view :as footer-view]
             [hyperopen.views.header-view :as header-view]
-            [hyperopen.views.account-info-view :as account-info-view]))
+            [hyperopen.views.trade-view :as trade-view]))
 
 (defn app-view [state]
-  [:div.h-screen.bg-base-100.flex.flex-col
-   ;; Header - Pinned to top
-   (header-view/header-view state)
-   ;; Main Content
-   [:div.flex-1.overflow-auto
-    ;; Active Assets Panel - Full width like header
-    [:div.w-full
-     (active-asset-view/active-asset-view state)]
-    
-     ;; Trading Chart Panel
-     [:div
-      (trading-chart/trading-chart-view state)]
-    
-    ;; Other content with max width constraint
-    [:div.max-w-7xl.mx-auto.px-8.space-y-8
-     
-     ;; Account Info Panel
-     [:div.flex.justify-center
-      (account-info-view/account-info-view state)]
-     
-     ;; L2 Order Book Panel
-     [:div.flex.justify-center
-      (let [active-asset (:active-asset state)
-            orderbook-data (when active-asset 
-                            (get-in state [:orderbooks active-asset]))]
-        (l2-orderbook-view/l2-orderbook-view 
-          {:coin (or active-asset "No Asset Selected")
-           :orderbook orderbook-data
-           :loading (and active-asset (nil? orderbook-data))}))]
-           
-     ;; Trading Chart Panel
-     [:div
-      (trading-chart/trading-chart-view state)]]]
-   
-   ;; Controls - Above footer
-   [:div.p-4.bg-base-200.border-t.border-base-300
-    [:div.max-w-7xl.mx-auto
-     [:div.flex.justify-center.space-x-4
-      [:button.btn.btn-primary
-       {:on {:click [[:actions/init-websockets]]}}
-       "Connect WebSocket"]
-      [:button.btn.btn-secondary
-       {:on {:click [[:actions/subscribe-to-asset "BTC"]]}}
-       "Subscribe to BTC"]
-      [:button.btn.btn-secondary
-       {:on {:click [[:actions/subscribe-to-asset "ETH"]]}}
-       "Subscribe to ETH"]]]]
-   
-   ;; Footer - Pinned to bottom
-   (footer-view/footer-view state)]) 
+  (let [route (get-in state [:router :path] "/trade")]
+    [:div.h-screen.bg-base-100.flex.flex-col
+     (header-view/header-view state)
+     (case route
+       "/trade" (trade-view/trade-view state)
+       (trade-view/trade-view state))
+     (when-let [modal (get-in state [:funding-ui :modal])]
+       [:div.fixed.inset-0.z-50.flex.items-center.justify-center
+        [:div.absolute.inset-0.bg-black.opacity-50
+         {:on {:click [[:actions/set-funding-modal nil]]}}]
+        [:div.relative.bg-base-100.rounded-lg.shadow-lg.p-6.w-full.max-w-sm
+         [:div.text-lg.font-semibold.mb-2 (str/capitalize (name modal))]
+         [:div.text-sm.text-gray-500.mb-4 "Coming soon in Phase 2."]
+         [:button.btn.btn-primary.w-full
+          {:on {:click [[:actions/set-funding-modal nil]]}}
+          "Close"]]])
+     (footer-view/footer-view state)]))
