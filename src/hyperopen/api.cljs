@@ -69,13 +69,18 @@
                          (swap! store assoc-in [:candles active-asset interval :error] (str %))))))))) 
 
 (defn fetch-frontend-open-orders!
-  [store address]
-  (-> (post-info! {"type" "frontendOpenOrders" "user" address})
-      (.then #(.json %))
-      (.then #(let [data (js->clj % :keywordize-keys true)]
-                (swap! store assoc-in [:orders :open] data)))
-      (.catch #(do (println "Error fetching open orders:" %)
-                   (swap! store assoc-in [:orders :open-error] (str %))))))
+  ([store address] (fetch-frontend-open-orders! store address nil))
+  ([store address dex]
+   (let [body (cond-> {"type" "frontendOpenOrders" "user" address}
+                (and dex (not= dex "")) (assoc "dex" dex))]
+     (-> (post-info! body)
+         (.then #(.json %))
+         (.then #(let [data (js->clj % :keywordize-keys true)]
+                   (if (and dex (not= dex ""))
+                     (swap! store assoc-in [:orders :open-orders-snapshot-by-dex dex] data)
+                     (swap! store assoc-in [:orders :open-orders-snapshot] data))))
+         (.catch #(do (println "Error fetching open orders:" %)
+                      (swap! store assoc-in [:orders :open-error] (str %))))))))
 
 (defn fetch-user-fills!
   [store address]

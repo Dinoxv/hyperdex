@@ -30,6 +30,8 @@
                              :loading-balances? false
                              :error nil}
                       :orders {:open-orders []
+                               :open-orders-snapshot []
+                               :open-orders-snapshot-by-dex {}
                                :fills []
                                :fundings []
                                :ledger []}
@@ -398,7 +400,18 @@
     (reify address-watcher/IAddressChangeHandler
       (on-address-changed [_ _ new-address]
         (when new-address
-          (api/fetch-frontend-open-orders! store new-address)
+          (swap! store assoc-in [:orders :open-orders-snapshot-by-dex] {})
+          (let [dexs (:perp-dexs @store)]
+            (if (seq dexs)
+              (do
+                (api/fetch-frontend-open-orders! store new-address)
+                (doseq [dex dexs]
+                  (api/fetch-frontend-open-orders! store new-address dex)))
+              (-> (api/fetch-perp-dexs! store)
+                  (.then (fn [loaded-dexs]
+                           (api/fetch-frontend-open-orders! store new-address)
+                           (doseq [dex loaded-dexs]
+                             (api/fetch-frontend-open-orders! store new-address dex)))))))
           (api/fetch-user-fills! store new-address)))
       (get-handler-name [_] "user-initial-data-handler")))
   ;; Fetch spot balances on address change
