@@ -14,11 +14,12 @@
   (let [nonce (js/Date.now)]
     (-> (signing/sign-l1-action! address action nonce :vault-address vault-address)
         (.then (fn [sig]
-                 (let [payload (cond-> {:action action
+                 (let [{:keys [r s v]} (js->clj sig :keywordize-keys true)
+                       payload (cond-> {:action action
                                         :nonce nonce
-                                        :signature {:r (.-r sig)
-                                                    :s (.-s sig)
-                                                    :v (.-v sig)}}
+                                        :signature {:r r
+                                                    :s s
+                                                    :v v}}
                                  vault-address (assoc :vaultAddress vault-address))]
                    (json-post! exchange-url payload)))))))
 

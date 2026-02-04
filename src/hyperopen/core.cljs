@@ -258,10 +258,14 @@
 (nxr/register-effect! :effects/api-submit-order
   (fn [_ store request]
     (let [address (get-in @store [:wallet :address])]
-      (if-not address
+      (cond
+        (nil? address)
         (swap! store assoc-in [:order-form :error] "Connect your wallet before submitting.")
-        (if-not (.-ethereum js/window)
-          (swap! store assoc-in [:order-form :error] "No EVM wallet provider found.")
+
+        (nil? (.-ethereum js/window))
+        (swap! store assoc-in [:order-form :error] "No EVM wallet provider found.")
+
+        :else
         (do
           (swap! store assoc-in [:order-form :submitting?] true)
           (-> (trading-api/submit-order! store address (:action request))
@@ -275,22 +279,26 @@
                                   (str (or (:error data) (:response data) data)))))))
               (.catch (fn [err]
                         (swap! store assoc-in [:order-form :submitting?] false)
-                        (swap! store assoc-in [:order-form :error] (str err))))))))))))
+                        (swap! store assoc-in [:order-form :error] (str err))))))))))
 
 (nxr/register-effect! :effects/api-cancel-order
   (fn [_ store request]
     (let [address (get-in @store [:wallet :address])]
-      (if-not address
+      (cond
+        (nil? address)
         (swap! store assoc-in [:orders :cancel-error] "Connect your wallet before cancelling.")
-        (if-not (.-ethereum js/window)
-          (swap! store assoc-in [:orders :cancel-error] "No EVM wallet provider found.")
+
+        (nil? (.-ethereum js/window))
+        (swap! store assoc-in [:orders :cancel-error] "No EVM wallet provider found.")
+
+        :else
         (-> (trading-api/cancel-order! store address (:action request))
             (.then #(.json %))
             (.then (fn [resp]
                      (swap! store assoc-in [:orders :cancel-error] nil)
                      (swap! store assoc-in [:orders :cancel-response] resp)))
             (.catch (fn [err]
-                      (swap! store assoc-in [:orders :cancel-error] (str err))))))))))
+                      (swap! store assoc-in [:orders :cancel-error] (str err)))))))))
 
 (nxr/register-effect! :effects/api-load-user-data
   (fn [_ store address]
