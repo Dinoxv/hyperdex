@@ -66,3 +66,32 @@
                 (swap! store assoc-in [:orders :fills] data)))
       (.catch #(do (println "Error fetching user fills:" %)
                    (swap! store assoc-in [:orders :fills-error] (str %)))))) 
+
+(defn fetch-spot-meta!
+  [store]
+  (println "Fetching spot metadata...")
+  (swap! store assoc-in [:spot :loading-meta?] true)
+  (-> (post-info! {"type" "spotMeta"})
+      (.then #(.json %))
+      (.then #(let [data (js->clj % :keywordize-keys true)]
+                (swap! store assoc-in [:spot :meta] data)
+                (swap! store assoc-in [:spot :loading-meta?] false)
+                (swap! store assoc-in [:spot :error] nil)))
+      (.catch #(do (println "Error fetching spot meta:" %)
+                   (swap! store assoc-in [:spot :loading-meta?] false)
+                   (swap! store assoc-in [:spot :error] (str %))))))
+
+(defn fetch-spot-clearinghouse-state!
+  [store address]
+  (when address
+    (println "Fetching spot clearinghouse state...")
+    (swap! store assoc-in [:spot :loading-balances?] true)
+    (-> (post-info! {"type" "spotClearinghouseState" "user" address})
+        (.then #(.json %))
+        (.then #(let [data (js->clj % :keywordize-keys true)]
+                  (swap! store assoc-in [:spot :clearinghouse-state] data)
+                  (swap! store assoc-in [:spot :loading-balances?] false)
+                  (swap! store assoc-in [:spot :error] nil)))
+        (.catch #(do (println "Error fetching spot balances:" %)
+                     (swap! store assoc-in [:spot :loading-balances?] false)
+                     (swap! store assoc-in [:spot :error] (str %)))))))

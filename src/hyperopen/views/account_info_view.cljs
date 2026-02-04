@@ -51,6 +51,23 @@
         (.toLocaleString num-val "en-US" #js {:minimumFractionDigits 2 :maximumFractionDigits 2})))
     "0.00"))
 
+(defn parse-num [value]
+  (let [num-val (js/parseFloat (or value 0))]
+    (if (js/isNaN num-val) 0 num-val)))
+
+(defn format-amount [value decimals]
+  (let [num-val (parse-num value)
+        safe-decimals (-> (or decimals 2)
+                          (max 0)
+                          (min 8))]
+    (.toLocaleString num-val "en-US" #js {:minimumFractionDigits safe-decimals
+                                          :maximumFractionDigits safe-decimals})))
+
+(defn format-balance-amount [value decimals]
+  (if decimals
+    (format-amount value decimals)
+    (format-currency value)))
+
 ;; Format percentage with color
 (defn format-pnl-percentage [value]
   (if (and value (not= value "N/A"))
@@ -75,19 +92,33 @@
     "S" "Sell"
     (or side "-")))
 
+(defn format-pnl [pnl-value pnl-pct]
+  (if (and (some? pnl-value) (some? pnl-pct))
+    (let [pnl-num (parse-num pnl-value)
+          pct-num (parse-num pnl-pct)
+          color-class (cond
+                        (pos? pnl-num) "text-success"
+                        (neg? pnl-num) "text-error"
+                        :else "text-base-content")]
+      [:span {:class color-class}
+       (str (if (pos? pnl-num) "+" "")
+            "$" (format-currency pnl-num)
+            " (" (if (pos? pct-num) "+" "") (.toFixed pct-num 2) "%)")])
+    [:span.text-base-content "--"]))
+
 ;; Balance row component
-(defn balance-row [coin total-balance available-balance usdc-value pnl-pct]
+(defn balance-row [{:keys [coin total-balance available-balance usdc-value pnl-value pnl-pct amount-decimals]}]
   [:div.grid.grid-cols-7.gap-4.py-3.px-4.hover:bg-base-200.border-b.border-base-300.items-center
    ;; Coin
    [:div.font-medium coin]
    ;; Total Balance  
-   [:div.text-right (format-currency total-balance)]
+   [:div.text-right (format-balance-amount total-balance amount-decimals)]
    ;; Available Balance
-   [:div.text-right (format-currency available-balance)]
+   [:div.text-right (format-balance-amount available-balance amount-decimals)]
    ;; USDC Value
    [:div.text-right "$" (format-currency usdc-value)]
    ;; PNL (ROE %)
-   [:div.text-right (format-pnl-percentage pnl-pct)]
+   [:div.text-right (format-pnl pnl-value pnl-pct)]
    ;; Send
    [:div.text-center
     [:button.btn.btn-xs.btn-ghost "Send"]]
@@ -107,24 +138,92 @@
    [:div.text-center "Transfer"]])
 
 ;; Balances tab content
-(defn balances-tab-content [webdata2]
-  (let [clearinghouse-state (:clearinghouseState webdata2)]
-    (if clearinghouse-state
+(defn balances-tab-content [webdata2 spot-data hide-small?]
+  (let [clearinghouse-state (:clearinghouseState webdata2)
+        spot-meta (:meta spot-data)
+        spot-state (:clearinghouse-state spot-data)
+        spot-asset-ctxs (:spotAssetCtxs webdata2)
+        token-decimals (into {}
+                             (map (fn [{:keys [index weiDecimals szDecimals]}]
+                                    [index (or weiDecimals szDecimals 2)]))
+                             (:tokens spot-meta))
+        usdc-token (some #(when (= "USDC" (:name %)) %) (:tokens spot-meta))
+        usdc-token-idx (:index usdc-token)
+        price-by-token (if (and usdc-token-idx (seq (:universe spot-meta)) (seq spot-asset-ctxs))
+                         (let [ctxs (vec spot-asset-ctxs)]
+                           (reduce (fn [m {:keys [tokens index]}]
+                                     (let [[base quote] tokens
+                                           ctx (nth ctxs index nil)
+                                           mark-px (parse-num (:markPx ctx))]
+                                       (cond
+                                         (and (= quote usdc-token-idx) (pos? mark-px))
+                                         (assoc m base mark-px)
+
+                                         (and (= base usdc-token-idx) (pos? mark-px))
+                                         (assoc m quote (/ 1 mark-px))
+
+                                         :else m)))
+                                   {usdc-token-idx 1}
+                                   (:universe spot-meta)))
+                         {})
+        perps-row (when clearinghouse-state
+                    {:key "perps-usdc"
+                     :coin "USDC (Perps)"
+                     :total-balance (get-in clearinghouse-state [:marginSummary :accountValue])
+                     :available-balance (:withdrawable clearinghouse-state)
+                     :usdc-value (get-in clearinghouse-state [:marginSummary :accountValue])
+                     :pnl-value nil
+                     :pnl-pct nil
+                     :amount-decimals nil})
+        spot-rows (when (seq (get spot-state :balances))
+                    (map (fn [{:keys [coin token hold total entryNtl]}]
+                           (let [token-idx (if (string? token) (js/parseInt token) token)
+                                 decimals (get token-decimals token-idx)
+                                 total-num (parse-num total)
+                                 hold-num (parse-num hold)
+                                 available-num (- total-num hold-num)
+                                 price (get price-by-token token-idx)
+                                 usdc-value (if price (* total-num price) 0)
+                                 entry-num (parse-num entryNtl)
+                                 pnl-value (when (and price (pos? entry-num))
+                                             (- usdc-value entry-num))
+                                 pnl-pct (when (and pnl-value (pos? entry-num))
+                                           (* 100 (/ pnl-value entry-num)))
+                                 coin-label (if (= coin "USDC") "USDC (Spot)" coin)]
+                             {:key (str "spot-" token-idx)
+                              :coin coin-label
+                              :total-balance total-num
+                              :available-balance available-num
+                              :usdc-value usdc-value
+                              :pnl-value pnl-value
+                              :pnl-pct pnl-pct
+                              :amount-decimals decimals}))
+                         (get spot-state :balances)))
+        rows (->> (concat (when perps-row [perps-row]) spot-rows)
+                  (remove nil?)
+                  (filter (fn [row]
+                            (if hide-small?
+                              (>= (parse-num (:usdc-value row)) 1)
+                              true))))]
+    (if (seq rows)
       [:div
        ;; Filter toggle
        [:div.flex.justify-between.items-center.p-4.border-b.border-base-300
         [:div.text-lg.font-medium "Balances"]
         [:div.flex.items-center.space-x-2
          [:input.checkbox.checkbox-primary
-          {:type "checkbox" :id "hide-small-balances"}]
+          {:type "checkbox"
+           :id "hide-small-balances"
+           :checked (boolean hide-small?)
+           :on {:change [[:actions/set-hide-small-balances :event.target/checked]]}}]
          [:label.text-sm {:for "hide-small-balances"} "Hide Small Balances"]]]
        
        ;; Balance table
        [:div
         (balance-table-header)
-        ;; Sample balance rows - will be replaced with real data
-        (balance-row "USDC" "29,060.48" "27,243.19" "29,060.48" nil)
-        (balance-row "HYPE" "2,980.83245490" "2,980.83245490" "149,909.61" "+83,888.91 (+50.0%)")]]
+        (for [row rows]
+          ^{:key (:key row)}
+          (balance-row row))]]
       (empty-state "No balance data available"))))
 
 ;; Calculate mark price from position data (placeholder - would need market data)
@@ -363,9 +462,9 @@
     (empty-state "No order history")))
 
 ;; Main tab content renderer
-(defn tab-content [selected-tab webdata2 sort-state]
+(defn tab-content [selected-tab webdata2 sort-state spot-data hide-small?]
   (case selected-tab
-    :balances (balances-tab-content webdata2)
+    :balances (balances-tab-content webdata2 spot-data hide-small?)
     :positions (positions-tab-content webdata2 sort-state)
     :open-orders (open-orders-tab-content (get-in webdata2 [:open-orders]))
     :twap (placeholder-tab-content :twap)
@@ -380,7 +479,9 @@
         webdata2 (merge (:webdata2 state) (get state :orders))
         loading? (get-in state [:account-info :loading] false)
         error (get-in state [:account-info :error])
-        sort-state (get-in state [:account-info :positions-sort] {:column nil :direction :asc})]
+        sort-state (get-in state [:account-info :positions-sort] {:column nil :direction :asc})
+        spot-data (:spot state)
+        hide-small? (get-in state [:account-info :hide-small-balances?] false)]
     [:div.bg-base-100.rounded-lg.shadow-lg.overflow-hidden.w-full.max-w-6xl
      ;; Tab navigation
      (tab-navigation selected-tab)
@@ -390,7 +491,7 @@
       (cond
         error (error-state error)
         loading? (loading-spinner)
-        :else (tab-content selected-tab webdata2 sort-state))]]))
+        :else (tab-content selected-tab webdata2 sort-state spot-data hide-small?))]]))
 
 ;; Main component that takes state and renders the UI
 (defn account-info-view [state]

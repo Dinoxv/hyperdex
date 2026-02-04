@@ -22,6 +22,11 @@
                       :active-asset nil
                       :orderbooks {}
                       :webdata2 {}
+                      :spot {:meta nil
+                             :clearinghouse-state nil
+                             :loading-meta? false
+                             :loading-balances? false
+                             :error nil}
                       :orders {:open-orders []
                                :fills []
                                :fundings []
@@ -45,6 +50,7 @@
                       :account-info {:selected-tab :balances
                                      :loading false
                                      :error nil
+                                     :hide-small-balances? false
                                      :positions-sort {:column nil :direction :asc}}}))
 
 ;; Effects - handle side effects
@@ -201,6 +207,9 @@
                        :asc)]
     [[:effects/save [:account-info :positions-sort] {:column column :direction new-direction}]]))
 
+(defn set-hide-small-balances [state checked]
+  [[:effects/save [:account-info :hide-small-balances?] checked]])
+
 (defn update-order-form [state path value]
   (let [v (cond
             (= path [:type]) (keyword value)
@@ -324,6 +333,7 @@
 (nxr/register-action! :actions/update-indicator-period update-indicator-period)
 (nxr/register-action! :actions/select-account-info-tab select-account-info-tab)
 (nxr/register-action! :actions/sort-positions sort-positions)
+(nxr/register-action! :actions/set-hide-small-balances set-hide-small-balances)
 (nxr/register-action! :actions/update-order-form update-order-form)
 (nxr/register-action! :actions/submit-order submit-order)
 (nxr/register-action! :actions/cancel-order cancel-order)
@@ -389,8 +399,17 @@
           (api/fetch-frontend-open-orders! store new-address)
           (api/fetch-user-fills! store new-address)))
       (get-handler-name [_] "user-initial-data-handler")))
+  ;; Fetch spot balances on address change
+  (address-watcher/add-handler!
+    (reify address-watcher/IAddressChangeHandler
+      (on-address-changed [_ _ new-address]
+        (if new-address
+          (api/fetch-spot-clearinghouse-state! store new-address)
+          (swap! store assoc-in [:spot :clearinghouse-state] nil)))
+      (get-handler-name [_] "spot-clearinghouse-handler")))
   ;; Fetch initial market data
-  (api/fetch-asset-contexts! store))
+  (api/fetch-asset-contexts! store)
+  (api/fetch-spot-meta! store))
 
 (defn init []
   (println "Initializing Hyperopen...")
