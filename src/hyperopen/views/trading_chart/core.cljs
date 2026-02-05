@@ -1,5 +1,6 @@
 (ns hyperopen.views.trading-chart.core
-  (:require [hyperopen.views.trading-chart.utils.chart-interop :as ci]
+  (:require [clojure.string :as str]
+            [hyperopen.views.trading-chart.utils.chart-interop :as ci]
             [hyperopen.views.trading-chart.utils.data-processing :as dp]
             [hyperopen.views.trading-chart.utils.indicators :as indicators]
             [hyperopen.views.trading-chart.timeframe-dropdown :refer [timeframe-dropdown]]
@@ -67,13 +68,18 @@
                             :active-indicators active-indicators})]]]))
 
 ;; Generic chart component that supports all chart types with volume
-(defn chart-canvas [candle-data chart-type active-indicators]
+(defn chart-canvas [candle-data chart-type active-indicators legend-meta]
   (let [;; Calculate indicators data
         indicators-data (map (fn [[indicator-type config]]
                               {:type indicator-type
                                :config config
                                :data (indicators/calculate-indicator indicator-type candle-data config)})
                             active-indicators)
+        legend-key (str (or (:symbol legend-meta) "")
+                        "-"
+                        (or (:timeframe-label legend-meta) "")
+                        "-"
+                        (or (:venue legend-meta) ""))
         mount! (fn [{:keys [:replicant/life-cycle :replicant/node]}]
                  (case life-cycle
                    :replicant.life-cycle/mount
@@ -86,14 +92,14 @@
                            main-series (.-mainSeries chart-obj)
                            volume-series (.-volumeSeries chart-obj)]
                        ;; Create legend for main series only
-                       (ci/create-legend! node chart main-series chart-type))
+                       (ci/create-legend! node chart main-series chart-type legend-meta))
                      (catch :default e
                        (js/console.error "Error in chart:" e)))
                    :replicant.life-cycle/unmount
                    nil
                    nil))]
     [:div {:class ["w-full" "relative" "flex-1" "h-full" "min-h-[480px]"]
-           :replicant/key (str "chart-" chart-type "-" (hash candle-data) "-" (hash active-indicators))
+           :replicant/key (str "chart-" chart-type "-" (hash candle-data) "-" (hash active-indicators) "-" legend-key)
            :replicant/on-render mount!
            :style {:background-color "rgb(30, 41, 55)"}}]))
 
@@ -110,7 +116,13 @@
         raw-candles (if (vector? api-response)
                       api-response  ; Direct array
                       (get api-response :data []))  ; Wrapped in :data
-        candle-data (dp/process-candle-data raw-candles)]
+        candle-data (dp/process-candle-data raw-candles)
+        symbol (or active-asset "—")
+        timeframe-label (str/upper-case (name selected-timeframe))
+        legend-meta {:symbol symbol
+                     :timeframe-label timeframe-label
+                     :venue "Hyperopen"
+                     :candle-data candle-data}]
     [:div {:class ["w-full" "h-full"]}
      ;; Chart container with consistent width for both menu and chart
      [:div {:class ["w-full" "h-full" "flex" "flex-col"]}
@@ -118,4 +130,4 @@
       (chart-top-menu state)
       (if has-error?
         [:div {:class ["text-red-500" "p-4" "flex-1"]} "Error fetching chart data."]
-        (chart-canvas candle-data selected-chart-type (get-in state [:chart-options :active-indicators] {})))]]))
+        (chart-canvas candle-data selected-chart-type (get-in state [:chart-options :active-indicators] {}) legend-meta))]]))

@@ -136,7 +136,7 @@
   "Fit content to the chart viewport"
   (.fitContent ^js (.timeScale ^js chart))) 
 
-(defn create-legend! [container chart series chart-type]
+(defn create-legend! [container chart _series _chart-type legend-meta]
   "Create legend element that adapts to different chart types"
   ;; Ensure container has relative positioning for absolute legend positioning
   (let [container-style (.-style container)]
@@ -147,7 +147,7 @@
   ;; Create legend div element
   (let [legend (js/document.createElement "div")]
     ;; Fully transparent legend styling
-    (set! (.-style legend) "position: absolute; left: 12px; top: 12px; z-index: 100; font-size: 13px; font-family: 'SF Pro Display', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; line-height: 1.4; font-weight: 500; color: #ffffff; padding: 8px 12px; border-radius: 6px; box-shadow: none;")
+    (set! (.-style legend) "position: absolute; left: 12px; top: 8px; z-index: 100; font-size: 12px; font-family: 'SF Pro Display', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; line-height: 1.4; font-weight: 500; color: #ffffff; padding: 6px 10px; border-radius: 6px; box-shadow: none; pointer-events: none;")
     
     ;; Set initial content
     (set! (.-innerHTML legend) "")
@@ -155,43 +155,89 @@
     ;; Append to container
     (.appendChild container legend)
     
-    ;; Format price helper
-    (let [format-price (fn [price] (.toFixed price 2))
-          format-volume (fn [volume] 
-                         (cond
-                           (>= volume 1000000000) (str (.toFixed (/ volume 1000000000) 1) "B")
-                           (>= volume 1000000) (str (.toFixed (/ volume 1000000) 1) "M")
-                           (>= volume 1000) (str (.toFixed (/ volume 1000) 1) "K")
-                           :else (.toFixed volume 0)))
-          
-          ;; Update legend content based on chart type
+    (let [symbol (or (:symbol legend-meta) "—")
+          timeframe-label (or (:timeframe-label legend-meta) "—")
+          venue (or (:venue legend-meta) "Hyperopen")
+          header-text (str symbol " · " timeframe-label " · " venue)
+          candle-data (or (:candle-data legend-meta) [])
+          candle-lookup (when (seq candle-data)
+                          (loop [remaining candle-data
+                                 prev-close nil
+                                 acc {}]
+                            (if (empty? remaining)
+                              acc
+                              (let [c (first remaining)
+                                    acc (assoc acc (:time c) {:candle c :prev-close prev-close})
+                                    prev-close (:close c)]
+                                (recur (rest remaining) prev-close acc)))))
+          latest-candle (last candle-data)
+          latest-prev-close (when (> (count candle-data) 1)
+                              (:close (nth candle-data (- (count candle-data) 2))))
+          latest-entry (when latest-candle
+                         {:candle latest-candle
+                          :prev-close latest-prev-close})
+          format-price (fn [price]
+                         (when (number? price)
+                           (let [abs (js/Math.abs price)
+                                 decimals (if (>= abs 1) 2 6)]
+                             (.toLocaleString (js/Number. price) "en-US"
+                                              #js {:minimumFractionDigits decimals
+                                                   :maximumFractionDigits decimals}))))
+          format-delta (fn [delta]
+                         (when (number? delta)
+                           (let [abs (js/Math.abs delta)
+                                 decimals (if (>= abs 1) 2 6)
+                                 formatted (.toLocaleString (js/Number. delta) "en-US"
+                                                            #js {:minimumFractionDigits decimals
+                                                                 :maximumFractionDigits decimals})]
+                             (if (>= delta 0) (str "+" formatted) formatted))))
+          format-pct (fn [pct]
+                       (when (number? pct)
+                         (let [formatted (.toFixed pct 2)]
+                           (if (>= pct 0) (str "+" formatted "%") (str formatted "%")))))
+          render-legend! (fn [entry]
+                           (if (and entry (:candle entry))
+                             (let [c (:candle entry)
+                                   baseline (or (:prev-close entry) (:open c))
+                                   close (:close c)
+                                   delta (when (and close baseline) (- close baseline))
+                                   pct (when (and delta baseline (not= baseline 0)) (* 100 (/ delta baseline)))
+                                   delta-color (cond
+                                                 (nil? delta) "#9ca3af"
+                                                 (>= delta 0) "#10b981"
+                                                 :else "#ef4444")
+                                   o (or (format-price (:open c)) "--")
+                                   h (or (format-price (:high c)) "--")
+                                   l (or (format-price (:low c)) "--")
+                                   cl (or (format-price (:close c)) "--")
+                                   delta-str (or (format-delta delta) "--")
+                                   pct-str (or (format-pct pct) "--")]
+                               (set! (.-innerHTML legend)
+                                     (str "<div style='display:flex; align-items:center; gap:6px; font-weight:600;'>"
+                                          "<span style='color:#e5e7eb;'>" header-text "</span>"
+                                          "</div>"
+                                          "<div style='display:flex; align-items:center; gap:8px;'>"
+                                          "<span style='color:#9ca3af'>O</span> " o
+                                          " <span style='color:#9ca3af'>H</span> " h
+                                          " <span style='color:#9ca3af'>L</span> " l
+                                          " <span style='color:#9ca3af'>C</span> " cl
+                                          " <span style='color:" delta-color "; font-weight:600;'>" delta-str " (" pct-str ")</span>"
+                                          "</div>")))
+                             (set! (.-innerHTML legend)
+                                   (str "<div style='display:flex; align-items:center; gap:6px; font-weight:600;'>"
+                                        "<span style='color:#e5e7eb;'>" header-text "</span>"
+                                        "</div>"
+                                        "<div style='display:flex; align-items:center; gap:8px;'>"
+                                        "<span style='color:#9ca3af'>O</span> --"
+                                        " <span style='color:#9ca3af'>H</span> --"
+                                        " <span style='color:#9ca3af'>L</span> --"
+                                        " <span style='color:#9ca3af'>C</span> --"
+                                        " <span style='color:#9ca3af'>-- (--)</span>"
+                                        "</div>"))))
           update-legend (fn [param]
-                         (if (and param (.-time param))
-                           ;; Valid crosshair point - show appropriate data
-                           (let [data-map (.-seriesData param)
-                                 bar (.get data-map series)]
-                             (if bar
-                               (case chart-type
-                                 (:bar :candlestick)
-                                 (let [o (.-open bar)
-                                       h (.-high bar)
-                                       l (.-low bar)
-                                       c (.-close bar)]
-                                   (set! (.-innerHTML legend) 
-                                         (str "<span style='color: #888; font-weight: 400;'>O</span> " (format-price o) 
-                                              " <span style='color: #888; font-weight: 400;'>H</span> " (format-price h) 
-                                              " <span style='color: #888; font-weight: 400;'>L</span> " (format-price l) 
-                                              " <span style='color: #888; font-weight: 400;'>C</span> " (format-price c))))
-                                 (:area :baseline :line :histogram)
-                                 (let [value (.-value bar)]
-                                   (set! (.-innerHTML legend) 
-                                         (str "<span style='color: #888; font-weight: 400;'>Value</span> " (format-price value))))
-                                 ;; Default
-                                 (set! (.-innerHTML legend) "No data"))
-                               (set! (.-innerHTML legend) "No data")))
-                           ;; No crosshair point - show hint
-                           (set! (.-innerHTML legend) "")))]
-      
+                          (let [entry (when (and param (.-time param))
+                                        (get candle-lookup (.-time param)))]
+                            (render-legend! (or entry latest-entry))))]
       ;; Subscribe to crosshair move events
       (.subscribeCrosshairMove ^js chart update-legend)
       
