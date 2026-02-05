@@ -22,14 +22,23 @@
 
 (deftest build-spot-markets-test
   (testing "build-spot-markets maps base/quote and symbol"
-    (let [spot-meta {:universe [{:name "PURR/USDC" :index 0}]}
-          spot-ctxs [{:markPx "0.5" :prevDayPx "0.4" :dayNtlVlm "100"}]
+    (let [spot-meta {:tokens [{:index 0 :name "USDC"}
+                              {:index 1 :name "PURR"}
+                              {:index 2 :name "HYPE"}]
+                     :universe [{:name "PURR/USDC" :index 0 :tokens [1 0]}
+                                {:name "@107" :index 1 :tokens [2 0]}]}
+          spot-ctxs [{:markPx "0.5" :prevDayPx "0.4" :dayNtlVlm "100"}
+                     {:markPx "10" :prevDayPx "9" :dayNtlVlm "250"}]
           markets (markets/build-spot-markets spot-meta spot-ctxs)
-          market (first markets)]
-      (is (= "PURR/USDC" (:symbol market)))
-      (is (= "PURR" (:base market)))
-      (is (= "USDC" (:quote market)))
-      (is (= :spot (:market-type market))))))
+          purr-market (first markets)
+          hype-market (second markets)]
+      (is (= "PURR/USDC" (:symbol purr-market)))
+      (is (= "PURR" (:base purr-market)))
+      (is (= "USDC" (:quote purr-market)))
+      (is (= :spot (:market-type purr-market)))
+      (is (= "HYPE/USDC" (:symbol hype-market)))
+      (is (= "HYPE" (:base hype-market)))
+      (is (= "USDC" (:quote hype-market))))))
 
 (deftest classify-market-test
   (testing "classify-market assigns crypto/tradfi/hip3"

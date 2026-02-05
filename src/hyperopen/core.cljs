@@ -54,6 +54,7 @@
                                       :markets []
                                       :market-by-key {}
                                       :favorites #{}
+                                      :missing-icons #{}
                                       :favorites-only? false
                                       :strict? false
                                       :active-tab :all}
@@ -226,6 +227,13 @@
 
 (defn refresh-asset-markets [state]
   [[:effects/fetch-asset-selector-markets]])
+
+(defn mark-missing-asset-icon [state market-key]
+  (if (seq market-key)
+    (let [missing (get-in state [:asset-selector :missing-icons] #{})
+          updated (conj missing market-key)]
+      [[:effects/save [:asset-selector :missing-icons] updated]])
+    []))
 
 (def open-orders-sortable-columns
   #{"Time" "Type" "Coin" "Direction" "Size" "Original Size" "Order Value" "Price"})
@@ -512,6 +520,7 @@
 (nxr/register-action! :actions/set-asset-selector-favorites-only set-asset-selector-favorites-only)
 (nxr/register-action! :actions/set-asset-selector-tab set-asset-selector-tab)
 (nxr/register-action! :actions/refresh-asset-markets refresh-asset-markets)
+(nxr/register-action! :actions/mark-missing-asset-icon mark-missing-asset-icon)
 (nxr/register-action! :actions/toggle-timeframes-dropdown toggle-timeframes-dropdown)
 (nxr/register-action! :actions/select-chart-timeframe select-chart-timeframe)
 (nxr/register-action! :actions/toggle-chart-type-dropdown toggle-chart-type-dropdown)

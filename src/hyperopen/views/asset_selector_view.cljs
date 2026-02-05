@@ -120,7 +120,7 @@
 (defn format-or-dash [value formatter]
   (or (formatter value) "—"))
 
-(defn asset-list-item [asset selected? favorites]
+(defn asset-list-item [asset selected? favorites missing-icons]
   (let [{:keys [key coin symbol base mark volume24h change24h change24hPct openInterest fundingRate
                 market-type dex maxLeverage]} asset
         safe-change (or change24h 0)
@@ -132,14 +132,22 @@
         funding-color (if funding-positive "text-success" "text-error")
         is-spot (= market-type :spot)
         favorite? (contains? favorites key)
-        icon-name (or base coin)]
+        icon-name (or base coin)
+        missing-icon? (contains? missing-icons key)
+        icon-blocked? (or missing-icon?
+                          (and (string? icon-name)
+                               (str/starts-with? icon-name "@")))]
     [:div.grid.grid-cols-12.gap-3.items-center.px-4.py-2.cursor-pointer.rounded.hover:bg-base-200.transition-colors
      {:class (when selected? ["bg-primary" "bg-opacity-10" "border" "border-primary"])
       :on {:click [[:actions/select-asset asset]]}}
      ;; Symbol column
      [:div.col-span-3.flex.items-center.space-x-2
       (favorite-button favorite? key)
-      [:img.w-5.h-5.rounded-full {:src (str "https://app.hyperliquid.xyz/coins/" icon-name ".svg") :alt icon-name}]
+      (when-not icon-blocked?
+        [:img.w-5.h-5.rounded-full
+         {:src (str "https://app.hyperliquid.xyz/coins/" icon-name ".svg")
+          :alt icon-name
+          :on {:error [[:actions/mark-missing-asset-icon key]]}}])
       [:div.flex.items-center.space-x-2
        [:div.font-medium.text-sm symbol]
        (when is-spot
@@ -173,7 +181,7 @@
         "—"
         (format-or-dash openInterest fmt/format-large-currency))]]))
 
-(defn asset-list [assets selected-market-key favorites]
+(defn asset-list [assets selected-market-key favorites missing-icons]
   [:div.max-h-96.overflow-y-auto.space-y-1.scrollbar-hide
    (if (empty? assets)
      [:div.text-center.py-8.text-gray-400
@@ -181,7 +189,7 @@
       [:div.text-xs "Try adjusting your search"]]
      (for [asset assets]
        ^{:key (:key asset)}
-       (asset-list-item asset (= selected-market-key (:key asset)) favorites)))])
+       (asset-list-item asset (= selected-market-key (:key asset)) favorites missing-icons)))])
 
 (defn matches-search? [asset search-term strict?]
   (let [query (str/lower-case (or search-term ""))
@@ -243,9 +251,10 @@
    - :favorites - set of favorite market keys
    - :favorites-only? - whether to filter to favorites
    - :strict? - strict search toggle
-   - :active-tab - current tab"
+   - :active-tab - current tab
+   - :missing-icons - set of market keys with missing icons"
   [{:keys [visible? markets selected-market-key search-term sort-by sort-direction
-           favorites favorites-only? strict? active-tab]}]
+           favorites favorites-only? strict? active-tab missing-icons]}]
   (when visible?
     (let [processed-assets (filter-and-sort-assets markets search-term sort-by sort-direction
                                                    favorites favorites-only? strict? active-tab)]
@@ -259,7 +268,7 @@
         (search-controls search-term strict? favorites-only?)
         (tab-row active-tab)
         (sort-controls sort-by sort-direction)
-        (asset-list processed-assets selected-market-key favorites)]])))
+        (asset-list processed-assets selected-market-key favorites missing-icons)]])))
 
 ;; Wrapper component that can be used in active-asset-view
 (defn asset-selector-wrapper [props]

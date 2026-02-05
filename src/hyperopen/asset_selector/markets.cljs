@@ -99,14 +99,38 @@
   "Build normalized spot market entries from spotMeta and spotAssetCtxs." 
   [spot-meta spot-asset-ctxs]
   (let [universe (:universe spot-meta)
+        tokens-list (vec (:tokens spot-meta))
+        token-by-index (reduce (fn [acc {:keys [index name tokenId]}]
+                                 (cond-> acc
+                                   (some? index) (assoc index name)
+                                   (some? index) (assoc (str index) name)
+                                   (some? tokenId) (assoc tokenId name)))
+                               {}
+                               tokens-list)
+        token-name (fn [idx]
+                     (or (get token-by-index idx)
+                         (when (and (number? idx)
+                                    (<= 0 idx)
+                                    (< idx (count tokens-list)))
+                           (:name (nth tokens-list idx)))
+                         (when (and (string? idx) (re-matches #"\d+" idx))
+                           (let [n (js/parseInt idx)]
+                             (when (and (<= 0 n) (< n (count tokens-list)))
+                               (:name (nth tokens-list n)))))))
         ctxs (vec (or spot-asset-ctxs []))]
     (->> (or universe [])
          (keep (fn [entry]
                  (let [coin (:name entry)
                        idx (:index entry)
+                       tokens (:tokens entry)
+                       base-idx (when (sequential? tokens) (first tokens))
+                       quote-idx (when (sequential? tokens) (second tokens))
                        ctx (nth ctxs idx nil)]
                    (when (and coin ctx)
-                     (let [{:keys [base quote]} (parse-spot-name coin)
+                     (let [parsed (parse-spot-name coin)
+                           base (or (token-name base-idx) (:base parsed))
+                           quote (or (token-name quote-idx) (:quote parsed))
+                           symbol (if (and base quote) (str base "/" quote) coin)
                            mark (safe-num (:markPx ctx))
                            prev (safe-num (:prevDayPx ctx))
                            change (- mark prev)
@@ -114,7 +138,7 @@
                            volume (safe-num (:dayNtlVlm ctx))
                            market {:key (str "spot:" coin)
                                    :coin coin
-                                   :symbol coin
+                                   :symbol symbol
                                    :base base
                                    :quote quote
                                    :market-type :spot

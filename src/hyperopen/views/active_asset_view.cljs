@@ -1,5 +1,6 @@
 (ns hyperopen.views.active-asset-view
-  (:require [hyperopen.websocket.active-asset-ctx :as active-ctx]
+  (:require [clojure.string :as str]
+            [hyperopen.websocket.active-asset-ctx :as active-ctx]
             [hyperopen.views.asset-selector-view :as asset-selector]
             [hyperopen.utils.formatting :as fmt]
             [hyperopen.asset-selector.markets :as markets]))
@@ -38,15 +39,24 @@
     [:span {:class color-class} 
      (str (fmt/format-number change-value 2) " / " (fmt/format-percentage change-pct))]))
 
-(defn asset-icon [market dropdown-visible?]
+(defn asset-icon [market dropdown-visible? missing-icons]
   (let [coin (:coin market)
         base (or (:base market) coin)
         symbol (or (:symbol market) coin)
         dex (:dex market)
-        market-type (:market-type market)]
+        market-type (:market-type market)
+        market-key (or (:key market) (markets/coin->market-key coin))
+        missing-icon? (contains? missing-icons market-key)
+        icon-blocked? (or missing-icon?
+                          (and (string? base)
+                               (str/starts-with? base "@")))]
     [:div.flex.items-center.space-x-2.cursor-pointer.hover:bg-base-300.rounded.px-2.py-1.transition-colors
      {:on {:click [[:actions/toggle-asset-dropdown :asset-selector]]}}
-     [:img.w-6.h-6.rounded-full {:src (str "https://app.hyperliquid.xyz/coins/" base ".svg") :alt base}]
+     (when-not icon-blocked?
+       [:img.w-6.h-6.rounded-full
+        {:src (str "https://app.hyperliquid.xyz/coins/" base ".svg")
+         :alt base
+         :on {:error [[:actions/mark-missing-asset-icon market-key]]}}])
      [:div.flex.items-center.space-x-2
       [:span.font-medium symbol]
       (when (= market-type :spot)
@@ -113,7 +123,9 @@
                    "md:grid-cols-[1.4fr_0.9fr_0.9fr_1.1fr_1.1fr_1.2fr_1.6fr]"]}
       ;; Asset/Pair column
       [:div.flex.justify-start
-       (asset-icon (or market {:coin coin}) dropdown-visible?)]
+       (asset-icon (or market {:coin coin})
+                   dropdown-visible?
+                   (get-in full-state [:asset-selector :missing-icons] #{}))]
       
       ;; Mark column
       [:div.flex.justify-center
@@ -240,6 +252,7 @@
           :sort-direction (:sort-direction dropdown-state :asc)
           :favorites (:favorites dropdown-state #{})
           :favorites-only? (:favorites-only? dropdown-state false)
+          :missing-icons (:missing-icons dropdown-state #{})
           :strict? (:strict? dropdown-state false)
           :active-tab (:active-tab dropdown-state :all)}))]))
 
@@ -253,6 +266,7 @@
                                                          :sort-by :volume
                                                          :sort-direction :desc
                                                          :favorites #{}
+                                                         :missing-icons #{}
                                                          :favorites-only? false
                                                          :strict? false
                                                          :active-tab :all})]
