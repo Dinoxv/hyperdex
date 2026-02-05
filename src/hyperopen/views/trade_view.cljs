@@ -8,21 +8,39 @@
 
 (defn trade-view [state]
   (let [active-asset (:active-asset state)
-        orderbook-data (when active-asset (get-in state [:orderbooks active-asset]))]
-    [:div.flex-1.overflow-auto
-     [:div.w-full
-      (active-asset-view/active-asset-view state)]
+        orderbook-data (when active-asset (get-in state [:orderbooks active-asset]))
+        top-row-height "600px"]
+    [:div.flex-1.overflow-auto.flex.flex-col
+     [:div {:class ["w-full" "px-0" "py-0" "space-y-0" "flex" "flex-col" "min-h-full"]}
+      (active-asset-view/active-asset-view state)
 
-     [:div.max-w-7xl.mx-auto.px-6.py-4.space-y-6
-       [:div {:class ["grid" "grid-cols-1" "lg:grid-cols-3" "gap-6"]}
-       [:div {:class "lg:col-span-2"}
-        (trading-chart/trading-chart-view state)]
-       [:div.space-y-6
-        (order-form-view/order-form-view state)
-        (account-equity-view/account-equity-view state)
-        (l2-orderbook-view/l2-orderbook-view
-          {:coin (or active-asset "No Asset Selected")
-           :orderbook orderbook-data
-           :loading (and active-asset (nil? orderbook-data))})]]
+      [:div {:class ["relative" "flex-1"]}
+       [:div {:class ["hidden" "xl:block" "absolute" "top-0" "bottom-0" "right-[320px]" "w-px" "bg-base-300" "pointer-events-none" "z-10"]}]
+       [:div {:class ["grid"
+                      "grid-cols-1"
+                      "gap-x-0" "gap-y-0"
+                      "bg-base-100"
+                      "items-stretch"
+                      "lg:grid-cols-[minmax(0,1fr)_320px]"
+                      "xl:grid-cols-[minmax(0,1fr)_320px_320px]"]}
+        [:div {:class ["bg-base-100" "border-r" "border-base-300"]
+               :style {:height top-row-height}}
+         [:div {:class ["h-full" "overflow-hidden" "flex" "flex-col"]}
+          (trading-chart/trading-chart-view state)]]
 
-      (account-info-view/account-info-view state)]]))
+        [:div {:class ["bg-base-100" "w-full"]
+               :style {:height top-row-height}}
+         (l2-orderbook-view/l2-orderbook-view
+           {:coin (or active-asset "No Asset Selected")
+            :orderbook orderbook-data
+            :loading (and active-asset (nil? orderbook-data))})]
+
+        [:div {:class ["bg-base-100" "lg:col-span-2" "xl:col-span-1" "xl:col-start-3"]
+               :style {:min-height top-row-height}}
+         (order-form-view/order-form-view state)]
+
+        [:div {:class ["bg-base-100" "lg:col-span-2" "xl:col-span-2" "border-t" "border-base-300"]}
+         (account-info-view/account-info-view state)]
+
+        [:div {:class ["bg-base-100" "lg:col-span-2" "xl:col-start-3" "xl:row-start-2" "h-full" "border-t" "border-base-300"]}
+         (account-equity-view/account-equity-view state)]]]]]))

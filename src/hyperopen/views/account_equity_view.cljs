@@ -123,7 +123,7 @@
         cross-margin-ratio (safe-div maintenance-margin cross-account-value)
         cross-account-leverage (safe-div cross-total-ntl-pos cross-account-value)
         pnl-info (pnl-display unrealized-pnl)]
-    [:div.bg-base-100.rounded-lg.shadow-lg.p-4.space-y-4.w-full
+    [:div {:class ["bg-base-100" "rounded-none" "shadow-none" "p-3" "space-y-4" "w-full" "h-full"]}
      [:div.text-sm.font-semibold.text-gray-200 "Account Equity"]
 
      [:div.space-y-2

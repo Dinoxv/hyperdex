@@ -82,13 +82,13 @@
         bar-width (cumulative-bar-width cum-size max-cum-size)
         bar-color (if is-ask? "bg-red-500/30" "bg-green-500/30")
         text-color (if is-ask? "text-red-400" "text-green-400")]
-    [:div.flex.items-center.h-8.relative.bg-gray-900
+    [:div.flex.items-center.h-6.relative.bg-gray-900.text-xs
      ;; Size bar background - always positioned from left
      [:div.absolute.inset-0.flex.items-center.justify-start
       [:div {:class ["h-full" bar-color "transition-all" "duration-300" "ease-[cubic-bezier(0.68,-0.6,0.32,1.6)]"]
              :style {:width (str bar-width "%")}}]]
      ;; Content
-     [:div.flex.w-full.items-center.justify-between.px-3.relative.z-10
+     [:div.flex.w-full.items-center.justify-between.px-2.relative.z-10
       [:div.text-right.flex-1
        [:span {:class [text-color]} (or (format-price price 2) "0.000000")]]
       [:div.text-right.flex-1
@@ -100,8 +100,8 @@
 (defn spread-row [spread]
   (let [absolute (:absolute spread)
         percentage (:percentage spread)]
-    [:div.flex.items-center.justify-center.h-8.bg-gray-800.border-y.border-gray-700
-     [:div.flex.items-center.space-x-4.text-white.text-sm
+    [:div.flex.items-center.justify-center.h-6.bg-gray-800.border-y.border-gray-700.text-xs
+     [:div.flex.items-center.space-x-3.text-white
       [:span "Spread"]
       [:span (format-price absolute 6)]
       [:span (str (format-price percentage 3) "%")]]]))
@@ -130,7 +130,8 @@
 
 ;; Main order book component
 (defn l2-orderbook-panel [coin orderbook-data]
-  (let [raw-bids (:bids orderbook-data)
+  (let [max-rows 10
+        raw-bids (:bids orderbook-data)
         raw-asks (:asks orderbook-data)
         
         ;; Sort into display order:
@@ -138,10 +139,12 @@
         display-asks (sort-by (comp js/parseFloat :px) < raw-asks)
         ;; Bids: best→worst (highest→lowest). Highest price = best bid.  
         display-bids (sort-by (comp js/parseFloat :px) > raw-bids)
+        asks-limited (take max-rows display-asks)
+        bids-limited (take max-rows display-bids)
         
         ;; Calculate cumulative totals in display order
-        asks-with-totals (calculate-cumulative-totals display-asks)
-        bids-with-totals (calculate-cumulative-totals display-bids)
+        asks-with-totals (calculate-cumulative-totals asks-limited)
+        bids-with-totals (calculate-cumulative-totals bids-limited)
         
         ;; Get best prices for spread calculation
         best-bid (first display-bids)
@@ -152,32 +155,34 @@
         max-ask-cum-size (get-max-cumulative-size asks-with-totals)
         max-bid-cum-size (get-max-cumulative-size bids-with-totals)
         max-cum-size (max (or max-ask-cum-size 0) (or max-bid-cum-size 0))]
-    [:div.bg-gray-900.rounded-lg.border.border-gray-700.overflow-hidden
+    [:div {:class ["bg-base-100" "border" "border-base-300" "rounded-none" "overflow-hidden" "h-full" "flex" "flex-col"]}
      ;; Header
      (orderbook-header coin "0.000001")
      
      ;; Column headers
      (column-headers)
-     
-     ;; Asks (sell orders) - top section, rendered worst→best (reversed for display)
+
+     ;; Order rows
      [:div
-      (for [ask (reverse asks-with-totals)]
-        ^{:key (str "ask-" (:px ask))}
-        (order-row ask max-cum-size true))]
-     
-     ;; Spread - middle section
-     (when spread
-       (spread-row spread))
-     
-     ;; Bids (buy orders) - bottom section, rendered best→worst
-     [:div
-      (for [bid bids-with-totals]
-        ^{:key (str "bid-" (:px bid))}
-        (order-row bid max-cum-size false))]]))
+      ;; Asks (sell orders) - top section, rendered worst→best (reversed for display)
+      [:div
+       (for [ask (reverse asks-with-totals)]
+         ^{:key (str "ask-" (:px ask))}
+         (order-row ask max-cum-size true))]
+      
+      ;; Spread - middle section
+      (when spread
+        (spread-row spread))
+      
+      ;; Bids (buy orders) - bottom section, rendered best→worst
+      [:div
+       (for [bid bids-with-totals]
+         ^{:key (str "bid-" (:px bid))}
+         (order-row bid max-cum-size false))]]]))
 
 ;; Empty state
 (defn empty-orderbook []
-  [:div.flex.flex-col.items-center.justify-center.p-8.text-center.bg-gray-900.rounded-lg.border.border-gray-700
+  [:div {:class ["flex" "flex-col" "items-center" "justify-center" "p-8" "text-center" "bg-base-100" "rounded-none" "border" "border-base-300" "h-full"]}
    [:div.text-gray-400.mb-4
     [:svg.w-12.h-12.mx-auto {:fill "none" :stroke "currentColor" :viewBox "0 0 24 24"}
      [:path {:stroke-linecap "round" :stroke-linejoin "round" :stroke-width 2 :d "M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"}]]]
@@ -186,7 +191,7 @@
 
 ;; Loading state
 (defn loading-orderbook []
-  [:div.flex.items-center.justify-center.p-8.bg-gray-900.rounded-lg.border.border-gray-700
+  [:div {:class ["flex" "items-center" "justify-center" "p-8" "bg-base-100" "rounded-none" "border" "border-base-300" "h-full"]}
    [:div.animate-spin.rounded-full.h-8.w-8.border-b-2.border-blue-500]])
 
 ;; Main component that takes state and renders the UI
@@ -194,7 +199,7 @@
   (let [coin (:coin state)
         orderbook-data (:orderbook state)
         loading? (:loading state)]
-    [:div.w-full.max-w-md
+    [:div {:class ["w-full" "h-full"]}
      (cond
        loading? (loading-orderbook)
        (and coin orderbook-data) (l2-orderbook-panel coin orderbook-data)

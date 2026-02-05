@@ -92,10 +92,10 @@
                    :replicant.life-cycle/unmount
                    nil
                    nil))]
-    [:div.w-full.h-96.relative
-     {:replicant/key (str "chart-" chart-type "-" (hash candle-data) "-" (hash active-indicators))
-      :replicant/on-render mount!
-      :style {:background-color "rgb(30, 41, 55)"}}]))
+    [:div {:class ["w-full" "relative" "flex-1" "h-full" "min-h-[480px]"]
+           :replicant/key (str "chart-" chart-type "-" (hash candle-data) "-" (hash active-indicators))
+           :replicant/on-render mount!
+           :style {:background-color "rgb(30, 41, 55)"}}]))
 
 (defn trading-chart-view [state]
   (let [active-asset (:active-asset state)
@@ -111,11 +111,11 @@
                       api-response  ; Direct array
                       (get api-response :data []))  ; Wrapped in :data
         candle-data (dp/process-candle-data raw-candles)]
-    [:div.w-full.mx-auto
+    [:div {:class ["w-full" "h-full"]}
      ;; Chart container with consistent width for both menu and chart
-     [:div.w-full
+     [:div {:class ["w-full" "h-full" "flex" "flex-col"]}
       ;; Add the top menu above the chart
       (chart-top-menu state)
       (if has-error?
-        [:div.text-red-500.p-4 "Error fetching chart data."]
-        (chart-canvas candle-data selected-chart-type (get-in state [:chart-options :active-indicators] {})))]])) 
+        [:div {:class ["text-red-500" "p-4" "flex-1"]} "Error fetching chart data."]
+        (chart-canvas candle-data selected-chart-type (get-in state [:chart-options :active-indicators] {})))]]))

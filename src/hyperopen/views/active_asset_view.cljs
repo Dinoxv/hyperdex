@@ -107,7 +107,7 @@
         dropdown-visible? (= (:visible-dropdown dropdown-state) coin)
         ;; Handle missing data gracefully
         has-data? (and mark oracle change-24h volume-24h open-interest funding-rate)]
-    [:div.relative.grid.grid-cols-7.gap-4.items-center.px-4.py-2.bg-base-200.rounded-lg.border.border-base-300
+    [:div {:class ["relative" "grid" "grid-cols-7" "gap-4" "items-center" "px-0" "py-2"]}
       ;; Asset/Pair column
       [:div.flex.justify-start
        (asset-icon coin dropdown-visible?)]
@@ -151,7 +151,7 @@
 
 (defn select-asset-row [dropdown-state]
   (let [dropdown-visible? (= (:visible-dropdown dropdown-state) :asset-selector)]
-    [:div.relative.grid.grid-cols-7.gap-4.items-center.px-4.py-2.bg-base-200.rounded-lg.border.border-base-300
+    [:div {:class ["relative" "grid" "grid-cols-7" "gap-4" "items-center" "px-0" "py-2"]}
      [:div.flex.justify-start
       (asset-selector-trigger dropdown-visible?)]
 
@@ -196,7 +196,7 @@
    [:div.animate-spin.rounded-full.h-8.w-8.border-b-2.border-primary]])
 
 (defn active-asset-panel [contexts loading? dropdown-state full-state]
-  [:div.relative.bg-base-100.rounded-lg.shadow-lg
+  [:div {:class ["relative" "bg-base-200" "border-b" "border-base-300" "rounded-none" "shadow-none"]}
    [:div
     (if (:active-asset full-state)
       (active-asset-list contexts dropdown-state full-state)

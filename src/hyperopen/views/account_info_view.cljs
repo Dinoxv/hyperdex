@@ -723,7 +723,7 @@
         tab-counts {:open-orders (count open-orders)
                     :balances (count balance-rows)}
         open-orders-sort (get-in state [:account-info :open-orders-sort] {:column "Time" :direction :desc})]
-    [:div.bg-base-100.rounded-lg.shadow-lg.overflow-hidden.w-full.max-w-6xl
+    [:div {:class ["bg-base-100" "border-t" "border-base-300" "rounded-none" "shadow-none" "overflow-hidden" "w-full"]}
      ;; Tab navigation
      (tab-navigation selected-tab tab-counts)
      
