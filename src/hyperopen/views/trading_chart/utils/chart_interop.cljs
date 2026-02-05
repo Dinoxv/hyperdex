@@ -23,7 +23,8 @@
 ;; Generic chart creation
 (defn create-chart! [container]
   "Create a chart with common options"
-  (let [chartOptions #js {:layout #js {:textColor "#e5e7eb" 
+  (let [chartOptions #js {:autoSize true
+                          :layout #js {:textColor "#e5e7eb" 
                                        :background #js {:type "solid" 
                                                        :color "rgb(30, 41, 55)"}}
                           :grid #js {:vertLines #js {:color "#374151"}
