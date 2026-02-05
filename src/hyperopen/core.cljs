@@ -80,9 +80,11 @@
 
 (defn subscribe-active-asset [_ store coin]
   (println "Subscribing to active asset context for:" coin)
+  (js/localStorage.setItem "active-asset" coin)
   (swap! store #(-> %
                     (assoc-in [:active-assets :loading] true)
-                    (assoc-in [:active-asset] coin)))
+                    (assoc-in [:active-asset] coin)
+                    (assoc-in [:selected-asset] coin)))
   (active-ctx/subscribe-active-asset-ctx! coin)
   (fetch-candle-snapshot _ store))
 
@@ -181,6 +183,16 @@
                     :desc)]
     (swap! store update-in [:account-info] merge {:open-orders-sort {:column column
                                                                      :direction direction}})))
+
+(defn restore-active-asset! [store]
+  (when (nil? (:active-asset @store))
+    (let [stored-asset (js/localStorage.getItem "active-asset")
+          asset (if (seq stored-asset) stored-asset "BTC")]
+      (swap! store assoc :active-asset asset :selected-asset asset)
+      (when-not (seq stored-asset)
+        (js/localStorage.setItem "active-asset" asset))
+      (when (ws-client/connected?)
+        (nxr/dispatch store nil [[:actions/subscribe-to-asset asset]])))))
 
 (defn toggle-timeframes-dropdown [state]
   (let [current-visible (get-in state [:chart-options :timeframes-dropdown-visible])]
@@ -417,7 +429,11 @@
     (js/queueMicrotask #(swap! store assoc-in [:websocket :status] (:status new-state)))
     ;; Notify address watcher of connection status changes
     (if (= (:status new-state) :connected)
-      (address-watcher/on-websocket-connected!)
+      (do
+        (address-watcher/on-websocket-connected!)
+        (js/queueMicrotask
+          #(when-let [asset (:active-asset @store)]
+             (nxr/dispatch store nil [[:actions/subscribe-to-asset asset]]))))
       (address-watcher/on-websocket-disconnected!))))
 
 (defn reload []
@@ -491,6 +507,8 @@
   (println "Initializing Hyperopen...")
   ;; Restore asset selector sort settings from localStorage
   (asset-selector-settings/restore-asset-selector-sort-settings! store)
+  ;; Restore selected asset from localStorage (default to BTC)
+  (restore-active-asset! store)
   ;; Restore open orders sort settings from localStorage
   (restore-open-orders-sort-settings! store)
   ;; Initialize wallet system

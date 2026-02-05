@@ -74,6 +74,18 @@
                                                       :class (when dropdown-visible? "rotate-180")}
     [:path {:stroke-linecap "round" :stroke-linejoin "round" :stroke-width 2 :d "M19 9l-7 7-7-7"}]]])
 
+(defn asset-selector-trigger [dropdown-visible?]
+  [:button.flex.items-center.space-x-2.cursor-pointer.hover:bg-base-300.rounded.px-2.py-1.transition-colors
+   {:type "button"
+    :on {:click [[:actions/toggle-asset-dropdown :asset-selector]]}}
+   [:div.w-6.h-6.rounded-full.bg-base-300.flex.items-center.justify-center
+    [:svg.w-4.h-4.text-gray-400 {:fill "none" :stroke "currentColor" :viewBox "0 0 24 24"}
+     [:path {:stroke-linecap "round" :stroke-linejoin "round" :stroke-width 2 :d "m21 21-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"}]]]
+   [:span.font-medium "Select Asset"]
+   [:svg.w-4.h-4.text-gray-400.transition-transform {:fill "none" :stroke "currentColor" :viewBox "0 0 24 24"
+                                                      :class (when dropdown-visible? "rotate-180")}
+    [:path {:stroke-linecap "round" :stroke-linejoin "round" :stroke-width 2 :d "M19 9l-7 7-7-7"}]]])
+
 (defn data-column [label value & [options]]
   (let [underlined? (:underlined options)
         value-component (if (:change? options)
@@ -127,7 +139,7 @@
       ;; Funding / Countdown column
       [:div.flex.justify-center
        [:div.text-center
-        [:div.text-xs.text-gray-400.mb-1 "Funding / Countdown"]
+       [:div.text-xs.text-gray-400.mb-1 "Funding / Countdown"]
         [:div.text-sm.flex.items-center.justify-center
          (if has-data?
            (tooltip 
@@ -136,6 +148,32 @@
            [:span "Loading..."])
          [:span.mx-1 "/"]
          [:span (fmt/format-funding-countdown)]]]]]))
+
+(defn select-asset-row [dropdown-state]
+  (let [dropdown-visible? (= (:visible-dropdown dropdown-state) :asset-selector)]
+    [:div.relative.grid.grid-cols-7.gap-4.items-center.px-4.py-2.bg-base-200.rounded-lg.border.border-base-300
+     [:div.flex.justify-start
+      (asset-selector-trigger dropdown-visible?)]
+
+     [:div.flex.justify-center
+      (data-column "Mark" "—" {:underlined true})]
+
+     [:div.flex.justify-center
+      (data-column "Oracle" "—" {:underlined true})]
+
+     [:div.flex.justify-center
+      (data-column "24h Change" "—")]
+
+     [:div.flex.justify-center
+      (data-column "24h Volume" "—")]
+
+     [:div.flex.justify-center 
+      (data-column "Open Interest" "—" {:underlined true})]
+
+     [:div.flex.justify-center
+      [:div.text-center
+       [:div.text-xs.text-gray-400.mb-1 "Funding / Countdown"]
+       [:div.text-sm.text-gray-400 "— / —"]]]]))
 
 (defn active-asset-list [contexts dropdown-state full-state]
   (let [active-asset (:active-asset full-state)
@@ -162,13 +200,13 @@
    [:div
     (if (:active-asset full-state)
       (active-asset-list contexts dropdown-state full-state)
-      (empty-state))]
+      (select-asset-row dropdown-state))]
    ;; Asset Selector Dropdown positioned at panel level
    (when (:visible-dropdown dropdown-state)
      (asset-selector/asset-selector-wrapper
        {:visible? true
         :assets (get-available-assets full-state)
-        :selected-asset (:visible-dropdown dropdown-state)
+        :selected-asset (:active-asset full-state)
         :search-term (:search-term dropdown-state "")
         :sort-by (:sort-by dropdown-state :volume)
         :sort-direction (:sort-direction dropdown-state :asc)}))])
