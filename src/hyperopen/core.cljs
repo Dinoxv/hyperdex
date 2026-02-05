@@ -55,7 +55,8 @@
                                      :loading false
                                      :error nil
                                      :hide-small-balances? false
-                                     :positions-sort {:column nil :direction :asc}}}))
+                                     :positions-sort {:column nil :direction :asc}
+                                     :open-orders-sort {:column "Time" :direction :desc}}}))
 
 ;; Effects - handle side effects
 (defn save [_ store path value]
@@ -162,6 +163,24 @@
     [[:effects/save [:asset-selector :sort-by] sort-field]
      [:effects/save [:asset-selector :sort-direction] new-direction]]))
 
+(def open-orders-sortable-columns
+  #{"Time" "Type" "Coin" "Direction" "Size" "Original Size" "Order Value" "Price"})
+
+(def open-orders-sort-directions
+  #{:asc :desc})
+
+(defn restore-open-orders-sort-settings! [store]
+  (let [stored-column (or (js/localStorage.getItem "open-orders-sort-by") "Time")
+        stored-direction (keyword (or (js/localStorage.getItem "open-orders-sort-direction") "desc"))
+        column (if (contains? open-orders-sortable-columns stored-column)
+                 stored-column
+                 "Time")
+        direction (if (contains? open-orders-sort-directions stored-direction)
+                    stored-direction
+                    :desc)]
+    (swap! store update-in [:account-info] merge {:open-orders-sort {:column column
+                                                                     :direction direction}})))
+
 (defn toggle-timeframes-dropdown [state]
   (let [current-visible (get-in state [:chart-options :timeframes-dropdown-visible])]
     [[:effects/save [:chart-options :timeframes-dropdown-visible] (not current-visible)]]))
@@ -210,6 +229,20 @@
                        :desc
                        :asc)]
     [[:effects/save [:account-info :positions-sort] {:column column :direction new-direction}]]))
+
+(defn sort-open-orders [state column]
+  (let [current-sort (get-in state [:account-info :open-orders-sort])
+        current-column (:column current-sort)
+        current-direction (:direction current-sort)
+        new-direction (if (= current-column column)
+                        (if (= current-direction :asc) :desc :asc)
+                        (if (contains? #{"Time" "Size" "Original Size" "Order Value" "Price"} column)
+                          :desc
+                          :asc))]
+    (js/localStorage.setItem "open-orders-sort-by" column)
+    (js/localStorage.setItem "open-orders-sort-direction" (name new-direction))
+    [[:effects/save [:account-info :open-orders-sort] {:column column
+                                                       :direction new-direction}]]))
 
 (defn set-hide-small-balances [state checked]
   [[:effects/save [:account-info :hide-small-balances?] checked]])
@@ -337,6 +370,7 @@
 (nxr/register-action! :actions/update-indicator-period update-indicator-period)
 (nxr/register-action! :actions/select-account-info-tab select-account-info-tab)
 (nxr/register-action! :actions/sort-positions sort-positions)
+(nxr/register-action! :actions/sort-open-orders sort-open-orders)
 (nxr/register-action! :actions/set-hide-small-balances set-hide-small-balances)
 (nxr/register-action! :actions/update-order-form update-order-form)
 (nxr/register-action! :actions/submit-order submit-order)
@@ -446,6 +480,8 @@
   (println "Initializing Hyperopen...")
   ;; Restore asset selector sort settings from localStorage
   (asset-selector-settings/restore-asset-selector-sort-settings! store)
+  ;; Restore open orders sort settings from localStorage
+  (restore-open-orders-sort-settings! store)
   ;; Initialize wallet system
   (wallet/init-wallet! store)
   ;; Initialize router

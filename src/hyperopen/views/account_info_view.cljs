@@ -93,6 +93,19 @@
     (let [d (js/Date. ms)]
       (.toLocaleString d))))
 
+(defn format-open-orders-time [ms]
+  (when ms
+    (let [d (js/Date. ms)
+          month (inc (.getMonth d))
+          day (.getDate d)
+          year (.getFullYear d)
+          hours (.getHours d)
+          minutes (.getMinutes d)
+          seconds (.getSeconds d)
+          pad2 (fn [v] (.padStart (str v) 2 "0"))]
+      (str month "/" day "/" year " - "
+           (pad2 hours) ":" (pad2 minutes) ":" (pad2 seconds)))))
+
 (defn format-side [side]
   (case side
     "B" "Buy"
@@ -190,6 +203,48 @@
         price (parse-num px)]
     (when (and (pos? size) (pos? price))
       (* size price))))
+
+(defn direction-label [side]
+  (case side
+    "B" "Long"
+    "A" "Short"
+    "S" "Short"
+    (or side "-")))
+
+(defn direction-class [side]
+  (case side
+    "B" "text-success"
+    "A" "text-error"
+    "S" "text-error"
+    "text-base-content"))
+
+(defn sort-open-orders-by-column [orders column direction]
+  (let [sort-fn (case column
+                  "Time" (fn [o] (parse-num (:time o)))
+                  "Type" (fn [o] (or (:type o) ""))
+                  "Coin" (fn [o] (or (:coin o) ""))
+                  "Direction" (fn [o] (direction-label (:side o)))
+                  "Size" (fn [o] (parse-num (:sz o)))
+                  "Original Size" (fn [o] (parse-num (or (:orig-sz o) (:sz o))))
+                  "Order Value" (fn [o] (or (order-value o) 0))
+                  "Price" (fn [o] (parse-num (:px o)))
+                  (fn [_] 0))
+        sorted (sort-by sort-fn orders)]
+    (if (= direction :desc)
+      (reverse sorted)
+      sorted)))
+
+(defn sortable-open-orders-header [column-name sort-state]
+  (let [current-column (:column sort-state)
+        current-direction (:direction sort-state)
+        is-active (= current-column column-name)
+        sort-icon (when is-active
+                    (if (= current-direction :asc) "↑" "↓"))]
+    [:button.text-sm.font-medium.text-base-content.hover:text-primary.transition-colors.flex.items-center.space-x-1.group
+     {:on {:click [[:actions/sort-open-orders column-name]]}}
+     [:span column-name]
+     (when sort-icon
+       [:span.text-xs.opacity-70 sort-icon])]))
 
 (defn format-pnl [pnl-value pnl-pct]
   (if (and (some? pnl-value) (some? pnl-pct))
@@ -499,43 +554,46 @@
    [:div.text-lg.font-medium.mb-4 (get tab-labels tab-name (name tab-name))]
    (empty-state (str (get tab-labels tab-name (name tab-name)) " coming soon"))])
 
-(defn open-orders-tab-content [normalized]
-  (if (seq normalized)
-    [:div
-     [:div.grid.grid-cols-12.gap-4.py-2.px-4.bg-base-200.border-b.border-base-300.text-sm.font-medium
-      [:div "Time"]
-      [:div "Type"]
-      [:div "Coin"]
-      [:div "Direction"]
-      [:div.text-right "Size"]
-      [:div.text-right "Original Size"]
-      [:div.text-right "Order Value"]
-      [:div.text-right "Price"]
-      [:div.text-center "Reduce Only"]
-      [:div.text-right "Trigger Conditions"]
-      [:div.text-center "TP/SL"]
-      [:div.text-right "Cancel All"]]
-     (for [o normalized]
-       ^{:key (str (:oid o) "-" (:coin o))}
-       [:div.grid.grid-cols-12.gap-4.py-3.px-4.border-b.border-base-300.text-sm
-        [:div (format-timestamp (:time o))]
-        [:div (or (:type o) "Order")]
-        [:div (:coin o)]
-        [:div (format-side (:side o))]
-        [:div.text-right (format-currency (:sz o))]
-        [:div.text-right (format-currency (or (:orig-sz o) (:sz o)))]
-        [:div.text-right (if-let [val (order-value o)]
-                           (str "$" (format-currency val))
-                           "--")]
-        [:div.text-right (format-currency (:px o))]
-        [:div.text-center (if (:reduce-only o) "Yes" "--")]
-        [:div.text-right (format-trigger-conditions o)]
-        [:div.text-center (format-tp-sl o)]
-        [:div.text-right
-         [:button.btn.btn-xs.btn-ghost
-          {:on {:click [[:actions/cancel-order o]]}}
-          "Cancel"]]])]
-    (empty-state "No open orders")))
+(defn open-orders-tab-content [normalized sort-state]
+  (let [sorted (sort-open-orders-by-column normalized
+                                           (:column sort-state)
+                                           (:direction sort-state))]
+    (if (seq sorted)
+      [:div
+       [:div {:class "grid gap-2 py-2 px-3 bg-base-200 border-b border-base-300 text-xs font-medium grid-cols-[130px_70px_60px_70px_60px_80px_100px_70px_70px_120px_50px_70px]"}
+        [:div.pr-2.whitespace-nowrap (sortable-open-orders-header "Time" sort-state)]
+        [:div.pl-1 (sortable-open-orders-header "Type" sort-state)]
+        [:div (sortable-open-orders-header "Coin" sort-state)]
+        [:div (sortable-open-orders-header "Direction" sort-state)]
+        [:div.text-right (sortable-open-orders-header "Size" sort-state)]
+        [:div.text-right (sortable-open-orders-header "Original Size" sort-state)]
+        [:div.text-right (sortable-open-orders-header "Order Value" sort-state)]
+        [:div.text-right (sortable-open-orders-header "Price" sort-state)]
+        [:div.text-center.whitespace-nowrap "Reduce Only"]
+        [:div.text-right.whitespace-nowrap "Trigger Conditions"]
+        [:div.text-center "TP/SL"]
+        [:div.text-right "Cancel All"]]
+       (for [o sorted]
+         ^{:key (str (:oid o) "-" (:coin o))}
+         [:div {:class "grid gap-2 py-2 px-3 border-b border-base-300 text-xs grid-cols-[130px_70px_60px_70px_60px_80px_100px_70px_70px_120px_50px_70px]"}
+          [:div.pr-2.whitespace-nowrap (format-open-orders-time (:time o))]
+          [:div.pl-1 (or (:type o) "Order")]
+          [:div (:coin o)]
+          [:div {:class (direction-class (:side o))} (direction-label (:side o))]
+          [:div.text-right (format-currency (:sz o))]
+          [:div.text-right (format-currency (or (:orig-sz o) (:sz o)))]
+          [:div.text-right (if-let [val (order-value o)]
+                             (str (format-currency val) " USDC")
+                             "--")]
+          [:div.text-right (format-currency (:px o))]
+          [:div.text-center (if (:reduce-only o) "Yes" "No")]
+          [:div.text-right (format-trigger-conditions o)]
+          [:div.text-center (format-tp-sl o)]
+          [:div.text-right
+           [:button.btn.btn-xs.btn-ghost
+            {:on {:click [[:actions/cancel-order o]]}}
+            "Cancel"]]])]
+      (empty-state "No open orders"))))
 
 (defn trade-history-tab-content [fills]
   (if (seq fills)
@@ -595,11 +653,11 @@
     (empty-state "No order history")))
 
 ;; Main tab content renderer
-(defn tab-content [selected-tab webdata2 sort-state spot-data hide-small? perp-dex-states open-orders]
+(defn tab-content [selected-tab webdata2 sort-state spot-data hide-small? perp-dex-states open-orders open-orders-sort]
   (case selected-tab
     :balances (balances-tab-content webdata2 spot-data hide-small?)
     :positions (positions-tab-content webdata2 sort-state perp-dex-states)
-    :open-orders (open-orders-tab-content open-orders)
+    :open-orders (open-orders-tab-content open-orders open-orders-sort)
     :twap (placeholder-tab-content :twap)
     :trade-history (trade-history-tab-content (get-in webdata2 [:fills]))
     :funding-history (funding-history-tab-content (get-in webdata2 [:fundings]))
@@ -619,7 +677,8 @@
         open-orders (normalized-open-orders (get-in webdata2 [:open-orders])
                                             (get-in webdata2 [:open-orders-snapshot])
                                             (get-in webdata2 [:open-orders-snapshot-by-dex]))
-        tab-counts {:open-orders (count open-orders)}]
+        tab-counts {:open-orders (count open-orders)}
+        open-orders-sort (get-in state [:account-info :open-orders-sort] {:column "Time" :direction :desc})]
     [:div.bg-base-100.rounded-lg.shadow-lg.overflow-hidden.w-full.max-w-6xl
      ;; Tab navigation
      (tab-navigation selected-tab tab-counts)
@@ -629,7 +688,7 @@
       (cond
         error (error-state error)
         loading? (loading-spinner)
-        :else (tab-content selected-tab webdata2 sort-state spot-data hide-small? perp-dex-states open-orders))]]))
+        :else (tab-content selected-tab webdata2 sort-state spot-data hide-small? perp-dex-states open-orders open-orders-sort))]]))
 
 ;; Main component that takes state and renders the UI
 (defn account-info-view [state]
