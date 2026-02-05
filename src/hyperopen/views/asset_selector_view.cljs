@@ -99,7 +99,7 @@
 (defn sort-controls [sort-by sort-direction]
   [:div {:class ["grid" "grid-cols-12" "gap-3" "items-center" "px-4" "pb-2"
                  "border-b" "border-base-300" "text-[11px]" "uppercase"
-                 "tracking-wide" "text-gray-400"]}
+                 "tracking-wide" "text-gray-400" "bg-base-100"]}
    [:div.col-span-3 (sort-button "Symbol" (= sort-by :name) sort-direction :name)]
    [:div.col-span-2.text-center (sort-button "Last Price" (= sort-by :price) sort-direction :price)]
    [:div.col-span-2.text-center (sort-button "24H Change" (= sort-by :change) sort-direction :change)]
@@ -137,8 +137,8 @@
         icon-blocked? (or missing-icon?
                           (and (string? icon-name)
                                (str/starts-with? icon-name "@")))]
-    [:div.grid.grid-cols-12.gap-3.items-center.px-4.py-2.cursor-pointer.rounded.hover:bg-base-200.transition-colors
-     {:class (when selected? ["bg-primary" "bg-opacity-10" "border" "border-primary"])
+    [:div.grid.grid-cols-12.gap-3.items-center.px-4.py-2.cursor-pointer.rounded.bg-base-100.hover:bg-base-200.transition-colors
+     {:class (when selected? ["bg-base-200" "border" "border-primary"])
       :on {:click [[:actions/select-asset asset]]}}
      ;; Symbol column
      [:div.col-span-3.flex.items-center.space-x-2
@@ -182,7 +182,7 @@
         (format-or-dash openInterest fmt/format-large-currency))]]))
 
 (defn asset-list [assets selected-market-key favorites missing-icons]
-  [:div.max-h-96.overflow-y-auto.space-y-1.scrollbar-hide
+  [:div.max-h-96.overflow-y-auto.scrollbar-hide.divide-y.divide-base-300
    (if (empty? assets)
      [:div.text-center.py-8.text-gray-400
       [:div "No assets found"]
@@ -258,13 +258,19 @@
   (when visible?
     (let [processed-assets (filter-and-sort-assets markets search-term sort-by sort-direction
                                                    favorites favorites-only? strict? active-tab)]
-      [:div.absolute.top-full.left-0.right-0.mt-1.bg-base-100.border.border-base-300.rounded-none.shadow-none.z-50
-       {:style {:transition "opacity 0.2s ease-in-out, transform 0.2s ease-in-out"
+      [:div
+       {:class ["absolute" "top-full" "left-0" "right-0" "mt-1" "bg-base-100"
+                "border" "border-base-300" "rounded-none" "shadow-none" "z-[220]" "isolate"]
+        :style {:transition "opacity 0.2s ease-in-out, transform 0.2s ease-in-out"
                 :opacity 1
-                :transform "translateY(0)"}
+                :transform "translateY(0)"
+                :background-color "var(--color-base-100)"}
         :replicant/mounting {:style {:opacity 0 :transform "translateY(-8px)"}}
         :replicant/unmounting {:style {:opacity 0 :transform "translateY(-8px)"}}}
-       [:div.p-4
+       [:div {:class ["absolute" "inset-0" "pointer-events-none"]
+              :style {:background-color "var(--color-base-100)"}}
+        nil]
+       [:div.relative.p-4.bg-base-100
         (search-controls search-term strict? favorites-only?)
         (tab-row active-tab)
         (sort-controls sort-by sort-direction)
@@ -276,5 +282,5 @@
    (asset-selector-dropdown props)
    ;; Invisible overlay to handle click-outside-to-close
    (when (:visible? props)
-     [:div.fixed.inset-0.z-40.transition.duration-700.ease-in-out
-      {:on {:click [[:actions/close-asset-dropdown]]}}])])
+     [:div {:class ["fixed" "inset-0" "z-[210]" "transition" "duration-700" "ease-in-out"]
+            :on {:click [[:actions/close-asset-dropdown]]}}])])
