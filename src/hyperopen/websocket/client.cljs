@@ -1,5 +1,7 @@
 (ns hyperopen.websocket.client
-  (:require [clojure.string :as str]))
+  (:require [clojure.string :as str]
+            [cljs.core.async :as async :refer [<! >! chan close! put!]])
+  (:require-macros [cljs.core.async.macros :refer [go-loop]]))
 
 (def ^:private ws-ready-state-connecting 0)
 (def ^:private ws-ready-state-open 1)
@@ -11,6 +13,14 @@
    :max-visible-delay-ms 15000
    :max-hidden-delay-ms 60000
    :max-queue-size 1000
+   :control-buffer-size 256
+   :outbound-buffer-size 1024
+   :ingress-raw-buffer-size 2048
+   :ingress-decoded-buffer-size 1024
+   :market-buffer-size 512
+   :lossless-buffer-size 1024
+   :lossless-depth-alert-threshold 500
+   :market-coalesce-window-ms 16
    :watchdog-interval-ms 10000
    :stale-visible-ms 45000
    :stale-hidden-ms 180000})
@@ -37,16 +47,34 @@
          :intentional-close? false
          :retry-timer nil
          :watchdog-timer nil
+         :channel-runtime nil
          :lifecycle-hooks-installed? false
          :lifecycle-handlers nil}))
 
 (defonce outbound-queue (atom []))
 (defonce desired-subscriptions (atom {}))
+(defonce stream-runtime (atom {:tier-depth {:market 0 :lossless 0}
+                               :metrics {:market-coalesced 0
+                                         :market-dispatched 0
+                                         :lossless-dispatched 0
+                                         :ingress-parse-errors 0}
+                               :market-coalesce {:pending {}
+                                                 :timer nil}}))
+
+(def ^:private market-topics #{"l2Book" "trades" "activeAssetCtx"})
+(def ^:private lossless-topics #{"webData2"
+                                 "openOrders"
+                                 "userFills"
+                                 "userFundings"
+                                 "userNonFundingLedgerUpdates"})
 
 (declare force-reconnect!)
 (declare attempt-connect!)
 (declare schedule-reconnect!)
 (declare handle-message!)
+(declare reconnect-if-needed!)
+(declare send-json!)
+(declare enqueue-message!)
 
 (defn now-ms []
   (.now js/Date))
@@ -118,6 +146,213 @@
 
 (defn- update-queue-size! []
   (swap! connection-state assoc :queue-size (count @outbound-queue)))
+
+(defn- runtime-channel [channel-key]
+  (get-in @runtime-state [:channel-runtime channel-key]))
+
+(defn- topic->tier [topic]
+  (cond
+    (contains? market-topics topic) :market
+    (contains? lossless-topics topic) :lossless
+    :else :lossless))
+
+(defn- make-channel-envelope [payload]
+  {:topic (:channel payload)
+   :tier (topic->tier (:channel payload))
+   :ts (now-ms)
+   :payload payload
+   :socket-id (:active-socket-id @runtime-state)})
+
+(defn- make-command-envelope
+  ([op]
+   (make-command-envelope op nil))
+  ([op attrs]
+   (merge {:op op :ts (now-ms)} attrs)))
+
+(defn- safe-put! [channel value]
+  (when channel
+    (try
+      (boolean (put! channel value))
+      (catch :default _
+        false))))
+
+(defn- update-tier-depth! [tier f]
+  (swap! stream-runtime update-in [:tier-depth tier] (fnil f 0)))
+
+(defn- increment-metric! [metric-key]
+  (swap! stream-runtime update-in [:metrics metric-key] (fnil inc 0)))
+
+(defn- dispatch-message! [data]
+  (when-let [channel (:channel data)]
+    (when-let [handler (get @message-handlers channel)]
+      (handler data))))
+
+(defn- drain-queued-messages! []
+  (let [queued @outbound-queue]
+    (reset! outbound-queue [])
+    (update-queue-size!)
+    queued))
+
+(defn- market-envelope-key [{:keys [topic payload]}]
+  (let [data (:data payload)
+        coin (or (:coin payload)
+                 (:coin data)
+                 (some-> data first :coin)
+                 (some-> data first :symbol)
+                 (some-> data first :asset))]
+    [topic coin]))
+
+(defn publish-control! [command]
+  (safe-put! (runtime-channel :control-ch) command))
+
+(defn- queue-market-envelope! [envelope]
+  (let [key (market-envelope-key envelope)
+        coalesce-window-ms (:market-coalesce-window-ms @connection-config)
+        needs-timer? (nil? (get-in @stream-runtime [:market-coalesce :timer]))]
+    (let [replacing? (contains? (get-in @stream-runtime [:market-coalesce :pending] {}) key)]
+      (swap! stream-runtime assoc-in [:market-coalesce :pending key] envelope)
+      (when replacing?
+        (increment-metric! :market-coalesced)))
+    (when needs-timer?
+      (let [timer-id (schedule-timeout!
+                       (fn []
+                         (swap! stream-runtime assoc-in [:market-coalesce :timer] nil)
+                         (publish-control! (make-command-envelope :flush-market-coalesced)))
+                       coalesce-window-ms)]
+        (swap! stream-runtime assoc-in [:market-coalesce :timer] timer-id)))))
+
+(defn- flush-market-coalesced! []
+  (let [pending (vals (get-in @stream-runtime [:market-coalesce :pending] {}))]
+    (swap! stream-runtime assoc-in [:market-coalesce :pending] {})
+    (doseq [envelope (sort-by :ts pending)]
+      (increment-metric! :market-dispatched)
+      (dispatch-message! (:payload envelope)))))
+
+(defn- dispatch-lossless-envelope! [envelope]
+  (increment-metric! :lossless-dispatched)
+  (dispatch-message! (:payload envelope)))
+
+(defn- dispatch-outbound-message! [data]
+  (let [socket (:socket @runtime-state)]
+    (if (and (= :connected (:status @connection-state))
+             socket
+             (send-json! socket data))
+      true
+      (do
+        (enqueue-message! data)
+        (when (and (not (:intentional-close? @runtime-state))
+                   (:ws-url @runtime-state)
+                   (nil? (:retry-timer @runtime-state))
+                   (not (socket-connecting? (:socket @runtime-state))))
+          (schedule-reconnect!))
+        false))))
+
+(defn- start-channel-runtime-loops! [channels]
+  (let [{:keys [control-ch outbound-ch ingress-raw-ch ingress-decoded-ch market-tier-ch lossless-tier-ch]} channels]
+    ;; Ingress decode loop: raw websocket text -> normalized envelope.
+    (go-loop []
+      (when-let [{:keys [raw]} (<! ingress-raw-ch)]
+        (try
+          (let [data (js/JSON.parse raw)
+                js-data (js->clj data :keywordize-keys true)
+                envelope (make-channel-envelope js-data)]
+            (>! ingress-decoded-ch envelope))
+          (catch :default e
+            (increment-metric! :ingress-parse-errors)
+            (println "Error parsing WebSocket message:" e)))
+        (recur)))
+    ;; Demux loop: decoded envelopes -> tier channels.
+    (go-loop []
+      (when-let [envelope (<! ingress-decoded-ch)]
+        (let [tier (:tier envelope)]
+          (case tier
+            :market
+            (do
+              (update-tier-depth! :market inc)
+              (>! market-tier-ch envelope))
+            :lossless
+            (do
+              (update-tier-depth! :lossless inc)
+              (>! lossless-tier-ch envelope))
+            (dispatch-lossless-envelope! envelope)))
+        (recur)))
+    ;; Market loop: coalesced by topic/coin before handler dispatch.
+    (go-loop []
+      (when-let [envelope (<! market-tier-ch)]
+        (update-tier-depth! :market #(max 0 (dec %)))
+        (queue-market-envelope! envelope)
+        (recur)))
+    ;; Lossless loop: strict ordered dispatch.
+    (go-loop []
+      (when-let [envelope (<! lossless-tier-ch)]
+        (update-tier-depth! :lossless #(max 0 (dec %)))
+        (dispatch-lossless-envelope! envelope)
+        (when (> (get-in @stream-runtime [:tier-depth :lossless] 0)
+                 (:lossless-depth-alert-threshold @connection-config))
+          (println "Lossless websocket queue depth is elevated:"
+                   (get-in @stream-runtime [:tier-depth :lossless])))
+        (recur)))
+    ;; Outbound loop: sends messages emitted from control commands.
+    (go-loop []
+      (when-let [data (<! outbound-ch)]
+        (dispatch-outbound-message! data)
+        (recur)))
+    ;; Control loop: command envelopes for replay/flush/control operations.
+    (go-loop []
+      (when-let [{:keys [op data]} (<! control-ch)]
+        (try
+          (case op
+            :send-outbound
+            (>! outbound-ch data)
+
+            :replay-subscriptions
+            (doseq [subscription (->> @desired-subscriptions vals (sort-by pr-str))]
+              (>! outbound-ch {:method "subscribe"
+                               :subscription subscription}))
+
+            :flush-outbound-queue
+            (doseq [queued (drain-queued-messages!)]
+              (>! outbound-ch queued))
+
+            :flush-market-coalesced
+            (flush-market-coalesced!)
+
+            :reconnect-if-needed
+            (reconnect-if-needed!)
+
+            nil)
+          (catch :default e
+            (println "WebSocket control loop command failed:" e)))
+        (recur)))))
+
+(defn- start-channel-runtime! []
+  (when-not (:channel-runtime @runtime-state)
+    (let [{:keys [control-buffer-size
+                  outbound-buffer-size
+                  ingress-raw-buffer-size
+                  ingress-decoded-buffer-size
+                  market-buffer-size
+                  lossless-buffer-size]} @connection-config
+          channels {:control-ch (chan (async/buffer control-buffer-size))
+                    :outbound-ch (chan (async/buffer outbound-buffer-size))
+                    :ingress-raw-ch (chan (async/sliding-buffer ingress-raw-buffer-size))
+                    :ingress-decoded-ch (chan (async/sliding-buffer ingress-decoded-buffer-size))
+                    :market-tier-ch (chan (async/sliding-buffer market-buffer-size))
+                    :lossless-tier-ch (chan (async/buffer lossless-buffer-size))}]
+      (swap! runtime-state assoc :channel-runtime channels)
+      (start-channel-runtime-loops! channels))))
+
+(defn- stop-channel-runtime! []
+  (when-let [channels (:channel-runtime @runtime-state)]
+    (doseq [channel (vals channels)]
+      (close! channel))
+    (swap! runtime-state assoc :channel-runtime nil))
+  (when-let [timer-id (get-in @stream-runtime [:market-coalesce :timer])]
+    (clear-timeout! timer-id))
+  (swap! stream-runtime assoc
+         :tier-depth {:market 0 :lossless 0}
+         :market-coalesce {:pending {}
+                           :timer nil}))
 
 (defn- normalize-method [value]
   (some-> value str str/lower-case))
@@ -244,16 +479,20 @@
                (:ws-url @runtime-state))
       (force-reconnect!))))
 
+(defn- request-reconnect-if-needed! []
+  (or (publish-control! (make-command-envelope :reconnect-if-needed))
+      (reconnect-if-needed!)))
+
 (defn- install-lifecycle-hooks! []
   (when-not (:lifecycle-hooks-installed? @runtime-state)
     (let [focus-handler (fn [_]
-                          (reconnect-if-needed!))
+                          (request-reconnect-if-needed!))
           visibility-handler (fn [_]
                                (when-not (hidden-tab?)
-                                 (reconnect-if-needed!)))
+                                 (request-reconnect-if-needed!)))
           online-handler (fn [_]
                            (println "Browser returned online, reconnecting WebSocket")
-                           (reconnect-if-needed!))
+                           (request-reconnect-if-needed!))
           offline-handler (fn [_]
                             (println "Browser went offline, pausing WebSocket reconnect timer")
                             (clear-retry-timer!)
@@ -382,22 +621,33 @@
 (defn register-handler! [message-type handler-fn]
   (swap! message-handlers assoc message-type handler-fn))
 
-;; Handle incoming WebSocket messages
-(defn handle-message! [event]
-  (swap! connection-state assoc :last-activity-at-ms (now-ms))
+(defn- handle-message-immediate! [event]
   (try
     (let [data (js/JSON.parse (.-data event))
           js-data (js->clj data :keywordize-keys true)]
-      ;; Route to registered handlers based on channel
-      (when-let [channel (:channel js-data)]
-        (when-let [handler (get @message-handlers channel)]
-          (handler js-data))))
+      (dispatch-message! js-data))
     (catch :default e
+      (increment-metric! :ingress-parse-errors)
       (println "Error parsing WebSocket message:" e))))
+
+;; Handle incoming WebSocket messages
+(defn handle-message! [event]
+  (swap! connection-state assoc :last-activity-at-ms (now-ms))
+  (let [raw-envelope {:raw (.-data event)
+                      :received-at-ms (now-ms)
+                      :socket-id (:active-socket-id @runtime-state)}
+        ingress-raw-ch (runtime-channel :ingress-raw-ch)]
+    (if (safe-put! ingress-raw-ch raw-envelope)
+      true
+      (do
+        ;; Fallback keeps backward compatibility if channel runtime is unavailable.
+        (handle-message-immediate! event)
+        false))))
 
 ;; Initialize WebSocket connection
 (defn init-connection! [ws-url]
   (swap! runtime-state assoc :ws-url ws-url :intentional-close? false)
+  (start-channel-runtime!)
   (install-lifecycle-hooks!)
   (ensure-watchdog!)
   (if (socket-active? (:socket @runtime-state))
@@ -431,19 +681,9 @@
 ;; Send message function
 (defn send-message! [data]
   (track-subscription-intent! data)
-  (let [socket (:socket @runtime-state)]
-    (if (and (= :connected (:status @connection-state))
-             socket
-             (send-json! socket data))
-      true
-      (do
-        (enqueue-message! data)
-        (when (and (not (:intentional-close? @runtime-state))
-                   (:ws-url @runtime-state)
-                   (nil? (:retry-timer @runtime-state))
-                   (not (socket-connecting? (:socket @runtime-state))))
-          (schedule-reconnect!))
-        false))))
+  ;; Keep synchronous send path for API compatibility while channel runtime
+  ;; handles replay, ingress routing, and tiered consumers.
+  (dispatch-outbound-message! data))
 
 ;; Connection status helpers
 (defn connected? []
@@ -452,14 +692,28 @@
 (defn get-connection-status []
   (:status @connection-state))
 
+(defn get-runtime-metrics []
+  (:metrics @stream-runtime))
+
+(defn get-tier-depths []
+  (:tier-depth @stream-runtime))
+
 (defn reset-manager-state! []
   ;; Primarily intended for tests.
   (disconnect!)
+  (stop-channel-runtime!)
   (when-let [watchdog-id (:watchdog-timer @runtime-state)]
     (clear-interval! watchdog-id))
   (reset! outbound-queue [])
   (reset! desired-subscriptions {})
   (reset! connection-config default-config)
+  (reset! stream-runtime {:tier-depth {:market 0 :lossless 0}
+                          :metrics {:market-coalesced 0
+                                    :market-dispatched 0
+                                    :lossless-dispatched 0
+                                    :ingress-parse-errors 0}
+                          :market-coalesce {:pending {}
+                                            :timer nil}})
   (reset! connection-state {:status :disconnected
                             :attempt 0
                             :next-retry-at-ms nil
@@ -472,6 +726,7 @@
          :ws-url nil
          :retry-timer nil
          :watchdog-timer nil
+         :channel-runtime nil
          :socket-id 0
          :active-socket-id nil
          :intentional-close? false
