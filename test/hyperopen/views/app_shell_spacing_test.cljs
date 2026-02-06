@@ -30,6 +30,11 @@
               nil))]
     (boolean (walk node))))
 
+(defn- root-class-set [node]
+  (let [attrs (when (and (vector? node) (map? (second node)))
+                (second node))]
+    (set (class-values (:class attrs)))))
+
 (def trade-view-test-state
   {:active-asset nil
    :active-market nil
@@ -80,6 +85,17 @@
 (deftest trade-view-does-not-use-app-shell-gutter-test
   (let [view-node (trade-view/trade-view trade-view-test-state)]
     (is (not (contains-class? view-node "app-shell-gutter")))))
+
+(deftest trade-view-root-and-right-column-layout-test
+  (let [view-node (trade-view/trade-view trade-view-test-state)
+        root-classes (root-class-set view-node)]
+    (is (not (contains? root-classes "overflow-auto")))
+    (is (contains? root-classes "min-h-0"))
+    (is (contains-class? view-node "right-[340px]"))
+    (is (contains-class? view-node "lg:grid-cols-[minmax(0,1fr)_340px]"))
+    (is (contains-class? view-node "xl:grid-cols-[minmax(0,1fr)_340px_340px]"))
+    (is (contains-class? view-node "xl:row-span-2"))
+    (is (not (contains-class? view-node "xl:row-start-2")))))
 
 (deftest footer-view-uses-app-shell-gutter-test
   (let [view-node (footer-view/footer-view {:websocket {:status :connected}})]

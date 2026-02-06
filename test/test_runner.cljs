@@ -18,6 +18,7 @@
             [hyperopen.views.footer-view-test]
             [hyperopen.views.trading-chart.timeframe-dropdown-test]
             [hyperopen.views.l2-orderbook-view-test]
+            [hyperopen.views.trade.order-form-view-test]
             [hyperopen.state.trading-test]))
 
 (defn run-all-tests
@@ -41,6 +42,7 @@
              'hyperopen.views.footer-view-test
              'hyperopen.views.trading-chart.timeframe-dropdown-test
              'hyperopen.views.l2-orderbook-view-test
+             'hyperopen.views.trade.order-form-view-test
              'hyperopen.state.trading-test))
 
 (defn -main

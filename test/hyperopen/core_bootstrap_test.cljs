@@ -2,6 +2,7 @@
   (:require [cljs.test :refer-macros [async deftest is use-fixtures]]
             [hyperopen.api :as api]
             [hyperopen.core :as core]
+            [hyperopen.state.trading :as trading]
             [hyperopen.wallet.address-watcher :as address-watcher]
             [hyperopen.websocket.active-asset-ctx :as active-ctx]
             [hyperopen.websocket.client :as ws-client]
@@ -147,3 +148,40 @@
            effects))
     (is (= :effects/save-many (ffirst effects)))
     (is (not-any? #(= (first %) :effects/fetch-candle-snapshot) effects))))
+
+(deftest select-order-entry-mode-emits-single-batched-projection-test
+  (let [effects (core/select-order-entry-mode {:order-form (trading/default-order-form)} :market)]
+    (is (= 1 (count effects)))
+    (is (= :effects/save-many (ffirst effects)))
+    (is (= :market (get-in (-> effects first second first second) [:type])))))
+
+(deftest set-order-size-percent-emits-single-batched-projection-and-no-network-effects-test
+  (let [state {:active-asset "BTC"
+               :active-market {:coin "BTC" :mark 100 :maxLeverage 40 :szDecimals 4}
+               :orderbooks {"BTC" {:bids [{:px "99"}]
+                                   :asks [{:px "101"}]}}
+               :webdata2 {:clearinghouseState {:marginSummary {:accountValue "1000"
+                                                               :totalMarginUsed "250"}}}
+               :order-form (assoc (trading/default-order-form) :type :limit :price "100")}
+        effects (core/set-order-size-percent state 25)
+        saved-form (-> effects first second first second)]
+    (is (= 1 (count effects)))
+    (is (= :effects/save-many (ffirst effects)))
+    (is (= 25 (:size-percent saved-form)))
+    (is (not-any? #(= (first %) :effects/api-submit-order) effects))
+    (is (not-any? #(= (first %) :effects/subscribe-orderbook) effects))))
+
+(deftest submit-order-emits-single-api-submit-order-effect-test
+  (let [state {:active-asset "BTC"
+               :active-market {:coin "BTC" :market-type :perp}
+               :asset-contexts {:BTC {:idx 0}}
+               :orderbooks {"BTC" {:bids [{:px "99"}]
+                                   :asks [{:px "101"}]}}
+               :order-form (assoc (trading/default-order-form)
+                                  :type :limit
+                                  :side :buy
+                                  :size "1"
+                                  :price "100")}
+        effects (core/submit-order state)
+        api-submit-effects (filter #(= (first %) :effects/api-submit-order) effects)]
+    (is (= 1 (count api-submit-effects)))))

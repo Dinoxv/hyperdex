@@ -9,18 +9,18 @@
 (defn trade-view [state]
   (let [active-asset (:active-asset state)
         orderbook-data (when active-asset (get-in state [:orderbooks active-asset]))]
-    [:div.flex-1.overflow-auto.flex.flex-col
+    [:div {:class ["flex-1" "flex" "flex-col" "min-h-0"]}
      [:div {:class ["w-full" "px-0" "py-0" "space-y-0" "flex" "flex-col" "min-h-full"]}
       [:div {:class ["relative" "flex-1"]}
-       [:div {:class ["hidden" "xl:block" "absolute" "top-0" "bottom-0" "right-[320px]" "w-px" "bg-base-300" "pointer-events-none" "z-10"]}]
-       [:div {:class ["grid"
-                      "grid-cols-1"
-                      "gap-x-0" "gap-y-0"
-                      "bg-base-100"
-                       "items-stretch"
-                       "lg:grid-cols-[minmax(0,1fr)_320px]"
-                       "xl:grid-cols-[minmax(0,1fr)_320px_320px]"
-                       "xl:grid-rows-[580px_auto]"]}
+       [:div {:class ["hidden" "xl:block" "absolute" "top-0" "bottom-0" "right-[340px]" "w-px" "bg-base-300" "pointer-events-none" "z-10"]}]
+        [:div {:class ["grid"
+                       "grid-cols-1"
+                       "gap-x-0" "gap-y-0"
+                       "bg-base-100"
+                        "items-stretch"
+                        "lg:grid-cols-[minmax(0,1fr)_340px]"
+                        "xl:grid-cols-[minmax(0,1fr)_340px_340px]"
+                       "xl:grid-rows-[minmax(580px,auto)_auto]"]}
         [:div {:class ["bg-base-100" "border-r" "border-base-300" "flex" "flex-col" "min-h-0"]}
          (active-asset-view/active-asset-view state)
          [:div {:class ["overflow-hidden" "flex-1" "min-h-0"]}
@@ -34,11 +34,10 @@
             :orderbook-ui (:orderbook-ui state)
             :loading (and active-asset (nil? orderbook-data))})]
 
-        [:div {:class ["bg-base-100" "lg:col-span-2" "xl:col-span-1" "xl:col-start-3" "h-full" "min-h-0" "overflow-y-auto"]}
-         (order-form-view/order-form-view state)]
+        [:div {:class ["bg-base-100" "lg:col-span-2" "xl:col-span-1" "xl:col-start-3" "xl:row-span-2" "overflow-visible" "flex" "flex-col"]}
+         (order-form-view/order-form-view state)
+         [:div {:class ["border-t" "border-base-300"]}
+          (account-equity-view/account-equity-view state)]]
 
         [:div {:class ["bg-base-100" "lg:col-span-2" "xl:col-span-2" "border-t" "border-base-300"]}
-         (account-info-view/account-info-view state)]
-
-        [:div {:class ["bg-base-100" "lg:col-span-2" "xl:col-start-3" "xl:row-start-2" "h-full" "border-t" "border-base-300"]}
-         (account-equity-view/account-equity-view state)]]]]]))
+         (account-info-view/account-info-view state)]]]]]))

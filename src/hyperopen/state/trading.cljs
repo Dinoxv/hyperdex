@@ -4,11 +4,23 @@
 (def order-types
   [:market :limit :stop-market :stop-limit :take-market :take-limit :scale :twap])
 
+(def advanced-order-types
+  [:stop-market :stop-limit :take-market :take-limit :scale :twap])
+
 (def tif-options [:gtc :ioc :alo])
+
+(def default-max-slippage-pct 8.0)
+
+(def default-fees
+  {:taker 0.045
+   :maker 0.015})
 
 (defn default-order-form []
   {:type :limit
    :side :buy
+   :ui-leverage 20
+   :size-percent 0
+   :tpsl-panel-open? false
    :size ""
    :price ""
    :trigger-px ""
@@ -40,6 +52,242 @@
                       n (js/parseFloat s)]
                   (when (and (not (str/blank? s)) (not (js/isNaN n))) n))
     :else nil))
+
+(defn- clamp-num [n min-v max-v]
+  (-> n
+      (max min-v)
+      (min max-v)))
+
+(defn clamp-percent [percent]
+  (let [parsed (or (parse-num percent) 0)]
+    (clamp-num parsed 0 100)))
+
+(defn- number->clean-string [value decimals]
+  (let [safe-decimals (-> (or decimals 4)
+                          (max 0)
+                          (min 8))]
+    (if (number? value)
+      (-> (.toFixed value safe-decimals)
+          (str/replace #"0+$" "")
+          (str/replace #"\.$" ""))
+      "")))
+
+(defn normalize-order-type [order-type]
+  (let [candidate (if (keyword? order-type) order-type (keyword order-type))]
+    (if (some #{candidate} order-types) candidate :limit)))
+
+(defn entry-mode-for-type [order-type]
+  (case (normalize-order-type order-type)
+    :market :market
+    :limit :limit
+    :pro))
+
+(defn normalize-pro-order-type [order-type]
+  (let [candidate (normalize-order-type order-type)]
+    (if (some #{candidate} advanced-order-types)
+      candidate
+      :stop-market)))
+
+(defn market-max-leverage [state]
+  (let [max-lev (parse-num (get-in state [:active-market :maxLeverage]))]
+    (when (and (number? max-lev) (pos? max-lev))
+      max-lev)))
+
+(defn normalize-ui-leverage [state leverage]
+  (let [raw (or (parse-num leverage) 20)
+        max-lev (or (market-max-leverage state) 100)]
+    (-> (clamp-num raw 1 max-lev)
+        js/Math.round)))
+
+(defn- active-clearinghouse-state [state]
+  (let [dex (get-in state [:active-market :dex])]
+    (if (and (string? dex) (seq dex))
+      (get-in state [:perp-dex-clearinghouse dex])
+      (get-in state [:webdata2 :clearinghouseState]))))
+
+(defn available-to-trade [state]
+  (let [clearinghouse (or (active-clearinghouse-state state) {})
+        withdrawable (parse-num (:withdrawable clearinghouse))
+        summary (or (get-in clearinghouse [:marginSummary])
+                    (get-in clearinghouse [:crossMarginSummary])
+                    {})
+        account-value (or (parse-num (:accountValue summary)) 0)
+        margin-used (or (parse-num (:totalMarginUsed summary)) 0)
+        fallback-available (- account-value margin-used)]
+    (max 0 (if (number? withdrawable)
+             withdrawable
+             fallback-available))))
+
+(defn position-for-active-asset [state]
+  (let [active-asset (:active-asset state)
+        positions (get-in (active-clearinghouse-state state) [:assetPositions])]
+    (some (fn [entry]
+            (let [position (or (:position entry) entry)]
+              (when (= active-asset (:coin position))
+                position)))
+          positions)))
+
+(defn current-position-summary [state]
+  (let [active-asset (:active-asset state)
+        position (position-for-active-asset state)
+        size (or (parse-num (:szi position)) 0)
+        liquidation (parse-num (:liquidationPx position))]
+    {:coin active-asset
+     :size size
+     :abs-size (js/Math.abs size)
+     :direction (cond
+                  (pos? size) :long
+                  (neg? size) :short
+                  :else :flat)
+     :liquidation-price (when (and (number? liquidation) (pos? liquidation))
+                          liquidation)}))
+
+(defn- size-decimals [state]
+  (let [sz-decimals (parse-num (get-in state [:active-market :szDecimals]))]
+    (-> (or sz-decimals 4)
+        (max 0)
+        (min 8)
+        int)))
+
+(defn best-bid-price [state]
+  (let [active-asset (:active-asset state)
+        orderbook (get-in state [:orderbooks active-asset])]
+    (some-> orderbook :bids first :px parse-num)))
+
+(defn best-ask-price [state]
+  (let [active-asset (:active-asset state)
+        orderbook (get-in state [:orderbooks active-asset])]
+    (some-> orderbook :asks first :px parse-num)))
+
+(defn reference-price [state form]
+  (let [order-type (normalize-order-type (:type form))
+        limit-price (when (contains? #{:limit :stop-limit :take-limit} order-type)
+                      (parse-num (:price form)))
+        side (:side form)
+        best-px (if (= side :buy)
+                  (best-ask-price state)
+                  (best-bid-price state))
+        projected-mark (parse-num (get-in state [:active-market :mark]))
+        streamed-mark (parse-num (get-in state [:active-assets :contexts (:active-asset state) :mark]))]
+    (cond
+      (and (number? limit-price) (pos? limit-price)) limit-price
+      (and (number? best-px) (pos? best-px)) best-px
+      (and (number? projected-mark) (pos? projected-mark)) projected-mark
+      (and (number? streamed-mark) (pos? streamed-mark)) streamed-mark
+      :else nil)))
+
+(defn mid-price-summary
+  "Return deterministic price context for UI rows:
+   {:mid-price number|nil :source :mid|:reference|:none}."
+  [state form]
+  (let [bid (best-bid-price state)
+        ask (best-ask-price state)
+        mid (when (and (number? bid)
+                       (pos? bid)
+                       (number? ask)
+                       (pos? ask))
+              (/ (+ bid ask) 2))
+        ref (reference-price state form)]
+    (cond
+      (number? mid) {:mid-price mid :source :mid}
+      (number? ref) {:mid-price ref :source :reference}
+      :else {:mid-price nil :source :none})))
+
+(defn size-from-percent [state form percent]
+  (let [pct (clamp-percent percent)
+        available (available-to-trade state)
+        leverage (normalize-ui-leverage state (:ui-leverage form))
+        ref-price (reference-price state form)
+        notional (* available leverage (/ pct 100))]
+    (when (and (pos? pct)
+               (number? ref-price)
+               (pos? ref-price)
+               (pos? notional))
+      (/ notional ref-price))))
+
+(defn percent-from-size [state form size]
+  (let [size-value (parse-num size)
+        available (available-to-trade state)
+        leverage (normalize-ui-leverage state (:ui-leverage form))
+        ref-price (reference-price state form)
+        notional-capacity (* available leverage)]
+    (when (and (number? size-value)
+               (pos? size-value)
+               (number? ref-price)
+               (pos? ref-price)
+               (pos? notional-capacity))
+      (clamp-percent (* 100 (/ (* size-value ref-price) notional-capacity))))))
+
+(defn apply-size-percent [state form percent]
+  (let [pct (clamp-percent percent)
+        normalized-form (assoc form
+                               :size-percent pct
+                               :ui-leverage (normalize-ui-leverage state (:ui-leverage form)))
+        computed-size (size-from-percent state normalized-form pct)
+        decimals (size-decimals state)]
+    (cond
+      (zero? pct) (assoc normalized-form :size "")
+      (number? computed-size) (assoc normalized-form :size (number->clean-string computed-size decimals))
+      :else normalized-form)))
+
+(defn sync-size-from-percent [state form]
+  (let [pct (clamp-percent (:size-percent form))]
+    (if (pos? pct)
+      (apply-size-percent state form pct)
+      (assoc form
+             :size-percent pct
+             :ui-leverage (normalize-ui-leverage state (:ui-leverage form))))))
+
+(defn sync-size-percent-from-size [state form]
+  (let [size (parse-num (:size form))
+        derived (percent-from-size state form (:size form))
+        leverage (normalize-ui-leverage state (:ui-leverage form))]
+    (cond
+      (or (nil? size) (<= size 0))
+      (assoc form :size-percent 0 :ui-leverage leverage)
+
+      (number? derived)
+      (assoc form :size-percent derived :ui-leverage leverage)
+
+      :else
+      (assoc form
+             :size-percent (clamp-percent (:size-percent form))
+             :ui-leverage leverage))))
+
+(defn normalize-order-form [state form]
+  (let [normalized-type (normalize-order-type (:type form))
+        final-type (if (= :pro (entry-mode-for-type normalized-type))
+                     (normalize-pro-order-type normalized-type)
+                     normalized-type)]
+    (-> form
+        (assoc :type final-type
+               :size-percent (clamp-percent (:size-percent form))
+               :ui-leverage (normalize-ui-leverage state (:ui-leverage form))
+               :tpsl-panel-open? (boolean (:tpsl-panel-open? form))))))
+
+(defn order-summary [state form]
+  (let [normalized-form (normalize-order-form state form)
+        size (parse-num (:size normalized-form))
+        ref-price (reference-price state normalized-form)
+        order-value (when (and (number? size) (pos? size) (number? ref-price) (pos? ref-price))
+                      (* size ref-price))
+        leverage (normalize-ui-leverage state (:ui-leverage normalized-form))
+        margin-required (when (and (number? order-value) (pos? leverage))
+                          (/ order-value leverage))
+        position (current-position-summary state)
+        liquidation-price (:liquidation-price position)
+        slippage-est (if (= :market (:type normalized-form))
+                       (max 0 (or (parse-num (:slippage normalized-form)) 0))
+                       0)]
+    {:available-to-trade (available-to-trade state)
+     :current-position position
+     :reference-price ref-price
+     :order-value order-value
+     :margin-required margin-required
+     :liquidation-price liquidation-price
+     :slippage-est slippage-est
+     :slippage-max default-max-slippage-pct
+     :fees default-fees}))
 
 (defn validate-order-form [form]
   (let [size (parse-num (:size form))
@@ -186,15 +434,9 @@
        :asset-idx asset-idx})))
 
 (defn best-price [state side]
-  (let [active-asset (:active-asset state)
-        orderbook (get-in state [:orderbooks active-asset])
-        bids (:bids orderbook)
-        asks (:asks orderbook)
-        best-bid (first bids)
-        best-ask (first asks)]
-    (if (= side :buy)
-      (some-> best-ask :px parse-num)
-      (some-> best-bid :px parse-num))))
+  (if (= side :buy)
+    (best-ask-price state)
+    (best-bid-price state)))
 
 (defn apply-market-price [state form]
   (let [side (:side form)

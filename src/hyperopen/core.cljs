@@ -529,17 +529,90 @@
 (defn set-hide-small-balances [state checked]
   [[:effects/save [:account-info :hide-small-balances?] checked]])
 
+(defn- normalize-order-entry-mode [mode]
+  (let [candidate (cond
+                    (keyword? mode) mode
+                    (string? mode) (keyword mode)
+                    :else :market)]
+    (if (contains? #{:market :limit :pro} candidate)
+      candidate
+      :market)))
+
+(defn select-order-entry-mode [state mode]
+  (let [mode* (normalize-order-entry-mode mode)
+        form (:order-form state)
+        next-type (case mode*
+                    :market :market
+                    :limit :limit
+                    (trading/normalize-pro-order-type (:type form)))
+        next-form (-> form
+                      (assoc :type next-type)
+                      (trading/sync-size-from-percent state)
+                      (assoc :error nil))]
+    [[:effects/save-many [[[:order-form] next-form]]]]))
+
+(defn select-pro-order-type [state order-type]
+  (let [form (:order-form state)
+        next-type (trading/normalize-pro-order-type order-type)
+        next-form (-> form
+                      (assoc :type next-type)
+                      (trading/sync-size-from-percent state)
+                      (assoc :error nil))]
+    [[:effects/save-many [[[:order-form] next-form]]]]))
+
+(defn set-order-ui-leverage [state leverage]
+  (let [form (:order-form state)
+        normalized (trading/normalize-ui-leverage state leverage)
+        next-form (-> form
+                      (assoc :ui-leverage normalized)
+                      (trading/sync-size-from-percent state)
+                      (assoc :error nil))]
+    [[:effects/save-many [[[:order-form] next-form]]]]))
+
+(defn set-order-size-percent [state percent]
+  (let [form (:order-form state)
+        next-form (-> (trading/apply-size-percent state form percent)
+                      (assoc :error nil))]
+    [[:effects/save-many [[[:order-form] next-form]]]]))
+
+(defn toggle-order-tpsl-panel [state]
+  (let [form (:order-form state)
+        next-open? (not (boolean (:tpsl-panel-open? form)))
+        next-form (cond-> (assoc form :tpsl-panel-open? next-open?)
+                    (not next-open?) (assoc-in [:tp :enabled?] false)
+                    (not next-open?) (assoc-in [:sl :enabled?] false))
+        next-form* (assoc next-form :error nil)]
+    [[:effects/save-many [[[:order-form] next-form*]]]]))
+
 (defn update-order-form [state path value]
   (let [v (cond
             (= path [:type]) (keyword value)
             (= path [:side]) (keyword value)
             (= path [:tif]) (keyword value)
-            :else value)]
-    [[:effects/save (into [:order-form] path) v]
-     [:effects/save [:order-form :error] nil]]))
+            :else value)
+        form (:order-form state)
+        updated (assoc-in form path v)
+        next-form (cond
+                    (= path [:type])
+                    (-> updated
+                        (update :type trading/normalize-order-type)
+                        (trading/sync-size-from-percent state))
+
+                    (= path [:size])
+                    (trading/sync-size-percent-from-size state updated)
+
+                    (or (= path [:price]) (= path [:side]))
+                    (if (pos? (or (trading/parse-num (:size-percent updated)) 0))
+                      (trading/sync-size-from-percent state updated)
+                      updated)
+
+                    :else
+                    updated)
+        next-form* (assoc next-form :error nil)]
+    [[:effects/save-many [[[:order-form] next-form*]]]]))
 
 (defn submit-order [state]
-  (let [form (:order-form state)
+  (let [form (trading/normalize-order-form state (:order-form state))
         active-market (:active-market state)
         active-asset (:active-asset state)
         inferred-spot? (and (string? active-asset) (str/includes? active-asset "/"))
@@ -686,6 +759,11 @@
 (nxr/register-action! :actions/sort-balances sort-balances)
 (nxr/register-action! :actions/sort-open-orders sort-open-orders)
 (nxr/register-action! :actions/set-hide-small-balances set-hide-small-balances)
+(nxr/register-action! :actions/select-order-entry-mode select-order-entry-mode)
+(nxr/register-action! :actions/select-pro-order-type select-pro-order-type)
+(nxr/register-action! :actions/set-order-ui-leverage set-order-ui-leverage)
+(nxr/register-action! :actions/set-order-size-percent set-order-size-percent)
+(nxr/register-action! :actions/toggle-order-tpsl-panel toggle-order-tpsl-panel)
 (nxr/register-action! :actions/update-order-form update-order-form)
 (nxr/register-action! :actions/submit-order submit-order)
 (nxr/register-action! :actions/cancel-order cancel-order)
