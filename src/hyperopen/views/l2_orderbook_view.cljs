@@ -304,15 +304,11 @@
    [:p.text-sm.text-gray-500 "Recent trades will appear here"]])
 
 (defn trades-panel [coin base-symbol]
-  (let [recent-trades (recent-trades-for-coin coin)
-        visible-rows 26
-        row-height-px 24
-        body-max-height (str (* visible-rows row-height-px) "px")]
+  (let [recent-trades (recent-trades-for-coin coin)]
     (if (seq recent-trades)
-      [:div {:class ["bg-base-100" "border" "border-base-300" "rounded-none" "overflow-hidden"]}
+      [:div {:class ["bg-base-100" "border" "border-base-300" "rounded-none" "overflow-hidden" "h-full" "min-h-0" "flex" "flex-col"]}
        (trades-column-headers base-symbol)
-       [:div.overflow-y-auto.scrollbar-hide
-        {:style {:max-height body-max-height}}
+       [:div.flex-1.min-h-0.overflow-y-auto.scrollbar-hide
         (for [trade recent-trades]
           ^{:key (str "trade-" coin "-" (:tid trade) "-" (:time-ms trade) "-" (:price-raw trade) "-" (:size-raw trade))}
           (trades-row trade))]]
@@ -361,7 +357,7 @@
 
 ;; Main order book component
 (defn l2-orderbook-panel [coin market orderbook-data orderbook-ui]
-  (let [max-rows 13
+  (let [max-rows 9
         size-unit (normalize-size-unit (:size-unit orderbook-ui))
         size-unit-dropdown-visible? (boolean (:size-unit-dropdown-visible? orderbook-ui))
         price-dropdown-visible? (boolean (:price-aggregation-dropdown-visible? orderbook-ui))

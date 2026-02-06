@@ -8,8 +8,7 @@
 
 (defn trade-view [state]
   (let [active-asset (:active-asset state)
-        orderbook-data (when active-asset (get-in state [:orderbooks active-asset]))
-        top-row-height "600px"]
+        orderbook-data (when active-asset (get-in state [:orderbooks active-asset]))]
     [:div.flex-1.overflow-auto.flex.flex-col
      [:div {:class ["w-full" "px-0" "py-0" "space-y-0" "flex" "flex-col" "min-h-full"]}
       [:div {:class ["relative" "flex-1"]}
@@ -18,13 +17,13 @@
                       "grid-cols-1"
                       "gap-x-0" "gap-y-0"
                       "bg-base-100"
-                      "items-stretch"
-                      "lg:grid-cols-[minmax(0,1fr)_320px]"
-                      "xl:grid-cols-[minmax(0,1fr)_320px_320px]"]}
-        [:div {:class ["bg-base-100" "border-r" "border-base-300" "flex" "flex-col"]}
+                       "items-stretch"
+                       "lg:grid-cols-[minmax(0,1fr)_320px]"
+                       "xl:grid-cols-[minmax(0,1fr)_320px_320px]"
+                       "xl:grid-rows-[580px_auto]"]}
+        [:div {:class ["bg-base-100" "border-r" "border-base-300" "flex" "flex-col" "min-h-0"]}
          (active-asset-view/active-asset-view state)
-         [:div {:class ["overflow-hidden"]
-                :style {:height top-row-height}}
+         [:div {:class ["overflow-hidden" "flex-1" "min-h-0"]}
           (trading-chart/trading-chart-view state)]]
 
         [:div {:class ["bg-base-100" "w-full" "h-full" "min-h-0" "overflow-hidden"]}
@@ -35,7 +34,7 @@
             :orderbook-ui (:orderbook-ui state)
             :loading (and active-asset (nil? orderbook-data))})]
 
-        [:div {:class ["bg-base-100" "lg:col-span-2" "xl:col-span-1" "xl:col-start-3" "h-full"]}
+        [:div {:class ["bg-base-100" "lg:col-span-2" "xl:col-span-1" "xl:col-start-3" "h-full" "min-h-0" "overflow-y-auto"]}
          (order-form-view/order-form-view state)]
 
         [:div {:class ["bg-base-100" "lg:col-span-2" "xl:col-span-2" "border-t" "border-base-300"]}
