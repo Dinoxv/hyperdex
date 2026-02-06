@@ -1,5 +1,6 @@
 (ns hyperopen.views.active-asset-view-test
-  (:require [cljs.test :refer-macros [deftest is]]
+  (:require [clojure.string :as str]
+            [cljs.test :refer-macros [deftest is]]
             [hyperopen.views.active-asset-view :as view]))
 
 (defn- collect-strings [node]
@@ -25,6 +26,30 @@
 
     :else
     []))
+
+(defn- class-values [class-attr]
+  (cond
+    (nil? class-attr) []
+    (string? class-attr) (remove str/blank? (str/split class-attr #"\s+"))
+    (sequential? class-attr) (mapcat class-values class-attr)
+    :else []))
+
+(defn- contains-class? [node class-name]
+  (letfn [(walk [n]
+            (cond
+              (vector? n)
+              (let [attrs (when (map? (second n)) (second n))
+                    children (if attrs (drop 2 n) (drop 1 n))
+                    class-set (set (class-values (:class attrs)))]
+                (or (contains? class-set class-name)
+                    (some walk children)))
+
+              (seq? n)
+              (some walk n)
+
+              :else
+              nil))]
+    (boolean (walk node))))
 
 (deftest active-asset-row-symbol-fallback-test
   (let [ctx-data {:coin "SOL"
@@ -71,3 +96,19 @@
         icon-node (view/asset-icon spot-market false #{})
         path-ds (set (collect-path-ds icon-node))]
     (is (contains? path-ds "M19 9l-7 7-7-7"))))
+
+(deftest active-asset-row-uses-app-shell-left-gutter-test
+  (let [ctx-data {:coin "SOL"
+                  :mark 87.0
+                  :oracle 86.9
+                  :change24h 1.2
+                  :change24hPct 1.4
+                  :volume24h 1000
+                  :openInterest 100
+                  :fundingRate 0.001}
+        market {:coin "SOL"
+                :symbol "SOL"
+                :base "SOL"
+                :market-type :perp}
+        view-node (view/active-asset-row ctx-data market {:visible-dropdown nil} {:asset-selector {:missing-icons #{}}})]
+    (is (contains-class? view-node "app-shell-gutter-left"))))

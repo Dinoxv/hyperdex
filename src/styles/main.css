@@ -131,27 +131,39 @@
     );
   }
 
-  .app-shell-gutter {
+  .app-shell-gutter,
+  .app-shell-gutter-left {
     padding-left: 0.75rem;
-    padding-right: 0.75rem;
     padding-left: max(0.75rem, env(safe-area-inset-left));
+  }
+
+  .app-shell-gutter {
+    padding-right: 0.75rem;
     padding-right: max(0.75rem, env(safe-area-inset-right));
   }
 
   @media (min-width: 768px) {
-    .app-shell-gutter {
+    .app-shell-gutter,
+    .app-shell-gutter-left {
       padding-left: 1rem;
-      padding-right: 1rem;
       padding-left: max(1rem, env(safe-area-inset-left));
+    }
+
+    .app-shell-gutter {
+      padding-right: 1rem;
       padding-right: max(1rem, env(safe-area-inset-right));
     }
   }
 
   @media (min-width: 1280px) {
-    .app-shell-gutter {
+    .app-shell-gutter,
+    .app-shell-gutter-left {
       padding-left: 1.5rem;
-      padding-right: 1.5rem;
       padding-left: max(1.5rem, env(safe-area-inset-left));
+    }
+
+    .app-shell-gutter {
+      padding-right: 1.5rem;
       padding-right: max(1.5rem, env(safe-area-inset-right));
     }
   }

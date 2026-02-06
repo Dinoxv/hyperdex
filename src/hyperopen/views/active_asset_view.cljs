@@ -66,8 +66,9 @@
         icon-blocked? (or missing-icon?
                           (and (string? base)
                                (str/starts-with? base "@")))]
-    [:div.flex.items-center.gap-2.cursor-pointer.hover:bg-base-300.rounded.px-2.py-1.transition-colors.min-w-0
-     {:on {:click [[:actions/toggle-asset-dropdown :asset-selector]]}}
+    [:div {:class ["flex" "items-center" "gap-2" "cursor-pointer" "hover:bg-base-300"
+                   "rounded" "pr-2" "py-1" "transition-colors" "min-w-0"]
+           :on {:click [[:actions/toggle-asset-dropdown :asset-selector]]}}
      (when-not icon-blocked?
        [:img.w-6.h-6.rounded-full
         {:src (str "https://app.hyperliquid.xyz/coins/" base ".svg")
@@ -90,8 +91,9 @@
       [:path {:stroke-linecap "round" :stroke-linejoin "round" :stroke-width 2 :d "M19 9l-7 7-7-7"}]]]))
 
 (defn asset-selector-trigger [dropdown-visible?]
-  [:button.flex.items-center.space-x-2.cursor-pointer.hover:bg-base-300.rounded.px-2.py-1.transition-colors
-   {:type "button"
+  [:button {:class ["flex" "items-center" "space-x-2" "cursor-pointer" "hover:bg-base-300"
+                    "rounded" "pr-2" "py-1" "transition-colors"]
+            :type "button"
     :on {:click [[:actions/toggle-asset-dropdown :asset-selector]]}}
    [:div.w-6.h-6.rounded-full.bg-base-300.flex.items-center.justify-center
     [:svg.w-4.h-4.text-gray-400 {:fill "none" :stroke "currentColor" :viewBox "0 0 24 24"}
@@ -148,7 +150,7 @@
                    "py-2"
                    "md:grid-cols-[1.4fr_0.9fr_0.9fr_1.1fr_1.1fr_1.2fr_1.6fr]"]}
       ;; Asset/Pair column
-      [:div.flex.justify-start
+      [:div {:class ["flex" "justify-start" "app-shell-gutter-left"]}
        (asset-icon icon-market
                    dropdown-visible?
                    (get-in full-state [:asset-selector :missing-icons] #{}))]
@@ -215,7 +217,7 @@
                    "px-0"
                    "py-2"
                    "md:grid-cols-[1.4fr_0.9fr_0.9fr_1.1fr_1.1fr_1.2fr_1.6fr]"]}
-     [:div.flex.justify-start
+     [:div {:class ["flex" "justify-start" "app-shell-gutter-left"]}
       (asset-selector-trigger dropdown-visible?)]
 
      [:div.flex.justify-center
