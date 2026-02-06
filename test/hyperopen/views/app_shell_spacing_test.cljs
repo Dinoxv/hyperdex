@@ -77,9 +77,9 @@
   (let [view-node (header-view/header-view {:wallet {}})]
     (is (contains-class? view-node "app-shell-gutter"))))
 
-(deftest trade-view-uses-app-shell-gutter-test
+(deftest trade-view-does-not-use-app-shell-gutter-test
   (let [view-node (trade-view/trade-view trade-view-test-state)]
-    (is (contains-class? view-node "app-shell-gutter"))))
+    (is (not (contains-class? view-node "app-shell-gutter")))))
 
 (deftest footer-view-uses-app-shell-gutter-test
   (let [view-node (footer-view/footer-view {:websocket {:status :connected}})]
