@@ -3,6 +3,7 @@
             [hyperopen.asset-selector.markets-test]
             [hyperopen.utils.data-normalization-test]
             [hyperopen.utils.formatting-test]
+            [hyperopen.orderbook.price-aggregation-test]
             [hyperopen.views.asset-selector-view-test]
             [hyperopen.views.l2-orderbook-view-test]
             [hyperopen.state.trading-test]))
@@ -13,6 +14,7 @@
   (run-tests 'hyperopen.utils.data-normalization-test
              'hyperopen.utils.formatting-test
              'hyperopen.asset-selector.markets-test
+             'hyperopen.orderbook.price-aggregation-test
              'hyperopen.views.asset-selector-view-test
              'hyperopen.views.l2-orderbook-view-test
              'hyperopen.state.trading-test))

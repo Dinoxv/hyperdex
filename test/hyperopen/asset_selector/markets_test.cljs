@@ -4,8 +4,8 @@
 
 (deftest build-perp-markets-test
   (testing "build-perp-markets builds symbols and dex correctly"
-    (let [meta {:universe [{:name "BTC" :maxLeverage 40}
-                           {:name "hyna:ETH" :maxLeverage 25}]
+    (let [meta {:universe [{:name "BTC" :maxLeverage 40 :szDecimals 5}
+                           {:name "hyna:ETH" :maxLeverage 25 :szDecimals 4}]
                 :collateralToken 0}
           asset-ctxs [{:markPx "100" :prevDayPx "90" :dayNtlVlm "1000" :openInterest "2" :funding "0.0001"}
                       {:markPx "200" :prevDayPx "100" :dayNtlVlm "500" :openInterest "1" :funding "-0.0002"}]
@@ -17,16 +17,18 @@
                                                    :dex "hyna")]
       (is (= "BTC-USDC" (:symbol (first default-markets))))
       (is (= "perp:BTC" (:key (first default-markets))))
+      (is (= 5 (:szDecimals (first default-markets))))
       (is (= "100" (:markRaw (first default-markets))))
       (is (= "90" (:prevDayRaw (first default-markets))))
       (is (= "ETH-USDE" (:symbol (second hyna-markets))))
+      (is (= 4 (:szDecimals (second hyna-markets))))
       (is (= "hyna" (:dex (second hyna-markets)))))))
 
 (deftest build-spot-markets-test
   (testing "build-spot-markets maps base/quote and symbol"
-    (let [spot-meta {:tokens [{:index 0 :name "USDC"}
-                              {:index 1 :name "PURR"}
-                              {:index 2 :name "HYPE"}]
+    (let [spot-meta {:tokens [{:index 0 :name "USDC" :szDecimals 8}
+                              {:index 1 :name "PURR" :szDecimals 0}
+                              {:index 2 :name "HYPE" :szDecimals 2}]
                      :universe [{:name "PURR/USDC" :index 0 :tokens [1 0]}
                                 {:name "@107" :index 1 :tokens [2 0]}]}
           spot-ctxs [{:markPx "0.5" :prevDayPx "0.4" :dayNtlVlm "100"}
@@ -37,12 +39,14 @@
       (is (= "PURR/USDC" (:symbol purr-market)))
       (is (= "PURR" (:base purr-market)))
       (is (= "USDC" (:quote purr-market)))
+      (is (= 0 (:szDecimals purr-market)))
       (is (= :spot (:market-type purr-market)))
       (is (= "0.5" (:markRaw purr-market)))
       (is (= "0.4" (:prevDayRaw purr-market)))
       (is (= "HYPE/USDC" (:symbol hype-market)))
       (is (= "HYPE" (:base hype-market)))
-      (is (= "USDC" (:quote hype-market))))))
+      (is (= "USDC" (:quote hype-market)))
+      (is (= 2 (:szDecimals hype-market))))))
 
 (deftest classify-market-test
   (testing "classify-market assigns crypto/tradfi/hip3"

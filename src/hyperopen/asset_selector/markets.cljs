@@ -64,7 +64,7 @@
          (keep (fn [[idx info]]
                  (let [ctx (nth ctxs idx nil)]
                    (when ctx
-                     (let [{:keys [name maxLeverage]} info
+                     (let [{:keys [name maxLeverage szDecimals]} info
                            parsed (parse-perp-name name)
                            base (:base parsed)
                            coin (:coin parsed)
@@ -93,6 +93,7 @@
                                    :change24h change
                                    :change24hPct change-pct
                                    :prevDayRaw prev-raw
+                                   :szDecimals szDecimals
                                    :openInterest open-interest-usd
                                    :fundingRate funding
                                    :maxLeverage maxLeverage}]
@@ -104,13 +105,16 @@
   [spot-meta spot-asset-ctxs]
   (let [universe (:universe spot-meta)
         tokens-list (vec (:tokens spot-meta))
-        token-by-index (reduce (fn [acc {:keys [index name tokenId]}]
+        token-info-by-index (reduce (fn [acc {:keys [index tokenId] :as token}]
                                  (cond-> acc
-                                   (some? index) (assoc index name)
-                                   (some? index) (assoc (str index) name)
-                                   (some? tokenId) (assoc tokenId name)))
+                                   (some? index) (assoc index token)
+                                   (some? index) (assoc (str index) token)
+                                   (some? tokenId) (assoc tokenId token)))
                                {}
                                tokens-list)
+        token-by-index (into {}
+                             (map (fn [[k {:keys [name]}]] [k name]))
+                             token-info-by-index)
         token-name (fn [idx]
                      (or (get token-by-index idx)
                          (when (and (number? idx)
@@ -121,6 +125,16 @@
                            (let [n (js/parseInt idx)]
                              (when (and (<= 0 n) (< n (count tokens-list)))
                                (:name (nth tokens-list n)))))))
+        token-sz-decimals (fn [idx]
+                            (or (some-> (get token-info-by-index idx) :szDecimals)
+                                (when (and (number? idx)
+                                           (<= 0 idx)
+                                           (< idx (count tokens-list)))
+                                  (:szDecimals (nth tokens-list idx)))
+                                (when (and (string? idx) (re-matches #"\d+" idx))
+                                  (let [n (js/parseInt idx)]
+                                    (when (and (<= 0 n) (< n (count tokens-list)))
+                                      (:szDecimals (nth tokens-list n)))))))
         ctxs (vec (or spot-asset-ctxs []))]
     (->> (or universe [])
          (keep (fn [entry]
@@ -156,6 +170,7 @@
                                    :change24h change
                                    :change24hPct change-pct
                                    :prevDayRaw prev-raw
+                                   :szDecimals (token-sz-decimals base-idx)
                                    :openInterest nil
                                    :fundingRate nil
                                    :maxLeverage nil}]

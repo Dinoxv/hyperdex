@@ -13,6 +13,7 @@
             [hyperopen.api.trading :as trading-api]
             [hyperopen.asset-selector.settings :as asset-selector-settings]
             [hyperopen.asset-selector.markets :as markets]
+            [hyperopen.orderbook.price-aggregation :as price-agg]
             [hyperopen.wallet.core :as wallet]
             [hyperopen.wallet.address-watcher :as address-watcher]
             [hyperopen.router :as router]
@@ -63,7 +64,9 @@
                                       :chart-type-dropdown-visible false
                                       :selected-chart-type :candlestick}
                       :orderbook-ui {:size-unit :base
-                                     :size-unit-dropdown-visible? false}
+                                     :size-unit-dropdown-visible? false
+                                     :price-aggregation-dropdown-visible? false
+                                     :price-aggregation-by-coin {}}
                       :account-info {:selected-tab :balances
                                      :loading false
                                      :error nil
@@ -113,7 +116,10 @@
 
 (defn subscribe-orderbook [_ store coin]
   (println "Subscribing to orderbook for:" coin)
-  (orderbook/subscribe-orderbook! coin))
+  (let [selected-mode (get-in @store [:orderbook-ui :price-aggregation-by-coin coin] :full)
+        mode (price-agg/normalize-mode selected-mode)
+        aggregation-config (price-agg/mode->subscription-config mode)]
+    (orderbook/subscribe-orderbook! coin aggregation-config)))
 
 (defn subscribe-trades [_ store coin]
   (println "Subscribing to trades for:" coin)
@@ -185,6 +191,7 @@
                            [:effects/save [:selected-asset] coin]
                            [:effects/save [:active-asset] coin]
                            [:effects/save [:active-market] market]
+                           [:effects/save [:orderbook-ui :price-aggregation-dropdown-visible?] false]
                            [:effects/save [:orderbook-ui :size-unit-dropdown-visible?] false]
                            [:effects/save [:asset-selector :visible-dropdown] nil]
                            [:effects/fetch-candle-snapshot :interval selected-timeframe]]]
@@ -262,6 +269,38 @@
   (let [v (keyword (or (js/localStorage.getItem "orderbook-size-unit") "base"))]
     (if (contains? orderbook-size-units v) v :base)))
 
+(defn- normalize-price-aggregation-by-coin [raw-map]
+  (if (map? raw-map)
+    (into {}
+          (keep (fn [[coin raw-mode]]
+                  (let [mode (cond
+                               (keyword? raw-mode) raw-mode
+                               (string? raw-mode) (keyword raw-mode)
+                               :else nil)]
+                    (when (and (string? coin)
+                               (seq coin)
+                               (contains? price-agg/valid-modes mode))
+                      [coin mode]))))
+          raw-map)
+    {}))
+
+(defn- load-orderbook-price-aggregation-by-coin []
+  (try
+    (let [raw (js/localStorage.getItem "orderbook-price-aggregation-by-coin")]
+      (if (seq raw)
+        (normalize-price-aggregation-by-coin (js->clj (js/JSON.parse raw)))
+        {}))
+    (catch :default _
+      {})))
+
+(defn- persist-orderbook-price-aggregation-by-coin! [by-coin]
+  (try
+    (let [normalized (normalize-price-aggregation-by-coin by-coin)]
+      (js/localStorage.setItem "orderbook-price-aggregation-by-coin"
+                               (js/JSON.stringify (clj->js normalized))))
+    (catch :default e
+      (js/console.warn "Failed to persist orderbook price aggregation settings:" e))))
+
 (defn- serialize-indicators [indicators]
   (into {}
         (map (fn [[k v]] [(name k) v]))
@@ -306,7 +345,9 @@
             :active-indicators indicators})))
 
 (defn restore-orderbook-ui! [store]
-  (swap! store assoc-in [:orderbook-ui :size-unit] (load-orderbook-size-unit)))
+  (swap! store update :orderbook-ui merge
+         {:size-unit (load-orderbook-size-unit)
+          :price-aggregation-by-coin (load-orderbook-price-aggregation-by-coin)}))
 
 (defn restore-active-asset! [store]
   (when (nil? (:active-asset @store))
@@ -350,6 +391,23 @@
     (js/localStorage.setItem "orderbook-size-unit" (name size-unit))
     [[:effects/save [:orderbook-ui :size-unit] size-unit]
      [:effects/save [:orderbook-ui :size-unit-dropdown-visible?] false]]))
+
+(defn toggle-orderbook-price-aggregation-dropdown [state]
+  (let [visible? (get-in state [:orderbook-ui :price-aggregation-dropdown-visible?] false)]
+    [[:effects/save [:orderbook-ui :price-aggregation-dropdown-visible?] (not visible?)]]))
+
+(defn select-orderbook-price-aggregation [state mode]
+  (let [coin (:active-asset state)
+        mode* (price-agg/normalize-mode mode)
+        current-by-coin (get-in state [:orderbook-ui :price-aggregation-by-coin] {})
+        next-by-coin (if (seq coin)
+                       (assoc current-by-coin coin mode*)
+                       current-by-coin)]
+    (persist-orderbook-price-aggregation-by-coin! next-by-coin)
+    (cond-> [[:effects/save [:orderbook-ui :price-aggregation-by-coin] next-by-coin]
+             [:effects/save [:orderbook-ui :price-aggregation-dropdown-visible?] false]]
+      (seq coin)
+      (conj [:effects/subscribe-orderbook coin]))))
 
 (defn add-indicator [state indicator-type params]
   (let [current-indicators (get-in state [:chart-options :active-indicators] {})
@@ -551,6 +609,8 @@
 (nxr/register-action! :actions/toggle-indicators-dropdown toggle-indicators-dropdown)
 (nxr/register-action! :actions/toggle-orderbook-size-unit-dropdown toggle-orderbook-size-unit-dropdown)
 (nxr/register-action! :actions/select-orderbook-size-unit select-orderbook-size-unit)
+(nxr/register-action! :actions/toggle-orderbook-price-aggregation-dropdown toggle-orderbook-price-aggregation-dropdown)
+(nxr/register-action! :actions/select-orderbook-price-aggregation select-orderbook-price-aggregation)
 (nxr/register-action! :actions/add-indicator add-indicator)
 (nxr/register-action! :actions/remove-indicator remove-indicator)
 (nxr/register-action! :actions/update-indicator-period update-indicator-period)

@@ -1,57 +1,88 @@
 (ns hyperopen.websocket.orderbook
   (:require [hyperopen.websocket.client :as ws-client]))
 
-;; Order book state
-(defonce orderbook-state (atom {:subscriptions #{}
-                                :books {}})) ; Map of coin -> {:bids [...] :asks [...]}
+(defn- parse-number [value]
+  (cond
+    (number? value) value
+    (string? value) (let [n (js/parseFloat value)]
+                      (when-not (js/isNaN n) n))
+    :else nil))
 
-;; Subscribe to order book for a symbol
-(defn subscribe-orderbook! [symbol]
-  (when (ws-client/connected?)
-    (let [subscription-msg {:method "subscribe"
-                            :subscription {:type "l2Book"
-                                           :coin symbol}}]
-      (ws-client/send-message! subscription-msg)
-      (swap! orderbook-state update :subscriptions conj symbol)
-      (println "Subscribed to order book for:" symbol))))
+(defn- sort-bids [bids]
+  (vec (sort-by #(or (parse-number (:px %)) 0) > bids)))
+
+(defn- sort-asks [asks]
+  ;; Keep legacy sort direction for compatibility with existing consumers.
+  (vec (sort-by #(or (parse-number (:px %)) 0) > asks)))
+
+(defn- normalize-aggregation-config [aggregation-config]
+  (let [n-sig-figs (:nSigFigs aggregation-config)]
+    (cond-> {}
+      (contains? #{2 3 4 5} n-sig-figs) (assoc :nSigFigs n-sig-figs))))
+
+(defn- build-subscription [symbol aggregation-config]
+  (merge {:type "l2Book"
+          :coin symbol}
+         (normalize-aggregation-config aggregation-config)))
+
+(defn- send-subscribe! [subscription]
+  (ws-client/send-message! {:method "subscribe"
+                            :subscription subscription}))
+
+(defn- send-unsubscribe! [subscription]
+  (ws-client/send-message! {:method "unsubscribe"
+                            :subscription subscription}))
+
+;; Order book state
+(defonce orderbook-state (atom {:subscriptions {}
+                                :books {}})) ; coin -> subscription map, and coin -> book data
+
+;; Subscribe to order book for a symbol with optional aggregation config
+(defn subscribe-orderbook!
+  ([symbol] (subscribe-orderbook! symbol nil))
+  ([symbol aggregation-config]
+   (when (and symbol (ws-client/connected?))
+     (let [desired-subscription (build-subscription symbol aggregation-config)
+           current-subscription (get-in @orderbook-state [:subscriptions symbol])]
+       (if (= current-subscription desired-subscription)
+         (println "Order book subscription unchanged for:" symbol desired-subscription)
+         (do
+           (when current-subscription
+             (send-unsubscribe! current-subscription))
+           (send-subscribe! desired-subscription)
+           (swap! orderbook-state assoc-in [:subscriptions symbol] desired-subscription)
+           (println "Subscribed to order book for:" symbol desired-subscription)))))))
 
 ;; Unsubscribe from order book for a symbol
 (defn unsubscribe-orderbook! [symbol]
-  (when (ws-client/connected?)
-    (let [unsubscription-msg {:method "unsubscribe"
-                              :subscription {:type "l2Book"
-                                             :coin symbol}}]
-      (ws-client/send-message! unsubscription-msg)
-      (swap! orderbook-state update :subscriptions disj symbol)
-      (swap! orderbook-state update :books dissoc symbol)
-      (println "Unsubscribed from order book for:" symbol))))
+  (let [subscription (or (get-in @orderbook-state [:subscriptions symbol])
+                         (build-subscription symbol nil))]
+    (when (and symbol (ws-client/connected?))
+      (send-unsubscribe! subscription)
+      (println "Unsubscribed from order book for:" symbol))
+    (swap! orderbook-state update :subscriptions dissoc symbol)
+    (swap! orderbook-state update :books dissoc symbol)))
 
 ;; Create a handler function that has access to the store
 (defn create-orderbook-data-handler [store]
   (fn [data]
-    ;;(println "Processing order book data:" data)
     (when (and (map? data) (= (:channel data) "l2Book"))
       (let [book-data (:data data)
             coin (:coin book-data)
             levels (:levels book-data)]
         (when (and coin levels (>= (count levels) 2))
-          ;; Hyperliquid l2Book format: levels = [bids_array, asks_array]
-          (let [bids (first levels)   ; First array is bids
-                asks (second levels)] ; Second array is asks
+          (let [bids (first levels)
+                asks (second levels)
+                next-book {:bids (sort-bids bids)
+                           :asks (sort-asks asks)
+                           :timestamp (:time book-data)}]
             ;; Update local state
-            (swap! orderbook-state assoc-in [:books coin] 
-                   {:bids (vec (sort-by :px > bids))  ; Sort bids highest to lowest
-                    :asks (vec (sort-by :px > asks))  ; Sort asks highest to lowest
-                    :timestamp (:time book-data)})
+            (swap! orderbook-state assoc-in [:books coin] next-book)
             ;; Update app store
             (when store
-              (js/setTimeout 
-               #(swap! store assoc-in [:orderbooks coin] 
-                       {:bids (vec (sort-by :px > bids))
-                        :asks (vec (sort-by :px > asks))
-                        :timestamp (:time book-data)})
-               0))
-            ))))))
+              (js/setTimeout
+               #(swap! store assoc-in [:orderbooks coin] next-book)
+               0))))))))
 
 ;; Get current subscriptions
 (defn get-subscriptions []
@@ -83,4 +114,4 @@
 (defn init! [store]
   (println "Order book subscription module initialized")
   ;; Register handler for l2Book channel with store access
-  (ws-client/register-handler! "l2Book" (create-orderbook-data-handler store))) 
+  (ws-client/register-handler! "l2Book" (create-orderbook-data-handler store)))
