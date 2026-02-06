@@ -253,9 +253,11 @@
    - :favorites-only? - whether to filter to favorites
    - :strict? - strict search toggle
    - :active-tab - current tab
-   - :missing-icons - set of market keys with missing icons"
+   - :missing-icons - set of market keys with missing icons
+   - :loading? - whether market refresh is in flight
+   - :phase - :bootstrap | :full"
   [{:keys [visible? markets selected-market-key search-term sort-by sort-direction
-           favorites favorites-only? strict? active-tab missing-icons]}]
+           favorites favorites-only? strict? active-tab missing-icons loading? phase]}]
   (when visible?
     (let [processed-assets (filter-and-sort-assets markets search-term sort-by sort-direction
                                                    favorites favorites-only? strict? active-tab)]
@@ -272,6 +274,11 @@
               :style {:background-color "var(--color-base-100)"}}
         nil]
        [:div.relative.p-4.bg-base-100
+        (when loading?
+          [:div.mb-2.text-xs.text-gray-400
+           (if (= phase :full)
+             "Loading markets..."
+             "Loading markets (bootstrap)...")])
         (search-controls search-term strict? favorites-only?)
         (tab-row active-tab)
         (sort-controls sort-by sort-direction)

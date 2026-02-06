@@ -1,21 +1,31 @@
 (ns test-runner
   (:require [cljs.test :refer-macros [run-tests]]
+            [hyperopen.api-test]
             [hyperopen.asset-selector.markets-test]
+            [hyperopen.core-bootstrap-test]
             [hyperopen.utils.data-normalization-test]
             [hyperopen.utils.formatting-test]
             [hyperopen.orderbook.price-aggregation-test]
+            [hyperopen.wallet.address-watcher-test]
+            [hyperopen.websocket.client-test]
             [hyperopen.views.asset-selector-view-test]
+            [hyperopen.views.footer-view-test]
             [hyperopen.views.l2-orderbook-view-test]
             [hyperopen.state.trading-test]))
 
 (defn run-all-tests
   "Run all test namespaces and return the results"
   []
-  (run-tests 'hyperopen.utils.data-normalization-test
+  (run-tests 'hyperopen.api-test
+             'hyperopen.utils.data-normalization-test
              'hyperopen.utils.formatting-test
              'hyperopen.asset-selector.markets-test
+             'hyperopen.core-bootstrap-test
              'hyperopen.orderbook.price-aggregation-test
+             'hyperopen.wallet.address-watcher-test
+             'hyperopen.websocket.client-test
              'hyperopen.views.asset-selector-view-test
+             'hyperopen.views.footer-view-test
              'hyperopen.views.l2-orderbook-view-test
              'hyperopen.state.trading-test))
 

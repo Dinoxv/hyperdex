@@ -75,3 +75,22 @@
           rendered (set strings)]
       (is (contains? rendered "$0.002028"))
       (is (not (contains? rendered "$0.00"))))))
+
+(deftest asset-selector-loading-state-test
+  (let [base-props {:visible? true
+                    :markets sample-markets
+                    :selected-market-key "perp:BTC"
+                    :search-term ""
+                    :sort-by :name
+                    :sort-direction :asc
+                    :favorites #{}
+                    :favorites-only? false
+                    :strict? false
+                    :active-tab :all
+                    :missing-icons #{}}
+        full-view (view/asset-selector-dropdown (assoc base-props :loading? true :phase :full))
+        bootstrap-view (view/asset-selector-dropdown (assoc base-props :loading? true :phase :bootstrap))
+        full-strings (set (collect-strings full-view))
+        bootstrap-strings (set (collect-strings bootstrap-view))]
+    (is (contains? full-strings "Loading markets..."))
+    (is (contains? bootstrap-strings "Loading markets (bootstrap)..."))))

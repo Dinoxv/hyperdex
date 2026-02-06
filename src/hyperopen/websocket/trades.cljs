@@ -10,22 +10,22 @@
 
 ;; Subscribe to trades for a symbol
 (defn subscribe-trades! [symbol]
-  (when (ws-client/connected?)
+  (when symbol
     (let [subscription-msg {:method "subscribe"
                             :subscription {:type "trades"
                                            :coin symbol}}]
-      (ws-client/send-message! subscription-msg)
       (swap! trades-state update :subscriptions conj symbol)
+      (ws-client/send-message! subscription-msg)
       (println "Subscribed to trades for:" symbol))))
 
 ;; Unsubscribe from trades for a symbol
 (defn unsubscribe-trades! [symbol]
-  (when (ws-client/connected?)
+  (when symbol
     (let [unsubscription-msg {:method "unsubscribe"
                               :subscription {:type "trades"
                                              :coin symbol}}]
-      (ws-client/send-message! unsubscription-msg)
       (swap! trades-state update :subscriptions disj symbol)
+      (ws-client/send-message! unsubscription-msg)
       (println "Unsubscribed from trades for:" symbol))))
 
 (defn- parse-number [value]

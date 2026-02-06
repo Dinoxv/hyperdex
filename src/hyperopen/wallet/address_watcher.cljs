@@ -147,6 +147,16 @@
     (remove-watch store ::address-watcher)
     (swap! address-watcher-state assoc :watching? false)))
 
+(defn sync-current-address!
+  "Process the current wallet address after handlers are registered.
+   This ensures an already-connected wallet is bootstrapped even without
+   a fresh `accountsChanged` event."
+  [store]
+  (let [current-address (get-in @store [:wallet :address])]
+    (swap! address-watcher-state assoc :current-address current-address)
+    (when current-address
+      (notify-handlers! nil current-address))))
+
 (defn create-webdata2-handler
   "Factory function to create a WebData2 subscription handler"
   [subscribe-fn unsubscribe-fn]

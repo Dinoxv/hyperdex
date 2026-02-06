@@ -8,27 +8,23 @@
 
 ;; Subscribe to WebData2 for an address
 (defn subscribe-webdata2! [address]
-  (println "Attempting to subscribe to WebData2 for address:" address)
-  (println "WebSocket connected?" (ws-client/connected?))
-  (when (ws-client/connected?)
+  (when address
     (let [subscription-msg {:method "subscribe"
                             :subscription {:type "webData2"
                                            :user address}}]
-      (println "Sending subscription message:" subscription-msg)
-      (ws-client/send-message! subscription-msg)
       (swap! webdata2-state update :subscriptions conj address)
-      (println "Subscribed to WebData2 for address:" address))
-    (println "WebSocket not connected, cannot subscribe")))
+      (ws-client/send-message! subscription-msg)
+      (println "Subscribed to WebData2 for address:" address))))
 
 ;; Unsubscribe from WebData2 for an address
 (defn unsubscribe-webdata2! [address]
-  (when (ws-client/connected?)
+  (when address
     (let [unsubscription-msg {:method "unsubscribe"
                               :subscription {:type "webData2"
                                              :user address}}]
-      (ws-client/send-message! unsubscription-msg)
       (swap! webdata2-state update :subscriptions disj address)
       (swap! webdata2-state update :data dissoc address)
+      (ws-client/send-message! unsubscription-msg)
       (println "Unsubscribed from WebData2 for address:" address))))
 
 ;; Create a handler function that has access to the store

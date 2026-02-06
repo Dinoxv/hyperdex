@@ -20,7 +20,12 @@
             [hyperopen.state.trading :as trading]))
 
 ;; App state
-(defonce store (atom {:websocket {:status :disconnected}
+(defonce store (atom {:websocket {:status :disconnected
+                                  :attempt 0
+                                  :next-retry-at-ms nil
+                                  :last-close nil
+                                  :last-activity-at-ms nil
+                                  :queue-size 0}
                       :active-assets {:contexts {}
                                      :loading false}
                       :active-asset nil
@@ -54,6 +59,9 @@
                      				  :sort-direction :desc
                                       :markets []
                                       :market-by-key {}
+                                      :loading? false
+                                      :phase :bootstrap
+                                      :loaded-at-ms nil
                                       :favorites #{}
                                       :missing-icons #{}
                                       :favorites-only? false
@@ -147,6 +155,10 @@
   (println "Connecting wallet...")
   (wallet/request-connection! store))
 
+(defn reconnect-websocket [_ _]
+  (println "Forcing WebSocket reconnect...")
+  (ws-client/force-reconnect!))
+
 (defn init-websockets [state]
   [[:effects/init-websocket]])
 
@@ -161,12 +173,19 @@
 (defn connect-wallet-action [state]
   [[:effects/connect-wallet]])
 
+(defn reconnect-websocket-action [state]
+  [[:effects/reconnect-websocket]])
+
 (defn toggle-asset-dropdown [state coin]
   (let [current-dropdown (get-in state [:asset-selector :visible-dropdown])]
     (let [next-dropdown (if (= current-dropdown coin) nil coin)
+          should-refresh? (and (= coin :asset-selector)
+                               (some? next-dropdown)
+                               (or (empty? (get-in state [:asset-selector :markets]))
+                                   (not= :full (get-in state [:asset-selector :phase]))))
           effects [[:effects/save [:asset-selector :visible-dropdown] next-dropdown]]]
       (cond-> effects
-        (and (= coin :asset-selector) (some? next-dropdown))
+        should-refresh?
         (conj [:effects/fetch-asset-selector-markets])))))
 
 (defn close-asset-dropdown [state]
@@ -554,9 +573,10 @@
 (nxr/register-effect! :effects/unsubscribe-trades unsubscribe-trades)
 (nxr/register-effect! :effects/unsubscribe-webdata2 unsubscribe-webdata2)
 (nxr/register-effect! :effects/connect-wallet connect-wallet)
+(nxr/register-effect! :effects/reconnect-websocket reconnect-websocket)
 (nxr/register-effect! :effects/fetch-asset-selector-markets
-  (fn [_ store & _]
-    (api/fetch-asset-selector-markets! store)))
+  (fn [_ store & [opts]]
+    (api/fetch-asset-selector-markets! store (or opts {:phase :full}))))
 (nxr/register-effect! :effects/api-submit-order
   (fn [_ store request]
     (let [address (get-in @store [:wallet :address])]
@@ -611,6 +631,7 @@
 (nxr/register-action! :actions/subscribe-to-asset subscribe-to-asset)
 (nxr/register-action! :actions/subscribe-to-webdata2 subscribe-to-webdata2)
 (nxr/register-action! :actions/connect-wallet connect-wallet-action)
+(nxr/register-action! :actions/reconnect-websocket reconnect-websocket-action)
 (nxr/register-action! :actions/toggle-asset-dropdown toggle-asset-dropdown)
 (nxr/register-action! :actions/close-asset-dropdown close-asset-dropdown)
 (nxr/register-action! :actions/select-asset select-asset)
@@ -669,90 +690,161 @@
 
 ;; Watch for WebSocket connection status changes
 (add-watch ws-client/connection-state ::ws-status
-  (fn [_ _ _ new-state]
-    ;; Defer store update to next tick to avoid nested renders
-    (js/queueMicrotask #(swap! store assoc-in [:websocket :status] (:status new-state)))
-    ;; Notify address watcher of connection status changes
-    (if (= (:status new-state) :connected)
-      (do
-        (address-watcher/on-websocket-connected!)
-        (js/queueMicrotask
-          #(when-let [asset (:active-asset @store)]
-             (nxr/dispatch store nil [[:actions/subscribe-to-asset asset]]))))
-      (address-watcher/on-websocket-disconnected!))))
+  (fn [_ _ old-state new-state]
+    (let [old-status (:status old-state)
+          new-status (:status new-state)]
+      ;; Defer store update to next tick to avoid nested renders.
+      ;; Exclude :last-activity-at-ms so high-frequency message flow does not trigger
+      ;; unnecessary app-wide renders.
+      (js/queueMicrotask
+        #(swap! store assoc :websocket
+                (select-keys new-state [:status
+                                        :attempt
+                                        :next-retry-at-ms
+                                        :last-close
+                                        :queue-size])))
+      ;; Notify address watcher only on status transitions.
+      (when (not= old-status new-status)
+        (if (= new-status :connected)
+          (address-watcher/on-websocket-connected!)
+          (address-watcher/on-websocket-disconnected!))))))
 
 (defn reload []
   (println "Reloading Hyperopen...")
   (r/render (.getElementById js/document "app") (app-view/app-view @store)))
 
+(def ^:private deferred-bootstrap-delay-ms 1200)
+(def ^:private per-dex-stagger-ms 120)
+
+(defonce ^:private startup-runtime
+  (atom {:deferred-scheduled? false
+         :bootstrapped-address nil
+         :summary-logged? false}))
+
+(defn- mark-performance!
+  [mark-name]
+  (when (and (exists? js/performance)
+             (some? (.-mark js/performance)))
+    (try
+      (.mark js/performance mark-name)
+      (catch :default _
+        nil))))
+
+(defn- schedule-idle-or-timeout!
+  [f]
+  (if (and (exists? js/window)
+           (some? (.-requestIdleCallback js/window)))
+    (.requestIdleCallback js/window
+                          (fn [_]
+                            (f))
+                          #js {:timeout deferred-bootstrap-delay-ms})
+    (js/setTimeout f deferred-bootstrap-delay-ms)))
+
+(defn- schedule-startup-summary-log! []
+  (when-not (:summary-logged? @startup-runtime)
+    (swap! startup-runtime assoc :summary-logged? true)
+    (js/setTimeout
+      (fn []
+        (let [stats (api/get-request-stats)
+              ws-status (get-in @store [:websocket :status])
+              selector (select-keys (get @store :asset-selector)
+                                    [:loading? :phase :loaded-at-ms])]
+          (println "Startup summary (+5s):"
+                   (clj->js {:request-stats stats
+                             :websocket-status ws-status
+                             :asset-selector selector}))))
+      5000)))
+
+(defn- stage-b-account-bootstrap!
+  [address dexs]
+  (doseq [[idx dex] (map-indexed vector (or dexs []))]
+    (js/setTimeout
+      (fn []
+        ;; Guard against stale async callbacks for an old address.
+        (when (= address (get-in @store [:wallet :address]))
+          (api/fetch-frontend-open-orders! store address dex {:priority :low})
+          (api/fetch-clearinghouse-state! store address dex {:priority :low})))
+      (* per-dex-stagger-ms (inc idx)))))
+
+(defn- bootstrap-account-data!
+  [address]
+  (when address
+    (when-not (= address (:bootstrapped-address @startup-runtime))
+      (swap! startup-runtime assoc :bootstrapped-address address)
+      (swap! store assoc-in [:orders :open-orders-snapshot-by-dex] {})
+      (swap! store assoc-in [:perp-dex-clearinghouse] {})
+      ;; Stage A: critical account data.
+      (api/fetch-frontend-open-orders! store address {:priority :high})
+      (api/fetch-user-fills! store address {:priority :high})
+      (api/fetch-spot-clearinghouse-state! store address {:priority :high})
+      ;; Stage B: low-priority, staggered per-dex data.
+      (-> (api/ensure-perp-dexs! store {:priority :low})
+          (.then (fn [dexs]
+                   (stage-b-account-bootstrap! address dexs)))
+          (.catch (fn [err]
+                    (println "Error bootstrapping per-dex account data:" err)))))))
+
+(defn- install-address-handlers! []
+  ;; Note: WebData2 subscriptions are managed by address-watcher.
+  (address-watcher/init-with-webdata2! store webdata2/subscribe-webdata2! webdata2/unsubscribe-webdata2!)
+  (address-watcher/add-handler! (user-ws/create-user-handler user-ws/subscribe-user! user-ws/unsubscribe-user!))
+  (address-watcher/add-handler!
+    (reify address-watcher/IAddressChangeHandler
+      (on-address-changed [_ _ new-address]
+        (if new-address
+          (bootstrap-account-data! new-address)
+          (do
+            (swap! startup-runtime assoc :bootstrapped-address nil)
+            (swap! store assoc-in [:orders :open-orders-snapshot-by-dex] {})
+            (swap! store assoc-in [:perp-dex-clearinghouse] {})
+            (swap! store assoc-in [:spot :clearinghouse-state] nil))))
+      (get-handler-name [_] "startup-account-bootstrap-handler")))
+  ;; Ensure already-connected wallets are handled after handlers are in place.
+  (address-watcher/sync-current-address! store))
+
+(defn- start-critical-bootstrap! []
+  (-> (js/Promise.all
+        (clj->js [(api/fetch-asset-contexts! store {:priority :high})
+                  (api/fetch-asset-selector-markets! store {:phase :bootstrap})]))
+      (.finally
+        (fn []
+          (mark-performance! "app:critical-data:ready")))))
+
+(defn- run-deferred-bootstrap! []
+  (-> (api/fetch-asset-selector-markets! store {:phase :full})
+      (.finally
+        (fn []
+          (mark-performance! "app:full-bootstrap:ready")))))
+
+(defn- schedule-deferred-bootstrap! []
+  (when-not (:deferred-scheduled? @startup-runtime)
+    (swap! startup-runtime assoc :deferred-scheduled? true)
+    (schedule-idle-or-timeout! run-deferred-bootstrap!)))
+
 (defn initialize-remote-data-streams! []
   (println "Initializing remote data streams...")
-  ;; initalize websocket client
+  ;; Initialize websocket client.
   (ws-client/init-connection! "wss://api.hyperliquid.xyz/ws")
-  ;; Initialize active asset context with store access
+  ;; Initialize WebSocket modules.
   (active-ctx/init! store)
-  ;; Initialize orderbook module
   (orderbook/init! store)
-  ;; Initialize trades module
   (trades/init! store)
-  ;; Initialize user websocket handlers
   (user-ws/init! store)
-  ;; Initialize WebData2 module
   (webdata2/init! store)
-  ;; Note: WebData2 subscriptions are now managed by address-watcher
-  (address-watcher/init-with-webdata2! store webdata2/subscribe-webdata2! webdata2/unsubscribe-webdata2!)
-  ;; Subscribe user streams when address changes
-  (address-watcher/add-handler! (user-ws/create-user-handler user-ws/subscribe-user! user-ws/unsubscribe-user!))
-  ;; Fetch initial user data on address change
-  (address-watcher/add-handler!
-    (reify address-watcher/IAddressChangeHandler
-      (on-address-changed [_ _ new-address]
-        (when new-address
-          (swap! store assoc-in [:orders :open-orders-snapshot-by-dex] {})
-          (let [dexs (:perp-dexs @store)]
-            (if (seq dexs)
-              (do
-                (api/fetch-frontend-open-orders! store new-address)
-                (doseq [dex dexs]
-                  (api/fetch-frontend-open-orders! store new-address dex)))
-              (-> (api/fetch-perp-dexs! store)
-                  (.then (fn [loaded-dexs]
-                           (api/fetch-frontend-open-orders! store new-address)
-                           (doseq [dex loaded-dexs]
-                             (api/fetch-frontend-open-orders! store new-address dex)))))))
-          (api/fetch-user-fills! store new-address)))
-      (get-handler-name [_] "user-initial-data-handler")))
-  ;; Fetch spot balances on address change
-  (address-watcher/add-handler!
-    (reify address-watcher/IAddressChangeHandler
-      (on-address-changed [_ _ new-address]
-        (if new-address
-          (api/fetch-spot-clearinghouse-state! store new-address)
-          (swap! store assoc-in [:spot :clearinghouse-state] nil)))
-      (get-handler-name [_] "spot-clearinghouse-handler")))
-  ;; Fetch clearinghouse states for all perp DEXes on address change
-  (address-watcher/add-handler!
-    (reify address-watcher/IAddressChangeHandler
-      (on-address-changed [_ _ new-address]
-        (if new-address
-          (do
-            (swap! store assoc-in [:perp-dex-clearinghouse] {})
-            (let [dexs (:perp-dexs @store)]
-              (if (seq dexs)
-                (api/fetch-perp-dex-clearinghouse-states! store new-address dexs)
-                (-> (api/fetch-perp-dexs! store)
-                    (.then (fn [loaded-dexs]
-                             (api/fetch-perp-dex-clearinghouse-states! store new-address loaded-dexs)))))))
-          (swap! store assoc-in [:perp-dex-clearinghouse] {})))
-      (get-handler-name [_] "perp-dex-clearinghouse-handler")))
-  ;; Fetch initial market data
-  (api/fetch-asset-contexts! store)
-  (api/fetch-perp-dexs! store)
-  (api/fetch-spot-meta! store)
-  (api/fetch-asset-selector-markets! store))
+  ;; Ensure active-asset market streams are requested on startup.
+  (when-let [asset (:active-asset @store)]
+    (nxr/dispatch store nil [[:actions/subscribe-to-asset asset]]))
+  (install-address-handlers!)
+  (start-critical-bootstrap!)
+  (schedule-deferred-bootstrap!))
 
 (defn init []
   (println "Initializing Hyperopen...")
+  (reset! startup-runtime {:deferred-scheduled? false
+                           :bootstrapped-address nil
+                           :summary-logged? false})
+  (mark-performance! "app:init:start")
+  (schedule-startup-summary-log!)
   ;; Restore asset selector sort settings from localStorage
   (asset-selector-settings/restore-asset-selector-sort-settings! store)
   ;; Restore chart options from localStorage

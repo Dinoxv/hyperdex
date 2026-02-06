@@ -57,23 +57,23 @@
 
 ;; Subscribe to active asset context for a coin
 (defn subscribe-active-asset-ctx! [coin]
-  (when (ws-client/connected?)
+  (when coin
     (let [subscription-msg {:method "subscribe"
                             :subscription {:type "activeAssetCtx"
                                            :coin coin}}]
-      (ws-client/send-message! subscription-msg)
       (swap! active-asset-ctx-state update :subscriptions conj coin)
+      (ws-client/send-message! subscription-msg)
       (println "Subscribed to active asset context for:" coin))))
 
 ;; Unsubscribe from active asset context for a coin
 (defn unsubscribe-active-asset-ctx! [coin]
-  (when (ws-client/connected?)
-    (let [unsubscription-msg {:type "unsubscribe"
+  (when coin
+    (let [unsubscription-msg {:method "unsubscribe"
                               :subscription {:type "activeAssetCtx"
                                              :coin coin}}]
-      (ws-client/send-message! unsubscription-msg)
       (swap! active-asset-ctx-state update :subscriptions disj coin)
       (swap! active-asset-ctx-state update :contexts dissoc coin)
+      (ws-client/send-message! unsubscription-msg)
       (println "Unsubscribed from active asset context for:" coin))))
 
 ;; Handle incoming active asset context data

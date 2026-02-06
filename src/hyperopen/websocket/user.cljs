@@ -5,14 +5,12 @@
 (defonce user-state (atom {:subscriptions #{}}))
 
 (defn- subscribe! [sub]
-  (when (ws-client/connected?)
-    (ws-client/send-message! {:method "subscribe"
-                              :subscription sub})))
+  (ws-client/send-message! {:method "subscribe"
+                            :subscription sub}))
 
 (defn- unsubscribe! [sub]
-  (when (ws-client/connected?)
-    (ws-client/send-message! {:method "unsubscribe"
-                              :subscription sub})))
+  (ws-client/send-message! {:method "unsubscribe"
+                            :subscription sub}))
 
 (defn subscribe-user! [address]
   (when address

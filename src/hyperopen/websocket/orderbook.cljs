@@ -41,7 +41,7 @@
 (defn subscribe-orderbook!
   ([symbol] (subscribe-orderbook! symbol nil))
   ([symbol aggregation-config]
-   (when (and symbol (ws-client/connected?))
+   (when symbol
      (let [desired-subscription (build-subscription symbol aggregation-config)
            current-subscription (get-in @orderbook-state [:subscriptions symbol])]
        (if (= current-subscription desired-subscription)
@@ -57,7 +57,7 @@
 (defn unsubscribe-orderbook! [symbol]
   (let [subscription (or (get-in @orderbook-state [:subscriptions symbol])
                          (build-subscription symbol nil))]
-    (when (and symbol (ws-client/connected?))
+    (when symbol
       (send-unsubscribe! subscription)
       (println "Unsubscribed from order book for:" symbol))
     (swap! orderbook-state update :subscriptions dissoc symbol)

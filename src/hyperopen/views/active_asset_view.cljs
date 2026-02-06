@@ -258,6 +258,8 @@
          {:visible? true
           :markets (get-available-assets full-state)
           :selected-market-key selected-key
+          :loading? (:loading? dropdown-state false)
+          :phase (:phase dropdown-state :bootstrap)
           :search-term (:search-term dropdown-state "")
           :sort-by (:sort-by dropdown-state :volume)
           :sort-direction (:sort-direction dropdown-state :asc)
@@ -276,6 +278,8 @@
                                                          :search-term ""
                                                          :sort-by :volume
                                                          :sort-direction :desc
+                                                         :loading? false
+                                                         :phase :bootstrap
                                                          :favorites #{}
                                                          :missing-icons #{}
                                                          :favorites-only? false
