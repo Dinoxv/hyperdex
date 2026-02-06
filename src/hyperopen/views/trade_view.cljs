@@ -27,7 +27,7 @@
                 :style {:height top-row-height}}
           (trading-chart/trading-chart-view state)]]
 
-        [:div {:class ["bg-base-100" "w-full" "h-full"]}
+        [:div {:class ["bg-base-100" "w-full" "h-full" "min-h-0" "overflow-hidden"]}
          (l2-orderbook-view/l2-orderbook-view
            {:coin (or active-asset "No Asset Selected")
             :market (:active-market state)

@@ -66,7 +66,8 @@
                       :orderbook-ui {:size-unit :base
                                      :size-unit-dropdown-visible? false
                                      :price-aggregation-dropdown-visible? false
-                                     :price-aggregation-by-coin {}}
+                                     :price-aggregation-by-coin {}
+                                     :active-tab :orderbook}
                       :account-info {:selected-tab :balances
                                      :loading false
                                      :error nil
@@ -260,6 +261,9 @@
 (def orderbook-size-units
   #{:base :quote})
 
+(def orderbook-tabs
+  #{:orderbook :trades})
+
 (defn- load-chart-option
   [ls-key default valid-set]
   (let [v (keyword (or (js/localStorage.getItem ls-key) (name default)))]
@@ -268,6 +272,10 @@
 (defn- load-orderbook-size-unit []
   (let [v (keyword (or (js/localStorage.getItem "orderbook-size-unit") "base"))]
     (if (contains? orderbook-size-units v) v :base)))
+
+(defn- load-orderbook-active-tab []
+  (let [v (keyword (or (js/localStorage.getItem "orderbook-active-tab") "orderbook"))]
+    (if (contains? orderbook-tabs v) v :orderbook)))
 
 (defn- normalize-price-aggregation-by-coin [raw-map]
   (if (map? raw-map)
@@ -347,7 +355,8 @@
 (defn restore-orderbook-ui! [store]
   (swap! store update :orderbook-ui merge
          {:size-unit (load-orderbook-size-unit)
-          :price-aggregation-by-coin (load-orderbook-price-aggregation-by-coin)}))
+          :price-aggregation-by-coin (load-orderbook-price-aggregation-by-coin)
+          :active-tab (load-orderbook-active-tab)}))
 
 (defn restore-active-asset! [store]
   (when (nil? (:active-asset @store))
@@ -408,6 +417,17 @@
              [:effects/save [:orderbook-ui :price-aggregation-dropdown-visible?] false]]
       (seq coin)
       (conj [:effects/subscribe-orderbook coin]))))
+
+(defn select-orderbook-tab [state tab]
+  (let [tab* (cond
+               (keyword? tab) tab
+               (string? tab) (keyword tab)
+               :else :orderbook)
+        normalized-tab (if (contains? orderbook-tabs tab*) tab* :orderbook)]
+    (js/localStorage.setItem "orderbook-active-tab" (name normalized-tab))
+    [[:effects/save [:orderbook-ui :active-tab] normalized-tab]
+     [:effects/save [:orderbook-ui :size-unit-dropdown-visible?] false]
+     [:effects/save [:orderbook-ui :price-aggregation-dropdown-visible?] false]]))
 
 (defn add-indicator [state indicator-type params]
   (let [current-indicators (get-in state [:chart-options :active-indicators] {})
@@ -611,6 +631,7 @@
 (nxr/register-action! :actions/select-orderbook-size-unit select-orderbook-size-unit)
 (nxr/register-action! :actions/toggle-orderbook-price-aggregation-dropdown toggle-orderbook-price-aggregation-dropdown)
 (nxr/register-action! :actions/select-orderbook-price-aggregation select-orderbook-price-aggregation)
+(nxr/register-action! :actions/select-orderbook-tab select-orderbook-tab)
 (nxr/register-action! :actions/add-indicator add-indicator)
 (nxr/register-action! :actions/remove-indicator remove-indicator)
 (nxr/register-action! :actions/update-indicator-period update-indicator-period)

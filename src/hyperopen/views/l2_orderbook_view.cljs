@@ -1,6 +1,7 @@
 (ns hyperopen.views.l2-orderbook-view
   (:require [clojure.string :as str]
             [hyperopen.orderbook.price-aggregation :as price-agg]
+            [hyperopen.websocket.trades :as trades]
             [hyperopen.utils.formatting :as fmt]))
 
 ;; Utility functions for formatting
@@ -10,6 +11,16 @@
     (string? value) (let [n (js/parseFloat value)]
                       (when-not (js/isNaN n) n))
     :else nil))
+
+(def orderbook-tabs
+  #{:orderbook :trades})
+
+(defn normalize-orderbook-tab [tab]
+  (let [tab* (cond
+               (keyword? tab) tab
+               (string? tab) (keyword tab)
+               :else :orderbook)]
+    (if (contains? orderbook-tabs tab*) tab* :orderbook)))
 
 (defn format-price
   ([price] (fmt/format-trade-price-plain price price))
@@ -103,6 +114,57 @@
   (or (midpoint-price best-bid best-ask)
       (parse-number (:mark market))
       1))
+
+(defn trade-time->ms [value]
+  (when-some [n (parse-number value)]
+    (if (< n 1000000000000) (* n 1000) n)))
+
+(defn format-trade-time [value]
+  (when-let [time-ms (trade-time->ms value)]
+    (let [d (js/Date. time-ms)
+          pad2 (fn [v] (.padStart (str v) 2 "0"))]
+      (str (pad2 (.getHours d)) ":" (pad2 (.getMinutes d)) ":" (pad2 (.getSeconds d))))))
+
+(defn trade-side->price-class [side]
+  (case (some-> side str str/upper-case)
+    "B" "text-green-400"
+    "A" "text-red-400"
+    "S" "text-red-400"
+    "text-gray-100"))
+
+(defn trade-matches-coin? [trade coin]
+  (let [trade-coin (or (:coin trade) (:symbol trade) (:asset trade))]
+    (if (seq coin)
+      (= trade-coin coin)
+      true)))
+
+(defn normalize-trade [trade]
+  (let [price-raw (or (:px trade) (:price trade) (:p trade))
+        size-raw (or (:sz trade) (:size trade) (:s trade))
+        time-raw (or (:time trade) (:t trade) (:ts trade) (:timestamp trade))
+        side (or (:side trade) (:dir trade))
+        coin (or (:coin trade) (:symbol trade) (:asset trade))]
+    {:coin coin
+     :price (parse-number price-raw)
+     :price-raw price-raw
+     :size (or (parse-number size-raw) 0)
+     :size-raw size-raw
+     :side side
+     :time-ms (trade-time->ms time-raw)
+     :tid (or (:tid trade) (:id trade))}))
+
+(defn format-trade-size [trade]
+  (let [raw-size (:size-raw trade)]
+    (if (string? raw-size)
+      raw-size
+      (or (format-total (:size trade) :decimals 8) "0"))))
+
+(defn recent-trades-for-coin [coin]
+  (->> (trades/get-recent-trades)
+       (filter #(trade-matches-coin? % coin))
+       (map normalize-trade)
+       (sort-by (fn [trade] (or (:time-ms trade) 0)) >)
+       (take 100)))
 
 (defn order-size-for-unit [order size-unit]
   (if (= size-unit :quote)
@@ -202,6 +264,60 @@
    (precision-dropdown selected-option price-options price-dropdown-visible?)
    (size-unit-dropdown base-symbol quote-symbol size-unit size-dropdown-visible?)])
 
+(defn orderbook-tab-button [active-tab tab-id label]
+  [:button.flex-1.px-3.py-2.text-sm.font-medium.border-b-2.transition-colors
+   {:type "button"
+    :class (if (= active-tab tab-id)
+             ["text-white" "border-cyan-400"]
+             ["text-gray-400" "border-transparent" "hover:text-gray-200"])
+    :on {:click [[:actions/select-orderbook-tab tab-id]]}}
+   label])
+
+(defn orderbook-tabs-row [active-tab]
+  [:div.flex.items-center.bg-gray-900.border-b.border-gray-700
+   (orderbook-tab-button active-tab :orderbook "Order Book")
+   (orderbook-tab-button active-tab :trades "Trades")])
+
+(defn trades-column-headers [base-symbol]
+  [:div.flex.items-center.justify-between.px-3.py-2.bg-gray-800.border-b.border-gray-700
+   [:div.text-right.flex-1
+    [:span.text-gray-400.text-xs "Price"]]
+   [:div.text-right.flex-1
+    [:span.text-gray-400.text-xs (str "Size (" base-symbol ")")]]
+   [:div.text-right.flex-1
+    [:span.text-gray-400.text-xs "Time"]]])
+
+(defn trades-row [trade]
+  (let [price-class (trade-side->price-class (:side trade))]
+    [:div {:class ["flex" "items-center" "h-6" "relative" "bg-gray-900" "text-xs" "border-b" "border-gray-800/60"]}
+     [:div.flex.w-full.items-center.justify-between.px-2
+      [:div.text-right.flex-1
+       [:span {:class [price-class]} (or (format-price (:price trade) (:price-raw trade)) "0.00")]]
+      [:div.text-right.flex-1
+       [:span.text-gray-100 (format-trade-size trade)]]
+      [:div.text-right.flex-1
+       [:span.text-gray-100 (or (format-trade-time (:time-ms trade)) "--:--:--")]]]]))
+
+(defn empty-trades []
+  [:div {:class ["flex" "flex-col" "items-center" "justify-center" "p-8" "text-center" "bg-base-100" "rounded-none" "border" "border-base-300" "h-full"]}
+   [:h3.text-lg.font-medium.text-gray-300 "No Trades Yet"]
+   [:p.text-sm.text-gray-500 "Recent trades will appear here"]])
+
+(defn trades-panel [coin base-symbol]
+  (let [recent-trades (recent-trades-for-coin coin)
+        visible-rows 26
+        row-height-px 24
+        body-max-height (str (* visible-rows row-height-px) "px")]
+    (if (seq recent-trades)
+      [:div {:class ["bg-base-100" "border" "border-base-300" "rounded-none" "overflow-hidden"]}
+       (trades-column-headers base-symbol)
+       [:div.overflow-y-auto.scrollbar-hide
+        {:style {:max-height body-max-height}}
+        (for [trade recent-trades]
+          ^{:key (str "trade-" coin "-" (:tid trade) "-" (:time-ms trade) "-" (:price-raw trade) "-" (:size-raw trade))}
+          (trades-row trade))]]
+      (empty-trades))))
+
 ;; Component for individual order row
 (defn order-row [order max-cum-size is-ask? size-unit]
   (let [price (:px order)
@@ -245,7 +361,7 @@
 
 ;; Main order book component
 (defn l2-orderbook-panel [coin market orderbook-data orderbook-ui]
-  (let [max-rows 10
+  (let [max-rows 13
         size-unit (normalize-size-unit (:size-unit orderbook-ui))
         size-unit-dropdown-visible? (boolean (:size-unit-dropdown-visible? orderbook-ui))
         price-dropdown-visible? (boolean (:price-aggregation-dropdown-visible? orderbook-ui))
@@ -339,11 +455,18 @@
         orderbook-ui (merge {:size-unit :base
                              :size-unit-dropdown-visible? false
                              :price-aggregation-dropdown-visible? false
-                             :price-aggregation-by-coin {}}
+                             :price-aggregation-by-coin {}
+                             :active-tab :orderbook}
                             (:orderbook-ui state))
-        loading? (:loading state)]
-    [:div {:class ["w-full" "h-full"]}
-     (cond
-       loading? (loading-orderbook)
-       (and coin orderbook-data) (l2-orderbook-panel coin market orderbook-data orderbook-ui)
-       :else (empty-orderbook))]))
+        loading? (:loading state)
+        active-tab (normalize-orderbook-tab (:active-tab orderbook-ui))
+        base-symbol (resolve-base-symbol coin market)]
+    [:div {:class ["w-full" "h-full" "min-h-0" "overflow-hidden" "flex" "flex-col"]}
+     (orderbook-tabs-row active-tab)
+     [:div.flex-1.min-h-0.overflow-hidden
+      (if (= active-tab :trades)
+        (trades-panel coin base-symbol)
+        (cond
+          loading? (loading-orderbook)
+          (and coin orderbook-data) (l2-orderbook-panel coin market orderbook-data orderbook-ui)
+          :else (empty-orderbook)))]]))
