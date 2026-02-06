@@ -23,6 +23,15 @@
 - MUST keep domain models and policies implementation-agnostic (framework/runtime-independent where practical).
 - MUST preserve lossless ordering rules for account/order/funding flows as a domain invariant.
 
+## S.O.L.I.D. Design Rules (MUST)
+- MUST apply Single Responsibility Principle: each module/function should have one reason to change.
+- MUST keep websocket responsibilities separated: reducer (pure decisions), engine (single-writer orchestration), effect interpreters (IO), ACL (schema translation), client (public API seam).
+- MUST apply Open-Closed Principle: extend behavior through `RuntimeMsg`, `RuntimeEffect`, policy maps, and adapters before modifying stable core flows.
+- MUST preserve stable public interfaces unless explicitly requested, especially `/hyperopen/src/hyperopen/websocket/client.cljs`.
+- MUST apply Liskov Substitution Principle: replacement transport/scheduler/clock/router implementations must preserve contract shape and semantics (ordering, timing units, and return behavior).
+- MUST apply Interface Segregation Principle: keep protocols and handler interfaces focused; avoid broad interfaces that force unused methods or arguments.
+- MUST apply Dependency Inversion Principle: high-level application/domain logic must depend on abstractions and injected collaborators, not concrete browser/JS primitives.
+
 ## WebSocket Runtime Architecture Rules (MUST)
 - MUST keep runtime decisions pure via `step(state, msg) -> {:state next-state :effects [...]}`.
 - MUST keep canonical websocket runtime state single-writer: only the engine loop mutates it.
@@ -78,6 +87,13 @@
 - [ ] Yes/No: external payload normalization/mapping is handled in ACL/interpreter boundaries.
 - [ ] Yes/No: domain changes include determinism, ordering, and replay safety tests.
 
+## S.O.L.I.D. Checklist
+- [ ] Yes/No: SRP is preserved (no mixed domain decision + IO + projection responsibilities in one unit).
+- [ ] Yes/No: OCP is preserved (behavior added via extension seams before core flow rewrites).
+- [ ] Yes/No: LSP is preserved (substitutable implementations satisfy existing contracts and invariants).
+- [ ] Yes/No: ISP is preserved (interfaces/protocols remain minimal and purpose-specific).
+- [ ] Yes/No: DIP is preserved (high-level logic depends on abstractions/injection, not concrete infra types).
+
 ## Testing Requirements (MUST)
 - MUST include reducer determinism tests (same state + same msg => same state/effects).
 - MUST include single-writer invariant tests for runtime ownership.
@@ -99,6 +115,10 @@
 - DO NOT put business rules in effect interpreters, transport handlers, or UI callbacks.
 - DO NOT leak raw exchange payload shapes directly into domain consumers without ACL mapping.
 - DO NOT introduce new behavior via direct infrastructure calls that bypass runtime message/effect algebra.
+- DO NOT mix domain decision logic and infrastructure IO concerns in the same function/module.
+- DO NOT modify stable interfaces for one-off behavior when existing extension points can satisfy the change.
+- DO NOT couple high-level runtime logic directly to concrete browser/JS infrastructure primitives.
+- DO NOT design broad protocols/handlers that force consumers to implement unused methods or accept unused arguments.
 
 ## Change Workflow for Agents
 - Read websocket runtime files before editing:
@@ -106,12 +126,14 @@
 - `/hyperopen/src/hyperopen/websocket/application/runtime_engine.cljs`
 - `/hyperopen/src/hyperopen/websocket/infrastructure/runtime_effects.cljs`
 - `/hyperopen/src/hyperopen/websocket/client.cljs`
+- Validate SRP/OCP/LSP/ISP/DIP impact before editing websocket runtime components; document intentional tradeoffs in PR notes.
 - Add or adjust tests before finalizing large runtime behavior changes.
 - Keep compatibility adapter behavior explicit and documented.
 - Document any intentional invariant deviations in PR notes.
 
 ## Mini-Template: Add a New WebSocket Event
 - Define or update the domain concept/invariant and ubiquitous term first.
+- Validate the intended extension seam (OCP) and responsibility split (SRP) before adding message/effect branches.
 - Add a `RuntimeMsg` variant in domain model (constructor/predicate coverage).
 - Extend reducer `step` with pure state transition and emitted effects.
 - Add or extend interpreter handling for any new effect type.
