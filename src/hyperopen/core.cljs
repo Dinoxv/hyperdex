@@ -113,18 +113,24 @@
 
 (defn subscribe-active-asset [_ store coin]
   (println "Subscribing to active asset context for:" coin)
-  (js/localStorage.setItem "active-asset" coin)
+  (let [market-by-key (get-in @store [:asset-selector :market-by-key] {})
+        market (markets/resolve-market-by-coin market-by-key coin)
+        canonical-coin (or (:coin market) coin)]
+    (when (string? canonical-coin)
+      (js/localStorage.setItem "active-asset" canonical-coin))
   (swap! store
          (fn [state]
-           (let [market (get-in state [:asset-selector :market-by-key]
-                                (markets/coin->market-key coin))]
+           (let [market (or market
+                            (markets/resolve-market-by-coin
+                             (get-in state [:asset-selector :market-by-key] {})
+                             canonical-coin))]
              (-> state
                  (assoc-in [:active-assets :loading] true)
-                 (assoc-in [:active-asset] coin)
-                 (assoc-in [:selected-asset] coin)
+                 (assoc-in [:active-asset] canonical-coin)
+                 (assoc-in [:selected-asset] canonical-coin)
                  (assoc :active-market (or market (:active-market state)))))))
-  (active-ctx/subscribe-active-asset-ctx! coin)
-  (fetch-candle-snapshot _ store :interval (get-in @store [:chart-options :selected-timeframe] :1d)))
+  (active-ctx/subscribe-active-asset-ctx! canonical-coin)
+  (fetch-candle-snapshot _ store :interval (get-in @store [:chart-options :selected-timeframe] :1d))))
 
 (defn unsubscribe-active-asset [_ store coin]
   (println "Unsubscribing from active asset context for:" coin)
@@ -200,16 +206,25 @@
   [[:effects/save [:asset-selector :visible-dropdown] nil]])
 
 (defn select-asset [state market-or-coin]
-  (let [market (cond
-                 (map? market-or-coin) market-or-coin
-                 (string? market-or-coin) (get-in state [:asset-selector :market-by-key]
-                                                 (markets/coin->market-key market-or-coin))
+  (let [market-by-key (get-in state [:asset-selector :market-by-key] {})
+        input-coin (cond
+                     (map? market-or-coin) (:coin market-or-coin)
+                     (string? market-or-coin) market-or-coin
+                     :else nil)
+        market (cond
+                 (map? market-or-coin)
+                 (or (markets/resolve-market-by-coin market-by-key input-coin)
+                     market-or-coin)
+
+                 (string? market-or-coin)
+                 (markets/resolve-market-by-coin market-by-key market-or-coin)
+
                  :else nil)
-        coin (or (:coin market) market-or-coin)
+        coin (or (:coin market) input-coin)
         resolved-market (or market
                             (when (string? coin)
-                              (get-in state [:asset-selector :market-by-key]
-                                      (markets/coin->market-key coin))))
+                              (markets/resolve-market-by-coin market-by-key coin)))
+        canonical-coin (or (:coin resolved-market) coin)
         current-asset (get-in state [:active-asset])
         immediate-ui-effects [[:effects/save-many [[[:asset-selector :visible-dropdown] nil]
                                                    [[:orderbook-ui :price-aggregation-dropdown-visible?] false]
@@ -220,9 +235,9 @@
                               [:effects/unsubscribe-orderbook current-asset]
                               [:effects/unsubscribe-trades current-asset]]
                              [])
-        subscribe-effects [[:effects/subscribe-active-asset coin]
-                           [:effects/subscribe-orderbook coin]
-                           [:effects/subscribe-trades coin]]]
+        subscribe-effects [[:effects/subscribe-active-asset canonical-coin]
+                           [:effects/subscribe-orderbook canonical-coin]
+                           [:effects/subscribe-trades canonical-coin]]]
     (into immediate-ui-effects
           (into unsubscribe-effects subscribe-effects))))
 

@@ -7,13 +7,54 @@
   [{:keys [market-type coin]}]
   (str (name market-type) ":" coin))
 
+(defn- numeric-coin-string? [coin]
+  (and (string? coin)
+       (re-matches #"\d+" coin)))
+
+(defn- spot-market-key [coin]
+  (str "spot:" coin))
+
+(defn- perp-market-key [coin]
+  (str "perp:" coin))
+
 (defn coin->market-key
   "Best-effort mapping from a coin string to a market key.
-   Spot coins contain '/', perps otherwise."
+   Spot coins contain '/' or provider spot ids prefixed with '@'."
   [coin]
-  (if (and coin (str/includes? coin "/"))
-    (str "spot:" coin)
-    (str "perp:" coin)))
+  (let [coin* (when (some? coin) (str coin))]
+    (if (and (seq coin*)
+             (or (str/includes? coin* "/")
+                 (str/starts-with? coin* "@")))
+      (spot-market-key coin*)
+      (perp-market-key coin*))))
+
+(defn candidate-market-keys
+  "Deterministically ordered candidate keys for resolving a coin into market-by-key.
+   For numeric legacy spot ids, tries `spot:@<id>` first."
+  [coin]
+  (let [coin* (when (some? coin) (str coin))]
+    (cond
+      (not (seq coin*))
+      []
+
+      (numeric-coin-string? coin*)
+      (vec (distinct [(spot-market-key (str "@" coin*))
+                      (spot-market-key coin*)
+                      (perp-market-key coin*)]))
+
+      :else
+      (let [primary (coin->market-key coin*)
+            fallback (if (str/starts-with? primary "spot:")
+                       (perp-market-key coin*)
+                       (spot-market-key coin*))]
+        (vec (distinct [primary fallback]))))))
+
+(defn resolve-market-by-coin
+  "Resolve a market from market-by-key using deterministic fallback keys."
+  [market-by-key coin]
+  (when (and (map? market-by-key) (some? coin))
+    (some #(get market-by-key %)
+          (candidate-market-keys coin))))
 
 (defn- parse-perp-name [name]
   (if (and name (str/includes? name ":"))

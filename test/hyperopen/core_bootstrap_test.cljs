@@ -122,3 +122,28 @@
             [:effects/subscribe-orderbook "SOL"]
             [:effects/subscribe-trades "SOL"]]
            effects))))
+
+(deftest select-asset-resolves-legacy-spot-id-to-canonical-coin-test
+  (let [resolved-market {:key "spot:@1"
+                         :coin "@1"
+                         :symbol "HYPE/USDC"
+                         :market-type :spot}
+        effects (core/select-asset {:active-asset "ETH"
+                                    :asset-selector {:visible-dropdown :asset-selector
+                                                     :market-by-key {"spot:@1" resolved-market}}
+                                    :orderbook-ui {:price-aggregation-dropdown-visible? true
+                                                   :size-unit-dropdown-visible? true}}
+                                   "1")]
+    (is (= [[:effects/save-many [[[:asset-selector :visible-dropdown] nil]
+                                 [[:orderbook-ui :price-aggregation-dropdown-visible?] false]
+                                 [[:orderbook-ui :size-unit-dropdown-visible?] false]
+                                 [[:active-market] resolved-market]]]
+            [:effects/unsubscribe-active-asset "ETH"]
+            [:effects/unsubscribe-orderbook "ETH"]
+            [:effects/unsubscribe-trades "ETH"]
+            [:effects/subscribe-active-asset "@1"]
+            [:effects/subscribe-orderbook "@1"]
+            [:effects/subscribe-trades "@1"]]
+           effects))
+    (is (= :effects/save-many (ffirst effects)))
+    (is (not-any? #(= (first %) :effects/fetch-candle-snapshot) effects))))

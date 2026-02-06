@@ -61,3 +61,19 @@
       (is (= :tradfi (:category xyz)))
       (is (true? (:hip3? xyz)))
       (is (= :spot (:category spot))))))
+
+(deftest coin->market-key-spot-id-test
+  (testing "spot ids prefixed with @ are treated as spot keys"
+    (is (= "spot:@1" (markets/coin->market-key "@1")))
+    (is (= "spot:PURR/USDC" (markets/coin->market-key "PURR/USDC")))
+    (is (= "perp:BTC" (markets/coin->market-key "BTC")))))
+
+(deftest resolve-market-by-coin-test
+  (testing "resolve-market-by-coin handles perp, spot pair, spot id, and numeric legacy ids"
+    (let [market-by-key {"perp:BTC" {:key "perp:BTC" :coin "BTC"}
+                         "spot:PURR/USDC" {:key "spot:PURR/USDC" :coin "PURR/USDC"}
+                         "spot:@1" {:key "spot:@1" :coin "@1"}}]
+      (is (= "perp:BTC" (:key (markets/resolve-market-by-coin market-by-key "BTC"))))
+      (is (= "spot:PURR/USDC" (:key (markets/resolve-market-by-coin market-by-key "PURR/USDC"))))
+      (is (= "spot:@1" (:key (markets/resolve-market-by-coin market-by-key "@1"))))
+      (is (= "spot:@1" (:key (markets/resolve-market-by-coin market-by-key "1")))))))

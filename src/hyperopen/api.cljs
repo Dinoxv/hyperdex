@@ -521,8 +521,9 @@
                             all-markets)
         active-asset (:active-asset @store)
         active-market (when active-asset
-                        (get market-by-key
-                             (markets/coin->market-key active-asset)))]
+                        (markets/resolve-market-by-coin
+                         market-by-key
+                         active-asset))]
     {:markets all-markets
      :market-by-key market-by-key
      :active-market active-market

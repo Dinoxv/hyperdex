@@ -41,6 +41,20 @@
           " / "
           (or (fmt/format-percentage change-pct) "--"))]))
 
+(defn- resolve-active-market [full-state active-asset]
+  (let [projected-market (:active-market full-state)
+        market-by-key (get-in full-state [:asset-selector :market-by-key] {})]
+    (cond
+      (and (map? projected-market)
+           (= (:coin projected-market) active-asset))
+      projected-market
+
+      (string? active-asset)
+      (markets/resolve-market-by-coin market-by-key active-asset)
+
+      :else
+      nil)))
+
 (defn asset-icon [market dropdown-visible? missing-icons]
   (let [coin (:coin market)
         base (or (:base market) coin)
@@ -52,15 +66,15 @@
         icon-blocked? (or missing-icon?
                           (and (string? base)
                                (str/starts-with? base "@")))]
-    [:div.flex.items-center.space-x-2.cursor-pointer.hover:bg-base-300.rounded.px-2.py-1.transition-colors
+    [:div.flex.items-center.gap-2.cursor-pointer.hover:bg-base-300.rounded.px-2.py-1.transition-colors.min-w-0
      {:on {:click [[:actions/toggle-asset-dropdown :asset-selector]]}}
      (when-not icon-blocked?
        [:img.w-6.h-6.rounded-full
         {:src (str "https://app.hyperliquid.xyz/coins/" base ".svg")
          :alt base
          :on {:error [[:actions/mark-missing-asset-icon market-key]]}}])
-     [:div.flex.items-center.space-x-2
-      [:span.font-medium symbol]
+     [:div.flex.items-center.space-x-2.min-w-0
+      [:span.font-medium.truncate symbol]
       (when (= market-type :spot)
         [:span {:class ["px-1.5" "py-0.5" "text-[10px]" "font-medium" "rounded" "bg-base-300" "text-gray-200"]}
          "SPOT"])
@@ -68,8 +82,11 @@
         [:span {:class ["px-1.5" "py-0.5" "text-[10px]" "font-medium" "rounded"
                         "bg-emerald-500/20" "text-emerald-300" "border" "border-emerald-500/30"]}
          dex])]
-     [:svg.w-4.h-4.text-gray-400.transition-transform {:fill "none" :stroke "currentColor" :viewBox "0 0 24 24"
-                                                        :class (when dropdown-visible? "rotate-180")}
+     [:svg {:fill "none"
+            :stroke "currentColor"
+            :viewBox "0 0 24 24"
+            :class (into ["w-4" "h-4" "text-gray-400" "transition-transform" "shrink-0"]
+                         (when dropdown-visible? ["rotate-180"]))}
       [:path {:stroke-linecap "round" :stroke-linejoin "round" :stroke-width 2 :d "M19 9l-7 7-7-7"}]]]))
 
 (defn asset-selector-trigger [dropdown-visible?]
@@ -224,10 +241,7 @@
 (defn active-asset-list [contexts dropdown-state full-state]
   (let [active-asset (:active-asset full-state)
         ctx-data (when active-asset (get contexts active-asset))
-        market-by-key (get-in full-state [:asset-selector :market-by-key])
-        active-market (or (:active-market full-state)
-                          (when active-asset
-                            (get market-by-key (markets/coin->market-key active-asset))))]
+        active-market (resolve-active-market full-state active-asset)]
     [:div.space-y-2
      (when active-asset
        ^{:key active-asset}
@@ -246,8 +260,8 @@
    [:div.animate-spin.rounded-full.h-8.w-8.border-b-2.border-primary]])
 
 (defn active-asset-panel [contexts loading? dropdown-state full-state]
-  (let [active-market (:active-market full-state)
-        active-asset (:active-asset full-state)
+  (let [active-asset (:active-asset full-state)
+        active-market (resolve-active-market full-state active-asset)
         selected-key (or (:key active-market)
                          (when active-asset (markets/coin->market-key active-asset)))]
     [:div {:class ["relative" "bg-base-200" "border-b" "border-base-300" "rounded-none" "shadow-none"]}
