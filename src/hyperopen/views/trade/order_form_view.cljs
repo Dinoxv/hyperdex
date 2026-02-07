@@ -74,6 +74,37 @@
                     "shrink-0"]}
       accessory])])
 
+(defn- inline-labeled-scale-input [label value on-change]
+  [:div {:class ["relative" "w-full"]}
+   [:span {:class ["pointer-events-none"
+                   "absolute"
+                   "left-3"
+                   "top-1/2"
+                   "-translate-y-1/2"
+                   "text-sm"
+                   "text-gray-400"
+                   "truncate"
+                   "max-w-[55%]"]}
+    label]
+   [:input {:class ["w-full"
+                    "h-10"
+                    "bg-base-200"
+                    "border"
+                    "border-base-300"
+                    "rounded-lg"
+                    "text-right"
+                    "text-sm"
+                    "font-semibold"
+                    "text-gray-100"
+                    "outline-none"
+                    "appearance-none"
+                    "pl-24"
+                    "pr-3"]
+            :type "text"
+            :aria-label label
+            :value (or value "")
+            :on {:input on-change}}]])
+
 (defn- non-blank-string [value]
   (let [s (when (some? value) (str value))
         trimmed (some-> s str/trim)]
@@ -546,9 +577,13 @@
          (input (get-in normalized-form [:scale :end])
                 [[:actions/update-order-form [:scale :end] [:event.target/value]]]
                 :placeholder "End price")
-         (input (get-in normalized-form [:scale :count])
-                [[:actions/update-order-form [:scale :count] [:event.target/value]]]
-                :placeholder "Order count")])
+         [:div {:class ["grid" "grid-cols-2" "gap-2"]}
+          (inline-labeled-scale-input "Total Orders"
+                                      (get-in normalized-form [:scale :count])
+                                      [[:actions/update-order-form [:scale :count] [:event.target/value]]])
+          (inline-labeled-scale-input "Size Skew"
+                                      (get-in normalized-form [:scale :skew])
+                                      [[:actions/update-order-form [:scale :skew] [:event.target/value]]])]])
 
       (when (= :twap type)
         [:div {:class ["space-y-2"]}
@@ -567,11 +602,12 @@
        (when show-limit-like-controls?
          (tif-inline-control normalized-form))]
 
-      (row-toggle "Take Profit / Stop Loss"
-                  (:tpsl-panel-open? normalized-form)
-                  [[:actions/toggle-order-tpsl-panel]])
+      (when (not= :scale type)
+        (row-toggle "Take Profit / Stop Loss"
+                    (:tpsl-panel-open? normalized-form)
+                    [[:actions/toggle-order-tpsl-panel]]))
 
-      (when (:tpsl-panel-open? normalized-form)
+      (when (and (not= :scale type) (:tpsl-panel-open? normalized-form))
         (tp-sl-panel normalized-form))
 
       (when (and pro-mode? limit-like?)

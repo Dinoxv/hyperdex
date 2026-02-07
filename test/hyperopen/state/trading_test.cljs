@@ -44,6 +44,62 @@
                       :twap {:minutes 0 :randomize true})]
       (is (seq (trading/validate-order-form form))))))
 
+(deftest scale-skew-validation-range-test
+  (let [base-scale-form (assoc (trading/default-order-form)
+                               :type :scale
+                               :size "1"
+                               :scale {:start "100"
+                                       :end "110"
+                                       :count 3
+                                       :skew "1.00"})]
+    (is (empty? (trading/validate-order-form (assoc-in base-scale-form [:scale :skew] "0"))))
+    (is (empty? (trading/validate-order-form (assoc-in base-scale-form [:scale :skew] "1"))))
+    (is (empty? (trading/validate-order-form (assoc-in base-scale-form [:scale :skew] "100"))))
+    (is (contains? (set (trading/validate-order-form (assoc-in base-scale-form [:scale :skew] "-1")))
+                   "Scale skew must be a number between 0 and 100."))
+    (is (contains? (set (trading/validate-order-form (assoc-in base-scale-form [:scale :skew] "101")))
+                   "Scale skew must be a number between 0 and 100."))
+    (is (contains? (set (trading/validate-order-form (assoc-in base-scale-form [:scale :skew] "abc")))
+                   "Scale skew must be a number between 0 and 100."))
+    (is (contains? (set (trading/validate-order-form (assoc-in base-scale-form [:scale :skew] nil)))
+                   "Scale skew must be a number between 0 and 100."))))
+
+(deftest normalize-order-form-disables-tpsl-for-scale-test
+  (let [form (-> (trading/default-order-form)
+                 (assoc :entry-mode :pro
+                        :type :scale
+                        :tpsl-panel-open? true)
+                 (assoc-in [:tp :enabled?] true)
+                 (assoc-in [:sl :enabled?] true))
+        normalized (trading/normalize-order-form base-state form)]
+    (is (= :scale (:type normalized)))
+    (is (false? (:tpsl-panel-open? normalized)))
+    (is (false? (get-in normalized [:tp :enabled?])))
+    (is (false? (get-in normalized [:sl :enabled?])))))
+
+(deftest scale-weights-power-curve-determinism-test
+  (let [first-weights (vec (trading/scale-weights 5 2.5))
+        second-weights (vec (trading/scale-weights 5 2.5))]
+    (is (= first-weights second-weights))
+    (is (= 5 (count first-weights)))
+    (is (approx= 1 (reduce + first-weights)))))
+
+(deftest scale-weights-skew-direction-test
+  (let [even-weights (vec (trading/scale-weights 4 1.0))
+        skew-to-end (vec (trading/scale-weights 4 2.0))
+        skew-to-start (vec (trading/scale-weights 4 0.5))]
+    (is (every? #(approx= (first even-weights) %) even-weights))
+    (is (< (first skew-to-end) (last skew-to-end)))
+    (is (> (first skew-to-start) (last skew-to-start)))))
+
+(deftest legacy-skew-keyword-compatibility-test
+  (is (= (vec (trading/scale-weights 4 :front))
+         (vec (trading/scale-weights 4 0.5))))
+  (is (= (vec (trading/scale-weights 4 :even))
+         (vec (trading/scale-weights 4 1.0))))
+  (is (= (vec (trading/scale-weights 4 :back))
+         (vec (trading/scale-weights 4 2.0)))))
+
 (deftest order-entry-mode-and-pro-type-normalization-test
   (is (= :market (trading/entry-mode-for-type :market)))
   (is (= :limit (trading/entry-mode-for-type :limit)))

@@ -638,12 +638,15 @@
 
 (defn toggle-order-tpsl-panel [state]
   (let [form (:order-form state)
-        next-open? (not (boolean (:tpsl-panel-open? form)))
-        next-form (cond-> (assoc form :tpsl-panel-open? next-open?)
-                    (not next-open?) (assoc-in [:tp :enabled?] false)
-                    (not next-open?) (assoc-in [:sl :enabled?] false))
-        next-form* (assoc next-form :error nil)]
-    [[:effects/save-many [[[:order-form] next-form*]]]]))
+        normalized-form (trading/normalize-order-form state form)]
+    (if (= :scale (:type normalized-form))
+      []
+      (let [next-open? (not (boolean (:tpsl-panel-open? form)))
+            next-form (cond-> (assoc form :tpsl-panel-open? next-open?)
+                        (not next-open?) (assoc-in [:tp :enabled?] false)
+                        (not next-open?) (assoc-in [:sl :enabled?] false))
+            next-form* (assoc next-form :error nil)]
+        [[:effects/save-many [[[:order-form] next-form*]]]]))))
 
 (defn update-order-form [state path value]
   (let [v (cond

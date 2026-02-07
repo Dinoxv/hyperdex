@@ -18,6 +18,11 @@
   {:taker 0.045
    :maker 0.015})
 
+(def legacy-scale-skew->number
+  {:even 1.0
+   :front 0.5
+   :back 2.0})
+
 (defn default-order-form []
   {:entry-mode :limit
    :type :limit
@@ -37,7 +42,7 @@
    :scale {:start ""
            :end ""
            :count 5
-           :skew :even}
+           :skew "1.00"}
    :twap {:minutes 5
           :randomize true}
    :tp {:enabled? false
@@ -68,6 +73,24 @@
   (let [parsed (or (parse-num percent) 0)]
     (clamp-num parsed 0 100)))
 
+(defn- parse-scale-skew-number [value]
+  (cond
+    (number? value) value
+    (string? value) (parse-num value)
+    (keyword? value) (get legacy-scale-skew->number value)
+    :else nil))
+
+(defn normalize-scale-skew-number [value]
+  (let [parsed (parse-scale-skew-number value)]
+    (if (number? parsed)
+      (clamp-num parsed 0 100)
+      1.0)))
+
+(defn- valid-scale-skew? [value]
+  (let [parsed (parse-scale-skew-number value)]
+    (and (number? parsed)
+         (<= 0 parsed 100))))
+
 (defn- number->clean-string [value decimals]
   (let [safe-decimals (-> (or decimals 4)
                           (max 0)
@@ -77,6 +100,19 @@
           (str/replace #"0+$" "")
           (str/replace #"\.$" ""))
       "")))
+
+(defn- normalize-scale-form [scale]
+  (let [raw-scale (or scale {})
+        raw-skew (:skew raw-scale)
+        normalized-skew (cond
+                          (string? raw-skew) raw-skew
+                          (number? raw-skew) (number->clean-string (normalize-scale-skew-number raw-skew) 2)
+                          (keyword? raw-skew) (number->clean-string (normalize-scale-skew-number raw-skew) 2)
+                          :else "1.00")]
+    {:start (or (:start raw-scale) "")
+     :end (or (:end raw-scale) "")
+     :count (or (:count raw-scale) 5)
+     :skew normalized-skew}))
 
 (defn normalize-order-type [order-type]
   (let [candidate (if (keyword? order-type) order-type (keyword order-type))]
@@ -437,15 +473,20 @@
         final-type (case entry-mode
                      :market :market
                      :limit :limit
-                     (normalize-pro-order-type normalized-type))]
-    (-> form
-        (assoc :entry-mode entry-mode
-               :type final-type
-               :size-display (or (:size-display form) (:size form) "")
-               :size-percent (clamp-percent (:size-percent form))
-               :pro-order-type-dropdown-open? (boolean (:pro-order-type-dropdown-open? form))
-               :ui-leverage (normalize-ui-leverage state (:ui-leverage form))
-               :tpsl-panel-open? (boolean (:tpsl-panel-open? form))))))
+                     (normalize-pro-order-type normalized-type))
+        normalized-form (-> form
+                            (assoc :entry-mode entry-mode
+                                   :type final-type
+                                   :size-display (or (:size-display form) (:size form) "")
+                                   :size-percent (clamp-percent (:size-percent form))
+                                   :pro-order-type-dropdown-open? (boolean (:pro-order-type-dropdown-open? form))
+                                   :ui-leverage (normalize-ui-leverage state (:ui-leverage form))
+                                   :tpsl-panel-open? (boolean (:tpsl-panel-open? form)))
+                            (assoc :scale (normalize-scale-form (:scale form))))]
+    (cond-> normalized-form
+      (= :scale final-type) (assoc :tpsl-panel-open? false)
+      (= :scale final-type) (assoc-in [:tp :enabled?] false)
+      (= :scale final-type) (assoc-in [:sl :enabled?] false))))
 
 (defn order-summary [state form]
   (let [normalized-form (normalize-order-form state form)
@@ -480,6 +521,7 @@
         scale-start (parse-num (get-in form [:scale :start]))
         scale-end (parse-num (get-in form [:scale :end]))
         scale-count (parse-num (get-in form [:scale :count]))
+        scale-skew (get-in form [:scale :skew])
         twap-min (parse-num (get-in form [:twap :minutes]))
         tp-enabled? (get-in form [:tp :enabled?])
         sl-enabled? (get-in form [:sl :enabled?])
@@ -494,6 +536,9 @@
       (and (= :scale (:type form))
            (or (nil? scale-start) (nil? scale-end) (<= scale-count 1)))
       (conj "Scale orders need start/end prices and count > 1.")
+      (and (= :scale (:type form))
+           (not (valid-scale-skew? scale-skew)))
+      (conj "Scale skew must be a number between 0 and 100.")
       (and (= :twap (:type form))
            (or (nil? twap-min) (<= twap-min 0)))
       (conj "TWAP minutes must be greater than 0.")
@@ -509,20 +554,24 @@
   (if (= side :buy) :sell :buy))
 
 (defn scale-weights [count skew]
-  (let [n (int count)
-        base (range 1 (inc n))
-        weights (case skew
-                  :front (reverse base)
-                  :back base
-                  base)
-        total (reduce + weights)]
-    (map #(/ % total) weights)))
+  (let [n (max 1 (int count))
+        exponent (- (normalize-scale-skew-number skew) 1.0)
+        raw-weights (map (fn [idx]
+                           (let [raw (js/Math.pow (inc idx) exponent)]
+                             (if (and (number? raw) (js/isFinite raw) (pos? raw))
+                               raw
+                               0)))
+                         (range n))
+        total (reduce + raw-weights)]
+    (if (and (number? total) (js/isFinite total) (pos? total))
+      (map #(/ % total) raw-weights)
+      (repeat n (/ 1 n)))))
 
 (defn build-scale-orders [asset-idx side total-size start end reduce-only post-only]
   (let [count (max 2 (int (or (parse-num (get-in total-size [:count])) 2)))
         start-px (parse-num start)
         end-px (parse-num end)
-        weights (scale-weights count (get-in total-size [:skew] :even))
+        weights (scale-weights count (get-in total-size [:skew]))
         size (parse-num (get-in total-size [:size]))
         step (if (= count 1) 0 (/ (- end-px start-px) (dec count)))
         tif (if post-only "Alo" "Gtc")]

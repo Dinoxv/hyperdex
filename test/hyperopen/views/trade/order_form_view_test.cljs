@@ -422,6 +422,37 @@
     (is (not (contains? strings "Pro Order Type")))
     (is (contains? strings "Trigger"))))
 
+(deftest scale-mode-renders-total-orders-and-size-skew-test
+  (let [view-node (view/order-form-view (base-state {:type :scale}))
+        tokens (set (collect-text-and-placeholders view-node))]
+    (is (contains? tokens "Total Orders"))
+    (is (contains? tokens "Size Skew"))
+    (is (not (contains? tokens "Order count")))))
+
+(deftest size-skew-input-dispatch-path-test
+  (let [view-node (view/order-form-view (base-state {:type :scale}))
+        skew-input (find-first-node view-node
+                                    (fn [node]
+                                      (let [attrs (when (map? (second node)) (second node))]
+                                        (and (= :input (first node))
+                                             (= "Size Skew" (:aria-label attrs))))))
+        skew-input-on (get-in skew-input [1 :on :input])
+        skew-input-classes (set (get-in skew-input [1 :class]))]
+    (is (some? skew-input))
+    (is (contains? skew-input-classes "text-right"))
+    (is (= [[:actions/update-order-form [:scale :skew] [:event.target/value]]]
+           skew-input-on))))
+
+(deftest scale-mode-hides-tpsl-toggle-test
+  (let [view-node (view/order-form-view (base-state {:type :scale}))
+        strings (set (collect-strings view-node))]
+    (is (not (contains? strings "Take Profit / Stop Loss")))))
+
+(deftest limit-mode-renders-tpsl-toggle-test
+  (let [view-node (view/order-form-view (base-state {:type :limit}))
+        strings (set (collect-strings view-node))]
+    (is (contains? strings "Take Profit / Stop Loss"))))
+
 (deftest toggle-checkboxes-use-green-checked-state-with-lighter-hover-test
   (let [view-node (view/order-form-view (base-state {:type :limit}))
         toggle-checkboxes (find-all-nodes view-node

@@ -274,6 +274,14 @@
            escape-effects))
     (is (= [] enter-effects))))
 
+(deftest toggle-order-tpsl-panel-noops-for-scale-test
+  (let [state {:order-form (assoc (trading/default-order-form)
+                                  :entry-mode :pro
+                                  :type :scale
+                                  :tpsl-panel-open? false)}
+        effects (core/toggle-order-tpsl-panel state)]
+    (is (= [] effects))))
+
 (deftest set-order-size-percent-emits-single-batched-projection-and-no-network-effects-test
   (let [state {:active-asset "BTC"
                :active-market {:coin "BTC" :mark 100 :maxLeverage 40 :szDecimals 4}
