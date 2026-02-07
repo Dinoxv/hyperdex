@@ -25,6 +25,19 @@
    :after (fn []
             (reset-startup-runtime!))})
 
+(defn- extract-saved-order-form [effects]
+  (or (some (fn [effect]
+              (when (= :effects/save-many (first effect))
+                (some (fn [[path value]]
+                        (when (= [:order-form] path) value))
+                      (second effect))))
+            effects)
+      (some (fn [effect]
+              (when (and (= :effects/save (first effect))
+                         (= [:order-form] (second effect)))
+                (nth effect 2)))
+            effects)))
+
 (deftest initialize-remote-data-streams-phased-bootstrap-test
   (let [phases (atom [])
         critical-fetches (atom 0)
@@ -186,10 +199,34 @@
     (is (= :effects/save-many (ffirst effects)))
     (is (not-any? #(= (first %) :effects/fetch-candle-snapshot) effects))))
 
-(deftest select-order-entry-mode-emits-single-batched-projection-test
-  (let [effects (core/select-order-entry-mode {:order-form (trading/default-order-form)} :market)]
+(deftest select-order-entry-mode-market-emits-single-batched-projection-test
+  (let [effects (core/select-order-entry-mode {:order-form (trading/default-order-form)} :market)
+        saved-form (extract-saved-order-form effects)]
     (is (= 1 (count effects)))
-    (is (= :effects/save-many (ffirst effects)))))
+    (is (= :effects/save-many (ffirst effects)))
+    (is (map? saved-form))
+    (is (= :market (:entry-mode saved-form)))
+    (is (= :market (:type saved-form)))))
+
+(deftest select-order-entry-mode-limit-forces-limit-type-test
+  (let [state {:order-form (assoc (trading/default-order-form) :type :stop-limit :entry-mode :pro)}
+        effects (core/select-order-entry-mode state :limit)
+        saved-form (extract-saved-order-form effects)]
+    (is (= 1 (count effects)))
+    (is (= :effects/save-many (ffirst effects)))
+    (is (map? saved-form))
+    (is (= :limit (:entry-mode saved-form)))
+    (is (= :limit (:type saved-form)))))
+
+(deftest select-order-entry-mode-pro-sets-pro-entry-and-normalized-pro-type-test
+  (let [state {:order-form (assoc (trading/default-order-form) :type :limit)}
+        effects (core/select-order-entry-mode state :pro)
+        saved-form (extract-saved-order-form effects)]
+    (is (= 1 (count effects)))
+    (is (= :effects/save-many (ffirst effects)))
+    (is (map? saved-form))
+    (is (= :pro (:entry-mode saved-form)))
+    (is (= :stop-market (:type saved-form)))))
 
 (deftest set-order-size-percent-emits-single-batched-projection-and-no-network-effects-test
   (let [state {:active-asset "BTC"

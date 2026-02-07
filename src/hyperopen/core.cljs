@@ -545,27 +545,30 @@
                     :market :market
                     :limit :limit
                     (trading/normalize-pro-order-type (:type form)))
-        next-form (-> form
-                      (assoc :type next-type)
-                      (trading/sync-size-from-percent state)
+        normalized (trading/normalize-order-form state
+                                                 (assoc form
+                                                        :entry-mode mode*
+                                                        :type next-type))
+        next-form (-> (trading/sync-size-from-percent state normalized)
                       (assoc :error nil))]
     [[:effects/save-many [[[:order-form] next-form]]]]))
 
 (defn select-pro-order-type [state order-type]
   (let [form (:order-form state)
         next-type (trading/normalize-pro-order-type order-type)
-        next-form (-> form
-                      (assoc :type next-type)
-                      (trading/sync-size-from-percent state)
+        normalized (trading/normalize-order-form state
+                                                 (assoc form
+                                                        :entry-mode :pro
+                                                        :type next-type))
+        next-form (-> (trading/sync-size-from-percent state normalized)
                       (assoc :error nil))]
     [[:effects/save-many [[[:order-form] next-form]]]]))
 
 (defn set-order-ui-leverage [state leverage]
   (let [form (:order-form state)
         normalized (trading/normalize-ui-leverage state leverage)
-        next-form (-> form
-                      (assoc :ui-leverage normalized)
-                      (trading/sync-size-from-percent state)
+        updated (assoc form :ui-leverage normalized)
+        next-form (-> (trading/sync-size-from-percent state updated)
                       (assoc :error nil))]
     [[:effects/save-many [[[:order-form] next-form]]]]))
 
@@ -634,9 +637,11 @@
         updated (assoc-in form path v)
         next-form (cond
                     (= path [:type])
-                    (-> updated
-                        (update :type trading/normalize-order-type)
-                        (trading/sync-size-from-percent state))
+                    (let [typed (-> updated
+                                    (update :type trading/normalize-order-type)
+                                    (assoc :entry-mode (trading/entry-mode-for-type (:type updated))))
+                          normalized (trading/normalize-order-form state typed)]
+                      (trading/sync-size-from-percent state normalized))
 
                     (= path [:size])
                     (trading/sync-size-percent-from-size state updated)

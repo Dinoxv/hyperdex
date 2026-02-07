@@ -52,6 +52,39 @@
   (is (= :stop-market (trading/normalize-pro-order-type :market)))
   (is (= :take-limit (trading/normalize-pro-order-type :take-limit))))
 
+(deftest default-order-form-uses-limit-entry-mode-test
+  (is (= :limit (:entry-mode (trading/default-order-form)))))
+
+(deftest normalize-order-form-keeps-entry-mode-and-type-consistent-test
+  (let [market-form (trading/normalize-order-form base-state {:entry-mode :market
+                                                               :type :limit
+                                                               :size-percent 0
+                                                               :ui-leverage 20})
+        limit-form (trading/normalize-order-form base-state {:entry-mode :limit
+                                                              :type :market
+                                                              :size-percent 0
+                                                              :ui-leverage 20})
+        pro-form (trading/normalize-order-form base-state {:entry-mode :pro
+                                                            :type :limit
+                                                            :size-percent 0
+                                                            :ui-leverage 20})]
+    (is (= :market (:entry-mode market-form)))
+    (is (= :market (:type market-form)))
+    (is (= :limit (:entry-mode limit-form)))
+    (is (= :limit (:type limit-form)))
+    (is (= :pro (:entry-mode pro-form)))
+    (is (= :stop-market (:type pro-form)))))
+
+(deftest normalize-order-form-derives-entry-mode-from-type-when-entry-mode-is-missing-test
+  (let [form-without-entry-mode (-> (trading/default-order-form)
+                                    (dissoc :entry-mode)
+                                    (assoc :type :take-limit))
+        normalized (trading/normalize-order-form base-state form-without-entry-mode)]
+    (is (= :pro (:entry-mode normalized)))
+    (is (= :take-limit (:type normalized)))
+    (is (= normalized
+           (trading/normalize-order-form base-state form-without-entry-mode)))))
+
 (deftest size-percent-conversion-roundtrip-test
   (let [form (assoc (trading/default-order-form)
                     :type :limit
@@ -99,6 +132,100 @@
       (is (nil? (:margin-required summary)))
       (is (nil? (:liquidation-price summary)))
       (is (= trading/default-max-slippage-pct (:slippage-max summary))))))
+
+(deftest market-slippage-estimate-uses-orderbook-depth-for-buy-side-test
+  (let [state {:active-asset "BTC"
+               :active-market {:coin "BTC"}
+               :orderbooks {"BTC" {:bids [{:px "99" :sz "2"}
+                                          {:px "100" :sz "2"}]
+                                   :asks [{:px "102" :sz "1"}
+                                          {:price "101" :size "2"}
+                                          {:p "103" :s "5"}]}}
+               :webdata2 {}}
+        form (assoc (trading/default-order-form)
+                    :type :market
+                    :side :buy
+                    :size "2.5")
+        summary (trading/order-summary state form)]
+    (is (approx= 0.6965174129353312 (:slippage-est summary)))))
+
+(deftest market-slippage-estimate-uses-orderbook-depth-for-sell-side-test
+  (let [state {:active-asset "BTC"
+               :active-market {:coin "BTC"}
+               :orderbooks {"BTC" {:bids [{:px "99" :sz "1"}
+                                          {:price "100" :size "1.5"}
+                                          {:p "98.5" :s "4"}]
+                                   :asks [{:px "101" :sz "3"}]}}
+               :webdata2 {}}
+        form (assoc (trading/default-order-form)
+                    :type :market
+                    :side :sell
+                    :size "1.8")
+        summary (trading/order-summary state form)]
+    (is (approx= 0.6633499170812619 (:slippage-est summary)))))
+
+(deftest market-slippage-estimate-increases-with-larger-size-test
+  (let [state {:active-asset "BTC"
+               :active-market {:coin "BTC"}
+               :orderbooks {"BTC" {:bids [{:px "99" :sz "10"}]
+                                   :asks [{:px "101" :sz "1"}
+                                          {:px "103" :sz "10"}]}}
+               :webdata2 {}}
+        small-form (assoc (trading/default-order-form)
+                          :type :market
+                          :side :buy
+                          :size "0.5")
+        large-form (assoc (trading/default-order-form)
+                          :type :market
+                          :side :buy
+                          :size "2")
+        small-est (:slippage-est (trading/order-summary state small-form))
+        large-est (:slippage-est (trading/order-summary state large-form))]
+    (is (number? small-est))
+    (is (number? large-est))
+    (is (< small-est large-est))))
+
+(deftest market-slippage-estimate-is-nil-when-visible-depth-is-insufficient-test
+  (let [state {:active-asset "BTC"
+               :active-market {:coin "BTC"}
+               :orderbooks {"BTC" {:bids [{:px "99" :sz "3"}]
+                                   :asks [{:px "101" :sz "1"}
+                                          {:px "102" :sz "1"}]}}
+               :webdata2 {}}
+        form (assoc (trading/default-order-form)
+                    :type :market
+                    :side :buy
+                    :size "5")
+        summary (trading/order-summary state form)]
+    (is (nil? (:slippage-est summary)))))
+
+(deftest market-slippage-estimate-is-nil-when-midpoint-is-unavailable-test
+  (let [state {:active-asset "BTC"
+               :active-market {:coin "BTC"}
+               :orderbooks {"BTC" {:bids []
+                                   :asks [{:px "101" :sz "5"}]}}
+               :webdata2 {}}
+        form (assoc (trading/default-order-form)
+                    :type :market
+                    :side :buy
+                    :size "1")
+        summary (trading/order-summary state form)]
+    (is (nil? (:slippage-est summary)))))
+
+(deftest market-slippage-estimate-is-deterministic-test
+  (let [state {:active-asset "BTC"
+               :active-market {:coin "BTC"}
+               :orderbooks {"BTC" {:bids [{:px "99" :sz "5"}]
+                                   :asks [{:px "101" :sz "5"}
+                                          {:px "102" :sz "5"}]}}
+               :webdata2 {}}
+        form (assoc (trading/default-order-form)
+                    :type :market
+                    :side :buy
+                    :size "3")
+        first-summary (trading/order-summary state form)
+        second-summary (trading/order-summary state form)]
+    (is (= first-summary second-summary))))
 
 (deftest order-summary-uses-canonical-size-for-order-value-test
   (let [form (assoc (trading/default-order-form)

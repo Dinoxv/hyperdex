@@ -123,6 +123,18 @@
             :on {:click on-click}}
    label])
 
+(defn- entry-mode-tabs [entry-mode]
+  [:div {:class ["flex" "items-center" "border-b" "border-base-300"]}
+   (mode-button "Market"
+                (= entry-mode :market)
+                [[:actions/select-order-entry-mode :market]])
+   (mode-button "Limit"
+                (= entry-mode :limit)
+                [[:actions/select-order-entry-mode :limit]])
+   (mode-button "Pro"
+                (= entry-mode :pro)
+                [[:actions/select-order-entry-mode :pro]])])
+
 (defn- order-type-label [order-type]
   (case order-type
     :stop-market "Stop Market"
@@ -167,15 +179,25 @@
            coin)
       (str "0.0000 " (or coin "--")))))
 
-(defn- format-percent [value]
-  (if (and (number? value) (not (js/isNaN value)))
-    (str (fmt/safe-to-fixed value 2) "%")
-    "N/A"))
+(defn- format-percent
+  ([value]
+   (format-percent value 2))
+  ([value decimals]
+   (if (and (number? value) (not (js/isNaN value)))
+     (str (fmt/safe-to-fixed value decimals) "%")
+     "N/A")))
 
-(defn- metric-row [title value]
+(defn- metric-row
+  ([title value]
+   (metric-row title value nil))
+  ([title value value-class]
   [:div {:class ["flex" "items-center" "justify-between"]}
    [:span {:class ["text-sm" "text-gray-400"]} title]
-   [:span {:class ["text-sm" "font-semibold" "text-gray-100" "tabular-nums"]} value]])
+   [:span {:class (into ["text-sm" "font-semibold" "tabular-nums"]
+                        (if (seq value-class)
+                          [value-class]
+                          ["text-gray-100"]))}
+    value]]))
 
 (defn- pro-order-type-select [form]
   [:div
@@ -307,7 +329,10 @@
         read-only? (or spot? hip3?)
         side (:side normalized-form)
         type (:type normalized-form)
-        entry-mode (trading/entry-mode-for-type type)
+        entry-mode (:entry-mode normalized-form)
+        market-mode? (= entry-mode :market)
+        pro-mode? (= entry-mode :pro)
+        show-limit-like-controls? (and (not market-mode?) (trading/limit-like-type? type))
         limit-like? (trading/limit-like-type? type)
         summary (trading/order-summary state normalized-form)
         available-to-trade (:available-to-trade summary)
@@ -362,18 +387,9 @@
                     :on-click [[:actions/set-order-ui-leverage next-lev]])
        (chip-button "Classic" true :disabled? true)]
 
-      [:div {:class ["flex" "items-center" "border-b" "border-base-300"]}
-       (mode-button "Market"
-                    (= entry-mode :market)
-                    [[:actions/select-order-entry-mode :market]])
-       (mode-button "Limit"
-                    (= entry-mode :limit)
-                    [[:actions/select-order-entry-mode :limit]])
-       (mode-button "Pro"
-                    (= entry-mode :pro)
-                    [[:actions/select-order-entry-mode :pro]])]
+      (entry-mode-tabs entry-mode)
 
-      (when (= entry-mode :pro)
+      (when pro-mode?
         (pro-order-type-select normalized-form))
 
       [:div {:class ["flex" "items-center" "gap-2" "bg-base-200" "rounded-md" "p-1"]}
@@ -394,7 +410,7 @@
         [:span {:class ["text-sm" "font-semibold" "text-gray-100" "tabular-nums"]}
          (format-position-label position sz-decimals)]]]
 
-      (when limit-like?
+      (when show-limit-like-controls?
         (row-input display-price
                    (str "Price (" quote-symbol ")")
                    [[:actions/update-order-form [:price] [:event.target/value]]]
@@ -504,7 +520,7 @@
        (row-toggle "Reduce Only"
                    (:reduce-only normalized-form)
                    [[:actions/update-order-form [:reduce-only] [:event.target/checked]]])
-       (when limit-like?
+       (when show-limit-like-controls?
          (tif-inline-control normalized-form))]
 
       (row-toggle "Take Profit / Stop Loss"
@@ -514,7 +530,7 @@
       (when (:tpsl-panel-open? normalized-form)
         (tp-sl-panel normalized-form))
 
-      (when (and (= entry-mode :pro) limit-like?)
+      (when (and pro-mode? limit-like?)
         (row-toggle "Post Only"
                     (:post-only normalized-form)
                     [[:actions/update-order-form [:post-only] [:event.target/checked]]]))
@@ -536,8 +552,9 @@
                      "N/A"))
        (when (= :market type)
          (metric-row "Slippage"
-                     (str "Est " (format-percent slippage-est)
-                          " / Max " (format-percent slippage-max))))
+                     (str "Est " (format-percent slippage-est 4)
+                          " / Max " (format-percent slippage-max 2))
+                     "text-primary"))
        (metric-row "Fees"
                    (if (and (number? (:taker fees)) (number? (:maker fees)))
                      (str (fmt/safe-to-fixed (:taker fees) 3)

@@ -31,6 +31,14 @@
                          (when (= item target) idx))
                        items)))
 
+(declare find-first-node)
+
+(defn- button-node-by-label [node label]
+  (find-first-node node
+                   (fn [candidate]
+                     (and (= :button (first candidate))
+                          (= label (last candidate))))))
+
 (defn- find-first-node [node pred]
   (cond
     (vector? node)
@@ -57,6 +65,17 @@
 
     :else []))
 
+(defn- metric-value-node-by-label [node label]
+  (find-first-node node
+                   (fn [candidate]
+                     (and (= :div (first candidate))
+                          (some #(= label %) (collect-strings candidate))
+                          (some #(and (vector? %)
+                                      (= :span (first %))
+                                      (contains? (set (get-in % [1 :class]))
+                                                 "tabular-nums"))
+                                (drop (if (map? (second candidate)) 2 1) candidate))))))
+
 (defn- collect-input-attrs [node]
   (cond
     (vector? node)
@@ -73,18 +92,23 @@
 (defn- base-state
   ([] (base-state {}))
   ([order-form-overrides]
-   {:active-asset "BTC"
-    :active-market {:coin "BTC"
-                    :quote "USDC"
-                    :mark 100
-                    :maxLeverage 40
-                    :market-type :perp
-                    :szDecimals 4}
-    :orderbooks {"BTC" {:bids [{:px "99"}]
-                        :asks [{:px "101"}]}}
-    :webdata2 {:clearinghouseState {:marginSummary {:accountValue "1000"
-                                                    :totalMarginUsed "250"}}}
-    :order-form (merge (trading/default-order-form) order-form-overrides)}))
+   (let [merged-form (merge (trading/default-order-form) order-form-overrides)
+         order-form (if (and (contains? order-form-overrides :type)
+                             (not (contains? order-form-overrides :entry-mode)))
+                      (assoc merged-form :entry-mode (trading/entry-mode-for-type (:type merged-form)))
+                      merged-form)]
+     {:active-asset "BTC"
+      :active-market {:coin "BTC"
+                      :quote "USDC"
+                      :mark 100
+                      :maxLeverage 40
+                      :market-type :perp
+                      :szDecimals 4}
+      :orderbooks {"BTC" {:bids [{:px "99"}]
+                          :asks [{:px "101"}]}}
+      :webdata2 {:clearinghouseState {:marginSummary {:accountValue "1000"
+                                                      :totalMarginUsed "250"}}}
+      :order-form order-form})))
 
 (deftest order-form-parity-controls-render-test
   (let [view-node (view/order-form-view (base-state))
@@ -97,6 +121,37 @@
     (is (contains? strings "Pro"))
     (is (contains? strings "Buy / Long"))
     (is (contains? strings "Sell / Short"))))
+
+(deftest market-mode-tab-is-active-and-limit-pro-tabs-are-inactive-test
+  (let [view-node (view/order-form-view (base-state {:entry-mode :market :type :limit}))
+        market-button (button-node-by-label view-node "Market")
+        limit-button (button-node-by-label view-node "Limit")
+        pro-button (button-node-by-label view-node "Pro")
+        market-classes (set (get-in market-button [1 :class]))
+        limit-classes (set (get-in limit-button [1 :class]))
+        pro-classes (set (get-in pro-button [1 :class]))]
+    (is (contains? market-classes "border-primary"))
+    (is (not (contains? limit-classes "border-primary")))
+    (is (not (contains? pro-classes "border-primary")))))
+
+(deftest market-mode-renders-market-entry-controls-and-hides-limit-pro-fields-test
+  (let [view-node (view/order-form-view (base-state {:entry-mode :market :type :limit}))
+        strings (set (collect-strings view-node))
+        tokens (set (collect-text-and-placeholders view-node))]
+    (is (contains? strings "Buy / Long"))
+    (is (contains? strings "Sell / Short"))
+    (is (contains? strings "Reduce Only"))
+    (is (contains? strings "Take Profit / Stop Loss"))
+    (is (contains? tokens "Size"))
+    (is (not (contains? tokens "Price (USDC)")))
+    (is (not (contains? strings "TIF")))
+    (is (not (contains? strings "Pro Order Type")))))
+
+(deftest market-mode-button-dispatches-select-order-entry-market-action-test
+  (let [view-node (view/order-form-view (base-state {:entry-mode :limit :type :limit}))
+        market-button (button-node-by-label view-node "Market")
+        market-click (get-in market-button [1 :on :click])]
+    (is (= [[:actions/select-order-entry-mode :market]] market-click))))
 
 (deftest limit-mode-renders-price-before-size-test
   (let [view-node (view/order-form-view (base-state {:type :limit}))
@@ -125,6 +180,32 @@
         market-strings (set (collect-strings market-view))]
     (is (not (contains? limit-strings "Slippage")))
     (is (contains? market-strings "Slippage"))))
+
+(deftest market-slippage-row-renders-estimate-with-4dp-and-max-with-2dp-test
+  (let [state (-> (base-state {:type :market
+                               :side :buy
+                               :size "2.5"})
+                  (assoc :orderbooks {"BTC" {:bids [{:px "99" :sz "2"}
+                                                    {:px "100" :sz "2"}]
+                                             :asks [{:px "102" :sz "1"}
+                                                    {:price "101" :size "2"}
+                                                    {:p "103" :s "5"}]}}))
+        view-node (view/order-form-view state)
+        strings (set (collect-strings view-node))]
+    (is (contains? strings "Slippage"))
+    (is (contains? strings "Est 0.6965% / Max 8.00%"))))
+
+(deftest market-slippage-value-uses-green-text-class-test
+  (let [view-node (view/order-form-view (base-state {:type :market :side :buy :size "2.5"}))
+        slippage-row (metric-value-node-by-label view-node "Slippage")
+        value-span (some #(when (and (vector? %)
+                                     (= :span (first %))
+                                     (contains? (set (get-in % [1 :class])) "tabular-nums"))
+                            %)
+                         (drop (if (map? (second slippage-row)) 2 1) slippage-row))
+        value-classes (set (get-in value-span [1 :class]))]
+    (is (some? slippage-row))
+    (is (contains? value-classes "text-primary"))))
 
 (deftest price-row-populates-initial-value-and-renders-clickable-mid-context-test
   (let [view-node (view/order-form-view (base-state {:type :limit :price ""}))

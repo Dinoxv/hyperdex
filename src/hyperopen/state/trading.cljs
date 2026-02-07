@@ -19,7 +19,8 @@
    :maker 0.015})
 
 (defn default-order-form []
-  {:type :limit
+  {:entry-mode :limit
+   :type :limit
    :side :buy
    :ui-leverage 20
    :size-percent 0
@@ -88,6 +89,15 @@
     :market :market
     :limit :limit
     :pro))
+
+(defn normalize-entry-mode [entry-mode order-type]
+  (let [candidate (cond
+                    (keyword? entry-mode) entry-mode
+                    (string? entry-mode) (keyword entry-mode)
+                    :else nil)]
+    (if (contains? #{:market :limit :pro} candidate)
+      candidate
+      (entry-mode-for-type order-type))))
 
 (defn normalize-pro-order-type [order-type]
   (let [candidate (normalize-order-type order-type)]
@@ -165,6 +175,105 @@
           truncated (/ (js/Math.floor (* value factor)) factor)]
       (when (pos? truncated)
         (number->clean-string truncated decimals)))))
+
+(defn- level-price [level]
+  (let [price (or (parse-num (:px level))
+                  (parse-num (:price level))
+                  (parse-num (:p level)))]
+    (when (and (number? price) (pos? price))
+      price)))
+
+(defn- level-size [level]
+  (let [size (or (parse-num (:sz level))
+                 (parse-num (:size level))
+                 (parse-num (:s level)))]
+    (when (and (number? size) (pos? size))
+      size)))
+
+(defn- normalize-level [level]
+  (let [price (level-price level)
+        size (level-size level)]
+    (when (and (number? price)
+               (pos? price)
+               (number? size)
+               (pos? size))
+      {:price price
+       :size size})))
+
+(defn- ordered-market-levels [state side]
+  (let [active-asset (:active-asset state)
+        raw-levels (case side
+                     :buy (get-in state [:orderbooks active-asset :asks])
+                     :sell (get-in state [:orderbooks active-asset :bids])
+                     nil)
+        comparator (case side
+                     :buy <
+                     :sell >
+                     nil)]
+    (when comparator
+      (->> (or raw-levels [])
+           (keep normalize-level)
+           (sort-by :price comparator)
+           vec))))
+
+(defn- top-of-book-midpoint [state]
+  (let [active-asset (:active-asset state)
+        bids (->> (get-in state [:orderbooks active-asset :bids])
+                  (keep normalize-level))
+        asks (->> (get-in state [:orderbooks active-asset :asks])
+                  (keep normalize-level))
+        best-bid (reduce (fn [best level]
+                           (let [price (:price level)]
+                             (if (or (nil? best) (> price best))
+                               price
+                               best)))
+                         nil
+                         bids)
+        best-ask (reduce (fn [best level]
+                           (let [price (:price level)]
+                             (if (or (nil? best) (< price best))
+                               price
+                               best)))
+                         nil
+                         asks)]
+    (when (and (number? best-bid)
+               (pos? best-bid)
+               (number? best-ask)
+               (pos? best-ask))
+      (/ (+ best-bid best-ask) 2))))
+
+(defn- simulate-average-fill-price [levels requested-size]
+  ;; Walk sorted levels deterministically and require a full simulated fill.
+  ;; Return nil when visible depth cannot satisfy requested-size.
+  (when (and (number? requested-size) (pos? requested-size))
+    (loop [remaining requested-size
+           filled-notional 0
+           remaining-levels levels]
+      (cond
+        (<= remaining 0)
+        (/ filled-notional requested-size)
+
+        (empty? remaining-levels)
+        nil
+
+        :else
+        (let [{:keys [price size]} (first remaining-levels)
+              fill-size (min remaining size)]
+          (recur (- remaining fill-size)
+                 (+ filled-notional (* fill-size price))
+                 (rest remaining-levels)))))))
+
+(defn- market-slippage-estimate-pct [state form]
+  (let [requested-size (parse-num (:size form))
+        side (:side form)
+        levels (ordered-market-levels state side)
+        avg-fill (simulate-average-fill-price levels requested-size)
+        midpoint (top-of-book-midpoint state)]
+    (when (and (number? avg-fill)
+               (pos? avg-fill)
+               (number? midpoint)
+               (pos? midpoint))
+      (* 100 (/ (js/Math.abs (- avg-fill midpoint)) midpoint)))))
 
 (defn- best-side-price
   "Return best price for a side independent of vector ordering.
@@ -323,11 +432,14 @@
 
 (defn normalize-order-form [state form]
   (let [normalized-type (normalize-order-type (:type form))
-        final-type (if (= :pro (entry-mode-for-type normalized-type))
-                     (normalize-pro-order-type normalized-type)
-                     normalized-type)]
+        entry-mode (normalize-entry-mode (:entry-mode form) normalized-type)
+        final-type (case entry-mode
+                     :market :market
+                     :limit :limit
+                     (normalize-pro-order-type normalized-type))]
     (-> form
-        (assoc :type final-type
+        (assoc :entry-mode entry-mode
+               :type final-type
                :size-display (or (:size-display form) (:size form) "")
                :size-percent (clamp-percent (:size-percent form))
                :ui-leverage (normalize-ui-leverage state (:ui-leverage form))
@@ -335,6 +447,8 @@
 
 (defn order-summary [state form]
   (let [normalized-form (normalize-order-form state form)
+        requested-type (normalize-order-type (:type form))
+        market-order? (= requested-type :market)
         size (parse-num (:size normalized-form))
         ref-price (reference-price state normalized-form)
         order-value (when (and (number? size) (pos? size) (number? ref-price) (pos? ref-price))
@@ -344,8 +458,8 @@
                           (/ order-value leverage))
         position (current-position-summary state)
         liquidation-price (:liquidation-price position)
-        slippage-est (if (= :market (:type normalized-form))
-                       (max 0 (or (parse-num (:slippage normalized-form)) 0))
+        slippage-est (if market-order?
+                       (market-slippage-estimate-pct state normalized-form)
                        0)]
     {:available-to-trade (available-to-trade state)
      :current-position position
