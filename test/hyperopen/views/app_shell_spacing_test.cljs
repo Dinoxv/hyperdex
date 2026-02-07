@@ -2,6 +2,7 @@
   (:require [clojure.string :as str]
             [cljs.test :refer-macros [deftest is]]
             [hyperopen.state.trading :as trading]
+            [hyperopen.views.app-view :as app-view]
             [hyperopen.views.footer-view :as footer-view]
             [hyperopen.views.header-view :as header-view]
             [hyperopen.views.trade-view :as trade-view]))
@@ -106,3 +107,11 @@
     (is (contains-class? view-node "z-40"))
     (is (contains-class? view-node "bg-base-200"))
     (is (contains-class? view-node "isolate"))))
+
+(deftest app-view-root-hides-scrollbar-while-remaining-scrollable-test
+  (let [view-node (app-view/app-view (assoc trade-view-test-state
+                                            :router {:path "/trade"}
+                                            :wallet {}))
+        root-classes (root-class-set view-node)]
+    (is (contains? root-classes "overflow-y-auto"))
+    (is (contains? root-classes "scrollbar-hide"))))

@@ -6,7 +6,7 @@
 
 (defn app-view [state]
   (let [route (get-in state [:router :path] "/trade")]
-    [:div.h-screen.bg-base-100.flex.flex-col
+    [:div {:class ["h-screen" "bg-base-100" "flex" "flex-col" "overflow-y-auto" "scrollbar-hide"]}
      (header-view/header-view state)
      [:div {:class ["flex-1" "min-h-0" "pb-12" "flex" "flex-col"]}
       (case route
