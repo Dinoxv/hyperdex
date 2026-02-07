@@ -1,18 +1,12 @@
 (ns hyperopen.views.trading-chart.utils.chart-interop
   (:require ["lightweight-charts" :refer [createChart AreaSeries BarSeries BaselineSeries CandlestickSeries HistogramSeries LineSeries]]
-            [hyperopen.utils.formatting :as fmt]))
+            [hyperopen.utils.formatting :as fmt]
+            [hyperopen.views.trading-chart.utils.chart-options :as chart-options]))
 
 ;; Generic chart creation with volume support
 (defn create-chart-with-volume! [container]
   "Create a chart with volume pane"
-  (let [chartOptions #js {:layout #js {:textColor "#e5e7eb" 
-                                       :background #js {:type "solid" 
-                                                       :color "rgb(30, 41, 55)"}}
-                          :grid #js {:vertLines #js {:color "#374151"}
-                                    :horzLines #js {:color "#374151"}}
-                          :rightPriceScale #js {:borderColor "#374151"}
-                          :timeScale #js {:borderColor "#374151"}
-                          :height 400}
+  (let [chartOptions (clj->js (chart-options/fixed-height-chart-options 400))
         chart (createChart container chartOptions)
         ;; Create volume series on a separate pane
         volumeSeries (.addSeries chart HistogramSeries #js {:priceFormat #js {:type "volume"}
@@ -24,14 +18,7 @@
 ;; Generic chart creation
 (defn create-chart! [container]
   "Create a chart with common options"
-  (let [chartOptions #js {:autoSize true
-                          :layout #js {:textColor "#e5e7eb" 
-                                       :background #js {:type "solid" 
-                                                       :color "rgb(30, 41, 55)"}}
-                          :grid #js {:vertLines #js {:color "#374151"}
-                                    :horzLines #js {:color "#374151"}}
-                          :rightPriceScale #js {:borderColor "#374151"}
-                          :timeScale #js {:borderColor "#374151"}}]
+  (let [chartOptions (clj->js (chart-options/base-chart-options))]
     (let [chart (createChart container chartOptions)]
       chart)))
 
