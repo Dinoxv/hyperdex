@@ -575,6 +575,46 @@
                       (assoc :error nil))]
     [[:effects/save-many [[[:order-form] next-form]]]]))
 
+(defn set-order-size-display [state value]
+  (let [raw-value (str (or value ""))
+        form (:order-form state)
+        normalized-form (trading/normalize-order-form state form)
+        reference-price (trading/reference-price state normalized-form)
+        parsed-display-size (trading/parse-num raw-value)
+        canonical-size (when (and (number? parsed-display-size)
+                                  (pos? parsed-display-size)
+                                  (number? reference-price)
+                                  (pos? reference-price))
+                         (trading/base-size-string state (/ parsed-display-size reference-price)))
+        updated (assoc form
+                       :size-display raw-value
+                       :size (or canonical-size ""))
+        next-form (cond
+                    (str/blank? raw-value)
+                    (assoc updated :size "" :size-percent 0)
+
+                    (seq canonical-size)
+                    (trading/sync-size-percent-from-size state updated)
+
+                    :else
+                    (assoc updated :size-percent 0))
+        next-form* (assoc next-form :error nil)]
+    [[:effects/save-many [[[:order-form] next-form*]]]]))
+
+(defn set-order-price-to-mid [state]
+  (let [form (:order-form state)
+        normalized-form (trading/normalize-order-form state form)
+        mid-price-string (trading/mid-price-string state normalized-form)
+        updated (if (seq mid-price-string)
+                  (assoc form :price mid-price-string)
+                  form)
+        next-form (if (and (seq mid-price-string)
+                           (pos? (or (trading/parse-num (:size-percent updated)) 0)))
+                    (trading/sync-size-from-percent state updated)
+                    updated)
+        next-form* (assoc next-form :error nil)]
+    [[:effects/save-many [[[:order-form] next-form*]]]]))
+
 (defn toggle-order-tpsl-panel [state]
   (let [form (:order-form state)
         next-open? (not (boolean (:tpsl-panel-open? form)))
@@ -769,6 +809,8 @@
 (nxr/register-action! :actions/select-pro-order-type select-pro-order-type)
 (nxr/register-action! :actions/set-order-ui-leverage set-order-ui-leverage)
 (nxr/register-action! :actions/set-order-size-percent set-order-size-percent)
+(nxr/register-action! :actions/set-order-size-display set-order-size-display)
+(nxr/register-action! :actions/set-order-price-to-mid set-order-price-to-mid)
 (nxr/register-action! :actions/toggle-order-tpsl-panel toggle-order-tpsl-panel)
 (nxr/register-action! :actions/update-order-form update-order-form)
 (nxr/register-action! :actions/submit-order submit-order)

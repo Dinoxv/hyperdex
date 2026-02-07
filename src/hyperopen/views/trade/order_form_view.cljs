@@ -57,19 +57,23 @@
                           "placeholder:text-gray-500"
                           "outline-none"
                           "appearance-none"]
-                         (when accessory ["pr-16"]))
+                         (when accessory ["pr-28"]))
             :type "text"
             :placeholder placeholder
             :value (or value "")
             :on {:input on-change}}]
    (when accessory
-     [:div {:class ["pointer-events-none"
-                    "absolute"
+     [:div {:class ["absolute"
                     "right-3"
                     "top-1/2"
                     "-translate-y-1/2"
                     "shrink-0"]}
       accessory])])
+
+(defn- non-blank-string [value]
+  (let [s (when (some? value) (str value))
+        trimmed (some-> s str/trim)]
+    (when (seq trimmed) trimmed)))
 
 (defn- chip-button [label active? & {:keys [on-click disabled?]}]
   [:button {:type "button"
@@ -231,6 +235,34 @@
             :clip-rule "evenodd"
             :d "M5.293 7.293a1 1 0 011.414 0L10 10.586l3.293-3.293a1 1 0 111.414 1.414l-4 4a1 1 0 01-1.414 0l-4-4a1 1 0 010-1.414z"}]]])
 
+(defn- resolve-quote-symbol [active-asset active-market]
+  (or (non-blank-string (:quote active-market))
+      (let [symbol (non-blank-string (:symbol active-market))]
+        (cond
+          (and symbol (str/includes? symbol "/"))
+          (non-blank-string (second (str/split symbol #"/" 2)))
+
+          (and symbol (str/includes? symbol "-"))
+          (non-blank-string (second (str/split symbol #"-" 2)))
+
+          :else nil))
+      (when (and (string? active-asset) (str/includes? active-asset "/"))
+        (non-blank-string (second (str/split active-asset #"/" 2))))
+      "USDC"))
+
+(defn- price-context-accessory [state form]
+  (let [{:keys [source]} (trading/mid-price-summary state form)
+        mid-available? (= :mid source)]
+    [:button {:type "button"
+              :disabled (not mid-available?)
+              :class (into ["text-xs" "font-semibold" "transition-colors"]
+                           (if mid-available?
+                             ["text-primary" "cursor-pointer" "hover:text-primary/80"]
+                             ["text-gray-500" "cursor-default"]))
+              :on (when mid-available?
+                    {:click [[:actions/set-order-price-to-mid]]})}
+     (if mid-available? "Mid" "Ref")]))
+
 (defn- tif-inline-control [form]
   [:div {:class ["relative" "flex" "items-center" "gap-2"]}
    [:span {:class ["text-xs" "uppercase" "tracking-wide" "text-gray-400"]} "TIF"]
@@ -286,10 +318,11 @@
         display-price (if (str/blank? raw-price)
                         (or fallback-limit-price "")
                         raw-price)
-        quote-symbol (or (:quote active-market) "USDC")
+        quote-symbol (resolve-quote-symbol active-asset active-market)
         sz-decimals (or (:szDecimals active-market) 4)
         order-value (:order-value summary)
         margin-required (:margin-required summary)
+        size-display (:size-display normalized-form)
         liq-price (:liquidation-price summary)
         slippage-est (:slippage-est summary)
         slippage-max (:slippage-max summary)
@@ -360,11 +393,11 @@
         (row-input display-price
                    (str "Price (" quote-symbol ")")
                    [[:actions/update-order-form [:price] [:event.target/value]]]
-                   nil))
+                   (price-context-accessory state normalized-form)))
 
-      (row-input (:size normalized-form)
+      (row-input size-display
                  "Size"
-                 [[:actions/update-order-form [:size] [:event.target/value]]]
+                 [[:actions/set-order-size-display [:event.target/value]]]
                  (quote-accessory quote-symbol))
 
       [:div {:class ["flex" "items-center" "gap-2"]}

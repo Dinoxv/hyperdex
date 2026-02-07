@@ -113,7 +113,7 @@
     (is (not (contains? limit-strings "Slippage")))
     (is (contains? market-strings "Slippage"))))
 
-(deftest price-row-populates-field-value-and-hides-mid-reference-accessory-test
+(deftest price-row-populates-initial-value-and-renders-clickable-mid-context-test
   (let [view-node (view/order-form-view (base-state {:type :limit :price ""}))
         strings (set (collect-strings view-node))
         price-input (find-first-node view-node
@@ -121,11 +121,18 @@
                                        (let [attrs (when (map? (second node)) (second node))]
                                          (and (= :input (first node))
                                               (= "Price (USDC)" (:placeholder attrs))))))
-        price-attrs (second price-input)]
+        price-attrs (second price-input)
+        mid-button (find-first-node view-node
+                                    (fn [node]
+                                      (let [attrs (when (map? (second node)) (second node))]
+                                        (and (= :button (first node))
+                                             (= "Mid" (last node))
+                                             (= [[:actions/set-order-price-to-mid]]
+                                                (get-in attrs [:on :click]))))))]
     (is (some? price-input))
     (is (seq (:value price-attrs)))
-    (is (not (contains? strings "Mid")))
-    (is (not (contains? strings "Ref")))))
+    (is (contains? strings "Mid"))
+    (is (some? mid-button))))
 
 (deftest slider-percent-badge-is-visible-without-numeric-spinner-input-test
   (let [view-node (view/order-form-view (base-state {:type :limit :size-percent 37}))
@@ -152,6 +159,31 @@
     (is (contains? size-class "border"))
     (is (not (contains? price-class "bg-transparent")))
     (is (not (contains? size-class "bg-transparent")))))
+
+(deftest size-row-preserves-input-value-and-resolves-quote-symbol-fallback-test
+  (let [state (-> (base-state {:type :limit :price "" :size "1" :size-display "1"})
+                  (assoc :active-market {:coin "BTC"
+                                         :symbol "BTC-USDT"
+                                         :mark 100
+                                         :maxLeverage 40
+                                         :market-type :perp
+                                         :szDecimals 4}))
+        view-node (view/order-form-view state)
+        strings (set (collect-strings view-node))
+        price-input (find-first-node view-node
+                                     (fn [node]
+                                       (let [attrs (when (map? (second node)) (second node))]
+                                         (and (= :input (first node))
+                                              (= "Price (USDT)" (:placeholder attrs))))))
+        size-input (find-first-node view-node
+                                    (fn [node]
+                                      (let [attrs (when (map? (second node)) (second node))]
+                                        (and (= :input (first node))
+                                             (= "Size" (:placeholder attrs))))))
+        size-value (:value (second size-input))]
+    (is (some? price-input))
+    (is (contains? strings "USDT"))
+    (is (= "1" size-value))))
 
 (deftest pro-mode-renders-advanced-controls-test
   (let [view-node (view/order-form-view (base-state {:type :stop-market}))

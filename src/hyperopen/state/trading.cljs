@@ -24,6 +24,7 @@
    :ui-leverage 20
    :size-percent 0
    :tpsl-panel-open? false
+   :size-display ""
    :size ""
    :price ""
    :trigger-px ""
@@ -155,15 +156,39 @@
         (min 8)
         int)))
 
+(defn base-size-string
+  "Format canonical base size by truncating to market szDecimals."
+  [state value]
+  (when (and (number? value) (pos? value))
+    (let [decimals (size-decimals state)
+          factor (js/Math.pow 10 decimals)
+          truncated (/ (js/Math.floor (* value factor)) factor)]
+      (when (pos? truncated)
+        (number->clean-string truncated decimals)))))
+
+(defn- best-side-price
+  "Return best price for a side independent of vector ordering.
+   For bids, pass > comparator. For asks, pass < comparator."
+  [levels better?]
+  (reduce (fn [best level]
+            (let [px (parse-num (:px level))]
+              (if (and (number? px)
+                       (pos? px)
+                       (or (nil? best) (better? px best)))
+                px
+                best)))
+          nil
+          (or levels [])))
+
 (defn best-bid-price [state]
   (let [active-asset (:active-asset state)
-        orderbook (get-in state [:orderbooks active-asset])]
-    (some-> orderbook :bids first :px parse-num)))
+        bids (get-in state [:orderbooks active-asset :bids])]
+    (best-side-price bids >)))
 
 (defn best-ask-price [state]
   (let [active-asset (:active-asset state)
-        orderbook (get-in state [:orderbooks active-asset])]
-    (some-> orderbook :asks first :px parse-num)))
+        asks (get-in state [:orderbooks active-asset :asks])]
+    (best-side-price asks <)))
 
 (defn reference-price [state form]
   (let [order-type (normalize-order-type (:type form))
@@ -217,6 +242,16 @@
   (when-let [price (effective-limit-price state form)]
     (number->clean-string price 6)))
 
+(defn mid-price-string
+  "String representation for the true midpoint (best bid/ask average).
+   Returns nil when midpoint is unavailable."
+  [state form]
+  (let [{:keys [mid-price source]} (mid-price-summary state form)]
+    (when (and (= source :mid)
+               (number? mid-price)
+               (pos? mid-price))
+      (number->clean-string mid-price 6))))
+
 (defn size-from-percent [state form percent]
   (let [pct (clamp-percent percent)
         available (available-to-trade state)
@@ -244,14 +279,22 @@
 
 (defn apply-size-percent [state form percent]
   (let [pct (clamp-percent percent)
+        available (available-to-trade state)
+        leverage (normalize-ui-leverage state (:ui-leverage form))
+        notional (* available leverage (/ pct 100))
         normalized-form (assoc form
                                :size-percent pct
                                :ui-leverage (normalize-ui-leverage state (:ui-leverage form)))
         computed-size (size-from-percent state normalized-form pct)
-        decimals (size-decimals state)]
+        quantized-size (when (number? computed-size)
+                         (base-size-string state computed-size))
+        display-notional (when (and (number? notional) (pos? notional))
+                           (number->clean-string notional 2))]
     (cond
-      (zero? pct) (assoc normalized-form :size "")
-      (number? computed-size) (assoc normalized-form :size (number->clean-string computed-size decimals))
+      (zero? pct) (assoc normalized-form :size "" :size-display "")
+      (seq quantized-size) (assoc normalized-form
+                                  :size quantized-size
+                                  :size-display (or display-notional ""))
       :else normalized-form)))
 
 (defn sync-size-from-percent [state form]
@@ -285,6 +328,7 @@
                      normalized-type)]
     (-> form
         (assoc :type final-type
+               :size-display (or (:size-display form) (:size form) "")
                :size-percent (clamp-percent (:size-percent form))
                :ui-leverage (normalize-ui-leverage state (:ui-leverage form))
                :tpsl-panel-open? (boolean (:tpsl-panel-open? form))))))

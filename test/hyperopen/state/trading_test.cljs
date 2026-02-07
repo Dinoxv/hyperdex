@@ -100,6 +100,22 @@
       (is (nil? (:liquidation-price summary)))
       (is (= trading/default-max-slippage-pct (:slippage-max summary))))))
 
+(deftest order-summary-uses-canonical-size-for-order-value-test
+  (let [form (assoc (trading/default-order-form)
+                    :type :limit
+                    :size "2"
+                    :size-display "1"
+                    :price "100"
+                    :ui-leverage 20)
+        summary (trading/order-summary base-state form)]
+    (is (= 200 (:order-value summary)))
+    (is (= 10 (:margin-required summary)))))
+
+(deftest base-size-string-truncates-to-market-step-test
+  (let [state {:active-market {:szDecimals 5}}]
+    (is (= "0.00002" (trading/base-size-string state 0.0000285)))
+    (is (nil? (trading/base-size-string state 0.0000099)))))
+
 (deftest available-to-trade-withdrawable-precedence-and-dex-isolation-test
   (testing "withdrawable is the canonical available balance when present"
     (let [state (assoc-in base-state [:webdata2 :clearinghouseState :withdrawable] "170.58")]
@@ -171,3 +187,24 @@
       (is (= "100.125" (trading/effective-limit-price-string state form)))
       (is (= (trading/effective-limit-price-string state form)
              (trading/effective-limit-price-string state form))))))
+
+(deftest mid-price-string-requires-true-midpoint-test
+  (testing "returns midpoint string when bid and ask are present"
+    (let [form (assoc (trading/default-order-form) :type :limit :price "")]
+      (is (= "100" (trading/mid-price-string base-state form)))))
+
+  (testing "returns nil when midpoint is unavailable"
+    (let [state (assoc base-state :orderbooks {})
+          form (assoc (trading/default-order-form) :type :limit :price "")]
+      (is (nil? (trading/mid-price-string state form)))))
+
+  (testing "midpoint uses max bid and min ask regardless of level ordering"
+    (let [state {:active-asset "BTC"
+                 :active-market {:coin "BTC" :mark 70000}
+                 :orderbooks {"BTC" {:bids [{:px "70120"} {:px "70150"} {:px "70090"}]
+                                     :asks [{:px "70240"} {:px "70160"} {:px "70210"}]}}
+                 :webdata2 {}}
+          form (assoc (trading/default-order-form) :type :limit :price "")]
+      (is (= "70155" (trading/mid-price-string state form)))
+      (is (= 70160 (trading/reference-price state (assoc form :side :buy))))
+      (is (= 70150 (trading/reference-price state (assoc form :side :sell)))))))
