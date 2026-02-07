@@ -266,6 +266,33 @@
     (is (every? #(contains? % "focus:ring-offset-0") all-classes))
     (is (every? #(contains? % "focus:shadow-none") all-classes))))
 
+(deftest tpsl-toggle-uses-explicit-text-label-binding-with-non-label-row-test
+  (let [view-node (view/order-form-view (base-state {:type :limit}))
+        toggle-row (find-first-node view-node
+                                    (fn [node]
+                                      (let [attrs (when (map? (second node)) (second node))
+                                            children (if attrs (drop 2 node) (drop 1 node))
+                                            child-tags (into #{} (keep (fn [child]
+                                                                         (when (vector? child)
+                                                                           (first child))))
+                                                             children)]
+                                        (and (= :div (first node))
+                                             (contains? child-tags :input)
+                                             (contains? child-tags :label)
+                                             (some #{"Take Profit / Stop Loss"} (collect-strings node))))))
+        attrs (when (some? toggle-row) (second toggle-row))
+        children (when (some? toggle-row)
+                   (if (map? attrs) (drop 2 toggle-row) (drop 1 toggle-row)))
+        checkbox-node (some #(when (and (vector? %) (= :input (first %))) %) children)
+        text-label-node (some #(when (and (vector? %) (= :label (first %))) %) children)
+        checkbox-id (get-in checkbox-node [1 :id])]
+    (is (some? toggle-row))
+    (is (= :div (first toggle-row)))
+    (is (= "checkbox" (get-in checkbox-node [1 :type])))
+    (is (string? checkbox-id))
+    (is (= checkbox-id (get-in text-label-node [1 :for])))
+    (is (= "Take Profit / Stop Loss" (last text-label-node)))))
+
 (deftest order-summary-and-position-fallback-render-test
   (let [state (assoc (base-state)
                      :orderbooks {}

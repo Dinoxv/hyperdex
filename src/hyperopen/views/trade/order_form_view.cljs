@@ -9,23 +9,27 @@
   [:div {:class ["text-xs" "text-gray-400" "mb-1"]} text])
 
 (defn- row-toggle [label-text checked? on-change]
-  [:label {:class ["inline-flex" "items-center" "gap-2" "cursor-pointer" "text-sm" "text-gray-100"]}
-   [:input {:class ["h-4"
-                    "w-4"
-                    "rounded-[3px]"
-                    "border"
-                    "border-base-300"
-                    "bg-transparent"
-                    "trade-toggle-checkbox"
-                    "transition-colors"
-                    "focus:outline-none"
-                    "focus:ring-0"
-                    "focus:ring-offset-0"
-                    "focus:shadow-none"]
-            :type "checkbox"
-            :checked (boolean checked?)
-            :on {:change on-change}}]
-   [:span label-text]])
+  (let [checkbox-id (str (gensym "trade-toggle-"))]
+    [:div {:class ["inline-flex" "items-center" "gap-2" "text-sm" "text-gray-100"]}
+     [:input {:id checkbox-id
+              :class ["h-4"
+                      "w-4"
+                      "rounded-[3px]"
+                      "border"
+                      "border-base-300"
+                      "bg-transparent"
+                      "trade-toggle-checkbox"
+                      "transition-colors"
+                      "focus:outline-none"
+                      "focus:ring-0"
+                      "focus:ring-offset-0"
+                      "focus:shadow-none"]
+              :type "checkbox"
+              :checked (boolean checked?)
+              :on {:change on-change}}]
+     [:label {:for checkbox-id
+              :class ["cursor-pointer" "select-none"]}
+      label-text]]))
 
 (defn- input [value on-change & {:keys [type placeholder]}]
   [:input {:class ["w-full"
