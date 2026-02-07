@@ -251,6 +251,21 @@
     (is (contains? strings "Stop Market"))
     (is (contains? strings "Trigger"))))
 
+(deftest toggle-checkboxes-use-green-checked-state-with-lighter-hover-test
+  (let [view-node (view/order-form-view (base-state {:type :limit}))
+        toggle-checkboxes (find-all-nodes view-node
+                                          (fn [node]
+                                            (let [attrs (when (map? (second node)) (second node))
+                                                  classes (set (:class attrs))]
+                                              (and (= :input (first node))
+                                                   (= "checkbox" (:type attrs))
+                                                   (contains? classes "trade-toggle-checkbox")))))
+        all-classes (map (comp set :class second) toggle-checkboxes)]
+    (is (not-empty toggle-checkboxes))
+    (is (every? #(contains? % "trade-toggle-checkbox") all-classes))
+    (is (every? #(contains? % "focus:ring-offset-0") all-classes))
+    (is (every? #(contains? % "focus:shadow-none") all-classes))))
+
 (deftest order-summary-and-position-fallback-render-test
   (let [state (assoc (base-state)
                      :orderbooks {}

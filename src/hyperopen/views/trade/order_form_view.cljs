@@ -12,16 +12,16 @@
   [:label {:class ["inline-flex" "items-center" "gap-2" "cursor-pointer" "text-sm" "text-gray-100"]}
    [:input {:class ["h-4"
                     "w-4"
-                    "appearance-none"
                     "rounded-[3px]"
                     "border"
                     "border-base-300"
                     "bg-transparent"
+                    "trade-toggle-checkbox"
                     "transition-colors"
-                    "checked:border-primary"
-                    "checked:bg-primary"
                     "focus:outline-none"
-                    "focus:ring-0"]
+                    "focus:ring-0"
+                    "focus:ring-offset-0"
+                    "focus:shadow-none"]
             :type "checkbox"
             :checked (boolean checked?)
             :on {:change on-change}}]

@@ -98,6 +98,32 @@
         rgba(0, 212, 170, 0.28);
   }
 
+  .trade-toggle-checkbox {
+    color: #00d4aa;
+    border-color: rgb(48 54 61);
+    background-color: transparent;
+    transition: background-color 0.15s ease, border-color 0.15s ease;
+  }
+
+  .trade-toggle-checkbox:checked {
+    border-color: #00d4aa;
+    background-color: #00d4aa;
+  }
+
+  .trade-toggle-checkbox:checked:hover {
+    border-color: #31e6c1;
+    background-color: #31e6c1;
+  }
+
+  .trade-toggle-checkbox:focus,
+  .trade-toggle-checkbox:focus-visible {
+    outline: none;
+    box-shadow: none;
+    --tw-ring-offset-width: 0px;
+    --tw-ring-offset-shadow: 0 0 #0000;
+    --tw-ring-shadow: 0 0 #0000;
+  }
+
   /* Order book styles */
   .order-book-row {
     @apply flex justify-between items-center py-1 px-2 hover:bg-trading-surface/50 transition-colors;
