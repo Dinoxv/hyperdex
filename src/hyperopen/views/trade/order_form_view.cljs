@@ -323,6 +323,7 @@
         order-value (:order-value summary)
         margin-required (:margin-required summary)
         size-display (:size-display normalized-form)
+        display-size-percent (str (int (js/Math.round size-percent)))
         liq-price (:liquidation-price summary)
         slippage-est (:slippage-est summary)
         slippage-max (:slippage-max summary)
@@ -401,26 +402,69 @@
                  (quote-accessory quote-symbol))
 
       [:div {:class ["flex" "items-center" "gap-2"]}
-       [:input {:class ["range" "range-primary" "range-sm" "w-full"]
-                :type "range"
-                :min 0
-                :max 100
-                :step 1
-                :value size-percent
-                :on {:input [[:actions/set-order-size-percent [:event.target/value]]]}}]
-       [:div {:class ["w-[82px]"
-                      "h-10"
-                      "px-2"
-                      "bg-base-200"
-                      "border"
-                      "border-base-300"
-                      "rounded-lg"
-                      "flex"
-                      "items-center"
-                      "justify-center"
-                      "tabular-nums"]}
-        [:span {:class ["text-sm" "font-semibold" "text-gray-100"]}
-         (str (int (js/Math.round size-percent)) " %")]]]
+       [:div {:class ["relative" "flex-1"]}
+        [:input {:class ["order-size-slider" "range" "range-sm" "w-full" "relative" "z-20"]
+                 :type "range"
+                 :min 0
+                 :max 100
+                 :step 1
+                 :value size-percent
+                 :on {:input [[:actions/set-order-size-percent [:event.target/value]]]}}]
+        [:div {:class ["order-size-slider-notches"
+                       "pointer-events-none"
+                       "absolute"
+                       "inset-x-0"
+                       "top-1/2"
+                       "z-10"
+                       "flex"
+                       "items-center"
+                       "justify-between"
+                       "px-0.5"]}
+         (for [pct [0 25 50 75 100]]
+           ^{:key (str "size-slider-notch-" pct)}
+           [:span {:class (into ["order-size-slider-notch"
+                            "block"
+                           "h-[7px]"
+                           "w-[7px]"
+                           "-translate-y-1/2"
+                           "rounded-full"]
+                          [(if (>= size-percent pct)
+                             "order-size-slider-notch-active"
+                             "order-size-slider-notch-inactive")])}])]]
+       [:div {:class ["relative" "w-[82px]"]}
+        [:input {:class ["order-size-percent-input"
+                         "h-10"
+                         "w-full"
+                         "bg-base-200/80"
+                         "border"
+                         "border-base-300"
+                         "rounded-lg"
+                         "text-right"
+                         "text-sm"
+                         "font-semibold"
+                         "text-gray-100"
+                         "tabular-nums"
+                         "appearance-none"
+                         "outline-none"
+                         "pl-2.5"
+                         "pr-6"
+                         "focus:outline-none"
+                         "focus:ring-0"
+                         "focus:border-base-300"]
+                 :type "text"
+                 :inputmode "numeric"
+                 :pattern "[0-9]*"
+                 :value display-size-percent
+                 :on {:input [[:actions/set-order-size-percent [:event.target/value]]]}}]
+        [:span {:class ["pointer-events-none"
+                        "absolute"
+                        "right-2.5"
+                        "top-1/2"
+                        "-translate-y-1/2"
+                        "text-sm"
+                        "font-semibold"
+                        "text-gray-300"]}
+         "%"]]]
 
       (when (#{:stop-market :stop-limit :take-market :take-limit} type)
         [:div

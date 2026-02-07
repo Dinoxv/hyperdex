@@ -44,6 +44,19 @@
 
     :else nil))
 
+(defn- find-all-nodes [node pred]
+  (cond
+    (vector? node)
+    (let [attrs (when (map? (second node)) (second node))
+          children (if attrs (drop 2 node) (drop 1 node))
+          self (if (pred node) [node] [])]
+      (into self (mapcat #(find-all-nodes % pred) children)))
+
+    (seq? node)
+    (mapcat #(find-all-nodes % pred) node)
+
+    :else []))
+
 (defn- collect-input-attrs [node]
   (cond
     (vector? node)
@@ -134,12 +147,58 @@
     (is (contains? strings "Mid"))
     (is (some? mid-button))))
 
-(deftest slider-percent-badge-is-visible-without-numeric-spinner-input-test
+(deftest slider-percent-input-is-editable-and-no-numeric-spinner-input-test
   (let [view-node (view/order-form-view (base-state {:type :limit :size-percent 37}))
-        strings (collect-strings view-node)
+        percent-input (find-first-node view-node
+                                       (fn [node]
+                                         (let [attrs (when (map? (second node)) (second node))
+                                               classes (set (:class attrs))]
+                                           (and (= :input (first node))
+                                                (contains? classes "order-size-percent-input")))))
+        percent-input-attrs (second percent-input)
         input-attrs (collect-input-attrs view-node)]
-    (is (some #(re-find #"\d+\s%" %) strings))
+    (is (some? percent-input))
+    (is (= "text" (:type percent-input-attrs)))
+    (is (= "37" (:value percent-input-attrs)))
+    (is (= [[:actions/set-order-size-percent [:event.target/value]]]
+           (get-in percent-input-attrs [:on :input])))
     (is (not-any? #(= "number" (:type %)) input-attrs))))
+
+(deftest slider-renders-five-quarter-notches-test
+  (let [view-node (view/order-form-view (base-state {:type :limit :size-percent 40}))
+        slider-input (find-first-node view-node
+                                      (fn [node]
+                                        (let [attrs (when (map? (second node)) (second node))
+                                              classes (set (:class attrs))]
+                                          (and (= :input (first node))
+                                               (= "range" (:type attrs))
+                                               (contains? classes "order-size-slider")))))
+        notches (find-all-nodes view-node
+                                (fn [node]
+                                  (let [attrs (when (map? (second node)) (second node))
+                                        classes (set (:class attrs))]
+                                    (contains? classes "order-size-slider-notch"))))]
+    (is (= 5 (count notches)))
+    (is (contains? (set (:class (second slider-input))) "z-20"))))
+
+(deftest slider-highlights-passed-quarter-notches-test
+  (let [view-node (view/order-form-view (base-state {:type :limit :size-percent 50}))
+        notches (find-all-nodes view-node
+                                (fn [node]
+                                  (let [attrs (when (map? (second node)) (second node))
+                                        classes (set (:class attrs))]
+                                    (contains? classes "order-size-slider-notch"))))
+        active-count (count (filter (fn [node]
+                                      (contains? (set (:class (second node)))
+                                                 "order-size-slider-notch-active"))
+                                    notches))
+        inactive-count (count (filter (fn [node]
+                                        (contains? (set (:class (second node)))
+                                                   "order-size-slider-notch-inactive"))
+                                      notches))]
+    (is (= 5 (count notches)))
+    (is (= 3 active-count))
+    (is (= 2 inactive-count))))
 
 (deftest price-and-size-rows-use-single-field-surface-test
   (let [view-node (view/order-form-view (base-state {:type :limit :price ""}))

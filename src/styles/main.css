@@ -48,6 +48,56 @@
     @apply input input-sm bg-trading-surface border-trading-border text-trading-text font-mono;
   }
 
+  .order-size-slider.range {
+    --range-shdw: rgba(0, 212, 170, 0.42);
+  }
+
+  .order-size-slider.range::-webkit-slider-runnable-track {
+    background-color: rgba(148, 163, 184, 0.14);
+    border: 0;
+  }
+
+  .order-size-slider.range::-moz-range-track {
+    background-color: rgba(148, 163, 184, 0.14);
+    border: 0;
+  }
+
+  .order-size-slider.range-sm::-webkit-slider-runnable-track {
+    height: 0.4375rem;
+  }
+
+  .order-size-slider.range-sm::-moz-range-track {
+    height: 0.4375rem;
+  }
+
+  .order-size-slider-notches {
+    height: 0;
+  }
+
+  .order-size-slider-notch-active {
+    background-color: rgba(0, 212, 170, 0.85);
+  }
+
+  .order-size-slider-notch-inactive {
+    background-color: rgba(148, 163, 184, 0.72);
+  }
+
+  .order-size-slider.range::-webkit-slider-thumb {
+    background-color: rgb(11, 14, 17);
+    box-shadow: 0 0 0 2px rgba(0, 212, 170, 0.78) inset,
+      var(--focus-shadow, 0 0),
+      calc(var(--filler-size) * -1 - var(--filler-offset)) 0 0 var(--filler-size)
+        rgba(0, 212, 170, 0.28);
+  }
+
+  .order-size-slider.range::-moz-range-thumb {
+    background-color: rgb(11, 14, 17);
+    box-shadow: 0 0 0 2px rgba(0, 212, 170, 0.78) inset,
+      var(--focus-shadow, 0 0),
+      calc(var(--filler-size) * -1 - var(--filler-offset)) 0 0 var(--filler-size)
+        rgba(0, 212, 170, 0.28);
+  }
+
   /* Order book styles */
   .order-book-row {
     @apply flex justify-between items-center py-1 px-2 hover:bg-trading-surface/50 transition-colors;
