@@ -1,5 +1,6 @@
 (ns hyperopen.views.account-info-view
-  (:require [hyperopen.utils.formatting :as fmt]))
+  (:require [clojure.string :as str]
+            [hyperopen.utils.formatting :as fmt]))
 
 ;; Available tabs for the account info component
 (def available-tabs [:balances :positions :open-orders :twap :trade-history :funding-history :order-history])
@@ -739,12 +740,49 @@
   ;; For now, use entry price as approximation - in real app would get from market data
   (:entryPx position-data))
 
+(def ^:private position-chip-classes
+  ["px-1.5"
+   "py-0.5"
+   "text-xs"
+   "leading-none"
+   "font-medium"
+   "rounded"
+   "border"
+   "bg-emerald-500/20"
+   "text-emerald-300"
+   "border-emerald-500/30"])
+
+(defn- non-blank-text [value]
+  (let [text (some-> value str str/trim)]
+    (when (seq text) text)))
+
+(defn- parse-coin-namespace [coin]
+  (let [coin* (non-blank-text coin)]
+    (when coin*
+      (if (str/includes? coin* ":")
+        (let [[prefix suffix] (str/split coin* #":" 2)]
+          {:prefix (non-blank-text prefix)
+           :base (non-blank-text suffix)})
+        {:prefix nil
+         :base coin*}))))
+
+(defn- display-coin [position-data]
+  (let [coin (:coin position-data)
+        parsed (parse-coin-namespace coin)]
+    (or (:base parsed)
+        (non-blank-text coin)
+        "-")))
+
+(defn- dex-chip-label [position-data]
+  (let [explicit-dex (non-blank-text (:dex position-data))
+        parsed-prefix (some-> (:coin position-data) parse-coin-namespace :prefix)]
+    (or explicit-dex parsed-prefix)))
+
 ;; Format position size display
 (defn format-position-size [position-data]
-  (let [leverage (get-in position-data [:leverage :value])
-        size (:szi position-data)
-        coin (:coin position-data)]
-    (str leverage "x " size " " coin)))
+  (let [size (or (:szi position-data) "0")
+        coin (display-coin position-data)]
+    (str size " " coin)))
 
 ;; Combine positions across the default DEX (webdata2) and any additional perp DEXes.
 (defn position-unique-key [position-data]
@@ -771,9 +809,10 @@
 ;; Position row component using real data
 (defn position-row [position-data]
   (let [pos (:position position-data)
-        coin (:coin pos)
+        coin-label (display-coin pos)
+        dex-label (dex-chip-label {:coin (:coin pos)
+                                   :dex (:dex position-data)})
         leverage (get-in pos [:leverage :value])
-        size (:szi pos)
         position-value (:positionValue pos)
         entry-price (:entryPx pos)
         mark-price (calculate-mark-price pos)
@@ -783,10 +822,13 @@
         margin (:marginUsed pos)
         funding (get-in pos [:cumFunding :allTime])]
     [:div.grid.grid-cols-11.gap-2.py-px.px-3.hover:bg-base-300.items-center.text-sm
-     ;; Coin with leverage badge
-     [:div.flex.items-center.space-x-2
-      [:span.font-medium coin]
-      [:span.badge.badge-sm.badge-outline (str leverage "x")]]
+     ;; Coin with leverage and dex chips
+     [:div {:class ["flex" "items-center" "gap-1.5" "min-w-0"]}
+      [:span {:class ["font-medium" "truncate"]} coin-label]
+      (when (some? leverage)
+        [:span {:class position-chip-classes} (str leverage "x")])
+      (when dex-label
+        [:span {:class position-chip-classes} dex-label])]
      ;; Size
      [:div.text-left.font-semibold (format-position-size pos)]
      ;; Position Value  

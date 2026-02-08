@@ -35,6 +35,18 @@
        (filter string?)
        set))
 
+(defn- collect-strings [node]
+  (cond
+    (string? node) [node]
+
+    (vector? node)
+    (mapcat collect-strings (node-children node))
+
+    (seq? node)
+    (mapcat collect-strings node)
+
+    :else []))
+
 (defn- find-first-node [node pred]
   (cond
     (vector? node)
@@ -464,6 +476,57 @@
       (is (contains? (node-class-set (nth header-cells idx)) "text-left")))
     (doseq [idx (range 1 11)]
       (is (contains? (node-class-set (nth row-cells idx)) "text-left")))))
+
+(defn- sample-position-row
+  ([coin leverage size]
+   (sample-position-row coin leverage size nil))
+  ([coin leverage size dex]
+   {:position {:coin coin
+               :leverage {:value leverage}
+               :szi size
+               :positionValue "100.00"
+               :entryPx "10.00"
+               :unrealizedPnl "1.25"
+               :returnOnEquity "0.10"
+               :liquidationPx "4.20"
+               :marginUsed "12.00"
+               :cumFunding {:allTime "0.5"}}
+    :dex dex}))
+
+(deftest position-size-format-removes-leverage-and-uses-base-symbol-test
+  (is (= "0.500 NVDA"
+         (view/format-position-size {:coin "xyz:NVDA"
+                                     :szi "0.500"
+                                     :leverage {:value 10}})))
+  (is (= "0.500 NVDA"
+         (view/format-position-size {:coin "NVDA"
+                                     :szi "0.500"
+                                     :leverage {:value 10}}))))
+
+(deftest position-row-renders-green-leverage-and-dex-chips-test
+  (let [row-node (view/position-row (sample-position-row "xyz:NVDA" 10 "0.500"))
+        row-cells (vec (node-children row-node))
+        coin-cell (nth row-cells 0)
+        size-cell (nth row-cells 1)
+        coin-strings (set (collect-strings coin-cell))
+        leverage-chip (find-first-node coin-cell #(contains? (direct-texts %) "10x"))
+        dex-chip (find-first-node coin-cell #(contains? (direct-texts %) "xyz"))
+        expected-chip-classes #{"bg-emerald-500/20" "text-emerald-300" "border-emerald-500/30"}]
+    (is (contains? coin-strings "NVDA"))
+    (is (contains? coin-strings "10x"))
+    (is (contains? coin-strings "xyz"))
+    (is (not (contains? coin-strings "xyz:NVDA")))
+    (is (= #{"0.500 NVDA"} (set (collect-strings size-cell))))
+    (is (every? #(contains? (node-class-set leverage-chip) %) expected-chip-classes))
+    (is (every? #(contains? (node-class-set dex-chip) %) expected-chip-classes))))
+
+(deftest position-row-dedupes-explicit-and-prefixed-dex-label-test
+  (let [row-node (view/position-row (sample-position-row "xyz:NVDA" 10 "0.500" "xyz"))
+        coin-cell (first (vec (node-children row-node)))
+        coin-strings (collect-strings coin-cell)]
+    (is (= 1 (count (filter #(= "xyz" %) coin-strings))))
+    (is (contains? (set coin-strings) "NVDA"))
+    (is (contains? (set coin-strings) "10x"))))
 
 (deftest open-orders-columns-are-left-aligned-test
   (let [open-orders [{:oid 101
