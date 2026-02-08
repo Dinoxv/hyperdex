@@ -574,6 +574,50 @@
                  (swap! store assoc-in [:orders :fills-error] (str err))
                  (js/Promise.reject err))))))
 
+(defn- historical-orders-seq
+  [payload]
+  (cond
+    (sequential? payload)
+    payload
+
+    (map? payload)
+    (let [nested (or (:orders payload)
+                     (:historicalOrders payload)
+                     (:data payload))]
+      (if (sequential? nested) nested []))
+
+    :else
+    []))
+
+(defn- normalize-historical-order-row
+  [row]
+  (when (map? row)
+    (let [order (:order row)]
+      (if (map? order)
+        row
+        (assoc row :order row)))))
+
+(defn fetch-historical-orders!
+  ([store address]
+   (fetch-historical-orders! store address {}))
+  ([_store address opts]
+   (if-not address
+     (js/Promise.resolve [])
+     (-> (post-info! {"type" "historicalOrders"
+                      "user" address}
+                     (merge {:priority :high}
+                            opts))
+         (.then #(.json %))
+         (.then (fn [payload]
+                  (->> (js->clj payload :keywordize-keys true)
+                       historical-orders-seq
+                       (map normalize-historical-order-row)
+                       (remove nil?)
+                       vec)))
+         (.catch (fn [err]
+                   (println "Error fetching historical orders:" err)
+                   (js/Promise.reject err)))))))
+
 (defn- user-funding-request-body
   [address start-time-ms end-time-ms]
   (cond-> {"type" "userFunding"

@@ -32,6 +32,14 @@
      :error nil
      :request-id 0}))
 
+(defn- default-order-history-state []
+  {:sort {:column "Time" :direction :desc}
+   :status-filter :all
+   :filter-open? false
+   :loading? false
+   :error nil
+   :request-id 0})
+
 ;; App state
 (defonce store (atom {:websocket {:status :disconnected
                                   :attempt 0
@@ -58,6 +66,7 @@
                                :fills []
                                :fundings-raw []
                                :fundings []
+                               :order-history []
                                :ledger []}
                       :wallet {:connected? false
                                :address    nil
@@ -97,7 +106,8 @@
                                      :balances-sort {:column nil :direction :asc}
                                      :positions-sort {:column nil :direction :asc}
                                      :open-orders-sort {:column "Time" :direction :desc}
-                                     :funding-history (default-funding-history-state)}}))
+                                     :funding-history (default-funding-history-state)
+                                     :order-history (default-order-history-state)}}))
 
 ;; Effects - handle side effects
 (defn save [_ store path value]
@@ -543,6 +553,23 @@
   [state]
   (get-in state [:account-info :funding-history :request-id] 0))
 
+(def ^:private order-history-status-options
+  #{:all :open :filled :canceled :rejected :triggered})
+
+(defn- order-history-request-id
+  [state]
+  (get-in state [:account-info :order-history :request-id] 0))
+
+(defn- normalize-order-history-status-filter
+  [status]
+  (let [status* (cond
+                  (keyword? status) status
+                  (string? status) (keyword (str/lower-case status))
+                  :else :all)]
+    (if (contains? order-history-status-options status*)
+      status*
+      :all)))
+
 (defn- filtered-funding-rows
   [state filters]
   (api/filter-funding-history-rows
@@ -550,7 +577,8 @@
    filters))
 
 (defn select-account-info-tab [state tab]
-  (if (= tab :funding-history)
+  (cond
+    (= tab :funding-history)
     (let [filters (funding-history-filters state)
           request-id (inc (funding-history-request-id state))
           projected (filtered-funding-rows state filters)]
@@ -562,6 +590,16 @@
                             [[:account-info :funding-history :request-id] request-id]
                             [[:orders :fundings] projected]]]
        [:effects/api-fetch-user-funding-history request-id]])
+
+    (= tab :order-history)
+    (let [request-id (inc (order-history-request-id state))]
+      [[:effects/save-many [[[:account-info :selected-tab] tab]
+                            [[:account-info :order-history :loading?] true]
+                            [[:account-info :order-history :error] nil]
+                            [[:account-info :order-history :request-id] request-id]]]
+       [:effects/api-fetch-historical-orders request-id]])
+
+    :else
     [[:effects/save [:account-info :selected-tab] tab]]))
 
 (defn set-funding-history-filters [_state path value]
@@ -684,6 +722,38 @@
                           :asc))]
     [[:effects/save [:account-info :funding-history :sort]
       {:column column :direction new-direction}]]))
+
+(defn sort-order-history [state column]
+  (let [current-sort (get-in state
+                             [:account-info :order-history :sort]
+                             {:column "Time" :direction :desc})
+        current-column (:column current-sort)
+        current-direction (:direction current-sort)
+        desc-columns #{"Time" "Size" "Filled Size" "Order Value" "Price" "Order ID"}
+        new-direction (if (= current-column column)
+                        (if (= current-direction :asc) :desc :asc)
+                        (if (contains? desc-columns column)
+                          :desc
+                          :asc))]
+    [[:effects/save [:account-info :order-history :sort]
+      {:column column :direction new-direction}]]))
+
+(defn toggle-order-history-filter-open [state]
+  (let [open? (boolean (get-in state [:account-info :order-history :filter-open?]))]
+    [[:effects/save [:account-info :order-history :filter-open?] (not open?)]]))
+
+(defn set-order-history-status-filter [state status-filter]
+  (let [status* (normalize-order-history-status-filter status-filter)]
+    [[:effects/save-many [[[:account-info :order-history :status-filter] status*]
+                          [[:account-info :order-history :filter-open?] false]]]]))
+
+(defn refresh-order-history [state]
+  (let [request-id (inc (order-history-request-id state))
+        selected? (= :order-history (get-in state [:account-info :selected-tab]))]
+    [[:effects/save-many [[[:account-info :order-history :request-id] request-id]
+                          [[:account-info :order-history :loading?] selected?]
+                          [[:account-info :order-history :error] nil]]]
+     [:effects/api-fetch-historical-orders request-id]]))
 
 (defn set-hide-small-balances [state checked]
   [[:effects/save [:account-info :hide-small-balances?] checked]])
@@ -1043,6 +1113,36 @@
                                      (assoc-in [:account-info :funding-history :loading?] false)
                                      (assoc-in [:account-info :funding-history :error] (str err)))
                                  state))))))))))
+(nxr/register-effect! :effects/api-fetch-historical-orders
+  (fn [_ store request-id]
+    (let [address (get-in @store [:wallet :address])]
+      (if-not address
+        (swap! store
+               (fn [state]
+                 (if (= request-id (order-history-request-id state))
+                   (-> state
+                       (assoc-in [:account-info :order-history :loading?] false)
+                       (assoc-in [:account-info :order-history :error] nil)
+                       (assoc-in [:orders :order-history] []))
+                   state)))
+        (-> (api/fetch-historical-orders! store address {:priority :high})
+            (.then (fn [rows]
+                     (swap! store
+                            (fn [state]
+                              (if (= request-id (order-history-request-id state))
+                                (-> state
+                                    (assoc-in [:account-info :order-history :loading?] false)
+                                    (assoc-in [:account-info :order-history :error] nil)
+                                    (assoc-in [:orders :order-history] (vec (or rows []))))
+                                state)))))
+            (.catch (fn [err]
+                      (swap! store
+                             (fn [state]
+                               (if (= request-id (order-history-request-id state))
+                                 (-> state
+                                     (assoc-in [:account-info :order-history :loading?] false)
+                                     (assoc-in [:account-info :order-history :error] (str err)))
+                                 state))))))))))
 (nxr/register-effect! :effects/export-funding-history-csv
   (fn [_ _ rows]
     (let [rows* (vec (or rows []))
@@ -1080,7 +1180,9 @@
                        (swap! store assoc-in [:order-form :submitting?] false)
                        (let [data (js->clj resp :keywordize-keys true)]
                          (if (= "ok" (:status data))
-                           (swap! store assoc-in [:order-form :error] nil)
+                           (do
+                             (swap! store assoc-in [:order-form :error] nil)
+                             (nxr/dispatch store nil [[:actions/refresh-order-history]]))
                            (swap! store assoc-in [:order-form :error]
                                   (str (or (:error data) (:response data) data)))))))
               (.catch (fn [err]
@@ -1102,7 +1204,10 @@
             (.then #(.json %))
             (.then (fn [resp]
                      (swap! store assoc-in [:orders :cancel-error] nil)
-                     (swap! store assoc-in [:orders :cancel-response] resp)))
+                     (swap! store assoc-in [:orders :cancel-response] resp)
+                     (let [data (js->clj resp :keywordize-keys true)]
+                       (when (= "ok" (:status data))
+                         (nxr/dispatch store nil [[:actions/refresh-order-history]])))))
             (.catch (fn [err]
                       (swap! store assoc-in [:orders :cancel-error] (str err)))))))))
 
@@ -1153,6 +1258,10 @@
 (nxr/register-action! :actions/sort-balances sort-balances)
 (nxr/register-action! :actions/sort-open-orders sort-open-orders)
 (nxr/register-action! :actions/sort-funding-history sort-funding-history)
+(nxr/register-action! :actions/sort-order-history sort-order-history)
+(nxr/register-action! :actions/toggle-order-history-filter-open toggle-order-history-filter-open)
+(nxr/register-action! :actions/set-order-history-status-filter set-order-history-status-filter)
+(nxr/register-action! :actions/refresh-order-history refresh-order-history)
 (nxr/register-action! :actions/set-hide-small-balances set-hide-small-balances)
 (nxr/register-action! :actions/select-order-entry-mode select-order-entry-mode)
 (nxr/register-action! :actions/select-pro-order-type select-pro-order-type)
@@ -1283,6 +1392,7 @@
       (swap! store assoc-in [:orders :open-orders-snapshot-by-dex] {})
       (swap! store assoc-in [:orders :fundings-raw] [])
       (swap! store assoc-in [:orders :fundings] [])
+      (swap! store assoc-in [:orders :order-history] [])
       (swap! store assoc-in [:perp-dex-clearinghouse] {})
       ;; Stage A: critical account data.
       (api/fetch-frontend-open-orders! store address {:priority :high})
@@ -1310,6 +1420,7 @@
             (swap! store assoc-in [:orders :open-orders-snapshot-by-dex] {})
             (swap! store assoc-in [:orders :fundings-raw] [])
             (swap! store assoc-in [:orders :fundings] [])
+            (swap! store assoc-in [:orders :order-history] [])
             (swap! store assoc-in [:perp-dex-clearinghouse] {})
             (swap! store assoc-in [:spot :clearinghouse-state] nil))))
       (get-handler-name [_] "startup-account-bootstrap-handler")))

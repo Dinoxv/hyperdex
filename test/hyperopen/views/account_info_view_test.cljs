@@ -126,6 +126,21 @@
               :marginUsed "2400"
               :cumFunding {:allTime "10.0"}}})
 
+(def sample-order-history-row
+  {:order {:coin "xyz:NVDA"
+           :oid 307891000622
+           :side "B"
+           :origSz "0.500"
+           :remainingSz "0.000"
+           :limitPx "0.000"
+           :orderType "Market"
+           :reduceOnly false
+           :isTrigger false
+           :isPositionTpsl false
+           :timestamp 1700000000000}
+   :status "filled"
+   :statusTimestamp 1700000005000})
+
 (def sample-account-info-state
   {:account-info {:selected-tab :balances
                   :loading false
@@ -133,11 +148,18 @@
                   :hide-small-balances? false
                   :balances-sort default-sort-state
                   :positions-sort default-sort-state
-                  :open-orders-sort {:column "Time" :direction :desc}}
+                  :open-orders-sort {:column "Time" :direction :desc}
+                  :order-history {:sort {:column "Time" :direction :desc}
+                                  :status-filter :all
+                                  :filter-open? false
+                                  :loading? false
+                                  :error nil
+                                  :request-id 0}}
    :webdata2 {}
    :orders {:open-orders []
             :open-orders-snapshot []
-            :open-orders-snapshot-by-dex {}}
+            :open-orders-snapshot-by-dex {}
+            :order-history []}
    :spot {:meta nil
           :clearinghouse-state nil}
    :perp-dex-clearinghouse {}})
@@ -306,6 +328,23 @@
     (is (contains? export-button-classes "text-trading-green"))
     (is (contains? export-button-classes "font-normal"))))
 
+(deftest tab-navigation-renders-order-history-filter-actions-test
+  (let [counts {:balances 2 :positions 4 :open-orders 3}
+        nav (view/tab-navigation :order-history
+                                 counts
+                                 false
+                                 {}
+                                 {:status-filter :filled
+                                  :filter-open? true})
+        filter-button (find-first-node nav #(contains? (direct-texts %) "Filter"))
+        filled-option (find-first-node nav #(contains? (direct-texts %) "Filled"))]
+    (is (some? filter-button))
+    (is (some? filled-option))
+    (is (= [[:actions/toggle-order-history-filter-open]]
+           (get-in filter-button [1 :on :click])))
+    (is (= [[:actions/set-order-history-status-filter :filled]]
+           (get-in filled-option [1 :on :click])))))
+
 (deftest tab-navigation-renders-positions-count-when-positive-test
   (let [counts {:balances 2 :positions 4 :open-orders 3}
         nav (view/tab-navigation :positions counts false {})
@@ -364,7 +403,7 @@
                       :is-position-tpsl false}]
         fills [{:tid 1 :coin "HYPE" :side "B" :sz "1.2" :px "100.0" :fee "0.1" :time 1700000000000}]
         fundings [{:coin "HYPE" :fundingRate "0.001" :payment "1.23" :positionSize "100.0" :time 1700000000000}]
-        ledger [{:type "deposit" :coin "USDC" :delta "5.0" :time 1700000000000}]
+        order-history [sample-order-history-row]
         contents [(view/balances-tab-content [sample-balance-row] false default-sort-state)
                   (view/positions-tab-content {:clearinghouseState {:assetPositions [sample-position-data]}}
                                               default-sort-state
@@ -372,7 +411,7 @@
                   (view/open-orders-tab-content open-orders {:column "Time" :direction :desc})
                   (view/trade-history-tab-content fills)
                   (view/funding-history-tab-content fundings)
-                  (view/order-history-tab-content ledger)]]
+                  (view/order-history-tab-content order-history)]]
     (doseq [content contents
             :let [rows-viewport-classes (node-class-set (tab-rows-viewport-node content))]]
       (is (contains? rows-viewport-classes "flex-1"))
@@ -395,7 +434,7 @@
                       :is-position-tpsl false}]
         fills [{:tid 1 :coin "HYPE" :side "B" :sz "1.2" :px "100.0" :fee "0.1" :time 1700000000000}]
         fundings [{:coin "HYPE" :fundingRate "0.001" :payment "1.23" :positionSize "100.0" :time 1700000000000}]
-        ledger [{:type "deposit" :coin "USDC" :delta "5.0" :time 1700000000000}]
+        order-history [sample-order-history-row]
         contents [(view/balances-tab-content [sample-balance-row] false default-sort-state)
                   (view/positions-tab-content {:clearinghouseState {:assetPositions [sample-position-data]}}
                                               default-sort-state
@@ -403,7 +442,7 @@
                   (view/open-orders-tab-content open-orders {:column "Time" :direction :desc})
                   (view/trade-history-tab-content fills)
                   (view/funding-history-tab-content fundings)
-                  (view/order-history-tab-content ledger)]]
+                  (view/order-history-tab-content order-history)]]
     (doseq [content contents
             :let [row-classes (node-class-set (first-viewport-row content))]]
       (is (contains? row-classes "hover:bg-base-300"))
@@ -425,7 +464,7 @@
                       :is-position-tpsl false}]
         fills [{:tid 1 :coin "HYPE" :side "B" :sz "1.2" :px "100.0" :fee "0.1" :time 1700000000000}]
         fundings [{:coin "HYPE" :fundingRate "0.001" :payment "1.23" :positionSize "100.0" :time 1700000000000}]
-        ledger [{:type "deposit" :coin "USDC" :delta "5.0" :time 1700000000000}]
+        order-history [sample-order-history-row]
         contents [(view/balances-tab-content [sample-balance-row] false default-sort-state)
                   (view/positions-tab-content {:clearinghouseState {:assetPositions [sample-position-data]}}
                                               default-sort-state
@@ -433,7 +472,7 @@
                   (view/open-orders-tab-content open-orders {:column "Time" :direction :desc})
                   (view/trade-history-tab-content fills)
                   (view/funding-history-tab-content fundings)
-                  (view/order-history-tab-content ledger)]]
+                  (view/order-history-tab-content order-history)]]
     (doseq [content contents
             :let [header-classes (node-class-set (tab-header-node content))]]
       (is (not (contains? header-classes "border-b")))
@@ -454,7 +493,7 @@
                       :is-position-tpsl false}]
         fills [{:tid 1 :coin "HYPE" :side "B" :sz "1.2" :px "100.0" :fee "0.1" :time 1700000000000}]
         fundings [{:coin "HYPE" :fundingRate "0.001" :payment "1.23" :positionSize "100.0" :time 1700000000000}]
-        ledger [{:type "deposit" :coin "USDC" :delta "5.0" :time 1700000000000}]
+        order-history [sample-order-history-row]
         contents [[:balances (view/balances-tab-content [sample-balance-row] false default-sort-state)]
                   [:positions (view/positions-tab-content {:clearinghouseState {:assetPositions [sample-position-data]}}
                                                           default-sort-state
@@ -462,7 +501,7 @@
                   [:open-orders (view/open-orders-tab-content open-orders {:column "Time" :direction :desc})]
                   [:trade-history (view/trade-history-tab-content fills)]
                   [:funding-history (view/funding-history-tab-content fundings)]
-                  [:order-history (view/order-history-tab-content ledger)]]]
+                  [:order-history (view/order-history-tab-content order-history)]]]
     (doseq [[tab-key content] contents
             :let [row-classes (node-class-set (first-viewport-row content))]]
       (if (= tab-key :positions)
@@ -490,7 +529,7 @@
                       :is-position-tpsl false}]
         fills [{:tid 1 :coin "HYPE" :side "B" :sz "1.2" :px "100.0" :fee "0.1" :time 1700000000000}]
         fundings [{:coin "HYPE" :fundingRate "0.001" :payment "1.23" :positionSize "100.0" :time 1700000000000}]
-        ledger [{:type "deposit" :coin "USDC" :delta "5.0" :time 1700000000000}]
+        order-history [sample-order-history-row]
         contents [[:balances (view/balances-tab-content [sample-balance-row] false default-sort-state)]
                   [:positions (view/positions-tab-content {:clearinghouseState {:assetPositions [sample-position-data]}}
                                                           default-sort-state
@@ -498,7 +537,7 @@
                   [:open-orders (view/open-orders-tab-content open-orders {:column "Time" :direction :desc})]
                   [:trade-history (view/trade-history-tab-content fills)]
                   [:funding-history (view/funding-history-tab-content fundings)]
-                  [:order-history (view/order-history-tab-content ledger)]]]
+                  [:order-history (view/order-history-tab-content order-history)]]]
     (doseq [[tab-key content] contents
             :let [header-classes (node-class-set (tab-header-node content))]]
       (is (contains? header-classes "py-1"))
@@ -647,14 +686,14 @@
 (deftest history-tables-columns-are-left-aligned-test
   (let [fills [{:tid 1 :coin "HYPE" :side "B" :sz "1.2" :px "100.0" :fee "0.1" :time 1700000000000}]
         fundings [{:coin "HYPE" :fundingRate "0.001" :payment "1.23" :positionSize "100.0" :time 1700000000000}]
-        ledger [{:type "deposit" :coin "USDC" :delta "5.0" :time 1700000000000}]
+        order-history [sample-order-history-row]
         trade-node (view/trade-history-tab-content fills)
         trade-header-cells (vec (node-children (tab-header-node trade-node)))
         trade-row-cells (vec (node-children (first-viewport-row trade-node)))
         funding-node (view/funding-history-tab-content fundings)
         funding-header-cells (vec (node-children (tab-header-node funding-node)))
         funding-row-cells (vec (node-children (first-viewport-row funding-node)))
-        order-node (view/order-history-tab-content ledger)
+        order-node (view/order-history-tab-content order-history)
         order-header-cells (vec (node-children (tab-header-node order-node)))
         order-row-cells (vec (node-children (first-viewport-row order-node)))]
     (doseq [idx (range 1 6)]
@@ -663,9 +702,135 @@
     (doseq [idx (range 1 6)]
       (is (contains? (node-class-set (nth funding-header-cells idx)) "text-left"))
       (is (contains? (node-class-set (nth funding-row-cells idx)) "text-left")))
-    (doseq [idx (range 1 4)]
+    (doseq [idx (range 1 13)]
       (is (contains? (node-class-set (nth order-header-cells idx)) "text-left"))
       (is (contains? (node-class-set (nth order-row-cells idx)) "text-left")))))
+
+(deftest order-history-content-renders-hyperliquid-columns-and-values-test
+  (let [rows [{:order {:coin "xyz:NVDA"
+                       :oid 307891000622
+                       :side "B"
+                       :origSz "0.500"
+                       :remainingSz "0.000"
+                       :limitPx "0"
+                       :orderType "Market"
+                       :reduceOnly false
+                       :isTrigger false
+                       :timestamp 1700000000000}
+               :status "filled"
+               :statusTimestamp 1700000000500}
+              {:order {:coin "PUMP"
+                       :oid 275043415805
+                       :side "B"
+                       :origSz "11386"
+                       :remainingSz "11386"
+                       :limitPx "0.001000"
+                       :orderType "Limit"
+                       :reduceOnly true
+                       :isTrigger false
+                       :timestamp 1700000000000}
+               :status "canceled"
+               :statusTimestamp 1699999999000}]
+        content (view/order-history-tab-content rows {:sort {:column "Time" :direction :desc}
+                                                      :status-filter :all
+                                                      :loading? false})
+        strings (set (collect-strings content))]
+    (is (some? (find-first-node content #(contains? (direct-texts %) "Filled Size"))))
+    (is (some? (find-first-node content #(contains? (direct-texts %) "Trigger Conditions"))))
+    (is (some? (find-first-node content #(contains? (direct-texts %) "Order ID"))))
+    (is (contains? strings "NVDA"))
+    (is (contains? strings "xyz"))
+    (is (not (contains? strings "xyz:NVDA")))
+    (is (contains? strings "Market"))
+    (is (contains? strings "N/A"))
+    (is (contains? strings "No"))
+    (is (contains? strings "Yes"))
+    (is (contains? strings "Filled"))
+    (is (contains? strings "Canceled"))))
+
+(deftest order-history-formatting-distinguishes-market-price-and-filled-size-placeholder-test
+  (let [market-row (view/normalize-order-history-row
+                    {:order {:coin "NVDA"
+                             :oid 1
+                             :side "B"
+                             :origSz "2.0"
+                             :remainingSz "1.0"
+                             :limitPx "0"
+                             :orderType "Market"}
+                     :status "filled"
+                     :statusTimestamp 1700000000000})
+        unfilled-limit-row (view/normalize-order-history-row
+                            {:order {:coin "PUMP"
+                                     :oid 2
+                                     :side "A"
+                                     :origSz "3.0"
+                                     :remainingSz "3.0"
+                                     :limitPx "0.0012"
+                                     :orderType "Limit"}
+                             :status "open"
+                             :statusTimestamp 1700000000100})]
+    (is (= "Market" (@#'view/format-order-history-price market-row)))
+    (is (= "--" (@#'view/format-order-history-filled-size (:filled-size unfilled-limit-row))))
+    (is (= "No" (@#'view/format-order-history-reduce-only (assoc market-row :reduce-only false))))
+    (is (= "N/A" (@#'view/format-order-history-trigger market-row)))))
+
+(deftest sort-order-history-by-column-is-deterministic-on-ties-test
+  (let [rows (view/normalized-order-history
+              [{:order {:coin "BTC" :oid "2" :side "B" :origSz "1.0" :remainingSz "0.0" :limitPx "1.0"}
+                :status "filled"
+                :statusTimestamp 2000}
+               {:order {:coin "BTC" :oid "1" :side "B" :origSz "1.0" :remainingSz "0.0" :limitPx "1.0"}
+                :status "filled"
+                :statusTimestamp 2000}])
+        time-asc (view/sort-order-history-by-column rows "Time" :asc)
+        oid-desc (view/sort-order-history-by-column rows "Order ID" :desc)]
+    (is (= ["1" "2"] (mapv (comp str :oid) time-asc)))
+    (is (= ["2" "1"] (mapv (comp str :oid) oid-desc)))))
+
+(deftest order-history-status-filter-controls-and-filtering-test
+  (let [rows [{:order {:coin "NVDA"
+                       :oid 1
+                       :side "B"
+                       :origSz "1.0"
+                       :remainingSz "0.0"
+                       :limitPx "0"
+                       :orderType "Market"}
+               :status "filled"
+               :statusTimestamp 1700000000000}
+              {:order {:coin "PUMP"
+                       :oid 2
+                       :side "A"
+                       :origSz "1.0"
+                       :remainingSz "0.0"
+                       :limitPx "0.001"
+                       :orderType "Limit"}
+               :status "canceled"
+               :statusTimestamp 1699999999000}]
+        filtered-content (view/order-history-tab-content rows {:sort {:column "Time" :direction :desc}
+                                                               :status-filter :filled
+                                                               :loading? false})
+        filtered-strings (set (collect-strings filtered-content))
+        panel-state (-> sample-account-info-state
+                        (assoc-in [:account-info :selected-tab] :order-history)
+                        (assoc-in [:account-info :order-history]
+                                  {:sort {:column "Time" :direction :desc}
+                                   :status-filter :filled
+                                   :filter-open? true
+                                   :loading? false
+                                   :error nil
+                                   :request-id 1})
+                        (assoc-in [:orders :order-history] rows))
+        panel (view/account-info-panel panel-state)
+        filter-button (find-first-node panel #(contains? (direct-texts %) "Filter"))
+        filled-option (find-first-node panel #(contains? (direct-texts %) "Filled"))]
+    (is (contains? filtered-strings "Filled"))
+    (is (not (contains? filtered-strings "Canceled")))
+    (is (some? filter-button))
+    (is (some? filled-option))
+    (is (= [[:actions/toggle-order-history-filter-open]]
+           (get-in filter-button [1 :on :click])))
+    (is (= [[:actions/set-order-history-status-filter :filled]]
+           (get-in filled-option [1 :on :click])))))
 
 (deftest funding-history-headers-use-secondary-text-and-sort-actions-test
   (let [fundings [{:id "1700000000000|HYPE|120.0|-0.42|0.0006"

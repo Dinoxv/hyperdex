@@ -217,6 +217,78 @@
              {:column "Payment" :direction :desc}]]
            payment-effects))))
 
+(deftest select-account-info-tab-order-history-saves-selection-before-fetch-test
+  (let [state {:account-info {:selected-tab :balances
+                              :order-history {:request-id 2}}}
+        effects (core/select-account-info-tab state :order-history)
+        immediate (first effects)
+        path-values (second immediate)]
+    (is (= :effects/save-many (first immediate)))
+    (is (= [:account-info :selected-tab]
+           (-> path-values first first)))
+    (is (= :order-history
+           (-> path-values first second)))
+    (is (= [:effects/api-fetch-historical-orders 3]
+           (second effects)))))
+
+(deftest sort-order-history-toggles-direction-on-same-column-test
+  (let [state {:account-info {:order-history {:sort {:column "Time"
+                                                     :direction :desc}}}}
+        effects (core/sort-order-history state "Time")]
+    (is (= [[:effects/save [:account-info :order-history :sort]
+             {:column "Time" :direction :asc}]]
+           effects))))
+
+(deftest sort-order-history-uses-mixed-default-direction-for-new-columns-test
+  (let [state {:account-info {:order-history {:sort {:column "Time"
+                                                     :direction :desc}}}}
+        coin-effects (core/sort-order-history state "Coin")
+        oid-effects (core/sort-order-history state "Order ID")]
+    (is (= [[:effects/save [:account-info :order-history :sort]
+             {:column "Coin" :direction :asc}]]
+           coin-effects))
+    (is (= [[:effects/save [:account-info :order-history :sort]
+             {:column "Order ID" :direction :desc}]]
+           oid-effects))))
+
+(deftest order-history-filter-actions-update-paths-and-close-dropdown-test
+  (let [state {:account-info {:order-history {:filter-open? false
+                                              :status-filter :all}}}
+        toggle-effects (core/toggle-order-history-filter-open state)
+        set-effects (core/set-order-history-status-filter
+                     {:account-info {:order-history {:filter-open? true
+                                                     :status-filter :all}}}
+                     :filled)
+        set-invalid-effects (core/set-order-history-status-filter
+                             {:account-info {:order-history {:filter-open? true
+                                                             :status-filter :all}}}
+                             :unknown)]
+    (is (= [[:effects/save [:account-info :order-history :filter-open?] true]]
+           toggle-effects))
+    (is (= [[:effects/save-many [[[:account-info :order-history :status-filter] :filled]
+                                 [[:account-info :order-history :filter-open?] false]]]]
+           set-effects))
+    (is (= [[:effects/save-many [[[:account-info :order-history :status-filter] :all]
+                                 [[:account-info :order-history :filter-open?] false]]]]
+           set-invalid-effects))))
+
+(deftest refresh-order-history-emits-request-then-fetch-with-tab-aware-loading-test
+  (let [selected-state {:account-info {:selected-tab :order-history
+                                       :order-history {:request-id 5}}}
+        background-state {:account-info {:selected-tab :balances
+                                         :order-history {:request-id 5}}}
+        selected-effects (core/refresh-order-history selected-state)
+        background-effects (core/refresh-order-history background-state)]
+    (is (= :effects/save-many (ffirst selected-effects)))
+    (is (= [:effects/api-fetch-historical-orders 6]
+           (second selected-effects)))
+    (is (= true
+           (-> selected-effects first second (nth 1) second)))
+    (is (= false
+           (-> background-effects first second (nth 1) second)))
+    (is (= [:effects/api-fetch-historical-orders 6]
+           (second background-effects)))))
+
 (deftest select-asset-closes-dropdown-first-and-removes-duplicate-effects-test
   (let [market {:key :perp/BTC
                 :coin "BTC"}

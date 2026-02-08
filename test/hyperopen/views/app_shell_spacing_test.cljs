@@ -71,6 +71,7 @@
             :open-orders-snapshot-by-dex {}
             :fills []
             :fundings []
+            :order-history []
             :ledger []}
    :spot {:meta nil
           :clearinghouse-state nil}

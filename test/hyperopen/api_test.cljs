@@ -201,3 +201,65 @@
           (.finally
             (fn []
               (set! hyperopen.api/post-info! original-post-info)))))))
+
+(deftest fetch-historical-orders-sends-request-and-normalizes-vector-payload-test
+  (async done
+    (let [calls (atom [])
+          original-post-info hyperopen.api/post-info!]
+      (set! hyperopen.api/post-info!
+            (fn post-info-mock
+              ([body]
+               (post-info-mock body {}))
+              ([body _opts]
+               (swap! calls conj body)
+               (js/Promise.resolve
+                #js {:status 200
+                     :ok true
+                     :json (fn []
+                             (js/Promise.resolve
+                              #js [#js {:order #js {:coin "BTC" :oid 1}}
+                                   #js {:coin "ETH" :oid 2}]))}))
+              ([body opts _attempt]
+               (post-info-mock body opts))))
+      (-> (api/fetch-historical-orders! (atom {}) "0xabc" {:priority :high})
+          (.then (fn [rows]
+                   (is (= {"type" "historicalOrders" "user" "0xabc"}
+                          (first @calls)))
+                   (is (= 2 (count rows)))
+                   (is (= "BTC" (get-in rows [0 :order :coin])))
+                   (is (= "ETH" (get-in rows [1 :order :coin])))
+                   (done)))
+          (.catch (fn [err]
+                    (is false (str "Unexpected error: " err))
+                    (done)))
+          (.finally
+            (fn []
+              (set! hyperopen.api/post-info! original-post-info)))))))
+
+(deftest fetch-historical-orders-supports-wrapped-payload-keys-test
+  (async done
+    (let [original-post-info hyperopen.api/post-info!]
+      (set! hyperopen.api/post-info!
+            (fn post-info-mock
+              ([body]
+               (post-info-mock body {}))
+              ([_body _opts]
+               (js/Promise.resolve
+                #js {:status 200
+                     :ok true
+                     :json (fn []
+                             (js/Promise.resolve
+                              #js {:orders #js [#js {:order #js {:coin "SOL" :oid 9}}]}))}))
+              ([body opts _attempt]
+               (post-info-mock body opts))))
+      (-> (api/fetch-historical-orders! (atom {}) "0xabc" {})
+          (.then (fn [rows]
+                   (is (= 1 (count rows)))
+                   (is (= "SOL" (get-in rows [0 :order :coin])))
+                   (done)))
+          (.catch (fn [err]
+                    (is false (str "Unexpected error: " err))
+                    (done)))
+          (.finally
+            (fn []
+              (set! hyperopen.api/post-info! original-post-info)))))))

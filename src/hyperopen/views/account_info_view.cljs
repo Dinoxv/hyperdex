@@ -43,45 +43,91 @@
              :on {:click [[:actions/export-funding-history-csv]]}}
     "Export as CSV"]])
 
-(defn tab-navigation [selected-tab counts hide-small? _funding-history-state]
-  [:div.flex.items-center.justify-between.border-b.border-base-300.bg-base-200
-   [:div.flex.items-center
-    (for [tab available-tabs]
-      [:button.px-4.py-2.text-sm.font-medium.transition-colors.border-b-2
-       {:key (name tab)
-        :class (if (= selected-tab tab)
-                 ["text-primary" "border-primary" "bg-base-100"]
-                 ["text-base-content" "border-transparent" "hover:text-primary" "hover:bg-base-100"])
-        :on {:click [[:actions/select-account-info-tab tab]]}}
-       (tab-label tab counts)])]
-   (case selected-tab
-     :balances
-     [:div.flex.items-center.space-x-2.px-4.py-2
-      [:input
-       {:type "checkbox"
-        :id "hide-small-balances"
-        :class ["h-4"
-                "w-4"
-                "rounded-[3px]"
-                "border"
-                "border-base-300"
-                "bg-transparent"
-                "trade-toggle-checkbox"
-                "transition-colors"
-                "focus:outline-none"
-                "focus:ring-0"
-                "focus:ring-offset-0"
-                "focus:shadow-none"]
-        :checked (boolean hide-small?)
-        :on {:change [[:actions/set-hide-small-balances :event.target/checked]]}}]
-      [:label.text-sm.text-trading-text.cursor-pointer.select-none
-       {:for "hide-small-balances"}
-       "Hide Small Balances"]]
+(def ^:private order-history-status-options
+  [[:all "All"]
+   [:open "Open"]
+   [:filled "Filled"]
+   [:canceled "Canceled"]
+   [:rejected "Rejected"]
+   [:triggered "Triggered"]])
 
-     :funding-history
-     (funding-history-header-actions)
+(def ^:private order-history-status-labels
+  (into {} order-history-status-options))
 
-     nil)])
+(defn- order-history-status-filter-key [order-history-state]
+  (let [status-filter (:status-filter order-history-state)]
+    (if (contains? order-history-status-labels status-filter)
+      status-filter
+      :all)))
+
+(defn- order-history-header-actions [order-history-state]
+  (let [filter-open? (boolean (:filter-open? order-history-state))
+        status-filter (order-history-status-filter-key order-history-state)
+        status-label (get order-history-status-labels status-filter "All")]
+    [:div {:class ["ml-auto" "relative" "flex" "items-center" "justify-end" "gap-2" "px-4" "py-2"]}
+     [:button {:class ["btn" "btn-xs" "btn-ghost" "font-normal" "text-trading-green" "hover:bg-trading-green/10" "hover:text-trading-green"]
+               :on {:click [[:actions/toggle-order-history-filter-open]]}}
+      "Filter"
+      [:span {:class ["ml-1" "text-xs" "opacity-70"]} (str "(" status-label ")")]
+      [:span {:class ["ml-1" "text-xs" "opacity-70"]} "v"]]
+     (when filter-open?
+       [:div {:class ["absolute" "right-4" "top-full" "z-20" "mt-1" "w-40" "overflow-hidden" "rounded-md" "border" "border-base-300" "bg-base-100" "shadow-lg"]}
+        (for [[option-key option-label] order-history-status-options]
+          ^{:key (name option-key)}
+          [:button {:class (into ["flex" "w-full" "items-center" "justify-between" "px-3" "py-2" "text-xs" "transition-colors"]
+                                 (if (= status-filter option-key)
+                                   ["bg-base-200" "text-trading-green"]
+                                   ["text-trading-text-secondary" "hover:bg-base-200" "hover:text-trading-text"]))
+                    :on {:click [[:actions/set-order-history-status-filter option-key]]}}
+           option-label
+           (when (= status-filter option-key)
+             [:span {:class ["text-trading-green"]} "*"])])])]))
+
+(defn tab-navigation
+  ([selected-tab counts hide-small? funding-history-state]
+   (tab-navigation selected-tab counts hide-small? funding-history-state {}))
+  ([selected-tab counts hide-small? _funding-history-state order-history-state]
+   [:div.flex.items-center.justify-between.border-b.border-base-300.bg-base-200
+    [:div.flex.items-center
+     (for [tab available-tabs]
+       [:button.px-4.py-2.text-sm.font-medium.transition-colors.border-b-2
+        {:key (name tab)
+         :class (if (= selected-tab tab)
+                  ["text-primary" "border-primary" "bg-base-100"]
+                  ["text-base-content" "border-transparent" "hover:text-primary" "hover:bg-base-100"])
+         :on {:click [[:actions/select-account-info-tab tab]]}}
+        (tab-label tab counts)])]
+    (case selected-tab
+      :balances
+      [:div.flex.items-center.space-x-2.px-4.py-2
+       [:input
+        {:type "checkbox"
+         :id "hide-small-balances"
+         :class ["h-4"
+                 "w-4"
+                 "rounded-[3px]"
+                 "border"
+                 "border-base-300"
+                 "bg-transparent"
+                 "trade-toggle-checkbox"
+                 "transition-colors"
+                 "focus:outline-none"
+                 "focus:ring-0"
+                 "focus:ring-offset-0"
+                 "focus:shadow-none"]
+         :checked (boolean hide-small?)
+         :on {:change [[:actions/set-hide-small-balances :event.target/checked]]}}]
+       [:label.text-sm.text-trading-text.cursor-pointer.select-none
+        {:for "hide-small-balances"}
+        "Hide Small Balances"]]
+
+      :funding-history
+      (funding-history-header-actions)
+
+      :order-history
+      (order-history-header-actions order-history-state)
+
+      nil)]))
 
 ;; Loading spinner component
 (defn loading-spinner []
@@ -586,6 +632,282 @@
      (when sort-icon
        [:span.text-xs.opacity-70 sort-icon])]))
 
+(def default-order-history-sort
+  {:column "Time" :direction :desc})
+
+(defn order-history-sort-state [order-history-state]
+  (merge default-order-history-sort
+         (or (:sort order-history-state) {})))
+
+(defn- parse-optional-num [value]
+  (let [num (cond
+              (number? value) value
+              (string? value) (js/parseFloat value)
+              :else js/NaN)]
+    (when (and (number? num) (not (js/isNaN num)))
+      num)))
+
+(defn- parse-time-ms [value]
+  (when-let [num (parse-optional-num value)]
+    (js/Math.floor num)))
+
+(defn- boolean-value [value]
+  (cond
+    (true? value) true
+    (false? value) false
+
+    (string? value)
+    (let [text (-> value str str/trim str/lower-case)]
+      (case text
+        "true" true
+        "false" false
+        nil))
+
+    :else nil))
+
+(defn- title-case-label [value]
+  (let [text (some-> value str str/trim)]
+    (if (seq text)
+      (->> (str/split (str/lower-case text) #"[_\s-]+")
+           (remove str/blank?)
+           (map str/capitalize)
+           (str/join " "))
+      "-")))
+
+(defn- order-history-status-key [status]
+  (let [text (some-> status str str/trim str/lower-case)]
+    (case text
+      "open" :open
+      "filled" :filled
+      "canceled" :canceled
+      "cancelled" :canceled
+      "rejected" :rejected
+      "triggered" :triggered
+      nil)))
+
+(defn- order-history-status-label [status]
+  (let [status-key (order-history-status-key status)]
+    (or (get order-history-status-labels status-key)
+        (title-case-label status))))
+
+(defn- order-history-coin-node [coin]
+  (let [coin* (non-blank-text coin)
+        parsed (parse-coin-namespace coin*)
+        base-label (or (:base parsed) coin* "-")
+        prefix-label (:prefix parsed)]
+    [:span {:class ["flex" "items-center" "gap-1.5" "min-w-0"]}
+     [:span {:class ["truncate"]} base-label]
+     (when prefix-label
+       [:span {:class position-chip-classes} prefix-label])]))
+
+(defn normalize-order-history-row [row]
+  (let [root (or (:order row) row)
+        root-map (if (map? root) root {})
+        row-map (if (map? row) row {})
+        coin (or (:coin root-map) (:coin row-map))
+        oid (or (:oid root-map) (:oid row-map) (:orderId root-map) (:orderId row-map))
+        side (or (:side root-map) (:side row-map))
+        size (or (:origSz root-map) (:origSz row-map) (:sz root-map) (:sz row-map))
+        remaining-size (or (:remainingSz root-map) (:remainingSz row-map))
+        limit-px (or (:limitPx root-map) (:limitPx row-map))
+        fallback-px (or (:px root-map) (:px row-map))
+        trigger-px (or (:triggerPx root-map) (:triggerPx row-map))
+        is-trigger (true? (boolean-value (or (:isTrigger root-map) (:isTrigger row-map))))
+        trigger-condition (or (:triggerCondition root-map)
+                              (:triggerCondition row-map)
+                              (:triggerCond root-map)
+                              (:triggerCond row-map))
+        reduce-only-value (if (contains? root-map :reduceOnly)
+                            (:reduceOnly root-map)
+                            (:reduceOnly row-map))
+        reduce-only (boolean-value reduce-only-value)
+        is-position-tpsl-value (if (contains? root-map :isPositionTpsl)
+                                 (:isPositionTpsl root-map)
+                                 (:isPositionTpsl row-map))
+        is-position-tpsl (true? (boolean-value is-position-tpsl-value))
+        order-type (or (:orderType root-map)
+                       (:orderType row-map)
+                       (:type root-map)
+                       (:type row-map)
+                       (:tif root-map)
+                       (:tif row-map))
+        status (or (:status row-map)
+                   (:status root-map)
+                   (:orderStatus row-map)
+                   (:orderStatus root-map))
+        status-timestamp (or (:statusTimestamp row-map)
+                             (:statusTimestamp root-map)
+                             (:statusTime row-map)
+                             (:statusTime root-map)
+                             (:timestamp root-map)
+                             (:timestamp row-map)
+                             (:time root-map)
+                             (:time row-map))
+        size-num (parse-optional-num size)
+        remaining-size-num (parse-optional-num remaining-size)
+        market? (or (= "market" (some-> order-type str str/trim str/lower-case))
+                    (true? (boolean-value (or (:isMarket root-map) (:isMarket row-map))))
+                    (zero? (or (parse-optional-num (or limit-px fallback-px)) 0)))
+        px (when-not market?
+             (or limit-px fallback-px))
+        filled-size (when (and (number? size-num)
+                               (number? remaining-size-num))
+                      (max 0 (- size-num remaining-size-num)))
+        order-value (let [price-num (parse-optional-num px)]
+                      (when (and (not market?)
+                                 (number? size-num)
+                                 (number? price-num)
+                                 (pos? size-num)
+                                 (pos? price-num))
+                        (* size-num price-num)))
+        status-key (order-history-status-key status)]
+    (when (or (some? oid) (some? coin) (some? status-timestamp))
+      {:coin coin
+       :oid oid
+       :side side
+       :size size
+       :size-num size-num
+       :filled-size filled-size
+       :order-value order-value
+       :px px
+       :market? market?
+       :type order-type
+       :time-ms (parse-time-ms status-timestamp)
+       :reduce-only reduce-only
+       :is-trigger is-trigger
+       :trigger-condition trigger-condition
+       :trigger-px trigger-px
+       :is-position-tpsl is-position-tpsl
+       :status status
+       :status-key status-key
+       :status-label (order-history-status-label status)})))
+
+(defn normalized-order-history [rows]
+  (->> (or rows [])
+       (map normalize-order-history-row)
+       (remove nil?)
+       vec))
+
+(defn- order-history-row-sort-id [row]
+  (str (or (:time-ms row) 0)
+       "|"
+       (or (:coin row) "")
+       "|"
+       (or (:oid row) "")
+       "|"
+       (or (:status-label row) "")))
+
+(defn- format-order-history-size [value]
+  (if-let [num (parse-optional-num value)]
+    (.toLocaleString (js/Number. num)
+                     "en-US"
+                     #js {:minimumFractionDigits 0
+                          :maximumFractionDigits 6})
+    "--"))
+
+(defn- format-order-history-filled-size [filled-size]
+  (if (and (number? filled-size)
+           (pos? filled-size))
+    (format-order-history-size filled-size)
+    "--"))
+
+(defn- format-order-history-value [order-value]
+  (if (and (number? order-value)
+           (pos? order-value))
+    (str (.toLocaleString (js/Number. order-value)
+                          "en-US"
+                          #js {:minimumFractionDigits 2
+                               :maximumFractionDigits 2})
+         " USDC")
+    "--"))
+
+(defn- format-order-history-price [{:keys [market? px]}]
+  (if market?
+    "Market"
+    (if-let [num (parse-optional-num px)]
+      (or (fmt/format-trade-price-plain num px) "0.00")
+      "--")))
+
+(defn- format-order-history-reduce-only [{:keys [reduce-only]}]
+  (case reduce-only
+    true "Yes"
+    false "No"
+    "--"))
+
+(defn- format-order-history-trigger [{:keys [is-trigger trigger-condition trigger-px]}]
+  (if (and is-trigger
+           (pos? (or (parse-optional-num trigger-px) 0)))
+    (let [label (trigger-condition-label trigger-condition)
+          trigger-px-num (parse-optional-num trigger-px)
+          price (if (number? trigger-px-num)
+                  (or (fmt/format-trade-price-plain trigger-px-num trigger-px) "--")
+                  "--")]
+      (if label
+        (str label " " price)
+        (str "Trigger @ " price)))
+    "N/A"))
+
+(defn- format-order-history-tp-sl [{:keys [is-position-tpsl]}]
+  (if is-position-tpsl
+    "TP/SL"
+    "--"))
+
+(defn- order-history-filter-status [rows status-filter]
+  (if (= :all status-filter)
+    rows
+    (filter (fn [row]
+              (= status-filter (:status-key row)))
+            rows)))
+
+(defn sort-order-history-by-column [rows column direction]
+  (let [sort-fn (case column
+                  "Time" (fn [row] (or (:time-ms row) 0))
+                  "Type" (fn [row] (title-case-label (:type row)))
+                  "Coin" (fn [row] (or (:coin row) ""))
+                  "Direction" (fn [row] (direction-label (:side row)))
+                  "Size" (fn [row] (or (:size-num row) 0))
+                  "Filled Size" (fn [row] (or (:filled-size row) 0))
+                  "Order Value" (fn [row] (or (:order-value row) 0))
+                  "Price" (fn [row] (or (parse-optional-num (:px row)) 0))
+                  "Reduce Only" (fn [row]
+                                  (case (:reduce-only row)
+                                    true 1
+                                    false 0
+                                    -1))
+                  "Trigger Conditions" (fn [row]
+                                         (format-order-history-trigger row))
+                  "TP/SL" (fn [row] (if (:is-position-tpsl row) 1 0))
+                  "Status" (fn [row] (or (:status-label row) ""))
+                  "Order ID" (fn [row]
+                               (let [oid (:oid row)
+                                     oid-num (parse-optional-num oid)]
+                                 (if (number? oid-num)
+                                   [0 oid-num]
+                                   [1 (str (or oid ""))])))
+                  (fn [_] 0))
+        sorted (sort-by (fn [row]
+                          [(sort-fn row)
+                           (order-history-row-sort-id row)])
+                        rows)]
+    (if (= direction :desc)
+      (reverse sorted)
+      sorted)))
+
+(defn sortable-order-history-header [column-name sort-state]
+  (let [current-column (:column sort-state)
+        current-direction (:direction sort-state)
+        is-active (= current-column column-name)
+        sort-icon (when is-active
+                    (if (= current-direction :asc) "↑" "↓"))]
+    [:button {:class (into []
+                           (concat header-base-text-classes
+                                   sortable-header-interaction-classes
+                                   sortable-header-layout-classes))
+              :on {:click [[:actions/sort-order-history column-name]]}}
+     [:span column-name]
+     (when sort-icon
+       [:span.text-xs.opacity-70 sort-icon])]))
+
 (defn format-pnl [pnl-value pnl-pct]
   (if (and (some? pnl-value) (some? pnl-pct))
     (let [pnl-num (parse-num pnl-value)
@@ -1084,25 +1406,62 @@
     (funding-history-controls funding-history-state fundings-raw)
     (funding-history-table fundings funding-history-state)]))
 
-(defn order-history-tab-content [ledger]
-  (if (seq ledger)
-    (tab-table-content
-      [:div.grid.grid-cols-4.gap-2.py-1.px-3.bg-base-200.text-sm.font-medium
-       [:div "Type"]
-       [:div.text-left "Asset"]
-       [:div.text-left "Delta"]
-       [:div.text-left "Time"]]
-      (for [l ledger]
-        ^{:key (str (:time l) "-" (:coin l) "-" (:delta l))}
-        [:div.grid.grid-cols-4.gap-2.py-px.px-3.hover:bg-base-300.text-sm
-         [:div (or (:type l) "event")]
-         [:div.text-left (or (:coin l) "-")]
-         [:div.text-left (format-currency (:delta l))]
-         [:div.text-left (format-timestamp (:time l))]]))
-    (empty-state "No order history")))
+(defn- order-history-table [order-history order-history-state]
+  (let [sort-state (order-history-sort-state order-history-state)
+        status-filter (order-history-status-filter-key order-history-state)
+        normalized (normalized-order-history order-history)
+        filtered (vec (order-history-filter-status normalized status-filter))
+        sorted (sort-order-history-by-column filtered
+                                             (:column sort-state)
+                                             (:direction sort-state))]
+    (if (seq sorted)
+      (tab-table-content
+       [:div {:class ["grid" "gap-2" "py-1" "px-3" "bg-base-200" "text-xs" "font-medium" "grid-cols-[130px_70px_90px_80px_90px_90px_110px_80px_90px_140px_70px_80px_120px]"]}
+        [:div.pr-2.whitespace-nowrap (sortable-order-history-header "Time" sort-state)]
+        [:div.pl-1.text-left (sortable-order-history-header "Type" sort-state)]
+        [:div.text-left (sortable-order-history-header "Coin" sort-state)]
+        [:div.text-left (sortable-order-history-header "Direction" sort-state)]
+        [:div.text-left (sortable-order-history-header "Size" sort-state)]
+        [:div.text-left (sortable-order-history-header "Filled Size" sort-state)]
+        [:div.text-left (sortable-order-history-header "Order Value" sort-state)]
+        [:div.text-left (sortable-order-history-header "Price" sort-state)]
+        [:div.text-left.whitespace-nowrap (sortable-order-history-header "Reduce Only" sort-state)]
+        [:div.text-left.whitespace-nowrap (sortable-order-history-header "Trigger Conditions" sort-state)]
+        [:div.text-left (sortable-order-history-header "TP/SL" sort-state)]
+        [:div.text-left (sortable-order-history-header "Status" sort-state)]
+        [:div.text-left (sortable-order-history-header "Order ID" sort-state)]]
+       (for [row sorted]
+         ^{:key (order-history-row-sort-id row)}
+         [:div {:class ["grid" "gap-2" "py-px" "px-3" "hover:bg-base-300" "text-xs" "grid-cols-[130px_70px_90px_80px_90px_90px_110px_80px_90px_140px_70px_80px_120px]"]}
+          [:div.pr-2.whitespace-nowrap (or (format-open-orders-time (:time-ms row)) "--")]
+          [:div.pl-1.text-left (title-case-label (:type row))]
+          [:div.text-left (order-history-coin-node (:coin row))]
+          [:div {:class ["text-left" (direction-class (:side row))]} (direction-label (:side row))]
+          [:div.text-left (format-order-history-size (:size row))]
+          [:div.text-left (format-order-history-filled-size (:filled-size row))]
+          [:div.text-left (format-order-history-value (:order-value row))]
+          [:div.text-left (format-order-history-price row)]
+          [:div.text-left (format-order-history-reduce-only row)]
+          [:div.text-left (format-order-history-trigger row)]
+          [:div.text-left (format-order-history-tp-sl row)]
+          [:div.text-left (:status-label row)]
+          [:div.text-left (or (some-> (:oid row) str) "--")]]))
+      (if (:loading? order-history-state)
+        (empty-state "Loading order history...")
+        (empty-state "No order history")))))
+
+(defn order-history-tab-content
+  ([order-history]
+   (order-history-table order-history {}))
+  ([order-history order-history-state]
+   [:div {:class ["flex" "h-full" "min-h-0" "flex-col"]}
+    (when-let [error (:error order-history-state)]
+      [:div {:class ["px-4" "py-2" "text-xs" "text-error" "border-b" "border-base-300" "bg-base-200"]}
+       (str error)])
+    (order-history-table order-history order-history-state)]))
 
 ;; Main tab content renderer
-(defn tab-content [selected-tab webdata2 sort-state hide-small? perp-dex-states open-orders open-orders-sort balance-rows balances-sort funding-history-state]
+(defn tab-content [selected-tab webdata2 sort-state hide-small? perp-dex-states open-orders open-orders-sort balance-rows balances-sort funding-history-state order-history-state]
   (case selected-tab
     :balances (balances-tab-content balance-rows hide-small? balances-sort)
     :positions (positions-tab-content webdata2 sort-state perp-dex-states)
@@ -1112,7 +1471,8 @@
     :funding-history (funding-history-tab-content (get-in webdata2 [:fundings])
                                                   funding-history-state
                                                   (get-in webdata2 [:fundings-raw]))
-    :order-history (order-history-tab-content (get-in webdata2 [:ledger]))
+    :order-history (order-history-tab-content (get-in webdata2 [:order-history])
+                                              order-history-state)
     (empty-state "Unknown tab")))
 
 ;; Account info panel component
@@ -1132,13 +1492,14 @@
                                             (get-in webdata2 [:open-orders-snapshot])
                                             (get-in webdata2 [:open-orders-snapshot-by-dex]))
         funding-history-state (get-in state [:account-info :funding-history] {})
+        order-history-state (get-in state [:account-info :order-history] {})
         tab-counts {:open-orders (count open-orders)
                     :positions (count positions)
                     :balances (count balance-rows)}
         open-orders-sort (get-in state [:account-info :open-orders-sort] {:column "Time" :direction :desc})]
     [:div {:class ["bg-base-100" "border-t" "border-base-300" "rounded-none" "shadow-none" "overflow-hidden" "w-full" "h-96" "flex" "flex-col" "min-h-0"]}
      ;; Tab navigation
-     (tab-navigation selected-tab tab-counts hide-small? funding-history-state)
+     (tab-navigation selected-tab tab-counts hide-small? funding-history-state order-history-state)
      
      ;; Content area
      [:div {:class ["flex-1" "min-h-0" "overflow-hidden"]}
@@ -1154,7 +1515,8 @@
                            open-orders-sort
                            balance-rows
                            balances-sort
-                           funding-history-state))]]))
+                           funding-history-state
+                           order-history-state))]]))
 
 ;; Main component that takes state and renders the UI
 (defn account-info-view [state]
