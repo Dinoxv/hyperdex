@@ -93,6 +93,15 @@
 (defn- first-viewport-row [tab-content]
   (-> tab-content tab-rows-viewport-node node-children first))
 
+(defn- balance-row-coin [row-node]
+  (let [coin-cell (first (vec (node-children row-node)))]
+    (first (direct-texts coin-cell))))
+
+(defn- balance-tab-coins [tab-content]
+  (->> (node-children (tab-rows-viewport-node tab-content))
+       (map balance-row-coin)
+       vec))
+
 (def sample-balance-row
   {:key "spot-0"
    :coin "USDC (Spot)"
@@ -197,6 +206,58 @@
     (is (= ["BTC" "ETH" "SOL"] (mapv :coin coin-asc)))
     (is (= [1.2 0.5 -0.3] (mapv :payment-usdc-raw payment-desc)))
     (is (= ["a" "b"] (mapv :id missing-asc)))))
+
+(deftest sort-balances-by-column-keeps-usdc-partition-on-top-for-coin-sort-test
+  (let [rows [{:key "spot-usdc" :coin "USDC (Spot)"}
+              {:key "hype" :coin "HYPE"}
+              {:key "perps-usdc" :coin "USDC (Perps)"}
+              {:key "btc" :coin "BTC"}]
+        coin-asc (view/sort-balances-by-column rows "Coin" :asc)
+        coin-desc (view/sort-balances-by-column rows "Coin" :desc)]
+    (is (= ["USDC (Perps)" "USDC (Spot)" "BTC" "HYPE"]
+           (mapv :coin coin-asc)))
+    (is (= ["USDC (Spot)" "USDC (Perps)" "HYPE" "BTC"]
+           (mapv :coin coin-desc)))))
+
+(deftest sort-balances-by-column-keeps-usdc-partition-on-top-for-numeric-columns-test
+  (let [rows [{:key "usdc-low" :coin "USDC (Spot)" :usdc-value 5}
+              {:key "coin-high" :coin "AAA" :usdc-value 1000}
+              {:key "usdc-high" :coin "USDC (Perps)" :usdc-value 100}
+              {:key "coin-low" :coin "BBB" :usdc-value 1}]
+        value-asc (view/sort-balances-by-column rows "USDC Value" :asc)
+        value-desc (view/sort-balances-by-column rows "USDC Value" :desc)]
+    (is (= ["USDC (Spot)" "USDC (Perps)" "BBB" "AAA"]
+           (mapv :coin value-asc)))
+    (is (= ["USDC (Perps)" "USDC (Spot)" "AAA" "BBB"]
+           (mapv :coin value-desc)))))
+
+(deftest sort-balances-by-column-is-deterministic-on-ties-with-coin-then-key-test
+  (let [rows [{:key "u-b" :coin "USDC Beta" :usdc-value 10}
+              {:key "u-a2" :coin "USDC Alpha" :usdc-value 10}
+              {:key "u-a1" :coin "USDC Alpha" :usdc-value 10}
+              {:key "n-z" :coin "ZZZ" :usdc-value 20}
+              {:key "n-a2" :coin "AAA" :usdc-value 20}
+              {:key "n-a1" :coin "AAA" :usdc-value 20}]
+        asc-result (view/sort-balances-by-column rows "USDC Value" :asc)
+        desc-result (view/sort-balances-by-column rows "USDC Value" :desc)
+        expected [["USDC Alpha" "u-a1"]
+                  ["USDC Alpha" "u-a2"]
+                  ["USDC Beta" "u-b"]
+                  ["AAA" "n-a1"]
+                  ["AAA" "n-a2"]
+                  ["ZZZ" "n-z"]]]
+    (is (= expected
+           (mapv (juxt :coin :key) asc-result)))
+    (is (= expected
+           (mapv (juxt :coin :key) desc-result)))))
+
+(deftest balances-tab-content-without-active-sort-preserves-input-order-test
+  (let [rows [{:key "row-1" :coin "HYPE" :total-balance 1 :available-balance 1 :usdc-value 1}
+              {:key "row-2" :coin "USDC (Spot)" :total-balance 2 :available-balance 2 :usdc-value 2}
+              {:key "row-3" :coin "BTC" :total-balance 3 :available-balance 3 :usdc-value 3}]
+        tab-content (view/balances-tab-content rows false {:column nil :direction :asc})]
+    (is (= ["HYPE" "USDC (Spot)" "BTC"]
+           (balance-tab-coins tab-content)))))
 
 (deftest tab-navigation-renders-hide-small-toggle-only-on-balances-tab-test
   (let [counts {:balances 1 :positions 1}

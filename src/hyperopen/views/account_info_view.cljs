@@ -636,18 +636,45 @@
          vec)))
 
 ;; Sort balances by column
+(defn- usdc-balance-row? [row]
+  (str/starts-with? (or (:coin row) "") "USDC"))
+
+(defn- balance-sort-value [column row]
+  (case column
+    "Coin" (or (:coin row) "")
+    "Total Balance" (parse-num (:total-balance row))
+    "Available Balance" (parse-num (:available-balance row))
+    "USDC Value" (parse-num (:usdc-value row))
+    "PNL (ROE %)" (parse-num (:pnl-value row))
+    0))
+
+(defn- compare-balance-rows [column direction row-a row-b]
+  (let [value-a (balance-sort-value column row-a)
+        value-b (balance-sort-value column row-b)
+        primary-cmp (if (= direction :desc)
+                      (compare value-b value-a)
+                      (compare value-a value-b))]
+    (if (zero? primary-cmp)
+      (let [coin-cmp (compare (or (:coin row-a) "")
+                              (or (:coin row-b) ""))]
+        (if (zero? coin-cmp)
+          (compare (or (:key row-a) "")
+                   (or (:key row-b) ""))
+          coin-cmp))
+      primary-cmp)))
+
 (defn sort-balances-by-column [rows column direction]
-  (let [sort-fn (case column
-                  "Coin" (fn [row] (:coin row))
-                  "Total Balance" (fn [row] (parse-num (:total-balance row)))
-                  "Available Balance" (fn [row] (parse-num (:available-balance row)))
-                  "USDC Value" (fn [row] (parse-num (:usdc-value row)))
-                  "PNL (ROE %)" (fn [row] (parse-num (:pnl-value row)))
-                  (fn [_] 0))
-        sorted-rows (sort-by sort-fn rows)]
-    (if (= direction :desc)
-      (reverse sorted-rows)
-      sorted-rows)))
+  (let [[usdc-rows non-usdc-rows]
+        (reduce (fn [[usdc* non-usdc*] row]
+                  (if (usdc-balance-row? row)
+                    [(conj usdc* row) non-usdc*]
+                    [usdc* (conj non-usdc* row)]))
+                [[] []]
+                rows)
+        compare-rows (partial compare-balance-rows column direction)]
+    (->> (concat (sort compare-rows usdc-rows)
+                 (sort compare-rows non-usdc-rows))
+         vec)))
 
 ;; Sortable balances header
 (defn sortable-balances-header
