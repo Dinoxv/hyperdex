@@ -33,6 +33,24 @@
 
     :else []))
 
+(defn- find-first-node [node pred]
+  (cond
+    (vector? node)
+    (let [attrs (when (map? (second node)) (second node))
+          children (if attrs (drop 2 node) (drop 1 node))]
+      (or (when (pred node) node)
+          (some #(find-first-node % pred) children)))
+
+    (seq? node)
+    (some #(find-first-node % pred) node)
+
+    :else nil))
+
+(defn- node-class-set [node]
+  (let [attrs (when (and (vector? node) (map? (second node)))
+                (second node))]
+    (set (class-values (:class attrs)))))
+
 (deftest symbol-resolution-test
   (testing "market metadata takes precedence"
     (is (= "PUMP" (view/resolve-base-symbol "PUMP" {:base "PUMP"})))
@@ -130,3 +148,42 @@
     (is (contains? classes "bg-base-100"))
     (is (contains? classes "border-base-300"))
     (is (not (contains? classes "bg-gray-900")))))
+
+(deftest trades-tab-viewport-is-scrollable-with-hidden-scrollbar-test
+  (with-redefs [ws-trades/get-recent-trades
+                (fn []
+                  [{:coin "BTC" :px "61500.1" :sz "0.03" :side "A" :time 1700000003}])]
+    (let [view-node (view/l2-orderbook-view {:coin "BTC"
+                                             :market {:base "BTC" :quote "USDC"}
+                                             :orderbook-ui {:active-tab :trades}})
+          classes (set (collect-all-classes view-node))]
+      (is (contains? classes "overflow-y-auto"))
+      (is (contains? classes "scrollbar-hide")))))
+
+(deftest orderbook-and-trades-share-constrained-tab-viewport-sizing-test
+  (let [required-classes #{"flex-1" "h-full" "min-h-0" "overflow-hidden"}
+        orderbook-view (view/l2-orderbook-view {:coin "BTC"
+                                                :market {:market-type :perp
+                                                         :base "BTC"
+                                                         :quote "USDC"
+                                                         :szDecimals 4}
+                                                :orderbook {:bids [{:px "99" :sz "2"}]
+                                                            :asks [{:px "101" :sz "1"}]}
+                                                :orderbook-ui {:active-tab :orderbook}})
+        trades-view (with-redefs [ws-trades/get-recent-trades
+                                  (fn []
+                                    [{:coin "BTC" :px "61500.1" :sz "0.03" :side "A" :time 1700000003}])]
+                      (view/l2-orderbook-view {:coin "BTC"
+                                               :market {:base "BTC" :quote "USDC"}
+                                               :orderbook-ui {:active-tab :trades}}))
+        viewport-pred (fn [candidate]
+                        (let [classes (node-class-set candidate)]
+                          (every? classes required-classes)))
+        orderbook-viewport (find-first-node orderbook-view viewport-pred)
+        trades-viewport (find-first-node trades-view viewport-pred)
+        orderbook-classes (node-class-set orderbook-viewport)
+        trades-classes (node-class-set trades-viewport)]
+    (is (some? orderbook-viewport))
+    (is (some? trades-viewport))
+    (is (= orderbook-classes trades-classes))
+    (is (every? orderbook-classes required-classes))))

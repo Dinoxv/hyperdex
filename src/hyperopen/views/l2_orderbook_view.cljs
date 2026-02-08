@@ -278,6 +278,10 @@
    (orderbook-tab-button active-tab :orderbook "Order Book")
    (orderbook-tab-button active-tab :trades "Trades")])
 
+(defn tab-content-viewport [content]
+  [:div {:class ["flex-1" "h-full" "min-h-0" "overflow-hidden"]}
+   content])
+
 (defn trades-column-headers [base-symbol]
   [:div.flex.items-center.justify-between.px-3.py-2.bg-base-100.border-b.border-base-300
    [:div.text-right.flex-1
@@ -459,10 +463,12 @@
         base-symbol (resolve-base-symbol coin market)]
     [:div {:class ["w-full" "h-full" "min-h-0" "overflow-hidden" "flex" "flex-col"]}
      (orderbook-tabs-row active-tab)
-     [:div.flex-1.min-h-0.overflow-hidden
+     [:div.flex-1.h-full.min-h-0.overflow-hidden
       (if (= active-tab :trades)
-        (trades-panel coin base-symbol)
-        (cond
-          loading? (loading-orderbook)
-          (and coin orderbook-data) (l2-orderbook-panel coin market orderbook-data orderbook-ui)
-          :else (empty-orderbook)))]]))
+        (tab-content-viewport
+         (trades-panel coin base-symbol))
+        (tab-content-viewport
+         (cond
+           loading? (loading-orderbook)
+           (and coin orderbook-data) (l2-orderbook-panel coin market orderbook-data orderbook-ui)
+           :else (empty-orderbook))))]]))

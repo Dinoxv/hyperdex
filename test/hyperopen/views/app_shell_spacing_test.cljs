@@ -141,7 +141,10 @@
     (is (contains? root-classes "min-h-0"))
     (is (contains-class? view-node "right-[340px]"))
     (is (contains-class? view-node "lg:grid-cols-[minmax(0,1fr)_340px]"))
+    (is (contains-class? view-node "lg:grid-rows-[minmax(580px,1fr)_auto_auto]"))
     (is (contains-class? view-node "xl:grid-cols-[minmax(0,1fr)_340px_340px]"))
+    (is (contains-class? view-node "xl:grid-rows-[minmax(580px,1fr)_auto]"))
+    (is (not (contains-class? view-node "xl:grid-rows-[minmax(580px,auto)_auto]")))
     (is (contains-class? view-node "xl:row-span-2"))
     (is (not (contains-class? view-node "xl:row-start-2")))))
 

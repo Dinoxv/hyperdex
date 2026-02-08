@@ -10,17 +10,20 @@
   (let [active-asset (:active-asset state)
         orderbook-data (when active-asset (get-in state [:orderbooks active-asset]))]
     [:div {:class ["flex-1" "flex" "flex-col" "min-h-0"]}
-     [:div {:class ["w-full" "px-0" "py-0" "space-y-0" "flex" "flex-col" "min-h-full"]}
-      [:div {:class ["relative" "flex-1"]}
+     [:div {:class ["w-full" "h-full" "px-0" "py-0" "space-y-0" "flex" "flex-col" "min-h-0"]}
+      [:div {:class ["relative" "flex-1" "min-h-0"]}
        [:div {:class ["hidden" "xl:block" "absolute" "top-0" "bottom-0" "right-[340px]" "w-px" "bg-base-300" "pointer-events-none" "z-10"]}]
         [:div {:class ["grid"
+                       "h-full"
+                       "min-h-0"
                        "grid-cols-1"
                        "gap-x-0" "gap-y-0"
                        "bg-base-100"
                         "items-stretch"
                         "lg:grid-cols-[minmax(0,1fr)_340px]"
+                        "lg:grid-rows-[minmax(580px,1fr)_auto_auto]"
                         "xl:grid-cols-[minmax(0,1fr)_340px_340px]"
-                       "xl:grid-rows-[minmax(580px,auto)_auto]"]}
+                        "xl:grid-rows-[minmax(580px,1fr)_auto]"]}
         [:div {:class ["bg-base-100" "border-r" "border-base-300" "flex" "flex-col" "min-h-0"]}
          (active-asset-view/active-asset-view state)
          [:div {:class ["overflow-hidden" "flex-1" "min-h-0"]}
