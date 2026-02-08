@@ -550,6 +550,14 @@
         strings (set (collect-strings view-node))]
     (is (not (contains? strings "Take Profit / Stop Loss")))))
 
+(deftest scale-mode-hides-liquidation-price-metric-row-test
+  (let [view-node (view/order-form-view (base-state {:type :scale}))
+        strings (set (collect-strings view-node))]
+    (is (not (contains? strings "Liquidation Price")))
+    (is (contains? strings "Order Value"))
+    (is (contains? strings "Margin Required"))
+    (is (contains? strings "Fees"))))
+
 (deftest limit-mode-renders-tpsl-toggle-test
   (let [view-node (view/order-form-view (base-state {:type :limit}))
         strings (set (collect-strings view-node))]

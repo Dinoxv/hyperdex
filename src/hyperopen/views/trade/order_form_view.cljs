@@ -669,10 +669,11 @@
          (metric-row "End" end-preview-line)])
 
       [:div {:class ["border-t" "border-base-300" "pt-3" "space-y-2"]}
-       (metric-row "Liquidation Price"
-                   (if liq-price
-                     (or (fmt/format-trade-price liq-price) "N/A")
-                     "N/A"))
+       (when (not= :scale type)
+         (metric-row "Liquidation Price"
+                     (if liq-price
+                       (or (fmt/format-trade-price liq-price) "N/A")
+                       "N/A")))
        (metric-row "Order Value"
                    (if order-value
                      (or (fmt/format-currency order-value) "N/A")
