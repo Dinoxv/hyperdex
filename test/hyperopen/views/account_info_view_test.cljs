@@ -78,12 +78,26 @@
         non-sortable-node (view/non-sortable-header "Send")
         non-sortable-center-node (view/non-sortable-header "Send" :center)]
     (is (contains? (node-class-set header-node) "text-trading-text"))
-    (is (contains? (node-class-set sortable-node) "text-trading-text"))
+    (is (contains? (node-class-set sortable-node) "text-trading-text-secondary"))
     (is (contains? (node-class-set sortable-node) "justify-start"))
     (is (contains? (node-class-set sortable-right-node) "justify-end"))
     (is (contains? (node-class-set sortable-node) "hover:text-trading-text"))
-    (is (contains? (node-class-set non-sortable-node) "text-trading-text"))
+    (is (contains? (node-class-set non-sortable-node) "text-trading-text-secondary"))
     (is (contains? (node-class-set non-sortable-center-node) "justify-center"))))
+
+(deftest position-headers-use-secondary-text-and-hover-affordance-test
+  (let [position-header-node (view/position-table-header default-sort-state)
+        position-coin-header (find-first-node position-header-node
+                                              #(contains? (direct-texts %) "Coin"))
+        sortable-node (view/sortable-header "Coin" default-sort-state)]
+    (is (some? position-coin-header))
+    (is (contains? (node-class-set sortable-node) "text-trading-text-secondary"))
+    (is (contains? (node-class-set sortable-node) "hover:text-trading-text"))))
+
+(deftest open-orders-sortable-header-uses-secondary-text-and-hover-affordance-test
+  (let [header-node (view/sortable-open-orders-header "Time" {:column "Time" :direction :asc})]
+    (is (contains? (node-class-set header-node) "text-trading-text-secondary"))
+    (is (contains? (node-class-set header-node) "hover:text-trading-text"))))
 
 (deftest tab-navigation-renders-hide-small-toggle-only-on-balances-tab-test
   (let [counts {:balances 1 :positions 1}

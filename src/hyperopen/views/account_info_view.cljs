@@ -266,14 +266,26 @@
       (reverse sorted)
       sorted)))
 
+(def header-base-text-classes
+  ["text-sm" "font-medium" "text-trading-text-secondary"])
+
+(def sortable-header-interaction-classes
+  ["hover:text-trading-text" "transition-colors"])
+
+(def sortable-header-layout-classes
+  ["flex" "items-center" "space-x-1" "group"])
+
 (defn sortable-open-orders-header [column-name sort-state]
   (let [current-column (:column sort-state)
         current-direction (:direction sort-state)
         is-active (= current-column column-name)
         sort-icon (when is-active
                     (if (= current-direction :asc) "↑" "↓"))]
-    [:button.text-sm.font-medium.text-base-content.hover:text-primary.transition-colors.flex.items-center.space-x-1.group
-     {:on {:click [[:actions/sort-open-orders column-name]]}}
+    [:button {:class (into []
+                           (concat header-base-text-classes
+                                   sortable-header-interaction-classes
+                                   sortable-header-layout-classes))
+              :on {:click [[:actions/sort-open-orders column-name]]}}
      [:span column-name]
      (when sort-icon
        [:span.text-xs.opacity-70 sort-icon])]))
@@ -391,10 +403,11 @@
          is-active (= current-column column-name)
          sort-icon (when is-active
                      (if (= current-direction :asc) "↑" "↓"))]
-     [:button {:class (into ["w-full" "text-sm" "font-medium" "text-trading-text"
-                             "hover:text-trading-text" "transition-colors" "flex"
-                             "items-center" "space-x-1" "group"]
-                            (header-alignment-classes align))
+     [:button {:class (into ["w-full"]
+                            (concat header-base-text-classes
+                                    sortable-header-interaction-classes
+                                    sortable-header-layout-classes
+                                    (header-alignment-classes align)))
                :on {:click [[:actions/sort-balances column-name]]}}
       [:span column-name]
       (when sort-icon
@@ -405,8 +418,9 @@
   ([column-name]
    (non-sortable-header column-name :left))
   ([column-name align]
-   [:div {:class (into ["w-full" "text-sm" "font-medium" "text-trading-text"]
-                       (header-alignment-classes align))}
+   [:div {:class (into ["w-full"]
+                       (concat header-base-text-classes
+                               (header-alignment-classes align)))}
     column-name]))
 
 ;; Balance row component
@@ -579,8 +593,11 @@
         is-active (= current-column column-name)
         sort-icon (when is-active
                     (if (= current-direction :asc) "↑" "↓"))]
-    [:button.text-sm.font-medium.text-base-content.hover:text-primary.transition-colors.flex.items-center.space-x-1.group
-     {:on {:click [[:actions/sort-positions column-name]]}}
+    [:button {:class (into []
+                           (concat header-base-text-classes
+                                   sortable-header-interaction-classes
+                                   sortable-header-layout-classes))
+              :on {:click [[:actions/sort-positions column-name]]}}
      [:span column-name]
      (when sort-icon
        [:span.text-xs.opacity-70 sort-icon])]))
