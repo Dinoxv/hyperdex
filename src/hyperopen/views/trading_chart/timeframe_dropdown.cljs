@@ -9,13 +9,13 @@
      {:class (if timeframes-dropdown-visible "rotate-180" "rotate-0")}
      "▼"]]
    ;; Dropdown menu (toggled with state)
-   [:div.absolute.top-full.left-0.mt-1.bg-gray-800.border.border-gray-600.rounded.shadow-lg.z-50.min-w-32.overflow-hidden
+   [:div.absolute.top-full.left-0.mt-1.bg-base-100.border.border-base-300.rounded.shadow-lg.z-50.min-w-32.overflow-hidden
     {:class (if timeframes-dropdown-visible 
               ["opacity-100" "scale-y-100" "translate-y-0"] 
               ["opacity-0" "scale-y-95" "-translate-y-2" "pointer-events-none"])
      :style {:transition "all 50ms ease-in-out"}}
     ;; Minutes section
-    [:div.px-3.py-2.text-xs.text-gray-400.uppercase.font-semibold.border-b.border-gray-600 "Minutes"]
+    [:div.px-3.py-2.text-xs.text-gray-400.uppercase.font-semibold.border-b.border-base-300 "Minutes"]
     [:button.block.w-full.text-left.px-3.py-2.text-sm.hover:bg-gray-700.hover:text-white
      {:class (if (= selected-timeframe :1m) ["text-blue-400" "bg-gray-700"] ["text-gray-300"])
       :on {:click [[:actions/select-chart-timeframe :1m]]}}
@@ -37,7 +37,7 @@
       :on {:click [[:actions/select-chart-timeframe :30m]]}}
      "30 min"]
     ;; Hours section
-    [:div.px-3.py-2.text-xs.text-gray-400.uppercase.font-semibold.border-b.border-gray-600.border-t "Hours"]
+    [:div.px-3.py-2.text-xs.text-gray-400.uppercase.font-semibold.border-b.border-base-300.border-t "Hours"]
     [:button.relative.block.w-full.text-left.px-3.py-2.text-sm.hover:bg-gray-700.hover:text-white
      {:class (if (= selected-timeframe :1h) ["text-blue-400" "bg-gray-700"] ["text-gray-300"])
       :on {:click [[:actions/select-chart-timeframe :1h]]}}
@@ -60,7 +60,7 @@
       :on {:click [[:actions/select-chart-timeframe :12h]]}}
      "12 hours"]
     ;; Days section
-    [:div.px-3.py-2.text-xs.text-gray-400.uppercase.font-semibold.border-b.border-gray-600.border-t "Days"]
+    [:div.px-3.py-2.text-xs.text-gray-400.uppercase.font-semibold.border-b.border-base-300.border-t "Days"]
     [:button.relative.block.w-full.text-left.px-3.py-2.text-sm.hover:bg-gray-700.hover:text-white
      {:class (if (= selected-timeframe :1d) ["text-blue-400" "bg-gray-700"] ["text-gray-300"])
       :on {:click [[:actions/select-chart-timeframe :1d]]}}

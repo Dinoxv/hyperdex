@@ -1,7 +1,37 @@
 (ns hyperopen.views.l2-orderbook-view-test
-  (:require [cljs.test :refer-macros [deftest is testing]]
+  (:require [clojure.string :as str]
+            [cljs.test :refer-macros [deftest is testing]]
             [hyperopen.websocket.trades :as ws-trades]
             [hyperopen.views.l2-orderbook-view :as view]))
+
+(defn- class-values [class-attr]
+  (cond
+    (nil? class-attr) []
+    (string? class-attr) (remove str/blank? (str/split class-attr #"\s+"))
+    (sequential? class-attr) (mapcat class-values class-attr)
+    :else []))
+
+(defn- classes-from-tag [tag]
+  (if (keyword? tag)
+    (let [parts (str/split (name tag) #"\.")]
+      (if (> (count parts) 1)
+        (rest parts)
+        []))
+    []))
+
+(defn- collect-all-classes [node]
+  (cond
+    (vector? node)
+    (let [attrs (when (map? (second node)) (second node))
+          children (if attrs (drop 2 node) (drop 1 node))]
+      (concat (classes-from-tag (first node))
+              (class-values (:class attrs))
+              (mapcat collect-all-classes children)))
+
+    (seq? node)
+    (mapcat collect-all-classes node)
+
+    :else []))
 
 (deftest symbol-resolution-test
   (testing "market metadata takes precedence"
@@ -83,3 +113,20 @@
         (is (every? #(= "BTC" (:coin %)) filtered-trades))
         (is (>= (:time-ms (first filtered-trades))
                 (:time-ms (second filtered-trades))))))))
+
+(deftest orderbook-panel-uses-base-background-and-border-tokens-test
+  (let [panel (view/l2-orderbook-panel "BTC"
+                                       {:market-type :perp
+                                        :base "BTC"
+                                        :quote "USDC"
+                                        :szDecimals 4}
+                                       {:bids [{:px "99" :sz "2"}]
+                                        :asks [{:px "101" :sz "1"}]}
+                                       {:size-unit :base
+                                        :size-unit-dropdown-visible? false
+                                        :price-aggregation-dropdown-visible? false
+                                        :price-aggregation-by-coin {"BTC" :full}})
+        classes (set (collect-all-classes panel))]
+    (is (contains? classes "bg-base-100"))
+    (is (contains? classes "border-base-300"))
+    (is (not (contains? classes "bg-gray-900")))))

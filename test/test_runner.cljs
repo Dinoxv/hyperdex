@@ -20,6 +20,7 @@
             [hyperopen.views.app-shell-spacing-test]
             [hyperopen.views.asset-selector-view-test]
             [hyperopen.views.footer-view-test]
+            [hyperopen.views.trading-chart.core-test]
             [hyperopen.views.trading-chart.timeframe-dropdown-test]
             [hyperopen.views.trading-chart.utils.chart-options-test]
             [hyperopen.views.trading-chart.utils.data-processing-test]
@@ -52,6 +53,7 @@
              'hyperopen.views.app-shell-spacing-test
              'hyperopen.views.asset-selector-view-test
              'hyperopen.views.footer-view-test
+             'hyperopen.views.trading-chart.core-test
              'hyperopen.views.trading-chart.timeframe-dropdown-test
              'hyperopen.views.trading-chart.utils.chart-options-test
              'hyperopen.views.trading-chart.utils.data-processing-test

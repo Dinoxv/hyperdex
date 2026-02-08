@@ -218,7 +218,7 @@
                                                         :class (when dropdown-visible? "rotate-180")}
        [:path {:stroke-linecap "round" :stroke-linejoin "round" :stroke-width 2 :d "M19 9l-7 7-7-7"}]]]
      (when interactive?
-       [:div.absolute.top-full.left-0.mt-1.bg-gray-900.border.border-gray-700.rounded.shadow-lg.z-30.min-w-24.overflow-hidden
+       [:div.absolute.top-full.left-0.mt-1.bg-base-100.border.border-base-300.rounded.shadow-lg.z-30.min-w-24.overflow-hidden
         {:class (if dropdown-visible?
                   ["opacity-100" "scale-y-100" "translate-y-0"]
                   ["opacity-0" "scale-y-95" "-translate-y-2" "pointer-events-none"])
@@ -244,7 +244,7 @@
                                                         :viewBox "0 0 24 24"
                                                         :class (when dropdown-visible? "rotate-180")}
        [:path {:stroke-linecap "round" :stroke-linejoin "round" :stroke-width 2 :d "M19 9l-7 7-7-7"}]]]
-     [:div.absolute.top-full.right-0.mt-1.bg-gray-900.border.border-gray-700.rounded.shadow-lg.z-20.min-w-20.overflow-hidden
+     [:div.absolute.top-full.right-0.mt-1.bg-base-100.border.border-base-300.rounded.shadow-lg.z-20.min-w-20.overflow-hidden
       {:class (if dropdown-visible?
                 ["opacity-100" "scale-y-100" "translate-y-0"]
                 ["opacity-0" "scale-y-95" "-translate-y-2" "pointer-events-none"])
@@ -260,7 +260,7 @@
 
 ;; Header component
 (defn orderbook-header [selected-option price-options price-dropdown-visible? base-symbol quote-symbol size-unit size-dropdown-visible?]
-  [:div.flex.items-center.justify-between.px-3.py-2.bg-gray-900.border-b.border-gray-700
+  [:div.flex.items-center.justify-between.px-3.py-2.bg-base-100.border-b.border-base-300
    (precision-dropdown selected-option price-options price-dropdown-visible?)
    (size-unit-dropdown base-symbol quote-symbol size-unit size-dropdown-visible?)])
 
@@ -274,12 +274,12 @@
    label])
 
 (defn orderbook-tabs-row [active-tab]
-  [:div.flex.items-center.bg-gray-900.border-b.border-gray-700
+  [:div.flex.items-center.bg-base-100.border-b.border-base-300
    (orderbook-tab-button active-tab :orderbook "Order Book")
    (orderbook-tab-button active-tab :trades "Trades")])
 
 (defn trades-column-headers [base-symbol]
-  [:div.flex.items-center.justify-between.px-3.py-2.bg-gray-800.border-b.border-gray-700
+  [:div.flex.items-center.justify-between.px-3.py-2.bg-base-100.border-b.border-base-300
    [:div.text-right.flex-1
     [:span.text-gray-400.text-xs "Price"]]
    [:div.text-right.flex-1
@@ -289,7 +289,7 @@
 
 (defn trades-row [trade]
   (let [price-class (trade-side->price-class (:side trade))]
-    [:div {:class ["flex" "items-center" "h-6" "relative" "bg-gray-900" "text-xs" "border-b" "border-gray-800/60"]}
+    [:div {:class ["flex" "items-center" "h-6" "relative" "bg-base-100" "text-xs" "border-b" "border-base-300"]}
      [:div.flex.w-full.items-center.justify-between.px-2
       [:div.text-right.flex-1
        [:span {:class [price-class]} (or (format-price (:price trade) (:price-raw trade)) "0.00")]]
@@ -321,7 +321,7 @@
         bar-width (cumulative-bar-width cum-total max-cum-size)
         bar-color (if is-ask? "bg-red-500/30" "bg-green-500/30")
         text-color (if is-ask? "text-red-400" "text-green-400")]
-    [:div.flex.items-center.h-6.relative.bg-gray-900.text-xs
+    [:div.flex.items-center.h-6.relative.bg-base-100.text-xs
      ;; Size bar background - always positioned from left
      [:div.absolute.inset-0.flex.items-center.justify-start
       [:div {:class ["h-full" bar-color "transition-all" "duration-300" "ease-[cubic-bezier(0.68,-0.6,0.32,1.6)]"]
@@ -339,7 +339,7 @@
 (defn spread-row [spread]
   (let [absolute (:absolute spread)
         percentage (:percentage spread)]
-    [:div.flex.items-center.justify-center.h-6.bg-gray-800.border-y.border-gray-700.text-xs
+    [:div.flex.items-center.justify-center.h-6.bg-base-100.border-y.border-base-300.text-xs
      [:div.flex.items-center.space-x-3.text-white
       [:span "Spread"]
       [:span (format-price absolute)]
@@ -347,7 +347,7 @@
 
 ;; Column headers
 (defn column-headers [size-symbol]
-  [:div.flex.items-center.justify-between.px-3.py-2.bg-gray-800.border-b.border-gray-700
+  [:div.flex.items-center.justify-between.px-3.py-2.bg-base-100.border-b.border-base-300
    [:div.text-right.flex-1
     [:span.text-gray-400.text-xs "Price"]]
    [:div.text-right.flex-1

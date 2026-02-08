@@ -1,4 +1,6 @@
 /** @type {import('tailwindcss').Config} */
+const HYPERLIQUID_BG = "#0f1a1f";
+
 module.exports = {
   content: ["./src/**/*.{cljs,clj}", "./resources/public/**/*.html"],
   theme: {
@@ -9,8 +11,8 @@ module.exports = {
       },
       colors: {
         // Custom colors for trading interface
-        "trading-bg": "#0b0e11",
-        "trading-surface": "#161a1e",
+        "trading-bg": HYPERLIQUID_BG,
+        "trading-surface": HYPERLIQUID_BG,
         "trading-border": "#30363d",
         "trading-green": "#00d4aa",
         "trading-red": "#ff6b6b",
@@ -36,9 +38,9 @@ module.exports = {
           primary: "#00d4aa",
           secondary: "#8b949e",
           accent: "#ff6b6b",
-          neutral: "#161a1e",
-          "base-100": "#0b0e11",
-          "base-200": "#161a1e",
+          neutral: HYPERLIQUID_BG,
+          "base-100": HYPERLIQUID_BG,
+          "base-200": HYPERLIQUID_BG,
           "base-300": "#30363d",
           info: "#3abff8",
           success: "#00d4aa",

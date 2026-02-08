@@ -101,7 +101,7 @@
   }
 
   .order-size-slider.range::-webkit-slider-thumb {
-    background-color: rgb(11, 14, 17);
+    background-color: rgb(15, 26, 31);
     box-shadow: 0 0 0 2px rgba(0, 212, 170, 0.78) inset,
       var(--focus-shadow, 0 0),
       calc(var(--filler-size) * -1 - var(--filler-offset)) 0 0 var(--filler-size)
@@ -109,7 +109,7 @@
   }
 
   .order-size-slider.range::-moz-range-thumb {
-    background-color: rgb(11, 14, 17);
+    background-color: rgb(15, 26, 31);
     box-shadow: 0 0 0 2px rgba(0, 212, 170, 0.78) inset,
       var(--focus-shadow, 0 0),
       calc(var(--filler-size) * -1 - var(--filler-offset)) 0 0 var(--filler-size)

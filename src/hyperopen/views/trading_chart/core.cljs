@@ -18,8 +18,7 @@
         selected-chart-type (get-in state [:chart-options :selected-chart-type] :candlestick)
         indicators-dropdown-visible (get-in state [:chart-options :indicators-dropdown-visible])
         active-indicators (get-in state [:chart-options :active-indicators] {})]
-    [:div.flex.items-center.border-b.border-gray-700.px-4.py-2.w-full.space-x-4
-     {:style {:background-color "rgb(30, 41, 55)"}}
+    [:div.flex.items-center.border-b.border-gray-700.px-4.py-2.w-full.space-x-4.bg-base-100
      ;; Left side - Favorite timeframes + dropdown
      [:div.flex.items-center.space-x-1
       ;; Main timeframe buttons
@@ -142,10 +141,9 @@
                          (catch :default _ nil)))
                      (set! (.-__hyperopenChart ^js node) nil))
                    nil))]
-    [:div {:class ["w-full" "relative" "flex-1" "h-full" "min-h-[360px]"]
+    [:div {:class ["w-full" "relative" "flex-1" "h-full" "min-h-[360px]" "bg-base-100"]
            :replicant/key (str "chart-" (hash active-indicators) "-" legend-key)
-           :replicant/on-render mount!
-           :style {:background-color "rgb(30, 41, 55)"}}]))
+           :replicant/on-render mount!}]))
 
 (defn trading-chart-view [state]
   (let [active-asset (:active-asset state)

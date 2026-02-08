@@ -5,7 +5,7 @@
 (defn- common-chart-options []
   {:layout {:textColor "#e5e7eb"
             :background {:type "solid"
-                         :color "rgb(30, 41, 55)"}}
+                         :color "rgb(15, 26, 31)"}}
    :grid {:vertLines {:color "#374151"}
           :horzLines {:color "#374151"}}
    :rightPriceScale {:borderColor "#374151"}

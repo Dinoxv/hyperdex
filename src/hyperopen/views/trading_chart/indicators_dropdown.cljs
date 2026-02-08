@@ -6,7 +6,7 @@
   [{:keys [indicators-dropdown-visible active-indicators]}]
   [:div.relative
    (when indicators-dropdown-visible
-     [:div.absolute.left-0.top-full.mt-1.w-80.bg-gray-800.border.border-gray-700.rounded-lg.shadow-lg.z-50.p-4
+     [:div.absolute.left-0.top-full.mt-1.w-80.bg-base-100.border.border-base-300.rounded-lg.shadow-lg.z-50.p-4
       [:div.text-white.font-medium.mb-3 "Add Indicators"]
       
       ;; Available indicators list
@@ -24,7 +24,7 @@
       ;; Active indicators management
       (when (seq active-indicators)
         [:div
-         [:div.text-white.font-medium.mb-2.border-t.border-gray-700.pt-3 "Active Indicators"]
+         [:div.text-white.font-medium.mb-2.border-t.border-base-300.pt-3 "Active Indicators"]
          [:div.space-y-2
           (for [[indicator-id config] active-indicators]
             (let [indicator-info (first (filter #(= (:id %) indicator-id) (indicators/get-available-indicators)))]
