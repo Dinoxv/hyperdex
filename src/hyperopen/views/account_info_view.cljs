@@ -262,12 +262,18 @@
           color-class (cond
                         (pos? pnl-num) "text-success"
                         (neg? pnl-num) "text-error"
-                        :else "text-base-content")]
+                        :else "text-trading-text")]
       [:span {:class color-class}
        (str (if (pos? pnl-num) "+" "")
             "$" (format-currency pnl-num)
             " (" (if (pos? pct-num) "+" "") (.toFixed pct-num 2) "%)")])
-    [:span.text-base-content "--"]))
+    [:span.text-trading-text "--"]))
+
+(defn- header-alignment-classes [align]
+  (case align
+    :right ["justify-end" "text-right"]
+    :center ["justify-center" "text-center"]
+    ["justify-start" "text-left"]))
 
 ;; Build balances rows for perps + spot
 (defn build-balance-rows [webdata2 spot-data]
@@ -353,52 +359,63 @@
       sorted-rows)))
 
 ;; Sortable balances header
-(defn sortable-balances-header [column-name sort-state]
-  (let [current-column (:column sort-state)
-        current-direction (:direction sort-state)
-        is-active (= current-column column-name)
-        sort-icon (when is-active
-                    (if (= current-direction :asc) "↑" "↓"))]
-    [:button.text-sm.font-medium.text-base-content.hover:text-primary.transition-colors.flex.items-center.space-x-1.group
-     {:on {:click [[:actions/sort-balances column-name]]}}
-     [:span column-name]
-     (when sort-icon
-       [:span.text-xs.opacity-70 sort-icon])]))
+(defn sortable-balances-header
+  ([column-name sort-state]
+   (sortable-balances-header column-name sort-state :left))
+  ([column-name sort-state align]
+   (let [current-column (:column sort-state)
+         current-direction (:direction sort-state)
+         is-active (= current-column column-name)
+         sort-icon (when is-active
+                     (if (= current-direction :asc) "↑" "↓"))]
+     [:button {:class (into ["w-full" "text-sm" "font-medium" "text-trading-text"
+                             "hover:text-trading-text" "transition-colors" "flex"
+                             "items-center" "space-x-1" "group"]
+                            (header-alignment-classes align))
+               :on {:click [[:actions/sort-balances column-name]]}}
+      [:span column-name]
+      (when sort-icon
+        [:span.text-xs.opacity-70 sort-icon])])))
 
 ;; Non-sortable column header
-(defn non-sortable-header [column-name]
-  [:div.text-sm.font-medium.text-base-content column-name])
+(defn non-sortable-header
+  ([column-name]
+   (non-sortable-header column-name :left))
+  ([column-name align]
+   [:div {:class (into ["w-full" "text-sm" "font-medium" "text-trading-text"]
+                       (header-alignment-classes align))}
+    column-name]))
 
 ;; Balance row component
 (defn balance-row [{:keys [coin total-balance available-balance usdc-value pnl-value pnl-pct amount-decimals]}]
-  [:div.grid.grid-cols-7.gap-4.py-3.px-4.hover:bg-base-200.border-b.border-base-300.items-center.text-sm
+  [:div.grid.grid-cols-7.gap-4.py-3.px-4.hover:bg-base-200.border-b.border-base-300.items-center.text-sm.text-trading-text
    ;; Coin
-   [:div.font-medium coin]
+   [:div.font-semibold coin]
    ;; Total Balance  
-   [:div.text-right (format-balance-amount total-balance amount-decimals)]
+   [:div.text-right.font-semibold (format-balance-amount total-balance amount-decimals)]
    ;; Available Balance
-   [:div.text-right (format-balance-amount available-balance amount-decimals)]
+   [:div.text-right.font-semibold (format-balance-amount available-balance amount-decimals)]
    ;; USDC Value
-   [:div.text-right "$" (format-currency usdc-value)]
+   [:div.text-right.font-semibold "$" (format-currency usdc-value)]
    ;; PNL (ROE %)
-   [:div.text-right (format-pnl pnl-value pnl-pct)]
+   [:div.text-right.font-semibold (format-pnl pnl-value pnl-pct)]
    ;; Send
    [:div.text-center
-    [:button.btn.btn-xs.btn-ghost "Send"]]
+    [:button {:class ["btn" "btn-xs" "btn-ghost" "text-trading-text"]} "Send"]]
    ;; Transfer/Contract
    [:div.text-center
-    [:button.btn.btn-xs.btn-ghost "Transfer"]]])
+    [:button {:class ["btn" "btn-xs" "btn-ghost" "text-trading-text"]} "Transfer"]]])
 
 ;; Balance table header
 (defn balance-table-header [sort-state]
-  [:div.grid.grid-cols-7.gap-4.py-2.px-4.bg-base-200.border-b.border-base-300.text-sm.font-medium.text-base-content
-   [:div (sortable-balances-header "Coin" sort-state)]
-   [:div.text-right (sortable-balances-header "Total Balance" sort-state)]
-   [:div.text-right (sortable-balances-header "Available Balance" sort-state)]
-   [:div.text-right (sortable-balances-header "USDC Value" sort-state)]
-   [:div.text-right (sortable-balances-header "PNL (ROE %)" sort-state)]
-   [:div.text-center (non-sortable-header "Send")]
-   [:div.text-center (non-sortable-header "Transfer")]])
+  [:div.grid.grid-cols-7.gap-4.py-2.px-4.bg-base-200.border-b.border-base-300.text-sm.font-medium.text-trading-text
+   [:div (sortable-balances-header "Coin" sort-state :left)]
+   [:div (sortable-balances-header "Total Balance" sort-state :right)]
+   [:div (sortable-balances-header "Available Balance" sort-state :right)]
+   [:div (sortable-balances-header "USDC Value" sort-state :right)]
+   [:div (sortable-balances-header "PNL (ROE %)" sort-state :right)]
+   [:div (non-sortable-header "Send" :center)]
+   [:div (non-sortable-header "Transfer" :center)]])
 
 ;; Balances tab content
 (defn balances-tab-content [balance-rows hide-small? sort-state]
@@ -417,14 +434,14 @@
       [:div
        ;; Filter toggle
        [:div.flex.justify-between.items-center.p-4.border-b.border-base-300
-        [:div.text-sm.font-medium "Balances (" balances-count ")"]
+        [:div.text-sm.font-medium.text-trading-text "Balances (" balances-count ")"]
         [:div.flex.items-center.space-x-2
          [:input.checkbox.checkbox-primary
           {:type "checkbox"
            :id "hide-small-balances"
            :checked (boolean hide-small?)
            :on {:change [[:actions/set-hide-small-balances :event.target/checked]]}}]
-         [:label.text-sm {:for "hide-small-balances"} "Hide Small Balances"]]]
+         [:label.text-sm.text-trading-text {:for "hide-small-balances"} "Hide Small Balances"]]]
 
        ;; Balance table
        [:div
@@ -488,15 +505,15 @@
       [:span.font-medium coin]
       [:span.badge.badge-sm.badge-outline (str leverage "x")]]
      ;; Size
-     [:div.text-right (format-position-size pos)]
+     [:div.text-right.font-semibold (format-position-size pos)]
      ;; Position Value  
-     [:div.text-right "$" (format-currency position-value)]
+     [:div.text-right.font-semibold "$" (format-currency position-value)]
      ;; Entry Price
-     [:div.text-right (format-trade-price entry-price)]
+     [:div.text-right.font-semibold (format-trade-price entry-price)]
      ;; Mark Price
-     [:div.text-right (format-trade-price mark-price)]
+     [:div.text-right.font-semibold (format-trade-price mark-price)]
      ;; PNL (ROE %)
-     [:div.text-right
+     [:div.text-right.font-semibold
       [:div 
        [:span {:class (if (pos? (js/parseFloat pnl-value))
                        "text-success" "text-error")}
@@ -507,11 +524,11 @@
          "(" (if (pos? pnl-percent) "+" "") 
          (.toFixed pnl-percent 2) "%)"]]]]
      ;; Liq. Price
-     [:div.text-right (if liq-price (format-trade-price liq-price) "N/A")]
+     [:div.text-right.font-semibold (if liq-price (format-trade-price liq-price) "N/A")]
      ;; Margin
-     [:div.text-right "$" (format-currency margin)]
+     [:div.text-right.font-semibold "$" (format-currency margin)]
      ;; Funding
-     [:div.text-right
+     [:div.text-right.font-semibold
       (let [funding-num (js/parseFloat funding)
             display-funding (if (pos? funding-num) (- funding-num) funding-num)
             display-text (str "$" (format-currency (str display-funding)))]

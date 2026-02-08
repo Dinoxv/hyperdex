@@ -68,10 +68,10 @@
   (let [account-info-path (join-path (project-root) "src" "hyperopen" "views" "account_info_view.cljs")
         account-info-source (read-text account-info-path)]
     (testing "balances title uses text-sm, not text-lg"
-      (is (re-find #"\[:div\.text-sm\.font-medium \"Balances \(" account-info-source))
+      (is (re-find #"\[:div\.text-sm\.font-medium(?:\.[A-Za-z0-9_-]+)* \"Balances \(" account-info-source))
       (is (not (re-find #"\[:div\.text-lg\.font-medium \"Balances \(" account-info-source))))
     (testing "balance row wrapper includes text-sm for 12px baseline"
-      (is (re-find #"\[:div\.grid\.grid-cols-7\.gap-4\.py-3\.px-4\.hover:bg-base-200\.border-b\.border-base-300\.items-center\.text-sm"
+      (is (re-find #"\[:div\.grid\.grid-cols-7\.gap-4\.py-3\.px-4\.hover:bg-base-200\.border-b\.border-base-300\.items-center\.text-sm(?:\.[A-Za-z0-9_-]+)*"
                    account-info-source)))))
 
 (deftest header-nav-link-css-uses-14px-and-600-weight-test

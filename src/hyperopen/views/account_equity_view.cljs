@@ -41,8 +41,8 @@
        :class (cond
                 (pos? value) "text-success"
                 (neg? value) "text-error"
-                :else "text-base-content")})
-    {:text "--" :class "text-base-content"}))
+                :else "text-trading-text")})
+    {:text "--" :class "text-trading-text-secondary"}))
 
 (defn tooltip [trigger text & [position]]
   (let [pos (or position "top")]
@@ -67,17 +67,22 @@
 
 (defn label-with-tooltip [label tooltip-text]
   (tooltip
-    [:span.text-sm.text-gray-400.border-b.border-dashed.border-gray-600.cursor-help
+    [:span.text-sm.text-trading-text-secondary.border-b.border-dashed.border-gray-600.cursor-help
      label]
     tooltip-text
     "top"))
+
+(defn default-metric-value-class [value]
+  (if (= value "--")
+    "text-trading-text-secondary"
+    "text-trading-text"))
 
 (defn metric-row [label value & {:keys [tooltip value-class]}]
   [:div.flex.items-center.justify-between.text-sm
    (if tooltip
      (label-with-tooltip label tooltip)
-     [:span.text-sm.text-gray-400 label])
-   [:span {:class (or value-class "text-base-content")}
+     [:span.text-sm.text-trading-text-secondary label])
+   [:span {:class (or value-class (default-metric-value-class value))}
     value]])
 
 (defn account-equity-view [state]
@@ -124,15 +129,15 @@
         cross-account-leverage (safe-div cross-total-ntl-pos cross-account-value)
         pnl-info (pnl-display unrealized-pnl)]
     [:div {:class ["bg-base-100" "rounded-none" "shadow-none" "p-3" "space-y-4" "w-full" "h-full"]}
-     [:div.text-sm.font-semibold.text-gray-200 "Account Equity"]
+     [:div.text-sm.font-semibold.text-trading-text "Account Equity"]
 
      [:div.space-y-2
       (metric-row "Spot" (display-currency spot-equity))
-      (metric-row "Perps" (display-currency perps-value)
+     (metric-row "Perps" (display-currency perps-value)
                   :tooltip "Balance + Unrealized PNL (approximate account value if all positions were closed)")]
 
      [:div.border-t.border-base-300.pt-3.space-y-2
-      [:div.text-xs.font-medium.text-gray-400 "Perps Overview"]
+      [:div.text-xs.font-semibold.text-trading-text "Perps Overview"]
       (metric-row "Balance" (display-currency base-balance)
                   :tooltip "Total Net Transfers + Total Realized Profit + Total Net Funding Fees")
       (metric-row "Unrealized PNL" (:text pnl-info)
