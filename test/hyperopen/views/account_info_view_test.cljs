@@ -257,6 +257,65 @@
       (is (contains? rows-viewport-classes "overflow-y-auto"))
       (is (contains? rows-viewport-classes "scrollbar-hide")))))
 
+(deftest account-info-table-rows-use-hover-highlight-without-divider-lines-test
+  (let [open-orders [{:oid 101
+                      :coin "HYPE"
+                      :side "B"
+                      :sz "2.0"
+                      :orig-sz "2.0"
+                      :px "100.0"
+                      :type "Limit"
+                      :time 1700000000000
+                      :reduce-only true
+                      :is-trigger false
+                      :trigger-condition nil
+                      :is-position-tpsl false}]
+        fills [{:tid 1 :coin "HYPE" :side "B" :sz "1.2" :px "100.0" :fee "0.1" :time 1700000000000}]
+        fundings [{:coin "HYPE" :fundingRate "0.001" :payment "1.23" :positionSize "100.0" :time 1700000000000}]
+        ledger [{:type "deposit" :coin "USDC" :delta "5.0" :time 1700000000000}]
+        contents [(view/balances-tab-content [sample-balance-row] false default-sort-state)
+                  (view/positions-tab-content {:clearinghouseState {:assetPositions [sample-position-data]}}
+                                              default-sort-state
+                                              {})
+                  (view/open-orders-tab-content open-orders {:column "Time" :direction :desc})
+                  (view/trade-history-tab-content fills)
+                  (view/funding-history-tab-content fundings)
+                  (view/order-history-tab-content ledger)]]
+    (doseq [content contents
+            :let [row-classes (node-class-set (first-viewport-row content))]]
+      (is (contains? row-classes "hover:bg-base-300"))
+      (is (not (contains? row-classes "border-b")))
+      (is (not (contains? row-classes "border-base-300"))))))
+
+(deftest account-info-table-headers-remove-divider-lines-test
+  (let [open-orders [{:oid 101
+                      :coin "HYPE"
+                      :side "B"
+                      :sz "2.0"
+                      :orig-sz "2.0"
+                      :px "100.0"
+                      :type "Limit"
+                      :time 1700000000000
+                      :reduce-only true
+                      :is-trigger false
+                      :trigger-condition nil
+                      :is-position-tpsl false}]
+        fills [{:tid 1 :coin "HYPE" :side "B" :sz "1.2" :px "100.0" :fee "0.1" :time 1700000000000}]
+        fundings [{:coin "HYPE" :fundingRate "0.001" :payment "1.23" :positionSize "100.0" :time 1700000000000}]
+        ledger [{:type "deposit" :coin "USDC" :delta "5.0" :time 1700000000000}]
+        contents [(view/balances-tab-content [sample-balance-row] false default-sort-state)
+                  (view/positions-tab-content {:clearinghouseState {:assetPositions [sample-position-data]}}
+                                              default-sort-state
+                                              {})
+                  (view/open-orders-tab-content open-orders {:column "Time" :direction :desc})
+                  (view/trade-history-tab-content fills)
+                  (view/funding-history-tab-content fundings)
+                  (view/order-history-tab-content ledger)]]
+    (doseq [content contents
+            :let [header-classes (node-class-set (tab-header-node content))]]
+      (is (not (contains? header-classes "border-b")))
+      (is (not (contains? header-classes "border-base-300"))))))
+
 (deftest balance-row-primary-value-and-action-contrast-test
   (let [row-node (view/balance-row sample-balance-row)
         coin-node (find-first-node row-node #(contains? (direct-texts %) "USDC (Spot)"))
