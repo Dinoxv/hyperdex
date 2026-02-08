@@ -98,6 +98,7 @@
           original-fetch-user-fills api/fetch-user-fills!
           original-fetch-spot-state api/fetch-spot-clearinghouse-state!
           original-ensure-perp-dexs api/ensure-perp-dexs!
+          original-fetch-and-merge-funding-history hyperopen.core/fetch-and-merge-funding-history!
           original-stage-b hyperopen.core/stage-b-account-bootstrap!]
       (swap! core/store assoc-in [:wallet :address] "0xabc")
       (set! api/fetch-frontend-open-orders!
@@ -129,6 +130,10 @@
                (ensure-perp-dexs-mock store {}))
               ([_ _]
                (js/Promise.resolve ["dex-1" "dex-2"]))))
+      (set! hyperopen.core/fetch-and-merge-funding-history!
+            (fn [_store address opts]
+              (swap! stage-a-calls conj [:fundings [address opts]])
+              (js/Promise.resolve nil)))
       (set! hyperopen.core/stage-b-account-bootstrap!
             (fn [address dexs]
               (swap! stage-b-calls conj [address dexs])))
@@ -137,22 +142,60 @@
                 (set! api/fetch-user-fills! original-fetch-user-fills)
                 (set! api/fetch-spot-clearinghouse-state! original-fetch-spot-state)
                 (set! api/ensure-perp-dexs! original-ensure-perp-dexs)
+                (set! hyperopen.core/fetch-and-merge-funding-history! original-fetch-and-merge-funding-history)
                 (set! hyperopen.core/stage-b-account-bootstrap! original-stage-b))]
         (@#'hyperopen.core/bootstrap-account-data! "0xabc")
         (js/setTimeout
          (fn []
-           (is (= 3 (count @stage-a-calls)))
+           (is (= 4 (count @stage-a-calls)))
            (is (= [["0xabc" ["dex-1" "dex-2"]]] @stage-b-calls))
            ;; Same address should not trigger stage A/B again.
            (@#'hyperopen.core/bootstrap-account-data! "0xabc")
            (js/setTimeout
             (fn []
-              (is (= 3 (count @stage-a-calls)))
+              (is (= 4 (count @stage-a-calls)))
               (is (= 1 (count @stage-b-calls)))
               (restore!)
               (done))
             0))
-         0)))))
+            0)))))
+
+(deftest select-account-info-tab-funding-history-saves-selection-before-fetch-test
+  (let [state {:account-info {:selected-tab :balances
+                              :funding-history {:filters {:coin-set #{}
+                                                          :start-time-ms 0
+                                                          :end-time-ms 1000}
+                                                :request-id 2}}
+               :orders {:fundings-raw []}}
+        effects (core/select-account-info-tab state :funding-history)
+        immediate (first effects)
+        path-values (second immediate)]
+    (is (= :effects/save-many (first immediate)))
+    (is (= [:account-info :selected-tab]
+           (-> path-values first first)))
+    (is (= :funding-history
+           (-> path-values first second)))
+    (is (= [:effects/api-fetch-user-funding-history 3]
+           (second effects)))))
+
+(deftest apply-funding-history-filters-refetches-only-on-time-range-change-test
+  (let [base-state {:account-info {:funding-history {:filters {:coin-set #{}
+                                                          :start-time-ms 1000
+                                                          :end-time-ms 2000}
+                                                    :draft-filters {:coin-set #{"BTC"}
+                                                                    :start-time-ms 1000
+                                                                    :end-time-ms 2000}
+                                                    :request-id 5}}
+                    :orders {:fundings-raw []}}
+        no-refetch (core/apply-funding-history-filters base-state)
+        with-refetch (core/apply-funding-history-filters
+                      (assoc-in base-state
+                                [:account-info :funding-history :draft-filters :end-time-ms]
+                                3000))]
+    (is (not-any? #(= :effects/api-fetch-user-funding-history (first %))
+                  no-refetch))
+    (is (some #(= :effects/api-fetch-user-funding-history (first %))
+              with-refetch))))
 
 (deftest select-asset-closes-dropdown-first-and-removes-duplicate-effects-test
   (let [market {:key :perp/BTC

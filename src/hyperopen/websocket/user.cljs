@@ -1,5 +1,6 @@
 (ns hyperopen.websocket.user
-  (:require [hyperopen.websocket.client :as ws-client]
+  (:require [hyperopen.api :as api]
+            [hyperopen.websocket.client :as ws-client]
             [hyperopen.wallet.address-watcher :as address-watcher]))
 
 (defonce user-state (atom {:subscriptions #{}}))
@@ -36,6 +37,23 @@
   (let [combined (concat incoming current)]
     (vec (take 200 combined))))
 
+(defn- extract-channel-rows
+  [msg collection-key]
+  (let [payload (:data msg)]
+    (cond
+      (and (map? payload)
+           (sequential? (get payload collection-key)))
+      {:rows (vec (get payload collection-key))
+       :snapshot? (boolean (:isSnapshot payload))}
+
+      (sequential? payload)
+      {:rows (vec payload)
+       :snapshot? (boolean (:isSnapshot msg))}
+
+      :else
+      {:rows []
+       :snapshot? false})))
+
 (defn create-user-handler [subscribe-fn unsubscribe-fn]
   (reify address-watcher/IAddressChangeHandler
     (on-address-changed [_ old-address new-address]
@@ -51,32 +69,36 @@
 (defn- user-fills-handler [store]
   (fn [msg]
     (when (= "userFills" (:channel msg))
-      (let [data (:data msg)
-            snapshot? (:isSnapshot msg)]
-        (when (seq data)
+      (let [{:keys [rows snapshot?]} (extract-channel-rows msg :fills)]
+        (when (seq rows)
           (if snapshot?
-            (swap! store assoc-in [:orders :fills] data)
-            (swap! store update-in [:orders :fills] #(upsert-seq (or % []) data))))))))
+            (swap! store assoc-in [:orders :fills] rows)
+            (swap! store update-in [:orders :fills] #(upsert-seq (or % []) rows))))))))
 
 (defn- user-fundings-handler [store]
   (fn [msg]
     (when (= "userFundings" (:channel msg))
-      (let [data (:data msg)
-            snapshot? (:isSnapshot msg)]
-        (when (seq data)
-          (if snapshot?
-            (swap! store assoc-in [:orders :fundings] data)
-            (swap! store update-in [:orders :fundings] #(upsert-seq (or % []) data))))))))
+      (let [{:keys [rows]} (extract-channel-rows msg :fundings)
+            normalized (api/normalize-ws-funding-rows rows)]
+        (when (seq normalized)
+          (swap! store
+                 (fn [state]
+                   (let [existing (get-in state [:orders :fundings-raw] [])
+                         filters (get-in state [:account-info :funding-history :filters])
+                         merged (api/merge-funding-history-rows existing normalized)
+                         filtered (api/filter-funding-history-rows merged filters)]
+                     (-> state
+                         (assoc-in [:orders :fundings-raw] merged)
+                         (assoc-in [:orders :fundings] filtered))))))))))
 
 (defn- user-ledger-handler [store]
   (fn [msg]
     (when (= "userNonFundingLedgerUpdates" (:channel msg))
-      (let [data (:data msg)
-            snapshot? (:isSnapshot msg)]
-        (when (seq data)
+      (let [{:keys [rows snapshot?]} (extract-channel-rows msg :nonFundingLedgerUpdates)]
+        (when (seq rows)
           (if snapshot?
-            (swap! store assoc-in [:orders :ledger] data)
-            (swap! store update-in [:orders :ledger] #(upsert-seq (or % []) data))))))))
+            (swap! store assoc-in [:orders :ledger] rows)
+            (swap! store update-in [:orders :ledger] #(upsert-seq (or % []) rows))))))))
 
 (defn init! [store]
   (ws-client/register-handler! "openOrders" (open-orders-handler store))

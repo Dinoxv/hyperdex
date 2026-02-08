@@ -109,3 +109,95 @@
             (fn []
               (set! hyperopen.api/enqueue-info-request! original-enqueue)
               (set! hyperopen.api/wait-ms original-wait)))))))
+
+(deftest normalize-info-funding-row-maps-delta-shape-test
+  (let [row (api/normalize-info-funding-row
+             {:time 1700000000000
+              :delta {:type "funding"
+                      :coin "HYPE"
+                      :usdc "-1.2500"
+                      :szi "-250.5"
+                      :fundingRate "0.00045"}})]
+    (is (= "HYPE" (:coin row)))
+    (is (= 1700000000000 (:time-ms row)))
+    (is (= :short (:position-side row)))
+    (is (= 250.5 (:size-raw row)))
+    (is (= -1.25 (:payment-usdc-raw row)))
+    (is (= 4.5e-4 (:funding-rate-raw row)))))
+
+(deftest funding-history-merge-and-filter-are-deterministic-test
+  (let [row-a (api/normalize-ws-funding-row {:time 1700000000000
+                                              :coin "HYPE"
+                                              :usdc "1.0"
+                                              :szi "100.0"
+                                              :fundingRate "0.0001"})
+        row-b (api/normalize-ws-funding-row {:time 1700003600000
+                                              :coin "BTC"
+                                              :usdc "-2.0"
+                                              :szi "-50.0"
+                                              :fundingRate "-0.0003"})
+        merged (api/merge-funding-history-rows [row-a row-b row-a] [])]
+    (is (= 2 (count merged)))
+    (is (= [1700003600000 1700000000000] (mapv :time-ms merged)))
+    (is (= ["BTC"]
+           (mapv :coin
+                 (api/filter-funding-history-rows
+                  merged
+                  {:coin-set #{"BTC"}
+                   :start-time-ms 0
+                   :end-time-ms 2000000000000}))))))
+
+(deftest fetch-user-funding-history-paginates-until-empty-page-test
+  (async done
+    (let [calls (atom [])
+          original-post-info hyperopen.api/post-info!]
+      (set! hyperopen.api/post-info!
+            (fn post-info-mock
+              ([body]
+               (post-info-mock body {}))
+              ([body _opts]
+               (swap! calls conj body)
+               (let [start-time (get body "startTime")
+                     payload (cond
+                               (= start-time 1000)
+                               #js [#js {:time 1000
+                                          :delta #js {:type "funding"
+                                                      :coin "HYPE"
+                                                      :usdc "1.0"
+                                                      :szi "10.0"
+                                                      :fundingRate "0.0001"}}
+                                    #js {:time 2000
+                                          :delta #js {:type "funding"
+                                                      :coin "BTC"
+                                                      :usdc "-1.0"
+                                                      :szi "-3.0"
+                                                      :fundingRate "-0.0002"}}]
+                               (= start-time 2001)
+                               #js [#js {:time 3000
+                                          :delta #js {:type "funding"
+                                                      :coin "ETH"
+                                                      :usdc "0.5"
+                                                      :szi "4.0"
+                                                      :fundingRate "0.0003"}}]
+                               :else
+                               #js [])]
+                 (js/Promise.resolve
+                  #js {:status 200
+                       :ok true
+                       :json (fn [] (js/Promise.resolve payload))})))
+              ([body opts _attempt]
+               (post-info-mock body opts))))
+      (-> (api/fetch-user-funding-history! (atom {}) "0xabc"
+                                           {:start-time-ms 1000
+                                            :end-time-ms 5000})
+          (.then (fn [rows]
+                   (is (= 3 (count rows)))
+                   (is (= [3000 2000 1000] (mapv :time-ms rows)))
+                   (is (= [1000 2001 3001] (mapv #(get % "startTime") @calls)))
+                   (done)))
+          (.catch (fn [err]
+                    (is false (str "Unexpected error: " err))
+                    (done)))
+          (.finally
+            (fn []
+              (set! hyperopen.api/post-info! original-post-info)))))))

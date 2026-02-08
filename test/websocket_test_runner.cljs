@@ -7,7 +7,8 @@
             [hyperopen.websocket.client-test]
             [hyperopen.websocket.domain.policy-test]
             [hyperopen.websocket.orderbook-policy-test]
-            [hyperopen.websocket.trades-policy-test]))
+            [hyperopen.websocket.trades-policy-test]
+            [hyperopen.websocket.user-test]))
 
 (defn run-websocket-tests
   []
@@ -16,6 +17,7 @@
              'hyperopen.websocket.application.runtime-reducer-test
              'hyperopen.websocket.domain.policy-test
              'hyperopen.websocket.client-test
+             'hyperopen.websocket.user-test
              'hyperopen.wallet.address-watcher-test
              'hyperopen.websocket.orderbook-policy-test
              'hyperopen.websocket.trades-policy-test))

@@ -133,6 +133,168 @@
     (let [d (js/Date. ms)]
       (.toLocaleString d))))
 
+(defn format-funding-history-time [time-ms]
+  (when time-ms
+    (let [d (js/Date. time-ms)
+          pad2 (fn [v] (.padStart (str v) 2 "0"))]
+      (str (inc (.getMonth d))
+           "/"
+           (.getDate d)
+           "/"
+           (.getFullYear d)
+           " - "
+           (pad2 (.getHours d))
+           ":"
+           (pad2 (.getMinutes d))
+           ":"
+           (pad2 (.getSeconds d))))))
+
+(defn- datetime-local-value [time-ms]
+  (when time-ms
+    (let [d (js/Date. time-ms)
+          pad2 (fn [v] (.padStart (str v) 2 "0"))]
+      (str (.getFullYear d)
+           "-"
+           (pad2 (inc (.getMonth d)))
+           "-"
+           (pad2 (.getDate d))
+           "T"
+           (pad2 (.getHours d))
+           ":"
+           (pad2 (.getMinutes d))))))
+
+(defn- funding-side-value [row]
+  (or (:position-side row)
+      (let [signed-size (parse-num (or (:position-size-raw row)
+                                       (:positionSize row)))]
+        (cond
+          (pos? signed-size) :long
+          (neg? signed-size) :short
+          :else :flat))))
+
+(defn- funding-side-label [position-side]
+  (case position-side
+    :long "Long"
+    :short "Short"
+    :flat "Flat"
+    "Flat"))
+
+(defn- funding-side-class [position-side]
+  (case position-side
+    :long "text-success"
+    :short "text-error"
+    :flat "text-base-content"
+    "text-base-content"))
+
+(defn- funding-size-text [row]
+  (let [size (js/Math.abs (parse-num (or (:position-size-raw row)
+                                         (:positionSize row)
+                                         (:size-raw row))))
+        coin (or (:coin row) "-")]
+    (str (.toLocaleString (js/Number. size)
+                          "en-US"
+                          #js {:minimumFractionDigits 3
+                               :maximumFractionDigits 6})
+         " "
+         coin)))
+
+(defn- funding-payment-node [row]
+  (let [payment (parse-num (or (:payment-usdc-raw row)
+                               (:payment row)))
+        color-class (cond
+                      (neg? payment) "text-error"
+                      (pos? payment) "text-success"
+                      :else "text-base-content")]
+    [:span {:class color-class}
+     (str (.toLocaleString (js/Number. payment)
+                           "en-US"
+                           #js {:minimumFractionDigits 4
+                                :maximumFractionDigits 6})
+          " USDC")]))
+
+(defn- funding-rate-node [row]
+  (let [rate (parse-num (or (:funding-rate-raw row)
+                            (:fundingRate row)))
+        color-class (cond
+                      (neg? rate) "text-error"
+                      (pos? rate) "text-success"
+                      :else "text-base-content")]
+    [:span {:class color-class}
+     (str (.toFixed (* 100 rate) 4) "%")]))
+
+(defn- funding-coin-options [fundings-raw]
+  (->> fundings-raw
+       (map :coin)
+       (filter string?)
+       distinct
+       sort
+       vec))
+
+(defn- funding-history-controls [funding-history-state fundings-raw]
+  (let [filters (or (:filters funding-history-state) {})
+        draft-filters (or (:draft-filters funding-history-state) filters)
+        coin-set (or (:coin-set draft-filters) #{})
+        filter-open? (boolean (:filter-open? funding-history-state))
+        loading? (boolean (:loading? funding-history-state))
+        error (:error funding-history-state)
+        start-time-ms (:start-time-ms draft-filters)
+        end-time-ms (:end-time-ms draft-filters)
+        coin-options (funding-coin-options fundings-raw)]
+    [:div {:class ["border-b" "border-base-300" "bg-base-200"]}
+     [:div {:class ["flex" "items-center" "justify-between" "px-4" "py-2" "text-sm"]}
+      [:div {:class ["flex" "items-center" "gap-2"]}
+       [:button.btn.btn-xs.btn-ghost
+        {:on {:click [[:actions/toggle-funding-history-filter-open]]}}
+        "Filter"]
+       [:button.btn.btn-xs.btn-ghost
+        {:on {:click [[:actions/view-all-funding-history]]}}
+        "View All"]
+       [:button.btn.btn-xs.btn-ghost
+        {:on {:click [[:actions/export-funding-history-csv]]}}
+        "Export as CSV"]]
+      [:div {:class ["flex" "items-center" "gap-2"]}
+       (when loading?
+         [:span {:class ["text-xs" "text-trading-text-secondary"]} "Loading..."])
+       (when error
+         [:span {:class ["text-xs" "text-error"]} (str error)])]]
+     (when filter-open?
+       [:div {:class ["grid" "grid-cols-1" "gap-3" "border-t" "border-base-300" "p-4" "text-sm" "md:grid-cols-2"]}
+        [:div {:class ["space-y-2"]}
+         [:label {:class ["text-xs" "font-medium" "text-trading-text-secondary"]}
+          "Start Time"]
+         [:input.input.input-sm.input-bordered.w-full
+          {:type "datetime-local"
+           :value (or (datetime-local-value start-time-ms) "")
+           :on {:change [[:actions/set-funding-history-filters [:draft-filters :start-time-ms] :event.target/value]]}}]]
+        [:div {:class ["space-y-2"]}
+         [:label {:class ["text-xs" "font-medium" "text-trading-text-secondary"]}
+          "End Time"]
+         [:input.input.input-sm.input-bordered.w-full
+          {:type "datetime-local"
+           :value (or (datetime-local-value end-time-ms) "")
+           :on {:change [[:actions/set-funding-history-filters [:draft-filters :end-time-ms] :event.target/value]]}}]]
+        [:div {:class ["space-y-2" "md:col-span-2"]}
+         [:label {:class ["text-xs" "font-medium" "text-trading-text-secondary"]}
+          "Coins"]
+         (if (seq coin-options)
+           [:div {:class ["flex" "max-h-28" "flex-wrap" "gap-2" "overflow-y-auto" "rounded-md" "border" "border-base-300" "bg-base-100" "p-2"]}
+            (for [coin coin-options]
+              ^{:key coin}
+              [:label {:class ["flex" "items-center" "gap-1" "rounded-md" "px-1" "py-0.5" "hover:bg-base-200"]}
+               [:input.checkbox.checkbox-xs
+                {:type "checkbox"
+                 :checked (contains? coin-set coin)
+                 :on {:change [[:actions/toggle-funding-history-filter-coin coin]]}}]
+               [:span coin]])]
+           [:div {:class ["text-xs" "text-trading-text-secondary"]} "No coin data available for current range."])]
+        [:div {:class ["flex" "items-center" "justify-end" "gap-2" "md:col-span-2"]}
+         [:button.btn.btn-sm.btn-ghost
+          {:on {:click [[:actions/reset-funding-history-filter-draft]]}}
+          "Cancel"]
+         [:button.btn.btn-sm.btn-primary
+          {:on {:click [[:actions/apply-funding-history-filters]]}}
+          "Apply"]]])]))
+
 (defn format-open-orders-time [ms]
   (when ms
     (let [d (js/Date. ms)
@@ -713,24 +875,40 @@
          [:div.text-left (format-timestamp (:time f))]]))
     (empty-state "No fills")))
 
-(defn funding-history-tab-content [fundings]
+(defn- funding-history-table [fundings funding-history-state]
   (if (seq fundings)
     (tab-table-content
-      [:div.grid.grid-cols-5.gap-4.py-2.px-4.bg-base-200.border-b.border-base-300.text-sm.font-medium
-       [:div "Coin"]
-       [:div.text-left "Rate"]
-       [:div.text-left "Payment"]
-       [:div.text-left "Position"]
-       [:div.text-left "Time"]]
-      (for [f fundings]
-        ^{:key (str (:coin f) "-" (:time f))}
-        [:div.grid.grid-cols-5.gap-4.py-3.px-4.border-b.border-base-300.text-sm
-         [:div (:coin f)]
-         [:div.text-left (format-pnl-percentage (* 100 (js/parseFloat (or (:fundingRate f) 0))))]
-         [:div.text-left (format-currency (:payment f))]
-         [:div.text-left (format-currency (:positionSize f))]
-         [:div.text-left (format-timestamp (:time f))]]))
-    (empty-state "No funding history")))
+     [:div.grid.grid-cols-6.gap-4.py-2.px-4.bg-base-200.border-b.border-base-300.text-sm.font-medium
+      [:div "Time"]
+      [:div.text-left "Coin"]
+      [:div.text-left "Size"]
+      [:div.text-left "Position Side"]
+      [:div.text-left "Payment"]
+      [:div.text-left "Rate"]]
+     (for [f fundings]
+       ^{:key (or (:id f)
+                  (str (:time-ms f) "|" (:coin f) "|" (:positionSize f) "|" (:payment f) "|" (:fundingRate f)))}
+       [:div.grid.grid-cols-6.gap-4.py-3.px-4.border-b.border-base-300.text-sm
+        [:div (format-funding-history-time (or (:time-ms f) (:time f)))]
+        [:div.text-left (:coin f)]
+        [:div.text-left (funding-size-text f)]
+        [:div.text-left
+         (let [position-side (funding-side-value f)]
+           [:span {:class (funding-side-class position-side)}
+            (funding-side-label position-side)])]
+        [:div.text-left (funding-payment-node f)]
+        [:div.text-left (funding-rate-node f)]]))
+    (if (:loading? funding-history-state)
+      (empty-state "Loading funding history...")
+      (empty-state "No funding history"))))
+
+(defn funding-history-tab-content
+  ([fundings]
+   (funding-history-table fundings {}))
+  ([fundings funding-history-state fundings-raw]
+   [:div {:class ["flex" "h-full" "min-h-0" "flex-col"]}
+    (funding-history-controls funding-history-state fundings-raw)
+    (funding-history-table fundings funding-history-state)]))
 
 (defn order-history-tab-content [ledger]
   (if (seq ledger)
@@ -750,14 +928,16 @@
     (empty-state "No order history")))
 
 ;; Main tab content renderer
-(defn tab-content [selected-tab webdata2 sort-state hide-small? perp-dex-states open-orders open-orders-sort balance-rows balances-sort]
+(defn tab-content [selected-tab webdata2 sort-state hide-small? perp-dex-states open-orders open-orders-sort balance-rows balances-sort funding-history-state]
   (case selected-tab
     :balances (balances-tab-content balance-rows hide-small? balances-sort)
     :positions (positions-tab-content webdata2 sort-state perp-dex-states)
     :open-orders (open-orders-tab-content open-orders open-orders-sort)
     :twap (placeholder-tab-content :twap)
     :trade-history (trade-history-tab-content (get-in webdata2 [:fills]))
-    :funding-history (funding-history-tab-content (get-in webdata2 [:fundings]))
+    :funding-history (funding-history-tab-content (get-in webdata2 [:fundings])
+                                                  funding-history-state
+                                                  (get-in webdata2 [:fundings-raw]))
     :order-history (order-history-tab-content (get-in webdata2 [:ledger]))
     (empty-state "Unknown tab")))
 
@@ -777,6 +957,7 @@
         open-orders (normalized-open-orders (get-in webdata2 [:open-orders])
                                             (get-in webdata2 [:open-orders-snapshot])
                                             (get-in webdata2 [:open-orders-snapshot-by-dex]))
+        funding-history-state (get-in state [:account-info :funding-history] {})
         tab-counts {:open-orders (count open-orders)
                     :positions (count positions)
                     :balances (count balance-rows)}
@@ -790,7 +971,16 @@
       (cond
         error (error-state error)
         loading? (loading-spinner)
-        :else (tab-content selected-tab webdata2 sort-state hide-small? perp-dex-states open-orders open-orders-sort balance-rows balances-sort))]]))
+        :else (tab-content selected-tab
+                           webdata2
+                           sort-state
+                           hide-small?
+                           perp-dex-states
+                           open-orders
+                           open-orders-sort
+                           balance-rows
+                           balances-sort
+                           funding-history-state))]]))
 
 ;; Main component that takes state and renders the UI
 (defn account-info-view [state]

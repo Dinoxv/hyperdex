@@ -9,6 +9,7 @@
 (def ^:private info-max-retry-ms 5000)
 (def ^:private info-max-inflight 4)
 (def ^:private high-priority-burst 3)
+(def default-funding-history-window-ms (* 7 24 60 60 1000))
 
 (defonce ^:private info-cooldown-until-ms (atom 0))
 (defonce ^:private single-flight-promises (atom {}))
@@ -34,6 +35,161 @@
 
 (defn- now-ms []
   (.now js/Date))
+
+(defn- finite-number?
+  [value]
+  (and (number? value)
+       (not (js/isNaN value))
+       (js/isFinite value)))
+
+(defn- parse-decimal
+  [value]
+  (cond
+    (number? value)
+    (when (finite-number? value) value)
+
+    (string? value)
+    (let [num (js/parseFloat value)]
+      (when (finite-number? num) num))
+
+    :else nil))
+
+(defn- parse-ms
+  [value]
+  (when-let [num (parse-decimal value)]
+    (js/Math.floor num)))
+
+(defn funding-position-side
+  [signed-size]
+  (cond
+    (pos? signed-size) :long
+    (neg? signed-size) :short
+    :else :flat))
+
+(defn funding-history-row-id
+  [time-ms coin signed-size payment-usdc funding-rate]
+  (str time-ms "|" coin "|" signed-size "|" payment-usdc "|" funding-rate))
+
+(defn- normalize-funding-row
+  [{:keys [time-ms coin signed-size payment-usdc funding-rate source]}]
+  (let [time-ms* (parse-ms time-ms)
+        signed-size* (parse-decimal signed-size)
+        payment-usdc* (parse-decimal payment-usdc)
+        funding-rate* (parse-decimal funding-rate)
+        coin* (when (string? coin) coin)]
+    (when (and time-ms*
+               coin*
+               (number? signed-size*)
+               (number? payment-usdc*)
+               (number? funding-rate*))
+      {:id (funding-history-row-id time-ms* coin* signed-size* payment-usdc* funding-rate*)
+       :time-ms time-ms*
+       :time time-ms*
+       :coin coin*
+       :size-raw (js/Math.abs signed-size*)
+       :position-size-raw signed-size*
+       :positionSize signed-size*
+       :position-side (funding-position-side signed-size*)
+       :payment-usdc-raw payment-usdc*
+       :payment payment-usdc*
+       :funding-rate-raw funding-rate*
+       :fundingRate funding-rate*
+       :source source})))
+
+(defn normalize-info-funding-row
+  [row]
+  (let [delta (:delta row)
+        funding-delta? (or (nil? (:type delta))
+                           (= "funding" (:type delta)))]
+    (when (and (map? delta) funding-delta?)
+      (normalize-funding-row {:time-ms (:time row)
+                              :coin (:coin delta)
+                              :signed-size (:szi delta)
+                              :payment-usdc (:usdc delta)
+                              :funding-rate (:fundingRate delta)
+                              :source :info}))))
+
+(defn normalize-info-funding-rows
+  [rows]
+  (->> rows
+       (map normalize-info-funding-row)
+       (remove nil?)
+       vec))
+
+(defn normalize-ws-funding-row
+  [row]
+  (normalize-funding-row {:time-ms (:time row)
+                          :coin (:coin row)
+                          :signed-size (:szi row)
+                          :payment-usdc (:usdc row)
+                          :funding-rate (:fundingRate row)
+                          :source :ws}))
+
+(defn normalize-ws-funding-rows
+  [rows]
+  (->> rows
+       (map normalize-ws-funding-row)
+       (remove nil?)
+       vec))
+
+(defn sort-funding-history-rows
+  [rows]
+  (->> rows
+       (sort-by (fn [row]
+                  [(- (or (:time-ms row) 0))
+                   (or (:id row) "")]))
+       vec))
+
+(defn merge-funding-history-rows
+  [existing incoming]
+  (->> (concat (or existing []) (or incoming []))
+       (reduce (fn [acc row]
+                 (if (and (map? row) (seq (:id row)))
+                   (assoc acc (:id row) row)
+                   acc))
+               {})
+       vals
+       sort-funding-history-rows
+       vec))
+
+(defn normalize-funding-history-filters
+  ([filters]
+   (normalize-funding-history-filters filters (now-ms)))
+  ([filters now]
+   (let [coin-set (->> (or (:coin-set filters) #{})
+                       (keep (fn [coin]
+                               (when (and (string? coin)
+                                          (seq coin))
+                                 coin)))
+                       set)
+         default-end (or (parse-ms now) 0)
+         default-start (max 0 (- default-end default-funding-history-window-ms))
+         start-candidate (parse-ms (:start-time-ms filters))
+         end-candidate (parse-ms (:end-time-ms filters))
+         start-time-ms (or start-candidate default-start)
+         end-time-ms (or end-candidate default-end)
+         [start-ms end-ms] (if (> start-time-ms end-time-ms)
+                             [end-time-ms start-time-ms]
+                             [start-time-ms end-time-ms])]
+     {:coin-set coin-set
+      :start-time-ms start-ms
+      :end-time-ms end-ms})))
+
+(defn filter-funding-history-rows
+  [rows filters]
+  (let [{:keys [coin-set start-time-ms end-time-ms]} (normalize-funding-history-filters filters)
+        use-coin-filter? (seq coin-set)]
+    (->> (or rows [])
+         (filter (fn [row]
+                   (let [time-ms (:time-ms row)
+                         coin (:coin row)]
+                     (and (number? time-ms)
+                          (>= time-ms start-time-ms)
+                          (<= time-ms end-time-ms)
+                          (or (not use-coin-filter?)
+                              (contains? coin-set coin))))))
+         sort-funding-history-rows
+         vec)))
 
 (defn- normalize-priority
   [priority]
@@ -417,6 +573,53 @@
                  (println "Error fetching user fills:" err)
                  (swap! store assoc-in [:orders :fills-error] (str err))
                  (js/Promise.reject err))))))
+
+(defn- user-funding-request-body
+  [address start-time-ms end-time-ms]
+  (cond-> {"type" "userFunding"
+           "user" address}
+    (number? start-time-ms) (assoc "startTime" (js/Math.floor start-time-ms))
+    (number? end-time-ms) (assoc "endTime" (js/Math.floor end-time-ms))))
+
+(defn- fetch-user-funding-page!
+  [address start-time-ms end-time-ms opts]
+  (-> (post-info! (user-funding-request-body address start-time-ms end-time-ms)
+                  (merge {:priority :high}
+                         opts))
+      (.then #(.json %))
+      (.then #(js->clj % :keywordize-keys true))))
+
+(defn- fetch-user-funding-history-loop!
+  [address start-time-ms end-time-ms opts acc]
+  (-> (fetch-user-funding-page! address start-time-ms end-time-ms opts)
+      (.then (fn [payload]
+               (let [rows (normalize-info-funding-rows payload)]
+                 (if (seq rows)
+                   (let [max-time-ms (apply max (map :time-ms rows))
+                         next-start-ms (inc max-time-ms)
+                         acc* (into acc rows)
+                         exhausted? (or (nil? max-time-ms)
+                                        (= next-start-ms start-time-ms)
+                                        (and (number? end-time-ms)
+                                             (> next-start-ms end-time-ms)))]
+                     (if exhausted?
+                       (sort-funding-history-rows acc*)
+                       (fetch-user-funding-history-loop! address next-start-ms end-time-ms opts acc*)))
+                   (sort-funding-history-rows acc)))))))
+
+(defn fetch-user-funding-history!
+  ([store address]
+   (fetch-user-funding-history! store address {}))
+  ([_store address opts]
+   (if-not address
+     (js/Promise.resolve [])
+     (let [{:keys [start-time-ms end-time-ms]} (normalize-funding-history-filters opts)]
+       (fetch-user-funding-history-loop! address
+                                         start-time-ms
+                                         end-time-ms
+                                         (merge {:priority :high}
+                                                (or opts {}))
+                                         [])))))
 
 (defn fetch-spot-meta!
   ([store]

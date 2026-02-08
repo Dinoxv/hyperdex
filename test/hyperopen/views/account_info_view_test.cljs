@@ -304,9 +304,68 @@
     (doseq [idx (range 1 6)]
       (is (contains? (node-class-set (nth trade-header-cells idx)) "text-left"))
       (is (contains? (node-class-set (nth trade-row-cells idx)) "text-left")))
-    (doseq [idx (range 1 5)]
+    (doseq [idx (range 1 6)]
       (is (contains? (node-class-set (nth funding-header-cells idx)) "text-left"))
       (is (contains? (node-class-set (nth funding-row-cells idx)) "text-left")))
     (doseq [idx (range 1 4)]
       (is (contains? (node-class-set (nth order-header-cells idx)) "text-left"))
       (is (contains? (node-class-set (nth order-row-cells idx)) "text-left")))))
+
+(deftest funding-history-panel-renders-controls-and-parity-columns-test
+  (let [funding-row {:id "1700000000000|HYPE|120.0|-0.42|0.0006"
+                     :time-ms 1700000000000
+                     :coin "HYPE"
+                     :size-raw 120.0
+                     :position-size-raw 120.0
+                     :position-side :long
+                     :payment-usdc-raw -0.42
+                     :funding-rate-raw 0.0006}
+        state (-> sample-account-info-state
+                  (assoc-in [:account-info :selected-tab] :funding-history)
+                  (assoc-in [:account-info :funding-history]
+                            {:filters {:coin-set #{}
+                                       :start-time-ms 0
+                                       :end-time-ms 2000000000000}
+                             :draft-filters {:coin-set #{}
+                                             :start-time-ms 0
+                                             :end-time-ms 2000000000000}
+                             :filter-open? false
+                             :loading? false
+                             :error nil})
+                  (assoc-in [:orders :fundings-raw] [funding-row])
+                  (assoc-in [:orders :fundings] [funding-row]))
+        panel (view/account-info-panel state)]
+    (is (some? (find-first-node panel #(contains? (direct-texts %) "Filter"))))
+    (is (some? (find-first-node panel #(contains? (direct-texts %) "View All"))))
+    (is (some? (find-first-node panel #(contains? (direct-texts %) "Export as CSV"))))
+    (is (some? (find-first-node panel #(contains? (direct-texts %) "Position Side"))))
+    (is (some? (find-first-node panel #(contains? (direct-texts %) "Long"))))))
+
+(deftest funding-history-filter-panel-renders-apply-and-cancel-controls-test
+  (let [funding-row {:id "1700000000000|HYPE|120.0|-0.42|0.0006"
+                     :time-ms 1700000000000
+                     :coin "HYPE"
+                     :size-raw 120.0
+                     :position-size-raw 120.0
+                     :position-side :long
+                     :payment-usdc-raw -0.42
+                     :funding-rate-raw 0.0006}
+        state (-> sample-account-info-state
+                  (assoc-in [:account-info :selected-tab] :funding-history)
+                  (assoc-in [:account-info :funding-history]
+                            {:filters {:coin-set #{}
+                                       :start-time-ms 0
+                                       :end-time-ms 2000000000000}
+                             :draft-filters {:coin-set #{"HYPE"}
+                                             :start-time-ms 1700000000000
+                                             :end-time-ms 1700100000000}
+                             :filter-open? true
+                             :loading? false
+                             :error nil})
+                  (assoc-in [:orders :fundings-raw] [funding-row])
+                  (assoc-in [:orders :fundings] [funding-row]))
+        panel (view/account-info-panel state)
+        datetime-input (find-first-node panel #(= "datetime-local" (get-in % [1 :type])))]
+    (is (some? datetime-input))
+    (is (some? (find-first-node panel #(contains? (direct-texts %) "Apply"))))
+    (is (some? (find-first-node panel #(contains? (direct-texts %) "Cancel"))))))
