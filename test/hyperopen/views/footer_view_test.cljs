@@ -26,6 +26,15 @@
                 (second node))]
     (set (class-values (:class attrs)))))
 
+(defn- footer-link-nodes [node]
+  (let [links ["Docs" "Support" "Terms" "Privacy Policy"]]
+    (keep (fn [label]
+            (find-node #(and (vector? %)
+                             (= :a (first %))
+                             (= label (last %)))
+                       node))
+          links)))
+
 (deftest retry-button-visible-when-disconnected-test
   (let [view (footer-view/footer-view {:websocket {:status :disconnected}})
         retry-btn (find-node #(and (vector? %)
@@ -61,3 +70,13 @@
         class-attr (get-in view [1 :class])]
     (is (coll? class-attr))
     (is (not (string? class-attr)))))
+
+(deftest footer-links-use-standard-white-12px-typography-test
+  (let [view (footer-view/footer-view {:websocket {:status :connected}})
+        links (footer-link-nodes view)]
+    (is (= 4 (count links)))
+    (doseq [link links]
+      (let [classes (set (class-values (get-in link [1 :class])))]
+        (is (contains? classes "text-sm"))
+        (is (contains? classes "text-trading-text"))
+        (is (not (contains? classes "opacity-70")))))))

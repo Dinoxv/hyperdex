@@ -1,5 +1,8 @@
 (ns hyperopen.views.footer-view)
 
+(def footer-link-classes
+  ["text-sm" "text-trading-text" "hover:text-primary" "transition-colors"])
+
 (defn- websocket-status-ui [status]
   (case status
     :connected {:dot-border "border-success"
@@ -39,11 +42,15 @@
 
        ;; Footer Links
        [:div.flex.space-x-6
-        [:a.text-base-content.opacity-70.hover:opacity-100.hover:text-primary.transition-colors
-         {:href "#"} "Docs"]
-        [:a.text-base-content.opacity-70.hover:opacity-100.hover:text-primary.transition-colors
-         {:href "#"} "Support"]
-        [:a.text-base-content.opacity-70.hover:opacity-100.hover:text-primary.transition-colors
-         {:href "#"} "Terms"]
-        [:a.text-base-content.opacity-70.hover:opacity-100.hover:text-primary.transition-colors
-         {:href "#"} "Privacy Policy"]]]]]))
+        [:a {:class footer-link-classes
+             :href "#"}
+         "Docs"]
+        [:a {:class footer-link-classes
+             :href "#"}
+         "Support"]
+        [:a {:class footer-link-classes
+             :href "#"}
+         "Terms"]
+        [:a {:class footer-link-classes
+             :href "#"}
+         "Privacy Policy"]]]]]))
