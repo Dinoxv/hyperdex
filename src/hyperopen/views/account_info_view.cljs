@@ -196,8 +196,7 @@
 
 (def ^:private position-coin-cell-style
   {:background "linear-gradient(90deg, rgb(31, 166, 125) 0px, rgb(31, 166, 125) 4px, rgb(11, 50, 38) 4px, transparent 100%) transparent"
-   :padding-left "12px"
-   :margin-left "-12px"})
+   :padding-left "12px"})
 
 (defn- non-blank-text [value]
   (let [text (some-> value str str/trim)]
@@ -863,7 +862,7 @@
         liq-price (:liquidationPx pos)
         margin (:marginUsed pos)
         funding (get-in pos [:cumFunding :allTime])]
-    [:div.grid.grid-cols-11.gap-2.py-0.px-3.hover:bg-base-300.items-center.text-sm
+    [:div.grid.grid-cols-11.gap-2.py-0.pr-3.hover:bg-base-300.items-center.text-sm
      ;; Coin with leverage and dex chips
      [:div {:class ["flex" "items-center" "gap-1.5" "min-w-0" "self-stretch"]
             :style position-coin-cell-style}
@@ -951,8 +950,8 @@
 
 ;; Position table header with sorting
 (defn position-table-header [sort-state]
-  [:div.grid.grid-cols-11.gap-2.py-1.px-3.bg-base-200
-   [:div.text-left (sortable-header "Coin" sort-state)]
+  [:div.grid.grid-cols-11.gap-2.py-1.pr-3.bg-base-200
+   [:div.text-left.pl-3 (sortable-header "Coin" sort-state)]
    [:div.text-left (sortable-header "Size" sort-state)]
    [:div.text-left (sortable-header "Position Value" sort-state)]
    [:div.text-left (sortable-header "Entry Price" sort-state)]

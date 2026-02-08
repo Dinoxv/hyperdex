@@ -165,6 +165,12 @@
     (is (contains? (node-class-set sortable-node) "text-trading-text-secondary"))
     (is (contains? (node-class-set sortable-node) "hover:text-trading-text"))))
 
+(deftest position-header-coin-cell-includes-left-padding-class-test
+  (let [position-header-node (view/position-table-header default-sort-state)
+        header-cells (vec (node-children position-header-node))
+        coin-header-cell (nth header-cells 0)]
+    (is (contains? (node-class-set coin-header-cell) "pl-3"))))
+
 (deftest open-orders-sortable-header-uses-secondary-text-and-hover-affordance-test
   (let [header-node (view/sortable-open-orders-header "Time" {:column "Time" :direction :asc})]
     (is (contains? (node-class-set header-node) "text-trading-text-secondary"))
@@ -460,9 +466,13 @@
     (doseq [[tab-key content] contents
             :let [row-classes (node-class-set (first-viewport-row content))]]
       (if (= tab-key :positions)
-        (is (contains? row-classes "py-0"))
-        (is (contains? row-classes "py-px")))
-      (is (contains? row-classes "px-3"))
+        (do
+          (is (contains? row-classes "py-0"))
+          (is (contains? row-classes "pr-3"))
+          (is (not (contains? row-classes "px-3"))))
+        (do
+          (is (contains? row-classes "py-px"))
+          (is (contains? row-classes "px-3"))))
       (is (contains? row-classes "gap-2")))))
 
 (deftest account-info-table-headers-use-compact-density-classes-test
@@ -489,10 +499,14 @@
                   [:trade-history (view/trade-history-tab-content fills)]
                   [:funding-history (view/funding-history-tab-content fundings)]
                   [:order-history (view/order-history-tab-content ledger)]]]
-    (doseq [[_ content] contents
+    (doseq [[tab-key content] contents
             :let [header-classes (node-class-set (tab-header-node content))]]
       (is (contains? header-classes "py-1"))
-      (is (contains? header-classes "px-3"))
+      (if (= tab-key :positions)
+        (do
+          (is (contains? header-classes "pr-3"))
+          (is (not (contains? header-classes "px-3"))))
+        (is (contains? header-classes "px-3")))
       (is (contains? header-classes "gap-2")))))
 
 (deftest balance-row-primary-value-and-action-contrast-test
@@ -590,7 +604,7 @@
     (is (= expected-background
            (get-in coin-cell [1 :style :background])))
     (is (= "12px" (get-in coin-cell [1 :style :padding-left])))
-    (is (= "-12px" (get-in coin-cell [1 :style :margin-left])))
+    (is (nil? (get-in coin-cell [1 :style :margin-left])))
     (is (nil? (get-in coin-cell [1 :style :padding-right])))
     (is (contains? (node-class-set coin-cell) "self-stretch"))))
 
