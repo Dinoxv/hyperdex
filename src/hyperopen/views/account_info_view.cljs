@@ -2007,22 +2007,22 @@
        [:div.grid.grid-cols-6.gap-2.py-1.px-3.bg-base-200.text-sm.font-medium
         [:div (sortable-funding-history-header "Time" sort-state)]
         [:div.text-left (sortable-funding-history-header "Coin" sort-state)]
-        [:div.text-right (sortable-funding-history-header "Size" sort-state)]
+        [:div.text-left (sortable-funding-history-header "Size" sort-state)]
         [:div.text-left (sortable-funding-history-header "Position Side" sort-state)]
-        [:div.text-right (sortable-funding-history-header "Payment" sort-state)]
-        [:div.text-right (sortable-funding-history-header "Rate" sort-state)]]
+        [:div.text-left (sortable-funding-history-header "Payment" sort-state)]
+        [:div.text-left (sortable-funding-history-header "Rate" sort-state)]]
        (for [f rows]
          ^{:key (funding-row-sort-id f)}
          [:div.grid.grid-cols-6.gap-2.py-px.px-3.hover:bg-base-300.text-sm
           [:div (format-funding-history-time (or (:time-ms f) (:time f)))]
           [:div.text-left (:coin f)]
-          [:div.text-right.num.num-right (funding-size-text f)]
+          [:div.text-left.num (funding-size-text f)]
           [:div.text-left
            (let [position-side (funding-side-value f)]
              [:span {:class (funding-side-class position-side)}
               (funding-side-label position-side)])]
-          [:div.text-right.num.num-right (funding-payment-node f)]
-          [:div.text-right.num.num-right (funding-rate-node f)]])
+          [:div.text-left.num (funding-payment-node f)]
+          [:div.text-left.num (funding-rate-node f)]])
        (funding-history-pagination-controls pagination))
       (if (:loading? funding-history-state)
         (empty-state "Loading funding history...")

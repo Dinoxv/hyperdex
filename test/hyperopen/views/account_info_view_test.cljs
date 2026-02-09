@@ -906,12 +906,9 @@
     (doseq [idx [3 4 5 6 7]]
       (is (contains? (node-class-set (nth trade-header-cells idx)) "text-right"))
       (is (contains? (node-class-set (nth trade-row-cells idx)) "text-right")))
-    (doseq [idx [1 3]]
+    (doseq [idx [1 2 3 4 5]]
       (is (contains? (node-class-set (nth funding-header-cells idx)) "text-left"))
       (is (contains? (node-class-set (nth funding-row-cells idx)) "text-left")))
-    (doseq [idx [2 4 5]]
-      (is (contains? (node-class-set (nth funding-header-cells idx)) "text-right"))
-      (is (contains? (node-class-set (nth funding-row-cells idx)) "text-right")))
     (doseq [idx [1 2 3 8 9 10 11 12]]
       (is (contains? (node-class-set (nth order-header-cells idx)) "text-left"))
       (is (contains? (node-class-set (nth order-row-cells idx)) "text-left")))
