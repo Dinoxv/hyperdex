@@ -83,3 +83,20 @@
     (testing "active header link color matches target accent"
       (is (re-find #"\.header-nav-link-active\s*\{[\s\S]*?color:\s*rgb\(151 252 228\);[\s\S]*?\}"
                    styles-source)))))
+
+(deftest order-size-slider-css-uses-progress-track-and-no-filler-trail-test
+  (let [styles-path (join-path (project-root) "src" "styles" "main.css")
+        styles-source (read-text styles-path)]
+    (testing "order size slider active fill stays darker than notch accents"
+      (is (re-find #"\.order-size-slider\.range\s*\{[^}]*--order-size-slider-active:\s*rgb\(15,\s*51,\s*51\);"
+                   styles-source)))
+    (testing "order size slider track fills from explicit progress variable"
+      (is (re-find #"\.order-size-slider\.range::-webkit-slider-runnable-track\s*\{[^}]*var\(--order-size-slider-progress\)"
+                   styles-source))
+      (is (re-find #"\.order-size-slider\.range::-moz-range-track\s*\{[^}]*var\(--order-size-slider-progress\)"
+                   styles-source)))
+    (testing "order size slider thumb avoids daisy filler shadow trail"
+      (is (not (re-find #"\.order-size-slider\.range::-webkit-slider-thumb\s*\{[^}]*calc\(var\(--filler-size\)"
+                        styles-source)))
+      (is (not (re-find #"\.order-size-slider\.range::-moz-range-thumb\s*\{[^}]*calc\(var\(--filler-size\)"
+                        styles-source))))))

@@ -452,6 +452,7 @@
         max-leverage (trading/market-max-leverage state)
         next-lev (next-leverage ui-leverage max-leverage)
         size-percent (trading/clamp-percent (:size-percent normalized-form))
+        notch-overlap-threshold 4
         raw-price (or (:price normalized-form) "")
         fallback-limit-price (when limit-like?
                                (trading/effective-limit-price-string state normalized-form))
@@ -549,6 +550,7 @@
                  :min 0
                  :max 100
                  :step 1
+                 :style {"--order-size-slider-progress" (str size-percent "%")}
                  :value size-percent
                  :on {:input [[:actions/set-order-size-percent [:event.target/value]]]}}]
         [:div {:class ["order-size-slider-notches"
@@ -556,7 +558,7 @@
                        "absolute"
                        "inset-x-0"
                        "top-1/2"
-                       "z-10"
+                       "z-30"
                        "flex"
                        "items-center"
                        "justify-between"
@@ -569,9 +571,13 @@
                            "w-[7px]"
                            "-translate-y-1/2"
                            "rounded-full"]
-                          [(if (>= size-percent pct)
-                             "order-size-slider-notch-active"
-                             "order-size-slider-notch-inactive")])}])]]
+                          (remove nil?
+                                  [(if (>= size-percent pct)
+                                     "order-size-slider-notch-active"
+                                     "order-size-slider-notch-inactive")
+                                   (when (<= (js/Math.abs (- size-percent pct))
+                                             notch-overlap-threshold)
+                                     "opacity-0")]))}])]]
        [:div {:class ["relative" "w-[82px]"]}
         [:input {:class ["order-size-percent-input"
                          "h-10"
