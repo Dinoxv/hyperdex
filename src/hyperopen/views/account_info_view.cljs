@@ -1,5 +1,6 @@
 (ns hyperopen.views.account-info-view
   (:require [clojure.string :as str]
+            [hyperopen.asset-selector.markets :as markets]
             [hyperopen.utils.formatting :as fmt]))
 
 ;; Available tabs for the account info component
@@ -266,6 +267,27 @@
            :base (non-blank-text suffix)})
         {:prefix nil
          :base coin*}))))
+
+(defn- symbol-base-label [symbol]
+  (let [symbol* (non-blank-text symbol)]
+    (when symbol*
+      (let [parts (cond
+                    (str/includes? symbol* "/") (str/split symbol* #"/" 2)
+                    (str/includes? symbol* "-") (str/split symbol* #"-" 2)
+                    :else [symbol*])]
+        (non-blank-text (first parts))))))
+
+(defn- resolve-coin-display [coin market-by-key]
+  (let [coin* (non-blank-text coin)
+        parsed (parse-coin-namespace coin*)
+        market (markets/resolve-market-by-coin (or market-by-key {}) coin*)
+        market-base (or (non-blank-text (:base market))
+                        (symbol-base-label (:symbol market))
+                        (some-> (:coin market) parse-coin-namespace :base))
+        base-label (or market-base (:base parsed) coin* "-")
+        prefix-label (:prefix parsed)]
+    {:base-label base-label
+     :prefix-label prefix-label}))
 
 (defn- funding-filter-coin-label [coin]
   (let [coin* (non-blank-text coin)
@@ -724,15 +746,15 @@
     (or (get order-history-status-labels status-key)
         (title-case-label status))))
 
-(defn- order-history-coin-node [coin]
-  (let [coin* (non-blank-text coin)
-        parsed (parse-coin-namespace coin*)
-        base-label (or (:base parsed) coin* "-")
-        prefix-label (:prefix parsed)]
-    [:span {:class ["flex" "items-center" "gap-1.5" "min-w-0"]}
-     [:span {:class ["truncate"]} base-label]
-     (when prefix-label
-       [:span {:class position-chip-classes} prefix-label])]))
+(defn- order-history-coin-node
+  ([coin]
+   (order-history-coin-node coin {}))
+  ([coin market-by-key]
+   (let [{:keys [base-label prefix-label]} (resolve-coin-display coin market-by-key)]
+     [:span {:class ["flex" "items-center" "gap-1.5" "min-w-0"]}
+      [:span {:class ["truncate"]} base-label]
+      (when prefix-label
+        [:span {:class position-chip-classes} prefix-label])])))
 
 (defn normalize-order-history-row [row]
   (let [root (or (:order row) row)
@@ -1522,6 +1544,7 @@
 (defn- order-history-table [order-history order-history-state]
   (let [sort-state (order-history-sort-state order-history-state)
         status-filter (order-history-status-filter-key order-history-state)
+        market-by-key (or (:market-by-key order-history-state) {})
         normalized (normalized-order-history order-history)
         filtered (vec (order-history-filter-status normalized status-filter))
         sorted (vec (sort-order-history-by-column filtered
@@ -1549,7 +1572,7 @@
          [:div {:class ["grid" "gap-2" "py-px" "px-3" "hover:bg-base-300" "text-xs" "grid-cols-[130px_70px_90px_80px_90px_90px_110px_80px_90px_140px_70px_80px_120px]"]}
           [:div.pr-2.whitespace-nowrap (or (format-open-orders-time (:time-ms row)) "--")]
           [:div.pl-1.text-left (title-case-label (:type row))]
-          [:div.text-left (order-history-coin-node (:coin row))]
+          [:div.text-left (order-history-coin-node (:coin row) market-by-key)]
           [:div {:class ["text-left" (direction-class (:side row))]} (direction-label (:side row))]
           [:div.text-left (format-order-history-size (:size row))]
           [:div.text-left (format-order-history-filled-size (:filled-size row))]
@@ -1607,7 +1630,8 @@
                                             (get-in webdata2 [:open-orders-snapshot])
                                             (get-in webdata2 [:open-orders-snapshot-by-dex]))
         funding-history-state (get-in state [:account-info :funding-history] {})
-        order-history-state (get-in state [:account-info :order-history] {})
+        order-history-state (assoc (get-in state [:account-info :order-history] {})
+                                   :market-by-key (get-in state [:asset-selector :market-by-key] {}))
         tab-counts {:open-orders (count open-orders)
                     :positions (count positions)
                     :balances (count balance-rows)}

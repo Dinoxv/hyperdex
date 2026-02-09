@@ -764,6 +764,31 @@
     (is (contains? strings "Filled"))
     (is (contains? strings "Canceled"))))
 
+(deftest order-history-coin-label-prefers-market-base-for-spot-id-test
+  (let [rows [{:order {:coin "@230"
+                       :oid 307891000622
+                       :side "B"
+                       :origSz "0.500"
+                       :remainingSz "0.000"
+                       :limitPx "0.000"
+                       :orderType "Market"
+                       :reduceOnly false
+                       :isTrigger false
+                       :isPositionTpsl false
+                       :timestamp 1700000000000}
+               :status "filled"
+               :statusTimestamp 1700000005000}]
+        content (view/order-history-tab-content rows {:sort {:column "Time" :direction :desc}
+                                                      :status-filter :all
+                                                      :loading? false
+                                                      :market-by-key {"spot:@230" {:coin "@230"
+                                                                                    :symbol "SOL/USDC"
+                                                                                    :base "SOL"
+                                                                                    :market-type :spot}}})
+        strings (set (collect-strings content))]
+    (is (contains? strings "SOL"))
+    (is (not (contains? strings "@230")))))
+
 (deftest order-history-formatting-distinguishes-market-price-and-filled-size-placeholder-test
   (let [market-row (view/normalize-order-history-row
                     {:order {:coin "NVDA"
