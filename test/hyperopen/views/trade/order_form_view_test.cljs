@@ -433,6 +433,44 @@
     (is (not (contains? price-class "bg-transparent")))
     (is (not (contains? size-class "bg-transparent")))))
 
+(deftest price-and-size-rows-render-persistent-leading-labels-and-balanced-input-padding-test
+  (let [view-node (view/order-form-view (base-state {:type :limit
+                                                      :price "87.996"
+                                                      :size-display "1854.37"}))
+        price-label (find-first-node view-node
+                                     (fn [node]
+                                       (let [attrs (when (map? (second node)) (second node))
+                                             classes (set (:class attrs))]
+                                         (and (= :span (first node))
+                                              (contains? classes "order-row-input-label")
+                                              (some #{"Price (USDC)"} (collect-strings node))))))
+        size-label (find-first-node view-node
+                                    (fn [node]
+                                      (let [attrs (when (map? (second node)) (second node))
+                                            classes (set (:class attrs))]
+                                        (and (= :span (first node))
+                                             (contains? classes "order-row-input-label")
+                                             (some #{"Size"} (collect-strings node))))))
+        price-input (find-first-node view-node
+                                     (fn [node]
+                                       (let [attrs (when (map? (second node)) (second node))]
+                                         (and (= :input (first node))
+                                              (= "Price (USDC)" (:placeholder attrs))))))
+        size-input (find-first-node view-node
+                                    (fn [node]
+                                      (let [attrs (when (map? (second node)) (second node))]
+                                        (and (= :input (first node))
+                                             (= "Size" (:placeholder attrs))))))
+        price-classes (set (get-in price-input [1 :class]))
+        size-classes (set (get-in size-input [1 :class]))]
+    (is (some? price-label))
+    (is (some? size-label))
+    (is (contains? price-classes "pl-24"))
+    (is (contains? size-classes "pl-24"))
+    (is (contains? price-classes "pr-14"))
+    (is (not (contains? price-classes "pr-20")))
+    (is (contains? size-classes "pr-20"))))
+
 (deftest size-row-preserves-input-value-and-resolves-quote-symbol-fallback-test
   (let [state (-> (base-state {:type :limit :price "" :size "1" :size-display "1"})
                   (assoc :active-market {:coin "BTC"

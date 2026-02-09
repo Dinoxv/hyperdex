@@ -49,11 +49,23 @@
            :value (or value "")
            :on {:input on-change}}])
 
-(defn- row-input [value placeholder on-change accessory]
+(defn- row-input [value placeholder on-change accessory & {:keys [input-padding-right]
+                                                           :or {input-padding-right "pr-20"}}]
   [:div {:class ["relative" "w-full"]}
+   [:span {:class ["order-row-input-label"
+                   "pointer-events-none"
+                   "absolute"
+                   "left-3"
+                   "top-1/2"
+                   "-translate-y-1/2"
+                   "max-w-[52%]"
+                   "truncate"
+                   "text-sm"
+                   "text-gray-500"]}
+    placeholder]
    [:input {:class (into ["w-full"
                           "h-11"
-                          "px-3"
+                          "pl-24"
                           "bg-base-200"
                           "border"
                           "border-base-300"
@@ -62,11 +74,12 @@
                           "text-right"
                           "text-gray-100"
                           "num"
-                          "placeholder:text-gray-500"
+                          "placeholder:text-transparent"
                           "outline-none"
                           "appearance-none"]
-                         (when accessory ["pr-28"]))
+                         (if accessory [input-padding-right] ["pr-3"]))
             :type "text"
+            :aria-label placeholder
             :placeholder placeholder
             :value (or value "")
             :on {:input on-change}}]
@@ -541,7 +554,8 @@
         (row-input display-price
                    (str "Price (" quote-symbol ")")
                    [[:actions/update-order-form [:price] [:event.target/value]]]
-                   (price-context-accessory state normalized-form)))
+                   (price-context-accessory state normalized-form)
+                   :input-padding-right "pr-14"))
 
       (row-input size-display
                  "Size"
