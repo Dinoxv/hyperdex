@@ -335,6 +335,93 @@
         (is (= 50
                (get-in @store [:account-info :funding-history :page-size])))))))
 
+(deftest trade-history-pagination-page-size-normalizes-and-persists-test
+  (with-test-local-storage
+    (fn []
+      (let [state {:account-info {:trade-history {:page-size 25
+                                                  :page 8
+                                                  :page-input "8"}}}
+            effects (core/set-trade-history-page-size state "100")]
+        (is (= [[:effects/save-many [[[:account-info :trade-history :page-size] 100]
+                                     [[:account-info :trade-history :page] 1]
+                                     [[:account-info :trade-history :page-input] "1"]]]]
+               effects))
+        (is (= "100" (.getItem js/localStorage "trade-history-page-size")))
+        (let [invalid-effects (core/set-trade-history-page-size state "13")]
+          (is (= [[:effects/save-many [[[:account-info :trade-history :page-size] 50]
+                                       [[:account-info :trade-history :page] 1]
+                                       [[:account-info :trade-history :page-input] "1"]]]]
+                 invalid-effects))
+          (is (= "50" (.getItem js/localStorage "trade-history-page-size"))))))))
+
+(deftest trade-history-pagination-set-page-clamps-and-syncs-input-test
+  (let [state {:account-info {:trade-history {:page 2
+                                              :page-input "2"}}}
+        within (core/set-trade-history-page state 3 5)
+        too-high (core/set-trade-history-page state 99 5)
+        too-low (core/set-trade-history-page state -2 5)]
+    (is (= [[:effects/save-many [[[:account-info :trade-history :page] 3]
+                                 [[:account-info :trade-history :page-input] "3"]]]]
+           within))
+    (is (= [[:effects/save-many [[[:account-info :trade-history :page] 5]
+                                 [[:account-info :trade-history :page-input] "5"]]]]
+           too-high))
+    (is (= [[:effects/save-many [[[:account-info :trade-history :page] 1]
+                                 [[:account-info :trade-history :page-input] "1"]]]]
+           too-low))))
+
+(deftest trade-history-pagination-next-prev-and-input-apply-test
+  (let [state {:account-info {:trade-history {:page 2
+                                              :page-input "2"}}}
+        next-effects (core/next-trade-history-page state 3)
+        prev-effects (core/prev-trade-history-page state 3)
+        at-end-effects (core/next-trade-history-page
+                        {:account-info {:trade-history {:page 3 :page-input "3"}}}
+                        3)
+        typed-state {:account-info {:trade-history {:page 1 :page-input "12"}}}
+        apply-effects (core/apply-trade-history-page-input typed-state 4)
+        invalid-apply-effects (core/apply-trade-history-page-input
+                               {:account-info {:trade-history {:page 1 :page-input "abc"}}}
+                               4)
+        keydown-effects (core/handle-trade-history-page-input-keydown typed-state "Enter" 4)
+        keydown-nop (core/handle-trade-history-page-input-keydown typed-state "Escape" 4)]
+    (is (= [[:effects/save-many [[[:account-info :trade-history :page] 3]
+                                 [[:account-info :trade-history :page-input] "3"]]]]
+           next-effects))
+    (is (= [[:effects/save-many [[[:account-info :trade-history :page] 1]
+                                 [[:account-info :trade-history :page-input] "1"]]]]
+           prev-effects))
+    (is (= [[:effects/save-many [[[:account-info :trade-history :page] 3]
+                                 [[:account-info :trade-history :page-input] "3"]]]]
+           at-end-effects))
+    (is (= [[:effects/save-many [[[:account-info :trade-history :page] 4]
+                                 [[:account-info :trade-history :page-input] "4"]]]]
+           apply-effects))
+    (is (= [[:effects/save-many [[[:account-info :trade-history :page] 1]
+                                 [[:account-info :trade-history :page-input] "1"]]]]
+           invalid-apply-effects))
+    (is (= apply-effects keydown-effects))
+    (is (= [] keydown-nop))))
+
+(deftest restore-trade-history-pagination-settings-uses-defaults-and-stored-size-test
+  (with-test-local-storage
+    (fn []
+      (.setItem js/localStorage "trade-history-page-size" "100")
+      (let [store (atom {:account-info {:trade-history {:page-size 25
+                                                        :page 4
+                                                        :page-input "4"}}})]
+        (core/restore-trade-history-pagination-settings! store)
+        (is (= {:page-size 100
+                :page 1
+                :page-input "1"}
+               (select-keys (get-in @store [:account-info :trade-history])
+                            [:page-size :page :page-input]))))
+      (.setItem js/localStorage "trade-history-page-size" "13")
+      (let [store (atom {:account-info {:trade-history {}}})]
+        (core/restore-trade-history-pagination-settings! store)
+        (is (= 50
+               (get-in @store [:account-info :trade-history :page-size])))))))
+
 (deftest select-account-info-tab-order-history-saves-selection-before-fetch-test
   (let [state {:account-info {:selected-tab :balances
                               :order-history {:request-id 2}}}

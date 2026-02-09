@@ -80,6 +80,11 @@
    :error nil
    :request-id 0})
 
+(defn- default-trade-history-state []
+  {:page-size default-order-history-page-size
+   :page 1
+   :page-input "1"})
+
 ;; App state
 (defonce store (atom {:websocket {:status :disconnected
                                   :attempt 0
@@ -146,6 +151,7 @@
                                      :balances-sort {:column nil :direction :asc}
                                      :positions-sort {:column nil :direction :asc}
                                      :open-orders-sort {:column "Time" :direction :desc}
+                                     :trade-history (default-trade-history-state)
                                      :funding-history (default-funding-history-state)
                                      :order-history (default-order-history-state)}}))
 
@@ -463,6 +469,14 @@
   (let [page-size (normalize-order-history-page-size
                    (js/localStorage.getItem "funding-history-page-size"))]
     (swap! store update-in [:account-info :funding-history] merge
+           {:page-size page-size
+            :page 1
+            :page-input "1"})))
+
+(defn restore-trade-history-pagination-settings! [store]
+  (let [page-size (normalize-order-history-page-size
+                   (js/localStorage.getItem "trade-history-page-size"))]
+    (swap! store update-in [:account-info :trade-history] merge
            {:page-size page-size
             :page 1
             :page-input "1"})))
@@ -820,6 +834,43 @@
 (defn handle-funding-history-page-input-keydown [state key max-page]
   (if (= key "Enter")
     (apply-funding-history-page-input state max-page)
+    []))
+
+(defn set-trade-history-page-size [state page-size]
+  (let [page-size* (normalize-order-history-page-size page-size)]
+    (js/localStorage.setItem "trade-history-page-size" (str page-size*))
+    [[:effects/save-many [[[:account-info :trade-history :page-size] page-size*]
+                          [[:account-info :trade-history :page] 1]
+                          [[:account-info :trade-history :page-input] "1"]]]]))
+
+(defn set-trade-history-page [state page max-page]
+  (let [page* (normalize-order-history-page page max-page)]
+    [[:effects/save-many [[[:account-info :trade-history :page] page*]
+                          [[:account-info :trade-history :page-input] (str page*)]]]]))
+
+(defn next-trade-history-page [state max-page]
+  (let [current-page (get-in state [:account-info :trade-history :page] 1)]
+    (set-trade-history-page state (inc current-page) max-page)))
+
+(defn prev-trade-history-page [state max-page]
+  (let [current-page (get-in state [:account-info :trade-history :page] 1)]
+    (set-trade-history-page state (dec current-page) max-page)))
+
+(defn set-trade-history-page-input [_state input-value]
+  [[:effects/save [:account-info :trade-history :page-input]
+    (if (string? input-value)
+      input-value
+      (str (or input-value "")))]] )
+
+(defn apply-trade-history-page-input [state max-page]
+  (let [raw-value (get-in state [:account-info :trade-history :page-input] "")
+        page* (normalize-order-history-page raw-value max-page)]
+    [[:effects/save-many [[[:account-info :trade-history :page] page*]
+                          [[:account-info :trade-history :page-input] (str page*)]]]]))
+
+(defn handle-trade-history-page-input-keydown [state key max-page]
+  (if (= key "Enter")
+    (apply-trade-history-page-input state max-page)
     []))
 
 (defn sort-order-history [state column]
@@ -1401,6 +1452,13 @@
 (nxr/register-action! :actions/set-funding-history-page-input set-funding-history-page-input)
 (nxr/register-action! :actions/apply-funding-history-page-input apply-funding-history-page-input)
 (nxr/register-action! :actions/handle-funding-history-page-input-keydown handle-funding-history-page-input-keydown)
+(nxr/register-action! :actions/set-trade-history-page-size set-trade-history-page-size)
+(nxr/register-action! :actions/set-trade-history-page set-trade-history-page)
+(nxr/register-action! :actions/next-trade-history-page next-trade-history-page)
+(nxr/register-action! :actions/prev-trade-history-page prev-trade-history-page)
+(nxr/register-action! :actions/set-trade-history-page-input set-trade-history-page-input)
+(nxr/register-action! :actions/apply-trade-history-page-input apply-trade-history-page-input)
+(nxr/register-action! :actions/handle-trade-history-page-input-keydown handle-trade-history-page-input-keydown)
 (nxr/register-action! :actions/sort-positions sort-positions)
 (nxr/register-action! :actions/sort-balances sort-balances)
 (nxr/register-action! :actions/sort-open-orders sort-open-orders)
@@ -1636,6 +1694,8 @@
   (restore-open-orders-sort-settings! store)
   ;; Restore funding history pagination settings from localStorage
   (restore-funding-history-pagination-settings! store)
+  ;; Restore trade history pagination settings from localStorage
+  (restore-trade-history-pagination-settings! store)
   ;; Restore order history pagination settings from localStorage
   (restore-order-history-pagination-settings! store)
   ;; Initialize wallet system

@@ -166,6 +166,16 @@
    :payment-usdc-raw (/ idx 1000)
    :funding-rate-raw (/ idx 1000000)})
 
+(defn- trade-history-row
+  [idx]
+  {:tid idx
+   :coin (if (odd? idx) "BTC" "ETH")
+   :side (if (odd? idx) "B" "A")
+   :sz "1.25"
+   :px "100.5"
+   :fee "0.05"
+   :time (+ 1700000000000 idx)})
+
 (def sample-account-info-state
   {:account-info {:selected-tab :balances
                   :loading false
@@ -730,6 +740,74 @@
     (doseq [idx (range 1 13)]
       (is (contains? (node-class-set (nth order-header-cells idx)) "text-left"))
       (is (contains? (node-class-set (nth order-row-cells idx)) "text-left")))))
+
+(deftest trade-history-pagination-renders-only-current-page-rows-test
+  (let [rows (mapv trade-history-row (range 55))
+        content (@#'view/trade-history-table rows {:page-size 25
+                                                   :page 2
+                                                   :page-input "2"})
+        viewport (tab-rows-viewport-node content)
+        rendered-rows (vec (node-children viewport))
+        all-strings (set (collect-strings content))]
+    (is (= 25 (count rendered-rows)))
+    (is (contains? all-strings "Page 2 of 3"))
+    (is (contains? all-strings "Total: 55"))))
+
+(deftest trade-history-pagination-controls-disable-prev-next-at-edges-test
+  (let [rows (mapv trade-history-row (range 51))
+        first-page (@#'view/trade-history-table rows {:page-size 25
+                                                      :page 1
+                                                      :page-input "1"})
+        first-prev (find-first-node first-page #(and (= :button (first %))
+                                                     (contains? (direct-texts %) "Prev")))
+        first-next (find-first-node first-page #(and (= :button (first %))
+                                                     (contains? (direct-texts %) "Next")))
+        last-page (@#'view/trade-history-table rows {:page-size 25
+                                                     :page 3
+                                                     :page-input "3"})
+        last-prev (find-first-node last-page #(and (= :button (first %))
+                                                   (contains? (direct-texts %) "Prev")))
+        last-next (find-first-node last-page #(and (= :button (first %))
+                                                   (contains? (direct-texts %) "Next")))]
+    (is (= true (get-in first-prev [1 :disabled])))
+    (is (not= true (get-in first-next [1 :disabled])))
+    (is (not= true (get-in last-prev [1 :disabled])))
+    (is (= true (get-in last-next [1 :disabled])))))
+
+(deftest trade-history-pagination-controls-wire-actions-test
+  (let [rows (mapv trade-history-row (range 12))
+        content (@#'view/trade-history-table rows {:page-size 25
+                                                   :page 1
+                                                   :page-input "4"})
+        page-size-select (find-first-node content #(and (= :select (first %))
+                                                        (= "trade-history-page-size" (get-in % [1 :id]))))
+        jump-input (find-first-node content #(and (= :input (first %))
+                                                  (= "trade-history-page-input" (get-in % [1 :id]))))
+        go-button (find-first-node content #(and (= :button (first %))
+                                                 (contains? (direct-texts %) "Go")))]
+    (is (= [[:actions/set-trade-history-page-size [:event.target/value]]]
+           (get-in page-size-select [1 :on :change])))
+    (is (= [[:actions/set-trade-history-page-input [:event.target/value]]]
+           (get-in jump-input [1 :on :input])))
+    (is (= [[:actions/set-trade-history-page-input [:event.target/value]]]
+           (get-in jump-input [1 :on :change])))
+    (is (= [[:actions/handle-trade-history-page-input-keydown [:event/key] 1]]
+           (get-in jump-input [1 :on :keydown])))
+    (is (= [[:actions/apply-trade-history-page-input 1]]
+           (get-in go-button [1 :on :click])))))
+
+(deftest trade-history-pagination-clamps-page-when-data-shrinks-test
+  (let [rows (mapv trade-history-row (range 10))
+        content (@#'view/trade-history-table rows {:page-size 25
+                                                   :page 4
+                                                   :page-input "4"})
+        viewport (tab-rows-viewport-node content)
+        jump-input (find-first-node content #(and (= :input (first %))
+                                                  (= "trade-history-page-input" (get-in % [1 :id]))))
+        all-strings (set (collect-strings content))]
+    (is (= 10 (count (vec (node-children viewport)))))
+    (is (contains? all-strings "Page 1 of 1"))
+    (is (= "1" (get-in jump-input [1 :value])))))
 
 (deftest order-history-content-renders-hyperliquid-columns-and-values-test
   (let [rows [{:order {:coin "xyz:NVDA"

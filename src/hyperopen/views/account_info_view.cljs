@@ -959,6 +959,28 @@
      :page-count page-count
      :page-input page-input}))
 
+(defn- paginate-trade-history [rows trade-history-state]
+  (let [total-rows (count rows)
+        page-size (normalize-order-history-page-size (:page-size trade-history-state))
+        page-count (max 1 (int (js/Math.ceil (/ total-rows page-size))))
+        requested-page (normalize-order-history-page (:page trade-history-state))
+        safe-page (normalize-order-history-page requested-page page-count)
+        start-idx (* (dec safe-page) page-size)
+        end-idx (min total-rows (+ start-idx page-size))
+        page-rows (if (< start-idx total-rows)
+                    (subvec rows start-idx end-idx)
+                    [])
+        raw-page-input (some-> (:page-input trade-history-state) str)
+        page-input (if (= raw-page-input (str requested-page))
+                     (str safe-page)
+                     (or raw-page-input (str safe-page)))]
+    {:rows page-rows
+     :total-rows total-rows
+     :page-size page-size
+     :page safe-page
+     :page-count page-count
+     :page-input page-input}))
+
 (defn sort-order-history-by-column [rows column direction]
   (let [sort-fn (case column
                   "Time" (fn [row] (or (:time-ms row) 0))
@@ -1007,6 +1029,58 @@
      [:span column-name]
      (when sort-icon
        [:span.text-xs.opacity-70 sort-icon])]))
+
+(defn- trade-history-pagination-controls [{:keys [total-rows page-size page page-count page-input]}]
+  (let [on-first-page? (<= page 1)
+        on-last-page? (>= page page-count)]
+    [:div {:class ["border-t" "border-base-300" "bg-base-100"]}
+     [:div {:class ["flex" "flex-wrap" "items-center" "justify-between" "gap-3" "px-3" "py-2" "text-xs"]}
+      [:div {:class ["flex" "items-center" "gap-2"]}
+       [:label {:for "trade-history-page-size"
+                :class ["font-medium" "text-trading-text-secondary"]}
+        "Rows"]
+       [:select {:id "trade-history-page-size"
+                 :class ["select" "select-sm" "select-bordered" "h-8" "min-h-8" "w-24" "pl-2" "pr-8" "text-sm" "leading-5"]
+                 :aria-label "Trade rows per page"
+                 :value (str page-size)
+                 :on {:change [[:actions/set-trade-history-page-size [:event.target/value]]]}}
+        (for [size order-history-page-size-options]
+          ^{:key size}
+          [:option {:value (str size)}
+           (str size)])]
+       [:span {:class ["text-trading-text-secondary"]}
+        (str "Total: " total-rows)]]
+      [:div {:class ["flex" "items-center" "gap-2"]}
+       [:button {:class ["btn" "btn-xs" "btn-ghost" "h-6" "min-h-6" "min-w-6"]
+                 :aria-label "Previous trade page"
+                 :disabled on-first-page?
+                 :on {:click [[:actions/prev-trade-history-page page-count]]}}
+        "Prev"]
+       [:span {:class ["min-w-[5.5rem]" "text-center" "text-trading-text-secondary"]}
+        (str "Page " page " of " page-count)]
+       [:button {:class ["btn" "btn-xs" "btn-ghost" "h-6" "min-h-6" "min-w-6"]
+                 :aria-label "Next trade page"
+                 :disabled on-last-page?
+                 :on {:click [[:actions/next-trade-history-page page-count]]}}
+        "Next"]]
+      [:div {:class ["flex" "items-center" "gap-2"]}
+       [:label {:for "trade-history-page-input"
+                :class ["font-medium" "text-trading-text-secondary"]}
+        "Jump"]
+       [:input {:id "trade-history-page-input"
+                :class ["input" "input-xs" "input-bordered" "h-6" "min-h-6" "w-16" "text-xs"]
+                :type "text"
+                :inputmode "numeric"
+                :pattern "[0-9]*"
+                :aria-label "Jump to trade page"
+                :value page-input
+                :on {:input [[:actions/set-trade-history-page-input [:event.target/value]]]
+                     :change [[:actions/set-trade-history-page-input [:event.target/value]]]
+                     :keydown [[:actions/handle-trade-history-page-input-keydown [:event/key] page-count]]}}]
+       [:button {:class ["btn" "btn-xs" "btn-primary" "h-6" "min-h-6" "min-w-6"]
+                 :aria-label "Go to trade page"
+                 :on {:click [[:actions/apply-trade-history-page-input page-count]]}}
+        "Go"]]]]))
 
 (defn- funding-history-pagination-controls [{:keys [total-rows page-size page page-count page-input]}]
   (let [on-first-page? (<= page 1)
@@ -1556,26 +1630,35 @@
              "Cancel"]]]))
       (empty-state "No open orders"))))
 
-(defn trade-history-tab-content [fills]
-  (if (seq fills)
-    (tab-table-content
-      [:div.grid.grid-cols-6.gap-2.py-1.px-3.bg-base-200.text-sm.font-medium
-       [:div "Coin"]
-       [:div.text-left "Side"]
-       [:div.text-left "Size"]
-       [:div.text-left "Price"]
-       [:div.text-left "Fee"]
-       [:div.text-left "Time"]]
-      (for [f fills]
-        ^{:key (str (:tid f) "-" (:coin f) "-" (:time f))}
-        [:div.grid.grid-cols-6.gap-2.py-px.px-3.hover:bg-base-300.text-sm
-         [:div (:coin f)]
-         [:div.text-left (format-side (:side f))]
-         [:div.text-left (format-currency (:sz f))]
-         [:div.text-left (format-trade-price (:px f))]
-         [:div.text-left (format-currency (:fee f))]
-         [:div.text-left (format-timestamp (:time f))]]))
-    (empty-state "No fills")))
+(defn- trade-history-table [fills trade-history-state]
+  (let [all-rows (vec (or fills []))
+        {:keys [rows] :as pagination} (paginate-trade-history all-rows trade-history-state)]
+    (if (seq all-rows)
+      (tab-table-content
+       [:div.grid.grid-cols-6.gap-2.py-1.px-3.bg-base-200.text-sm.font-medium
+        [:div "Coin"]
+        [:div.text-left "Side"]
+        [:div.text-left "Size"]
+        [:div.text-left "Price"]
+        [:div.text-left "Fee"]
+        [:div.text-left "Time"]]
+       (for [f rows]
+         ^{:key (str (:tid f) "-" (:coin f) "-" (:time f))}
+         [:div.grid.grid-cols-6.gap-2.py-px.px-3.hover:bg-base-300.text-sm
+          [:div (:coin f)]
+          [:div.text-left (format-side (:side f))]
+          [:div.text-left (format-currency (:sz f))]
+          [:div.text-left (format-trade-price (:px f))]
+          [:div.text-left (format-currency (:fee f))]
+          [:div.text-left (format-timestamp (:time f))]])
+       (trade-history-pagination-controls pagination))
+      (empty-state "No fills"))))
+
+(defn trade-history-tab-content
+  ([fills]
+   (trade-history-table fills {}))
+  ([fills trade-history-state]
+   (trade-history-table fills trade-history-state)))
 
 (defn- funding-history-table [fundings funding-history-state]
   (let [sort-state (funding-history-sort-state funding-history-state)
@@ -1675,13 +1758,13 @@
     (order-history-table order-history order-history-state)]))
 
 ;; Main tab content renderer
-(defn tab-content [selected-tab webdata2 sort-state hide-small? perp-dex-states open-orders open-orders-sort balance-rows balances-sort funding-history-state order-history-state]
+(defn tab-content [selected-tab webdata2 sort-state hide-small? perp-dex-states open-orders open-orders-sort balance-rows balances-sort trade-history-state funding-history-state order-history-state]
   (case selected-tab
     :balances (balances-tab-content balance-rows hide-small? balances-sort)
     :positions (positions-tab-content webdata2 sort-state perp-dex-states)
     :open-orders (open-orders-tab-content open-orders open-orders-sort)
     :twap (placeholder-tab-content :twap)
-    :trade-history (trade-history-tab-content (get-in webdata2 [:fills]))
+    :trade-history (trade-history-tab-content (get-in webdata2 [:fills]) trade-history-state)
     :funding-history (funding-history-tab-content (get-in webdata2 [:fundings])
                                                   funding-history-state
                                                   (get-in webdata2 [:fundings-raw]))
@@ -1705,6 +1788,7 @@
         open-orders (normalized-open-orders (get-in webdata2 [:open-orders])
                                             (get-in webdata2 [:open-orders-snapshot])
                                             (get-in webdata2 [:open-orders-snapshot-by-dex]))
+        trade-history-state (get-in state [:account-info :trade-history] {})
         funding-history-state (get-in state [:account-info :funding-history] {})
         order-history-state (assoc (get-in state [:account-info :order-history] {})
                                    :market-by-key (get-in state [:asset-selector :market-by-key] {}))
@@ -1730,6 +1814,7 @@
                            open-orders-sort
                            balance-rows
                            balances-sort
+                           trade-history-state
                            funding-history-state
                            order-history-state))]]))
 
