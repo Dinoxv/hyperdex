@@ -745,15 +745,15 @@
     (is (some? balance-value-node))
     (is (some? position-value-node))))
 
-(deftest position-table-uses-right-alignment-for-numeric-columns-test
+(deftest position-table-uses-left-alignment-for-value-columns-test
   (let [header-node (view/position-table-header default-sort-state)
         header-cells (vec (node-children header-node))
         row-node (view/position-row sample-position-data)
         row-cells (vec (node-children row-node))]
     (doseq [idx (range 1 9)]
-      (is (contains? (node-class-set (nth header-cells idx)) "text-right")))
+      (is (contains? (node-class-set (nth header-cells idx)) "text-left")))
     (doseq [idx (range 1 9)]
-      (is (contains? (node-class-set (nth row-cells idx)) "text-right")))
+      (is (contains? (node-class-set (nth row-cells idx)) "text-left")))
     (doseq [idx [9]]
       (is (contains? (node-class-set (nth header-cells idx)) "text-left")))
     (doseq [idx [9]]

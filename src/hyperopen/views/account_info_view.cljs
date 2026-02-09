@@ -1570,21 +1570,21 @@
       (when dex-label
         [:span {:class position-chip-classes} dex-label])]
      ;; Size
-     [:div.text-right.font-semibold.num.num-right (format-position-size pos)]
+     [:div.text-left.font-semibold.num (format-position-size pos)]
      ;; Position Value  
-     [:div.text-right.font-semibold.num.num-right "$" (format-currency position-value)]
+     [:div.text-left.font-semibold.num "$" (format-currency position-value)]
      ;; Entry Price
-     [:div.text-right.font-semibold.num.num-right (format-trade-price entry-price)]
+     [:div.text-left.font-semibold.num (format-trade-price entry-price)]
      ;; Mark Price
-     [:div.text-right.font-semibold.num.num-right (format-trade-price mark-price)]
+     [:div.text-left.font-semibold.num (format-trade-price mark-price)]
      ;; PNL (ROE %)
-     [:div.text-right.font-semibold.num.num-right
+     [:div.text-left.font-semibold.num
       [:div
        [:span {:class [(if (pos? (js/parseFloat pnl-value))
                          "text-success" "text-error")
                        "num"]}
         "$" (format-currency pnl-value)]
-       [:div.text-xs.opacity-70.num
+     [:div.text-xs.opacity-70.num
         [:span {:class (if (pos? pnl-percent)
                         "text-success"
                         "text-error")}
@@ -1592,11 +1592,11 @@
                "")
          (.toFixed pnl-percent 2) "%)"]]]]
      ;; Liq. Price
-     [:div.text-right.font-semibold.num.num-right (if liq-price (format-trade-price liq-price) "N/A")]
+     [:div.text-left.font-semibold.num (if liq-price (format-trade-price liq-price) "N/A")]
      ;; Margin
-     [:div.text-right.font-semibold.num.num-right "$" (format-currency margin)]
+     [:div.text-left.font-semibold.num "$" (format-currency margin)]
      ;; Funding
-     [:div.text-right.font-semibold.num.num-right
+     [:div.text-left.font-semibold.num
       (let [funding-num (js/parseFloat funding)
             display-funding (if (pos? funding-num) (- funding-num) funding-num)
             display-text (str "$" (format-currency (str display-funding)))]
@@ -1654,14 +1654,14 @@
                  positions-grid-min-width-class
                  "bg-base-200"]}
    [:div.text-left.pl-3 (sortable-header "Coin" sort-state)]
-   [:div.text-right (sortable-header "Size" sort-state)]
-   [:div.text-right (sortable-header "Position Value" sort-state)]
-   [:div.text-right (sortable-header "Entry Price" sort-state)]
-   [:div.text-right (sortable-header "Mark Price" sort-state)]
-   [:div.text-right (sortable-header "PNL (ROE %)" sort-state)]
-   [:div.text-right (sortable-header "Liq. Price" sort-state)]
-   [:div.text-right (sortable-header "Margin" sort-state)]
-   [:div.text-right (sortable-header "Funding" sort-state)]
+   [:div.text-left (sortable-header "Size" sort-state)]
+   [:div.text-left (sortable-header "Position Value" sort-state)]
+   [:div.text-left (sortable-header "Entry Price" sort-state)]
+   [:div.text-left (sortable-header "Mark Price" sort-state)]
+   [:div.text-left (sortable-header "PNL (ROE %)" sort-state)]
+   [:div.text-left (sortable-header "Liq. Price" sort-state)]
+   [:div.text-left (sortable-header "Margin" sort-state)]
+   [:div.text-left (sortable-header "Funding" sort-state)]
    [:div.text-left (non-sortable-header "TP/SL")]])
 
 ;; Positions tab content
