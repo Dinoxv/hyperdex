@@ -81,7 +81,8 @@
    :request-id 0})
 
 (defn- default-trade-history-state []
-  {:page-size default-order-history-page-size
+  {:sort {:column "Time" :direction :desc}
+   :page-size default-order-history-page-size
    :page 1
    :page-input "1"})
 
@@ -873,6 +874,23 @@
     (apply-trade-history-page-input state max-page)
     []))
 
+(defn sort-trade-history [state column]
+  (let [current-sort (get-in state
+                             [:account-info :trade-history :sort]
+                             {:column "Time" :direction :desc})
+        current-column (:column current-sort)
+        current-direction (:direction current-sort)
+        desc-columns #{"Time" "Price" "Size" "Trade Value" "Fee" "Closed PNL"}
+        new-direction (if (= current-column column)
+                        (if (= current-direction :asc) :desc :asc)
+                        (if (contains? desc-columns column)
+                          :desc
+                          :asc))]
+    [[:effects/save-many [[[:account-info :trade-history :sort]
+                           {:column column :direction new-direction}]
+                          [[:account-info :trade-history :page] 1]
+                          [[:account-info :trade-history :page-input] "1"]]]]))
+
 (defn sort-order-history [state column]
   (let [current-sort (get-in state
                              [:account-info :order-history :sort]
@@ -1459,6 +1477,7 @@
 (nxr/register-action! :actions/set-trade-history-page-input set-trade-history-page-input)
 (nxr/register-action! :actions/apply-trade-history-page-input apply-trade-history-page-input)
 (nxr/register-action! :actions/handle-trade-history-page-input-keydown handle-trade-history-page-input-keydown)
+(nxr/register-action! :actions/sort-trade-history sort-trade-history)
 (nxr/register-action! :actions/sort-positions sort-positions)
 (nxr/register-action! :actions/sort-balances sort-balances)
 (nxr/register-action! :actions/sort-open-orders sort-open-orders)

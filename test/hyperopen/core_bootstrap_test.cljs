@@ -403,6 +403,36 @@
     (is (= apply-effects keydown-effects))
     (is (= [] keydown-nop))))
 
+(deftest sort-trade-history-toggles-direction-on-same-column-test
+  (let [state {:account-info {:trade-history {:sort {:column "Time"
+                                                     :direction :desc}
+                                              :page 3
+                                              :page-input "3"}}}
+        effects (core/sort-trade-history state "Time")]
+    (is (= [[:effects/save-many [[[:account-info :trade-history :sort]
+                                  {:column "Time" :direction :asc}]
+                                 [[:account-info :trade-history :page] 1]
+                                 [[:account-info :trade-history :page-input] "1"]]]]
+           effects))))
+
+(deftest sort-trade-history-uses-mixed-default-direction-for-new-columns-test
+  (let [state {:account-info {:trade-history {:sort {:column "Time"
+                                                     :direction :desc}
+                                              :page 2
+                                              :page-input "2"}}}
+        coin-effects (core/sort-trade-history state "Coin")
+        value-effects (core/sort-trade-history state "Trade Value")]
+    (is (= [[:effects/save-many [[[:account-info :trade-history :sort]
+                                  {:column "Coin" :direction :asc}]
+                                 [[:account-info :trade-history :page] 1]
+                                 [[:account-info :trade-history :page-input] "1"]]]]
+           coin-effects))
+    (is (= [[:effects/save-many [[[:account-info :trade-history :sort]
+                                  {:column "Trade Value" :direction :desc}]
+                                 [[:account-info :trade-history :page] 1]
+                                 [[:account-info :trade-history :page-input] "1"]]]]
+           value-effects))))
+
 (deftest restore-trade-history-pagination-settings-uses-defaults-and-stored-size-test
   (with-test-local-storage
     (fn []

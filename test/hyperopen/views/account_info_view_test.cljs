@@ -242,6 +242,46 @@
            (get-in header-node [1 :on :click])))
     (is (= "↑" (last sort-icon-node)))))
 
+(deftest trade-history-sortable-header-uses-secondary-text-hover-and-action-test
+  (let [header-node (view/sortable-trade-history-header "Time" {:column "Time" :direction :asc})
+        sort-icon-node (second (vec (node-children header-node)))]
+    (is (contains? (node-class-set header-node) "text-trading-text-secondary"))
+    (is (contains? (node-class-set header-node) "hover:text-trading-text"))
+    (is (= [[:actions/sort-trade-history "Time"]]
+           (get-in header-node [1 :on :click])))
+    (is (= "↑" (last sort-icon-node)))))
+
+(deftest sort-trade-history-by-column-is-deterministic-on-ties-and-formats-derived-values-test
+  (let [rows [{:tid 2
+               :coin "xyz:NVDA"
+               :side "B"
+               :sz "2"
+               :px "10"
+               :fee "0.1"
+               :time 1700000000000}
+              {:tid 1
+               :coin "BTC"
+               :side "A"
+               :sz "1"
+               :px "15"
+               :fee "0.2"
+               :time 1700000000000}
+              {:tid 3
+               :coin "ETH"
+               :dir "Open Long (Price Improved)"
+               :sz "3"
+               :px "8"
+               :tradeValue "24"
+               :closedPnl "-0.3"
+               :fee "0.05"
+               :time 1700000001000}]
+        time-asc (view/sort-trade-history-by-column rows "Time" :asc {})
+        value-desc (view/sort-trade-history-by-column rows "Trade Value" :desc {})
+        direction-asc (view/sort-trade-history-by-column rows "Direction" :asc {})]
+    (is (= [1 2 3] (mapv :tid time-asc)))
+    (is (= [3 2 1] (mapv :tid value-desc)))
+    (is (= [2 3 1] (mapv :tid direction-asc)))))
+
 (deftest sort-funding-history-by-column-respects-direction-and-deterministic-fallback-test
   (let [rows [{:id "2"
                :time-ms 2000
@@ -731,7 +771,7 @@
         order-node (view/order-history-tab-content order-history)
         order-header-cells (vec (node-children (tab-header-node order-node)))
         order-row-cells (vec (node-children (first-viewport-row order-node)))]
-    (doseq [idx (range 1 6)]
+    (doseq [idx (range 1 8)]
       (is (contains? (node-class-set (nth trade-header-cells idx)) "text-left"))
       (is (contains? (node-class-set (nth trade-row-cells idx)) "text-left")))
     (doseq [idx (range 1 6)]
@@ -740,6 +780,67 @@
     (doseq [idx (range 1 13)]
       (is (contains? (node-class-set (nth order-header-cells idx)) "text-left"))
       (is (contains? (node-class-set (nth order-row-cells idx)) "text-left")))))
+
+(deftest trade-history-headers-match-hyperliquid-order-and-contrast-test
+  (let [fills [{:tid 1
+                :coin "xyz:NVDA"
+                :dir "Open Long"
+                :side "B"
+                :sz "0.500"
+                :px "187.88"
+                :tradeValue "93.94"
+                :fee "0.01"
+                :closedPnl "-0.01"
+                :time 1700000000000}]
+        content (view/trade-history-tab-content fills)
+        header-node (tab-header-node content)
+        header-cells (vec (node-children header-node))
+        header-buttons (mapv #(first (vec (node-children %))) header-cells)
+        header-labels (mapv #(first (collect-strings %)) header-buttons)]
+    (is (= ["Time" "Coin" "Direction" "Price" "Size" "Trade Value" "Fee" "Closed PNL"]
+           header-labels))
+    (is (every? #(= :button (first %)) header-buttons))
+    (is (every? #(contains? (node-class-set %) "text-trading-text-secondary") header-buttons))
+    (is (contains? (node-class-set header-node) "text-trading-text-secondary"))))
+
+(deftest trade-history-parity-renders-coin-direction-and-usdc-fields-test
+  (let [fills [{:tid 1
+                :coin "xyz:NVDA"
+                :side "A"
+                :dir "Open Long (Price Improved)"
+                :sz "0.500"
+                :px "187.88"
+                :tradeValue "93.94"
+                :fee "0.01"
+                :closedPnl "-0.01"
+                :time 1700000000000}
+               {:tid 2
+                :coin "HYPE"
+                :side "S"
+                :sz "2"
+                :px "10"
+                :fee "0.02"
+                :time 1700000001000}]
+        content (view/trade-history-tab-content fills)
+        viewport (tab-rows-viewport-node content)
+        rendered-rows (vec (node-children viewport))
+        nvda-row (some #(when (contains? (set (collect-strings %)) "NVDA") %) rendered-rows)
+        hype-row (some #(when (contains? (set (collect-strings %)) "HYPE") %) rendered-rows)
+        nvda-row-cells (vec (node-children nvda-row))
+        hype-row-cells (vec (node-children hype-row))
+        nvda-coin-strings (set (collect-strings (nth nvda-row-cells 1)))
+        nvda-row-strings (set (collect-strings nvda-row))]
+    (is (some? nvda-row))
+    (is (some? hype-row))
+    (is (contains? nvda-coin-strings "NVDA"))
+    (is (contains? nvda-coin-strings "xyz"))
+    (is (not (contains? nvda-row-strings "xyz:NVDA")))
+    (is (contains? (direct-texts (nth nvda-row-cells 2)) "Open Long (Price Improved)"))
+    (is (contains? (direct-texts (nth hype-row-cells 2)) "Open Short"))
+    (is (contains? (direct-texts (nth hype-row-cells 5)) "20.00 USDC"))
+    (is (contains? (direct-texts (nth nvda-row-cells 6)) "0.01 USDC"))
+    (is (contains? (direct-texts (nth nvda-row-cells 7)) "-0.01 USDC"))
+    (is (contains? (direct-texts (nth hype-row-cells 7)) "--"))))
 
 (deftest trade-history-pagination-renders-only-current-page-rows-test
   (let [rows (mapv trade-history-row (range 55))

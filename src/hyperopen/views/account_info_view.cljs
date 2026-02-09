@@ -1630,27 +1630,224 @@
              "Cancel"]]]))
       (empty-state "No open orders"))))
 
+(def default-trade-history-sort
+  {:column "Time" :direction :desc})
+
+(defn trade-history-sort-state [trade-history-state]
+  (merge default-trade-history-sort
+         (or (:sort trade-history-state) {})))
+
+(def ^:private trade-history-trade-value-keys
+  [:tradeValue :trade-value :tradeValueUsd :tradeValueUSDC :notional :notionalValue :value :quoteValue])
+
+(def ^:private trade-history-fee-keys
+  [:fee :feePaid :feeUsd :feeUSDC])
+
+(def ^:private trade-history-closed-pnl-keys
+  [:closedPnl :closed-pnl :closed_pnl :closedPnlUsd :closedPnlUSDC :realizedPnl])
+
+(defn- trade-history-coin [row]
+  (or (:coin row) (:symbol row) (:asset row)))
+
+(defn- trade-history-time-ms [row]
+  (when-let [raw-time (parse-optional-num (or (:time row) (:timestamp row) (:ts row) (:t row)))]
+    (let [rounded (js/Math.floor raw-time)]
+      (if (< rounded 1000000000000)
+        (* rounded 1000)
+        rounded))))
+
+(defn- format-usdc-amount [value]
+  (if-let [num (parse-optional-num value)]
+    (str (.toLocaleString (js/Number. num)
+                          "en-US"
+                          #js {:minimumFractionDigits 2
+                               :maximumFractionDigits 2})
+         " USDC")
+    "--"))
+
+(defn- trade-history-direction-label [row]
+  (or (non-blank-text (or (:dir row) (:direction row)))
+      (case (:side row)
+        "B" "Open Long"
+        "A" "Open Short"
+        "S" "Open Short"
+        "-")))
+
+(defn- trade-history-direction-class [direction-label]
+  (cond
+    (str/includes? direction-label "Long") "text-success"
+    (str/includes? direction-label "Short") "text-error"
+    :else "text-trading-text"))
+
+(defn- trade-history-coin-node [row market-by-key]
+  (let [{:keys [base-label prefix-label]} (resolve-coin-display (trade-history-coin row)
+                                                                market-by-key)]
+    [:span {:class ["flex" "items-center" "gap-1.5" "min-w-0"]}
+     [:span {:class ["truncate"]} base-label]
+     (when prefix-label
+       [:span {:class position-chip-classes} prefix-label])]))
+
+(defn- format-trade-history-price [row]
+  (let [price (or (:px row) (:price row) (:p row))]
+    (if-let [num (parse-optional-num price)]
+      (or (fmt/format-trade-price-plain num price) "--")
+      "--")))
+
+(defn- format-trade-history-size [row market-by-key]
+  (let [size-raw (or (:sz row) (:size row) (:s row))
+        size-text (if-let [size-string (non-blank-text size-raw)]
+                    size-string
+                    (format-order-history-size size-raw))
+        {:keys [base-label]} (resolve-coin-display (trade-history-coin row) market-by-key)]
+    (if (= size-text "--")
+      "--"
+      (str size-text " " base-label))))
+
+(defn- first-parseable-row-value [row keys]
+  (some (fn [k]
+          (let [value (get row k)]
+            (when (number? (parse-optional-num value))
+              value)))
+        keys))
+
+(defn- trade-history-value-number [row]
+  (let [explicit-value (first-parseable-row-value row trade-history-trade-value-keys)]
+    (or (parse-optional-num explicit-value)
+        (let [size (parse-optional-num (or (:sz row) (:size row) (:s row)))
+              price (parse-optional-num (or (:px row) (:price row) (:p row)))]
+          (when (and (number? size)
+                     (number? price))
+            (* size price))))))
+
+(defn- format-trade-history-value [row]
+  (format-usdc-amount (trade-history-value-number row)))
+
+(defn- format-trade-history-fee [row]
+  (format-usdc-amount (first-parseable-row-value row trade-history-fee-keys)))
+
+(defn- format-trade-history-closed-pnl [row]
+  (format-usdc-amount (first-parseable-row-value row trade-history-closed-pnl-keys)))
+
+(defn- trade-history-closed-pnl-class [row]
+  (let [value (parse-optional-num (first-parseable-row-value row trade-history-closed-pnl-keys))]
+    (cond
+      (and (number? value) (pos? value)) "text-success"
+      (and (number? value) (neg? value)) "text-error"
+      :else "text-trading-text")))
+
+(defn- trade-history-row-id [row]
+  (str (or (:tid row) (:id row) "")
+       "|"
+       (or (trade-history-time-ms row) 0)
+       "|"
+       (or (trade-history-coin row) "")
+       "|"
+       (or (:px row) (:price row) (:p row) "")
+       "|"
+       (or (:sz row) (:size row) (:s row) "")))
+
+(defn sort-trade-history-by-column
+  ([rows column direction]
+   (sort-trade-history-by-column rows column direction {}))
+  ([rows column direction market-by-key]
+   (let [sort-fn (case column
+                   "Time" (fn [row]
+                            (or (trade-history-time-ms row) 0))
+                   "Coin" (fn [row]
+                            (or (some-> (resolve-coin-display (trade-history-coin row) market-by-key)
+                                        :base-label
+                                        str/lower-case)
+                                ""))
+                   "Direction" (fn [row]
+                                 (or (trade-history-direction-label row) ""))
+                   "Price" (fn [row]
+                             (or (parse-optional-num (or (:px row) (:price row) (:p row))) 0))
+                   "Size" (fn [row]
+                            (or (parse-optional-num (or (:sz row) (:size row) (:s row))) 0))
+                   "Trade Value" (fn [row]
+                                   (or (trade-history-value-number row) 0))
+                   "Fee" (fn [row]
+                           (or (parse-optional-num (first-parseable-row-value row trade-history-fee-keys)) 0))
+                   "Closed PNL" (fn [row]
+                                  (or (parse-optional-num (first-parseable-row-value row trade-history-closed-pnl-keys)) 0))
+                   (fn [_] 0))
+         sorted (sort-by (fn [row]
+                           [(sort-fn row)
+                            (trade-history-row-id row)])
+                         rows)]
+     (if (= direction :desc)
+       (reverse sorted)
+       sorted))))
+
+(defn sortable-trade-history-header [column-name sort-state]
+  (let [current-column (:column sort-state)
+        current-direction (:direction sort-state)
+        is-active (= current-column column-name)
+        sort-icon (when is-active
+                    (if (= current-direction :asc) "↑" "↓"))]
+    [:button {:class (into []
+                           (concat header-base-text-classes
+                                   sortable-header-interaction-classes
+                                   sortable-header-layout-classes))
+              :on {:click [[:actions/sort-trade-history column-name]]}}
+     [:span column-name]
+     (when sort-icon
+       [:span.text-xs.opacity-70 sort-icon])]))
+
 (defn- trade-history-table [fills trade-history-state]
   (let [all-rows (vec (or fills []))
-        {:keys [rows] :as pagination} (paginate-trade-history all-rows trade-history-state)]
-    (if (seq all-rows)
+        market-by-key (or (:market-by-key trade-history-state) {})
+        sort-state (trade-history-sort-state trade-history-state)
+        sorted-rows (vec (sort-trade-history-by-column all-rows
+                                                       (:column sort-state)
+                                                       (:direction sort-state)
+                                                       market-by-key))
+        {:keys [rows] :as pagination} (paginate-trade-history sorted-rows trade-history-state)]
+    (if (seq sorted-rows)
       (tab-table-content
-       [:div.grid.grid-cols-6.gap-2.py-1.px-3.bg-base-200.text-sm.font-medium
-        [:div "Coin"]
-        [:div.text-left "Side"]
-        [:div.text-left "Size"]
-        [:div.text-left "Price"]
-        [:div.text-left "Fee"]
-        [:div.text-left "Time"]]
+       [:div {:class ["grid"
+                      "gap-2"
+                      "py-1"
+                      "px-3"
+                      "bg-base-200"
+                      "text-sm"
+                      "font-medium"
+                      "text-trading-text-secondary"
+                      "grid-cols-[140px_90px_180px_90px_130px_130px_110px_120px]"]}
+        [:div {:class ["text-left"]} (sortable-trade-history-header "Time" sort-state)]
+        [:div {:class ["text-left"]} (sortable-trade-history-header "Coin" sort-state)]
+        [:div {:class ["text-left"]} (sortable-trade-history-header "Direction" sort-state)]
+        [:div {:class ["text-left"]} (sortable-trade-history-header "Price" sort-state)]
+        [:div {:class ["text-left"]} (sortable-trade-history-header "Size" sort-state)]
+        [:div {:class ["text-left"]} (sortable-trade-history-header "Trade Value" sort-state)]
+        [:div {:class ["text-left"]} (sortable-trade-history-header "Fee" sort-state)]
+        [:div {:class ["text-left"]} (sortable-trade-history-header "Closed PNL" sort-state)]]
        (for [f rows]
-         ^{:key (str (:tid f) "-" (:coin f) "-" (:time f))}
-         [:div.grid.grid-cols-6.gap-2.py-px.px-3.hover:bg-base-300.text-sm
-          [:div (:coin f)]
-          [:div.text-left (format-side (:side f))]
-          [:div.text-left (format-currency (:sz f))]
-          [:div.text-left (format-trade-price (:px f))]
-          [:div.text-left (format-currency (:fee f))]
-          [:div.text-left (format-timestamp (:time f))]])
+         ^{:key (trade-history-row-id f)}
+         [:div {:class ["grid"
+                        "gap-2"
+                        "py-px"
+                        "px-3"
+                        "hover:bg-base-300"
+                        "text-sm"
+                        "grid-cols-[140px_90px_180px_90px_130px_130px_110px_120px]"]}
+          [:div {:class ["text-left"]}
+           (format-open-orders-time (trade-history-time-ms f))]
+          [:div {:class ["text-left"]}
+           (trade-history-coin-node f market-by-key)]
+          (let [direction (trade-history-direction-label f)]
+            [:div {:class ["text-left" (trade-history-direction-class direction)]}
+             direction])
+          [:div {:class ["text-left"]}
+           (format-trade-history-price f)]
+          [:div {:class ["text-left"]}
+           (format-trade-history-size f market-by-key)]
+          [:div {:class ["text-left"]}
+           (format-trade-history-value f)]
+          [:div {:class ["text-left"]}
+           (format-trade-history-fee f)]
+          [:div {:class ["text-left" (trade-history-closed-pnl-class f)]}
+           (format-trade-history-closed-pnl f)]])
        (trade-history-pagination-controls pagination))
       (empty-state "No fills"))))
 
@@ -1788,7 +1985,8 @@
         open-orders (normalized-open-orders (get-in webdata2 [:open-orders])
                                             (get-in webdata2 [:open-orders-snapshot])
                                             (get-in webdata2 [:open-orders-snapshot-by-dex]))
-        trade-history-state (get-in state [:account-info :trade-history] {})
+        trade-history-state (assoc (get-in state [:account-info :trade-history] {})
+                                   :market-by-key (get-in state [:asset-selector :market-by-key] {}))
         funding-history-state (get-in state [:account-info :funding-history] {})
         order-history-state (assoc (get-in state [:account-info :order-history] {})
                                    :market-by-key (get-in state [:asset-selector :market-by-key] {}))
