@@ -1805,7 +1805,7 @@
          " USDC")
     "--"))
 
-(defn- trade-history-direction-label [row]
+(defn- trade-history-direction-base-label [row]
   (or (non-blank-text (or (:dir row) (:direction row)))
       (case (:side row)
         "B" "Open Long"
@@ -1818,6 +1818,89 @@
     (str/includes? direction-label "Long") "text-success"
     (str/includes? direction-label "Short") "text-error"
     :else "text-trading-text"))
+
+(def ^:private trade-history-price-improved-tooltip-text
+  "This fill price was more favorable to you than the price chart at that time, because your order provided liquidity to another user's liquidation.")
+
+(defn- trade-history-price-improved?
+  [row direction-label]
+  (let [direction-label* (or (non-blank-text direction-label)
+                             (trade-history-direction-base-label row))
+        normalized (some-> direction-label* str/lower-case)
+        liquidation (:liquidation row)
+        liquidation-fill? (and (map? liquidation)
+                               (or (some? (:markPx liquidation))
+                                   (some? (:method liquidation))
+                                   (some? (:liquidatedUser liquidation))))
+        liquidation-direction? (and normalized
+                                   (str/includes? normalized "liquidation"))
+        price-improved-text? (and normalized
+                                 (str/includes? normalized "price improved"))]
+    (boolean (or price-improved-text?
+                 (and liquidation-fill?
+                      normalized
+                      (not= normalized "-")
+                      (not liquidation-direction?))))))
+
+(defn- trade-history-direction-label [row]
+  (let [base-label (trade-history-direction-base-label row)
+        normalized (some-> base-label str/lower-case)]
+    (if (and (trade-history-price-improved? row base-label)
+             normalized
+             (not (str/includes? normalized "price improved")))
+      (str base-label " (Price Improved)")
+      base-label)))
+
+(defn- trade-history-direction-node [row]
+  (let [direction-label (trade-history-direction-label row)
+        direction-class (trade-history-direction-class direction-label)]
+    (if (trade-history-price-improved? row direction-label)
+      [:div {:class ["text-left" direction-class]}
+       [:div {:class ["group" "relative" "inline-flex" "min-h-6" "items-center"]}
+        [:span {:class ["cursor-help"
+                        "rounded"
+                        "focus-visible:outline-none"
+                        "focus-visible:ring-2"
+                        "focus-visible:ring-trading-green/70"
+                        "focus-visible:ring-offset-1"
+                        "focus-visible:ring-offset-base-100"]
+                :tab-index 0}
+         direction-label]
+        [:div {:class ["pointer-events-none"
+                       "absolute"
+                       "left-0"
+                       "bottom-full"
+                       "z-50"
+                       "mb-2"
+                       "opacity-0"
+                       "transition-opacity"
+                       "duration-200"
+                       "group-hover:opacity-100"
+                       "group-focus-within:opacity-100"]}
+         [:div {:class ["relative"
+                        "w-[520px]"
+                        "max-w-[calc(100vw-2rem)]"
+                        "min-w-[380px]"
+                        "rounded-md"
+                        "bg-gray-800"
+                        "px-3"
+                        "py-1.5"
+                        "text-xs"
+                        "leading-tight"
+                        "text-gray-100"
+                        "shadow-lg"
+                        "whitespace-normal"]}
+          trade-history-price-improved-tooltip-text
+          [:div {:class ["absolute"
+                         "top-full"
+                         "left-3"
+                         "h-0"
+                         "w-0"
+                         "border-4"
+                         "border-transparent"
+                         "border-t-gray-800"]}]]]]]
+      [:div {:class ["text-left" direction-class]}
+       direction-label])))
 
 (defn- trade-history-coin-node [row market-by-key]
   (let [{:keys [base-label prefix-label]} (resolve-coin-display (trade-history-coin row)
@@ -1975,9 +2058,7 @@
            (trade-history-time-node f)]
           [:div {:class ["text-left"]}
            (trade-history-coin-node f market-by-key)]
-          (let [direction (trade-history-direction-label f)]
-            [:div {:class ["text-left" (trade-history-direction-class direction)]}
-             direction])
+          (trade-history-direction-node f)
           [:div {:class ["text-left" "num"]}
            (format-trade-history-price f)]
           [:div {:class ["text-left" "num"]}

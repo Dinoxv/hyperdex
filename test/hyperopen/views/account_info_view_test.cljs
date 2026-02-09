@@ -964,18 +964,119 @@
         nvda-row-cells (vec (node-children nvda-row))
         hype-row-cells (vec (node-children hype-row))
         nvda-coin-strings (set (collect-strings (nth nvda-row-cells 1)))
-        nvda-row-strings (set (collect-strings nvda-row))]
+        nvda-row-strings (set (collect-strings nvda-row))
+        nvda-direction-strings (set (collect-strings (nth nvda-row-cells 2)))
+        hype-direction-strings (set (collect-strings (nth hype-row-cells 2)))]
     (is (some? nvda-row))
     (is (some? hype-row))
     (is (contains? nvda-coin-strings "NVDA"))
     (is (contains? nvda-coin-strings "xyz"))
     (is (not (contains? nvda-row-strings "xyz:NVDA")))
-    (is (contains? (direct-texts (nth nvda-row-cells 2)) "Open Long (Price Improved)"))
-    (is (contains? (direct-texts (nth hype-row-cells 2)) "Open Short"))
+    (is (contains? nvda-direction-strings "Open Long (Price Improved)"))
+    (is (contains? hype-direction-strings "Open Short"))
     (is (contains? (direct-texts (nth hype-row-cells 5)) "20.00 USDC"))
     (is (contains? (direct-texts (nth nvda-row-cells 6)) "0.01 USDC"))
     (is (contains? (direct-texts (nth nvda-row-cells 7)) "-0.01 USDC"))
     (is (contains? (direct-texts (nth hype-row-cells 7)) "--"))))
+
+(deftest trade-history-price-improved-direction-renders-liquidation-tooltip-test
+  (let [tooltip-copy "This fill price was more favorable to you than the price chart at that time, because your order provided liquidity to another user's liquidation."
+        fills [{:tid 1
+                :coin "PUMP"
+                :side "B"
+                :dir "Open Long (Price Improved)"
+                :sz "100"
+                :px "0.001765"
+                :fee "0.01"
+                :time 1700000000000}]
+        content (view/trade-history-tab-content fills)
+        row-node (first-viewport-row content)
+        direction-cell (nth (vec (node-children row-node)) 2)
+        direction-strings (set (collect-strings direction-cell))
+        group-node (find-first-node direction-cell #(and (= :div (first %))
+                                                         (contains? (node-class-set %) "group")))
+        focusable-label (find-first-node direction-cell #(and (= :span (first %))
+                                                              (= 0 (get-in % [1 :tab-index]))))
+        tooltip-panel-node (find-first-node direction-cell #(and (= :div (first %))
+                                                                 (contains? (node-class-set %) "group-hover:opacity-100")
+                                                                 (contains? (node-class-set %) "group-focus-within:opacity-100")))
+        tooltip-panel-classes (node-class-set tooltip-panel-node)
+        tooltip-bubble-node (find-first-node tooltip-panel-node #(and (= :div (first %))
+                                                                      (contains? (node-class-set %) "w-[520px]")))
+        tooltip-bubble-classes (node-class-set tooltip-bubble-node)]
+    (is (contains? direction-strings "Open Long (Price Improved)"))
+    (is (some? group-node))
+    (is (some? focusable-label))
+    (is (some? tooltip-panel-node))
+    (is (some? tooltip-bubble-node))
+    (is (contains? (set (collect-strings tooltip-panel-node)) tooltip-copy))
+    (is (contains? tooltip-panel-classes "bottom-full"))
+    (is (contains? tooltip-panel-classes "mb-2"))
+    (is (contains? tooltip-panel-classes "group-hover:opacity-100"))
+    (is (contains? tooltip-panel-classes "group-focus-within:opacity-100"))
+    (is (contains? tooltip-bubble-classes "w-[520px]"))))
+
+(deftest trade-history-standard-direction-does-not-render-liquidation-tooltip-test
+  (let [tooltip-copy "This fill price was more favorable to you than the price chart at that time, because your order provided liquidity to another user's liquidation."
+        fills [{:tid 1
+                :coin "PUMP"
+                :side "B"
+                :dir "Open Long"
+                :sz "100"
+                :px "0.001765"
+                :fee "0.01"
+                :time 1700000000000}]
+        content (view/trade-history-tab-content fills)
+        row-node (first-viewport-row content)
+        direction-cell (nth (vec (node-children row-node)) 2)
+        tooltip-panel-node (find-first-node direction-cell #(and (= :div (first %))
+                                                                 (contains? (node-class-set %) "group-hover:opacity-100")
+                                                                 (contains? (node-class-set %) "group-focus-within:opacity-100")))
+        direction-strings (set (collect-strings direction-cell))]
+    (is (contains? direction-strings "Open Long"))
+    (is (not (contains? direction-strings tooltip-copy)))
+    (is (nil? tooltip-panel-node))))
+
+(deftest trade-history-liquidation-metadata-infers-price-improved-direction-test
+  (let [tooltip-copy "This fill price was more favorable to you than the price chart at that time, because your order provided liquidity to another user's liquidation."
+        fills [{:tid 1
+                :coin "PUMP"
+                :side "B"
+                :dir "Open Long"
+                :liquidation {:markPx "0.001780"
+                              :method "market"}
+                :sz "100"
+                :px "0.001765"
+                :fee "0.01"
+                :time 1700000000000}]
+        content (view/trade-history-tab-content fills)
+        row-node (first-viewport-row content)
+        direction-cell (nth (vec (node-children row-node)) 2)
+        direction-strings (set (collect-strings direction-cell))
+        tooltip-panel-node (find-first-node direction-cell #(and (= :div (first %))
+                                                                 (contains? (node-class-set %) "group-hover:opacity-100")
+                                                                 (contains? (node-class-set %) "group-focus-within:opacity-100")))]
+    (is (contains? direction-strings "Open Long (Price Improved)"))
+    (is (contains? direction-strings tooltip-copy))
+    (is (some? tooltip-panel-node))))
+
+(deftest trade-history-liquidation-direction-remains-unmodified-test
+  (let [fills [{:tid 1
+                :coin "PUMP"
+                :side "A"
+                :dir "Market Order Liquidation: Close Long"
+                :liquidation {:markPx "0.001780"
+                              :method "market"}
+                :sz "100"
+                :px "0.001765"
+                :fee "0.01"
+                :time 1700000000000}]
+        content (view/trade-history-tab-content fills)
+        row-node (first-viewport-row content)
+        direction-cell (nth (vec (node-children row-node)) 2)
+        direction-strings (set (collect-strings direction-cell))]
+    (is (contains? direction-strings "Market Order Liquidation: Close Long"))
+    (is (not (contains? direction-strings "Market Order Liquidation: Close Long (Price Improved)")))))
 
 (deftest trade-history-time-cell-renders-explorer-link-when-valid-hash-present-test
   (let [hash-value "0xcb13be47d7d3e736cc8d04346f1535020494002d72d706086edc699a96d7c121"
