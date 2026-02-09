@@ -289,13 +289,13 @@
          :data-role "trades-column-headers-row"}
    [:div {:class ["text-left"]
           :data-role "trades-price-header-cell"}
-    [:span.text-gray-400.text-xs "Price"]]
-   [:div {:class ["text-right"]
+    [:span {:class ["text-gray-400" "text-xs" "num"]} "Price"]]
+   [:div {:class ["text-right" "num-right"]
           :data-role "trades-size-header-cell"}
-    [:span.text-gray-400.text-xs (str "Size (" base-symbol ")")]]
-   [:div {:class ["text-right"]
+    [:span {:class ["text-gray-400" "text-xs" "num"]} (str "Size (" base-symbol ")")]]
+   [:div {:class ["text-right" "num-right"]
           :data-role "trades-time-header-cell"}
-    [:span.text-gray-400.text-xs "Time"]]])
+    [:span {:class ["text-gray-400" "text-xs" "num"]} "Time"]]])
 
 (defn trades-row [trade]
   (let [price-class (trade-side->price-class (:side trade))]
@@ -304,13 +304,13 @@
             :data-role "trades-level-content-row"}
       [:div {:class ["text-left"]
              :data-role "trades-level-price-cell"}
-       [:span {:class [price-class]} (or (format-price (:price trade) (:price-raw trade)) "0.00")]]
-      [:div {:class ["text-right"]
+       [:span {:class [price-class "num"]} (or (format-price (:price trade) (:price-raw trade)) "0.00")]]
+      [:div {:class ["text-right" "num-right"]
              :data-role "trades-level-size-cell"}
-       [:span.text-gray-100 (format-trade-size trade)]]
-      [:div {:class ["text-right"]
+       [:span {:class ["text-gray-100" "num"]} (format-trade-size trade)]]
+      [:div {:class ["text-right" "num-right"]
              :data-role "trades-level-time-cell"}
-       [:span.text-gray-100 (or (format-trade-time (:time-ms trade)) "--:--:--")]]]]))
+       [:span {:class ["text-gray-100" "num"]} (or (format-trade-time (:time-ms trade)) "--:--:--")]]]]))
 
 (defn empty-trades []
   [:div {:class ["flex" "flex-col" "items-center" "justify-center" "p-8" "text-center" "bg-base-100" "rounded-none" "border" "border-base-300" "h-full"]}
@@ -320,7 +320,7 @@
 (defn trades-panel [coin base-symbol]
   (let [recent-trades (recent-trades-for-coin coin)]
     (if (seq recent-trades)
-      [:div {:class ["bg-base-100" "border" "border-base-300" "rounded-none" "overflow-hidden" "h-full" "min-h-0" "flex" "flex-col"]}
+      [:div {:class ["bg-base-100" "border" "border-base-300" "rounded-none" "overflow-hidden" "h-full" "min-h-0" "flex" "flex-col" "num" "num-dense"]}
        (trades-column-headers base-symbol)
        [:div.flex-1.min-h-0.overflow-y-auto.scrollbar-hide
         (for [trade recent-trades]
@@ -345,20 +345,20 @@
             :data-role "orderbook-level-content-row"}
       [:div {:class ["text-left"]
              :data-role "orderbook-level-price-cell"}
-       [:span {:class [price-text-color]} (or (format-price price price) "0.00")]]
-      [:div {:class ["text-right"]
+       [:span {:class [price-text-color "num"]} (or (format-price price price) "0.00")]]
+      [:div {:class ["text-right" "num-right"]
              :data-role "orderbook-level-size-cell"}
-       [:span.text-white (format-order-size order size-unit)]]
-      [:div {:class ["text-right"]
+       [:span {:class ["text-white" "num"]} (format-order-size order size-unit)]]
+      [:div {:class ["text-right" "num-right"]
              :data-role "orderbook-level-total-cell"}
-       [:span.text-white (format-order-total order size-unit)]]]]))
+       [:span {:class ["text-white" "num"]} (format-order-total order size-unit)]]]]))
 
 ;; Spread component
 (defn spread-row [spread]
   (let [absolute (:absolute spread)
         percentage (:percentage spread)]
     [:div.flex.items-center.justify-center.h-6.bg-base-100.border-y.border-base-300.text-xs
-     [:div.flex.items-center.space-x-3.text-white
+     [:div.flex.items-center.space-x-3.text-white.num
       [:span "Spread"]
       [:span (format-price absolute)]
       [:span (str (format-percent percentage 3) "%")]]]))
@@ -369,13 +369,13 @@
          :data-role "orderbook-column-headers-row"}
    [:div {:class ["text-left"]
           :data-role "orderbook-price-header-cell"}
-    [:span.text-gray-400.text-xs "Price"]]
-   [:div {:class ["text-right"]
+    [:span {:class ["text-gray-400" "text-xs" "num"]} "Price"]]
+   [:div {:class ["text-right" "num-right"]
           :data-role "orderbook-size-header-cell"}
-    [:span.text-gray-400.text-xs (str "Size (" size-symbol ")")]]
-   [:div {:class ["text-right"]
+    [:span {:class ["text-gray-400" "text-xs" "num"]} (str "Size (" size-symbol ")")]]
+   [:div {:class ["text-right" "num-right"]
           :data-role "orderbook-total-header-cell"}
-    [:span.text-gray-400.text-xs (str "Total (" size-symbol ")")]]])
+    [:span {:class ["text-gray-400" "text-xs" "num"]} (str "Total (" size-symbol ")")]]])
 
 ;; Main order book component
 (defn l2-orderbook-panel [coin market orderbook-data orderbook-ui]
@@ -419,7 +419,7 @@
         max-ask-cum-size (get-max-cumulative-total asks-with-totals size-unit)
         max-bid-cum-size (get-max-cumulative-total bids-with-totals size-unit)
         max-cum-size (max (or max-ask-cum-size 0) (or max-bid-cum-size 0))]
-    [:div {:class ["bg-base-100" "border" "border-base-300" "rounded-none" "overflow-hidden" "h-full" "flex" "flex-col"]}
+    [:div {:class ["bg-base-100" "border" "border-base-300" "rounded-none" "overflow-hidden" "h-full" "flex" "flex-col" "num" "num-dense"]}
      ;; Header
      (orderbook-header selected-option
                        price-options

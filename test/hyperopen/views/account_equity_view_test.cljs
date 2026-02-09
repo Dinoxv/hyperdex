@@ -64,7 +64,9 @@
     (let [value-node (last (view/metric-row "Balance" "$10.00"))
           placeholder-node (last (view/metric-row "Balance" "--"))]
       (is (contains? (node-class-set value-node) "text-trading-text"))
-      (is (contains? (node-class-set placeholder-node) "text-trading-text-secondary")))))
+      (is (contains? (node-class-set value-node) "num"))
+      (is (contains? (node-class-set placeholder-node) "text-trading-text-secondary"))
+      (is (contains? (node-class-set placeholder-node) "num")))))
 
 (deftest pnl-display-color-mapping-test
   (let [positive (view/pnl-display 10.5)

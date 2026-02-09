@@ -11,6 +11,9 @@
     (testing "uses hyperliquid background color for chart canvas"
       (is (= "rgb(15, 26, 31)"
              (get-in options [:layout :background :color]))))
+    (testing "uses tokenized UI font stack for chart labels"
+      (is (string? (get-in options [:layout :fontFamily])))
+      (is (.includes (get-in options [:layout :fontFamily]) "system-ui")))
     (testing "defaults to subtle-v1 grid and border palette"
       (is (= "rgba(139, 148, 158, 0.16)"
              (get-in options [:grid :vertLines :color])))

@@ -87,7 +87,7 @@
                           (some #(and (vector? %)
                                       (= :span (first %))
                                       (contains? (set (get-in % [1 :class]))
-                                                 "tabular-nums"))
+                                                 "num"))
                                 (drop (if (map? (second candidate)) 2 1) candidate))))))
 
 (defn- metric-value-text [node label]
@@ -97,7 +97,7 @@
         value-span (some #(when (and (vector? %)
                                      (= :span (first %))
                                      (contains? (set (get-in % [1 :class]))
-                                                "tabular-nums"))
+                                                "num"))
                             %)
                          children)]
     (first (collect-strings value-span))))
@@ -307,7 +307,7 @@
         slippage-row (metric-value-node-by-label view-node "Slippage")
         value-span (some #(when (and (vector? %)
                                      (= :span (first %))
-                                     (contains? (set (get-in % [1 :class])) "tabular-nums"))
+                                     (contains? (set (get-in % [1 :class])) "num"))
                             %)
                          (drop (if (map? (second slippage-row)) 2 1) slippage-row))
         value-classes (set (get-in value-span [1 :class]))]

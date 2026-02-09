@@ -112,3 +112,21 @@
                 :market-type :perp}
         view-node (view/active-asset-row ctx-data market {:visible-dropdown nil} {:asset-selector {:missing-icons #{}}})]
     (is (contains-class? view-node "app-shell-gutter-left"))))
+
+(deftest active-asset-row-applies-numeric-utility-to-live-values-test
+  (let [ctx-data {:coin "SOL"
+                  :mark 87.0
+                  :markRaw "87.0"
+                  :oracle 86.9
+                  :oracleRaw "86.9"
+                  :change24h 1.2
+                  :change24hPct 1.4
+                  :volume24h 1000
+                  :openInterest 100
+                  :fundingRate 0.001}
+        market {:coin "SOL"
+                :symbol "SOL"
+                :base "SOL"
+                :market-type :perp}
+        view-node (view/active-asset-row ctx-data market {:visible-dropdown nil} {:asset-selector {:missing-icons #{}}})]
+    (is (contains-class? view-node "num"))))

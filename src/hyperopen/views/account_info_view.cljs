@@ -341,7 +341,7 @@
                       (neg? payment) "text-error"
                       (pos? payment) "text-success"
                       :else "text-base-content")]
-    [:span {:class color-class}
+    [:span {:class [color-class "num"]}
      (str (.toLocaleString (js/Number. payment)
                            "en-US"
                            #js {:minimumFractionDigits 4
@@ -355,7 +355,7 @@
                       (neg? rate) "text-error"
                       (pos? rate) "text-success"
                       :else "text-base-content")]
-    [:span {:class color-class}
+    [:span {:class [color-class "num"]}
      (str (.toFixed (* 100 rate) 4) "%")]))
 
 (defn- funding-coin-options [fundings-raw]
@@ -1194,7 +1194,7 @@
                         (pos? pnl-num) "text-success"
                         (neg? pnl-num) "text-error"
                         :else "text-trading-text")]
-      [:span {:class color-class}
+      [:span {:class [color-class "num"]}
        (str (if (pos? pnl-num) "+" "")
             "$" (format-currency pnl-num)
             " (" (if (pos? pct-num) "+" "") (.toFixed pct-num 2) "%)")])
@@ -1438,13 +1438,13 @@
        [:div.font-semibold coin-attrs coin]
        [:div.font-semibold coin])
      ;; Total Balance  
-     [:div.text-left.font-semibold (format-balance-amount total-balance amount-decimals)]
+     [:div.text-right.font-semibold.num.num-right (format-balance-amount total-balance amount-decimals)]
      ;; Available Balance
-     [:div.text-left.font-semibold (format-balance-amount available-balance amount-decimals)]
+     [:div.text-right.font-semibold.num.num-right (format-balance-amount available-balance amount-decimals)]
      ;; USDC Value
-     [:div.text-left.font-semibold "$" (format-currency usdc-value)]
+     [:div.text-right.font-semibold.num.num-right "$" (format-currency usdc-value)]
      ;; PNL (ROE %)
-     [:div.text-left.font-semibold (format-pnl pnl-value pnl-pct)]
+     [:div.text-right.font-semibold.num.num-right (format-pnl pnl-value pnl-pct)]
      ;; Send
      [:div.text-left
       [:button {:class ["btn" "btn-xs" "btn-ghost" "text-trading-text"]} "Send"]]
@@ -1459,10 +1459,10 @@
 (defn balance-table-header [sort-state]
   [:div.grid.grid-cols-8.gap-2.py-1.px-3.bg-base-200.text-sm.font-medium.text-trading-text
    [:div (sortable-balances-header "Coin" sort-state :left)]
-   [:div (sortable-balances-header "Total Balance" sort-state :left)]
-   [:div (sortable-balances-header "Available Balance" sort-state :left)]
-   [:div (sortable-balances-header "USDC Value" sort-state :left)]
-   [:div (sortable-balances-header "PNL (ROE %)" sort-state :left)]
+   [:div (sortable-balances-header "Total Balance" sort-state :right)]
+   [:div (sortable-balances-header "Available Balance" sort-state :right)]
+   [:div (sortable-balances-header "USDC Value" sort-state :right)]
+   [:div (sortable-balances-header "PNL (ROE %)" sort-state :right)]
    [:div (non-sortable-header "Send" :left)]
    [:div (non-sortable-header "Transfer" :left)]
    [:div (non-sortable-header "Contract" :left)]])
@@ -1550,26 +1550,27 @@
      ;; Coin with leverage and dex chips
      [:div {:class ["flex" "items-center" "gap-1.5" "min-w-0" "self-stretch"]
             :style position-coin-cell-style}
-      [:span {:class ["font-medium" "truncate"]} coin-label]
+     [:span {:class ["font-medium" "truncate"]} coin-label]
       (when (some? leverage)
         [:span {:class position-chip-classes} (str leverage "x")])
       (when dex-label
         [:span {:class position-chip-classes} dex-label])]
      ;; Size
-     [:div.text-left.font-semibold (format-position-size pos)]
+     [:div.text-right.font-semibold.num.num-right (format-position-size pos)]
      ;; Position Value  
-     [:div.text-left.font-semibold "$" (format-currency position-value)]
+     [:div.text-right.font-semibold.num.num-right "$" (format-currency position-value)]
      ;; Entry Price
-     [:div.text-left.font-semibold (format-trade-price entry-price)]
+     [:div.text-right.font-semibold.num.num-right (format-trade-price entry-price)]
      ;; Mark Price
-     [:div.text-left.font-semibold (format-trade-price mark-price)]
+     [:div.text-right.font-semibold.num.num-right (format-trade-price mark-price)]
      ;; PNL (ROE %)
-     [:div.text-left.font-semibold
+     [:div.text-right.font-semibold.num.num-right
       [:div
-       [:span {:class (if (pos? (js/parseFloat pnl-value))
-                       "text-success" "text-error")}
+       [:span {:class [(if (pos? (js/parseFloat pnl-value))
+                         "text-success" "text-error")
+                       "num"]}
         "$" (format-currency pnl-value)]
-       [:div.text-xs.opacity-70
+       [:div.text-xs.opacity-70.num
         [:span {:class (if (pos? pnl-percent)
                         "text-success"
                         "text-error")}
@@ -1577,17 +1578,18 @@
                "")
          (.toFixed pnl-percent 2) "%)"]]]]
      ;; Liq. Price
-     [:div.text-left.font-semibold (if liq-price (format-trade-price liq-price) "N/A")]
+     [:div.text-right.font-semibold.num.num-right (if liq-price (format-trade-price liq-price) "N/A")]
      ;; Margin
-     [:div.text-left.font-semibold "$" (format-currency margin)]
+     [:div.text-right.font-semibold.num.num-right "$" (format-currency margin)]
      ;; Funding
-     [:div.text-left.font-semibold
+     [:div.text-right.font-semibold.num.num-right
       (let [funding-num (js/parseFloat funding)
             display-funding (if (pos? funding-num) (- funding-num) funding-num)
             display-text (str "$" (format-currency (str display-funding)))]
-        [:span {:class (if (neg? display-funding)
-                        "text-error" 
-                        "text-success")}
+        [:span {:class [(if (neg? display-funding)
+                          "text-error"
+                          "text-success")
+                        "num"]}
          display-text])]
      ;; Close All
      [:div.text-left
@@ -1636,14 +1638,14 @@
 (defn position-table-header [sort-state]
   [:div.grid.grid-cols-11.gap-2.py-1.pr-3.bg-base-200
    [:div.text-left.pl-3 (sortable-header "Coin" sort-state)]
-   [:div.text-left (sortable-header "Size" sort-state)]
-   [:div.text-left (sortable-header "Position Value" sort-state)]
-   [:div.text-left (sortable-header "Entry Price" sort-state)]
-   [:div.text-left (sortable-header "Mark Price" sort-state)]
-   [:div.text-left (sortable-header "PNL (ROE %)" sort-state)]
-   [:div.text-left (sortable-header "Liq. Price" sort-state)]
-   [:div.text-left (sortable-header "Margin" sort-state)]
-   [:div.text-left (sortable-header "Funding" sort-state)]
+   [:div.text-right (sortable-header "Size" sort-state)]
+   [:div.text-right (sortable-header "Position Value" sort-state)]
+   [:div.text-right (sortable-header "Entry Price" sort-state)]
+   [:div.text-right (sortable-header "Mark Price" sort-state)]
+   [:div.text-right (sortable-header "PNL (ROE %)" sort-state)]
+   [:div.text-right (sortable-header "Liq. Price" sort-state)]
+   [:div.text-right (sortable-header "Margin" sort-state)]
+   [:div.text-right (sortable-header "Funding" sort-state)]
    [:div.text-left (non-sortable-header "Close All")]
    [:div.text-left (non-sortable-header "TP/SL")]])
 
@@ -1675,34 +1677,34 @@
     (if (seq sorted)
       (tab-table-content
         [:div {:class ["grid" "gap-2" "py-1" "px-3" "bg-base-200" "text-xs" "font-medium" "grid-cols-[130px_70px_60px_70px_60px_80px_100px_70px_70px_120px_50px_70px]"]}
-         [:div.pr-2.whitespace-nowrap (sortable-open-orders-header "Time" sort-state)]
-         [:div.pl-1 (sortable-open-orders-header "Type" sort-state)]
-         [:div (sortable-open-orders-header "Coin" sort-state)]
-         [:div (sortable-open-orders-header "Direction" sort-state)]
-         [:div.text-left (sortable-open-orders-header "Size" sort-state)]
-         [:div.text-left (sortable-open-orders-header "Original Size" sort-state)]
-         [:div.text-left (sortable-open-orders-header "Order Value" sort-state)]
-         [:div.text-left (sortable-open-orders-header "Price" sort-state)]
-         [:div.text-left.whitespace-nowrap "Reduce Only"]
-         [:div.text-left.whitespace-nowrap "Trigger Conditions"]
-         [:div.text-left "TP/SL"]
+        [:div.pr-2.whitespace-nowrap (sortable-open-orders-header "Time" sort-state)]
+        [:div.pl-1 (sortable-open-orders-header "Type" sort-state)]
+        [:div (sortable-open-orders-header "Coin" sort-state)]
+        [:div (sortable-open-orders-header "Direction" sort-state)]
+        [:div.text-right (sortable-open-orders-header "Size" sort-state)]
+        [:div.text-right (sortable-open-orders-header "Original Size" sort-state)]
+        [:div.text-right (sortable-open-orders-header "Order Value" sort-state)]
+        [:div.text-right (sortable-open-orders-header "Price" sort-state)]
+        [:div.text-left.whitespace-nowrap "Reduce Only"]
+        [:div.text-left.whitespace-nowrap "Trigger Conditions"]
+        [:div.text-left "TP/SL"]
          [:div.text-left "Cancel All"]]
         (for [o sorted]
           ^{:key (str (:oid o) "-" (:coin o))}
           [:div {:class ["grid" "gap-2" "py-px" "px-3" "hover:bg-base-300" "text-xs" "grid-cols-[130px_70px_60px_70px_60px_80px_100px_70px_70px_120px_50px_70px]"]}
-           [:div.pr-2.whitespace-nowrap (format-open-orders-time (:time o))]
-           [:div.pl-1 (or (:type o) "Order")]
-           [:div (:coin o)]
-           [:div {:class (direction-class (:side o))} (direction-label (:side o))]
-           [:div.text-left (format-currency (:sz o))]
-           [:div.text-left (format-currency (or (:orig-sz o) (:sz o)))]
-           [:div.text-left (if-let [val (order-value o)]
-                              (str (format-currency val) " USDC")
-                              "--")]
-           [:div.text-left (format-trade-price (:px o))]
-           [:div.text-left (if (:reduce-only o) "Yes" "No")]
-           [:div.text-left (format-trigger-conditions o)]
-           [:div.text-left (format-tp-sl o)]
+          [:div.pr-2.whitespace-nowrap (format-open-orders-time (:time o))]
+          [:div.pl-1 (or (:type o) "Order")]
+          [:div (:coin o)]
+          [:div {:class (direction-class (:side o))} (direction-label (:side o))]
+          [:div.text-right.num.num-right (format-currency (:sz o))]
+          [:div.text-right.num.num-right (format-currency (or (:orig-sz o) (:sz o)))]
+          [:div.text-right.num.num-right (if-let [val (order-value o)]
+                                            (str (format-currency val) " USDC")
+                                            "--")]
+          [:div.text-right.num.num-right (format-trade-price (:px o))]
+          [:div.text-left (if (:reduce-only o) "Yes" "No")]
+          [:div.text-left (format-trigger-conditions o)]
+          [:div.text-left (format-tp-sl o)]
            [:div.text-left
             [:button {:class ["btn" "btn-xs" "btn-ghost"]
                       :on {:click [[:actions/cancel-order o]]}}
@@ -1939,11 +1941,11 @@
         [:div {:class ["text-left"]} (sortable-trade-history-header "Time" sort-state)]
         [:div {:class ["text-left"]} (sortable-trade-history-header "Coin" sort-state)]
         [:div {:class ["text-left"]} (sortable-trade-history-header "Direction" sort-state)]
-        [:div {:class ["text-left"]} (sortable-trade-history-header "Price" sort-state)]
-        [:div {:class ["text-left"]} (sortable-trade-history-header "Size" sort-state)]
-        [:div {:class ["text-left"]} (sortable-trade-history-header "Trade Value" sort-state)]
-        [:div {:class ["text-left"]} (sortable-trade-history-header "Fee" sort-state)]
-        [:div {:class ["text-left"]} (sortable-trade-history-header "Closed PNL" sort-state)]]
+        [:div {:class ["text-right"]} (sortable-trade-history-header "Price" sort-state)]
+        [:div {:class ["text-right"]} (sortable-trade-history-header "Size" sort-state)]
+        [:div {:class ["text-right"]} (sortable-trade-history-header "Trade Value" sort-state)]
+        [:div {:class ["text-right"]} (sortable-trade-history-header "Fee" sort-state)]
+        [:div {:class ["text-right"]} (sortable-trade-history-header "Closed PNL" sort-state)]]
        (for [f rows]
          ^{:key (trade-history-row-id f)}
          [:div {:class ["grid"
@@ -1960,15 +1962,15 @@
           (let [direction (trade-history-direction-label f)]
             [:div {:class ["text-left" (trade-history-direction-class direction)]}
              direction])
-          [:div {:class ["text-left"]}
+          [:div {:class ["text-right" "num" "num-right"]}
            (format-trade-history-price f)]
-          [:div {:class ["text-left"]}
+          [:div {:class ["text-right" "num" "num-right"]}
            (format-trade-history-size f market-by-key)]
-          [:div {:class ["text-left"]}
+          [:div {:class ["text-right" "num" "num-right"]}
            (format-trade-history-value f)]
-          [:div {:class ["text-left"]}
+          [:div {:class ["text-right" "num" "num-right"]}
            (format-trade-history-fee f)]
-          [:div {:class ["text-left" (trade-history-closed-pnl-class f)]}
+          [:div {:class ["text-right" "num" "num-right" (trade-history-closed-pnl-class f)]}
            (format-trade-history-closed-pnl f)]])
        (trade-history-pagination-controls pagination))
       (empty-state "No fills"))))
@@ -1990,22 +1992,22 @@
        [:div.grid.grid-cols-6.gap-2.py-1.px-3.bg-base-200.text-sm.font-medium
         [:div (sortable-funding-history-header "Time" sort-state)]
         [:div.text-left (sortable-funding-history-header "Coin" sort-state)]
-        [:div.text-left (sortable-funding-history-header "Size" sort-state)]
+        [:div.text-right (sortable-funding-history-header "Size" sort-state)]
         [:div.text-left (sortable-funding-history-header "Position Side" sort-state)]
-        [:div.text-left (sortable-funding-history-header "Payment" sort-state)]
-        [:div.text-left (sortable-funding-history-header "Rate" sort-state)]]
+        [:div.text-right (sortable-funding-history-header "Payment" sort-state)]
+        [:div.text-right (sortable-funding-history-header "Rate" sort-state)]]
        (for [f rows]
          ^{:key (funding-row-sort-id f)}
          [:div.grid.grid-cols-6.gap-2.py-px.px-3.hover:bg-base-300.text-sm
           [:div (format-funding-history-time (or (:time-ms f) (:time f)))]
           [:div.text-left (:coin f)]
-          [:div.text-left (funding-size-text f)]
+          [:div.text-right.num.num-right (funding-size-text f)]
           [:div.text-left
            (let [position-side (funding-side-value f)]
              [:span {:class (funding-side-class position-side)}
               (funding-side-label position-side)])]
-          [:div.text-left (funding-payment-node f)]
-          [:div.text-left (funding-rate-node f)]])
+          [:div.text-right.num.num-right (funding-payment-node f)]
+          [:div.text-right.num.num-right (funding-rate-node f)]])
        (funding-history-pagination-controls pagination))
       (if (:loading? funding-history-state)
         (empty-state "Loading funding history...")
@@ -2036,10 +2038,10 @@
         [:div.pl-1.text-left (sortable-order-history-header "Type" sort-state)]
         [:div.text-left (sortable-order-history-header "Coin" sort-state)]
         [:div.text-left (sortable-order-history-header "Direction" sort-state)]
-        [:div.text-left (sortable-order-history-header "Size" sort-state)]
-        [:div.text-left (sortable-order-history-header "Filled Size" sort-state)]
-        [:div.text-left (sortable-order-history-header "Order Value" sort-state)]
-        [:div.text-left (sortable-order-history-header "Price" sort-state)]
+        [:div.text-right (sortable-order-history-header "Size" sort-state)]
+        [:div.text-right (sortable-order-history-header "Filled Size" sort-state)]
+        [:div.text-right (sortable-order-history-header "Order Value" sort-state)]
+        [:div.text-right (sortable-order-history-header "Price" sort-state)]
         [:div.text-left.whitespace-nowrap (sortable-order-history-header "Reduce Only" sort-state)]
         [:div.text-left.whitespace-nowrap (sortable-order-history-header "Trigger Conditions" sort-state)]
         [:div.text-left (sortable-order-history-header "TP/SL" sort-state)]
@@ -2048,17 +2050,17 @@
        (for [row rows]
          ^{:key (order-history-row-sort-id row)}
          [:div {:class ["grid" "gap-2" "py-px" "px-3" "hover:bg-base-300" "text-xs" "grid-cols-[130px_70px_90px_80px_90px_90px_110px_80px_90px_140px_70px_80px_120px]"]}
-          [:div.pr-2.whitespace-nowrap (or (format-open-orders-time (:time-ms row)) "--")]
-          [:div.pl-1.text-left (title-case-label (:type row))]
-          [:div.text-left (order-history-coin-node (:coin row) market-by-key)]
-          [:div {:class ["text-left" (direction-class (:side row))]} (direction-label (:side row))]
-          [:div.text-left (format-order-history-size (:size row))]
-          [:div.text-left (format-order-history-filled-size (:filled-size row))]
-          [:div.text-left (format-order-history-value (:order-value row))]
-          [:div.text-left (format-order-history-price row)]
-          [:div.text-left (format-order-history-reduce-only row)]
-          [:div.text-left (format-order-history-trigger row)]
-          [:div.text-left (format-order-history-tp-sl row)]
+         [:div.pr-2.whitespace-nowrap (or (format-open-orders-time (:time-ms row)) "--")]
+         [:div.pl-1.text-left (title-case-label (:type row))]
+         [:div.text-left (order-history-coin-node (:coin row) market-by-key)]
+         [:div {:class ["text-left" (direction-class (:side row))]} (direction-label (:side row))]
+         [:div.text-right.num.num-right (format-order-history-size (:size row))]
+         [:div.text-right.num.num-right (format-order-history-filled-size (:filled-size row))]
+         [:div.text-right.num.num-right (format-order-history-value (:order-value row))]
+         [:div.text-right.num.num-right (format-order-history-price row)]
+         [:div.text-left (format-order-history-reduce-only row)]
+         [:div.text-left (format-order-history-trigger row)]
+         [:div.text-left (format-order-history-tp-sl row)]
           [:div.text-left (:status-label row)]
           [:div.text-left (or (some-> (:oid row) str) "--")]])
        (order-history-pagination-controls pagination))

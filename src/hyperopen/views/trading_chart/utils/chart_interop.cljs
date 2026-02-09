@@ -189,9 +189,16 @@
       (set! (.-position container-style) "relative")))
   
   ;; Create legend div element
-  (let [legend (js/document.createElement "div")]
+  (let [legend (js/document.createElement "div")
+        legend-font-family (chart-options/resolve-chart-font-family)]
     ;; Fully transparent legend styling
-    (set! (.-style legend) "position: absolute; left: 12px; top: 8px; z-index: 100; font-size: 12px; font-family: 'SF Pro Display', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; line-height: 1.4; font-weight: 500; color: #ffffff; padding: 6px 10px; border-radius: 6px; box-shadow: none; pointer-events: none;")
+    (set! (.-style legend)
+          (str "position: absolute; left: 12px; top: 8px; z-index: 100; "
+               "font-size: 12px; font-family: " legend-font-family "; "
+               "font-variant-numeric: tabular-nums lining-nums; "
+               "font-feature-settings: 'tnum' 1, 'lnum' 1; "
+               "line-height: 1.4; font-weight: 500; color: #ffffff; "
+               "padding: 6px 10px; border-radius: 6px; box-shadow: none; pointer-events: none;"))
     
     ;; Set initial content
     (set! (.-innerHTML legend) "")

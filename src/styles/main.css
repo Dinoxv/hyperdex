@@ -6,18 +6,46 @@
   font-display: swap;
 }
 
+@font-face {
+  font-family: "Inter Variable";
+  src: url("/fonts/InterVariable.woff2") format("woff2");
+  font-weight: 100 900;
+  font-style: normal;
+  font-display: swap;
+}
+
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
 
 /* Custom CSS for trading interface */
 @layer base {
+  /*
+   * Typography tokens:
+   * - Default UI text uses system fonts for fast first paint.
+   * - `data-ui-font="inter"` opt-in swaps UI text to Inter Variable.
+   * - Monospace is reserved for dense numeric views only.
+   */
+  :root,
+  :root[data-ui-font="system"] {
+    --font-ui-system: system-ui, -apple-system, "Segoe UI", Roboto,
+      "Helvetica Neue", Arial, "Noto Sans", "Liberation Sans", sans-serif;
+    --font-ui: var(--font-ui-system);
+    --font-mono: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas,
+      "Liberation Mono", "Courier New", monospace;
+  }
+
+  :root[data-ui-font="inter"] {
+    --font-ui: "Inter Variable", var(--font-ui-system);
+  }
+
   html {
     @apply h-full;
   }
 
   body {
-    @apply h-full bg-trading-bg text-trading-text font-mono antialiased;
+    @apply h-full bg-trading-bg text-trading-text antialiased;
+    font-family: var(--font-ui);
   }
 
   /* Ensure proper scrolling and layout */
@@ -41,16 +69,15 @@
   }
 
   .trading-button {
-    @apply btn btn-sm font-mono tracking-wide;
+    @apply btn btn-sm tracking-wide;
   }
 
   .trading-input {
-    @apply input input-sm bg-trading-surface border-trading-border text-trading-text font-mono;
+    @apply input input-sm bg-trading-surface border-trading-border text-trading-text;
   }
 
   .header-nav-link {
-    font-family: OurFont, system-ui, "Segoe UI", Roboto, Ubuntu, "Helvetica Neue",
-      sans-serif;
+    font-family: var(--font-ui);
     font-style: normal;
     font-weight: 600;
     font-size: 14px;
@@ -240,13 +267,36 @@
 }
 
 @layer utilities {
+  /*
+   * Numeric typography utilities:
+   * - `.num` for tabular lining numerals on all live numeric values.
+   * - `.num-right` for right-aligned numeric table columns.
+   * - `.num-dense` for dense orderbook/trades style surfaces only.
+   */
+  .num {
+    font-variant-numeric: tabular-nums lining-nums;
+    font-feature-settings: "tnum" 1, "lnum" 1;
+  }
+
+  .num-right {
+    text-align: right;
+  }
+
+  .num-dense {
+    font-family: var(--font-mono);
+  }
+
   /* Custom utilities for trading interface */
   .text-price {
-    @apply font-mono text-sm tabular-nums;
+    @apply text-sm;
+    font-variant-numeric: tabular-nums lining-nums;
+    font-feature-settings: "tnum" 1, "lnum" 1;
   }
 
   .text-volume {
-    @apply font-mono text-xs text-trading-text-secondary tabular-nums;
+    @apply text-xs text-trading-text-secondary;
+    font-variant-numeric: tabular-nums lining-nums;
+    font-feature-settings: "tnum" 1, "lnum" 1;
   }
 
   .gradient-green {

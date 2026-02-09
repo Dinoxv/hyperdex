@@ -21,7 +21,13 @@ module.exports = {
         "trading-text-secondary": "#8b949e",
       },
       fontFamily: {
-        mono: ["JetBrains Mono", "Fira Code", "monospace"],
+        sans: [
+          "var(--font-ui)",
+          "var(--font-ui-system)",
+          "system-ui",
+          "sans-serif",
+        ],
+        mono: ["var(--font-mono)", "ui-monospace", "monospace"],
         splash: ["Splash", "ui-sans-serif", "system-ui", "sans-serif"],
       },
     },

@@ -736,23 +736,27 @@
         position-row-node (view/position-row sample-position-data)
         balance-value-node (find-first-node balance-row-node
                                             #(let [classes (node-class-set %)]
-                                               (and (contains? classes "text-left")
-                                                    (contains? classes "font-semibold"))))
+                                               (and (contains? classes "font-semibold")
+                                                    (contains? classes "num"))))
         position-value-node (find-first-node position-row-node
                                              #(let [classes (node-class-set %)]
-                                                (and (contains? classes "text-left")
-                                                     (contains? classes "font-semibold"))))]
+                                                (and (contains? classes "font-semibold")
+                                                     (contains? classes "num"))))]
     (is (some? balance-value-node))
     (is (some? position-value-node))))
 
-(deftest position-table-columns-are-left-aligned-test
+(deftest position-table-uses-right-alignment-for-numeric-columns-test
   (let [header-node (view/position-table-header default-sort-state)
         header-cells (vec (node-children header-node))
         row-node (view/position-row sample-position-data)
         row-cells (vec (node-children row-node))]
-    (doseq [idx (range 1 11)]
+    (doseq [idx (range 1 9)]
+      (is (contains? (node-class-set (nth header-cells idx)) "text-right")))
+    (doseq [idx (range 1 9)]
+      (is (contains? (node-class-set (nth row-cells idx)) "text-right")))
+    (doseq [idx [9 10]]
       (is (contains? (node-class-set (nth header-cells idx)) "text-left")))
-    (doseq [idx (range 1 11)]
+    (doseq [idx [9 10]]
       (is (contains? (node-class-set (nth row-cells idx)) "text-left")))))
 
 (defn- sample-position-row
@@ -833,7 +837,7 @@
         coin-cell (first (vec (node-children row-node)))]
     (is (nil? (get-in coin-cell [1 :style :color])))))
 
-(deftest open-orders-columns-are-left-aligned-test
+(deftest open-orders-columns-right-align-numeric-cells-test
   (let [open-orders [{:oid 101
                       :coin "HYPE"
                       :side "B"
@@ -851,12 +855,26 @@
         header-cells (vec (node-children header-node))
         row-node (first-viewport-row content)
         row-cells (vec (node-children row-node))]
-    (doseq [idx [4 5 6 7 8 9 10 11]]
+    (doseq [idx [4 5 6 7]]
+      (is (contains? (node-class-set (nth header-cells idx)) "text-right")))
+    (doseq [idx [4 5 6 7]]
+      (is (contains? (node-class-set (nth row-cells idx)) "text-right")))
+    (doseq [idx [8 9 10 11]]
       (is (contains? (node-class-set (nth header-cells idx)) "text-left")))
-    (doseq [idx [4 5 6 7 8 9 10 11]]
+    (doseq [idx [8 9 10 11]]
       (is (contains? (node-class-set (nth row-cells idx)) "text-left")))))
 
-(deftest history-tables-columns-are-left-aligned-test
+(deftest account-info-numeric-cells-use-num-utility-test
+  (let [balance-node (view/balance-row sample-balance-row)
+        balance-cells (vec (node-children balance-node))
+        position-node (view/position-row sample-position-data)
+        position-cells (vec (node-children position-node))]
+    (doseq [idx [1 2 3 4]]
+      (is (contains? (node-class-set (nth balance-cells idx)) "num")))
+    (doseq [idx [1 2 3 4 5 6 7 8]]
+      (is (contains? (node-class-set (nth position-cells idx)) "num")))))
+
+(deftest history-tables-right-align-numeric-columns-test
   (let [fills [{:tid 1 :coin "HYPE" :side "B" :sz "1.2" :px "100.0" :fee "0.1" :time 1700000000000}]
         fundings [{:coin "HYPE" :fundingRate "0.001" :payment "1.23" :positionSize "100.0" :time 1700000000000}]
         order-history [sample-order-history-row]
@@ -869,15 +887,24 @@
         order-node (view/order-history-tab-content order-history)
         order-header-cells (vec (node-children (tab-header-node order-node)))
         order-row-cells (vec (node-children (first-viewport-row order-node)))]
-    (doseq [idx (range 1 8)]
+    (doseq [idx [1 2]]
       (is (contains? (node-class-set (nth trade-header-cells idx)) "text-left"))
       (is (contains? (node-class-set (nth trade-row-cells idx)) "text-left")))
-    (doseq [idx (range 1 6)]
+    (doseq [idx [3 4 5 6 7]]
+      (is (contains? (node-class-set (nth trade-header-cells idx)) "text-right"))
+      (is (contains? (node-class-set (nth trade-row-cells idx)) "text-right")))
+    (doseq [idx [1 3]]
       (is (contains? (node-class-set (nth funding-header-cells idx)) "text-left"))
       (is (contains? (node-class-set (nth funding-row-cells idx)) "text-left")))
-    (doseq [idx (range 1 13)]
+    (doseq [idx [2 4 5]]
+      (is (contains? (node-class-set (nth funding-header-cells idx)) "text-right"))
+      (is (contains? (node-class-set (nth funding-row-cells idx)) "text-right")))
+    (doseq [idx [1 2 3 8 9 10 11 12]]
       (is (contains? (node-class-set (nth order-header-cells idx)) "text-left"))
-      (is (contains? (node-class-set (nth order-row-cells idx)) "text-left")))))
+      (is (contains? (node-class-set (nth order-row-cells idx)) "text-left")))
+    (doseq [idx [4 5 6 7]]
+      (is (contains? (node-class-set (nth order-header-cells idx)) "text-right"))
+      (is (contains? (node-class-set (nth order-row-cells idx)) "text-right")))))
 
 (deftest trade-history-headers-match-hyperliquid-order-and-contrast-test
   (let [fills [{:tid 1

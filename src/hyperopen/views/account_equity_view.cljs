@@ -82,7 +82,7 @@
    (if tooltip
      (label-with-tooltip label tooltip)
      [:span.text-sm.text-trading-text-secondary label])
-   [:span {:class (or value-class (default-metric-value-class value))}
+   [:span {:class ["num" (or value-class (default-metric-value-class value))]}
     value]])
 
 (defn account-equity-view [state]

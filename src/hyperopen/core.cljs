@@ -379,6 +379,9 @@
 (def orderbook-tabs
   #{:orderbook :trades})
 
+(def ^:private ui-font-local-storage-key "hyperopen-ui-font")
+(def ^:private supported-ui-fonts #{"system" "inter"})
+
 (defn- load-chart-option
   [ls-key default valid-set]
   (let [v (keyword (or (js/localStorage.getItem ls-key) (name default)))]
@@ -496,6 +499,26 @@
          {:size-unit (load-orderbook-size-unit)
           :price-aggregation-by-coin (load-orderbook-price-aggregation-by-coin)
           :active-tab (load-orderbook-active-tab)}))
+
+(defn- normalize-ui-font [value]
+  (let [candidate (-> (or value "system")
+                      str
+                      str/trim
+                      str/lower-case)]
+    (if (contains? supported-ui-fonts candidate)
+      candidate
+      "system")))
+
+(defn restore-ui-font-preference! []
+  (when (exists? js/document)
+    (let [html-el (.-documentElement js/document)
+          stored (try
+                   (when (exists? js/localStorage)
+                     (.getItem js/localStorage ui-font-local-storage-key))
+                   (catch :default _
+                     nil))
+          normalized (normalize-ui-font stored)]
+      (set! (.-uiFont (.-dataset html-el)) normalized))))
 
 (defn restore-active-asset! [store]
   (when (nil? (:active-asset @store))
@@ -1701,6 +1724,8 @@
                            :summary-logged? false})
   (mark-performance! "app:init:start")
   (schedule-startup-summary-log!)
+  ;; Restore root typography preference (system default, optional Inter override).
+  (restore-ui-font-preference!)
   ;; Restore asset selector sort settings from localStorage
   (asset-selector-settings/restore-asset-selector-sort-settings! store)
   ;; Restore chart options from localStorage

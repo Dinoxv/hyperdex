@@ -64,6 +64,16 @@ npm ci
 | `npm run test:watch` | Watches and recompiles the `:test` build while you iterate. |
 | `npm run test:repl` | Starts a ClojureScript REPL connected to the `:test` build. |
 
+## Typography
+
+- Default app typography uses system UI fonts (`--font-ui`) for fast initial render and no webfont blocking.
+- Apply `.num` to any live numeric data (prices, sizes, PnL, balances, chart values) for tabular lining numerals.
+- Apply `.num-right` to numeric table columns/cells to improve scan alignment.
+- Use `.num-dense` only for dense numeric panes (orderbook/trades), not general UI text.
+- Optional Inter support is runtime-only and off by default:
+  - Root attribute: `data-ui-font="system"` or `data-ui-font="inter"`.
+  - Persisted key: `hyperopen-ui-font` (`system` or `inter`).
+
 ## License
 
 GNU AGPL v3

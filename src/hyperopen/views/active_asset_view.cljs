@@ -36,7 +36,7 @@
 (defn change-indicator [change-value change-pct & [change-raw]]
   (let [is-positive (and change-value (>= change-value 0))
         color-class (if is-positive "text-success" "text-error")]
-    [:span {:class color-class} 
+    [:span {:class [color-class "num"]}
      (str (or (fmt/format-trade-price-delta change-value change-raw) "--")
           " / "
           (or (fmt/format-percentage change-pct) "--"))]))
@@ -109,12 +109,16 @@
                           (change-indicator (:change-value options)
                                             (:change-pct options)
                                             (:change-raw options))
-                          [:span.font-medium value])]
+                          [:span {:class (into ["font-medium"]
+                                               (when (:numeric? options) ["num"]))}
+                           value])]
     [:div.text-center
      [:div {:class (into ["text-xs" "text-gray-400" "mb-1"]
                          (when underlined? ["border-b" "border-dashed" "border-gray-600"]))}
       label]
-     [:div {:class ["text-xs"]} value-component]]))
+     [:div {:class (into ["text-xs"]
+                         (when (:numeric? options) ["num"]))}
+      value-component]]))
 
 (defn active-asset-row [ctx-data market dropdown-state full-state]
   (let [coin (or (:coin market) (:coin ctx-data))
@@ -161,7 +165,8 @@
                     (if mark
                       (fmt/format-trade-price mark mark-raw)
                       "Loading...")
-                    {:underlined true})]
+                    {:underlined true
+                     :numeric? true})]
       
       ;; Oracle column
       [:div.flex.justify-center
@@ -169,7 +174,8 @@
                     (if (and (not is-spot) oracle)
                       (fmt/format-trade-price oracle oracle-raw)
                       (if is-spot "—" "Loading..."))
-                    {:underlined true})]
+                    {:underlined true
+                     :numeric? true})]
       
       ;; 24h Change column
       [:div.flex.justify-center
@@ -178,11 +184,14 @@
                     {:change? (or has-perp-data? has-spot-data?)
                      :change-value change-24h
                      :change-pct change-24h-pct
-                     :change-raw nil})]
+                     :change-raw nil
+                     :numeric? true})]
       
       ;; 24h Volume column
       [:div.flex.justify-center
-       (data-column "24h Volume" (if volume-24h (fmt/format-large-currency volume-24h) "Loading..."))]
+       (data-column "24h Volume"
+                    (if volume-24h (fmt/format-large-currency volume-24h) "Loading...")
+                    {:numeric? true})]
       
       ;; Open Interest column 
       [:div.flex.justify-center 
@@ -191,7 +200,8 @@
                       is-spot "—"
                       open-interest-usd (fmt/format-large-currency open-interest-usd)
                       :else "Loading...")
-                    {:underlined true})]
+                    {:underlined true
+                     :numeric? true})]
       
       ;; Funding / Countdown column
      [:div.flex.justify-center
@@ -200,11 +210,12 @@
         [:div {:class ["text-xs" "flex" "items-center" "justify-center"]}
          (if (and (not is-spot) has-perp-data?)
            (tooltip 
-             [[:span.text-success.cursor-help (fmt/format-percentage funding-rate 4)]
+             [[:span {:class ["text-success" "cursor-help" "num"]}
+               (fmt/format-percentage funding-rate 4)]
               (str "Annualized: " (fmt/format-percentage (fmt/annualized-funding-rate funding-rate) 2))])
            [:span (if is-spot "—" "Loading...")])
          [:span.mx-1 "/"]
-         [:span (if is-spot "—" (fmt/format-funding-countdown))]]]]]))
+         [:span.num (if is-spot "—" (fmt/format-funding-countdown))]]]]]))
 
 (defn select-asset-row [dropdown-state]
   (let [dropdown-visible? (= (:visible-dropdown dropdown-state) :asset-selector)]

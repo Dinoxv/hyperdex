@@ -2,6 +2,9 @@
 
 (def default-right-offset-bars 4)
 
+(def default-chart-font-family
+  "system-ui, -apple-system, \"Segoe UI\", Roboto, \"Helvetica Neue\", Arial, \"Noto Sans\", \"Liberation Sans\", sans-serif")
+
 (def chart-visual-profile-local-storage-key "chart-visual-profile")
 (def default-chart-visual-profile :subtle-v1)
 
@@ -46,6 +49,21 @@
     (normalize-chart-visual-profile profile)
     (resolve-local-storage-chart-visual-profile)))
 
+(defn resolve-chart-font-family []
+  (if (and (exists? js/window) (exists? js/document))
+    (try
+      (let [root (.-documentElement js/document)
+            computed-style (.getComputedStyle js/window root)
+            configured (some-> (.getPropertyValue computed-style "--font-ui")
+                               str
+                               .trim)]
+        (if (seq configured)
+          configured
+          default-chart-font-family))
+      (catch :default _
+        default-chart-font-family))
+    default-chart-font-family))
+
 (defn- common-chart-options [profile]
   (let [{:keys [text-color
                 background-color
@@ -55,6 +73,7 @@
                 pane-separator-hover-color]}
         (get chart-visual-profile-tokens (effective-chart-visual-profile profile))]
     {:layout {:textColor text-color
+              :fontFamily (resolve-chart-font-family)
               :background {:type "solid"
                            :color background-color}
               :panes {:separatorColor pane-separator-color

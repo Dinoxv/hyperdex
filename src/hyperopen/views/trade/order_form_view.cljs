@@ -40,7 +40,9 @@
                    "border-base-300"
                    "rounded-lg"
                    "text-sm"
+                   "text-right"
                    "text-gray-100"
+                   "num"
                    "placeholder:text-gray-500"]
            :type (or type "text")
            :placeholder (or placeholder "")
@@ -57,7 +59,9 @@
                           "border-base-300"
                           "rounded-lg"
                           "text-sm"
+                          "text-right"
                           "text-gray-100"
+                          "num"
                           "placeholder:text-gray-500"
                           "outline-none"
                           "appearance-none"]
@@ -96,6 +100,7 @@
                     "text-sm"
                     "font-semibold"
                     "text-gray-100"
+                    "num"
                     "outline-none"
                     "appearance-none"
                     "pl-24"
@@ -304,7 +309,7 @@
   ([title value value-class]
   [:div {:class ["flex" "items-center" "justify-between"]}
    [:span {:class ["text-sm" "text-gray-400"]} title]
-   [:span {:class (into ["text-sm" "font-semibold" "tabular-nums"]
+   [:span {:class (into ["text-sm" "font-semibold" "num"]
                         (if (seq value-class)
                           [value-class]
                           ["text-gray-100"]))}
@@ -525,11 +530,11 @@
       [:div {:class ["space-y-1.5"]}
        [:div {:class ["flex" "items-center" "justify-between"]}
         [:span {:class ["text-sm" "text-gray-400"]} "Available to Trade"]
-        [:span {:class ["text-sm" "font-semibold" "text-gray-100" "tabular-nums"]}
+        [:span {:class ["text-sm" "font-semibold" "text-gray-100" "num"]}
          (format-usdc available-to-trade)]]
        [:div {:class ["flex" "items-center" "justify-between"]}
         [:span {:class ["text-sm" "text-gray-400"]} "Current position"]
-        [:span {:class ["text-sm" "font-semibold" "text-gray-100" "tabular-nums"]}
+        [:span {:class ["text-sm" "font-semibold" "text-gray-100" "num"]}
          (format-position-label position sz-decimals)]]]
 
       (when show-limit-like-controls?
@@ -590,7 +595,7 @@
                          "text-sm"
                          "font-semibold"
                          "text-gray-100"
-                         "tabular-nums"
+                         "num"
                          "appearance-none"
                          "outline-none"
                          "pl-2.5"

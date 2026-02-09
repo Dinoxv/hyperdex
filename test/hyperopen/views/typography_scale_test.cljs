@@ -117,3 +117,27 @@
                         styles-source)))
       (is (not (re-find #"\.order-size-slider\.range:focus-visible::-moz-range-thumb\s*\{[^}]*0 0 0 12px"
                         styles-source))))))
+
+(deftest typography-defaults-use-system-ui-token-and-body-font-variable-test
+  (let [styles-path (join-path (project-root) "src" "styles" "main.css")
+        styles-source (read-text styles-path)
+        index-path (join-path (project-root) "resources" "public" "index.html")
+        index-source (read-text index-path)]
+    (testing "root typography variables include system/ui and monospace tokens"
+      (is (re-find #"--font-ui-system:\s*system-ui" styles-source))
+      (is (re-find #"--font-ui:\s*var\(--font-ui-system\)" styles-source))
+      (is (re-find #"--font-mono:\s*ui-monospace" styles-source)))
+    (testing "body font is driven by typography token"
+      (is (re-find #"body\s*\{[\s\S]*?font-family:\s*var\(--font-ui\);" styles-source)))
+    (testing "html defaults to system UI font mode"
+      (is (re-find #"<html[^>]*data-ui-font=\"system\"" index-source)))))
+
+(deftest numeric-utility-and-inter-font-face-contract-test
+  (let [styles-path (join-path (project-root) "src" "styles" "main.css")
+        styles-source (read-text styles-path)]
+    (testing "num utility enforces tabular lining numerals with fallback features"
+      (is (re-find #"\.num\s*\{[\s\S]*?font-variant-numeric:\s*tabular-nums\s+lining-nums;[\s\S]*?font-feature-settings:\s*\"tnum\"\s*1,\s*\"lnum\"\s*1;" styles-source)))
+    (testing "num-right utility right aligns numeric columns"
+      (is (re-find #"\.num-right\s*\{[\s\S]*?text-align:\s*right;" styles-source)))
+    (testing "Inter Variable font-face uses swap display behavior"
+      (is (re-find #"@font-face\s*\{[\s\S]*?font-family:\s*\"Inter Variable\";[\s\S]*?font-display:\s*swap;" styles-source)))))
