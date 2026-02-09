@@ -102,6 +102,9 @@
        (map balance-row-coin)
        vec))
 
+(defn- balance-row-contract-cell [row-node]
+  (nth (vec (node-children row-node)) 7))
+
 (def sample-balance-row
   {:key "spot-0"
    :coin "USDC (Spot)"
@@ -212,6 +215,21 @@
     (is (contains? (node-class-set sortable-node) "hover:text-trading-text"))
     (is (contains? (node-class-set non-sortable-node) "text-trading-text-secondary"))
     (is (contains? (node-class-set non-sortable-center-node) "justify-center"))))
+
+(deftest balances-header-includes-contract-column-as-final-cell-test
+  (let [header-node (view/balance-table-header default-sort-state)
+        header-cells (vec (node-children header-node))
+        header-labels (mapv #(first (collect-strings %)) header-cells)]
+    (is (= 8 (count header-cells)))
+    (is (= ["Coin"
+            "Total Balance"
+            "Available Balance"
+            "USDC Value"
+            "PNL (ROE %)"
+            "Send"
+            "Transfer"
+            "Contract"]
+           header-labels))))
 
 (deftest position-headers-use-secondary-text-and-hover-affordance-test
   (let [position-header-node (view/position-table-header default-sort-state)
@@ -353,6 +371,36 @@
            (mapv (juxt :coin :key) asc-result)))
     (is (= expected
            (mapv (juxt :coin :key) desc-result)))))
+
+(deftest build-balance-rows-attaches-contract-id-for-non-usdc-spot-and-leaves-usdc-rows-empty-test
+  (let [rows (view/build-balance-rows
+              {:clearinghouseState {:marginSummary {:accountValue "12.5"
+                                                    :totalMarginUsed "2.5"}}
+               :spotAssetCtxs []}
+              {:meta {:tokens [{:index 0
+                                :name "USDC"
+                                :weiDecimals 8
+                                :tokenId "0x11111111111111111111111111111111"}
+                               {:index 1
+                                :name "HYPE"
+                                :weiDecimals 5
+                                :tokenId "0x22222222222222222222222222222222"}]
+                      :universe []}
+               :clearinghouse-state {:balances [{:coin "USDC"
+                                                 :token 0
+                                                 :hold "0.0"
+                                                 :total "5.0"
+                                                 :entryNtl "0"}
+                                                {:coin "HYPE"
+                                                 :token 1
+                                                 :hold "0.0"
+                                                 :total "7.0"
+                                                 :entryNtl "0"}]}})
+        by-coin (into {} (map (juxt :coin identity)) rows)]
+    (is (nil? (:contract-id (get by-coin "USDC (Perps)"))))
+    (is (nil? (:contract-id (get by-coin "USDC (Spot)"))))
+    (is (= "0x22222222222222222222222222222222"
+           (:contract-id (get by-coin "HYPE"))))))
 
 (deftest balances-tab-content-without-active-sort-preserves-input-order-test
   (let [rows [{:key "row-1" :coin "HYPE" :total-balance 1 :available-balance 1 :usdc-value 1}
@@ -632,6 +680,45 @@
     (is (contains? (node-class-set coin-node) "font-semibold"))
     (is (contains? (node-class-set send-button-node) "text-trading-text"))
     (is (contains? (node-class-set transfer-button-node) "text-trading-text"))))
+
+(deftest balance-row-contract-cell-renders-explorer-link-with-abbreviated-id-test
+  (let [contract-id "0x1234567890abcdef"
+        row-node (view/balance-row (assoc sample-balance-row :contract-id contract-id))
+        contract-cell (balance-row-contract-cell row-node)
+        link-node (find-first-node contract-cell #(= :a (first %)))
+        icon-node (find-first-node contract-cell #(= :svg (first %)))
+        strings (set (collect-strings contract-cell))]
+    (is (some? link-node))
+    (is (some? icon-node))
+    (is (= (str "https://app.hyperliquid.xyz/explorer/token/" contract-id)
+           (get-in link-node [1 :href])))
+    (is (= "_blank" (get-in link-node [1 :target])))
+    (is (= "noopener noreferrer" (get-in link-node [1 :rel])))
+    (is (contains? strings "0x1234...cdef"))))
+
+(deftest balance-row-contract-cell-stays-blank-when-contract-id-missing-or-invalid-test
+  (let [missing-row (view/balance-row sample-balance-row)
+        invalid-row (view/balance-row (assoc sample-balance-row :contract-id "bad id"))
+        missing-cell (balance-row-contract-cell missing-row)
+        invalid-cell (balance-row-contract-cell invalid-row)
+        missing-link (find-first-node missing-cell #(= :a (first %)))
+        invalid-link (find-first-node invalid-cell #(= :a (first %)))]
+    (is (some? missing-cell))
+    (is (some? invalid-cell))
+    (is (nil? missing-link))
+    (is (nil? invalid-link))
+    (is (empty? (collect-strings missing-cell)))
+    (is (empty? (collect-strings invalid-cell)))))
+
+(deftest balance-row-contract-abbreviation-rules-test
+  (let [short-id "1234567890"
+        no-prefix-id "abcdefghijklmnop"
+        short-row (view/balance-row (assoc sample-balance-row :contract-id short-id))
+        no-prefix-row (view/balance-row (assoc sample-balance-row :contract-id no-prefix-id))
+        short-strings (set (collect-strings (balance-row-contract-cell short-row)))
+        no-prefix-strings (set (collect-strings (balance-row-contract-cell no-prefix-row)))]
+    (is (contains? short-strings short-id))
+    (is (contains? no-prefix-strings "abcd...mnop"))))
 
 (deftest balance-pnl-color-and-placeholder-contrast-test
   (testing "pnl uses success/error colors and white placeholders"

@@ -1206,12 +1206,78 @@
     :center ["justify-center" "text-center"]
     ["justify-start" "text-left"]))
 
+(defn- external-link-icon
+  ([] (external-link-icon ["h-3" "w-3" "shrink-0"]))
+  ([class-names]
+   [:svg {:class class-names
+          :viewBox "0 0 20 20"
+          :fill "none"
+          :stroke "currentColor"
+          :stroke-width "1.8"
+          :aria-hidden true}
+    [:path {:d "M8 4h8v8"}]
+    [:path {:d "M16 4 7 13"}]
+    [:path {:d "M14 10v5a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1V7a1 1 0 0 1 1-1h5"}]]))
+
+(def ^:private balance-contract-explorer-token-base-url
+  "https://app.hyperliquid.xyz/explorer/token/")
+
+(def ^:private balance-contract-id-pattern
+  #"^(?:0x)?[0-9a-zA-Z]+$")
+
+(defn- normalize-balance-contract-id [contract-id]
+  (let [contract-id* (some-> contract-id str str/trim)]
+    (when (and (seq contract-id*)
+               (re-matches balance-contract-id-pattern contract-id*))
+      contract-id*)))
+
+(defn- abbreviate-contract-id [contract-id]
+  (when-let [contract-id* (normalize-balance-contract-id contract-id)]
+    (if (> (count contract-id*) 10)
+      (let [prefix-len (if (str/starts-with? contract-id* "0x") 6 4)
+            safe-prefix-len (min prefix-len (count contract-id*))]
+        (str (subs contract-id* 0 safe-prefix-len)
+             "..."
+             (subs contract-id* (- (count contract-id*) 4))))
+      contract-id*)))
+
+(defn- balance-contract-explorer-url [contract-id]
+  (when-let [contract-id* (normalize-balance-contract-id contract-id)]
+    (str balance-contract-explorer-token-base-url contract-id*)))
+
+(defn- balance-contract-node [contract-id]
+  (let [display-contract-id (abbreviate-contract-id contract-id)]
+    (when-let [explorer-url (balance-contract-explorer-url contract-id)]
+      [:a {:href explorer-url
+           :target "_blank"
+           :rel "noopener noreferrer"
+           :class ["inline-flex"
+                   "min-h-6"
+                   "items-center"
+                   "gap-0.5"
+                   "whitespace-nowrap"
+                   "rounded"
+                   "text-trading-text"
+                   "hover:text-trading-text/80"
+                   "focus-visible:outline-none"
+                   "focus-visible:ring-2"
+                   "focus-visible:ring-trading-green/70"
+                   "focus-visible:ring-offset-1"
+                   "focus-visible:ring-offset-base-100"]}
+       [:span display-contract-id]
+       (external-link-icon ["h-3" "w-3" "shrink-0" "text-trading-green"])])))
+
 ;; Build balances rows for perps + spot
 (defn build-balance-rows [webdata2 spot-data]
   (let [clearinghouse-state (:clearinghouseState webdata2)
         spot-meta (:meta spot-data)
         spot-state (:clearinghouse-state spot-data)
         spot-asset-ctxs (:spotAssetCtxs webdata2)
+        token-by-index (into {}
+                             (keep (fn [{:keys [index] :as token}]
+                                     (when (some? index)
+                                       [index token])))
+                             (:tokens spot-meta))
         token-decimals (into {}
                              (map (fn [{:keys [index weiDecimals szDecimals]}]
                                     [index (or weiDecimals szDecimals 2)]))
@@ -1250,6 +1316,7 @@
         spot-rows (when (seq (get spot-state :balances))
                     (map (fn [{:keys [coin token hold total entryNtl]}]
                            (let [token-idx (if (string? token) (js/parseInt token) token)
+                                 token-meta (get token-by-index token-idx)
                                  decimals (get token-decimals token-idx)
                                  total-num (parse-num total)
                                  hold-num (parse-num hold)
@@ -1261,7 +1328,10 @@
                                              (- usdc-value entry-num))
                                  pnl-pct (when (and pnl-value (pos? entry-num))
                                            (* 100 (/ pnl-value entry-num)))
-                                 coin-label (if (= coin "USDC") "USDC (Spot)" coin)]
+                                 coin-label (if (= coin "USDC") "USDC (Spot)" coin)
+                                 contract-id (when-not (= coin "USDC")
+                                               (normalize-balance-contract-id
+                                                (:tokenId token-meta)))]
                              {:key (str "spot-" token-idx)
                               :coin coin-label
                               :total-balance total-num
@@ -1269,7 +1339,8 @@
                               :usdc-value usdc-value
                               :pnl-value pnl-value
                               :pnl-pct pnl-pct
-                              :amount-decimals decimals}))
+                              :amount-decimals decimals
+                              :contract-id contract-id}))
                          (get spot-state :balances)))]
     (->> (concat (when perps-row [perps-row]) spot-rows)
          (remove nil?)
@@ -1358,10 +1429,10 @@
       footer)]))
 
 ;; Balance row component
-(defn balance-row [{:keys [coin total-balance available-balance usdc-value pnl-value pnl-pct amount-decimals]}]
+(defn balance-row [{:keys [coin total-balance available-balance usdc-value pnl-value pnl-pct amount-decimals contract-id]}]
   (let [coin-attrs (when-not (usdc-balance-row? {:coin coin})
                      {:style {:color "rgb(151, 252, 228)"}})]
-    [:div.grid.grid-cols-7.gap-2.py-px.px-3.hover:bg-base-300.items-center.text-sm.text-trading-text
+    [:div.grid.grid-cols-8.gap-2.py-px.px-3.hover:bg-base-300.items-center.text-sm.text-trading-text
      ;; Coin
      (if coin-attrs
        [:div.font-semibold coin-attrs coin]
@@ -1379,18 +1450,22 @@
       [:button {:class ["btn" "btn-xs" "btn-ghost" "text-trading-text"]} "Send"]]
      ;; Transfer/Contract
      [:div.text-left
-      [:button {:class ["btn" "btn-xs" "btn-ghost" "text-trading-text"]} "Transfer"]]]))
+      [:button {:class ["btn" "btn-xs" "btn-ghost" "text-trading-text"]} "Transfer"]]
+     ;; Contract
+     [:div.text-left
+      (balance-contract-node contract-id)]]))
 
 ;; Balance table header
 (defn balance-table-header [sort-state]
-  [:div.grid.grid-cols-7.gap-2.py-1.px-3.bg-base-200.text-sm.font-medium.text-trading-text
+  [:div.grid.grid-cols-8.gap-2.py-1.px-3.bg-base-200.text-sm.font-medium.text-trading-text
    [:div (sortable-balances-header "Coin" sort-state :left)]
    [:div (sortable-balances-header "Total Balance" sort-state :left)]
    [:div (sortable-balances-header "Available Balance" sort-state :left)]
    [:div (sortable-balances-header "USDC Value" sort-state :left)]
    [:div (sortable-balances-header "PNL (ROE %)" sort-state :left)]
    [:div (non-sortable-header "Send" :left)]
-   [:div (non-sortable-header "Transfer" :left)]])
+   [:div (non-sortable-header "Transfer" :left)]
+   [:div (non-sortable-header "Contract" :left)]])
 
 ;; Balances tab content
 (defn balances-tab-content [balance-rows hide-small? sort-state]
@@ -1680,17 +1755,6 @@
     (when (valid-trade-history-tx-hash? hash-value)
       (str trade-history-explorer-tx-base-url hash-value))))
 
-(defn- trade-history-external-link-icon []
-  [:svg {:class ["h-3" "w-3" "shrink-0"]
-         :viewBox "0 0 20 20"
-         :fill "none"
-         :stroke "currentColor"
-         :stroke-width "1.8"
-         :aria-hidden true}
-   [:path {:d "M8 4h8v8"}]
-   [:path {:d "M16 4 7 13"}]
-   [:path {:d "M14 10v5a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1V7a1 1 0 0 1 1-1h5"}]])
-
 (defn- trade-history-time-node [row]
   (let [formatted-time (format-open-orders-time (trade-history-time-ms row))]
     (if-let [explorer-url (trade-history-explorer-tx-url row)]
@@ -1711,7 +1775,7 @@
                    "focus-visible:ring-offset-1"
                    "focus-visible:ring-offset-base-100"]}
        [:span formatted-time]
-       (trade-history-external-link-icon)]
+       (external-link-icon)]
       formatted-time)))
 
 (defn- format-usdc-amount [value]
