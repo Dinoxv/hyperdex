@@ -735,6 +735,17 @@
         coin-cell (first (vec (node-children row-node)))]
     (is (nil? (get-in coin-cell [1 :style :background])))))
 
+(deftest balance-row-non-usdc-coin-uses-highlight-color-test
+  (let [row-node (view/balance-row (assoc sample-balance-row :coin "HYPE"))
+        coin-cell (first (vec (node-children row-node)))]
+    (is (= "rgb(151, 252, 228)"
+           (get-in coin-cell [1 :style :color])))))
+
+(deftest balance-row-usdc-coin-keeps-default-color-test
+  (let [row-node (view/balance-row (assoc sample-balance-row :coin "USDC (Perps)"))
+        coin-cell (first (vec (node-children row-node)))]
+    (is (nil? (get-in coin-cell [1 :style :color])))))
+
 (deftest open-orders-columns-are-left-aligned-test
   (let [open-orders [{:oid 101
                       :coin "HYPE"

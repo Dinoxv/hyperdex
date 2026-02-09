@@ -1359,23 +1359,27 @@
 
 ;; Balance row component
 (defn balance-row [{:keys [coin total-balance available-balance usdc-value pnl-value pnl-pct amount-decimals]}]
-  [:div.grid.grid-cols-7.gap-2.py-px.px-3.hover:bg-base-300.items-center.text-sm.text-trading-text
-   ;; Coin
-   [:div.font-semibold coin]
-   ;; Total Balance  
-   [:div.text-left.font-semibold (format-balance-amount total-balance amount-decimals)]
-   ;; Available Balance
-   [:div.text-left.font-semibold (format-balance-amount available-balance amount-decimals)]
-   ;; USDC Value
-   [:div.text-left.font-semibold "$" (format-currency usdc-value)]
-   ;; PNL (ROE %)
-   [:div.text-left.font-semibold (format-pnl pnl-value pnl-pct)]
-   ;; Send
-   [:div.text-left
-    [:button {:class ["btn" "btn-xs" "btn-ghost" "text-trading-text"]} "Send"]]
-   ;; Transfer/Contract
-   [:div.text-left
-    [:button {:class ["btn" "btn-xs" "btn-ghost" "text-trading-text"]} "Transfer"]]])
+  (let [coin-attrs (when-not (usdc-balance-row? {:coin coin})
+                     {:style {:color "rgb(151, 252, 228)"}})]
+    [:div.grid.grid-cols-7.gap-2.py-px.px-3.hover:bg-base-300.items-center.text-sm.text-trading-text
+     ;; Coin
+     (if coin-attrs
+       [:div.font-semibold coin-attrs coin]
+       [:div.font-semibold coin])
+     ;; Total Balance  
+     [:div.text-left.font-semibold (format-balance-amount total-balance amount-decimals)]
+     ;; Available Balance
+     [:div.text-left.font-semibold (format-balance-amount available-balance amount-decimals)]
+     ;; USDC Value
+     [:div.text-left.font-semibold "$" (format-currency usdc-value)]
+     ;; PNL (ROE %)
+     [:div.text-left.font-semibold (format-pnl pnl-value pnl-pct)]
+     ;; Send
+     [:div.text-left
+      [:button {:class ["btn" "btn-xs" "btn-ghost" "text-trading-text"]} "Send"]]
+     ;; Transfer/Contract
+     [:div.text-left
+      [:button {:class ["btn" "btn-xs" "btn-ghost" "text-trading-text"]} "Transfer"]]]))
 
 ;; Balance table header
 (defn balance-table-header [sort-state]
