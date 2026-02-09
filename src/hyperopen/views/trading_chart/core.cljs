@@ -26,14 +26,14 @@
         [:button.relative.px-3.py-1.text-sm.font-medium.rounded.transition-colors
          {:key key
           :class (if (= selected-timeframe key)
-                   ["text-white" "bg-blue-600"]
+                   ["text-trading-green"]
                    ["text-gray-300" "hover:text-white" "hover:bg-gray-700"])
           :on {:click [[:actions/select-chart-timeframe key]]}}
          (name key)])
       ;; Additional timeframe button visible only when selected timeframe is not one of the main 3
       (when-not (contains? (set main-timeframes) selected-timeframe)
         [:button.relative.px-3.py-1.text-sm.font-medium.rounded.transition-colors
-         {:class ["text-white" "bg-blue-600"]
+         {:class ["text-trading-green"]
           :on {:click [[:actions/toggle-timeframes-dropdown]]}}
          (name selected-timeframe)])
 

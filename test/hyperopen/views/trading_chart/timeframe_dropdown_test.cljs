@@ -69,3 +69,11 @@
                                      (not-any? spaced-class-string? class-value)))]
     (is (tokenized-collection? hidden-class))
     (is (tokenized-collection? visible-class))))
+
+(deftest selected-timeframe-uses-green-text-without-blue-box-styles-test
+  (let [view (timeframe-dropdown/timeframe-dropdown {:selected-timeframe :1m
+                                                     :timeframes-dropdown-visible true})
+        classes (set (collect-class-strings view))]
+    (is (contains? classes "text-trading-green"))
+    (is (not (contains? classes "text-blue-400")))
+    (is (not (contains? classes "bg-gray-700")))))

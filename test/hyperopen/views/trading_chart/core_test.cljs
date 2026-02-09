@@ -109,3 +109,14 @@
     (is (contains? classes "bg-base-100"))
     (is (contains? classes "opacity-100"))
     (is (not-any? spaced-class-string? class-strings*))))
+
+(deftest chart-top-menu-selected-timeframe-uses-green-text-without-blue-background-test
+  (let [menu (chart-core/chart-top-menu {:chart-options {:timeframes-dropdown-visible false
+                                                          :selected-timeframe :1d
+                                                          :chart-type-dropdown-visible false
+                                                          :selected-chart-type :candlestick
+                                                          :indicators-dropdown-visible false
+                                                          :active-indicators {}}})
+        classes (set (collect-all-classes menu))]
+    (is (contains? classes "text-trading-green"))
+    (is (not (contains? classes "bg-blue-600")))))
