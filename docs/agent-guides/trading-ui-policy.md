@@ -32,6 +32,11 @@
 - MUST show timezone context and data freshness when staleness is possible.
 - MUST show market session context (open/closed/pre/post) where execution behavior changes.
 
+## Instrument Rendering Rules (MUST)
+- MUST render namespaced instrument identifiers as base symbol text plus a separate venue/type chip in table/list cells (for example `xyz:NVDA` renders as `NVDA` with an `xyz` chip).
+- MUST NOT render raw namespaced identifiers (for example `xyz:NVDA`) as the primary visible coin label when a parsed/base symbol is available.
+- MUST render size/quantity text using the base symbol only (for example `0.500 NVDA`), without namespace/type prefixes in the size suffix.
+
 ## Order Ticket and Confirmation Rules
 - MUST support this ticket sequence: instrument, side, quantity, order type, conditional price fields, time-in-force, estimate context, and submit path.
 - SHOULD include a review step before submit for high-impact actions.

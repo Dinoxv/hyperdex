@@ -29,6 +29,8 @@
 - MUST avoid duplicate side-effect issuance in one interaction flow (example: only one candle snapshot trigger per asset selection).
 - MUST define a single owner per projection path in a flow (`:active-asset`, `:selected-asset`, `:active-market`) and avoid redundant writers unless explicitly documented and tested.
 - MUST represent multi-token Replicant `:class` values as collections (for example `["opacity-0" "scale-y-95"]`) and MUST NOT use space-separated class strings in `:class` (for example `"opacity-0 scale-y-95"`), to avoid Replicant warnings and normalization overhead.
+- MUST render namespaced instrument identifiers in UI tables as base symbol text plus a prefix/type chip (for example `xyz:NVDA` -> `NVDA` + `xyz` chip), and MUST NOT render the raw concatenated identifier as the primary display label.
+- MUST render quantity/size symbol suffixes using the base symbol only (for example `0.500 NVDA`), and MUST NOT include namespace/type prefixes in size strings.
 
 ## Domain-Driven Design Rules (MUST)
 - MUST use ubiquitous language aligned to Hyperliquid protocol and product concepts.
@@ -151,6 +153,7 @@
 - Asset select emits no duplicate fetch/subscription effects.
 - Active asset bar still renders symbol if `:active-market` is partial.
 - Transition from one active asset to another preserves visible symbol and closes selector instantly.
+- Funding/order/trade rows display namespaced coins as base symbol + chip, and size fields never include namespace/type prefixes.
 
 ## Interaction Assumptions and Defaults
 - Assume existing Nexus/Replicant synchronous dispatch model remains unchanged.
