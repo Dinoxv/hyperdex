@@ -1957,11 +1957,11 @@
         [:div {:class ["text-left"]} (sortable-trade-history-header "Time" sort-state)]
         [:div {:class ["text-left"]} (sortable-trade-history-header "Coin" sort-state)]
         [:div {:class ["text-left"]} (sortable-trade-history-header "Direction" sort-state)]
-        [:div {:class ["text-right"]} (sortable-trade-history-header "Price" sort-state)]
-        [:div {:class ["text-right"]} (sortable-trade-history-header "Size" sort-state)]
-        [:div {:class ["text-right"]} (sortable-trade-history-header "Trade Value" sort-state)]
-        [:div {:class ["text-right"]} (sortable-trade-history-header "Fee" sort-state)]
-        [:div {:class ["text-right"]} (sortable-trade-history-header "Closed PNL" sort-state)]]
+        [:div {:class ["text-left"]} (sortable-trade-history-header "Price" sort-state)]
+        [:div {:class ["text-left"]} (sortable-trade-history-header "Size" sort-state)]
+        [:div {:class ["text-left"]} (sortable-trade-history-header "Trade Value" sort-state)]
+        [:div {:class ["text-left"]} (sortable-trade-history-header "Fee" sort-state)]
+        [:div {:class ["text-left"]} (sortable-trade-history-header "Closed PNL" sort-state)]]
        (for [f rows]
          ^{:key (trade-history-row-id f)}
          [:div {:class ["grid"
@@ -1978,15 +1978,15 @@
           (let [direction (trade-history-direction-label f)]
             [:div {:class ["text-left" (trade-history-direction-class direction)]}
              direction])
-          [:div {:class ["text-right" "num" "num-right"]}
+          [:div {:class ["text-left" "num"]}
            (format-trade-history-price f)]
-          [:div {:class ["text-right" "num" "num-right"]}
+          [:div {:class ["text-left" "num"]}
            (format-trade-history-size f market-by-key)]
-          [:div {:class ["text-right" "num" "num-right"]}
+          [:div {:class ["text-left" "num"]}
            (format-trade-history-value f)]
-          [:div {:class ["text-right" "num" "num-right"]}
+          [:div {:class ["text-left" "num"]}
            (format-trade-history-fee f)]
-          [:div {:class ["text-right" "num" "num-right" (trade-history-closed-pnl-class f)]}
+          [:div {:class ["text-left" "num" (trade-history-closed-pnl-class f)]}
            (format-trade-history-closed-pnl f)]])
        (trade-history-pagination-controls pagination))
       (empty-state "No fills"))))

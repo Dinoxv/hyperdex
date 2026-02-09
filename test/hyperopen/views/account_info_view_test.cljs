@@ -887,7 +887,7 @@
     (doseq [idx [1 2 3 4 5 6 7 8]]
       (is (contains? (node-class-set (nth position-cells idx)) "num")))))
 
-(deftest history-tables-right-align-numeric-columns-test
+(deftest history-tables-trade-history-left-aligns-value-columns-test
   (let [fills [{:tid 1 :coin "HYPE" :side "B" :sz "1.2" :px "100.0" :fee "0.1" :time 1700000000000}]
         fundings [{:coin "HYPE" :fundingRate "0.001" :payment "1.23" :positionSize "100.0" :time 1700000000000}]
         order-history [sample-order-history-row]
@@ -900,12 +900,11 @@
         order-node (view/order-history-tab-content order-history)
         order-header-cells (vec (node-children (tab-header-node order-node)))
         order-row-cells (vec (node-children (first-viewport-row order-node)))]
-    (doseq [idx [1 2]]
+    (doseq [idx [1 2 3 4 5 6 7]]
       (is (contains? (node-class-set (nth trade-header-cells idx)) "text-left"))
       (is (contains? (node-class-set (nth trade-row-cells idx)) "text-left")))
     (doseq [idx [3 4 5 6 7]]
-      (is (contains? (node-class-set (nth trade-header-cells idx)) "text-right"))
-      (is (contains? (node-class-set (nth trade-row-cells idx)) "text-right")))
+      (is (not (contains? (node-class-set (nth trade-row-cells idx)) "num-right"))))
     (doseq [idx [1 2 3 4 5]]
       (is (contains? (node-class-set (nth funding-header-cells idx)) "text-left"))
       (is (contains? (node-class-set (nth funding-row-cells idx)) "text-left")))
