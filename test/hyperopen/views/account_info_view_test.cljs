@@ -979,6 +979,77 @@
     (is (contains? (direct-texts (nth nvda-row-cells 7)) "-0.01 USDC"))
     (is (contains? (direct-texts (nth hype-row-cells 7)) "--"))))
 
+(deftest trade-history-direction-and-coin-colors-follow-action-intent-test
+  (let [fills [{:tid 1
+                :coin "xyz:NVDA"
+                :side "B"
+                :dir "Open Long"
+                :sz "0.500"
+                :px "187.88"
+                :fee "0.01"
+                :time 1700000000000}
+               {:tid 2
+                :coin "PUMP"
+                :side "A"
+                :dir "Sell"
+                :sz "2"
+                :px "10"
+                :fee "0.02"
+                :time 1700000001000}
+               {:tid 3
+                :coin "HYPE"
+                :side "A"
+                :dir "Market Order Liquidation: Close Long"
+                :liquidation {:markPx "0.001780"
+                              :method "market"}
+                :sz "100"
+                :px "0.001765"
+                :fee "0.01"
+                :time 1700000002000}]
+        content (view/trade-history-tab-content fills)
+        viewport (tab-rows-viewport-node content)
+        rendered-rows (vec (node-children viewport))
+        row-for (fn [needle]
+                  (some #(when (contains? (set (collect-strings %)) needle)
+                           %)
+                        rendered-rows))
+        nvda-row (row-for "NVDA")
+        pump-row (row-for "PUMP")
+        hype-row (row-for "HYPE")
+        nvda-cells (vec (node-children nvda-row))
+        pump-cells (vec (node-children pump-row))
+        hype-cells (vec (node-children hype-row))
+        nvda-coin-cell (nth nvda-cells 1)
+        pump-coin-cell (nth pump-cells 1)
+        hype-coin-cell (nth hype-cells 1)
+        nvda-coin-base (find-first-node nvda-coin-cell #(and (= :span (first %))
+                                                              (contains? (direct-texts %) "NVDA")))
+        pump-coin-base (find-first-node pump-coin-cell #(and (= :span (first %))
+                                                              (contains? (direct-texts %) "PUMP")))
+        hype-coin-base (find-first-node hype-coin-cell #(and (= :span (first %))
+                                                              (contains? (direct-texts %) "HYPE")))
+        xyz-chip (find-first-node nvda-coin-cell #(and (= :span (first %))
+                                                       (contains? (direct-texts %) "xyz")))
+        nvda-direction-cell (nth nvda-cells 2)
+        pump-direction-cell (nth pump-cells 2)
+        hype-direction-cell (nth hype-cells 2)]
+    (is (some? nvda-row))
+    (is (some? pump-row))
+    (is (some? hype-row))
+    (is (some? nvda-coin-base))
+    (is (some? pump-coin-base))
+    (is (some? hype-coin-base))
+    (is (some? xyz-chip))
+    (is (contains? (node-class-set nvda-direction-cell) "text-success"))
+    (is (contains? (node-class-set nvda-coin-base) "text-success"))
+    (is (contains? (node-class-set pump-direction-cell) "text-error"))
+    (is (contains? (node-class-set pump-coin-base) "text-error"))
+    (is (contains? (node-class-set hype-direction-cell) "text-error"))
+    (is (contains? (node-class-set hype-coin-base) "text-error"))
+    (is (contains? (set (collect-strings pump-direction-cell)) "Sell"))
+    (is (contains? (set (collect-strings hype-direction-cell))
+                   "Market Order Liquidation: Close Long"))))
+
 (deftest trade-history-price-improved-direction-renders-liquidation-tooltip-test
   (let [tooltip-copy "This fill price was more favorable to you than the price chart at that time, because your order provided liquidity to another user's liquidation."
         fills [{:tid 1
@@ -997,6 +1068,7 @@
                                                          (contains? (node-class-set %) "group")))
         focusable-label (find-first-node direction-cell #(and (= :span (first %))
                                                               (= 0 (get-in % [1 :tab-index]))))
+        focusable-label-classes (node-class-set focusable-label)
         tooltip-panel-node (find-first-node direction-cell #(and (= :div (first %))
                                                                  (contains? (node-class-set %) "group-hover:opacity-100")
                                                                  (contains? (node-class-set %) "group-focus-within:opacity-100")))
@@ -1010,6 +1082,9 @@
     (is (some? tooltip-panel-node))
     (is (some? tooltip-bubble-node))
     (is (contains? (set (collect-strings tooltip-panel-node)) tooltip-copy))
+    (is (contains? focusable-label-classes "underline"))
+    (is (contains? focusable-label-classes "decoration-dotted"))
+    (is (contains? focusable-label-classes "underline-offset-2"))
     (is (contains? tooltip-panel-classes "bottom-full"))
     (is (contains? tooltip-panel-classes "mb-2"))
     (is (contains? tooltip-panel-classes "group-hover:opacity-100"))
@@ -1076,6 +1151,25 @@
         direction-cell (nth (vec (node-children row-node)) 2)
         direction-strings (set (collect-strings direction-cell))]
     (is (contains? direction-strings "Market Order Liquidation: Close Long"))
+    (is (not (contains? direction-strings "Market Order Liquidation: Close Long (Price Improved)")))))
+
+(deftest trade-history-liquidation-close-direction-is-inferred-from-metadata-test
+  (let [fills [{:tid 1
+                :coin "PUMP"
+                :side "A"
+                :dir "Close Long"
+                :liquidation {:markPx "0.001780"
+                              :method "market"}
+                :sz "100"
+                :px "0.001765"
+                :fee "0.01"
+                :time 1700000000000}]
+        content (view/trade-history-tab-content fills)
+        row-node (first-viewport-row content)
+        direction-cell (nth (vec (node-children row-node)) 2)
+        direction-strings (set (collect-strings direction-cell))]
+    (is (contains? direction-strings "Market Order Liquidation: Close Long"))
+    (is (not (contains? direction-strings "Close Long (Price Improved)")))
     (is (not (contains? direction-strings "Market Order Liquidation: Close Long (Price Improved)")))))
 
 (deftest trade-history-time-cell-renders-explorer-link-when-valid-hash-present-test

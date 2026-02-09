@@ -263,3 +263,48 @@
           (.finally
             (fn []
               (set! hyperopen.api/post-info! original-post-info)))))))
+
+(deftest fetch-user-fills-sends-aggregate-request-and-preserves-liquidation-fields-test
+  (async done
+    (let [store (atom {:orders {}})
+          calls (atom [])
+          original-post-info hyperopen.api/post-info!]
+      (set! hyperopen.api/post-info!
+            (fn post-info-mock
+              ([body]
+               (post-info-mock body {}))
+              ([body _opts]
+               (swap! calls conj body)
+               (js/Promise.resolve
+                #js {:status 200
+                     :ok true
+                     :json (fn []
+                             (js/Promise.resolve
+                              #js [#js {:tid 1
+                                        :coin "PUMP"
+                                        :side "A"
+                                        :dir "Market Order Liquidation: Close Long"
+                                        :liquidation #js {:markPx "0.001780"
+                                                          :method "market"}
+                                        :time 1700000000000}]))}))
+              ([body opts _attempt]
+               (post-info-mock body opts))))
+      (-> (api/fetch-user-fills! store "0xabc")
+          (.then (fn [rows]
+                   (let [request-body (first @calls)
+                         stored-row (first (get-in @store [:orders :fills]))]
+                     (is (= {"type" "userFills"
+                             "user" "0xabc"
+                             "aggregateByTime" true}
+                            request-body))
+                     (is (= "Market Order Liquidation: Close Long" (:dir stored-row)))
+                     (is (= "0.001780" (get-in stored-row [:liquidation :markPx])))
+                     (is (= "market" (get-in stored-row [:liquidation :method])))
+                     (is (= rows (get-in @store [:orders :fills])))
+                     (done))))
+          (.catch (fn [err]
+                    (is false (str "Unexpected error: " err))
+                    (done)))
+          (.finally
+            (fn []
+              (set! hyperopen.api/post-info! original-post-info)))))))
