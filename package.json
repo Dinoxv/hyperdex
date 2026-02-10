@@ -21,9 +21,10 @@
   },
   "license": "AGPL-3.0",
   "dependencies": {
-    "shadow-cljs": "^3.1.7",
+    "@noble/secp256k1": "^3.0.0",
+    "indicatorts": "^2.2.2",
     "lightweight-charts": "^5.0.8",
-    "indicatorts": "^2.2.2"
+    "shadow-cljs": "^3.1.7"
   },
   "devDependencies": {
     "@tailwindcss/forms": "^0.5.7",

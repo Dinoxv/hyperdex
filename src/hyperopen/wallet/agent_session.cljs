@@ -1,0 +1,168 @@
+(ns hyperopen.wallet.agent-session
+  (:require [clojure.string :as str]
+            ["@noble/secp256k1" :as secp]
+            ["../vendor/keccak" :as keccak]))
+
+(def ^:private session-storage-prefix
+  "hyperopen:agent-session:v1:")
+
+(def ^:private default-signature-chain-id
+  "0x66eee")
+
+(defn normalize-storage-mode
+  [storage-mode]
+  (let [mode (cond
+               (keyword? storage-mode) storage-mode
+               (string? storage-mode) (keyword (str/lower-case (str/trim storage-mode)))
+               :else :session)]
+    (if (= :local mode) :local :session)))
+
+(defn normalize-wallet-address
+  [wallet-address]
+  (when (seq wallet-address)
+    (-> wallet-address
+        str
+        str/trim
+        str/lower-case)))
+
+(defn session-storage-key
+  [wallet-address]
+  (str session-storage-prefix (normalize-wallet-address wallet-address)))
+
+(defn default-agent-state
+  [& {:keys [storage-mode]
+      :or {storage-mode :session}}]
+  {:status :not-ready
+   :agent-address nil
+   :storage-mode (normalize-storage-mode storage-mode)
+   :last-approved-at nil
+   :error nil
+   :nonce-cursor nil})
+
+(defn build-approve-agent-action
+  [agent-address nonce & {:keys [agent-name is-mainnet signature-chain-id]
+                          :or {agent-name nil
+                               is-mainnet true
+                               signature-chain-id default-signature-chain-id}}]
+  (cond-> {:type "approveAgent"
+           :agentAddress agent-address
+           :nonce nonce
+           :hyperliquidChain (if is-mainnet "Mainnet" "Testnet")
+           :signatureChainId signature-chain-id}
+    (some? agent-name) (assoc :agentName agent-name)))
+
+(defn- storage-by-mode
+  [storage-mode]
+  (let [global js/globalThis
+        mode (normalize-storage-mode storage-mode)]
+    (case mode
+      :local (.-localStorage global)
+      :session (.-sessionStorage global)
+      nil)))
+
+(defn- bytes->hex
+  [bytes]
+  (let [parts (array)]
+    (dotimes [i (.-length bytes)]
+      (let [b (aget bytes i)
+            hex (.toString b 16)]
+        (.push parts (if (= 1 (count hex)) "0" ""))
+        (.push parts hex)))
+    (apply str parts)))
+
+(defn- hex->bytes
+  [hex]
+  (let [value (str (or hex ""))
+        stripped (if (str/starts-with? value "0x") (subs value 2) value)
+        len (/ (count stripped) 2)
+        out (js/Uint8Array. len)]
+    (dotimes [idx len]
+      (let [offset (* idx 2)
+            byte-str (subs stripped offset (+ offset 2))]
+        (aset out idx (js/parseInt byte-str 16))))
+    out))
+
+(defn- random-private-key-bytes
+  []
+  (let [crypto (.-crypto js/globalThis)]
+    (if (and crypto (.-getRandomValues crypto))
+      (loop []
+        (let [candidate (js/Uint8Array. 32)]
+          (.getRandomValues crypto candidate)
+          (if (-> secp .-utils (.isValidPrivateKey candidate))
+            candidate
+            (recur))))
+      (throw (js/Error. "Secure random unavailable for agent key generation")))))
+
+(defn private-key->agent-address
+  [private-key]
+  (let [public-key (.getPublicKey secp (hex->bytes private-key) false)
+        uncompressed (.slice public-key 1)
+        digest-hex (.keccak256 keccak uncompressed)]
+    (str "0x" (subs digest-hex (- (count digest-hex) 40)))))
+
+(defn create-agent-credentials!
+  []
+  (let [private-key-bytes (random-private-key-bytes)
+        private-key (str "0x" (bytes->hex private-key-bytes))]
+    {:private-key private-key
+     :agent-address (private-key->agent-address private-key)}))
+
+(defn- sanitize-agent-session
+  [session]
+  (let [agent-address (:agent-address session)
+        private-key (:private-key session)
+        last-approved-at (:last-approved-at session)
+        nonce-cursor (:nonce-cursor session)]
+    (when (and (string? agent-address)
+               (seq agent-address)
+               (string? private-key)
+               (seq private-key))
+      {:agent-address agent-address
+       :private-key private-key
+       :last-approved-at (when (number? last-approved-at) (js/Math.floor last-approved-at))
+       :nonce-cursor (when (number? nonce-cursor) (js/Math.floor nonce-cursor))})))
+
+(defn persist-agent-session!
+  [storage wallet-address session]
+  (let [key (session-storage-key wallet-address)
+        normalized (sanitize-agent-session session)]
+    (when (and storage (seq key) normalized)
+      (try
+        (.setItem storage key (js/JSON.stringify (clj->js normalized)))
+        true
+        (catch :default _
+          false)))))
+
+(defn load-agent-session
+  [storage wallet-address]
+  (let [key (session-storage-key wallet-address)]
+    (when (and storage (seq key))
+      (try
+        (let [raw (.getItem storage key)]
+          (when (seq raw)
+            (sanitize-agent-session (js->clj (js/JSON.parse raw) :keywordize-keys true))))
+        (catch :default _
+          nil)))))
+
+(defn clear-agent-session!
+  [storage wallet-address]
+  (let [key (session-storage-key wallet-address)]
+    (when (and storage (seq key))
+      (try
+        (.removeItem storage key)
+        true
+        (catch :default _
+          false)))))
+
+(defn persist-agent-session-by-mode!
+  [wallet-address storage-mode session]
+  (persist-agent-session! (storage-by-mode storage-mode) wallet-address session))
+
+(defn load-agent-session-by-mode
+  [wallet-address storage-mode]
+  (load-agent-session (storage-by-mode storage-mode) wallet-address))
+
+(defn clear-agent-session-by-mode!
+  [wallet-address storage-mode]
+  (clear-agent-session! (storage-by-mode storage-mode) wallet-address))

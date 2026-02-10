@@ -30,3 +30,15 @@
 (defn cancel-order!
   [store address action]
   (sign-and-post-action! store address action))
+
+(defn approve-agent!
+  [store address action]
+  (-> (signing/sign-approve-agent-action! address action)
+      (.then (fn [sig]
+               (let [{:keys [r s v]} (js->clj sig :keywordize-keys true)
+                     payload {:action action
+                              :nonce (:nonce action)
+                              :signature {:r r
+                                          :s s
+                                          :v v}}]
+                 (json-post! exchange-url payload))))))

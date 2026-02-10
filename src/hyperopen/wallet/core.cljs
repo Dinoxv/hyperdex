@@ -1,4 +1,6 @@
-(ns hyperopen.wallet.core)
+(ns hyperopen.wallet.core
+  (:require [clojure.string :as str]
+            [hyperopen.wallet.agent-session :as agent-session]))
 
 ;; ---------- Provider helpers -------------------------------------------------
 
@@ -8,22 +10,56 @@
 (defn short-addr [a]
   (when a (str (subs a 0 6) "…" (subs a (- (count a) 4)))))
 
+(defn- current-agent-storage-mode
+  [wallet-state]
+  (agent-session/normalize-storage-mode (get-in wallet-state [:agent :storage-mode])))
+
+(defn- persisted-session->agent-state
+  [persisted storage-mode]
+  (if (and (map? persisted)
+           (seq (:agent-address persisted)))
+    {:status :ready
+     :agent-address (:agent-address persisted)
+     :storage-mode storage-mode
+     :last-approved-at (:last-approved-at persisted)
+     :error nil
+     :nonce-cursor (:nonce-cursor persisted)}
+    (agent-session/default-agent-state :storage-mode storage-mode)))
+
 ;; ---------- Core EIP-1102 actions -------------------------------------------
 
 (defn set-disconnected! [store]
-  (swap! store update-in [:wallet] 
+  (swap! store update-in [:wallet]
          (fn [wallet-state]
-           {:connected? false
-            :address    nil
-            :chain-id   (:chain-id wallet-state) ; keep last chain id
-            :connecting? false
-            :error      nil})))
+           (let [wallet-address (:address wallet-state)
+                 storage-mode (current-agent-storage-mode wallet-state)]
+             (when (seq wallet-address)
+               (agent-session/clear-agent-session-by-mode! wallet-address storage-mode))
+             {:connected? false
+              :address nil
+              :chain-id (:chain-id wallet-state) ; keep last chain id
+              :connecting? false
+              :error nil
+              :agent (agent-session/default-agent-state :storage-mode storage-mode)}))))
 
 (defn set-connected! [store addr]
-  (swap! store update-in [:wallet] merge {:connected? true
-                                          :address    addr
-                                          :connecting? false
-                                          :error      nil}))
+  (swap! store update-in [:wallet]
+         (fn [wallet-state]
+           (let [previous-address (:address wallet-state)
+                 storage-mode (current-agent-storage-mode wallet-state)
+                 previous-address* (some-> previous-address str str/lower-case)
+                 next-address* (some-> addr str str/lower-case)]
+             (when (and (seq previous-address*)
+                        (seq next-address*)
+                        (not= previous-address* next-address*))
+               (agent-session/clear-agent-session-by-mode! previous-address storage-mode))
+             (let [persisted (agent-session/load-agent-session-by-mode addr storage-mode)]
+               (-> wallet-state
+                   (merge {:connected? true
+                           :address addr
+                           :connecting? false
+                           :error nil})
+                   (assoc :agent (persisted-session->agent-state persisted storage-mode))))))))
 
 (defn set-chain! [store chain-id]
   (swap! store assoc-in [:wallet :chain-id] chain-id))

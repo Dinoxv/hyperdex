@@ -16,6 +16,7 @@
             [hyperopen.asset-selector.markets :as markets]
             [hyperopen.orderbook.price-aggregation :as price-agg]
             [hyperopen.wallet.core :as wallet]
+            [hyperopen.wallet.agent-session :as agent-session]
             [hyperopen.wallet.address-watcher :as address-watcher]
             [hyperopen.router :as router]
             [hyperopen.state.trading :as trading]))
@@ -135,7 +136,8 @@
                                :address    nil
                                :chain-id   nil
                                :connecting? false
-                               :error      nil}
+                               :error      nil
+                               :agent (agent-session/default-agent-state)}
                       :router {:path "/trade"}
                       :order-form (trading/default-order-form)
                       :funding-ui {:modal nil}
@@ -616,6 +618,86 @@
 
 (defn connect-wallet-action [state]
   [[:effects/connect-wallet]])
+
+(defn- exchange-response-error
+  [resp]
+  (or (:error resp)
+      (:response resp)
+      (:message resp)
+      (pr-str resp)))
+
+(defn enable-agent-trading
+  [_ store {:keys [storage-mode is-mainnet agent-name signature-chain-id]
+            :or {storage-mode :session
+                 is-mainnet true
+                 agent-name nil
+                 signature-chain-id "0x66eee"}}]
+  (let [owner-address (get-in @store [:wallet :address])]
+    (if-not (seq owner-address)
+      (swap! store update-in [:wallet :agent] merge
+             {:status :error
+              :error "Connect your wallet before enabling trading."})
+      (let [{:keys [private-key agent-address]} (agent-session/create-agent-credentials!)
+            nonce (.now js/Date)
+            normalized-storage-mode (agent-session/normalize-storage-mode storage-mode)
+            action (agent-session/build-approve-agent-action
+                    agent-address
+                    nonce
+                    :agent-name agent-name
+                    :is-mainnet is-mainnet
+                    :signature-chain-id signature-chain-id)]
+        (-> (trading-api/approve-agent! store owner-address action)
+            (.then #(.json %))
+            (.then (fn [resp]
+                     (let [data (js->clj resp :keywordize-keys true)]
+                       (if (= "ok" (:status data))
+                         (let [persisted? (agent-session/persist-agent-session-by-mode!
+                                           owner-address
+                                           normalized-storage-mode
+                                           {:agent-address agent-address
+                                            :private-key private-key
+                                            :last-approved-at nonce
+                                            :nonce-cursor nonce})]
+                           (if persisted?
+                             (swap! store update-in [:wallet :agent] merge
+                                    {:status :ready
+                                     :agent-address agent-address
+                                     :storage-mode normalized-storage-mode
+                                     :last-approved-at nonce
+                                     :error nil
+                                     :nonce-cursor nonce})
+                             (swap! store update-in [:wallet :agent] merge
+                                    {:status :error
+                                     :error "Unable to persist agent credentials."
+                                     :agent-address nil
+                                     :last-approved-at nil
+                                     :nonce-cursor nil})))
+                         (swap! store update-in [:wallet :agent] merge
+                                {:status :error
+                                 :error (exchange-response-error data)
+                                 :agent-address nil
+                                 :last-approved-at nil
+                                 :nonce-cursor nil})))))
+            (.catch (fn [err]
+                      (swap! store update-in [:wallet :agent] merge
+                             {:status :error
+                              :error (str err)
+                              :agent-address nil
+                              :last-approved-at nil
+                              :nonce-cursor nil}))))))))
+
+(defn enable-agent-trading-action
+  [state]
+  (let [wallet-address (get-in state [:wallet :address])
+        connected? (boolean (get-in state [:wallet :connected?]))
+        storage-mode (agent-session/normalize-storage-mode
+                      (get-in state [:wallet :agent :storage-mode]))]
+    (if (and connected? (seq wallet-address))
+      [[:effects/save-many [[[:wallet :agent :status] :approving]
+                            [[:wallet :agent :error] nil]]]
+       [:effects/enable-agent-trading {:storage-mode storage-mode}]]
+      [[:effects/save-many [[[:wallet :agent :status] :error]
+                            [[:wallet :agent :error] "Connect your wallet before enabling trading."]]]])))
 
 (defn copy-wallet-address-action [state]
   [[:effects/copy-wallet-address (get-in state [:wallet :address])]])
@@ -1749,6 +1831,7 @@
 (nxr/register-effect! :effects/unsubscribe-trades unsubscribe-trades)
 (nxr/register-effect! :effects/unsubscribe-webdata2 unsubscribe-webdata2)
 (nxr/register-effect! :effects/connect-wallet connect-wallet)
+(nxr/register-effect! :effects/enable-agent-trading enable-agent-trading)
 (nxr/register-effect! :effects/copy-wallet-address copy-wallet-address)
 (nxr/register-effect! :effects/reconnect-websocket reconnect-websocket)
 (nxr/register-effect! :effects/refresh-websocket-health refresh-websocket-health)
@@ -1898,6 +1981,7 @@
 (nxr/register-action! :actions/subscribe-to-asset subscribe-to-asset)
 (nxr/register-action! :actions/subscribe-to-webdata2 subscribe-to-webdata2)
 (nxr/register-action! :actions/connect-wallet connect-wallet-action)
+(nxr/register-action! :actions/enable-agent-trading enable-agent-trading-action)
 (nxr/register-action! :actions/copy-wallet-address copy-wallet-address-action)
 (nxr/register-action! :actions/reconnect-websocket reconnect-websocket-action)
 (nxr/register-action! :actions/toggle-ws-diagnostics toggle-ws-diagnostics)

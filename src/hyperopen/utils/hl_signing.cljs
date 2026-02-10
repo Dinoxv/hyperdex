@@ -145,6 +145,10 @@
                    (clj->js (merge {:sig sig}
                                    parts))))))))
 
+(defn sign-approve-agent-action!
+  [address action]
+  (sign-typed-data! address (build-approve-agent-typed-data action)))
+
 (defn sign-l1-action!
   "Uses window.ethereum to sign typed data. Returns a promise resolving
    to {:connectionId :r :s :v :sig}."
