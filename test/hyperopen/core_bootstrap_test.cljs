@@ -780,6 +780,10 @@
   (is (= [[:effects/copy-wallet-address nil]]
          (core/copy-wallet-address-action {:wallet {:address nil}}))))
 
+(deftest disconnect-wallet-action-emits-disconnect-effect-test
+  (is (= [[:effects/disconnect-wallet]]
+         (core/disconnect-wallet-action {}))))
+
 (deftest copy-wallet-address-effect-writes-to-clipboard-when-available-test
   (async done
     (let [written (atom nil)

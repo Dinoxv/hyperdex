@@ -456,6 +456,11 @@
     (js/clearTimeout timeout-id)
     (reset! wallet-copy-feedback-timeout-id nil)))
 
+(defn disconnect-wallet [_ store]
+  (println "Disconnecting wallet...")
+  (clear-wallet-copy-feedback-timeout!)
+  (wallet/set-disconnected! store))
+
 (defn- schedule-wallet-copy-feedback-clear! [store]
   (clear-wallet-copy-feedback-timeout!)
   (let [timeout-id (js/setTimeout
@@ -618,6 +623,9 @@
 
 (defn connect-wallet-action [state]
   [[:effects/connect-wallet]])
+
+(defn disconnect-wallet-action [_state]
+  [[:effects/disconnect-wallet]])
 
 (defn- exchange-response-error
   [resp]
@@ -1840,6 +1848,7 @@
 (nxr/register-effect! :effects/unsubscribe-trades unsubscribe-trades)
 (nxr/register-effect! :effects/unsubscribe-webdata2 unsubscribe-webdata2)
 (nxr/register-effect! :effects/connect-wallet connect-wallet)
+(nxr/register-effect! :effects/disconnect-wallet disconnect-wallet)
 (nxr/register-effect! :effects/enable-agent-trading enable-agent-trading)
 (nxr/register-effect! :effects/copy-wallet-address copy-wallet-address)
 (nxr/register-effect! :effects/reconnect-websocket reconnect-websocket)
@@ -1991,6 +2000,7 @@
 (nxr/register-action! :actions/subscribe-to-asset subscribe-to-asset)
 (nxr/register-action! :actions/subscribe-to-webdata2 subscribe-to-webdata2)
 (nxr/register-action! :actions/connect-wallet connect-wallet-action)
+(nxr/register-action! :actions/disconnect-wallet disconnect-wallet-action)
 (nxr/register-action! :actions/enable-agent-trading enable-agent-trading-action)
 (nxr/register-action! :actions/copy-wallet-address copy-wallet-address-action)
 (nxr/register-action! :actions/reconnect-websocket reconnect-websocket-action)

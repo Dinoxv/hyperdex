@@ -71,14 +71,15 @@
     (is (some? disconnect-button))
     (is (= "Disconnect" (last disconnect-button)))))
 
-(deftest wallet-menu-is-ui-only-no-disconnect-or-copy-action-dispatch-test
+(deftest wallet-menu-copy-and-disconnect-dispatch-actions-test
   (let [view (header-view/header-view {:wallet {:connected? true
                                                  :address connected-address}})
         copy-button (find-node-by-role view "wallet-menu-copy")
         disconnect-button (find-node-by-role view "wallet-menu-disconnect")]
     (is (= [[:actions/copy-wallet-address]]
            (get-in copy-button [1 :on :click])))
-    (is (nil? (get-in disconnect-button [1 :on :click])))))
+    (is (= [[:actions/disconnect-wallet]]
+           (get-in disconnect-button [1 :on :click])))))
 
 (deftest wallet-menu-copy-feedback-renders-success-message-and-icon-test
   (let [view (header-view/header-view {:wallet {:connected? true

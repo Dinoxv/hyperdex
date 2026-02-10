@@ -127,6 +127,7 @@
                      "transition-colors"
                      "hover:bg-base-200"
                      "focus:outline-none"]
+             :on {:click [[:actions/disconnect-wallet]]}
              :data-role "wallet-menu-disconnect"}
     "Disconnect"]])
 
