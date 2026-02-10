@@ -1747,7 +1747,7 @@
           [:div {:class ["grid" "gap-2" "py-px" "px-3" "hover:bg-base-300" "text-xs" "grid-cols-[130px_70px_60px_70px_60px_80px_100px_70px_70px_120px_50px_70px]"]}
           [:div.pr-2.whitespace-nowrap (format-open-orders-time (:time o))]
           [:div.pl-1 (or (:type o) "Order")]
-          [:div (:coin o)]
+          [:div (order-history-coin-node (:coin o) {} (:side o))]
           [:div {:class (direction-class (:side o))} (direction-label (:side o))]
           [:div.text-right.num.num-right (format-currency (:sz o))]
           [:div.text-right.num.num-right (format-currency (or (:orig-sz o) (:sz o)))]

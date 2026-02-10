@@ -944,6 +944,47 @@
     (doseq [idx [8 9 10 11]]
       (is (contains? (node-class-set (nth row-cells idx)) "text-left")))))
 
+(deftest open-orders-coin-labels-are-bold-and-side-colored-test
+  (let [open-orders [{:oid 101
+                      :coin "xyz:NVDA"
+                      :side "B"
+                      :sz "1.0"
+                      :orig-sz "1.0"
+                      :px "100.0"
+                      :type "Limit"
+                      :time 1700000001000
+                      :reduce-only false
+                      :is-trigger false
+                      :trigger-condition nil
+                      :is-position-tpsl false}
+                     {:oid 102
+                      :coin "PUMP"
+                      :side "A"
+                      :sz "2.0"
+                      :orig-sz "2.0"
+                      :px "99.5"
+                      :type "Limit"
+                      :time 1700000000000
+                      :reduce-only false
+                      :is-trigger false
+                      :trigger-condition nil
+                      :is-position-tpsl false}]
+        content (view/open-orders-tab-content open-orders {:column "Time" :direction :desc})
+        long-coin-base (find-first-node content #(and (= :span (first %))
+                                                      (contains? (node-class-set %) "truncate")
+                                                      (contains? (direct-texts %) "NVDA")))
+        short-coin-base (find-first-node content #(and (= :span (first %))
+                                                       (contains? (node-class-set %) "truncate")
+                                                       (contains? (direct-texts %) "PUMP")))]
+    (is (some? long-coin-base))
+    (is (some? short-coin-base))
+    (is (contains? (node-class-set long-coin-base) "font-semibold"))
+    (is (contains? (node-class-set short-coin-base) "font-semibold"))
+    (is (= "rgb(151, 252, 228)"
+           (get-in long-coin-base [1 :style :color])))
+    (is (= "rgb(234, 175, 184)"
+           (get-in short-coin-base [1 :style :color])))))
+
 (deftest account-info-numeric-cells-use-num-utility-test
   (let [balance-node (view/balance-row sample-balance-row)
         balance-cells (vec (node-children balance-node))
