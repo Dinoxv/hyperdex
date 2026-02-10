@@ -1,5 +1,6 @@
 (ns hyperopen.api.trading-test
   (:require [cljs.test :refer-macros [async deftest is]]
+            [hyperopen.wallet.agent-session :as agent-session]
             [hyperopen.api.trading :as trading]
             [hyperopen.utils.hl-signing :as signing]))
 
@@ -45,3 +46,141 @@
            (fn []
              (set! signing/sign-approve-agent-action! original-sign)
              (set! (.-fetch js/globalThis) original-fetch)))))))
+
+(deftest submit-order-agent-signs-locally-and-persists-nonce-cursor-test
+  (async done
+    (let [store (atom {:wallet {:agent {:status :ready
+                                        :storage-mode :session
+                                        :nonce-cursor 1700000005555}}})
+          sign-calls (atom [])
+          persist-calls (atom [])
+          fetch-calls (atom [])
+          original-load agent-session/load-agent-session-by-mode
+          original-persist agent-session/persist-agent-session-by-mode!
+          original-sign signing/sign-l1-action-with-private-key!
+          original-fetch (.-fetch js/globalThis)]
+      (set! agent-session/load-agent-session-by-mode
+            (fn [_wallet-address _storage-mode]
+              {:agent-address "0x9999999999999999999999999999999999999999"
+               :private-key "0xaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+               :nonce-cursor 1700000005555}))
+      (set! agent-session/persist-agent-session-by-mode!
+            (fn [wallet-address storage-mode session]
+              (swap! persist-calls conj [wallet-address storage-mode session])
+              true))
+      (set! signing/sign-l1-action-with-private-key!
+            (fn [private-key action nonce & _]
+              (swap! sign-calls conj [private-key action nonce])
+              (js/Promise.resolve
+               (clj->js {:r "0x01"
+                         :s "0x02"
+                         :v 27}))))
+      (set! (.-fetch js/globalThis)
+            (fn [url opts]
+              (swap! fetch-calls conj [url (js->clj opts :keywordize-keys true)])
+              (js/Promise.resolve
+               #js {:ok true
+                    :json (fn []
+                            (js/Promise.resolve #js {:status "ok"}))})))
+      (-> (trading/submit-order! store
+                                 "0xowner"
+                                 {:type "order"
+                                  :orders []
+                                  :grouping "na"})
+          (.then (fn [resp]
+                   (is (= "ok" (:status resp)))
+                   (is (= 1 (count @sign-calls)))
+                   (is (= 1 (count @fetch-calls)))
+                   (is (= 1 (count @persist-calls)))
+                   (is (number? (get-in @store [:wallet :agent :nonce-cursor])))
+                   (done)))
+          (.catch (fn [err]
+                    (is false (str "Unexpected error: " err))
+                    (done)))
+          (.finally
+           (fn []
+             (set! agent-session/load-agent-session-by-mode original-load)
+             (set! agent-session/persist-agent-session-by-mode! original-persist)
+             (set! signing/sign-l1-action-with-private-key! original-sign)
+             (set! (.-fetch js/globalThis) original-fetch)))))))
+
+(deftest submit-order-retries-on-nonce-error-once-test
+  (async done
+    (let [store (atom {:wallet {:agent {:status :ready
+                                        :storage-mode :session
+                                        :nonce-cursor 1700000006666}}})
+          sign-nonces (atom [])
+          fetch-count (atom 0)
+          original-load agent-session/load-agent-session-by-mode
+          original-persist agent-session/persist-agent-session-by-mode!
+          original-sign signing/sign-l1-action-with-private-key!
+          original-fetch (.-fetch js/globalThis)]
+      (set! agent-session/load-agent-session-by-mode
+            (fn [_wallet-address _storage-mode]
+              {:agent-address "0x8888888888888888888888888888888888888888"
+               :private-key "0xbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+               :nonce-cursor 1700000006666}))
+      (set! agent-session/persist-agent-session-by-mode!
+            (fn [_wallet-address _storage-mode _session] true))
+      (set! signing/sign-l1-action-with-private-key!
+            (fn [_private-key _action nonce & _]
+              (swap! sign-nonces conj nonce)
+              (js/Promise.resolve
+               (clj->js {:r "0x01"
+                         :s "0x02"
+                         :v 27}))))
+      (set! (.-fetch js/globalThis)
+            (fn [_url _opts]
+              (swap! fetch-count inc)
+              (if (= 1 @fetch-count)
+                (js/Promise.resolve
+                 #js {:ok true
+                      :json (fn []
+                              (js/Promise.resolve #js {:status "err"
+                                                       :error "nonce too low"}))})
+                (js/Promise.resolve
+                 #js {:ok true
+                      :json (fn []
+                              (js/Promise.resolve #js {:status "ok"}))}))))
+      (-> (trading/submit-order! store
+                                 "0xowner"
+                                 {:type "order"
+                                  :orders []
+                                  :grouping "na"})
+          (.then (fn [resp]
+                   (is (= "ok" (:status resp)))
+                   (is (= 2 @fetch-count))
+                   (is (= 2 (count @sign-nonces)))
+                   (is (> (second @sign-nonces) (first @sign-nonces)))
+                   (done)))
+          (.catch (fn [err]
+                    (is false (str "Unexpected error: " err))
+                    (done)))
+          (.finally
+           (fn []
+             (set! agent-session/load-agent-session-by-mode original-load)
+             (set! agent-session/persist-agent-session-by-mode! original-persist)
+             (set! signing/sign-l1-action-with-private-key! original-sign)
+             (set! (.-fetch js/globalThis) original-fetch)))))))
+
+(deftest submit-order-errors-when-agent-session-is-missing-test
+  (async done
+    (let [store (atom {:wallet {:agent {:status :ready
+                                        :storage-mode :session}}})
+          original-load agent-session/load-agent-session-by-mode]
+      (set! agent-session/load-agent-session-by-mode
+            (fn [_wallet-address _storage-mode] nil))
+      (-> (trading/submit-order! store
+                                 "0xowner"
+                                 {:type "order"
+                                  :orders []
+                                  :grouping "na"})
+          (.then (fn [_]
+                   (is false "Expected missing agent session to reject")
+                   (done)))
+          (.catch (fn [err]
+                    (is (re-find #"Agent session unavailable" (str err)))
+                    (done)))
+          (.finally
+           (fn []
+             (set! agent-session/load-agent-session-by-mode original-load)))))))

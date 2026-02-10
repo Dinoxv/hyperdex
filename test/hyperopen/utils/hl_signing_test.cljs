@@ -1,5 +1,5 @@
 (ns hyperopen.utils.hl-signing-test
-  (:require [cljs.test :refer-macros [deftest is testing]]
+  (:require [cljs.test :refer-macros [async deftest is testing]]
             [hyperopen.utils.hl-signing :as signing]))
 
 (defn- bytes->vec [bytes]
@@ -76,3 +76,32 @@
     (is (= (str "0x" r) (:r parts)))
     (is (= (str "0x" s) (:s parts)))
     (is (= 28 (:v parts)))))
+
+(deftest sign-l1-action-with-private-key-is-deterministic-test
+  (async done
+    (let [private-key "0xaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+          action {:type "order"
+                  :orders [{:a 0
+                            :b true
+                            :p "100"
+                            :s "0.1"
+                            :r false
+                            :t {:limit {:tif "Gtc"}}}]
+                  :grouping "na"}
+          nonce 1700000007777]
+      (-> (js/Promise.all
+           #js [(signing/sign-l1-action-with-private-key! private-key action nonce)
+                (signing/sign-l1-action-with-private-key! private-key action nonce)])
+          (.then (fn [results]
+                   (let [[first-sig second-sig] (js->clj results :keywordize-keys true)]
+                     (is (= (:connectionId first-sig) (:connectionId second-sig)))
+                     (is (= (:r first-sig) (:r second-sig)))
+                     (is (= (:s first-sig) (:s second-sig)))
+                     (is (= (:v first-sig) (:v second-sig)))
+                     (is (re-matches #"0x[0-9a-f]{64}" (:r first-sig)))
+                     (is (re-matches #"0x[0-9a-f]{64}" (:s first-sig)))
+                     (is (contains? #{27 28} (:v first-sig)))
+                     (done))))
+          (.catch (fn [err]
+                    (is false (str "Unexpected error: " err))
+                    (done)))))))

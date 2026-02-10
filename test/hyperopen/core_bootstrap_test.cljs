@@ -1383,6 +1383,11 @@
   (let [state {:active-asset "BTC"
                :active-market {:coin "BTC" :market-type :perp}
                :asset-contexts {:BTC {:idx 0}}
+               :wallet {:connected? true
+                        :address "0xabc"
+                        :agent {:status :ready
+                                :storage-mode :session
+                                :agent-address "0xagent"}}
                :orderbooks {"BTC" {:bids [{:px "99"}]
                                    :asks [{:px "101"}]}}
                :order-form (assoc (trading/default-order-form)
@@ -1398,6 +1403,11 @@
   (let [state {:active-asset "BTC"
                :active-market {:coin "BTC" :market-type :perp}
                :asset-contexts {:BTC {:idx 0}}
+               :wallet {:connected? true
+                        :address "0xabc"
+                        :agent {:status :ready
+                                :storage-mode :session
+                                :agent-address "0xagent"}}
                :orderbooks {"BTC" {:bids [{:px "99"}]
                                    :asks [{:px "101"}]}}
                :order-form (assoc (trading/default-order-form)
@@ -1414,6 +1424,51 @@
                          effects)]
     (is (= 1 (count api-submit-effects)))
     (is (seq (:price saved-form)))))
+
+(deftest submit-order-requires-agent-ready-session-test
+  (let [state {:active-asset "BTC"
+               :active-market {:coin "BTC" :market-type :perp}
+               :asset-contexts {:BTC {:idx 0}}
+               :wallet {:connected? true
+                        :address "0xabc"
+                        :agent {:status :not-ready
+                                :storage-mode :session}}
+               :orderbooks {"BTC" {:bids [{:px "99"}]
+                                   :asks [{:px "101"}]}}
+               :order-form (assoc (trading/default-order-form)
+                                  :type :limit
+                                  :side :buy
+                                  :size "1"
+                                  :price "100")}
+        effects (core/submit-order state)]
+    (is (not-any? #(= (first %) :effects/api-submit-order) effects))
+    (is (= [[:effects/save [:order-form :error] "Enable trading before submitting orders."]]
+           effects))))
+
+(deftest cancel-order-requires-agent-ready-session-test
+  (let [state {:wallet {:connected? true
+                        :address "0xabc"
+                        :agent {:status :not-ready
+                                :storage-mode :session}}
+               :asset-contexts {:BTC {:idx 0}}}
+        order {:coin "BTC"
+               :oid 101}
+        effects (core/cancel-order state order)]
+    (is (= [[:effects/save [:orders :cancel-error] "Enable trading before cancelling orders."]]
+           effects))))
+
+(deftest cancel-order-ready-agent-emits-single-api-cancel-effect-test
+  (let [state {:wallet {:connected? true
+                        :address "0xabc"
+                        :agent {:status :ready
+                                :storage-mode :session
+                                :agent-address "0xagent"}}
+               :asset-contexts {:BTC {:idx 0}}}
+        order {:coin "BTC"
+               :oid 202}
+        effects (core/cancel-order state order)
+        cancel-effects (filter #(= (first %) :effects/api-cancel-order) effects)]
+    (is (= 1 (count cancel-effects)))))
 
 (deftest enable-agent-trading-action-emits-approving-projection-before-effect-test
   (let [state {:wallet {:connected? true

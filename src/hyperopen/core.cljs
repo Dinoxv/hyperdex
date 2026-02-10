@@ -1671,6 +1671,7 @@
         submit-prep (trading/prepare-order-form-for-submit state raw-form)
         form (:form submit-prep)
         market-price-missing? (:market-price-missing? submit-prep)
+        agent-ready? (= :ready (get-in state [:wallet :agent :status]))
         active-market (:active-market state)
         active-asset (:active-asset state)
         inferred-spot? (and (string? active-asset) (str/includes? active-asset "/"))
@@ -1690,17 +1691,25 @@
       [[:effects/save [:order-form :error] "Market price unavailable. Load order book first."]]
       (seq errors) [[:effects/save [:order-form :error] (first errors)]]
       (nil? request) [[:effects/save [:order-form :error] "Select an asset and ensure market data is loaded."]]
+      (not agent-ready?) [[:effects/save [:order-form :error] "Enable trading before submitting orders."]]
       :else [[:effects/save [:order-form :error] nil]
              [:effects/save [:order-form] form]
              [:effects/api-submit-order request]])))
 
 (defn cancel-order [state order]
-  (let [coin (:coin order)
+  (let [agent-ready? (= :ready (get-in state [:wallet :agent :status]))
+        coin (:coin order)
         oid (:oid order)
         asset-idx (get-in state [:asset-contexts (keyword coin) :idx])]
-    (if (and asset-idx oid)
+    (cond
+      (not agent-ready?)
+      [[:effects/save [:orders :cancel-error] "Enable trading before cancelling orders."]]
+
+      (and asset-idx oid)
       [[:effects/api-cancel-order {:action {:type "cancel"
                                             :cancels [{:a asset-idx :o oid}]}}]]
+
+      :else
       [[:effects/save [:orders :cancel-error] "Missing asset or order id."]])))
 
 (defn load-user-data [state address]
@@ -1923,53 +1932,54 @@
           (.revokeObjectURL js/URL url))))))
 (nxr/register-effect! :effects/api-submit-order
   (fn [_ store request]
-    (let [address (get-in @store [:wallet :address])]
+    (let [address (get-in @store [:wallet :address])
+          agent-status (get-in @store [:wallet :agent :status])]
       (cond
         (nil? address)
         (swap! store assoc-in [:order-form :error] "Connect your wallet before submitting.")
 
-        (nil? (.-ethereum js/window))
-        (swap! store assoc-in [:order-form :error] "No EVM wallet provider found.")
+        (not= :ready agent-status)
+        (swap! store assoc-in [:order-form :error] "Enable trading before submitting orders.")
 
         :else
         (do
           (swap! store assoc-in [:order-form :submitting?] true)
           (-> (trading-api/submit-order! store address (:action request))
-              (.then #(.json %))
               (.then (fn [resp]
                        (swap! store assoc-in [:order-form :submitting?] false)
-                       (let [data (js->clj resp :keywordize-keys true)]
-                         (if (= "ok" (:status data))
+                       (if (= "ok" (:status resp))
                            (do
                              (swap! store assoc-in [:order-form :error] nil)
                              (nxr/dispatch store nil [[:actions/refresh-order-history]]))
                            (swap! store assoc-in [:order-form :error]
-                                  (str (or (:error data) (:response data) data)))))))
+                                  (str (or (:error resp) (:response resp) resp))))))
               (.catch (fn [err]
                         (swap! store assoc-in [:order-form :submitting?] false)
                         (swap! store assoc-in [:order-form :error] (str err))))))))))
 
 (nxr/register-effect! :effects/api-cancel-order
   (fn [_ store request]
-    (let [address (get-in @store [:wallet :address])]
+    (let [address (get-in @store [:wallet :address])
+          agent-status (get-in @store [:wallet :agent :status])]
       (cond
         (nil? address)
         (swap! store assoc-in [:orders :cancel-error] "Connect your wallet before cancelling.")
 
-        (nil? (.-ethereum js/window))
-        (swap! store assoc-in [:orders :cancel-error] "No EVM wallet provider found.")
+        (not= :ready agent-status)
+        (swap! store assoc-in [:orders :cancel-error] "Enable trading before cancelling orders.")
 
         :else
         (-> (trading-api/cancel-order! store address (:action request))
-            (.then #(.json %))
             (.then (fn [resp]
-                     (swap! store assoc-in [:orders :cancel-error] nil)
-                     (swap! store assoc-in [:orders :cancel-response] resp)
-                     (let [data (js->clj resp :keywordize-keys true)]
-                       (when (= "ok" (:status data))
-                         (nxr/dispatch store nil [[:actions/refresh-order-history]])))))
+                     (if (= "ok" (:status resp))
+                       (do
+                         (swap! store assoc-in [:orders :cancel-error] nil)
+                         (swap! store assoc-in [:orders :cancel-response] resp)
+                         (nxr/dispatch store nil [[:actions/refresh-order-history]]))
+                       (swap! store assoc-in [:orders :cancel-error]
+                              (str (or (:error resp) (:response resp) resp)))))
             (.catch (fn [err]
-                      (swap! store assoc-in [:orders :cancel-error] (str err)))))))))
+                      (swap! store assoc-in [:orders :cancel-error] (str err))))))))))
 
 (nxr/register-effect! :effects/api-load-user-data
   (fn [_ store address]
