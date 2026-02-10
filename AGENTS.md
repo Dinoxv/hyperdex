@@ -29,6 +29,7 @@
 - MUST avoid duplicate side-effect issuance in one interaction flow (example: only one candle snapshot trigger per asset selection).
 - MUST define a single owner per projection path in a flow (`:active-asset`, `:selected-asset`, `:active-market`) and avoid redundant writers unless explicitly documented and tested.
 - MUST represent multi-token Replicant `:class` values as collections (for example `["opacity-0" "scale-y-95"]`) and MUST NOT use space-separated class strings in `:class` (for example `"opacity-0 scale-y-95"`), to avoid Replicant warnings and normalization overhead.
+- MUST represent Hiccup `:style` map keys as keywords (including CSS custom properties, for example `:--order-size-slider-progress`) and MUST NOT use string keys (for example `"--order-size-slider-progress"`), to avoid Replicant style-key warnings.
 - MUST render namespaced instrument identifiers in UI tables as base symbol text plus a prefix/type chip (for example `xyz:NVDA` -> `NVDA` + `xyz` chip), and MUST NOT render the raw concatenated identifier as the primary display label.
 - MUST render quantity/size symbol suffixes using the base symbol only (for example `0.500 NVDA`), and MUST NOT include namespace/type prefixes in size strings.
 
@@ -177,6 +178,7 @@
 - DO NOT write the same semantic state in multiple layers of one flow (action + effect) unless idempotency and intent are documented.
 - DO NOT persist partial denormalized market projections without required identity/display fields (`:coin`, `:symbol`) when non-nil.
 - DO NOT pass space-separated class strings to `:class` in Hiccup attrs.
+- DO NOT use string keys in Hiccup `:style` maps; use keyword keys (including keyword CSS custom properties like `:--foo`).
 
 ## Change Workflow for Agents
 - Read websocket runtime files before editing:

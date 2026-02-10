@@ -366,7 +366,8 @@
                                        (let [attrs (when (map? (second node)) (second node))
                                              classes (set (:class attrs))]
                                          (contains? classes "order-size-slider-notches"))))
-        slider-progress (get-in slider-input [1 :style "--order-size-slider-progress"])
+        slider-progress (get-in slider-input [1 :style :--order-size-slider-progress])
+        slider-progress-string-key (get-in slider-input [1 :style "--order-size-slider-progress"])
         notches (find-all-nodes view-node
                                 (fn [node]
                                   (let [attrs (when (map? (second node)) (second node))
@@ -374,6 +375,7 @@
                                     (contains? classes "order-size-slider-notch"))))]
     (is (= 5 (count notches)))
     (is (= "40%" slider-progress))
+    (is (nil? slider-progress-string-key))
     (is (contains? (set (:class (second notch-layer))) "z-30"))
     (is (contains? (set (:class (second slider-input))) "z-20"))))
 

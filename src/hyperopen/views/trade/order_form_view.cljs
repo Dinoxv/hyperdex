@@ -590,7 +590,7 @@
                  :min 0
                  :max 100
                  :step 1
-                 :style {"--order-size-slider-progress" (str size-percent "%")}
+                 :style {:--order-size-slider-progress (str size-percent "%")}
                  :value size-percent
                  :on {:input [[:actions/set-order-size-percent [:event.target/value]]]}}]
         [:div {:class ["order-size-slider-notches"
