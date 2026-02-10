@@ -510,3 +510,52 @@
         cue-text (str/join " " (collect-strings cue-node))]
     (is (some? cue-node))
     (is (str/includes? cue-text "Waiting for first update..."))))
+
+(deftest l2-orderbook-view-hides-freshness-cue-by-default-test
+  (let [panel (view/l2-orderbook-view {:coin "BTC"
+                                       :market {:market-type :perp
+                                                :base "BTC"
+                                                :quote "USDC"
+                                                :szDecimals 4}
+                                       :orderbook {:bids [{:px "99" :sz "2"}]
+                                                   :asks [{:px "101" :sz "1"}]}
+                                       :orderbook-ui {:size-unit :base
+                                                      :size-unit-dropdown-visible? false
+                                                      :price-aggregation-dropdown-visible? false
+                                                      :price-aggregation-by-coin {"BTC" :full}
+                                                      :active-tab :orderbook}
+                                       :websocket-health {:generated-at-ms 5000
+                                                          :streams {["l2Book" "BTC" nil nil nil]
+                                                                    {:topic "l2Book"
+                                                                     :status :live
+                                                                     :subscribed? true
+                                                                     :last-payload-at-ms 4880
+                                                                     :stale-threshold-ms 5000}}}})
+        cue-node (find-first-node panel (data-role= "orderbook-freshness-cue"))]
+    (is (nil? cue-node))))
+
+(deftest l2-orderbook-view-renders-freshness-cue-when-enabled-test
+  (let [panel (view/l2-orderbook-view {:coin "BTC"
+                                       :market {:market-type :perp
+                                                :base "BTC"
+                                                :quote "USDC"
+                                                :szDecimals 4}
+                                       :orderbook {:bids [{:px "99" :sz "2"}]
+                                                   :asks [{:px "101" :sz "1"}]}
+                                       :show-surface-freshness-cues? true
+                                       :orderbook-ui {:size-unit :base
+                                                      :size-unit-dropdown-visible? false
+                                                      :price-aggregation-dropdown-visible? false
+                                                      :price-aggregation-by-coin {"BTC" :full}
+                                                      :active-tab :orderbook}
+                                       :websocket-health {:generated-at-ms 5000
+                                                          :streams {["l2Book" "BTC" nil nil nil]
+                                                                    {:topic "l2Book"
+                                                                     :status :live
+                                                                     :subscribed? true
+                                                                     :last-payload-at-ms 4880
+                                                                     :stale-threshold-ms 5000}}}})
+        cue-node (find-first-node panel (data-role= "orderbook-freshness-cue"))
+        cue-text (str/join " " (collect-strings cue-node))]
+    (is (some? cue-node))
+    (is (str/includes? cue-text "Updated 120ms ago"))))

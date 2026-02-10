@@ -19,12 +19,15 @@
         selected-chart-type (get-in state [:chart-options :selected-chart-type] :candlestick)
         indicators-dropdown-visible (get-in state [:chart-options :indicators-dropdown-visible])
         active-indicators (get-in state [:chart-options :active-indicators] {})
+        show-surface-freshness-cues?
+        (boolean (get-in state [:websocket-ui :show-surface-freshness-cues?] false))
         websocket-health (or (:websocket-health state)
                              (get-in state [:websocket :health]))
-        freshness-cue (ws-freshness/surface-cue websocket-health
-                                                {:topic "trades"
-                                                 :selector {:coin (:active-asset state)}
-                                                 :live-prefix "Last tick"})]
+        freshness-cue (when show-surface-freshness-cues?
+                        (ws-freshness/surface-cue websocket-health
+                                                  {:topic "trades"
+                                                   :selector {:coin (:active-asset state)}
+                                                   :live-prefix "Last tick"}))]
     [:div.flex.items-center.border-b.border-gray-700.px-4.py-2.w-full.space-x-4.bg-base-100
      ;; Left side - Favorite timeframes + dropdown
      [:div.flex.items-center.space-x-1
@@ -73,13 +76,15 @@
        (indicators-dropdown {:indicators-dropdown-visible indicators-dropdown-visible
                             :active-indicators active-indicators})]]
 
-     [:div {:class ["ml-auto" "flex" "items-center"]
-            :data-role "chart-freshness-cue"}
-      [:span {:class (case (:tone freshness-cue)
-                       :success ["text-xs" "font-medium" "text-success" "tracking-wide"]
-                       :warning ["text-xs" "font-medium" "text-warning" "tracking-wide"]
-                       ["text-xs" "font-medium" "text-base-content/70" "tracking-wide"])}
-       (:text freshness-cue)]]]))
+     (when freshness-cue
+       ^{:replicant/key "chart-freshness-cue"}
+       [:div {:class ["ml-auto" "flex" "items-center"]
+              :data-role "chart-freshness-cue"}
+        [:span {:class (case (:tone freshness-cue)
+                         :success ["text-xs" "font-medium" "text-success" "tracking-wide"]
+                         :warning ["text-xs" "font-medium" "text-warning" "tracking-wide"]
+                         ["text-xs" "font-medium" "text-base-content/70" "tracking-wide"])}
+         (:text freshness-cue)]])]))
 
 ;; Generic chart component that supports all chart types with volume
 (defn chart-canvas [candle-data chart-type active-indicators legend-meta]

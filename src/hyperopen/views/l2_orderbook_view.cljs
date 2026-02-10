@@ -281,12 +281,15 @@
                         quote-symbol
                         size-unit
                         size-dropdown-visible?
-                        freshness-cue]
+                        show-freshness-cue?
+   freshness-cue]
   [:div.flex.items-center.justify-between.px-3.py-2.bg-base-100.border-b.border-base-300
    (precision-dropdown selected-option price-options price-dropdown-visible?)
    [:div {:class ["flex" "items-center" "gap-3"]}
-    (when freshness-cue
+    (when show-freshness-cue?
+      ^{:replicant/key "orderbook-freshness-cue"}
       (freshness-cue-node freshness-cue))
+    ^{:replicant/key "orderbook-size-unit"}
     (size-unit-dropdown base-symbol quote-symbol size-unit size-dropdown-visible?)]])
 
 (defn orderbook-tab-button [active-tab tab-id label]
@@ -405,6 +408,8 @@
   ([coin market orderbook-data orderbook-ui]
    (l2-orderbook-panel coin market orderbook-data orderbook-ui nil))
   ([coin market orderbook-data orderbook-ui websocket-health]
+   (l2-orderbook-panel coin market orderbook-data orderbook-ui websocket-health true))
+  ([coin market orderbook-data orderbook-ui websocket-health show-freshness-cue?]
    (let [size-unit (normalize-size-unit (:size-unit orderbook-ui))
         size-unit-dropdown-visible? (boolean (:size-unit-dropdown-visible? orderbook-ui))
         price-dropdown-visible? (boolean (:price-aggregation-dropdown-visible? orderbook-ui))
@@ -445,11 +450,12 @@
         max-ask-cum-size (get-max-cumulative-total asks-with-totals size-unit)
         max-bid-cum-size (get-max-cumulative-total bids-with-totals size-unit)
         max-cum-size (max (or max-ask-cum-size 0) (or max-bid-cum-size 0))
-        freshness-cue (ws-freshness/surface-cue websocket-health
-                                                {:topic "l2Book"
-                                                 :selector {:coin coin}
-                                                 :live-prefix "Updated"})
-        depth-dimmed? (:delayed? freshness-cue)]
+        freshness-cue (when show-freshness-cue?
+                        (ws-freshness/surface-cue websocket-health
+                                                  {:topic "l2Book"
+                                                   :selector {:coin coin}
+                                                   :live-prefix "Updated"}))
+        depth-dimmed? (boolean (and freshness-cue (:delayed? freshness-cue)))]
     [:div {:class ["bg-base-100" "border" "border-base-300" "rounded-none" "overflow-hidden" "h-full" "flex" "flex-col" "num" "num-dense"]}
      ;; Header
      (orderbook-header selected-option
@@ -459,6 +465,7 @@
                        quote-symbol
                        size-unit
                        size-unit-dropdown-visible?
+                       show-freshness-cue?
                        freshness-cue)
 
      ;; Column headers
@@ -505,6 +512,8 @@
   (let [coin (:coin state)
         market (:market state)
         orderbook-data (:orderbook state)
+        show-surface-freshness-cues?
+        (boolean (:show-surface-freshness-cues? state))
         websocket-health (or (:websocket-health state)
                              (get-in state [:websocket :health]))
         orderbook-ui (merge {:size-unit :base
@@ -525,5 +534,10 @@
         (tab-content-viewport
          (cond
            loading? (loading-orderbook)
-           (and coin orderbook-data) (l2-orderbook-panel coin market orderbook-data orderbook-ui websocket-health)
+           (and coin orderbook-data) (l2-orderbook-panel coin
+                                                          market
+                                                          orderbook-data
+                                                          orderbook-ui
+                                                          websocket-health
+                                                          show-surface-freshness-cues?)
            :else (empty-orderbook))))]]))

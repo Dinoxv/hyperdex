@@ -97,6 +97,7 @@
                                   :health (ws-client/get-health-snapshot)}
                       :websocket-ui {:diagnostics-open? false
                                      :show-market-offline-banner? false
+                                     :show-surface-freshness-cues? false
                                      :reveal-sensitive? false
                                      :copy-status nil
                                      :reconnect-cooldown-until-ms nil
@@ -602,6 +603,13 @@
 
 (defn ws-diagnostics-copy [_]
   [[:effects/copy-websocket-diagnostics]])
+
+(defn set-show-surface-freshness-cues [_ checked]
+  [[:effects/save [:websocket-ui :show-surface-freshness-cues?] (boolean checked)]])
+
+(defn toggle-show-surface-freshness-cues [state]
+  [[:effects/save [:websocket-ui :show-surface-freshness-cues?]
+    (not (boolean (get-in state [:websocket-ui :show-surface-freshness-cues?] false)))]])
 
 (defn- reset-blocked? [state]
   (let [transport-state (get-in state [:websocket :health :transport :state])
@@ -1840,6 +1848,8 @@
 (nxr/register-action! :actions/toggle-ws-diagnostics-sensitive toggle-ws-diagnostics-sensitive)
 (nxr/register-action! :actions/ws-diagnostics-reconnect-now ws-diagnostics-reconnect-now)
 (nxr/register-action! :actions/ws-diagnostics-copy ws-diagnostics-copy)
+(nxr/register-action! :actions/set-show-surface-freshness-cues set-show-surface-freshness-cues)
+(nxr/register-action! :actions/toggle-show-surface-freshness-cues toggle-show-surface-freshness-cues)
 (nxr/register-action! :actions/ws-diagnostics-reset-market-subscriptions ws-diagnostics-reset-market-subscriptions)
 (nxr/register-action! :actions/ws-diagnostics-reset-orders-subscriptions ws-diagnostics-reset-orders-subscriptions)
 (nxr/register-action! :actions/ws-diagnostics-reset-all-subscriptions ws-diagnostics-reset-all-subscriptions)

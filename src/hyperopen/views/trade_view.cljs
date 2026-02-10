@@ -10,6 +10,8 @@
 (defn trade-view [state]
   (let [active-asset (:active-asset state)
         orderbook-data (when active-asset (get-in state [:orderbooks active-asset]))
+        show-surface-freshness-cues?
+        (boolean (get-in state [:websocket-ui :show-surface-freshness-cues?] false))
         websocket-health (or (:websocket-health state)
                              (ws-client/get-health-snapshot))
         state* (assoc state :websocket-health websocket-health)]
@@ -36,9 +38,10 @@
         [:div {:class ["bg-base-100" "w-full" "h-full" "min-h-0" "overflow-hidden"]}
          (l2-orderbook-view/l2-orderbook-view
            {:coin (or active-asset "No Asset Selected")
-            :market (:active-market state)
+           :market (:active-market state)
             :orderbook orderbook-data
             :orderbook-ui (:orderbook-ui state)
+            :show-surface-freshness-cues? show-surface-freshness-cues?
             :websocket-health websocket-health
             :loading (and active-asset (nil? orderbook-data))})]
 

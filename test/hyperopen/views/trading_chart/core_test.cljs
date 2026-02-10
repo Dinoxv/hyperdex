@@ -143,6 +143,7 @@
 
 (deftest chart-top-menu-renders-trades-freshness-cue-from-health-snapshot-test
   (let [menu (chart-core/chart-top-menu {:active-asset "BTC"
+                                         :websocket-ui {:show-surface-freshness-cues? true}
                                          :websocket-health {:generated-at-ms 5000
                                                             :streams {["trades" "BTC" nil nil nil]
                                                                       {:topic "trades"
@@ -162,6 +163,7 @@
 
 (deftest chart-top-menu-renders-idle-freshness-message-when-awaiting-first-update-test
   (let [menu (chart-core/chart-top-menu {:active-asset "BTC"
+                                         :websocket-ui {:show-surface-freshness-cues? true}
                                          :websocket-health {:generated-at-ms 5000
                                                             :streams {["trades" "BTC" nil nil nil]
                                                                       {:topic "trades"
@@ -178,3 +180,21 @@
         cue-node (find-first-node menu #(= "chart-freshness-cue" (get-in % [1 :data-role])))]
     (is (some? cue-node))
     (is (str/includes? (str/join " " (collect-strings cue-node)) "Waiting for first update..."))))
+
+(deftest chart-top-menu-hides-freshness-cue-by-default-test
+  (let [menu (chart-core/chart-top-menu {:active-asset "BTC"
+                                         :websocket-health {:generated-at-ms 5000
+                                                            :streams {["trades" "BTC" nil nil nil]
+                                                                      {:topic "trades"
+                                                                       :status :live
+                                                                       :subscribed? true
+                                                                       :last-payload-at-ms 4700
+                                                                       :stale-threshold-ms 10000}}}
+                                         :chart-options {:timeframes-dropdown-visible false
+                                                         :selected-timeframe :1d
+                                                         :chart-type-dropdown-visible false
+                                                         :selected-chart-type :candlestick
+                                                         :indicators-dropdown-visible false
+                                                         :active-indicators {}}})
+        cue-node (find-first-node menu #(= "chart-freshness-cue" (get-in % [1 :data-role])))]
+    (is (nil? cue-node))))

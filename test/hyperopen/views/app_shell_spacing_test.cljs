@@ -182,6 +182,7 @@
                               :stale-threshold-ms 5000}}})]
     (let [state (-> trade-view-test-state
                     (assoc :active-asset "BTC")
+                    (assoc-in [:websocket-ui :show-surface-freshness-cues?] true)
                     (assoc :orderbooks {"BTC" {:bids [{:px "99" :sz "2"}]
                                               :asks [{:px "101" :sz "1"}]}}))
           view-node (trade-view/trade-view state)

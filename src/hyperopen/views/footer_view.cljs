@@ -304,7 +304,7 @@
                       "space-y-4"]}
       [:div {:class ["flex" "items-center" "justify-between"]}
        [:h2 {:class ["text-sm" "font-semibold" "uppercase" "tracking-wide"]}
-        "WebSocket diagnostics"]
+        "Connection diagnostics"]
        [:button.btn.btn-xs.btn-ghost
         {:type "button"
          :on {:click [[:actions/close-ws-diagnostics]]}}
@@ -501,6 +501,8 @@
         {:keys [status]} (dominant-pill-state health)
         {:keys [border bg text]} (status-tone status)
         pill-label (if (= status :live) "Connected" (status-label status))
+        show-surface-freshness-cues?
+        (boolean (get-in state [:websocket-ui :show-surface-freshness-cues?] false))
         diagnostics-open? (boolean (get-in state [:websocket-ui :diagnostics-open?] false))
         footer-z-class (if diagnostics-open? "z-[260]" "z-40")
         banner (banner-model state health)]
@@ -535,7 +537,25 @@
                           bg
                           text]
                   :on {:click [[:actions/toggle-ws-diagnostics]]}}
-         [:span pill-label]]]
+         [:span pill-label]]
+        [:label {:class ["flex" "items-center" "gap-2" "text-xs" "text-base-content/70" "cursor-pointer" "select-none"]
+                 :data-role "surface-freshness-toggle"}
+         [:input {:type "checkbox"
+                  :class ["h-4"
+                          "w-4"
+                          "rounded-[3px]"
+                          "border"
+                          "border-base-300"
+                          "bg-transparent"
+                          "trade-toggle-checkbox"
+                          "transition-colors"
+                          "focus:outline-none"
+                          "focus:ring-0"
+                          "focus:ring-offset-0"
+                          "focus:shadow-none"]
+                  :checked show-surface-freshness-cues?
+                  :on {:click [[:actions/toggle-show-surface-freshness-cues]]}}]
+         [:span "Show freshness cues"]]]
 
        [:div {:class ["flex" "space-x-6"]}
         [:a {:class footer-link-classes

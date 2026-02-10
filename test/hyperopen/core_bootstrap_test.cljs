@@ -713,6 +713,16 @@
                                                                   :transport {:state :connected}}}})))
   (is (= [[:effects/copy-websocket-diagnostics]]
          (core/ws-diagnostics-copy {})))
+  (is (= [[:effects/save [:websocket-ui :show-surface-freshness-cues?] true]]
+         (core/set-show-surface-freshness-cues {} true)))
+  (is (= [[:effects/save [:websocket-ui :show-surface-freshness-cues?] false]]
+         (core/set-show-surface-freshness-cues {} nil)))
+  (is (= [[:effects/save [:websocket-ui :show-surface-freshness-cues?] true]]
+         (core/toggle-show-surface-freshness-cues
+           {:websocket-ui {:show-surface-freshness-cues? false}})))
+  (is (= [[:effects/save [:websocket-ui :show-surface-freshness-cues?] false]]
+         (core/toggle-show-surface-freshness-cues
+           {:websocket-ui {:show-surface-freshness-cues? true}})))
   (is (= [[:effects/ws-reset-subscriptions {:group :market_data :source :manual}]]
          (core/ws-diagnostics-reset-market-subscriptions
            {:websocket-ui {:reset-in-progress? false}

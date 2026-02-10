@@ -54,6 +54,13 @@
                       (get-in % [1 :on :click])))
              view))
 
+(defn- find-surface-freshness-toggle [view]
+  (find-node #(and (vector? %)
+                   (= :input (first %))
+                   (= [[:actions/toggle-show-surface-freshness-cues]]
+                      (get-in % [1 :on :click])))
+             view))
+
 (defn- button-tag? [node]
   (and (keyword? node)
        (str/starts-with? (name node) "button")))
@@ -141,16 +148,27 @@
     (is (= [[:actions/toggle-ws-diagnostics]]
            (get-in pill [1 :on :click])))))
 
+(deftest footer-renders-surface-freshness-toggle-test
+  (let [off-view (footer-view/footer-view (base-state))
+        off-toggle (find-surface-freshness-toggle off-view)
+        on-view (footer-view/footer-view (assoc-in (base-state)
+                                                   [:websocket-ui :show-surface-freshness-cues?]
+                                                   true))
+        on-toggle (find-surface-freshness-toggle on-view)]
+    (is (some? off-toggle))
+    (is (false? (boolean (get-in off-toggle [1 :checked]))))
+    (is (true? (boolean (get-in on-toggle [1 :checked]))))))
+
 (deftest diagnostics-drawer-renders-only-when-open-test
   (let [closed-view (footer-view/footer-view (base-state))
         open-view (footer-view/footer-view (assoc-in (base-state) [:websocket-ui :diagnostics-open?] true))]
     (is (nil? (find-node #(and (vector? %)
                                (= :h2 (first %))
-                               (= "WebSocket diagnostics" (last %)))
+                               (= "Connection diagnostics" (last %)))
                          closed-view)))
     (is (some? (find-node #(and (vector? %)
                                 (= :h2 (first %))
-                                (= "WebSocket diagnostics" (last %)))
+                                (= "Connection diagnostics" (last %)))
                           open-view)))
     (is (some? (find-node #(and (vector? %)
                                 (= :h3 (first %))
