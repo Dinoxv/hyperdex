@@ -1,7 +1,8 @@
 (ns hyperopen.views.account-info-view
   (:require [clojure.string :as str]
             [hyperopen.asset-selector.markets :as markets]
-            [hyperopen.utils.formatting :as fmt]))
+            [hyperopen.utils.formatting :as fmt]
+            [hyperopen.views.websocket-freshness :as ws-freshness]))
 
 ;; Available tabs for the account info component
 (def available-tabs [:balances :positions :open-orders :twap :trade-history :funding-history :order-history])
@@ -31,6 +32,16 @@
       (str base " (" count ")")
 
       :else base)))
+
+(defn- freshness-cue-node [cue]
+  (when (map? cue)
+    [:div {:class ["ml-auto" "px-4" "py-2"]
+           :data-role "account-tab-freshness-cue"}
+     [:span {:class (case (:tone cue)
+                      :success ["text-xs" "font-medium" "text-success" "tracking-wide"]
+                      :warning ["text-xs" "font-medium" "text-warning" "tracking-wide"]
+                      ["text-xs" "font-medium" "text-base-content/70" "tracking-wide"])}
+      (:text cue)]]))
 
 (defn- funding-history-header-actions []
   [:div {:class ["ml-auto" "flex" "items-center" "justify-end" "gap-2" "px-4" "py-2"]}
@@ -95,8 +106,10 @@
 
 (defn tab-navigation
   ([selected-tab counts hide-small? funding-history-state]
-   (tab-navigation selected-tab counts hide-small? funding-history-state {}))
+   (tab-navigation selected-tab counts hide-small? funding-history-state {} nil))
   ([selected-tab counts hide-small? _funding-history-state order-history-state]
+   (tab-navigation selected-tab counts hide-small? _funding-history-state order-history-state nil))
+  ([selected-tab counts hide-small? _funding-history-state order-history-state freshness-cues]
    [:div.flex.items-center.justify-between.border-b.border-base-300.bg-base-200
     [:div.flex.items-center
      (for [tab available-tabs]
@@ -136,6 +149,12 @@
 
       :order-history
       (order-history-header-actions order-history-state)
+
+      :positions
+      (freshness-cue-node (get freshness-cues :positions))
+
+      :open-orders
+      (freshness-cue-node (get freshness-cues :open-orders))
 
       nil)]))
 
@@ -2259,10 +2278,25 @@
         tab-counts {:open-orders (count open-orders)
                     :positions (count positions)
                     :balances (count balance-rows)}
-        open-orders-sort (get-in state [:account-info :open-orders-sort] {:column "Time" :direction :desc})]
+        open-orders-sort (get-in state [:account-info :open-orders-sort] {:column "Time" :direction :desc})
+        websocket-health (or (:websocket-health state)
+                             (get-in state [:websocket :health]))
+        wallet-address (get-in state [:wallet :address])
+        freshness-cues {:positions (ws-freshness/surface-cue websocket-health
+                                                             {:topic "webData2"
+                                                              :selector (when wallet-address
+                                                                          {:user wallet-address})
+                                                              :live-prefix "Updated"
+                                                              :na-prefix "Last update"})
+                        :open-orders (ws-freshness/surface-cue websocket-health
+                                                               {:topic "openOrders"
+                                                                :selector (when wallet-address
+                                                                            {:user wallet-address})
+                                                                :live-prefix "Updated"
+                                                                :na-prefix "Last update"})}]
     [:div {:class ["bg-base-100" "border-t" "border-base-300" "rounded-none" "shadow-none" "overflow-hidden" "w-full" "h-96" "flex" "flex-col" "min-h-0"]}
      ;; Tab navigation
-     (tab-navigation selected-tab tab-counts hide-small? funding-history-state order-history-state)
+     (tab-navigation selected-tab tab-counts hide-small? funding-history-state order-history-state freshness-cues)
      
      ;; Content area
      [:div {:class ["flex-1" "min-h-0" "overflow-hidden"]}

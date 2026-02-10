@@ -482,6 +482,73 @@
     (is (some? positions-tab-base-node))
     (is (nil? positions-tab-count-node))))
 
+(deftest tab-navigation-renders-neutral-positions-freshness-cue-test
+  (let [counts {:balances 2 :positions 4 :open-orders 3}
+        nav (view/tab-navigation :positions
+                                 counts
+                                 false
+                                 {}
+                                 {}
+                                 {:positions {:text "Last update 2m 0s ago"
+                                              :tone :neutral}})
+        cue-node (find-first-node nav #(= "account-tab-freshness-cue" (get-in % [1 :data-role])))
+        cue-text (str/join " " (collect-strings cue-node))
+        cue-text-node (find-first-node cue-node #(contains? (direct-texts %) "Last update 2m 0s ago"))]
+    (is (some? cue-node))
+    (is (str/includes? cue-text "Last update 2m 0s ago"))
+    (is (contains? (node-class-set cue-text-node) "text-base-content/70"))))
+
+(deftest tab-navigation-renders-open-orders-delayed-freshness-cue-test
+  (let [counts {:balances 2 :positions 4 :open-orders 3}
+        nav (view/tab-navigation :open-orders
+                                 counts
+                                 false
+                                 {}
+                                 {}
+                                 {:open-orders {:text "Stale 12s"
+                                                :tone :warning}})
+        cue-node (find-first-node nav #(= "account-tab-freshness-cue" (get-in % [1 :data-role])))
+        cue-text (str/join " " (collect-strings cue-node))
+        cue-text-node (find-first-node cue-node #(contains? (direct-texts %) "Stale 12s"))]
+    (is (some? cue-node))
+    (is (str/includes? cue-text "Stale 12s"))
+    (is (contains? (node-class-set cue-text-node) "text-warning"))))
+
+(deftest account-info-panel-derives-positions-freshness-cue-from-websocket-health-test
+  (let [state (-> sample-account-info-state
+                  (assoc-in [:account-info :selected-tab] :positions)
+                  (assoc :wallet {:address "0xabc"})
+                  (assoc :websocket-health
+                         {:generated-at-ms 5000
+                          :streams {["webData2" nil "0xabc" nil nil]
+                                    {:topic "webData2"
+                                     :status :n-a
+                                     :subscribed? true
+                                     :last-payload-at-ms 3000}}}))
+        panel (view/account-info-panel state)
+        cue-node (find-first-node panel #(= "account-tab-freshness-cue" (get-in % [1 :data-role])))
+        cue-text (str/join " " (collect-strings cue-node))]
+    (is (some? cue-node))
+    (is (str/includes? cue-text "Last update 2s ago"))))
+
+(deftest account-info-panel-derives-open-orders-stale-cue-from-websocket-health-test
+  (let [state (-> sample-account-info-state
+                  (assoc-in [:account-info :selected-tab] :open-orders)
+                  (assoc :wallet {:address "0xabc"})
+                  (assoc :websocket-health
+                         {:generated-at-ms 20000
+                          :streams {["openOrders" nil "0xabc" nil nil]
+                                    {:topic "openOrders"
+                                     :status :delayed
+                                     :subscribed? true
+                                     :last-payload-at-ms 8000
+                                     :stale-threshold-ms 5000}}}))
+        panel (view/account-info-panel state)
+        cue-node (find-first-node panel #(= "account-tab-freshness-cue" (get-in % [1 :data-role])))
+        cue-text (str/join " " (collect-strings cue-node))]
+    (is (some? cue-node))
+    (is (str/includes? cue-text "Stale 12s"))))
+
 (deftest balances-tab-content-does-not-render-legacy-subheader-row-test
   (let [content (view/balances-tab-content [sample-balance-row] false default-sort-state)
         title-node (find-first-node content #(contains? (direct-texts %) "Balances ("))

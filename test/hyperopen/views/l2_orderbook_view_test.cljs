@@ -72,6 +72,13 @@
 
     :else 0))
 
+(defn- collect-strings [node]
+  (cond
+    (string? node) [node]
+    (vector? node) (mapcat collect-strings (if (map? (second node)) (drop 2 node) (drop 1 node)))
+    (seq? node) (mapcat collect-strings node)
+    :else []))
+
 (deftest symbol-resolution-test
   (testing "market metadata takes precedence"
     (is (= "PUMP" (view/resolve-base-symbol "PUMP" {:base "PUMP"})))
@@ -402,3 +409,104 @@
     (is (every? depth-body-classes #{"flex-1" "min-h-0" "flex" "flex-col"}))
     (is (every? asks-pane-classes #{"flex-1" "min-h-0" "overflow-hidden" "flex" "flex-col" "justify-end"}))
     (is (every? bids-pane-classes #{"flex-1" "min-h-0" "overflow-hidden" "flex" "flex-col"}))))
+
+(deftest orderbook-panel-renders-freshness-cue-from-health-snapshot-test
+  (let [panel (view/l2-orderbook-panel "BTC"
+                                       {:market-type :perp
+                                        :base "BTC"
+                                        :quote "USDC"
+                                        :szDecimals 4}
+                                       {:bids [{:px "99" :sz "2"}]
+                                        :asks [{:px "101" :sz "1"}]}
+                                       {:size-unit :base
+                                        :size-unit-dropdown-visible? false
+                                        :price-aggregation-dropdown-visible? false
+                                        :price-aggregation-by-coin {"BTC" :full}}
+                                       {:generated-at-ms 5000
+                                        :streams {["l2Book" "BTC" nil nil nil]
+                                                  {:topic "l2Book"
+                                                   :status :live
+                                                   :subscribed? true
+                                                   :last-payload-at-ms 4880
+                                                   :stale-threshold-ms 5000}}})
+        cue-node (find-first-node panel (data-role= "orderbook-freshness-cue"))]
+    (is (some? cue-node))
+    (is (str/includes? (str/join " " (collect-strings cue-node)) "Updated 120ms ago"))))
+
+(deftest orderbook-panel-applies-subtle-dim-when-freshness-is-delayed-test
+  (let [panel (view/l2-orderbook-panel "BTC"
+                                       {:market-type :perp
+                                        :base "BTC"
+                                        :quote "USDC"
+                                        :szDecimals 4}
+                                       {:bids [{:px "99" :sz "2"}]
+                                        :asks [{:px "101" :sz "1"}]}
+                                       {:size-unit :base
+                                        :size-unit-dropdown-visible? false
+                                        :price-aggregation-dropdown-visible? false
+                                        :price-aggregation-by-coin {"BTC" :full}}
+                                       {:generated-at-ms 20000
+                                        :streams {["l2Book" "BTC" nil nil nil]
+                                                  {:topic "l2Book"
+                                                   :status :delayed
+                                                   :subscribed? true
+                                                   :last-payload-at-ms 1000
+                                                   :stale-threshold-ms 5000}}})
+        depth-body (find-first-node panel (data-role= "orderbook-depth-body"))
+        classes (node-class-set depth-body)]
+    (is (some? depth-body))
+    (is (contains? classes "opacity-90"))))
+
+(deftest orderbook-freshness-cue-falls-back-to-unique-topic-stream-when-exact-key-missing-test
+  (let [panel (view/l2-orderbook-panel "BTC"
+                                       {:market-type :perp
+                                        :base "BTC"
+                                        :quote "USDC"
+                                        :szDecimals 4}
+                                       {:bids [{:px "99" :sz "2"}]
+                                        :asks [{:px "101" :sz "1"}]}
+                                       {:size-unit :base
+                                        :size-unit-dropdown-visible? false
+                                        :price-aggregation-dropdown-visible? false
+                                        :price-aggregation-by-coin {"BTC" :full}}
+                                       {:generated-at-ms 5000
+                                        :streams {["l2Book" nil nil nil nil]
+                                                  {:topic "l2Book"
+                                                   :status :live
+                                                   :subscribed? true
+                                                   :last-payload-at-ms 4920
+                                                   :stale-threshold-ms 5000}}})
+        cue-node (find-first-node panel (data-role= "orderbook-freshness-cue"))
+        cue-text (str/join " " (collect-strings cue-node))]
+    (is (some? cue-node))
+    (is (str/includes? cue-text "Updated 80ms ago"))))
+
+(deftest orderbook-freshness-cue-remains-idle-when-topic-stream-selection-is-ambiguous-test
+  (let [panel (view/l2-orderbook-panel "SOL"
+                                       {:market-type :perp
+                                        :base "SOL"
+                                        :quote "USDC"
+                                        :szDecimals 4}
+                                       {:bids [{:px "99" :sz "2"}]
+                                        :asks [{:px "101" :sz "1"}]}
+                                       {:size-unit :base
+                                        :size-unit-dropdown-visible? false
+                                        :price-aggregation-dropdown-visible? false
+                                        :price-aggregation-by-coin {"SOL" :full}}
+                                       {:generated-at-ms 5000
+                                        :streams {["l2Book" "BTC" nil nil nil]
+                                                  {:topic "l2Book"
+                                                   :status :live
+                                                   :subscribed? true
+                                                   :last-payload-at-ms 4990
+                                                   :stale-threshold-ms 5000}
+                                                  ["l2Book" "ETH" nil nil nil]
+                                                  {:topic "l2Book"
+                                                   :status :live
+                                                   :subscribed? true
+                                                   :last-payload-at-ms 4990
+                                                   :stale-threshold-ms 5000}}})
+        cue-node (find-first-node panel (data-role= "orderbook-freshness-cue"))
+        cue-text (str/join " " (collect-strings cue-node))]
+    (is (some? cue-node))
+    (is (str/includes? cue-text "Waiting for first update..."))))

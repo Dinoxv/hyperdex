@@ -2,7 +2,8 @@
   (:require [clojure.string :as str]
             [hyperopen.orderbook.price-aggregation :as price-agg]
             [hyperopen.websocket.trades :as trades]
-            [hyperopen.utils.formatting :as fmt]))
+            [hyperopen.utils.formatting :as fmt]
+            [hyperopen.views.websocket-freshness :as ws-freshness]))
 
 ;; Utility functions for formatting
 (defn parse-number [value]
@@ -258,13 +259,35 @@
       [:button.block.w-full.text-left.px-3.py-2.text-sm.hover:bg-gray-800
        {:class (if (= size-unit :base) ["text-white" "bg-gray-800"] ["text-gray-300"])
         :on {:click [[:actions/select-orderbook-size-unit :base]]}}
-       base-symbol]]]))
+	       base-symbol]]]))
+
+(defn- freshness-tone-classes [tone]
+  (case tone
+    :success ["text-success"]
+    :warning ["text-warning"]
+    ["text-base-content/70"]))
+
+(defn- freshness-cue-node [{:keys [text tone]}]
+  [:span {:class (into ["text-xs" "font-medium" "tracking-wide"]
+                       (freshness-tone-classes tone))
+          :data-role "orderbook-freshness-cue"}
+   text])
 
 ;; Header component
-(defn orderbook-header [selected-option price-options price-dropdown-visible? base-symbol quote-symbol size-unit size-dropdown-visible?]
+(defn orderbook-header [selected-option
+                        price-options
+                        price-dropdown-visible?
+                        base-symbol
+                        quote-symbol
+                        size-unit
+                        size-dropdown-visible?
+                        freshness-cue]
   [:div.flex.items-center.justify-between.px-3.py-2.bg-base-100.border-b.border-base-300
    (precision-dropdown selected-option price-options price-dropdown-visible?)
-   (size-unit-dropdown base-symbol quote-symbol size-unit size-dropdown-visible?)])
+   [:div {:class ["flex" "items-center" "gap-3"]}
+    (when freshness-cue
+      (freshness-cue-node freshness-cue))
+    (size-unit-dropdown base-symbol quote-symbol size-unit size-dropdown-visible?)]])
 
 (defn orderbook-tab-button [active-tab tab-id label]
   [:button.flex-1.px-3.py-2.text-sm.font-medium.border-b-2.transition-colors
@@ -378,8 +401,11 @@
     [:span {:class ["text-gray-400" "text-xs" "num"]} (str "Total (" size-symbol ")")]]])
 
 ;; Main order book component
-(defn l2-orderbook-panel [coin market orderbook-data orderbook-ui]
-  (let [size-unit (normalize-size-unit (:size-unit orderbook-ui))
+(defn l2-orderbook-panel
+  ([coin market orderbook-data orderbook-ui]
+   (l2-orderbook-panel coin market orderbook-data orderbook-ui nil))
+  ([coin market orderbook-data orderbook-ui websocket-health]
+   (let [size-unit (normalize-size-unit (:size-unit orderbook-ui))
         size-unit-dropdown-visible? (boolean (:size-unit-dropdown-visible? orderbook-ui))
         price-dropdown-visible? (boolean (:price-aggregation-dropdown-visible? orderbook-ui))
         aggregation-by-coin (or (:price-aggregation-by-coin orderbook-ui) {})
@@ -418,7 +444,12 @@
         ;; Calculate max size for bar width in the selected unit
         max-ask-cum-size (get-max-cumulative-total asks-with-totals size-unit)
         max-bid-cum-size (get-max-cumulative-total bids-with-totals size-unit)
-        max-cum-size (max (or max-ask-cum-size 0) (or max-bid-cum-size 0))]
+        max-cum-size (max (or max-ask-cum-size 0) (or max-bid-cum-size 0))
+        freshness-cue (ws-freshness/surface-cue websocket-health
+                                                {:topic "l2Book"
+                                                 :selector {:coin coin}
+                                                 :live-prefix "Updated"})
+        depth-dimmed? (:delayed? freshness-cue)]
     [:div {:class ["bg-base-100" "border" "border-base-300" "rounded-none" "overflow-hidden" "h-full" "flex" "flex-col" "num" "num-dense"]}
      ;; Header
      (orderbook-header selected-option
@@ -427,13 +458,15 @@
                        base-symbol
                        quote-symbol
                        size-unit
-                       size-unit-dropdown-visible?)
+                       size-unit-dropdown-visible?
+                       freshness-cue)
 
      ;; Column headers
      (column-headers selected-size-symbol)
 
      ;; Order rows
-     [:div {:class ["flex-1" "min-h-0" "flex" "flex-col"]
+     [:div {:class (cond-> ["flex-1" "min-h-0" "flex" "flex-col"]
+                     depth-dimmed? (conj "opacity-90"))
             :data-role "orderbook-depth-body"}
       ;; Asks (sell orders) - top section, rendered worst->best (reversed for display)
       [:div {:class ["flex-1" "min-h-0" "overflow-hidden" "flex" "flex-col" "justify-end"]
@@ -451,7 +484,7 @@
              :data-role "orderbook-bids-pane"}
        (for [bid bids-with-totals]
          ^{:key (str "bid-" (:px bid))}
-         (order-row bid max-cum-size false size-unit))]]]))
+         (order-row bid max-cum-size false size-unit))]]])))
 
 ;; Empty state
 (defn empty-orderbook []
@@ -472,6 +505,8 @@
   (let [coin (:coin state)
         market (:market state)
         orderbook-data (:orderbook state)
+        websocket-health (or (:websocket-health state)
+                             (get-in state [:websocket :health]))
         orderbook-ui (merge {:size-unit :base
                              :size-unit-dropdown-visible? false
                              :price-aggregation-dropdown-visible? false
@@ -490,5 +525,5 @@
         (tab-content-viewport
          (cond
            loading? (loading-orderbook)
-           (and coin orderbook-data) (l2-orderbook-panel coin market orderbook-data orderbook-ui)
+           (and coin orderbook-data) (l2-orderbook-panel coin market orderbook-data orderbook-ui websocket-health)
            :else (empty-orderbook))))]]))
