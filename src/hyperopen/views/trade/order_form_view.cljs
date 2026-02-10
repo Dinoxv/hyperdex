@@ -522,7 +522,15 @@
         slippage-max (:slippage-max summary)
         fees (:fees summary)
         error (:error normalized-form)
-        submitting? (:submitting? normalized-form)]
+        submitting? (:submitting? normalized-form)
+        submit-prep (trading/prepare-order-form-for-submit state normalized-form)
+        submit-form (:form submit-prep)
+        market-price-missing? (:market-price-missing? submit-prep)
+        submit-errors (trading/validate-order-form state submit-form)
+        submit-disabled? (boolean (or submitting?
+                                      read-only?
+                                      market-price-missing?
+                                      (seq submit-errors)))]
     [:div {:class ["bg-base-100"
                    "border"
                    "border-base-300"
@@ -711,6 +719,31 @@
          (metric-row "Start" start-preview-line)
          (metric-row "End" end-preview-line)])
 
+      (when error
+        [:div {:class ["text-xs" "text-red-400"]} error])
+
+      [:button {:type "button"
+                :class (into ["w-full"
+                              "h-11"
+                              "rounded-lg"
+                              "text-sm"
+                              "font-semibold"
+                              "transition-colors"
+                              "focus:outline-none"
+                              "focus:ring-1"
+                              "focus:ring-[#8a96a6]/40"
+                              "focus:ring-offset-0"]
+                             (if submit-disabled?
+                               ["bg-[rgb(23,69,63)]"
+                                "text-[#7f9f9a]"
+                                "cursor-not-allowed"]
+                               ["bg-primary"
+                                "text-primary-content"
+                                "hover:bg-primary/90"]))
+                :disabled submit-disabled?
+                :on {:click [[:actions/submit-order]]}}
+       (if submitting? "Submitting..." "Place Order")]
+
       [:div {:class ["border-t" "border-base-300" "pt-3" "space-y-2"]}
        (when (not= :scale type)
          (metric-row "Liquidation Price"
@@ -736,12 +769,4 @@
                           "% / "
                           (fmt/safe-to-fixed (:maker fees) 3)
                           "%")
-                     "N/A"))]
-
-      (when error
-        [:div {:class ["text-xs" "text-red-400"]} error])
-
-      [:button {:class ["btn" "btn-primary" "w-full" "h-11" "text-sm" "font-semibold"]
-                :disabled (or submitting? read-only?)
-                :on {:click [[:actions/submit-order]]}}
-       (if submitting? "Submitting..." "Submit Order")]]]))
+                     "N/A"))]]]))

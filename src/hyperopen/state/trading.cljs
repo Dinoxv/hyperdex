@@ -794,6 +794,25 @@
     (when px
       (assoc form :price (str (* px adj))))))
 
+(defn prepare-order-form-for-submit
+  "Return a normalized order form suitable for deterministic submit validation.
+   {:form prepared-form
+    :market-price-missing? boolean}"
+  [state form]
+  (let [normalized-form (normalize-order-form state form)
+        market-form (when (= :market (:type normalized-form))
+                      (apply-market-price state normalized-form))
+        form-with-market (or market-form normalized-form)
+        form* (if (and (limit-like-type? (:type form-with-market))
+                       (str/blank? (:price form-with-market)))
+                (if-let [fallback-price (effective-limit-price-string state form-with-market)]
+                  (assoc form-with-market :price fallback-price)
+                  form-with-market)
+                form-with-market)]
+    {:form form*
+     :market-price-missing? (and (= :market (:type normalized-form))
+                                 (nil? market-form))}))
+
 (defn build-order-request [state form]
   (case (:type form)
     :twap (build-twap-action state form)

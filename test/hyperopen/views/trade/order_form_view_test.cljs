@@ -709,3 +709,30 @@
     (is (contains? strings "Margin Required"))
     (is (contains? strings "Fees"))
     (is (contains? strings "N/A"))))
+
+(deftest submit-button-renders-before-liquidation-metrics-test
+  (let [view-node (view/order-form-view (base-state {:type :limit :size "1" :price "100"}))
+        tokens (vec (collect-strings view-node))
+        submit-index (first-index tokens "Place Order")
+        liquidation-index (first-index tokens "Liquidation Price")]
+    (is (number? submit-index))
+    (is (number? liquidation-index))
+    (is (< submit-index liquidation-index))))
+
+(deftest submit-button-is-disabled-until-required-limit-fields-are-present-test
+  (let [disabled-view (view/order-form-view (base-state {:type :limit :size "" :price ""}))
+        enabled-view (view/order-form-view (base-state {:type :limit :size "1" :price "100"}))
+        disabled-button (button-node-by-click-action disabled-view :actions/submit-order)
+        enabled-button (button-node-by-click-action enabled-view :actions/submit-order)
+        disabled-attrs (second disabled-button)
+        enabled-attrs (second enabled-button)
+        disabled-classes (set (:class disabled-attrs))
+        enabled-classes (set (:class enabled-attrs))]
+    (is (some? disabled-button))
+    (is (= true (:disabled disabled-attrs)))
+    (is (contains? disabled-classes "bg-[rgb(23,69,63)]"))
+    (is (contains? disabled-classes "cursor-not-allowed"))
+    (is (some? enabled-button))
+    (is (not (:disabled enabled-attrs)))
+    (is (contains? enabled-classes "bg-primary"))
+    (is (contains? enabled-classes "hover:bg-primary/90"))))

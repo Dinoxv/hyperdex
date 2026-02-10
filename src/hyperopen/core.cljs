@@ -1585,24 +1585,18 @@
     [[:effects/save-many [[[:order-form] next-form*]]]]))
 
 (defn submit-order [state]
-  (let [form (trading/normalize-order-form state (:order-form state))
+  (let [raw-form (:order-form state)
+        submit-prep (trading/prepare-order-form-for-submit state raw-form)
+        form (:form submit-prep)
+        market-price-missing? (:market-price-missing? submit-prep)
         active-market (:active-market state)
         active-asset (:active-asset state)
         inferred-spot? (and (string? active-asset) (str/includes? active-asset "/"))
         inferred-hip3? (and (string? active-asset) (str/includes? active-asset ":") (not inferred-spot?))
         spot? (or (= :spot (:market-type active-market)) inferred-spot?)
         hip3? (or (:dex active-market) inferred-hip3?)
-        market-form (when (= :market (:type form))
-                      (trading/apply-market-price state form))
-        form-with-market (if market-form market-form form)
-        form* (if (and (trading/limit-like-type? (:type form-with-market))
-                       (str/blank? (:price form-with-market)))
-                (if-let [fallback-price (trading/effective-limit-price-string state form-with-market)]
-                  (assoc form-with-market :price fallback-price)
-                  form-with-market)
-                form-with-market)
-        errors (trading/validate-order-form state form*)
-        request (trading/build-order-request state form*)]
+        errors (trading/validate-order-form state form)
+        request (trading/build-order-request state form)]
     (cond
       spot?
       [[:effects/save [:order-form :error] "Spot trading is not supported yet."]]
@@ -1610,12 +1604,12 @@
       hip3?
       [[:effects/save [:order-form :error] "HIP-3 trading is not supported yet."]]
 
-      (and (= :market (:type form)) (nil? market-form))
+      market-price-missing?
       [[:effects/save [:order-form :error] "Market price unavailable. Load order book first."]]
       (seq errors) [[:effects/save [:order-form :error] (first errors)]]
       (nil? request) [[:effects/save [:order-form :error] "Select an asset and ensure market data is loaded."]]
       :else [[:effects/save [:order-form :error] nil]
-             [:effects/save [:order-form] form*]
+             [:effects/save [:order-form] form]
              [:effects/api-submit-order request]])))
 
 (defn cancel-order [state order]
