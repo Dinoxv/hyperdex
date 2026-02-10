@@ -9,6 +9,7 @@
             [hyperopen.websocket.trades :as trades]
             [hyperopen.websocket.webdata2 :as webdata2]
             [hyperopen.websocket.user :as user-ws]
+            [hyperopen.websocket.diagnostics-sanitize :as diagnostics-sanitize]
             [hyperopen.api :as api]
             [hyperopen.api.trading :as trading-api]
             [hyperopen.asset-selector.settings :as asset-selector-settings]
@@ -92,7 +93,23 @@
                                   :next-retry-at-ms nil
                                   :last-close nil
                                   :last-activity-at-ms nil
-                                  :queue-size 0}
+                                  :queue-size 0
+                                  :health (ws-client/get-health-snapshot)}
+                      :websocket-ui {:diagnostics-open? false
+                                     :show-market-offline-banner? false
+                                     :show-surface-freshness-cues? false
+                                     :reveal-sensitive? false
+                                     :copy-status nil
+                                     :reconnect-cooldown-until-ms nil
+                                     :reset-in-progress? false
+                                     :reset-cooldown-until-ms nil
+                                     :reset-counts {:market_data 0
+                                                    :orders_oms 0
+                                                    :all 0}
+                                     :auto-recover-cooldown-until-ms nil
+                                     :auto-recover-count 0
+                                     :reconnect-count 0
+                                     :diagnostics-timeline []}
                       :active-assets {:contexts {}
                                      :loading false}
                       :active-asset nil
@@ -155,6 +172,184 @@
                                      :trade-history (default-trade-history-state)
                                      :funding-history (default-funding-history-state)
                                      :order-history (default-order-history-state)}}))
+
+(defonce ^:private websocket-health-projection-state
+  (atom {:fingerprint nil}))
+
+(defonce ^:private websocket-health-sync-stats
+  (atom {:writes 0}))
+
+(defn- websocket-health-fingerprint [health]
+  {:transport/state (get-in health [:transport :state])
+   :transport/freshness (get-in health [:transport :freshness])
+   :groups/orders_oms (get-in health [:groups :orders_oms :worst-status])
+   :groups/market_data (get-in health [:groups :market_data :worst-status])
+   :groups/account (get-in health [:groups :account :worst-status])
+   :gap/orders_oms (boolean (get-in health [:groups :orders_oms :gap-detected?]))
+   :gap/market_data (boolean (get-in health [:groups :market_data :gap-detected?]))
+   :gap/account (boolean (get-in health [:groups :account :gap-detected?]))})
+
+(def ^:private diagnostics-timeline-limit
+  50)
+
+(def ^:private reconnect-cooldown-ms
+  5000)
+
+(def ^:private reset-subscriptions-cooldown-ms
+  5000)
+
+(def ^:private auto-recover-severe-threshold-ms
+  30000)
+
+(def ^:private auto-recover-cooldown-ms
+  300000)
+
+(def ^:private app-version
+  "0.1.0")
+
+(defn- effective-now-ms
+  [generated-at-ms]
+  (let [generated* (or generated-at-ms 0)
+        wall-now-ms (.now js/Date)]
+    (if (>= generated* 1000000000000)
+      (max generated* wall-now-ms)
+      generated*)))
+
+(defn- append-diagnostics-event!
+  [store event at-ms & [details]]
+  (swap! store
+         (fn [state]
+           (let [entry (cond-> {:event event
+                                :at-ms at-ms}
+                         (map? details) (assoc :details details))
+                 timeline (conj (vec (get-in state [:websocket-ui :diagnostics-timeline] [])) entry)
+                 max-start (max 0 (- (count timeline) diagnostics-timeline-limit))
+                 bounded (subvec timeline max-start)]
+             (assoc-in state [:websocket-ui :diagnostics-timeline] bounded)))))
+
+(defn- stream-age-ms
+  [generated-at-ms last-payload-at-ms]
+  (when (and (number? generated-at-ms)
+             (number? last-payload-at-ms))
+    (max 0 (- generated-at-ms last-payload-at-ms))))
+
+(defn- delayed-market-stream-severe?
+  [health]
+  (let [generated-at-ms (:generated-at-ms health)]
+    (boolean
+      (some (fn [[_ stream]]
+              (let [group (:group stream)
+                    status (:status stream)
+                    stale-threshold-ms (:stale-threshold-ms stream)
+                    age-ms (stream-age-ms generated-at-ms (:last-payload-at-ms stream))]
+                (and (= :market_data group)
+                     (= :delayed status)
+                     (number? stale-threshold-ms)
+                     (number? age-ms)
+                     (> age-ms auto-recover-severe-threshold-ms))))
+            (get health :streams {})))))
+
+(defn- auto-recover-enabled? []
+  (let [flag (some-> js/globalThis (aget "ENABLE_WS_AUTO_RECOVER"))]
+    (cond
+      (true? flag) true
+      (false? flag) false
+      (string? flag) (= "true" (str/lower-case flag))
+      :else false)))
+
+(defn- auto-recover-eligible?
+  [state health]
+  (let [transport-state (get-in health [:transport :state])
+        transport-freshness (get-in health [:transport :freshness])
+        generated-at-ms (or (:generated-at-ms health) 0)
+        cooldown-until-ms (get-in state [:websocket-ui :auto-recover-cooldown-until-ms])]
+    (and (auto-recover-enabled?)
+         (= :connected transport-state)
+         (= :live transport-freshness)
+         (not (contains? #{:connecting :reconnecting} transport-state))
+         (not (true? (get-in state [:websocket-ui :reset-in-progress?])))
+         (or (not (number? cooldown-until-ms))
+             (<= cooldown-until-ms generated-at-ms))
+         (delayed-market-stream-severe? health))))
+
+(defn- sync-websocket-health!
+  [store & {:keys [force?]}]
+  (let [health (ws-client/get-health-snapshot)
+        generated-at-ms (or (:generated-at-ms health) 0)
+        prior-fingerprint (:fingerprint @websocket-health-projection-state)
+        fingerprint (websocket-health-fingerprint health)
+        state* @store
+        should-sync? (or force?
+                         (not= fingerprint prior-fingerprint))]
+    (when (auto-recover-eligible? state* health)
+      (swap! store
+             (fn [state]
+               (-> state
+                   (assoc-in [:websocket-ui :auto-recover-cooldown-until-ms]
+                             (+ generated-at-ms auto-recover-cooldown-ms))
+                   (update-in [:websocket-ui :auto-recover-count] (fnil inc 0)))))
+      (nxr/dispatch store nil [[:actions/ws-diagnostics-reset-market-subscriptions :auto-recover]]))
+    (when (and (not (some true? (vals (select-keys prior-fingerprint [:gap/orders_oms :gap/market_data :gap/account]))))
+               (some true? (vals (select-keys fingerprint [:gap/orders_oms :gap/market_data :gap/account]))))
+      (append-diagnostics-event! store :gap-detected generated-at-ms))
+    (when should-sync?
+      (reset! websocket-health-projection-state {:fingerprint fingerprint})
+      (swap! websocket-health-sync-stats update :writes (fnil inc 0))
+      (js/queueMicrotask
+        #(swap! store assoc-in [:websocket :health] health)))))
+
+(defn- copy-status-at-ms [health]
+  (or (:generated-at-ms health)
+      0))
+
+(defn- set-copy-status!
+  [store status]
+  (swap! store assoc-in [:websocket-ui :copy-status] status))
+
+(defn- copy-success-status [health]
+  {:kind :success
+   :at-ms (copy-status-at-ms health)
+   :message "Copied (redacted)"})
+
+(defn- copy-error-status [health diagnostics-json]
+  {:kind :error
+   :at-ms (copy-status-at-ms health)
+   :message "Couldn't access clipboard. Copy the redacted JSON below."
+   :fallback-json diagnostics-json})
+
+(defn- diagnostics-stream-rows [health]
+  (->> (get health :streams {})
+       (sort-by (fn [[sub-key stream]]
+                  [(name (or (:group stream) :account))
+                   (str (:topic stream))
+                   (pr-str sub-key)]))
+       (mapv (fn [[sub-key stream]]
+               {:sub-key sub-key
+                :group (:group stream)
+                :topic (:topic stream)
+                :status (:status stream)
+                :last-payload-at-ms (:last-payload-at-ms stream)
+                :stale-threshold-ms (:stale-threshold-ms stream)
+                :message-count (:message-count stream)
+                :descriptor (:descriptor stream)}))))
+
+(defn- app-build-id []
+  (some-> js/globalThis
+          (aget "HYPEROPEN_BUILD_ID")
+          str))
+
+(defn- diagnostics-copy-payload [state health]
+  {:app {:version app-version
+         :build-id (app-build-id)}
+   :generated-at-ms (:generated-at-ms health)
+   :transport (:transport health)
+   :groups (:groups health)
+   :counters {:reconnect-count (or (get-in state [:websocket-ui :reconnect-count]) 0)
+              :reset-counts (merge {:market_data 0 :orders_oms 0 :all 0}
+                                   (get-in state [:websocket-ui :reset-counts]))
+              :auto-recover-count (or (get-in state [:websocket-ui :auto-recover-count]) 0)}
+   :timeline (vec (get-in state [:websocket-ui :diagnostics-timeline] []))
+   :streams (diagnostics-stream-rows health)})
 
 ;; Effects - handle side effects
 (defn save [_ store path value]
@@ -245,6 +440,111 @@
   (println "Forcing WebSocket reconnect...")
   (ws-client/force-reconnect!))
 
+(defn refresh-websocket-health [_ store]
+  (sync-websocket-health! store :force? true))
+
+(defn- reset-group-match?
+  [stream group]
+  (case group
+    :market_data (= :market_data (:group stream))
+    :orders_oms (= :orders_oms (:group stream))
+    :all true
+    false))
+
+(defn- reset-target-descriptors
+  [health group]
+  (->> (get health :streams {})
+       vals
+       (filter (fn [stream]
+                 (and (:subscribed? stream)
+                      (map? (:descriptor stream))
+                      (reset-group-match? stream group))))
+       (map :descriptor)
+       distinct
+       (sort-by pr-str)
+       vec))
+
+(defn- reset-event
+  [group source]
+  (if (= :auto-recover source)
+    :auto-recover-market
+    (case group
+      :market_data :reset-market
+      :orders_oms :reset-oms
+      :all :reset-all
+      :reset-unknown)))
+
+(defn ws-reset-subscriptions [_ store {:keys [group source]
+                                       :or {group :all
+                                            source :manual}}]
+  (let [state @store
+        health (ws-client/get-health-snapshot)
+        transport-state (get-in health [:transport :state])
+        generated-at-ms (or (:generated-at-ms health) 0)
+        now-ms (effective-now-ms generated-at-ms)
+        in-progress? (boolean (get-in state [:websocket-ui :reset-in-progress?]))
+        cooldown-until-ms (get-in state [:websocket-ui :reset-cooldown-until-ms])
+        cooldown-active? (and (number? cooldown-until-ms)
+                              (> cooldown-until-ms now-ms))
+        blocked? (or in-progress?
+                     cooldown-active?
+                     (contains? #{:connecting :reconnecting} transport-state))
+        group-key (if (= group :all) :all group)
+        descriptors (reset-target-descriptors health group)]
+    (when (and (not blocked?)
+               (seq descriptors))
+      (swap! store assoc-in [:websocket-ui :reset-in-progress?] true)
+      (try
+        (doseq [descriptor descriptors]
+          (ws-client/send-message! {:method "unsubscribe"
+                                    :subscription descriptor}))
+        (doseq [descriptor descriptors]
+          (ws-client/send-message! {:method "subscribe"
+                                    :subscription descriptor}))
+        (finally
+          (swap! store assoc-in [:websocket-ui :reset-in-progress?] false)))
+      (swap! store
+             (fn [state*]
+               (-> state*
+                   (assoc-in [:websocket-ui :reset-cooldown-until-ms]
+                             (+ now-ms reset-subscriptions-cooldown-ms))
+                    (update-in [:websocket-ui :reset-counts group-key] (fnil inc 0)))))
+      (append-diagnostics-event! store
+                                 (reset-event group source)
+                                 now-ms
+                                 {:count (count descriptors)
+                                  :source source}))))
+
+(defn confirm-ws-diagnostics-reveal [_ store]
+  (let [confirmed? (js/confirm "Reveal sensitive diagnostics values? This may expose wallet identifiers.")]
+    (when confirmed?
+      (swap! store assoc-in [:websocket-ui :reveal-sensitive?] true))))
+
+(defn copy-websocket-diagnostics [_ store]
+  (let [state @store
+        health (get-in state [:websocket :health] {})
+        payload (diagnostics-sanitize/sanitize-value
+                  :redact
+                  (diagnostics-copy-payload state health))
+        diagnostics-json (.stringify js/JSON (clj->js payload) nil 2)
+        clipboard (some-> js/globalThis .-navigator .-clipboard)
+        write-text-fn (some-> clipboard .-writeText)]
+    (set-copy-status! store nil)
+    (if (and clipboard write-text-fn)
+      (try
+        (-> (.writeText clipboard diagnostics-json)
+            (.then (fn []
+                     (set-copy-status! store (copy-success-status health))))
+            (.catch (fn [err]
+                      (println "Copy diagnostics failed:" err)
+                      (set-copy-status! store (copy-error-status health diagnostics-json)))))
+        (catch :default err
+          (println "Copy diagnostics failed:" err)
+          (set-copy-status! store (copy-error-status health diagnostics-json))))
+      (do
+        (println "Clipboard API unavailable for websocket diagnostics copy")
+        (set-copy-status! store (copy-error-status health diagnostics-json))))))
+
 (defn init-websockets [state]
   [[:effects/init-websocket]])
 
@@ -261,6 +561,91 @@
 
 (defn reconnect-websocket-action [state]
   [[:effects/reconnect-websocket]])
+
+(defn toggle-ws-diagnostics [state]
+  (let [open? (not (boolean (get-in state [:websocket-ui :diagnostics-open?])))]
+    (cond-> [[:effects/save-many [[[:websocket-ui :diagnostics-open?] open?]
+                                  [[:websocket-ui :reveal-sensitive?] false]
+                                  [[:websocket-ui :copy-status] nil]]]]
+      open?
+      (conj [:effects/refresh-websocket-health]))))
+
+(defn close-ws-diagnostics [_]
+  [[:effects/save-many [[[:websocket-ui :diagnostics-open?] false]
+                        [[:websocket-ui :reveal-sensitive?] false]
+                        [[:websocket-ui :copy-status] nil]]]])
+
+(defn toggle-ws-diagnostics-sensitive [state]
+  (if (boolean (get-in state [:websocket-ui :reveal-sensitive?]))
+    [[:effects/save [:websocket-ui :reveal-sensitive?] false]]
+    [[:effects/confirm-ws-diagnostics-reveal]]))
+
+(defn- reconnect-blocked? [state]
+  (let [transport-state (get-in state [:websocket :health :transport :state])
+        generated-at-ms (or (get-in state [:websocket :health :generated-at-ms]) 0)
+        now-ms (effective-now-ms generated-at-ms)
+        cooldown-until-ms (get-in state [:websocket-ui :reconnect-cooldown-until-ms])]
+    (or (contains? #{:connecting :reconnecting} transport-state)
+        (and (number? cooldown-until-ms)
+             (> cooldown-until-ms now-ms)))))
+
+(defn ws-diagnostics-reconnect-now [state]
+  (if (reconnect-blocked? state)
+    []
+    (let [generated-at-ms (or (get-in state [:websocket :health :generated-at-ms]) 0)
+          now-ms (effective-now-ms generated-at-ms)]
+      [[:effects/save-many [[[:websocket-ui :diagnostics-open?] false]
+                            [[:websocket-ui :reveal-sensitive?] false]
+                            [[:websocket-ui :copy-status] nil]]]
+       [:effects/save [:websocket-ui :reconnect-cooldown-until-ms]
+        (+ now-ms reconnect-cooldown-ms)]
+       [:effects/reconnect-websocket]])))
+
+(defn ws-diagnostics-copy [_]
+  [[:effects/copy-websocket-diagnostics]])
+
+(defn set-show-surface-freshness-cues [_ checked]
+  [[:effects/save [:websocket-ui :show-surface-freshness-cues?] (boolean checked)]])
+
+(defn toggle-show-surface-freshness-cues [state]
+  [[:effects/save [:websocket-ui :show-surface-freshness-cues?]
+    (not (boolean (get-in state [:websocket-ui :show-surface-freshness-cues?] false)))]])
+
+(defn- reset-blocked? [state]
+  (let [transport-state (get-in state [:websocket :health :transport :state])
+        generated-at-ms (or (get-in state [:websocket :health :generated-at-ms]) 0)
+        now-ms (effective-now-ms generated-at-ms)
+        in-progress? (boolean (get-in state [:websocket-ui :reset-in-progress?]))
+        cooldown-until-ms (get-in state [:websocket-ui :reset-cooldown-until-ms])]
+    (or in-progress?
+        (contains? #{:connecting :reconnecting} transport-state)
+        (and (number? cooldown-until-ms)
+             (> cooldown-until-ms now-ms)))))
+
+(defn- ws-diagnostics-reset-subscriptions
+  [state group source]
+  (if (reset-blocked? state)
+    []
+    [[:effects/ws-reset-subscriptions {:group group
+                                       :source source}]]))
+
+(defn ws-diagnostics-reset-market-subscriptions
+  ([state]
+   (ws-diagnostics-reset-market-subscriptions state :manual))
+  ([state source]
+   (ws-diagnostics-reset-subscriptions state :market_data source)))
+
+(defn ws-diagnostics-reset-orders-subscriptions
+  ([state]
+   (ws-diagnostics-reset-orders-subscriptions state :manual))
+  ([state source]
+   (ws-diagnostics-reset-subscriptions state :orders_oms source)))
+
+(defn ws-diagnostics-reset-all-subscriptions
+  ([state]
+   (ws-diagnostics-reset-all-subscriptions state :manual))
+  ([state source]
+   (ws-diagnostics-reset-subscriptions state :all source)))
 
 (defn toggle-asset-dropdown [state coin]
   (let [current-dropdown (get-in state [:asset-selector :visible-dropdown])]
@@ -1310,6 +1695,10 @@
 (nxr/register-effect! :effects/unsubscribe-webdata2 unsubscribe-webdata2)
 (nxr/register-effect! :effects/connect-wallet connect-wallet)
 (nxr/register-effect! :effects/reconnect-websocket reconnect-websocket)
+(nxr/register-effect! :effects/refresh-websocket-health refresh-websocket-health)
+(nxr/register-effect! :effects/confirm-ws-diagnostics-reveal confirm-ws-diagnostics-reveal)
+(nxr/register-effect! :effects/copy-websocket-diagnostics copy-websocket-diagnostics)
+(nxr/register-effect! :effects/ws-reset-subscriptions ws-reset-subscriptions)
 (nxr/register-effect! :effects/fetch-asset-selector-markets
   (fn [_ store & [opts]]
     (api/fetch-asset-selector-markets! store (or opts {:phase :full}))))
@@ -1454,6 +1843,16 @@
 (nxr/register-action! :actions/subscribe-to-webdata2 subscribe-to-webdata2)
 (nxr/register-action! :actions/connect-wallet connect-wallet-action)
 (nxr/register-action! :actions/reconnect-websocket reconnect-websocket-action)
+(nxr/register-action! :actions/toggle-ws-diagnostics toggle-ws-diagnostics)
+(nxr/register-action! :actions/close-ws-diagnostics close-ws-diagnostics)
+(nxr/register-action! :actions/toggle-ws-diagnostics-sensitive toggle-ws-diagnostics-sensitive)
+(nxr/register-action! :actions/ws-diagnostics-reconnect-now ws-diagnostics-reconnect-now)
+(nxr/register-action! :actions/ws-diagnostics-copy ws-diagnostics-copy)
+(nxr/register-action! :actions/set-show-surface-freshness-cues set-show-surface-freshness-cues)
+(nxr/register-action! :actions/toggle-show-surface-freshness-cues toggle-show-surface-freshness-cues)
+(nxr/register-action! :actions/ws-diagnostics-reset-market-subscriptions ws-diagnostics-reset-market-subscriptions)
+(nxr/register-action! :actions/ws-diagnostics-reset-orders-subscriptions ws-diagnostics-reset-orders-subscriptions)
+(nxr/register-action! :actions/ws-diagnostics-reset-all-subscriptions ws-diagnostics-reset-all-subscriptions)
 (nxr/register-action! :actions/toggle-asset-dropdown toggle-asset-dropdown)
 (nxr/register-action! :actions/close-asset-dropdown close-asset-dropdown)
 (nxr/register-action! :actions/select-asset select-asset)
@@ -1559,26 +1958,47 @@
 (when (exists? js/document)
   (add-watch store ::render #(r/render (.getElementById js/document "app") (app-view/app-view %4))))
 
+(defn- status->diagnostics-event [status]
+  (case status
+    :connected :connected
+    :reconnecting :reconnecting
+    :disconnected :offline
+    nil))
+
 ;; Watch for WebSocket connection status changes
 (add-watch ws-client/connection-state ::ws-status
   (fn [_ _ old-state new-state]
     (let [old-status (:status old-state)
-          new-status (:status new-state)]
+          new-status (:status new-state)
+          status-transition? (not= old-status new-status)
+          legacy-projection (select-keys new-state [:status
+                                                    :attempt
+                                                    :next-retry-at-ms
+                                                    :last-close
+                                                    :queue-size])
+          transition-event (status->diagnostics-event new-status)
+          transition-at-ms (or (:now-ms new-state) (.now js/Date))]
       ;; Defer store update to next tick to avoid nested renders.
-      ;; Exclude :last-activity-at-ms so high-frequency message flow does not trigger
-      ;; unnecessary app-wide renders.
       (js/queueMicrotask
-        #(swap! store assoc :websocket
-                (select-keys new-state [:status
-                                        :attempt
-                                        :next-retry-at-ms
-                                        :last-close
-                                        :queue-size])))
+        #(do
+           (swap! store
+                  (fn [state]
+                    (cond-> (update state :websocket merge legacy-projection)
+                      (and status-transition?
+                           (= :reconnecting new-status))
+                      (update-in [:websocket-ui :reconnect-count] (fnil inc 0)))))
+           (when (and status-transition? transition-event)
+             (append-diagnostics-event! store transition-event transition-at-ms))))
+      (sync-websocket-health! store :force? status-transition?)
       ;; Notify address watcher only on status transitions.
-      (when (not= old-status new-status)
+      (when status-transition?
         (if (= new-status :connected)
           (address-watcher/on-websocket-connected!)
           (address-watcher/on-websocket-disconnected!))))))
+
+(add-watch ws-client/stream-runtime ::ws-health
+  (fn [_ _ _ _]
+    (sync-websocket-health! store)))
 
 (defn reload []
   (println "Reloading Hyperopen...")

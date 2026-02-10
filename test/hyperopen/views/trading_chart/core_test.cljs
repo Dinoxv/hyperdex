@@ -70,6 +70,26 @@
 
     :else []))
 
+(defn- find-first-node [node pred]
+  (cond
+    (vector? node)
+    (let [attrs (when (map? (second node)) (second node))
+          children (if attrs (drop 2 node) (drop 1 node))]
+      (or (when (pred node) node)
+          (some #(find-first-node % pred) children)))
+
+    (seq? node)
+    (some #(find-first-node % pred) node)
+
+    :else nil))
+
+(defn- collect-strings [node]
+  (cond
+    (string? node) [node]
+    (vector? node) (mapcat collect-strings (if (map? (second node)) (drop 2 node) (drop 1 node)))
+    (seq? node) (mapcat collect-strings node)
+    :else []))
+
 (deftest chart-top-menu-uses-base-background-class-test
   (let [menu (chart-core/chart-top-menu {:chart-options {:timeframes-dropdown-visible false
                                                           :selected-timeframe :1d
@@ -120,3 +140,61 @@
         classes (set (collect-all-classes menu))]
     (is (contains? classes "text-trading-green"))
     (is (not (contains? classes "bg-blue-600")))))
+
+(deftest chart-top-menu-renders-trades-freshness-cue-from-health-snapshot-test
+  (let [menu (chart-core/chart-top-menu {:active-asset "BTC"
+                                         :websocket-ui {:show-surface-freshness-cues? true}
+                                         :websocket-health {:generated-at-ms 5000
+                                                            :streams {["trades" "BTC" nil nil nil]
+                                                                      {:topic "trades"
+                                                                       :status :live
+                                                                       :subscribed? true
+                                                                       :last-payload-at-ms 4700
+                                                                       :stale-threshold-ms 10000}}}
+                                         :chart-options {:timeframes-dropdown-visible false
+                                                         :selected-timeframe :1d
+                                                         :chart-type-dropdown-visible false
+                                                         :selected-chart-type :candlestick
+                                                         :indicators-dropdown-visible false
+                                                         :active-indicators {}}})
+        cue-node (find-first-node menu #(= "chart-freshness-cue" (get-in % [1 :data-role])))]
+    (is (some? cue-node))
+    (is (str/includes? (str/join " " (collect-strings cue-node)) "Last tick 300ms ago"))))
+
+(deftest chart-top-menu-renders-idle-freshness-message-when-awaiting-first-update-test
+  (let [menu (chart-core/chart-top-menu {:active-asset "BTC"
+                                         :websocket-ui {:show-surface-freshness-cues? true}
+                                         :websocket-health {:generated-at-ms 5000
+                                                            :streams {["trades" "BTC" nil nil nil]
+                                                                      {:topic "trades"
+                                                                       :status :idle
+                                                                       :subscribed? true
+                                                                       :last-payload-at-ms nil
+                                                                       :stale-threshold-ms 10000}}}
+                                         :chart-options {:timeframes-dropdown-visible false
+                                                         :selected-timeframe :1d
+                                                         :chart-type-dropdown-visible false
+                                                         :selected-chart-type :candlestick
+                                                         :indicators-dropdown-visible false
+                                                         :active-indicators {}}})
+        cue-node (find-first-node menu #(= "chart-freshness-cue" (get-in % [1 :data-role])))]
+    (is (some? cue-node))
+    (is (str/includes? (str/join " " (collect-strings cue-node)) "Waiting for first update..."))))
+
+(deftest chart-top-menu-hides-freshness-cue-by-default-test
+  (let [menu (chart-core/chart-top-menu {:active-asset "BTC"
+                                         :websocket-health {:generated-at-ms 5000
+                                                            :streams {["trades" "BTC" nil nil nil]
+                                                                      {:topic "trades"
+                                                                       :status :live
+                                                                       :subscribed? true
+                                                                       :last-payload-at-ms 4700
+                                                                       :stale-threshold-ms 10000}}}
+                                         :chart-options {:timeframes-dropdown-visible false
+                                                         :selected-timeframe :1d
+                                                         :chart-type-dropdown-visible false
+                                                         :selected-chart-type :candlestick
+                                                         :indicators-dropdown-visible false
+                                                         :active-indicators {}}})
+        cue-node (find-first-node menu #(= "chart-freshness-cue" (get-in % [1 :data-role])))]
+    (is (nil? cue-node))))

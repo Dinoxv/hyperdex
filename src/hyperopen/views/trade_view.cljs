@@ -4,11 +4,17 @@
             [hyperopen.views.trading-chart.core :as trading-chart]
             [hyperopen.views.account-info-view :as account-info-view]
             [hyperopen.views.account-equity-view :as account-equity-view]
-            [hyperopen.views.trade.order-form-view :as order-form-view]))
+            [hyperopen.views.trade.order-form-view :as order-form-view]
+            [hyperopen.websocket.client :as ws-client]))
 
 (defn trade-view [state]
   (let [active-asset (:active-asset state)
-        orderbook-data (when active-asset (get-in state [:orderbooks active-asset]))]
+        orderbook-data (when active-asset (get-in state [:orderbooks active-asset]))
+        show-surface-freshness-cues?
+        (boolean (get-in state [:websocket-ui :show-surface-freshness-cues?] false))
+        websocket-health (or (:websocket-health state)
+                             (ws-client/get-health-snapshot))
+        state* (assoc state :websocket-health websocket-health)]
     [:div {:class ["flex-1" "flex" "flex-col" "min-h-0"]}
      [:div {:class ["w-full" "h-full" "px-0" "py-0" "space-y-0" "flex" "flex-col" "min-h-0"]}
       [:div {:class ["relative" "flex-1" "min-h-0"]}
@@ -25,22 +31,24 @@
                         "xl:grid-cols-[minmax(0,1fr)_340px_340px]"
                         "xl:grid-rows-[minmax(580px,1fr)_auto]"]}
         [:div {:class ["bg-base-100" "border-r" "border-base-300" "flex" "flex-col" "min-h-0"]}
-         (active-asset-view/active-asset-view state)
+         (active-asset-view/active-asset-view state*)
          [:div {:class ["overflow-hidden" "flex-1" "min-h-0"]}
-          (trading-chart/trading-chart-view state)]]
+          (trading-chart/trading-chart-view state*)]]
 
         [:div {:class ["bg-base-100" "w-full" "h-full" "min-h-0" "overflow-hidden"]}
          (l2-orderbook-view/l2-orderbook-view
            {:coin (or active-asset "No Asset Selected")
-            :market (:active-market state)
+           :market (:active-market state)
             :orderbook orderbook-data
             :orderbook-ui (:orderbook-ui state)
+            :show-surface-freshness-cues? show-surface-freshness-cues?
+            :websocket-health websocket-health
             :loading (and active-asset (nil? orderbook-data))})]
 
         [:div {:class ["bg-base-100" "lg:col-span-2" "xl:col-span-1" "xl:col-start-3" "xl:row-span-2" "overflow-visible" "flex" "flex-col"]}
-         (order-form-view/order-form-view state)
+         (order-form-view/order-form-view state*)
          [:div {:class ["border-t" "border-base-300"]}
-          (account-equity-view/account-equity-view state)]]
+          (account-equity-view/account-equity-view state*)]]
 
         [:div {:class ["bg-base-100" "lg:col-span-2" "xl:col-span-2" "border-t" "border-base-300" "flex" "flex-col" "min-h-0" "overflow-hidden"]}
-         (account-info-view/account-info-view state)]]]]]))
+         (account-info-view/account-info-view state*)]]]]]))
