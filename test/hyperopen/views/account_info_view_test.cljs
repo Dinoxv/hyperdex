@@ -1703,11 +1703,18 @@
         row-strings (set (collect-strings row))
         coin-strings (set (collect-strings coin-cell))
         size-strings (set (collect-strings size-cell))
+        coin-base (find-first-node coin-cell #(and (= :span (first %))
+                                                   (contains? (node-class-set %) "truncate")
+                                                   (contains? (direct-texts %) "NVDA")))
         xyz-chip (find-first-node coin-cell #(contains? (direct-texts %) "xyz"))]
     (is (contains? coin-strings "NVDA"))
     (is (contains? coin-strings "xyz"))
     (is (not (contains? row-strings "xyz:NVDA")))
     (is (= #{"0.500 NVDA"} size-strings))
+    (is (some? coin-base))
+    (is (contains? (node-class-set coin-base) "font-semibold"))
+    (is (= view/order-history-long-coin-color
+           (get-in coin-base [1 :style :color])))
     (is (some? xyz-chip))
     (is (contains? (node-class-set xyz-chip) "bg-emerald-500/20"))))
 
