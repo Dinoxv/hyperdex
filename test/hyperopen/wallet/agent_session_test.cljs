@@ -9,10 +9,19 @@
          :removeItem (fn [k] (swap! store dissoc (str k)))
          :clear (fn [] (reset! store {}))}))
 
+(defn- with-test-local-storage [f]
+  (let [original-local-storage (.-localStorage js/globalThis)
+        storage (fake-storage)]
+    (set! (.-localStorage js/globalThis) storage)
+    (try
+      (f storage)
+      (finally
+        (set! (.-localStorage js/globalThis) original-local-storage)))))
+
 (deftest default-agent-state-shape-test
   (let [agent (agent-session/default-agent-state)]
     (is (= :not-ready (:status agent)))
-    (is (= :session (:storage-mode agent)))
+    (is (= :local (:storage-mode agent)))
     (is (nil? (:agent-address agent)))
     (is (nil? (:last-approved-at agent)))
     (is (nil? (:error agent)))
@@ -21,6 +30,18 @@
 (deftest storage-key-normalizes-wallet-address-test
   (is (= "hyperopen:agent-session:v1:0xabc123"
          (agent-session/session-storage-key "0xAbC123"))))
+
+(deftest storage-mode-preference-roundtrip-and-normalization-test
+  (with-test-local-storage
+    (fn [storage]
+      (is (= :local (agent-session/load-storage-mode-preference)))
+      (is (true? (agent-session/persist-storage-mode-preference! :local)))
+      (is (= "local" (.getItem storage "hyperopen:agent-storage-mode:v1")))
+      (is (= :local (agent-session/load-storage-mode-preference)))
+      (.setItem storage "hyperopen:agent-storage-mode:v1" "SESSION")
+      (is (= :session (agent-session/load-storage-mode-preference)))
+      (.setItem storage "hyperopen:agent-storage-mode:v1" "unknown")
+      (is (= :local (agent-session/load-storage-mode-preference))))))
 
 (deftest build-approve-agent-action-adds-protocol-fields-test
   (let [action (agent-session/build-approve-agent-action

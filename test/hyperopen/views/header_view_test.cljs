@@ -65,11 +65,13 @@
         details-node (find-node-by-role view "wallet-menu-details")
         menu-panel (find-node-by-role view "wallet-menu-panel")
         copy-button (find-node-by-role view "wallet-menu-copy")
+        storage-mode-toggle (find-node-by-role view "wallet-agent-storage-mode-toggle")
         enable-button (find-node-by-role view "wallet-enable-trading")
         disconnect-button (find-node-by-role view "wallet-menu-disconnect")]
     (is (some? details-node))
     (is (some? menu-panel))
     (is (some? copy-button))
+    (is (some? storage-mode-toggle))
     (is (some? enable-button))
     (is (some? disconnect-button))
     (is (= "Disconnect" (last disconnect-button)))))
@@ -77,16 +79,31 @@
 (deftest wallet-menu-copy-and-disconnect-dispatch-actions-test
   (let [view (header-view/header-view {:wallet {:connected? true
                                                  :address connected-address
-                                                 :agent {:status :not-ready}}})
+                                                 :agent {:status :not-ready
+                                                         :storage-mode :session}}})
         copy-button (find-node-by-role view "wallet-menu-copy")
+        storage-mode-toggle (find-node-by-role view "wallet-agent-storage-mode-toggle")
         enable-button (find-node-by-role view "wallet-enable-trading")
         disconnect-button (find-node-by-role view "wallet-menu-disconnect")]
     (is (= [[:actions/copy-wallet-address]]
            (get-in copy-button [1 :on :click])))
+    (is (= [[:actions/set-agent-storage-mode :local]]
+           (get-in storage-mode-toggle [1 :on :click])))
     (is (= [[:actions/enable-agent-trading]]
            (get-in enable-button [1 :on :click])))
     (is (= [[:actions/disconnect-wallet]]
            (get-in disconnect-button [1 :on :click])))))
+
+(deftest wallet-menu-storage-toggle-dispatches-session-when-local-selected-test
+  (let [view (header-view/header-view {:wallet {:connected? true
+                                                 :address connected-address
+                                                 :agent {:status :not-ready
+                                                         :storage-mode :local}}})
+        storage-mode-toggle (find-node-by-role view "wallet-agent-storage-mode-toggle")
+        mode-value (find-node-by-role view "wallet-agent-storage-mode-value")]
+    (is (= [[:actions/set-agent-storage-mode :session]]
+           (get-in storage-mode-toggle [1 :on :click])))
+    (is (contains? (set (collect-strings mode-value)) "Device"))))
 
 (deftest wallet-menu-hides-enable-button-when-trading-ready-test
   (let [view (header-view/header-view {:wallet {:connected? true

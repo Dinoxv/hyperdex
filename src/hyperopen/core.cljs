@@ -212,6 +212,9 @@
 (def ^:private wallet-copy-feedback-duration-ms
   1500)
 
+(def ^:private agent-storage-mode-reset-message
+  "Trading persistence updated. Enable Trading again.")
+
 (defonce ^:private wallet-copy-feedback-timeout-id
   (atom nil))
 
@@ -461,6 +464,21 @@
   (clear-wallet-copy-feedback-timeout!)
   (wallet/set-disconnected! store))
 
+(defn set-agent-storage-mode [_ store storage-mode]
+  (let [next-mode (agent-session/normalize-storage-mode storage-mode)
+        current-mode (agent-session/normalize-storage-mode
+                      (get-in @store [:wallet :agent :storage-mode]))
+        wallet-address (get-in @store [:wallet :address])
+        switching? (not= current-mode next-mode)]
+    (when switching?
+      (when (seq wallet-address)
+        (agent-session/clear-agent-session-by-mode! wallet-address current-mode)
+        (agent-session/clear-agent-session-by-mode! wallet-address next-mode))
+      (agent-session/persist-storage-mode-preference! next-mode)
+      (swap! store assoc-in [:wallet :agent]
+             (assoc (agent-session/default-agent-state :storage-mode next-mode)
+                    :error agent-storage-mode-reset-message)))))
+
 (defn- schedule-wallet-copy-feedback-clear! [store]
   (clear-wallet-copy-feedback-timeout!)
   (let [timeout-id (js/setTimeout
@@ -675,7 +693,7 @@
 
 (defn enable-agent-trading
   [_ store {:keys [storage-mode is-mainnet agent-name signature-chain-id]
-            :or {storage-mode :session
+            :or {storage-mode :local
                  is-mainnet true
                  agent-name nil
                  signature-chain-id nil}}]
@@ -757,6 +775,15 @@
        [:effects/enable-agent-trading {:storage-mode storage-mode}]]
       [[:effects/save-many [[[:wallet :agent :status] :error]
                             [[:wallet :agent :error] "Connect your wallet before enabling trading."]]]])))
+
+(defn set-agent-storage-mode-action
+  [state storage-mode]
+  (let [next-mode (agent-session/normalize-storage-mode storage-mode)
+        current-mode (agent-session/normalize-storage-mode
+                      (get-in state [:wallet :agent :storage-mode]))]
+    (if (= next-mode current-mode)
+      []
+      [[:effects/set-agent-storage-mode next-mode]])))
 
 (defn copy-wallet-address-action [state]
   [[:effects/copy-wallet-address (get-in state [:wallet :address])]])
@@ -1086,6 +1113,10 @@
          {:size-unit (load-orderbook-size-unit)
           :price-aggregation-by-coin (load-orderbook-price-aggregation-by-coin)
           :active-tab (load-orderbook-active-tab)}))
+
+(defn restore-agent-storage-mode! [store]
+  (let [storage-mode (agent-session/load-storage-mode-preference)]
+    (swap! store assoc-in [:wallet :agent :storage-mode] storage-mode)))
 
 (defn- normalize-ui-font [value]
   (let [candidate (-> (or value "system")
@@ -1901,6 +1932,7 @@
 (nxr/register-effect! :effects/connect-wallet connect-wallet)
 (nxr/register-effect! :effects/disconnect-wallet disconnect-wallet)
 (nxr/register-effect! :effects/enable-agent-trading enable-agent-trading)
+(nxr/register-effect! :effects/set-agent-storage-mode set-agent-storage-mode)
 (nxr/register-effect! :effects/copy-wallet-address copy-wallet-address)
 (nxr/register-effect! :effects/reconnect-websocket reconnect-websocket)
 (nxr/register-effect! :effects/refresh-websocket-health refresh-websocket-health)
@@ -2053,6 +2085,7 @@
 (nxr/register-action! :actions/connect-wallet connect-wallet-action)
 (nxr/register-action! :actions/disconnect-wallet disconnect-wallet-action)
 (nxr/register-action! :actions/enable-agent-trading enable-agent-trading-action)
+(nxr/register-action! :actions/set-agent-storage-mode set-agent-storage-mode-action)
 (nxr/register-action! :actions/copy-wallet-address copy-wallet-address-action)
 (nxr/register-action! :actions/reconnect-websocket reconnect-websocket-action)
 (nxr/register-action! :actions/toggle-ws-diagnostics toggle-ws-diagnostics)
@@ -2365,6 +2398,8 @@
   (restore-chart-options! store)
   ;; Restore orderbook UI options from localStorage
   (restore-orderbook-ui! store)
+  ;; Restore agent storage preference from localStorage
+  (restore-agent-storage-mode! store)
   ;; Restore selected asset from localStorage (default to BTC)
   (restore-active-asset! store)
   ;; Restore open orders sort settings from localStorage

@@ -6,6 +6,9 @@
 (def ^:private session-storage-prefix
   "hyperopen:agent-session:v1:")
 
+(def ^:private storage-mode-preference-key
+  "hyperopen:agent-storage-mode:v1")
+
 (def ^:private default-signature-chain-id
   "0xa4b1")
 
@@ -23,8 +26,30 @@
   (let [mode (cond
                (keyword? storage-mode) storage-mode
                (string? storage-mode) (keyword (str/lower-case (str/trim storage-mode)))
-               :else :session)]
-    (if (= :local mode) :local :session)))
+               :else :local)]
+    (if (= :session mode) :session :local)))
+
+(defn load-storage-mode-preference
+  []
+  (let [storage (some-> js/globalThis .-localStorage)]
+    (if-not storage
+      :local
+      (try
+        (normalize-storage-mode (.getItem storage storage-mode-preference-key))
+        (catch :default _
+          :local)))))
+
+(defn persist-storage-mode-preference!
+  [storage-mode]
+  (let [storage (some-> js/globalThis .-localStorage)
+        mode (name (normalize-storage-mode storage-mode))]
+    (if-not storage
+      false
+      (try
+        (.setItem storage storage-mode-preference-key mode)
+        true
+        (catch :default _
+          false)))))
 
 (defn normalize-wallet-address
   [wallet-address]
@@ -40,7 +65,7 @@
 
 (defn default-agent-state
   [& {:keys [storage-mode]
-      :or {storage-mode :session}}]
+      :or {storage-mode :local}}]
   {:status :not-ready
    :agent-address nil
    :storage-mode (normalize-storage-mode storage-mode)

@@ -1552,6 +1552,52 @@
     (is (= [[:wallet :agent :error] "Connect your wallet before enabling trading."]
            (second path-values)))))
 
+(deftest set-agent-storage-mode-action-emits-effect-when-mode-changes-test
+  (let [state {:wallet {:agent {:storage-mode :session}}}
+        effects (core/set-agent-storage-mode-action state :local)]
+    (is (= [[:effects/set-agent-storage-mode :local]]
+           effects))))
+
+(deftest set-agent-storage-mode-action-noops-when-mode-is-unchanged-test
+  (let [state {:wallet {:agent {:storage-mode :session}}}
+        effects (core/set-agent-storage-mode-action state :session)]
+    (is (= [] effects))))
+
+(deftest set-agent-storage-mode-effect-clears-sessions-and-resets-agent-state-test
+  (let [store (atom {:wallet {:connected? true
+                              :address "0xabc"
+                              :agent {:status :ready
+                                      :storage-mode :session
+                                      :agent-address "0xagent"
+                                      :nonce-cursor 1700000001111}}})
+        cleared (atom [])
+        persisted-modes (atom [])]
+    (with-redefs [agent-session/clear-agent-session-by-mode!
+                  (fn [wallet-address storage-mode]
+                    (swap! cleared conj [wallet-address storage-mode])
+                    true)
+                  agent-session/persist-storage-mode-preference!
+                  (fn [storage-mode]
+                    (swap! persisted-modes conj storage-mode)
+                    true)]
+      (core/set-agent-storage-mode nil store :local)
+      (is (= [["0xabc" :session]
+              ["0xabc" :local]]
+             @cleared))
+      (is (= [:local] @persisted-modes))
+      (is (= :not-ready (get-in @store [:wallet :agent :status])))
+      (is (= :local (get-in @store [:wallet :agent :storage-mode])))
+      (is (str/includes? (str (get-in @store [:wallet :agent :error]))
+                         "Enable Trading again.")))))
+
+(deftest restore-agent-storage-mode-applies-preference-before-wallet-bootstrap-test
+  (let [store (atom {:wallet {:agent {:storage-mode :session}}})]
+    (with-redefs [agent-session/load-storage-mode-preference
+                  (fn [] :local)]
+      (core/restore-agent-storage-mode! store)
+      (is (= :local
+             (get-in @store [:wallet :agent :storage-mode]))))))
+
 (deftest enable-agent-trading-effect-sets-ready-state-on-success-test
   (async done
     (let [store (atom {:wallet {:address "0xabc"

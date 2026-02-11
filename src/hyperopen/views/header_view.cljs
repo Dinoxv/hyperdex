@@ -96,6 +96,43 @@
               :data-role "wallet-agent-error"}
         (:error agent-state)])]))
 
+(defn- agent-storage-mode-row [agent-state]
+  (let [storage-mode (if (= :local (:storage-mode agent-state)) :local :session)
+        persistent? (= :local storage-mode)
+        next-mode (if persistent? :session :local)
+        disabled? (= :approving (:status agent-state))]
+    [:div {:class ["px-3" "pb-1.5" "pt-2"]
+           :data-role "wallet-agent-storage-mode-row"}
+     [:button {:type "button"
+               :class ["flex"
+                       "w-full"
+                       "items-center"
+                       "justify-between"
+                       "gap-2"
+                       "rounded-lg"
+                       "border"
+                       "border-base-300"
+                       "bg-base-100"
+                       "px-2.5"
+                       "py-2"
+                       "text-left"
+                       "text-xs"
+                       "text-gray-200"
+                       "transition-colors"
+                       "hover:bg-base-200"
+                       "disabled:cursor-not-allowed"
+                       "disabled:opacity-60"]
+               :disabled disabled?
+               :on {:click [[:actions/set-agent-storage-mode next-mode]]}
+               :data-role "wallet-agent-storage-mode-toggle"}
+      [:span "Persist trading key"]
+      [:span {:class ["font-medium" "text-white"]
+              :data-role "wallet-agent-storage-mode-value"}
+       (if persistent? "Device" "Session")]]
+     [:div {:class ["mt-1" "text-xs" "text-gray-400"]
+            :data-role "wallet-agent-storage-mode-hint"}
+      "Switching mode resets trading setup."]]))
+
 (defn- enable-trading-button [agent-state]
   (let [status (:status agent-state)
         disabled? (= :approving status)]
@@ -161,6 +198,7 @@
    (when (and (map? copy-feedback)
               (seq (:message copy-feedback)))
      (wallet-copy-feedback-row copy-feedback))
+   (agent-storage-mode-row agent-state)
    (trading-agent-status-row agent-state)
    (enable-trading-button agent-state)
    [:div {:class ["h-px" "w-full" "bg-base-300"]}]
