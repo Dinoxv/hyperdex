@@ -784,6 +784,56 @@
   (is (= [[:effects/disconnect-wallet]]
          (core/disconnect-wallet-action {}))))
 
+(deftest should-auto-enable-agent-trading-predicate-guards-connect-state-test
+  (let [predicate @#'hyperopen.core/should-auto-enable-agent-trading?]
+    (is (true? (predicate {:wallet {:connected? true
+                                    :address "0xAbC"
+                                    :agent {:status :not-ready}}}
+                          "0xabc")))
+    (is (false? (predicate {:wallet {:connected? false
+                                     :address "0xabc"
+                                     :agent {:status :not-ready}}}
+                           "0xabc")))
+    (is (false? (predicate {:wallet {:connected? true
+                                     :address "0xabc"
+                                     :agent {:status :ready}}}
+                           "0xabc")))
+    (is (false? (predicate {:wallet {:connected? true
+                                     :address "0xabc"
+                                     :agent {:status :not-ready}}}
+                           "0xdef")))))
+
+(deftest handle-wallet-connected-dispatches-enable-agent-trading-when-eligible-test
+  (let [store (atom {:wallet {:connected? true
+                              :address "0xabc"
+                              :agent {:status :not-ready}}})
+        dispatched (atom [])
+        original-queue-microtask js/queueMicrotask]
+    (set! js/queueMicrotask (fn [f] (f)))
+    (try
+      (with-redefs [nxr/dispatch (fn [_ _ actions]
+                                   (swap! dispatched conj actions))]
+        (core/handle-wallet-connected store "0xabc")
+        (is (= [[[:actions/enable-agent-trading]]]
+               @dispatched)))
+      (finally
+        (set! js/queueMicrotask original-queue-microtask)))))
+
+(deftest handle-wallet-connected-skips-dispatch-when-not-eligible-test
+  (let [store (atom {:wallet {:connected? true
+                              :address "0xabc"
+                              :agent {:status :ready}}})
+        dispatched (atom [])
+        original-queue-microtask js/queueMicrotask]
+    (set! js/queueMicrotask (fn [f] (f)))
+    (try
+      (with-redefs [nxr/dispatch (fn [_ _ actions]
+                                   (swap! dispatched conj actions))]
+        (core/handle-wallet-connected store "0xabc")
+        (is (= [] @dispatched)))
+      (finally
+        (set! js/queueMicrotask original-queue-microtask)))))
+
 (deftest copy-wallet-address-effect-writes-to-clipboard-when-available-test
   (async done
     (let [written (atom nil)
@@ -1597,3 +1647,19 @@
            (restore!)
            (done))
          0)))))
+
+(deftest enable-agent-trading-effect-sets-error-state-on-sync-exception-test
+  (let [store (atom {:wallet {:address "0xabc"
+                              :agent {:status :approving
+                                      :storage-mode :session}}})
+        original-create agent-session/create-agent-credentials!]
+    (set! agent-session/create-agent-credentials!
+          (fn []
+            (throw (js/Error. "secure random unavailable"))))
+    (try
+      (core/enable-agent-trading nil store {:storage-mode :session})
+      (is (= :error (get-in @store [:wallet :agent :status])))
+      (is (str/includes? (str (get-in @store [:wallet :agent :error]))
+                         "secure random unavailable"))
+      (finally
+        (set! agent-session/create-agent-credentials! original-create)))))

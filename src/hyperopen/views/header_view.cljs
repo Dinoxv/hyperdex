@@ -70,12 +70,59 @@
               :fill "currentColor"
               :class ["h-3.5" "w-3.5"]
               :data-role "wallet-copy-feedback-error-icon"}
-        [:path {:fill-rule "evenodd"
+       [:path {:fill-rule "evenodd"
                 :clip-rule "evenodd"
                 :d "M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z"}]])
      [:span message]]))
 
-(defn- wallet-menu [wallet-address copy-feedback]
+(defn- trading-agent-status-row [agent-state]
+  (let [status (:status agent-state)
+        status-text (case status
+                      :ready "Trading enabled"
+                      :approving "Awaiting signature..."
+                      :error "Trading setup failed"
+                      "Trading not enabled")
+        status-classes (case status
+                         :ready ["text-success"]
+                         :approving ["text-warning"]
+                         :error ["text-error"]
+                         ["text-gray-300"])]
+    [:div {:class ["px-3" "pt-2" "pb-1.5"]}
+     [:div {:class (into ["text-xs" "font-medium"] status-classes)
+            :data-role "wallet-agent-status"}
+      status-text]
+     (when (seq (:error agent-state))
+       [:div {:class ["mt-1" "text-xs" "text-error"]
+              :data-role "wallet-agent-error"}
+        (:error agent-state)])]))
+
+(defn- enable-trading-button [agent-state]
+  (let [status (:status agent-state)
+        disabled? (= :approving status)]
+    (when (not= :ready status)
+      [:button {:type "button"
+                :class ["mx-3"
+                        "mb-2"
+                        "mt-1"
+                        "block"
+                        "w-[calc(100%-1.5rem)]"
+                        "rounded-lg"
+                        "bg-teal-600"
+                        "px-3"
+                        "py-2"
+                        "text-sm"
+                        "font-medium"
+                        "text-teal-100"
+                        "transition-colors"
+                        "hover:bg-teal-700"
+                        "disabled:cursor-not-allowed"
+                        "disabled:opacity-60"]
+                :disabled disabled?
+                :on {:click [[:actions/enable-agent-trading]]}
+                :data-role "wallet-enable-trading"}
+       (if disabled? "Awaiting signature..." "Enable Trading")])))
+
+(defn- wallet-menu [wallet-address copy-feedback agent-state]
   [:div {:class ["absolute"
                  "right-0"
                  "top-full"
@@ -108,12 +155,14 @@
              :on {:click [[:actions/copy-wallet-address]]}
              :title "Copy address"
              :aria-label "Copy address"
-             :data-role "wallet-menu-copy"}
+                     :data-role "wallet-menu-copy"}
     [:span {:class ["truncate" "num"]} (or (wallet/short-addr wallet-address) "Unavailable")]
     (wallet-copy-icon)]
    (when (and (map? copy-feedback)
               (seq (:message copy-feedback)))
      (wallet-copy-feedback-row copy-feedback))
+   (trading-agent-status-row agent-state)
+   (enable-trading-button agent-state)
    [:div {:class ["h-px" "w-full" "bg-base-300"]}]
    [:button {:type "button"
              :class ["block"
@@ -172,11 +221,12 @@
   (let [is-connected (boolean (:connected? wallet-state))
         wallet-address (:address wallet-state)
         copy-feedback (:copy-feedback wallet-state)
+        agent-state (:agent wallet-state)
         is-connecting (boolean (:connecting? wallet-state))]
     (if is-connected
       [:details {:class ["relative" "group"] :data-role "wallet-menu-details"}
        (wallet-trigger wallet-address)
-       (wallet-menu wallet-address copy-feedback)]
+       (wallet-menu wallet-address copy-feedback agent-state)]
       (connect-wallet-button is-connecting))))
 
 (defn header-view [state]

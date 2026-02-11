@@ -10,6 +10,26 @@
 (defn short-addr [a]
   (when a (str (subs a 0 6) "…" (subs a (- (count a) 4)))))
 
+(defonce ^:private on-connected-handler
+  (atom nil))
+
+(defn set-on-connected-handler!
+  [handler]
+  (reset! on-connected-handler handler))
+
+(defn clear-on-connected-handler!
+  []
+  (reset! on-connected-handler nil))
+
+(defn- notify-connected!
+  [store address]
+  (when-let [handler @on-connected-handler]
+    (try
+      (handler store address)
+      (catch :default err
+        (when-let [console (.-console js/globalThis)]
+          (.warn console "Wallet connected handler failed" err))))))
+
 (defn- current-agent-storage-mode
   [wallet-state]
   (agent-session/normalize-storage-mode (get-in wallet-state [:agent :storage-mode])))
@@ -42,7 +62,9 @@
               :error nil
               :agent (agent-session/default-agent-state :storage-mode storage-mode)}))))
 
-(defn set-connected! [store addr]
+(defn set-connected!
+  [store addr & {:keys [notify-connected?]
+                 :or {notify-connected? false}}]
   (swap! store update-in [:wallet]
          (fn [wallet-state]
            (let [previous-address (:address wallet-state)
@@ -59,7 +81,9 @@
                            :address addr
                            :connecting? false
                            :error nil})
-                   (assoc :agent (persisted-session->agent-state persisted storage-mode))))))))
+                   (assoc :agent (persisted-session->agent-state persisted storage-mode)))))))
+  (when notify-connected?
+    (notify-connected! store addr)))
 
 (defn set-chain! [store chain-id]
   (swap! store assoc-in [:wallet :chain-id] chain-id))
@@ -84,21 +108,16 @@
 (defn request-connection! [store]
   (if-not (has-provider?)
     (set-disconnected! store)
-    (do 
+    (do
       ;; Set connecting state
       (swap! store update-in [:wallet] merge {:connecting? true :error nil})
       ;; Request accounts
       (-> (.request (provider) (->js {:method "eth_requestAccounts"}))
           (.then (fn [accounts]
-                   ;; Small delay to prevent nested render warnings
-                   (js/setTimeout 
-                     #(if (seq accounts)
-                        (set-connected! store (first accounts))
-                        (set-disconnected! store))
-                     10)))
-          (.catch #(js/setTimeout 
-                     (fn [] (set-error! store %))
-                     10))))))
+                   (if (seq accounts)
+                     (set-connected! store (first accounts) :notify-connected? true)
+                     (set-disconnected! store))))
+          (.catch #(set-error! store %))))))
 
 ;; ---------- Event listeners (accounts/chain) --------------------------------
 

@@ -69,8 +69,8 @@
               (swap! persist-calls conj [wallet-address storage-mode session])
               true))
       (set! signing/sign-l1-action-with-private-key!
-            (fn [private-key action nonce & _]
-              (swap! sign-calls conj [private-key action nonce])
+            (fn [private-key action nonce & opts]
+              (swap! sign-calls conj [private-key action nonce opts])
               (js/Promise.resolve
                (clj->js {:r "0x01"
                          :s "0x02"
@@ -92,6 +92,12 @@
                    (is (= 1 (count @sign-calls)))
                    (is (= 1 (count @fetch-calls)))
                    (is (= 1 (count @persist-calls)))
+                   (let [[_ _ _ sign-opts] (first @sign-calls)
+                         sign-opts-map (apply hash-map sign-opts)
+                         [_ fetch-opts] (first @fetch-calls)
+                         payload (js->clj (js/JSON.parse (:body fetch-opts)) :keywordize-keys true)]
+                     (is (nil? (:vault-address sign-opts-map)))
+                     (is (false? (contains? payload :vaultAddress))))
                    (is (number? (get-in @store [:wallet :agent :nonce-cursor])))
                    (done)))
           (.catch (fn [err]
@@ -123,7 +129,8 @@
       (set! agent-session/persist-agent-session-by-mode!
             (fn [_wallet-address _storage-mode _session] true))
       (set! signing/sign-l1-action-with-private-key!
-            (fn [_private-key _action nonce & _]
+            (fn [_private-key _action nonce & opts]
+              (is (nil? (:vault-address (apply hash-map opts))))
               (swap! sign-nonces conj nonce)
               (js/Promise.resolve
                (clj->js {:r "0x01"
@@ -184,3 +191,68 @@
           (.finally
            (fn []
              (set! agent-session/load-agent-session-by-mode original-load)))))))
+
+(deftest submit-order-invalidates-agent-session-when-api-wallet-is-missing-test
+  (async done
+    (let [store (atom {:wallet {:agent {:status :ready
+                                        :storage-mode :session
+                                        :nonce-cursor 1700000007777}}})
+          cleared (atom [])
+          persisted (atom 0)
+          original-load agent-session/load-agent-session-by-mode
+          original-clear agent-session/clear-agent-session-by-mode!
+          original-persist agent-session/persist-agent-session-by-mode!
+          original-sign signing/sign-l1-action-with-private-key!
+          original-fetch (.-fetch js/globalThis)]
+      (set! agent-session/load-agent-session-by-mode
+            (fn [_wallet-address _storage-mode]
+              {:agent-address "0x7777777777777777777777777777777777777777"
+               :private-key "0xcccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc"
+               :nonce-cursor 1700000007777}))
+      (set! agent-session/clear-agent-session-by-mode!
+            (fn [wallet-address storage-mode]
+              (swap! cleared conj [wallet-address storage-mode])
+              true))
+      (set! agent-session/persist-agent-session-by-mode!
+            (fn [_wallet-address _storage-mode _session]
+              (swap! persisted inc)
+              true))
+      (set! signing/sign-l1-action-with-private-key!
+            (fn [_private-key _action _nonce & _]
+              (js/Promise.resolve
+               (clj->js {:r "0x01"
+                         :s "0x02"
+                         :v 27}))))
+      (set! (.-fetch js/globalThis)
+            (fn [_url _opts]
+              (js/Promise.resolve
+               #js {:ok true
+                    :json (fn []
+                            (js/Promise.resolve
+                             #js {:status "err"
+                                  :error "User or API Wallet 0x7777777777777777777777777777777777777777 does not exist."}))})))
+      (-> (trading/submit-order! store
+                                 "0xowner"
+                                 {:type "order"
+                                  :orders []
+                                  :grouping "na"})
+          (.then (fn [resp]
+                   (is (= "err" (:status resp)))
+                   (is (re-find #"Enable Trading again"
+                                (str (:error resp))))
+                   (is (= [["0xowner" :session]] @cleared))
+                   (is (= 0 @persisted))
+                   (is (= :error (get-in @store [:wallet :agent :status])))
+                   (is (re-find #"Enable Trading again"
+                                (str (get-in @store [:wallet :agent :error]))))
+                   (done)))
+          (.catch (fn [err]
+                    (is false (str "Unexpected error: " err))
+                    (done)))
+          (.finally
+           (fn []
+             (set! agent-session/load-agent-session-by-mode original-load)
+             (set! agent-session/clear-agent-session-by-mode! original-clear)
+             (set! agent-session/persist-agent-session-by-mode! original-persist)
+             (set! signing/sign-l1-action-with-private-key! original-sign)
+             (set! (.-fetch js/globalThis) original-fetch)))))))

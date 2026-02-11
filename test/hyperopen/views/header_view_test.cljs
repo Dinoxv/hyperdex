@@ -60,26 +60,43 @@
 
 (deftest wallet-menu-renders-copy-and-disconnect-controls-test
   (let [view (header-view/header-view {:wallet {:connected? true
-                                                 :address connected-address}})
+                                                 :address connected-address
+                                                 :agent {:status :not-ready}}})
         details-node (find-node-by-role view "wallet-menu-details")
         menu-panel (find-node-by-role view "wallet-menu-panel")
         copy-button (find-node-by-role view "wallet-menu-copy")
+        enable-button (find-node-by-role view "wallet-enable-trading")
         disconnect-button (find-node-by-role view "wallet-menu-disconnect")]
     (is (some? details-node))
     (is (some? menu-panel))
     (is (some? copy-button))
+    (is (some? enable-button))
     (is (some? disconnect-button))
     (is (= "Disconnect" (last disconnect-button)))))
 
 (deftest wallet-menu-copy-and-disconnect-dispatch-actions-test
   (let [view (header-view/header-view {:wallet {:connected? true
-                                                 :address connected-address}})
+                                                 :address connected-address
+                                                 :agent {:status :not-ready}}})
         copy-button (find-node-by-role view "wallet-menu-copy")
+        enable-button (find-node-by-role view "wallet-enable-trading")
         disconnect-button (find-node-by-role view "wallet-menu-disconnect")]
     (is (= [[:actions/copy-wallet-address]]
            (get-in copy-button [1 :on :click])))
+    (is (= [[:actions/enable-agent-trading]]
+           (get-in enable-button [1 :on :click])))
     (is (= [[:actions/disconnect-wallet]]
            (get-in disconnect-button [1 :on :click])))))
+
+(deftest wallet-menu-hides-enable-button-when-trading-ready-test
+  (let [view (header-view/header-view {:wallet {:connected? true
+                                                 :address connected-address
+                                                 :agent {:status :ready}}})
+        status-row (find-node-by-role view "wallet-agent-status")
+        enable-button (find-node-by-role view "wallet-enable-trading")]
+    (is (some? status-row))
+    (is (contains? (set (collect-strings status-row)) "Trading enabled"))
+    (is (nil? enable-button))))
 
 (deftest wallet-menu-copy-feedback-renders-success-message-and-icon-test
   (let [view (header-view/header-view {:wallet {:connected? true

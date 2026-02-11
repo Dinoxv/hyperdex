@@ -19,6 +19,12 @@
 (defn- approx= [a b]
   (<= (js/Math.abs (- a b)) 0.000001))
 
+(defn- js-object-keys
+  [value]
+  (->> (js/Object.keys value)
+       array-seq
+       vec))
+
 (deftest validate-order-form-test
   (testing "size is required"
     (is (seq (trading/validate-order-form (trading/default-order-form)))))
@@ -235,6 +241,22 @@
   (is (= :pro (trading/entry-mode-for-type :scale)))
   (is (= :stop-market (trading/normalize-pro-order-type :market)))
   (is (= :take-limit (trading/normalize-pro-order-type :take-limit))))
+
+(deftest build-order-request-uses-canonical-key-order-for-l1-signing-test
+  (let [state (assoc base-state
+                     :asset-contexts {:BTC {:idx 5}})
+        form (-> (trading/default-order-form)
+                 (assoc :type :limit
+                        :side :buy
+                        :size "1"
+                        :price "50"))
+        request (trading/build-order-request state form)
+        action-js (clj->js (:action request))
+        order-js (aget (aget action-js "orders") 0)]
+    (is (= ["type" "orders" "grouping"] (js-object-keys action-js)))
+    (is (= ["a" "b" "p" "s" "r" "t"] (js-object-keys order-js)))
+    (is (= ["limit"] (js-object-keys (aget order-js "t"))))
+    (is (= ["tif"] (js-object-keys (aget (aget order-js "t") "limit"))))))
 
 (deftest default-order-form-uses-limit-entry-mode-test
   (is (= :limit (:entry-mode (trading/default-order-form)))))

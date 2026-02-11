@@ -82,7 +82,7 @@
     (aset 0 n)))
 
 (defn- parse-chain-id [signature-chain-id]
-  (let [raw (str (or signature-chain-id "0x66eee"))
+  (let [raw (str (or signature-chain-id "0xa4b1"))
         base (if (str/starts-with? raw "0x") 16 10)
         source (if (str/starts-with? raw "0x") (subs raw 2) raw)]
     (js/parseInt source base)))
@@ -193,17 +193,90 @@
      :s (str "0x" s)
      :v (js/parseInt v 16)}))
 
+(defn- promise-race
+  [promises]
+  (js/Promise.
+   (fn [resolve reject]
+     (doseq [p promises]
+       (-> p
+           (.then resolve)
+           (.catch reject))))))
+
+(def ^:private typed-data-timeout-ms
+  300000)
+
+(defn- typed-data-timeout-promise
+  []
+  (js/Promise.
+   (fn [_ reject]
+     (js/setTimeout
+      (fn []
+        (reject
+         (js/Error.
+          "Signature request timed out. Open your wallet and approve the request, then try again.")))
+      typed-data-timeout-ms))))
+
+(defn- request-signature!
+  [provider method params]
+  (js/Promise.resolve
+   (.request provider
+             (clj->js {:method method
+                       :params params}))))
+
+(defn- signing-error-message
+  [err]
+  (or (some-> err .-message str)
+      (some-> err (aget "message") str)
+      (some-> err (aget "data") (aget "message") str)
+      (some-> err (aget "error") (aget "message") str)
+      (str err)))
+
+(defn- fallback-compatible-signing-error?
+  [err]
+  (let [message (-> (signing-error-message err)
+                    str
+                    str/lower-case)]
+    (or (str/includes? message "method not found")
+        (str/includes? message "unsupported")
+        (str/includes? message "not supported")
+        (str/includes? message "invalid parameters")
+        (str/includes? message "must provide an ethereum address")
+        (str/includes? message "invalid message")
+        (str/includes? message "invalid params"))))
+
+(defn- try-sign-typed-data!
+  [provider address typed-data]
+  (let [typed-data-json (js/JSON.stringify (clj->js typed-data))
+        typed-data-js (clj->js typed-data)
+        attempts [{:method "eth_signTypedData_v4"
+                   :params [address typed-data-json]}
+                  {:method "eth_signTypedData_v4"
+                   :params [address typed-data-js]}
+                  {:method "eth_signTypedData"
+                   :params [address typed-data-js]}]]
+    (letfn [(attempt [remaining]
+              (if-let [{:keys [method params]} (first remaining)]
+                (-> (request-signature! provider method params)
+                    (.catch (fn [err]
+                              (if (and (next remaining)
+                                       (fallback-compatible-signing-error? err))
+                                (attempt (next remaining))
+                                (js/Promise.reject
+                                 (js/Error. (signing-error-message err)))))))
+                (js/Promise.reject (js/Error. "Unable to sign typed data with the current wallet provider."))))]
+      (attempt attempts))))
+
 (defn- sign-typed-data!
   [address typed-data]
-  (let [payload (clj->js typed-data)
-        msg (js/JSON.stringify payload)]
-    (-> (.request (.-ethereum js/window)
-                  (clj->js {:method "eth_signTypedData_v4"
-                            :params [address msg]}))
-        (.then (fn [sig]
-                 (let [parts (split-signature sig)]
-                   (clj->js (merge {:sig sig}
-                                   parts))))))))
+  (let [provider (.-ethereum js/globalThis)]
+    (if-not provider
+      (js/Promise.reject (js/Error. "No wallet provider found. Connect your wallet first."))
+      (-> (promise-race [(try-sign-typed-data! provider address typed-data)
+                         (typed-data-timeout-promise)])
+          (.then (fn [sig]
+                   (let [parts (split-signature sig)]
+                     (clj->js (merge {:sig sig}
+                                     parts)))))))))
 
 (defn sign-approve-agent-action!
   [address action]

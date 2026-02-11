@@ -627,6 +627,24 @@
 (defn disconnect-wallet-action [_state]
   [[:effects/disconnect-wallet]])
 
+(defn- should-auto-enable-agent-trading?
+  [state connected-address]
+  (let [wallet-address (some-> (get-in state [:wallet :address]) str str/lower-case)
+        connected-address* (some-> connected-address str str/lower-case)
+        connected? (boolean (get-in state [:wallet :connected?]))
+        agent-status (get-in state [:wallet :agent :status])]
+    (and connected?
+         (seq wallet-address)
+         (seq connected-address*)
+         (= wallet-address connected-address*)
+         (= :not-ready agent-status))))
+
+(defn handle-wallet-connected
+  [store connected-address]
+  (let [state @store]
+    (when (should-auto-enable-agent-trading? state connected-address)
+      (nxr/dispatch store nil [[:actions/enable-agent-trading]]))))
+
 (defn- exchange-response-error
   [resp]
   (or (:error resp)
@@ -634,65 +652,98 @@
       (:message resp)
       (pr-str resp)))
 
+(defn- runtime-error-message
+  [err]
+  (or (some-> err .-message str)
+      (some-> err (aget "message") str)
+      (some-> err (aget "data") (aget "message") str)
+      (some-> err (aget "error") (aget "message") str)
+      (when (map? err)
+        (or (some-> (:message err) str)
+            (some-> err :data :message str)
+            (some-> err :error :message str)))
+      (try
+        (let [clj-value (js->clj err :keywordize-keys true)]
+          (when (map? clj-value)
+            (or (some-> (:message clj-value) str)
+                (some-> clj-value :data :message str)
+                (some-> clj-value :error :message str)
+                (pr-str clj-value))))
+        (catch :default _
+          nil))
+      (str err)))
+
 (defn enable-agent-trading
   [_ store {:keys [storage-mode is-mainnet agent-name signature-chain-id]
             :or {storage-mode :session
                  is-mainnet true
                  agent-name nil
-                 signature-chain-id "0x66eee"}}]
+                 signature-chain-id nil}}]
   (let [owner-address (get-in @store [:wallet :address])]
     (if-not (seq owner-address)
       (swap! store update-in [:wallet :agent] merge
              {:status :error
               :error "Connect your wallet before enabling trading."})
-      (let [{:keys [private-key agent-address]} (agent-session/create-agent-credentials!)
-            nonce (.now js/Date)
-            normalized-storage-mode (agent-session/normalize-storage-mode storage-mode)
-            action (agent-session/build-approve-agent-action
-                    agent-address
-                    nonce
-                    :agent-name agent-name
-                    :is-mainnet is-mainnet
-                    :signature-chain-id signature-chain-id)]
-        (-> (trading-api/approve-agent! store owner-address action)
-            (.then #(.json %))
-            (.then (fn [resp]
-                     (let [data (js->clj resp :keywordize-keys true)]
-                       (if (= "ok" (:status data))
-                         (let [persisted? (agent-session/persist-agent-session-by-mode!
-                                           owner-address
-                                           normalized-storage-mode
-                                           {:agent-address agent-address
-                                            :private-key private-key
-                                            :last-approved-at nonce
-                                            :nonce-cursor nonce})]
-                           (if persisted?
-                             (swap! store update-in [:wallet :agent] merge
-                                    {:status :ready
-                                     :agent-address agent-address
-                                     :storage-mode normalized-storage-mode
-                                     :last-approved-at nonce
-                                     :error nil
-                                     :nonce-cursor nonce})
-                             (swap! store update-in [:wallet :agent] merge
-                                    {:status :error
-                                     :error "Unable to persist agent credentials."
-                                     :agent-address nil
-                                     :last-approved-at nil
-                                     :nonce-cursor nil})))
-                         (swap! store update-in [:wallet :agent] merge
-                                {:status :error
-                                 :error (exchange-response-error data)
-                                 :agent-address nil
-                                 :last-approved-at nil
-                                 :nonce-cursor nil})))))
-            (.catch (fn [err]
-                      (swap! store update-in [:wallet :agent] merge
-                             {:status :error
-                              :error (str err)
-                              :agent-address nil
-                              :last-approved-at nil
-                              :nonce-cursor nil}))))))))
+      (try
+        (let [{:keys [private-key agent-address]} (agent-session/create-agent-credentials!)
+              nonce (.now js/Date)
+              normalized-storage-mode (agent-session/normalize-storage-mode storage-mode)
+              wallet-chain-id (get-in @store [:wallet :chain-id])
+              resolved-signature-chain-id (or signature-chain-id
+                                              wallet-chain-id
+                                              (agent-session/default-signature-chain-id-for-environment is-mainnet))
+              action (agent-session/build-approve-agent-action
+                      agent-address
+                      nonce
+                      :agent-name agent-name
+                      :is-mainnet is-mainnet
+                      :signature-chain-id resolved-signature-chain-id)]
+          (-> (trading-api/approve-agent! store owner-address action)
+              (.then #(.json %))
+              (.then (fn [resp]
+                       (let [data (js->clj resp :keywordize-keys true)]
+                         (if (= "ok" (:status data))
+                           (let [persisted? (agent-session/persist-agent-session-by-mode!
+                                             owner-address
+                                             normalized-storage-mode
+                                             {:agent-address agent-address
+                                              :private-key private-key
+                                              :last-approved-at nonce
+                                              :nonce-cursor nonce})]
+                             (if persisted?
+                               (swap! store update-in [:wallet :agent] merge
+                                      {:status :ready
+                                       :agent-address agent-address
+                                       :storage-mode normalized-storage-mode
+                                       :last-approved-at nonce
+                                       :error nil
+                                       :nonce-cursor nonce})
+                               (swap! store update-in [:wallet :agent] merge
+                                      {:status :error
+                                       :error "Unable to persist agent credentials."
+                                       :agent-address nil
+                                       :last-approved-at nil
+                                       :nonce-cursor nil})))
+                           (swap! store update-in [:wallet :agent] merge
+                                  {:status :error
+                                   :error (exchange-response-error data)
+                                   :agent-address nil
+                                   :last-approved-at nil
+                                   :nonce-cursor nil})))))
+              (.catch (fn [err]
+                        (swap! store update-in [:wallet :agent] merge
+                               {:status :error
+                                :error (runtime-error-message err)
+                                :agent-address nil
+                                :last-approved-at nil
+                                :nonce-cursor nil})))))
+        (catch :default err
+          (swap! store update-in [:wallet :agent] merge
+                 {:status :error
+                  :error (runtime-error-message err)
+                  :agent-address nil
+                  :last-approved-at nil
+                  :nonce-cursor nil}))))))
 
 (defn enable-agent-trading-action
   [state]
@@ -2163,6 +2214,7 @@
 
 (defn reload []
   (println "Reloading Hyperopen...")
+  (wallet/set-on-connected-handler! handle-wallet-connected)
   (when (exists? js/document)
     (r/render (.getElementById js/document "app") (app-view/app-view @store))))
 
@@ -2323,6 +2375,7 @@
   (restore-trade-history-pagination-settings! store)
   ;; Restore order history pagination settings from localStorage
   (restore-order-history-pagination-settings! store)
+  (wallet/set-on-connected-handler! handle-wallet-connected)
   ;; Initialize wallet system
   (wallet/init-wallet! store)
   ;; Initialize router

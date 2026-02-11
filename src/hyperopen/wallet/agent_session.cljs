@@ -7,7 +7,16 @@
   "hyperopen:agent-session:v1:")
 
 (def ^:private default-signature-chain-id
+  "0xa4b1")
+
+(def ^:private default-testnet-signature-chain-id
   "0x66eee")
+
+(defn default-signature-chain-id-for-environment
+  [is-mainnet]
+  (if is-mainnet
+    default-signature-chain-id
+    default-testnet-signature-chain-id))
 
 (defn normalize-storage-mode
   [storage-mode]
@@ -43,13 +52,15 @@
   [agent-address nonce & {:keys [agent-name is-mainnet signature-chain-id]
                           :or {agent-name nil
                                is-mainnet true
-                               signature-chain-id default-signature-chain-id}}]
+                               signature-chain-id nil}}]
+  (let [signature-chain-id* (or signature-chain-id
+                                (default-signature-chain-id-for-environment is-mainnet))]
   (cond-> {:type "approveAgent"
            :agentAddress agent-address
            :nonce nonce
            :hyperliquidChain (if is-mainnet "Mainnet" "Testnet")
-           :signatureChainId signature-chain-id}
-    (some? agent-name) (assoc :agentName agent-name)))
+           :signatureChainId signature-chain-id*}
+    (some? agent-name) (assoc :agentName agent-name))))
 
 (defn- storage-by-mode
   [storage-mode]
@@ -84,15 +95,35 @@
 
 (defn- random-private-key-bytes
   []
-  (let [crypto (.-crypto js/globalThis)]
-    (if (and crypto (.-getRandomValues crypto))
+  (let [utils (.-utils secp)
+        random-secret-key-fn (some-> utils .-randomSecretKey)
+        random-private-key-fn (some-> utils .-randomPrivateKey)
+        is-valid-secret-key-fn (some-> utils .-isValidSecretKey)
+        is-valid-private-key-fn (some-> utils .-isValidPrivateKey)
+        crypto (.-crypto js/globalThis)]
+    (cond
+      (fn? random-secret-key-fn)
+      (.randomSecretKey utils)
+
+      (fn? random-private-key-fn)
+      (.randomPrivateKey utils)
+
+      (and crypto (.-getRandomValues crypto))
       (loop []
         (let [candidate (js/Uint8Array. 32)]
           (.getRandomValues crypto candidate)
-          (if (-> secp .-utils (.isValidPrivateKey candidate))
+          (let [valid? (cond
+                         (fn? is-valid-secret-key-fn) (.isValidSecretKey utils candidate)
+                         (fn? is-valid-private-key-fn) (.isValidPrivateKey utils candidate)
+                         :else false)]
+          (if valid?
             candidate
-            (recur))))
-      (throw (js/Error. "Secure random unavailable for agent key generation")))))
+            (recur)))))
+
+      :else
+      (throw
+       (js/Error.
+        "Secure random unavailable for agent key generation")))))
 
 (defn private-key->agent-address
   [private-key]

@@ -27,6 +27,24 @@
              (seq text))
          (str/includes? text "nonce"))))
 
+(defn- response-error-text
+  [resp]
+  (-> (or (:error resp)
+          (:response resp)
+          (:message resp)
+          "")
+      str))
+
+(defn- missing-api-wallet-response?
+  [resp]
+  (let [text (-> (response-error-text resp)
+                 str/lower-case)]
+    (and (str/includes? text "user or api wallet")
+         (str/includes? text "does not exist"))))
+
+(def ^:private missing-api-wallet-error-message
+  "Agent wallet not recognized by Hyperliquid. Enable Trading again.")
+
 (defn- next-nonce [cursor]
   (let [now (.now js/Date)
         cursor* (when (number? cursor)
@@ -63,40 +81,62 @@
                                                    :storage-mode storage-mode
                                                    :nonce-cursor nonce})))
 
+(defn- invalidate-agent-session!
+  [store owner-address session message]
+  (let [storage-mode (:storage-mode session)]
+    (agent-session/clear-agent-session-by-mode! owner-address storage-mode)
+    (swap! store assoc-in [:wallet :agent]
+           (assoc (agent-session/default-agent-state :storage-mode storage-mode)
+                  :status :error
+                  :error message))))
+
 (defn- sign-and-post-agent-action!
   [store owner-address action & {:keys [vault-address expires-after is-mainnet max-nonce-retries]
                                  :or {vault-address nil
                                       expires-after nil
                                       is-mainnet true
                                       max-nonce-retries 1}}]
-  (let [session (resolve-agent-session store owner-address)]
+  (let [session (resolve-agent-session store owner-address)
+        vault-address* (some-> vault-address str str/lower-case)]
     (if-not (and (map? session)
                  (seq (:private-key session)))
       (js/Promise.reject (js/Error. "Agent session unavailable. Enable trading first."))
-      (letfn [(attempt! [cursor retries-left]
+      (letfn [(handle-response! [resp nonce retries-left]
+                (cond
+                  (and (pos? retries-left)
+                       (nonce-error-response? resp))
+                  (attempt! nonce (dec retries-left))
+
+                  (missing-api-wallet-response? resp)
+                  (do
+                    (invalidate-agent-session! store
+                                               owner-address
+                                               session
+                                               missing-api-wallet-error-message)
+                    {:status "err"
+                     :error missing-api-wallet-error-message})
+
+                  :else
+                  (do
+                    (persist-agent-nonce-cursor! store owner-address session nonce)
+                    resp)))
+              (post-signed! [nonce retries-left sig]
+                (let [{:keys [r s v]} (js->clj sig :keywordize-keys true)]
+                  (-> (post-signed-action! action nonce {:r r :s s :v v}
+                                           :vault-address vault-address*
+                                           :expires-after expires-after)
+                      (.then parse-json!)
+                      (.then #(handle-response! % nonce retries-left)))))
+              (attempt! [cursor retries-left]
                 (let [nonce (next-nonce cursor)]
                   (-> (signing/sign-l1-action-with-private-key!
                        (:private-key session)
                        action
                        nonce
-                       :vault-address vault-address
+                       :vault-address vault-address*
                        :expires-after expires-after
                        :is-mainnet is-mainnet)
-                      (.then
-                       (fn [sig]
-                         (let [{:keys [r s v]} (js->clj sig :keywordize-keys true)]
-                           (-> (post-signed-action! action nonce {:r r :s s :v v}
-                                                    :vault-address vault-address
-                                                    :expires-after expires-after)
-                               (.then parse-json!)
-                               (.then
-                                (fn [resp]
-                                  (if (and (pos? retries-left)
-                                           (nonce-error-response? resp))
-                                    (attempt! nonce (dec retries-left))
-                                    (do
-                                      (persist-agent-nonce-cursor! store owner-address session nonce)
-                                      resp)))))))))))]
+                      (.then #(post-signed! nonce retries-left %)))))]
         (attempt! (or (:nonce-cursor session)
                       (get-in @store [:wallet :agent :nonce-cursor]))
                   max-nonce-retries)))))

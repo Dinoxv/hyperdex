@@ -723,12 +723,12 @@
                                {:sz-decimals (get total-size :sz-decimals)})
         tif (if post-only "Alo" "Gtc")]
     (mapv (fn [{:keys [price size]}]
-            {:a asset-idx
-             :b (order-side->is-buy side)
-             :p (str price)
-             :s (str size)
-             :r reduce-only
-             :t {:limit {:tif tif}}})
+            (array-map :a asset-idx
+                       :b (order-side->is-buy side)
+                       :p (str price)
+                       :s (str size)
+                       :r reduce-only
+                       :t {:limit {:tif tif}}))
           legs)))
 
 (defn build-tpsl-orders [asset-idx side form]
@@ -738,14 +738,14 @@
         sl-enabled? (:enabled? sl)
         close-side (opposite-side side)
         mk-trigger (fn [tpsl cfg]
-                     {:a asset-idx
-                      :b (order-side->is-buy close-side)
-                      :p (str (or (parse-num (:limit cfg)) (parse-num (:trigger cfg))))
-                      :s (str (parse-num (:size form)))
-                      :r true
-                      :t {:trigger {:isMarket (:is-market cfg)
-                                    :triggerPx (parse-num (:trigger cfg))
-                                    :tpsl tpsl}}})]
+                     (array-map :a asset-idx
+                                :b (order-side->is-buy close-side)
+                                :p (str (or (parse-num (:limit cfg)) (parse-num (:trigger cfg))))
+                                :s (str (parse-num (:size form)))
+                                :r true
+                                :t {:trigger (array-map :isMarket (:is-market cfg)
+                                                        :triggerPx (parse-num (:trigger cfg))
+                                                        :tpsl tpsl)}))]
     (cond-> []
       tp-enabled? (conj (mk-trigger "tp" tp))
       sl-enabled? (conj (mk-trigger "sl" sl)))))
@@ -769,27 +769,27 @@
                    "normalTpsl"
                    "na")]
     (when (and active-asset asset-idx size)
-      (let [base-order {:a asset-idx
-                        :b (order-side->is-buy side)
-                        :p (str price)
-                        :s (str size)
-                        :r reduce-only}
+      (let [base-order (array-map :a asset-idx
+                                  :b (order-side->is-buy side)
+                                  :p (str price)
+                                  :s (str size)
+                                  :r reduce-only)
             order (case (:type form)
                     :limit (assoc base-order :t {:limit {:tif (if post-only "Alo" tif)}})
                     :market (assoc base-order :t {:limit {:tif "Ioc"}})
                     :stop-market (assoc base-order :p (str (or price trigger))
-                                        :t {:trigger {:isMarket true :triggerPx trigger :tpsl "sl"}})
-                    :stop-limit (assoc base-order :t {:trigger {:isMarket false :triggerPx trigger :tpsl "sl"}})
+                                        :t {:trigger (array-map :isMarket true :triggerPx trigger :tpsl "sl")})
+                    :stop-limit (assoc base-order :t {:trigger (array-map :isMarket false :triggerPx trigger :tpsl "sl")})
                     :take-market (assoc base-order :p (str (or price trigger))
-                                        :t {:trigger {:isMarket true :triggerPx trigger :tpsl "tp"}})
-                    :take-limit (assoc base-order :t {:trigger {:isMarket false :triggerPx trigger :tpsl "tp"}})
+                                        :t {:trigger (array-map :isMarket true :triggerPx trigger :tpsl "tp")})
+                    :take-limit (assoc base-order :t {:trigger (array-map :isMarket false :triggerPx trigger :tpsl "tp")})
                     base-order)
             tpsl-orders (build-tpsl-orders asset-idx side form)
             orders (cond-> [order]
                      (seq tpsl-orders) (into tpsl-orders))]
-        {:action {:type "order"
-                  :grouping grouping
-                  :orders orders}
+        {:action (array-map :type "order"
+                            :orders orders
+                            :grouping grouping)
          :asset-idx asset-idx
          :orders orders}))))
 
@@ -801,13 +801,13 @@
         minutes (parse-num (get-in form [:twap :minutes]))
         randomize (boolean (get-in form [:twap :randomize]))]
     (when (and active-asset asset-idx size minutes)
-      {:action {:type "twapOrder"
-                :twap {:a asset-idx
-                       :b (order-side->is-buy side)
-                       :s (str size)
-                       :r (boolean (:reduce-only form))
-                       :m (int minutes)
-                       :t randomize}}
+      {:action (array-map :type "twapOrder"
+                          :twap (array-map :a asset-idx
+                                           :b (order-side->is-buy side)
+                                           :s (str size)
+                                           :r (boolean (:reduce-only form))
+                                           :m (int minutes)
+                                           :t randomize))
        :asset-idx asset-idx})))
 
 (defn best-price [state side]
@@ -863,9 +863,9 @@
                             (:reduce-only form)
                             (:post-only form)))]
              (when (seq orders)
-               {:action {:type "order"
-                         :grouping "na"
-                         :orders (vec orders)}
+               {:action (array-map :type "order"
+                                   :orders (vec orders)
+                                   :grouping "na")
                 :asset-idx asset-idx
                 :orders orders}))
     (build-order-action state form)))

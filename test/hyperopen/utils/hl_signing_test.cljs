@@ -1,5 +1,6 @@
 (ns hyperopen.utils.hl-signing-test
-  (:require [cljs.test :refer-macros [async deftest is testing]]
+  (:require [clojure.string :as str]
+            [cljs.test :refer-macros [async deftest is testing]]
             [hyperopen.utils.hl-signing :as signing]))
 
 (defn- bytes->vec [bytes]
@@ -104,4 +105,66 @@
                      (done))))
           (.catch (fn [err]
                     (is false (str "Unexpected error: " err))
+                    (done)))))))
+
+(deftest sign-approve-agent-action-falls-back-to-next-typed-data-method-test
+  (async done
+    (let [original-provider (.-ethereum js/globalThis)
+          calls (atom [])
+          r (apply str (repeat 64 "a"))
+          s (apply str (repeat 64 "b"))
+          signature (str "0x" r s "1c")
+          address "0x1234567890abcdef1234567890abcdef12345678"
+          action {:hyperliquidChain "Mainnet"
+                  :signatureChainId "0xa4b1"
+                  :agentAddress "0x9999999999999999999999999999999999999999"
+                  :agentName ""
+                  :nonce 1700000000999}]
+      (set! (.-ethereum js/globalThis)
+            #js {:request (fn [payload]
+                            (let [method (aget payload "method")
+                                  params (array-seq (aget payload "params"))]
+                              (swap! calls conj {:method method :params params})
+                              (if (= 1 (count @calls))
+                                (js/Promise.reject (js/Error. "unsupported typed data format"))
+                                (js/Promise.resolve signature))))})
+      (-> (signing/sign-approve-agent-action! address action)
+          (.then (fn [signed]
+                   (let [result (js->clj signed :keywordize-keys true)]
+                     (is (= 2 (count @calls)))
+                     (is (= "eth_signTypedData_v4" (:method (first @calls))))
+                     (is (= "eth_signTypedData_v4" (:method (second @calls))))
+                     (is (string? (second (:params (first @calls)))))
+                     (is (some? (aget (second (:params (second @calls))) "types")))
+                     (is (= signature (:sig result)))
+                     (is (= (str "0x" r) (:r result)))
+                     (is (= (str "0x" s) (:s result)))
+                     (is (= 28 (:v result)))
+                     (set! (.-ethereum js/globalThis) original-provider)
+                     (done))))
+          (.catch (fn [err]
+                    (set! (.-ethereum js/globalThis) original-provider)
+                    (is false (str "Unexpected error: " err))
+                    (done)))))))
+
+(deftest sign-approve-agent-action-errors-when-provider-missing-test
+  (async done
+    (let [original-provider (.-ethereum js/globalThis)
+          address "0x1234567890abcdef1234567890abcdef12345678"
+          action {:hyperliquidChain "Mainnet"
+                  :signatureChainId "0xa4b1"
+                  :agentAddress "0x9999999999999999999999999999999999999999"
+                  :agentName ""
+                  :nonce 1700000000999}]
+      (set! (.-ethereum js/globalThis) nil)
+      (-> (signing/sign-approve-agent-action! address action)
+          (.then (fn [_]
+                   (set! (.-ethereum js/globalThis) original-provider)
+                   (is false "Expected signing to fail when provider is missing")
+                   (done)))
+          (.catch (fn [err]
+                    (set! (.-ethereum js/globalThis) original-provider)
+                    (let [message (or (some-> err .-message str)
+                                      (str err))]
+                      (is (str/includes? message "No wallet provider found.")))
                     (done)))))))

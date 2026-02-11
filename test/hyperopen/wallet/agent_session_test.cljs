@@ -30,8 +30,21 @@
     (is (= "0x1234567890abcdef1234567890abcdef12345678" (:agentAddress action)))
     (is (= 1700000001111 (:nonce action)))
     (is (= "Mainnet" (:hyperliquidChain action)))
-    (is (= "0x66eee" (:signatureChainId action)))
+    (is (= "0xa4b1" (:signatureChainId action)))
     (is (nil? (:agentName action)))))
+
+(deftest build-approve-agent-action-uses-testnet-chain-id-when-requested-test
+  (let [action (agent-session/build-approve-agent-action
+                "0x1234567890abcdef1234567890abcdef12345678"
+                1700000001111
+                :is-mainnet false)]
+    (is (= "Testnet" (:hyperliquidChain action)))
+    (is (= "0x66eee" (:signatureChainId action)))))
+
+(deftest create-agent-credentials-generates-hex-keypair-test
+  (let [{:keys [private-key agent-address]} (agent-session/create-agent-credentials!)]
+    (is (re-matches #"0x[0-9a-f]{64}" private-key))
+    (is (re-matches #"0x[0-9a-f]{40}" agent-address))))
 
 (deftest persist-load-and-clear-agent-session-test
   (let [storage (fake-storage)
