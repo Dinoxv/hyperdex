@@ -150,8 +150,11 @@
                      				  :sort-direction :desc
                                       :markets []
                                       :market-by-key {}
+                                      :scroll-top 0
+                                      :render-limit 120
                                       :loading? false
                                       :phase :bootstrap
+                                      :cache-hydrated? false
                                       :loaded-at-ms nil
                                       :favorites #{}
                                       :loaded-icons #{}
@@ -230,6 +233,27 @@
 
 (defonce ^:private order-feedback-toast-timeout-id
   (atom nil))
+
+(defonce ^:private pending-asset-icon-statuses
+  (atom {}))
+
+(defonce ^:private asset-icon-status-flush-handle
+  (atom nil))
+
+(def ^:private asset-selector-default-render-limit
+  120)
+
+(def ^:private asset-selector-render-limit-step
+  80)
+
+(def ^:private asset-selector-render-prefetch-px
+  320)
+
+(def ^:private asset-selector-row-height-px
+  48)
+
+(def ^:private asset-selector-viewport-height-px
+  384)
 
 (defn- effective-now-ms
   [generated-at-ms]
@@ -387,6 +411,36 @@
                    state
                    path-values))))
 
+(declare apply-asset-icon-status-updates)
+
+(defn- schedule-animation-frame! [f]
+  (if (fn? (.-requestAnimationFrame js/globalThis))
+    (.requestAnimationFrame js/globalThis f)
+    (js/setTimeout f 16)))
+
+(defn- flush-queued-asset-icon-statuses! [store]
+  (let [status-by-market @pending-asset-icon-statuses]
+    (reset! pending-asset-icon-statuses {})
+    (reset! asset-icon-status-flush-handle nil)
+    (when (seq status-by-market)
+      (let [{:keys [loaded-icons missing-icons changed?]}
+            (apply-asset-icon-status-updates @store status-by-market)]
+        (when changed?
+          (save-many nil
+                     store
+                     [[[:asset-selector :loaded-icons] loaded-icons]
+                      [[:asset-selector :missing-icons] missing-icons]]))))))
+
+(defn queue-asset-icon-status [_ store payload]
+  (let [{:keys [market-key status]} (or payload {})]
+    (when (and (seq market-key)
+               (contains? #{:loaded :missing} status))
+      (swap! pending-asset-icon-statuses assoc market-key status)
+      (when-not @asset-icon-status-flush-handle
+        (reset! asset-icon-status-flush-handle
+                (schedule-animation-frame!
+                  #(flush-queued-asset-icon-statuses! store)))))))
+
 (defn push-state [_ _ path]
   (.pushState js/history nil "" path))
 
@@ -405,8 +459,14 @@
 (def ^:private active-market-display-local-storage-key
   "active-market-display")
 
+(def ^:private asset-selector-markets-cache-local-storage-key
+  "asset-selector-markets-cache")
+
 (def ^:private supported-market-types
   #{:perp :spot})
+
+(def ^:private supported-market-categories
+  #{:spot :crypto :tradfi})
 
 (defn- normalize-market-type [value]
   (let [market-type (cond
@@ -424,10 +484,169 @@
                         num))
     :else nil))
 
+(defn- normalize-market-category [value]
+  (let [category (cond
+                   (keyword? value) value
+                   (string? value) (some-> value str/trim str/lower-case keyword)
+                   :else nil)]
+    (when (contains? supported-market-categories category)
+      category)))
+
+(defn- parse-optional-boolean [value]
+  (cond
+    (boolean? value) value
+    (string? value) (= "true" (some-> value str/trim str/lower-case))
+    :else nil))
+
 (defn- normalize-display-text [value]
   (let [text (some-> value str str/trim)]
     (when (seq text)
       text)))
+
+(defn- normalize-asset-selector-market-cache-entry [market]
+  (when (map? market)
+    (let [market-key (normalize-display-text (:key market))
+          coin (normalize-display-text (:coin market))
+          symbol (or (normalize-display-text (:symbol market))
+                     coin)
+          base (or (normalize-display-text (:base market))
+                   coin)
+          quote (normalize-display-text (:quote market))
+          dex (normalize-display-text (:dex market))
+          market-type (normalize-market-type (:market-type market))
+          category (normalize-market-category (:category market))
+          hip3? (parse-optional-boolean (:hip3? market))
+          max-leverage (parse-max-leverage (:maxLeverage market))
+          cache-order (parse-int-value (:cache-order market))]
+      (when (and (seq market-key) (seq coin) (seq symbol))
+        (cond-> {:key market-key
+                 :coin coin
+                 :symbol symbol
+                 :base base}
+          (seq quote) (assoc :quote quote)
+          (seq dex) (assoc :dex dex)
+          market-type (assoc :market-type market-type)
+          category (assoc :category category)
+          (some? hip3?) (assoc :hip3? hip3?)
+          (some? max-leverage) (assoc :maxLeverage max-leverage)
+          (some? cache-order) (assoc :cache-order cache-order))))))
+
+(defn- normalize-asset-selector-markets-cache [markets]
+  (if (sequential? markets)
+    (->> markets
+         (keep normalize-asset-selector-market-cache-entry)
+         vec)
+    []))
+
+(defn- market-by-key-from-markets [markets]
+  (into {}
+        (map (fn [market]
+               [(:key market) market]))
+        markets))
+
+(defn- parse-sort-number [value]
+  (let [num (cond
+              (number? value) value
+              (string? value) (js/parseFloat value)
+              :else js/NaN)]
+    (if (or (not (number? num))
+            (js/isNaN num))
+      0
+      num)))
+
+(defn- sort-token [value]
+  (str/lower-case (or (normalize-display-text value) "")))
+
+(defn- selector-market-primary-sort-value [sort-by market]
+  (case sort-by
+    :name (sort-token (:symbol market))
+    :price (parse-sort-number (:mark market))
+    :change (parse-sort-number (:change24hPct market))
+    :funding (parse-sort-number (:fundingRate market))
+    :openInterest (parse-sort-number (:openInterest market))
+    :volume (parse-sort-number (:volume24h market))
+    (parse-sort-number (:volume24h market))))
+
+(defn- selector-market-fallback-rank [market]
+  [(or (parse-int-value (:cache-order market))
+       js/Number.MAX_SAFE_INTEGER)
+   (sort-token (:symbol market))
+   (sort-token (:coin market))
+   (sort-token (:key market))])
+
+(defn- compare-selector-markets [sort-by sort-direction a b]
+  (let [primary-cmp (compare (selector-market-primary-sort-value sort-by a)
+                             (selector-market-primary-sort-value sort-by b))
+        directional-primary (if (= :desc sort-direction)
+                              (- primary-cmp)
+                              primary-cmp)]
+    (if (zero? directional-primary)
+      (compare (selector-market-fallback-rank a)
+               (selector-market-fallback-rank b))
+      directional-primary)))
+
+(defn- sort-selector-markets-for-cache [markets sort-by sort-direction]
+  (->> markets
+       (sort (fn [a b]
+               (neg? (compare-selector-markets sort-by sort-direction a b))))
+       vec))
+
+(defn- build-asset-selector-markets-cache [markets state]
+  (let [sort-by (get-in state [:asset-selector :sort-by] :volume)
+        sort-direction (get-in state [:asset-selector :sort-direction] :desc)
+        ordered-markets (sort-selector-markets-for-cache markets sort-by sort-direction)]
+    (->> ordered-markets
+         (map-indexed (fn [idx market]
+                        (some-> (normalize-asset-selector-market-cache-entry market)
+                                (assoc :cache-order idx))))
+         (keep identity)
+         vec)))
+
+(defn- persist-asset-selector-markets-cache!
+  ([markets]
+   (persist-asset-selector-markets-cache! markets {}))
+  ([markets state]
+   (let [normalized (build-asset-selector-markets-cache markets state)]
+    (when (seq normalized)
+      (try
+        (when (exists? js/localStorage)
+          (js/localStorage.setItem asset-selector-markets-cache-local-storage-key
+                                   (js/JSON.stringify (clj->js normalized))))
+        (catch :default e
+          (js/console.warn "Failed to persist asset selector market cache:" e)))))))
+
+(defn- load-asset-selector-markets-cache []
+  (try
+    (let [raw (when (exists? js/localStorage)
+                (js/localStorage.getItem asset-selector-markets-cache-local-storage-key))]
+      (if (seq raw)
+        (-> raw
+            js/JSON.parse
+            (js->clj :keywordize-keys true)
+            normalize-asset-selector-markets-cache)
+        []))
+    (catch :default _
+      [])))
+
+(defn restore-asset-selector-markets-cache! [store]
+  (let [cached-markets (load-asset-selector-markets-cache)]
+    (when (seq cached-markets)
+      (swap! store
+             (fn [state]
+               (if (seq (get-in state [:asset-selector :markets]))
+                 state
+                 (let [market-by-key (market-by-key-from-markets cached-markets)
+                       active-asset (:active-asset state)
+                       resolved-active-market (when (and (string? active-asset)
+                                                         (nil? (:active-market state)))
+                                                (markets/resolve-market-by-coin market-by-key active-asset))]
+                   (cond-> (-> state
+                               (assoc-in [:asset-selector :markets] cached-markets)
+                               (assoc-in [:asset-selector :market-by-key] market-by-key)
+                               (assoc-in [:asset-selector :phase] :bootstrap)
+                               (assoc-in [:asset-selector :cache-hydrated?] true))
+                     (map? resolved-active-market)
+                     (assoc :active-market resolved-active-market)))))))))
 
 (defn- normalize-active-market-display [market]
   (when (map? market)
@@ -1003,13 +1222,19 @@
                                (some? next-dropdown)
                                (or (empty? (get-in state [:asset-selector :markets]))
                                    (not= :full (get-in state [:asset-selector :phase]))))
-          effects [[:effects/save [:asset-selector :visible-dropdown] next-dropdown]]]
+          path-values (cond-> [[[:asset-selector :visible-dropdown] next-dropdown]]
+                        (and (= coin :asset-selector) (some? next-dropdown))
+                        (conj [[:asset-selector :scroll-top] 0]
+                              [[:asset-selector :render-limit] asset-selector-default-render-limit]))
+          effects [[:effects/save-many path-values]]]
       (cond-> effects
         should-refresh?
         (conj [:effects/fetch-asset-selector-markets])))))
 
 (defn close-asset-dropdown [state]
-  [[:effects/save [:asset-selector :visible-dropdown] nil]])
+  [[:effects/save-many [[[:asset-selector :visible-dropdown] nil]
+                        [[:asset-selector :scroll-top] 0]
+                        [[:asset-selector :render-limit] asset-selector-default-render-limit]]]])
 
 (defn select-asset [state market-or-coin]
   (let [market-by-key (get-in state [:asset-selector :market-by-key] {})
@@ -1040,6 +1265,8 @@
                                   :price ""
                                   :price-input-focused? false))
         immediate-ui-path-values (cond-> [[[:asset-selector :visible-dropdown] nil]
+                                          [[:asset-selector :scroll-top] 0]
+                                          [[:asset-selector :render-limit] asset-selector-default-render-limit]
                                           [[:orderbook-ui :price-aggregation-dropdown-visible?] false]
                                           [[:orderbook-ui :size-unit-dropdown-visible?] false]
                                           [[:active-market] resolved-market]]
@@ -1058,7 +1285,9 @@
           (into unsubscribe-effects subscribe-effects))))
 
 (defn update-asset-search [state value]
-  [[:effects/save [:asset-selector :search-term] (str value)]])
+  [[:effects/save-many [[[:asset-selector :search-term] (str value)]
+                        [[:asset-selector :scroll-top] 0]
+                        [[:asset-selector :render-limit] asset-selector-default-render-limit]]]])
 
 ;; --- asset selector sort settings logic moved to asset_selector/settings.cljs ---
 
@@ -1071,13 +1300,17 @@
     ;; Persist to localStorage
     (js/localStorage.setItem "asset-selector-sort-by" (name sort-field))
     (js/localStorage.setItem "asset-selector-sort-direction" (name new-direction))
-    [[:effects/save [:asset-selector :sort-by] sort-field]
-     [:effects/save [:asset-selector :sort-direction] new-direction]]))
+    [[:effects/save-many [[[:asset-selector :sort-by] sort-field]
+                          [[:asset-selector :sort-direction] new-direction]
+                          [[:asset-selector :scroll-top] 0]
+                          [[:asset-selector :render-limit] asset-selector-default-render-limit]]]]))
 
 (defn toggle-asset-selector-strict [state]
   (let [new-value (not (get-in state [:asset-selector :strict?] false))]
     (js/localStorage.setItem "asset-selector-strict" (str new-value))
-    [[:effects/save [:asset-selector :strict?] new-value]]))
+    [[:effects/save-many [[[:asset-selector :strict?] new-value]
+                          [[:asset-selector :scroll-top] 0]
+                          [[:asset-selector :render-limit] asset-selector-default-render-limit]]]]))
 
 (defn toggle-asset-favorite [state market-key]
   (let [favorites (get-in state [:asset-selector :favorites] #{})
@@ -1086,37 +1319,108 @@
                         (conj favorites market-key))]
     (js/localStorage.setItem "asset-selector-favorites"
                              (js/JSON.stringify (clj->js (vec new-favorites))))
-    [[:effects/save [:asset-selector :favorites] new-favorites]]))
+    [[:effects/save-many [[[:asset-selector :favorites] new-favorites]
+                          [[:asset-selector :render-limit] asset-selector-default-render-limit]]]]))
 
 (defn set-asset-selector-favorites-only [state enabled?]
-  [[:effects/save [:asset-selector :favorites-only?] (boolean enabled?)]])
+  [[:effects/save-many [[[:asset-selector :favorites-only?] (boolean enabled?)]
+                        [[:asset-selector :scroll-top] 0]
+                        [[:asset-selector :render-limit] asset-selector-default-render-limit]]]])
 
 (defn set-asset-selector-tab [state tab]
   (js/localStorage.setItem "asset-selector-active-tab" (name tab))
-  [[:effects/save [:asset-selector :active-tab] tab]])
+  [[:effects/save-many [[[:asset-selector :active-tab] tab]
+                        [[:asset-selector :scroll-top] 0]
+                        [[:asset-selector :render-limit] asset-selector-default-render-limit]]]])
+
+(defn set-asset-selector-scroll-top [state scroll-top]
+  (let [next-scroll-top (max 0 (or (parse-int-value scroll-top) 0))]
+    (if (= next-scroll-top (get-in state [:asset-selector :scroll-top] 0))
+      []
+      [[:effects/save [:asset-selector :scroll-top] next-scroll-top]])))
+
+(defn- current-asset-selector-render-limit [state total]
+  (if (pos? total)
+    (-> (or (parse-int-value (get-in state [:asset-selector :render-limit]))
+            asset-selector-default-render-limit)
+        (max 1)
+        (min total))
+    0))
+
+(defn increase-asset-selector-render-limit [state]
+  (let [markets (get-in state [:asset-selector :markets] [])
+        total (count markets)
+        current-limit (current-asset-selector-render-limit state total)
+        next-limit (min total (+ current-limit asset-selector-render-limit-step))]
+    (if (> next-limit current-limit)
+      [[:effects/save [:asset-selector :render-limit] next-limit]]
+      [])))
+
+(defn show-all-asset-selector-markets [state]
+  (let [markets (get-in state [:asset-selector :markets] [])
+        total (count markets)
+        current-limit (current-asset-selector-render-limit state total)]
+    (if (> total current-limit)
+      [[:effects/save [:asset-selector :render-limit] total]]
+      [])))
+
+(defn maybe-increase-asset-selector-render-limit [state scroll-top]
+  (let [markets (get-in state [:asset-selector :markets] [])
+        total (count markets)
+        current-limit (current-asset-selector-render-limit state total)
+        scroll-top* (max 0 (or (parse-int-value scroll-top) 0))
+        rendered-height (* current-limit asset-selector-row-height-px)
+        near-bottom? (and (pos? rendered-height)
+                          (>= (+ scroll-top*
+                                 asset-selector-viewport-height-px
+                                 asset-selector-render-prefetch-px)
+                              rendered-height))
+        next-limit (if near-bottom?
+                     (min total (+ current-limit asset-selector-render-limit-step))
+                     current-limit)]
+    (if (> next-limit current-limit)
+      [[:effects/save [:asset-selector :render-limit] next-limit]]
+      [])))
 
 (defn refresh-asset-markets [state]
   [[:effects/fetch-asset-selector-markets]])
 
+(defn apply-asset-icon-status-updates [state status-by-market]
+  (let [loaded-icons (get-in state [:asset-selector :loaded-icons] #{})
+        missing-icons (get-in state [:asset-selector :missing-icons] #{})
+        [next-loaded-icons next-missing-icons]
+        (reduce-kv
+          (fn [[loaded missing] market-key status]
+            (if-not (seq market-key)
+              [loaded missing]
+              (case status
+                :loaded [(conj loaded market-key) (disj missing market-key)]
+                :missing [(disj loaded market-key) (conj missing market-key)]
+                [loaded missing])))
+          [loaded-icons missing-icons]
+          (or status-by-market {}))]
+    {:loaded-icons next-loaded-icons
+     :missing-icons next-missing-icons
+     :changed? (or (not= loaded-icons next-loaded-icons)
+                   (not= missing-icons next-missing-icons))}))
+
 (defn mark-loaded-asset-icon [state market-key]
-  (if (seq market-key)
-    (let [loaded-icons (get-in state [:asset-selector :loaded-icons] #{})
-          missing-icons (get-in state [:asset-selector :missing-icons] #{})
-          next-loaded-icons (conj loaded-icons market-key)
-          next-missing-icons (disj missing-icons market-key)]
-      [[:effects/save-many [[[:asset-selector :loaded-icons] next-loaded-icons]
-                            [[:asset-selector :missing-icons] next-missing-icons]]]])
-    []))
+  (if-not (seq market-key)
+    []
+    (let [{:keys [changed?]} (apply-asset-icon-status-updates state {market-key :loaded})]
+      (if changed?
+        [[:effects/queue-asset-icon-status {:market-key market-key
+                                            :status :loaded}]]
+        []))))
 
 (defn mark-missing-asset-icon [state market-key]
-  (if (seq market-key)
-    (let [missing-icons (get-in state [:asset-selector :missing-icons] #{})
-          loaded-icons (get-in state [:asset-selector :loaded-icons] #{})
-          next-missing-icons (conj missing-icons market-key)
-          next-loaded-icons (disj loaded-icons market-key)]
-      [[:effects/save-many [[[:asset-selector :missing-icons] next-missing-icons]
-                            [[:asset-selector :loaded-icons] next-loaded-icons]]]])
-    []))
+  (if-not (seq market-key)
+    []
+    (let [{:keys [changed?]} (apply-asset-icon-status-updates state {market-key :missing})]
+      (if changed?
+        [[:effects/queue-asset-icon-status {:market-key market-key
+                                            :status :missing}]]
+        []))))
 
 (def open-orders-sortable-columns
   #{"Time" "Type" "Coin" "Direction" "Size" "Original Size" "Order Value" "Price"})
@@ -2180,6 +2484,7 @@
 ;; Register effects and actions
 (nxr/register-effect! :effects/save save)
 (nxr/register-effect! :effects/save-many save-many)
+(nxr/register-effect! :effects/queue-asset-icon-status queue-asset-icon-status)
 (nxr/register-effect! :effects/push-state push-state)
 (nxr/register-effect! :effects/replace-state replace-state)
 (nxr/register-effect! :effects/init-websocket init-websocket)
@@ -2416,6 +2721,13 @@
 (nxr/register-action! :actions/toggle-asset-favorite toggle-asset-favorite)
 (nxr/register-action! :actions/set-asset-selector-favorites-only set-asset-selector-favorites-only)
 (nxr/register-action! :actions/set-asset-selector-tab set-asset-selector-tab)
+(nxr/register-action! :actions/set-asset-selector-scroll-top set-asset-selector-scroll-top)
+(nxr/register-action! :actions/increase-asset-selector-render-limit
+                      increase-asset-selector-render-limit)
+(nxr/register-action! :actions/show-all-asset-selector-markets
+                      show-all-asset-selector-markets)
+(nxr/register-action! :actions/maybe-increase-asset-selector-render-limit
+                      maybe-increase-asset-selector-render-limit)
 (nxr/register-action! :actions/refresh-asset-markets refresh-asset-markets)
 (nxr/register-action! :actions/mark-loaded-asset-icon mark-loaded-asset-icon)
 (nxr/register-action! :actions/mark-missing-asset-icon mark-missing-asset-icon)
@@ -2510,6 +2822,10 @@
   (fn [{:replicant/keys [dom-event]}]
     (some-> dom-event .-key)))
 
+(nxr/register-placeholder! :event.target/scrollTop
+  (fn [{:replicant/keys [dom-event]}]
+    (some-> dom-event .-target .-scrollTop)))
+
 ;; Wire up the render loop
 (r/set-dispatch! #(nxr/dispatch store %1 %2))
 (when (exists? js/document)
@@ -2522,6 +2838,14 @@
           new-market (:active-market new-state)]
       (when (not= old-market new-market)
         (persist-active-market-display! new-market)))))
+
+;; Persist non-empty selector market lists so symbols are available on next reload.
+(add-watch store ::asset-selector-markets-cache
+  (fn [_ _ old-state new-state]
+    (let [old-markets (get-in old-state [:asset-selector :markets] [])
+          new-markets (get-in new-state [:asset-selector :markets] [])]
+      (when (not= old-markets new-markets)
+        (persist-asset-selector-markets-cache! new-markets new-state)))))
 
 (defn- status->diagnostics-event [status]
   (case status
@@ -2738,6 +3062,8 @@
   (restore-agent-storage-mode! store)
   ;; Restore selected asset from localStorage (default to BTC)
   (restore-active-asset! store)
+  ;; Restore cached selector market symbols for immediate dropdown population.
+  (restore-asset-selector-markets-cache! store)
   ;; Restore open orders sort settings from localStorage
   (restore-open-orders-sort-settings! store)
   ;; Restore funding history pagination settings from localStorage

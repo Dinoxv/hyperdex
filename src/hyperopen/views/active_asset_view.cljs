@@ -349,6 +349,7 @@
           :favorites-only? (:favorites-only? dropdown-state false)
           :missing-icons (:missing-icons dropdown-state #{})
           :loaded-icons (:loaded-icons dropdown-state #{})
+          :render-limit (:render-limit dropdown-state 120)
           :strict? (:strict? dropdown-state false)
           :active-tab (:active-tab dropdown-state :all)}))]))
 
@@ -366,6 +367,8 @@
                                                          :favorites #{}
                                                          :missing-icons #{}
                                                          :loaded-icons #{}
+                                                         :scroll-top 0
+                                                         :render-limit 120
                                                          :favorites-only? false
                                                          :strict? false
                                                          :active-tab :all})]

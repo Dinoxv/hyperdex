@@ -51,6 +51,38 @@
       (is (= 1 (count results)))
       (is (= :spot (:market-type (first results)))))))
 
+(deftest filter-and-sort-assets-preserves-cache-order-when-sort-values-missing-test
+  (let [cached-markets [{:key "spot:AAA/USDC"
+                         :symbol "AAA/USDC"
+                         :coin "AAA/USDC"
+                         :base "AAA"
+                         :market-type :spot
+                         :cache-order 2}
+                        {:key "spot:BBB/USDC"
+                         :symbol "BBB/USDC"
+                         :coin "BBB/USDC"
+                         :base "BBB"
+                         :market-type :spot
+                         :cache-order 0}
+                        {:key "spot:CCC/USDC"
+                         :symbol "CCC/USDC"
+                         :coin "CCC/USDC"
+                         :base "CCC"
+                         :market-type :spot
+                         :cache-order 1}]
+        results (view/filter-and-sort-assets cached-markets "" :volume :desc #{} false false :all)]
+    (is (= ["BBB/USDC" "CCC/USDC" "AAA/USDC"]
+           (mapv :symbol results)))))
+
+(deftest processed-assets-returns-cached-result-when-input-identities-match-test
+  (view/reset-processed-assets-cache!)
+  (let [favorites #{}
+        first-result (view/processed-assets sample-markets "" :volume :desc favorites false false :all)
+        second-result (view/processed-assets sample-markets "" :volume :desc favorites false false :all)
+        changed-result (view/processed-assets sample-markets "btc" :volume :desc favorites false false :all)]
+    (is (identical? first-result second-result))
+    (is (not (identical? second-result changed-result)))))
+
 (defn- collect-strings [node]
   (cond
     (string? node) [node]
@@ -100,6 +132,27 @@
 
     :else nil))
 
+(defn- node-children [node]
+  (let [attrs (when (and (vector? node) (map? (second node))) (second node))]
+    (if attrs
+      (drop 2 node)
+      (drop 1 node))))
+
+(defn- find-buttons-with-text [node text]
+  (cond
+    (vector? node)
+    (let [children (node-children node)
+          button? (and (keyword? (first node))
+                       (str/starts-with? (name (first node)) "button"))
+          text? (some #(= text %) (collect-strings node))
+          self-match (when (and button? text?) [node])]
+      (concat self-match (mapcat #(find-buttons-with-text % text) children)))
+
+    (seq? node)
+    (mapcat #(find-buttons-with-text % text) node)
+
+    :else []))
+
 (defn- find-first-img-node [node]
   (find-first-node
     node
@@ -107,6 +160,73 @@
       (and (vector? candidate)
            (keyword? (first candidate))
            (str/starts-with? (name (first candidate)) "img")))))
+
+(defn- count-selectable-asset-rows [node]
+  (cond
+    (vector? node)
+    (let [attrs (when (map? (second node)) (second node))
+          children (if attrs (drop 2 node) (drop 1 node))
+          row? (= :actions/select-asset
+                  (-> attrs :on :click first first))]
+      (+ (if row? 1 0)
+         (reduce + 0 (map count-selectable-asset-rows children))))
+
+    (seq? node)
+    (reduce + 0 (map count-selectable-asset-rows node))
+
+    :else 0))
+
+(deftest asset-list-renders-footer-controls-outside-scroll-container-test
+  (let [assets (vec (for [n (range 150)]
+                      {:key (str "perp:T" n)
+                       :symbol (str "T" n "-USDC")
+                       :coin (str "T" n)
+                       :base (str "T" n)
+                       :market-type :perp}))
+        hiccup (view/asset-list assets nil #{} #{} #{} 40)
+        children (vec (node-children hiccup))
+        scroll-container (first children)
+        footer-container (second children)
+        load-more-button (first (find-buttons-with-text footer-container "Load more"))
+        show-all-button (first (find-buttons-with-text footer-container "Show all"))]
+    (is (= 2 (count children)))
+    (is (some? scroll-container))
+    (is (some? footer-container))
+    (is (= [[:actions/increase-asset-selector-render-limit]]
+           (get-in (second load-more-button) [:on :click])))
+    (is (= [[:actions/show-all-asset-selector-markets]]
+           (get-in (second show-all-button) [:on :click])))))
+
+(deftest asset-list-wires-scroll-action-and-renders-progressive-chunk-test
+  (let [assets (vec (for [n (range 150)]
+                      {:key (str "perp:T" n)
+                       :symbol (str "T" n "-USDC")
+                       :coin (str "T" n)
+                       :base (str "T" n)
+                       :market-type :perp}))
+        hiccup (view/asset-list assets nil #{} #{} #{} 40)
+        scroll-container (first (node-children hiccup))
+        attrs (second scroll-container)
+        strings (set (collect-strings hiccup))]
+    (is (= [[:actions/maybe-increase-asset-selector-render-limit
+             [:event.target/scrollTop]]]
+           (get-in attrs [:on :scroll])))
+    (is (= 40 (count-selectable-asset-rows hiccup)))
+    (is (contains? strings "Showing 40 of 150 markets"))
+    (is (contains? strings "Load more"))
+    (is (contains? strings "Show all"))))
+
+(deftest asset-list-renders-all-rows-when-render-limit-exceeds-total-test
+  (let [assets (vec (for [n (range 8)]
+                      {:key (str "perp:T" n)
+                       :symbol (str "T" n "-USDC")
+                       :coin (str "T" n)
+                       :base (str "T" n)
+                       :market-type :perp}))
+        hiccup (view/asset-list assets nil #{} #{} #{} 120)
+        strings (set (collect-strings hiccup))]
+    (is (= 8 (count-selectable-asset-rows hiccup)))
+    (is (not (contains? strings "Showing 120 of 8 markets")))))
 
 (deftest asset-list-item-sub-cent-formatting-test
   (testing "last price renders adaptive decimals for tiny assets"
@@ -126,6 +246,17 @@
           rendered (set strings)]
       (is (contains? rendered "$0.002028"))
       (is (not (contains? rendered "$0.00"))))))
+
+(deftest asset-list-item-renders-dashes-when-market-data-missing-test
+  (let [asset {:key "perp:ABC"
+               :symbol "ABC-USDC"
+               :coin "ABC"
+               :base "ABC"
+               :market-type :perp}
+        hiccup (view/asset-list-item asset false #{} #{} #{})
+        strings (set (collect-strings hiccup))]
+    (is (contains? strings "—"))
+    (is (not (contains? strings "+0.00 (0.00%)")))))
 
 (deftest asset-selector-loading-state-test
   (let [base-props {:visible? true
@@ -163,6 +294,25 @@
         classes (set (collect-all-classes row))]
     (is (contains? classes "num"))
     (is (contains? classes "num-right"))))
+
+(deftest asset-list-item-uses-fixed-row-height-and-single-line-symbol-test
+  (let [asset {:key "perp:xyz:GOOGL"
+               :symbol "GOOGL-USDC"
+               :coin "xyz:GOOGL"
+               :base "GOOGL"
+               :market-type :perp
+               :dex "xyz"
+               :maxLeverage 10
+               :mark 10
+               :volume24h 100
+               :change24hPct 1}
+        row (view/asset-list-item asset false #{} #{} #{})
+        classes (set (collect-all-classes row))]
+    (is (contains? classes "h-12"))
+    (is (contains? classes "box-border"))
+    (is (contains? classes "border-b"))
+    (is (contains? classes "truncate"))
+    (is (contains? classes "whitespace-nowrap"))))
 
 (deftest asset-list-item-hides-icon-until-load-and-wires-load-events-test
   (let [asset {:key "perp:BTC"

@@ -139,20 +139,86 @@
 (deftest mark-loaded-asset-icon-promotes-key-to-loaded-and-clears-missing-test
   (let [state {:asset-selector {:loaded-icons #{}
                                 :missing-icons #{"perp:BTC"}}}
-        effects (core/mark-loaded-asset-icon state "perp:BTC")
-        writes (-> effects first second)]
-    (is (= :effects/save-many (-> effects first first)))
-    (is (some #(= [[:asset-selector :loaded-icons] #{"perp:BTC"}] %) writes))
-    (is (some #(= [[:asset-selector :missing-icons] #{}] %) writes))))
+        effects (core/mark-loaded-asset-icon state "perp:BTC")]
+    (is (= [[:effects/queue-asset-icon-status {:market-key "perp:BTC"
+                                               :status :loaded}]]
+           effects))))
+
+(deftest mark-loaded-asset-icon-noop-when-key-already-loaded-and-not-missing-test
+  (let [state {:asset-selector {:loaded-icons #{"perp:BTC"}
+                                :missing-icons #{}}}
+        effects (core/mark-loaded-asset-icon state "perp:BTC")]
+    (is (= [] effects))))
 
 (deftest mark-missing-asset-icon-promotes-key-to-missing-and-clears-loaded-test
   (let [state {:asset-selector {:loaded-icons #{"perp:BTC"}
                                 :missing-icons #{}}}
-        effects (core/mark-missing-asset-icon state "perp:BTC")
-        writes (-> effects first second)]
-    (is (= :effects/save-many (-> effects first first)))
-    (is (some #(= [[:asset-selector :missing-icons] #{"perp:BTC"}] %) writes))
-    (is (some #(= [[:asset-selector :loaded-icons] #{}] %) writes))))
+        effects (core/mark-missing-asset-icon state "perp:BTC")]
+    (is (= [[:effects/queue-asset-icon-status {:market-key "perp:BTC"
+                                               :status :missing}]]
+           effects))))
+
+(deftest mark-missing-asset-icon-noop-when-key-already-missing-and-not-loaded-test
+  (let [state {:asset-selector {:loaded-icons #{}
+                                :missing-icons #{"perp:BTC"}}}
+        effects (core/mark-missing-asset-icon state "perp:BTC")]
+    (is (= [] effects))))
+
+(deftest apply-asset-icon-status-updates-merges-statuses-test
+  (let [state {:asset-selector {:loaded-icons #{"perp:BTC"}
+                                :missing-icons #{"perp:ETH"}}}
+        result (core/apply-asset-icon-status-updates state {"perp:BTC" :missing
+                                                            "perp:ETH" :loaded
+                                                            "perp:SOL" :loaded})]
+    (is (= #{"perp:ETH" "perp:SOL"} (:loaded-icons result)))
+    (is (= #{"perp:BTC"} (:missing-icons result)))
+    (is (= true (:changed? result)))))
+
+(deftest queue-asset-icon-status-batches-updates-into-single-flush-test
+  (let [store (atom {:asset-selector {:loaded-icons #{}
+                                      :missing-icons #{}}})
+        scheduled-callback (atom nil)]
+    (reset! @#'hyperopen.core/pending-asset-icon-statuses {})
+    (reset! @#'hyperopen.core/asset-icon-status-flush-handle nil)
+    (with-redefs [hyperopen.core/schedule-animation-frame! (fn [f]
+                                                              (reset! scheduled-callback f)
+                                                              :raf-id)]
+      (core/queue-asset-icon-status nil store {:market-key "perp:BTC" :status :loaded})
+      (core/queue-asset-icon-status nil store {:market-key "perp:BTC" :status :missing})
+      (core/queue-asset-icon-status nil store {:market-key "perp:ETH" :status :loaded})
+      (is (fn? @scheduled-callback))
+      (@scheduled-callback)
+      (is (= #{"perp:ETH"} (get-in @store [:asset-selector :loaded-icons])))
+      (is (= #{"perp:BTC"} (get-in @store [:asset-selector :missing-icons])))
+      (is (= {} @@#'hyperopen.core/pending-asset-icon-statuses))
+      (is (nil? @@#'hyperopen.core/asset-icon-status-flush-handle)))))
+
+(deftest maybe-increase-asset-selector-render-limit-expands-near-bottom-test
+  (let [state {:asset-selector {:markets (vec (repeat 400 {:key "perp:T"}))
+                                :render-limit 120}}
+        effects (core/maybe-increase-asset-selector-render-limit state 5100)]
+    (is (= [[:effects/save [:asset-selector :render-limit] 200]]
+           effects))))
+
+(deftest maybe-increase-asset-selector-render-limit-noop-when-not-near-bottom-test
+  (let [state {:asset-selector {:markets (vec (repeat 400 {:key "perp:T"}))
+                                :render-limit 120}}
+        effects (core/maybe-increase-asset-selector-render-limit state 0)]
+    (is (= [] effects))))
+
+(deftest increase-asset-selector-render-limit-steps-forward-test
+  (let [state {:asset-selector {:markets (vec (repeat 400 {:key "perp:T"}))
+                                :render-limit 120}}
+        effects (core/increase-asset-selector-render-limit state)]
+    (is (= [[:effects/save [:asset-selector :render-limit] 200]]
+           effects))))
+
+(deftest show-all-asset-selector-markets-expands-to-total-test
+  (let [state {:asset-selector {:markets (vec (repeat 622 {:key "perp:T"}))
+                                :render-limit 120}}
+        effects (core/show-all-asset-selector-markets state)]
+    (is (= [[:effects/save [:asset-selector :render-limit] 622]]
+           effects))))
 
 (deftest account-bootstrap-two-stage-and-guarded-test
   (async done
@@ -797,6 +863,108 @@
           (finally
             (reset! core/store original-state)))))))
 
+(deftest restore-asset-selector-markets-cache-hydrates-symbols-test
+  (with-test-local-storage
+    (fn []
+      (.setItem js/localStorage
+                "asset-selector-markets-cache"
+                (js/JSON.stringify
+                 (clj->js [{:key "perp:ETH"
+                            :coin "ETH"
+                            :symbol "ETH-USDC"
+                            :base "ETH"
+                            :quote "USDC"
+                            :market-type "perp"
+                            :category "crypto"
+                            :hip3? false
+                            :maxLeverage "25"}
+                           {:key "spot:PURR/USDC"
+                            :coin "PURR/USDC"
+                            :symbol "PURR/USDC"
+                            :base "PURR"
+                            :quote "USDC"
+                            :market-type "spot"
+                            :category "spot"
+                            :hip3? false}])))
+      (let [store (atom {:active-asset "ETH"
+                         :active-market nil
+                         :asset-selector {:markets []
+                                          :market-by-key {}
+                                          :phase :bootstrap}})]
+        (core/restore-asset-selector-markets-cache! store)
+        (is (= 2 (count (get-in @store [:asset-selector :markets]))))
+        (is (= :perp (get-in @store [:asset-selector :market-by-key "perp:ETH" :market-type])))
+        (is (= :spot (get-in @store [:asset-selector :market-by-key "spot:PURR/USDC" :market-type])))
+        (is (= "ETH-USDC" (get-in @store [:asset-selector :market-by-key "perp:ETH" :symbol])))
+        (is (= "ETH" (get-in @store [:active-market :coin])))
+        (is (= 25 (get-in @store [:active-market :maxLeverage])))
+        (is (= true (get-in @store [:asset-selector :cache-hydrated?])))))))
+
+(deftest restore-asset-selector-markets-cache-keeps-existing-markets-test
+  (with-test-local-storage
+    (fn []
+      (.setItem js/localStorage
+                "asset-selector-markets-cache"
+                (js/JSON.stringify
+                 (clj->js [{:key "perp:ETH"
+                            :coin "ETH"
+                            :symbol "ETH-USDC"
+                            :base "ETH"
+                            :market-type "perp"}])))
+      (let [existing-market {:key "perp:BTC"
+                             :coin "BTC"
+                             :symbol "BTC-USDC"
+                             :base "BTC"
+                             :market-type :perp}
+            store (atom {:asset-selector {:markets [existing-market]
+                                          :market-by-key {"perp:BTC" existing-market}
+                                          :phase :full}})]
+        (core/restore-asset-selector-markets-cache! store)
+        (is (= [existing-market]
+               (get-in @store [:asset-selector :markets])))
+        (is (= {"perp:BTC" existing-market}
+               (get-in @store [:asset-selector :market-by-key])))))))
+
+(deftest asset-selector-markets-store-projection-persists-cache-test
+  (with-test-local-storage
+    (fn []
+      (let [original-state @core/store
+            markets [{:key "perp:ETH"
+                      :coin "ETH"
+                      :symbol "ETH-USDC"
+                      :base "ETH"
+                      :quote "USDC"
+                      :market-type :perp
+                      :category :crypto
+                      :hip3? false
+                      :mark 1900.1
+                      :volume24h 1000}
+                     {:key "spot:PURR/USDC"
+                      :coin "PURR/USDC"
+                      :symbol "PURR/USDC"
+                      :base "PURR"
+                      :quote "USDC"
+                      :market-type :spot
+                      :category :spot
+                      :mark 0.21
+                      :volume24h 2000}]]
+        (try
+          (swap! core/store assoc-in [:asset-selector :sort-by] :volume)
+          (swap! core/store assoc-in [:asset-selector :sort-direction] :desc)
+          (swap! core/store assoc-in [:asset-selector :markets] [])
+          (swap! core/store assoc-in [:asset-selector :market-by-key] {})
+          (swap! core/store assoc-in [:asset-selector :markets] markets)
+          (let [cached (js->clj (js/JSON.parse (.getItem js/localStorage "asset-selector-markets-cache"))
+                                :keywordize-keys true)]
+            (is (= 2 (count cached)))
+            (is (= "PURR/USDC" (:symbol (first cached))))
+            (is (= "ETH-USDC" (:symbol (second cached))))
+            (is (= "spot" (:market-type (first cached))))
+            (is (= [0 1] (mapv :cache-order cached)))
+            (is (nil? (:mark (first cached)))))
+          (finally
+            (reset! core/store original-state)))))))
+
 (deftest refresh-order-history-emits-request-then-fetch-with-tab-aware-loading-test
   (let [selected-state {:account-info {:selected-tab :order-history
                                        :order-history {:request-id 5}}}
@@ -823,6 +991,8 @@
                                                    :size-unit-dropdown-visible? true}}
                                    market)]
     (is (= [[:effects/save-many [[[:asset-selector :visible-dropdown] nil]
+                                 [[:asset-selector :scroll-top] 0]
+                                 [[:asset-selector :render-limit] 120]
                                  [[:orderbook-ui :price-aggregation-dropdown-visible?] false]
                                  [[:orderbook-ui :size-unit-dropdown-visible?] false]
                                  [[:active-market] market]]]
@@ -843,6 +1013,8 @@
                 :coin "SOL"}
         effects (core/select-asset {:active-asset nil} market)]
     (is (= [[:effects/save-many [[[:asset-selector :visible-dropdown] nil]
+                                 [[:asset-selector :scroll-top] 0]
+                                 [[:asset-selector :render-limit] 120]
                                  [[:orderbook-ui :price-aggregation-dropdown-visible?] false]
                                  [[:orderbook-ui :size-unit-dropdown-visible?] false]
                                  [[:active-market] market]]]
@@ -863,6 +1035,8 @@
                                                    :size-unit-dropdown-visible? true}}
                                    "1")]
     (is (= [[:effects/save-many [[[:asset-selector :visible-dropdown] nil]
+                                 [[:asset-selector :scroll-top] 0]
+                                 [[:asset-selector :render-limit] 120]
                                  [[:orderbook-ui :price-aggregation-dropdown-visible?] false]
                                  [[:orderbook-ui :size-unit-dropdown-visible?] false]
                                  [[:active-market] resolved-market]]]

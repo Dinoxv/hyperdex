@@ -120,15 +120,67 @@
 (defn format-or-dash [value formatter]
   (or (formatter value) "—"))
 
+(defn- parse-cache-order [value]
+  (let [parsed (cond
+                 (number? value) value
+                 (string? value) (js/parseInt value 10)
+                 :else js/NaN)]
+    (when (and (number? parsed)
+               (not (js/isNaN parsed)))
+      (js/Math.floor parsed))))
+
+(defn- safe-sort-number [value]
+  (let [n (fmt/safe-number value)]
+    (if (js/isNaN n) 0 n)))
+
+(defn- sort-token [value]
+  (str/lower-case (or (some-> value str str/trim) "")))
+
+(defn- market-primary-sort-rank [sort-key asset]
+  (case sort-key
+    :name (sort-token (:symbol asset))
+    :price (safe-sort-number (:mark asset))
+    :volume (safe-sort-number (:volume24h asset))
+    :change (safe-sort-number (:change24hPct asset))
+    :openInterest (safe-sort-number (:openInterest asset))
+    :funding (safe-sort-number (:fundingRate asset))
+    (safe-sort-number (:volume24h asset))))
+
+(defn- market-fallback-sort-rank [asset]
+  [(or (parse-cache-order (:cache-order asset))
+       js/Number.MAX_SAFE_INTEGER)
+   (sort-token (:symbol asset))
+   (sort-token (:coin asset))
+   (sort-token (:key asset))])
+
+(defn- compare-markets [sort-key sort-direction a b]
+  (let [primary-cmp (compare (market-primary-sort-rank sort-key a)
+                             (market-primary-sort-rank sort-key b))
+        directional-primary (if (= :desc sort-direction)
+                              (- primary-cmp)
+                              primary-cmp)]
+    (if (zero? directional-primary)
+      (compare (market-fallback-sort-rank a)
+               (market-fallback-sort-rank b))
+      directional-primary)))
+
 (defn asset-list-item [asset selected? favorites missing-icons loaded-icons]
   (let [{:keys [key coin symbol base mark markRaw volume24h change24h change24hPct openInterest fundingRate
                 market-type dex maxLeverage]} asset
-        safe-change (or change24h 0)
-        safe-change-pct (or change24hPct 0)
-        safe-funding-rate (or fundingRate 0)
-        is-positive (>= safe-change 0)
+        safe-change (when (some? change24h) (fmt/safe-number change24h))
+        safe-change-pct (when (some? change24hPct) (fmt/safe-number change24hPct))
+        safe-funding-rate (when (some? fundingRate) (fmt/safe-number fundingRate))
+        change-available? (and (number? safe-change)
+                               (number? safe-change-pct)
+                               (not (js/isNaN safe-change))
+                               (not (js/isNaN safe-change-pct)))
+        is-positive (and change-available?
+                         (>= safe-change 0))
         change-color (if is-positive "text-success" "text-error")
-        funding-positive (>= safe-funding-rate 0)
+        funding-available? (and (number? safe-funding-rate)
+                                (not (js/isNaN safe-funding-rate)))
+        funding-positive (and funding-available?
+                              (>= safe-funding-rate 0))
         funding-color (if funding-positive "text-success" "text-error")
         is-spot (= market-type :spot)
         favorite? (contains? favorites key)
@@ -138,11 +190,11 @@
         icon-blocked? (or missing-icon?
                           (and (string? icon-name)
                                (str/starts-with? icon-name "@")))]
-    [:div.grid.grid-cols-12.gap-3.items-center.px-4.py-2.cursor-pointer.rounded.bg-base-100.hover:bg-base-200.transition-colors
-     {:class (when selected? ["bg-base-200" "border" "border-primary"])
+    [:div.grid.grid-cols-12.gap-3.items-center.px-4.h-12.box-border.cursor-pointer.bg-base-100.hover:bg-base-200.transition-colors.border-b.border-base-300
+     {:class (when selected? ["bg-base-200" "ring-1" "ring-inset" "ring-primary"])
       :on {:click [[:actions/select-asset asset]]}}
      ;; Symbol column
-     [:div.col-span-3.flex.items-center.space-x-2
+     [:div.col-span-3.flex.items-center.space-x-2.min-w-0
       (favorite-button favorite? key)
       (when-not icon-blocked?
         [:img.w-5.h-5.rounded-full
@@ -151,32 +203,36 @@
           :class (when-not loaded-icon? ["hidden"])
           :on {:load [[:actions/mark-loaded-asset-icon key]]
                :error [[:actions/mark-missing-asset-icon key]]}}])
-      [:div.flex.items-center.space-x-2
-       [:div.font-medium.text-sm symbol]
+      [:div.flex.items-center.space-x-2.min-w-0.overflow-hidden
+       [:div.font-medium.text-sm.truncate.whitespace-nowrap symbol]
        (when is-spot
-         (chip "SPOT" ["bg-base-300" "text-gray-200"]))
+         (chip "SPOT" ["bg-base-300" "text-gray-200" "shrink-0"]))
        (when dex
-         (chip dex ["bg-emerald-500/20" "text-emerald-300" "border-emerald-500/30"]))
+         (chip dex ["bg-emerald-500/20" "text-emerald-300" "border-emerald-500/30" "shrink-0"]))
        (when (and maxLeverage (> maxLeverage 0))
-         (chip (str maxLeverage "x") ["bg-primary" "text-primary-content" "border-primary"]))]]
+         (chip (str maxLeverage "x") ["bg-primary" "text-primary-content" "border-primary" "shrink-0"]))]]
      ;; Last Price
      [:div.col-span-2.text-sm.text-gray-400.num.num-right
       (or (fmt/format-trade-price mark markRaw) "—")]
      ;; 24H Change
      [:div.col-span-2.num-right
-      [:div {:class [change-color "text-sm" "num"]}
-       (str (if is-positive "+" "") (or (fmt/format-trade-price-delta safe-change) "0.00")
-            " (" (fmt/safe-to-fixed safe-change-pct 2) "%)")]]
+      (if change-available?
+        [:div {:class [change-color "text-sm" "num"]}
+         (str (if is-positive "+" "") (or (fmt/format-trade-price-delta safe-change) "0.00")
+              " (" (fmt/safe-to-fixed safe-change-pct 2) "%)")]
+        [:div.text-sm.text-gray-400.num "—"])]
      ;; 8H Funding
      [:div.col-span-1.num-right
       (if is-spot
         [:div.text-sm.text-gray-400.num "—"]
-        (tooltip
-          [[:div {:class [funding-color "text-sm" "cursor-help" "num" "num-right"]
-                  :style {:min-width "max-content"}}
-            (str (if funding-positive "+" "") (fmt/safe-to-fixed (* safe-funding-rate 100) 4) "%")]
-           (str "Annualized: " (fmt/format-percentage (fmt/annualized-funding-rate (* safe-funding-rate 100)) 2))]
-          "bottom"))]
+        (if funding-available?
+          (tooltip
+            [[:div {:class [funding-color "text-sm" "cursor-help" "num" "num-right"]
+                    :style {:min-width "max-content"}}
+              (str (if funding-positive "+" "") (fmt/safe-to-fixed (* safe-funding-rate 100) 4) "%")]
+             (str "Annualized: " (fmt/format-percentage (fmt/annualized-funding-rate (* safe-funding-rate 100)) 2))]
+            "bottom")
+          [:div.text-sm.text-gray-400.num "—"]))]
      ;; Volume
      [:div.col-span-2.text-sm.font-medium.num.num-right (format-or-dash volume24h fmt/format-large-currency)]
      ;; Open Interest
@@ -185,15 +241,51 @@
         "—"
         (format-or-dash openInterest fmt/format-large-currency))]]))
 
-(defn asset-list [assets selected-market-key favorites missing-icons loaded-icons]
-  [:div.max-h-96.overflow-y-auto.scrollbar-hide.divide-y.divide-base-300
-   (if (empty? assets)
-     [:div.text-center.py-8.text-gray-400
-      [:div "No assets found"]
-      [:div.text-xs "Try adjusting your search"]]
-     (for [asset assets]
-       ^{:key (:key asset)}
-       (asset-list-item asset (= selected-market-key (:key asset)) favorites missing-icons loaded-icons)))])
+(def ^:private asset-list-default-render-limit
+  120)
+
+(defn- normalize-render-limit [render-limit total]
+  (let [candidate (parse-cache-order render-limit)
+        default-limit (min total asset-list-default-render-limit)]
+    (if (and (number? candidate)
+             (not (js/isNaN candidate)))
+      (-> candidate
+          (max 1)
+          (min total))
+      default-limit)))
+
+(defn asset-list [assets selected-market-key favorites missing-icons loaded-icons render-limit]
+  (let [assets* (if (vector? assets) assets (vec assets))
+        total (count assets*)]
+    (if (zero? total)
+      [:div.max-h-96.overflow-y-auto.scrollbar-hide
+       [:div.text-center.py-8.text-gray-400
+        [:div "No assets found"]
+        [:div.text-xs "Try adjusting your search"]]]
+      (let [limit (normalize-render-limit render-limit total)
+            visible-assets (subvec assets* 0 limit)
+            has-more? (< limit total)
+            rows (mapv (fn [asset]
+                         ^{:key (:key asset)}
+                         (asset-list-item asset (= selected-market-key (:key asset)) favorites missing-icons loaded-icons))
+                       visible-assets)]
+        [:div
+         [:div.max-h-96.overflow-y-auto.scrollbar-hide
+          {:on {:scroll [[:actions/maybe-increase-asset-selector-render-limit
+                          [:event.target/scrollTop]]]}}
+          (into [:div] rows)]
+         (when has-more?
+           [:div.py-3.text-center.text-xs.text-gray-500.border-t.border-base-300
+            [:div.mb-2 (str "Showing " limit " of " total " markets")]
+            [:div.flex.items-center.justify-center.gap-2
+             [:button.px-2.py-1.rounded.border.border-base-300.hover:bg-base-200.transition-colors
+              {:type "button"
+               :on {:click [[:actions/increase-asset-selector-render-limit]]}}
+              "Load more"]
+             [:button.px-2.py-1.rounded.border.border-base-300.hover:bg-base-200.transition-colors
+              {:type "button"
+               :on {:click [[:actions/show-all-asset-selector-markets]]}}
+              "Show all"]]])]))))
 
 (defn matches-search? [asset search-term strict?]
   (let [query (str/lower-case (or search-term ""))
@@ -231,17 +323,42 @@
                                        (if (and search-term (not (str/blank? search-term)))
                                          (matches-search? asset search-term strict?)
                                          true))))
-        sorted-assets (case sort-key
-                        :name (clojure.core/sort-by (comp str/lower-case :symbol) filtered-assets)
-                        :price (sort #(< (fmt/safe-number (:mark %1)) (fmt/safe-number (:mark %2))) filtered-assets)
-                        :volume (sort #(< (fmt/safe-number (:volume24h %1)) (fmt/safe-number (:volume24h %2))) filtered-assets)
-                        :change (sort #(< (fmt/safe-number (:change24hPct %1)) (fmt/safe-number (:change24hPct %2))) filtered-assets)
-                        :openInterest (sort #(< (fmt/safe-number (:openInterest %1)) (fmt/safe-number (:openInterest %2))) filtered-assets)
-                        :funding (sort #(< (fmt/safe-number (:fundingRate %1)) (fmt/safe-number (:fundingRate %2))) filtered-assets)
-                        filtered-assets)]
-    (if (= sort-direction :desc)
-      (reverse sorted-assets)
-      sorted-assets)))
+        comparator (fn [a b]
+                     (neg? (compare-markets sort-key sort-direction a b)))]
+    (vec (sort comparator filtered-assets))))
+
+(defonce ^:private processed-assets-cache
+  (atom nil))
+
+(defn reset-processed-assets-cache! []
+  (reset! processed-assets-cache nil))
+
+(defn processed-assets
+  [markets search-term sort-key sort-direction favorites favorites-only? strict? active-tab]
+  (let [cache @processed-assets-cache
+        cache-hit? (and (map? cache)
+                        (identical? markets (:markets cache))
+                        (identical? favorites (:favorites cache))
+                        (= search-term (:search-term cache))
+                        (= sort-key (:sort-key cache))
+                        (= sort-direction (:sort-direction cache))
+                        (= favorites-only? (:favorites-only? cache))
+                        (= strict? (:strict? cache))
+                        (= active-tab (:active-tab cache)))]
+    (if cache-hit?
+      (:result cache)
+      (let [result (filter-and-sort-assets markets search-term sort-key sort-direction
+                                           favorites favorites-only? strict? active-tab)]
+        (reset! processed-assets-cache {:markets markets
+                                        :favorites favorites
+                                        :search-term search-term
+                                        :sort-key sort-key
+                                        :sort-direction sort-direction
+                                        :favorites-only? favorites-only?
+                                        :strict? strict?
+                                        :active-tab active-tab
+                                        :result result})
+        result))))
 
 (defn asset-selector-dropdown
   "Asset selector dropdown component
@@ -258,13 +375,15 @@
    - :active-tab - current tab
    - :missing-icons - set of market keys with missing icons
    - :loaded-icons - set of market keys with loaded icons
+   - :render-limit - max rows currently rendered in list
    - :loading? - whether market refresh is in flight
    - :phase - :bootstrap | :full"
   [{:keys [visible? markets selected-market-key search-term sort-by sort-direction
-           favorites favorites-only? strict? active-tab missing-icons loaded-icons loading? phase]}]
+           favorites favorites-only? strict? active-tab missing-icons loaded-icons
+           render-limit loading? phase]}]
   (when visible?
-    (let [processed-assets (filter-and-sort-assets markets search-term sort-by sort-direction
-                                                   favorites favorites-only? strict? active-tab)]
+    (let [processed-assets-list (processed-assets markets search-term sort-by sort-direction
+                                                  favorites favorites-only? strict? active-tab)]
       [:div
        {:class ["absolute" "top-full" "left-0" "right-0" "mt-1" "bg-base-100"
                 "border" "border-base-300" "rounded-none" "shadow-none" "z-[220]" "isolate"]
@@ -286,7 +405,7 @@
         (search-controls search-term strict? favorites-only?)
         (tab-row active-tab)
         (sort-controls sort-by sort-direction)
-        (asset-list processed-assets selected-market-key favorites missing-icons loaded-icons)]])))
+        (asset-list processed-assets-list selected-market-key favorites missing-icons loaded-icons render-limit)]])))
 
 ;; Wrapper component that can be used in active-asset-view
 (defn asset-selector-wrapper [props]
