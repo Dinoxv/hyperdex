@@ -9,8 +9,17 @@ function pushU16(out, v) { out.push((v >> 8) & 0xff, v & 0xff); }
 function pushU32(out, v) {
   out.push((v >>> 24) & 0xff, (v >>> 16) & 0xff, (v >>> 8) & 0xff, v & 0xff);
 }
+function pushU64(out, v) {
+  const value = BigInt(v);
+  for (let shift = 56n; shift >= 0n; shift -= 8n) {
+    out.push(Number((value >> shift) & 0xffn));
+  }
+}
 function pushI16(out, v) { pushU16(out, v & 0xffff); }
 function pushI32(out, v) { pushU32(out, v >>> 0); }
+function pushI64(out, v) {
+  pushU64(out, BigInt.asUintN(64, BigInt(v)));
+}
 function pushF64(out, v) {
   const buf = new ArrayBuffer(8);
   const view = new DataView(buf);
@@ -54,6 +63,8 @@ function encodeValue(out, value) {
       if (value >= -128 && value <= 127) { pushU8(out, 0xd0); pushU8(out, value & 0xff); return; }
       if (value >= -32768 && value <= 32767) { pushU8(out, 0xd1); pushI16(out, value); return; }
       if (value >= -2147483648 && value <= 2147483647) { pushU8(out, 0xd2); pushI32(out, value); return; }
+      if (Number.isSafeInteger(value) && value >= 0) { pushU8(out, 0xcf); pushU64(out, value); return; }
+      if (Number.isSafeInteger(value) && value < 0) { pushU8(out, 0xd3); pushI64(out, value); return; }
     }
     pushU8(out, 0xcb); pushF64(out, value); return;
   }

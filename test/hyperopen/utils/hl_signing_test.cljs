@@ -45,7 +45,15 @@
              (signing/compute-connection-id action
                                             nonce
                                             :vault-address vault
-                                            :expires-after expires-after))))))
+                                            :expires-after expires-after)))))
+
+  (testing "matches l1 action hash parity vector for cancel with large oid"
+    (let [action {:type "cancel"
+                  :cancels [{:a 5
+                             :o 317776454141}]}
+          nonce 1770824619171]
+      (is (= "0x4b3f03be6a802e9484c28b9ca31353e7e097059fa40f46f243f531ebf44fd57c"
+             (signing/compute-connection-id action nonce))))))
 
 (deftest build-typed-data-selects-source-by-environment-test
   (let [connection-id "0x1234"

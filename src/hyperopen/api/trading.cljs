@@ -4,6 +4,7 @@
             [hyperopen.utils.hl-signing :as signing]))
 
 (def exchange-url "https://api.hyperliquid.xyz/exchange")
+(def info-url "https://api.hyperliquid.xyz/info")
 
 (defn- json-post! [url body]
   (js/fetch url
@@ -45,6 +46,24 @@
 (def ^:private missing-api-wallet-error-message
   "Agent wallet not recognized by Hyperliquid. Enable Trading again.")
 
+(def ^:private missing-api-wallet-preserved-message
+  "Agent wallet lookup was inconclusive. Preserved local trading key.")
+
+(defn- normalize-address
+  [address]
+  (let [text (some-> address str str/trim)]
+    (when (seq text)
+      (str/lower-case text))))
+
+(defn- safe-private-key->agent-address
+  [private-key]
+  (try
+    (some-> private-key
+            agent-session/private-key->agent-address
+            normalize-address)
+    (catch :default _
+      nil)))
+
 (defn- next-nonce [cursor]
   (let [now (.now js/Date)
         cursor* (when (number? cursor)
@@ -63,13 +82,62 @@
                   expires-after (assoc :expiresAfter expires-after))]
     (json-post! exchange-url payload)))
 
+(defn- post-info!
+  [body]
+  (json-post! info-url body))
+
+(defn- fetch-user-role!
+  [address]
+  (-> (post-info! {:type "userRole"
+                   :user address})
+      (.then parse-json!)))
+
+(defn- user-role-agent-for-owner?
+  [owner-address role-response]
+  (let [owner* (normalize-address owner-address)
+        role (some-> (:role role-response)
+                     str
+                     str/lower-case)
+        linked-user* (normalize-address (or (get-in role-response [:data :user])
+                                            (:user role-response)))]
+    (and (= role "agent")
+         (seq owner*)
+         (= owner* linked-user*))))
+
+(defn- should-invalidate-missing-api-wallet-session!
+  [owner-address session]
+  (let [agent-address* (normalize-address (:agent-address session))]
+    (if-not (seq agent-address*)
+      (js/Promise.resolve true)
+      (-> (fetch-user-role! agent-address*)
+          (.then (fn [role-response]
+                   (not (user-role-agent-for-owner? owner-address role-response))))
+          ;; Preserve local key if lookup itself fails (network/rate-limit),
+          ;; because we could not prove the session is invalid.
+          (.catch (fn [_]
+                    (js/Promise.resolve false)))))))
+
+(defn- reconcile-session-agent-address!
+  [store owner-address storage-mode session]
+  (let [stored-address* (normalize-address (:agent-address session))
+        derived-address* (safe-private-key->agent-address (:private-key session))
+        needs-update? (and (seq derived-address*)
+                           (not= stored-address* derived-address*))
+        session* (cond-> (assoc session :storage-mode storage-mode)
+                   (seq derived-address*) (assoc :agent-address derived-address*))]
+    (when (and needs-update?
+               (seq owner-address))
+      (agent-session/persist-agent-session-by-mode! owner-address storage-mode session*)
+      (swap! store update-in [:wallet :agent] merge {:agent-address derived-address*}))
+    session*))
+
 (defn- resolve-agent-session
   [store owner-address]
   (let [agent-state (get-in @store [:wallet :agent] {})
         storage-mode (agent-session/normalize-storage-mode (:storage-mode agent-state))
         session (agent-session/load-agent-session-by-mode owner-address storage-mode)]
     (when (map? session)
-      (assoc session :storage-mode storage-mode))))
+      (reconcile-session-agent-address! store owner-address storage-mode session))))
 
 (defn- persist-agent-nonce-cursor!
   [store owner-address session nonce]
@@ -108,13 +176,19 @@
                   (attempt! nonce (dec retries-left))
 
                   (missing-api-wallet-response? resp)
-                  (do
-                    (invalidate-agent-session! store
-                                               owner-address
-                                               session
-                                               missing-api-wallet-error-message)
-                    {:status "err"
-                     :error missing-api-wallet-error-message})
+                  (-> (should-invalidate-missing-api-wallet-session! owner-address session)
+                      (.then (fn [invalidate?]
+                               (when invalidate?
+                                 (invalidate-agent-session! store
+                                                            owner-address
+                                                            session
+                                                            missing-api-wallet-error-message))
+                               (if invalidate?
+                                 {:status "err"
+                                  :error missing-api-wallet-error-message}
+                                 {:status "err"
+                                  :error missing-api-wallet-preserved-message
+                                  :response (response-error-text resp)}))))
 
                   :else
                   (do

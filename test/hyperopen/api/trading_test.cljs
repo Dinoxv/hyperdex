@@ -61,7 +61,7 @@
           original-fetch (.-fetch js/globalThis)]
       (set! agent-session/load-agent-session-by-mode
             (fn [_wallet-address _storage-mode]
-              {:agent-address "0x9999999999999999999999999999999999999999"
+              {:agent-address "0x8fd379246834eac74b8419ffda202cf8051f7a03"
                :private-key "0xaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
                :nonce-cursor 1700000005555}))
       (set! agent-session/persist-agent-session-by-mode!
@@ -123,7 +123,7 @@
           original-fetch (.-fetch js/globalThis)]
       (set! agent-session/load-agent-session-by-mode
             (fn [_wallet-address _storage-mode]
-              {:agent-address "0x8888888888888888888888888888888888888888"
+              {:agent-address "0x88f9b82462f6c4bf4a0fb15e5c3971559a316e7f"
                :private-key "0xbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
                :nonce-cursor 1700000006666}))
       (set! agent-session/persist-agent-session-by-mode!
@@ -206,7 +206,7 @@
           original-fetch (.-fetch js/globalThis)]
       (set! agent-session/load-agent-session-by-mode
             (fn [_wallet-address _storage-mode]
-              {:agent-address "0x7777777777777777777777777777777777777777"
+              {:agent-address "0xe8acf143afbf8b1371a20ea934d334180190eac1"
                :private-key "0xcccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc"
                :nonce-cursor 1700000007777}))
       (set! agent-session/clear-agent-session-by-mode!
@@ -271,7 +271,7 @@
           original-fetch (.-fetch js/globalThis)]
       (set! agent-session/load-agent-session-by-mode
             (fn [_wallet-address _storage-mode]
-              {:agent-address "0x6666666666666666666666666666666666666666"
+              {:agent-address "0xa84585fb6728f413d4d89ec972c45e94686bf38e"
                :private-key "0xdddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd"
                :nonce-cursor 1700000008888}))
       (set! agent-session/clear-agent-session-by-mode!
@@ -321,6 +321,133 @@
              (set! signing/sign-l1-action-with-private-key! original-sign)
              (set! (.-fetch js/globalThis) original-fetch)))))))
 
+(deftest cancel-order-preserves-agent-session-when-user-role-confirms-agent-test
+  (async done
+    (let [store (atom {:wallet {:agent {:status :ready
+                                        :storage-mode :session
+                                        :nonce-cursor 1700000011111}}})
+          cleared (atom [])
+          persisted (atom 0)
+          info-lookups (atom 0)
+          original-load agent-session/load-agent-session-by-mode
+          original-clear agent-session/clear-agent-session-by-mode!
+          original-persist agent-session/persist-agent-session-by-mode!
+          original-sign signing/sign-l1-action-with-private-key!
+          original-fetch (.-fetch js/globalThis)]
+      (set! agent-session/load-agent-session-by-mode
+            (fn [_wallet-address _storage-mode]
+              {:agent-address "0x8fd379246834eac74b8419ffda202cf8051f7a03"
+               :private-key "0xaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+               :nonce-cursor 1700000011111}))
+      (set! agent-session/clear-agent-session-by-mode!
+            (fn [wallet-address storage-mode]
+              (swap! cleared conj [wallet-address storage-mode])
+              true))
+      (set! agent-session/persist-agent-session-by-mode!
+            (fn [_wallet-address _storage-mode _session]
+              (swap! persisted inc)
+              true))
+      (set! signing/sign-l1-action-with-private-key!
+            (fn [_private-key _action _nonce & _]
+              (js/Promise.resolve
+               (clj->js {:r "0x01"
+                         :s "0x02"
+                         :v 27}))))
+      (set! (.-fetch js/globalThis)
+            (fn [url _opts]
+              (if (= trading/info-url url)
+                (do
+                  (swap! info-lookups inc)
+                  (js/Promise.resolve
+                   #js {:ok true
+                        :json (fn []
+                                (js/Promise.resolve
+                                 #js {:role "agent"
+                                      :data #js {:user "0xowner"}}))}))
+                (js/Promise.resolve
+                 #js {:ok true
+                      :json (fn []
+                              (js/Promise.resolve
+                               #js {:status "err"
+                                    :response "User or API Wallet 0x8fd379246834eac74b8419ffda202cf8051f7a03 does not exist."}))}))))
+      (-> (trading/cancel-order! store
+                                 "0xowner"
+                                 {:type "cancel"
+                                  :cancels [{:a 0 :o 1}]})
+          (.then (fn [resp]
+                   (is (= "err" (:status resp)))
+                   (is (re-find #"Preserved local trading key"
+                                (str (:error resp))))
+                   (is (= 1 @info-lookups))
+                   (is (= [] @cleared))
+                   (is (= 0 @persisted))
+                   (is (= :ready (get-in @store [:wallet :agent :status])))
+                   (done)))
+          (.catch (fn [err]
+                    (is false (str "Unexpected error: " err))
+                    (done)))
+          (.finally
+           (fn []
+             (set! agent-session/load-agent-session-by-mode original-load)
+             (set! agent-session/clear-agent-session-by-mode! original-clear)
+             (set! agent-session/persist-agent-session-by-mode! original-persist)
+             (set! signing/sign-l1-action-with-private-key! original-sign)
+             (set! (.-fetch js/globalThis) original-fetch)))))))
+
+(deftest submit-order-reconciles-agent-address-from-private-key-before-signing-test
+  (async done
+    (let [store (atom {:wallet {:agent {:status :ready
+                                        :storage-mode :session
+                                        :nonce-cursor 1700000012222}}})
+          persisted (atom [])
+          original-load agent-session/load-agent-session-by-mode
+          original-persist agent-session/persist-agent-session-by-mode!
+          original-sign signing/sign-l1-action-with-private-key!
+          original-fetch (.-fetch js/globalThis)]
+      (set! agent-session/load-agent-session-by-mode
+            (fn [_wallet-address _storage-mode]
+              {:agent-address "0x1111111111111111111111111111111111111111"
+               :private-key "0xaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+               :nonce-cursor 1700000012222}))
+      (set! agent-session/persist-agent-session-by-mode!
+            (fn [wallet-address storage-mode session]
+              (swap! persisted conj [wallet-address storage-mode session])
+              true))
+      (set! signing/sign-l1-action-with-private-key!
+            (fn [_private-key _action _nonce & _]
+              (js/Promise.resolve
+               (clj->js {:r "0x01"
+                         :s "0x02"
+                         :v 27}))))
+      (set! (.-fetch js/globalThis)
+            (fn [_url _opts]
+              (js/Promise.resolve
+               #js {:ok true
+                    :json (fn []
+                            (js/Promise.resolve #js {:status "ok"}))})))
+      (-> (trading/submit-order! store
+                                 "0xowner"
+                                 {:type "order"
+                                  :orders []
+                                  :grouping "na"})
+          (.then (fn [resp]
+                   (is (= "ok" (:status resp)))
+                   (is (= 2 (count @persisted)))
+                   (is (= "0x8fd379246834eac74b8419ffda202cf8051f7a03"
+                          (get-in (nth @persisted 0) [2 :agent-address])))
+                   (is (= "0x8fd379246834eac74b8419ffda202cf8051f7a03"
+                          (get-in @store [:wallet :agent :agent-address])))
+                   (done)))
+          (.catch (fn [err]
+                    (is false (str "Unexpected error: " err))
+                    (done)))
+          (.finally
+           (fn []
+             (set! agent-session/load-agent-session-by-mode original-load)
+             (set! agent-session/persist-agent-session-by-mode! original-persist)
+             (set! signing/sign-l1-action-with-private-key! original-sign)
+             (set! (.-fetch js/globalThis) original-fetch)))))))
+
 (deftest submit-order-preserves-agent-session-when-vault-is-not-registered-test
   (async done
     (let [store (atom {:wallet {:agent {:status :ready
@@ -335,7 +462,7 @@
           original-fetch (.-fetch js/globalThis)]
       (set! agent-session/load-agent-session-by-mode
             (fn [_wallet-address _storage-mode]
-              {:agent-address "0x5555555555555555555555555555555555555555"
+              {:agent-address "0x46a23e25df9a0f6c18729dda9ad1af3b6a131160"
                :private-key "0xeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee"
                :nonce-cursor 1700000009999}))
       (set! agent-session/clear-agent-session-by-mode!

@@ -130,3 +130,36 @@
         (is (= 0 @disconnected-calls)))
       (finally
         (set! js/queueMicrotask original-queue-microtask)))))
+
+(deftest check-connection-success-restores-wallet-without-notify-handler-test
+  (let [store (atom {:wallet {:connected? false
+                              :address nil
+                              :connecting? false
+                              :error nil}})
+        connected-calls (atom [])
+        disconnected-calls (atom 0)
+        original-queue-microtask js/queueMicrotask]
+    (set! js/queueMicrotask (fn [f] (f)))
+    (try
+      (with-redefs [wallet/has-provider? (fn [] true)
+                    wallet/provider (fn []
+                                      (let [thenable #js {}]
+                                        (set! (.-then thenable)
+                                              (fn [on-fulfilled]
+                                                (on-fulfilled #js ["0xabc"])
+                                                thenable))
+                                        (set! (.-catch thenable)
+                                              (fn [_]
+                                                thenable))
+                                        #js {:request (fn [_] thenable)}))
+                    wallet/set-connected! (fn [store' addr & {:keys [notify-connected?]}]
+                                            (swap! connected-calls conj [store' addr notify-connected?]))
+                    wallet/set-disconnected! (fn [_]
+                                               (swap! disconnected-calls inc))]
+        (wallet/check-connection! store)
+        (is (= 1 (count @connected-calls)))
+        (is (= "0xabc" (second (first @connected-calls))))
+        (is (nil? (nth (first @connected-calls) 2)))
+        (is (= 0 @disconnected-calls)))
+      (finally
+        (set! js/queueMicrotask original-queue-microtask)))))

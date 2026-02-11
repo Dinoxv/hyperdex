@@ -1788,16 +1788,52 @@
              [:effects/save [:order-form] form]
              [:effects/api-submit-order request]])))
 
+(defn- normalize-cancel-order-coin
+  [order]
+  (let [coin (some-> (or (:coin order)
+                         (get-in order [:order :coin]))
+                     str
+                     str/trim)]
+    (when (seq coin) coin)))
+
+(defn- resolve-cancel-order-oid
+  [order]
+  (some parse-int-value
+        [(:oid order)
+         (:o order)
+         (get-in order [:order :oid])
+         (get-in order [:order :o])]))
+
+(defn- resolve-cancel-order-asset-idx
+  [state order coin]
+  (let [market-by-key (get-in state [:asset-selector :market-by-key] {})
+        market-idx (some-> (markets/resolve-market-by-coin market-by-key coin)
+                           :idx)]
+    (some parse-int-value
+          [(:asset-idx order)
+           (:assetIdx order)
+           (:asset order)
+           (:a order)
+           (get-in order [:order :asset-idx])
+           (get-in order [:order :assetIdx])
+           (get-in order [:order :asset])
+           (get-in order [:order :a])
+           (when coin
+             (get-in state [:asset-contexts (keyword coin) :idx]))
+           (when coin
+             (get-in state [:asset-contexts coin :idx]))
+           market-idx])))
+
 (defn cancel-order [state order]
   (let [agent-ready? (= :ready (get-in state [:wallet :agent :status]))
-        coin (:coin order)
-        oid (:oid order)
-        asset-idx (get-in state [:asset-contexts (keyword coin) :idx])]
+        coin (normalize-cancel-order-coin order)
+        oid (resolve-cancel-order-oid order)
+        asset-idx (resolve-cancel-order-asset-idx state order coin)]
     (cond
       (not agent-ready?)
       [[:effects/save [:orders :cancel-error] "Enable trading before cancelling orders."]]
 
-      (and asset-idx oid)
+      (and (some? asset-idx) (some? oid))
       [[:effects/api-cancel-order {:action {:type "cancel"
                                             :cancels [{:a asset-idx :o oid}]}}]]
 

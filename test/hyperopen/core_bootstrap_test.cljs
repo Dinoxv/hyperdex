@@ -1562,6 +1562,22 @@
         cancel-effects (filter #(= (first %) :effects/api-cancel-order) effects)]
     (is (= 1 (count cancel-effects)))))
 
+(deftest cancel-order-falls-back-to-asset-selector-market-index-test
+  (let [state {:wallet {:connected? true
+                        :address "0xabc"
+                        :agent {:status :ready
+                                :storage-mode :session
+                                :agent-address "0xagent"}}
+               :asset-contexts {}
+               :asset-selector {:market-by-key {"perp:SOL" {:coin "SOL"
+                                                            :idx 12}}}}
+        order {:coin "SOL"
+               :oid "307891000622"}
+        effects (core/cancel-order state order)]
+    (is (= [[:effects/api-cancel-order {:action {:type "cancel"
+                                                 :cancels [{:a 12 :o 307891000622}]}}]]
+           effects))))
+
 (deftest enable-agent-trading-action-emits-approving-projection-before-effect-test
   (let [state {:wallet {:connected? true
                         :address "0xabc"
