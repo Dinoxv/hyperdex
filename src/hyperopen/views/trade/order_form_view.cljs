@@ -192,19 +192,23 @@
             :on {:click on-click}}
    label])
 
-(defn- side-button [label active? on-click]
-  [:button {:type "button"
-            :class (into ["flex-1"
-                          "h-10"
-                          "text-sm"
-                          "font-semibold"
-                          "rounded-md"
-                          "transition-colors"]
-                         (if active?
-                           ["bg-primary" "text-primary-content"]
-                           ["bg-base-200/70" "text-gray-100"]))
-            :on {:click on-click}}
-   label])
+(defn- side-button [label side active? on-click]
+  (let [active-classes (case side
+                         :buy ["bg-[#50D2C1]" "text-[#0F1A1F]"]
+                         :sell ["bg-[#ED7088]" "text-[#F6FEFD]"]
+                         ["bg-primary" "text-primary-content"])]
+    [:button {:type "button"
+              :class (into ["flex-1"
+                            "h-10"
+                            "text-sm"
+                            "font-semibold"
+                            "rounded-md"
+                            "transition-colors"]
+                           (if active?
+                             active-classes
+                             ["bg-[#273035]" "text-[#F6FEFD]"]))
+              :on {:click on-click}}
+     label]))
 
 (defn- order-type-label [order-type]
   (case order-type
@@ -585,9 +589,11 @@
 
       [:div {:class ["flex" "items-center" "gap-2" "bg-base-200" "rounded-md" "p-1"]}
        (side-button "Buy / Long"
+                    :buy
                     (= side :buy)
                     [[:actions/update-order-form [:side] :buy]])
        (side-button "Sell / Short"
+                    :sell
                     (= side :sell)
                     [[:actions/update-order-form [:side] :sell]])]
 

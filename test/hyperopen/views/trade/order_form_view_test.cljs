@@ -152,6 +152,20 @@
     (is (contains? strings "Buy / Long"))
     (is (contains? strings "Sell / Short"))))
 
+(deftest side-toggle-uses-hyperliquid-buy-and-sell-colors-test
+  (let [buy-active-view (view/order-form-view (base-state {:side :buy}))
+        sell-active-view (view/order-form-view (base-state {:side :sell}))
+        buy-when-active-classes (set (get-in (button-node-by-label buy-active-view "Buy / Long") [1 :class]))
+        sell-when-inactive-classes (set (get-in (button-node-by-label buy-active-view "Sell / Short") [1 :class]))
+        sell-when-active-classes (set (get-in (button-node-by-label sell-active-view "Sell / Short") [1 :class]))
+        buy-when-inactive-classes (set (get-in (button-node-by-label sell-active-view "Buy / Long") [1 :class]))]
+    (is (contains? buy-when-active-classes "bg-[#50D2C1]"))
+    (is (contains? buy-when-active-classes "text-[#0F1A1F]"))
+    (is (contains? sell-when-active-classes "bg-[#ED7088]"))
+    (is (contains? sell-when-active-classes "text-[#F6FEFD]"))
+    (is (contains? buy-when-inactive-classes "bg-[#273035]"))
+    (is (contains? sell-when-inactive-classes "bg-[#273035]"))))
+
 (deftest market-mode-tab-is-active-and-limit-pro-tabs-are-inactive-test
   (let [view-node (view/order-form-view (base-state {:entry-mode :market :type :limit}))
         market-button (button-node-by-label view-node "Market")
