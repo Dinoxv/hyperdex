@@ -706,6 +706,97 @@
         (is (= 50
                (get-in @store [:account-info :order-history :page-size])))))))
 
+(deftest restore-active-asset-hydrates-cached-active-market-display-test
+  (with-test-local-storage
+    (fn []
+      (.setItem js/localStorage "active-asset" "ETH")
+      (.setItem js/localStorage
+                "active-market-display"
+                (js/JSON.stringify
+                 (clj->js {:coin "ETH"
+                           :symbol "ETH-USDC"
+                           :base "ETH"
+                           :quote "USDC"
+                           :market-type "perp"
+                           :dex "hyna"
+                           :maxLeverage "25"})))
+      (let [store (atom {:active-asset nil
+                         :selected-asset nil
+                         :active-market nil})]
+        (with-redefs [ws-client/connected? (fn [] false)]
+          (core/restore-active-asset! store))
+        (is (= "ETH" (:active-asset @store)))
+        (is (= "ETH-USDC" (get-in @store [:active-market :symbol])))
+        (is (= :perp (get-in @store [:active-market :market-type])))
+        (is (= 25 (get-in @store [:active-market :maxLeverage])))))))
+
+(deftest restore-active-asset-ignores-mismatched-cached-market-test
+  (with-test-local-storage
+    (fn []
+      (.setItem js/localStorage "active-asset" "ETH")
+      (.setItem js/localStorage
+                "active-market-display"
+                (js/JSON.stringify (clj->js {:coin "BTC"
+                                             :symbol "BTC-USDC"
+                                             :market-type "perp"
+                                             :maxLeverage 40})))
+      (let [store (atom {:active-asset nil
+                         :selected-asset nil
+                         :active-market nil})]
+        (with-redefs [ws-client/connected? (fn [] false)]
+          (core/restore-active-asset! store))
+        (is (= "ETH" (:active-asset @store)))
+        (is (nil? (:active-market @store)))))))
+
+(deftest subscribe-active-asset-persists-active-market-display-cache-test
+  (with-test-local-storage
+    (fn []
+      (let [market {:key "perp:ETH"
+                    :coin "ETH"
+                    :symbol "ETH-USDC"
+                    :base "ETH"
+                    :quote "USDC"
+                    :market-type :perp
+                    :maxLeverage 25}
+            store (atom {:asset-selector {:market-by-key {"perp:ETH" market}}
+                         :chart-options {:selected-timeframe :1d}
+                         :active-assets {:contexts {}
+                                         :loading false}
+                         :active-market nil})]
+        (with-redefs [active-ctx/subscribe-active-asset-ctx! (fn [_] nil)
+                      core/fetch-candle-snapshot (fn [& _] nil)]
+          (core/subscribe-active-asset nil store "ETH"))
+        (let [cached (js->clj (js/JSON.parse (.getItem js/localStorage "active-market-display"))
+                              :keywordize-keys true)]
+          (is (= "ETH" (:coin cached)))
+          (is (= "ETH-USDC" (:symbol cached)))
+          (is (= "perp" (:market-type cached)))
+          (is (= 25 (:maxLeverage cached))))))))
+
+(deftest active-market-store-projection-persists-display-cache-test
+  (with-test-local-storage
+    (fn []
+      (let [original-state @core/store
+            market {:key "perp:ETH"
+                    :coin "ETH"
+                    :symbol "ETH-USDC"
+                    :base "ETH"
+                    :quote "USDC"
+                    :market-type :perp
+                    :dex "hyna"
+                    :maxLeverage 25}]
+        (try
+          (swap! core/store assoc :active-market nil)
+          (swap! core/store assoc :active-market market)
+          (let [cached (js->clj (js/JSON.parse (.getItem js/localStorage "active-market-display"))
+                                :keywordize-keys true)]
+            (is (= "ETH" (:coin cached)))
+            (is (= "ETH-USDC" (:symbol cached)))
+            (is (= "perp" (:market-type cached)))
+            (is (= 25 (:maxLeverage cached))))
+          (finally
+            (reset! core/store original-state)))))))
+
 (deftest refresh-order-history-emits-request-then-fetch-with-tab-aware-loading-test
   (let [selected-state {:account-info {:selected-tab :order-history
                                        :order-history {:request-id 5}}}

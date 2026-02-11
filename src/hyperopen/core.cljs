@@ -402,26 +402,102 @@
   (ws-client/init-connection! "wss://api.hyperliquid.xyz/ws")
   (swap! store assoc-in [:websocket :status] :connecting))
 
+(def ^:private active-market-display-local-storage-key
+  "active-market-display")
+
+(def ^:private supported-market-types
+  #{:perp :spot})
+
+(defn- normalize-market-type [value]
+  (let [market-type (cond
+                      (keyword? value) value
+                      (string? value) (some-> value str/trim str/lower-case keyword)
+                      :else nil)]
+    (when (contains? supported-market-types market-type)
+      market-type)))
+
+(defn- parse-max-leverage [value]
+  (cond
+    (number? value) value
+    (string? value) (let [num (js/parseFloat value)]
+                      (when-not (js/isNaN num)
+                        num))
+    :else nil))
+
+(defn- normalize-display-text [value]
+  (let [text (some-> value str str/trim)]
+    (when (seq text)
+      text)))
+
+(defn- normalize-active-market-display [market]
+  (when (map? market)
+    (let [coin (normalize-display-text (:coin market))
+          key (normalize-display-text (:key market))
+          symbol (normalize-display-text (:symbol market))
+          base (normalize-display-text (:base market))
+          quote (normalize-display-text (:quote market))
+          dex (normalize-display-text (:dex market))
+          market-type (normalize-market-type (:market-type market))
+          max-leverage (parse-max-leverage (:maxLeverage market))]
+      (when (seq coin)
+        (cond-> {:coin coin}
+          (seq key) (assoc :key key)
+          (seq symbol) (assoc :symbol symbol)
+          (seq base) (assoc :base base)
+          (seq quote) (assoc :quote quote)
+          (seq dex) (assoc :dex dex)
+          market-type (assoc :market-type market-type)
+          (some? max-leverage) (assoc :maxLeverage max-leverage))))))
+
+(defn- persist-active-market-display! [market]
+  (when-let [normalized (normalize-active-market-display market)]
+    (try
+      (when (exists? js/localStorage)
+        (js/localStorage.setItem active-market-display-local-storage-key
+                                 (js/JSON.stringify (clj->js normalized))))
+      (catch :default e
+        (js/console.warn "Failed to persist active market display metadata:" e)))))
+
+(defn- load-active-market-display [active-asset]
+  (when (seq active-asset)
+    (try
+      (let [raw (when (exists? js/localStorage)
+                  (js/localStorage.getItem active-market-display-local-storage-key))]
+        (when (seq raw)
+          (let [parsed (-> raw
+                           js/JSON.parse
+                           (js->clj :keywordize-keys true)
+                           normalize-active-market-display)]
+            (when (= active-asset (:coin parsed))
+              parsed))))
+      (catch :default _
+        nil))))
+
 (defn subscribe-active-asset [_ store coin]
   (println "Subscribing to active asset context for:" coin)
   (let [market-by-key (get-in @store [:asset-selector :market-by-key] {})
         market (markets/resolve-market-by-coin market-by-key coin)
-        canonical-coin (or (:coin market) coin)]
+        canonical-coin (or (:coin market) coin)
+        resolved-market (or market
+                           (markets/resolve-market-by-coin
+                            market-by-key
+                            canonical-coin))]
     (when (string? canonical-coin)
       (js/localStorage.setItem "active-asset" canonical-coin))
-  (swap! store
-         (fn [state]
-           (let [market (or market
-                            (markets/resolve-market-by-coin
-                             (get-in state [:asset-selector :market-by-key] {})
-                             canonical-coin))]
-             (-> state
-                 (assoc-in [:active-assets :loading] true)
-                 (assoc-in [:active-asset] canonical-coin)
-                 (assoc-in [:selected-asset] canonical-coin)
-                 (assoc :active-market (or market (:active-market state)))))))
-  (active-ctx/subscribe-active-asset-ctx! canonical-coin)
-  (fetch-candle-snapshot _ store :interval (get-in @store [:chart-options :selected-timeframe] :1d))))
+    (persist-active-market-display! resolved-market)
+    (swap! store
+           (fn [state]
+             (let [market (or resolved-market
+                              (markets/resolve-market-by-coin
+                               (get-in state [:asset-selector :market-by-key] {})
+                               canonical-coin))]
+               (-> state
+                   (assoc-in [:active-assets :loading] true)
+                   (assoc-in [:active-asset] canonical-coin)
+                   (assoc-in [:selected-asset] canonical-coin)
+                   (assoc :active-market (or market (:active-market state)))))))
+    (active-ctx/subscribe-active-asset-ctx! canonical-coin)
+    (fetch-candle-snapshot _ store :interval (get-in @store [:chart-options :selected-timeframe] :1d))))
 
 (defn unsubscribe-active-asset [_ store coin]
   (println "Unsubscribing from active asset context for:" coin)
@@ -1208,8 +1284,12 @@
 (defn restore-active-asset! [store]
   (when (nil? (:active-asset @store))
     (let [stored-asset (js/localStorage.getItem "active-asset")
-          asset (if (seq stored-asset) stored-asset "BTC")]
-      (swap! store assoc :active-asset asset :selected-asset asset)
+          asset (if (seq stored-asset) stored-asset "BTC")
+          cached-market (load-active-market-display asset)]
+      (swap! store
+             (fn [state]
+               (cond-> (assoc state :active-asset asset :selected-asset asset)
+                 (map? cached-market) (assoc :active-market cached-market))))
       (when-not (seq stored-asset)
         (js/localStorage.setItem "active-asset" asset))
       (when (ws-client/connected?)
@@ -2434,6 +2514,14 @@
 (r/set-dispatch! #(nxr/dispatch store %1 %2))
 (when (exists? js/document)
   (add-watch store ::render #(r/render (.getElementById js/document "app") (app-view/app-view %4))))
+
+;; Keep startup display metadata fresh whenever active-market becomes available.
+(add-watch store ::active-market-display-cache
+  (fn [_ _ old-state new-state]
+    (let [old-market (:active-market old-state)
+          new-market (:active-market new-state)]
+      (when (not= old-market new-market)
+        (persist-active-market-display! new-market)))))
 
 (defn- status->diagnostics-event [status]
   (case status
