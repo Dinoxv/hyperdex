@@ -201,6 +201,66 @@
     (format-amount value decimals)
     (format-currency value)))
 
+(def ^:private unified-available-balance-tooltip-suffix
+  " is available to withdraw or transfer. Some perps may have a larger available to trade amount, which can be seen in the order form for that asset.")
+
+(defn- unified-available-balance-tooltip-text [coin available-balance amount-decimals]
+  (str (format-balance-amount available-balance amount-decimals)
+       " "
+       (or coin "USDC")
+       unified-available-balance-tooltip-suffix))
+
+(defn- available-balance-value-node [{:keys [coin available-balance amount-decimals transfer-disabled?]}]
+  (let [value-text (format-balance-amount available-balance amount-decimals)]
+    (if transfer-disabled?
+      [:div {:class ["group" "relative" "inline-flex" "min-h-6" "items-center" "justify-end"]}
+       [:span {:class ["cursor-help"
+                       "rounded"
+                       "underline"
+                       "decoration-dashed"
+                       "underline-offset-2"
+                       "focus-visible:outline-none"
+                       "focus-visible:ring-2"
+                       "focus-visible:ring-trading-green/70"
+                       "focus-visible:ring-offset-1"
+                       "focus-visible:ring-offset-base-100"]
+               :tab-index 0}
+        value-text]
+       [:div {:class ["pointer-events-none"
+                      "absolute"
+                      "right-0"
+                      "bottom-full"
+                      "z-50"
+                      "mb-2"
+                      "opacity-0"
+                      "transition-opacity"
+                      "duration-200"
+                      "group-hover:opacity-100"
+                      "group-focus-within:opacity-100"]}
+        [:div {:class ["relative"
+                       "w-[420px]"
+                       "max-w-[calc(100vw-2rem)]"
+                       "min-w-[280px]"
+                       "rounded-md"
+                       "bg-gray-800"
+                       "px-3"
+                       "py-1.5"
+                       "text-xs"
+                       "leading-tight"
+                       "text-gray-100"
+                       "shadow-lg"
+                       "whitespace-normal"]}
+         (unified-available-balance-tooltip-text coin available-balance amount-decimals)
+         [:div {:class ["absolute"
+                        "top-full"
+                        "right-3"
+                        "h-0"
+                        "w-0"
+                        "border-4"
+                        "border-transparent"
+                        "border-t-gray-800"]}]]]]
+      value-text)))
+
 ;; Format percentage with color
 (defn format-pnl-percentage [value]
   (if (and value (not= value "N/A"))
@@ -1036,7 +1096,10 @@
 
 ;; Build balances rows for perps + spot
 (defn build-balance-rows [webdata2 spot-data]
-  (projections/build-balance-rows webdata2 spot-data))
+  (projections/build-balance-rows webdata2 spot-data nil))
+
+(defn build-balance-rows-for-account [webdata2 spot-data account]
+  (projections/build-balance-rows webdata2 spot-data account))
 
 ;; Sort balances by column
 (defn- usdc-balance-row? [row]
@@ -1112,7 +1175,15 @@
       footer)]))
 
 ;; Balance row component
-(defn balance-row [{:keys [coin total-balance available-balance usdc-value pnl-value pnl-pct amount-decimals contract-id]}]
+(defn balance-row [{:keys [coin
+                           total-balance
+                           available-balance
+                           usdc-value
+                           pnl-value
+                           pnl-pct
+                           amount-decimals
+                           contract-id
+                           transfer-disabled?]}]
   (let [coin-attrs (when-not (usdc-balance-row? {:coin coin})
                      {:style {:color "rgb(151, 252, 228)"}})]
     [:div.grid.grid-cols-8.gap-2.py-px.px-3.hover:bg-base-300.items-center.text-sm.text-trading-text
@@ -1123,7 +1194,11 @@
      ;; Total Balance  
      [:div.text-right.font-semibold.num.num-right (format-balance-amount total-balance amount-decimals)]
      ;; Available Balance
-     [:div.text-right.font-semibold.num.num-right (format-balance-amount available-balance amount-decimals)]
+     [:div.text-right.font-semibold.num.num-right
+      (available-balance-value-node {:coin coin
+                                     :available-balance available-balance
+                                     :amount-decimals amount-decimals
+                                     :transfer-disabled? transfer-disabled?})]
      ;; USDC Value
      [:div.text-right.font-semibold.num.num-right "$" (format-currency usdc-value)]
      ;; PNL (ROE %)
@@ -1133,7 +1208,9 @@
       [:button {:class ["btn" "btn-xs" "btn-ghost" "text-trading-text"]} "Send"]]
      ;; Transfer/Contract
      [:div.text-left
-      [:button {:class ["btn" "btn-xs" "btn-ghost" "text-trading-text"]} "Transfer"]]
+      (if transfer-disabled?
+        [:span {:class ["text-xs" "text-trading-text-secondary"]} "Unified"]
+        [:button {:class ["btn" "btn-xs" "btn-ghost" "text-trading-text"]} "Transfer"])]
      ;; Contract
      [:div.text-left
       (balance-contract-node contract-id)]]))
@@ -1892,7 +1969,7 @@
         sort-state (get-in state [:account-info :positions-sort] {:column nil :direction :asc})
         balances-sort (get-in state [:account-info :balances-sort] {:column nil :direction :asc})
         spot-data (:spot state)
-        balance-rows (build-balance-rows webdata2 spot-data)
+        balance-rows (build-balance-rows-for-account webdata2 spot-data (:account state))
         hide-small? (get-in state [:account-info :hide-small-balances?] false)
         perp-dex-states (:perp-dex-clearinghouse state)
         positions (collect-positions webdata2 perp-dex-states)

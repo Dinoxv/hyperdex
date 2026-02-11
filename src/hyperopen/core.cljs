@@ -138,6 +138,8 @@
                                :connecting? false
                                :error      nil
                                :agent (agent-session/default-agent-state)}
+                      :account {:mode :classic
+                                :abstraction-raw nil}
                       :router {:path "/trade"}
                       :order-form (trading/default-order-form)
                       :funding-ui {:modal nil}
@@ -2318,6 +2320,7 @@
       (api/fetch-frontend-open-orders! store address {:priority :high})
       (api/fetch-user-fills! store address {:priority :high})
       (api/fetch-spot-clearinghouse-state! store address {:priority :high})
+      (api/fetch-user-abstraction! store address {:priority :high})
       (fetch-and-merge-funding-history! store address {:priority :high})
       ;; Stage B: low-priority, staggered per-dex data.
       (-> (api/ensure-perp-dexs! store {:priority :low})
@@ -2342,7 +2345,9 @@
             (swap! store assoc-in [:orders :fundings] [])
             (swap! store assoc-in [:orders :order-history] [])
             (swap! store assoc-in [:perp-dex-clearinghouse] {})
-            (swap! store assoc-in [:spot :clearinghouse-state] nil))))
+            (swap! store assoc-in [:spot :clearinghouse-state] nil)
+            (swap! store assoc :account {:mode :classic
+                                         :abstraction-raw nil}))))
       (get-handler-name [_] "startup-account-bootstrap-handler")))
   ;; Ensure already-connected wallets are handled after handlers are in place.
   (address-watcher/sync-current-address! store))

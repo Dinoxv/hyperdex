@@ -107,6 +107,7 @@
           original-fetch-open-orders api/fetch-frontend-open-orders!
           original-fetch-user-fills api/fetch-user-fills!
           original-fetch-spot-state api/fetch-spot-clearinghouse-state!
+          original-fetch-user-abstraction api/fetch-user-abstraction!
           original-ensure-perp-dexs api/ensure-perp-dexs!
           original-fetch-and-merge-funding-history hyperopen.core/fetch-and-merge-funding-history!
           original-stage-b hyperopen.core/stage-b-account-bootstrap!]
@@ -134,6 +135,13 @@
               ([store address opts]
                (swap! stage-a-calls conj [:spot [store address opts]])
                (js/Promise.resolve nil))))
+      (set! api/fetch-user-abstraction!
+            (fn fetch-user-abstraction-mock
+              ([store address]
+               (fetch-user-abstraction-mock store address {}))
+              ([store address opts]
+               (swap! stage-a-calls conj [:abstraction [store address opts]])
+               (js/Promise.resolve nil))))
       (set! api/ensure-perp-dexs!
             (fn ensure-perp-dexs-mock
               ([store]
@@ -147,28 +155,58 @@
       (set! hyperopen.core/stage-b-account-bootstrap!
             (fn [address dexs]
               (swap! stage-b-calls conj [address dexs])))
-      (letfn [(restore! []
+        (letfn [(restore! []
                 (set! api/fetch-frontend-open-orders! original-fetch-open-orders)
                 (set! api/fetch-user-fills! original-fetch-user-fills)
                 (set! api/fetch-spot-clearinghouse-state! original-fetch-spot-state)
+                (set! api/fetch-user-abstraction! original-fetch-user-abstraction)
                 (set! api/ensure-perp-dexs! original-ensure-perp-dexs)
                 (set! hyperopen.core/fetch-and-merge-funding-history! original-fetch-and-merge-funding-history)
                 (set! hyperopen.core/stage-b-account-bootstrap! original-stage-b))]
         (@#'hyperopen.core/bootstrap-account-data! "0xabc")
         (js/setTimeout
          (fn []
-           (is (= 4 (count @stage-a-calls)))
+           (is (= 5 (count @stage-a-calls)))
+           (is (some #(= :abstraction (first %)) @stage-a-calls))
            (is (= [["0xabc" ["dex-1" "dex-2"]]] @stage-b-calls))
            ;; Same address should not trigger stage A/B again.
            (@#'hyperopen.core/bootstrap-account-data! "0xabc")
            (js/setTimeout
             (fn []
-              (is (= 4 (count @stage-a-calls)))
+              (is (= 5 (count @stage-a-calls)))
               (is (= 1 (count @stage-b-calls)))
               (restore!)
               (done))
             0))
             0)))))
+
+(deftest install-address-handlers-clears-account-mode-on-address-removal-test
+  (let [captured-handlers (atom [])
+        test-store (atom {:orders {:open-orders-snapshot-by-dex {"dex-a" [{}]}
+                                   :fundings-raw [1]
+                                   :fundings [2]
+                                   :order-history [3]}
+                          :perp-dex-clearinghouse {"dex-a" {:assetPositions []}}
+                          :spot {:clearinghouse-state {:time 1}}
+                          :account {:mode :unified
+                                    :abstraction-raw "unifiedAccount"}})]
+    (with-redefs [hyperopen.core/store test-store
+                  address-watcher/init-with-webdata2! (fn [& _] nil)
+                  address-watcher/add-handler! (fn [handler]
+                                                 (swap! captured-handlers conj handler))
+                  address-watcher/sync-current-address! (fn [& _] nil)]
+      (@#'hyperopen.core/install-address-handlers!)
+      (let [startup-handler (last @captured-handlers)]
+        (address-watcher/on-address-changed startup-handler "0xabc" nil)
+        (is (= {:mode :classic
+                :abstraction-raw nil}
+               (:account @test-store)))
+        (is (= {} (get-in @test-store [:orders :open-orders-snapshot-by-dex])))
+        (is (= [] (get-in @test-store [:orders :fundings-raw])))
+        (is (= [] (get-in @test-store [:orders :fundings])))
+        (is (= [] (get-in @test-store [:orders :order-history])))
+        (is (= {} (get-in @test-store [:perp-dex-clearinghouse])))
+        (is (nil? (get-in @test-store [:spot :clearinghouse-state])))))))
 
 (deftest select-account-info-tab-funding-history-saves-selection-before-fetch-test
   (let [state {:account-info {:selected-tab :balances

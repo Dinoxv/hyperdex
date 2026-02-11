@@ -416,6 +416,107 @@
     (is (= "0x22222222222222222222222222222222"
            (:contract-id (get by-coin "HYPE"))))))
 
+(deftest build-balance-rows-unified-mode-prefers-spot-usdc-without-perps-double-count-test
+  (let [rows (view/build-balance-rows-for-account
+              {:clearinghouseState {:marginSummary {:accountValue "3.03"
+                                                    :totalMarginUsed "0.0"}}
+               :spotAssetCtxs [{:markPx "1"}]}
+              {:meta {:tokens [{:index 0
+                                :name "USDC"
+                                :weiDecimals 6
+                                :tokenId "0x11111111111111111111111111111111"}
+                               {:index 1
+                                :name "MEOW"
+                                :weiDecimals 6
+                                :tokenId "0x22222222222222222222222222222222"}]
+                      :universe [{:tokens [0 0]
+                                  :index 0}]}
+               :clearinghouse-state {:balances [{:coin "USDC"
+                                                 :token 0
+                                                 :hold "0.0"
+                                                 :total "201.42"
+                                                 :entryNtl "0"}
+                                                {:coin "MEOW"
+                                                 :token 1
+                                                 :hold "0.0"
+                                                 :total "1.0"
+                                                 :entryNtl "0"}]}}
+              {:mode :unified
+               :abstraction-raw "unifiedAccount"})
+        by-coin (into {} (map (juxt :coin identity)) rows)
+        usdc-row (get by-coin "USDC")]
+    (is (= 2 (count rows)))
+    (is (some? usdc-row))
+    (is (= 201.42 (view/parse-num (:total-balance usdc-row))))
+    (is (= 201.42 (view/parse-num (:usdc-value usdc-row))))
+    (is (true? (:transfer-disabled? usdc-row)))
+    (is (nil? (get by-coin "USDC (Spot)")))
+    (is (nil? (get by-coin "USDC (Perps)")))))
+
+(deftest build-balance-rows-unified-mode-falls-back-to-perps-usdc-when-spot-usdc-missing-test
+  (let [rows (view/build-balance-rows-for-account
+              {:clearinghouseState {:marginSummary {:accountValue "3.03"
+                                                    :totalMarginUsed "0.0"}}
+               :spotAssetCtxs []}
+              {:meta {:tokens [{:index 0
+                                :name "USDC"
+                                :weiDecimals 6}
+                               {:index 1
+                                :name "MEOW"
+                                :weiDecimals 6}]
+                      :universe []}
+               :clearinghouse-state {:balances [{:coin "MEOW"
+                                                 :token 1
+                                                 :hold "0.0"
+                                                 :total "1.0"
+                                                 :entryNtl "0"}]}}
+              {:mode :unified
+               :abstraction-raw "unifiedAccount"})
+        by-coin (into {} (map (juxt :coin identity)) rows)
+        usdc-row (get by-coin "USDC")]
+    (is (= 2 (count rows)))
+    (is (some? usdc-row))
+    (is (= 3.03 (view/parse-num (:total-balance usdc-row))))
+    (is (= 3.03 (view/parse-num (:usdc-value usdc-row))))
+    (is (true? (:transfer-disabled? usdc-row)))))
+
+(deftest build-balance-rows-filters-zero-balance-rows-by-default-test
+  (let [rows (view/build-balance-rows
+              {:clearinghouseState {:marginSummary {:accountValue "0.0"
+                                                    :totalMarginUsed "0.0"}}
+               :spotAssetCtxs [{:markPx "1"}]}
+              {:meta {:tokens [{:index 0
+                                :name "USDC"
+                                :weiDecimals 6}
+                               {:index 1
+                                :name "USDE"
+                                :weiDecimals 6}
+                               {:index 2
+                                :name "HYPE"
+                                :weiDecimals 6}]
+                      :universe [{:tokens [0 0]
+                                  :index 0}]}
+               :clearinghouse-state {:balances [{:coin "USDC"
+                                                 :token 0
+                                                 :hold "0.0"
+                                                 :total "10.0"
+                                                 :entryNtl "0"}
+                                                {:coin "USDE"
+                                                 :token 1
+                                                 :hold "0.0"
+                                                 :total "0.0"
+                                                 :entryNtl "0"}
+                                                {:coin "HYPE"
+                                                 :token 2
+                                                 :hold "0.0"
+                                                 :total "1.0"
+                                                 :entryNtl "0"}]}})
+        coins (set (map :coin rows))]
+    (is (contains? coins "USDC (Spot)"))
+    (is (contains? coins "HYPE"))
+    (is (not (contains? coins "USDE")))
+    (is (not (contains? coins "USDC (Perps)")))))
+
 (deftest balances-tab-content-without-active-sort-preserves-input-order-test
   (let [rows [{:key "row-1" :coin "HYPE" :total-balance 1 :available-balance 1 :usdc-value 1}
               {:key "row-2" :coin "USDC (Spot)" :total-balance 2 :available-balance 2 :usdc-value 2}
@@ -761,6 +862,37 @@
     (is (contains? (node-class-set coin-node) "font-semibold"))
     (is (contains? (node-class-set send-button-node) "text-trading-text"))
     (is (contains? (node-class-set transfer-button-node) "text-trading-text"))))
+
+(deftest balance-row-renders-unified-transfer-disabled-label-test
+  (let [row-node (view/balance-row (assoc sample-balance-row
+                                          :coin "USDC"
+                                          :transfer-disabled? true))
+        transfer-label-node (find-first-node row-node #(contains? (direct-texts %) "Unified"))
+        transfer-button-node (find-first-node row-node #(contains? (direct-texts %) "Transfer"))]
+    (is (some? transfer-label-node))
+    (is (contains? (node-class-set transfer-label-node) "text-trading-text-secondary"))
+    (is (nil? transfer-button-node))))
+
+(deftest balance-row-unified-available-balance-renders-dashed-tooltip-test
+  (let [row-node (view/balance-row {:key "unified-usdc"
+                                    :coin "USDC"
+                                    :total-balance 204.419365
+                                    :available-balance 201.389365
+                                    :usdc-value 204.41
+                                    :pnl-value nil
+                                    :pnl-pct nil
+                                    :amount-decimals 8
+                                    :transfer-disabled? true})
+        tooltip-trigger-node (find-first-node row-node #(and (contains? (node-class-set %) "decoration-dashed")
+                                                              (contains? (direct-texts %) "201.38936500")))
+        tooltip-panel-node (find-first-node row-node #(and (= :div (first %))
+                                                           (contains? (node-class-set %) "group-hover:opacity-100")))
+        tooltip-text (str/join " " (collect-strings tooltip-panel-node))]
+    (is (some? tooltip-trigger-node))
+    (is (contains? (node-class-set tooltip-trigger-node) "underline"))
+    (is (contains? (node-class-set tooltip-trigger-node) "underline-offset-2"))
+    (is (some? tooltip-panel-node))
+    (is (str/includes? tooltip-text "201.38936500 USDC is available to withdraw or transfer."))))
 
 (deftest balance-row-contract-cell-renders-explorer-link-with-abbreviated-id-test
   (let [contract-id "0x1234567890abcdef"

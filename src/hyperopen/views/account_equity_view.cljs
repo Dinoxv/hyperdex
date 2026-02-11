@@ -85,7 +85,10 @@
    [:span {:class ["num" (or value-class (default-metric-value-class value))]}
     value]])
 
-(defn account-equity-view [state]
+(defn- unified-account? [state]
+  (= :unified (get-in state [:account :mode])))
+
+(defn- derive-account-equity-metrics [state]
   (let [webdata2 (:webdata2 state)
         clearinghouse-state (:clearinghouseState webdata2)
         margin-summary (:marginSummary clearinghouse-state)
@@ -99,7 +102,7 @@
         cross-total-ntl-pos (or (parse-num (:totalNtlPos cross-summary)) total-ntl-pos)
         cross-total-margin-used (parse-num (:totalMarginUsed cross-summary))
         maintenance-margin (parse-num (:crossMaintenanceMarginUsed clearinghouse-state))
-        balance-rows (account-projections/build-balance-rows webdata2 (:spot state))
+        balance-rows (account-projections/build-balance-rows webdata2 (:spot state) (:account state))
         perps-row (first (filter #(= "perps-usdc" (:key %)) balance-rows))
         perps-row-balance (parse-num (:total-balance perps-row))
         positions (account-projections/collect-positions webdata2 (:perp-dex-clearinghouse state))
@@ -125,26 +128,76 @@
                               (parse-num (:usdc-value row))))
                           balance-rows)
         spot-equity (when (seq spot-values) (reduce + spot-values))
+        portfolio-value (when (seq balance-rows)
+                          (reduce + (map #(parse-num (:usdc-value %)) balance-rows)))
         cross-margin-ratio (safe-div maintenance-margin cross-account-value)
+        unified-account-ratio (safe-div maintenance-margin portfolio-value)
         cross-account-leverage (safe-div cross-total-ntl-pos cross-account-value)
+        unified-account-leverage (safe-div cross-total-ntl-pos portfolio-value)
         pnl-info (pnl-display unrealized-pnl)]
-    [:div {:class ["bg-base-100" "rounded-none" "shadow-none" "p-3" "space-y-4" "w-full" "h-full"]}
-     [:div.text-sm.font-semibold.text-trading-text "Account Equity"]
+    {:spot-equity spot-equity
+     :perps-value perps-value
+     :base-balance base-balance
+     :unrealized-pnl unrealized-pnl
+     :cross-margin-ratio cross-margin-ratio
+     :unified-account-ratio unified-account-ratio
+     :maintenance-margin maintenance-margin
+     :cross-account-leverage cross-account-leverage
+     :unified-account-leverage unified-account-leverage
+     :cross-account-value cross-account-value
+     :portfolio-value portfolio-value
+     :pnl-info pnl-info}))
 
-     [:div.space-y-2
-      (metric-row "Spot" (display-currency spot-equity))
-     (metric-row "Perps" (display-currency perps-value)
-                  :tooltip "Balance + Unrealized PNL (approximate account value if all positions were closed)")]
+(defn- classic-account-equity-view [{:keys [spot-equity
+                                            perps-value
+                                            base-balance
+                                            maintenance-margin
+                                            cross-margin-ratio
+                                            cross-account-leverage
+                                            pnl-info]}]
+  [:div {:class ["bg-base-100" "rounded-none" "shadow-none" "p-3" "space-y-4" "w-full" "h-full"]}
+   [:div.text-sm.font-semibold.text-trading-text "Account Equity"]
 
-     [:div.border-t.border-base-300.pt-3.space-y-2
-      [:div.text-xs.font-semibold.text-trading-text "Perps Overview"]
-      (metric-row "Balance" (display-currency base-balance)
-                  :tooltip "Total Net Transfers + Total Realized Profit + Total Net Funding Fees")
-      (metric-row "Unrealized PNL" (:text pnl-info)
-                  :value-class (:class pnl-info))
-      (metric-row "Cross Margin Ratio" (display-percent cross-margin-ratio)
-                  :tooltip "Maintenance Margin / Portfolio Value. Your cross positions will be liquidated if Margin Ratio reaches 100%.")
-      (metric-row "Maintenance Margin" (display-currency maintenance-margin)
-                  :tooltip "The minimum portfolio value required to keep your cross positions open")
-      (metric-row "Cross Account Leverage" (display-leverage cross-account-leverage)
-                  :tooltip "Cross Account Leverage = Total Cross Positions Value / Cross Account Value.")]]))
+   [:div.space-y-2
+    (metric-row "Spot" (display-currency spot-equity))
+    (metric-row "Perps" (display-currency perps-value)
+                :tooltip "Balance + Unrealized PNL (approximate account value if all positions were closed)")]
+
+   [:div.border-t.border-base-300.pt-3.space-y-2
+    [:div.text-xs.font-semibold.text-trading-text "Perps Overview"]
+    (metric-row "Balance" (display-currency base-balance)
+                :tooltip "Total Net Transfers + Total Realized Profit + Total Net Funding Fees")
+    (metric-row "Unrealized PNL" (:text pnl-info)
+                :value-class (:class pnl-info))
+    (metric-row "Cross Margin Ratio" (display-percent cross-margin-ratio)
+                :tooltip "Maintenance Margin / Portfolio Value. Your cross positions will be liquidated if Margin Ratio reaches 100%.")
+    (metric-row "Maintenance Margin" (display-currency maintenance-margin)
+                :tooltip "The minimum portfolio value required to keep your cross positions open")
+    (metric-row "Cross Account Leverage" (display-leverage cross-account-leverage)
+                :tooltip "Cross Account Leverage = Total Cross Positions Value / Cross Account Value.")]])
+
+(defn- unified-account-summary-view [{:keys [unified-account-ratio
+                                             portfolio-value
+                                             maintenance-margin
+                                             unified-account-leverage
+                                             pnl-info]}]
+  [:div {:class ["bg-base-100" "rounded-none" "shadow-none" "p-3" "space-y-4" "w-full" "h-full"]}
+   [:div.text-sm.font-semibold.text-trading-text "Unified Account Summary"]
+
+   [:div.space-y-2
+    (metric-row "Unified Account Ratio" (display-percent unified-account-ratio)
+                :tooltip "Perps Maintenance Margin / Portfolio Value.")
+    (metric-row "Portfolio Value" (display-currency portfolio-value)
+                :tooltip "Total portfolio value used for unified account risk and leverage calculations.")
+    (metric-row "Unrealized PNL" (:text pnl-info)
+                :value-class (:class pnl-info))
+    (metric-row "Perps Maintenance Margin" (display-currency maintenance-margin)
+                :tooltip "The minimum portfolio value required to keep your perps positions open.")
+    (metric-row "Unified Account Leverage" (display-leverage unified-account-leverage)
+                :tooltip "Total Perps Positions Value / Portfolio Value.")]])
+
+(defn account-equity-view [state]
+  (let [metrics (derive-account-equity-metrics state)]
+    (if (unified-account? state)
+      (unified-account-summary-view metrics)
+      (classic-account-equity-view metrics))))

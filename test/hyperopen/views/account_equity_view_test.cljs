@@ -78,3 +78,74 @@
     (is (= "text-trading-text" (:class zero)))
     (is (= "text-trading-text-secondary" (:class missing)))
     (is (= "--" (:text missing)))))
+
+(deftest unified-account-summary-renders-unified-labels-test
+  (let [view-node (view/account-equity-view {:account {:mode :unified}
+                                             :webdata2 {:clearinghouseState {:marginSummary {:accountValue "204.45"
+                                                                                              :totalNtlPos "0.0"
+                                                                                              :totalRawUsd "204.45"
+                                                                                              :totalMarginUsed "0.0"}
+                                                                              :crossMarginSummary {:accountValue "204.45"
+                                                                                                   :totalNtlPos "0.0"
+                                                                                                   :totalRawUsd "204.45"
+                                                                                                   :totalMarginUsed "0.0"}
+                                                                              :crossMaintenanceMarginUsed "0.0"
+                                                                              :assetPositions []}}
+                                             :spot {}
+                                             :perp-dex-clearinghouse {}})]
+    (is (some? (find-first-node view-node #(contains? (direct-texts %) "Unified Account Summary"))))
+    (is (some? (find-first-node view-node #(contains? (direct-texts %) "Unified Account Ratio"))))
+    (is (some? (find-first-node view-node #(contains? (direct-texts %) "Portfolio Value"))))
+    (is (some? (find-first-node view-node #(contains? (direct-texts %) "Perps Maintenance Margin"))))
+    (is (some? (find-first-node view-node #(contains? (direct-texts %) "Unified Account Leverage"))))
+    (is (nil? (find-first-node view-node #(contains? (direct-texts %) "Perps Overview"))))))
+
+(deftest unified-account-summary-falls-back-to-placeholders-test
+  (let [view-node (view/account-equity-view {:account {:mode :unified}
+                                             :webdata2 {}
+                                             :spot {}
+                                             :perp-dex-clearinghouse {}})
+        placeholder-node (find-first-node view-node #(contains? (direct-texts %) "--"))]
+    (is (some? (find-first-node view-node #(contains? (direct-texts %) "Unified Account Summary"))))
+    (is (some? (find-first-node view-node #(contains? (direct-texts %) "Portfolio Value"))))
+    (is (some? placeholder-node))
+    (is (contains? (node-class-set placeholder-node) "text-trading-text-secondary"))))
+
+(deftest unified-account-summary-portfolio-ignores-perps-double-count-test
+  (let [view-node (view/account-equity-view {:account {:mode :unified}
+                                             :webdata2 {:clearinghouseState {:marginSummary {:accountValue "3.03"
+                                                                                              :totalNtlPos "0.0"
+                                                                                              :totalRawUsd "3.03"
+                                                                                              :totalMarginUsed "0.0"}
+                                                                              :crossMarginSummary {:accountValue "3.03"
+                                                                                                   :totalNtlPos "0.0"
+                                                                                                   :totalRawUsd "3.03"
+                                                                                                   :totalMarginUsed "0.0"}
+                                                                              :crossMaintenanceMarginUsed "0.0"
+                                                                              :assetPositions []}
+                                                        :spotAssetCtxs [{:markPx "0.04"}]}
+                                             :spot {:meta {:tokens [{:index 0
+                                                                     :name "USDC"
+                                                                     :weiDecimals 6}
+                                                                    {:index 1
+                                                                     :name "MEOW"
+                                                                     :weiDecimals 6}]
+                                                           :universe [{:tokens [1 0]
+                                                                       :index 0}]}
+                                                    :clearinghouse-state {:balances [{:coin "USDC"
+                                                                                      :token 0
+                                                                                      :hold "0.0"
+                                                                                      :total "204.41"
+                                                                                      :entryNtl "0"}
+                                                                                     {:coin "MEOW"
+                                                                                      :token 1
+                                                                                      :hold "0.0"
+                                                                                      :total "1.0"
+                                                                                      :entryNtl "0"}]}}
+                                             :perp-dex-clearinghouse {}})
+        portfolio-value-node (find-first-node view-node #(contains? (direct-texts %) "$204.45"))
+        overcount-node (find-first-node view-node #(contains? (direct-texts %) "$207.48"))]
+    (is (some? (find-first-node view-node #(contains? (direct-texts %) "Unified Account Summary"))))
+    (is (some? portfolio-value-node))
+    (is (nil? overcount-node))
+    (is (contains? (node-class-set portfolio-value-node) "text-trading-text"))))

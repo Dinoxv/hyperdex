@@ -1,5 +1,6 @@
 (ns hyperopen.api
-  (:require [hyperopen.asset-selector.markets :as markets]
+  (:require [clojure.string :as str]
+            [hyperopen.asset-selector.markets :as markets]
             [hyperopen.utils.data-normalization :refer [normalize-asset-contexts]]
             [hyperopen.utils.interval :refer [interval-to-milliseconds]]))
 
@@ -874,6 +875,50 @@
                      (println "Error fetching spot balances:" err)
                      (swap! store assoc-in [:spot :loading-balances?] false)
                      (swap! store assoc-in [:spot :error] (str err))
+                     (js/Promise.reject err))))))))
+
+(defn- normalize-user-abstraction-mode
+  [abstraction]
+  (let [abstraction* (some-> abstraction str str/trim)]
+    (case abstraction*
+      "unifiedAccount" :unified
+      "portfolioMargin" :unified
+      "dexAbstraction" :unified
+      "default" :classic
+      "disabled" :classic
+      :classic)))
+
+(defn fetch-user-abstraction!
+  "Fetch account abstraction mode for a user and project normalized account mode.
+   Supported normalized modes:
+   - :unified  => unifiedAccount / portfolioMargin / dexAbstraction
+   - :classic  => default / disabled / nil / unknown"
+  ([store address]
+   (fetch-user-abstraction! store address {}))
+  ([store address opts]
+   (if-not address
+     (js/Promise.resolve {:mode :classic
+                          :abstraction-raw nil})
+     (let [requested-address (some-> address str str/lower-case)
+           opts* (merge {:priority :high
+                         :dedupe-key [:user-abstraction requested-address]}
+                        opts)]
+       (-> (post-info! {"type" "userAbstraction"
+                        "user" address}
+                       opts*)
+           (.then #(.json %))
+           (.then (fn [payload]
+                    (let [abstraction (js->clj payload)
+                          mode (normalize-user-abstraction-mode abstraction)
+                          snapshot {:mode mode
+                                    :abstraction-raw abstraction}
+                          active-address (some-> (get-in @store [:wallet :address]) str str/lower-case)]
+                      ;; Guard against stale async writes after address switches.
+                      (when (= requested-address active-address)
+                        (swap! store assoc :account snapshot))
+                      snapshot)))
+           (.catch (fn [err]
+                     (println "Error fetching user abstraction:" err)
                      (js/Promise.reject err))))))))
 
 (defn fetch-clearinghouse-state!

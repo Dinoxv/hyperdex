@@ -184,8 +184,52 @@
                (re-matches balance-contract-id-pattern contract-id*))
       contract-id*)))
 
-(defn build-balance-rows [webdata2 spot-data]
+(defn- unified-account-mode? [account]
+  (= :unified (:mode account)))
+
+(defn- non-zero-balance-row? [row]
+  (let [total-balance (parse-num (:total-balance row))
+        available-balance (parse-num (:available-balance row))
+        usdc-value (parse-num (:usdc-value row))
+        pnl-value (parse-num (:pnl-value row))]
+    (or (not (zero? total-balance))
+        (not (zero? available-balance))
+        (not (zero? usdc-value))
+        (not (zero? pnl-value)))))
+
+(defn- merge-unified-usdc-row [spot-rows perps-row]
+  (let [usdc-spot-row (some #(when (= "USDC" (:coin %)) %) (or spot-rows []))
+        other-spot-rows (->> (or spot-rows [])
+                             (remove #(= "USDC" (:coin %)))
+                             (filter non-zero-balance-row?))
+        unified-usdc-row (cond
+                           usdc-spot-row
+                           (assoc usdc-spot-row
+                                  :coin "USDC"
+                                  :contract-id nil
+                                  :transfer-disabled? true)
+
+                           perps-row
+                           (assoc perps-row
+                                  :key "unified-usdc-fallback"
+                                  :coin "USDC"
+                                  :contract-id nil
+                                  :transfer-disabled? true)
+
+                           :else
+                           nil)]
+    (->> (concat (when unified-usdc-row [unified-usdc-row])
+                 other-spot-rows)
+         (filter non-zero-balance-row?)
+         (remove nil?)
+         vec)))
+
+(defn build-balance-rows
+  ([webdata2 spot-data]
+   (build-balance-rows webdata2 spot-data nil))
+  ([webdata2 spot-data account]
   (let [clearinghouse-state (:clearinghouseState webdata2)
+        unified? (unified-account-mode? account)
         spot-meta (:meta spot-data)
         spot-state (:clearinghouse-state spot-data)
         spot-asset-ctxs (:spotAssetCtxs webdata2)
@@ -222,7 +266,7 @@
                           total-margin-used (parse-num (get-in clearinghouse-state [:marginSummary :totalMarginUsed]))
                           available (- account-value total-margin-used)]
                       {:key "perps-usdc"
-                       :coin "USDC (Perps)"
+                       :coin (if unified? "USDC" "USDC (Perps)")
                        :total-balance account-value
                        :available-balance available
                        :usdc-value account-value
@@ -244,7 +288,9 @@
                                              (- usdc-value entry-num))
                                  pnl-pct (when (and pnl-value (pos? entry-num))
                                            (* 100 (/ pnl-value entry-num)))
-                                 coin-label (if (= coin "USDC") "USDC (Spot)" coin)
+                                 coin-label (if (= coin "USDC")
+                                              (if unified? "USDC" "USDC (Spot)")
+                                              coin)
                                  contract-id (when-not (= coin "USDC")
                                                (normalize-balance-contract-id
                                                 (:tokenId token-meta)))]
@@ -258,9 +304,12 @@
                               :amount-decimals decimals
                               :contract-id contract-id}))
                          (get spot-state :balances)))]
-    (->> (concat (when perps-row [perps-row]) spot-rows)
-         (remove nil?)
-         vec)))
+    (if unified?
+      (merge-unified-usdc-row spot-rows perps-row)
+      (->> (concat (when perps-row [perps-row]) spot-rows)
+           (remove nil?)
+           (filter non-zero-balance-row?)
+           vec)))))
 
 (defn position-unique-key [position-data]
   (str (get-in position-data [:position :coin]) "|" (or (:dex position-data) "default")))
