@@ -100,6 +100,14 @@
 
     :else nil))
 
+(defn- find-first-img-node [node]
+  (find-first-node
+    node
+    (fn [candidate]
+      (and (vector? candidate)
+           (keyword? (first candidate))
+           (str/starts-with? (name (first candidate)) "img")))))
+
 (deftest asset-list-item-sub-cent-formatting-test
   (testing "last price renders adaptive decimals for tiny assets"
     (let [asset {:key "perp:PUMP"
@@ -113,7 +121,7 @@
                  :change24hPct -13.95
                  :fundingRate 0.001
                  :market-type :perp}
-          hiccup (view/asset-list-item asset false #{} #{})
+          hiccup (view/asset-list-item asset false #{} #{} #{})
           strings (collect-strings hiccup)
           rendered (set strings)]
       (is (contains? rendered "$0.002028"))
@@ -151,7 +159,43 @@
                :fundingRate 0.0001
                :openInterest 99999
                :market-type :perp}
-        row (view/asset-list-item asset false #{} #{})
+        row (view/asset-list-item asset false #{} #{} #{})
         classes (set (collect-all-classes row))]
     (is (contains? classes "num"))
     (is (contains? classes "num-right"))))
+
+(deftest asset-list-item-hides-icon-until-load-and-wires-load-events-test
+  (let [asset {:key "perp:BTC"
+               :symbol "BTC-USDC"
+               :coin "BTC"
+               :base "BTC"
+               :market-type :perp
+               :mark 1
+               :volume24h 10
+               :change24hPct 1}
+        row (view/asset-list-item asset false #{} #{} #{})
+        img-node (find-first-img-node row)
+        attrs (second img-node)
+        classes (set (class-values (:class attrs)))]
+    (is (some? img-node))
+    (is (contains? classes "hidden"))
+    (is (= [[:actions/mark-loaded-asset-icon "perp:BTC"]]
+           (get-in attrs [:on :load])))
+    (is (= [[:actions/mark-missing-asset-icon "perp:BTC"]]
+           (get-in attrs [:on :error])))))
+
+(deftest asset-list-item-shows-icon-after-load-test
+  (let [asset {:key "perp:BTC"
+               :symbol "BTC-USDC"
+               :coin "BTC"
+               :base "BTC"
+               :market-type :perp
+               :mark 1
+               :volume24h 10
+               :change24hPct 1}
+        row (view/asset-list-item asset false #{} #{} #{"perp:BTC"})
+        img-node (find-first-img-node row)
+        attrs (second img-node)
+        classes (set (class-values (:class attrs)))]
+    (is (some? img-node))
+    (is (not (contains? classes "hidden")))))

@@ -100,7 +100,7 @@
       :else
       nil)))
 
-(defn asset-icon [market dropdown-visible? missing-icons]
+(defn asset-icon [market dropdown-visible? missing-icons loaded-icons]
   (let [coin (:coin market)
         base (or (:base market) coin)
         symbol (or (:symbol market) coin)
@@ -108,6 +108,7 @@
         leverage-label (leverage-chip-label market)
         market-type (:market-type market)
         market-key (or (:key market) (markets/coin->market-key coin))
+        loaded-icon? (contains? loaded-icons market-key)
         missing-icon? (contains? missing-icons market-key)
         icon-blocked? (or missing-icon?
                           (and (string? base)
@@ -118,8 +119,10 @@
      (when-not icon-blocked?
        [:img.w-6.h-6.rounded-full
         {:src (str "https://app.hyperliquid.xyz/coins/" base ".svg")
-         :alt base
-         :on {:error [[:actions/mark-missing-asset-icon market-key]]}}])
+         :alt ""
+         :class (when-not loaded-icon? ["hidden"])
+         :on {:load [[:actions/mark-loaded-asset-icon market-key]]
+              :error [[:actions/mark-missing-asset-icon market-key]]}}])
      [:div.flex.items-center.space-x-2.min-w-0
       [:span.font-medium.truncate symbol]
       (when (= market-type :spot)
@@ -205,7 +208,8 @@
       [:div {:class ["flex" "justify-start" "app-shell-gutter-left" "min-w-fit"]}
        (asset-icon icon-market
                    dropdown-visible?
-                   (get-in full-state [:asset-selector :missing-icons] #{}))]
+                   (get-in full-state [:asset-selector :missing-icons] #{})
+                   (get-in full-state [:asset-selector :loaded-icons] #{}))]
       
       ;; Mark column
       [:div.flex.justify-center
@@ -344,6 +348,7 @@
           :favorites (:favorites dropdown-state #{})
           :favorites-only? (:favorites-only? dropdown-state false)
           :missing-icons (:missing-icons dropdown-state #{})
+          :loaded-icons (:loaded-icons dropdown-state #{})
           :strict? (:strict? dropdown-state false)
           :active-tab (:active-tab dropdown-state :all)}))]))
 
@@ -360,6 +365,7 @@
                                                          :phase :bootstrap
                                                          :favorites #{}
                                                          :missing-icons #{}
+                                                         :loaded-icons #{}
                                                          :favorites-only? false
                                                          :strict? false
                                                          :active-tab :all})]

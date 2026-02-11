@@ -59,6 +59,19 @@
       (finally
         (set! (.-localStorage js/globalThis) original-local-storage)))))
 
+(defn- with-test-navigator [navigator-value f]
+  (let [navigator-prop "navigator"
+        original-navigator-descriptor (js/Object.getOwnPropertyDescriptor js/globalThis navigator-prop)]
+    (js/Object.defineProperty js/globalThis navigator-prop
+                              #js {:value navigator-value
+                                   :configurable true})
+    (try
+      (f)
+      (finally
+        (if original-navigator-descriptor
+          (js/Object.defineProperty js/globalThis navigator-prop original-navigator-descriptor)
+          (js/Reflect.deleteProperty js/globalThis navigator-prop))))))
+
 (defn- clear-wallet-copy-feedback-timeout! []
   (let [timeout-atom @#'hyperopen.core/wallet-copy-feedback-timeout-id]
     (when-let [timeout-id @timeout-atom]
@@ -105,6 +118,41 @@
       (is (fn? @deferred-callback))
       (@deferred-callback)
       (is (= [:bootstrap :full] @phases)))))
+
+(deftest register-icon-service-worker-registers-when-supported-test
+  (let [registered-paths (atom [])]
+    (with-test-navigator
+      #js {:serviceWorker
+           #js {:register (fn [script-path]
+                            (swap! registered-paths conj script-path)
+                            (js/Promise.resolve #js {:scope "/"}))}}
+      (fn []
+        (@#'hyperopen.core/register-icon-service-worker!)
+        (is (= ["/sw.js"] @registered-paths))))))
+
+(deftest register-icon-service-worker-skips-when-unsupported-test
+  (with-test-navigator
+    #js {}
+    (fn []
+      (is (nil? (@#'hyperopen.core/register-icon-service-worker!))))))
+
+(deftest mark-loaded-asset-icon-promotes-key-to-loaded-and-clears-missing-test
+  (let [state {:asset-selector {:loaded-icons #{}
+                                :missing-icons #{"perp:BTC"}}}
+        effects (core/mark-loaded-asset-icon state "perp:BTC")
+        writes (-> effects first second)]
+    (is (= :effects/save-many (-> effects first first)))
+    (is (some #(= [[:asset-selector :loaded-icons] #{"perp:BTC"}] %) writes))
+    (is (some #(= [[:asset-selector :missing-icons] #{}] %) writes))))
+
+(deftest mark-missing-asset-icon-promotes-key-to-missing-and-clears-loaded-test
+  (let [state {:asset-selector {:loaded-icons #{"perp:BTC"}
+                                :missing-icons #{}}}
+        effects (core/mark-missing-asset-icon state "perp:BTC")
+        writes (-> effects first second)]
+    (is (= :effects/save-many (-> effects first first)))
+    (is (some #(= [[:asset-selector :missing-icons] #{"perp:BTC"}] %) writes))
+    (is (some #(= [[:asset-selector :loaded-icons] #{}] %) writes))))
 
 (deftest account-bootstrap-two-stage-and-guarded-test
   (async done

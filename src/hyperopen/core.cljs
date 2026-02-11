@@ -154,6 +154,7 @@
                                       :phase :bootstrap
                                       :loaded-at-ms nil
                                       :favorites #{}
+                                      :loaded-icons #{}
                                       :missing-icons #{}
                                       :favorites-only? false
                                       :strict? false
@@ -208,6 +209,9 @@
 
 (def ^:private auto-recover-cooldown-ms
   300000)
+
+(def ^:private icon-service-worker-path
+  "/sw.js")
 
 (def ^:private app-version
   "0.1.0")
@@ -1018,11 +1022,24 @@
 (defn refresh-asset-markets [state]
   [[:effects/fetch-asset-selector-markets]])
 
+(defn mark-loaded-asset-icon [state market-key]
+  (if (seq market-key)
+    (let [loaded-icons (get-in state [:asset-selector :loaded-icons] #{})
+          missing-icons (get-in state [:asset-selector :missing-icons] #{})
+          next-loaded-icons (conj loaded-icons market-key)
+          next-missing-icons (disj missing-icons market-key)]
+      [[:effects/save-many [[[:asset-selector :loaded-icons] next-loaded-icons]
+                            [[:asset-selector :missing-icons] next-missing-icons]]]])
+    []))
+
 (defn mark-missing-asset-icon [state market-key]
   (if (seq market-key)
-    (let [missing (get-in state [:asset-selector :missing-icons] #{})
-          updated (conj missing market-key)]
-      [[:effects/save [:asset-selector :missing-icons] updated]])
+    (let [missing-icons (get-in state [:asset-selector :missing-icons] #{})
+          loaded-icons (get-in state [:asset-selector :loaded-icons] #{})
+          next-missing-icons (conj missing-icons market-key)
+          next-loaded-icons (disj loaded-icons market-key)]
+      [[:effects/save-many [[[:asset-selector :missing-icons] next-missing-icons]
+                            [[:asset-selector :loaded-icons] next-loaded-icons]]]])
     []))
 
 (def open-orders-sortable-columns
@@ -2320,6 +2337,7 @@
 (nxr/register-action! :actions/set-asset-selector-favorites-only set-asset-selector-favorites-only)
 (nxr/register-action! :actions/set-asset-selector-tab set-asset-selector-tab)
 (nxr/register-action! :actions/refresh-asset-markets refresh-asset-markets)
+(nxr/register-action! :actions/mark-loaded-asset-icon mark-loaded-asset-icon)
 (nxr/register-action! :actions/mark-missing-asset-icon mark-missing-asset-icon)
 (nxr/register-action! :actions/toggle-timeframes-dropdown toggle-timeframes-dropdown)
 (nxr/register-action! :actions/select-chart-timeframe select-chart-timeframe)
@@ -2507,6 +2525,19 @@
                              :asset-selector selector}))))
       5000)))
 
+(defn- register-icon-service-worker! []
+  (let [navigator-object (when (exists? js/globalThis)
+                           (.-navigator js/globalThis))
+        service-worker (some-> navigator-object (.-serviceWorker))
+        register-fn (some-> service-worker (.-register))]
+    (when (fn? register-fn)
+      ;; Persist icon responses across reloads to avoid repeated broken-image flashes.
+      (-> (.register service-worker icon-service-worker-path)
+          (.then (fn [_registration]
+                   (println "Registered icon cache service worker.")))
+          (.catch (fn [err]
+                    (println "Service worker registration failed:" err)))))))
+
 (defn- stage-b-account-bootstrap!
   [address dexs]
   (doseq [[idx dex] (map-indexed vector (or dexs []))]
@@ -2632,6 +2663,8 @@
   (wallet/init-wallet! store)
   ;; Initialize router
   (router/init! store)
+  ;; Register icon cache service worker for cross-reload symbol icon caching.
+  (register-icon-service-worker!)
   ;; Initialize remote data streams
   (initialize-remote-data-streams!)
   ;; Trigger initial render by updating the store

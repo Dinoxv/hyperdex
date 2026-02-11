@@ -51,6 +51,25 @@
               nil))]
     (boolean (walk node))))
 
+(defn- find-first-img-node [node]
+  (letfn [(walk [n]
+            (cond
+              (vector? n)
+              (let [tag (first n)
+                    attrs (when (map? (second n)) (second n))
+                    children (if attrs (drop 2 n) (drop 1 n))]
+                (if (and (keyword? tag)
+                         (str/starts-with? (name tag) "img"))
+                  n
+                  (some walk children)))
+
+              (seq? n)
+              (some walk n)
+
+              :else
+              nil))]
+    (walk node)))
+
 (deftest active-asset-row-symbol-fallback-test
   (let [ctx-data {:coin "SOL"
                   :mark 87.0
@@ -93,9 +112,24 @@
                      :symbol "HYPE/USDC"
                      :base "HYPE"
                      :market-type :spot}
-        icon-node (view/asset-icon spot-market false #{})
+        icon-node (view/asset-icon spot-market false #{} #{})
         path-ds (set (collect-path-ds icon-node))]
     (is (contains? path-ds "M19 9l-7 7-7-7"))))
+
+(deftest asset-icon-hides-image-until-load-test
+  (let [market {:key "perp:BTC"
+                :coin "BTC"
+                :symbol "BTC-USDC"
+                :base "BTC"
+                :market-type :perp}
+        icon-node (view/asset-icon market false #{} #{})
+        img-node (find-first-img-node icon-node)
+        attrs (second img-node)
+        classes (set (class-values (:class attrs)))]
+    (is (some? img-node))
+    (is (contains? classes "hidden"))
+    (is (= [[:actions/mark-loaded-asset-icon "perp:BTC"]]
+           (get-in attrs [:on :load])))))
 
 (deftest active-asset-row-uses-app-shell-left-gutter-test
   (let [ctx-data {:coin "SOL"
