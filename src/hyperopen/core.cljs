@@ -10,10 +10,10 @@
             [hyperopen.runtime.bootstrap :as runtime-bootstrap]
             [hyperopen.runtime.state :as runtime-state]
             [hyperopen.runtime.wiring :as runtime-wiring]
-            [hyperopen.startup.collaborators :as startup-collaborators]
             [hyperopen.startup.composition :as startup-composition]
             [hyperopen.startup.runtime :as startup-runtime-lib]
             [hyperopen.startup.watchers :as startup-watchers]
+            [hyperopen.startup.wiring :as startup-wiring]
             [hyperopen.wallet.core :as wallet]
             [hyperopen.wallet.agent-session :as agent-session]
             [hyperopen.wallet.address-watcher :as address-watcher]
@@ -107,7 +107,7 @@
 
 (defn- startup-base-deps
   []
-  (startup-collaborators/startup-base-deps
+  (startup-wiring/startup-base-deps
    {:startup-runtime startup-runtime
     :store store
     :icon-service-worker-path runtime-state/icon-service-worker-path
@@ -117,68 +117,58 @@
 
 (defn- schedule-startup-summary-log!
   []
-  (startup-composition/schedule-startup-summary-log!
-   (assoc (startup-base-deps)
-          :delay-ms runtime-state/startup-summary-delay-ms)))
+  (startup-wiring/schedule-startup-summary-log!
+   (startup-base-deps)
+   runtime-state/startup-summary-delay-ms))
 
 (defn- register-icon-service-worker!
   []
-  (startup-composition/register-icon-service-worker!
+  (startup-wiring/register-icon-service-worker!
    (startup-base-deps)))
 
 (defn- stage-b-account-bootstrap!
   [address dexs]
-  (startup-composition/stage-b-account-bootstrap!
+  (startup-wiring/stage-b-account-bootstrap!
    (startup-base-deps)
    address
    dexs))
 
 (defn- bootstrap-account-data!
   [address]
-  (startup-composition/bootstrap-account-data!
-   (assoc (startup-base-deps)
-          :stage-b-account-bootstrap! stage-b-account-bootstrap!)
-   address))
-
-(defn- reify-address-handler
-  [on-address-changed-fn handler-name]
-  (reify address-watcher/IAddressChangeHandler
-    (on-address-changed [_ _ new-address]
-      (on-address-changed-fn new-address))
-    (get-handler-name [_]
-      handler-name)))
+  (startup-wiring/bootstrap-account-data!
+   (startup-base-deps)
+   address
+   stage-b-account-bootstrap!))
 
 (defn- install-address-handlers!
   []
-  (startup-composition/install-address-handlers!
-   (assoc (startup-base-deps)
-          :bootstrap-account-data! bootstrap-account-data!
-          :address-handler-reify reify-address-handler
-          :address-handler-name "startup-account-bootstrap-handler")))
+  (startup-wiring/install-address-handlers!
+   (startup-base-deps)
+   bootstrap-account-data!))
 
 (defn- start-critical-bootstrap!
   []
-  (startup-composition/start-critical-bootstrap!
+  (startup-wiring/start-critical-bootstrap!
    (startup-base-deps)))
 
 (defn- run-deferred-bootstrap!
   []
-  (startup-composition/run-deferred-bootstrap!
+  (startup-wiring/run-deferred-bootstrap!
    (startup-base-deps)))
 
 (defn- schedule-deferred-bootstrap!
   []
-  (startup-composition/schedule-deferred-bootstrap!
-   (assoc (startup-base-deps)
-          :run-deferred-bootstrap! run-deferred-bootstrap!)))
+  (startup-wiring/schedule-deferred-bootstrap!
+   (startup-base-deps)
+   run-deferred-bootstrap!))
 
 (defn initialize-remote-data-streams!
   []
-  (startup-composition/initialize-remote-data-streams!
-   (assoc (startup-base-deps)
-          :install-address-handlers! install-address-handlers!
-          :start-critical-bootstrap! start-critical-bootstrap!
-          :schedule-deferred-bootstrap! schedule-deferred-bootstrap!)))
+  (startup-wiring/initialize-remote-data-streams!
+   (startup-base-deps)
+   {:install-address-handlers-fn install-address-handlers!
+    :start-critical-bootstrap-fn start-critical-bootstrap!
+    :schedule-deferred-bootstrap-fn schedule-deferred-bootstrap!}))
 
 (defn init []
   (ensure-runtime-bootstrapped!)
