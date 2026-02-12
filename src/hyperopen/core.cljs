@@ -34,6 +34,7 @@
             [hyperopen.orderbook.settings :as orderbook-settings]
             [hyperopen.registry.runtime :as runtime-registry]
             [hyperopen.runtime.app-effects :as app-effects]
+            [hyperopen.runtime.api-effects :as api-effects]
             [hyperopen.startup.init :as startup-init]
             [hyperopen.startup.restore :as startup-restore]
             [hyperopen.startup.runtime :as startup-runtime-lib]
@@ -959,14 +960,19 @@
 
 (defn- fetch-asset-selector-markets-effect
   [_ store & [opts]]
-  (api/fetch-asset-selector-markets! store (or opts {:phase :full})))
+  (api-effects/fetch-asset-selector-markets!
+   {:store store
+    :opts opts
+    :fetch-asset-selector-markets-fn api/fetch-asset-selector-markets!}))
 
 (defn- api-load-user-data-effect
   [_ store address]
-  (when address
-    (api/fetch-frontend-open-orders! store address)
-    (api/fetch-user-fills! store address)
-    (account-history-effects/fetch-and-merge-funding-history! store address {:priority :high})))
+  (api-effects/load-user-data!
+   {:store store
+    :address address
+    :fetch-frontend-open-orders! api/fetch-frontend-open-orders!
+    :fetch-user-fills! api/fetch-user-fills!
+    :fetch-and-merge-funding-history! account-history-effects/fetch-and-merge-funding-history!}))
 
 (defn navigate
   [state path & [opts]]
