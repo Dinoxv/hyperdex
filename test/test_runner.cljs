@@ -16,6 +16,7 @@
             [hyperopen.asset-selector.markets-cache-test]
             [hyperopen.asset-selector.icon-status-runtime-test]
             [hyperopen.websocket.subscriptions-runtime-test]
+            [hyperopen.core-public-actions-test]
             [hyperopen.core-bootstrap-test]
             [hyperopen.utils.data-normalization-test]
             [hyperopen.utils.formatting-test]
@@ -79,6 +80,7 @@
              'hyperopen.asset-selector.markets-test
              'hyperopen.asset-selector.markets-cache-test
              'hyperopen.asset-selector.icon-status-runtime-test
+             'hyperopen.core-public-actions-test
              'hyperopen.core-bootstrap-test
              'hyperopen.orderbook.price-aggregation-test
              'hyperopen.order.feedback-runtime-test

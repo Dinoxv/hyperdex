@@ -1,4 +1,5 @@
 (ns hyperopen.core
+  (:require-macros [hyperopen.core.macros :refer [def-public-action-aliases]])
   (:require [replicant.dom :as r]
             [nexus.registry :as nxr]
             [hyperopen.views.app-view :as app-view]
@@ -18,20 +19,16 @@
             [hyperopen.api.trading :as trading-api]
             [hyperopen.account.history.actions :as account-history-actions]
             [hyperopen.account.history.effects :as account-history-effects]
-            [hyperopen.order.actions :as order-actions]
             [hyperopen.order.feedback-runtime :as order-feedback-runtime]
             [hyperopen.order.effects :as order-effects]
+            [hyperopen.core.public-actions :as public-actions]
             [hyperopen.asset-selector.active-market-cache :as active-market-cache]
             [hyperopen.asset-selector.actions :as asset-actions]
             [hyperopen.asset-selector.icon-status-runtime :as icon-status-runtime]
             [hyperopen.asset-selector.markets-cache :as markets-cache]
             [hyperopen.asset-selector.settings :as asset-selector-settings]
             [hyperopen.asset-selector.markets :as markets]
-            [hyperopen.chart.actions :as chart-actions]
-            [hyperopen.chart.settings :as chart-settings]
-            [hyperopen.orderbook.actions :as orderbook-actions]
             [hyperopen.orderbook.price-aggregation :as price-agg]
-            [hyperopen.orderbook.settings :as orderbook-settings]
             [hyperopen.registry.runtime :as runtime-registry]
             [hyperopen.runtime.app-effects :as app-effects]
             [hyperopen.runtime.api-effects :as api-effects]
@@ -44,8 +41,6 @@
             [hyperopen.startup.restore :as startup-restore]
             [hyperopen.startup.runtime :as startup-runtime-lib]
             [hyperopen.startup.watchers :as startup-watchers]
-            [hyperopen.ui.preferences :as ui-preferences]
-            [hyperopen.utils.parse :as parse-utils]
             [hyperopen.wallet.agent-runtime :as agent-runtime]
             [hyperopen.wallet.actions :as wallet-actions]
             [hyperopen.wallet.connection-runtime :as wallet-connection-runtime]
@@ -59,9 +54,6 @@
 
 (def ^:private default-funding-history-state
   account-history-actions/default-funding-history-state)
-
-(def ^:private parse-int-value
-  parse-utils/parse-int-value)
 
 (def ^:private default-order-history-state
   account-history-actions/default-order-history-state)
@@ -523,82 +515,105 @@
     source
     (ws-diagnostics-action-deps))))
 
-(def toggle-asset-dropdown
-  asset-actions/toggle-asset-dropdown)
-
-(def close-asset-dropdown
-  asset-actions/close-asset-dropdown)
-
-(def select-asset
-  asset-actions/select-asset)
-
-(def update-asset-search
-  asset-actions/update-asset-search)
-
-;; --- asset selector sort settings logic moved to asset_selector/settings.cljs ---
-
-(def update-asset-selector-sort
-  asset-actions/update-asset-selector-sort)
-
-(def toggle-asset-selector-strict
-  asset-actions/toggle-asset-selector-strict)
-
-(def toggle-asset-favorite
-  asset-actions/toggle-asset-favorite)
-
-(def set-asset-selector-favorites-only
-  asset-actions/set-asset-selector-favorites-only)
-
-(def set-asset-selector-tab
-  asset-actions/set-asset-selector-tab)
-
-(def set-asset-selector-scroll-top
-  asset-actions/set-asset-selector-scroll-top)
-
-(def increase-asset-selector-render-limit
-  asset-actions/increase-asset-selector-render-limit)
-
-(def show-all-asset-selector-markets
-  asset-actions/show-all-asset-selector-markets)
-
-(def maybe-increase-asset-selector-render-limit
-  asset-actions/maybe-increase-asset-selector-render-limit)
-
-(defn refresh-asset-markets [state]
-  [[:effects/fetch-asset-selector-markets]])
-
-(def apply-asset-icon-status-updates
-  asset-actions/apply-asset-icon-status-updates)
-
-(def mark-loaded-asset-icon
-  asset-actions/mark-loaded-asset-icon)
-
-(def mark-missing-asset-icon
-  asset-actions/mark-missing-asset-icon)
-
-(def restore-open-orders-sort-settings!
-  account-history-actions/restore-open-orders-sort-settings!)
-
-(def restore-order-history-pagination-settings!
-  account-history-actions/restore-order-history-pagination-settings!)
-
-(def restore-funding-history-pagination-settings!
-  account-history-actions/restore-funding-history-pagination-settings!)
-
-(def restore-trade-history-pagination-settings!
-  account-history-actions/restore-trade-history-pagination-settings!)
-
-(def restore-chart-options!
-  chart-settings/restore-chart-options!)
-
-(def restore-orderbook-ui!
-  orderbook-settings/restore-orderbook-ui!)
-
-(def restore-agent-storage-mode!
-  startup-restore/restore-agent-storage-mode!)
-
-(def restore-ui-font-preference!
-  ui-preferences/restore-ui-font-preference!)
+;; Re-export action aliases from a dedicated module to keep this namespace thin
+;; while preserving the legacy `hyperopen.core/*` API surface.
+(def-public-action-aliases
+  public-actions
+  [toggle-asset-dropdown
+   close-asset-dropdown
+   select-asset
+   update-asset-search
+   update-asset-selector-sort
+   toggle-asset-selector-strict
+   toggle-asset-favorite
+   set-asset-selector-favorites-only
+   set-asset-selector-tab
+   set-asset-selector-scroll-top
+   increase-asset-selector-render-limit
+   show-all-asset-selector-markets
+   maybe-increase-asset-selector-render-limit
+   refresh-asset-markets
+   apply-asset-icon-status-updates
+   mark-loaded-asset-icon
+   mark-missing-asset-icon
+   restore-open-orders-sort-settings!
+   restore-order-history-pagination-settings!
+   restore-funding-history-pagination-settings!
+   restore-trade-history-pagination-settings!
+   restore-chart-options!
+   restore-orderbook-ui!
+   restore-agent-storage-mode!
+   restore-ui-font-preference!
+   toggle-timeframes-dropdown
+   select-chart-timeframe
+   toggle-chart-type-dropdown
+   select-chart-type
+   toggle-indicators-dropdown
+   toggle-orderbook-size-unit-dropdown
+   select-orderbook-size-unit
+   toggle-orderbook-price-aggregation-dropdown
+   select-orderbook-price-aggregation
+   select-orderbook-tab
+   add-indicator
+   remove-indicator
+   update-indicator-period
+   select-account-info-tab
+   set-funding-history-filters
+   toggle-funding-history-filter-open
+   toggle-funding-history-filter-coin
+   reset-funding-history-filter-draft
+   apply-funding-history-filters
+   view-all-funding-history
+   export-funding-history-csv
+   sort-positions
+   sort-balances
+   sort-open-orders
+   sort-funding-history
+   set-funding-history-page-size
+   set-funding-history-page
+   next-funding-history-page
+   prev-funding-history-page
+   set-funding-history-page-input
+   apply-funding-history-page-input
+   handle-funding-history-page-input-keydown
+   set-trade-history-page-size
+   set-trade-history-page
+   next-trade-history-page
+   prev-trade-history-page
+   set-trade-history-page-input
+   apply-trade-history-page-input
+   handle-trade-history-page-input-keydown
+   sort-trade-history
+   sort-order-history
+   toggle-order-history-filter-open
+   set-order-history-status-filter
+   set-order-history-page-size
+   set-order-history-page
+   next-order-history-page
+   prev-order-history-page
+   set-order-history-page-input
+   apply-order-history-page-input
+   handle-order-history-page-input-keydown
+   refresh-order-history
+   set-hide-small-balances
+   select-order-entry-mode
+   select-pro-order-type
+   toggle-pro-order-type-dropdown
+   close-pro-order-type-dropdown
+   handle-pro-order-type-dropdown-keydown
+   set-order-ui-leverage
+   set-order-size-percent
+   set-order-size-display
+   focus-order-price-input
+   blur-order-price-input
+   set-order-price-to-mid
+   toggle-order-tpsl-panel
+   update-order-form
+   submit-order
+   prune-canceled-open-orders
+   cancel-order
+   load-user-data
+   set-funding-modal])
 
 (defn- restore-active-asset-deps []
   {:connected?-fn ws-client/connected?
@@ -607,216 +622,6 @@
 
 (defn restore-active-asset! [store]
   (startup-restore/restore-active-asset! store (restore-active-asset-deps)))
-
-(def toggle-timeframes-dropdown
-  chart-actions/toggle-timeframes-dropdown)
-
-(def select-chart-timeframe
-  chart-actions/select-chart-timeframe)
-
-(def toggle-chart-type-dropdown
-  chart-actions/toggle-chart-type-dropdown)
-
-(def select-chart-type
-  chart-actions/select-chart-type)
-
-(def toggle-indicators-dropdown
-  chart-actions/toggle-indicators-dropdown)
-
-(def toggle-orderbook-size-unit-dropdown
-  orderbook-actions/toggle-orderbook-size-unit-dropdown)
-
-(def select-orderbook-size-unit
-  orderbook-actions/select-orderbook-size-unit)
-
-(def toggle-orderbook-price-aggregation-dropdown
-  orderbook-actions/toggle-orderbook-price-aggregation-dropdown)
-
-(def select-orderbook-price-aggregation
-  orderbook-actions/select-orderbook-price-aggregation)
-
-(def select-orderbook-tab
-  orderbook-actions/select-orderbook-tab)
-
-(def add-indicator
-  chart-settings/add-indicator)
-
-(def remove-indicator
-  chart-settings/remove-indicator)
-
-(def update-indicator-period
-  chart-settings/update-indicator-period)
-
-(def select-account-info-tab
-  account-history-actions/select-account-info-tab)
-
-(def set-funding-history-filters
-  account-history-actions/set-funding-history-filters)
-
-(def toggle-funding-history-filter-open
-  account-history-actions/toggle-funding-history-filter-open)
-
-(def toggle-funding-history-filter-coin
-  account-history-actions/toggle-funding-history-filter-coin)
-
-(def reset-funding-history-filter-draft
-  account-history-actions/reset-funding-history-filter-draft)
-
-(def apply-funding-history-filters
-  account-history-actions/apply-funding-history-filters)
-
-(def view-all-funding-history
-  account-history-actions/view-all-funding-history)
-
-(def export-funding-history-csv
-  account-history-actions/export-funding-history-csv)
-
-(def sort-positions
-  account-history-actions/sort-positions)
-
-(def sort-balances
-  account-history-actions/sort-balances)
-
-(def sort-open-orders
-  account-history-actions/sort-open-orders)
-
-(def sort-funding-history
-  account-history-actions/sort-funding-history)
-
-(def set-funding-history-page-size
-  account-history-actions/set-funding-history-page-size)
-
-(def set-funding-history-page
-  account-history-actions/set-funding-history-page)
-
-(def next-funding-history-page
-  account-history-actions/next-funding-history-page)
-
-(def prev-funding-history-page
-  account-history-actions/prev-funding-history-page)
-
-(def set-funding-history-page-input
-  account-history-actions/set-funding-history-page-input)
-
-(def apply-funding-history-page-input
-  account-history-actions/apply-funding-history-page-input)
-
-(def handle-funding-history-page-input-keydown
-  account-history-actions/handle-funding-history-page-input-keydown)
-
-(def set-trade-history-page-size
-  account-history-actions/set-trade-history-page-size)
-
-(def set-trade-history-page
-  account-history-actions/set-trade-history-page)
-
-(def next-trade-history-page
-  account-history-actions/next-trade-history-page)
-
-(def prev-trade-history-page
-  account-history-actions/prev-trade-history-page)
-
-(def set-trade-history-page-input
-  account-history-actions/set-trade-history-page-input)
-
-(def apply-trade-history-page-input
-  account-history-actions/apply-trade-history-page-input)
-
-(def handle-trade-history-page-input-keydown
-  account-history-actions/handle-trade-history-page-input-keydown)
-
-(def sort-trade-history
-  account-history-actions/sort-trade-history)
-
-(def sort-order-history
-  account-history-actions/sort-order-history)
-
-(def toggle-order-history-filter-open
-  account-history-actions/toggle-order-history-filter-open)
-
-(def set-order-history-status-filter
-  account-history-actions/set-order-history-status-filter)
-
-(def set-order-history-page-size
-  account-history-actions/set-order-history-page-size)
-
-(def set-order-history-page
-  account-history-actions/set-order-history-page)
-
-(def next-order-history-page
-  account-history-actions/next-order-history-page)
-
-(def prev-order-history-page
-  account-history-actions/prev-order-history-page)
-
-(def set-order-history-page-input
-  account-history-actions/set-order-history-page-input)
-
-(def apply-order-history-page-input
-  account-history-actions/apply-order-history-page-input)
-
-(def handle-order-history-page-input-keydown
-  account-history-actions/handle-order-history-page-input-keydown)
-
-(def refresh-order-history
-  account-history-actions/refresh-order-history)
-
-(def set-hide-small-balances
-  account-history-actions/set-hide-small-balances)
-
-(def select-order-entry-mode
-  order-actions/select-order-entry-mode)
-
-(def select-pro-order-type
-  order-actions/select-pro-order-type)
-
-(def toggle-pro-order-type-dropdown
-  order-actions/toggle-pro-order-type-dropdown)
-
-(def close-pro-order-type-dropdown
-  order-actions/close-pro-order-type-dropdown)
-
-(def handle-pro-order-type-dropdown-keydown
-  order-actions/handle-pro-order-type-dropdown-keydown)
-
-(def set-order-ui-leverage
-  order-actions/set-order-ui-leverage)
-
-(def set-order-size-percent
-  order-actions/set-order-size-percent)
-
-(def set-order-size-display
-  order-actions/set-order-size-display)
-
-(def focus-order-price-input
-  order-actions/focus-order-price-input)
-
-(def blur-order-price-input
-  order-actions/blur-order-price-input)
-
-(def set-order-price-to-mid
-  order-actions/set-order-price-to-mid)
-
-(def toggle-order-tpsl-panel
-  order-actions/toggle-order-tpsl-panel)
-
-(def update-order-form
-  order-actions/update-order-form)
-
-(def submit-order
-  order-actions/submit-order)
-
-(def prune-canceled-open-orders
-  order-actions/prune-canceled-open-orders)
-
-(def cancel-order
-  order-actions/cancel-order)
-
-(defn load-user-data [state address]
-  [[:effects/api-load-user-data address]])
-
-(defn set-funding-modal [state modal]
-  [[:effects/save [:funding-ui :modal] modal]])
 
 (defn- order-api-effect-deps []
   {:dispatch! nxr/dispatch
