@@ -24,6 +24,7 @@
             [hyperopen.orderbook.actions :as orderbook-actions]
             [hyperopen.orderbook.price-aggregation :as price-agg]
             [hyperopen.orderbook.settings :as orderbook-settings]
+            [hyperopen.registry.runtime :as runtime-registry]
             [hyperopen.startup.restore :as startup-restore]
             [hyperopen.ui.preferences :as ui-preferences]
             [hyperopen.utils.parse :as parse-utils]
@@ -1599,40 +1600,6 @@
 (defn set-funding-modal [state modal]
   [[:effects/save [:funding-ui :modal] modal]])
 
-;; Register effects and actions
-(nxr/register-effect! :effects/save save)
-(nxr/register-effect! :effects/save-many save-many)
-(nxr/register-effect! :effects/local-storage-set local-storage-set)
-(nxr/register-effect! :effects/local-storage-set-json local-storage-set-json)
-(nxr/register-effect! :effects/queue-asset-icon-status queue-asset-icon-status)
-(nxr/register-effect! :effects/push-state push-state)
-(nxr/register-effect! :effects/replace-state replace-state)
-(nxr/register-effect! :effects/init-websocket init-websocket)
-(nxr/register-effect! :effects/subscribe-active-asset subscribe-active-asset)
-(nxr/register-effect! :effects/subscribe-orderbook subscribe-orderbook)
-(nxr/register-effect! :effects/subscribe-trades subscribe-trades)
-(nxr/register-effect! :effects/subscribe-webdata2 subscribe-webdata2)
-(nxr/register-effect! :effects/fetch-candle-snapshot fetch-candle-snapshot)
-(nxr/register-effect! :effects/unsubscribe-active-asset unsubscribe-active-asset)
-(nxr/register-effect! :effects/unsubscribe-orderbook unsubscribe-orderbook)
-(nxr/register-effect! :effects/unsubscribe-trades unsubscribe-trades)
-(nxr/register-effect! :effects/unsubscribe-webdata2 unsubscribe-webdata2)
-(nxr/register-effect! :effects/connect-wallet connect-wallet)
-(nxr/register-effect! :effects/disconnect-wallet disconnect-wallet)
-(nxr/register-effect! :effects/enable-agent-trading enable-agent-trading)
-(nxr/register-effect! :effects/set-agent-storage-mode set-agent-storage-mode)
-(nxr/register-effect! :effects/copy-wallet-address copy-wallet-address)
-(nxr/register-effect! :effects/reconnect-websocket reconnect-websocket)
-(nxr/register-effect! :effects/refresh-websocket-health refresh-websocket-health)
-(nxr/register-effect! :effects/confirm-ws-diagnostics-reveal confirm-ws-diagnostics-reveal)
-(nxr/register-effect! :effects/copy-websocket-diagnostics copy-websocket-diagnostics)
-(nxr/register-effect! :effects/ws-reset-subscriptions ws-reset-subscriptions)
-(nxr/register-effect! :effects/fetch-asset-selector-markets
-  (fn [_ store & [opts]]
-    (api/fetch-asset-selector-markets! store (or opts {:phase :full}))))
-(nxr/register-effect! :effects/api-fetch-user-funding-history
-  account-history-effects/api-fetch-user-funding-history-effect)
-
 (defn- order-api-effect-deps []
   {:dispatch! nxr/dispatch
    :exchange-response-error exchange-response-error
@@ -1648,154 +1615,174 @@
   [ctx store request]
   (order-effects/api-cancel-order (order-api-effect-deps) ctx store request))
 
-(nxr/register-effect! :effects/api-fetch-historical-orders
-  account-history-effects/api-fetch-historical-orders-effect)
-(nxr/register-effect! :effects/export-funding-history-csv
-  account-history-effects/export-funding-history-csv-effect)
-(nxr/register-effect! :effects/api-submit-order
-  api-submit-order)
+(defn- fetch-asset-selector-markets-effect
+  [_ store & [opts]]
+  (api/fetch-asset-selector-markets! store (or opts {:phase :full})))
 
-(nxr/register-effect! :effects/api-cancel-order
-  api-cancel-order)
+(defn- api-load-user-data-effect
+  [_ store address]
+  (when address
+    (api/fetch-frontend-open-orders! store address)
+    (api/fetch-user-fills! store address)
+    (account-history-effects/fetch-and-merge-funding-history! store address {:priority :high})))
 
-(nxr/register-effect! :effects/api-load-user-data
-  (fn [_ store address]
-    (when address
-      (api/fetch-frontend-open-orders! store address)
-      (api/fetch-user-fills! store address)
-      (account-history-effects/fetch-and-merge-funding-history! store address {:priority :high}))))
-(nxr/register-action! :actions/init-websockets init-websockets)
-(nxr/register-action! :actions/subscribe-to-asset subscribe-to-asset)
-(nxr/register-action! :actions/subscribe-to-webdata2 subscribe-to-webdata2)
-(nxr/register-action! :actions/connect-wallet connect-wallet-action)
-(nxr/register-action! :actions/disconnect-wallet disconnect-wallet-action)
-(nxr/register-action! :actions/enable-agent-trading enable-agent-trading-action)
-(nxr/register-action! :actions/set-agent-storage-mode set-agent-storage-mode-action)
-(nxr/register-action! :actions/copy-wallet-address copy-wallet-address-action)
-(nxr/register-action! :actions/reconnect-websocket reconnect-websocket-action)
-(nxr/register-action! :actions/toggle-ws-diagnostics toggle-ws-diagnostics)
-(nxr/register-action! :actions/close-ws-diagnostics close-ws-diagnostics)
-(nxr/register-action! :actions/toggle-ws-diagnostics-sensitive toggle-ws-diagnostics-sensitive)
-(nxr/register-action! :actions/ws-diagnostics-reconnect-now ws-diagnostics-reconnect-now)
-(nxr/register-action! :actions/ws-diagnostics-copy ws-diagnostics-copy)
-(nxr/register-action! :actions/set-show-surface-freshness-cues set-show-surface-freshness-cues)
-(nxr/register-action! :actions/toggle-show-surface-freshness-cues toggle-show-surface-freshness-cues)
-(nxr/register-action! :actions/ws-diagnostics-reset-market-subscriptions ws-diagnostics-reset-market-subscriptions)
-(nxr/register-action! :actions/ws-diagnostics-reset-orders-subscriptions ws-diagnostics-reset-orders-subscriptions)
-(nxr/register-action! :actions/ws-diagnostics-reset-all-subscriptions ws-diagnostics-reset-all-subscriptions)
-(nxr/register-action! :actions/toggle-asset-dropdown toggle-asset-dropdown)
-(nxr/register-action! :actions/close-asset-dropdown close-asset-dropdown)
-(nxr/register-action! :actions/select-asset select-asset)
-(nxr/register-action! :actions/update-asset-search update-asset-search)
-(nxr/register-action! :actions/update-asset-selector-sort update-asset-selector-sort)
-(nxr/register-action! :actions/toggle-asset-selector-strict toggle-asset-selector-strict)
-(nxr/register-action! :actions/toggle-asset-favorite toggle-asset-favorite)
-(nxr/register-action! :actions/set-asset-selector-favorites-only set-asset-selector-favorites-only)
-(nxr/register-action! :actions/set-asset-selector-tab set-asset-selector-tab)
-(nxr/register-action! :actions/set-asset-selector-scroll-top set-asset-selector-scroll-top)
-(nxr/register-action! :actions/increase-asset-selector-render-limit
-                      increase-asset-selector-render-limit)
-(nxr/register-action! :actions/show-all-asset-selector-markets
-                      show-all-asset-selector-markets)
-(nxr/register-action! :actions/maybe-increase-asset-selector-render-limit
-                      maybe-increase-asset-selector-render-limit)
-(nxr/register-action! :actions/refresh-asset-markets refresh-asset-markets)
-(nxr/register-action! :actions/mark-loaded-asset-icon mark-loaded-asset-icon)
-(nxr/register-action! :actions/mark-missing-asset-icon mark-missing-asset-icon)
-(nxr/register-action! :actions/toggle-timeframes-dropdown toggle-timeframes-dropdown)
-(nxr/register-action! :actions/select-chart-timeframe select-chart-timeframe)
-(nxr/register-action! :actions/toggle-chart-type-dropdown toggle-chart-type-dropdown)
-(nxr/register-action! :actions/select-chart-type select-chart-type)
-(nxr/register-action! :actions/toggle-indicators-dropdown toggle-indicators-dropdown)
-(nxr/register-action! :actions/toggle-orderbook-size-unit-dropdown toggle-orderbook-size-unit-dropdown)
-(nxr/register-action! :actions/select-orderbook-size-unit select-orderbook-size-unit)
-(nxr/register-action! :actions/toggle-orderbook-price-aggregation-dropdown toggle-orderbook-price-aggregation-dropdown)
-(nxr/register-action! :actions/select-orderbook-price-aggregation select-orderbook-price-aggregation)
-(nxr/register-action! :actions/select-orderbook-tab select-orderbook-tab)
-(nxr/register-action! :actions/add-indicator add-indicator)
-(nxr/register-action! :actions/remove-indicator remove-indicator)
-(nxr/register-action! :actions/update-indicator-period update-indicator-period)
-(nxr/register-action! :actions/select-account-info-tab select-account-info-tab)
-(nxr/register-action! :actions/set-funding-history-filters set-funding-history-filters)
-(nxr/register-action! :actions/toggle-funding-history-filter-open toggle-funding-history-filter-open)
-(nxr/register-action! :actions/toggle-funding-history-filter-coin toggle-funding-history-filter-coin)
-(nxr/register-action! :actions/reset-funding-history-filter-draft reset-funding-history-filter-draft)
-(nxr/register-action! :actions/apply-funding-history-filters apply-funding-history-filters)
-(nxr/register-action! :actions/view-all-funding-history view-all-funding-history)
-(nxr/register-action! :actions/export-funding-history-csv export-funding-history-csv)
-(nxr/register-action! :actions/set-funding-history-page-size set-funding-history-page-size)
-(nxr/register-action! :actions/set-funding-history-page set-funding-history-page)
-(nxr/register-action! :actions/next-funding-history-page next-funding-history-page)
-(nxr/register-action! :actions/prev-funding-history-page prev-funding-history-page)
-(nxr/register-action! :actions/set-funding-history-page-input set-funding-history-page-input)
-(nxr/register-action! :actions/apply-funding-history-page-input apply-funding-history-page-input)
-(nxr/register-action! :actions/handle-funding-history-page-input-keydown handle-funding-history-page-input-keydown)
-(nxr/register-action! :actions/set-trade-history-page-size set-trade-history-page-size)
-(nxr/register-action! :actions/set-trade-history-page set-trade-history-page)
-(nxr/register-action! :actions/next-trade-history-page next-trade-history-page)
-(nxr/register-action! :actions/prev-trade-history-page prev-trade-history-page)
-(nxr/register-action! :actions/set-trade-history-page-input set-trade-history-page-input)
-(nxr/register-action! :actions/apply-trade-history-page-input apply-trade-history-page-input)
-(nxr/register-action! :actions/handle-trade-history-page-input-keydown handle-trade-history-page-input-keydown)
-(nxr/register-action! :actions/sort-trade-history sort-trade-history)
-(nxr/register-action! :actions/sort-positions sort-positions)
-(nxr/register-action! :actions/sort-balances sort-balances)
-(nxr/register-action! :actions/sort-open-orders sort-open-orders)
-(nxr/register-action! :actions/sort-funding-history sort-funding-history)
-(nxr/register-action! :actions/sort-order-history sort-order-history)
-(nxr/register-action! :actions/toggle-order-history-filter-open toggle-order-history-filter-open)
-(nxr/register-action! :actions/set-order-history-status-filter set-order-history-status-filter)
-(nxr/register-action! :actions/set-order-history-page-size set-order-history-page-size)
-(nxr/register-action! :actions/set-order-history-page set-order-history-page)
-(nxr/register-action! :actions/next-order-history-page next-order-history-page)
-(nxr/register-action! :actions/prev-order-history-page prev-order-history-page)
-(nxr/register-action! :actions/set-order-history-page-input set-order-history-page-input)
-(nxr/register-action! :actions/apply-order-history-page-input apply-order-history-page-input)
-(nxr/register-action! :actions/handle-order-history-page-input-keydown handle-order-history-page-input-keydown)
-(nxr/register-action! :actions/refresh-order-history refresh-order-history)
-(nxr/register-action! :actions/set-hide-small-balances set-hide-small-balances)
-(nxr/register-action! :actions/select-order-entry-mode select-order-entry-mode)
-(nxr/register-action! :actions/select-pro-order-type select-pro-order-type)
-(nxr/register-action! :actions/toggle-pro-order-type-dropdown toggle-pro-order-type-dropdown)
-(nxr/register-action! :actions/close-pro-order-type-dropdown close-pro-order-type-dropdown)
-(nxr/register-action! :actions/handle-pro-order-type-dropdown-keydown handle-pro-order-type-dropdown-keydown)
-(nxr/register-action! :actions/set-order-ui-leverage set-order-ui-leverage)
-(nxr/register-action! :actions/set-order-size-percent set-order-size-percent)
-(nxr/register-action! :actions/set-order-size-display set-order-size-display)
-(nxr/register-action! :actions/focus-order-price-input focus-order-price-input)
-(nxr/register-action! :actions/blur-order-price-input blur-order-price-input)
-(nxr/register-action! :actions/set-order-price-to-mid set-order-price-to-mid)
-(nxr/register-action! :actions/toggle-order-tpsl-panel toggle-order-tpsl-panel)
-(nxr/register-action! :actions/update-order-form update-order-form)
-(nxr/register-action! :actions/submit-order submit-order)
-(nxr/register-action! :actions/cancel-order cancel-order)
-(nxr/register-action! :actions/load-user-data load-user-data)
-(nxr/register-action! :actions/set-funding-modal set-funding-modal)
-(nxr/register-action! :actions/navigate
-  (fn [state path & [opts]]
-    (let [p (router/normalize-path path)
-          replace? (boolean (:replace? opts))]
-      (cond-> [[:effects/save [:router :path] p]]
-        replace? (conj [:effects/replace-state p])
-        (not replace?) (conj [:effects/push-state p])))))
-(nxr/register-system->state! deref)
+(defn navigate
+  [state path & [opts]]
+  (let [p (router/normalize-path path)
+        replace? (boolean (:replace? opts))]
+    (cond-> [[:effects/save [:router :path] p]]
+      replace? (conj [:effects/replace-state p])
+      (not replace?) (conj [:effects/push-state p]))))
 
-;; Register placeholder for DOM event values
-(nxr/register-placeholder! :event.target/value
-  (fn [{:replicant/keys [dom-event]}]
-    (some-> dom-event .-target .-value)))
+(defn- register-runtime!
+  []
+  (runtime-registry/register-effects!
+   {:save save
+    :save-many save-many
+    :local-storage-set local-storage-set
+    :local-storage-set-json local-storage-set-json
+    :queue-asset-icon-status queue-asset-icon-status
+    :push-state push-state
+    :replace-state replace-state
+    :init-websocket init-websocket
+    :subscribe-active-asset subscribe-active-asset
+    :subscribe-orderbook subscribe-orderbook
+    :subscribe-trades subscribe-trades
+    :subscribe-webdata2 subscribe-webdata2
+    :fetch-candle-snapshot fetch-candle-snapshot
+    :unsubscribe-active-asset unsubscribe-active-asset
+    :unsubscribe-orderbook unsubscribe-orderbook
+    :unsubscribe-trades unsubscribe-trades
+    :unsubscribe-webdata2 unsubscribe-webdata2
+    :connect-wallet connect-wallet
+    :disconnect-wallet disconnect-wallet
+    :enable-agent-trading enable-agent-trading
+    :set-agent-storage-mode set-agent-storage-mode
+    :copy-wallet-address copy-wallet-address
+    :reconnect-websocket reconnect-websocket
+    :refresh-websocket-health refresh-websocket-health
+    :confirm-ws-diagnostics-reveal confirm-ws-diagnostics-reveal
+    :copy-websocket-diagnostics copy-websocket-diagnostics
+    :ws-reset-subscriptions ws-reset-subscriptions
+    :fetch-asset-selector-markets fetch-asset-selector-markets-effect
+    :api-fetch-user-funding-history account-history-effects/api-fetch-user-funding-history-effect
+    :api-fetch-historical-orders account-history-effects/api-fetch-historical-orders-effect
+    :export-funding-history-csv account-history-effects/export-funding-history-csv-effect
+    :api-submit-order api-submit-order
+    :api-cancel-order api-cancel-order
+    :api-load-user-data api-load-user-data-effect})
 
-(nxr/register-placeholder! :event.target/checked
-  (fn [{:replicant/keys [dom-event]}]
-    (some-> dom-event .-target .-checked)))
+  (runtime-registry/register-actions!
+   {:init-websockets init-websockets
+    :subscribe-to-asset subscribe-to-asset
+    :subscribe-to-webdata2 subscribe-to-webdata2
+    :connect-wallet-action connect-wallet-action
+    :disconnect-wallet-action disconnect-wallet-action
+    :enable-agent-trading-action enable-agent-trading-action
+    :set-agent-storage-mode-action set-agent-storage-mode-action
+    :copy-wallet-address-action copy-wallet-address-action
+    :reconnect-websocket-action reconnect-websocket-action
+    :toggle-ws-diagnostics toggle-ws-diagnostics
+    :close-ws-diagnostics close-ws-diagnostics
+    :toggle-ws-diagnostics-sensitive toggle-ws-diagnostics-sensitive
+    :ws-diagnostics-reconnect-now ws-diagnostics-reconnect-now
+    :ws-diagnostics-copy ws-diagnostics-copy
+    :set-show-surface-freshness-cues set-show-surface-freshness-cues
+    :toggle-show-surface-freshness-cues toggle-show-surface-freshness-cues
+    :ws-diagnostics-reset-market-subscriptions ws-diagnostics-reset-market-subscriptions
+    :ws-diagnostics-reset-orders-subscriptions ws-diagnostics-reset-orders-subscriptions
+    :ws-diagnostics-reset-all-subscriptions ws-diagnostics-reset-all-subscriptions
+    :toggle-asset-dropdown toggle-asset-dropdown
+    :close-asset-dropdown close-asset-dropdown
+    :select-asset select-asset
+    :update-asset-search update-asset-search
+    :update-asset-selector-sort update-asset-selector-sort
+    :toggle-asset-selector-strict toggle-asset-selector-strict
+    :toggle-asset-favorite toggle-asset-favorite
+    :set-asset-selector-favorites-only set-asset-selector-favorites-only
+    :set-asset-selector-tab set-asset-selector-tab
+    :set-asset-selector-scroll-top set-asset-selector-scroll-top
+    :increase-asset-selector-render-limit increase-asset-selector-render-limit
+    :show-all-asset-selector-markets show-all-asset-selector-markets
+    :maybe-increase-asset-selector-render-limit maybe-increase-asset-selector-render-limit
+    :refresh-asset-markets refresh-asset-markets
+    :mark-loaded-asset-icon mark-loaded-asset-icon
+    :mark-missing-asset-icon mark-missing-asset-icon
+    :toggle-timeframes-dropdown toggle-timeframes-dropdown
+    :select-chart-timeframe select-chart-timeframe
+    :toggle-chart-type-dropdown toggle-chart-type-dropdown
+    :select-chart-type select-chart-type
+    :toggle-indicators-dropdown toggle-indicators-dropdown
+    :toggle-orderbook-size-unit-dropdown toggle-orderbook-size-unit-dropdown
+    :select-orderbook-size-unit select-orderbook-size-unit
+    :toggle-orderbook-price-aggregation-dropdown toggle-orderbook-price-aggregation-dropdown
+    :select-orderbook-price-aggregation select-orderbook-price-aggregation
+    :select-orderbook-tab select-orderbook-tab
+    :add-indicator add-indicator
+    :remove-indicator remove-indicator
+    :update-indicator-period update-indicator-period
+    :select-account-info-tab select-account-info-tab
+    :set-funding-history-filters set-funding-history-filters
+    :toggle-funding-history-filter-open toggle-funding-history-filter-open
+    :toggle-funding-history-filter-coin toggle-funding-history-filter-coin
+    :reset-funding-history-filter-draft reset-funding-history-filter-draft
+    :apply-funding-history-filters apply-funding-history-filters
+    :view-all-funding-history view-all-funding-history
+    :export-funding-history-csv export-funding-history-csv
+    :set-funding-history-page-size set-funding-history-page-size
+    :set-funding-history-page set-funding-history-page
+    :next-funding-history-page next-funding-history-page
+    :prev-funding-history-page prev-funding-history-page
+    :set-funding-history-page-input set-funding-history-page-input
+    :apply-funding-history-page-input apply-funding-history-page-input
+    :handle-funding-history-page-input-keydown handle-funding-history-page-input-keydown
+    :set-trade-history-page-size set-trade-history-page-size
+    :set-trade-history-page set-trade-history-page
+    :next-trade-history-page next-trade-history-page
+    :prev-trade-history-page prev-trade-history-page
+    :set-trade-history-page-input set-trade-history-page-input
+    :apply-trade-history-page-input apply-trade-history-page-input
+    :handle-trade-history-page-input-keydown handle-trade-history-page-input-keydown
+    :sort-trade-history sort-trade-history
+    :sort-positions sort-positions
+    :sort-balances sort-balances
+    :sort-open-orders sort-open-orders
+    :sort-funding-history sort-funding-history
+    :sort-order-history sort-order-history
+    :toggle-order-history-filter-open toggle-order-history-filter-open
+    :set-order-history-status-filter set-order-history-status-filter
+    :set-order-history-page-size set-order-history-page-size
+    :set-order-history-page set-order-history-page
+    :next-order-history-page next-order-history-page
+    :prev-order-history-page prev-order-history-page
+    :set-order-history-page-input set-order-history-page-input
+    :apply-order-history-page-input apply-order-history-page-input
+    :handle-order-history-page-input-keydown handle-order-history-page-input-keydown
+    :refresh-order-history refresh-order-history
+    :set-hide-small-balances set-hide-small-balances
+    :select-order-entry-mode select-order-entry-mode
+    :select-pro-order-type select-pro-order-type
+    :toggle-pro-order-type-dropdown toggle-pro-order-type-dropdown
+    :close-pro-order-type-dropdown close-pro-order-type-dropdown
+    :handle-pro-order-type-dropdown-keydown handle-pro-order-type-dropdown-keydown
+    :set-order-ui-leverage set-order-ui-leverage
+    :set-order-size-percent set-order-size-percent
+    :set-order-size-display set-order-size-display
+    :focus-order-price-input focus-order-price-input
+    :blur-order-price-input blur-order-price-input
+    :set-order-price-to-mid set-order-price-to-mid
+    :toggle-order-tpsl-panel toggle-order-tpsl-panel
+    :update-order-form update-order-form
+    :submit-order submit-order
+    :cancel-order cancel-order
+    :load-user-data load-user-data
+    :set-funding-modal set-funding-modal
+    :navigate navigate})
 
-(nxr/register-placeholder! :event/key
-  (fn [{:replicant/keys [dom-event]}]
-    (some-> dom-event .-key)))
+  (runtime-registry/register-system-state!)
+  (runtime-registry/register-placeholders!))
 
-(nxr/register-placeholder! :event.target/scrollTop
-  (fn [{:replicant/keys [dom-event]}]
-    (some-> dom-event .-target .-scrollTop)))
+(register-runtime!)
 
 ;; Wire up the render loop
 (r/set-dispatch! #(nxr/dispatch store %1 %2))
