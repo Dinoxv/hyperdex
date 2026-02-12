@@ -24,7 +24,17 @@
     (is (number? (get-in @runtime [:websocket-health :writes])))
     (is (map? (get-in @runtime [:asset-icons :pending])))
     (is (nil? (get-in @runtime [:asset-icons :flush-handle])))
+    (is (false? (runtime-state/app-started? runtime)))
     (is (false? (runtime-state/runtime-bootstrapped? runtime)))))
+
+(deftest runtime-state-mark-app-started-updates-once-test
+  (let [runtime (runtime-state/make-runtime-state)]
+    (is (true? (runtime-state/mark-app-started! runtime)))
+    (is (true? (runtime-state/app-started? runtime)))
+    (is (false? (runtime-state/mark-app-started! runtime))))
+  (let [runtime (runtime-state/make-runtime-state)]
+    (swap! runtime assoc :app-started? true)
+    (is (true? (runtime-state/app-started? runtime)))))
 
 (deftest runtime-state-mark-runtime-bootstrapped-updates-once-test
   (let [runtime (runtime-state/make-runtime-state)]

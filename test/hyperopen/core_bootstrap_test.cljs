@@ -149,6 +149,33 @@
     (is (true? (runtime-state/runtime-bootstrapped? runtime-state/runtime)))
     (swap! runtime-state/runtime assoc :runtime-bootstrapped? true)))
 
+(deftest init-runs-startup-sequence-once-test
+  (let [ensure-calls (atom 0)
+        bootstrap-calls (atom 0)
+        startup-calls (atom 0)
+        original-runtime-bootstrapped? (:runtime-bootstrapped? @runtime-state/runtime)
+        original-app-started? (:app-started? @runtime-state/runtime)]
+    (try
+      (swap! runtime-state/runtime assoc
+             :runtime-bootstrapped? false
+             :app-started? false)
+      (with-redefs [app-bootstrap/ensure-runtime-bootstrapped! (fn [_runtime bootstrap-fn]
+                                                                  (swap! ensure-calls inc)
+                                                                  (bootstrap-fn))
+                    app-bootstrap/bootstrap-runtime! (fn [_]
+                                                       (swap! bootstrap-calls inc))
+                    app-startup/init! (fn [_]
+                                        (swap! startup-calls inc))]
+        (app-core/init)
+        (app-core/init))
+      (is (= 1 @ensure-calls))
+      (is (= 1 @bootstrap-calls))
+      (is (= 1 @startup-calls))
+      (finally
+        (swap! runtime-state/runtime assoc
+               :runtime-bootstrapped? original-runtime-bootstrapped?
+               :app-started? original-app-started?)))))
+
 (deftest make-system-creates-isolated-store-and-runtime-atoms-test
   (let [system-a (app-core/make-system)
         system-b (app-core/make-system)]

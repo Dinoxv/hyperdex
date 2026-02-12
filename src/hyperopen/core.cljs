@@ -1,6 +1,7 @@
 (ns hyperopen.core
   (:require [hyperopen.app.bootstrap :as app-bootstrap]
             [hyperopen.app.startup :as app-startup]
+            [hyperopen.runtime.state :as runtime-state]
             [hyperopen.system :as app-system]))
 
 (def make-system
@@ -18,16 +19,21 @@
    {:runtime app-system/runtime
     :store store}))
 
+(defn start!
+  []
+  (when (runtime-state/mark-app-started! app-system/runtime)
+    (app-bootstrap/ensure-runtime-bootstrapped!
+     app-system/runtime
+     #(app-bootstrap/bootstrap-runtime!
+       {:runtime app-system/runtime
+        :store store}))
+    (app-startup/init!
+     {:runtime app-system/runtime
+      :store store})))
+
 (defn init
   []
-  (app-bootstrap/ensure-runtime-bootstrapped!
-   app-system/runtime
-   #(app-bootstrap/bootstrap-runtime!
-     {:runtime app-system/runtime
-      :store store}))
-  (app-startup/init!
-   {:runtime app-system/runtime
-    :store store}))
+  (start!))
 
 (defn reload
   []

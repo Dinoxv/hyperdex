@@ -52,6 +52,7 @@
    :asset-icons {:pending {}
                  :flush-handle nil}
    :startup (startup-runtime-lib/default-startup-runtime-state)
+   :app-started? false
    :runtime-bootstrapped? false})
 
 (defn make-runtime-state
@@ -64,6 +65,22 @@
 (defn runtime-bootstrapped?
   [runtime-state]
   (true? (:runtime-bootstrapped? @runtime-state)))
+
+(defn app-started?
+  [runtime-state]
+  (true? (:app-started? @runtime-state)))
+
+(defn mark-app-started!
+  [runtime-state]
+  (let [marked? (atom false)]
+    (swap! runtime-state
+           (fn [state]
+             (if (:app-started? state)
+               state
+               (do
+                 (reset! marked? true)
+                 (assoc state :app-started? true)))))
+    @marked?))
 
 (defn mark-runtime-bootstrapped!
   [runtime-state]
