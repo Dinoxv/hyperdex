@@ -15,6 +15,7 @@
             [hyperopen.account.history.actions :as account-history-actions]
             [hyperopen.account.history.effects :as account-history-effects]
             [hyperopen.order.effects :as order-effects]
+            [hyperopen.asset-selector.active-market-cache :as active-market-cache]
             [hyperopen.asset-selector.actions :as asset-actions]
             [hyperopen.asset-selector.settings :as asset-selector-settings]
             [hyperopen.asset-selector.markets :as markets]
@@ -408,9 +409,6 @@
   (ws-client/init-connection! "wss://api.hyperliquid.xyz/ws")
   (swap! store assoc-in [:websocket :status] :connecting))
 
-(def ^:private active-market-display-local-storage-key
-  "active-market-display")
-
 (def ^:private asset-selector-markets-cache-local-storage-key
   "asset-selector-markets-cache")
 
@@ -600,49 +598,20 @@
                      (map? resolved-active-market)
                      (assoc :active-market resolved-active-market)))))))))
 
-(defn- normalize-active-market-display [market]
-  (when (map? market)
-    (let [coin (normalize-display-text (:coin market))
-          key (normalize-display-text (:key market))
-          symbol (normalize-display-text (:symbol market))
-          base (normalize-display-text (:base market))
-          quote (normalize-display-text (:quote market))
-          dex (normalize-display-text (:dex market))
-          market-type (normalize-market-type (:market-type market))
-          max-leverage (parse-max-leverage (:maxLeverage market))]
-      (when (seq coin)
-        (cond-> {:coin coin}
-          (seq key) (assoc :key key)
-          (seq symbol) (assoc :symbol symbol)
-          (seq base) (assoc :base base)
-          (seq quote) (assoc :quote quote)
-          (seq dex) (assoc :dex dex)
-          market-type (assoc :market-type market-type)
-          (some? max-leverage) (assoc :maxLeverage max-leverage))))))
+(defn- active-market-display-normalize-deps []
+  {:normalize-display-text normalize-display-text
+   :normalize-market-type normalize-market-type
+   :parse-max-leverage parse-max-leverage})
 
 (defn- persist-active-market-display! [market]
-  (when-let [normalized (normalize-active-market-display market)]
-    (try
-      (when (exists? js/localStorage)
-        (js/localStorage.setItem active-market-display-local-storage-key
-                                 (js/JSON.stringify (clj->js normalized))))
-      (catch :default e
-        (js/console.warn "Failed to persist active market display metadata:" e)))))
+  (active-market-cache/persist-active-market-display!
+   market
+   (active-market-display-normalize-deps)))
 
 (defn- load-active-market-display [active-asset]
-  (when (seq active-asset)
-    (try
-      (let [raw (when (exists? js/localStorage)
-                  (js/localStorage.getItem active-market-display-local-storage-key))]
-        (when (seq raw)
-          (let [parsed (-> raw
-                           js/JSON.parse
-                           (js->clj :keywordize-keys true)
-                           normalize-active-market-display)]
-            (when (= active-asset (:coin parsed))
-              parsed))))
-      (catch :default _
-        nil))))
+  (active-market-cache/load-active-market-display
+   active-asset
+   (active-market-display-normalize-deps)))
 
 (defn subscribe-active-asset [_ store coin]
   (println "Subscribing to active asset context for:" coin)
