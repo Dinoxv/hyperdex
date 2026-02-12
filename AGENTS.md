@@ -41,6 +41,9 @@
 ## UI Interaction Runtime Rules (MUST)
 - MUST apply user-visible UI state transitions first in an action pipeline (example: close dropdown immediately before unsubscribe/subscribe/fetch effects).
 - MUST batch related UI state writes caused by one interaction into a single state projection effect when feasible.
+- MUST batch logically related writes to the same atom/store into a single `swap!` (or equivalent single transition) when intermediate states are not intentionally observable.
+- MUST NOT emit multiple sequential `swap!` calls for one logical UI/domain transition when a single atomic update can represent the same transition.
+- If staged intermediate states are intentional, MUST document the reason and add ordering/regression tests that cover the staged behavior.
 - MUST avoid duplicate side-effect issuance in one interaction flow (example: only one candle snapshot trigger per asset selection).
 - MUST define a single owner per projection path in a flow (`:active-asset`, `:selected-asset`, `:active-market`) and avoid redundant writers unless explicitly documented and tested.
 - MUST represent multi-token Replicant `:class` values as collections (for example `["opacity-0" "scale-y-95"]`) and MUST NOT use space-separated class strings in `:class` (for example `"opacity-0 scale-y-95"`), to avoid Replicant warnings and normalization overhead.
