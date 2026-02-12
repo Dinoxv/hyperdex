@@ -1,5 +1,6 @@
 (ns hyperopen.views.footer-view
   (:require [clojure.string :as str]
+            [hyperopen.config :as app-config]
             [hyperopen.platform :as platform]
             [hyperopen.websocket.diagnostics-sanitize :as diagnostics-sanitize]))
 
@@ -7,10 +8,10 @@
   ["text-sm" "text-trading-text" "hover:text-primary" "transition-colors"])
 
 (def ^:private default-app-version
-  "0.1.0")
+  (:app-version app-config/config))
 
 (def ^:private diagnostics-timeline-limit
-  50)
+  (get-in app-config/config [:diagnostics :timeline-limit]))
 
 (def ^:private neutral-statuses
   #{:idle :n-a nil})

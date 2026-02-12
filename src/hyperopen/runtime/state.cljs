@@ -1,47 +1,51 @@
 (ns hyperopen.runtime.state
-  (:require [hyperopen.startup.runtime :as startup-runtime-lib]))
+  (:require [hyperopen.config :as app-config]
+            [hyperopen.startup.runtime :as startup-runtime-lib]))
+
+(def config
+  app-config/config)
 
 (def diagnostics-timeline-limit
-  50)
+  (get-in config [:diagnostics :timeline-limit]))
 
 (def reconnect-cooldown-ms
-  5000)
+  (get-in config [:cooldowns :reconnect-ms]))
 
 (def reset-subscriptions-cooldown-ms
-  5000)
+  (get-in config [:cooldowns :reset-subscriptions-ms]))
 
 (def auto-recover-severe-threshold-ms
-  30000)
+  (get-in config [:cooldowns :auto-recover-severe-threshold-ms]))
 
 (def auto-recover-cooldown-ms
-  300000)
+  (get-in config [:cooldowns :auto-recover-cooldown-ms]))
 
 (def icon-service-worker-path
-  "/sw.js")
+  (:icon-service-worker-path config))
 
 (def app-version
-  "0.1.0")
+  (:app-version config))
 
 (def websocket-url
-  "wss://api.hyperliquid.xyz/ws")
+  (:ws-url config))
 
 (def wallet-copy-feedback-duration-ms
-  1500)
+  (get-in config [:ui :wallet-copy-feedback-ms]))
 
 (def order-feedback-toast-duration-ms
-  3500)
+  (get-in config [:ui :order-toast-ms]))
 
 (def agent-storage-mode-reset-message
-  "Trading persistence updated. Enable Trading again.")
+  (get-in config [:messages :agent-storage-mode-reset]))
 
 (def deferred-bootstrap-delay-ms
-  1200)
+  (get-in config [:startup :deferred-bootstrap-delay-ms]))
 
 (def per-dex-stagger-ms
-  120)
+  (get-in config [:startup :per-dex-stagger-ms]))
 
 (def startup-summary-delay-ms
-  5000)
+  (get-in config [:startup :startup-summary-delay-ms]))
 
 (defn default-runtime-state
   []

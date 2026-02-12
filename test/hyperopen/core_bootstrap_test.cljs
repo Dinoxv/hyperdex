@@ -195,7 +195,7 @@
         (app-startup/register-icon-service-worker!
          {:runtime runtime-state/runtime
           :store app-core/store})
-        (is (= ["/sw.js"] @registered-paths))))))
+        (is (= [runtime-state/icon-service-worker-path] @registered-paths))))))
 
 (deftest register-icon-service-worker-skips-when-unsupported-test
   (with-test-navigator
@@ -1556,7 +1556,7 @@
             (is (= "Copied (redacted)"
                    (get-in @store [:websocket-ui :copy-status :message])))
             (let [decoded (js->clj (js/JSON.parse @written) :keywordize-keys true)]
-              (is (= "0.1.0" (get-in decoded [:app :version])))
+              (is (= runtime-state/app-version (get-in decoded [:app :version])))
               (is (map? (:counters decoded)))
               (is (= "<redacted>" (get-in decoded [:streams 0 :descriptor :user])))
               (is (= "<redacted>" (get-in decoded [:streams 0 :descriptor :token])))

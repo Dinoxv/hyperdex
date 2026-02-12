@@ -1,21 +1,23 @@
 (ns hyperopen.runtime.state-test
   (:require [cljs.test :refer-macros [deftest is]]
+            [hyperopen.config :as app-config]
             [hyperopen.runtime.state :as runtime-state]))
 
 (deftest runtime-state-exposes-default-config-values-test
-  (is (= 50 runtime-state/diagnostics-timeline-limit))
-  (is (= 5000 runtime-state/reconnect-cooldown-ms))
-  (is (= 5000 runtime-state/reset-subscriptions-cooldown-ms))
-  (is (= 30000 runtime-state/auto-recover-severe-threshold-ms))
-  (is (= 300000 runtime-state/auto-recover-cooldown-ms))
-  (is (= "/sw.js" runtime-state/icon-service-worker-path))
-  (is (= "0.1.0" runtime-state/app-version))
-  (is (= "wss://api.hyperliquid.xyz/ws" runtime-state/websocket-url))
-  (is (= 1500 runtime-state/wallet-copy-feedback-duration-ms))
-  (is (= 3500 runtime-state/order-feedback-toast-duration-ms))
-  (is (= 1200 runtime-state/deferred-bootstrap-delay-ms))
-  (is (= 120 runtime-state/per-dex-stagger-ms))
-  (is (= 5000 runtime-state/startup-summary-delay-ms)))
+  (let [cfg app-config/config]
+    (is (= (get-in cfg [:diagnostics :timeline-limit]) runtime-state/diagnostics-timeline-limit))
+    (is (= (get-in cfg [:cooldowns :reconnect-ms]) runtime-state/reconnect-cooldown-ms))
+    (is (= (get-in cfg [:cooldowns :reset-subscriptions-ms]) runtime-state/reset-subscriptions-cooldown-ms))
+    (is (= (get-in cfg [:cooldowns :auto-recover-severe-threshold-ms]) runtime-state/auto-recover-severe-threshold-ms))
+    (is (= (get-in cfg [:cooldowns :auto-recover-cooldown-ms]) runtime-state/auto-recover-cooldown-ms))
+    (is (= (:icon-service-worker-path cfg) runtime-state/icon-service-worker-path))
+    (is (= (:app-version cfg) runtime-state/app-version))
+    (is (= (:ws-url cfg) runtime-state/websocket-url))
+    (is (= (get-in cfg [:ui :wallet-copy-feedback-ms]) runtime-state/wallet-copy-feedback-duration-ms))
+    (is (= (get-in cfg [:ui :order-toast-ms]) runtime-state/order-feedback-toast-duration-ms))
+    (is (= (get-in cfg [:startup :deferred-bootstrap-delay-ms]) runtime-state/deferred-bootstrap-delay-ms))
+    (is (= (get-in cfg [:startup :per-dex-stagger-ms]) runtime-state/per-dex-stagger-ms))
+    (is (= (get-in cfg [:startup :startup-summary-delay-ms]) runtime-state/startup-summary-delay-ms))))
 
 (deftest runtime-state-exposes-single-runtime-atom-test
   (let [runtime (runtime-state/make-runtime-state)]

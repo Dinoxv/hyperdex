@@ -1,6 +1,7 @@
 (ns hyperopen.views.footer-view-test
   (:require [clojure.string :as str]
             [cljs.test :refer-macros [deftest is]]
+            [hyperopen.config :as app-config]
             [hyperopen.views.footer-view :as footer-view]))
 
 (defn- find-node [pred node]
@@ -183,6 +184,11 @@
                                 (= "Streams" (last %)))
                           open-view)))
     (is (pos? (count-nodes #(and (vector? %) (= :details (first %))) open-view)))))
+
+(deftest diagnostics-drawer-renders-configured-app-version-test
+  (let [view (footer-view/footer-view (assoc-in (base-state) [:websocket-ui :diagnostics-open?] true))]
+    (is (str/includes? (node-text view)
+                       (str "App version " (:app-version app-config/config))))))
 
 (deftest diagnostics-drawer-stream-ages-update-from-snapshot-test
   (let [view-a (footer-view/footer-view (-> (base-state)

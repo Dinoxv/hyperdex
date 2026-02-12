@@ -1,5 +1,6 @@
 (ns test-runner
   (:require [cljs.test :refer-macros [run-tests]]
+            [hyperopen.config-test]
             [hyperopen.api-test]
             [hyperopen.websocket.acl.hyperliquid-test]
             [hyperopen.websocket.application.runtime-test]
@@ -61,6 +62,7 @@
   "Run all test namespaces and return the results"
   []
   (run-tests 'hyperopen.api-test
+             'hyperopen.config-test
              'hyperopen.websocket.acl.hyperliquid-test
              'hyperopen.websocket.application.runtime-test
              'hyperopen.websocket.application.runtime-reducer-test

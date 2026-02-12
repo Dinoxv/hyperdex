@@ -2,6 +2,7 @@
   (:require [cljs.test :refer-macros [deftest is]]
             [hyperopen.api :as api]
             [hyperopen.account.history.effects :as account-history-effects]
+            [hyperopen.runtime.state :as runtime-state]
             [hyperopen.startup.collaborators :as collaborators]
             [hyperopen.websocket.client :as ws-client]))
 
@@ -11,7 +12,7 @@
                :startup-runtime :startup-runtime})]
     (is (= :store (:store deps)))
     (is (= :startup-runtime (:startup-runtime deps)))
-    (is (= "wss://api.hyperliquid.xyz/ws" (:ws-url deps)))
+    (is (= runtime-state/websocket-url (:ws-url deps)))
     (is (fn? (:log-fn deps)))
     (is (identical? api/get-request-stats
                     (:get-request-stats deps)))
