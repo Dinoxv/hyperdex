@@ -26,28 +26,23 @@
             [hyperopen.router :as router]
             [hyperopen.state.trading :as trading]))
 
-(defn- default-funding-history-state []
-  (account-history-actions/default-funding-history-state))
+(def ^:private default-funding-history-state
+  account-history-actions/default-funding-history-state)
 
-(defn- parse-int-value
-  [value]
-  (parse-utils/parse-int-value value))
+(def ^:private parse-int-value
+  parse-utils/parse-int-value)
 
-(defn- normalize-order-history-page-size
-  [value]
-  (account-history-actions/normalize-order-history-page-size value))
+(def ^:private normalize-order-history-page-size
+  account-history-actions/normalize-order-history-page-size)
 
-(defn- normalize-order-history-page
-  ([value]
-   (normalize-order-history-page value nil))
-  ([value max-page]
-   (account-history-actions/normalize-order-history-page value max-page)))
+(def ^:private normalize-order-history-page
+  account-history-actions/normalize-order-history-page)
 
-(defn- default-order-history-state []
-  (account-history-actions/default-order-history-state))
+(def ^:private default-order-history-state
+  account-history-actions/default-order-history-state)
 
-(defn- default-trade-history-state []
-  (account-history-actions/default-trade-history-state))
+(def ^:private default-trade-history-state
+  account-history-actions/default-trade-history-state)
 
 ;; App state
 (defonce store (atom {:websocket {:status :disconnected
@@ -1308,17 +1303,17 @@
     (catch :default _
       {})))
 
-(defn restore-open-orders-sort-settings! [store]
-  (account-history-actions/restore-open-orders-sort-settings! store))
+(def restore-open-orders-sort-settings!
+  account-history-actions/restore-open-orders-sort-settings!)
 
-(defn restore-order-history-pagination-settings! [store]
-  (account-history-actions/restore-order-history-pagination-settings! store))
+(def restore-order-history-pagination-settings!
+  account-history-actions/restore-order-history-pagination-settings!)
 
-(defn restore-funding-history-pagination-settings! [store]
-  (account-history-actions/restore-funding-history-pagination-settings! store))
+(def restore-funding-history-pagination-settings!
+  account-history-actions/restore-funding-history-pagination-settings!)
 
-(defn restore-trade-history-pagination-settings! [store]
-  (account-history-actions/restore-trade-history-pagination-settings! store))
+(def restore-trade-history-pagination-settings!
+  account-history-actions/restore-trade-history-pagination-settings!)
 
 (defn restore-chart-options! [store]
   (let [timeframe (load-chart-option "chart-timeframe" :1d chart-timeframes)
@@ -1468,122 +1463,122 @@
     [[:effects/save [:chart-options :active-indicators] updated-indicators]
      [:effects/local-storage-set-json "chart-active-indicators" (serialize-indicators updated-indicators)]]))
 
-(defn select-account-info-tab [state tab]
-  (account-history-actions/select-account-info-tab state tab))
+(def select-account-info-tab
+  account-history-actions/select-account-info-tab)
 
-(defn set-funding-history-filters [_state path value]
-  (account-history-actions/set-funding-history-filters _state path value))
+(def set-funding-history-filters
+  account-history-actions/set-funding-history-filters)
 
-(defn toggle-funding-history-filter-open [state]
-  (account-history-actions/toggle-funding-history-filter-open state))
+(def toggle-funding-history-filter-open
+  account-history-actions/toggle-funding-history-filter-open)
 
-(defn toggle-funding-history-filter-coin [state coin]
-  (account-history-actions/toggle-funding-history-filter-coin state coin))
+(def toggle-funding-history-filter-coin
+  account-history-actions/toggle-funding-history-filter-coin)
 
-(defn reset-funding-history-filter-draft [state]
-  (account-history-actions/reset-funding-history-filter-draft state))
+(def reset-funding-history-filter-draft
+  account-history-actions/reset-funding-history-filter-draft)
 
-(defn apply-funding-history-filters [state]
-  (account-history-actions/apply-funding-history-filters state))
+(def apply-funding-history-filters
+  account-history-actions/apply-funding-history-filters)
 
-(defn view-all-funding-history [state]
-  (account-history-actions/view-all-funding-history state))
+(def view-all-funding-history
+  account-history-actions/view-all-funding-history)
 
-(defn export-funding-history-csv [state]
-  (account-history-actions/export-funding-history-csv state))
+(def export-funding-history-csv
+  account-history-actions/export-funding-history-csv)
 
-(defn sort-positions [state column]
-  (account-history-actions/sort-positions state column))
+(def sort-positions
+  account-history-actions/sort-positions)
 
-(defn sort-balances [state column]
-  (account-history-actions/sort-balances state column))
+(def sort-balances
+  account-history-actions/sort-balances)
 
-(defn sort-open-orders [state column]
-  (account-history-actions/sort-open-orders state column))
+(def sort-open-orders
+  account-history-actions/sort-open-orders)
 
-(defn sort-funding-history [state column]
-  (account-history-actions/sort-funding-history state column))
+(def sort-funding-history
+  account-history-actions/sort-funding-history)
 
-(defn set-funding-history-page-size [state page-size]
-  (account-history-actions/set-funding-history-page-size state page-size))
+(def set-funding-history-page-size
+  account-history-actions/set-funding-history-page-size)
 
-(defn set-funding-history-page [state page max-page]
-  (account-history-actions/set-funding-history-page state page max-page))
+(def set-funding-history-page
+  account-history-actions/set-funding-history-page)
 
-(defn next-funding-history-page [state max-page]
-  (account-history-actions/next-funding-history-page state max-page))
+(def next-funding-history-page
+  account-history-actions/next-funding-history-page)
 
-(defn prev-funding-history-page [state max-page]
-  (account-history-actions/prev-funding-history-page state max-page))
+(def prev-funding-history-page
+  account-history-actions/prev-funding-history-page)
 
-(defn set-funding-history-page-input [_state input-value]
-  (account-history-actions/set-funding-history-page-input _state input-value))
+(def set-funding-history-page-input
+  account-history-actions/set-funding-history-page-input)
 
-(defn apply-funding-history-page-input [state max-page]
-  (account-history-actions/apply-funding-history-page-input state max-page))
+(def apply-funding-history-page-input
+  account-history-actions/apply-funding-history-page-input)
 
-(defn handle-funding-history-page-input-keydown [state key max-page]
-  (account-history-actions/handle-funding-history-page-input-keydown state key max-page))
+(def handle-funding-history-page-input-keydown
+  account-history-actions/handle-funding-history-page-input-keydown)
 
-(defn set-trade-history-page-size [state page-size]
-  (account-history-actions/set-trade-history-page-size state page-size))
+(def set-trade-history-page-size
+  account-history-actions/set-trade-history-page-size)
 
-(defn set-trade-history-page [state page max-page]
-  (account-history-actions/set-trade-history-page state page max-page))
+(def set-trade-history-page
+  account-history-actions/set-trade-history-page)
 
-(defn next-trade-history-page [state max-page]
-  (account-history-actions/next-trade-history-page state max-page))
+(def next-trade-history-page
+  account-history-actions/next-trade-history-page)
 
-(defn prev-trade-history-page [state max-page]
-  (account-history-actions/prev-trade-history-page state max-page))
+(def prev-trade-history-page
+  account-history-actions/prev-trade-history-page)
 
-(defn set-trade-history-page-input [_state input-value]
-  (account-history-actions/set-trade-history-page-input _state input-value))
+(def set-trade-history-page-input
+  account-history-actions/set-trade-history-page-input)
 
-(defn apply-trade-history-page-input [state max-page]
-  (account-history-actions/apply-trade-history-page-input state max-page))
+(def apply-trade-history-page-input
+  account-history-actions/apply-trade-history-page-input)
 
-(defn handle-trade-history-page-input-keydown [state key max-page]
-  (account-history-actions/handle-trade-history-page-input-keydown state key max-page))
+(def handle-trade-history-page-input-keydown
+  account-history-actions/handle-trade-history-page-input-keydown)
 
-(defn sort-trade-history [state column]
-  (account-history-actions/sort-trade-history state column))
+(def sort-trade-history
+  account-history-actions/sort-trade-history)
 
-(defn sort-order-history [state column]
-  (account-history-actions/sort-order-history state column))
+(def sort-order-history
+  account-history-actions/sort-order-history)
 
-(defn toggle-order-history-filter-open [state]
-  (account-history-actions/toggle-order-history-filter-open state))
+(def toggle-order-history-filter-open
+  account-history-actions/toggle-order-history-filter-open)
 
-(defn set-order-history-status-filter [state status-filter]
-  (account-history-actions/set-order-history-status-filter state status-filter))
+(def set-order-history-status-filter
+  account-history-actions/set-order-history-status-filter)
 
-(defn set-order-history-page-size [state page-size]
-  (account-history-actions/set-order-history-page-size state page-size))
+(def set-order-history-page-size
+  account-history-actions/set-order-history-page-size)
 
-(defn set-order-history-page [state page max-page]
-  (account-history-actions/set-order-history-page state page max-page))
+(def set-order-history-page
+  account-history-actions/set-order-history-page)
 
-(defn next-order-history-page [state max-page]
-  (account-history-actions/next-order-history-page state max-page))
+(def next-order-history-page
+  account-history-actions/next-order-history-page)
 
-(defn prev-order-history-page [state max-page]
-  (account-history-actions/prev-order-history-page state max-page))
+(def prev-order-history-page
+  account-history-actions/prev-order-history-page)
 
-(defn set-order-history-page-input [_state input-value]
-  (account-history-actions/set-order-history-page-input _state input-value))
+(def set-order-history-page-input
+  account-history-actions/set-order-history-page-input)
 
-(defn apply-order-history-page-input [state max-page]
-  (account-history-actions/apply-order-history-page-input state max-page))
+(def apply-order-history-page-input
+  account-history-actions/apply-order-history-page-input)
 
-(defn handle-order-history-page-input-keydown [state key max-page]
-  (account-history-actions/handle-order-history-page-input-keydown state key max-page))
+(def handle-order-history-page-input-keydown
+  account-history-actions/handle-order-history-page-input-keydown)
 
-(defn refresh-order-history [state]
-  (account-history-actions/refresh-order-history state))
+(def refresh-order-history
+  account-history-actions/refresh-order-history)
 
-(defn set-hide-small-balances [state checked]
-  (account-history-actions/set-hide-small-balances state checked))
+(def set-hide-small-balances
+  account-history-actions/set-hide-small-balances)
 
 (defn- normalize-order-entry-mode [mode]
   (let [candidate (cond
