@@ -38,6 +38,7 @@
             [hyperopen.runtime.bootstrap :as runtime-bootstrap]
             [hyperopen.runtime.collaborators :as runtime-collaborators]
             [hyperopen.runtime.registry-composition :as registry-composition]
+            [hyperopen.startup.collaborators :as startup-collaborators]
             [hyperopen.startup.composition :as startup-composition]
             [hyperopen.startup.restore :as startup-restore]
             [hyperopen.startup.runtime :as startup-runtime-lib]
@@ -1037,39 +1038,13 @@
 
 (defn- startup-base-deps
   []
-  {:startup-runtime startup-runtime
-   :store store
-   :log-fn println
-   :icon-service-worker-path icon-service-worker-path
-   :get-request-stats api/get-request-stats
-   :per-dex-stagger-ms per-dex-stagger-ms
-   :fetch-frontend-open-orders! api/fetch-frontend-open-orders!
-   :fetch-clearinghouse-state! api/fetch-clearinghouse-state!
-   :fetch-user-fills! api/fetch-user-fills!
-   :fetch-spot-clearinghouse-state! api/fetch-spot-clearinghouse-state!
-   :fetch-user-abstraction! api/fetch-user-abstraction!
-   :fetch-and-merge-funding-history! account-history-effects/fetch-and-merge-funding-history!
-   :ensure-perp-dexs! api/ensure-perp-dexs!
-   :fetch-asset-contexts! api/fetch-asset-contexts!
-   :fetch-asset-selector-markets! api/fetch-asset-selector-markets!
-   :schedule-idle-or-timeout! schedule-idle-or-timeout!
-   :mark-performance! mark-performance!
-   :ws-url "wss://api.hyperliquid.xyz/ws"
-   :init-connection! ws-client/init-connection!
-   :init-active-ctx! active-ctx/init!
-   :init-orderbook! orderbook/init!
-   :init-trades! trades/init!
-   :init-user-ws! user-ws/init!
-   :init-webdata2! webdata2/init!
-   :dispatch! nxr/dispatch
-   :init-with-webdata2! address-watcher/init-with-webdata2!
-   :add-handler! address-watcher/add-handler!
-   :sync-current-address! address-watcher/sync-current-address!
-   :create-user-handler user-ws/create-user-handler
-   :subscribe-user! user-ws/subscribe-user!
-   :unsubscribe-user! user-ws/unsubscribe-user!
-   :subscribe-webdata2! webdata2/subscribe-webdata2!
-   :unsubscribe-webdata2! webdata2/unsubscribe-webdata2!})
+  (startup-collaborators/startup-base-deps
+   {:startup-runtime startup-runtime
+    :store store
+    :icon-service-worker-path icon-service-worker-path
+    :per-dex-stagger-ms per-dex-stagger-ms
+    :schedule-idle-or-timeout! schedule-idle-or-timeout!
+    :mark-performance! mark-performance!}))
 
 (defn- schedule-startup-summary-log!
   []
