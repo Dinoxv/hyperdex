@@ -37,6 +37,7 @@
             [hyperopen.startup.watchers :as startup-watchers]
             [hyperopen.ui.preferences :as ui-preferences]
             [hyperopen.utils.parse :as parse-utils]
+            [hyperopen.wallet.agent-runtime :as agent-runtime]
             [hyperopen.wallet.core :as wallet]
             [hyperopen.wallet.agent-session :as agent-session]
             [hyperopen.wallet.address-watcher :as address-watcher]
@@ -508,19 +509,14 @@
   (wallet/set-disconnected! store))
 
 (defn set-agent-storage-mode [_ store storage-mode]
-  (let [next-mode (agent-session/normalize-storage-mode storage-mode)
-        current-mode (agent-session/normalize-storage-mode
-                      (get-in @store [:wallet :agent :storage-mode]))
-        wallet-address (get-in @store [:wallet :address])
-        switching? (not= current-mode next-mode)]
-    (when switching?
-      (when (seq wallet-address)
-        (agent-session/clear-agent-session-by-mode! wallet-address current-mode)
-        (agent-session/clear-agent-session-by-mode! wallet-address next-mode))
-      (agent-session/persist-storage-mode-preference! next-mode)
-      (swap! store assoc-in [:wallet :agent]
-             (assoc (agent-session/default-agent-state :storage-mode next-mode)
-                    :error agent-storage-mode-reset-message)))))
+  (agent-runtime/set-agent-storage-mode!
+   {:store store
+    :storage-mode storage-mode
+    :normalize-storage-mode agent-session/normalize-storage-mode
+    :clear-agent-session-by-mode! agent-session/clear-agent-session-by-mode!
+    :persist-storage-mode-preference! agent-session/persist-storage-mode-preference!
+    :default-agent-state agent-session/default-agent-state
+    :agent-storage-mode-reset-message agent-storage-mode-reset-message}))
 
 (defn- schedule-wallet-copy-feedback-clear! [store]
   (clear-wallet-copy-feedback-timeout!)
@@ -634,31 +630,11 @@
 
 (defn- exchange-response-error
   [resp]
-  (or (:error resp)
-      (:response resp)
-      (:message resp)
-      (pr-str resp)))
+  (agent-runtime/exchange-response-error resp))
 
 (defn- runtime-error-message
   [err]
-  (or (some-> err .-message str)
-      (some-> err (aget "message") str)
-      (some-> err (aget "data") (aget "message") str)
-      (some-> err (aget "error") (aget "message") str)
-      (when (map? err)
-        (or (some-> (:message err) str)
-            (some-> err :data :message str)
-            (some-> err :error :message str)))
-      (try
-        (let [clj-value (js->clj err :keywordize-keys true)]
-          (when (map? clj-value)
-            (or (some-> (:message clj-value) str)
-                (some-> clj-value :data :message str)
-                (some-> clj-value :error :message str)
-                (pr-str clj-value))))
-        (catch :default _
-          nil))
-      (str err)))
+  (agent-runtime/runtime-error-message err))
 
 (defn enable-agent-trading
   [_ store {:keys [storage-mode is-mainnet agent-name signature-chain-id]
@@ -666,71 +642,22 @@
                  is-mainnet true
                  agent-name nil
                  signature-chain-id nil}}]
-  (let [owner-address (get-in @store [:wallet :address])]
-    (if-not (seq owner-address)
-      (swap! store update-in [:wallet :agent] merge
-             {:status :error
-              :error "Connect your wallet before enabling trading."})
-      (try
-        (let [{:keys [private-key agent-address]} (agent-session/create-agent-credentials!)
-              nonce (.now js/Date)
-              normalized-storage-mode (agent-session/normalize-storage-mode storage-mode)
-              wallet-chain-id (get-in @store [:wallet :chain-id])
-              resolved-signature-chain-id (or signature-chain-id
-                                              wallet-chain-id
-                                              (agent-session/default-signature-chain-id-for-environment is-mainnet))
-              action (agent-session/build-approve-agent-action
-                      agent-address
-                      nonce
-                      :agent-name agent-name
-                      :is-mainnet is-mainnet
-                      :signature-chain-id resolved-signature-chain-id)]
-          (-> (trading-api/approve-agent! store owner-address action)
-              (.then #(.json %))
-              (.then (fn [resp]
-                       (let [data (js->clj resp :keywordize-keys true)]
-                         (if (= "ok" (:status data))
-                           (let [persisted? (agent-session/persist-agent-session-by-mode!
-                                             owner-address
-                                             normalized-storage-mode
-                                             {:agent-address agent-address
-                                              :private-key private-key
-                                              :last-approved-at nonce
-                                              :nonce-cursor nonce})]
-                             (if persisted?
-                               (swap! store update-in [:wallet :agent] merge
-                                      {:status :ready
-                                       :agent-address agent-address
-                                       :storage-mode normalized-storage-mode
-                                       :last-approved-at nonce
-                                       :error nil
-                                       :nonce-cursor nonce})
-                               (swap! store update-in [:wallet :agent] merge
-                                      {:status :error
-                                       :error "Unable to persist agent credentials."
-                                       :agent-address nil
-                                       :last-approved-at nil
-                                       :nonce-cursor nil})))
-                           (swap! store update-in [:wallet :agent] merge
-                                  {:status :error
-                                   :error (exchange-response-error data)
-                                   :agent-address nil
-                                   :last-approved-at nil
-                                   :nonce-cursor nil})))))
-              (.catch (fn [err]
-                        (swap! store update-in [:wallet :agent] merge
-                               {:status :error
-                                :error (runtime-error-message err)
-                                :agent-address nil
-                                :last-approved-at nil
-                                :nonce-cursor nil})))))
-        (catch :default err
-          (swap! store update-in [:wallet :agent] merge
-                 {:status :error
-                  :error (runtime-error-message err)
-                  :agent-address nil
-                  :last-approved-at nil
-                  :nonce-cursor nil}))))))
+  (agent-runtime/enable-agent-trading!
+   {:store store
+    :options {:storage-mode storage-mode
+              :is-mainnet is-mainnet
+              :agent-name agent-name
+              :signature-chain-id signature-chain-id}
+    :create-agent-credentials! agent-session/create-agent-credentials!
+    :now-ms-fn (fn []
+                 (.now js/Date))
+    :normalize-storage-mode agent-session/normalize-storage-mode
+    :default-signature-chain-id-for-environment agent-session/default-signature-chain-id-for-environment
+    :build-approve-agent-action agent-session/build-approve-agent-action
+    :approve-agent! trading-api/approve-agent!
+    :persist-agent-session-by-mode! agent-session/persist-agent-session-by-mode!
+    :runtime-error-message runtime-error-message
+    :exchange-response-error exchange-response-error}))
 
 (defn enable-agent-trading-action
   [state]
