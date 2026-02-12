@@ -12,6 +12,7 @@
             [hyperopen.websocket.diagnostics-sanitize :as diagnostics-sanitize]
             [hyperopen.api :as api]
             [hyperopen.api.trading :as trading-api]
+            [hyperopen.asset-selector.actions :as asset-actions]
             [hyperopen.asset-selector.settings :as asset-selector-settings]
             [hyperopen.asset-selector.markets :as markets]
             [hyperopen.orderbook.price-aggregation :as price-agg]
@@ -240,21 +241,6 @@
 (defonce ^:private asset-icon-status-flush-handle
   (atom nil))
 
-(def ^:private asset-selector-default-render-limit
-  120)
-
-(def ^:private asset-selector-render-limit-step
-  80)
-
-(def ^:private asset-selector-render-prefetch-px
-  320)
-
-(def ^:private asset-selector-row-height-px
-  48)
-
-(def ^:private asset-selector-viewport-height-px
-  384)
-
 (defn- effective-now-ms
   [generated-at-ms]
   (let [generated* (or generated-at-ms 0)
@@ -411,7 +397,19 @@
                    state
                    path-values))))
 
-(declare apply-asset-icon-status-updates)
+(defn local-storage-set [_ _ key value]
+  (try
+    (when (exists? js/localStorage)
+      (js/localStorage.setItem key (str value)))
+    (catch :default e
+      (js/console.warn "Failed to persist localStorage value:" key e))))
+
+(defn local-storage-set-json [_ _ key value]
+  (try
+    (when (exists? js/localStorage)
+      (js/localStorage.setItem key (js/JSON.stringify (clj->js value))))
+    (catch :default e
+      (js/console.warn "Failed to persist localStorage JSON value:" key e))))
 
 (defn- schedule-animation-frame! [f]
   (if (fn? (.-requestAnimationFrame js/globalThis))
@@ -424,7 +422,7 @@
     (reset! asset-icon-status-flush-handle nil)
     (when (seq status-by-market)
       (let [{:keys [loaded-icons missing-icons changed?]}
-            (apply-asset-icon-status-updates @store status-by-market)]
+            (asset-actions/apply-asset-icon-status-updates @store status-by-market)]
         (when changed?
           (save-many nil
                      store
@@ -1216,211 +1214,57 @@
    (ws-diagnostics-reset-subscriptions state :all source)))
 
 (defn toggle-asset-dropdown [state coin]
-  (let [current-dropdown (get-in state [:asset-selector :visible-dropdown])]
-    (let [next-dropdown (if (= current-dropdown coin) nil coin)
-          should-refresh? (and (= coin :asset-selector)
-                               (some? next-dropdown)
-                               (or (empty? (get-in state [:asset-selector :markets]))
-                                   (not= :full (get-in state [:asset-selector :phase]))))
-          path-values (cond-> [[[:asset-selector :visible-dropdown] next-dropdown]]
-                        (and (= coin :asset-selector) (some? next-dropdown))
-                        (conj [[:asset-selector :scroll-top] 0]
-                              [[:asset-selector :render-limit] asset-selector-default-render-limit]))
-          effects [[:effects/save-many path-values]]]
-      (cond-> effects
-        should-refresh?
-        (conj [:effects/fetch-asset-selector-markets])))))
+  (asset-actions/toggle-asset-dropdown state coin))
 
 (defn close-asset-dropdown [state]
-  [[:effects/save-many [[[:asset-selector :visible-dropdown] nil]
-                        [[:asset-selector :scroll-top] 0]
-                        [[:asset-selector :render-limit] asset-selector-default-render-limit]]]])
+  (asset-actions/close-asset-dropdown state))
 
 (defn select-asset [state market-or-coin]
-  (let [market-by-key (get-in state [:asset-selector :market-by-key] {})
-        input-coin (cond
-                     (map? market-or-coin) (:coin market-or-coin)
-                     (string? market-or-coin) market-or-coin
-                     :else nil)
-        market (cond
-                 (map? market-or-coin)
-                 (or (markets/resolve-market-by-coin market-by-key input-coin)
-                     market-or-coin)
-
-                 (string? market-or-coin)
-                 (markets/resolve-market-by-coin market-by-key market-or-coin)
-
-                 :else nil)
-        coin (or (:coin market) input-coin)
-        resolved-market (or market
-                            (when (string? coin)
-                              (markets/resolve-market-by-coin market-by-key coin)))
-        canonical-coin (or (:coin resolved-market) coin)
-        current-asset (get-in state [:active-asset])
-        switched-asset? (and (seq canonical-coin)
-                             (not= canonical-coin current-asset))
-        reset-order-form (when (and switched-asset?
-                                    (map? (:order-form state)))
-                           (assoc (:order-form state)
-                                  :price ""
-                                  :price-input-focused? false))
-        immediate-ui-path-values (cond-> [[[:asset-selector :visible-dropdown] nil]
-                                          [[:asset-selector :scroll-top] 0]
-                                          [[:asset-selector :render-limit] asset-selector-default-render-limit]
-                                          [[:orderbook-ui :price-aggregation-dropdown-visible?] false]
-                                          [[:orderbook-ui :size-unit-dropdown-visible?] false]
-                                          [[:active-market] resolved-market]]
-                                   reset-order-form
-                                   (conj [[:order-form] reset-order-form]))
-        immediate-ui-effects [[:effects/save-many immediate-ui-path-values]]
-        unsubscribe-effects (if current-asset
-                             [[:effects/unsubscribe-active-asset current-asset]
-                              [:effects/unsubscribe-orderbook current-asset]
-                              [:effects/unsubscribe-trades current-asset]]
-                             [])
-        subscribe-effects [[:effects/subscribe-active-asset canonical-coin]
-                           [:effects/subscribe-orderbook canonical-coin]
-                           [:effects/subscribe-trades canonical-coin]]]
-    (into immediate-ui-effects
-          (into unsubscribe-effects subscribe-effects))))
+  (asset-actions/select-asset state market-or-coin))
 
 (defn update-asset-search [state value]
-  [[:effects/save-many [[[:asset-selector :search-term] (str value)]
-                        [[:asset-selector :scroll-top] 0]
-                        [[:asset-selector :render-limit] asset-selector-default-render-limit]]]])
+  (asset-actions/update-asset-search state value))
 
 ;; --- asset selector sort settings logic moved to asset_selector/settings.cljs ---
 
 (defn update-asset-selector-sort [state sort-field]
-  (let [current-sort (get-in state [:asset-selector :sort-by])
-        current-direction (get-in state [:asset-selector :sort-direction] :asc)
-        new-direction (if (= current-sort sort-field)
-                       (if (= current-direction :asc) :desc :asc)
-                       :desc)]
-    ;; Persist to localStorage
-    (js/localStorage.setItem "asset-selector-sort-by" (name sort-field))
-    (js/localStorage.setItem "asset-selector-sort-direction" (name new-direction))
-    [[:effects/save-many [[[:asset-selector :sort-by] sort-field]
-                          [[:asset-selector :sort-direction] new-direction]
-                          [[:asset-selector :scroll-top] 0]
-                          [[:asset-selector :render-limit] asset-selector-default-render-limit]]]]))
+  (asset-actions/update-asset-selector-sort state sort-field))
 
 (defn toggle-asset-selector-strict [state]
-  (let [new-value (not (get-in state [:asset-selector :strict?] false))]
-    (js/localStorage.setItem "asset-selector-strict" (str new-value))
-    [[:effects/save-many [[[:asset-selector :strict?] new-value]
-                          [[:asset-selector :scroll-top] 0]
-                          [[:asset-selector :render-limit] asset-selector-default-render-limit]]]]))
+  (asset-actions/toggle-asset-selector-strict state))
 
 (defn toggle-asset-favorite [state market-key]
-  (let [favorites (get-in state [:asset-selector :favorites] #{})
-        new-favorites (if (contains? favorites market-key)
-                        (disj favorites market-key)
-                        (conj favorites market-key))]
-    (js/localStorage.setItem "asset-selector-favorites"
-                             (js/JSON.stringify (clj->js (vec new-favorites))))
-    [[:effects/save-many [[[:asset-selector :favorites] new-favorites]
-                          [[:asset-selector :render-limit] asset-selector-default-render-limit]]]]))
+  (asset-actions/toggle-asset-favorite state market-key))
 
 (defn set-asset-selector-favorites-only [state enabled?]
-  [[:effects/save-many [[[:asset-selector :favorites-only?] (boolean enabled?)]
-                        [[:asset-selector :scroll-top] 0]
-                        [[:asset-selector :render-limit] asset-selector-default-render-limit]]]])
+  (asset-actions/set-asset-selector-favorites-only state enabled?))
 
 (defn set-asset-selector-tab [state tab]
-  (js/localStorage.setItem "asset-selector-active-tab" (name tab))
-  [[:effects/save-many [[[:asset-selector :active-tab] tab]
-                        [[:asset-selector :scroll-top] 0]
-                        [[:asset-selector :render-limit] asset-selector-default-render-limit]]]])
+  (asset-actions/set-asset-selector-tab state tab))
 
 (defn set-asset-selector-scroll-top [state scroll-top]
-  (let [next-scroll-top (max 0 (or (parse-int-value scroll-top) 0))]
-    (if (= next-scroll-top (get-in state [:asset-selector :scroll-top] 0))
-      []
-      [[:effects/save [:asset-selector :scroll-top] next-scroll-top]])))
-
-(defn- current-asset-selector-render-limit [state total]
-  (if (pos? total)
-    (-> (or (parse-int-value (get-in state [:asset-selector :render-limit]))
-            asset-selector-default-render-limit)
-        (max 1)
-        (min total))
-    0))
+  (asset-actions/set-asset-selector-scroll-top state scroll-top))
 
 (defn increase-asset-selector-render-limit [state]
-  (let [markets (get-in state [:asset-selector :markets] [])
-        total (count markets)
-        current-limit (current-asset-selector-render-limit state total)
-        next-limit (min total (+ current-limit asset-selector-render-limit-step))]
-    (if (> next-limit current-limit)
-      [[:effects/save [:asset-selector :render-limit] next-limit]]
-      [])))
+  (asset-actions/increase-asset-selector-render-limit state))
 
 (defn show-all-asset-selector-markets [state]
-  (let [markets (get-in state [:asset-selector :markets] [])
-        total (count markets)
-        current-limit (current-asset-selector-render-limit state total)]
-    (if (> total current-limit)
-      [[:effects/save [:asset-selector :render-limit] total]]
-      [])))
+  (asset-actions/show-all-asset-selector-markets state))
 
 (defn maybe-increase-asset-selector-render-limit [state scroll-top]
-  (let [markets (get-in state [:asset-selector :markets] [])
-        total (count markets)
-        current-limit (current-asset-selector-render-limit state total)
-        scroll-top* (max 0 (or (parse-int-value scroll-top) 0))
-        rendered-height (* current-limit asset-selector-row-height-px)
-        near-bottom? (and (pos? rendered-height)
-                          (>= (+ scroll-top*
-                                 asset-selector-viewport-height-px
-                                 asset-selector-render-prefetch-px)
-                              rendered-height))
-        next-limit (if near-bottom?
-                     (min total (+ current-limit asset-selector-render-limit-step))
-                     current-limit)]
-    (if (> next-limit current-limit)
-      [[:effects/save [:asset-selector :render-limit] next-limit]]
-      [])))
+  (asset-actions/maybe-increase-asset-selector-render-limit state scroll-top))
 
 (defn refresh-asset-markets [state]
   [[:effects/fetch-asset-selector-markets]])
 
 (defn apply-asset-icon-status-updates [state status-by-market]
-  (let [loaded-icons (get-in state [:asset-selector :loaded-icons] #{})
-        missing-icons (get-in state [:asset-selector :missing-icons] #{})
-        [next-loaded-icons next-missing-icons]
-        (reduce-kv
-          (fn [[loaded missing] market-key status]
-            (if-not (seq market-key)
-              [loaded missing]
-              (case status
-                :loaded [(conj loaded market-key) (disj missing market-key)]
-                :missing [(disj loaded market-key) (conj missing market-key)]
-                [loaded missing])))
-          [loaded-icons missing-icons]
-          (or status-by-market {}))]
-    {:loaded-icons next-loaded-icons
-     :missing-icons next-missing-icons
-     :changed? (or (not= loaded-icons next-loaded-icons)
-                   (not= missing-icons next-missing-icons))}))
+  (asset-actions/apply-asset-icon-status-updates state status-by-market))
 
 (defn mark-loaded-asset-icon [state market-key]
-  (if-not (seq market-key)
-    []
-    (let [{:keys [changed?]} (apply-asset-icon-status-updates state {market-key :loaded})]
-      (if changed?
-        [[:effects/queue-asset-icon-status {:market-key market-key
-                                            :status :loaded}]]
-        []))))
+  (asset-actions/mark-loaded-asset-icon state market-key))
 
 (defn mark-missing-asset-icon [state market-key]
-  (if-not (seq market-key)
-    []
-    (let [{:keys [changed?]} (apply-asset-icon-status-updates state {market-key :missing})]
-      (if changed?
-        [[:effects/queue-asset-icon-status {:market-key market-key
-                                            :status :missing}]]
-        []))))
+  (asset-actions/mark-missing-asset-icon state market-key))
 
 (def open-orders-sortable-columns
   #{"Time" "Type" "Coin" "Direction" "Size" "Original Size" "Order Value" "Price"})
@@ -1617,8 +1461,8 @@
     [(chart-dropdown-projection-effect open-dropdown)]))
 
 (defn select-chart-timeframe [state timeframe]
-  (js/localStorage.setItem "chart-timeframe" (name timeframe))
   [(chart-dropdown-projection-effect nil [[[:chart-options :selected-timeframe] timeframe]])
+   [:effects/local-storage-set "chart-timeframe" (name timeframe)]
    [:effects/fetch-candle-snapshot :interval timeframe]])
 
 (defn toggle-chart-type-dropdown [state]
@@ -1627,8 +1471,8 @@
     [(chart-dropdown-projection-effect open-dropdown)]))
 
 (defn select-chart-type [state chart-type]
-  (js/localStorage.setItem "chart-type" (name chart-type))
-  [(chart-dropdown-projection-effect nil [[[:chart-options :selected-chart-type] chart-type]])])
+  [(chart-dropdown-projection-effect nil [[[:chart-options :selected-chart-type] chart-type]])
+   [:effects/local-storage-set "chart-type" (name chart-type)]])
 
 (defn toggle-indicators-dropdown [state]
   (let [current-visible (boolean (get-in state [:chart-options :indicators-dropdown-visible]))
@@ -1641,9 +1485,9 @@
 
 (defn select-orderbook-size-unit [state unit]
   (let [size-unit (if (= unit :quote) :quote :base)]
-    (js/localStorage.setItem "orderbook-size-unit" (name size-unit))
     [[:effects/save [:orderbook-ui :size-unit] size-unit]
-     [:effects/save [:orderbook-ui :size-unit-dropdown-visible?] false]]))
+     [:effects/save [:orderbook-ui :size-unit-dropdown-visible?] false]
+     [:effects/local-storage-set "orderbook-size-unit" (name size-unit)]]))
 
 (defn toggle-orderbook-price-aggregation-dropdown [state]
   (let [visible? (get-in state [:orderbook-ui :price-aggregation-dropdown-visible?] false)]
@@ -1656,9 +1500,11 @@
         next-by-coin (if (seq coin)
                        (assoc current-by-coin coin mode*)
                        current-by-coin)]
-    (persist-orderbook-price-aggregation-by-coin! next-by-coin)
     (cond-> [[:effects/save [:orderbook-ui :price-aggregation-by-coin] next-by-coin]
-             [:effects/save [:orderbook-ui :price-aggregation-dropdown-visible?] false]]
+             [:effects/save [:orderbook-ui :price-aggregation-dropdown-visible?] false]
+             [:effects/local-storage-set-json
+              "orderbook-price-aggregation-by-coin"
+              (normalize-price-aggregation-by-coin next-by-coin)]]
       (seq coin)
       (conj [:effects/subscribe-orderbook coin]))))
 
@@ -1668,29 +1514,29 @@
                (string? tab) (keyword tab)
                :else :orderbook)
         normalized-tab (if (contains? orderbook-tabs tab*) tab* :orderbook)]
-    (js/localStorage.setItem "orderbook-active-tab" (name normalized-tab))
     [[:effects/save [:orderbook-ui :active-tab] normalized-tab]
      [:effects/save [:orderbook-ui :size-unit-dropdown-visible?] false]
-     [:effects/save [:orderbook-ui :price-aggregation-dropdown-visible?] false]]))
+     [:effects/save [:orderbook-ui :price-aggregation-dropdown-visible?] false]
+     [:effects/local-storage-set "orderbook-active-tab" (name normalized-tab)]]))
 
 (defn add-indicator [state indicator-type params]
   (let [current-indicators (get-in state [:chart-options :active-indicators] {})
         new-indicators (assoc current-indicators indicator-type params)]
-    (persist-indicators! new-indicators)
-    [[:effects/save [:chart-options :active-indicators] new-indicators]]))
+    [[:effects/save [:chart-options :active-indicators] new-indicators]
+     [:effects/local-storage-set-json "chart-active-indicators" (serialize-indicators new-indicators)]]))
 
 (defn remove-indicator [state indicator-type]
   (let [current-indicators (get-in state [:chart-options :active-indicators] {})
         new-indicators (dissoc current-indicators indicator-type)]
-    (persist-indicators! new-indicators)
-    [[:effects/save [:chart-options :active-indicators] new-indicators]]))
+    [[:effects/save [:chart-options :active-indicators] new-indicators]
+     [:effects/local-storage-set-json "chart-active-indicators" (serialize-indicators new-indicators)]]))
 
 (defn update-indicator-period [state indicator-type period-value]
   (let [current-indicators (get-in state [:chart-options :active-indicators] {})
         period (js/parseInt period-value)
         updated-indicators (assoc-in current-indicators [indicator-type :period] period)]
-    (persist-indicators! updated-indicators)
-    [[:effects/save [:chart-options :active-indicators] updated-indicators]]))
+    [[:effects/save [:chart-options :active-indicators] updated-indicators]
+     [:effects/local-storage-set-json "chart-active-indicators" (serialize-indicators updated-indicators)]]))
 
 (defn- parse-datetime-local-ms
   [value]
@@ -1871,10 +1717,10 @@
                         (if (contains? #{"Time" "Size" "Original Size" "Order Value" "Price"} column)
                           :desc
                           :asc))]
-    (js/localStorage.setItem "open-orders-sort-by" column)
-    (js/localStorage.setItem "open-orders-sort-direction" (name new-direction))
     [[:effects/save [:account-info :open-orders-sort] {:column column
-                                                       :direction new-direction}]]))
+                                                       :direction new-direction}]
+     [:effects/local-storage-set "open-orders-sort-by" column]
+     [:effects/local-storage-set "open-orders-sort-direction" (name new-direction)]]))
 
 (defn sort-funding-history [state column]
   (let [current-sort (get-in state
@@ -1894,10 +1740,10 @@
 
 (defn set-funding-history-page-size [state page-size]
   (let [page-size* (normalize-order-history-page-size page-size)]
-    (js/localStorage.setItem "funding-history-page-size" (str page-size*))
     [[:effects/save-many [[[:account-info :funding-history :page-size] page-size*]
                           [[:account-info :funding-history :page] 1]
-                          [[:account-info :funding-history :page-input] "1"]]]]))
+                          [[:account-info :funding-history :page-input] "1"]]]
+     [:effects/local-storage-set "funding-history-page-size" (str page-size*)]]))
 
 (defn set-funding-history-page [state page max-page]
   (let [page* (normalize-order-history-page page max-page)]
@@ -1931,10 +1777,10 @@
 
 (defn set-trade-history-page-size [state page-size]
   (let [page-size* (normalize-order-history-page-size page-size)]
-    (js/localStorage.setItem "trade-history-page-size" (str page-size*))
     [[:effects/save-many [[[:account-info :trade-history :page-size] page-size*]
                           [[:account-info :trade-history :page] 1]
-                          [[:account-info :trade-history :page-input] "1"]]]]))
+                          [[:account-info :trade-history :page-input] "1"]]]
+     [:effects/local-storage-set "trade-history-page-size" (str page-size*)]]))
 
 (defn set-trade-history-page [state page max-page]
   (let [page* (normalize-order-history-page page max-page)]
@@ -2013,10 +1859,10 @@
 
 (defn set-order-history-page-size [state page-size]
   (let [page-size* (normalize-order-history-page-size page-size)]
-    (js/localStorage.setItem "order-history-page-size" (str page-size*))
     [[:effects/save-many [[[:account-info :order-history :page-size] page-size*]
                           [[:account-info :order-history :page] 1]
-                          [[:account-info :order-history :page-input] "1"]]]]))
+                          [[:account-info :order-history :page-input] "1"]]]
+     [:effects/local-storage-set "order-history-page-size" (str page-size*)]]))
 
 (defn set-order-history-page [state page max-page]
   (let [page* (normalize-order-history-page page max-page)]
@@ -2484,6 +2330,8 @@
 ;; Register effects and actions
 (nxr/register-effect! :effects/save save)
 (nxr/register-effect! :effects/save-many save-many)
+(nxr/register-effect! :effects/local-storage-set local-storage-set)
+(nxr/register-effect! :effects/local-storage-set-json local-storage-set-json)
 (nxr/register-effect! :effects/queue-asset-icon-status queue-asset-icon-status)
 (nxr/register-effect! :effects/push-state push-state)
 (nxr/register-effect! :effects/replace-state replace-state)

@@ -425,15 +425,15 @@
             effects (core/set-funding-history-page-size state "100")]
         (is (= [[:effects/save-many [[[:account-info :funding-history :page-size] 100]
                                      [[:account-info :funding-history :page] 1]
-                                     [[:account-info :funding-history :page-input] "1"]]]]
+                                     [[:account-info :funding-history :page-input] "1"]]]
+                [:effects/local-storage-set "funding-history-page-size" "100"]]
                effects))
-        (is (= "100" (.getItem js/localStorage "funding-history-page-size")))
         (let [invalid-effects (core/set-funding-history-page-size state "13")]
           (is (= [[:effects/save-many [[[:account-info :funding-history :page-size] 50]
                                        [[:account-info :funding-history :page] 1]
-                                       [[:account-info :funding-history :page-input] "1"]]]]
-                 invalid-effects))
-          (is (= "50" (.getItem js/localStorage "funding-history-page-size"))))))))
+                                       [[:account-info :funding-history :page-input] "1"]]]
+                  [:effects/local-storage-set "funding-history-page-size" "50"]]
+                 invalid-effects)))))))
 
 (deftest funding-history-pagination-set-page-clamps-and-syncs-input-test
   (let [state {:account-info {:funding-history {:page 2
@@ -512,15 +512,15 @@
             effects (core/set-trade-history-page-size state "100")]
         (is (= [[:effects/save-many [[[:account-info :trade-history :page-size] 100]
                                      [[:account-info :trade-history :page] 1]
-                                     [[:account-info :trade-history :page-input] "1"]]]]
+                                     [[:account-info :trade-history :page-input] "1"]]]
+                [:effects/local-storage-set "trade-history-page-size" "100"]]
                effects))
-        (is (= "100" (.getItem js/localStorage "trade-history-page-size")))
         (let [invalid-effects (core/set-trade-history-page-size state "13")]
           (is (= [[:effects/save-many [[[:account-info :trade-history :page-size] 50]
                                        [[:account-info :trade-history :page] 1]
-                                       [[:account-info :trade-history :page-input] "1"]]]]
-                 invalid-effects))
-          (is (= "50" (.getItem js/localStorage "trade-history-page-size"))))))))
+                                       [[:account-info :trade-history :page-input] "1"]]]
+                  [:effects/local-storage-set "trade-history-page-size" "50"]]
+                 invalid-effects)))))))
 
 (deftest trade-history-pagination-set-page-clamps-and-syncs-input-test
   (let [state {:account-info {:trade-history {:page 2
@@ -694,15 +694,15 @@
             effects (core/set-order-history-page-size state "100")]
         (is (= [[:effects/save-many [[[:account-info :order-history :page-size] 100]
                                      [[:account-info :order-history :page] 1]
-                                     [[:account-info :order-history :page-input] "1"]]]]
+                                     [[:account-info :order-history :page-input] "1"]]]
+                [:effects/local-storage-set "order-history-page-size" "100"]]
                effects))
-        (is (= "100" (.getItem js/localStorage "order-history-page-size")))
         (let [invalid-effects (core/set-order-history-page-size state "13")]
           (is (= [[:effects/save-many [[[:account-info :order-history :page-size] 50]
                                        [[:account-info :order-history :page] 1]
-                                       [[:account-info :order-history :page-input] "1"]]]]
-                 invalid-effects))
-          (is (= "50" (.getItem js/localStorage "order-history-page-size"))))))))
+                                       [[:account-info :order-history :page-input] "1"]]]
+                  [:effects/local-storage-set "order-history-page-size" "50"]]
+                 invalid-effects)))))))
 
 (deftest order-history-pagination-set-page-clamps-and-syncs-input-test
   (let [state {:account-info {:order-history {:page 2
@@ -1748,11 +1748,12 @@
                                      [[:chart-options :timeframes-dropdown-visible] false]
                                      [[:chart-options :chart-type-dropdown-visible] false]
                                      [[:chart-options :indicators-dropdown-visible] false]]]
+                [:effects/local-storage-set "chart-timeframe" "5m"]
                 [:effects/fetch-candle-snapshot :interval :5m]]
                effects))
         (is (= 1 (count (filter #(= :effects/fetch-candle-snapshot (first %)) effects))))
         (is (= :effects/save-many (ffirst effects)))
-        (is (= :effects/fetch-candle-snapshot (first (second effects))))))))
+        (is (= :effects/fetch-candle-snapshot (first (last effects))))))))
 
 (deftest select-chart-type-emits-single-batched-projection-and-no-network-effects-test
   (with-test-local-storage
@@ -1765,11 +1766,22 @@
         (is (= [[:effects/save-many [[[:chart-options :selected-chart-type] :line]
                                      [[:chart-options :timeframes-dropdown-visible] false]
                                      [[:chart-options :chart-type-dropdown-visible] false]
-                                     [[:chart-options :indicators-dropdown-visible] false]]]]
+                                     [[:chart-options :indicators-dropdown-visible] false]]]
+                [:effects/local-storage-set "chart-type" "line"]]
                effects))
-        (is (= 1 (count effects)))
+        (is (= 2 (count effects)))
         (is (not-any? #(= :effects/fetch-candle-snapshot (first %)) effects))
         (is (not-any? #(= :effects/subscribe-active-asset (first %)) effects))))))
+
+(deftest local-storage-effect-interpreters-persist-string-and-json-values-test
+  (with-test-local-storage
+    (fn []
+      (core/local-storage-set nil nil "sample-key" "sample-value")
+      (is (= "sample-value" (.getItem js/localStorage "sample-key")))
+      (core/local-storage-set-json nil nil "sample-json" {:a 1 :b "two"})
+      (is (= {:a 1 :b "two"}
+             (js->clj (js/JSON.parse (.getItem js/localStorage "sample-json"))
+                      :keywordize-keys true))))))
 
 (deftest select-order-entry-mode-market-emits-single-batched-projection-test
   (let [state {:order-form (assoc (trading/default-order-form)
