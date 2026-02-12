@@ -1,0 +1,149 @@
+(ns hyperopen.runtime.action-adapters
+  (:require [nexus.registry :as nxr]
+            [hyperopen.api.trading :as trading-api]
+            [hyperopen.runtime.state :as runtime-state]
+            [hyperopen.wallet.agent-runtime :as agent-runtime]
+            [hyperopen.wallet.actions :as wallet-actions]
+            [hyperopen.wallet.agent-session :as agent-session]
+            [hyperopen.wallet.connection-runtime :as wallet-connection-runtime]
+            [hyperopen.websocket.diagnostics-actions :as diagnostics-actions]
+            [hyperopen.websocket.health-runtime :as health-runtime]))
+
+(defn init-websockets [_state]
+  [[:effects/init-websocket]])
+
+(defn subscribe-to-asset [_state coin]
+  [[:effects/subscribe-active-asset coin]
+   [:effects/subscribe-orderbook coin]
+   [:effects/subscribe-trades coin]])
+
+(defn subscribe-to-webdata2 [_state address]
+  [[:effects/subscribe-webdata2 address]])
+
+(defn connect-wallet-action [state]
+  (wallet-actions/connect-wallet-action state))
+
+(defn disconnect-wallet-action [_state]
+  (wallet-actions/disconnect-wallet-action nil))
+
+(defn should-auto-enable-agent-trading?
+  [state connected-address]
+  (wallet-connection-runtime/should-auto-enable-agent-trading?
+   state
+   connected-address))
+
+(defn handle-wallet-connected
+  [store connected-address]
+  (wallet-connection-runtime/handle-wallet-connected!
+   {:store store
+    :connected-address connected-address
+    :should-auto-enable-agent-trading? should-auto-enable-agent-trading?
+    :dispatch! nxr/dispatch}))
+
+(defn- exchange-response-error
+  [resp]
+  (agent-runtime/exchange-response-error resp))
+
+(defn- runtime-error-message
+  [err]
+  (agent-runtime/runtime-error-message err))
+
+(defn enable-agent-trading
+  [_ store {:keys [storage-mode is-mainnet agent-name signature-chain-id]
+            :or {storage-mode :local
+                 is-mainnet true
+                 agent-name nil
+                 signature-chain-id nil}}]
+  (agent-runtime/enable-agent-trading!
+   {:store store
+    :options {:storage-mode storage-mode
+              :is-mainnet is-mainnet
+              :agent-name agent-name
+              :signature-chain-id signature-chain-id}
+    :create-agent-credentials! agent-session/create-agent-credentials!
+    :now-ms-fn (fn []
+                 (.now js/Date))
+    :normalize-storage-mode agent-session/normalize-storage-mode
+    :default-signature-chain-id-for-environment agent-session/default-signature-chain-id-for-environment
+    :build-approve-agent-action agent-session/build-approve-agent-action
+    :approve-agent! trading-api/approve-agent!
+    :persist-agent-session-by-mode! agent-session/persist-agent-session-by-mode!
+    :runtime-error-message runtime-error-message
+    :exchange-response-error exchange-response-error}))
+
+(defn enable-agent-trading-action
+  [state]
+  (wallet-actions/enable-agent-trading-action
+   state
+   agent-session/normalize-storage-mode))
+
+(defn set-agent-storage-mode-action
+  [state storage-mode]
+  (wallet-actions/set-agent-storage-mode-action
+   state
+   storage-mode
+   agent-session/normalize-storage-mode))
+
+(defn copy-wallet-address-action [state]
+  (wallet-actions/copy-wallet-address-action state))
+
+(defn reconnect-websocket-action [_state]
+  [[:effects/reconnect-websocket]])
+
+(defn- effective-now-ms
+  [generated-at-ms]
+  (health-runtime/effective-now-ms generated-at-ms))
+
+(defn- ws-diagnostics-action-deps []
+  {:effective-now-ms effective-now-ms
+   :reconnect-cooldown-ms runtime-state/reconnect-cooldown-ms})
+
+(defn toggle-ws-diagnostics [state]
+  (diagnostics-actions/toggle-ws-diagnostics state))
+
+(defn close-ws-diagnostics [_]
+  (diagnostics-actions/close-ws-diagnostics nil))
+
+(defn toggle-ws-diagnostics-sensitive [state]
+  (diagnostics-actions/toggle-ws-diagnostics-sensitive state))
+
+(defn ws-diagnostics-reconnect-now [state]
+  (diagnostics-actions/ws-diagnostics-reconnect-now
+   state
+   (ws-diagnostics-action-deps)))
+
+(defn ws-diagnostics-copy [_]
+  (diagnostics-actions/ws-diagnostics-copy nil))
+
+(defn set-show-surface-freshness-cues [_ checked]
+  (diagnostics-actions/set-show-surface-freshness-cues nil checked))
+
+(defn toggle-show-surface-freshness-cues [state]
+  (diagnostics-actions/toggle-show-surface-freshness-cues state))
+
+(defn ws-diagnostics-reset-market-subscriptions
+  ([state]
+   (ws-diagnostics-reset-market-subscriptions state :manual))
+  ([state source]
+   (diagnostics-actions/ws-diagnostics-reset-market-subscriptions
+    state
+    source
+    (ws-diagnostics-action-deps))))
+
+(defn ws-diagnostics-reset-orders-subscriptions
+  ([state]
+   (ws-diagnostics-reset-orders-subscriptions state :manual))
+  ([state source]
+   (diagnostics-actions/ws-diagnostics-reset-orders-subscriptions
+    state
+    source
+    (ws-diagnostics-action-deps))))
+
+(defn ws-diagnostics-reset-all-subscriptions
+  ([state]
+   (ws-diagnostics-reset-all-subscriptions state :manual))
+  ([state source]
+   (diagnostics-actions/ws-diagnostics-reset-all-subscriptions
+    state
+    source
+    (ws-diagnostics-action-deps))))

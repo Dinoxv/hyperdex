@@ -6,6 +6,7 @@
             [hyperopen.api.trading :as trading-api]
             [hyperopen.account.history.effects :as account-history-effects]
             [hyperopen.core :as core]
+            [hyperopen.runtime.effect-adapters :as effect-adapters]
             [hyperopen.runtime.state :as runtime-state]
             [hyperopen.state.trading :as trading]
             [hyperopen.wallet.agent-session :as agent-session]
@@ -200,9 +201,9 @@
         scheduled-callback (atom nil)]
     (reset! @#'runtime-state/pending-asset-icon-statuses {})
     (reset! @#'runtime-state/asset-icon-status-flush-handle nil)
-    (with-redefs [hyperopen.core/schedule-animation-frame! (fn [f]
-                                                              (reset! scheduled-callback f)
-                                                              :raf-id)]
+    (with-redefs [effect-adapters/schedule-animation-frame! (fn [f]
+                                                               (reset! scheduled-callback f)
+                                                               :raf-id)]
       (core/queue-asset-icon-status nil store {:market-key "perp:BTC" :status :loaded})
       (core/queue-asset-icon-status nil store {:market-key "perp:BTC" :status :missing})
       (core/queue-asset-icon-status nil store {:market-key "perp:ETH" :status :loaded})
@@ -850,7 +851,7 @@
                                          :loading false}
                          :active-market nil})]
         (with-redefs [active-ctx/subscribe-active-asset-ctx! (fn [_] nil)
-                      core/fetch-candle-snapshot (fn [& _] nil)]
+                      effect-adapters/fetch-candle-snapshot (fn [& _] nil)]
           (core/subscribe-active-asset nil store "ETH"))
         (let [cached (js->clj (js/JSON.parse (.getItem js/localStorage "active-market-display"))
                               :keywordize-keys true)]

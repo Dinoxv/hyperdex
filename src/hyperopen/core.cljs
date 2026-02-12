@@ -3,48 +3,21 @@
   (:require [replicant.dom :as r]
             [nexus.registry :as nxr]
             [hyperopen.views.app-view :as app-view]
-            [hyperopen.websocket.active-asset-ctx :as active-ctx]
             [hyperopen.websocket.client :as ws-client]
-            [hyperopen.websocket.health-runtime :as health-runtime]
-            [hyperopen.websocket.orderbook :as orderbook]
-            [hyperopen.websocket.trades :as trades]
-            [hyperopen.websocket.webdata2 :as webdata2]
-            [hyperopen.websocket.user :as user-ws]
-            [hyperopen.websocket.diagnostics-actions :as diagnostics-actions]
-            [hyperopen.websocket.diagnostics-effects :as diagnostics-effects]
-            [hyperopen.websocket.diagnostics-runtime :as diagnostics-runtime]
-            [hyperopen.websocket.health-projection :as health-projection]
-            [hyperopen.websocket.subscriptions-runtime :as subscriptions-runtime]
-            [hyperopen.api :as api]
-            [hyperopen.api.trading :as trading-api]
             [hyperopen.account.history.actions :as account-history-actions]
-            [hyperopen.account.history.effects :as account-history-effects]
-            [hyperopen.order.feedback-runtime :as order-feedback-runtime]
-            [hyperopen.order.effects :as order-effects]
             [hyperopen.core.public-actions :as public-actions]
-            [hyperopen.asset-selector.active-market-cache :as active-market-cache]
-            [hyperopen.asset-selector.actions :as asset-actions]
-            [hyperopen.asset-selector.icon-status-runtime :as icon-status-runtime]
-            [hyperopen.asset-selector.markets-cache :as markets-cache]
             [hyperopen.asset-selector.settings :as asset-selector-settings]
-            [hyperopen.asset-selector.markets :as markets]
-            [hyperopen.orderbook.price-aggregation :as price-agg]
             [hyperopen.registry.runtime :as runtime-registry]
-            [hyperopen.runtime.app-effects :as app-effects]
-            [hyperopen.runtime.api-effects :as api-effects]
+            [hyperopen.runtime.action-adapters :as action-adapters]
             [hyperopen.runtime.bootstrap :as runtime-bootstrap]
             [hyperopen.runtime.collaborators :as runtime-collaborators]
+            [hyperopen.runtime.effect-adapters :as effect-adapters]
             [hyperopen.runtime.registry-composition :as registry-composition]
             [hyperopen.runtime.state :as runtime-state]
             [hyperopen.startup.collaborators :as startup-collaborators]
             [hyperopen.startup.composition :as startup-composition]
-            [hyperopen.startup.restore :as startup-restore]
             [hyperopen.startup.runtime :as startup-runtime-lib]
             [hyperopen.startup.watchers :as startup-watchers]
-            [hyperopen.wallet.agent-runtime :as agent-runtime]
-            [hyperopen.wallet.actions :as wallet-actions]
-            [hyperopen.wallet.connection-runtime :as wallet-connection-runtime]
-            [hyperopen.wallet.copy-feedback-runtime :as wallet-copy-runtime]
             [hyperopen.wallet.core :as wallet]
             [hyperopen.wallet.agent-session :as agent-session]
             [hyperopen.wallet.address-watcher :as address-watcher]
@@ -72,448 +45,74 @@
      :default-funding-history (default-funding-history-state)
      :default-order-history (default-order-history-state)})))
 
-(defn- websocket-health-fingerprint [health]
-  (health-projection/websocket-health-fingerprint health))
-
-(defn- effective-now-ms
-  [generated-at-ms]
-  (health-runtime/effective-now-ms generated-at-ms))
-
-(defn- append-diagnostics-event!
-  [store event at-ms & [details]]
-  (swap! store
-         health-projection/append-diagnostics-event
-         event
-         at-ms
-         details
-         runtime-state/diagnostics-timeline-limit))
-
-(defn- sync-websocket-health!
-  [store & {:keys [force?]}]
-  (health-runtime/sync-websocket-health!
-   {:store store
-    :force? force?
-    :get-health-snapshot ws-client/get-health-snapshot
-    :websocket-health-fingerprint websocket-health-fingerprint
-    :projection-state runtime-state/websocket-health-projection-state
-    :sync-stats runtime-state/websocket-health-sync-stats
-    :auto-recover-enabled-fn health-runtime/auto-recover-enabled?
-    :auto-recover-severe-threshold-ms runtime-state/auto-recover-severe-threshold-ms
-    :auto-recover-cooldown-ms runtime-state/auto-recover-cooldown-ms
-    :dispatch! nxr/dispatch
-    :append-diagnostics-event! append-diagnostics-event!
-    :queue-microtask-fn js/queueMicrotask}))
-
-(defn- set-copy-status!
-  [store status]
-  (swap! store assoc-in [:websocket-ui :copy-status] status))
-
-;; Effects - handle side effects
-(defn save [_ store path value]
-  (app-effects/save! store path value))
-
-(defn save-many [_ store path-values]
-  (app-effects/save-many! store path-values))
-
-(defn local-storage-set [_ _ key value]
-  (app-effects/local-storage-set! key value))
-
-(defn local-storage-set-json [_ _ key value]
-  (app-effects/local-storage-set-json! key value))
-
-(defn- schedule-animation-frame! [f]
-  (if (fn? (.-requestAnimationFrame js/globalThis))
-    (.requestAnimationFrame js/globalThis f)
-    (js/setTimeout f 16)))
-
-(defn- flush-queued-asset-icon-statuses! [store]
-  (icon-status-runtime/flush-queued-asset-icon-statuses!
-   {:store store
-    :pending-statuses runtime-state/pending-asset-icon-statuses
-    :flush-handle runtime-state/asset-icon-status-flush-handle
-    :apply-asset-icon-status-updates-fn asset-actions/apply-asset-icon-status-updates
-    :save-many! (fn [runtime-store path-values]
-                  (save-many nil runtime-store path-values))}))
-
-(defn queue-asset-icon-status [_ store payload]
-  (icon-status-runtime/queue-asset-icon-status!
-   {:store store
-    :payload payload
-    :pending-statuses runtime-state/pending-asset-icon-statuses
-    :flush-handle runtime-state/asset-icon-status-flush-handle
-    :schedule-animation-frame! schedule-animation-frame!
-    :flush-queued-asset-icon-statuses! flush-queued-asset-icon-statuses!}))
-
-(defn push-state [_ _ path]
-  (app-effects/push-state! path))
-
-(defn replace-state [_ _ path]
-  (app-effects/replace-state! path))
-
-(defn fetch-candle-snapshot [_ store & {:keys [interval bars] :or {interval :1d bars 330}}]
-  (app-effects/fetch-candle-snapshot!
-   {:store store
-    :interval interval
-    :bars bars
-    :log-fn println
-    :fetch-candle-snapshot-fn api/fetch-candle-snapshot!}))
-
-(defn init-websocket [_ store]
-  (app-effects/init-websocket!
-   {:store store
-    :ws-url runtime-state/websocket-url
-    :log-fn println
-    :init-connection! ws-client/init-connection!}))
-
-(defn- normalize-market-type [value]
-  (markets-cache/normalize-market-type value))
-
-(defn- parse-max-leverage [value]
-  (markets-cache/parse-max-leverage value))
-
-(defn- normalize-display-text [value]
-  (markets-cache/normalize-display-text value))
-
-(defn- persist-asset-selector-markets-cache!
-  ([markets]
-   (persist-asset-selector-markets-cache! markets {}))
-  ([markets state]
-   (markets-cache/persist-asset-selector-markets-cache! markets state)))
-
-(defn- load-asset-selector-markets-cache []
-  (markets-cache/load-asset-selector-markets-cache))
-
-(defn restore-asset-selector-markets-cache! [store]
-  (markets-cache/restore-asset-selector-markets-cache!
-   store
-   {:load-cache-fn load-asset-selector-markets-cache
-    :resolve-market-by-coin-fn markets/resolve-market-by-coin}))
-
-(defn- active-market-display-normalize-deps []
-  {:normalize-display-text normalize-display-text
-   :normalize-market-type normalize-market-type
-   :parse-max-leverage parse-max-leverage})
-
-(defn- persist-active-market-display! [market]
-  (active-market-cache/persist-active-market-display!
-   market
-   (active-market-display-normalize-deps)))
-
-(defn- load-active-market-display [active-asset]
-  (active-market-cache/load-active-market-display
-   active-asset
-   (active-market-display-normalize-deps)))
-
-(defn subscribe-active-asset [_ store coin]
-  (subscriptions-runtime/subscribe-active-asset!
-   {:store store
-    :coin coin
-    :log-fn println
-    :resolve-market-by-coin-fn markets/resolve-market-by-coin
-    :persist-active-asset! (fn [canonical-coin]
-                             (when (string? canonical-coin)
-                               (js/localStorage.setItem "active-asset" canonical-coin)))
-    :persist-active-market-display! persist-active-market-display!
-    :subscribe-active-asset-ctx! active-ctx/subscribe-active-asset-ctx!
-    :fetch-candle-snapshot! (fn [selected-timeframe]
-                              (fetch-candle-snapshot nil store :interval selected-timeframe))}))
-
-(defn unsubscribe-active-asset [_ store coin]
-  (subscriptions-runtime/unsubscribe-active-asset!
-   {:store store
-    :coin coin
-    :log-fn println
-    :unsubscribe-active-asset-ctx! active-ctx/unsubscribe-active-asset-ctx!}))
-
-(defn subscribe-orderbook [_ store coin]
-  (subscriptions-runtime/subscribe-orderbook!
-   {:store store
-    :coin coin
-    :log-fn println
-    :normalize-mode-fn price-agg/normalize-mode
-    :mode->subscription-config-fn price-agg/mode->subscription-config
-    :subscribe-orderbook-fn orderbook/subscribe-orderbook!}))
-
-(defn subscribe-trades [_ store coin]
-  (subscriptions-runtime/subscribe-trades!
-   {:coin coin
-    :log-fn println
-    :subscribe-trades-fn trades/subscribe-trades!}))
-
-(defn unsubscribe-orderbook [_ store coin]
-  (subscriptions-runtime/unsubscribe-orderbook!
-   {:store store
-    :coin coin
-    :log-fn println
-    :unsubscribe-orderbook-fn orderbook/unsubscribe-orderbook!}))
-
-(defn unsubscribe-trades [_ store coin]
-  (subscriptions-runtime/unsubscribe-trades!
-   {:coin coin
-    :log-fn println
-    :unsubscribe-trades-fn trades/unsubscribe-trades!}))
-
-(defn subscribe-webdata2 [_ store address]
-  (subscriptions-runtime/subscribe-webdata2!
-   {:address address
-    :log-fn println
-    :subscribe-webdata2-fn webdata2/subscribe-webdata2!}))
-
-(defn unsubscribe-webdata2 [_ store address]
-  (subscriptions-runtime/unsubscribe-webdata2!
-   {:address address
-    :log-fn println
-    :unsubscribe-webdata2-fn webdata2/unsubscribe-webdata2!}))
-
-(defn connect-wallet [_ store]
-  (wallet-connection-runtime/connect-wallet!
-   {:store store
-    :log-fn println
-    :request-connection! wallet/request-connection!}))
-
-(defn- set-wallet-copy-feedback! [store kind message]
-  (wallet-copy-runtime/set-wallet-copy-feedback! store kind message))
-
-(defn- clear-wallet-copy-feedback! [store]
-  (wallet-copy-runtime/clear-wallet-copy-feedback! store))
-
-(defn- clear-wallet-copy-feedback-timeout! []
-  (wallet-copy-runtime/clear-wallet-copy-feedback-timeout!
-   runtime-state/wallet-copy-feedback-timeout-id
-   js/clearTimeout))
-
-(defn- set-order-feedback-toast! [store kind message]
-  (order-feedback-runtime/set-order-feedback-toast! store kind message))
-
-(defn- clear-order-feedback-toast! [store]
-  (order-feedback-runtime/clear-order-feedback-toast! store))
-
-(defn- clear-order-feedback-toast-timeout! []
-  (order-feedback-runtime/clear-order-feedback-toast-timeout!
-   runtime-state/order-feedback-toast-timeout-id
-   js/clearTimeout))
-
-(defn- schedule-order-feedback-toast-clear! [store]
-  (order-feedback-runtime/schedule-order-feedback-toast-clear!
-   {:store store
-    :order-feedback-toast-timeout-id runtime-state/order-feedback-toast-timeout-id
-    :clear-order-feedback-toast! clear-order-feedback-toast!
-    :clear-order-feedback-toast-timeout! clear-order-feedback-toast-timeout!
-    :order-feedback-toast-duration-ms runtime-state/order-feedback-toast-duration-ms
-    :set-timeout-fn js/setTimeout}))
-
-(defn- show-order-feedback-toast! [store kind message]
-  (order-feedback-runtime/show-order-feedback-toast!
-   store
-   kind
-   message
-   schedule-order-feedback-toast-clear!))
-
-(defn disconnect-wallet [_ store]
-  (wallet-connection-runtime/disconnect-wallet!
-   {:store store
-    :log-fn println
-    :clear-wallet-copy-feedback-timeout! clear-wallet-copy-feedback-timeout!
-    :clear-order-feedback-toast-timeout! clear-order-feedback-toast-timeout!
-    :clear-order-feedback-toast! clear-order-feedback-toast!
-    :set-disconnected! wallet/set-disconnected!}))
-
-(defn set-agent-storage-mode [_ store storage-mode]
-  (agent-runtime/set-agent-storage-mode!
-   {:store store
-    :storage-mode storage-mode
-    :normalize-storage-mode agent-session/normalize-storage-mode
-    :clear-agent-session-by-mode! agent-session/clear-agent-session-by-mode!
-    :persist-storage-mode-preference! agent-session/persist-storage-mode-preference!
-    :default-agent-state agent-session/default-agent-state
-    :agent-storage-mode-reset-message runtime-state/agent-storage-mode-reset-message}))
-
-(defn- schedule-wallet-copy-feedback-clear! [store]
-  (wallet-copy-runtime/schedule-wallet-copy-feedback-clear!
-   {:store store
-    :wallet-copy-feedback-timeout-id runtime-state/wallet-copy-feedback-timeout-id
-    :clear-wallet-copy-feedback! clear-wallet-copy-feedback!
-    :clear-wallet-copy-feedback-timeout! clear-wallet-copy-feedback-timeout!
-    :wallet-copy-feedback-duration-ms runtime-state/wallet-copy-feedback-duration-ms
-    :set-timeout-fn js/setTimeout}))
-
-(defn copy-wallet-address [_ store address]
-  (wallet-copy-runtime/copy-wallet-address!
-   {:store store
-    :address address
-    :set-wallet-copy-feedback! set-wallet-copy-feedback!
-    :clear-wallet-copy-feedback! clear-wallet-copy-feedback!
-    :clear-wallet-copy-feedback-timeout! clear-wallet-copy-feedback-timeout!
-    :schedule-wallet-copy-feedback-clear! schedule-wallet-copy-feedback-clear!
-    :log-fn println}))
-
-(defn reconnect-websocket [_ _]
-  (app-effects/reconnect-websocket!
-   {:log-fn println
-    :force-reconnect! ws-client/force-reconnect!}))
-
-(defn refresh-websocket-health [_ store]
-  (sync-websocket-health! store :force? true))
-
-(defn ws-reset-subscriptions [_ store {:keys [group source]
-                                       :or {group :all
-                                            source :manual}}]
-  (diagnostics-runtime/ws-reset-subscriptions!
-   {:store store
-    :group group
-    :source source
-    :get-health-snapshot ws-client/get-health-snapshot
-    :effective-now-ms effective-now-ms
-    :reset-subscriptions-cooldown-ms runtime-state/reset-subscriptions-cooldown-ms
-    :send-message! ws-client/send-message!
-    :append-diagnostics-event! append-diagnostics-event!}))
-
-(defn confirm-ws-diagnostics-reveal [_ store]
-  (diagnostics-effects/confirm-ws-diagnostics-reveal!
-   {:store store
-    :confirm-fn js/confirm}))
-
-(defn copy-websocket-diagnostics [_ store]
-  (diagnostics-effects/copy-websocket-diagnostics!
-   {:store store
-    :app-version runtime-state/app-version
-    :set-copy-status! set-copy-status!
-    :log-fn println}))
-
-(defn init-websockets [state]
-  [[:effects/init-websocket]])
-
-(defn subscribe-to-asset [state coin]
-  [[:effects/subscribe-active-asset coin]
-   [:effects/subscribe-orderbook coin]
-   [:effects/subscribe-trades coin]])
-
-(defn subscribe-to-webdata2 [state address]
-  [[:effects/subscribe-webdata2 address]])
-
-(defn connect-wallet-action [state]
-  (wallet-actions/connect-wallet-action state))
-
-(defn disconnect-wallet-action [_state]
-  (wallet-actions/disconnect-wallet-action nil))
-
-(defn- should-auto-enable-agent-trading?
-  [state connected-address]
-  (wallet-connection-runtime/should-auto-enable-agent-trading?
-   state
-   connected-address))
-
-(defn handle-wallet-connected
-  [store connected-address]
-  (wallet-connection-runtime/handle-wallet-connected!
-   {:store store
-    :connected-address connected-address
-    :should-auto-enable-agent-trading? should-auto-enable-agent-trading?
-    :dispatch! nxr/dispatch}))
-
-(defn- exchange-response-error
-  [resp]
-  (agent-runtime/exchange-response-error resp))
-
-(defn- runtime-error-message
-  [err]
-  (agent-runtime/runtime-error-message err))
-
-(defn enable-agent-trading
-  [_ store {:keys [storage-mode is-mainnet agent-name signature-chain-id]
-            :or {storage-mode :local
-                 is-mainnet true
-                 agent-name nil
-                 signature-chain-id nil}}]
-  (agent-runtime/enable-agent-trading!
-   {:store store
-    :options {:storage-mode storage-mode
-              :is-mainnet is-mainnet
-              :agent-name agent-name
-              :signature-chain-id signature-chain-id}
-    :create-agent-credentials! agent-session/create-agent-credentials!
-    :now-ms-fn (fn []
-                 (.now js/Date))
-    :normalize-storage-mode agent-session/normalize-storage-mode
-    :default-signature-chain-id-for-environment agent-session/default-signature-chain-id-for-environment
-    :build-approve-agent-action agent-session/build-approve-agent-action
-    :approve-agent! trading-api/approve-agent!
-    :persist-agent-session-by-mode! agent-session/persist-agent-session-by-mode!
-    :runtime-error-message runtime-error-message
-    :exchange-response-error exchange-response-error}))
-
-(defn enable-agent-trading-action
-  [state]
-  (wallet-actions/enable-agent-trading-action
-   state
-   agent-session/normalize-storage-mode))
-
-(defn set-agent-storage-mode-action
-  [state storage-mode]
-  (wallet-actions/set-agent-storage-mode-action
-   state
-   storage-mode
-   agent-session/normalize-storage-mode))
-
-(defn copy-wallet-address-action [state]
-  (wallet-actions/copy-wallet-address-action state))
-
-(defn reconnect-websocket-action [state]
-  [[:effects/reconnect-websocket]])
-
-(defn- ws-diagnostics-action-deps []
-  {:effective-now-ms effective-now-ms
-   :reconnect-cooldown-ms runtime-state/reconnect-cooldown-ms})
-
-(defn toggle-ws-diagnostics [state]
-  (diagnostics-actions/toggle-ws-diagnostics state))
-
-(defn close-ws-diagnostics [_]
-  (diagnostics-actions/close-ws-diagnostics nil))
-
-(defn toggle-ws-diagnostics-sensitive [state]
-  (diagnostics-actions/toggle-ws-diagnostics-sensitive state))
-
-(defn ws-diagnostics-reconnect-now [state]
-  (diagnostics-actions/ws-diagnostics-reconnect-now
-   state
-   (ws-diagnostics-action-deps)))
-
-(defn ws-diagnostics-copy [_]
-  (diagnostics-actions/ws-diagnostics-copy nil))
-
-(defn set-show-surface-freshness-cues [_ checked]
-  (diagnostics-actions/set-show-surface-freshness-cues nil checked))
-
-(defn toggle-show-surface-freshness-cues [state]
-  (diagnostics-actions/toggle-show-surface-freshness-cues state))
-
-(defn ws-diagnostics-reset-market-subscriptions
-  ([state]
-   (ws-diagnostics-reset-market-subscriptions state :manual))
-  ([state source]
-   (diagnostics-actions/ws-diagnostics-reset-market-subscriptions
-    state
-    source
-    (ws-diagnostics-action-deps))))
-
-(defn ws-diagnostics-reset-orders-subscriptions
-  ([state]
-   (ws-diagnostics-reset-orders-subscriptions state :manual))
-  ([state source]
-   (diagnostics-actions/ws-diagnostics-reset-orders-subscriptions
-    state
-    source
-    (ws-diagnostics-action-deps))))
-
-(defn ws-diagnostics-reset-all-subscriptions
-  ([state]
-   (ws-diagnostics-reset-all-subscriptions state :manual))
-  ([state source]
-   (diagnostics-actions/ws-diagnostics-reset-all-subscriptions
-    state
-    source
-    (ws-diagnostics-action-deps))))
+;; Re-export runtime effect/action adapters so `hyperopen.core/*` remains stable
+;; while implementation details live in dedicated runtime namespaces.
+(def-public-action-aliases
+  effect-adapters
+  [append-diagnostics-event!
+   sync-websocket-health!
+   save
+   save-many
+   local-storage-set
+   local-storage-set-json
+   schedule-animation-frame!
+   flush-queued-asset-icon-statuses!
+   queue-asset-icon-status
+   push-state
+   replace-state
+   fetch-candle-snapshot
+   init-websocket
+   persist-asset-selector-markets-cache!
+   restore-asset-selector-markets-cache!
+   persist-active-market-display!
+   load-active-market-display
+   subscribe-active-asset
+   unsubscribe-active-asset
+   subscribe-orderbook
+   subscribe-trades
+   unsubscribe-orderbook
+   unsubscribe-trades
+   subscribe-webdata2
+   unsubscribe-webdata2
+   connect-wallet
+   disconnect-wallet
+   set-agent-storage-mode
+   copy-wallet-address
+   reconnect-websocket
+   refresh-websocket-health
+   ws-reset-subscriptions
+   confirm-ws-diagnostics-reveal
+   copy-websocket-diagnostics
+   restore-active-asset!
+   api-submit-order
+   api-cancel-order
+   fetch-asset-selector-markets-effect
+   api-load-user-data-effect])
+
+(def-public-action-aliases
+  action-adapters
+  [init-websockets
+   subscribe-to-asset
+   subscribe-to-webdata2
+   connect-wallet-action
+   disconnect-wallet-action
+   should-auto-enable-agent-trading?
+   handle-wallet-connected
+   enable-agent-trading
+   enable-agent-trading-action
+   set-agent-storage-mode-action
+   copy-wallet-address-action
+   reconnect-websocket-action
+   toggle-ws-diagnostics
+   close-ws-diagnostics
+   toggle-ws-diagnostics-sensitive
+   ws-diagnostics-reconnect-now
+   ws-diagnostics-copy
+   set-show-surface-freshness-cues
+   toggle-show-surface-freshness-cues
+   ws-diagnostics-reset-market-subscriptions
+   ws-diagnostics-reset-orders-subscriptions
+   ws-diagnostics-reset-all-subscriptions])
 
 ;; Re-export action aliases from a dedicated module to keep this namespace thin
 ;; while preserving the legacy `hyperopen.core/*` API surface.
@@ -614,45 +213,6 @@
    cancel-order
    load-user-data
    set-funding-modal])
-
-(defn- restore-active-asset-deps []
-  {:connected?-fn ws-client/connected?
-   :dispatch! nxr/dispatch
-   :load-active-market-display-fn load-active-market-display})
-
-(defn restore-active-asset! [store]
-  (startup-restore/restore-active-asset! store (restore-active-asset-deps)))
-
-(defn- order-api-effect-deps []
-  {:dispatch! nxr/dispatch
-   :exchange-response-error exchange-response-error
-   :prune-canceled-open-orders-fn order-effects/prune-canceled-open-orders
-   :runtime-error-message runtime-error-message
-   :show-toast! show-order-feedback-toast!})
-
-(defn api-submit-order
-  [ctx store request]
-  (order-effects/api-submit-order (order-api-effect-deps) ctx store request))
-
-(defn api-cancel-order
-  [ctx store request]
-  (order-effects/api-cancel-order (order-api-effect-deps) ctx store request))
-
-(defn- fetch-asset-selector-markets-effect
-  [_ store & [opts]]
-  (api-effects/fetch-asset-selector-markets!
-   {:store store
-    :opts opts
-    :fetch-asset-selector-markets-fn api/fetch-asset-selector-markets!}))
-
-(defn- api-load-user-data-effect
-  [_ store address]
-  (api-effects/load-user-data!
-   {:store store
-    :address address
-    :fetch-frontend-open-orders! api/fetch-frontend-open-orders!
-    :fetch-user-fills! api/fetch-user-fills!
-    :fetch-and-merge-funding-history! account-history-effects/fetch-and-merge-funding-history!}))
 
 (defn navigate
   [state path & [opts]]
