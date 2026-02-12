@@ -49,6 +49,7 @@
             [hyperopen.startup.composition-test]
             [hyperopen.runtime.bootstrap-test]
             [hyperopen.runtime.app-effects-test]
+            [hyperopen.state.app-defaults-test]
             [hyperopen.state.trading-test]))
 
 (defn run-all-tests
@@ -103,6 +104,7 @@
              'hyperopen.startup.composition-test
              'hyperopen.runtime.bootstrap-test
              'hyperopen.runtime.app-effects-test
+             'hyperopen.state.app-defaults-test
              'hyperopen.state.trading-test))
 
 (defn -main
