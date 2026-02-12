@@ -10,10 +10,8 @@
             [hyperopen.websocket.webdata2 :as webdata2]
             [hyperopen.websocket.user :as user-ws]
             [hyperopen.websocket.diagnostics-actions :as diagnostics-actions]
-            [hyperopen.websocket.diagnostics-copy :as diagnostics-copy]
-            [hyperopen.websocket.diagnostics-payload :as diagnostics-payload]
+            [hyperopen.websocket.diagnostics-effects :as diagnostics-effects]
             [hyperopen.websocket.diagnostics-runtime :as diagnostics-runtime]
-            [hyperopen.websocket.diagnostics-sanitize :as diagnostics-sanitize]
             [hyperopen.websocket.health-projection :as health-projection]
             [hyperopen.websocket.subscriptions-runtime :as subscriptions-runtime]
             [hyperopen.api :as api]
@@ -238,27 +236,9 @@
     :append-diagnostics-event! append-diagnostics-event!
     :queue-microtask-fn js/queueMicrotask}))
 
-(defn- copy-status-at-ms [health]
-  (diagnostics-payload/copy-status-at-ms health))
-
 (defn- set-copy-status!
   [store status]
   (swap! store assoc-in [:websocket-ui :copy-status] status))
-
-(defn- copy-success-status [health]
-  (diagnostics-payload/copy-success-status health))
-
-(defn- copy-error-status [health diagnostics-json]
-  (diagnostics-payload/copy-error-status health diagnostics-json))
-
-(defn- diagnostics-stream-rows [health]
-  (diagnostics-payload/diagnostics-stream-rows health))
-
-(defn- app-build-id []
-  (diagnostics-payload/app-build-id))
-
-(defn- diagnostics-copy-payload [state health]
-  (diagnostics-payload/diagnostics-copy-payload state health app-version))
 
 ;; Effects - handle side effects
 (defn save [_ store path value]
@@ -521,18 +501,15 @@
     :append-diagnostics-event! append-diagnostics-event!}))
 
 (defn confirm-ws-diagnostics-reveal [_ store]
-  (let [confirmed? (js/confirm "Reveal sensitive diagnostics values? This may expose wallet identifiers.")]
-    (when confirmed?
-      (swap! store assoc-in [:websocket-ui :reveal-sensitive?] true))))
+  (diagnostics-effects/confirm-ws-diagnostics-reveal!
+   {:store store
+    :confirm-fn js/confirm}))
 
 (defn copy-websocket-diagnostics [_ store]
-  (diagnostics-copy/copy-websocket-diagnostics!
+  (diagnostics-effects/copy-websocket-diagnostics!
    {:store store
-    :diagnostics-copy-payload diagnostics-copy-payload
-    :sanitize-value diagnostics-sanitize/sanitize-value
+    :app-version app-version
     :set-copy-status! set-copy-status!
-    :copy-success-status copy-success-status
-    :copy-error-status copy-error-status
     :log-fn println}))
 
 (defn init-websockets [state]

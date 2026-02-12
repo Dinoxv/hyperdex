@@ -6,6 +6,7 @@
             [hyperopen.websocket.application.runtime-reducer-test]
             [hyperopen.websocket.client-test]
             [hyperopen.websocket.diagnostics-actions-test]
+            [hyperopen.websocket.diagnostics-effects-test]
             [hyperopen.websocket.diagnostics-copy-test]
             [hyperopen.websocket.diagnostics-payload-test]
             [hyperopen.websocket.diagnostics-runtime-test]
@@ -24,6 +25,7 @@
              'hyperopen.websocket.application.runtime-test
              'hyperopen.websocket.application.runtime-reducer-test
              'hyperopen.websocket.diagnostics-actions-test
+             'hyperopen.websocket.diagnostics-effects-test
              'hyperopen.websocket.diagnostics-copy-test
              'hyperopen.websocket.diagnostics-payload-test
              'hyperopen.websocket.diagnostics-runtime-test
