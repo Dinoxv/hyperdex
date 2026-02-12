@@ -26,6 +26,7 @@
             [hyperopen.orderbook.settings :as orderbook-settings]
             [hyperopen.registry.runtime :as runtime-registry]
             [hyperopen.startup.restore :as startup-restore]
+            [hyperopen.startup.runtime :as startup-runtime-lib]
             [hyperopen.startup.watchers :as startup-watchers]
             [hyperopen.ui.preferences :as ui-preferences]
             [hyperopen.utils.parse :as parse-utils]
@@ -1813,155 +1814,123 @@
 (def ^:private per-dex-stagger-ms 120)
 
 (defonce ^:private startup-runtime
-  (atom {:deferred-scheduled? false
-         :bootstrapped-address nil
-         :summary-logged? false}))
+  (atom (startup-runtime-lib/default-startup-runtime-state)))
 
 (defn- mark-performance!
   [mark-name]
-  (when (and (exists? js/performance)
-             (some? (.-mark js/performance)))
-    (try
-      (.mark js/performance mark-name)
-      (catch :default _
-        nil))))
+  (startup-runtime-lib/mark-performance! mark-name))
 
 (defn- schedule-idle-or-timeout!
   [f]
-  (if (and (exists? js/window)
-           (some? (.-requestIdleCallback js/window)))
-    (.requestIdleCallback js/window
-                          (fn [_]
-                            (f))
-                          #js {:timeout deferred-bootstrap-delay-ms})
-    (js/setTimeout f deferred-bootstrap-delay-ms)))
+  (startup-runtime-lib/schedule-idle-or-timeout! deferred-bootstrap-delay-ms f))
 
-(defn- schedule-startup-summary-log! []
-  (when-not (:summary-logged? @startup-runtime)
-    (swap! startup-runtime assoc :summary-logged? true)
-    (js/setTimeout
-      (fn []
-        (let [stats (api/get-request-stats)
-              ws-status (get-in @store [:websocket :status])
-              selector (select-keys (get @store :asset-selector)
-                                    [:loading? :phase :loaded-at-ms])]
-          (println "Startup summary (+5s):"
-                   (clj->js {:request-stats stats
-                             :websocket-status ws-status
-                             :asset-selector selector}))))
-      5000)))
+(defn- schedule-startup-summary-log!
+  []
+  (startup-runtime-lib/schedule-startup-summary-log!
+   {:startup-runtime startup-runtime
+    :store store
+    :get-request-stats api/get-request-stats
+    :delay-ms 5000
+    :log-fn println}))
 
-(defn- register-icon-service-worker! []
-  (let [navigator-object (when (exists? js/globalThis)
-                           (.-navigator js/globalThis))
-        service-worker (some-> navigator-object (.-serviceWorker))
-        register-fn (some-> service-worker (.-register))]
-    (when (fn? register-fn)
-      ;; Persist icon responses across reloads to avoid repeated broken-image flashes.
-      (-> (.register service-worker icon-service-worker-path)
-          (.then (fn [_registration]
-                   (println "Registered icon cache service worker.")))
-          (.catch (fn [err]
-                    (println "Service worker registration failed:" err)))))))
+(defn- register-icon-service-worker!
+  []
+  (startup-runtime-lib/register-icon-service-worker!
+   {:icon-service-worker-path icon-service-worker-path
+    :log-fn println}))
 
 (defn- stage-b-account-bootstrap!
   [address dexs]
-  (doseq [[idx dex] (map-indexed vector (or dexs []))]
-    (js/setTimeout
-      (fn []
-        ;; Guard against stale async callbacks for an old address.
-        (when (= address (get-in @store [:wallet :address]))
-          (api/fetch-frontend-open-orders! store address dex {:priority :low})
-          (api/fetch-clearinghouse-state! store address dex {:priority :low})))
-      (* per-dex-stagger-ms (inc idx)))))
+  (startup-runtime-lib/stage-b-account-bootstrap!
+   {:store store
+    :address address
+    :dexs dexs
+    :per-dex-stagger-ms per-dex-stagger-ms
+    :fetch-frontend-open-orders! api/fetch-frontend-open-orders!
+    :fetch-clearinghouse-state! api/fetch-clearinghouse-state!}))
 
 (defn- bootstrap-account-data!
   [address]
-  (when address
-    (when-not (= address (:bootstrapped-address @startup-runtime))
-      (swap! startup-runtime assoc :bootstrapped-address address)
-      (swap! store assoc-in [:orders :open-orders-snapshot-by-dex] {})
-      (swap! store assoc-in [:orders :fundings-raw] [])
-      (swap! store assoc-in [:orders :fundings] [])
-      (swap! store assoc-in [:orders :order-history] [])
-      (swap! store assoc-in [:perp-dex-clearinghouse] {})
-      ;; Stage A: critical account data.
-      (api/fetch-frontend-open-orders! store address {:priority :high})
-      (api/fetch-user-fills! store address {:priority :high})
-      (api/fetch-spot-clearinghouse-state! store address {:priority :high})
-      (api/fetch-user-abstraction! store address {:priority :high})
-      (account-history-effects/fetch-and-merge-funding-history! store address {:priority :high})
-      ;; Stage B: low-priority, staggered per-dex data.
-      (-> (api/ensure-perp-dexs! store {:priority :low})
-          (.then (fn [dexs]
-                   (stage-b-account-bootstrap! address dexs)))
-          (.catch (fn [err]
-                    (println "Error bootstrapping per-dex account data:" err)))))))
+  (startup-runtime-lib/bootstrap-account-data!
+   {:startup-runtime startup-runtime
+    :store store
+    :address address
+    :fetch-frontend-open-orders! api/fetch-frontend-open-orders!
+    :fetch-user-fills! api/fetch-user-fills!
+    :fetch-spot-clearinghouse-state! api/fetch-spot-clearinghouse-state!
+    :fetch-user-abstraction! api/fetch-user-abstraction!
+    :fetch-and-merge-funding-history! account-history-effects/fetch-and-merge-funding-history!
+    :ensure-perp-dexs! api/ensure-perp-dexs!
+    :stage-b-account-bootstrap! stage-b-account-bootstrap!
+    :log-fn println}))
 
-(defn- install-address-handlers! []
-  ;; Note: WebData2 subscriptions are managed by address-watcher.
-  (address-watcher/init-with-webdata2! store webdata2/subscribe-webdata2! webdata2/unsubscribe-webdata2!)
-  (address-watcher/add-handler! (user-ws/create-user-handler user-ws/subscribe-user! user-ws/unsubscribe-user!))
-  (address-watcher/add-handler!
-    (reify address-watcher/IAddressChangeHandler
-      (on-address-changed [_ _ new-address]
-        (if new-address
-          (bootstrap-account-data! new-address)
-          (do
-            (swap! startup-runtime assoc :bootstrapped-address nil)
-            (swap! store assoc-in [:orders :open-orders-snapshot-by-dex] {})
-            (swap! store assoc-in [:orders :fundings-raw] [])
-            (swap! store assoc-in [:orders :fundings] [])
-            (swap! store assoc-in [:orders :order-history] [])
-            (swap! store assoc-in [:perp-dex-clearinghouse] {})
-            (swap! store assoc-in [:spot :clearinghouse-state] nil)
-            (swap! store assoc :account {:mode :classic
-                                         :abstraction-raw nil}))))
-      (get-handler-name [_] "startup-account-bootstrap-handler")))
-  ;; Ensure already-connected wallets are handled after handlers are in place.
-  (address-watcher/sync-current-address! store))
+(defn- reify-address-handler
+  [on-address-changed-fn handler-name]
+  (reify address-watcher/IAddressChangeHandler
+    (on-address-changed [_ _ new-address]
+      (on-address-changed-fn new-address))
+    (get-handler-name [_]
+      handler-name)))
 
-(defn- start-critical-bootstrap! []
-  (-> (js/Promise.all
-        (clj->js [(api/fetch-asset-contexts! store {:priority :high})
-                  (api/fetch-asset-selector-markets! store {:phase :bootstrap})]))
-      (.finally
-        (fn []
-          (mark-performance! "app:critical-data:ready")))))
+(defn- install-address-handlers!
+  []
+  (startup-runtime-lib/install-address-handlers!
+   {:store store
+    :startup-runtime startup-runtime
+    :bootstrap-account-data! bootstrap-account-data!
+    :init-with-webdata2! address-watcher/init-with-webdata2!
+    :add-handler! address-watcher/add-handler!
+    :sync-current-address! address-watcher/sync-current-address!
+    :create-user-handler user-ws/create-user-handler
+    :subscribe-user! user-ws/subscribe-user!
+    :unsubscribe-user! user-ws/unsubscribe-user!
+    :subscribe-webdata2! webdata2/subscribe-webdata2!
+    :unsubscribe-webdata2! webdata2/unsubscribe-webdata2!
+    :address-handler-reify reify-address-handler
+    :address-handler-name "startup-account-bootstrap-handler"}))
 
-(defn- run-deferred-bootstrap! []
-  (-> (api/fetch-asset-selector-markets! store {:phase :full})
-      (.finally
-        (fn []
-          (mark-performance! "app:full-bootstrap:ready")))))
+(defn- start-critical-bootstrap!
+  []
+  (startup-runtime-lib/start-critical-bootstrap!
+   {:store store
+    :fetch-asset-contexts! api/fetch-asset-contexts!
+    :fetch-asset-selector-markets! api/fetch-asset-selector-markets!
+    :mark-performance! mark-performance!}))
 
-(defn- schedule-deferred-bootstrap! []
-  (when-not (:deferred-scheduled? @startup-runtime)
-    (swap! startup-runtime assoc :deferred-scheduled? true)
-    (schedule-idle-or-timeout! run-deferred-bootstrap!)))
+(defn- run-deferred-bootstrap!
+  []
+  (startup-runtime-lib/run-deferred-bootstrap!
+   {:store store
+    :fetch-asset-selector-markets! api/fetch-asset-selector-markets!
+    :mark-performance! mark-performance!}))
 
-(defn initialize-remote-data-streams! []
-  (println "Initializing remote data streams...")
-  ;; Initialize websocket client.
-  (ws-client/init-connection! "wss://api.hyperliquid.xyz/ws")
-  ;; Initialize WebSocket modules.
-  (active-ctx/init! store)
-  (orderbook/init! store)
-  (trades/init! store)
-  (user-ws/init! store)
-  (webdata2/init! store)
-  ;; Ensure active-asset market streams are requested on startup.
-  (when-let [asset (:active-asset @store)]
-    (nxr/dispatch store nil [[:actions/subscribe-to-asset asset]]))
-  (install-address-handlers!)
-  (start-critical-bootstrap!)
-  (schedule-deferred-bootstrap!))
+(defn- schedule-deferred-bootstrap!
+  []
+  (startup-runtime-lib/schedule-deferred-bootstrap!
+   {:startup-runtime startup-runtime
+    :schedule-idle-or-timeout! schedule-idle-or-timeout!
+    :run-deferred-bootstrap! run-deferred-bootstrap!}))
+
+(defn initialize-remote-data-streams!
+  []
+  (startup-runtime-lib/initialize-remote-data-streams!
+   {:store store
+    :ws-url "wss://api.hyperliquid.xyz/ws"
+    :log-fn println
+    :init-connection! ws-client/init-connection!
+    :init-active-ctx! active-ctx/init!
+    :init-orderbook! orderbook/init!
+    :init-trades! trades/init!
+    :init-user-ws! user-ws/init!
+    :init-webdata2! webdata2/init!
+    :dispatch! nxr/dispatch
+    :install-address-handlers! install-address-handlers!
+    :start-critical-bootstrap! start-critical-bootstrap!
+    :schedule-deferred-bootstrap! schedule-deferred-bootstrap!}))
 
 (defn init []
   (println "Initializing Hyperopen...")
-  (reset! startup-runtime {:deferred-scheduled? false
-                           :bootstrapped-address nil
-                           :summary-logged? false})
+  (reset! startup-runtime (startup-runtime-lib/default-startup-runtime-state))
   (mark-performance! "app:init:start")
   (schedule-startup-summary-log!)
   ;; Restore root typography preference (system default, optional Inter override).
