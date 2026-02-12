@@ -1,5 +1,6 @@
 (ns hyperopen.api.trading
   (:require [clojure.string :as str]
+            [hyperopen.asset-selector.markets :as markets]
             [hyperopen.wallet.agent-session :as agent-session]
             [hyperopen.utils.hl-signing :as signing]))
 
@@ -54,6 +55,63 @@
   (let [text (some-> address str str/trim)]
     (when (seq text)
       (str/lower-case text))))
+
+(defn- parse-int-value
+  [value]
+  (let [num (cond
+              (number? value) value
+              (string? value) (js/parseInt value 10)
+              :else js/NaN)]
+    (when (and (number? num)
+               (not (js/isNaN num)))
+      (js/Math.floor num))))
+
+(defn- normalize-cancel-order-coin
+  [order]
+  (let [coin (some-> (or (:coin order)
+                         (get-in order [:order :coin]))
+                     str
+                     str/trim)]
+    (when (seq coin) coin)))
+
+(defn resolve-cancel-order-oid
+  [order]
+  (some parse-int-value
+        [(:oid order)
+         (:o order)
+         (get-in order [:order :oid])
+         (get-in order [:order :o])]))
+
+(defn- resolve-cancel-order-asset-idx
+  [state order coin]
+  (let [market-by-key (get-in state [:asset-selector :market-by-key] {})
+        market-idx (some-> (markets/resolve-market-by-coin market-by-key coin)
+                           :idx)]
+    (some parse-int-value
+          [(:asset-idx order)
+           (:assetIdx order)
+           (:asset order)
+           (:a order)
+           (get-in order [:order :asset-idx])
+           (get-in order [:order :assetIdx])
+           (get-in order [:order :asset])
+           (get-in order [:order :a])
+           (when coin
+             (get-in state [:asset-contexts (keyword coin) :idx]))
+           (when coin
+             (get-in state [:asset-contexts coin :idx]))
+           market-idx])))
+
+(defn build-cancel-order-request
+  "Normalize heterogeneous order row payloads into exchange cancel action shape.
+   Returns nil when required fields are missing."
+  [state order]
+  (let [coin (normalize-cancel-order-coin order)
+        oid (resolve-cancel-order-oid order)
+        asset-idx (resolve-cancel-order-asset-idx state order coin)]
+    (when (and (some? asset-idx) (some? oid))
+      {:action {:type "cancel"
+                :cancels [{:a asset-idx :o oid}]}})))
 
 (defn- safe-private-key->agent-address
   [private-key]

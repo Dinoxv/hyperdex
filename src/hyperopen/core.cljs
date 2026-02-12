@@ -12,82 +12,40 @@
             [hyperopen.websocket.diagnostics-sanitize :as diagnostics-sanitize]
             [hyperopen.api :as api]
             [hyperopen.api.trading :as trading-api]
+            [hyperopen.account.history.actions :as account-history-actions]
             [hyperopen.asset-selector.actions :as asset-actions]
             [hyperopen.asset-selector.settings :as asset-selector-settings]
             [hyperopen.asset-selector.markets :as markets]
             [hyperopen.orderbook.price-aggregation :as price-agg]
+            [hyperopen.utils.parse :as parse-utils]
             [hyperopen.wallet.core :as wallet]
             [hyperopen.wallet.agent-session :as agent-session]
             [hyperopen.wallet.address-watcher :as address-watcher]
             [hyperopen.router :as router]
             [hyperopen.state.trading :as trading]))
 
-(defn- default-funding-history-filters []
-  (api/normalize-funding-history-filters {}))
-
-(def ^:private order-history-page-size-options
-  #{25 50 100})
-
-(def ^:private default-order-history-page-size
-  50)
-
 (defn- default-funding-history-state []
-  (let [filters (default-funding-history-filters)]
-    {:filters filters
-     :draft-filters filters
-     :sort {:column "Time" :direction :desc}
-     :filter-open? false
-     :page-size default-order-history-page-size
-     :page 1
-     :page-input "1"
-     :loading? false
-     :error nil
-     :request-id 0}))
+  (account-history-actions/default-funding-history-state))
 
 (defn- parse-int-value
   [value]
-  (let [num (cond
-              (number? value) value
-              (string? value) (js/parseInt value 10)
-              :else js/NaN)]
-    (when (and (number? num)
-               (not (js/isNaN num)))
-      (js/Math.floor num))))
+  (parse-utils/parse-int-value value))
 
 (defn- normalize-order-history-page-size
   [value]
-  (let [candidate (parse-int-value value)]
-    (if (contains? order-history-page-size-options candidate)
-      candidate
-      default-order-history-page-size)))
+  (account-history-actions/normalize-order-history-page-size value))
 
 (defn- normalize-order-history-page
   ([value]
    (normalize-order-history-page value nil))
   ([value max-page]
-   (let [candidate (max 1 (or (parse-int-value value) 1))
-         max-page* (when (some? max-page)
-                     (max 1 (or (parse-int-value max-page) 1)))]
-     (if max-page*
-       (min candidate max-page*)
-       candidate))))
+   (account-history-actions/normalize-order-history-page value max-page)))
 
 (defn- default-order-history-state []
-  {:sort {:column "Time" :direction :desc}
-   :status-filter :all
-   :filter-open? false
-   :page-size default-order-history-page-size
-   :page 1
-   :page-input "1"
-   :loading? false
-   :error nil
-   :request-id 0})
+  (account-history-actions/default-order-history-state))
 
 (defn- default-trade-history-state []
-  {:sort {:column "Time" :direction :desc}
-   :page-size default-order-history-page-size
-   :page 1
-   :page-input "1"})
+  (account-history-actions/default-trade-history-state))
 
 ;; App state
 (defonce store (atom {:websocket {:status :disconnected
@@ -1266,12 +1224,6 @@
 (defn mark-missing-asset-icon [state market-key]
   (asset-actions/mark-missing-asset-icon state market-key))
 
-(def open-orders-sortable-columns
-  #{"Time" "Type" "Coin" "Direction" "Size" "Original Size" "Order Value" "Price"})
-
-(def open-orders-sort-directions
-  #{:asc :desc})
-
 (def chart-timeframes
   #{:1m :3m :5m :15m :30m :1h :2h :4h :8h :12h :1d :3d :1w :1M})
 
@@ -1355,40 +1307,16 @@
       {})))
 
 (defn restore-open-orders-sort-settings! [store]
-  (let [stored-column (or (js/localStorage.getItem "open-orders-sort-by") "Time")
-        stored-direction (keyword (or (js/localStorage.getItem "open-orders-sort-direction") "desc"))
-        column (if (contains? open-orders-sortable-columns stored-column)
-                 stored-column
-                 "Time")
-        direction (if (contains? open-orders-sort-directions stored-direction)
-                    stored-direction
-                    :desc)]
-    (swap! store update-in [:account-info] merge {:open-orders-sort {:column column
-                                                                     :direction direction}})))
+  (account-history-actions/restore-open-orders-sort-settings! store))
 
 (defn restore-order-history-pagination-settings! [store]
-  (let [page-size (normalize-order-history-page-size
-                   (js/localStorage.getItem "order-history-page-size"))]
-    (swap! store update-in [:account-info :order-history] merge
-           {:page-size page-size
-            :page 1
-            :page-input "1"})))
+  (account-history-actions/restore-order-history-pagination-settings! store))
 
 (defn restore-funding-history-pagination-settings! [store]
-  (let [page-size (normalize-order-history-page-size
-                   (js/localStorage.getItem "funding-history-page-size"))]
-    (swap! store update-in [:account-info :funding-history] merge
-           {:page-size page-size
-            :page 1
-            :page-input "1"})))
+  (account-history-actions/restore-funding-history-pagination-settings! store))
 
 (defn restore-trade-history-pagination-settings! [store]
-  (let [page-size (normalize-order-history-page-size
-                   (js/localStorage.getItem "trade-history-page-size"))]
-    (swap! store update-in [:account-info :trade-history] merge
-           {:page-size page-size
-            :page 1
-            :page-input "1"})))
+  (account-history-actions/restore-trade-history-pagination-settings! store))
 
 (defn restore-chart-options! [store]
   (let [timeframe (load-chart-option "chart-timeframe" :1d chart-timeframes)
@@ -1538,372 +1466,122 @@
     [[:effects/save [:chart-options :active-indicators] updated-indicators]
      [:effects/local-storage-set-json "chart-active-indicators" (serialize-indicators updated-indicators)]]))
 
-(defn- parse-datetime-local-ms
-  [value]
-  (let [text (str/trim (str (or value "")))]
-    (when (seq text)
-      (let [parsed (.parse js/Date text)]
-        (when (and (number? parsed)
-                   (not (js/isNaN parsed)))
-          (js/Math.floor parsed))))))
-
-(defn- funding-history-filters
-  [state]
-  (api/normalize-funding-history-filters
-   (get-in state [:account-info :funding-history :filters])))
-
-(defn- funding-history-draft-filters
-  [state]
-  (api/normalize-funding-history-filters
-   (or (get-in state [:account-info :funding-history :draft-filters])
-       (funding-history-filters state))))
-
-(defn- funding-history-request-id
-  [state]
-  (get-in state [:account-info :funding-history :request-id] 0))
-
-(def ^:private order-history-status-options
-  #{:all :open :filled :canceled :rejected :triggered})
-
-(defn- order-history-request-id
-  [state]
-  (get-in state [:account-info :order-history :request-id] 0))
-
-(defn- normalize-order-history-status-filter
-  [status]
-  (let [status* (cond
-                  (keyword? status) status
-                  (string? status) (keyword (str/lower-case status))
-                  :else :all)]
-    (if (contains? order-history-status-options status*)
-      status*
-      :all)))
-
-(defn- filtered-funding-rows
-  [state filters]
-  (api/filter-funding-history-rows
-   (get-in state [:orders :fundings-raw] [])
-   filters))
-
 (defn select-account-info-tab [state tab]
-  (cond
-    (= tab :funding-history)
-    (let [filters (funding-history-filters state)
-          request-id (inc (funding-history-request-id state))
-          projected (filtered-funding-rows state filters)]
-      [[:effects/save-many [[[:account-info :selected-tab] tab]
-                            [[:account-info :funding-history :filters] filters]
-                            [[:account-info :funding-history :draft-filters] filters]
-                            [[:account-info :funding-history :loading?] true]
-                            [[:account-info :funding-history :error] nil]
-                            [[:account-info :funding-history :request-id] request-id]
-                            [[:orders :fundings] projected]]]
-       [:effects/api-fetch-user-funding-history request-id]])
-
-    (= tab :order-history)
-    (let [request-id (inc (order-history-request-id state))]
-      [[:effects/save-many [[[:account-info :selected-tab] tab]
-                            [[:account-info :order-history :loading?] true]
-                            [[:account-info :order-history :error] nil]
-                            [[:account-info :order-history :request-id] request-id]]]
-       [:effects/api-fetch-historical-orders request-id]])
-
-    :else
-    [[:effects/save [:account-info :selected-tab] tab]]))
+  (account-history-actions/select-account-info-tab state tab))
 
 (defn set-funding-history-filters [_state path value]
-  (let [path* (if (vector? path) path [path])
-        full-path (into [:account-info :funding-history] path*)
-        value* (case path*
-                 [:draft-filters :start-time-ms] (parse-datetime-local-ms value)
-                 [:draft-filters :end-time-ms] (parse-datetime-local-ms value)
-                 [:filters :start-time-ms] (parse-datetime-local-ms value)
-                 [:filters :end-time-ms] (parse-datetime-local-ms value)
-                 value)]
-    [[:effects/save full-path value*]]))
+  (account-history-actions/set-funding-history-filters _state path value))
 
 (defn toggle-funding-history-filter-open [state]
-  (let [open? (boolean (get-in state [:account-info :funding-history :filter-open?]))
-        filters (funding-history-filters state)
-        draft-filters (if open?
-                        (funding-history-draft-filters state)
-                        filters)]
-    [[:effects/save-many [[[:account-info :funding-history :filter-open?] (not open?)]
-                          [[:account-info :funding-history :draft-filters] draft-filters]]]]))
+  (account-history-actions/toggle-funding-history-filter-open state))
 
 (defn toggle-funding-history-filter-coin [state coin]
-  (let [draft-filters (funding-history-draft-filters state)
-        current-set (or (:coin-set draft-filters) #{})
-        next-set (if (contains? current-set coin)
-                   (disj current-set coin)
-                   (conj current-set coin))]
-    [[:effects/save [:account-info :funding-history :draft-filters]
-      (assoc draft-filters :coin-set next-set)]]))
+  (account-history-actions/toggle-funding-history-filter-coin state coin))
 
 (defn reset-funding-history-filter-draft [state]
-  (let [filters (funding-history-filters state)]
-    [[:effects/save-many [[[:account-info :funding-history :draft-filters] filters]
-                          [[:account-info :funding-history :filter-open?] false]]]]))
+  (account-history-actions/reset-funding-history-filter-draft state))
 
 (defn apply-funding-history-filters [state]
-  (let [current-filters (funding-history-filters state)
-        draft-filters (funding-history-draft-filters state)
-        time-range-changed?
-        (not= (select-keys current-filters [:start-time-ms :end-time-ms])
-              (select-keys draft-filters [:start-time-ms :end-time-ms]))
-        projected (filtered-funding-rows state draft-filters)
-        request-id (inc (funding-history-request-id state))
-        base-effects [[:effects/save-many [[[:account-info :funding-history :filters] draft-filters]
-                                           [[:account-info :funding-history :draft-filters] draft-filters]
-                                           [[:account-info :funding-history :filter-open?] false]
-                                           [[:account-info :funding-history :page] 1]
-                                           [[:account-info :funding-history :page-input] "1"]
-                                           [[:orders :fundings] projected]]]]]
-    (if time-range-changed?
-      (into base-effects
-            [[:effects/save-many [[[:account-info :funding-history :loading?] true]
-                                  [[:account-info :funding-history :error] nil]
-                                  [[:account-info :funding-history :request-id] request-id]]]
-             [:effects/api-fetch-user-funding-history request-id]])
-      base-effects)))
+  (account-history-actions/apply-funding-history-filters state))
 
 (defn view-all-funding-history [state]
-  (let [current-filters (funding-history-filters state)
-        next-filters (assoc current-filters
-                            :start-time-ms 0
-                            :end-time-ms (.now js/Date))
-        projected (filtered-funding-rows state next-filters)
-        request-id (inc (funding-history-request-id state))]
-    [[:effects/save-many [[[:account-info :funding-history :filters] next-filters]
-                          [[:account-info :funding-history :draft-filters] next-filters]
-                          [[:account-info :funding-history :filter-open?] false]
-                          [[:account-info :funding-history :page] 1]
-                          [[:account-info :funding-history :page-input] "1"]
-                          [[:account-info :funding-history :loading?] true]
-                          [[:account-info :funding-history :error] nil]
-                          [[:account-info :funding-history :request-id] request-id]
-                          [[:orders :fundings] projected]]]
-     [:effects/api-fetch-user-funding-history request-id]]))
+  (account-history-actions/view-all-funding-history state))
 
 (defn export-funding-history-csv [state]
-  (let [filters (funding-history-filters state)
-        rows (filtered-funding-rows state filters)]
-    [[:effects/export-funding-history-csv rows]]))
+  (account-history-actions/export-funding-history-csv state))
 
 (defn sort-positions [state column]
-  (let [current-sort (get-in state [:account-info :positions-sort])
-        current-column (:column current-sort)
-        current-direction (:direction current-sort)
-        new-direction (if (and (= current-column column) (= current-direction :asc))
-                       :desc
-                       :asc)]
-    [[:effects/save [:account-info :positions-sort] {:column column :direction new-direction}]]))
+  (account-history-actions/sort-positions state column))
 
 (defn sort-balances [state column]
-  (let [current-sort (get-in state [:account-info :balances-sort])
-        current-column (:column current-sort)
-        current-direction (:direction current-sort)
-        new-direction (if (and (= current-column column) (= current-direction :asc))
-                        :desc
-                        :asc)]
-    [[:effects/save [:account-info :balances-sort] {:column column :direction new-direction}]]))
+  (account-history-actions/sort-balances state column))
 
 (defn sort-open-orders [state column]
-  (let [current-sort (get-in state [:account-info :open-orders-sort])
-        current-column (:column current-sort)
-        current-direction (:direction current-sort)
-        new-direction (if (= current-column column)
-                        (if (= current-direction :asc) :desc :asc)
-                        (if (contains? #{"Time" "Size" "Original Size" "Order Value" "Price"} column)
-                          :desc
-                          :asc))]
-    [[:effects/save [:account-info :open-orders-sort] {:column column
-                                                       :direction new-direction}]
-     [:effects/local-storage-set "open-orders-sort-by" column]
-     [:effects/local-storage-set "open-orders-sort-direction" (name new-direction)]]))
+  (account-history-actions/sort-open-orders state column))
 
 (defn sort-funding-history [state column]
-  (let [current-sort (get-in state
-                             [:account-info :funding-history :sort]
-                             {:column "Time" :direction :desc})
-        current-column (:column current-sort)
-        current-direction (:direction current-sort)
-        new-direction (if (= current-column column)
-                        (if (= current-direction :asc) :desc :asc)
-                        (if (contains? #{"Time" "Size" "Payment" "Rate"} column)
-                          :desc
-                          :asc))]
-    [[:effects/save-many [[[:account-info :funding-history :sort]
-                           {:column column :direction new-direction}]
-                          [[:account-info :funding-history :page] 1]
-                          [[:account-info :funding-history :page-input] "1"]]]]))
+  (account-history-actions/sort-funding-history state column))
 
 (defn set-funding-history-page-size [state page-size]
-  (let [page-size* (normalize-order-history-page-size page-size)]
-    [[:effects/save-many [[[:account-info :funding-history :page-size] page-size*]
-                          [[:account-info :funding-history :page] 1]
-                          [[:account-info :funding-history :page-input] "1"]]]
-     [:effects/local-storage-set "funding-history-page-size" (str page-size*)]]))
+  (account-history-actions/set-funding-history-page-size state page-size))
 
 (defn set-funding-history-page [state page max-page]
-  (let [page* (normalize-order-history-page page max-page)]
-    [[:effects/save-many [[[:account-info :funding-history :page] page*]
-                          [[:account-info :funding-history :page-input] (str page*)]]]]))
+  (account-history-actions/set-funding-history-page state page max-page))
 
 (defn next-funding-history-page [state max-page]
-  (let [current-page (get-in state [:account-info :funding-history :page] 1)]
-    (set-funding-history-page state (inc current-page) max-page)))
+  (account-history-actions/next-funding-history-page state max-page))
 
 (defn prev-funding-history-page [state max-page]
-  (let [current-page (get-in state [:account-info :funding-history :page] 1)]
-    (set-funding-history-page state (dec current-page) max-page)))
+  (account-history-actions/prev-funding-history-page state max-page))
 
 (defn set-funding-history-page-input [_state input-value]
-  [[:effects/save [:account-info :funding-history :page-input]
-    (if (string? input-value)
-      input-value
-      (str (or input-value "")))]] )
+  (account-history-actions/set-funding-history-page-input _state input-value))
 
 (defn apply-funding-history-page-input [state max-page]
-  (let [raw-value (get-in state [:account-info :funding-history :page-input] "")
-        page* (normalize-order-history-page raw-value max-page)]
-    [[:effects/save-many [[[:account-info :funding-history :page] page*]
-                          [[:account-info :funding-history :page-input] (str page*)]]]]))
+  (account-history-actions/apply-funding-history-page-input state max-page))
 
 (defn handle-funding-history-page-input-keydown [state key max-page]
-  (if (= key "Enter")
-    (apply-funding-history-page-input state max-page)
-    []))
+  (account-history-actions/handle-funding-history-page-input-keydown state key max-page))
 
 (defn set-trade-history-page-size [state page-size]
-  (let [page-size* (normalize-order-history-page-size page-size)]
-    [[:effects/save-many [[[:account-info :trade-history :page-size] page-size*]
-                          [[:account-info :trade-history :page] 1]
-                          [[:account-info :trade-history :page-input] "1"]]]
-     [:effects/local-storage-set "trade-history-page-size" (str page-size*)]]))
+  (account-history-actions/set-trade-history-page-size state page-size))
 
 (defn set-trade-history-page [state page max-page]
-  (let [page* (normalize-order-history-page page max-page)]
-    [[:effects/save-many [[[:account-info :trade-history :page] page*]
-                          [[:account-info :trade-history :page-input] (str page*)]]]]))
+  (account-history-actions/set-trade-history-page state page max-page))
 
 (defn next-trade-history-page [state max-page]
-  (let [current-page (get-in state [:account-info :trade-history :page] 1)]
-    (set-trade-history-page state (inc current-page) max-page)))
+  (account-history-actions/next-trade-history-page state max-page))
 
 (defn prev-trade-history-page [state max-page]
-  (let [current-page (get-in state [:account-info :trade-history :page] 1)]
-    (set-trade-history-page state (dec current-page) max-page)))
+  (account-history-actions/prev-trade-history-page state max-page))
 
 (defn set-trade-history-page-input [_state input-value]
-  [[:effects/save [:account-info :trade-history :page-input]
-    (if (string? input-value)
-      input-value
-      (str (or input-value "")))]] )
+  (account-history-actions/set-trade-history-page-input _state input-value))
 
 (defn apply-trade-history-page-input [state max-page]
-  (let [raw-value (get-in state [:account-info :trade-history :page-input] "")
-        page* (normalize-order-history-page raw-value max-page)]
-    [[:effects/save-many [[[:account-info :trade-history :page] page*]
-                          [[:account-info :trade-history :page-input] (str page*)]]]]))
+  (account-history-actions/apply-trade-history-page-input state max-page))
 
 (defn handle-trade-history-page-input-keydown [state key max-page]
-  (if (= key "Enter")
-    (apply-trade-history-page-input state max-page)
-    []))
+  (account-history-actions/handle-trade-history-page-input-keydown state key max-page))
 
 (defn sort-trade-history [state column]
-  (let [current-sort (get-in state
-                             [:account-info :trade-history :sort]
-                             {:column "Time" :direction :desc})
-        current-column (:column current-sort)
-        current-direction (:direction current-sort)
-        desc-columns #{"Time" "Price" "Size" "Trade Value" "Fee" "Closed PNL"}
-        new-direction (if (= current-column column)
-                        (if (= current-direction :asc) :desc :asc)
-                        (if (contains? desc-columns column)
-                          :desc
-                          :asc))]
-    [[:effects/save-many [[[:account-info :trade-history :sort]
-                           {:column column :direction new-direction}]
-                          [[:account-info :trade-history :page] 1]
-                          [[:account-info :trade-history :page-input] "1"]]]]))
+  (account-history-actions/sort-trade-history state column))
 
 (defn sort-order-history [state column]
-  (let [current-sort (get-in state
-                             [:account-info :order-history :sort]
-                             {:column "Time" :direction :desc})
-        current-column (:column current-sort)
-        current-direction (:direction current-sort)
-        desc-columns #{"Time" "Size" "Filled Size" "Order Value" "Price" "Order ID"}
-        new-direction (if (= current-column column)
-                        (if (= current-direction :asc) :desc :asc)
-                        (if (contains? desc-columns column)
-                          :desc
-                          :asc))]
-    [[:effects/save-many [[[:account-info :order-history :sort]
-                           {:column column :direction new-direction}]
-                          [[:account-info :order-history :page] 1]
-                          [[:account-info :order-history :page-input] "1"]]]]))
+  (account-history-actions/sort-order-history state column))
 
 (defn toggle-order-history-filter-open [state]
-  (let [open? (boolean (get-in state [:account-info :order-history :filter-open?]))]
-    [[:effects/save [:account-info :order-history :filter-open?] (not open?)]]))
+  (account-history-actions/toggle-order-history-filter-open state))
 
 (defn set-order-history-status-filter [state status-filter]
-  (let [status* (normalize-order-history-status-filter status-filter)]
-    [[:effects/save-many [[[:account-info :order-history :status-filter] status*]
-                          [[:account-info :order-history :filter-open?] false]
-                          [[:account-info :order-history :page] 1]
-                          [[:account-info :order-history :page-input] "1"]]]]))
+  (account-history-actions/set-order-history-status-filter state status-filter))
 
 (defn set-order-history-page-size [state page-size]
-  (let [page-size* (normalize-order-history-page-size page-size)]
-    [[:effects/save-many [[[:account-info :order-history :page-size] page-size*]
-                          [[:account-info :order-history :page] 1]
-                          [[:account-info :order-history :page-input] "1"]]]
-     [:effects/local-storage-set "order-history-page-size" (str page-size*)]]))
+  (account-history-actions/set-order-history-page-size state page-size))
 
 (defn set-order-history-page [state page max-page]
-  (let [page* (normalize-order-history-page page max-page)]
-    [[:effects/save-many [[[:account-info :order-history :page] page*]
-                          [[:account-info :order-history :page-input] (str page*)]]]]))
+  (account-history-actions/set-order-history-page state page max-page))
 
 (defn next-order-history-page [state max-page]
-  (let [current-page (get-in state [:account-info :order-history :page] 1)]
-    (set-order-history-page state (inc current-page) max-page)))
+  (account-history-actions/next-order-history-page state max-page))
 
 (defn prev-order-history-page [state max-page]
-  (let [current-page (get-in state [:account-info :order-history :page] 1)]
-    (set-order-history-page state (dec current-page) max-page)))
+  (account-history-actions/prev-order-history-page state max-page))
 
 (defn set-order-history-page-input [_state input-value]
-  [[:effects/save [:account-info :order-history :page-input]
-    (if (string? input-value)
-      input-value
-      (str (or input-value "")))]] )
+  (account-history-actions/set-order-history-page-input _state input-value))
 
 (defn apply-order-history-page-input [state max-page]
-  (let [raw-value (get-in state [:account-info :order-history :page-input] "")
-        page* (normalize-order-history-page raw-value max-page)]
-    [[:effects/save-many [[[:account-info :order-history :page] page*]
-                          [[:account-info :order-history :page-input] (str page*)]]]]))
+  (account-history-actions/apply-order-history-page-input state max-page))
 
 (defn handle-order-history-page-input-keydown [state key max-page]
-  (if (= key "Enter")
-    (apply-order-history-page-input state max-page)
-    []))
+  (account-history-actions/handle-order-history-page-input-keydown state key max-page))
 
 (defn refresh-order-history [state]
-  (let [request-id (inc (order-history-request-id state))
-        selected? (= :order-history (get-in state [:account-info :selected-tab]))]
-    [[:effects/save-many [[[:account-info :order-history :request-id] request-id]
-                          [[:account-info :order-history :loading?] selected?]
-                          [[:account-info :order-history :error] nil]]]
-     [:effects/api-fetch-historical-orders request-id]]))
+  (account-history-actions/refresh-order-history state))
 
 (defn set-hide-small-balances [state checked]
-  [[:effects/save [:account-info :hide-small-balances?] checked]])
+  (account-history-actions/set-hide-small-balances state checked))
 
 (defn- normalize-order-entry-mode [mode]
   (let [candidate (cond
@@ -2103,56 +1781,18 @@
              [:effects/save [:order-form] form]
              [:effects/api-submit-order request]])))
 
-(defn- normalize-cancel-order-coin
-  [order]
-  (let [coin (some-> (or (:coin order)
-                         (get-in order [:order :coin]))
-                     str
-                     str/trim)]
-    (when (seq coin) coin)))
-
-(defn- resolve-cancel-order-oid
-  [order]
-  (some parse-int-value
-        [(:oid order)
-         (:o order)
-         (get-in order [:order :oid])
-         (get-in order [:order :o])]))
-
-(defn- resolve-cancel-order-asset-idx
-  [state order coin]
-  (let [market-by-key (get-in state [:asset-selector :market-by-key] {})
-        market-idx (some-> (markets/resolve-market-by-coin market-by-key coin)
-                           :idx)]
-    (some parse-int-value
-          [(:asset-idx order)
-           (:assetIdx order)
-           (:asset order)
-           (:a order)
-           (get-in order [:order :asset-idx])
-           (get-in order [:order :assetIdx])
-           (get-in order [:order :asset])
-           (get-in order [:order :a])
-           (when coin
-             (get-in state [:asset-contexts (keyword coin) :idx]))
-           (when coin
-             (get-in state [:asset-contexts coin :idx]))
-           market-idx])))
-
 (defn- cancel-request-oids
   [request]
   (->> (get-in request [:action :cancels] [])
        (keep (fn [cancel]
-               (some parse-int-value
-                     [(:o cancel)
-                      (:oid cancel)])))
+               (trading-api/resolve-cancel-order-oid cancel)))
        set))
 
 (defn- remove-canceled-open-orders-seq
   [orders cancel-oids]
   (->> (or orders [])
        (remove (fn [order]
-                 (when-let [oid (resolve-cancel-order-oid order)]
+                 (when-let [oid (trading-api/resolve-cancel-order-oid order)]
                    (contains? cancel-oids oid))))
        vec))
 
@@ -2201,16 +1841,13 @@
 
 (defn cancel-order [state order]
   (let [agent-ready? (= :ready (get-in state [:wallet :agent :status]))
-        coin (normalize-cancel-order-coin order)
-        oid (resolve-cancel-order-oid order)
-        asset-idx (resolve-cancel-order-asset-idx state order coin)]
+        request (trading-api/build-cancel-order-request state order)]
     (cond
       (not agent-ready?)
       [[:effects/save [:orders :cancel-error] "Enable trading before cancelling orders."]]
 
-      (and (some? asset-idx) (some? oid))
-      [[:effects/api-cancel-order {:action {:type "cancel"
-                                            :cancels [{:a asset-idx :o oid}]}}]]
+      (map? request)
+      [[:effects/api-cancel-order request]]
 
       :else
       [[:effects/save [:orders :cancel-error] "Missing asset or order id."]])))
@@ -2293,7 +1930,7 @@
 
 (defn- merge-and-project-funding-history
   [state rows]
-  (let [filters (funding-history-filters state)
+  (let [filters (account-history-actions/funding-history-filters state)
         merged (api/merge-funding-history-rows (get-in state [:orders :fundings-raw] [])
                                                rows)
         projected (api/filter-funding-history-rows merged filters)]
@@ -2305,7 +1942,7 @@
 (defn- fetch-and-merge-funding-history!
   [store address opts]
   (when address
-    (let [filters (funding-history-filters @store)
+    (let [filters (account-history-actions/funding-history-filters @store)
           request-opts (merge {:priority :high}
                               filters
                               (or opts {}))]
@@ -2361,13 +1998,13 @@
 (nxr/register-effect! :effects/api-fetch-user-funding-history
   (fn [_ store request-id]
     (let [address (get-in @store [:wallet :address])
-          filters (funding-history-filters @store)
+          filters (account-history-actions/funding-history-filters @store)
           opts (merge {:priority :high}
                       filters)]
       (if-not address
         (swap! store
                (fn [state]
-                 (if (= request-id (funding-history-request-id state))
+                 (if (= request-id (account-history-actions/funding-history-request-id state))
                    (-> state
                        (assoc-in [:account-info :funding-history :loading?] false)
                        (assoc-in [:orders :fundings-raw] [])
@@ -2377,7 +2014,7 @@
             (.then (fn [rows]
                      (swap! store
                             (fn [state]
-                              (if (= request-id (funding-history-request-id state))
+                              (if (= request-id (account-history-actions/funding-history-request-id state))
                                 (-> (merge-and-project-funding-history state rows)
                                     (assoc-in [:account-info :funding-history :loading?] false)
                                     (assoc-in [:account-info :funding-history :error] nil))
@@ -2385,7 +2022,7 @@
             (.catch (fn [err]
                       (swap! store
                              (fn [state]
-                               (if (= request-id (funding-history-request-id state))
+                               (if (= request-id (account-history-actions/funding-history-request-id state))
                                  (-> state
                                      (assoc-in [:account-info :funding-history :loading?] false)
                                      (assoc-in [:account-info :funding-history :error] (str err)))
@@ -2487,7 +2124,7 @@
       (if-not address
         (swap! store
                (fn [state]
-                 (if (= request-id (order-history-request-id state))
+                 (if (= request-id (account-history-actions/order-history-request-id state))
                    (-> state
                        (assoc-in [:account-info :order-history :loading?] false)
                        (assoc-in [:account-info :order-history :error] nil)
@@ -2497,7 +2134,7 @@
             (.then (fn [rows]
                      (swap! store
                             (fn [state]
-                              (if (= request-id (order-history-request-id state))
+                              (if (= request-id (account-history-actions/order-history-request-id state))
                                 (-> state
                                     (assoc-in [:account-info :order-history :loading?] false)
                                     (assoc-in [:account-info :order-history :error] nil)
@@ -2506,7 +2143,7 @@
             (.catch (fn [err]
                       (swap! store
                              (fn [state]
-                               (if (= request-id (order-history-request-id state))
+                               (if (= request-id (account-history-actions/order-history-request-id state))
                                  (-> state
                                      (assoc-in [:account-info :order-history :loading?] false)
                                      (assoc-in [:account-info :order-history :error] (str err)))
