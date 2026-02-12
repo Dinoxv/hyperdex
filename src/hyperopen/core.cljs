@@ -22,6 +22,7 @@
             [hyperopen.chart.settings :as chart-settings]
             [hyperopen.orderbook.price-aggregation :as price-agg]
             [hyperopen.orderbook.settings :as orderbook-settings]
+            [hyperopen.ui.preferences :as ui-preferences]
             [hyperopen.utils.parse :as parse-utils]
             [hyperopen.wallet.core :as wallet]
             [hyperopen.wallet.agent-session :as agent-session]
@@ -1218,9 +1219,6 @@
 (def mark-missing-asset-icon
   asset-actions/mark-missing-asset-icon)
 
-(def ^:private ui-font-local-storage-key "hyperopen-ui-font")
-(def ^:private supported-ui-fonts #{"system" "inter"})
-
 (def restore-open-orders-sort-settings!
   account-history-actions/restore-open-orders-sort-settings!)
 
@@ -1243,25 +1241,8 @@
   (let [storage-mode (agent-session/load-storage-mode-preference)]
     (swap! store assoc-in [:wallet :agent :storage-mode] storage-mode)))
 
-(defn- normalize-ui-font [value]
-  (let [candidate (-> (or value "system")
-                      str
-                      str/trim
-                      str/lower-case)]
-    (if (contains? supported-ui-fonts candidate)
-      candidate
-      "system")))
-
-(defn restore-ui-font-preference! []
-  (when (exists? js/document)
-    (let [html-el (.-documentElement js/document)
-          stored (try
-                   (when (exists? js/localStorage)
-                     (.getItem js/localStorage ui-font-local-storage-key))
-                   (catch :default _
-                     nil))
-          normalized (normalize-ui-font stored)]
-      (set! (.-uiFont (.-dataset html-el)) normalized))))
+(def restore-ui-font-preference!
+  ui-preferences/restore-ui-font-preference!)
 
 (defn restore-active-asset! [store]
   (when (nil? (:active-asset @store))
