@@ -1,5 +1,6 @@
 (ns hyperopen.runtime.action-adapters
   (:require [nexus.registry :as nxr]
+            [hyperopen.platform :as platform]
             [hyperopen.api.trading :as trading-api]
             [hyperopen.router :as router]
             [hyperopen.runtime.state :as runtime-state]
@@ -79,8 +80,7 @@
               :agent-name agent-name
               :signature-chain-id signature-chain-id}
     :create-agent-credentials! agent-session/create-agent-credentials!
-    :now-ms-fn (fn []
-                 (.now js/Date))
+    :now-ms-fn platform/now-ms
     :normalize-storage-mode agent-session/normalize-storage-mode
     :default-signature-chain-id-for-environment agent-session/default-signature-chain-id-for-environment
     :build-approve-agent-action agent-session/build-approve-agent-action

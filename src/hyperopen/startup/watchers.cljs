@@ -1,4 +1,5 @@
-(ns hyperopen.startup.watchers)
+(ns hyperopen.startup.watchers
+  (:require [hyperopen.platform :as platform]))
 
 (def ^:private active-market-display-watch-key
   ::active-market-display-cache)
@@ -59,9 +60,9 @@
                                                       :last-close
                                                       :queue-size])
             transition-event (status->diagnostics-event new-status)
-            transition-at-ms (or (:now-ms new-state) (.now js/Date))]
+            transition-at-ms (or (:now-ms new-state) (platform/now-ms))]
         ;; Defer store update to next tick to avoid nested renders.
-        (js/queueMicrotask
+        (platform/queue-microtask!
          #(do
             (swap! store
                    (fn [state]

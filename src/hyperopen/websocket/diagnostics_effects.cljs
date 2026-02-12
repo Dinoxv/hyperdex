@@ -1,5 +1,6 @@
 (ns hyperopen.websocket.diagnostics-effects
-  (:require [hyperopen.websocket.diagnostics-copy :as diagnostics-copy]
+  (:require [hyperopen.platform :as platform]
+            [hyperopen.websocket.diagnostics-copy :as diagnostics-copy]
             [hyperopen.websocket.diagnostics-payload :as diagnostics-payload]
             [hyperopen.websocket.diagnostics-sanitize :as diagnostics-sanitize]))
 
@@ -8,7 +9,7 @@
 
 (defn confirm-ws-diagnostics-reveal!
   [{:keys [store confirm-fn]}]
-  (let [confirm!* (or confirm-fn js/confirm)
+  (let [confirm!* (or confirm-fn platform/confirm!)
         confirmed? (confirm!* reveal-sensitive-confirm-message)]
     (when confirmed?
       (swap! store assoc-in [:websocket-ui :reveal-sensitive?] true))))

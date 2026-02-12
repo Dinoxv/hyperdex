@@ -1,4 +1,5 @@
-(ns hyperopen.startup.runtime)
+(ns hyperopen.startup.runtime
+  (:require [hyperopen.platform :as platform]))
 
 (defn default-startup-runtime-state
   []
@@ -23,7 +24,7 @@
                           (fn [_]
                             (f))
                           #js {:timeout delay-ms})
-    (js/setTimeout f delay-ms)))
+    (platform/set-timeout! f delay-ms)))
 
 (defn- startup-state
   [{:keys [startup-runtime runtime]}]
@@ -43,7 +44,7 @@
   [{:keys [store get-request-stats delay-ms log-fn] :as deps}]
   (when-not (:summary-logged? (startup-state deps))
     (swap-startup-state! deps assoc :summary-logged? true)
-    (js/setTimeout
+    (platform/set-timeout!
      (fn []
        (let [stats (get-request-stats)
              ws-status (get-in @store [:websocket :status])
@@ -77,7 +78,7 @@
            fetch-frontend-open-orders!
            fetch-clearinghouse-state!]}]
   (doseq [[idx dex] (map-indexed vector (or dexs []))]
-    (js/setTimeout
+    (platform/set-timeout!
      (fn []
        ;; Guard against stale async callbacks for an old address.
        (when (= address (get-in @store [:wallet :address]))

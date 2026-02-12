@@ -1,5 +1,6 @@
 (ns hyperopen.runtime.effect-adapters
   (:require [nexus.registry :as nxr]
+            [hyperopen.platform :as platform]
             [hyperopen.api :as api]
             [hyperopen.account.history.effects :as account-history-effects]
             [hyperopen.order.effects :as order-effects]
@@ -59,7 +60,7 @@
     :auto-recover-cooldown-ms runtime-state/auto-recover-cooldown-ms
     :dispatch! nxr/dispatch
     :append-diagnostics-event! append-diagnostics-event!
-    :queue-microtask-fn js/queueMicrotask}))
+    :queue-microtask-fn platform/queue-microtask!}))
 
 (defn sync-websocket-health!
   [store & {:keys [force?]}]
@@ -82,9 +83,7 @@
   (app-effects/local-storage-set-json! key value))
 
 (defn schedule-animation-frame! [f]
-  (if (fn? (.-requestAnimationFrame js/globalThis))
-    (.requestAnimationFrame js/globalThis f)
-    (js/setTimeout f 16)))
+  (platform/request-animation-frame! f))
 
 (defn flush-queued-asset-icon-statuses!
   ([store]
@@ -169,15 +168,18 @@
    active-asset
    (active-market-display-normalize-deps)))
 
+(defn- persist-active-asset!
+  [canonical-coin]
+  (when (string? canonical-coin)
+    (app-effects/local-storage-set! "active-asset" canonical-coin)))
+
 (defn subscribe-active-asset [_ store coin]
   (subscriptions-runtime/subscribe-active-asset!
    {:store store
     :coin coin
     :log-fn println
     :resolve-market-by-coin-fn markets/resolve-market-by-coin
-    :persist-active-asset! (fn [canonical-coin]
-                             (when (string? canonical-coin)
-                               (js/localStorage.setItem "active-asset" canonical-coin)))
+    :persist-active-asset! persist-active-asset!
     :persist-active-market-display! persist-active-market-display!
     :subscribe-active-asset-ctx! active-ctx/subscribe-active-asset-ctx!
     :fetch-candle-snapshot! (fn [selected-timeframe]
@@ -246,7 +248,7 @@
   [runtime]
   (wallet-copy-runtime/clear-wallet-copy-feedback-timeout-in-runtime!
    runtime
-   js/clearTimeout))
+   platform/clear-timeout!))
 
 (defn- set-order-feedback-toast! [store kind message]
   (order-feedback-runtime/set-order-feedback-toast! store kind message))
@@ -258,7 +260,7 @@
   [runtime]
   (order-feedback-runtime/clear-order-feedback-toast-timeout-in-runtime!
    runtime
-   js/clearTimeout))
+   platform/clear-timeout!))
 
 (defn- schedule-order-feedback-toast-clear! [runtime store]
   (order-feedback-runtime/schedule-order-feedback-toast-clear!
@@ -267,7 +269,7 @@
     :clear-order-feedback-toast! clear-order-feedback-toast!
     :clear-order-feedback-toast-timeout! #(clear-order-feedback-toast-timeout! runtime)
     :order-feedback-toast-duration-ms runtime-state/order-feedback-toast-duration-ms
-    :set-timeout-fn js/setTimeout}))
+    :set-timeout-fn platform/set-timeout!}))
 
 (defn- show-order-feedback-toast!
   ([store kind message]
@@ -308,7 +310,7 @@
     :clear-wallet-copy-feedback! clear-wallet-copy-feedback!
     :clear-wallet-copy-feedback-timeout! #(clear-wallet-copy-feedback-timeout! runtime)
     :wallet-copy-feedback-duration-ms runtime-state/wallet-copy-feedback-duration-ms
-    :set-timeout-fn js/setTimeout}))
+    :set-timeout-fn platform/set-timeout!}))
 
 (defn copy-wallet-address
   ([_ store address]
@@ -350,7 +352,7 @@
 (defn confirm-ws-diagnostics-reveal [_ store]
   (diagnostics-effects/confirm-ws-diagnostics-reveal!
    {:store store
-    :confirm-fn js/confirm}))
+    :confirm-fn platform/confirm!}))
 
 (defn copy-websocket-diagnostics [_ store]
   (diagnostics-effects/copy-websocket-diagnostics!

@@ -1,5 +1,6 @@
 (ns hyperopen.websocket.application.runtime-engine
-  (:require [cljs.core.async :as async :refer [<! >! chan close! put!]])
+  (:require [cljs.core.async :as async :refer [<! >! chan close! put!]]
+            [hyperopen.platform :as platform])
   (:require-macros [cljs.core.async.macros :refer [go-loop]]))
 
 (defn safe-put! [channel value]
@@ -19,7 +20,7 @@
            now-ms]
     :or {mailbox-size 4096
          effects-size 4096
-         now-ms (fn [] (.now js/Date))}}]
+         now-ms platform/now-ms}}]
   (let [mailbox-ch (chan (async/buffer mailbox-size))
         effects-ch (chan (async/buffer effects-size))
         state (atom initial-state)

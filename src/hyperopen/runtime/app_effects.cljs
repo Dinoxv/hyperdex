@@ -1,4 +1,5 @@
-(ns hyperopen.runtime.app-effects)
+(ns hyperopen.runtime.app-effects
+  (:require [hyperopen.platform :as platform]))
 
 (defn save!
   [store path value]
@@ -16,16 +17,14 @@
 (defn local-storage-set!
   [key value]
   (try
-    (when (exists? js/localStorage)
-      (js/localStorage.setItem key (str value)))
+    (platform/local-storage-set! key (str value))
     (catch :default e
       (js/console.warn "Failed to persist localStorage value:" key e))))
 
 (defn local-storage-set-json!
   [key value]
   (try
-    (when (exists? js/localStorage)
-      (js/localStorage.setItem key (js/JSON.stringify (clj->js value))))
+    (platform/local-storage-set! key (js/JSON.stringify (clj->js value)))
     (catch :default e
       (js/console.warn "Failed to persist localStorage JSON value:" key e))))
 

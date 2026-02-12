@@ -1,11 +1,12 @@
 (ns hyperopen.websocket.health-runtime
   (:require [clojure.string :as str]
+            [hyperopen.platform :as platform]
             [hyperopen.websocket.health-projection :as health-projection]))
 
 (defn effective-now-ms
   [generated-at-ms]
   (let [generated* (or generated-at-ms 0)
-        wall-now-ms (.now js/Date)]
+        wall-now-ms (platform/now-ms)]
     (if (>= generated* 1000000000000)
       (max generated* wall-now-ms)
       generated*)))
@@ -41,7 +42,7 @@
            append-diagnostics-event!
            queue-microtask-fn]}]
   (let [get-health (or get-health-snapshot (fn [] {}))
-        queue-microtask (or queue-microtask-fn js/queueMicrotask)
+        queue-microtask (or queue-microtask-fn platform/queue-microtask!)
         auto-recover-enabled-fn* (or auto-recover-enabled-fn auto-recover-enabled?)
         health (get-health)
         generated-at-ms (or (:generated-at-ms health) 0)

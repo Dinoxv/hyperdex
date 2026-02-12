@@ -1,5 +1,6 @@
 (ns hyperopen.websocket.client
-  (:require [hyperopen.websocket.acl.hyperliquid :as acl]
+  (:require [hyperopen.platform :as platform]
+            [hyperopen.websocket.acl.hyperliquid :as acl]
             [hyperopen.websocket.application.runtime :as app-runtime]
             [hyperopen.websocket.domain.model :as model]
             [hyperopen.websocket.domain.policy :as policy]
@@ -77,22 +78,22 @@
 
 ;; Wrappers retained as stable seams for tests and adapters.
 (defn now-ms []
-  (.now js/Date))
+  (platform/now-ms))
 
 (defn random-value []
-  (js/Math.random))
+  (platform/random-value))
 
 (defn schedule-timeout! [f ms]
-  (js/setTimeout f ms))
+  (platform/set-timeout! f ms))
 
 (defn clear-timeout! [timer-id]
-  (js/clearTimeout timer-id))
+  (platform/clear-timeout! timer-id))
 
 (defn schedule-interval! [f ms]
-  (js/setInterval f ms))
+  (platform/set-interval! f ms))
 
 (defn clear-interval! [timer-id]
-  (js/clearInterval timer-id))
+  (platform/clear-interval! timer-id))
 
 (defn create-websocket [ws-url]
   (js/WebSocket. ws-url))
