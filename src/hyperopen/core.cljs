@@ -38,6 +38,7 @@
             [hyperopen.ui.preferences :as ui-preferences]
             [hyperopen.utils.parse :as parse-utils]
             [hyperopen.wallet.agent-runtime :as agent-runtime]
+            [hyperopen.wallet.copy-feedback-runtime :as wallet-copy-runtime]
             [hyperopen.wallet.core :as wallet]
             [hyperopen.wallet.agent-session :as agent-session]
             [hyperopen.wallet.address-watcher :as address-watcher]
@@ -461,16 +462,15 @@
   (wallet/request-connection! store))
 
 (defn- set-wallet-copy-feedback! [store kind message]
-  (swap! store assoc-in [:wallet :copy-feedback] {:kind kind
-                                                  :message message}))
+  (wallet-copy-runtime/set-wallet-copy-feedback! store kind message))
 
 (defn- clear-wallet-copy-feedback! [store]
-  (swap! store assoc-in [:wallet :copy-feedback] nil))
+  (wallet-copy-runtime/clear-wallet-copy-feedback! store))
 
 (defn- clear-wallet-copy-feedback-timeout! []
-  (when-let [timeout-id @wallet-copy-feedback-timeout-id]
-    (js/clearTimeout timeout-id)
-    (reset! wallet-copy-feedback-timeout-id nil)))
+  (wallet-copy-runtime/clear-wallet-copy-feedback-timeout!
+   wallet-copy-feedback-timeout-id
+   js/clearTimeout))
 
 (defn- set-order-feedback-toast! [store kind message]
   (let [message* (some-> message str str/trim)]
@@ -519,44 +519,23 @@
     :agent-storage-mode-reset-message agent-storage-mode-reset-message}))
 
 (defn- schedule-wallet-copy-feedback-clear! [store]
-  (clear-wallet-copy-feedback-timeout!)
-  (let [timeout-id (js/setTimeout
-                     (fn []
-                       (clear-wallet-copy-feedback! store)
-                       (reset! wallet-copy-feedback-timeout-id nil))
-                     wallet-copy-feedback-duration-ms)]
-    (reset! wallet-copy-feedback-timeout-id timeout-id)))
+  (wallet-copy-runtime/schedule-wallet-copy-feedback-clear!
+   {:store store
+    :wallet-copy-feedback-timeout-id wallet-copy-feedback-timeout-id
+    :clear-wallet-copy-feedback! clear-wallet-copy-feedback!
+    :clear-wallet-copy-feedback-timeout! clear-wallet-copy-feedback-timeout!
+    :wallet-copy-feedback-duration-ms wallet-copy-feedback-duration-ms
+    :set-timeout-fn js/setTimeout}))
 
 (defn copy-wallet-address [_ store address]
-  (let [clipboard (some-> js/globalThis .-navigator .-clipboard)
-        write-text-fn (some-> clipboard .-writeText)]
-    (clear-wallet-copy-feedback! store)
-    (clear-wallet-copy-feedback-timeout!)
-    (cond
-      (not (seq address))
-      (do
-        (set-wallet-copy-feedback! store :error "No address to copy")
-        (schedule-wallet-copy-feedback-clear! store))
-
-      (not (and clipboard write-text-fn))
-      (do
-        (set-wallet-copy-feedback! store :error "Clipboard unavailable")
-        (schedule-wallet-copy-feedback-clear! store))
-
-      :else
-      (try
-        (-> (.writeText clipboard address)
-            (.then (fn []
-                     (set-wallet-copy-feedback! store :success "Address copied to clipboard")
-                     (schedule-wallet-copy-feedback-clear! store)))
-            (.catch (fn [err]
-                      (println "Copy wallet address failed:" err)
-                      (set-wallet-copy-feedback! store :error "Couldn't copy address")
-                      (schedule-wallet-copy-feedback-clear! store))))
-        (catch :default err
-          (println "Copy wallet address failed:" err)
-          (set-wallet-copy-feedback! store :error "Couldn't copy address")
-          (schedule-wallet-copy-feedback-clear! store))))))
+  (wallet-copy-runtime/copy-wallet-address!
+   {:store store
+    :address address
+    :set-wallet-copy-feedback! set-wallet-copy-feedback!
+    :clear-wallet-copy-feedback! clear-wallet-copy-feedback!
+    :clear-wallet-copy-feedback-timeout! clear-wallet-copy-feedback-timeout!
+    :schedule-wallet-copy-feedback-clear! schedule-wallet-copy-feedback-clear!
+    :log-fn println}))
 
 (defn reconnect-websocket [_ _]
   (println "Forcing WebSocket reconnect...")

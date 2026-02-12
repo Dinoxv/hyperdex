@@ -19,6 +19,7 @@
             [hyperopen.utils.interval-test]
             [hyperopen.orderbook.price-aggregation-test]
             [hyperopen.wallet.address-watcher-test]
+            [hyperopen.wallet.copy-feedback-runtime-test]
             [hyperopen.wallet.agent-runtime-test]
             [hyperopen.websocket.client-test]
             [hyperopen.websocket.orderbook-policy-test]
@@ -61,6 +62,7 @@
              'hyperopen.core-bootstrap-test
              'hyperopen.orderbook.price-aggregation-test
              'hyperopen.wallet.address-watcher-test
+             'hyperopen.wallet.copy-feedback-runtime-test
              'hyperopen.wallet.agent-runtime-test
              'hyperopen.websocket.client-test
              'hyperopen.websocket.orderbook-policy-test
