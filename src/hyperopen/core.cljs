@@ -39,6 +39,7 @@
             [hyperopen.ui.preferences :as ui-preferences]
             [hyperopen.utils.parse :as parse-utils]
             [hyperopen.wallet.agent-runtime :as agent-runtime]
+            [hyperopen.wallet.connection-runtime :as wallet-connection-runtime]
             [hyperopen.wallet.copy-feedback-runtime :as wallet-copy-runtime]
             [hyperopen.wallet.core :as wallet]
             [hyperopen.wallet.agent-session :as agent-session]
@@ -459,8 +460,10 @@
   (webdata2/unsubscribe-webdata2! address))
 
 (defn connect-wallet [_ store]
-  (println "Connecting wallet...")
-  (wallet/request-connection! store))
+  (wallet-connection-runtime/connect-wallet!
+   {:store store
+    :log-fn println
+    :request-connection! wallet/request-connection!}))
 
 (defn- set-wallet-copy-feedback! [store kind message]
   (wallet-copy-runtime/set-wallet-copy-feedback! store kind message))
@@ -501,11 +504,13 @@
    schedule-order-feedback-toast-clear!))
 
 (defn disconnect-wallet [_ store]
-  (println "Disconnecting wallet...")
-  (clear-wallet-copy-feedback-timeout!)
-  (clear-order-feedback-toast-timeout!)
-  (clear-order-feedback-toast! store)
-  (wallet/set-disconnected! store))
+  (wallet-connection-runtime/disconnect-wallet!
+   {:store store
+    :log-fn println
+    :clear-wallet-copy-feedback-timeout! clear-wallet-copy-feedback-timeout!
+    :clear-order-feedback-toast-timeout! clear-order-feedback-toast-timeout!
+    :clear-order-feedback-toast! clear-order-feedback-toast!
+    :set-disconnected! wallet/set-disconnected!}))
 
 (defn set-agent-storage-mode [_ store storage-mode]
   (agent-runtime/set-agent-storage-mode!
@@ -590,21 +595,17 @@
 
 (defn- should-auto-enable-agent-trading?
   [state connected-address]
-  (let [wallet-address (some-> (get-in state [:wallet :address]) str str/lower-case)
-        connected-address* (some-> connected-address str str/lower-case)
-        connected? (boolean (get-in state [:wallet :connected?]))
-        agent-status (get-in state [:wallet :agent :status])]
-    (and connected?
-         (seq wallet-address)
-         (seq connected-address*)
-         (= wallet-address connected-address*)
-         (= :not-ready agent-status))))
+  (wallet-connection-runtime/should-auto-enable-agent-trading?
+   state
+   connected-address))
 
 (defn handle-wallet-connected
   [store connected-address]
-  (let [state @store]
-    (when (should-auto-enable-agent-trading? state connected-address)
-      (nxr/dispatch store nil [[:actions/enable-agent-trading]]))))
+  (wallet-connection-runtime/handle-wallet-connected!
+   {:store store
+    :connected-address connected-address
+    :should-auto-enable-agent-trading? should-auto-enable-agent-trading?
+    :dispatch! nxr/dispatch}))
 
 (defn- exchange-response-error
   [resp]
