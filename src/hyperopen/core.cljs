@@ -9,6 +9,7 @@
             [hyperopen.websocket.trades :as trades]
             [hyperopen.websocket.webdata2 :as webdata2]
             [hyperopen.websocket.user :as user-ws]
+            [hyperopen.websocket.diagnostics-actions :as diagnostics-actions]
             [hyperopen.websocket.diagnostics-payload :as diagnostics-payload]
             [hyperopen.websocket.diagnostics-sanitize :as diagnostics-sanitize]
             [hyperopen.websocket.health-projection :as health-projection]
@@ -831,90 +832,59 @@
 (defn reconnect-websocket-action [state]
   [[:effects/reconnect-websocket]])
 
+(defn- ws-diagnostics-action-deps []
+  {:effective-now-ms effective-now-ms
+   :reconnect-cooldown-ms reconnect-cooldown-ms})
+
 (defn toggle-ws-diagnostics [state]
-  (let [open? (not (boolean (get-in state [:websocket-ui :diagnostics-open?])))]
-    (cond-> [[:effects/save-many [[[:websocket-ui :diagnostics-open?] open?]
-                                  [[:websocket-ui :reveal-sensitive?] false]
-                                  [[:websocket-ui :copy-status] nil]]]]
-      open?
-      (conj [:effects/refresh-websocket-health]))))
+  (diagnostics-actions/toggle-ws-diagnostics state))
 
 (defn close-ws-diagnostics [_]
-  [[:effects/save-many [[[:websocket-ui :diagnostics-open?] false]
-                        [[:websocket-ui :reveal-sensitive?] false]
-                        [[:websocket-ui :copy-status] nil]]]])
+  (diagnostics-actions/close-ws-diagnostics nil))
 
 (defn toggle-ws-diagnostics-sensitive [state]
-  (if (boolean (get-in state [:websocket-ui :reveal-sensitive?]))
-    [[:effects/save [:websocket-ui :reveal-sensitive?] false]]
-    [[:effects/confirm-ws-diagnostics-reveal]]))
-
-(defn- reconnect-blocked? [state]
-  (let [transport-state (get-in state [:websocket :health :transport :state])
-        generated-at-ms (or (get-in state [:websocket :health :generated-at-ms]) 0)
-        now-ms (effective-now-ms generated-at-ms)
-        cooldown-until-ms (get-in state [:websocket-ui :reconnect-cooldown-until-ms])]
-    (or (contains? #{:connecting :reconnecting} transport-state)
-        (and (number? cooldown-until-ms)
-             (> cooldown-until-ms now-ms)))))
+  (diagnostics-actions/toggle-ws-diagnostics-sensitive state))
 
 (defn ws-diagnostics-reconnect-now [state]
-  (if (reconnect-blocked? state)
-    []
-    (let [generated-at-ms (or (get-in state [:websocket :health :generated-at-ms]) 0)
-          now-ms (effective-now-ms generated-at-ms)]
-      [[:effects/save-many [[[:websocket-ui :diagnostics-open?] false]
-                            [[:websocket-ui :reveal-sensitive?] false]
-                            [[:websocket-ui :copy-status] nil]]]
-       [:effects/save [:websocket-ui :reconnect-cooldown-until-ms]
-        (+ now-ms reconnect-cooldown-ms)]
-       [:effects/reconnect-websocket]])))
+  (diagnostics-actions/ws-diagnostics-reconnect-now
+   state
+   (ws-diagnostics-action-deps)))
 
 (defn ws-diagnostics-copy [_]
-  [[:effects/copy-websocket-diagnostics]])
+  (diagnostics-actions/ws-diagnostics-copy nil))
 
 (defn set-show-surface-freshness-cues [_ checked]
-  [[:effects/save [:websocket-ui :show-surface-freshness-cues?] (boolean checked)]])
+  (diagnostics-actions/set-show-surface-freshness-cues nil checked))
 
 (defn toggle-show-surface-freshness-cues [state]
-  [[:effects/save [:websocket-ui :show-surface-freshness-cues?]
-    (not (boolean (get-in state [:websocket-ui :show-surface-freshness-cues?] false)))]])
-
-(defn- reset-blocked? [state]
-  (let [transport-state (get-in state [:websocket :health :transport :state])
-        generated-at-ms (or (get-in state [:websocket :health :generated-at-ms]) 0)
-        now-ms (effective-now-ms generated-at-ms)
-        in-progress? (boolean (get-in state [:websocket-ui :reset-in-progress?]))
-        cooldown-until-ms (get-in state [:websocket-ui :reset-cooldown-until-ms])]
-    (or in-progress?
-        (contains? #{:connecting :reconnecting} transport-state)
-        (and (number? cooldown-until-ms)
-             (> cooldown-until-ms now-ms)))))
-
-(defn- ws-diagnostics-reset-subscriptions
-  [state group source]
-  (if (reset-blocked? state)
-    []
-    [[:effects/ws-reset-subscriptions {:group group
-                                       :source source}]]))
+  (diagnostics-actions/toggle-show-surface-freshness-cues state))
 
 (defn ws-diagnostics-reset-market-subscriptions
   ([state]
    (ws-diagnostics-reset-market-subscriptions state :manual))
   ([state source]
-   (ws-diagnostics-reset-subscriptions state :market_data source)))
+   (diagnostics-actions/ws-diagnostics-reset-market-subscriptions
+    state
+    source
+    (ws-diagnostics-action-deps))))
 
 (defn ws-diagnostics-reset-orders-subscriptions
   ([state]
    (ws-diagnostics-reset-orders-subscriptions state :manual))
   ([state source]
-   (ws-diagnostics-reset-subscriptions state :orders_oms source)))
+   (diagnostics-actions/ws-diagnostics-reset-orders-subscriptions
+    state
+    source
+    (ws-diagnostics-action-deps))))
 
 (defn ws-diagnostics-reset-all-subscriptions
   ([state]
    (ws-diagnostics-reset-all-subscriptions state :manual))
   ([state source]
-   (ws-diagnostics-reset-subscriptions state :all source)))
+   (diagnostics-actions/ws-diagnostics-reset-all-subscriptions
+    state
+    source
+    (ws-diagnostics-action-deps))))
 
 (def toggle-asset-dropdown
   asset-actions/toggle-asset-dropdown)
