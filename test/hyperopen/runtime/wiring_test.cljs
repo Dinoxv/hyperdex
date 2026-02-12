@@ -7,13 +7,13 @@
 (deftest runtime-effect-deps-uses-extracted-effect-adapter-overrides-test
   (let [deps (wiring/runtime-effect-deps)]
     (is (identical? effect-adapters/save
-                    (:save deps)))
+                    (get-in deps [:storage :save])))
     (is (identical? effect-adapters/fetch-candle-snapshot
-                    (:fetch-candle-snapshot deps)))
+                    (get-in deps [:websocket :fetch-candle-snapshot])))
     (is (identical? effect-adapters/ws-reset-subscriptions
-                    (:ws-reset-subscriptions deps)))
+                    (get-in deps [:diagnostics :ws-reset-subscriptions])))
     (is (identical? action-adapters/enable-agent-trading
-                    (:enable-agent-trading deps)))))
+                    (get-in deps [:wallet :enable-agent-trading])))))
 
 (deftest runtime-action-deps-uses-extracted-action-adapter-overrides-test
   (let [deps (wiring/runtime-action-deps)]

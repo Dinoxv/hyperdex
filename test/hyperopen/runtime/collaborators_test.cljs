@@ -12,14 +12,14 @@
   (let [save-fn (fn [& _] :save)
         export-fn (fn [& _] :export)
         deps (collaborators/runtime-effect-deps
-              {:save save-fn
-               :export-funding-history-csv export-fn})]
-    (is (identical? save-fn (:save deps)))
-    (is (identical? export-fn (:export-funding-history-csv deps)))
+              {:storage {:save save-fn}
+               :api {:export-funding-history-csv export-fn}})]
+    (is (identical? save-fn (get-in deps [:storage :save])))
+    (is (identical? export-fn (get-in deps [:api :export-funding-history-csv])))
     (is (identical? account-history-effects/api-fetch-user-funding-history-effect
-                    (:api-fetch-user-funding-history deps)))
+                    (get-in deps [:api :api-fetch-user-funding-history])))
     (is (identical? account-history-effects/api-fetch-historical-orders-effect
-                    (:api-fetch-historical-orders deps)))))
+                    (get-in deps [:api :api-fetch-historical-orders])))))
 
 (deftest runtime-action-deps-provides-default-domain-action-handlers-test
   (let [deps (collaborators/runtime-action-deps {})]

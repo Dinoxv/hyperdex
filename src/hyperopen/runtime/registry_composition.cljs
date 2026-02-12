@@ -4,9 +4,9 @@
   [{:keys [save
            save-many
            local-storage-set
-           local-storage-set-json
-           queue-asset-icon-status
-           push-state
+           local-storage-set-json]}
+   {:keys [queue-asset-icon-status]}
+   {:keys [push-state
            replace-state]}]
   {:save save
    :save-many save-many
@@ -28,8 +28,8 @@
            unsubscribe-trades
            unsubscribe-webdata2
            reconnect-websocket
-           refresh-websocket-health
-           confirm-ws-diagnostics-reveal
+           refresh-websocket-health]}
+   {:keys [confirm-ws-diagnostics-reveal
            copy-websocket-diagnostics
            ws-reset-subscriptions]}]
   {:init-websocket init-websocket
@@ -61,7 +61,8 @@
    :copy-wallet-address copy-wallet-address})
 
 (defn- trading-effect-handlers
-  [{:keys [api-submit-order api-cancel-order]}]
+  [{:keys [api-submit-order
+           api-cancel-order]}]
   {:api-submit-order api-submit-order
    :api-cancel-order api-cancel-order})
 
@@ -78,13 +79,20 @@
    :api-load-user-data api-load-user-data})
 
 (defn runtime-effect-handlers
-  [effect-deps]
+  [{:keys [storage
+           asset-selector
+           navigation
+           websocket
+           diagnostics
+           wallet
+           orders
+           api]}]
   (merge
-   (core-effect-handlers effect-deps)
-   (websocket-effect-handlers effect-deps)
-   (wallet-effect-handlers effect-deps)
-   (trading-effect-handlers effect-deps)
-   (api-effect-handlers effect-deps)))
+   (core-effect-handlers storage asset-selector navigation)
+   (websocket-effect-handlers websocket diagnostics)
+   (wallet-effect-handlers wallet)
+   (trading-effect-handlers orders)
+   (api-effect-handlers api)))
 
 (defn- runtime-core-action-handlers
   [{:keys [init-websockets

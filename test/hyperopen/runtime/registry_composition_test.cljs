@@ -10,8 +10,8 @@
                :register-actions! :register-actions
                :register-system-state! :register-system
                :register-placeholders! :register-placeholders}
-              {:effect-deps {:save (fn [& _] :save)
-                             :export-funding-history-csv effect-export}
+              {:effect-deps {:storage {:save (fn [& _] :save)}
+                             :api {:export-funding-history-csv effect-export}}
                :action-deps {:navigate (fn [& _] :navigate)
                              :export-funding-history-csv action-export}})]
     (is (= :register-effects (:register-effects! deps)))
@@ -31,7 +31,7 @@
                :register-actions! identity
                :register-system-state! identity
                :register-placeholders! identity}
-              {:effect-deps {:save save-fn}
+              {:effect-deps {:storage {:save save-fn}}
                :action-deps {:navigate navigate-fn}})]
     (is (= save-fn (get-in deps [:effect-handlers :save])))
     (is (= navigate-fn (get-in deps [:action-handlers :navigate])))))

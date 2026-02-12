@@ -105,11 +105,19 @@
 
 (defn runtime-effect-deps
   [effect-overrides]
-  (merge
-   {:api-fetch-user-funding-history account-history-effects/api-fetch-user-funding-history-effect
-    :api-fetch-historical-orders account-history-effects/api-fetch-historical-orders-effect
-    :export-funding-history-csv account-history-effects/export-funding-history-csv-effect}
-   effect-overrides))
+  (letfn [(merge-nested [left right]
+            (merge-with (fn [left-value right-value]
+                          (if (and (map? left-value)
+                                   (map? right-value))
+                            (merge-nested left-value right-value)
+                            right-value))
+                        (or left {})
+                        (or right {})))]
+    (merge-nested
+     {:api {:api-fetch-user-funding-history account-history-effects/api-fetch-user-funding-history-effect
+            :api-fetch-historical-orders account-history-effects/api-fetch-historical-orders-effect
+            :export-funding-history-csv account-history-effects/export-funding-history-csv-effect}}
+     effect-overrides)))
 
 (defn runtime-action-deps
   [action-overrides]
