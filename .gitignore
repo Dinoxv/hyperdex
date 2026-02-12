@@ -34,7 +34,9 @@ yarn-error.log*
 
 # Local tooling and temp output
 /.calva/
-/.clj-kondo/
+/.clj-kondo/*
+!/.clj-kondo/config.edn
+/.clj-kondo/.cache/
 /.lsp/
 /out/
 /output/

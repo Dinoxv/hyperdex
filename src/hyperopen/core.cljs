@@ -5,15 +5,21 @@
             [hyperopen.views.app-view :as app-view]
             [hyperopen.websocket.client :as ws-client]
             [hyperopen.account.history.actions :as account-history-actions]
+            [hyperopen.chart.settings :as chart-settings]
             [hyperopen.core.compat :as compat]
             [hyperopen.asset-selector.settings :as asset-selector-settings]
+            [hyperopen.orderbook.settings :as orderbook-settings]
+            [hyperopen.runtime.action-adapters :as runtime-action-adapters]
             [hyperopen.runtime.bootstrap :as runtime-bootstrap]
+            [hyperopen.runtime.effect-adapters :as runtime-effect-adapters]
             [hyperopen.runtime.state :as runtime-state]
             [hyperopen.runtime.wiring :as runtime-wiring]
             [hyperopen.startup.composition :as startup-composition]
+            [hyperopen.startup.restore :as startup-restore]
             [hyperopen.startup.runtime :as startup-runtime-lib]
             [hyperopen.startup.watchers :as startup-watchers]
             [hyperopen.startup.wiring :as startup-wiring]
+            [hyperopen.ui.preferences :as ui-preferences]
             [hyperopen.wallet.core :as wallet]
             [hyperopen.wallet.agent-session :as agent-session]
             [hyperopen.wallet.address-watcher :as address-watcher]
@@ -44,6 +50,7 @@
 ;; Re-export all legacy public vars from `hyperopen.core.compat`.
 ;; This keeps `hyperopen.core/*` API stable while `hyperopen.core` stays focused
 ;; on entrypoint and startup/runtime bootstrapping.
+;; NOTE: compat is for external legacy callers only, not internal wiring.
 (def-core-legacy-exports compat)
 
 (defn- render-app!
@@ -51,21 +58,6 @@
   (when (exists? js/document)
     (r/render (.getElementById js/document "app")
               (app-view/app-view state))))
-
-(defn- store-cache-watcher-deps
-  []
-  {:persist-active-market-display! persist-active-market-display!
-   :persist-asset-selector-markets-cache! persist-asset-selector-markets-cache!})
-
-(defn- websocket-watcher-deps
-  []
-  {:store store
-   :connection-state ws-client/connection-state
-   :stream-runtime ws-client/stream-runtime
-   :append-diagnostics-event! append-diagnostics-event!
-   :sync-websocket-health! sync-websocket-health!
-   :on-websocket-connected! address-watcher/on-websocket-connected!
-   :on-websocket-disconnected! address-watcher/on-websocket-disconnected!})
 
 (defn- bootstrap-runtime!
   []
@@ -79,9 +71,20 @@
                        :document? (exists? js/document)}
     :watchers-deps {:store store
                     :install-store-cache-watchers! startup-watchers/install-store-cache-watchers!
-                    :store-cache-watchers-deps (store-cache-watcher-deps)
+                    :store-cache-watchers-deps
+                    (startup-wiring/store-cache-watcher-deps
+                     {:persist-active-market-display! runtime-effect-adapters/persist-active-market-display!
+                      :persist-asset-selector-markets-cache! runtime-effect-adapters/persist-asset-selector-markets-cache!})
                     :install-websocket-watchers! startup-watchers/install-websocket-watchers!
-                    :websocket-watchers-deps (websocket-watcher-deps)}}))
+                    :websocket-watchers-deps
+                    (startup-wiring/websocket-watcher-deps
+                     {:store store
+                      :connection-state ws-client/connection-state
+                      :stream-runtime ws-client/stream-runtime
+                      :append-diagnostics-event! runtime-effect-adapters/append-diagnostics-event!
+                      :sync-websocket-health! runtime-effect-adapters/sync-websocket-health!
+                      :on-websocket-connected! address-watcher/on-websocket-connected!
+                      :on-websocket-disconnected! address-watcher/on-websocket-disconnected!})}}))
 
 (defn- ensure-runtime-bootstrapped!
   []
@@ -91,7 +94,7 @@
 (defn reload []
   (ensure-runtime-bootstrapped!)
   (println "Reloading Hyperopen...")
-  (wallet/set-on-connected-handler! handle-wallet-connected)
+  (wallet/set-on-connected-handler! runtime-action-adapters/handle-wallet-connected)
   (render-app! @store))
 
 (defonce ^:private startup-runtime
@@ -177,19 +180,19 @@
     (startup-base-deps)
     {:default-startup-runtime-state startup-runtime-lib/default-startup-runtime-state
      :schedule-startup-summary-log! schedule-startup-summary-log!
-     :restore-ui-font-preference! restore-ui-font-preference!
+     :restore-ui-font-preference! ui-preferences/restore-ui-font-preference!
      :restore-asset-selector-sort-settings! asset-selector-settings/restore-asset-selector-sort-settings!
-     :restore-chart-options! restore-chart-options!
-     :restore-orderbook-ui! restore-orderbook-ui!
-     :restore-agent-storage-mode! restore-agent-storage-mode!
-     :restore-active-asset! restore-active-asset!
-     :restore-asset-selector-markets-cache! restore-asset-selector-markets-cache!
-     :restore-open-orders-sort-settings! restore-open-orders-sort-settings!
-     :restore-funding-history-pagination-settings! restore-funding-history-pagination-settings!
-     :restore-trade-history-pagination-settings! restore-trade-history-pagination-settings!
-     :restore-order-history-pagination-settings! restore-order-history-pagination-settings!
+     :restore-chart-options! chart-settings/restore-chart-options!
+     :restore-orderbook-ui! orderbook-settings/restore-orderbook-ui!
+     :restore-agent-storage-mode! startup-restore/restore-agent-storage-mode!
+     :restore-active-asset! runtime-effect-adapters/restore-active-asset!
+     :restore-asset-selector-markets-cache! runtime-effect-adapters/restore-asset-selector-markets-cache!
+     :restore-open-orders-sort-settings! account-history-actions/restore-open-orders-sort-settings!
+     :restore-funding-history-pagination-settings! account-history-actions/restore-funding-history-pagination-settings!
+     :restore-trade-history-pagination-settings! account-history-actions/restore-trade-history-pagination-settings!
+     :restore-order-history-pagination-settings! account-history-actions/restore-order-history-pagination-settings!
      :set-on-connected-handler! wallet/set-on-connected-handler!
-     :handle-wallet-connected handle-wallet-connected
+     :handle-wallet-connected runtime-action-adapters/handle-wallet-connected
      :init-wallet! wallet/init-wallet!
      :init-router! router/init!
      :register-icon-service-worker! register-icon-service-worker!

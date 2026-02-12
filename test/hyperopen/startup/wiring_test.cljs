@@ -15,6 +15,41 @@
     (address-watcher/on-address-changed handler nil "0xabc")
     (is (= ["0xabc"] @calls))))
 
+(deftest store-cache-watcher-deps-shapes-required-cache-collaborators-test
+  (let [persist-active-market-display! (fn [& _] nil)
+        persist-asset-selector-markets-cache! (fn [& _] nil)
+        deps (startup-wiring/store-cache-watcher-deps
+              {:persist-active-market-display! persist-active-market-display!
+               :persist-asset-selector-markets-cache! persist-asset-selector-markets-cache!})]
+    (is (identical? persist-active-market-display!
+                    (:persist-active-market-display! deps)))
+    (is (identical? persist-asset-selector-markets-cache!
+                    (:persist-asset-selector-markets-cache! deps)))))
+
+(deftest websocket-watcher-deps-shapes-required-websocket-collaborators-test
+  (let [store (atom {})
+        connection-state (atom {:status :disconnected})
+        stream-runtime (atom {})
+        append-diagnostics-event! (fn [& _] nil)
+        sync-websocket-health! (fn [& _] nil)
+        on-websocket-connected! (fn [] nil)
+        on-websocket-disconnected! (fn [] nil)
+        deps (startup-wiring/websocket-watcher-deps
+              {:store store
+               :connection-state connection-state
+               :stream-runtime stream-runtime
+               :append-diagnostics-event! append-diagnostics-event!
+               :sync-websocket-health! sync-websocket-health!
+               :on-websocket-connected! on-websocket-connected!
+               :on-websocket-disconnected! on-websocket-disconnected!})]
+    (is (identical? store (:store deps)))
+    (is (identical? connection-state (:connection-state deps)))
+    (is (identical? stream-runtime (:stream-runtime deps)))
+    (is (identical? append-diagnostics-event! (:append-diagnostics-event! deps)))
+    (is (identical? sync-websocket-health! (:sync-websocket-health! deps)))
+    (is (identical? on-websocket-connected! (:on-websocket-connected! deps)))
+    (is (identical? on-websocket-disconnected! (:on-websocket-disconnected! deps)))))
+
 (deftest install-address-handlers-injects-reify-and-default-handler-name-test
   (let [captured (atom nil)
         base-deps {:store (atom {})}

@@ -7,6 +7,28 @@
   [deps]
   (startup-collaborators/startup-base-deps deps))
 
+(defn store-cache-watcher-deps
+  [{:keys [persist-active-market-display!
+           persist-asset-selector-markets-cache!]}]
+  {:persist-active-market-display! persist-active-market-display!
+   :persist-asset-selector-markets-cache! persist-asset-selector-markets-cache!})
+
+(defn websocket-watcher-deps
+  [{:keys [store
+           connection-state
+           stream-runtime
+           append-diagnostics-event!
+           sync-websocket-health!
+           on-websocket-connected!
+           on-websocket-disconnected!]}]
+  {:store store
+   :connection-state connection-state
+   :stream-runtime stream-runtime
+   :append-diagnostics-event! append-diagnostics-event!
+   :sync-websocket-health! sync-websocket-health!
+   :on-websocket-connected! on-websocket-connected!
+   :on-websocket-disconnected! on-websocket-disconnected!})
+
 (defn schedule-startup-summary-log!
   [base-deps startup-summary-delay-ms]
   (startup-composition/schedule-startup-summary-log!
