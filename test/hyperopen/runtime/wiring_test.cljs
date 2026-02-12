@@ -18,13 +18,13 @@
 (deftest runtime-action-deps-uses-extracted-action-adapter-overrides-test
   (let [deps (wiring/runtime-action-deps)]
     (is (identical? action-adapters/init-websockets
-                    (:init-websockets deps)))
+                    (get-in deps [:core :init-websockets])))
     (is (identical? action-adapters/reconnect-websocket-action
-                    (:reconnect-websocket-action deps)))
+                    (get-in deps [:core :reconnect-websocket-action])))
     (is (identical? action-adapters/refresh-asset-markets
-                    (:refresh-asset-markets deps)))
+                    (get-in deps [:asset-selector :refresh-asset-markets])))
     (is (identical? action-adapters/navigate
-                    (:navigate deps)))))
+                    (get-in deps [:core :navigate])))))
 
 (deftest runtime-registration-deps-builds-effect-and-action-handlers-test
   (let [deps (wiring/runtime-registration-deps)]

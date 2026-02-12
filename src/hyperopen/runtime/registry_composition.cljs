@@ -319,15 +319,21 @@
    :set-funding-modal set-funding-modal})
 
 (defn runtime-action-handlers
-  [action-deps]
+  [{:keys [core
+           wallet
+           diagnostics
+           asset-selector
+           chart
+           account-history
+           orders]}]
   (merge
-   (runtime-core-action-handlers action-deps)
-   (wallet-action-handlers action-deps)
-   (websocket-diagnostics-action-handlers action-deps)
-   (asset-selector-action-handlers action-deps)
-   (chart-and-orderbook-action-handlers action-deps)
-   (account-history-action-handlers action-deps)
-   (order-action-handlers action-deps)))
+   (runtime-core-action-handlers core)
+   (wallet-action-handlers wallet)
+   (websocket-diagnostics-action-handlers diagnostics)
+   (asset-selector-action-handlers asset-selector)
+   (chart-and-orderbook-action-handlers chart)
+   (account-history-action-handlers account-history)
+   (order-action-handlers orders)))
 
 (defn runtime-registration-deps
   [{:keys [register-effects!

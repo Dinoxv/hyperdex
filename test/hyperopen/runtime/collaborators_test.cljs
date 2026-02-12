@@ -24,23 +24,23 @@
 (deftest runtime-action-deps-provides-default-domain-action-handlers-test
   (let [deps (collaborators/runtime-action-deps {})]
     (is (identical? wallet-actions/connect-wallet-action
-                    (:connect-wallet-action deps)))
+                    (get-in deps [:wallet :connect-wallet-action])))
     (is (identical? asset-actions/select-asset
-                    (:select-asset deps)))
+                    (get-in deps [:asset-selector :select-asset])))
     (is (identical? chart-actions/select-chart-type
-                    (:select-chart-type deps)))
+                    (get-in deps [:chart :select-chart-type])))
     (is (identical? account-history-actions/select-account-info-tab
-                    (:select-account-info-tab deps)))
+                    (get-in deps [:account-history :select-account-info-tab])))
     (is (identical? order-actions/submit-order
-                    (:submit-order deps)))))
+                    (get-in deps [:orders :submit-order])))))
 
 (deftest runtime-action-deps-overrides-default-action-handlers-test
   (let [connect-wallet-action* (fn [& _] :override-connect)
         navigate* (fn [& _] :navigate)
         deps (collaborators/runtime-action-deps
-              {:connect-wallet-action connect-wallet-action*
-               :navigate navigate*})]
+              {:wallet {:connect-wallet-action connect-wallet-action*}
+               :core {:navigate navigate*}})]
     (is (identical? connect-wallet-action*
-                    (:connect-wallet-action deps)))
+                    (get-in deps [:wallet :connect-wallet-action])))
     (is (identical? navigate*
-                    (:navigate deps)))))
+                    (get-in deps [:core :navigate])))))

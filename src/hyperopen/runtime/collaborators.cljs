@@ -8,6 +8,16 @@
             [hyperopen.orderbook.actions :as orderbook-actions]
             [hyperopen.wallet.actions :as wallet-actions]))
 
+(defn- merge-nested
+  [left right]
+  (merge-with (fn [left-value right-value]
+                (if (and (map? left-value)
+                         (map? right-value))
+                  (merge-nested left-value right-value)
+                  right-value))
+              (or left {})
+              (or right {})))
+
 (defn- wallet-action-deps []
   {:connect-wallet-action wallet-actions/connect-wallet-action
    :disconnect-wallet-action wallet-actions/disconnect-wallet-action
@@ -105,26 +115,19 @@
 
 (defn runtime-effect-deps
   [effect-overrides]
-  (letfn [(merge-nested [left right]
-            (merge-with (fn [left-value right-value]
-                          (if (and (map? left-value)
-                                   (map? right-value))
-                            (merge-nested left-value right-value)
-                            right-value))
-                        (or left {})
-                        (or right {})))]
-    (merge-nested
-     {:api {:api-fetch-user-funding-history account-history-effects/api-fetch-user-funding-history-effect
-            :api-fetch-historical-orders account-history-effects/api-fetch-historical-orders-effect
-            :export-funding-history-csv account-history-effects/export-funding-history-csv-effect}}
-     effect-overrides)))
+  (merge-nested
+   {:api {:api-fetch-user-funding-history account-history-effects/api-fetch-user-funding-history-effect
+          :api-fetch-historical-orders account-history-effects/api-fetch-historical-orders-effect
+          :export-funding-history-csv account-history-effects/export-funding-history-csv-effect}}
+   effect-overrides))
 
 (defn runtime-action-deps
   [action-overrides]
-  (merge
-   (wallet-action-deps)
-   (asset-selector-action-deps)
-   (chart-and-orderbook-action-deps)
-   (account-history-action-deps)
-   (order-action-deps)
+  (merge-nested
+   {:core {}
+    :wallet (wallet-action-deps)
+    :asset-selector (asset-selector-action-deps)
+    :chart (chart-and-orderbook-action-deps)
+    :account-history (account-history-action-deps)
+    :orders (order-action-deps)}
    action-overrides))
