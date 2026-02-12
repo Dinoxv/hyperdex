@@ -2,6 +2,7 @@
   (:require [nexus.registry :as nxr]
             [hyperopen.api :as api]
             [hyperopen.account.history.effects :as account-history-effects]
+            [hyperopen.runtime.state :as runtime-state]
             [hyperopen.wallet.address-watcher :as address-watcher]
             [hyperopen.websocket.active-asset-ctx :as active-ctx]
             [hyperopen.websocket.client :as ws-client]
@@ -9,9 +10,6 @@
             [hyperopen.websocket.trades :as trades]
             [hyperopen.websocket.user :as user-ws]
             [hyperopen.websocket.webdata2 :as webdata2]))
-
-(def ^:private default-ws-url
-  "wss://api.hyperliquid.xyz/ws")
 
 (defn startup-base-deps
   [overrides]
@@ -27,7 +25,7 @@
     :ensure-perp-dexs! api/ensure-perp-dexs!
     :fetch-asset-contexts! api/fetch-asset-contexts!
     :fetch-asset-selector-markets! api/fetch-asset-selector-markets!
-    :ws-url default-ws-url
+    :ws-url runtime-state/websocket-url
     :init-connection! ws-client/init-connection!
     :init-active-ctx! active-ctx/init!
     :init-orderbook! orderbook/init!

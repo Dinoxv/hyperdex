@@ -169,7 +169,7 @@
 (defn init-websocket [_ store]
   (app-effects/init-websocket!
    {:store store
-    :ws-url "wss://api.hyperliquid.xyz/ws"
+    :ws-url runtime-state/websocket-url
     :log-fn println
     :init-connection! ws-client/init-connection!}))
 
@@ -967,9 +967,13 @@
                     :install-websocket-watchers! startup-watchers/install-websocket-watchers!
                     :websocket-watchers-deps (websocket-watcher-deps)}}))
 
-(bootstrap-runtime!)
+(defn- ensure-runtime-bootstrapped!
+  []
+  (when (compare-and-set! runtime-state/runtime-bootstrapped? false true)
+    (bootstrap-runtime!)))
 
 (defn reload []
+  (ensure-runtime-bootstrapped!)
   (println "Reloading Hyperopen...")
   (wallet/set-on-connected-handler! handle-wallet-connected)
   (render-app! @store))
@@ -1061,6 +1065,7 @@
           :schedule-deferred-bootstrap! schedule-deferred-bootstrap!)))
 
 (defn init []
+  (ensure-runtime-bootstrapped!)
   (startup-composition/init!
    (merge
     (startup-base-deps)

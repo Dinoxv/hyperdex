@@ -21,6 +21,9 @@
 (def app-version
   "0.1.0")
 
+(def websocket-url
+  "wss://api.hyperliquid.xyz/ws")
+
 (def wallet-copy-feedback-duration-ms
   1500)
 
@@ -56,3 +59,6 @@
 
 (defonce asset-icon-status-flush-handle
   (atom nil))
+
+(defonce runtime-bootstrapped?
+  (atom false))

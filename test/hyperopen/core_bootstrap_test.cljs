@@ -24,6 +24,12 @@
            :summary-logged? false}))
 
 (use-fixtures
+  :once
+  {:before (fn []
+             (@#'hyperopen.core/ensure-runtime-bootstrapped!))
+   :after (fn [])})
+
+(use-fixtures
   :each
   {:before (fn []
              (reset-startup-runtime!)
@@ -120,6 +126,18 @@
       (is (fn? @deferred-callback))
       (@deferred-callback)
       (is (= [:bootstrap :full] @phases)))))
+
+(deftest ensure-runtime-bootstrapped-runs-bootstrap-once-test
+  (let [calls (atom 0)]
+    (reset! runtime-state/runtime-bootstrapped? false)
+    (with-redefs [hyperopen.core/bootstrap-runtime!
+                  (fn []
+                    (swap! calls inc))]
+      (@#'hyperopen.core/ensure-runtime-bootstrapped!)
+      (@#'hyperopen.core/ensure-runtime-bootstrapped!))
+    (is (= 1 @calls))
+    (is (true? @runtime-state/runtime-bootstrapped?))
+    (reset! runtime-state/runtime-bootstrapped? true)))
 
 (deftest register-icon-service-worker-registers-when-supported-test
   (let [registered-paths (atom [])]
