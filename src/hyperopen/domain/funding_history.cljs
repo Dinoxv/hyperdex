@@ -66,14 +66,25 @@
   [row]
   (let [delta (:delta row)
         funding-delta? (or (nil? (:type delta))
-                           (= "funding" (:type delta)))]
-    (when (and (map? delta) funding-delta?)
-      (normalize-funding-row {:time-ms (:time row)
-                              :coin (:coin delta)
-                              :signed-size (:szi delta)
-                              :payment-usdc (:usdc delta)
-                              :funding-rate (:fundingRate delta)
-                              :source :info}))))
+                           (= "funding" (:type delta)))
+        payload (cond
+                  (and (map? delta) funding-delta?)
+                  {:time-ms (:time row)
+                   :coin (:coin delta)
+                   :signed-size (:szi delta)
+                   :payment-usdc (:usdc delta)
+                   :funding-rate (:fundingRate delta)}
+
+                  (map? row)
+                  {:time-ms (:time row)
+                   :coin (:coin row)
+                   :signed-size (:szi row)
+                   :payment-usdc (:usdc row)
+                   :funding-rate (:fundingRate row)}
+
+                  :else nil)]
+    (when payload
+      (normalize-funding-row (assoc payload :source :info)))))
 
 (defn normalize-info-funding-rows
   [rows]

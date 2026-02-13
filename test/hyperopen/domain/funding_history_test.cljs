@@ -17,6 +17,20 @@
     (is (= -1.25 (:payment-usdc-raw row)))
     (is (= 4.5e-4 (:funding-rate-raw row)))))
 
+(deftest normalize-info-funding-row-supports-direct-row-shape-test
+  (let [row (funding-history/normalize-info-funding-row
+             {:time 1700000000000
+              :coin "BTC"
+              :usdc "0.1250"
+              :szi "15.5"
+              :fundingRate "0.0002"})]
+    (is (= "BTC" (:coin row)))
+    (is (= 1700000000000 (:time-ms row)))
+    (is (= :long (:position-side row)))
+    (is (= 15.5 (:size-raw row)))
+    (is (= 0.125 (:payment-usdc-raw row)))
+    (is (= 2.0e-4 (:funding-rate-raw row)))))
+
 (deftest normalize-funding-history-filters-is-deterministic-for-fixed-now-test
   (let [now 1700600000000
         filters {:coin-set #{"BTC" "ETH"}

@@ -14,12 +14,50 @@
               (merge {:priority :high}
                      opts)))
 
+(defn- funding-history-seq
+  [payload]
+  (cond
+    (sequential? payload)
+    payload
+
+    (map? payload)
+    (let [data (:data payload)
+          nested (or (:fundings payload)
+                     (:userFunding payload)
+                     (:userFundings payload)
+                     (when (map? data)
+                       (or (:fundings data)
+                           (:userFunding data)
+                           (:userFundings data)))
+                     data)]
+      (if (sequential? nested) nested []))
+
+    :else
+    []))
+
+(defn- warn-funding-normalization-drop!
+  [start-time-ms end-time-ms raw-rows]
+  (let [console-object (some-> js/globalThis .-console)
+        warn-fn (some-> console-object .-warn)]
+    (when (and (fn? warn-fn)
+               (seq raw-rows))
+      (.warn console-object
+             "Funding history normalization dropped all rows on a non-empty page."
+             (clj->js {:event "funding-history-normalization-drop"
+                       :start-time-ms start-time-ms
+                       :end-time-ms end-time-ms
+                       :raw-row-count (count raw-rows)})))))
+
 (defn- fetch-user-funding-history-loop!
   [post-info! normalize-info-funding-rows-fn sort-funding-history-rows-fn
    address start-time-ms end-time-ms opts acc]
   (-> (fetch-user-funding-page! post-info! address start-time-ms end-time-ms opts)
       (.then (fn [payload]
-               (let [rows (normalize-info-funding-rows-fn payload)]
+               (let [raw-rows (funding-history-seq payload)
+                     rows (normalize-info-funding-rows-fn raw-rows)]
+                 (when (and (seq raw-rows)
+                            (empty? rows))
+                   (warn-funding-normalization-drop! start-time-ms end-time-ms raw-rows))
                  (if (seq rows)
                    (let [max-time-ms (apply max (map :time-ms rows))
                          next-start-ms (inc max-time-ms)

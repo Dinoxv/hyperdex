@@ -20,7 +20,11 @@
   #{:all :open :filled :canceled :rejected :triggered})
 
 (defn- default-funding-history-filters []
-  (funding-history/normalize-funding-history-filters {} (platform/now-ms)))
+  (let [now (platform/now-ms)]
+    (funding-history/normalize-funding-history-filters
+     {:start-time-ms 0
+      :end-time-ms now}
+     now)))
 
 (defn default-funding-history-state []
   (let [filters (default-funding-history-filters)]
