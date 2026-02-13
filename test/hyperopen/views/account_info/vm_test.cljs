@@ -72,3 +72,78 @@
     (is (= :warning (get-in view-model [:freshness-cues :open-orders :tone])))
     (is (str/includes? (get-in view-model [:freshness-cues :open-orders :text]) "Stale 12s"))
     (is (str/includes? (get-in view-model [:freshness-cues :positions :text]) "Last update 3s ago"))))
+
+(deftest account-info-vm-builds-balance-pnl-from-asset-selector-spot-prices-when-webdata2-spot-ctxs-missing-test
+  (let [state {:account-info {:selected-tab :balances}
+               :webdata2 {}
+               :orders (base-orders)
+               :account {:mode :classic}
+               :asset-selector {:market-by-key {"spot:MEOW/USDC" {:coin "MEOW/USDC"
+                                                                   :mark 0.02}}}
+               :spot {:meta {:tokens [{:index 0 :name "USDC" :weiDecimals 6}
+                                      {:index 1 :name "MEOW" :weiDecimals 6}]
+                             :universe [{:name "MEOW/USDC"
+                                         :tokens [1 0]
+                                         :index 0}]}
+                      :clearinghouse-state {:balances [{:coin "MEOW"
+                                                        :token 1
+                                                        :hold "0.0"
+                                                        :total "2.0"
+                                                        :entryNtl "0.03"}]}}
+               :perp-dex-clearinghouse {}}
+        view-model (vm/account-info-vm state)
+        meow-row (some #(when (= "MEOW" (:coin %)) %) (:balance-rows view-model))]
+    (is (some? meow-row))
+    (is (< (js/Math.abs (- 0.04 (:usdc-value meow-row))) 0.000001))
+    (is (< (js/Math.abs (- 0.01 (:pnl-value meow-row))) 0.000001))
+    (is (< (js/Math.abs (- 33.3333333333 (:pnl-pct meow-row))) 0.000001))))
+
+(deftest account-info-vm-builds-balance-pnl-when-entry-notional-uses-alternate-key-test
+  (let [state {:account-info {:selected-tab :balances}
+               :webdata2 {}
+               :orders (base-orders)
+               :account {:mode :classic}
+               :asset-selector {:market-by-key {"spot:MEOW/USDC" {:coin "MEOW/USDC"
+                                                                   :mark 0.02}}}
+               :spot {:meta {:tokens [{:index 0 :name "USDC" :weiDecimals 6}
+                                      {:index 1 :name "MEOW" :weiDecimals 6}]
+                             :universe [{:name "MEOW/USDC"
+                                         :tokens [1 0]
+                                         :index 0}]}
+                      :clearinghouse-state {:balances [{:coin "MEOW"
+                                                        :token "1"
+                                                        :hold "0.0"
+                                                        :total "2.0"
+                                                        :entryNotional "0.03"}]}}
+               :perp-dex-clearinghouse {}}
+        view-model (vm/account-info-vm state)
+        meow-row (some #(when (= "MEOW" (:coin %)) %) (:balance-rows view-model))]
+    (is (some? meow-row))
+    (is (< (js/Math.abs (- 0.01 (:pnl-value meow-row))) 0.000001))
+    (is (< (js/Math.abs (- 33.3333333333 (:pnl-pct meow-row))) 0.000001))))
+
+(deftest account-info-vm-builds-balance-pnl-from-market-base-coin-when-spot-meta-missing-test
+  (let [state {:account-info {:selected-tab :balances}
+               :webdata2 {}
+               :orders (base-orders)
+               :account {:mode :classic}
+               :asset-selector {:market-by-key {"spot:@123" {:market-type :spot
+                                                             :coin "@123"
+                                                             :symbol "MEOW/USDC"
+                                                             :base "MEOW"
+                                                             :quote "USDC"
+                                                             :mark 0.02
+                                                             :szDecimals 6}}}
+               :spot {:meta nil
+                      :clearinghouse-state {:balances [{:coin "MEOW"
+                                                        :hold "0.0"
+                                                        :total "2.0"
+                                                        :entryNtl "0.03"}]}}
+               :perp-dex-clearinghouse {}}
+        view-model (vm/account-info-vm state)
+        meow-row (some #(when (= "MEOW" (:coin %)) %) (:balance-rows view-model))]
+    (is (some? meow-row))
+    (is (= 6 (:amount-decimals meow-row)))
+    (is (< (js/Math.abs (- 0.04 (:usdc-value meow-row))) 0.000001))
+    (is (< (js/Math.abs (- 0.01 (:pnl-value meow-row))) 0.000001))
+    (is (< (js/Math.abs (- 33.3333333333 (:pnl-pct meow-row))) 0.000001))))

@@ -192,12 +192,89 @@
     (and (seq coin*)
          (str/starts-with? coin* "USDC"))))
 
+(defn- normalize-coin-code [coin]
+  (some-> coin str str/trim str/upper-case))
+
 (def ^:private usdc-valuation-invariant-epsilon 0.000001)
 
-(defn- build-token-usdc-price-map [spot-meta spot-asset-ctxs]
-  (let [tokens (:tokens spot-meta)
-        usdc-token (some #(when (= "USDC" (:name %)) %) tokens)
-        usdc-token-idx (:index usdc-token)
+(defn- usdc-token-idx [spot-meta]
+  (some->> (:tokens spot-meta)
+           (some (fn [{:keys [name index]}]
+                   (when (= "USDC" (some-> name str str/trim str/upper-case))
+                     index)))))
+
+(defn- spot-market-mark-px [market-by-key spot-coin]
+  (let [market (or (get market-by-key (str "spot:" spot-coin))
+                   (markets/resolve-market-by-coin market-by-key spot-coin))]
+    (or (let [mark (parse-optional-num (:mark market))]
+          (when (and (number? mark) (pos? mark))
+            mark))
+        (let [mark-raw (parse-optional-num (:markRaw market))]
+          (when (and (number? mark-raw) (pos? mark-raw))
+            mark-raw)))))
+
+(defn- market-positive-mark [market]
+  (or (let [mark (parse-optional-num (:mark market))]
+        (when (and (number? mark) (pos? mark))
+          mark))
+      (let [mark-raw (parse-optional-num (:markRaw market))]
+        (when (and (number? mark-raw) (pos? mark-raw))
+          mark-raw))))
+
+(defn- spot-market-base-coin [market]
+  (or (normalize-coin-code (:base market))
+      (normalize-coin-code (symbol-base-label (:symbol market)))
+      (normalize-coin-code (some-> (parse-coin-namespace (:coin market))
+                                   :base))))
+
+(defn- spot-market-quote-coin [market]
+  (or (normalize-coin-code (:quote market))
+      (let [symbol* (some-> (:symbol market) str str/trim)]
+        (when (and (seq symbol*) (str/includes? symbol* "/"))
+          (normalize-coin-code (second (str/split symbol* #"/" 2)))))))
+
+(defn- build-coin-usdc-price-map-from-market-state [market-by-key]
+  (if (map? market-by-key)
+    (reduce (fn [m market]
+              (if (= :spot (:market-type market))
+                (let [base-coin (spot-market-base-coin market)
+                      quote-coin (spot-market-quote-coin market)
+                      mark-px (market-positive-mark market)]
+                  (cond
+                    (and (seq base-coin)
+                         (usdc-coin? quote-coin)
+                         (number? mark-px)
+                         (pos? mark-px))
+                    (assoc m base-coin mark-px)
+
+                    (and (seq quote-coin)
+                         (usdc-coin? base-coin)
+                         (number? mark-px)
+                         (pos? mark-px))
+                    (assoc m quote-coin (/ 1 mark-px))
+
+                    :else m))
+                m))
+            {}
+            (vals market-by-key))
+    {}))
+
+(defn- build-coin-decimals-map-from-market-state [market-by-key]
+  (if (map? market-by-key)
+    (reduce (fn [m market]
+              (if (= :spot (:market-type market))
+                (let [base-coin (spot-market-base-coin market)
+                      decimals (parse-optional-int (:szDecimals market))]
+                  (if (and (seq base-coin) (number? decimals))
+                    (assoc m base-coin decimals)
+                    m))
+                m))
+            {}
+            (vals market-by-key))
+    {}))
+
+(defn- build-token-usdc-price-map-from-spot-ctxs [spot-meta spot-asset-ctxs]
+  (let [usdc-token-idx (usdc-token-idx spot-meta)
         base-prices (if (some? usdc-token-idx)
                       {usdc-token-idx 1}
                       {})]
@@ -208,12 +285,12 @@
         (reduce (fn [m {:keys [tokens index]}]
                   (let [[base quote] tokens
                         ctx (nth ctxs index nil)
-                        mark-px (parse-num (:markPx ctx))]
+                        mark-px (parse-optional-num (:markPx ctx))]
                     (cond
-                      (and (= quote usdc-token-idx) (pos? mark-px))
+                      (and (= quote usdc-token-idx) (number? mark-px) (pos? mark-px))
                       (assoc m base mark-px)
 
-                      (and (= base usdc-token-idx) (pos? mark-px))
+                      (and (= base usdc-token-idx) (number? mark-px) (pos? mark-px))
                       (assoc m quote (/ 1 mark-px))
 
                       :else m)))
@@ -221,9 +298,46 @@
                 (:universe spot-meta)))
       base-prices)))
 
+(defn- build-token-usdc-price-map-from-market-state [spot-meta market-by-key]
+  (let [usdc-token-idx (usdc-token-idx spot-meta)
+        base-prices (if (some? usdc-token-idx)
+                      {usdc-token-idx 1}
+                      {})]
+    (if (and (some? usdc-token-idx)
+             (seq (:universe spot-meta))
+             (map? market-by-key))
+      (reduce (fn [m {:keys [name tokens]}]
+                (let [[base quote] tokens
+                      mark-px (spot-market-mark-px market-by-key name)]
+                  (cond
+                    (and (= quote usdc-token-idx) (number? mark-px) (pos? mark-px))
+                    (assoc m base mark-px)
+
+                    (and (= base usdc-token-idx) (number? mark-px) (pos? mark-px))
+                    (assoc m quote (/ 1 mark-px))
+
+                    :else m)))
+              base-prices
+              (:universe spot-meta))
+      base-prices)))
+
+(defn- build-token-usdc-price-map [spot-meta spot-asset-ctxs market-by-key]
+  (let [market-state-prices (build-token-usdc-price-map-from-market-state spot-meta market-by-key)
+        ctx-prices (build-token-usdc-price-map-from-spot-ctxs spot-meta spot-asset-ctxs)]
+    ;; Prefer direct spotAssetCtxs when available; fall back to market projection prices.
+    (merge market-state-prices ctx-prices)))
+
 (defn- spot-token-usdc-price [price-by-token token-idx coin]
   (or (get price-by-token token-idx)
       (when (usdc-coin? coin) 1)))
+
+(defn- spot-coin-usdc-price [price-by-coin coin]
+  (let [coin-key (normalize-coin-code coin)
+        base-key (normalize-coin-code (some-> (parse-coin-namespace coin)
+                                              :base))]
+    (or (get price-by-coin coin-key)
+        (get price-by-coin base-key)
+        (when (usdc-coin? coin) 1))))
 
 (defn- maybe-warn-usdc-valuation-invariant! [coin total-num usdc-value]
   (when (and ^boolean goog.DEBUG
@@ -236,10 +350,34 @@
                                :total-balance total-num
                                :usdc-value usdc-value}))))
 
-(defn- spot-balance-valuation [price-by-token coin token total]
-  (let [token-idx (if (string? token) (js/parseInt token) token)
+(defn- normalize-spot-token-index [token]
+  (cond
+    (number? token) (js/Math.floor token)
+    (string? token) (let [token* (str/trim token)
+                          token* (if (str/starts-with? token* "@")
+                                   (subs token* 1)
+                                   token*)
+                          parsed (js/parseInt token* 10)]
+                      (when (and (seq token*) (not (js/isNaN parsed)))
+                        parsed))
+    :else nil))
+
+(def ^:private spot-entry-notional-keys
+  [:entryNtl :entryNotional :entryNtlUsd :entryNtlUSDC :entryValue :entry])
+
+(defn- spot-entry-notional [balance]
+  (some (fn [k]
+          (let [value (get balance k)
+                parsed (parse-optional-num value)]
+            (when (number? parsed)
+              parsed)))
+        spot-entry-notional-keys))
+
+(defn- spot-balance-valuation [price-by-token price-by-coin coin token total]
+  (let [token-idx (normalize-spot-token-index token)
         total-num (parse-num total)
-        price (spot-token-usdc-price price-by-token token-idx coin)
+        price (or (spot-token-usdc-price price-by-token token-idx coin)
+                  (spot-coin-usdc-price price-by-coin coin))
         usdc-value (if (number? price) (* total-num price) 0)]
     (maybe-warn-usdc-valuation-invariant! coin total-num usdc-value)
     {:token-idx token-idx
@@ -292,12 +430,15 @@
   ([webdata2 spot-data]
    (build-balance-rows webdata2 spot-data nil))
   ([webdata2 spot-data account]
+   (build-balance-rows webdata2 spot-data account nil))
+  ([webdata2 spot-data account market-by-key]
   (let [clearinghouse-state (:clearinghouseState webdata2)
         unified? (unified-account-mode? account)
         spot-meta (:meta spot-data)
         spot-state (:clearinghouse-state spot-data)
         spot-asset-ctxs (:spotAssetCtxs webdata2)
-        price-by-token (build-token-usdc-price-map spot-meta spot-asset-ctxs)
+        price-by-token (build-token-usdc-price-map spot-meta spot-asset-ctxs market-by-key)
+        price-by-coin (build-coin-usdc-price-map-from-market-state market-by-key)
         token-by-index (into {}
                              (keep (fn [{:keys [index] :as token}]
                                      (when (some? index)
@@ -307,6 +448,7 @@
                              (map (fn [{:keys [index weiDecimals szDecimals]}]
                                     [index (or weiDecimals szDecimals 2)]))
                              (:tokens spot-meta))
+        coin-decimals (build-coin-decimals-map-from-market-state market-by-key)
         perps-row (when clearinghouse-state
                     (let [account-value (parse-num (get-in clearinghouse-state [:marginSummary :accountValue]))
                           total-margin-used (parse-num (get-in clearinghouse-state [:marginSummary :totalMarginUsed]))
@@ -320,15 +462,18 @@
                        :pnl-pct nil
                        :amount-decimals nil}))
         spot-rows (when (seq (get spot-state :balances))
-                    (map (fn [{:keys [coin token hold total entryNtl]}]
+                    (map (fn [{:keys [coin token hold total] :as balance}]
                            (let [{:keys [token-idx total-num price usdc-value]}
-                                 (spot-balance-valuation price-by-token coin token total)
+                                 (spot-balance-valuation price-by-token price-by-coin coin token total)
                                  token-meta (get token-by-index token-idx)
-                                 decimals (get token-decimals token-idx)
+                                 decimals (or (get token-decimals token-idx)
+                                              (get coin-decimals (normalize-coin-code coin)))
                                  hold-num (parse-num hold)
                                  available-num (- total-num hold-num)
-                                 entry-num (parse-num entryNtl)
-                                 pnl-value (when (and price (pos? entry-num))
+                                 entry-num (spot-entry-notional balance)
+                                 pnl-value (when (and (number? price)
+                                                      (number? entry-num)
+                                                      (pos? entry-num))
                                              (- usdc-value entry-num))
                                  pnl-pct (when (and pnl-value (pos? entry-num))
                                            (* 100 (/ pnl-value entry-num)))
@@ -338,7 +483,7 @@
                                  contract-id (when-not (= coin "USDC")
                                                (normalize-balance-contract-id
                                                 (:tokenId token-meta)))]
-                             {:key (str "spot-" token-idx)
+                             {:key (str "spot-" (or token-idx coin))
                               :coin coin-label
                               :total-balance total-num
                               :available-balance available-num
