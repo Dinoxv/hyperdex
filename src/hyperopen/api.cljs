@@ -5,6 +5,7 @@
             [hyperopen.api.endpoints.orders :as order-endpoints]
             [hyperopen.api.info-client :as info-client]
             [hyperopen.api.projections :as api-projections]
+            [hyperopen.api.runtime :as api-runtime]
             [hyperopen.domain.funding-history :as funding-history]
             [hyperopen.platform :as platform]))
 
@@ -15,13 +16,11 @@
   (merge info-client/default-config
          {:info-url info-url}))
 
-(defonce ^:private info-client-instance
-  (atom (info-client/make-info-client
-         {:config default-info-client-config
-          :log-fn println})))
-
-(defonce ^:private public-webdata2-cache (atom nil))
-(defonce ^:private ensure-perp-dexs-flight (atom nil))
+(defonce ^:private api-runtime-instance
+  (atom (api-runtime/make-runtime
+         {:info-client (info-client/make-info-client
+                        {:config default-info-client-config
+                         :log-fn println})})))
 
 (declare request-spot-clearinghouse-state!)
 (declare request-user-abstraction!)
@@ -33,7 +32,11 @@
 
 (defn- active-info-client
   []
-  @info-client-instance)
+  (api-runtime/info-client @api-runtime-instance))
+
+(defn- active-api-runtime
+  []
+  @api-runtime-instance)
 
 (defn funding-position-side
   [signed-size]
@@ -78,38 +81,6 @@
   (let [filters* (normalize-funding-history-filters filters)]
     (funding-history/filter-funding-history-rows rows filters*)))
 
-(defn- normalize-priority
-  [priority]
-  ((:normalize-priority (active-info-client)) priority))
-
-(defn- wait-ms
-  [ms]
-  ((:wait-ms (active-info-client)) ms))
-
-(defn- maybe-wait-for-cooldown!
-  []
-  ((:maybe-wait-for-cooldown! (active-info-client))))
-
-(defn- enqueue-request!
-  [priority request-fn]
-  ((:enqueue-request! (active-info-client)) priority request-fn))
-
-(defn- enqueue-info-request!
-  [priority request-fn]
-  ((:enqueue-info-request! (active-info-client)) priority request-fn))
-
-(defn- track-rate-limit!
-  []
-  ((:track-rate-limit! (active-info-client))))
-
-(defn- mark-rate-limit-cooldown!
-  [delay-ms]
-  ((:mark-rate-limit-cooldown! (active-info-client)) delay-ms))
-
-(defn- with-single-flight!
-  [dedupe-key promise-fn]
-  ((:with-single-flight! (active-info-client)) dedupe-key promise-fn))
-
 (defn get-request-stats
   []
   ((:get-request-stats (active-info-client))))
@@ -117,8 +88,7 @@
 (defn reset-request-runtime!
   []
   ((:reset! (active-info-client)))
-  (reset! public-webdata2-cache nil)
-  (reset! ensure-perp-dexs-flight nil)
+  (api-runtime/reset-runtime! (active-api-runtime))
   nil)
 
 (defn- post-info!
@@ -349,10 +319,11 @@
   ([store]
    (ensure-perp-dexs-data! store {}))
   ([store opts]
-   (let [existing (get-in @store [:perp-dexs])]
+   (let [runtime (active-api-runtime)
+         existing (get-in @store [:perp-dexs])]
      (if (seq existing)
        (js/Promise.resolve existing)
-       (if-let [inflight @ensure-perp-dexs-flight]
+       (if-let [inflight (api-runtime/ensure-perp-dexs-flight runtime)]
          inflight
          (let [tracked-ref (atom nil)
                tracked (-> (request-perp-dexs!
@@ -360,11 +331,11 @@
                                    opts))
                            (.finally
                             (fn []
-                              (let [tracked* @tracked-ref]
-                                (when (identical? @ensure-perp-dexs-flight tracked*)
-                                  (reset! ensure-perp-dexs-flight nil))))))]
+                              (api-runtime/clear-ensure-perp-dexs-flight-if-tracked!
+                               runtime
+                               @tracked-ref))))]
            (reset! tracked-ref tracked)
-           (reset! ensure-perp-dexs-flight tracked)
+           (api-runtime/set-ensure-perp-dexs-flight! runtime tracked)
            tracked))))))
 
 (defn ensure-spot-meta-data!
@@ -392,15 +363,16 @@
   ([]
    (ensure-public-webdata2! {}))
   ([opts]
-   (let [force? (boolean (:force? opts))
+   (let [runtime (active-api-runtime)
+         force? (boolean (:force? opts))
          opts* (dissoc opts :force?)]
-     (if (and (not force?) @public-webdata2-cache)
-       (js/Promise.resolve @public-webdata2-cache)
+     (if (and (not force?) (some? (api-runtime/public-webdata2-cache runtime)))
+       (js/Promise.resolve (api-runtime/public-webdata2-cache runtime))
        (-> (fetch-public-webdata2!
             (merge {:dedupe-key :public-webdata2}
                    opts*))
            (.then (fn [snapshot]
-                    (reset! public-webdata2-cache snapshot)
+                    (api-runtime/set-public-webdata2-cache! runtime snapshot)
                     snapshot)))))))
 
 (defn fetch-asset-selector-markets!

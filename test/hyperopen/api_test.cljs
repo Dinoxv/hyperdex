@@ -48,7 +48,8 @@
 
 (deftest scheduler-prioritizes-high-after-saturation-test
   (async done
-    (let [enqueue-request! @#'hyperopen.api/enqueue-request!
+    (let [client (info-client/make-info-client {:log-fn (fn [& _])})
+          enqueue-request! (:enqueue-request! client)
           started (atom [])
           releases (atom {})
           make-task (fn [label]
