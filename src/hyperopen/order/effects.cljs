@@ -63,7 +63,9 @@
 
 (defn- refresh-open-orders-snapshot!
   [store address dex opts]
-  (-> (api/request-frontend-open-orders! address dex opts)
+  (-> (api/request-frontend-open-orders! address
+                                         (cond-> (or opts {})
+                                           (and dex (not= dex "")) (assoc :dex dex)))
       (.then (fn [rows]
                (swap! store api-projections/apply-open-orders-success dex rows)
                rows))

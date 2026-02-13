@@ -82,7 +82,8 @@
      (fn []
        ;; Guard against stale async callbacks for an old address.
        (when (= address (get-in @store [:wallet :address]))
-         (fetch-frontend-open-orders! store address dex {:priority :low})
+         (fetch-frontend-open-orders! store address {:dex dex
+                                                     :priority :low})
          (fetch-clearinghouse-state! store address dex {:priority :low})))
      (* per-dex-stagger-ms (inc idx)))))
 

@@ -166,20 +166,16 @@
 
 (defn request-frontend-open-orders!
   ([address]
-   (order-gateway/request-frontend-open-orders!
-    {:post-info! post-info!}
-    address))
-  ([address dex-or-opts]
+   (request-frontend-open-orders! address {}))
+  ([address opts]
    (order-gateway/request-frontend-open-orders!
     {:post-info! post-info!}
     address
-    dex-or-opts))
+    opts))
   ([address dex opts]
-   (order-gateway/request-frontend-open-orders!
-    {:post-info! post-info!}
-    address
-    dex
-    opts)))
+   (request-frontend-open-orders! address
+                                  (cond-> (or opts {})
+                                    (and dex (not= dex "")) (assoc :dex dex)))))
 
 (defn fetch-frontend-open-orders!
   ([store address]
@@ -187,22 +183,20 @@
     {:log-fn (api-log-fn)
      :request-frontend-open-orders! request-frontend-open-orders!}
     store
-    address))
-  ([store address dex-or-opts]
+    address
+    {}))
+  ([store address opts]
    (api-compat/fetch-frontend-open-orders!
     {:log-fn (api-log-fn)
      :request-frontend-open-orders! request-frontend-open-orders!}
     store
     address
-    dex-or-opts))
+    opts))
   ([store address dex opts]
-   (api-compat/fetch-frontend-open-orders!
-    {:log-fn (api-log-fn)
-     :request-frontend-open-orders! request-frontend-open-orders!}
-    store
-    address
-    dex
-    opts)))
+   (fetch-frontend-open-orders! store
+                                address
+                                (cond-> (or opts {})
+                                  (and dex (not= dex "")) (assoc :dex dex)))))
 
 (defn request-user-fills!
   ([address]

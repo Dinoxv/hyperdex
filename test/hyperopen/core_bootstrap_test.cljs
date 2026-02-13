@@ -308,11 +308,9 @@
       (set! api/request-frontend-open-orders!
             (fn request-frontend-open-orders-mock
               ([address]
-               (request-frontend-open-orders-mock address nil {}))
-              ([address dex-or-opts]
-               (if (map? dex-or-opts)
-                 (request-frontend-open-orders-mock address nil dex-or-opts)
-                 (request-frontend-open-orders-mock address dex-or-opts {})))
+               (request-frontend-open-orders-mock address {}))
+              ([address opts]
+               (request-frontend-open-orders-mock address (:dex opts) (dissoc opts :dex)))
               ([address dex opts]
                (swap! stage-a-calls conj [:open-orders [address dex opts]])
                (js/Promise.resolve nil))))
@@ -1408,11 +1406,9 @@
       (set! api/request-frontend-open-orders!
             (fn request-frontend-open-orders-mock
               ([address]
-               (request-frontend-open-orders-mock address nil {}))
-              ([address dex-or-opts]
-               (if (map? dex-or-opts)
-                 (request-frontend-open-orders-mock address nil dex-or-opts)
-                 (request-frontend-open-orders-mock address dex-or-opts {})))
+               (request-frontend-open-orders-mock address {}))
+              ([address opts]
+               (request-frontend-open-orders-mock address (:dex opts) (dissoc opts :dex)))
               ([address dex opts]
                (swap! refresh-calls conj [address dex opts])
                (js/Promise.resolve []))))

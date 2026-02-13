@@ -42,25 +42,28 @@
 
 (defn fetch-frontend-open-orders!
   ([deps store address]
-   (fetch-frontend-open-orders! deps store address nil {}))
-  ([deps store address dex-or-opts]
-   (if (map? dex-or-opts)
-     (fetch-frontend-open-orders! deps store address nil dex-or-opts)
-     (fetch-frontend-open-orders! deps store address dex-or-opts {})))
+   (fetch-frontend-open-orders! deps store address {}))
+  ([deps store address opts]
+   (order-gateway/fetch-frontend-open-orders!
+    {:log-fn (:log-fn deps)
+     :request-frontend-open-orders! (:request-frontend-open-orders! deps)
+     :apply-open-orders-success api-projections/apply-open-orders-success
+     :apply-open-orders-error api-projections/apply-open-orders-error}
+    store
+    address
+    opts))
   ([{:keys [log-fn request-frontend-open-orders!]}
     store
     address
     dex
     opts]
-   (order-gateway/fetch-frontend-open-orders!
+   (fetch-frontend-open-orders!
     {:log-fn log-fn
-     :request-frontend-open-orders! request-frontend-open-orders!
-     :apply-open-orders-success api-projections/apply-open-orders-success
-     :apply-open-orders-error api-projections/apply-open-orders-error}
+     :request-frontend-open-orders! request-frontend-open-orders!}
     store
     address
-    dex
-    opts)))
+    (cond-> (or opts {})
+      (and dex (not= dex "")) (assoc :dex dex)))))
 
 (defn fetch-user-fills!
   [{:keys [log-fn request-user-fills!]}

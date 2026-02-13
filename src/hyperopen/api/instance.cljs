@@ -138,17 +138,16 @@
   [post-info! log-fn]
   (letfn [(request-frontend-open-orders!
             ([address]
-             (request-frontend-open-orders! address nil {}))
-            ([address dex-or-opts]
-             (if (map? dex-or-opts)
-               (request-frontend-open-orders! address nil dex-or-opts)
-               (request-frontend-open-orders! address dex-or-opts {})))
-            ([address dex opts]
+             (request-frontend-open-orders! address {}))
+            ([address opts]
              (order-gateway/request-frontend-open-orders!
               {:post-info! post-info!}
               address
-              dex
-              opts)))
+              opts))
+            ([address dex opts]
+             (request-frontend-open-orders! address
+                                            (cond-> (or opts {})
+                                              (and dex (not= dex "")) (assoc :dex dex)))))
           (request-user-fills!
             ([address]
              (request-user-fills! address {}))

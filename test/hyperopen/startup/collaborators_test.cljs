@@ -38,7 +38,7 @@
                                           (js/Promise.resolve {:phase :full
                                                                :market-state {:markets []}}))
         api-instance {:get-request-stats get-request-stats*
-                      :request-frontend-open-orders! (fn [_address _dex _opts] (js/Promise.resolve []))
+                      :request-frontend-open-orders! (fn [_address _opts] (js/Promise.resolve []))
                       :request-clearinghouse-state! (fn [_address _dex _opts] (js/Promise.resolve nil))
                       :request-user-fills! (fn [_address _opts] (js/Promise.resolve []))
                       :request-spot-clearinghouse-state! (fn [_address _opts] (js/Promise.resolve nil))
@@ -55,7 +55,7 @@
     (let [calls (atom 0)
           deps (collaborators/startup-base-deps
                 {:api {:get-request-stats (fn [] {:source :injected})
-                       :request-frontend-open-orders! (fn [_address _dex _opts] (js/Promise.resolve []))
+                       :request-frontend-open-orders! (fn [_address _opts] (js/Promise.resolve []))
                        :request-clearinghouse-state! (fn [_address _dex _opts] (js/Promise.resolve nil))
                        :request-user-fills! (fn [_address _opts] (js/Promise.resolve []))
                        :request-spot-clearinghouse-state! (fn [_address _opts] (js/Promise.resolve nil))

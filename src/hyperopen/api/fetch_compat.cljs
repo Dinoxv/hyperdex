@@ -69,16 +69,17 @@
            apply-open-orders-error]}
    store
    address
-   dex
    opts]
-  (-> (request-frontend-open-orders! address dex opts)
+  (let [opts* (or opts {})
+        dex (:dex opts*)]
+    (-> (request-frontend-open-orders! address opts*)
       (.then (fn [data]
                (swap! store apply-open-orders-success dex data)
                data))
       (.catch (fn [err]
                 (log-fn "Error fetching open orders:" err)
                 (swap! store apply-open-orders-error err)
-                (js/Promise.reject err)))))
+                (js/Promise.reject err))))))
 
 (defn fetch-user-fills!
   [{:keys [log-fn

@@ -20,12 +20,17 @@
 (deftest fetch-frontend-open-orders-projects-by-dex-test
   (async done
     (let [store (atom {:orders {}})
+          calls (atom [])
           deps {:log-fn (fn [& _] nil)
-                :request-frontend-open-orders! (fn [_address _dex _opts]
+                :request-frontend-open-orders! (fn [_address opts]
+                                                 (swap! calls conj opts)
                                                  (js/Promise.resolve [{:oid 7 :coin "ETH"}]))}]
       (-> (api-compat/fetch-frontend-open-orders! deps store "0xabc" "dex-a" {:priority :high})
           (.then (fn [rows]
                    (is (= [{:oid 7 :coin "ETH"}] rows))
+                   (is (= [{:dex "dex-a"
+                            :priority :high}]
+                          @calls))
                    (is (= rows
                           (get-in @store [:orders :open-orders-snapshot-by-dex "dex-a"])))
                    (done)))

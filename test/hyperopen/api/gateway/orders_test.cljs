@@ -21,8 +21,8 @@
                    (orders-gateway/request-frontend-open-orders!
                     deps
                     "0xabc"
-                    "dex-a"
-                    {:priority :high})))
+                    {:dex "dex-a"
+                     :priority :high})))
           (.then (fn []
                    (is (= {"type" "frontendOpenOrders"
                            "user" "0xabc"
@@ -30,6 +30,18 @@
                           (get-in @calls [1 :body])))
                    (is (= {:priority :high}
                           (get-in @calls [1 :opts])))
+                   (orders-gateway/request-frontend-open-orders!
+                    deps
+                    "0xabc"
+                    "dex-b"
+                    {:priority :low})))
+          (.then (fn []
+                   (is (= {"type" "frontendOpenOrders"
+                           "user" "0xabc"
+                           "dex" "dex-b"}
+                          (get-in @calls [2 :body])))
+                   (is (= {:priority :low}
+                          (get-in @calls [2 :opts])))
                    (done)))
           (.catch (fn [err]
                     (is false (str "Unexpected error: " err))

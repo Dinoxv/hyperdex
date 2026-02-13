@@ -34,19 +34,21 @@
 
 (defn- fetch-frontend-open-orders!
   ([api-ops store address]
-   (fetch-frontend-open-orders! api-ops store address nil {}))
-  ([api-ops store address dex-or-opts]
-   (if (map? dex-or-opts)
-     (fetch-frontend-open-orders! api-ops store address nil dex-or-opts)
-     (fetch-frontend-open-orders! api-ops store address dex-or-opts {})))
-  ([{:keys [request-frontend-open-orders!]} store address dex opts]
-   (-> (request-frontend-open-orders! address dex opts)
+   (fetch-frontend-open-orders! api-ops store address {}))
+  ([{:keys [request-frontend-open-orders!]} store address opts]
+   (let [opts* (or opts {})
+         dex (:dex opts*)]
+     (-> (request-frontend-open-orders! address opts*)
        (.then (fn [rows]
                 (swap! store api-projections/apply-open-orders-success dex rows)
                 rows))
        (.catch (fn [err]
                  (swap! store api-projections/apply-open-orders-error err)
                  (js/Promise.reject err))))))
+  ([api-ops store address dex opts]
+   (fetch-frontend-open-orders! api-ops store address
+                                (cond-> (or opts {})
+                                  (and dex (not= dex "")) (assoc :dex dex)))))
 
 (defn- fetch-clearinghouse-state!
   ([api-ops store address dex]
@@ -150,8 +152,8 @@
       :fetch-frontend-open-orders! (fn
                                      ([store address]
                                       (fetch-frontend-open-orders! api-ops store address))
-                                     ([store address dex-or-opts]
-                                      (fetch-frontend-open-orders! api-ops store address dex-or-opts))
+                                     ([store address opts]
+                                      (fetch-frontend-open-orders! api-ops store address opts))
                                      ([store address dex opts]
                                       (fetch-frontend-open-orders! api-ops store address dex opts)))
       :fetch-clearinghouse-state! (fn
