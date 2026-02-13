@@ -1,8 +1,8 @@
 (ns hyperopen.api
   (:require [hyperopen.api.endpoints.account :as account-endpoints]
             [hyperopen.api.endpoints.market :as market-endpoints]
-            [hyperopen.api.endpoints.orders :as order-endpoints]
             [hyperopen.api.fetch-compat :as fetch-compat]
+            [hyperopen.api.gateway.orders :as order-gateway]
             [hyperopen.api.info-client :as info-client]
             [hyperopen.api.market-loader :as market-loader]
             [hyperopen.api.projections :as api-projections]
@@ -167,27 +167,43 @@
 
 (defn request-frontend-open-orders!
   ([address]
-   (request-frontend-open-orders! address nil {}))
+   (order-gateway/request-frontend-open-orders!
+    {:post-info! post-info!}
+    address))
   ([address dex-or-opts]
-   (if (map? dex-or-opts)
-     (request-frontend-open-orders! address nil dex-or-opts)
-     (request-frontend-open-orders! address dex-or-opts {})))
+   (order-gateway/request-frontend-open-orders!
+    {:post-info! post-info!}
+    address
+    dex-or-opts))
   ([address dex opts]
-   (order-endpoints/request-frontend-open-orders! post-info! address dex opts)))
+   (order-gateway/request-frontend-open-orders!
+    {:post-info! post-info!}
+    address
+    dex
+    opts)))
+
+(defn- open-orders-fetch-deps
+  []
+  {:log-fn (api-log-fn)
+   :request-frontend-open-orders! request-frontend-open-orders!
+   :apply-open-orders-success api-projections/apply-open-orders-success
+   :apply-open-orders-error api-projections/apply-open-orders-error})
 
 (defn fetch-frontend-open-orders!
   ([store address]
-   (fetch-frontend-open-orders! store address nil {}))
+   (order-gateway/fetch-frontend-open-orders!
+    (open-orders-fetch-deps)
+    store
+    address))
   ([store address dex-or-opts]
-  (if (map? dex-or-opts)
-     (fetch-frontend-open-orders! store address nil dex-or-opts)
-     (fetch-frontend-open-orders! store address dex-or-opts {})))
+   (order-gateway/fetch-frontend-open-orders!
+    (open-orders-fetch-deps)
+    store
+    address
+    dex-or-opts))
   ([store address dex opts]
-   (fetch-compat/fetch-frontend-open-orders!
-    {:log-fn (api-log-fn)
-     :request-frontend-open-orders! request-frontend-open-orders!
-     :apply-open-orders-success api-projections/apply-open-orders-success
-     :apply-open-orders-error api-projections/apply-open-orders-error}
+   (order-gateway/fetch-frontend-open-orders!
+    (open-orders-fetch-deps)
     store
     address
     dex
@@ -197,31 +213,39 @@
   ([address]
    (request-user-fills! address {}))
   ([address opts]
-   (order-endpoints/request-user-fills! post-info! address opts)))
+   (order-gateway/request-user-fills!
+    {:post-info! post-info!}
+    address
+    opts)))
+
+(defn- user-fills-fetch-deps
+  []
+  {:log-fn (api-log-fn)
+   :request-user-fills! request-user-fills!
+   :apply-user-fills-success api-projections/apply-user-fills-success
+   :apply-user-fills-error api-projections/apply-user-fills-error})
 
 (defn fetch-user-fills!
   ([store address]
    (fetch-user-fills! store address {}))
   ([store address opts]
-   (fetch-compat/fetch-user-fills!
-    {:log-fn (api-log-fn)
-     :request-user-fills! request-user-fills!
-     :apply-user-fills-success api-projections/apply-user-fills-success
-     :apply-user-fills-error api-projections/apply-user-fills-error}
+   (order-gateway/fetch-user-fills!
+    (user-fills-fetch-deps)
     store
     address
     opts)))
+
+(defn- historical-orders-fetch-deps
+  []
+  {:log-fn (api-log-fn)
+   :post-info! post-info!})
 
 (defn fetch-historical-orders!
   ([store address]
    (fetch-historical-orders! store address {}))
   ([_store address opts]
-   (fetch-compat/fetch-historical-orders!
-    {:log-fn (api-log-fn)
-     :request-historical-orders! (fn [requested-address request-opts]
-                                   (order-endpoints/request-historical-orders! post-info!
-                                                                              requested-address
-                                                                              request-opts))}
+   (order-gateway/fetch-historical-orders!
+    (historical-orders-fetch-deps)
     address
     opts)))
 
@@ -229,7 +253,10 @@
   ([address]
    (request-historical-orders! address {}))
   ([address opts]
-   (fetch-historical-orders! nil address opts)))
+   (order-gateway/request-historical-orders!
+    {:fetch-historical-orders! fetch-historical-orders!}
+    address
+    opts)))
 
 (defn fetch-user-funding-history!
   ([store address]
