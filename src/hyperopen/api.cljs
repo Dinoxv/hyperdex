@@ -1,9 +1,9 @@
 (ns hyperopen.api
-  (:require [hyperopen.api.gateway.account :as account-gateway]
+  (:require [hyperopen.api.compat :as api-compat]
+            [hyperopen.api.gateway.account :as account-gateway]
             [hyperopen.api.gateway.market :as market-gateway]
             [hyperopen.api.gateway.orders :as order-gateway]
             [hyperopen.api.info-client :as info-client]
-            [hyperopen.api.projections :as api-projections]
             [hyperopen.api.service :as api-service]
             [hyperopen.domain.funding-history :as funding-history]
             [hyperopen.platform :as platform]))
@@ -15,10 +15,14 @@
   (merge info-client/default-config
          {:info-url info-url}))
 
-(defonce ^:private api-service-instance
+(defn- make-default-api-service
+  []
   (api-service/make-service
    {:info-client-config default-info-client-config
     :log-fn println}))
+
+(defonce ^:private api-facade-state
+  (atom {:service (make-default-api-service)}))
 
 (declare request-spot-clearinghouse-state!)
 (declare request-user-abstraction!)
@@ -30,7 +34,29 @@
 
 (defn- active-api-service
   []
-  api-service-instance)
+  (:service @api-facade-state))
+
+(defn install-api-service!
+  [service]
+  (swap! api-facade-state assoc :service service)
+  nil)
+
+(defn configure-api-service!
+  [opts]
+  (let [opts* (or opts {})
+        configured-info-client
+        (if (contains? opts* :info-client-config)
+          (merge default-info-client-config
+                 (:info-client-config opts*))
+          default-info-client-config)
+        service-opts (merge {:info-client-config configured-info-client
+                             :log-fn println}
+                            (dissoc opts* :info-client-config))]
+    (install-api-service! (api-service/make-service service-opts))))
+
+(defn reset-api-service!
+  []
+  (install-api-service! (make-default-api-service)))
 
 (defn- api-log-fn
   []
@@ -83,11 +109,9 @@
   ([store]
    (fetch-asset-contexts! store {}))
   ([store opts]
-   (market-gateway/fetch-asset-contexts!
+   (api-compat/fetch-asset-contexts!
     {:log-fn (api-log-fn)
-     :request-asset-contexts! request-asset-contexts!
-     :apply-asset-contexts-success api-projections/apply-asset-contexts-success
-     :apply-asset-contexts-error api-projections/apply-asset-contexts-error}
+     :request-asset-contexts! request-asset-contexts!}
     store
     opts)))
 
@@ -114,11 +138,9 @@
   ([store]
    (fetch-perp-dexs! store {}))
   ([store opts]
-   (market-gateway/fetch-perp-dexs!
+   (api-compat/fetch-perp-dexs!
     {:log-fn (api-log-fn)
-     :request-perp-dexs! request-perp-dexs!
-     :apply-perp-dexs-success api-projections/apply-perp-dexs-success
-     :apply-perp-dexs-error api-projections/apply-perp-dexs-error}
+     :request-perp-dexs! request-perp-dexs!}
     store
     opts)))
 
@@ -138,11 +160,9 @@
    Defaults to :1d interval and 330 bars if not specified."
   [store & {:keys [interval bars priority]
             :or {interval :1d bars 330 priority :high}}]
-  (market-gateway/fetch-candle-snapshot!
+  (api-compat/fetch-candle-snapshot!
    {:log-fn (api-log-fn)
-    :request-candle-snapshot! request-candle-snapshot!
-    :apply-candle-snapshot-success api-projections/apply-candle-snapshot-success
-    :apply-candle-snapshot-error api-projections/apply-candle-snapshot-error}
+    :request-candle-snapshot! request-candle-snapshot!}
    store
    {:interval interval
     :bars bars
@@ -165,28 +185,24 @@
     dex
     opts)))
 
-(defn- open-orders-fetch-deps
-  []
-  {:log-fn (api-log-fn)
-   :request-frontend-open-orders! request-frontend-open-orders!
-   :apply-open-orders-success api-projections/apply-open-orders-success
-   :apply-open-orders-error api-projections/apply-open-orders-error})
-
 (defn fetch-frontend-open-orders!
   ([store address]
-   (order-gateway/fetch-frontend-open-orders!
-    (open-orders-fetch-deps)
+   (api-compat/fetch-frontend-open-orders!
+    {:log-fn (api-log-fn)
+     :request-frontend-open-orders! request-frontend-open-orders!}
     store
     address))
   ([store address dex-or-opts]
-   (order-gateway/fetch-frontend-open-orders!
-    (open-orders-fetch-deps)
+   (api-compat/fetch-frontend-open-orders!
+    {:log-fn (api-log-fn)
+     :request-frontend-open-orders! request-frontend-open-orders!}
     store
     address
     dex-or-opts))
   ([store address dex opts]
-   (order-gateway/fetch-frontend-open-orders!
-    (open-orders-fetch-deps)
+   (api-compat/fetch-frontend-open-orders!
+    {:log-fn (api-log-fn)
+     :request-frontend-open-orders! request-frontend-open-orders!}
     store
     address
     dex
@@ -201,34 +217,24 @@
     address
     opts)))
 
-(defn- user-fills-fetch-deps
-  []
-  {:log-fn (api-log-fn)
-   :request-user-fills! request-user-fills!
-   :apply-user-fills-success api-projections/apply-user-fills-success
-   :apply-user-fills-error api-projections/apply-user-fills-error})
-
 (defn fetch-user-fills!
   ([store address]
    (fetch-user-fills! store address {}))
   ([store address opts]
-   (order-gateway/fetch-user-fills!
-    (user-fills-fetch-deps)
+   (api-compat/fetch-user-fills!
+    {:log-fn (api-log-fn)
+     :request-user-fills! request-user-fills!}
     store
     address
     opts)))
-
-(defn- historical-orders-fetch-deps
-  []
-  {:log-fn (api-log-fn)
-   :post-info! post-info!})
 
 (defn fetch-historical-orders!
   ([store address]
    (fetch-historical-orders! store address {}))
   ([_store address opts]
-   (order-gateway/fetch-historical-orders!
-    (historical-orders-fetch-deps)
+   (api-compat/fetch-historical-orders!
+    {:log-fn (api-log-fn)
+     :post-info! post-info!}
     address
     opts)))
 
@@ -274,12 +280,9 @@
   ([store]
    (fetch-spot-meta! store {}))
   ([store opts]
-   (market-gateway/fetch-spot-meta!
+   (api-compat/fetch-spot-meta!
     {:log-fn (api-log-fn)
-     :request-spot-meta! request-spot-meta!
-     :begin-spot-meta-load api-projections/begin-spot-meta-load
-     :apply-spot-meta-success api-projections/apply-spot-meta-success
-     :apply-spot-meta-error api-projections/apply-spot-meta-error}
+     :request-spot-meta! request-spot-meta!}
     store
     opts)))
 
@@ -313,10 +316,8 @@
   ([store]
    (ensure-perp-dexs! store {}))
   ([store opts]
-   (market-gateway/ensure-perp-dexs!
-    {:ensure-perp-dexs-data! ensure-perp-dexs-data!
-     :apply-perp-dexs-success api-projections/apply-perp-dexs-success
-     :apply-perp-dexs-error api-projections/apply-perp-dexs-error}
+   (api-compat/ensure-perp-dexs!
+    {:ensure-perp-dexs-data! ensure-perp-dexs-data!}
     store
     opts)))
 
@@ -344,10 +345,8 @@
   ([store]
    (ensure-spot-meta! store {}))
   ([store opts]
-   (market-gateway/ensure-spot-meta!
-    {:ensure-spot-meta-data! ensure-spot-meta-data!
-     :apply-spot-meta-success api-projections/apply-spot-meta-success
-     :apply-spot-meta-error api-projections/apply-spot-meta-error}
+   (api-compat/ensure-spot-meta!
+    {:ensure-spot-meta-data! ensure-spot-meta-data!}
     store
     opts)))
 
@@ -368,12 +367,9 @@
   ([store]
    (fetch-asset-selector-markets! store {:phase :full}))
   ([store opts]
-   (market-gateway/fetch-asset-selector-markets!
+   (api-compat/fetch-asset-selector-markets!
     {:log-fn (api-log-fn)
-     :request-asset-selector-markets! request-asset-selector-markets!
-     :begin-asset-selector-load api-projections/begin-asset-selector-load
-     :apply-asset-selector-success api-projections/apply-asset-selector-success
-     :apply-asset-selector-error api-projections/apply-asset-selector-error}
+     :request-asset-selector-markets! request-asset-selector-markets!}
     store
     opts)))
 
@@ -402,12 +398,9 @@
   ([store address]
    (fetch-spot-clearinghouse-state! store address {}))
   ([store address opts]
-   (account-gateway/fetch-spot-clearinghouse-state!
+   (api-compat/fetch-spot-clearinghouse-state!
     {:log-fn (api-log-fn)
-     :request-spot-clearinghouse-state! request-spot-clearinghouse-state!
-     :begin-spot-balances-load api-projections/begin-spot-balances-load
-     :apply-spot-balances-success api-projections/apply-spot-balances-success
-     :apply-spot-balances-error api-projections/apply-spot-balances-error}
+     :request-spot-clearinghouse-state! request-spot-clearinghouse-state!}
     store
     address
     opts)))
@@ -429,11 +422,9 @@
   ([store address]
    (fetch-user-abstraction! store address {}))
   ([store address opts]
-   (account-gateway/fetch-user-abstraction!
+   (api-compat/fetch-user-abstraction!
     {:log-fn (api-log-fn)
-     :request-user-abstraction! request-user-abstraction!
-     :normalize-user-abstraction-mode account-gateway/normalize-user-abstraction-mode
-     :apply-user-abstraction-snapshot api-projections/apply-user-abstraction-snapshot}
+     :request-user-abstraction! request-user-abstraction!}
     store
     address
     opts)))
@@ -462,11 +453,9 @@
   ([store address dex]
    (fetch-clearinghouse-state! store address dex {}))
   ([store address dex opts]
-   (account-gateway/fetch-clearinghouse-state!
+   (api-compat/fetch-clearinghouse-state!
     {:log-fn (api-log-fn)
-     :request-clearinghouse-state! request-clearinghouse-state!
-     :apply-perp-dex-clearinghouse-success api-projections/apply-perp-dex-clearinghouse-success
-     :apply-perp-dex-clearinghouse-error api-projections/apply-perp-dex-clearinghouse-error}
+     :request-clearinghouse-state! request-clearinghouse-state!}
     store
     address
     dex
@@ -477,7 +466,7 @@
   ([store address dex-names]
    (fetch-perp-dex-clearinghouse-states! store address dex-names {}))
   ([store address dex-names opts]
-   (account-gateway/fetch-perp-dex-clearinghouse-states!
+   (api-compat/fetch-perp-dex-clearinghouse-states!
     {:fetch-clearinghouse-state! fetch-clearinghouse-state!}
     store
     address
