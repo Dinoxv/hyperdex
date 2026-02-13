@@ -1,9 +1,10 @@
 (ns hyperopen.api
-  (:require [clojure.string :as str]
-            [hyperopen.api.endpoints.account :as account-endpoints]
+  (:require [hyperopen.api.endpoints.account :as account-endpoints]
             [hyperopen.api.endpoints.market :as market-endpoints]
             [hyperopen.api.endpoints.orders :as order-endpoints]
+            [hyperopen.api.fetch-compat :as fetch-compat]
             [hyperopen.api.info-client :as info-client]
+            [hyperopen.api.market-loader :as market-loader]
             [hyperopen.api.projections :as api-projections]
             [hyperopen.api.runtime :as api-runtime]
             [hyperopen.domain.funding-history :as funding-history]
@@ -108,16 +109,13 @@
   ([store]
    (fetch-asset-contexts! store {}))
   ([store opts]
-   (println "Fetching perpetual asset contexts...")
-   (-> (request-asset-contexts! opts)
-       (.then (fn [normalised]
-                (swap! store api-projections/apply-asset-contexts-success normalised)
-                (println "Loaded" (count normalised) "assets")
-                normalised))
-       (.catch (fn [err]
-                 (println "Error fetching asset contexts:" err)
-                 (swap! store api-projections/apply-asset-contexts-error err)
-                 (js/Promise.reject err))))))
+   (fetch-compat/fetch-asset-contexts!
+    {:log-fn println
+     :request-asset-contexts! request-asset-contexts!
+     :apply-asset-contexts-success api-projections/apply-asset-contexts-success
+     :apply-asset-contexts-error api-projections/apply-asset-contexts-error}
+    store
+    opts)))
 
 (defn fetch-meta-and-asset-ctxs!
   "Fetch metaAndAssetCtxs for the default perp DEX or a named DEX."
@@ -137,15 +135,13 @@
   ([store]
    (fetch-perp-dexs! store {}))
   ([store opts]
-   (println "Fetching perp DEX list...")
-   (-> (request-perp-dexs! opts)
-       (.then (fn [dex-names]
-                (swap! store api-projections/apply-perp-dexs-success dex-names)
-                dex-names))
-       (.catch (fn [err]
-                 (println "Error fetching perp DEX list:" err)
-                 (swap! store api-projections/apply-perp-dexs-error err)
-                 (js/Promise.reject err))))))
+   (fetch-compat/fetch-perp-dexs!
+    {:log-fn println
+     :request-perp-dexs! request-perp-dexs!
+     :apply-perp-dexs-success api-projections/apply-perp-dexs-success
+     :apply-perp-dexs-error api-projections/apply-perp-dexs-error}
+    store
+    opts)))
 
 (defn request-candle-snapshot!
   [coin & {:keys [interval bars priority]
@@ -162,24 +158,15 @@
    Defaults to :1d interval and 330 bars if not specified."
   [store & {:keys [interval bars priority]
             :or {interval :1d bars 330 priority :high}}]
-  (let [active-asset (:active-asset @store)]
-    (if (nil? active-asset)
-      (do
-        (println "No active asset selected, skipping candle fetch")
-        (js/Promise.resolve nil))
-      (let [interval-s (name interval)]
-        (println "Fetching" bars interval-s "bars for" active-asset)
-        (-> (request-candle-snapshot! active-asset
-                                      :interval interval
-                                      :bars bars
-                                      :priority priority)
-            (.then (fn [data]
-                     (swap! store api-projections/apply-candle-snapshot-success active-asset interval data)
-                     data))
-            (.catch (fn [err]
-                      (println "Error fetching" err)
-                      (swap! store api-projections/apply-candle-snapshot-error active-asset interval err)
-                      (js/Promise.reject err))))))))
+  (fetch-compat/fetch-candle-snapshot!
+   {:log-fn println
+    :request-candle-snapshot! request-candle-snapshot!
+    :apply-candle-snapshot-success api-projections/apply-candle-snapshot-success
+    :apply-candle-snapshot-error api-projections/apply-candle-snapshot-error}
+   store
+   {:interval interval
+    :bars bars
+    :priority priority}))
 
 (defn request-frontend-open-orders!
   ([address]
@@ -199,14 +186,15 @@
      (fetch-frontend-open-orders! store address nil dex-or-opts)
      (fetch-frontend-open-orders! store address dex-or-opts {})))
   ([store address dex opts]
-   (-> (request-frontend-open-orders! address dex opts)
-       (.then (fn [data]
-                (swap! store api-projections/apply-open-orders-success dex data)
-                data))
-       (.catch (fn [err]
-                 (println "Error fetching open orders:" err)
-                 (swap! store api-projections/apply-open-orders-error err)
-                 (js/Promise.reject err))))))
+   (fetch-compat/fetch-frontend-open-orders!
+    {:log-fn println
+     :request-frontend-open-orders! request-frontend-open-orders!
+     :apply-open-orders-success api-projections/apply-open-orders-success
+     :apply-open-orders-error api-projections/apply-open-orders-error}
+    store
+    address
+    dex
+    opts)))
 
 (defn request-user-fills!
   ([address]
@@ -218,23 +206,27 @@
   ([store address]
    (fetch-user-fills! store address {}))
   ([store address opts]
-   (-> (request-user-fills! address opts)
-       (.then (fn [data]
-                (swap! store api-projections/apply-user-fills-success data)
-                data))
-       (.catch (fn [err]
-                 (println "Error fetching user fills:" err)
-                 (swap! store api-projections/apply-user-fills-error err)
-                 (js/Promise.reject err))))))
+   (fetch-compat/fetch-user-fills!
+    {:log-fn println
+     :request-user-fills! request-user-fills!
+     :apply-user-fills-success api-projections/apply-user-fills-success
+     :apply-user-fills-error api-projections/apply-user-fills-error}
+    store
+    address
+    opts)))
 
 (defn fetch-historical-orders!
   ([store address]
    (fetch-historical-orders! store address {}))
   ([_store address opts]
-   (-> (order-endpoints/request-historical-orders! post-info! address opts)
-       (.catch (fn [err]
-                 (println "Error fetching historical orders:" err)
-                 (js/Promise.reject err))))))
+   (fetch-compat/fetch-historical-orders!
+    {:log-fn println
+     :request-historical-orders! (fn [requested-address request-opts]
+                                   (order-endpoints/request-historical-orders! post-info!
+                                                                              requested-address
+                                                                              request-opts))}
+    address
+    opts)))
 
 (defn request-historical-orders!
   ([address]
@@ -272,16 +264,14 @@
   ([store]
    (fetch-spot-meta! store {}))
   ([store opts]
-   (println "Fetching spot metadata...")
-   (swap! store api-projections/begin-spot-meta-load)
-   (-> (request-spot-meta! opts)
-       (.then (fn [data]
-                (swap! store api-projections/apply-spot-meta-success data)
-                data))
-       (.catch (fn [err]
-                 (println "Error fetching spot meta:" err)
-                 (swap! store api-projections/apply-spot-meta-error err)
-                 (js/Promise.reject err))))))
+   (fetch-compat/fetch-spot-meta!
+    {:log-fn println
+     :request-spot-meta! request-spot-meta!
+     :begin-spot-meta-load api-projections/begin-spot-meta-load
+     :apply-spot-meta-success api-projections/apply-spot-meta-success
+     :apply-spot-meta-error api-projections/apply-spot-meta-error}
+    store
+    opts)))
 
 (defn fetch-spot-meta-raw!
   "Fetch spot meta and return the parsed response without touching state."
@@ -307,13 +297,12 @@
   ([store]
    (ensure-perp-dexs! store {}))
   ([store opts]
-   (-> (ensure-perp-dexs-data! store opts)
-       (.then (fn [dex-names]
-                (swap! store api-projections/apply-perp-dexs-success dex-names)
-                dex-names))
-       (.catch (fn [err]
-                 (swap! store api-projections/apply-perp-dexs-error err)
-                 (js/Promise.reject err))))))
+   (fetch-compat/ensure-perp-dexs!
+    {:ensure-perp-dexs-data! ensure-perp-dexs-data!
+     :apply-perp-dexs-success api-projections/apply-perp-dexs-success
+     :apply-perp-dexs-error api-projections/apply-perp-dexs-error}
+    store
+    opts)))
 
 (defn ensure-perp-dexs-data!
   ([store]
@@ -351,13 +340,12 @@
   ([store]
    (ensure-spot-meta! store {}))
   ([store opts]
-   (-> (ensure-spot-meta-data! store opts)
-       (.then (fn [meta]
-                (swap! store api-projections/apply-spot-meta-success meta)
-                meta))
-       (.catch (fn [err]
-                 (swap! store api-projections/apply-spot-meta-error err)
-                 (js/Promise.reject err))))))
+   (fetch-compat/ensure-spot-meta!
+    {:ensure-spot-meta-data! ensure-spot-meta-data!
+     :apply-spot-meta-success api-projections/apply-spot-meta-success
+     :apply-spot-meta-error api-projections/apply-spot-meta-error}
+    store
+    opts)))
 
 (defn ensure-public-webdata2!
   ([]
@@ -383,74 +371,49 @@
   ([store]
    (fetch-asset-selector-markets! store {:phase :full}))
   ([store opts]
-   (swap! store api-projections/begin-asset-selector-load
-          (if (= :bootstrap (:phase opts)) :bootstrap :full))
-   (-> (request-asset-selector-markets! store opts)
-       (.then (fn [{:keys [phase market-state]}]
-                (swap! store api-projections/apply-asset-selector-success phase market-state)
-                (:markets market-state)))
-       (.catch
-        (fn [err]
-          (println "Error fetching asset selector markets:" err)
-          (swap! store api-projections/apply-asset-selector-error err)
-          (js/Promise.reject err))))))
+   (fetch-compat/fetch-asset-selector-markets!
+    {:log-fn println
+     :request-asset-selector-markets! request-asset-selector-markets!
+     :begin-asset-selector-load api-projections/begin-asset-selector-load
+     :apply-asset-selector-success api-projections/apply-asset-selector-success
+     :apply-asset-selector-error api-projections/apply-asset-selector-error}
+    store
+    opts)))
 
 (defn request-asset-selector-markets!
   ([store]
    (request-asset-selector-markets! store {:phase :full}))
   ([store opts]
-   (let [phase (if (= :bootstrap (:phase opts)) :bootstrap :full)
-         priority (if (= phase :bootstrap) :high :low)
-         base-promises (js/Promise.all
-                        (clj->js [(ensure-perp-dexs-data! store {:priority priority})
-                                  (ensure-spot-meta-data! store {:priority priority})
-                                  (ensure-public-webdata2! {:priority priority})]))]
-     (println "Fetching asset selector markets. phase:" (name phase))
-     (.then
-      base-promises
-      (fn [[dexs-loaded spot-meta-loaded webdata2]]
-        (let [dexs* (vec (remove nil? dexs-loaded))
-              dexs-with-default (if (= phase :bootstrap)
-                                  [nil]
-                                  (vec (cons nil dexs*)))
-              perp-promises (->> dexs-with-default
-                                 (map (fn [dex]
-                                        (fetch-meta-and-asset-ctxs!
-                                         dex
-                                         {:priority priority})))
-                                 (into-array))
-              spot-asset-ctxs (:spotAssetCtxs webdata2)]
-          (.then
-	           (js/Promise.all perp-promises)
-	           (fn [perp-results]
-	             (let [market-state (market-endpoints/build-market-state
-	                                 now-ms
-	                                 store
-	                                 phase
-	                                 dexs*
-	                                 spot-meta-loaded
-	                                 spot-asset-ctxs
-	                                 (array-seq perp-results))]
-	               {:phase phase
-	                :market-state market-state})))))))))
+   (market-loader/request-asset-selector-markets!
+    {:store store
+     :opts opts
+     :ensure-perp-dexs-data! ensure-perp-dexs-data!
+     :ensure-spot-meta-data! ensure-spot-meta-data!
+     :ensure-public-webdata2! ensure-public-webdata2!
+     :fetch-meta-and-asset-ctxs! fetch-meta-and-asset-ctxs!
+     :build-market-state (fn [runtime-store phase dexs spot-meta spot-asset-ctxs perp-results]
+                           (market-endpoints/build-market-state now-ms
+                                                                runtime-store
+                                                                phase
+                                                                dexs
+                                                                spot-meta
+                                                                spot-asset-ctxs
+                                                                perp-results))
+     :log-fn println})))
 
 (defn fetch-spot-clearinghouse-state!
   ([store address]
    (fetch-spot-clearinghouse-state! store address {}))
   ([store address opts]
-   (if-not address
-     (js/Promise.resolve nil)
-     (do
-      (println "Fetching spot clearinghouse state...")
-      (swap! store api-projections/begin-spot-balances-load)
-       (-> (request-spot-clearinghouse-state! address opts)
-           (.then (fn [data]
-                    (swap! store api-projections/apply-spot-balances-success data)
-                    data))
-           (.catch (fn [err]
-                     (println "Error fetching spot balances:" err)
-                     (swap! store api-projections/apply-spot-balances-error err)
-                     (js/Promise.reject err))))))))
+   (fetch-compat/fetch-spot-clearinghouse-state!
+    {:log-fn println
+     :request-spot-clearinghouse-state! request-spot-clearinghouse-state!
+     :begin-spot-balances-load api-projections/begin-spot-balances-load
+     :apply-spot-balances-success api-projections/apply-spot-balances-success
+     :apply-spot-balances-error api-projections/apply-spot-balances-error}
+    store
+    address
+    opts)))
 
 (defn request-spot-clearinghouse-state!
   ([address]
@@ -466,21 +429,14 @@
   ([store address]
    (fetch-user-abstraction! store address {}))
   ([store address opts]
-   (if-not address
-     (js/Promise.resolve {:mode :classic
-                          :abstraction-raw nil})
-     (let [requested-address (some-> address str str/lower-case)]
-       (-> (request-user-abstraction! address opts)
-           (.then (fn [payload]
-                    (let [abstraction payload
-                          mode (account-endpoints/normalize-user-abstraction-mode abstraction)
-                          snapshot {:mode mode
-                                    :abstraction-raw abstraction}]
-                      (swap! store api-projections/apply-user-abstraction-snapshot requested-address snapshot)
-                      snapshot)))
-           (.catch (fn [err]
-                     (println "Error fetching user abstraction:" err)
-                     (js/Promise.reject err))))))))
+   (fetch-compat/fetch-user-abstraction!
+    {:log-fn println
+     :request-user-abstraction! request-user-abstraction!
+     :normalize-user-abstraction-mode account-endpoints/normalize-user-abstraction-mode
+     :apply-user-abstraction-snapshot api-projections/apply-user-abstraction-snapshot}
+    store
+    address
+    opts)))
 
 (defn request-user-abstraction!
   ([address]
@@ -499,24 +455,24 @@
   ([store address dex]
    (fetch-clearinghouse-state! store address dex {}))
   ([store address dex opts]
-   (-> (request-clearinghouse-state! address dex opts)
-       (.then (fn [data]
-                (swap! store api-projections/apply-perp-dex-clearinghouse-success dex data)
-                data))
-       (.catch (fn [err]
-                 (println "Error fetching clearinghouse state:" err)
-                 (swap! store api-projections/apply-perp-dex-clearinghouse-error err)
-                 (js/Promise.reject err))))))
+   (fetch-compat/fetch-clearinghouse-state!
+    {:log-fn println
+     :request-clearinghouse-state! request-clearinghouse-state!
+     :apply-perp-dex-clearinghouse-success api-projections/apply-perp-dex-clearinghouse-success
+     :apply-perp-dex-clearinghouse-error api-projections/apply-perp-dex-clearinghouse-error}
+    store
+    address
+    dex
+    opts)))
 
 (defn fetch-perp-dex-clearinghouse-states!
   "Fetch clearinghouse state for all named perp DEXes."
   ([store address dex-names]
    (fetch-perp-dex-clearinghouse-states! store address dex-names {}))
   ([store address dex-names opts]
-   (if (and address (seq dex-names))
-     (js/Promise.all
-      (into-array
-       (map (fn [dex]
-              (fetch-clearinghouse-state! store address dex opts))
-            dex-names)))
-     (js/Promise.resolve nil))))
+   (fetch-compat/fetch-perp-dex-clearinghouse-states!
+    {:fetch-clearinghouse-state! fetch-clearinghouse-state!}
+    store
+    address
+    dex-names
+    opts)))
