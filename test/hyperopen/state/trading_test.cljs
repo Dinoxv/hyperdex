@@ -25,6 +25,12 @@
        array-seq
        vec))
 
+(defn- validation-codes
+  [errors]
+  (->> (or errors [])
+       (keep :code)
+       set))
+
 (deftest validate-order-form-test
   (testing "size is required"
     (is (seq (trading/validate-order-form (trading/default-order-form)))))
@@ -60,16 +66,16 @@
                                        :skew "1.00"})]
     (is (empty? (trading/validate-order-form (assoc-in base-scale-form [:scale :skew] "1"))))
     (is (empty? (trading/validate-order-form (assoc-in base-scale-form [:scale :skew] "100"))))
-    (is (contains? (set (trading/validate-order-form (assoc-in base-scale-form [:scale :skew] "0")))
-                   "Scale skew must be greater than 0 and at most 100."))
-    (is (contains? (set (trading/validate-order-form (assoc-in base-scale-form [:scale :skew] "-1")))
-                   "Scale skew must be greater than 0 and at most 100."))
-    (is (contains? (set (trading/validate-order-form (assoc-in base-scale-form [:scale :skew] "101")))
-                   "Scale skew must be greater than 0 and at most 100."))
-    (is (contains? (set (trading/validate-order-form (assoc-in base-scale-form [:scale :skew] "abc")))
-                   "Scale skew must be greater than 0 and at most 100."))
-    (is (contains? (set (trading/validate-order-form (assoc-in base-scale-form [:scale :skew] nil)))
-                   "Scale skew must be greater than 0 and at most 100."))))
+    (is (contains? (validation-codes (trading/validate-order-form (assoc-in base-scale-form [:scale :skew] "0")))
+                   :scale/skew-invalid))
+    (is (contains? (validation-codes (trading/validate-order-form (assoc-in base-scale-form [:scale :skew] "-1")))
+                   :scale/skew-invalid))
+    (is (contains? (validation-codes (trading/validate-order-form (assoc-in base-scale-form [:scale :skew] "101")))
+                   :scale/skew-invalid))
+    (is (contains? (validation-codes (trading/validate-order-form (assoc-in base-scale-form [:scale :skew] "abc")))
+                   :scale/skew-invalid))
+    (is (contains? (validation-codes (trading/validate-order-form (assoc-in base-scale-form [:scale :skew] nil)))
+                   :scale/skew-invalid))))
 
 (deftest scale-count-validation-upper-bound-test
   (let [form (assoc (trading/default-order-form)
@@ -79,8 +85,8 @@
                             :end "110"
                             :count 101
                             :skew "1.00"})]
-    (is (contains? (set (trading/validate-order-form form))
-                   "Scale orders need start/end prices and count between 2 and 100."))
+    (is (contains? (validation-codes (trading/validate-order-form form))
+                   :scale/inputs-invalid))
     (is (empty? (trading/validate-order-form (assoc-in form [:scale :count] 100))))))
 
 (deftest scale-endpoint-min-notional-validation-test
@@ -91,8 +97,8 @@
                             :end "7"
                             :count 20
                             :skew "1.00"})]
-    (is (contains? (set (trading/validate-order-form form))
-                   "Scale start/end orders must each be at least 10 in order value."))))
+    (is (contains? (validation-codes (trading/validate-order-form form))
+                   :scale/endpoint-notional-too-small))))
 
 (deftest normalize-order-form-disables-tpsl-for-scale-test
   (let [form (-> (trading/default-order-form)

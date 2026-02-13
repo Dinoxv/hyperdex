@@ -1,0 +1,347 @@
+(ns hyperopen.domain.trading.market
+  (:require [hyperopen.domain.trading.core :as core]))
+
+(defn available-to-trade [context]
+  (let [clearinghouse (or (:clearinghouse context) {})
+        withdrawable (core/parse-num (:withdrawable clearinghouse))
+        summary (or (get-in clearinghouse [:marginSummary])
+                    (get-in clearinghouse [:crossMarginSummary])
+                    {})
+        account-value (or (core/parse-num (:accountValue summary)) 0)
+        margin-used (or (core/parse-num (:totalMarginUsed summary)) 0)
+        fallback-available (- account-value margin-used)]
+    (max 0 (if (number? withdrawable)
+             withdrawable
+             fallback-available))))
+
+(defn position-for-active-asset [context]
+  (let [active-asset (:active-asset context)
+        positions (get-in context [:clearinghouse :assetPositions])]
+    (some (fn [entry]
+            (let [position (or (:position entry) entry)]
+              (when (= active-asset (:coin position))
+                position)))
+          positions)))
+
+(defn current-position-summary [context]
+  (let [active-asset (:active-asset context)
+        position (position-for-active-asset context)
+        size (or (core/parse-num (:szi position)) 0)
+        liquidation (core/parse-num (:liquidationPx position))]
+    {:coin active-asset
+     :size size
+     :abs-size (js/Math.abs size)
+     :direction (cond
+                  (pos? size) :long
+                  (neg? size) :short
+                  :else :flat)
+     :liquidation-price (when (and (number? liquidation) (pos? liquidation))
+                          liquidation)}))
+
+(defn- size-decimals [context]
+  (let [sz-decimals (or (:sz-decimals context)
+                        (get-in context [:active-market :szDecimals]))
+        parsed (core/parse-num sz-decimals)]
+    (-> (or parsed 4)
+        (max 0)
+        (min 8)
+        int)))
+
+(defn base-size-string
+  "Format canonical base size by truncating to market szDecimals."
+  [context value]
+  (when (and (number? value) (pos? value))
+    (let [decimals (size-decimals context)
+          factor (js/Math.pow 10 decimals)
+          truncated (/ (js/Math.floor (* value factor)) factor)]
+      (when (pos? truncated)
+        (core/number->clean-string truncated decimals)))))
+
+(defn- level-price [level]
+  (let [price (or (core/parse-num (:px level))
+                  (core/parse-num (:price level))
+                  (core/parse-num (:p level)))]
+    (when (and (number? price) (pos? price))
+      price)))
+
+(defn- level-size [level]
+  (let [size (or (core/parse-num (:sz level))
+                 (core/parse-num (:size level))
+                 (core/parse-num (:s level)))]
+    (when (and (number? size) (pos? size))
+      size)))
+
+(defn- normalize-level [level]
+  (let [price (level-price level)
+        size (level-size level)]
+    (when (and (number? price)
+               (pos? price)
+               (number? size)
+               (pos? size))
+      {:price price
+       :size size})))
+
+(defn- ordered-market-levels [context side]
+  (let [raw-levels (case side
+                     :buy (get-in context [:orderbook :asks])
+                     :sell (get-in context [:orderbook :bids])
+                     nil)
+        comparator (case side
+                     :buy <
+                     :sell >
+                     nil)]
+    (when comparator
+      (->> (or raw-levels [])
+           (keep normalize-level)
+           (sort-by :price comparator)
+           vec))))
+
+(defn- top-of-book-midpoint [context]
+  (let [bids (->> (get-in context [:orderbook :bids])
+                  (keep normalize-level))
+        asks (->> (get-in context [:orderbook :asks])
+                  (keep normalize-level))
+        best-bid (reduce (fn [best level]
+                           (let [price (:price level)]
+                             (if (or (nil? best) (> price best))
+                               price
+                               best)))
+                         nil
+                         bids)
+        best-ask (reduce (fn [best level]
+                           (let [price (:price level)]
+                             (if (or (nil? best) (< price best))
+                               price
+                               best)))
+                         nil
+                         asks)]
+    (when (and (number? best-bid)
+               (pos? best-bid)
+               (number? best-ask)
+               (pos? best-ask))
+      (/ (+ best-bid best-ask) 2))))
+
+(defn- simulate-average-fill-price [levels requested-size]
+  ;; Walk sorted levels deterministically and require a full simulated fill.
+  ;; Return nil when visible depth cannot satisfy requested-size.
+  (when (and (number? requested-size) (pos? requested-size))
+    (loop [remaining requested-size
+           filled-notional 0
+           remaining-levels levels]
+      (cond
+        (<= remaining 0)
+        (/ filled-notional requested-size)
+
+        (empty? remaining-levels)
+        nil
+
+        :else
+        (let [{:keys [price size]} (first remaining-levels)
+              fill-size (min remaining size)]
+          (recur (- remaining fill-size)
+                 (+ filled-notional (* fill-size price))
+                 (rest remaining-levels)))))))
+
+(defn- market-slippage-estimate-pct [context form]
+  (let [requested-size (core/parse-num (:size form))
+        side (:side form)
+        levels (ordered-market-levels context side)
+        avg-fill (simulate-average-fill-price levels requested-size)
+        midpoint (top-of-book-midpoint context)]
+    (when (and (number? avg-fill)
+               (pos? avg-fill)
+               (number? midpoint)
+               (pos? midpoint))
+      (* 100 (/ (js/Math.abs (- avg-fill midpoint)) midpoint)))))
+
+(defn- best-side-price
+  "Return best price for a side independent of vector ordering.
+   For bids, pass > comparator. For asks, pass < comparator."
+  [levels better?]
+  (reduce (fn [best level]
+            (let [px (core/parse-num (:px level))]
+              (if (and (number? px)
+                       (pos? px)
+                       (or (nil? best) (better? px best)))
+                px
+                best)))
+          nil
+          (or levels [])))
+
+(defn best-bid-price [context]
+  (best-side-price (get-in context [:orderbook :bids]) >))
+
+(defn best-ask-price [context]
+  (best-side-price (get-in context [:orderbook :asks]) <))
+
+(defn reference-price [context form]
+  (let [order-type (core/normalize-order-type (:type form))
+        limit-price (when (core/limit-like-type? order-type)
+                      (core/parse-num (:price form)))
+        side (:side form)
+        best-px (if (= side :buy)
+                  (best-ask-price context)
+                  (best-bid-price context))
+        projected-mark (core/parse-num (get-in context [:active-market :mark]))
+        streamed-mark (core/parse-num (:streamed-mark context))]
+    (cond
+      (and (number? limit-price) (pos? limit-price)) limit-price
+      (and (number? best-px) (pos? best-px)) best-px
+      (and (number? projected-mark) (pos? projected-mark)) projected-mark
+      (and (number? streamed-mark) (pos? streamed-mark)) streamed-mark
+      :else nil)))
+
+(defn mid-price-summary
+  "Return deterministic price context for UI rows:
+   {:mid-price number|nil :source :mid|:reference|:none}."
+  [context form]
+  (let [bid (best-bid-price context)
+        ask (best-ask-price context)
+        mid (when (and (number? bid)
+                       (pos? bid)
+                       (number? ask)
+                       (pos? ask))
+              (/ (+ bid ask) 2))
+        ref (reference-price context form)]
+    (cond
+      (number? mid) {:mid-price mid :source :mid}
+      (number? ref) {:mid-price ref :source :reference}
+      :else {:mid-price nil :source :none})))
+
+(defn effective-limit-price
+  "Return a deterministic fallback price for limit-like order types.
+   Prefers mid (bid/ask average), then reference price."
+  [context form]
+  (when (core/limit-like-type? (:type form))
+    (let [{:keys [mid-price]} (mid-price-summary context form)
+          ref (reference-price context form)]
+      (cond
+        (and (number? mid-price) (pos? mid-price)) mid-price
+        (and (number? ref) (pos? ref)) ref
+        :else nil))))
+
+(defn effective-limit-price-string
+  "String representation for deterministic limit fallback price."
+  [context form]
+  (when-let [price (effective-limit-price context form)]
+    (core/number->clean-string price 6)))
+
+(defn mid-price-string
+  "String representation for the true midpoint (best bid/ask average).
+   Returns nil when midpoint is unavailable."
+  [context form]
+  (let [{:keys [mid-price source]} (mid-price-summary context form)]
+    (when (and (= source :mid)
+               (number? mid-price)
+               (pos? mid-price))
+      (core/number->clean-string mid-price 6))))
+
+(defn size-from-percent [context form percent]
+  (let [pct (core/clamp-percent percent)
+        available (available-to-trade context)
+        leverage (core/normalize-ui-leverage context (:ui-leverage form))
+        ref-price (reference-price context form)
+        notional (* available leverage (/ pct 100))]
+    (when (and (pos? pct)
+               (number? ref-price)
+               (pos? ref-price)
+               (pos? notional))
+      (/ notional ref-price))))
+
+(defn percent-from-size [context form size]
+  (let [size-value (core/parse-num size)
+        available (available-to-trade context)
+        leverage (core/normalize-ui-leverage context (:ui-leverage form))
+        ref-price (reference-price context form)
+        notional-capacity (* available leverage)]
+    (when (and (number? size-value)
+               (pos? size-value)
+               (number? ref-price)
+               (pos? ref-price)
+               (pos? notional-capacity))
+      (core/clamp-percent (* 100 (/ (* size-value ref-price) notional-capacity))))))
+
+(defn apply-size-percent [context form percent]
+  (let [pct (core/clamp-percent percent)
+        available (available-to-trade context)
+        leverage (core/normalize-ui-leverage context (:ui-leverage form))
+        notional (* available leverage (/ pct 100))
+        normalized-form (assoc form
+                               :size-percent pct
+                               :ui-leverage (core/normalize-ui-leverage context (:ui-leverage form)))
+        computed-size (size-from-percent context normalized-form pct)
+        quantized-size (when (number? computed-size)
+                         (base-size-string context computed-size))
+        display-notional (when (and (number? notional) (pos? notional))
+                           (core/number->clean-string notional 2))]
+    (cond
+      (zero? pct) (assoc normalized-form :size "" :size-display "")
+      (seq quantized-size) (assoc normalized-form
+                                  :size quantized-size
+                                  :size-display (or display-notional ""))
+      :else normalized-form)))
+
+(defn sync-size-from-percent [context form]
+  (let [pct (core/clamp-percent (:size-percent form))]
+    (if (pos? pct)
+      (apply-size-percent context form pct)
+      (assoc form
+             :size-percent pct
+             :ui-leverage (core/normalize-ui-leverage context (:ui-leverage form))))))
+
+(defn sync-size-percent-from-size [context form]
+  (let [size (core/parse-num (:size form))
+        derived (percent-from-size context form (:size form))
+        leverage (core/normalize-ui-leverage context (:ui-leverage form))]
+    (cond
+      (or (nil? size) (<= size 0))
+      (assoc form :size-percent 0 :ui-leverage leverage)
+
+      (number? derived)
+      (assoc form :size-percent derived :ui-leverage leverage)
+
+      :else
+      (assoc form
+             :size-percent (core/clamp-percent (:size-percent form))
+             :ui-leverage leverage))))
+
+(defn order-summary [context form]
+  (let [size (core/parse-num (:size form))
+        ref-price (reference-price context form)
+        order-value (when (and (number? size)
+                               (pos? size)
+                               (number? ref-price)
+                               (pos? ref-price))
+                      (* size ref-price))
+        leverage (core/normalize-ui-leverage context (:ui-leverage form))
+        margin-required (when (and (number? order-value) (pos? leverage))
+                          (/ order-value leverage))
+        position (current-position-summary context)
+        liquidation-price (:liquidation-price position)
+        requested-type (core/normalize-order-type (or (:requested-type form) (:type form)))
+        market-order? (= :market requested-type)
+        slippage-est (if market-order?
+                       (market-slippage-estimate-pct context form)
+                       0)]
+    {:available-to-trade (available-to-trade context)
+     :current-position position
+     :reference-price ref-price
+     :order-value order-value
+     :margin-required margin-required
+     :liquidation-price liquidation-price
+     :slippage-est slippage-est
+     :slippage-max core/default-max-slippage-pct
+     :fees core/default-fees}))
+
+(defn best-price [context side]
+  (if (= side :buy)
+    (best-ask-price context)
+    (best-bid-price context)))
+
+(defn apply-market-price [context form]
+  (let [side (:side form)
+        px (best-price context side)
+        slippage (or (core/parse-num (:slippage form)) 0.5)
+        adj (if (= side :buy) (+ 1 (/ slippage 100)) (- 1 (/ slippage 100)))]
+    (when px
+      (assoc form :price (str (* px adj))))))

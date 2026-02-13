@@ -197,7 +197,7 @@
       [[:effects/save [:order-form :error] "Market price unavailable. Load order book first."]]
 
       (seq errors)
-      [[:effects/save [:order-form :error] (first errors)]]
+      [[:effects/save [:order-form :error] (trading/validation-error-message (first errors))]]
 
       (nil? request)
       [[:effects/save [:order-form :error] "Select an asset and ensure market data is loaded."]]
