@@ -1,6 +1,6 @@
 (ns hyperopen.account.history.actions
   (:require [clojure.string :as str]
-            [hyperopen.api :as api]
+            [hyperopen.domain.funding-history :as funding-history]
             [hyperopen.platform :as platform]
             [hyperopen.utils.parse :as parse-utils]))
 
@@ -20,7 +20,7 @@
   #{:all :open :filled :canceled :rejected :triggered})
 
 (defn- default-funding-history-filters []
-  (api/normalize-funding-history-filters {}))
+  (funding-history/normalize-funding-history-filters {} (platform/now-ms)))
 
 (defn default-funding-history-state []
   (let [filters (default-funding-history-filters)]
@@ -117,14 +117,16 @@
 
 (defn funding-history-filters
   [state]
-  (api/normalize-funding-history-filters
-   (get-in state [:account-info :funding-history :filters])))
+  (funding-history/normalize-funding-history-filters
+   (get-in state [:account-info :funding-history :filters])
+   (platform/now-ms)))
 
 (defn- funding-history-draft-filters
   [state]
-  (api/normalize-funding-history-filters
+  (funding-history/normalize-funding-history-filters
    (or (get-in state [:account-info :funding-history :draft-filters])
-       (funding-history-filters state))))
+       (funding-history-filters state))
+   (platform/now-ms)))
 
 (defn funding-history-request-id
   [state]
@@ -146,7 +148,7 @@
 
 (defn- filtered-funding-rows
   [state filters]
-  (api/filter-funding-history-rows
+  (funding-history/filter-funding-history-rows
    (get-in state [:orders :fundings-raw] [])
    filters))
 

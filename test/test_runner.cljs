@@ -2,6 +2,7 @@
   (:require [cljs.test :refer-macros [run-tests]]
             [hyperopen.config-test]
             [hyperopen.api-test]
+            [hyperopen.domain.funding-history-test]
             [hyperopen.websocket.acl.hyperliquid-test]
             [hyperopen.websocket.application.runtime-test]
             [hyperopen.websocket.application.runtime-reducer-test]
@@ -66,6 +67,7 @@
   "Run all test namespaces and return the results"
   []
   (run-tests 'hyperopen.api-test
+             'hyperopen.domain.funding-history-test
              'hyperopen.config-test
              'hyperopen.websocket.acl.hyperliquid-test
              'hyperopen.websocket.application.runtime-test

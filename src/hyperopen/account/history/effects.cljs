@@ -2,6 +2,7 @@
   (:require [clojure.string :as str]
             [hyperopen.api :as api]
             [hyperopen.account.history.actions :as account-history-actions]
+            [hyperopen.domain.funding-history :as funding-history]
             [hyperopen.platform :as platform]))
 
 (defn- format-funding-history-time [time-ms]
@@ -77,9 +78,9 @@
 (defn- merge-and-project-funding-history
   [state rows]
   (let [filters (account-history-actions/funding-history-filters state)
-        merged (api/merge-funding-history-rows (get-in state [:orders :fundings-raw] [])
-                                               rows)
-        projected (api/filter-funding-history-rows merged filters)]
+        merged (funding-history/merge-funding-history-rows (get-in state [:orders :fundings-raw] [])
+                                                           rows)
+        projected (funding-history/filter-funding-history-rows merged filters)]
     (-> state
         (assoc-in [:account-info :funding-history :filters] filters)
         (assoc-in [:orders :fundings-raw] merged)

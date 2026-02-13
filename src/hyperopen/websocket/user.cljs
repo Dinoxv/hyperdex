@@ -1,5 +1,6 @@
 (ns hyperopen.websocket.user
-  (:require [hyperopen.api :as api]
+  (:require [hyperopen.domain.funding-history :as funding-history]
+            [hyperopen.platform :as platform]
             [hyperopen.websocket.client :as ws-client]
             [hyperopen.wallet.address-watcher :as address-watcher]))
 
@@ -79,14 +80,17 @@
   (fn [msg]
     (when (= "userFundings" (:channel msg))
       (let [{:keys [rows]} (extract-channel-rows msg :fundings)
-            normalized (api/normalize-ws-funding-rows rows)]
+            normalized (funding-history/normalize-ws-funding-rows rows)]
         (when (seq normalized)
           (swap! store
                  (fn [state]
                    (let [existing (get-in state [:orders :fundings-raw] [])
                          filters (get-in state [:account-info :funding-history :filters])
-                         merged (api/merge-funding-history-rows existing normalized)
-                         filtered (api/filter-funding-history-rows merged filters)]
+                         filters* (funding-history/normalize-funding-history-filters
+                                   filters
+                                   (platform/now-ms))
+                         merged (funding-history/merge-funding-history-rows existing normalized)
+                         filtered (funding-history/filter-funding-history-rows merged filters*)]
                      (-> state
                          (assoc-in [:orders :fundings-raw] merged)
                          (assoc-in [:orders :fundings] filtered))))))))))

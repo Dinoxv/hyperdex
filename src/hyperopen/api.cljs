@@ -2,6 +2,7 @@
   (:require [clojure.string :as str]
             [hyperopen.api.info-runtime :as info-runtime]
             [hyperopen.asset-selector.markets :as markets]
+            [hyperopen.domain.funding-history :as funding-history]
             [hyperopen.platform :as platform]
             [hyperopen.utils.data-normalization :refer [normalize-asset-contexts]]
             [hyperopen.utils.interval :refer [interval-to-milliseconds]]))
@@ -10,7 +11,7 @@
 (def ^:private info-max-retries 4)
 (def ^:private info-base-retry-ms 400)
 (def ^:private info-max-retry-ms 5000)
-(def default-funding-history-window-ms (* 7 24 60 60 1000))
+(def default-funding-history-window-ms funding-history/default-window-ms)
 
 (defonce ^:private public-webdata2-cache (atom nil))
 (defonce ^:private ensure-perp-dexs-flight (atom nil))
@@ -18,160 +19,48 @@
 (defn- now-ms []
   (platform/now-ms))
 
-(defn- finite-number?
-  [value]
-  (and (number? value)
-       (not (js/isNaN value))
-       (js/isFinite value)))
-
-(defn- parse-decimal
-  [value]
-  (cond
-    (number? value)
-    (when (finite-number? value) value)
-
-    (string? value)
-    (let [num (js/parseFloat value)]
-      (when (finite-number? num) num))
-
-    :else nil))
-
-(defn- parse-ms
-  [value]
-  (when-let [num (parse-decimal value)]
-    (js/Math.floor num)))
-
 (defn funding-position-side
   [signed-size]
-  (cond
-    (pos? signed-size) :long
-    (neg? signed-size) :short
-    :else :flat))
+  (funding-history/funding-position-side signed-size))
 
 (defn funding-history-row-id
   [time-ms coin signed-size payment-usdc funding-rate]
-  (str time-ms "|" coin "|" signed-size "|" payment-usdc "|" funding-rate))
-
-(defn- normalize-funding-row
-  [{:keys [time-ms coin signed-size payment-usdc funding-rate source]}]
-  (let [time-ms* (parse-ms time-ms)
-        signed-size* (parse-decimal signed-size)
-        payment-usdc* (parse-decimal payment-usdc)
-        funding-rate* (parse-decimal funding-rate)
-        coin* (when (string? coin) coin)]
-    (when (and time-ms*
-               coin*
-               (number? signed-size*)
-               (number? payment-usdc*)
-               (number? funding-rate*))
-      {:id (funding-history-row-id time-ms* coin* signed-size* payment-usdc* funding-rate*)
-       :time-ms time-ms*
-       :time time-ms*
-       :coin coin*
-       :size-raw (js/Math.abs signed-size*)
-       :position-size-raw signed-size*
-       :positionSize signed-size*
-       :position-side (funding-position-side signed-size*)
-       :payment-usdc-raw payment-usdc*
-       :payment payment-usdc*
-       :funding-rate-raw funding-rate*
-       :fundingRate funding-rate*
-       :source source})))
+  (funding-history/funding-history-row-id time-ms coin signed-size payment-usdc funding-rate))
 
 (defn normalize-info-funding-row
   [row]
-  (let [delta (:delta row)
-        funding-delta? (or (nil? (:type delta))
-                           (= "funding" (:type delta)))]
-    (when (and (map? delta) funding-delta?)
-      (normalize-funding-row {:time-ms (:time row)
-                              :coin (:coin delta)
-                              :signed-size (:szi delta)
-                              :payment-usdc (:usdc delta)
-                              :funding-rate (:fundingRate delta)
-                              :source :info}))))
+  (funding-history/normalize-info-funding-row row))
 
 (defn normalize-info-funding-rows
   [rows]
-  (->> rows
-       (map normalize-info-funding-row)
-       (remove nil?)
-       vec))
+  (funding-history/normalize-info-funding-rows rows))
 
 (defn normalize-ws-funding-row
   [row]
-  (normalize-funding-row {:time-ms (:time row)
-                          :coin (:coin row)
-                          :signed-size (:szi row)
-                          :payment-usdc (:usdc row)
-                          :funding-rate (:fundingRate row)
-                          :source :ws}))
+  (funding-history/normalize-ws-funding-row row))
 
 (defn normalize-ws-funding-rows
   [rows]
-  (->> rows
-       (map normalize-ws-funding-row)
-       (remove nil?)
-       vec))
+  (funding-history/normalize-ws-funding-rows rows))
 
 (defn sort-funding-history-rows
   [rows]
-  (->> rows
-       (sort-by (fn [row]
-                  [(- (or (:time-ms row) 0))
-                   (or (:id row) "")]))
-       vec))
+  (funding-history/sort-funding-history-rows rows))
 
 (defn merge-funding-history-rows
   [existing incoming]
-  (->> (concat (or existing []) (or incoming []))
-       (reduce (fn [acc row]
-                 (if (and (map? row) (seq (:id row)))
-                   (assoc acc (:id row) row)
-                   acc))
-               {})
-       vals
-       sort-funding-history-rows
-       vec))
+  (funding-history/merge-funding-history-rows existing incoming))
 
 (defn normalize-funding-history-filters
   ([filters]
    (normalize-funding-history-filters filters (now-ms)))
   ([filters now]
-   (let [coin-set (->> (or (:coin-set filters) #{})
-                       (keep (fn [coin]
-                               (when (and (string? coin)
-                                          (seq coin))
-                                 coin)))
-                       set)
-         default-end (or (parse-ms now) 0)
-         default-start (max 0 (- default-end default-funding-history-window-ms))
-         start-candidate (parse-ms (:start-time-ms filters))
-         end-candidate (parse-ms (:end-time-ms filters))
-         start-time-ms (or start-candidate default-start)
-         end-time-ms (or end-candidate default-end)
-         [start-ms end-ms] (if (> start-time-ms end-time-ms)
-                             [end-time-ms start-time-ms]
-                             [start-time-ms end-time-ms])]
-     {:coin-set coin-set
-      :start-time-ms start-ms
-      :end-time-ms end-ms})))
+   (funding-history/normalize-funding-history-filters filters now default-funding-history-window-ms)))
 
 (defn filter-funding-history-rows
   [rows filters]
-  (let [{:keys [coin-set start-time-ms end-time-ms]} (normalize-funding-history-filters filters)
-        use-coin-filter? (seq coin-set)]
-    (->> (or rows [])
-         (filter (fn [row]
-                   (let [time-ms (:time-ms row)
-                         coin (:coin row)]
-                     (and (number? time-ms)
-                          (>= time-ms start-time-ms)
-                          (<= time-ms end-time-ms)
-                          (or (not use-coin-filter?)
-                              (contains? coin-set coin))))))
-         sort-funding-history-rows
-         vec)))
+  (let [filters* (normalize-funding-history-filters filters)]
+    (funding-history/filter-funding-history-rows rows filters*)))
 
 (defn- normalize-priority
   [priority]
