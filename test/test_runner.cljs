@@ -25,7 +25,9 @@
             [hyperopen.utils.interval-test]
             [hyperopen.orderbook.price-aggregation-test]
             [hyperopen.order.feedback-runtime-test]
+            [hyperopen.app.effects-test]
             [hyperopen.runtime.api-effects-test]
+            [hyperopen.runtime.effect-adapters-test]
             [hyperopen.wallet.actions-test]
             [hyperopen.wallet.address-watcher-test]
             [hyperopen.wallet.connection-runtime-test]
@@ -88,7 +90,9 @@
              'hyperopen.core-bootstrap-test
              'hyperopen.orderbook.price-aggregation-test
              'hyperopen.order.feedback-runtime-test
+             'hyperopen.app.effects-test
              'hyperopen.runtime.api-effects-test
+             'hyperopen.runtime.effect-adapters-test
              'hyperopen.wallet.actions-test
              'hyperopen.wallet.address-watcher-test
              'hyperopen.wallet.connection-runtime-test

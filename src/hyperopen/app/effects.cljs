@@ -10,8 +10,7 @@
              :save-many effect-adapters/save-many
              :local-storage-set effect-adapters/local-storage-set
              :local-storage-set-json effect-adapters/local-storage-set-json}
-   :asset-selector {:queue-asset-icon-status (fn [ctx store payload]
-                                               (effect-adapters/queue-asset-icon-status runtime ctx store payload))}
+   :asset-selector {:queue-asset-icon-status (effect-adapters/make-queue-asset-icon-status runtime)}
    :navigation {:push-state effect-adapters/push-state
                 :replace-state effect-adapters/replace-state}
    :websocket {:init-websocket effect-adapters/init-websocket
@@ -25,22 +24,17 @@
                :unsubscribe-trades effect-adapters/unsubscribe-trades
                :unsubscribe-webdata2 effect-adapters/unsubscribe-webdata2
                :reconnect-websocket effect-adapters/reconnect-websocket
-               :refresh-websocket-health (fn [ctx store]
-                                           (effect-adapters/refresh-websocket-health runtime ctx store))}
+               :refresh-websocket-health (effect-adapters/make-refresh-websocket-health runtime)}
    :wallet {:connect-wallet effect-adapters/connect-wallet
-            :disconnect-wallet (fn [ctx store]
-                                 (effect-adapters/disconnect-wallet runtime ctx store))
+            :disconnect-wallet (effect-adapters/make-disconnect-wallet runtime)
             :enable-agent-trading action-adapters/enable-agent-trading
             :set-agent-storage-mode effect-adapters/set-agent-storage-mode
-            :copy-wallet-address (fn [ctx store address]
-                                   (effect-adapters/copy-wallet-address runtime ctx store address))}
+            :copy-wallet-address (effect-adapters/make-copy-wallet-address runtime)}
    :diagnostics {:confirm-ws-diagnostics-reveal effect-adapters/confirm-ws-diagnostics-reveal
                  :copy-websocket-diagnostics effect-adapters/copy-websocket-diagnostics
                  :ws-reset-subscriptions effect-adapters/ws-reset-subscriptions}
-   :orders {:api-submit-order (fn [ctx store request]
-                                (effect-adapters/api-submit-order runtime ctx store request))
-            :api-cancel-order (fn [ctx store request]
-                                (effect-adapters/api-cancel-order runtime ctx store request))}
+   :orders {:api-submit-order (effect-adapters/make-api-submit-order runtime)
+            :api-cancel-order (effect-adapters/make-api-cancel-order runtime)}
    :api {:fetch-asset-selector-markets effect-adapters/fetch-asset-selector-markets-effect
          :api-load-user-data effect-adapters/api-load-user-data-effect}})
 

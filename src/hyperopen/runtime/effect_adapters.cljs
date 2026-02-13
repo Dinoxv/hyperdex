@@ -70,17 +70,37 @@
   [store status]
   (swap! store assoc-in [:websocket-ui :copy-status] status))
 
-(defn save [_ store path value]
-  (app-effects/save! store path value))
+(defn- effect-handler-store-1
+  [f]
+  (fn [_ store arg]
+    (f store arg)))
 
-(defn save-many [_ store path-values]
-  (app-effects/save-many! store path-values))
+(defn- effect-handler-store-2
+  [f]
+  (fn [_ store arg1 arg2]
+    (f store arg1 arg2)))
 
-(defn local-storage-set [_ _ key value]
-  (app-effects/local-storage-set! key value))
+(defn- effect-handler-1
+  [f]
+  (fn [_ _ arg]
+    (f arg)))
 
-(defn local-storage-set-json [_ _ key value]
-  (app-effects/local-storage-set-json! key value))
+(defn- effect-handler-2
+  [f]
+  (fn [_ _ arg1 arg2]
+    (f arg1 arg2)))
+
+(def save
+  (effect-handler-store-2 #'app-effects/save!))
+
+(def save-many
+  (effect-handler-store-1 #'app-effects/save-many!))
+
+(def local-storage-set
+  (effect-handler-2 #'app-effects/local-storage-set!))
+
+(def local-storage-set-json
+  (effect-handler-2 #'app-effects/local-storage-set-json!))
 
 (defn schedule-animation-frame! [f]
   (platform/request-animation-frame! f))
@@ -108,26 +128,46 @@
      :flush-queued-asset-icon-statuses! (fn [runtime-store]
                                           (flush-queued-asset-icon-statuses! runtime runtime-store))})))
 
-(defn push-state [_ _ path]
-  (app-effects/push-state! path))
+(defn make-queue-asset-icon-status
+  [runtime]
+  (fn [ctx store payload]
+    (queue-asset-icon-status runtime ctx store payload)))
 
-(defn replace-state [_ _ path]
-  (app-effects/replace-state! path))
+(def push-state
+  (effect-handler-1 #'app-effects/push-state!))
 
-(defn fetch-candle-snapshot [_ store & {:keys [interval bars] :or {interval :1d bars 330}}]
-  (app-effects/fetch-candle-snapshot!
-   {:store store
-    :interval interval
-    :bars bars
-    :log-fn println
-    :fetch-candle-snapshot-fn api/fetch-candle-snapshot!}))
+(def replace-state
+  (effect-handler-1 #'app-effects/replace-state!))
 
-(defn init-websocket [_ store]
-  (app-effects/init-websocket!
-   {:store store
-    :ws-url runtime-state/websocket-url
-    :log-fn println
-    :init-connection! ws-client/init-connection!}))
+(defn make-fetch-candle-snapshot
+  [{:keys [log-fn fetch-candle-snapshot-fn]
+    :or {log-fn println
+         fetch-candle-snapshot-fn api/fetch-candle-snapshot!}}]
+  (fn [_ store & {:keys [interval bars] :or {interval :1d bars 330}}]
+    (app-effects/fetch-candle-snapshot!
+     {:store store
+      :interval interval
+      :bars bars
+      :log-fn log-fn
+      :fetch-candle-snapshot-fn fetch-candle-snapshot-fn})))
+
+(def fetch-candle-snapshot
+  (make-fetch-candle-snapshot {}))
+
+(defn make-init-websocket
+  [{:keys [ws-url log-fn init-connection!]
+    :or {ws-url runtime-state/websocket-url
+         log-fn println
+         init-connection! ws-client/init-connection!}}]
+  (fn [_ store]
+    (app-effects/init-websocket!
+     {:store store
+      :ws-url ws-url
+      :log-fn log-fn
+      :init-connection! init-connection!})))
+
+(def init-websocket
+  (make-init-websocket {}))
 
 (defn- normalize-market-type [value]
   (markets-cache/normalize-market-type value))
@@ -293,6 +333,11 @@
      :clear-order-feedback-toast! clear-order-feedback-toast!
      :set-disconnected! wallet/set-disconnected!})))
 
+(defn make-disconnect-wallet
+  [runtime]
+  (fn [ctx store]
+    (disconnect-wallet runtime ctx store)))
+
 (defn set-agent-storage-mode [_ store storage-mode]
   (agent-runtime/set-agent-storage-mode!
    {:store store
@@ -325,16 +370,33 @@
      :schedule-wallet-copy-feedback-clear! #(schedule-wallet-copy-feedback-clear! runtime %)
      :log-fn println})))
 
-(defn reconnect-websocket [_ _]
-  (app-effects/reconnect-websocket!
-   {:log-fn println
-    :force-reconnect! ws-client/force-reconnect!}))
+(defn make-copy-wallet-address
+  [runtime]
+  (fn [ctx store address]
+    (copy-wallet-address runtime ctx store address)))
+
+(defn make-reconnect-websocket
+  [{:keys [log-fn force-reconnect!]
+    :or {log-fn println
+         force-reconnect! ws-client/force-reconnect!}}]
+  (fn [_ _]
+    (app-effects/reconnect-websocket!
+     {:log-fn log-fn
+      :force-reconnect! force-reconnect!})))
+
+(def reconnect-websocket
+  (make-reconnect-websocket {}))
 
 (defn refresh-websocket-health
   ([_ store]
    (refresh-websocket-health runtime-state/runtime nil store))
   ([runtime _ store]
    (sync-websocket-health-with-runtime! runtime store :force? true)))
+
+(defn make-refresh-websocket-health
+  [runtime]
+  (fn [ctx store]
+    (refresh-websocket-health runtime ctx store)))
 
 (defn ws-reset-subscriptions [_ store {:keys [group source]
                                        :or {group :all
@@ -399,6 +461,16 @@
    (api-cancel-order runtime-state/runtime ctx store request))
   ([runtime ctx store request]
    (order-effects/api-cancel-order (order-api-effect-deps runtime) ctx store request)))
+
+(defn make-api-submit-order
+  [runtime]
+  (fn [ctx store request]
+    (api-submit-order runtime ctx store request)))
+
+(defn make-api-cancel-order
+  [runtime]
+  (fn [ctx store request]
+    (api-cancel-order runtime ctx store request)))
 
 (defn fetch-asset-selector-markets-effect
   [_ store & [opts]]
