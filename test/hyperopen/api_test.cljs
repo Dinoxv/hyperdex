@@ -1,6 +1,7 @@
 (ns hyperopen.api-test
   (:require [cljs.test :refer-macros [async deftest is use-fixtures]]
             [hyperopen.api :as api]
+            [hyperopen.domain.funding-history :as funding-history]
             [hyperopen.api.info-client :as info-client]))
 
 (defn- fake-http-response
@@ -107,7 +108,7 @@
                     (done)))))))
 
 (deftest normalize-info-funding-row-maps-delta-shape-test
-  (let [row (api/normalize-info-funding-row
+  (let [row (funding-history/normalize-info-funding-row
              {:time 1700000000000
               :delta {:type "funding"
                       :coin "HYPE"
@@ -122,26 +123,28 @@
     (is (= 4.5e-4 (:funding-rate-raw row)))))
 
 (deftest funding-history-merge-and-filter-are-deterministic-test
-  (let [row-a (api/normalize-ws-funding-row {:time 1700000000000
-                                              :coin "HYPE"
-                                              :usdc "1.0"
-                                              :szi "100.0"
-                                              :fundingRate "0.0001"})
-        row-b (api/normalize-ws-funding-row {:time 1700003600000
-                                              :coin "BTC"
-                                              :usdc "-2.0"
-                                              :szi "-50.0"
-                                              :fundingRate "-0.0003"})
-        merged (api/merge-funding-history-rows [row-a row-b row-a] [])]
+  (let [row-a (funding-history/normalize-ws-funding-row {:time 1700000000000
+                                                          :coin "HYPE"
+                                                          :usdc "1.0"
+                                                          :szi "100.0"
+                                                          :fundingRate "0.0001"})
+        row-b (funding-history/normalize-ws-funding-row {:time 1700003600000
+                                                          :coin "BTC"
+                                                          :usdc "-2.0"
+                                                          :szi "-50.0"
+                                                          :fundingRate "-0.0003"})
+        merged (funding-history/merge-funding-history-rows [row-a row-b row-a] [])
+        filters (funding-history/normalize-funding-history-filters
+                 {:coin-set #{"BTC"}
+                  :start-time-ms 0
+                  :end-time-ms 2000000000000}
+                 1700000000000
+                 funding-history/default-window-ms)]
     (is (= 2 (count merged)))
     (is (= [1700003600000 1700000000000] (mapv :time-ms merged)))
     (is (= ["BTC"]
            (mapv :coin
-                 (api/filter-funding-history-rows
-                  merged
-                  {:coin-set #{"BTC"}
-                   :start-time-ms 0
-                   :end-time-ms 2000000000000}))))))
+                 (funding-history/filter-funding-history-rows merged filters))))))
 
 (deftest fetch-user-funding-history-paginates-until-empty-page-test
   (async done
