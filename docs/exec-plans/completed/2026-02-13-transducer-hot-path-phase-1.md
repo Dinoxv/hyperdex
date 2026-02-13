@@ -20,7 +20,7 @@ The user-visible outcome is not a new feature toggle; it is better runtime effic
 - [x] (2026-02-13 17:25Z) Implemented Milestone 2 (websocket trades normalization pipeline) and added focused websocket trades tests.
 - [x] (2026-02-13 17:29Z) Implemented Milestone 3 (domain funding-history pipelines) and expanded normalization/filter coverage.
 - [x] (2026-02-13 17:34Z) Ran required validation gates and recorded evidence in this plan.
-- [ ] Complete retrospective with before/after performance notes.
+- [x] (2026-02-13 17:39Z) Captured benchmark checkpoints for all three refactor targets and completed retrospective notes.
 
 ## Surprises & Discoveries
 
@@ -73,9 +73,24 @@ Validation outcome:
 
 - Required gates are passing (`npm run check`, `npm test`, `npm run test:websocket`).
 
-Remaining:
+Performance checkpoints:
 
-- Before/after timing checkpoints were not captured prior to refactor in this execution, so strict comparative benchmark notes remain pending for a follow-up pass.
+- Milestone 1 (`health/match-stream-keys` shape benchmark, 5,000 streams + 800 payload rows):
+  - Old shape: 0.550ms avg (80 runs)
+  - New shape: 0.420ms avg (80 runs)
+  - Approx improvement: 23.7%
+- Milestone 2 (`trades` normalize/filter pre-sort shape benchmark, 25,000 rows):
+  - Old shape: 5.342ms avg (60 runs)
+  - New shape: 4.372ms avg (60 runs)
+  - Approx improvement: 18.1%
+- Milestone 3 (`funding-history` shape benchmarks):
+  - normalize-info (20,000 rows): 0.454ms -> 0.265ms (41.6%)
+  - normalize-ws (20,000 rows): 0.613ms -> 0.365ms (40.5%)
+  - filter (50,000 rows): 4.914ms -> 4.542ms (7.6%)
+
+Inference note:
+
+- These timing checkpoints use controlled local old-shape/new-shape fixtures to estimate the effect of fused transformation stages. They are representative and directionally useful, but they are not a production profiler trace.
 
 ## Context and Orientation
 
@@ -214,7 +229,20 @@ Validation excerpts (local):
 
 Benchmark note:
 
-- Comparative before/after timing checkpoints were not captured before applying refactors in this session; add a follow-up benchmark pass against fixed fixtures to populate this section with timing deltas.
+- Milestone 1 benchmark (local old/new shape, Node 22, same process):
+  - Fixture: 5,000 streams, 800 descriptor payload rows.
+  - Before: 0.550ms average over 80 runs.
+  - After: 0.420ms average over 80 runs.
+
+- Milestone 2 benchmark (local old/new shape, Node 22, same process):
+  - Fixture: 25,000 trade rows.
+  - Before: 5.342ms average over 60 runs.
+  - After: 4.372ms average over 60 runs.
+
+- Milestone 3 benchmarks (local old/new shape, Node 22, same process):
+  - normalize-info fixture (20,000 rows): 0.454ms -> 0.265ms over 60 runs.
+  - normalize-ws fixture (20,000 rows): 0.613ms -> 0.365ms over 60 runs.
+  - filter fixture (50,000 rows): 4.914ms -> 4.542ms over 60 runs.
 
 ## Interfaces and Dependencies
 
