@@ -158,6 +158,7 @@
   [{:keys [log-fn
            request-asset-selector-markets!
            begin-asset-selector-load
+           apply-spot-meta-success
            apply-asset-selector-success
            apply-asset-selector-error]}
    store
@@ -165,7 +166,9 @@
   (swap! store begin-asset-selector-load
          (if (= :bootstrap (:phase opts)) :bootstrap :full))
   (-> (request-asset-selector-markets! store opts)
-      (.then (fn [{:keys [phase market-state]}]
+      (.then (fn [{:keys [phase spot-meta market-state]}]
+               (when apply-spot-meta-success
+                 (swap! store apply-spot-meta-success spot-meta))
                (swap! store apply-asset-selector-success phase market-state)
                (:markets market-state)))
       (.catch

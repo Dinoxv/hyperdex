@@ -136,10 +136,11 @@
    (fetch-asset-selector-markets! api-ops store {:phase :full}))
   ([{:keys [request-asset-selector-markets!]} store opts]
    (runtime-api-effects/fetch-asset-selector-markets!
-    {:store store
+   {:store store
      :opts opts
      :request-asset-selector-markets-fn request-asset-selector-markets!
      :begin-asset-selector-load api-projections/begin-asset-selector-load
+     :apply-spot-meta-success api-projections/apply-spot-meta-success
      :apply-asset-selector-success api-projections/apply-asset-selector-success
      :apply-asset-selector-error api-projections/apply-asset-selector-error})))
 

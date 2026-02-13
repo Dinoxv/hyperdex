@@ -40,4 +40,5 @@
                                                    spot-asset-ctxs
                                                    (array-seq perp-results))]
               {:phase phase
+               :spot-meta spot-meta-loaded
                :market-state market-state}))))))))

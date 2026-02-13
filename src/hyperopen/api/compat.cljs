@@ -132,6 +132,7 @@
    {:log-fn log-fn
     :request-asset-selector-markets! request-asset-selector-markets!
     :begin-asset-selector-load api-projections/begin-asset-selector-load
+    :apply-spot-meta-success api-projections/apply-spot-meta-success
     :apply-asset-selector-success api-projections/apply-asset-selector-success
     :apply-asset-selector-error api-projections/apply-asset-selector-error}
    store

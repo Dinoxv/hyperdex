@@ -176,13 +176,103 @@
        vec))
 
 (def ^:private balance-contract-id-pattern
-  #"^(?:0x)?[0-9a-zA-Z]+$")
+  #"^(?:0[xX][0-9a-fA-F]{8,}|[0-9A-Za-z]{10,})$")
+
+(def ^:private embedded-hex-contract-id-pattern
+  #"0[xX][0-9a-fA-F]{8,}")
 
 (defn normalize-balance-contract-id [contract-id]
   (let [contract-id* (some-> contract-id str str/trim)]
-    (when (and (seq contract-id*)
-               (re-matches balance-contract-id-pattern contract-id*))
-      contract-id*)))
+    (cond
+      (not (seq contract-id*)) nil
+      (re-matches balance-contract-id-pattern contract-id*) contract-id*
+      :else (some->> (re-find embedded-hex-contract-id-pattern contract-id*)
+                     str))))
+
+(def ^:private balance-contract-id-candidate-keys
+  [:tokenId :token-id :token_id
+   :tokenAddress :token-address :token_address
+   :contractId :contract-id :contract_id
+   :contractAddress :contract-address :contract_address
+   :erc20Address :erc20-address :erc20_address
+   :evmAddress :evm-address :evm_address
+   :evmContract :evm-contract :evm_contract
+   :tokenInfo :token-info :token_info
+   :tokenMetadata :token-metadata :token_metadata
+   :metadata :meta :details
+   :address])
+
+(def ^:private non-contract-address-key-exact
+  #{"user" "wallet" "owner" "account" "maker" "taker" "from" "to"})
+
+(defn- map-entry-contract-key? [k]
+  (let [key-name (some-> k name str/lower-case)]
+    (and (seq key-name)
+         (or (str/includes? key-name "contract")
+             (str/includes? key-name "token")
+             (str/includes? key-name "address"))
+         (not (contains? non-contract-address-key-exact key-name)))))
+
+(defn- extract-balance-contract-id [value]
+  (letfn [(walk [node depth]
+            (when (and (some? node) (<= depth 4))
+              (cond
+                (map? node)
+                (or (some (fn [k]
+                            (walk (get node k) (inc depth)))
+                          balance-contract-id-candidate-keys)
+                    (some (fn [[k v]]
+                            (when (map-entry-contract-key? k)
+                              (walk v (inc depth))))
+                          node))
+
+                (sequential? node)
+                (some #(walk % (inc depth)) node)
+
+                :else
+                (normalize-balance-contract-id node))))]
+    (walk value 0)))
+
+(defn- parse-spot-token-index [token]
+  (cond
+    (number? token) (js/Math.floor token)
+    (string? token) (let [token* (str/trim token)
+                          token* (if (str/starts-with? token* "@")
+                                   (subs token* 1)
+                                   token*)
+                          parsed (js/parseInt token* 10)]
+                      (when (and (seq token*) (not (js/isNaN parsed)))
+                        parsed))
+    :else nil))
+
+(defn- token-ref-candidates [token coin]
+  (let [token* (some-> token str str/trim)
+        coin* (some-> coin str str/trim)]
+    (->> [token
+          token*
+          coin
+          coin*
+          (some-> coin* str/upper-case)]
+         (remove nil?))))
+
+(defn- build-token-by-ref [tokens]
+  (reduce (fn [acc {:keys [index name] :as token}]
+            (let [name* (some-> name str str/trim)
+                  contract-id (extract-balance-contract-id token)]
+              (cond-> acc
+                (some? index) (assoc index token)
+                (some? index) (assoc (str index) token)
+                (seq name*) (assoc name* token)
+                (seq name*) (assoc (str/upper-case name*) token)
+                (seq contract-id) (assoc contract-id token))))
+          {}
+          (or tokens [])))
+
+(defn- resolve-token-meta [token-by-index token-by-ref token coin]
+  (let [token-idx (parse-spot-token-index token)]
+    (or (get token-by-index token-idx)
+        (some #(get token-by-ref %)
+              (token-ref-candidates token coin)))))
 
 (defn- unified-account-mode? [account]
   (= :unified (:mode account)))
@@ -351,16 +441,7 @@
                                :usdc-value usdc-value}))))
 
 (defn- normalize-spot-token-index [token]
-  (cond
-    (number? token) (js/Math.floor token)
-    (string? token) (let [token* (str/trim token)
-                          token* (if (str/starts-with? token* "@")
-                                   (subs token* 1)
-                                   token*)
-                          parsed (js/parseInt token* 10)]
-                      (when (and (seq token*) (not (js/isNaN parsed)))
-                        parsed))
-    :else nil))
+  (parse-spot-token-index token))
 
 (def ^:private spot-entry-notional-keys
   [:entryNtl :entryNotional :entryNtlUsd :entryNtlUSDC :entryValue :entry])
@@ -437,17 +518,19 @@
         spot-meta (:meta spot-data)
         spot-state (:clearinghouse-state spot-data)
         spot-asset-ctxs (:spotAssetCtxs webdata2)
+        spot-tokens (or (:tokens spot-meta) [])
         price-by-token (build-token-usdc-price-map spot-meta spot-asset-ctxs market-by-key)
         price-by-coin (build-coin-usdc-price-map-from-market-state market-by-key)
         token-by-index (into {}
                              (keep (fn [{:keys [index] :as token}]
                                      (when (some? index)
                                        [index token])))
-                             (:tokens spot-meta))
+                             spot-tokens)
+        token-by-ref (build-token-by-ref spot-tokens)
         token-decimals (into {}
                              (map (fn [{:keys [index weiDecimals szDecimals]}]
                                     [index (or weiDecimals szDecimals 2)]))
-                             (:tokens spot-meta))
+                             spot-tokens)
         coin-decimals (build-coin-decimals-map-from-market-state market-by-key)
         perps-row (when clearinghouse-state
                     (let [account-value (parse-num (get-in clearinghouse-state [:marginSummary :accountValue]))
@@ -465,7 +548,7 @@
                     (map (fn [{:keys [coin token hold total] :as balance}]
                            (let [{:keys [token-idx total-num price usdc-value]}
                                  (spot-balance-valuation price-by-token price-by-coin coin token total)
-                                 token-meta (get token-by-index token-idx)
+                                 token-meta (resolve-token-meta token-by-index token-by-ref token coin)
                                  decimals (or (get token-decimals token-idx)
                                               (get coin-decimals (normalize-coin-code coin)))
                                  hold-num (parse-num hold)
@@ -481,8 +564,8 @@
                                               (if unified? "USDC" "USDC (Spot)")
                                               coin)
                                  contract-id (when-not (= coin "USDC")
-                                               (normalize-balance-contract-id
-                                                (:tokenId token-meta)))]
+                                               (or (extract-balance-contract-id balance)
+                                                   (extract-balance-contract-id token-meta)))]
                              {:key (str "spot-" (or token-idx coin))
                               :coin coin-label
                               :total-balance total-num

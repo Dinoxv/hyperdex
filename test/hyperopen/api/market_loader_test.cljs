@@ -30,6 +30,7 @@
       (-> (market-loader/request-asset-selector-markets! deps)
           (.then (fn [result]
                    (is (= {:phase :bootstrap
+                           :spot-meta {:tokens []}
                            :market-state {:markets [{:coin "BTC"}]}}
                           result))
                    (is (= [{:priority :high}] @ensure-perp-calls))

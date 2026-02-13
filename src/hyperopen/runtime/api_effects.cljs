@@ -5,13 +5,16 @@
            opts
            request-asset-selector-markets-fn
            begin-asset-selector-load
+           apply-spot-meta-success
            apply-asset-selector-success
            apply-asset-selector-error]}]
   (let [opts* (or opts {:phase :full})
         phase (if (= :bootstrap (:phase opts*)) :bootstrap :full)]
     (swap! store begin-asset-selector-load phase)
     (-> (request-asset-selector-markets-fn store opts*)
-        (.then (fn [{:keys [phase market-state]}]
+        (.then (fn [{:keys [phase spot-meta market-state]}]
+                 (when apply-spot-meta-success
+                   (swap! store apply-spot-meta-success spot-meta))
                  (swap! store apply-asset-selector-success phase market-state)
                  (:markets market-state)))
         (.catch (fn [err]

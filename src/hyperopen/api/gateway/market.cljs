@@ -157,6 +157,7 @@
   [{:keys [log-fn
            request-asset-selector-markets!
            begin-asset-selector-load
+           apply-spot-meta-success
            apply-asset-selector-success
            apply-asset-selector-error]}
    store
@@ -165,6 +166,7 @@
    {:log-fn log-fn
     :request-asset-selector-markets! request-asset-selector-markets!
     :begin-asset-selector-load begin-asset-selector-load
+    :apply-spot-meta-success apply-spot-meta-success
     :apply-asset-selector-success apply-asset-selector-success
     :apply-asset-selector-error apply-asset-selector-error}
    store

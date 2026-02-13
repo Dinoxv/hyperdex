@@ -1,5 +1,5 @@
 (ns hyperopen.runtime.api-effects-test
-  (:require [cljs.test :refer-macros [deftest is]]
+  (:require [cljs.test :refer-macros [async deftest is]]
             [hyperopen.runtime.api-effects :as api-effects]))
 
 (deftest fetch-asset-selector-markets-uses-default-and-explicit-options-test
@@ -30,6 +30,32 @@
     (is (= [[store {:phase :full}]
             [store {:phase :bootstrap}]]
            @calls))))
+
+(deftest fetch-asset-selector-markets-persists-spot-meta-when-returned-test
+  (async done
+  (let [store (atom {})
+        request-fn (fn [_store _opts]
+                     (js/Promise.resolve
+                      {:phase :full
+                       :spot-meta {:tokens [{:index 0 :name "USDC"}]}
+                       :market-state {:markets [] :loaded-at-ms 1}}))]
+    (-> (api-effects/fetch-asset-selector-markets!
+         {:store store
+          :request-asset-selector-markets-fn request-fn
+          :begin-asset-selector-load (fn [state phase]
+                                       (assoc-in state [:asset-selector :phase] phase))
+          :apply-spot-meta-success (fn [state spot-meta]
+                                     (assoc-in state [:spot :meta] spot-meta))
+          :apply-asset-selector-success (fn [state phase _]
+                                          (assoc-in state [:asset-selector :phase] phase))
+          :apply-asset-selector-error (fn [state _] state)})
+        (.then (fn [_]
+                 (is (= {:tokens [{:index 0 :name "USDC"}]}
+                        (get-in @store [:spot :meta])))
+                 (done)))
+        (.catch (fn [err]
+                  (is false (str "Unexpected error: " err))
+                  (done)))))))
 
 (deftest load-user-data-issues-fetches-only-when-address-present-test
   (let [open-orders-calls (atom [])
