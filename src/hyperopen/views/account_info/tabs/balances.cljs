@@ -202,7 +202,7 @@
                                      :amount-decimals amount-decimals
                                      :transfer-disabled? transfer-disabled?})]
      [:div.text-right.font-semibold.num.num-right "$" (shared/format-currency usdc-value)]
-     [:div.text-right.font-semibold.num.num-right (shared/format-pnl pnl-value pnl-pct)]
+     [:div.text-right.font-medium.num.num-right (shared/format-pnl pnl-value pnl-pct)]
      [:div.text-left
       [:button {:class ["btn" "btn-xs" "btn-ghost" "text-trading-text"]} "Send"]]
      [:div.text-left
