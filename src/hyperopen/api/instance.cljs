@@ -1,0 +1,272 @@
+(ns hyperopen.api.instance
+  (:require [hyperopen.api.compat :as api-compat]
+            [hyperopen.api.gateway.account :as account-gateway]
+            [hyperopen.api.gateway.market :as market-gateway]
+            [hyperopen.api.gateway.orders :as order-gateway]
+            [hyperopen.api.info-client :as info-client]
+            [hyperopen.api.service :as api-service]
+            [hyperopen.domain.funding-history :as funding-history]))
+
+(def info-url (:info-url info-client/default-config))
+
+(def default-info-client-config
+  (merge info-client/default-config
+         {:info-url info-url}))
+
+(defn make-default-api-service
+  []
+  (api-service/make-service
+   {:info-client-config default-info-client-config
+    :log-fn println}))
+
+(defn- make-instance-post-info!
+  [service]
+  (fn post-info
+    ([body]
+     (post-info body {}))
+    ([body opts]
+     (api-service/request-info! service body opts))
+    ([body opts attempt]
+     (api-service/request-info! service body opts attempt))))
+
+(defn- make-instance-normalize-funding-history-filters
+  [now-ms-fn]
+  (fn [filters]
+    (funding-history/normalize-funding-history-filters
+     filters
+     (now-ms-fn)
+     funding-history/default-window-ms)))
+
+(defn- make-instance-market-request-ops
+  [post-info! now-ms-fn]
+  (letfn [(request-asset-contexts!
+            ([] (request-asset-contexts! {}))
+            ([opts]
+             (market-gateway/request-asset-contexts!
+              {:post-info! post-info!}
+              opts)))
+          (request-meta-and-asset-ctxs!
+            ([dex]
+             (request-meta-and-asset-ctxs! dex {}))
+            ([dex opts]
+             (market-gateway/request-meta-and-asset-ctxs!
+              {:post-info! post-info!}
+              dex
+              opts)))
+          (request-perp-dexs!
+            ([] (request-perp-dexs! {}))
+            ([opts]
+             (market-gateway/request-perp-dexs!
+              {:post-info! post-info!}
+              opts)))
+          (request-candle-snapshot!
+            [coin & {:keys [interval bars priority]
+                     :or {interval :1d bars 330 priority :high}}]
+            (market-gateway/request-candle-snapshot!
+             {:post-info! post-info!
+              :now-ms-fn now-ms-fn}
+             coin
+             {:interval interval
+              :bars bars
+              :priority priority}))
+          (request-spot-meta!
+            ([] (request-spot-meta! {}))
+            ([opts]
+             (market-gateway/request-spot-meta!
+              {:post-info! post-info!}
+              opts)))
+          (request-public-webdata2!
+            ([] (request-public-webdata2! {}))
+            ([opts]
+             (market-gateway/request-public-webdata2!
+              {:post-info! post-info!}
+              opts)))
+          (fetch-public-webdata2!
+            ([] (fetch-public-webdata2! {}))
+            ([opts]
+             (market-gateway/fetch-public-webdata2!
+              {:request-public-webdata2! request-public-webdata2!}
+              opts)))]
+    {:request-asset-contexts! request-asset-contexts!
+     :request-meta-and-asset-ctxs! request-meta-and-asset-ctxs!
+     :request-perp-dexs! request-perp-dexs!
+     :request-candle-snapshot! request-candle-snapshot!
+     :request-spot-meta! request-spot-meta!
+     :request-public-webdata2! request-public-webdata2!
+     :fetch-public-webdata2! fetch-public-webdata2!}))
+
+(defn- make-instance-market-state-ops
+  [service now-ms-fn log-fn market-ops]
+  (let [{:keys [request-perp-dexs!
+                request-spot-meta!
+                fetch-public-webdata2!
+                request-meta-and-asset-ctxs!]} market-ops]
+    (letfn [(ensure-perp-dexs-data!
+              ([store]
+               (ensure-perp-dexs-data! store {}))
+              ([store opts]
+               (api-service/ensure-perp-dexs-data! service store request-perp-dexs! opts)))
+            (ensure-spot-meta-data!
+              ([store]
+               (ensure-spot-meta-data! store {}))
+              ([store opts]
+               (api-service/ensure-spot-meta-data! service store request-spot-meta! opts)))
+            (ensure-public-webdata2!
+              ([]
+               (ensure-public-webdata2! {}))
+              ([opts]
+               (api-service/ensure-public-webdata2! service fetch-public-webdata2! opts)))
+            (request-asset-selector-markets!
+              ([store]
+               (request-asset-selector-markets! store {:phase :full}))
+              ([store opts]
+               (market-gateway/request-asset-selector-markets!
+                {:store store
+                 :opts opts
+                 :ensure-perp-dexs-data! ensure-perp-dexs-data!
+                 :ensure-spot-meta-data! ensure-spot-meta-data!
+                 :ensure-public-webdata2! ensure-public-webdata2!
+                 :fetch-meta-and-asset-ctxs! request-meta-and-asset-ctxs!
+                 :build-market-state (fn [runtime-store phase dexs spot-meta spot-asset-ctxs perp-results]
+                                       (market-gateway/build-market-state now-ms-fn
+                                                                          runtime-store
+                                                                          phase
+                                                                          dexs
+                                                                          spot-meta
+                                                                          spot-asset-ctxs
+                                                                          perp-results))
+                 :log-fn log-fn})))]
+      {:ensure-perp-dexs-data! ensure-perp-dexs-data!
+       :ensure-spot-meta-data! ensure-spot-meta-data!
+       :ensure-public-webdata2! ensure-public-webdata2!
+       :request-asset-selector-markets! request-asset-selector-markets!})))
+
+(defn- make-instance-order-ops
+  [post-info! log-fn]
+  (letfn [(request-frontend-open-orders!
+            ([address]
+             (request-frontend-open-orders! address nil {}))
+            ([address dex-or-opts]
+             (if (map? dex-or-opts)
+               (request-frontend-open-orders! address nil dex-or-opts)
+               (request-frontend-open-orders! address dex-or-opts {})))
+            ([address dex opts]
+             (order-gateway/request-frontend-open-orders!
+              {:post-info! post-info!}
+              address
+              dex
+              opts)))
+          (request-user-fills!
+            ([address]
+             (request-user-fills! address {}))
+            ([address opts]
+             (order-gateway/request-user-fills!
+              {:post-info! post-info!}
+              address
+              opts)))
+          (fetch-historical-orders! [address opts]
+            (api-compat/fetch-historical-orders!
+             {:log-fn log-fn
+              :post-info! post-info!}
+             address
+             opts))
+          (request-historical-orders!
+            ([address]
+             (request-historical-orders! address {}))
+            ([address opts]
+             (order-gateway/request-historical-orders!
+              {:fetch-historical-orders! (fn [_store requested-address request-opts]
+                                           (fetch-historical-orders! requested-address request-opts))}
+              address
+              opts)))]
+    {:request-frontend-open-orders! request-frontend-open-orders!
+     :request-user-fills! request-user-fills!
+     :request-historical-orders! request-historical-orders!}))
+
+(defn- make-instance-account-ops
+  [post-info! normalize-funding-history-filters-fn]
+  (letfn [(fetch-user-funding-history! [address opts]
+            (account-gateway/fetch-user-funding-history!
+             {:post-info! post-info!
+              :normalize-funding-history-filters normalize-funding-history-filters-fn
+              :normalize-info-funding-rows funding-history/normalize-info-funding-rows
+              :sort-funding-history-rows funding-history/sort-funding-history-rows}
+             nil
+             address
+             opts))
+          (request-user-funding-history!
+            ([address]
+             (request-user-funding-history! address {}))
+            ([address opts]
+             (account-gateway/request-user-funding-history!
+              {:fetch-user-funding-history! (fn [_store requested-address request-opts]
+                                              (fetch-user-funding-history! requested-address request-opts))}
+              address
+              opts)))
+          (request-spot-clearinghouse-state!
+            ([address]
+             (request-spot-clearinghouse-state! address {}))
+            ([address opts]
+             (account-gateway/request-spot-clearinghouse-state!
+              {:post-info! post-info!}
+              address
+              opts)))
+          (request-user-abstraction!
+            ([address]
+             (request-user-abstraction! address {}))
+            ([address opts]
+             (account-gateway/request-user-abstraction!
+              {:post-info! post-info!}
+              address
+              opts)))
+          (request-clearinghouse-state!
+            ([address dex]
+             (request-clearinghouse-state! address dex {}))
+            ([address dex opts]
+             (account-gateway/request-clearinghouse-state!
+              {:post-info! post-info!}
+              address
+              dex
+              opts)))]
+    {:request-user-funding-history! request-user-funding-history!
+     :request-spot-clearinghouse-state! request-spot-clearinghouse-state!
+     :request-user-abstraction! request-user-abstraction!
+     :request-clearinghouse-state! request-clearinghouse-state!}))
+
+(defn make-api
+  [{:keys [service now-ms-fn log-fn]}]
+  (let [service* (or service (make-default-api-service))
+        now-ms* (or now-ms-fn (fn [] (api-service/now-ms service*)))
+        log-fn* (or log-fn (api-service/log-fn service*))
+        post-info! (make-instance-post-info! service*)
+        normalize-filters* (make-instance-normalize-funding-history-filters now-ms*)
+        market-request-ops (make-instance-market-request-ops post-info! now-ms*)
+        market-state-ops (make-instance-market-state-ops service* now-ms* log-fn* market-request-ops)
+        order-ops (make-instance-order-ops post-info! log-fn*)
+        account-ops (make-instance-account-ops post-info! normalize-filters*)]
+    (merge
+     {:service service*
+      :log-fn log-fn*
+      :now-ms now-ms*
+      :funding-position-side funding-history/funding-position-side
+      :funding-history-row-id funding-history/funding-history-row-id
+      :normalize-info-funding-row funding-history/normalize-info-funding-row
+      :normalize-info-funding-rows funding-history/normalize-info-funding-rows
+      :normalize-ws-funding-row funding-history/normalize-ws-funding-row
+      :normalize-ws-funding-rows funding-history/normalize-ws-funding-rows
+      :sort-funding-history-rows funding-history/sort-funding-history-rows
+      :merge-funding-history-rows funding-history/merge-funding-history-rows
+      :normalize-funding-history-filters normalize-filters*
+      :filter-funding-history-rows (fn [rows filters]
+                                     (funding-history/filter-funding-history-rows
+                                      rows
+                                      (normalize-filters* filters)))
+      :get-request-stats (fn []
+                           (api-service/get-request-stats service*))
+      :reset-request-runtime! (fn []
+                                (api-service/reset-service! service*))
+      :request-info! post-info!}
+     market-request-ops
+     market-state-ops
+     order-ops
+     account-ops)))

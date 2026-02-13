@@ -3,23 +3,20 @@
             [hyperopen.api.gateway.account :as account-gateway]
             [hyperopen.api.gateway.market :as market-gateway]
             [hyperopen.api.gateway.orders :as order-gateway]
-            [hyperopen.api.info-client :as info-client]
+            [hyperopen.api.instance :as api-instance]
             [hyperopen.api.service :as api-service]
             [hyperopen.domain.funding-history :as funding-history]
             [hyperopen.platform :as platform]))
 
-(def info-url (:info-url info-client/default-config))
+(def info-url api-instance/info-url)
 (def default-funding-history-window-ms funding-history/default-window-ms)
 
 (def ^:private default-info-client-config
-  (merge info-client/default-config
-         {:info-url info-url}))
+  api-instance/default-info-client-config)
 
 (defn- make-default-api-service
   []
-  (api-service/make-service
-   {:info-client-config default-info-client-config
-    :log-fn println}))
+  (api-instance/make-default-api-service))
 
 (defonce ^:private api-facade-state
   (atom {:service (make-default-api-service)}))
@@ -57,6 +54,10 @@
 (defn reset-api-service!
   []
   (install-api-service! (make-default-api-service)))
+
+(defn make-api
+  [opts]
+  (api-instance/make-api opts))
 
 (defn- api-log-fn
   []

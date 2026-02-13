@@ -1,5 +1,5 @@
 (ns hyperopen.startup.collaborators-test
-  (:require [cljs.test :refer-macros [deftest is]]
+  (:require [cljs.test :refer-macros [async deftest is]]
             [hyperopen.api :as api]
             [hyperopen.account.history.effects :as account-history-effects]
             [hyperopen.runtime.state :as runtime-state]
@@ -31,3 +31,48 @@
     (is (identical? log-fn* (:log-fn deps)))
     (is (= "wss://example.test/ws" (:ws-url deps)))
     (is (identical? dispatch!* (:dispatch! deps)))))
+
+(deftest startup-base-deps-prefers-injected-api-ops-test
+  (let [get-request-stats* (fn [] {:source :injected})
+        request-asset-selector-markets* (fn [_store _opts]
+                                          (js/Promise.resolve {:phase :full
+                                                               :market-state {:markets []}}))
+        api-instance {:get-request-stats get-request-stats*
+                      :request-frontend-open-orders! (fn [_address _dex _opts] (js/Promise.resolve []))
+                      :request-clearinghouse-state! (fn [_address _dex _opts] (js/Promise.resolve nil))
+                      :request-user-fills! (fn [_address _opts] (js/Promise.resolve []))
+                      :request-spot-clearinghouse-state! (fn [_address _opts] (js/Promise.resolve nil))
+                      :request-user-abstraction! (fn [_address _opts] (js/Promise.resolve "default"))
+                      :ensure-perp-dexs-data! (fn [_store _opts] (js/Promise.resolve []))
+                      :request-asset-contexts! (fn [_opts] (js/Promise.resolve []))
+                      :request-asset-selector-markets! request-asset-selector-markets*}
+        deps (collaborators/startup-base-deps {:api api-instance})]
+    (is (identical? get-request-stats*
+                    (:get-request-stats deps)))))
+
+(deftest startup-base-deps-fetch-asset-contexts-uses-injected-api-request-test
+  (async done
+    (let [calls (atom 0)
+          deps (collaborators/startup-base-deps
+                {:api {:get-request-stats (fn [] {:source :injected})
+                       :request-frontend-open-orders! (fn [_address _dex _opts] (js/Promise.resolve []))
+                       :request-clearinghouse-state! (fn [_address _dex _opts] (js/Promise.resolve nil))
+                       :request-user-fills! (fn [_address _opts] (js/Promise.resolve []))
+                       :request-spot-clearinghouse-state! (fn [_address _opts] (js/Promise.resolve nil))
+                       :request-user-abstraction! (fn [_address _opts] (js/Promise.resolve "default"))
+                       :ensure-perp-dexs-data! (fn [_store _opts] (js/Promise.resolve []))
+                       :request-asset-contexts! (fn [_opts]
+                                                  (swap! calls inc)
+                                                  (js/Promise.resolve [{:coin "BTC"}]))
+                       :request-asset-selector-markets! (fn [_store _opts]
+                                                          (js/Promise.resolve {:phase :full
+                                                                               :market-state {:markets []}}))}})
+          store (atom {})]
+      (-> ((:fetch-asset-contexts! deps) store {})
+          (.then (fn [rows]
+                   (is (= [{:coin "BTC"}] rows))
+                   (is (= 1 @calls))
+                   (done)))
+          (.catch (fn [err]
+                    (is false (str "Unexpected error: " err))
+                    (done)))))))
