@@ -282,22 +282,6 @@
     (and (seq coin*)
          (str/starts-with? coin* "USDC"))))
 
-(defn- non-usdc-balance? [balance]
-  (not (usdc-coin? (:coin balance))))
-
-(defn- maybe-warn-balance-spot-meta-invariant!
-  [spot-meta spot-state]
-  (let [spot-balances (or (get spot-state :balances) [])
-        non-usdc-count (count (filter non-usdc-balance? spot-balances))
-        token-count (count (or (:tokens spot-meta) []))]
-    (when (and ^boolean goog.DEBUG
-               (pos? non-usdc-count)
-               (zero? token-count))
-      (js/console.warn
-       "Balance contract invariant warning: spot balances include non-USDC assets but spot meta tokens are empty."
-       (clj->js {:non-usdc-balance-count non-usdc-count
-                 :spot-meta-token-count token-count})))))
-
 (defn- normalize-coin-code [coin]
   (some-> coin str str/trim str/upper-case))
 
@@ -533,7 +517,6 @@
         unified? (unified-account-mode? account)
         spot-meta (:meta spot-data)
         spot-state (:clearinghouse-state spot-data)
-        _ (maybe-warn-balance-spot-meta-invariant! spot-meta spot-state)
         spot-asset-ctxs (:spotAssetCtxs webdata2)
         spot-tokens (or (:tokens spot-meta) [])
         price-by-token (build-token-usdc-price-map spot-meta spot-asset-ctxs market-by-key)
