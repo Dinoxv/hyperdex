@@ -55,6 +55,8 @@
             [hyperopen.runtime.collaborators-test]
             [hyperopen.runtime.registry-composition-test]
             [hyperopen.runtime.state-test]
+            [hyperopen.schema.contracts-test]
+            [hyperopen.runtime.validation-test]
             [hyperopen.state.app-defaults-test]
             [hyperopen.state.trading-test]))
 
@@ -116,6 +118,8 @@
              'hyperopen.runtime.collaborators-test
              'hyperopen.runtime.registry-composition-test
              'hyperopen.runtime.state-test
+             'hyperopen.schema.contracts-test
+             'hyperopen.runtime.validation-test
              'hyperopen.state.app-defaults-test
              'hyperopen.state.trading-test))
 

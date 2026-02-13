@@ -41,10 +41,18 @@
   (install-websocket-watchers!
    websocket-watchers-deps))
 
+(defn install-state-validation!
+  [{:keys [store
+           install-store-state-validation!]}]
+  (when (fn? install-store-state-validation!)
+    (install-store-state-validation! store)))
+
 (defn bootstrap-runtime!
   [{:keys [register-runtime-deps
            render-loop-deps
-           watchers-deps]}]
+           watchers-deps
+           validation-deps]}]
   (register-runtime! register-runtime-deps)
   (install-render-loop! render-loop-deps)
-  (install-runtime-watchers! watchers-deps))
+  (install-runtime-watchers! watchers-deps)
+  (install-state-validation! validation-deps))

@@ -1,5 +1,6 @@
 (ns hyperopen.websocket.acl.hyperliquid
-  (:require [hyperopen.websocket.domain.model :as model]))
+  (:require [hyperopen.schema.contracts :as contracts]
+            [hyperopen.websocket.domain.model :as model]))
 
 (defn parse-raw-envelope
   "Anti-corruption layer: map provider websocket raw payload into domain envelope.
@@ -7,6 +8,10 @@
   [{:keys [raw socket-id now-ms topic->tier source]}]
   (try
     (let [provider-message (js->clj (js/JSON.parse raw) :keywordize-keys true)
+          _ (when (contracts/validation-enabled?)
+              (contracts/assert-provider-message!
+               provider-message
+               {:boundary :ws-acl/parse-raw-envelope}))
           topic (:channel provider-message)]
       (if (string? topic)
         (let [tier (topic->tier topic)

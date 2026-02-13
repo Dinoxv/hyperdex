@@ -2,6 +2,7 @@
   (:require [clojure.string :as str]
             [hyperopen.asset-selector.markets :as markets]
             [hyperopen.platform :as platform]
+            [hyperopen.schema.contracts :as contracts]
             [hyperopen.wallet.agent-session :as agent-session]
             [hyperopen.utils.hl-signing :as signing]))
 
@@ -17,7 +18,12 @@
 (defn- parse-json! [resp]
   (-> (.json resp)
       (.then (fn [payload]
-               (js->clj payload :keywordize-keys true)))))
+               (let [parsed (js->clj payload :keywordize-keys true)]
+                 (when (contracts/validation-enabled?)
+                   (contracts/assert-exchange-response!
+                    parsed
+                    {:boundary :api-trading/parse-json}))
+                 parsed)))))
 
 (defn- nonce-error-response? [resp]
   (let [text (-> (or (:error resp)
@@ -139,6 +145,11 @@
                          :signature signature}
                   vault-address (assoc :vaultAddress vault-address)
                   expires-after (assoc :expiresAfter expires-after))]
+    (when (contracts/validation-enabled?)
+      (contracts/assert-signed-exchange-payload!
+       payload
+       {:boundary :api-trading/post-signed-action
+        :action-type (:type action)}))
     (json-post! exchange-url payload)))
 
 (defn- post-info!

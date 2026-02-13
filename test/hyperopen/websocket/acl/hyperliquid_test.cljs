@@ -36,3 +36,13 @@
     (testing "Payloads without provider channel are rejected by ACL"
       (is (contains? result :error))
       (is (not (contains? result :ok))))))
+
+(deftest parse-raw-envelope-empty-channel-test
+  (let [result (acl/parse-raw-envelope {:raw "{\"channel\":\"\",\"data\":[]}"
+                                        :socket-id 0
+                                        :now-ms (constantly 0)
+                                        :topic->tier (constantly :lossless)})]
+    (testing "Payloads with empty provider channel are rejected by ACL"
+      (is (contains? result :error))
+      (is (not (contains? result :ok))))))
+

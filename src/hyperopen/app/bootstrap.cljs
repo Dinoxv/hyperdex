@@ -5,6 +5,7 @@
             [hyperopen.runtime.bootstrap :as runtime-bootstrap]
             [hyperopen.runtime.effect-adapters :as runtime-effect-adapters]
             [hyperopen.runtime.state :as runtime-state]
+            [hyperopen.runtime.validation :as runtime-validation]
             [hyperopen.runtime.wiring :as runtime-wiring]
             [hyperopen.startup.watchers :as startup-watchers]
             [hyperopen.startup.wiring :as startup-wiring]
@@ -49,7 +50,10 @@
                                   runtime-store
                                   :force? force?))
        :on-websocket-connected! address-watcher/on-websocket-connected!
-       :on-websocket-disconnected! address-watcher/on-websocket-disconnected!})}}))
+       :on-websocket-disconnected! address-watcher/on-websocket-disconnected!})}
+    :validation-deps
+    {:store store
+     :install-store-state-validation! runtime-validation/install-store-state-validation!}}))
 
 (defn bootstrap-runtime!
   [{:keys [runtime store]}]

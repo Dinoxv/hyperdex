@@ -79,3 +79,28 @@
       :websocket-watchers-deps websocket-watchers-deps})
     (is (= [[store store-cache-watchers-deps]] @store-watcher-calls))
     (is (= [websocket-watchers-deps] @websocket-watcher-calls))))
+
+(deftest bootstrap-runtime-installs-state-validation-when-provided-test
+  (let [validation-calls (atom [])]
+    (runtime-bootstrap/bootstrap-runtime!
+     {:register-runtime-deps {:register-effects! (fn [& _] nil)
+                              :effect-handlers {}
+                              :register-actions! (fn [& _] nil)
+                              :action-handlers {}
+                              :register-system-state! (fn [] nil)
+                              :register-placeholders! (fn [] nil)}
+      :render-loop-deps {:store (atom {})
+                         :render-watch-key ::validation-test-render
+                         :set-dispatch! (fn [& _] nil)
+                         :dispatch! (fn [& _] nil)
+                         :render! (fn [& _] nil)
+                         :document? false}
+      :watchers-deps {:store (atom {})
+                      :install-store-cache-watchers! (fn [& _] nil)
+                      :store-cache-watchers-deps {}
+                      :install-websocket-watchers! (fn [& _] nil)
+                      :websocket-watchers-deps {}}
+      :validation-deps {:store :store-id
+                        :install-store-state-validation! (fn [store]
+                                                           (swap! validation-calls conj store))}})
+    (is (= [:store-id] @validation-calls))))

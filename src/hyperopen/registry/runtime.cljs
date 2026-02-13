@@ -1,5 +1,6 @@
 (ns hyperopen.registry.runtime
-  (:require [nexus.registry :as nxr]))
+  (:require [nexus.registry :as nxr]
+            [hyperopen.runtime.validation :as runtime-validation]))
 
 (def ^:private effect-bindings
   [[:effects/save :save]
@@ -155,14 +156,20 @@
 (defn register-effects!
   [handlers]
   (doseq [[effect-id handler-key] effect-bindings]
-    (nxr/register-effect! effect-id
-                          (require-handler handlers handler-key :effect effect-id))))
+    (nxr/register-effect!
+     effect-id
+     (runtime-validation/wrap-effect-handler
+      effect-id
+      (require-handler handlers handler-key :effect effect-id)))))
 
 (defn register-actions!
   [handlers]
   (doseq [[action-id handler-key] action-bindings]
-    (nxr/register-action! action-id
-                          (require-handler handlers handler-key :action action-id))))
+    (nxr/register-action!
+     action-id
+     (runtime-validation/wrap-action-handler
+      action-id
+      (require-handler handlers handler-key :action action-id)))))
 
 (defn register-system-state!
   []
