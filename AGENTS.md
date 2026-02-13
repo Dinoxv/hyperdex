@@ -6,6 +6,9 @@
 - `.cursorrules` and `GUIDELINES.md` remain important context documents, but they are not the primary agent contract.
 - This document is repo-wide and includes strict websocket runtime standards.
 
+## ExecPlans
+- When writing complex features or significant refactors, use an ExecPlan (as described in `.agents/PLANS.md`) from design to implementation.
+
 ## UI Guidance (UI Tasks Only)
 - Apply UI guidance only when tasks touch UI-facing code such as `/hyperopen/src/hyperopen/views/**`, `/hyperopen/src/styles/**`, or user interaction flows (selectors/modals/dropdowns/forms/tables).
 - For UI-facing tasks, this file remains the primary contract and runtime authority.
