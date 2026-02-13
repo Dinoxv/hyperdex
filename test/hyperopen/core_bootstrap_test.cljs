@@ -112,18 +112,22 @@
                   address-watcher/init-with-webdata2! (fn [& _] nil)
                   address-watcher/add-handler! (fn [& _] nil)
                   address-watcher/sync-current-address! (fn [& _] nil)
-                  api/fetch-asset-contexts! (fn fetch-asset-contexts-mock
-                                              ([store]
-                                               (fetch-asset-contexts-mock store {}))
-                                              ([_ _]
-                                               (swap! critical-fetches inc)
-                                               (js/Promise.resolve nil)))
-                  api/fetch-asset-selector-markets! (fn fetch-asset-selector-markets-mock
-                                                      ([store]
-                                                       (fetch-asset-selector-markets-mock store {:phase :full}))
-                                                      ([_ opts]
-                                                       (swap! phases conj (:phase opts))
-                                                       (js/Promise.resolve [])))
+                  api/request-asset-contexts! (fn request-asset-contexts-mock
+                                                ([]
+                                                 (request-asset-contexts-mock {}))
+                                                ([_opts]
+                                                 (swap! critical-fetches inc)
+                                                 (js/Promise.resolve {})))
+                  api/request-asset-selector-markets! (fn [store opts]
+                                                        (let [phase (if (= :bootstrap (:phase opts))
+                                                                      :bootstrap
+                                                                      :full)]
+                                                          (swap! phases conj phase)
+                                                          (js/Promise.resolve {:phase phase
+                                                                               :market-state {:markets []
+                                                                                              :market-by-key {}
+                                                                                              :active-market nil
+                                                                                              :loaded-at-ms 1}})))
                   app-startup/schedule-idle-or-timeout! (fn [f]
                                                           (reset! deferred-callback f)
                                                           :scheduled)]
@@ -293,48 +297,50 @@
   (async done
     (let [stage-a-calls (atom [])
           stage-b-calls (atom [])
-          original-fetch-open-orders api/fetch-frontend-open-orders!
-          original-fetch-user-fills api/fetch-user-fills!
-          original-fetch-spot-state api/fetch-spot-clearinghouse-state!
-          original-fetch-user-abstraction api/fetch-user-abstraction!
-          original-ensure-perp-dexs api/ensure-perp-dexs!
+          original-request-open-orders api/request-frontend-open-orders!
+          original-request-user-fills api/request-user-fills!
+          original-request-spot-state api/request-spot-clearinghouse-state!
+          original-request-user-abstraction api/request-user-abstraction!
+          original-ensure-perp-dexs-data api/ensure-perp-dexs-data!
           original-fetch-and-merge-funding-history account-history-effects/fetch-and-merge-funding-history!
           original-stage-b app-startup/stage-b-account-bootstrap!]
       (swap! app-core/store assoc-in [:wallet :address] "0xabc")
-      (set! api/fetch-frontend-open-orders!
-            (fn fetch-frontend-open-orders-mock
-              ([store address]
-               (fetch-frontend-open-orders-mock store address nil {}))
-              ([store address dex-or-opts]
-               (fetch-frontend-open-orders-mock store address dex-or-opts {}))
-              ([store address dex opts]
-               (swap! stage-a-calls conj [:open-orders [store address dex opts]])
+      (set! api/request-frontend-open-orders!
+            (fn request-frontend-open-orders-mock
+              ([address]
+               (request-frontend-open-orders-mock address nil {}))
+              ([address dex-or-opts]
+               (if (map? dex-or-opts)
+                 (request-frontend-open-orders-mock address nil dex-or-opts)
+                 (request-frontend-open-orders-mock address dex-or-opts {})))
+              ([address dex opts]
+               (swap! stage-a-calls conj [:open-orders [address dex opts]])
                (js/Promise.resolve nil))))
-      (set! api/fetch-user-fills!
-            (fn fetch-user-fills-mock
-              ([store address]
-               (fetch-user-fills-mock store address {}))
-              ([store address opts]
-               (swap! stage-a-calls conj [:fills [store address opts]])
+      (set! api/request-user-fills!
+            (fn request-user-fills-mock
+              ([address]
+               (request-user-fills-mock address {}))
+              ([address opts]
+               (swap! stage-a-calls conj [:fills [address opts]])
                (js/Promise.resolve nil))))
-      (set! api/fetch-spot-clearinghouse-state!
-            (fn fetch-spot-clearinghouse-state-mock
-              ([store address]
-               (fetch-spot-clearinghouse-state-mock store address {}))
-              ([store address opts]
-               (swap! stage-a-calls conj [:spot [store address opts]])
+      (set! api/request-spot-clearinghouse-state!
+            (fn request-spot-clearinghouse-state-mock
+              ([address]
+               (request-spot-clearinghouse-state-mock address {}))
+              ([address opts]
+               (swap! stage-a-calls conj [:spot [address opts]])
                (js/Promise.resolve nil))))
-      (set! api/fetch-user-abstraction!
-            (fn fetch-user-abstraction-mock
-              ([store address]
-               (fetch-user-abstraction-mock store address {}))
-              ([store address opts]
-               (swap! stage-a-calls conj [:abstraction [store address opts]])
-               (js/Promise.resolve nil))))
-      (set! api/ensure-perp-dexs!
-            (fn ensure-perp-dexs-mock
+      (set! api/request-user-abstraction!
+            (fn request-user-abstraction-mock
+              ([address]
+               (request-user-abstraction-mock address {}))
+              ([address opts]
+               (swap! stage-a-calls conj [:abstraction [address opts]])
+               (js/Promise.resolve "default"))))
+      (set! api/ensure-perp-dexs-data!
+            (fn ensure-perp-dexs-data-mock
               ([store]
-               (ensure-perp-dexs-mock store {}))
+               (ensure-perp-dexs-data-mock store {}))
               ([_ _]
                (js/Promise.resolve ["dex-1" "dex-2"]))))
       (set! account-history-effects/fetch-and-merge-funding-history!
@@ -345,11 +351,11 @@
             (fn [_system address dexs]
               (swap! stage-b-calls conj [address dexs])))
         (letfn [(restore! []
-                (set! api/fetch-frontend-open-orders! original-fetch-open-orders)
-                (set! api/fetch-user-fills! original-fetch-user-fills)
-                (set! api/fetch-spot-clearinghouse-state! original-fetch-spot-state)
-                (set! api/fetch-user-abstraction! original-fetch-user-abstraction)
-                (set! api/ensure-perp-dexs! original-ensure-perp-dexs)
+                (set! api/request-frontend-open-orders! original-request-open-orders)
+                (set! api/request-user-fills! original-request-user-fills)
+                (set! api/request-spot-clearinghouse-state! original-request-spot-state)
+                (set! api/request-user-abstraction! original-request-user-abstraction)
+                (set! api/ensure-perp-dexs-data! original-ensure-perp-dexs-data)
                 (set! account-history-effects/fetch-and-merge-funding-history! original-fetch-and-merge-funding-history)
                 (set! app-startup/stage-b-account-bootstrap! original-stage-b))]
         (app-startup/bootstrap-account-data!

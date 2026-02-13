@@ -12,6 +12,7 @@ Application modules were still consuming `api/fetch-*` helpers that mutate store
 1. Adopt request-only API calls in additional application modules:
    - `/hyperopen/src/hyperopen/order/effects.cljs`
    - `/hyperopen/src/hyperopen/account/history/effects.cljs`
+   - `/hyperopen/src/hyperopen/startup/collaborators.cljs`
 2. Keep state projection ownership in application/effects by applying projection helpers after request completion.
 3. Add centralized API error normalization boundary:
    - `/hyperopen/src/hyperopen/api/errors.cljs`
@@ -28,6 +29,9 @@ Application modules were still consuming `api/fetch-*` helpers that mutate store
 - Open orders refresh-after-cancel projection ownership:
   - `/hyperopen/src/hyperopen/order/effects.cljs`
   - `refresh-open-orders-snapshot!`
+- Startup bootstrap projection ownership:
+  - `/hyperopen/src/hyperopen/startup/collaborators.cljs`
+  - `fetch-frontend-open-orders!`, `fetch-user-fills!`, `fetch-spot-clearinghouse-state!`, `fetch-asset-contexts!`
 - API error category normalization ownership:
   - `/hyperopen/src/hyperopen/api/errors.cljs`
   - `normalize-error`
