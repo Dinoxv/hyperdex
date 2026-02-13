@@ -36,12 +36,14 @@
         selected-timeframe (get-in state [:chart-options :selected-timeframe] :1d)
         interval-ms (interval/interval-to-milliseconds selected-timeframe)]
     (when (and active-asset (seq trades))
-      (let [normalized (->> trades
-                            (map policy/normalize-trade)
-                            (filter #(and (:time-ms %) (:price %)))
-                            (filter (fn [trade]
-                                      (or (nil? (:coin trade))
-                                          (= active-asset (:coin trade)))))
+      (let [normalize-trades-xf (comp
+                                  (map policy/normalize-trade)
+                                  (filter #(and (:time-ms %) (:price %)))
+                                  (filter (fn [trade]
+                                            (or (nil? (:coin trade))
+                                                (= active-asset (:coin trade))))))
+            normalized (->> trades
+                            (into [] normalize-trades-xf)
                             (sort-by :time-ms))
             update-fn (fn [entry]
                         (let [raw (cond

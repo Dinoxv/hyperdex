@@ -77,10 +77,11 @@
 
 (defn normalize-info-funding-rows
   [rows]
-  (->> rows
-       (map normalize-info-funding-row)
-       (remove nil?)
-       vec))
+  (into []
+        (comp
+          (map normalize-info-funding-row)
+          (keep identity))
+        rows))
 
 (defn normalize-ws-funding-row
   [row]
@@ -93,10 +94,11 @@
 
 (defn normalize-ws-funding-rows
   [rows]
-  (->> rows
-       (map normalize-ws-funding-row)
-       (remove nil?)
-       vec))
+  (into []
+        (comp
+          (map normalize-ws-funding-row)
+          (keep identity))
+        rows))
 
 (defn sort-funding-history-rows
   [rows]
@@ -145,14 +147,14 @@
   [rows filters]
   (let [{:keys [coin-set start-time-ms end-time-ms]} filters
         use-coin-filter? (seq coin-set)]
-    (->> (or rows [])
-         (filter (fn [row]
-                   (let [time-ms (:time-ms row)
-                         coin (:coin row)]
-                     (and (number? time-ms)
-                          (>= time-ms start-time-ms)
-                          (<= time-ms end-time-ms)
-                          (or (not use-coin-filter?)
-                              (contains? coin-set coin))))))
-         sort-funding-history-rows
-         vec)))
+    (-> (into []
+              (filter (fn [row]
+                        (let [time-ms (:time-ms row)
+                              coin (:coin row)]
+                          (and (number? time-ms)
+                               (>= time-ms start-time-ms)
+                               (<= time-ms end-time-ms)
+                               (or (not use-coin-filter?)
+                                   (contains? coin-set coin))))))
+              (or rows []))
+        sort-funding-history-rows)))

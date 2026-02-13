@@ -199,28 +199,30 @@
 (defn- extract-trades-coins [payload]
   (let [rows (:data payload)]
     (if (sequential? rows)
-      (->> rows
-           (map (fn [row]
-                  (or (normalized-string (:coin row))
-                      (normalized-string (:symbol row))
-                      (normalized-string (:asset row)))))
-           (keep identity)
-           distinct
-           vec)
+      (into []
+            (comp
+              (map (fn [row]
+                     (or (normalized-string (:coin row))
+                         (normalized-string (:symbol row))
+                         (normalized-string (:asset row)))))
+              (keep identity)
+              (distinct))
+            rows)
       [])))
 
 (defn- extract-user-candidates [payload]
-  (->> [(:user payload)
-        (:address payload)
-        (:walletAddress payload)
-        (get-in payload [:data :user])
-        (get-in payload [:data :address])
-        (get-in payload [:data :walletAddress])
-        (get-in payload [:data :wallet])]
-       (map normalized-string)
-       (keep identity)
-       distinct
-       vec))
+  (into []
+        (comp
+          (map normalized-string)
+          (keep identity)
+          (distinct))
+        [(:user payload)
+         (:address payload)
+         (:walletAddress payload)
+         (get-in payload [:data :user])
+         (get-in payload [:data :address])
+         (get-in payload [:data :walletAddress])
+         (get-in payload [:data :wallet])]))
 
 (def ^:private topic->matcher
   {"l2Book" (fn [payload]
@@ -262,25 +264,34 @@
   [streams envelope]
   (let [topic (:topic envelope)
         payload (:payload envelope)
-        active-entries (->> (or streams {})
-                            (filter (fn [[_ stream]]
-                                      (let [stream-topic (or (:topic stream)
-                                                             (get-in stream [:descriptor :type]))]
-                                        (and (:subscribed? stream)
-                                             (= topic stream-topic)))))
-                            vec)
-        active-keys (set (map first active-entries))
-        descriptor-keys (->> (descriptor-candidates {:topic topic :payload payload})
-                             (map model/subscription-key)
-                             (filter active-keys)
-                             distinct
-                             vec)]
+        {:keys [active-count active-keys lone-key]}
+        (reduce (fn [{:keys [active-count] :as acc} [sub-key stream]]
+                  (let [stream-topic (or (:topic stream)
+                                         (get-in stream [:descriptor :type]))]
+                    (if (and (:subscribed? stream)
+                             (= topic stream-topic))
+                      (-> acc
+                          (update :active-count inc)
+                          (update :active-keys conj sub-key)
+                          (cond-> (zero? active-count)
+                            (assoc :lone-key sub-key)))
+                      acc)))
+                {:active-count 0
+                 :active-keys #{}
+                 :lone-key nil}
+                (or streams {}))
+        descriptor-keys (into []
+                              (comp
+                                (map model/subscription-key)
+                                (filter #(contains? active-keys %))
+                                (distinct))
+                              (descriptor-candidates {:topic topic :payload payload}))]
     (cond
       (seq descriptor-keys)
       descriptor-keys
 
-      (= 1 (count active-entries))
-      [(ffirst active-entries)]
+      (= 1 active-count)
+      [lone-key]
 
       :else
       [])))

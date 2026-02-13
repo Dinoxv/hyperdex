@@ -38,6 +38,7 @@
             [hyperopen.websocket.client-test]
             [hyperopen.websocket.orderbook-policy-test]
             [hyperopen.websocket.trades-policy-test]
+            [hyperopen.websocket.trades-test]
             [hyperopen.views.active-asset-view-test]
             [hyperopen.views.app-shell-spacing-test]
             [hyperopen.views.asset-selector-view-test]
@@ -105,6 +106,7 @@
              'hyperopen.websocket.client-test
              'hyperopen.websocket.orderbook-policy-test
              'hyperopen.websocket.trades-policy-test
+             'hyperopen.websocket.trades-test
              'hyperopen.views.active-asset-view-test
              'hyperopen.views.app-shell-spacing-test
              'hyperopen.views.asset-selector-view-test

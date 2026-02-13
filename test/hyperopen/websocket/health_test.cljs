@@ -125,6 +125,35 @@
     (is (= [eth-key]
            (health/match-stream-keys streams envelope)))))
 
+(deftest trades-matcher-dedupes-candidate-keys-and-ignores-unsubscribed-streams-test
+  (let [btc {:type "trades" :coin "BTC"}
+        eth {:type "trades" :coin "ETH"}
+        sol {:type "trades" :coin "SOL"}
+        btc-key (model/subscription-key btc)
+        eth-key (model/subscription-key eth)
+        sol-key (model/subscription-key sol)
+        streams {btc-key (mk-stream {:subscribed? true
+                                     :topic "trades"
+                                     :descriptor btc
+                                     :stale-threshold-ms 10000})
+                 eth-key (mk-stream {:subscribed? true
+                                     :topic "trades"
+                                     :descriptor eth
+                                     :stale-threshold-ms 10000})
+                 sol-key (mk-stream {:subscribed? false
+                                     :topic "trades"
+                                     :descriptor sol
+                                     :stale-threshold-ms 10000})}
+        envelope {:topic "trades"
+                  :payload {:channel "trades"
+                            :data [{:coin "ETH"}
+                                   {:coin "ETH"}
+                                   {:symbol "BTC"}
+                                   {:asset "SOL"}
+                                   {:coin "BTC"}]}}]
+    (is (= [eth-key btc-key]
+           (health/match-stream-keys streams envelope)))))
+
 (deftest user-channel-fixture-matching-prefers-user-and-avoids-ambiguous-fallback-test
   (let [alice {:type "openOrders" :user "0xalice"}
         bob {:type "openOrders" :user "0xbob"}
@@ -149,6 +178,23 @@
                                        {:topic "openOrders"
                                         :payload {:channel "openOrders"
                                                   :data {:openOrders []}}}))))))
+
+(deftest user-channel-single-active-stream-falls-back-when-payload-lacks-user-test
+  (let [alice {:type "openOrders" :user "0xalice"}
+        bob {:type "openOrders" :user "0xbob"}
+        alice-key (model/subscription-key alice)
+        bob-key (model/subscription-key bob)
+        streams {alice-key (mk-stream {:subscribed? true
+                                       :topic "openOrders"
+                                       :descriptor alice})
+                 bob-key (mk-stream {:subscribed? false
+                                     :topic "openOrders"
+                                     :descriptor bob})}]
+    (is (= [alice-key]
+           (health/match-stream-keys streams
+                                     {:topic "openOrders"
+                                      :payload {:channel "openOrders"
+                                                :data {:openOrders []}}})))))
 
 (deftest health-snapshot-includes-seq-gap-fields-and-group-rollup-test
   (let [sub-key ["trades" "BTC" nil nil nil]
