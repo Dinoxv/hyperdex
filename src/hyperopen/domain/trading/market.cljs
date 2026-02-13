@@ -39,8 +39,7 @@
                           liquidation)}))
 
 (defn- size-decimals [context]
-  (let [sz-decimals (or (:sz-decimals context)
-                        (get-in context [:active-market :szDecimals]))
+  (let [sz-decimals (get-in context [:market :szDecimals])
         parsed (core/parse-num sz-decimals)]
     (-> (or parsed 4)
         (max 0)
@@ -182,8 +181,8 @@
         best-px (if (= side :buy)
                   (best-ask-price context)
                   (best-bid-price context))
-        projected-mark (core/parse-num (get-in context [:active-market :mark]))
-        streamed-mark (core/parse-num (:streamed-mark context))]
+        projected-mark (core/parse-num (get-in context [:market :mark]))
+        streamed-mark (core/parse-num (get-in context [:market :streamed-mark]))]
     (cond
       (and (number? limit-price) (pos? limit-price)) limit-price
       (and (number? best-px) (pos? best-px)) best-px

@@ -109,6 +109,7 @@
         side (:side form)
         size (trading-domain/parse-num (:size form))
         scale (get-in form [:scale])
+        sz-decimals (get-in command-context [:market :szDecimals])
         orders (when (and asset-idx size)
                  (build-scale-orders
                   asset-idx
@@ -116,7 +117,7 @@
                   {:size size
                    :count (:count scale)
                    :skew (:skew scale)
-                   :sz-decimals (:sz-decimals command-context)}
+                   :sz-decimals sz-decimals}
                   (get scale :start)
                   (get scale :end)
                   (:reduce-only form)

@@ -42,19 +42,14 @@
       (get-in state [:webdata2 :clearinghouseState]))))
 
 (defn- trading-context [state]
-  (let [active-asset (:active-asset state)]
-    {:active-asset active-asset
-     :active-market (:active-market state)
-     :orderbook (get-in state [:orderbooks active-asset])
-     :streamed-mark (get-in state [:active-assets :contexts active-asset :mark])
-     :clearinghouse (or (active-clearinghouse-state state) {})
-     :sz-decimals (get-in state [:active-market :szDecimals])}))
-
-(defn- order-command-context [state]
-  (let [active-asset (:active-asset state)]
+  (let [active-asset (:active-asset state)
+        streamed-mark (get-in state [:active-assets :contexts active-asset :mark])]
     {:active-asset active-asset
      :asset-idx (get-in state [:asset-contexts (keyword active-asset) :idx])
-     :sz-decimals (get-in state [:active-market :szDecimals])}))
+     :orderbook (get-in state [:orderbooks active-asset])
+     :market (cond-> (or (:active-market state) {})
+               (some? streamed-mark) (assoc :streamed-mark streamed-mark))
+     :clearinghouse (or (active-clearinghouse-state state) {})}))
 
 (defn market-max-leverage [state]
   (trading-domain/market-max-leverage (trading-context state)))
@@ -165,10 +160,10 @@
 (defn build-order-action
   "Return {:action action :grouping grouping}"
   [state form]
-  (order-commands/build-order-action (order-command-context state) form))
+  (order-commands/build-order-action (trading-context state) form))
 
 (defn build-twap-action [state form]
-  (order-commands/build-twap-action (order-command-context state) form))
+  (order-commands/build-twap-action (trading-context state) form))
 
 (defn best-price [state side]
   (trading-domain/best-price (trading-context state) side))
@@ -196,4 +191,4 @@
                                  (nil? market-form))}))
 
 (defn build-order-request [state form]
-  (order-commands/build-order-request (order-command-context state) form))
+  (order-commands/build-order-request (trading-context state) form))

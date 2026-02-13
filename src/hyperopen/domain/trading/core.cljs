@@ -193,7 +193,7 @@
       :stop-market)))
 
 (defn market-max-leverage [context]
-  (let [max-lev (parse-num (get-in context [:active-market :maxLeverage]))]
+  (let [max-lev (parse-num (get-in context [:market :maxLeverage]))]
     (when (and (number? max-lev) (pos? max-lev))
       max-lev)))
 

@@ -127,7 +127,7 @@
          scale-end (core/parse-num (get-in form [:scale :end]))
          scale-count (core/parse-num (get-in form [:scale :count]))
          scale-skew (get-in form [:scale :skew])
-         scale-sz-decimals (or (:sz-decimals context)
+         scale-sz-decimals (or (get-in context [:market :szDecimals])
                                (:sz-decimals form)
                                (get-in form [:scale :sz-decimals]))
          scale-legs (when (= :scale order-type)
