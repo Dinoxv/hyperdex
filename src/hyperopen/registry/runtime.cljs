@@ -85,6 +85,7 @@
    [:actions/toggle-chart-type-dropdown :toggle-chart-type-dropdown]
    [:actions/select-chart-type :select-chart-type]
    [:actions/toggle-indicators-dropdown :toggle-indicators-dropdown]
+   [:actions/update-indicators-search :update-indicators-search]
    [:actions/toggle-orderbook-size-unit-dropdown :toggle-orderbook-size-unit-dropdown]
    [:actions/select-orderbook-size-unit :select-orderbook-size-unit]
    [:actions/toggle-orderbook-price-aggregation-dropdown :toggle-orderbook-price-aggregation-dropdown]

@@ -104,6 +104,7 @@
     toggle-chart-type-dropdown
     select-chart-type
     toggle-indicators-dropdown
+    update-indicators-search
     toggle-orderbook-size-unit-dropdown
     select-orderbook-size-unit
     toggle-orderbook-price-aggregation-dropdown

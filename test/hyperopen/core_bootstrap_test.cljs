@@ -1803,9 +1803,27 @@
                  {:chart-options {:timeframes-dropdown-visible true
                                   :chart-type-dropdown-visible true
                                   :indicators-dropdown-visible false}})]
-    (is (= [[:effects/save-many [[[:chart-options :timeframes-dropdown-visible] false]
+    (is (= [[:effects/save-many [[[:chart-options :indicators-search-term] ""]
+                                 [[:chart-options :timeframes-dropdown-visible] false]
                                  [[:chart-options :chart-type-dropdown-visible] false]
                                  [[:chart-options :indicators-dropdown-visible] true]]]]
+           effects))))
+
+(deftest update-indicators-search-saves-string-value-test
+  (let [effects (core/update-indicators-search {} "sma")]
+    (is (= [[:effects/save [:chart-options :indicators-search-term] "sma"]]
+           effects))))
+
+(deftest toggle-open-indicators-dropdown-clears-search-and-closes-all-chart-menus-test
+  (let [effects (core/toggle-indicators-dropdown
+                 {:chart-options {:timeframes-dropdown-visible true
+                                  :chart-type-dropdown-visible false
+                                  :indicators-dropdown-visible true
+                                  :indicators-search-term "moving"}})]
+    (is (= [[:effects/save-many [[[:chart-options :indicators-search-term] ""]
+                                 [[:chart-options :timeframes-dropdown-visible] false]
+                                 [[:chart-options :chart-type-dropdown-visible] false]
+                                 [[:chart-options :indicators-dropdown-visible] false]]]]
            effects))))
 
 (deftest toggle-open-chart-menu-closes-all-chart-menus-test

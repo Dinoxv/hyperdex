@@ -100,6 +100,9 @@
 (def toggle-indicators-dropdown
   chart-actions/toggle-indicators-dropdown)
 
+(def update-indicators-search
+  chart-actions/update-indicators-search)
+
 (def toggle-orderbook-size-unit-dropdown
   orderbook-actions/toggle-orderbook-size-unit-dropdown)
 

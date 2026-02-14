@@ -142,6 +142,32 @@
     (is (contains? classes "text-trading-green"))
     (is (not (contains? classes "bg-blue-600")))))
 
+(deftest chart-top-menu-indicators-dropdown-renders-search-input-test
+  (let [menu (chart-core/chart-top-menu {:chart-options {:timeframes-dropdown-visible false
+                                                          :selected-timeframe :1d
+                                                          :chart-type-dropdown-visible false
+                                                          :selected-chart-type :candlestick
+                                                          :indicators-dropdown-visible true
+                                                          :indicators-search-term "sm"
+                                                          :active-indicators {}}})
+        search-node (find-first-node menu #(= "chart-indicators-search" (get-in % [1 :id])))]
+    (is (some? search-node))
+    (is (= [[:actions/update-indicators-search [:event.target/value]]]
+           (get-in search-node [1 :on :input])))))
+
+(deftest chart-top-menu-indicator-rows-use-full-row-click-add-action-test
+  (let [menu (chart-core/chart-top-menu {:chart-options {:timeframes-dropdown-visible false
+                                                          :selected-timeframe :1d
+                                                          :chart-type-dropdown-visible false
+                                                          :selected-chart-type :candlestick
+                                                          :indicators-dropdown-visible true
+                                                          :indicators-search-term ""
+                                                          :active-indicators {}}})
+        add-node (find-first-node menu #(= [[:actions/add-indicator :sma {:period 20}]]
+                                            (get-in % [1 :on :click])))]
+    (is (some? add-node))
+    (is (= :button (first add-node)))))
+
 (deftest chart-top-menu-renders-trades-freshness-cue-from-health-snapshot-test
   (let [menu (chart-core/chart-top-menu {:active-asset "BTC"
                                          :websocket-ui {:show-surface-freshness-cues? true}

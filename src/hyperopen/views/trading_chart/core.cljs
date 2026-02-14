@@ -19,6 +19,7 @@
         selected-chart-type (get-in state [:chart-options :selected-chart-type] :candlestick)
         indicators-dropdown-visible (get-in state [:chart-options :indicators-dropdown-visible])
         active-indicators (get-in state [:chart-options :active-indicators] {})
+        indicators-search-term (get-in state [:chart-options :indicators-search-term] "")
         show-surface-freshness-cues?
         (boolean (get-in state [:websocket-ui :show-surface-freshness-cues?] false))
         websocket-health (or (:websocket-health state)
@@ -71,10 +72,11 @@
                    (when (seq active-indicators) 
                      (str " (" (count active-indicators) ")")))]
        [:span.inline-block.transition-transform.duration-200.ease-in-out
-         {:class (if indicators-dropdown-visible "rotate-180" "rotate-0")}
+         {:class (if indicators-dropdown-visible ["rotate-180"] ["rotate-0"])}
          "▼"]]
        (indicators-dropdown {:indicators-dropdown-visible indicators-dropdown-visible
-                            :active-indicators active-indicators})]]
+                            :active-indicators active-indicators
+                            :search-term indicators-search-term})]]
 
      (when freshness-cue
        ^{:replicant/key "chart-freshness-cue"}

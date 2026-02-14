@@ -180,6 +180,7 @@
            toggle-chart-type-dropdown
            select-chart-type
            toggle-indicators-dropdown
+           update-indicators-search
            toggle-orderbook-size-unit-dropdown
            select-orderbook-size-unit
            toggle-orderbook-price-aggregation-dropdown
@@ -193,6 +194,7 @@
    :toggle-chart-type-dropdown toggle-chart-type-dropdown
    :select-chart-type select-chart-type
    :toggle-indicators-dropdown toggle-indicators-dropdown
+   :update-indicators-search update-indicators-search
    :toggle-orderbook-size-unit-dropdown toggle-orderbook-size-unit-dropdown
    :select-orderbook-size-unit select-orderbook-size-unit
    :toggle-orderbook-price-aggregation-dropdown toggle-orderbook-price-aggregation-dropdown

@@ -200,6 +200,7 @@
    :actions/toggle-chart-type-dropdown ::no-args
    :actions/select-chart-type ::keyword-args
    :actions/toggle-indicators-dropdown ::no-args
+   :actions/update-indicators-search ::single-input-args
    :actions/toggle-orderbook-size-unit-dropdown ::no-args
    :actions/select-orderbook-size-unit ::keyword-or-string-args
    :actions/toggle-orderbook-price-aggregation-dropdown ::no-args

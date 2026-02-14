@@ -40,4 +40,13 @@
   [state]
   (let [current-visible (boolean (get-in state [:chart-options :indicators-dropdown-visible]))
         open-dropdown (when-not current-visible :indicators)]
-    [(chart-dropdown-projection-effect open-dropdown)]))
+    [(chart-dropdown-projection-effect open-dropdown
+                                       [[[:chart-options :indicators-search-term] ""]])]))
+
+(defn update-indicators-search
+  [_state value]
+  [[:effects/save
+    [:chart-options :indicators-search-term]
+    (if (string? value)
+      value
+      (str (or value "")))]])

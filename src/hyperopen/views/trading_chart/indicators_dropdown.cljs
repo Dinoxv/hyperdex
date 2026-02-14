@@ -1,46 +1,128 @@
 (ns hyperopen.views.trading-chart.indicators-dropdown
-  (:require [hyperopen.views.trading-chart.utils.indicators :as indicators]))
+  (:require [clojure.string :as str]
+            [hyperopen.views.trading-chart.utils.indicators :as indicators]))
+
+(defn- includes-query?
+  [value query]
+  (str/includes? (str/lower-case (or value "")) query))
 
 (defn indicators-dropdown
-  "Dropdown component for selecting and managing indicators"
-  [{:keys [indicators-dropdown-visible active-indicators]}]
-  [:div.relative
-   (when indicators-dropdown-visible
-     [:div
-      {:class ["absolute" "left-0" "top-full" "mt-1" "w-80"
-               "bg-base-100" "opacity-100" "border" "border-base-300"
-               "rounded-lg" "shadow-lg" "z-[120]" "isolate" "p-4"]}
-      [:div.text-white.font-medium.mb-3 "Add Indicators"]
-      
-      ;; Available indicators list
-      [:div.space-y-2.mb-4
-       (for [indicator (indicators/get-available-indicators)]
-         [:div.flex.items-center.justify-between.p-2.hover:bg-gray-700.rounded
-          {:key (:id indicator)}
-          [:div.flex.flex-col
-           [:span.text-white.text-sm (:name indicator)]
-           [:span.text-gray-400.text-xs (:description indicator)]]
-          [:button.px-3.py-1.bg-blue-600.hover:bg-blue-700.text-white.text-sm.rounded.transition-colors
-           {:on {:click [[:actions/add-indicator (:id indicator) {:period (:default-period indicator)}]]}}
-           "Add"]])]
-      
-      ;; Active indicators management
-      (when (seq active-indicators)
+  "Dropdown component for selecting and managing indicators."
+  [{:keys [indicators-dropdown-visible active-indicators search-term]}]
+  (let [available-indicators (indicators/get-available-indicators)
+        indicator-by-id (into {} (map (juxt :id identity)) available-indicators)
+        query (str/lower-case (str/trim (or search-term "")))
+        filtered-indicators (if (str/blank? query)
+                              available-indicators
+                              (filter (fn [indicator]
+                                        (or (includes-query? (:name indicator) query)
+                                            (includes-query? (:short-name indicator) query)
+                                            (includes-query? (:description indicator) query)))
+                                      available-indicators))]
+    [:div.relative
+     (when indicators-dropdown-visible
+       [:div
+        {:class ["absolute" "left-0" "top-full" "mt-1" "w-[22rem]"
+                 "bg-base-100" "opacity-100" "border" "border-base-300"
+                 "rounded-lg" "shadow-lg" "z-[120]" "isolate" "overflow-hidden"]}
         [:div
-         [:div.text-white.font-medium.mb-2.border-t.border-base-300.pt-3 "Active Indicators"]
-         [:div.space-y-2
-          (for [[indicator-id config] active-indicators]
-            (let [indicator-info (first (filter #(= (:id %) indicator-id) (indicators/get-available-indicators)))]
-              [:div.flex.items-center.justify-between.p-2.bg-gray-700.rounded
-               {:key indicator-id}
-               [:div.flex.items-center.space-x-2
-                [:span.text-white.text-sm (:short-name indicator-info)]
-                [:input.w-16.px-2.py-1.bg-gray-600.text-white.text-sm.rounded.border.border-gray-500
-                 {:type "number"
-                  :value (:period config)
-                  :min (:min-period indicator-info)
-                  :max (:max-period indicator-info)
-                  :on {:change [[:actions/update-indicator-period indicator-id [:event.target/value]]]}}]]
-               [:button.px-2.py-1.bg-red-600.hover:bg-red-700.text-white.text-xs.rounded.transition-colors
-                {:on {:click [[:actions/remove-indicator indicator-id]]}}
-                "Remove"]]))]])])]) 
+         {:class ["flex" "items-center" "justify-between" "px-4" "py-3" "border-b" "border-base-300"]}
+         [:h3 {:class ["text-white" "text-lg" "font-medium"]} "Indicators"]
+         [:button
+          {:type "button"
+           :class ["h-7" "w-7" "rounded" "text-gray-300" "hover:text-white" "hover:bg-base-200"
+                   "focus:outline-none" "focus-visible:ring-1" "focus-visible:ring-base-content/40"]
+           :on {:click [[:actions/toggle-indicators-dropdown]]}
+           :aria-label "Close indicators menu"}
+          "×"]]
+        [:div
+         {:class ["px-4" "py-3" "border-b" "border-base-300"]}
+         [:label {:for "chart-indicators-search"
+                  :class ["sr-only"]}
+          "Search indicators"]
+         [:div
+          {:class ["flex" "items-center" "gap-2" "px-3" "py-2" "rounded-md" "border" "border-base-300"
+                   "bg-base-200/50"]}
+          [:svg
+           {:class ["h-4" "w-4" "text-gray-400"]
+            :viewBox "0 0 20 20"
+            :fill "none"
+            :stroke "currentColor"
+            :stroke-width "2"
+            :aria-hidden "true"}
+           [:circle {:cx "8.5" :cy "8.5" :r "5.5"}]
+           [:line {:x1 "12.5" :y1 "12.5" :x2 "17" :y2 "17"}]]
+          [:input
+           {:id "chart-indicators-search"
+            :type "search"
+            :value (or search-term "")
+            :placeholder "Search"
+            :class ["w-full" "bg-transparent" "text-sm" "text-white" "placeholder:text-gray-500"
+                    "focus:outline-none"]
+            :on {:input [[:actions/update-indicators-search [:event.target/value]]]}
+            :aria-label "Search indicators"}]]]
+        [:div
+         {:class ["max-h-72" "overflow-y-auto"]}
+        [:div
+          {:class ["px-4" "pt-3" "pb-1" "text-xs" "uppercase" "tracking-wide" "text-gray-500"]}
+          "Script Name"]
+         (if (seq filtered-indicators)
+           (for [indicator filtered-indicators]
+             (let [indicator-id (:id indicator)
+                   active? (contains? active-indicators indicator-id)]
+               [:button
+                {:key indicator-id
+                 :type "button"
+                 :class (into ["w-full" "px-4" "py-2.5" "text-left" "flex" "items-start" "justify-between" "gap-3"
+                               "transition-colors" "focus:outline-none" "focus-visible:ring-1"
+                               "focus-visible:ring-base-content/40"]
+                              (if active?
+                                ["cursor-default" "bg-base-200/70"]
+                                ["hover:bg-base-200/70"]))
+                 :disabled active?
+                 :on {:click [[:actions/add-indicator indicator-id {:period (:default-period indicator)}]]}
+                 :aria-label (str "Add " (:name indicator) " indicator")}
+                [:span
+                 {:class ["flex" "flex-col" "gap-0.5"]}
+                 [:span {:class ["text-sm" "text-white"]} (:name indicator)]
+                 [:span {:class ["text-xs" "text-gray-400"]} (:description indicator)]]
+                [:span
+                 {:class (if active?
+                           ["text-xs" "font-semibold" "uppercase" "tracking-wide" "text-trading-green"]
+                           ["text-xs" "uppercase" "tracking-wide" "text-gray-500"])}
+                 (if active? "Added" "Add")]]))
+           [:div
+            {:class ["px-4" "py-6" "text-sm" "text-gray-400"]}
+            "No indicators match your search."])]
+        (when (seq active-indicators)
+          [:div
+           {:class ["border-t" "border-base-300" "px-4" "py-3"]}
+           [:div
+            {:class ["mb-2" "text-xs" "font-semibold" "uppercase" "tracking-wide" "text-gray-500"]}
+            "Active Indicators"]
+           [:div
+            {:class ["space-y-2"]}
+            (for [[indicator-id config] active-indicators]
+              (when-let [indicator-info (get indicator-by-id indicator-id)]
+                [:div
+                 {:key indicator-id
+                  :class ["flex" "items-center" "justify-between" "gap-2" "rounded" "bg-base-200/70" "p-2"]}
+                 [:div
+                  {:class ["flex" "items-center" "gap-2"]}
+                  [:span {:class ["text-sm" "text-white"]} (:short-name indicator-info)]
+                  [:input
+                   {:type "number"
+                    :value (:period config)
+                    :min (:min-period indicator-info)
+                    :max (:max-period indicator-info)
+                    :class ["w-16" "rounded" "border" "border-base-300" "bg-base-100"
+                            "px-2" "py-1" "text-sm" "text-white"]
+                    :on {:change [[:actions/update-indicator-period indicator-id [:event.target/value]]]}
+                    :aria-label (str "Set " (:short-name indicator-info) " period")}]]
+                 [:button
+                  {:type "button"
+                   :class ["rounded" "px-2" "py-1" "text-xs" "text-red-300" "hover:text-red-200"
+                           "hover:bg-red-500/10" "focus:outline-none" "focus-visible:ring-1"
+                           "focus-visible:ring-red-300/60"]
+                   :on {:click [[:actions/remove-indicator indicator-id]]}}
+                  "Remove"]]))]])])]))

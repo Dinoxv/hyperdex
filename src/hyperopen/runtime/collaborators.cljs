@@ -46,6 +46,7 @@
    :toggle-chart-type-dropdown chart-actions/toggle-chart-type-dropdown
    :select-chart-type chart-actions/select-chart-type
    :toggle-indicators-dropdown chart-actions/toggle-indicators-dropdown
+   :update-indicators-search chart-actions/update-indicators-search
    :toggle-orderbook-size-unit-dropdown orderbook-actions/toggle-orderbook-size-unit-dropdown
    :select-orderbook-size-unit orderbook-actions/select-orderbook-size-unit
    :toggle-orderbook-price-aggregation-dropdown orderbook-actions/toggle-orderbook-price-aggregation-dropdown

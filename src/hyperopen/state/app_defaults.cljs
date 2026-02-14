@@ -74,7 +74,10 @@
   {:timeframes-dropdown-visible false
    :selected-timeframe :1d
    :chart-type-dropdown-visible false
-   :selected-chart-type :candlestick})
+   :selected-chart-type :candlestick
+   :indicators-dropdown-visible false
+   :active-indicators {}
+   :indicators-search-term ""})
 
 (defn default-orderbook-ui-state
   []
