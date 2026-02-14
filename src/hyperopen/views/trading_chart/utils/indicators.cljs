@@ -20,9 +20,9 @@
   "Return list of available indicators"
   []
   [{:id :sma
-    :name "Simple Moving Average"
-    :short-name "SMA"
-    :description "Simple Moving Average indicator"
+    :name "Moving Average"
+    :short-name "MA"
+    :description "Moving average"
     :default-period 20
     :min-period 2
     :max-period 200}])

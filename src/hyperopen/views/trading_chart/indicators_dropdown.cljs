@@ -24,7 +24,7 @@
        [:div
         {:class ["absolute" "left-0" "top-full" "mt-1" "w-[22rem]"
                  "bg-base-100" "opacity-100" "border" "border-base-300"
-                 "rounded-lg" "shadow-lg" "z-[120]" "isolate" "overflow-hidden"]}
+                 "shadow-lg" "z-[120]" "isolate" "overflow-hidden"]}
         [:div
          {:class ["flex" "items-center" "justify-between" "px-4" "py-3" "border-b" "border-base-300"]}
          [:h3 {:class ["text-white" "text-lg" "font-medium"]} "Indicators"]
@@ -35,35 +35,30 @@
            :on {:click [[:actions/toggle-indicators-dropdown]]}
            :aria-label "Close indicators menu"}
           "×"]]
-        [:div
-         {:class ["px-4" "py-3" "border-b" "border-base-300"]}
-         [:label {:for "chart-indicators-search"
-                  :class ["sr-only"]}
-          "Search indicators"]
-         [:div
-          {:class ["flex" "items-center" "gap-2" "px-3" "py-2" "rounded-md" "border" "border-base-300"
-                   "bg-base-200/50"]}
-          [:svg
-           {:class ["h-4" "w-4" "text-gray-400"]
-            :viewBox "0 0 20 20"
-            :fill "none"
-            :stroke "currentColor"
-            :stroke-width "2"
-            :aria-hidden "true"}
-           [:circle {:cx "8.5" :cy "8.5" :r "5.5"}]
-           [:line {:x1 "12.5" :y1 "12.5" :x2 "17" :y2 "17"}]]
-          [:input
-           {:id "chart-indicators-search"
-            :type "search"
-            :value (or search-term "")
-            :placeholder "Search"
-            :class ["w-full" "bg-transparent" "text-sm" "text-white" "placeholder:text-gray-500"
-                    "focus:outline-none"]
-            :on {:input [[:actions/update-indicators-search [:event.target/value]]]}
-            :aria-label "Search indicators"}]]]
+        [:label
+         {:for "chart-indicators-search"
+          :class ["flex" "items-center" "gap-2" "px-4" "py-3" "border-b" "border-base-300" "cursor-text"]}
+         [:svg
+          {:class ["h-4" "w-4" "text-gray-400"]
+           :viewBox "0 0 20 20"
+           :fill "none"
+           :stroke "currentColor"
+           :stroke-width "2"
+           :aria-hidden "true"}
+          [:circle {:cx "8.5" :cy "8.5" :r "5.5"}]
+          [:line {:x1 "12.5" :y1 "12.5" :x2 "17" :y2 "17"}]]
+         [:input
+          {:id "chart-indicators-search"
+           :type "search"
+           :value (or search-term "")
+           :placeholder "Search"
+           :class ["w-full" "border-0" "bg-transparent" "p-0" "text-lg" "text-gray-200"
+                   "placeholder:text-gray-500" "focus:outline-none" "focus:ring-0"]
+           :on {:input [[:actions/update-indicators-search [:event.target/value]]]}
+           :aria-label "Search indicators"}]]
         [:div
          {:class ["max-h-72" "overflow-y-auto"]}
-        [:div
+         [:div
           {:class ["px-4" "pt-3" "pb-1" "text-xs" "uppercase" "tracking-wide" "text-gray-500"]}
           "Script Name"]
          (if (seq filtered-indicators)
@@ -73,24 +68,14 @@
                [:button
                 {:key indicator-id
                  :type "button"
-                 :class (into ["w-full" "px-4" "py-2.5" "text-left" "flex" "items-start" "justify-between" "gap-3"
-                               "transition-colors" "focus:outline-none" "focus-visible:ring-1"
-                               "focus-visible:ring-base-content/40"]
+                 :class (into ["w-full" "px-4" "py-2.5" "text-left" "text-sm" "transition-colors"
+                               "focus:outline-none" "focus-visible:ring-1" "focus-visible:ring-base-content/40"]
                               (if active?
-                                ["cursor-default" "bg-base-200/70"]
-                                ["hover:bg-base-200/70"]))
-                 :disabled active?
+                                ["text-trading-green" "bg-base-200/30"]
+                                ["text-white" "hover:bg-base-200/70"]))
                  :on {:click [[:actions/add-indicator indicator-id {:period (:default-period indicator)}]]}
                  :aria-label (str "Add " (:name indicator) " indicator")}
-                [:span
-                 {:class ["flex" "flex-col" "gap-0.5"]}
-                 [:span {:class ["text-sm" "text-white"]} (:name indicator)]
-                 [:span {:class ["text-xs" "text-gray-400"]} (:description indicator)]]
-                [:span
-                 {:class (if active?
-                           ["text-xs" "font-semibold" "uppercase" "tracking-wide" "text-trading-green"]
-                           ["text-xs" "uppercase" "tracking-wide" "text-gray-500"])}
-                 (if active? "Added" "Add")]]))
+                (:name indicator)]))
            [:div
             {:class ["px-4" "py-6" "text-sm" "text-gray-400"]}
             "No indicators match your search."])]
