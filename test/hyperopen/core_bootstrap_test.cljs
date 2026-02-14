@@ -12,6 +12,7 @@
             [hyperopen.runtime.effect-adapters :as effect-adapters]
             [hyperopen.runtime.state :as runtime-state]
             [hyperopen.state.trading :as trading]
+            [hyperopen.telemetry.console-warning :as console-warning]
             [hyperopen.wallet.agent-session :as agent-session]
             [hyperopen.wallet.address-watcher :as address-watcher]
             [hyperopen.websocket.active-asset-ctx :as active-ctx]
@@ -157,6 +158,7 @@
   (let [ensure-calls (atom 0)
         bootstrap-calls (atom 0)
         startup-calls (atom 0)
+        warning-calls (atom 0)
         original-runtime-bootstrapped? (:runtime-bootstrapped? @runtime-state/runtime)
         original-app-started? (:app-started? @runtime-state/runtime)]
     (try
@@ -169,12 +171,15 @@
                     app-bootstrap/bootstrap-runtime! (fn [_]
                                                        (swap! bootstrap-calls inc))
                     app-startup/init! (fn [_]
-                                        (swap! startup-calls inc))]
+                                        (swap! startup-calls inc))
+                    console-warning/emit-warning! (fn []
+                                                    (swap! warning-calls inc))]
         (app-core/init)
         (app-core/init))
       (is (= 1 @ensure-calls))
       (is (= 1 @bootstrap-calls))
       (is (= 1 @startup-calls))
+      (is (= 1 @warning-calls))
       (finally
         (swap! runtime-state/runtime assoc
                :runtime-bootstrapped? original-runtime-bootstrapped?

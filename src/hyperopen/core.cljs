@@ -2,7 +2,8 @@
   (:require [hyperopen.app.bootstrap :as app-bootstrap]
             [hyperopen.app.startup :as app-startup]
             [hyperopen.runtime.state :as runtime-state]
-            [hyperopen.system :as app-system]))
+            [hyperopen.system :as app-system]
+            [hyperopen.telemetry.console-warning :as console-warning]))
 
 (def make-system
   app-system/make-system)
@@ -22,6 +23,7 @@
 (defn start!
   []
   (when (runtime-state/mark-app-started! app-system/runtime)
+    (console-warning/emit-warning!)
     (app-bootstrap/ensure-runtime-bootstrapped!
      app-system/runtime
      #(app-bootstrap/bootstrap-runtime!
