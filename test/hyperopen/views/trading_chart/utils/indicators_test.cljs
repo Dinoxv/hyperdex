@@ -47,25 +47,84 @@
 (deftest available-indicators-test
   (let [available (indicators/get-available-indicators)
         ids (set (map :id available))
-        expected-ids #{:week-52-high-low
-                       :accelerator-oscillator
-                       :accumulation-distribution
-                       :accumulative-swing-index
-                       :advance-decline
-                       :alma
-                       :aroon
-                       :adx
-                       :average-price
-                       :atr
-                       :awesome-oscillator
-                       :balance-of-power
-                       :bollinger-bands
-                       :sma}
+        expected-core-ids #{:week-52-high-low
+                            :accelerator-oscillator
+                            :accumulation-distribution
+                            :accumulative-swing-index
+                            :advance-decline
+                            :alma
+                            :aroon
+                            :adx
+                            :average-price
+                            :atr
+                            :awesome-oscillator
+                            :balance-of-power
+                            :bollinger-bands
+                            :sma}
+        expected-wave2-ids #{:bollinger-bands-percent-b
+                             :bollinger-bands-width
+                             :chaikin-money-flow
+                             :chaikin-oscillator
+                             :commodity-channel-index
+                             :donchian-channels
+                             :ema-cross
+                             :historical-volatility
+                             :hull-moving-average
+                             :ichimoku-cloud
+                             :keltner-channels
+                             :macd
+                             :money-flow-index
+                             :on-balance-volume
+                             :parabolic-sar
+                             :rate-of-change
+                             :relative-strength-index
+                             :stochastic-rsi
+                             :supertrend
+                             :triple-ema
+                             :vortex-indicator
+                             :vwap
+                             :vwma
+                             :williams-r}
+        expected-wave3-ids #{:chaikin-volatility
+                             :chande-kroll-stop
+                             :connors-rsi
+                             :coppock-curve
+                             :correlation-log
+                             :correlation-coefficient
+                             :fisher-transform
+                             :guppy-multiple-moving-average
+                             :klinger-oscillator
+                             :know-sure-thing
+                             :majority-rule
+                             :mcginley-dynamic
+                             :moving-average-adaptive
+                             :moving-average-hamming
+                             :pivot-points-standard
+                             :rank-correlation-index
+                             :relative-vigor-index
+                             :relative-volatility-index
+                             :smi-ergodic
+                             :standard-error
+                             :standard-error-bands
+                             :trend-strength-index
+                             :true-strength-index
+                             :ultimate-oscillator
+                             :volatility-close-to-close
+                             :volatility-index
+                             :volatility-ohlc
+                             :volatility-zero-trend-close-to-close
+                             :volume
+                             :williams-alligator
+                             :williams-fractal
+                             :zig-zag}
         by-id (into {} (map (juxt :id identity) available))]
-    (is (= expected-ids ids))
-    (is (= 14 (count available)))
+    (is (every? ids expected-core-ids))
+    (is (every? ids expected-wave2-ids))
+    (is (every? ids expected-wave3-ids))
+    (is (> (count available) 70))
     (is (true? (:supports-period? (get by-id :sma))))
-    (is (false? (:supports-period? (get by-id :awesome-oscillator))))))
+    (is (false? (:supports-period? (get by-id :awesome-oscillator))))
+    (is (false? (:supports-period? (get by-id :macd))))))
 
 (deftest calculate-indicator-sma-shape-test
   (let [result (indicators/calculate-indicator :sma sample-candles {:period 5})
@@ -143,3 +202,82 @@
 
 (deftest calculate-indicator-test
   (is (nil? (indicators/calculate-indicator :unknown sample-candles {}))))
+
+(deftest calculate-indicator-wave2-macd-shape-test
+  (let [result (indicators/calculate-indicator :macd sample-candles {})
+        series (:series result)
+        histogram (first series)
+        macd-line (second series)
+        signal-line (nth series 2)]
+    (is (= :macd (:type result)))
+    (is (= :separate (:pane result)))
+    (is (= 3 (count series)))
+    (is (= :histogram (:series-type histogram)))
+    (is (= :line (:series-type macd-line)))
+    (is (= :line (:series-type signal-line)))
+    (is (finite-number? (last-value macd-line)))
+    (is (finite-number? (last-value signal-line)))))
+
+(deftest calculate-indicator-wave2-supertrend-shape-test
+  (let [result (indicators/calculate-indicator :supertrend sample-candles {})]
+    (is (= :overlay (:pane result)))
+    (is (= 2 (count (:series result))))
+    (is (some finite-number? (map :value (:data (first (:series result))))))
+    (is (some finite-number? (map :value (:data (second (:series result))))))))
+
+(deftest calculate-indicator-wave2-stochastic-rsi-shape-test
+  (let [result (indicators/calculate-indicator :stochastic-rsi sample-candles {})
+        k-series (first (:series result))
+        d-series (second (:series result))]
+    (is (= :separate (:pane result)))
+    (is (= 2 (count (:series result))))
+    (is (= (count sample-candles) (count (:data k-series))))
+    (is (= (count sample-candles) (count (:data d-series))))))
+
+(deftest calculate-indicator-wave2-ichimoku-and-vwap-shape-test
+  (let [ichimoku (indicators/calculate-indicator :ichimoku-cloud sample-candles {})
+        vwap-result (indicators/calculate-indicator :vwap sample-candles {})]
+    (is (= :overlay (:pane ichimoku)))
+    (is (= 5 (count (:series ichimoku))))
+    (is (= :overlay (:pane vwap-result)))
+    (is (= 1 (count (:series vwap-result))))
+    (is (finite-number? (last-value (first (:series vwap-result)))))))
+
+(deftest calculate-indicator-wave3-shape-test
+  (let [gmma (indicators/calculate-indicator :guppy-multiple-moving-average sample-candles {})
+        pivots (indicators/calculate-indicator :pivot-points-standard sample-candles {:period 10})
+        fisher (indicators/calculate-indicator :fisher-transform sample-candles {})
+        smi (indicators/calculate-indicator :smi-ergodic sample-candles {})
+        volume (indicators/calculate-indicator :volume sample-candles {})]
+    (is (= :overlay (:pane gmma)))
+    (is (= 12 (count (:series gmma))))
+    (is (= :overlay (:pane pivots)))
+    (is (= 7 (count (:series pivots))))
+    (is (= :separate (:pane fisher)))
+    (is (= 2 (count (:series fisher))))
+    (is (= :separate (:pane smi)))
+    (is (= 3 (count (:series smi))))
+    (is (= :histogram (:series-type (first (:series smi)))))
+    (is (= :separate (:pane volume)))
+    (is (= :histogram (:series-type (first (:series volume)))))))
+
+(deftest calculate-indicator-wave3-regression-and-williams-shape-test
+  (let [stderr-bands (indicators/calculate-indicator :standard-error-bands sample-candles {:period 10 :multiplier 2})
+        alligator (indicators/calculate-indicator :williams-alligator sample-candles {})
+        fractal (indicators/calculate-indicator :williams-fractal sample-candles {})
+        zig-zag (indicators/calculate-indicator :zig-zag sample-candles {:threshold-percent 3})
+        upper (indicator-series-by-id stderr-bands :upper)
+        center (indicator-series-by-id stderr-bands :center)
+        lower (indicator-series-by-id stderr-bands :lower)]
+    (is (= :overlay (:pane stderr-bands)))
+    (is (= 3 (count (:series stderr-bands))))
+    (is (finite-number? (last-value upper)))
+    (is (finite-number? (last-value center)))
+    (is (finite-number? (last-value lower)))
+    (is (= :overlay (:pane alligator)))
+    (is (= 3 (count (:series alligator))))
+    (is (= :overlay (:pane fractal)))
+    (is (= 2 (count (:series fractal))))
+    (is (= :overlay (:pane zig-zag)))
+    (is (= 1 (count (:series zig-zag))))
+    (is (some finite-number? (map :value (:data (first (:series zig-zag))))))))

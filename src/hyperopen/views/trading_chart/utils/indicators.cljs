@@ -1,4 +1,6 @@
-(ns hyperopen.views.trading-chart.utils.indicators)
+(ns hyperopen.views.trading-chart.utils.indicators
+  (:require [hyperopen.views.trading-chart.utils.indicators-wave2 :as wave2]
+            [hyperopen.views.trading-chart.utils.indicators-wave3 :as wave3]))
 
 (def ^:private seconds-per-week (* 7 24 60 60))
 
@@ -682,7 +684,9 @@
 (defn get-available-indicators
   "Return list of available indicators"
   []
-  indicator-definitions)
+  (vec (concat indicator-definitions
+               (wave2/get-wave2-indicators)
+               (wave3/get-wave3-indicators))))
 
 (defn calculate-indicator
   "Calculate indicator based on type and parameters"
@@ -709,4 +713,5 @@
                                            "#38bdf8"
                                            (times data)
                                            (mapv :value (calculate-sma data (:period config 20))))])
-      nil)))
+      (or (wave2/calculate-wave2-indicator indicator-type data config)
+          (wave3/calculate-wave3-indicator indicator-type data config)))))
