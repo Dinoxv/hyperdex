@@ -161,7 +161,7 @@
                          (catch :default _ nil)))
                      (set! (.-__hyperopenChart ^js node) nil))
                    nil))]
-    [:div {:class ["w-full" "relative" "flex-1" "h-full" "min-h-[360px]" "bg-base-100"]
+    [:div {:class ["w-full" "relative" "flex-1" "h-full" "min-h-[360px]" "bg-base-100" "trading-chart-host"]
            :replicant/key (str "chart-" (hash active-indicators) "-" legend-key)
            :replicant/on-render mount!}]))
 

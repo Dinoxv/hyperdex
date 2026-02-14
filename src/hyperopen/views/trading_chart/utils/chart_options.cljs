@@ -80,6 +80,7 @@
                       :separatorHoverColor pane-separator-hover-color}}
      :grid {:vertLines {:color grid-line-color}
             :horzLines {:color grid-line-color}}
+     :crosshair {:mode 0}
      :rightPriceScale {:borderColor scale-border-color}
      :timeScale {:borderColor scale-border-color
                  :rightOffset default-right-offset-bars}}))

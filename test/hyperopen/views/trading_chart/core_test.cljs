@@ -113,6 +113,7 @@
         classes (set (class-values (get-in canvas [1 :class])))
         bg-colors (set (collect-background-colors canvas))]
     (is (contains? classes "bg-base-100"))
+    (is (contains? classes "trading-chart-host"))
     (is (not (contains? bg-colors "rgb(30, 41, 55)")))))
 
 (deftest chart-top-menu-dropdowns-use-high-z-opaque-tokenized-classes-test

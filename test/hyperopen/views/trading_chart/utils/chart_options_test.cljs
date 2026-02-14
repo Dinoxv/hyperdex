@@ -8,6 +8,8 @@
       (is (= chart-options/default-right-offset-bars
              (get-in options [:timeScale :rightOffset])))
       (is (= 4 (get-in options [:timeScale :rightOffset]))))
+    (testing "uses normal crosshair mode so crosshair tracks pointer position"
+      (is (= 0 (get-in options [:crosshair :mode]))))
     (testing "uses hyperliquid background color for chart canvas"
       (is (= "rgb(15, 26, 31)"
              (get-in options [:layout :background :color]))))
