@@ -89,14 +89,21 @@
          (:text freshness-cue)]])]))
 
 ;; Generic chart component that supports all chart types with volume
+(defn- sorted-active-indicator-configs
+  [active-indicators]
+  (sort-by (comp name key) active-indicators))
+
+(defn- flatten-indicator-series
+  [indicators-data]
+  (vec (mapcat :series indicators-data)))
+
 (defn chart-canvas [candle-data chart-type active-indicators legend-meta]
   (let [;; Calculate indicators data
-        indicators-data (map (fn [[indicator-type config]]
-                              {:type indicator-type
-                               :config config
-                               :data (indicators/calculate-indicator indicator-type candle-data config)})
-                            active-indicators)
-        indicators-data-vec (vec indicators-data)
+        indicators-data-vec (->> (sorted-active-indicator-configs active-indicators)
+                                 (keep (fn [[indicator-type config]]
+                                         (indicators/calculate-indicator indicator-type candle-data config)))
+                                 vec)
+        indicator-series-data-vec (flatten-indicator-series indicators-data-vec)
         legend-key (str (or (:symbol legend-meta) "")
                         "-"
                         (or (:timeframe-label legend-meta) "")
@@ -144,11 +151,11 @@
                        (ci/set-series-data! main-series candle-data chart-type))
                      (when volume-series
                        (ci/set-volume-data! volume-series candle-data))
-                     (when (and indicator-series (seq indicators-data-vec))
-                       (doseq [[idx indicator] (map-indexed vector indicators-data-vec)]
+                     (when (and indicator-series (seq indicator-series-data-vec))
+                       (doseq [[idx series-entry] (map-indexed vector indicator-series-data-vec)]
                          (when-let [^js indicator-series-entry (aget ^js indicator-series idx)]
                            (when-let [series (.-series indicator-series-entry)]
-                             (ci/set-indicator-data! series (:data indicator))))))
+                             (ci/set-indicator-data! series (:data series-entry))))))
                      (when legend-control
                        (.update ^js legend-control legend-meta)))
                    :replicant.life-cycle/unmount

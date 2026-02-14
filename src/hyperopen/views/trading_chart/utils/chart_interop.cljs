@@ -279,15 +279,26 @@
       #js {:update update! :destroy destroy!})))
 
 ;; Indicator series functions
-(defn add-indicator-line-series! [chart color]
-  "Add a line series for indicators"
-  (let [seriesOptions #js {:color color
-                           :lineWidth 2}
-        series (.addSeries ^js chart LineSeries seriesOptions)]
-    series))
+(defn- indicator-line-options
+  [series-def]
+  #js {:color (or (:color series-def) "#38bdf8")
+       :lineWidth (or (:line-width series-def) 2)})
+
+(defn- indicator-histogram-options
+  [series-def]
+  #js {:color (or (:color series-def) "#10b981")
+       :priceFormat #js {:type "price"}
+       :base (or (:base series-def) 0)})
+
+(defn add-indicator-series!
+  [chart series-def pane-index]
+  "Add an indicator series in the requested pane."
+  (case (:series-type series-def)
+    :histogram (.addSeries ^js chart HistogramSeries (indicator-histogram-options series-def) pane-index)
+    (.addSeries ^js chart LineSeries (indicator-line-options series-def) pane-index)))
 
 (defn set-indicator-data! [series data]
-  "Set indicator data for line series - preserves whitespace data points"
+  "Set indicator data and preserve whitespace points."
   (.setData series (clj->js data)))
 
 ;; Chart with volume support using separate panes
@@ -316,32 +327,60 @@
     #js {:chart chart :mainSeries main-series :volumeSeries volume-series}))
 
 ;; Enhanced chart creation with indicators support
+(defn- indicator-pane-allocation
+  [indicators]
+  (loop [remaining indicators
+         next-pane-index 1
+         assignments []]
+    (if (empty? remaining)
+      {:next-pane-index next-pane-index
+       :assignments assignments}
+      (let [indicator (first remaining)
+            pane-index (if (= :overlay (:pane indicator))
+                         0
+                         next-pane-index)
+            updated-next-pane (if (= :overlay (:pane indicator))
+                                next-pane-index
+                                (inc next-pane-index))
+            indicator-assignments (mapv (fn [series-def]
+                                          {:indicator indicator
+                                           :series-def series-def
+                                           :pane-index pane-index})
+                                        (:series indicator))]
+        (recur (rest remaining)
+               updated-next-pane
+               (into assignments indicator-assignments))))))
+
 (defn create-chart-with-indicators! [container chart-type data indicators]
-  "Create a chart with indicators, main series, and volume series - indicators appear underneath"
+  "Create a chart with indicators, main series, and volume series."
   (let [chart (create-chart! container)
-        indicator-colors ["#FF6B6B" "#4ECDC4" "#45B7D1" "#96CEB4" "#FFEAA7"]
-        ;; Add indicator series FIRST so they appear underneath
-        indicator-series (map-indexed 
-                          (fn [idx indicator]
-                            (let [color (nth indicator-colors (mod idx (count indicator-colors)))
-                                  series (add-indicator-line-series! chart color)]
-                              (set-indicator-data! series (:data indicator))
-                              {:series series :indicator indicator}))
-                          indicators)
-        ;; Add main series to pane 0 (after indicators)
+        {:keys [next-pane-index assignments]} (indicator-pane-allocation indicators)
+        ;; Add indicator series first so overlays stay beneath candles.
+        indicator-series (mapv (fn [{:keys [indicator series-def pane-index]}]
+                                 (let [series (add-indicator-series! chart series-def pane-index)]
+                                   (set-indicator-data! series (:data series-def))
+                                   {:series series
+                                    :indicator indicator
+                                    :seriesDef series-def
+                                    :paneIndex pane-index}))
+                               assignments)
+        ;; Add main series to pane 0.
         main-series (add-series! chart chart-type)
-        ;; Add volume series to pane 1 (separate pane)
+        ;; Keep volume in the pane after all indicator panes.
         volume-series (.addSeries ^js chart HistogramSeries 
                                   #js {:color "#26a69a"
                                        :priceFormat #js {:type "volume"}}
-                                  1)] ; Pane index 1
+                                  next-pane-index)]
     
-    ;; Set data for main and volume series
+    ;; Set data for main and volume series.
     (set-series-data! main-series data chart-type)
     (set-volume-data! volume-series data)
     
-    ;; Configure the volume pane height
-    (let [volume-pane (aget (.panes ^js chart) 1)]
+    ;; Configure indicator panes and volume pane heights.
+    (doseq [pane-index (range 1 next-pane-index)]
+      (when-let [pane (aget (.panes ^js chart) pane-index)]
+        (.setHeight ^js pane 120)))
+    (when-let [volume-pane (aget (.panes ^js chart) next-pane-index)]
       (.setHeight ^js volume-pane 150))
     
     (fit-content! chart)

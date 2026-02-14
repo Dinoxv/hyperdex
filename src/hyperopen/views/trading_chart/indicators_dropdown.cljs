@@ -73,7 +73,7 @@
                               (if active?
                                 ["text-trading-green" "bg-base-200/30"]
                                 ["text-white" "hover:bg-base-200/70"]))
-                 :on {:click [[:actions/add-indicator indicator-id {:period (:default-period indicator)}]]}
+                 :on {:click [[:actions/add-indicator indicator-id (or (:default-config indicator) {})]]}
                  :aria-label (str "Add " (:name indicator) " indicator")}
                 (:name indicator)]))
            [:div
@@ -87,7 +87,7 @@
             "Active Indicators"]
            [:div
             {:class ["space-y-2"]}
-            (for [[indicator-id config] active-indicators]
+            (for [[indicator-id config] (sort-by (comp name key) active-indicators)]
               (when-let [indicator-info (get indicator-by-id indicator-id)]
                 [:div
                  {:key indicator-id
@@ -95,15 +95,16 @@
                  [:div
                   {:class ["flex" "items-center" "gap-2"]}
                   [:span {:class ["text-sm" "text-white"]} (:short-name indicator-info)]
-                  [:input
-                   {:type "number"
-                    :value (:period config)
-                    :min (:min-period indicator-info)
-                    :max (:max-period indicator-info)
-                    :class ["w-16" "rounded" "border" "border-base-300" "bg-base-100"
-                            "px-2" "py-1" "text-sm" "text-white"]
-                    :on {:change [[:actions/update-indicator-period indicator-id [:event.target/value]]]}
-                    :aria-label (str "Set " (:short-name indicator-info) " period")}]]
+                  (when (:supports-period? indicator-info)
+                    [:input
+                     {:type "number"
+                      :value (or (:period config) (:default-period indicator-info))
+                      :min (:min-period indicator-info)
+                      :max (:max-period indicator-info)
+                      :class ["w-16" "rounded" "border" "border-base-300" "bg-base-100"
+                              "px-2" "py-1" "text-sm" "text-white"]
+                      :on {:change [[:actions/update-indicator-period indicator-id [:event.target/value]]]}
+                      :aria-label (str "Set " (:short-name indicator-info) " period")}])]
                  [:button
                   {:type "button"
                    :class ["rounded" "px-2" "py-1" "text-xs" "text-red-300" "hover:text-red-200"

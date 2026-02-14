@@ -56,7 +56,11 @@
 (defn update-indicator-period
   [state indicator-type period-value]
   (let [current-indicators (get-in state [:chart-options :active-indicators] {})
-        period (js/parseInt period-value)
+        parsed-period (js/parseInt period-value 10)
+        current-period (get-in current-indicators [indicator-type :period])
+        period (if (js/isNaN parsed-period)
+                 current-period
+                 parsed-period)
         updated-indicators (assoc-in current-indicators [indicator-type :period] period)]
     [[:effects/save [:chart-options :active-indicators] updated-indicators]
      [:effects/local-storage-set-json "chart-active-indicators" (serialize-indicators updated-indicators)]]))
