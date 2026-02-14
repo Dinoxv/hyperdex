@@ -1,5 +1,6 @@
 (ns hyperopen.websocket.infrastructure.runtime-effects
-  (:require [hyperopen.websocket.infrastructure.transport :as infra]))
+  (:require [hyperopen.telemetry :as telemetry]
+            [hyperopen.websocket.infrastructure.transport :as infra]))
 
 (defn- now-ms [clock]
   (infra/now-ms* clock))
@@ -195,9 +196,12 @@
 
     :fx/log
     (let [{:keys [level message error]} effect]
-      (println "WebSocket" (name (or level :info)) message (when error error)))
+      (telemetry/emit! :websocket/runtime-log
+                       {:level (or level :info)
+                        :message message
+                        :error (when error (str error))}))
 
     :fx/dead-letter
-    (println "WebSocket dead-letter event:" effect)
+    (telemetry/emit! :websocket/dead-letter effect)
 
     nil))

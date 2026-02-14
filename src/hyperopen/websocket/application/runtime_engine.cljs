@@ -1,5 +1,6 @@
 (ns hyperopen.websocket.application.runtime-engine
   (:require [cljs.core.async :as async :refer [<! >! chan close! put!]]
+            [hyperopen.telemetry :as telemetry]
             [hyperopen.platform :as platform])
   (:require-macros [cljs.core.async.macros :refer [go-loop]]))
 
@@ -53,7 +54,9 @@
                                     :get-state (fn [] @state))
                              fx)
           (catch :default e
-            (println "Runtime effect interpreter failed:" e "for effect" fx)))
+            (telemetry/emit! :websocket/runtime-interpreter-failure
+                             {:error (str e)
+                              :effect fx})))
         (recur)))
     {:mailbox-ch mailbox-ch
      :effects-ch effects-ch

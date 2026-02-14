@@ -6,7 +6,8 @@
    - Open/Closed: Extensible via subscription handlers
    - Liskov Substitution: All handlers follow the same protocol
    - Interface Segregation: Minimal, focused handler interface
-   - Dependency Inversion: Depends on abstractions, not concrete implementations")
+   - Dependency Inversion: Depends on abstractions, not concrete implementations"
+  (:require [hyperopen.telemetry :as telemetry]))
 
 ;; ---------- Address Change Handler Protocol ----------------------------------
 
@@ -23,11 +24,11 @@
   IAddressChangeHandler
   (on-address-changed [_ old-address new-address]
     (when old-address
-      (println (str "Unsubscribing WebData2 from old address: " old-address))
+      (telemetry/log! (str "Unsubscribing WebData2 from old address: " old-address))
       (unsubscribe-fn old-address))
     
     (when new-address
-      (println (str "Subscribing WebData2 to new address: " new-address))
+      (telemetry/log! (str "Subscribing WebData2 to new address: " new-address))
       (subscribe-fn new-address)))
   
   (get-handler-name [_]
@@ -47,7 +48,7 @@
   [handler]
   {:pre [(satisfies? IAddressChangeHandler handler)]}
   (swap! address-watcher-state update :handlers conj handler)
-  (println (str "Added address change handler: " (get-handler-name handler))))
+  (telemetry/log! (str "Added address change handler: " (get-handler-name handler))))
 
 (defn remove-handler!
   "Remove a handler by name"
@@ -56,7 +57,7 @@
          update :handlers 
          (fn [handlers]
            (remove #(= (get-handler-name %) handler-name) handlers)))
-  (println (str "Removed address change handler: " handler-name)))
+  (telemetry/log! (str "Removed address change handler: " handler-name)))
 
 (defn- notify-handlers!
   "Notify all registered handlers of address change"
@@ -68,12 +69,12 @@
         (try
           (on-address-changed handler old-address new-address)
           (catch js/Error e
-            (println (str "Error in address change handler " 
-                         (get-handler-name handler) ": " 
-                         (.-message e))))))
+            (telemetry/log! (str "Error in address change handler "
+                                 (get-handler-name handler) ": "
+                                 (.-message e))))))
       ;; WebSocket not connected, store pending subscription
       (do
-        (println "WebSocket not connected, storing pending subscription for address:" new-address)
+        (telemetry/log! "WebSocket not connected, storing pending subscription for address:" new-address)
         (swap! address-watcher-state assoc :pending-subscription {:old-address old-address
                                                                    :new-address new-address})))))
 
@@ -86,7 +87,7 @@
     ;; Only process if address actually changed and we're watching
     (when (and (get @address-watcher-state :watching?)
                (not= old-address new-address))
-      (println (str "Wallet address changed: " old-address " -> " new-address))
+      (telemetry/log! (str "Wallet address changed: " old-address " -> " new-address))
       
       ;; Update our tracked address
       (swap! address-watcher-state assoc :current-address new-address)
@@ -100,28 +101,28 @@
   (when-let [pending (get @address-watcher-state :pending-subscription)]
     (let [{:keys [old-address new-address]} pending
           handlers (get @address-watcher-state :handlers)]
-      (println "Processing pending subscription for address:" new-address)
+      (telemetry/log! "Processing pending subscription for address:" new-address)
       (doseq [handler handlers]
         (try
           (on-address-changed handler old-address new-address)
           (catch js/Error e
-            (println (str "Error in pending subscription handler " 
-                         (get-handler-name handler) ": " 
-                         (.-message e))))))
+            (telemetry/log! (str "Error in pending subscription handler "
+                                 (get-handler-name handler) ": "
+                                 (.-message e))))))
       ;; Clear pending subscription
       (swap! address-watcher-state assoc :pending-subscription nil))))
 
 (defn on-websocket-connected!
   "Called when WebSocket connection is established"
   []
-  (println "Address watcher: WebSocket connected")
+  (telemetry/log! "Address watcher: WebSocket connected")
   (swap! address-watcher-state assoc :ws-connected? true)
   (process-pending-subscription!))
 
 (defn on-websocket-disconnected!
   "Called when WebSocket connection is lost"
   []
-  (println "Address watcher: WebSocket disconnected")
+  (telemetry/log! "Address watcher: WebSocket disconnected")
   (swap! address-watcher-state assoc :ws-connected? false))
 
 ;; ---------- Public API ---------------------------------------------------
@@ -130,20 +131,20 @@
   "Start watching for wallet address changes on the given store atom"
   [store]
   (when-not (get @address-watcher-state :watching?)
-    (println "Starting wallet address watcher...")
+    (telemetry/log! "Starting wallet address watcher...")
     (add-watch store ::address-watcher address-change-listener)
     (swap! address-watcher-state assoc :watching? true)
     
     ;; Initialize current address
     (let [current-address (get-in @store [:wallet :address])]
       (swap! address-watcher-state assoc :current-address current-address)
-      (println (str "Initial wallet address: " current-address)))))
+      (telemetry/log! (str "Initial wallet address: " current-address)))))
 
 (defn stop-watching!
   "Stop watching for wallet address changes"
   [store]
   (when (get @address-watcher-state :watching?)
-    (println "Stopping wallet address watcher...")
+    (telemetry/log! "Stopping wallet address watcher...")
     (remove-watch store ::address-watcher)
     (swap! address-watcher-state assoc :watching? false)))
 
@@ -170,4 +171,4 @@
   (let [webdata2-handler (create-webdata2-handler subscribe-fn unsubscribe-fn)]
     (add-handler! webdata2-handler)
     (start-watching! store)
-    (println "Address watcher initialized with WebData2 handler")))
+    (telemetry/log! "Address watcher initialized with WebData2 handler")))

@@ -5,7 +5,8 @@
             [hyperopen.api.gateway.orders :as order-gateway]
             [hyperopen.api.info-client :as info-client]
             [hyperopen.api.service :as api-service]
-            [hyperopen.domain.funding-history :as funding-history]))
+            [hyperopen.domain.funding-history :as funding-history]
+            [hyperopen.telemetry :as telemetry]))
 
 (def info-url (:info-url info-client/default-config))
 
@@ -17,7 +18,7 @@
   []
   (api-service/make-service
    {:info-client-config default-info-client-config
-    :log-fn println}))
+    :log-fn telemetry/log!}))
 
 (defn- make-instance-post-info!
   [service]

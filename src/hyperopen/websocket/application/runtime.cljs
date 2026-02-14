@@ -1,5 +1,6 @@
 (ns hyperopen.websocket.application.runtime
   (:require [cljs.core.async :as async :refer [<! chan close! put!]]
+            [hyperopen.telemetry :as telemetry]
             [hyperopen.websocket.application.runtime-engine :as engine]
             [hyperopen.websocket.application.runtime-reducer :as reducer]
             [hyperopen.websocket.domain.model :as model]
@@ -43,7 +44,9 @@
             (try
               (handler-fn payload*)
               (catch :default e
-                (println "WebSocket topic handler failed for" topic e))))
+                (telemetry/emit! :websocket/topic-handler-failure
+                                 {:topic topic
+                                  :error (str e)}))))
           (recur)))))
   (stop-router! [_]
     (doseq [[topic {:keys [ch]}] @handlers]

@@ -6,7 +6,8 @@
             [hyperopen.api.instance :as api-instance]
             [hyperopen.api.service :as api-service]
             [hyperopen.domain.funding-history :as funding-history]
-            [hyperopen.platform :as platform]))
+            [hyperopen.platform :as platform]
+            [hyperopen.telemetry :as telemetry]))
 
 (def info-url api-instance/info-url)
 
@@ -48,7 +49,7 @@
                  (:info-client-config opts*))
           default-info-client-config)
         service-opts (merge {:info-client-config configured-info-client
-                             :log-fn println}
+                             :log-fn telemetry/log!}
                             (dissoc opts* :info-client-config))]
     (install-api-service! (api-service/make-service service-opts))))
 

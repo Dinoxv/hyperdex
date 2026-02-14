@@ -7,6 +7,7 @@
             [hyperopen.account.history.effects :as account-history-effects]
             [hyperopen.runtime.api-effects :as runtime-api-effects]
             [hyperopen.runtime.state :as runtime-state]
+            [hyperopen.telemetry :as telemetry]
             [hyperopen.wallet.address-watcher :as address-watcher]
             [hyperopen.websocket.active-asset-ctx :as active-ctx]
             [hyperopen.websocket.client :as ws-client]
@@ -148,7 +149,7 @@
   [overrides]
   (let [api-ops (resolve-api-ops (:api overrides))]
     (merge
-     {:log-fn println
+     {:log-fn telemetry/log!
       :get-request-stats (:get-request-stats api-ops)
       :fetch-frontend-open-orders! (fn
                                      ([store address]

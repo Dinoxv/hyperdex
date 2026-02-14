@@ -1,5 +1,6 @@
 (ns hyperopen.websocket.active-asset-ctx
   (:require [hyperopen.platform :as platform]
+            [hyperopen.telemetry :as telemetry]
             [hyperopen.websocket.client :as ws-client]))
 
 ;; Active asset context state
@@ -16,7 +17,6 @@
 ;; Create a handler function that has access to the store
 (defn create-active-asset-data-handler [store]
   (fn [data]
-    ;;(println "Processing active asset context data:" data)
     (when (and (map? data) (= (:channel data) "activeAssetCtx"))
       (let [data-payload (:data data)
             coin (:coin data-payload)
@@ -48,7 +48,6 @@
                                 :openInterest (parse-number (:openInterest ctx))
                                 :fundingRate (when (number? funding)
                                                (* 100 funding))}]
-            ;;(println "Formatted data for" coin ":" formatted-data)
             ;; Use setTimeout to avoid nested render issues
             (platform/set-timeout!
               #(do
@@ -64,7 +63,7 @@
                                            :coin coin}}]
       (swap! active-asset-ctx-state update :subscriptions conj coin)
       (ws-client/send-message! subscription-msg)
-      (println "Subscribed to active asset context for:" coin))))
+      (telemetry/log! "Subscribed to active asset context for:" coin))))
 
 ;; Unsubscribe from active asset context for a coin
 (defn unsubscribe-active-asset-ctx! [coin]
@@ -75,17 +74,17 @@
       (swap! active-asset-ctx-state update :subscriptions disj coin)
       (swap! active-asset-ctx-state update :contexts dissoc coin)
       (ws-client/send-message! unsubscription-msg)
-      (println "Unsubscribed from active asset context for:" coin))))
+      (telemetry/log! "Unsubscribed from active asset context for:" coin))))
 
 ;; Handle incoming active asset context data
 (defn handle-active-asset-ctx-data! [data]
-  (println "Processing active asset context data:" data)
+  (telemetry/log! "Processing active asset context data:" data)
   (when (and (map? data) (= (:channel data) "activeAssetCtx"))
     (let [ctx-data (:data data)
           coin (:coin ctx-data)]
       (when coin
         (swap! active-asset-ctx-state assoc-in [:contexts coin] ctx-data)
-        (println "Updated active asset context for" coin ":" ctx-data)))))
+        (telemetry/log! "Updated active asset context for" coin ":" ctx-data)))))
 
 ;; Get current subscriptions
 (defn get-subscriptions []
@@ -117,6 +116,6 @@
 
 ;; Initialize active asset context module
 (defn init! [store]
-  (println "Active asset context subscription module initialized")
+  (telemetry/log! "Active asset context subscription module initialized")
   ;; Register handler for activeAssetCtx channel with store access
   (ws-client/register-handler! "activeAssetCtx" (create-active-asset-data-handler store))) 

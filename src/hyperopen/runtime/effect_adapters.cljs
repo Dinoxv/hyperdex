@@ -15,6 +15,7 @@
             [hyperopen.runtime.app-effects :as app-effects]
             [hyperopen.runtime.api-effects :as api-effects]
             [hyperopen.runtime.state :as runtime-state]
+            [hyperopen.telemetry :as telemetry]
             [hyperopen.startup.restore :as startup-restore]
             [hyperopen.wallet.agent-runtime :as agent-runtime]
             [hyperopen.wallet.agent-session :as agent-session]
@@ -145,7 +146,7 @@
            request-candle-snapshot-fn
            apply-candle-snapshot-success
            apply-candle-snapshot-error]
-    :or {log-fn println
+    :or {log-fn telemetry/log!
          request-candle-snapshot-fn api/request-candle-snapshot!
          apply-candle-snapshot-success api-projections/apply-candle-snapshot-success
          apply-candle-snapshot-error api-projections/apply-candle-snapshot-error}}]
@@ -165,7 +166,7 @@
 (defn make-init-websocket
   [{:keys [ws-url log-fn init-connection!]
     :or {ws-url runtime-state/websocket-url
-         log-fn println
+         log-fn telemetry/log!
          init-connection! ws-client/init-connection!}}]
   (fn [_ store]
     (app-effects/init-websocket!
@@ -225,7 +226,7 @@
   (subscriptions-runtime/subscribe-active-asset!
    {:store store
     :coin coin
-    :log-fn println
+    :log-fn telemetry/log!
     :resolve-market-by-coin-fn markets/resolve-market-by-coin
     :persist-active-asset! persist-active-asset!
     :persist-active-market-display! persist-active-market-display!
@@ -237,14 +238,14 @@
   (subscriptions-runtime/unsubscribe-active-asset!
    {:store store
     :coin coin
-    :log-fn println
+    :log-fn telemetry/log!
     :unsubscribe-active-asset-ctx! active-ctx/unsubscribe-active-asset-ctx!}))
 
 (defn subscribe-orderbook [_ store coin]
   (subscriptions-runtime/subscribe-orderbook!
    {:store store
     :coin coin
-    :log-fn println
+    :log-fn telemetry/log!
     :normalize-mode-fn price-agg/normalize-mode
     :mode->subscription-config-fn price-agg/mode->subscription-config
     :subscribe-orderbook-fn orderbook/subscribe-orderbook!}))
@@ -252,38 +253,38 @@
 (defn subscribe-trades [_ store coin]
   (subscriptions-runtime/subscribe-trades!
    {:coin coin
-    :log-fn println
+    :log-fn telemetry/log!
     :subscribe-trades-fn trades/subscribe-trades!}))
 
 (defn unsubscribe-orderbook [_ store coin]
   (subscriptions-runtime/unsubscribe-orderbook!
    {:store store
     :coin coin
-    :log-fn println
+    :log-fn telemetry/log!
     :unsubscribe-orderbook-fn orderbook/unsubscribe-orderbook!}))
 
 (defn unsubscribe-trades [_ store coin]
   (subscriptions-runtime/unsubscribe-trades!
    {:coin coin
-    :log-fn println
+    :log-fn telemetry/log!
     :unsubscribe-trades-fn trades/unsubscribe-trades!}))
 
 (defn subscribe-webdata2 [_ store address]
   (subscriptions-runtime/subscribe-webdata2!
    {:address address
-    :log-fn println
+    :log-fn telemetry/log!
     :subscribe-webdata2-fn webdata2/subscribe-webdata2!}))
 
 (defn unsubscribe-webdata2 [_ store address]
   (subscriptions-runtime/unsubscribe-webdata2!
    {:address address
-    :log-fn println
+    :log-fn telemetry/log!
     :unsubscribe-webdata2-fn webdata2/unsubscribe-webdata2!}))
 
 (defn connect-wallet [_ store]
   (wallet-connection-runtime/connect-wallet!
    {:store store
-    :log-fn println
+    :log-fn telemetry/log!
     :request-connection! wallet/request-connection!}))
 
 (defn- set-wallet-copy-feedback! [store kind message]
@@ -335,7 +336,7 @@
   ([runtime _ store]
    (wallet-connection-runtime/disconnect-wallet!
     {:store store
-     :log-fn println
+     :log-fn telemetry/log!
      :clear-wallet-copy-feedback-timeout! #(clear-wallet-copy-feedback-timeout! runtime)
      :clear-order-feedback-toast-timeout! #(clear-order-feedback-toast-timeout! runtime)
      :clear-order-feedback-toast! clear-order-feedback-toast!
@@ -376,7 +377,7 @@
      :clear-wallet-copy-feedback! clear-wallet-copy-feedback!
      :clear-wallet-copy-feedback-timeout! #(clear-wallet-copy-feedback-timeout! runtime)
      :schedule-wallet-copy-feedback-clear! #(schedule-wallet-copy-feedback-clear! runtime %)
-     :log-fn println})))
+     :log-fn telemetry/log!})))
 
 (defn make-copy-wallet-address
   [runtime]
@@ -385,7 +386,7 @@
 
 (defn make-reconnect-websocket
   [{:keys [log-fn force-reconnect!]
-    :or {log-fn println
+    :or {log-fn telemetry/log!
          force-reconnect! ws-client/force-reconnect!}}]
   (fn [_ _]
     (app-effects/reconnect-websocket!
@@ -429,7 +430,7 @@
    {:store store
     :app-version runtime-state/app-version
     :set-copy-status! set-copy-status!
-    :log-fn println}))
+    :log-fn telemetry/log!}))
 
 (defn- restore-active-asset-deps []
   {:connected?-fn ws-client/connected?

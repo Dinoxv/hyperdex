@@ -7,6 +7,7 @@
             [hyperopen.runtime.state :as runtime-state]
             [hyperopen.runtime.validation :as runtime-validation]
             [hyperopen.runtime.wiring :as runtime-wiring]
+            [hyperopen.telemetry :as telemetry]
             [hyperopen.startup.watchers :as startup-watchers]
             [hyperopen.startup.wiring :as startup-wiring]
             [hyperopen.views.app-view :as app-view]
@@ -69,6 +70,6 @@
   (ensure-runtime-bootstrapped!
    runtime
    #(bootstrap-runtime-once! runtime store))
-  (println "Reloading Hyperopen...")
+  (telemetry/log! "Reloading Hyperopen...")
   (wallet/set-on-connected-handler! runtime-action-adapters/handle-wallet-connected)
   (render-app! @store))

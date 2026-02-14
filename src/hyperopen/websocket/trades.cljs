@@ -1,5 +1,6 @@
 (ns hyperopen.websocket.trades
   (:require [hyperopen.platform :as platform]
+            [hyperopen.telemetry :as telemetry]
             [hyperopen.websocket.client :as ws-client]
             [hyperopen.utils.interval :as interval]
             [hyperopen.websocket.trades-policy :as policy]))
@@ -18,7 +19,7 @@
                                            :coin symbol}}]
       (swap! trades-state update :subscriptions conj symbol)
       (ws-client/send-message! subscription-msg)
-      (println "Subscribed to trades for:" symbol))))
+      (telemetry/log! "Subscribed to trades for:" symbol))))
 
 ;; Unsubscribe from trades for a symbol
 (defn unsubscribe-trades! [symbol]
@@ -28,7 +29,7 @@
                                              :coin symbol}}]
       (swap! trades-state update :subscriptions disj symbol)
       (ws-client/send-message! unsubscription-msg)
-      (println "Unsubscribed from trades for:" symbol))))
+      (telemetry/log! "Unsubscribed from trades for:" symbol))))
 
 (defn- update-candles-from-trades! [store trades]
   (let [state @store
@@ -76,14 +77,14 @@
 
 ;; Handle incoming trade data
 (defn handle-trade-data! [data]
-  (println "Processing trade data:" data)
+  (telemetry/log! "Processing trade data:" data)
   (when (and (map? data) (= (:channel data) "trades"))
     (let [trades (:data data)]
       (when (seq trades)
         (swap! trades-state update :trades 
                #(take 100 (concat trades %))) ; Keep last 100 trades
-        (println "Received" (count trades) "new trades")
-        (println "Latest trade:" (first trades))))))
+        (telemetry/log! "Received" (count trades) "new trades")
+        (telemetry/log! "Latest trade:" (first trades))))))
 
 (defn create-trades-handler [store]
   (fn [data]
@@ -108,6 +109,6 @@
 
 ;; Initialize trades module
 (defn init! [store]
-  (println "Trades subscription module initialized")
+  (telemetry/log! "Trades subscription module initialized")
   ;; Register handler for trades channel
   (ws-client/register-handler! "trades" (create-trades-handler store)))

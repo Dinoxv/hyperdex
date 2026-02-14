@@ -1,5 +1,6 @@
 (ns hyperopen.websocket.webdata2
-  (:require [hyperopen.websocket.client :as ws-client]
+  (:require [hyperopen.telemetry :as telemetry]
+            [hyperopen.websocket.client :as ws-client]
             [hyperopen.utils.data-normalization :refer [preprocess-webdata2 normalize-asset-contexts]]))
 
 ;; WebData2 state
@@ -14,7 +15,7 @@
                                            :user address}}]
       (swap! webdata2-state update :subscriptions conj address)
       (ws-client/send-message! subscription-msg)
-      (println "Subscribed to WebData2 for address:" address))))
+      (telemetry/log! "Subscribed to WebData2 for address:" address))))
 
 ;; Unsubscribe from WebData2 for an address
 (defn unsubscribe-webdata2! [address]
@@ -25,7 +26,7 @@
       (swap! webdata2-state update :subscriptions disj address)
       (swap! webdata2-state update :data dissoc address)
       (ws-client/send-message! unsubscription-msg)
-      (println "Unsubscribed from WebData2 for address:" address))))
+      (telemetry/log! "Unsubscribed from WebData2 for address:" address))))
 
 ;; Create a handler function that has access to the store
 (defn create-webdata2-handler [store]
@@ -66,8 +67,8 @@
 
 ;; Initialize WebData2 module
 (defn init! [store]
-  (println "WebData2 subscription module initialized")
-  (println "Registering WebData2 handler with store:" store)
+  (telemetry/log! "WebData2 subscription module initialized")
+  (telemetry/log! "Registering WebData2 handler with store:" store)
   ;; Register handler for webData2 channel with store access
   (ws-client/register-handler! "webData2" (create-webdata2-handler store))
-  (println "WebData2 handler registered successfully")) 
+  (telemetry/log! "WebData2 handler registered successfully")) 

@@ -1,5 +1,6 @@
 (ns hyperopen.api.info-client
-  (:require [hyperopen.platform :as platform]))
+  (:require [hyperopen.platform :as platform]
+            [hyperopen.telemetry :as telemetry]))
 
 (def default-config
   {:info-url "https://api.hyperliquid.xyz/info"
@@ -22,7 +23,7 @@
          fetch-fn js/fetch
          now-ms-fn platform/now-ms
          sleep-ms-fn default-sleep-ms
-         log-fn println}}]
+         log-fn telemetry/log!}}]
   (let [{:keys [info-url
                 max-retries
                 base-retry-ms

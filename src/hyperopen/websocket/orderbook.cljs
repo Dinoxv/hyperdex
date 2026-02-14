@@ -1,5 +1,6 @@
 (ns hyperopen.websocket.orderbook
   (:require [hyperopen.platform :as platform]
+            [hyperopen.telemetry :as telemetry]
             [hyperopen.websocket.client :as ws-client]
             [hyperopen.websocket.orderbook-policy :as policy]))
 
@@ -23,13 +24,13 @@
      (let [desired-subscription (policy/build-subscription symbol aggregation-config)
            current-subscription (get-in @orderbook-state [:subscriptions symbol])]
        (if (= current-subscription desired-subscription)
-         (println "Order book subscription unchanged for:" symbol desired-subscription)
+         (telemetry/log! "Order book subscription unchanged for:" symbol desired-subscription)
          (do
            (when current-subscription
              (send-unsubscribe! current-subscription))
            (send-subscribe! desired-subscription)
            (swap! orderbook-state assoc-in [:subscriptions symbol] desired-subscription)
-           (println "Subscribed to order book for:" symbol desired-subscription)))))))
+           (telemetry/log! "Subscribed to order book for:" symbol desired-subscription)))))))
 
 ;; Unsubscribe from order book for a symbol
 (defn unsubscribe-orderbook! [symbol]
@@ -37,7 +38,7 @@
                          (policy/build-subscription symbol nil))]
     (when symbol
       (send-unsubscribe! subscription)
-      (println "Unsubscribed from order book for:" symbol))
+      (telemetry/log! "Unsubscribed from order book for:" symbol))
     (swap! orderbook-state update :subscriptions dissoc symbol)
     (swap! orderbook-state update :books dissoc symbol)))
 
@@ -90,6 +91,6 @@
 
 ;; Initialize order book module
 (defn init! [store]
-  (println "Order book subscription module initialized")
+  (telemetry/log! "Order book subscription module initialized")
   ;; Register handler for l2Book channel with store access
   (ws-client/register-handler! "l2Book" (create-orderbook-data-handler store)))

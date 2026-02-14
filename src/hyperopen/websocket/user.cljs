@@ -1,6 +1,7 @@
 (ns hyperopen.websocket.user
   (:require [hyperopen.domain.funding-history :as funding-history]
             [hyperopen.platform :as platform]
+            [hyperopen.telemetry :as telemetry]
             [hyperopen.websocket.client :as ws-client]
             [hyperopen.wallet.address-watcher :as address-watcher]))
 
@@ -22,7 +23,7 @@
                 {:type "userNonFundingLedgerUpdates" :user address}]]
       (doseq [s subs] (subscribe! s))
       (swap! user-state update :subscriptions conj address)
-      (println "Subscribed to user streams for:" address))))
+      (telemetry/log! "Subscribed to user streams for:" address))))
 
 (defn unsubscribe-user! [address]
   (when address
@@ -32,7 +33,7 @@
                 {:type "userNonFundingLedgerUpdates" :user address}]]
       (doseq [s subs] (unsubscribe! s))
       (swap! user-state update :subscriptions disj address)
-      (println "Unsubscribed from user streams for:" address))))
+      (telemetry/log! "Unsubscribed from user streams for:" address))))
 
 (defn- upsert-seq [current incoming]
   (let [combined (concat incoming current)]
@@ -109,4 +110,4 @@
   (ws-client/register-handler! "userFills" (user-fills-handler store))
   (ws-client/register-handler! "userFundings" (user-fundings-handler store))
   (ws-client/register-handler! "userNonFundingLedgerUpdates" (user-ledger-handler store))
-  (println "User websocket handlers initialized"))
+  (telemetry/log! "User websocket handlers initialized"))

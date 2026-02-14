@@ -1,6 +1,7 @@
 (ns hyperopen.order.effects
   (:require [hyperopen.api.default :as api]
             [hyperopen.api.projections :as api-projections]
+            [hyperopen.telemetry :as telemetry]
             [hyperopen.api.trading :as trading-api]))
 
 (defn- cancel-request-oids
@@ -86,7 +87,7 @@
                    (refresh-open-orders-snapshot! store address dex {:priority :low}))))
         (.catch (fn [err]
                   (swap! store api-projections/apply-perp-dexs-error err)
-                  (println "Error refreshing per-dex open orders after cancel:" err))))))
+                  (telemetry/log! "Error refreshing per-dex open orders after cancel:" err))))))
 
 (defn- submit-order-error-message
   [exchange-response-error resp]

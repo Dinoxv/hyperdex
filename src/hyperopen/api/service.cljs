@@ -1,12 +1,13 @@
 (ns hyperopen.api.service
   (:require [hyperopen.api.info-client :as info-client]
             [hyperopen.api.runtime :as api-runtime]
-            [hyperopen.platform :as platform]))
+            [hyperopen.platform :as platform]
+            [hyperopen.telemetry :as telemetry]))
 
 (def default-config
   {:info-client-config info-client/default-config
    :now-ms-fn platform/now-ms
-   :log-fn println})
+   :log-fn telemetry/log!})
 
 (defn make-service
   [{:keys [info-client-instance info-client-config now-ms-fn log-fn]
