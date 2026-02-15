@@ -62,7 +62,16 @@
    [:moving-average-hamming :hamming-ma] {:name "Hamming MA" :color "#38bdf8"}
    [:williams-alligator :jaw] {:name "Jaw" :color "#3b82f6"}
    [:williams-alligator :teeth] {:name "Teeth" :color "#ef4444"}
-   [:williams-alligator :lips] {:name "Lips" :color "#22c55e"}})
+   [:williams-alligator :lips] {:name "Lips" :color "#22c55e"}
+   [:pivot-points-standard :pp] {:name "PP" :color "#e5e7eb"}
+   [:pivot-points-standard :r1] {:name "R1" :color "#22c55e"}
+   [:pivot-points-standard :s1] {:name "S1" :color "#ef4444"}
+   [:pivot-points-standard :r2] {:name "R2" :color "#16a34a"}
+   [:pivot-points-standard :s2] {:name "S2" :color "#dc2626"}
+   [:pivot-points-standard :r3] {:name "R3" :color "#15803d"}
+   [:pivot-points-standard :s3] {:name "S3" :color "#b91c1c"}
+   [:rank-correlation-index :rci] {:name "RCI" :color "#a855f7"}
+   [:zig-zag :zig-zag] {:name "Zig Zag" :color "#f97316"}})
 
 (def ^:private histogram-series-meta
   {[:awesome-oscillator :ao] {:name "AO"

@@ -13,7 +13,10 @@ The indicator system still has domain math in view namespaces, fallback dispatch
 - [x] (2026-02-15 15:11Z) Created active ExecPlan and captured remaining SOLID/DDD gaps and migration milestones.
 - [x] (2026-02-15 15:16Z) Milestone 1 completed: introduced domain-level registry orchestration and migrated remaining base calculators from `indicators.cljs` into domain namespaces.
 - [x] (2026-02-15 15:18Z) Validated Milestone 1 with required gates: `npm run check`, `npm test`, `npm run test:websocket`.
-- [ ] (2026-02-15 15:19Z) Milestone 2 in progress: completed wave3 trend-overlay family migration (`:guppy-multiple-moving-average`, `:mcginley-dynamic`, `:moving-average-adaptive`, `:moving-average-hamming`, `:williams-alligator`) and removed migrated wave3 implementations; remaining wave3 families are still pending.
+- [x] (2026-02-15 15:25Z) Milestone 2 batch A completed: migrated wave3 trend-overlay family (`:guppy-multiple-moving-average`, `:mcginley-dynamic`, `:moving-average-adaptive`, `:moving-average-hamming`, `:williams-alligator`) to domain trend and removed wave3 duplicates.
+- [x] (2026-02-15 15:25Z) Milestone 2 batch B completed: migrated wave3 structure/pattern family (`:pivot-points-standard`, `:rank-correlation-index`, `:williams-fractal`, `:zig-zag`) to a new domain structure namespace and removed wave3 duplicates.
+- [x] (2026-02-15 15:25Z) Validated Milestone 2 batches A+B with required gates: `npm run check`, `npm test`, `npm run test:websocket`.
+- [ ] Milestone 2 in progress: migrate remaining wave3 oscillators/volume family and remove final wave3 fallback implementations.
 - [ ] Milestone 3 pending: begin wave2 semantic extraction and progressively remove migrated wave2 implementations.
 - [ ] Milestone 4 pending: harden boundaries (math adapter isolation, contract validation, parity/performance tests), then retire wave fallbacks.
 
@@ -25,6 +28,8 @@ The indicator system still has domain math in view namespaces, fallback dispatch
   Evidence: full required validation passed with 0 failures after the coordinator rewrite.
 - Observation: Preserving wave3 parity for Williams Alligator required aligned RMA seeding semantics for shifted median series.
   Evidence: trend domain migration used `imath/rma-values` with `:aligned` for alligator lines and validation remained green.
+- Observation: Splitting structure/pattern indicators into a dedicated domain namespace reduced duplicate ownership in oscillators without changing observable test behavior.
+  Evidence: removed moved IDs from oscillator definitions, added structure registry routing, and full suites remained green.
 
 ## Decision Log
 
@@ -37,10 +42,13 @@ The indicator system still has domain math in view namespaces, fallback dispatch
 - Decision: Migrate the wave3 trend-overlay family into `domain.trading.indicators.trend` as the first Milestone 2 batch.
   Rationale: This family is cohesive, high-visibility, and mostly independent from marker-heavy structure indicators, making it a low-risk semantic extraction step.
   Date/Author: 2026-02-15 / Codex
+- Decision: Introduce `domain.trading.indicators.structure` for pivot/rank/zigzag/fractal instead of expanding oscillators further.
+  Rationale: These indicators are geometric/market-structure concepts, not momentum oscillators; semantic partitioning improves bounded-context clarity.
+  Date/Author: 2026-02-15 / Codex
 
 ## Outcomes & Retrospective
 
-Milestone 1 achieved the immediate separation-of-concerns target. `indicators.cljs` is now orchestration-only, three residual view-owned calculators were migrated into domain namespaces, and presentation metadata was centralized in the view adapter. Milestone 2 has begun with one complete wave3 family extraction (trend overlays) validated by required gates.
+Milestone 1 achieved the immediate separation-of-concerns target. Milestone 2 now has two completed batches (trend overlays and structure/pattern), both validated by required gates. Remaining wave3 implementations are limited to oscillator/volume families, reducing fallback scope significantly.
 
 ## Context and Orientation
 
@@ -121,3 +129,4 @@ New domain-level interfaces introduced by Milestone 1:
 Plan revision note: 2026-02-15 15:11Z - Initial active roadmap created to drive remaining SOLID/DDD alignment work and start Milestone 1.
 Plan revision note: 2026-02-15 15:18Z - Updated living sections after completing Milestone 1 implementation and validation.
 Plan revision note: 2026-02-15 15:19Z - Updated living sections after completing first Milestone 2 migration batch (wave3 trend overlays) and validation.
+Plan revision note: 2026-02-15 15:25Z - Updated living sections after completing Milestone 2 structure/pattern batch and validation.

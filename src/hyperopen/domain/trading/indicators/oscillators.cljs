@@ -134,16 +134,6 @@
                      :sma4 15
                      :signal 9}
     :migrated-from :wave3}
-   {:id :rank-correlation-index
-    :name "Rank Correlation Index"
-    :short-name "RCI"
-    :description "Spearman rank correlation oscillator"
-    :supports-period? true
-    :default-period 9
-    :min-period 3
-    :max-period 400
-    :default-config {:period 9}
-    :migrated-from :wave3}
    {:id :relative-vigor-index
     :name "Relative Vigor Index"
     :short-name "RVI"
@@ -236,80 +226,7 @@
                      :atr-period 10
                      :multiplier 1.0}
     :migrated-from :wave3}
-   {:id :guppy-multiple-moving-average
-    :name "Guppy Multiple Moving Average"
-    :short-name "GMMA"
-    :description "Short and long EMA ribbon"
-    :supports-period? false
-    :default-config {}
-    :migrated-from :wave3}
-   {:id :mcginley-dynamic
-    :name "McGinley Dynamic"
-    :short-name "MGD"
-    :description "Adaptive moving average with speed correction"
-    :supports-period? true
-    :default-period 14
-    :min-period 2
-    :max-period 400
-    :default-config {:period 14}
-    :migrated-from :wave3}
-   {:id :moving-average-adaptive
-    :name "Moving Average Adaptive"
-    :short-name "KAMA"
-    :description "Kaufman Adaptive Moving Average"
-    :supports-period? true
-    :default-period 10
-    :min-period 2
-    :max-period 400
-    :default-config {:period 10
-                     :fast 2
-                     :slow 30}
-    :migrated-from :wave3}
-   {:id :moving-average-hamming
-    :name "Moving Average Hamming"
-    :short-name "HAMMA"
-    :description "Moving average with Hamming window weights"
-    :supports-period? true
-    :default-period 20
-    :min-period 2
-    :max-period 400
-    :default-config {:period 20}
-    :migrated-from :wave3}
-   {:id :pivot-points-standard
-    :name "Pivot Points Standard"
-    :short-name "Pivots"
-    :description "PP, R1-R3 and S1-S3 from previous window"
-    :supports-period? true
-    :default-period 20
-    :min-period 2
-    :max-period 400
-    :default-config {:period 20}
-    :migrated-from :wave3}
-   {:id :williams-alligator
-    :name "Williams Alligator"
-    :short-name "Alligator"
-    :description "Three smoothed moving averages with offsets"
-    :supports-period? false
-    :default-config {:jaw-period 13
-                     :jaw-shift 8
-                     :teeth-period 8
-                     :teeth-shift 5
-                     :lips-period 5
-                     :lips-shift 3}
-    :migrated-from :wave3}
-   {:id :zig-zag
-    :name "Zig Zag"
-    :short-name "ZigZag"
-    :description "Swing-line connecting pivots that exceed threshold"
-    :supports-period? false
-    :default-config {:threshold-percent 5}
-    :migrated-from :wave3}
-   {:id :williams-fractal
-    :name "Williams Fractal"
-    :short-name "Fractal"
-    :description "Five-bar high/low fractal markers"
-    :supports-period? false
-    :default-config {}}])
+   ])
 
 (defn get-oscillator-indicators
   []
