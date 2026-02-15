@@ -17,6 +17,15 @@
    :runtime-state (trading/order-form-runtime-state state)
    :market-info (trading/market-info state)})
 
+(defn- grouped-ui-state
+  [ui-state]
+  {:entry {:mode (:entry-mode ui-state)
+           :pro-dropdown-open? (boolean (:pro-order-type-dropdown-open? ui-state))}
+   :interaction {:price-input-focused? (boolean (:price-input-focused? ui-state))}
+   :panels {:tpsl-open? (boolean (:tpsl-panel-open? ui-state))}
+   :sizing {:ui-leverage (:ui-leverage ui-state)
+            :size-display (:size-display ui-state)}})
+
 (defn build-order-form-context
   [state {:keys [draft ui-state runtime-state market-info]}]
   (let [order-type (:type draft)
@@ -28,6 +37,7 @@
                                                           :submitting? submitting?})]
     {:draft draft
      :ui-state ui-state
+     :ui (grouped-ui-state ui-state)
      :runtime-state runtime-state
      :market-info market-info
      :order-type-capabilities capabilities

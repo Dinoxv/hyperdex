@@ -1,8 +1,9 @@
-(ns hyperopen.views.trade.order-form-commands)
+(ns hyperopen.views.trade.order-form-commands
+  (:require [hyperopen.views.trade.order-form-placeholders :as placeholders]))
 
-(def event-target-value :order-form.event/target-value)
-(def event-target-checked :order-form.event/target-checked)
-(def event-key :order-form.event/key)
+(def event-target-value placeholders/event-target-value)
+(def event-target-checked placeholders/event-target-checked)
+(def event-key placeholders/event-key)
 
 (defn- command
   [command-id & args]

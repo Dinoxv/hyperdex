@@ -69,110 +69,169 @@
 (def ^:private allowed-transition-keys
   #{:order-form :order-form-ui :order-form-runtime})
 
-(defn- map-with-exact-keys?
-  [value exact-keys]
-  (and (map? value)
-       (= exact-keys (set (keys value)))))
+(defn- exact-keys? [value expected-keys]
+  (= expected-keys (set (keys value))))
 
-(defn- map-with-required-keys?
-  [value required-keys]
-  (and (map? value)
-       (every? #(contains? value %) required-keys)))
+(s/def :order-form-vm/form map?)
+(s/def :order-form-vm/side keyword?)
+(s/def :order-form-vm/type keyword?)
+(s/def :order-form-vm/entry-mode keyword?)
+(s/def :order-form-vm/pro-dropdown-open? boolean?)
+(s/def :order-form-vm/tpsl-panel-open? boolean?)
+(s/def :order-form-vm/pro-dropdown-options (s/coll-of keyword? :kind vector?))
+(s/def :order-form-vm/pro-tab-label string?)
+(s/def :order-form-vm/spot? boolean?)
+(s/def :order-form-vm/hip3? boolean?)
+(s/def :order-form-vm/read-only? boolean?)
+(s/def :order-form-vm/ui-leverage number?)
+(s/def :order-form-vm/next-leverage number?)
+(s/def :order-form-vm/size-percent number?)
+(s/def :order-form-vm/display-size-percent string?)
+(s/def :order-form-vm/notch-overlap-threshold number?)
+(s/def :order-form-vm/size-display string?)
+(s/def :order-form-vm/quote-symbol string?)
+(s/def :order-form-vm/error (s/nilable string?))
+(s/def :order-form-vm/submitting? boolean?)
 
-(defn- price-context-shape?
-  [price-context]
-  (and (map-with-exact-keys? price-context required-price-context-keys)
-       (string? (:label price-context))
-       (boolean? (:mid-available? price-context))))
+(s/def :order-form-vm.price-context/label string?)
+(s/def :order-form-vm.price-context/mid-available? boolean?)
+(s/def :order-form-vm/price-context
+  (s/and
+   (s/keys :req-un [:order-form-vm.price-context/label
+                    :order-form-vm.price-context/mid-available?])
+   #(exact-keys? % required-price-context-keys)))
 
-(defn- price-shape?
-  [price]
-  (and (map-with-exact-keys? price required-price-keys)
-       (string? (:raw price))
-       (string? (:display price))
-       (boolean? (:focused? price))
-       (or (nil? (:fallback price)) (string? (:fallback price)))
-       (price-context-shape? (:context price))))
+(s/def :order-form-vm.price/raw string?)
+(s/def :order-form-vm.price/display string?)
+(s/def :order-form-vm.price/focused? boolean?)
+(s/def :order-form-vm.price/fallback (s/nilable string?))
+(s/def :order-form-vm.price/context :order-form-vm/price-context)
+(s/def :order-form-vm/price
+  (s/and
+   (s/keys :req-un [:order-form-vm.price/raw
+                    :order-form-vm.price/display
+                    :order-form-vm.price/focused?
+                    :order-form-vm.price/fallback
+                    :order-form-vm.price/context])
+   #(exact-keys? % required-price-keys)))
 
-(defn- submit-shape?
-  [submit]
-  (and (map-with-exact-keys? submit required-submit-keys)
-       (map? (:form submit))
-       (vector? (:errors submit))
-       (vector? (:required-fields submit))
-       (or (nil? (:reason submit)) (keyword? (:reason submit)))
-       (or (nil? (:error-message submit)) (string? (:error-message submit)))
-       (or (nil? (:tooltip submit)) (string? (:tooltip submit)))
-       (boolean? (:market-price-missing? submit))
-       (boolean? (:disabled? submit))))
+(s/def :order-form-vm.display/available-to-trade string?)
+(s/def :order-form-vm.display/current-position string?)
+(s/def :order-form-vm.display/liquidation-price string?)
+(s/def :order-form-vm.display/order-value string?)
+(s/def :order-form-vm.display/margin-required string?)
+(s/def :order-form-vm.display/slippage string?)
+(s/def :order-form-vm.display/fees string?)
+(s/def :order-form-vm/display
+  (s/and
+   (s/keys :req-un [:order-form-vm.display/available-to-trade
+                    :order-form-vm.display/current-position
+                    :order-form-vm.display/liquidation-price
+                    :order-form-vm.display/order-value
+                    :order-form-vm.display/margin-required
+                    :order-form-vm.display/slippage
+                    :order-form-vm.display/fees])
+   #(exact-keys? % required-display-keys)))
 
-(defn- controls-shape?
-  [controls]
-  (and (map-with-exact-keys? controls required-controls-keys)
-       (every? true? (map boolean? (vals controls)))))
+(s/def :order-form-vm.scale-preview/start string?)
+(s/def :order-form-vm.scale-preview/end string?)
+(s/def :order-form-vm/scale-preview-lines
+  (s/and
+   (s/keys :req-un [:order-form-vm.scale-preview/start
+                    :order-form-vm.scale-preview/end])
+   #(exact-keys? % required-scale-preview-keys)))
 
-(defn- display-shape?
-  [display]
-  (and (map-with-exact-keys? display required-display-keys)
-       (every? string? (vals display))))
+(s/def :order-form-vm.controls/limit-like? boolean?)
+(s/def :order-form-vm.controls/show-limit-like-controls? boolean?)
+(s/def :order-form-vm.controls/show-tpsl-toggle? boolean?)
+(s/def :order-form-vm.controls/show-tpsl-panel? boolean?)
+(s/def :order-form-vm.controls/show-post-only? boolean?)
+(s/def :order-form-vm.controls/show-scale-preview? boolean?)
+(s/def :order-form-vm.controls/show-liquidation-row? boolean?)
+(s/def :order-form-vm.controls/show-slippage-row? boolean?)
+(s/def :order-form-vm/controls
+  (s/and
+   (s/keys :req-un [:order-form-vm.controls/limit-like?
+                    :order-form-vm.controls/show-limit-like-controls?
+                    :order-form-vm.controls/show-tpsl-toggle?
+                    :order-form-vm.controls/show-tpsl-panel?
+                    :order-form-vm.controls/show-post-only?
+                    :order-form-vm.controls/show-scale-preview?
+                    :order-form-vm.controls/show-liquidation-row?
+                    :order-form-vm.controls/show-slippage-row?])
+   #(exact-keys? % required-controls-keys)))
 
-(defn- scale-preview-shape?
-  [preview]
-  (and (map-with-exact-keys? preview required-scale-preview-keys)
-       (string? (:start preview))
-       (string? (:end preview))))
+(s/def :order-form-vm.submit/form map?)
+(s/def :order-form-vm.submit/errors vector?)
+(s/def :order-form-vm.submit/required-fields vector?)
+(s/def :order-form-vm.submit/reason (s/nilable keyword?))
+(s/def :order-form-vm.submit/error-message (s/nilable string?))
+(s/def :order-form-vm.submit/tooltip (s/nilable string?))
+(s/def :order-form-vm.submit/market-price-missing? boolean?)
+(s/def :order-form-vm.submit/disabled? boolean?)
+(s/def :order-form-vm/submit
+  (s/and
+   (s/keys :req-un [:order-form-vm.submit/form
+                    :order-form-vm.submit/errors
+                    :order-form-vm.submit/required-fields
+                    :order-form-vm.submit/reason
+                    :order-form-vm.submit/error-message
+                    :order-form-vm.submit/tooltip
+                    :order-form-vm.submit/market-price-missing?
+                    :order-form-vm.submit/disabled?])
+   #(exact-keys? % required-submit-keys)))
 
-(defn- order-form-vm-shape?
-  [vm]
-  (and (map-with-exact-keys? vm required-vm-keys)
-       (map? (:form vm))
-       (keyword? (:side vm))
-       (keyword? (:type vm))
-       (keyword? (:entry-mode vm))
-       (boolean? (:pro-dropdown-open? vm))
-       (boolean? (:tpsl-panel-open? vm))
-       (vector? (:pro-dropdown-options vm))
-       (every? keyword? (:pro-dropdown-options vm))
-       (string? (:pro-tab-label vm))
-       (boolean? (:spot? vm))
-       (boolean? (:hip3? vm))
-       (boolean? (:read-only? vm))
-       (number? (:ui-leverage vm))
-       (number? (:next-leverage vm))
-       (number? (:size-percent vm))
-       (string? (:display-size-percent vm))
-       (number? (:notch-overlap-threshold vm))
-       (string? (:size-display vm))
-       (string? (:quote-symbol vm))
-       (or (nil? (:error vm)) (string? (:error vm)))
-       (boolean? (:submitting? vm))
-       (display-shape? (:display vm))
-       (price-shape? (:price vm))
-       (scale-preview-shape? (:scale-preview-lines vm))
-       (controls-shape? (:controls vm))
-       (submit-shape? (:submit vm))))
+(s/def ::order-form-vm
+  (s/and
+   (s/keys :req-un [:order-form-vm/form
+                    :order-form-vm/side
+                    :order-form-vm/type
+                    :order-form-vm/entry-mode
+                    :order-form-vm/pro-dropdown-open?
+                    :order-form-vm/tpsl-panel-open?
+                    :order-form-vm/pro-dropdown-options
+                    :order-form-vm/pro-tab-label
+                    :order-form-vm/controls
+                    :order-form-vm/spot?
+                    :order-form-vm/hip3?
+                    :order-form-vm/read-only?
+                    :order-form-vm/display
+                    :order-form-vm/ui-leverage
+                    :order-form-vm/next-leverage
+                    :order-form-vm/size-percent
+                    :order-form-vm/display-size-percent
+                    :order-form-vm/notch-overlap-threshold
+                    :order-form-vm/size-display
+                    :order-form-vm/price
+                    :order-form-vm/quote-symbol
+                    :order-form-vm/scale-preview-lines
+                    :order-form-vm/error
+                    :order-form-vm/submitting?
+                    :order-form-vm/submit])
+   #(exact-keys? % required-vm-keys)))
 
-(defn- runtime-shape?
-  [runtime]
-  (and (map-with-exact-keys? runtime #{:submitting? :error})
-       (boolean? (:submitting? runtime))
-       (or (nil? (:error runtime))
-           (string? (:error runtime)))))
+(s/def :order-form-transition.runtime/submitting? boolean?)
+(s/def :order-form-transition.runtime/error (s/nilable string?))
+(s/def :order-form-transition/order-form-runtime
+  (s/and
+   (s/keys :req-un [:order-form-transition.runtime/submitting?
+                    :order-form-transition.runtime/error])
+   #(exact-keys? % #{:submitting? :error})))
 
-(defn- transition-shape?
-  [transition]
-  (and (map-with-required-keys? transition #{})
-       (seq transition)
-       (every? #(contains? allowed-transition-keys %) (keys transition))
-       (or (not (contains? transition :order-form))
-           (map? (:order-form transition)))
-       (or (not (contains? transition :order-form-ui))
-           (map? (:order-form-ui transition)))
-       (or (not (contains? transition :order-form-runtime))
-           (runtime-shape? (:order-form-runtime transition)))))
-
-(s/def ::order-form-vm order-form-vm-shape?)
-(s/def ::order-form-transition transition-shape?)
+(s/def ::order-form-transition
+  (s/and map?
+         #(seq %)
+         #(every? (fn [key] (contains? allowed-transition-keys key)) (keys %))
+         (fn [transition]
+           (or (not (contains? transition :order-form))
+               (map? (:order-form transition))))
+         (fn [transition]
+           (or (not (contains? transition :order-form-ui))
+               (map? (:order-form-ui transition))))
+         (fn [transition]
+           (or (not (contains? transition :order-form-runtime))
+               (s/valid? :order-form-transition/order-form-runtime
+                         (:order-form-runtime transition))))))
 
 (defn order-form-vm-valid?
   [vm]

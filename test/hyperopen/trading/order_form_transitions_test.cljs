@@ -221,6 +221,43 @@
            (<= 0 size-percent 100)
            true))))
 
+(defn- evaluate-intents
+  [initial-state initial-model intents]
+  (loop [idx 0
+         remaining intents
+         state initial-state
+         model initial-model]
+    (if (empty? remaining)
+      {:ok? true}
+      (let [intent (first remaining)
+            transition (run-intent state intent)
+            transition-valid? (or (nil? transition)
+                                  (contracts/order-form-transition-valid? transition))
+            next-state (apply-transition state transition)
+            next-model (apply-model model intent)
+            invariants-ok? (state-invariants-hold? next-state next-model)]
+        (if (and transition-valid? invariants-ok?)
+          (recur (inc idx) (rest remaining) next-state next-model)
+          {:ok? false
+           :idx idx
+           :intent intent
+           :transition transition
+           :transition-valid? transition-valid?
+           :invariants-ok? invariants-ok?
+           :state-snapshot {:order-form (:order-form next-state)
+                            :order-form-ui (:order-form-ui next-state)}})))))
+
+(defn- failure-diagnostics
+  [base initial-model result]
+  (let [shrunk-intents (or (get-in result [:shrunk :smallest])
+                           (get-in result [:fail]))
+        run (when (sequential? shrunk-intents)
+              (evaluate-intents base initial-model shrunk-intents))]
+    {:result (dissoc result :result)
+     :shrunk-intents (when (sequential? shrunk-intents)
+                       (vec (take 25 shrunk-intents)))
+     :failure run}))
+
 (deftest transition-state-machine-generative-model-invariants-test
   (let [base (base-state {:type :limit
                           :price "100"
@@ -231,21 +268,8 @@
                        :pro-order-type-dropdown-open? false
                        :tpsl-panel-open? false}
         property (prop/for-all [intents (gen/vector intent-gen 1 120)]
-                   (loop [remaining intents
-                          state base
-                          model initial-model]
-                     (if (empty? remaining)
-                       true
-                       (let [intent (first remaining)
-                             transition (run-intent state intent)
-                             transition-valid? (or (nil? transition)
-                                                   (contracts/order-form-transition-valid? transition))
-                             next-state (apply-transition state transition)
-                             next-model (apply-model model intent)]
-                         (and transition-valid?
-                              (state-invariants-hold? next-state next-model)
-                              (recur (rest remaining) next-state next-model))))))]
+                   (:ok? (evaluate-intents base initial-model intents)))]
     (let [result (tc/quick-check 120 property)]
       (is (:pass? result)
           (str "generative model check failed: "
-               (pr-str (dissoc result :result)))))))
+               (pr-str (failure-diagnostics base initial-model result)))))))

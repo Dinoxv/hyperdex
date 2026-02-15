@@ -25,6 +25,7 @@
 (defn order-form-vm [state]
   (let [{:keys [draft
                 ui-state
+                ui
                 runtime-state
                 market-info
                 order-type-capabilities
@@ -44,9 +45,9 @@
         side (:side normalized-form)
         type (:type normalized-form)
         entry-mode (:entry-mode normalized-form)
-        pro-dropdown-open? (boolean (:pro-order-type-dropdown-open? ui-state))
+        pro-dropdown-open? (boolean (get-in ui [:entry :pro-dropdown-open?]))
         pro-mode? (= entry-mode :pro)
-        tpsl-panel-open? (boolean (:tpsl-panel-open? ui-state))
+        tpsl-panel-open? (boolean (get-in ui [:panels :tpsl-open?]))
         controls (selectors/order-type-controls {:entry-mode entry-mode
                                                  :pro-mode? pro-mode?
                                                  :tpsl-panel-open? tpsl-panel-open?
