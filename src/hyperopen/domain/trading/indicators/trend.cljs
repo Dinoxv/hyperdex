@@ -41,7 +41,58 @@
     :default-period 20
     :min-period 2
     :max-period 200
-    :default-config {:period 20}}])
+    :default-config {:period 20}}
+   {:id :guppy-multiple-moving-average
+    :name "Guppy Multiple Moving Average"
+    :short-name "GMMA"
+    :description "Short and long EMA ribbon"
+    :supports-period? false
+    :default-config {}
+    :migrated-from :wave3}
+   {:id :mcginley-dynamic
+    :name "McGinley Dynamic"
+    :short-name "MGD"
+    :description "Adaptive moving average with speed correction"
+    :supports-period? true
+    :default-period 14
+    :min-period 2
+    :max-period 400
+    :default-config {:period 14}
+    :migrated-from :wave3}
+   {:id :moving-average-adaptive
+    :name "Moving Average Adaptive"
+    :short-name "KAMA"
+    :description "Kaufman Adaptive Moving Average"
+    :supports-period? true
+    :default-period 10
+    :min-period 2
+    :max-period 400
+    :default-config {:period 10
+                     :fast 2
+                     :slow 30}
+    :migrated-from :wave3}
+   {:id :moving-average-hamming
+    :name "Moving Average Hamming"
+    :short-name "HAMMA"
+    :description "Moving average with Hamming window weights"
+    :supports-period? true
+    :default-period 20
+    :min-period 2
+    :max-period 400
+    :default-config {:period 20}
+    :migrated-from :wave3}
+   {:id :williams-alligator
+    :name "Williams Alligator"
+    :short-name "Alligator"
+    :description "Three smoothed moving averages with offsets"
+    :supports-period? false
+    :default-config {:jaw-period 13
+                     :jaw-shift 8
+                     :teeth-period 8
+                     :teeth-shift 5
+                     :lips-period 5
+                     :lips-shift 3}
+    :migrated-from :wave3}])
 
 (defn get-trend-indicators
   []
@@ -63,11 +114,47 @@
   [values period]
   (imath/rma-values values period :lagged))
 
+(defn- rma-aligned-values
+  [values period]
+  (imath/rma-values values period :aligned))
+
+(defn- ema-values
+  [values period]
+  (imath/ema-values values period))
+
 (defn calculate-sma-values
   [data period]
   (let [length (parse-period period 20 2 1000)
         closes (field-values data :close)]
     (sma-values closes length)))
+
+(defn- shift-right
+  [values shift]
+  (let [size (count values)
+        shifted (concat (repeat shift nil) values)]
+    (vec (take size shifted))))
+
+(defn- make-hamming-weights
+  [period]
+  (if (= period 1)
+    [1]
+    (let [weights (mapv (fn [idx]
+                          (- 0.54
+                             (* 0.46
+                                (js/Math.cos (/ (* 2 js/Math.PI idx)
+                                                (dec period))))))
+                        (range period))
+          total (reduce + 0 weights)]
+      (mapv #(/ % total) weights))))
+
+(defn- weighted-ma
+  [values weights]
+  (let [period (count weights)]
+    (imath/rolling-apply values
+                         period
+                         (fn [window]
+                           (reduce + 0 (map * window weights)))
+                         :aligned)))
 
 (defn- alma-weights
   [period offset sigma]
@@ -219,15 +306,128 @@
                              :separate
                              [(result/line-series :adx adx-values)])))
 
+(defn- calculate-guppy-multiple-moving-average
+  [data _params]
+  (let [close-values (field-values data :close)
+        short-periods [3 5 8 10 12 15]
+        long-periods [30 35 40 45 50 60]
+        short-series (mapv (fn [period]
+                             (result/line-series (keyword (str "ema-short-" period))
+                                                 (ema-values close-values period)))
+                           short-periods)
+        long-series (mapv (fn [period]
+                            (result/line-series (keyword (str "ema-long-" period))
+                                                (ema-values close-values period)))
+                          long-periods)]
+    (result/indicator-result :guppy-multiple-moving-average
+                             :overlay
+                             (vec (concat short-series long-series)))))
+
+(defn- calculate-mcginley-dynamic
+  [data params]
+  (let [period (parse-period (:period params) 14 2 400)
+        close-values (field-values data :close)
+        size (count data)
+        values (loop [idx 0
+                      prev nil
+                      out []]
+                 (if (= idx size)
+                   out
+                   (let [close (nth close-values idx)
+                         current (if (nil? prev)
+                                   close
+                                   (let [ratio (if (zero? prev)
+                                                 1
+                                                 (/ close prev))
+                                         denom (* period (js/Math.pow ratio 4))]
+                                     (+ prev (/ (- close prev)
+                                                (if (zero? denom) period denom)))))]
+                     (recur (inc idx)
+                            current
+                            (conj out current)))))]
+    (result/indicator-result :mcginley-dynamic
+                             :overlay
+                             [(result/line-series :mcginley values)])))
+
+(defn- calculate-moving-average-adaptive
+  [data params]
+  (let [period (parse-period (:period params) 10 2 400)
+        fast (parse-period (:fast params) 2 2 100)
+        slow (parse-period (:slow params) 30 2 200)
+        close-values (field-values data :close)
+        size (count data)
+        fast-sc (/ 2 (inc fast))
+        slow-sc (/ 2 (inc slow))
+        values (loop [idx 0
+                      prev nil
+                      out []]
+                 (if (= idx size)
+                   out
+                   (let [close (nth close-values idx)
+                         current (if (or (nil? prev) (< idx period))
+                                   close
+                                   (let [change (js/Math.abs (- close (nth close-values (- idx period))))
+                                         volatility (reduce + 0
+                                                            (map (fn [j]
+                                                                   (js/Math.abs (- (nth close-values j)
+                                                                                   (nth close-values (dec j)))))
+                                                                 (range (- idx period -1) (inc idx))))
+                                         er (if (zero? volatility)
+                                              0
+                                              (/ change volatility))
+                                         sc (js/Math.pow (+ (* er (- fast-sc slow-sc)) slow-sc) 2)]
+                                     (+ prev (* sc (- close prev)))))]
+                     (recur (inc idx)
+                            current
+                            (conj out current)))))]
+    (result/indicator-result :moving-average-adaptive
+                             :overlay
+                             [(result/line-series :kama values)])))
+
+(defn- calculate-moving-average-hamming
+  [data params]
+  (let [period (parse-period (:period params) 20 2 400)
+        weights (make-hamming-weights period)
+        values (weighted-ma (field-values data :close) weights)]
+    (result/indicator-result :moving-average-hamming
+                             :overlay
+                             [(result/line-series :hamming-ma values)])))
+
+(defn- calculate-williams-alligator
+  [data params]
+  (let [jaw-period (parse-period (:jaw-period params) 13 2 200)
+        jaw-shift (parse-period (:jaw-shift params) 8 0 50)
+        teeth-period (parse-period (:teeth-period params) 8 2 200)
+        teeth-shift (parse-period (:teeth-shift params) 5 0 50)
+        lips-period (parse-period (:lips-period params) 5 2 200)
+        lips-shift (parse-period (:lips-shift params) 3 0 50)
+        median (mapv (fn [high low]
+                       (/ (+ high low) 2))
+                     (field-values data :high)
+                     (field-values data :low))
+        jaw (shift-right (rma-aligned-values median jaw-period) jaw-shift)
+        teeth (shift-right (rma-aligned-values median teeth-period) teeth-shift)
+        lips (shift-right (rma-aligned-values median lips-period) lips-shift)]
+    (result/indicator-result :williams-alligator
+                             :overlay
+                             [(result/line-series :jaw jaw)
+                              (result/line-series :teeth teeth)
+                              (result/line-series :lips lips)])))
+
 (def ^:private trend-calculators
   {:alma calculate-alma
    :aroon calculate-aroon
    :adx calculate-adx
+   :guppy-multiple-moving-average calculate-guppy-multiple-moving-average
+   :mcginley-dynamic calculate-mcginley-dynamic
+   :moving-average-adaptive calculate-moving-average-adaptive
+   :moving-average-hamming calculate-moving-average-hamming
    :sma (fn [data params]
           (result/indicator-result :sma
                                    :overlay
                                    [(result/line-series :sma
-                                                        (calculate-sma-values data (:period params 20)))]))})
+                                                        (calculate-sma-values data (:period params 20)))]))
+   :williams-alligator calculate-williams-alligator})
 
 (defn calculate-trend-indicator
   [indicator-type data params]

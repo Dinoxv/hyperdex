@@ -41,7 +41,28 @@
    [:relative-volatility-index :rvi-vol] {:name "RVI" :color "#a855f7"}
    [:smi-ergodic :indicator] {:name "SMI Ergodic" :color "#22d3ee"}
    [:smi-ergodic :signal] {:name "Signal" :color "#f97316"}
-   [:ultimate-oscillator :uo] {:name "Ultimate Osc" :color "#a78bfa"}})
+   [:ultimate-oscillator :uo] {:name "Ultimate Osc" :color "#a78bfa"}
+   [:accumulation-distribution :adl] {:name "A/D" :color "#22d3ee"}
+   [:accumulative-swing-index :asi] {:name "ASI" :color "#f97316"}
+   [:average-price :ohlc4] {:name "OHLC4" :color "#a3e635"}
+   [:guppy-multiple-moving-average :ema-short-3] {:name "EMA 3" :color "#22c55e"}
+   [:guppy-multiple-moving-average :ema-short-5] {:name "EMA 5" :color "#4ade80"}
+   [:guppy-multiple-moving-average :ema-short-8] {:name "EMA 8" :color "#86efac"}
+   [:guppy-multiple-moving-average :ema-short-10] {:name "EMA 10" :color "#16a34a"}
+   [:guppy-multiple-moving-average :ema-short-12] {:name "EMA 12" :color "#15803d"}
+   [:guppy-multiple-moving-average :ema-short-15] {:name "EMA 15" :color "#166534"}
+   [:guppy-multiple-moving-average :ema-long-30] {:name "EMA 30" :color "#ef4444"}
+   [:guppy-multiple-moving-average :ema-long-35] {:name "EMA 35" :color "#f87171"}
+   [:guppy-multiple-moving-average :ema-long-40] {:name "EMA 40" :color "#fca5a5"}
+   [:guppy-multiple-moving-average :ema-long-45] {:name "EMA 45" :color "#dc2626"}
+   [:guppy-multiple-moving-average :ema-long-50] {:name "EMA 50" :color "#b91c1c"}
+   [:guppy-multiple-moving-average :ema-long-60] {:name "EMA 60" :color "#991b1b"}
+   [:mcginley-dynamic :mcginley] {:name "McGinley" :color "#f59e0b"}
+   [:moving-average-adaptive :kama] {:name "KAMA" :color "#22d3ee"}
+   [:moving-average-hamming :hamming-ma] {:name "Hamming MA" :color "#38bdf8"}
+   [:williams-alligator :jaw] {:name "Jaw" :color "#3b82f6"}
+   [:williams-alligator :teeth] {:name "Teeth" :color "#ef4444"}
+   [:williams-alligator :lips] {:name "Lips" :color "#22c55e"}})
 
 (def ^:private histogram-series-meta
   {[:awesome-oscillator :ao] {:name "AO"
