@@ -1,9 +1,8 @@
 (ns hyperopen.views.trade.order-form-view
   (:require [clojure.string :as str]
             [hyperopen.state.trading :as trading]
-            [hyperopen.utils.formatting :as fmt]))
-
-(def leverage-presets [2 5 10 20 25 40 50])
+            [hyperopen.utils.formatting :as fmt]
+            [hyperopen.views.trade.order-form-vm :as order-form-vm]))
 
 (def neutral-input-focus-classes
   ["outline-none"
@@ -23,8 +22,20 @@
 (defn- section-label [text]
   [:div {:class ["text-xs" "text-gray-400" "mb-1"]} text])
 
-(defn- row-toggle [label-text checked? on-change]
-  (let [checkbox-id (str (gensym "trade-toggle-"))]
+(defn- label->stable-id [label-text]
+  (let [safe-label (or label-text "toggle")
+        slug (-> safe-label
+                 str/lower-case
+                 (str/replace #"[^a-z0-9]+" "-")
+                 (str/replace #"^-+|-+$" ""))]
+    (if (seq slug) slug "toggle")))
+
+(defn- row-toggle
+  ([label-text checked? on-change]
+   (row-toggle label-text checked? on-change nil))
+  ([label-text checked? on-change toggle-id]
+  (let [checkbox-id (or toggle-id
+                        (str "trade-toggle-" (label->stable-id label-text)))]
     [:div {:class ["inline-flex" "items-center" "gap-2" "text-sm" "text-gray-100"]}
      [:input {:id checkbox-id
               :class ["h-4"
@@ -44,7 +55,7 @@
               :on {:change on-change}}]
      [:label {:for checkbox-id
               :class ["cursor-pointer" "select-none"]}
-      label-text]]))
+      label-text]])))
 
 (defn- input [value on-change & {:keys [type placeholder]}]
   [:input {:class (into ["w-full"
@@ -142,26 +153,6 @@
             :value (or value "")
             :on {:input on-change}}]])
 
-(defn- non-blank-string [value]
-  (let [s (when (some? value) (str value))
-        trimmed (some-> s str/trim)]
-    (when (seq trimmed) trimmed)))
-
-(defn- base-symbol-from-value [value]
-  (let [text (non-blank-string value)]
-    (cond
-      (and text (str/includes? text "/"))
-      (non-blank-string (first (str/split text #"/" 2)))
-
-      (and text (str/includes? text ":"))
-      (non-blank-string (second (str/split text #":" 2)))
-
-      (and text (str/includes? text "-"))
-      (non-blank-string (first (str/split text #"-" 2)))
-
-      :else
-      text)))
-
 (defn- chip-button [label active? & {:keys [on-click disabled?]}]
   [:button {:type "button"
             :disabled (boolean disabled?)
@@ -210,28 +201,7 @@
               :on {:click on-click}}
      label]))
 
-(defn- order-type-label [order-type]
-  (case order-type
-    :stop-market "Stop Market"
-    :stop-limit "Stop Limit"
-    :take-market "Take Market"
-    :take-limit "Take Limit"
-    :scale "Scale"
-    :twap "TWAP"
-    "Stop Market"))
-
-(defn- pro-dropdown-options []
-  [:scale :stop-limit :stop-market :take-limit :take-market :twap])
-
-(defn- pro-tab-label [entry-mode order-type]
-  (if (= entry-mode :pro)
-    (order-type-label order-type)
-    "Pro"))
-
-(defn- pro-dropdown-open? [form]
-  (boolean (:pro-order-type-dropdown-open? form)))
-
-(defn- entry-mode-tabs [entry-mode order-type pro-dropdown-open?]
+(defn- entry-mode-tabs [{:keys [entry-mode type pro-dropdown-open? pro-tab-label pro-dropdown-options]}]
   [:div {:class ["relative"]}
    (when pro-dropdown-open?
      [:div {:class ["fixed" "inset-0" "z-[180]"]
@@ -260,7 +230,7 @@
                               ["text-gray-400" "border-transparent" "hover:text-gray-200"]))
                :on {:click [[:actions/toggle-pro-order-type-dropdown]]
                     :keydown [[:actions/handle-pro-order-type-dropdown-keydown [:event/key]]]}}
-      [:span (pro-tab-label entry-mode order-type)]
+      [:span pro-tab-label]
       [:svg {:class (into ["h-3.5" "w-3.5" "transition-transform"]
                           (if pro-dropdown-open?
                             ["rotate-180"]
@@ -284,7 +254,7 @@
                       "bg-base-100"
                       "shadow-lg"
                       "z-[210]"]}
-        (for [pro-order-type (pro-dropdown-options)]
+        (for [pro-order-type pro-dropdown-options]
           ^{:key (name pro-order-type)}
           [:button {:type "button"
                     :class (into ["block"
@@ -294,23 +264,11 @@
                                   "text-left"
                                   "text-sm"
                                   "transition-colors"]
-                                 (if (= order-type pro-order-type)
+                                 (if (= type pro-order-type)
                                    ["bg-base-200" "text-gray-100"]
                                    ["text-gray-300" "hover:bg-base-200" "hover:text-gray-100"]))
                     :on {:click [[:actions/select-pro-order-type pro-order-type]]}}
-           (order-type-label pro-order-type)])])]]])
-
-(defn- next-leverage [current-leverage max-leverage]
-  (let [cap (or max-leverage (last leverage-presets))
-        options (->> leverage-presets
-                     (filter #(<= % cap))
-                     vec)
-        options* (if (seq options) options leverage-presets)
-        idx (.indexOf (clj->js options*) current-leverage)
-        next-idx (if (= idx -1)
-                   0
-                   (mod (inc idx) (count options*)))]
-    (nth options* next-idx)))
+           (order-form-vm/order-type-label pro-order-type)])])]]])
 
 (defn- format-usdc [value]
   (if (and (number? value) (not (js/isNaN value)))
@@ -394,39 +352,6 @@
             :clip-rule "evenodd"
             :d "M5.293 7.293a1 1 0 011.414 0L10 10.586l3.293-3.293a1 1 0 111.414 1.414l-4 4a1 1 0 01-1.414 0l-4-4a1 1 0 010-1.414z"}]]])
 
-(defn- resolve-quote-symbol [active-asset active-market]
-  (or (non-blank-string (:quote active-market))
-      (let [symbol (non-blank-string (:symbol active-market))]
-        (cond
-          (and symbol (str/includes? symbol "/"))
-          (non-blank-string (second (str/split symbol #"/" 2)))
-
-          (and symbol (str/includes? symbol "-"))
-          (non-blank-string (second (str/split symbol #"-" 2)))
-
-          :else nil))
-      (when (and (string? active-asset) (str/includes? active-asset "/"))
-        (non-blank-string (second (str/split active-asset #"/" 2))))
-      "USDC"))
-
-(defn- resolve-base-symbol [active-asset active-market]
-  (or (base-symbol-from-value active-asset)
-      (non-blank-string (:base active-market))
-      (base-symbol-from-value (:coin active-market))
-      (base-symbol-from-value (:symbol active-market))
-      "Asset"))
-
-(defn- format-scale-preview-line [state edge raw-price base-symbol quote-symbol]
-  (let [size (when (map? edge) (:size edge))
-        price (when (map? edge) (:price edge))
-        formatted-size (when (number? size)
-                         (trading/base-size-string state size))
-        formatted-price (when (number? price)
-                          (fmt/format-trade-price-plain price raw-price))]
-    (if (and (seq formatted-size) (seq formatted-price))
-      (str formatted-size " " base-symbol " @ " formatted-price " " quote-symbol)
-      "N/A")))
-
 (defn- price-context-accessory [state form]
   (let [{:keys [source]} (trading/mid-price-summary state form)
         mid-available? (= :mid source)]
@@ -469,94 +394,93 @@
                   "text-gray-400"]
           :viewBox "0 0 20 20"
           :fill "currentColor"}
-    [:path {:fill-rule "evenodd"
+   [:path {:fill-rule "evenodd"
             :clip-rule "evenodd"
             :d "M5.293 7.293a1 1 0 011.414 0L10 10.586l3.293-3.293a1 1 0 111.414 1.414l-4 4a1 1 0 01-1.414 0l-4-4a1 1 0 010-1.414z"}]]])
 
-(defn- submit-tooltip-message [required-fields market-price-missing?]
-  (cond
-    (seq required-fields)
-    (str "Fill required fields: " (str/join ", " required-fields) ".")
+(defn- render-order-type-section [section form]
+  (case section
+    :trigger
+    [:div
+     (section-label "Trigger")
+     (input (:trigger-px form)
+            [[:actions/update-order-form [:trigger-px] [:event.target/value]]]
+            :placeholder "Trigger price")]
 
-    market-price-missing?
-    "Load order book data before placing a market order."
+    :scale
+    [:div {:class ["space-y-2"]}
+     (section-label "Scale")
+     (input (get-in form [:scale :start])
+            [[:actions/update-order-form [:scale :start] [:event.target/value]]]
+            :placeholder "Start price")
+     (input (get-in form [:scale :end])
+            [[:actions/update-order-form [:scale :end] [:event.target/value]]]
+            :placeholder "End price")
+     [:div {:class ["grid" "grid-cols-2" "gap-2"]}
+      (inline-labeled-scale-input "Total Orders"
+                                  (get-in form [:scale :count])
+                                  [[:actions/update-order-form [:scale :count] [:event.target/value]]])
+      (inline-labeled-scale-input "Size Skew"
+                                  (get-in form [:scale :skew])
+                                  [[:actions/update-order-form [:scale :skew] [:event.target/value]]])]]
 
-    :else nil))
+    :twap
+    [:div {:class ["space-y-2"]}
+     (section-label "TWAP")
+     (input (get-in form [:twap :minutes])
+            [[:actions/update-order-form [:twap :minutes] [:event.target/value]]]
+            :placeholder "Minutes")
+     (row-toggle "Randomize"
+                 (get-in form [:twap :randomize])
+                 [[:actions/update-order-form [:twap :randomize] [:event.target/checked]]]
+                 "trade-toggle-twap-randomize")]
+
+    nil))
 
 (defn order-form-view [state]
-  (let [form (:order-form state)
-        normalized-form (trading/normalize-order-form state form)
-        active-market (:active-market state)
-        active-asset (:active-asset state)
-        inferred-spot? (and (string? active-asset) (str/includes? active-asset "/"))
-        inferred-hip3? (and (string? active-asset) (str/includes? active-asset ":") (not inferred-spot?))
-        spot? (or (= :spot (:market-type active-market)) inferred-spot?)
-        hip3? (or (some? (:dex active-market)) inferred-hip3?)
-        read-only? (or spot? hip3?)
-        side (:side normalized-form)
-        type (:type normalized-form)
-        entry-mode (:entry-mode normalized-form)
-        pro-dropdown-open?* (pro-dropdown-open? normalized-form)
-        market-mode? (= entry-mode :market)
-        pro-mode? (= entry-mode :pro)
-        show-limit-like-controls? (and (not market-mode?) (trading/limit-like-type? type))
-        limit-like? (trading/limit-like-type? type)
-        summary (trading/order-summary state normalized-form)
+  (let [{:keys [form
+                side
+                type
+                entry-mode
+                pro-dropdown-open?
+                pro-dropdown-options
+                pro-tab-label
+                order-type-sections
+                pro-mode?
+                show-limit-like-controls?
+                limit-like?
+                spot?
+                hip3?
+                read-only?
+                summary
+                ui-leverage
+                next-leverage
+                size-percent
+                display-size-percent
+                notch-overlap-threshold
+                size-display
+                price
+                quote-symbol
+                scale-preview-lines
+                order-value
+                margin-required
+                liq-price
+                slippage-est
+                slippage-max
+                fees
+                error
+                submitting?
+                submit]}
+        (order-form-vm/order-form-vm state)
+        normalized-form form
         available-to-trade (:available-to-trade summary)
         position (:current-position summary)
-        ui-leverage (:ui-leverage normalized-form)
-        max-leverage (trading/market-max-leverage state)
-        next-lev (next-leverage ui-leverage max-leverage)
-        size-percent (trading/clamp-percent (:size-percent normalized-form))
-        notch-overlap-threshold 4
-        raw-price (or (:price normalized-form) "")
-        price-input-focused? (boolean (:price-input-focused? normalized-form))
-        fallback-limit-price (when limit-like?
-                               (trading/effective-limit-price-string state normalized-form))
-        display-price (cond
-                        (not (str/blank? raw-price))
-                        raw-price
-
-                        (and (not price-input-focused?) limit-like?)
-                        (or fallback-limit-price "")
-
-                        :else
-                        "")
-        sz-decimals (or (:szDecimals active-market) 4)
-        base-symbol (resolve-base-symbol active-asset active-market)
-        quote-symbol (resolve-quote-symbol active-asset active-market)
-        scale-preview (when (= :scale type)
-                        (trading/scale-preview-boundaries normalized-form {:sz-decimals sz-decimals}))
-        start-preview-line (format-scale-preview-line state
-                                                      (:start scale-preview)
-                                                      (get-in normalized-form [:scale :start])
-                                                      base-symbol
-                                                      quote-symbol)
-        end-preview-line (format-scale-preview-line state
-                                                    (:end scale-preview)
-                                                    (get-in normalized-form [:scale :end])
-                                                    base-symbol
-                                                    quote-symbol)
-        order-value (:order-value summary)
-        margin-required (:margin-required summary)
-        size-display (:size-display normalized-form)
-        display-size-percent (str (int (js/Math.round size-percent)))
-        liq-price (:liquidation-price summary)
-        slippage-est (:slippage-est summary)
-        slippage-max (:slippage-max summary)
-        fees (:fees summary)
-        error (:error normalized-form)
-        submitting? (:submitting? normalized-form)
-        submit-prep (trading/prepare-order-form-for-submit state normalized-form)
-        submit-form (:form submit-prep)
-        market-price-missing? (:market-price-missing? submit-prep)
-        submit-errors (trading/validate-order-form state submit-form)
-        required-submit-fields (trading/submit-required-fields submit-errors)
-        submit-tooltip (submit-tooltip-message required-submit-fields market-price-missing?)
-        submit-disabled? (boolean (or submitting?
-                                      read-only?
-                                      market-price-missing?
-                                      (seq submit-errors)))]
+        sz-decimals (or (get-in state [:active-market :szDecimals]) 4)
+        display-price (:display price)
+        start-preview-line (:start scale-preview-lines)
+        end-preview-line (:end scale-preview-lines)
+        submit-tooltip (:tooltip submit)
+        submit-disabled? (:disabled? submit)]
     [:div {:class ["bg-base-100"
                    "border"
                    "border-base-300"
@@ -582,10 +506,14 @@
        (chip-button "Cross" true :disabled? true)
        (chip-button (str ui-leverage "x")
                     true
-                    :on-click [[:actions/set-order-ui-leverage next-lev]])
+                    :on-click [[:actions/set-order-ui-leverage next-leverage]])
        (chip-button "Classic" true :disabled? true)]
 
-      (entry-mode-tabs entry-mode type pro-dropdown-open?*)
+      (entry-mode-tabs {:entry-mode entry-mode
+                        :type type
+                        :pro-dropdown-open? pro-dropdown-open?
+                        :pro-tab-label pro-tab-label
+                        :pro-dropdown-options pro-dropdown-options})
 
       [:div {:class ["flex" "items-center" "gap-2" "bg-base-200" "rounded-md" "p-1"]}
        (side-button "Buy / Long"
@@ -688,39 +616,9 @@
                         "text-gray-300"]}
          "%"]]]
 
-      (when (#{:stop-market :stop-limit :take-market :take-limit} type)
-        [:div
-         (section-label "Trigger")
-         (input (:trigger-px normalized-form)
-                [[:actions/update-order-form [:trigger-px] [:event.target/value]]]
-                :placeholder "Trigger price")])
-
-      (when (= :scale type)
-        [:div {:class ["space-y-2"]}
-         (section-label "Scale")
-         (input (get-in normalized-form [:scale :start])
-                [[:actions/update-order-form [:scale :start] [:event.target/value]]]
-                :placeholder "Start price")
-         (input (get-in normalized-form [:scale :end])
-                [[:actions/update-order-form [:scale :end] [:event.target/value]]]
-                :placeholder "End price")
-         [:div {:class ["grid" "grid-cols-2" "gap-2"]}
-          (inline-labeled-scale-input "Total Orders"
-                                      (get-in normalized-form [:scale :count])
-                                      [[:actions/update-order-form [:scale :count] [:event.target/value]]])
-          (inline-labeled-scale-input "Size Skew"
-                                      (get-in normalized-form [:scale :skew])
-                                      [[:actions/update-order-form [:scale :skew] [:event.target/value]]])]])
-
-      (when (= :twap type)
-        [:div {:class ["space-y-2"]}
-         (section-label "TWAP")
-         (input (get-in normalized-form [:twap :minutes])
-                [[:actions/update-order-form [:twap :minutes] [:event.target/value]]]
-                :placeholder "Minutes")
-         (row-toggle "Randomize"
-                     (get-in normalized-form [:twap :randomize])
-                     [[:actions/update-order-form [:twap :randomize] [:event.target/checked]]])])
+      (for [section order-type-sections]
+        ^{:key (str "order-type-section-" (name section))}
+        (render-order-type-section section normalized-form))
 
       [:div {:class ["flex" "items-center" "justify-between" "gap-3"]}
        (row-toggle "Reduce Only"

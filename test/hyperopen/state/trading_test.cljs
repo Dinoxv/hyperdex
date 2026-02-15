@@ -623,3 +623,40 @@
       (is (= "70155" (trading/mid-price-string state form)))
       (is (= 70160 (trading/reference-price state (assoc form :side :buy))))
       (is (= 70150 (trading/reference-price state (assoc form :side :sell)))))))
+
+(deftest market-identity-symbol-and-read-only-inference-test
+  (testing "derives base and quote symbols from active-market and active-asset"
+    (let [state {:active-asset "PURR"
+                 :active-market {:symbol "PURR-USDT"
+                                 :quote "USDT"
+                                 :market-type :perp}}
+          identity (trading/market-identity state)]
+      (is (= "PURR" (:base-symbol identity)))
+      (is (= "USDT" (:quote-symbol identity)))
+      (is (false? (:spot? identity)))
+      (is (false? (:hip3? identity)))
+      (is (false? (:read-only? identity)))))
+
+  (testing "infers spot and read-only when active-asset is spot-style"
+    (let [state {:active-asset "ETH/USDC"
+                 :active-market {:symbol "ETH-USDC"}}
+          identity (trading/market-identity state)]
+      (is (= "ETH" (:base-symbol identity)))
+      (is (= "USDC" (:quote-symbol identity)))
+      (is (true? (:spot? identity)))
+      (is (false? (:hip3? identity)))
+      (is (true? (:read-only? identity)))))
+
+  (testing "infers hip3 and read-only from namespaced asset and dex market"
+    (let [asset-only-state {:active-asset "hyna:GOLD"
+                            :active-market {:symbol "hyna:GOLD"}}
+          dex-state {:active-asset "BTC"
+                     :active-market {:symbol "BTC-USD"
+                                     :dex "dex-a"}}
+          asset-identity (trading/market-identity asset-only-state)
+          dex-identity (trading/market-identity dex-state)]
+      (is (= "GOLD" (:base-symbol asset-identity)))
+      (is (true? (:hip3? asset-identity)))
+      (is (true? (:read-only? asset-identity)))
+      (is (true? (:hip3? dex-identity)))
+      (is (true? (:read-only? dex-identity))))))

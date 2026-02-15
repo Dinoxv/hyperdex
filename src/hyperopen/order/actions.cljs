@@ -178,12 +178,9 @@
         form (:form submit-prep)
         market-price-missing? (:market-price-missing? submit-prep)
         agent-ready? (= :ready (get-in state [:wallet :agent :status]))
-        active-market (:active-market state)
-        active-asset (:active-asset state)
-        inferred-spot? (and (string? active-asset) (str/includes? active-asset "/"))
-        inferred-hip3? (and (string? active-asset) (str/includes? active-asset ":") (not inferred-spot?))
-        spot? (or (= :spot (:market-type active-market)) inferred-spot?)
-        hip3? (or (:dex active-market) inferred-hip3?)
+        market-identity (trading/market-identity state)
+        spot? (:spot? market-identity)
+        hip3? (:hip3? market-identity)
         errors (trading/validate-order-form state form)
         request (trading/build-order-request state form)]
     (cond

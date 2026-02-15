@@ -35,6 +35,10 @@
 (defn default-order-form []
   (order-form-state/default-order-form))
 
+(defn market-identity [state]
+  (trading-domain/market-identity {:active-asset (:active-asset state)
+                                   :market (:active-market state)}))
+
 (defn- active-clearinghouse-state [state]
   (let [dex (get-in state [:active-market :dex])]
     (if (and (string? dex) (seq dex))

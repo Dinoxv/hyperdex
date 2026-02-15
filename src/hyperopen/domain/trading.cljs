@@ -29,6 +29,7 @@
 (def market-max-leverage core/market-max-leverage)
 (def normalize-ui-leverage core/normalize-ui-leverage)
 
+(def market-identity market/market-identity)
 (def available-to-trade market/available-to-trade)
 (def position-for-active-asset market/position-for-active-asset)
 (def current-position-summary market/current-position-summary)

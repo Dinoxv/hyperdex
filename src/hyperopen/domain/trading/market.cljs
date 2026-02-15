@@ -9,6 +9,68 @@
   (and (string? coin)
        (str/starts-with? coin "USDC")))
 
+(defn- non-blank-string [value]
+  (let [s (when (some? value) (str value))
+        trimmed (some-> s str/trim)]
+    (when (seq trimmed) trimmed)))
+
+(defn- base-symbol-from-value [value]
+  (let [text (non-blank-string value)]
+    (cond
+      (and text (str/includes? text "/"))
+      (non-blank-string (first (str/split text #"/" 2)))
+
+      (and text (str/includes? text ":"))
+      (non-blank-string (second (str/split text #":" 2)))
+
+      (and text (str/includes? text "-"))
+      (non-blank-string (first (str/split text #"-" 2)))
+
+      :else
+      text)))
+
+(defn- quote-symbol-from-value [value]
+  (let [text (non-blank-string value)]
+    (cond
+      (and text (str/includes? text "/"))
+      (non-blank-string (second (str/split text #"/" 2)))
+
+      (and text (str/includes? text "-"))
+      (non-blank-string (second (str/split text #"-" 2)))
+
+      :else
+      nil)))
+
+(defn market-identity
+  "Return a deterministic market identity summary for UI and action policy.
+   {:base-symbol string
+    :quote-symbol string
+    :spot? boolean
+    :hip3? boolean
+    :read-only? boolean}"
+  [{:keys [active-asset market]}]
+  (let [active-market (or market {})
+        inferred-spot? (and (string? active-asset) (str/includes? active-asset "/"))
+        inferred-hip3? (and (string? active-asset)
+                            (str/includes? active-asset ":")
+                            (not inferred-spot?))
+        spot? (or (= :spot (:market-type active-market)) inferred-spot?)
+        hip3? (or (some? (:dex active-market)) inferred-hip3?)
+        base-symbol (or (base-symbol-from-value active-asset)
+                        (non-blank-string (:base active-market))
+                        (base-symbol-from-value (:coin active-market))
+                        (base-symbol-from-value (:symbol active-market))
+                        "Asset")
+        quote-symbol (or (non-blank-string (:quote active-market))
+                         (quote-symbol-from-value (:symbol active-market))
+                         (quote-symbol-from-value active-asset)
+                         "USDC")]
+    {:base-symbol base-symbol
+     :quote-symbol quote-symbol
+     :spot? (boolean spot?)
+     :hip3? (boolean hip3?)
+     :read-only? (boolean (or spot? hip3?))}))
+
 (defn- unified-spot-usdc-available [context]
   (when (unified-account-mode? context)
     (some (fn [balance]
