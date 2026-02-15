@@ -1,27 +1,15 @@
 (ns hyperopen.views.trading-chart.utils.indicators
   (:require [hyperopen.domain.trading.indicators.math :as imath]
+            [hyperopen.views.trading-chart.utils.indicators-oscillators :as oscillators]
+            [hyperopen.views.trading-chart.utils.indicators-trend :as trend]
+            [hyperopen.views.trading-chart.utils.indicators-volatility :as volatility]
             [hyperopen.views.trading-chart.utils.indicators-wave2 :as wave2]
             [hyperopen.views.trading-chart.utils.indicators-wave3 :as wave3]))
 
 (def ^:private seconds-per-week (* 7 24 60 60))
 
 (def ^:private indicator-definitions
-  [{:id :week-52-high-low
-    :name "52 Week High/Low"
-    :short-name "52W H/L"
-    :description "Rolling 52-week high and low levels"
-    :supports-period? true
-    :default-period 52
-    :min-period 1
-    :max-period 260
-    :default-config {:period 52}}
-   {:id :accelerator-oscillator
-    :name "Accelerator Oscillator"
-    :short-name "AC"
-    :description "Awesome Oscillator minus its 5-period simple moving average"
-    :supports-period? false
-    :default-config {}}
-   {:id :accumulation-distribution
+  [{:id :accumulation-distribution
     :name "Accumulation/Distribution"
     :short-name "A/D"
     :description "Cumulative money flow volume line"
@@ -33,88 +21,12 @@
     :description "Wilder swing index accumulated over time"
     :supports-period? false
     :default-config {}}
-   {:id :advance-decline
-    :name "Advance/Decline"
-    :short-name "A/D (Bars)"
-    :description "Single-instrument proxy using cumulative up/down bar count"
-    :supports-period? false
-    :default-config {}}
-   {:id :alma
-    :name "Arnaud Legoux Moving Average"
-    :short-name "ALMA"
-    :description "Gaussian-weighted moving average"
-    :supports-period? true
-    :default-period 9
-    :min-period 2
-    :max-period 200
-    :default-config {:period 9
-                     :offset 0.85
-                     :sigma 6}}
-   {:id :aroon
-    :name "Aroon"
-    :short-name "Aroon"
-    :description "Aroon Up and Aroon Down lines"
-    :supports-period? true
-    :default-period 14
-    :min-period 2
-    :max-period 200
-    :default-config {:period 14}}
-   {:id :adx
-    :name "Average Directional Index"
-    :short-name "ADX"
-    :description "Trend strength from directional movement"
-    :supports-period? true
-    :default-period 14
-    :min-period 2
-    :max-period 200
-    :default-config {:period 14
-                     :smoothing 14}}
    {:id :average-price
     :name "Average Price"
-    :short-name "OHLC4"
-    :description "(Open + High + Low + Close) / 4"
-    :supports-period? false
-    :default-config {}}
-   {:id :atr
-    :name "Average True Range"
-    :short-name "ATR"
-    :description "Wilder average true range"
-    :supports-period? true
-    :default-period 14
-    :min-period 2
-    :max-period 200
-    :default-config {:period 14}}
-   {:id :awesome-oscillator
-    :name "Awesome Oscillator"
-    :short-name "AO"
-    :description "5-period SMA minus 34-period SMA of median price"
-    :supports-period? false
-    :default-config {}}
-   {:id :balance-of-power
-    :name "Balance of Power"
-    :short-name "BOP"
-    :description "(Close - Open) / (High - Low)"
-    :supports-period? false
-    :default-config {}}
-   {:id :bollinger-bands
-    :name "Bollinger Bands"
-    :short-name "BOLL"
-    :description "Upper, basis, and lower volatility bands"
-    :supports-period? true
-    :default-period 20
-    :min-period 2
-    :max-period 200
-    :default-config {:period 20
-                     :multiplier 2}}
-   {:id :sma
-    :name "Moving Average"
-    :short-name "MA"
-    :description "Simple moving average"
-    :supports-period? true
-    :default-period 20
-    :min-period 2
-    :max-period 200
-    :default-config {:period 20}}])
+   :short-name "OHLC4"
+   :description "(Open + High + Low + Close) / 4"
+   :supports-period? false
+    :default-config {}}])
 
 (def ^:private finite-number? imath/finite-number?)
 (def ^:private parse-period imath/parse-period)
@@ -189,11 +101,7 @@
 (defn calculate-sma
   "Calculate Simple Moving Average for given data and period"
   [data period]
-  (let [length (parse-period period 20 2 1000)
-        time-values (times data)
-        closes (field-values data :close)
-        values (sma-values closes length)]
-    (points-from-values time-values values)))
+  (trend/calculate-sma data period))
 
 (defn- calculate-52-week-high-low
   [data params]
@@ -623,31 +531,16 @@
   "Return list of available indicators"
   []
   (vec (concat indicator-definitions
+               (trend/get-trend-indicators)
+               (oscillators/get-oscillator-indicators)
+               (volatility/get-volatility-indicators)
                (wave2/get-wave2-indicators)
                (wave3/get-wave3-indicators))))
 
 (def ^:private indicator-calculators
-  {:week-52-high-low calculate-52-week-high-low
-   :accelerator-oscillator calculate-accelerator-oscillator
-   :accumulation-distribution calculate-accumulation-distribution
+  {:accumulation-distribution calculate-accumulation-distribution
    :accumulative-swing-index calculate-accumulative-swing-index
-   :advance-decline calculate-advance-decline
-   :alma calculate-alma
-   :aroon calculate-aroon
-   :adx calculate-adx
-   :average-price calculate-average-price
-   :atr calculate-atr
-   :awesome-oscillator calculate-awesome-oscillator
-   :balance-of-power calculate-balance-of-power
-   :bollinger-bands calculate-bollinger-bands
-   :sma (fn [data config]
-          (indicator-result :sma
-                            :overlay
-                            [(line-series :sma
-                                          "MA"
-                                          "#38bdf8"
-                                          (times data)
-                                          (mapv :value (calculate-sma data (:period config 20))))]))})
+   :average-price calculate-average-price})
 
 (defn calculate-indicator
   "Calculate indicator based on type and parameters"
@@ -656,5 +549,8 @@
         calculator (get indicator-calculators indicator-type)]
     (or (when calculator
           (calculator data config))
+        (trend/calculate-trend-indicator indicator-type data config)
+        (oscillators/calculate-oscillator-indicator indicator-type data config)
+        (volatility/calculate-volatility-indicator indicator-type data config)
         (wave2/calculate-wave2-indicator indicator-type data config)
         (wave3/calculate-wave3-indicator indicator-type data config))))
