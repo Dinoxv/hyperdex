@@ -1,6 +1,6 @@
 (ns hyperopen.views.trading-chart.utils.indicators-wave2
   (:require [hyperopen.domain.trading.indicators.math :as imath]
-            ["indicatorts" :refer [apo cci cmf cmo dema ema emv fi ichimokuCloud kc macd mfi mi movingLeastSquare movingLinearRegressionUsingLeastSquare obv pvo psar rma rsi stoch tema trix typprice vpt vortex vwap vwma willr]]))
+            ["indicatorts" :refer [apo cci cmf cmo dema ema emv fi ichimokuCloud kc macd mfi mi movingLeastSquare movingLinearRegressionUsingLeastSquare obv pvo psar rma rsi stoch tema trix vpt vortex vwap vwma willr]]))
 
 (def ^:private wave2-indicator-definitions
   [{:id :bollinger-bands-percent-b
@@ -230,21 +230,6 @@
     :supports-period? false
     :default-config {:emaPeriod 9
                      :miPeriod 25}}
-   {:id :median-price
-    :name "Median Price"
-    :short-name "MED"
-    :description "(High + Low) / 2"
-    :supports-period? false
-    :default-config {}}
-   {:id :momentum
-    :name "Momentum"
-    :short-name "MOM"
-    :description "Price change over n periods"
-    :supports-period? true
-    :default-period 10
-    :min-period 1
-    :max-period 400
-    :default-config {:period 10}}
    {:id :money-flow-index
     :name "Money Flow Index"
     :short-name "MFI"
@@ -400,12 +385,6 @@
     :min-period 2
     :max-period 400
     :default-config {:period 15}}
-   {:id :typical-price
-    :name "Typical Price"
-    :short-name "TP"
-    :description "(High + Low + Close) / 3"
-    :supports-period? false
-    :default-config {}}
    {:id :volume-oscillator
     :name "Volume Oscillator"
     :short-name "PVO"
@@ -1124,35 +1103,6 @@
                       :separate
                       [(line-series :mi "Mass Index" "#f59e0b" time-values values)])))
 
-(defn- calculate-median-price
-  [data _params]
-  (let [high-values (highs data)
-        low-values (lows data)
-        values (mapv (fn [idx]
-                       (/ (+ (nth high-values idx)
-                             (nth low-values idx))
-                          2))
-                     (range (count high-values)))
-        time-values (times data)]
-    (indicator-result :median-price
-                      :overlay
-                      [(line-series :median "Median" "#a3e635" time-values values)])))
-
-(defn- calculate-momentum
-  [data params]
-  (let [period (parse-period (:period params) 10 1 400)
-        close-values (closes data)
-        values (mapv (fn [idx]
-                       (if (< idx period)
-                         nil
-                         (- (nth close-values idx)
-                            (nth close-values (- idx period)))))
-                     (range (count close-values)))
-        time-values (times data)]
-    (indicator-result :momentum
-                      :separate
-                      [(line-series :momentum "Momentum" "#f97316" time-values values)])))
-
 (defn- calculate-money-flow-index
   [data params]
   (let [period (parse-period (:period params) 14 2 200)
@@ -1513,17 +1463,6 @@
                       :separate
                       [(line-series :trix "TRIX" "#f59e0b" time-values values)])))
 
-(defn- calculate-typical-price
-  [data _params]
-  (let [values (normalize-values
-                (typprice (js-array (highs data))
-                          (js-array (lows data))
-                          (js-array (closes data))))
-        time-values (times data)]
-    (indicator-result :typical-price
-                      :overlay
-                      [(line-series :typical "Typical Price" "#a3e635" time-values values)])))
-
 (defn- calculate-volume-oscillator
   [data params]
   (let [fast (parse-period (:fast params) 12 1 200)
@@ -1626,8 +1565,6 @@
    :ma-with-ema-cross calculate-ma-with-ema-cross
    :macd calculate-macd
    :mass-index calculate-mass-index
-   :median-price calculate-median-price
-   :momentum calculate-momentum
    :money-flow-index calculate-money-flow-index
    :moving-average-channel calculate-moving-average-channel
    :moving-average-double calculate-moving-average-double
@@ -1647,7 +1584,6 @@
    :supertrend calculate-supertrend
    :triple-ema calculate-triple-ema
    :trix calculate-trix
-   :typical-price calculate-typical-price
    :volume-oscillator calculate-volume-oscillator
    :vortex-indicator calculate-vortex-indicator
    :vwap calculate-vwap

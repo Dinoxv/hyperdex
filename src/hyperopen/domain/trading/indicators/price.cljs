@@ -9,7 +9,21 @@
     :description "(Open + High + Low + Close) / 4"
     :supports-period? false
     :default-config {}
-    :migrated-from :indicators}])
+    :migrated-from :indicators}
+   {:id :median-price
+    :name "Median Price"
+    :short-name "Median"
+    :description "(High + Low) / 2"
+    :supports-period? false
+    :default-config {}
+    :migrated-from :wave2}
+   {:id :typical-price
+    :name "Typical Price"
+    :short-name "Typical"
+    :description "(High + Low + Close) / 3"
+    :supports-period? false
+    :default-config {}
+    :migrated-from :wave2}])
 
 (defn get-price-indicators
   []
@@ -35,8 +49,38 @@
                              :overlay
                              [(result/line-series :ohlc4 values)])))
 
+(defn- calculate-median-price
+  [data _params]
+  (let [high-values (field-values data :high)
+        low-values (field-values data :low)
+        values (mapv (fn [idx]
+                       (/ (+ (nth high-values idx)
+                             (nth low-values idx))
+                          2))
+                     (range (count high-values)))]
+    (result/indicator-result :median-price
+                             :overlay
+                             [(result/line-series :median values)])))
+
+(defn- calculate-typical-price
+  [data _params]
+  (let [high-values (field-values data :high)
+        low-values (field-values data :low)
+        close-values (field-values data :close)
+        values (mapv (fn [idx]
+                       (/ (+ (nth high-values idx)
+                             (nth low-values idx)
+                             (nth close-values idx))
+                          3))
+                     (range (count high-values)))]
+    (result/indicator-result :typical-price
+                             :overlay
+                             [(result/line-series :typical values)])))
+
 (def ^:private price-calculators
-  {:average-price calculate-average-price})
+  {:average-price calculate-average-price
+   :median-price calculate-median-price
+   :typical-price calculate-typical-price})
 
 (defn calculate-price-indicator
   [indicator-type data params]

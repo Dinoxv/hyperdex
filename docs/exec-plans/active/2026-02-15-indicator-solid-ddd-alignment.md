@@ -19,7 +19,9 @@ The indicator system still has domain math in view namespaces, fallback dispatch
 - [x] (2026-02-15 15:29Z) Milestone 2 batch C completed: migrated remaining wave3 oscillator/volume family (`:chaikin-volatility`, `:chande-kroll-stop`, `:chop-zone`, `:connors-rsi`, `:correlation-log`, `:klinger-oscillator`, `:know-sure-thing`, `:volume`) to domain modules.
 - [x] (2026-02-15 15:29Z) Milestone 2 completed: removed wave3 fallback path from coordinator and deleted `indicators_wave3.cljs`.
 - [x] (2026-02-15 15:29Z) Validated Milestone 2 batch C and wave3 retirement with required gates: `npm run check`, `npm test`, `npm run test:websocket`.
-- [ ] Milestone 3 pending: begin wave2 semantic extraction and progressively remove migrated wave2 implementations.
+- [x] (2026-02-15 15:32Z) Milestone 3 batch A completed: migrated wave2 starter family (`:median-price`, `:typical-price`, `:momentum`) into domain price/oscillator modules and removed wave2 duplicates.
+- [x] (2026-02-15 15:32Z) Validated Milestone 3 batch A with required gates: `npm run check`, `npm test`, `npm run test:websocket`.
+- [ ] Milestone 3 in progress: continue wave2 family-by-family extraction (trend/volume/channel groups) until wave2 fallback can be retired.
 - [ ] Milestone 4 pending: harden boundaries (math adapter isolation, contract validation, parity/performance tests), then retire wave fallbacks.
 
 ## Surprises & Discoveries
@@ -34,6 +36,8 @@ The indicator system still has domain math in view namespaces, fallback dispatch
   Evidence: removed moved IDs from oscillator definitions, added structure registry routing, and full suites remained green.
 - Observation: The wave3 namespace could be retired cleanly once all remaining IDs were domain-owned and adapter metadata was filled in.
   Evidence: coordinator no longer references wave3 and all required suites passed after deleting `indicators_wave3.cljs`.
+- Observation: A low-risk wave2 starter batch can be extracted using pure formulas (no dependency on `indicatorts`) while preserving behavior.
+  Evidence: moved `:median-price`, `:typical-price`, and `:momentum` to domain code and full required suites remained green.
 
 ## Decision Log
 
@@ -52,10 +56,13 @@ The indicator system still has domain math in view namespaces, fallback dispatch
 - Decision: Keep migrated oscillators in `domain.trading.indicators.oscillators` for this phase (rather than splitting a second new namespace) while retiring wave3 completely.
   Rationale: This minimizes churn while still eliminating wave3 fallback coupling; finer semantic subdivision can continue in Milestone 3+ with lower risk.
   Date/Author: 2026-02-15 / Codex
+- Decision: Start wave2 extraction with formula-based indicators before `indicatorts`-wrapped groups.
+  Rationale: This establishes safe migration throughput and test confidence prior to adapting additional third-party-backed calculators.
+  Date/Author: 2026-02-15 / Codex
 
 ## Outcomes & Retrospective
 
-Milestone 1 achieved the immediate separation-of-concerns target. Milestone 2 is now fully complete: all wave3 indicators are domain-owned and the wave3 fallback namespace has been removed from runtime wiring. Remaining migration scope is wave2 plus boundary-hardening tasks.
+Milestone 1 achieved the immediate separation-of-concerns target. Milestone 2 is fully complete with wave3 retired from runtime wiring. Milestone 3 is now active, with the first wave2 family extracted and validated; remaining migration scope is the rest of wave2 plus boundary-hardening tasks.
 
 ## Context and Orientation
 
@@ -138,3 +145,4 @@ Plan revision note: 2026-02-15 15:18Z - Updated living sections after completing
 Plan revision note: 2026-02-15 15:19Z - Updated living sections after completing first Milestone 2 migration batch (wave3 trend overlays) and validation.
 Plan revision note: 2026-02-15 15:25Z - Updated living sections after completing Milestone 2 structure/pattern batch and validation.
 Plan revision note: 2026-02-15 15:29Z - Updated living sections after completing Milestone 2 batch C and retiring wave3 runtime fallback.
+Plan revision note: 2026-02-15 15:32Z - Updated living sections after completing Milestone 3 wave2 starter batch and validation.

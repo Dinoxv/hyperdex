@@ -45,6 +45,9 @@
    [:accumulation-distribution :adl] {:name "A/D" :color "#22d3ee"}
    [:accumulative-swing-index :asi] {:name "ASI" :color "#f97316"}
    [:average-price :ohlc4] {:name "OHLC4" :color "#a3e635"}
+   [:median-price :median] {:name "Median" :color "#a3e635"}
+   [:typical-price :typical] {:name "Typical Price" :color "#a3e635"}
+   [:momentum :momentum] {:name "Momentum" :color "#f97316"}
    [:guppy-multiple-moving-average :ema-short-3] {:name "EMA 3" :color "#22c55e"}
    [:guppy-multiple-moving-average :ema-short-5] {:name "EMA 5" :color "#4ade80"}
    [:guppy-multiple-moving-average :ema-short-8] {:name "EMA 8" :color "#86efac"}

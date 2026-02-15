@@ -36,6 +36,16 @@
     :min-period 1
     :max-period 400
     :default-config {:period 9}}
+   {:id :momentum
+    :name "Momentum"
+    :short-name "Momentum"
+    :description "Price change over n periods"
+    :supports-period? true
+    :default-period 10
+    :min-period 1
+    :max-period 400
+    :default-config {:period 10}
+    :migrated-from :wave2}
    {:id :relative-strength-index
     :name "Relative Strength Index"
     :short-name "RSI"
@@ -552,6 +562,20 @@
                              :separate
                              [(result/line-series :roc values)])))
 
+(defn- calculate-momentum
+  [data params]
+  (let [period (parse-period (:period params) 10 1 400)
+        close-values (field-values data :close)
+        values (mapv (fn [idx]
+                       (if (< idx period)
+                         nil
+                         (- (nth close-values idx)
+                            (nth close-values (- idx period)))))
+                     (range (count close-values)))]
+    (result/indicator-result :momentum
+                             :separate
+                             [(result/line-series :momentum values)])))
+
 (defn- calculate-relative-strength-index
   [data params]
   (let [period (parse-period (:period params) 14 2 200)
@@ -1060,6 +1084,7 @@
    :correlation-log calculate-correlation-log
    :klinger-oscillator calculate-klinger-oscillator
    :know-sure-thing calculate-know-sure-thing
+   :momentum calculate-momentum
    :rate-of-change calculate-rate-of-change
    :relative-strength-index calculate-relative-strength-index
    :ratio calculate-ratio
