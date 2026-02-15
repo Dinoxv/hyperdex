@@ -1,7 +1,8 @@
 (ns hyperopen.domain.trading.indicators.volatility
   (:require [hyperopen.domain.trading.indicators.catalog.volatility :as catalog]
-            [hyperopen.domain.trading.indicators.contracts :as contracts]
-            [hyperopen.domain.trading.indicators.math-adapter :as math-adapter]
+            [hyperopen.domain.trading.indicators.family-runtime :as family-runtime]
+            [hyperopen.domain.trading.indicators.math.statistics :as mstats]
+            [hyperopen.domain.trading.indicators.volatility.channels :as channels]
             [hyperopen.domain.trading.indicators.math :as imath]
             [hyperopen.domain.trading.indicators.result :as result]))
 
@@ -9,15 +10,16 @@
 
 (def ^:private volatility-indicator-definitions catalog/volatility-indicator-definitions)
 
+(declare volatility-family)
+
 (defn get-volatility-indicators
   []
-  volatility-indicator-definitions)
+  (family-runtime/indicators volatility-family))
 
 (def ^:private finite-number? imath/finite-number?)
 (def ^:private parse-period imath/parse-period)
 (def ^:private parse-number imath/parse-number)
 (def ^:private field-values imath/field-values)
-(def ^:private normalize-values imath/normalize-values)
 
 (defn- sma-values
   [values period]
@@ -38,28 +40,6 @@
 (defn- rma-values
   [values period]
   (imath/rma-values values period :lagged))
-
-(defn- rolling-max-aligned
-  [values period]
-  (imath/rolling-max values period :aligned))
-
-(defn- rolling-min-aligned
-  [values period]
-  (imath/rolling-min values period :aligned))
-
-(defn- log-return-values
-  [close-values]
-  (mapv (fn [idx]
-          (if (zero? idx)
-            nil
-            (let [current (nth close-values idx)
-                  prev (nth close-values (dec idx))]
-              (when (and (finite-number? current)
-                         (finite-number? prev)
-                         (pos? current)
-                         (pos? prev))
-                (js/Math.log (/ current prev))))))
-        (range (count close-values))))
 
 (defn- calculate-52-week-high-low
   [data params]
@@ -197,92 +177,6 @@
                              :separate
                              [(result/line-series :bbw width)])))
 
-(defn- calculate-donchian-channels
-  [data params]
-  (let [period (parse-period (:period params) 20 2 400)
-        high-values (field-values data :high)
-        low-values (field-values data :low)
-        upper (rolling-max-aligned high-values period)
-        lower (rolling-min-aligned low-values period)
-        middle (mapv (fn [u l]
-                       (when (and (finite-number? u)
-                                  (finite-number? l))
-                         (/ (+ u l) 2)))
-                     upper lower)]
-    (result/indicator-result :donchian-channels
-                             :overlay
-                             [(result/line-series :upper upper)
-                              (result/line-series :middle middle)
-                              (result/line-series :lower lower)])))
-
-(defn- calculate-price-channel
-  [data params]
-  (let [period (parse-period (:period params) 20 2 400)
-        high-values (field-values data :high)
-        low-values (field-values data :low)
-        upper (rolling-max-aligned high-values period)
-        lower (rolling-min-aligned low-values period)
-        middle (mapv (fn [u l]
-                       (when (and (finite-number? u)
-                                  (finite-number? l))
-                         (/ (+ u l) 2)))
-                     upper lower)]
-    (result/indicator-result :price-channel
-                             :overlay
-                             [(result/line-series :upper upper)
-                              (result/line-series :middle middle)
-                              (result/line-series :lower lower)])))
-
-(defn- calculate-historical-volatility
-  [data params]
-  (let [period (parse-period (:period params) 20 2 400)
-        annualization (parse-number (:annualization params) 365)
-        returns (log-return-values (field-values data :close))
-        std-values (stddev-aligned-values returns period)
-        hv-values (mapv (fn [value]
-                          (when (finite-number? value)
-                            (* value (js/Math.sqrt annualization) 100)))
-                        std-values)]
-    (result/indicator-result :historical-volatility
-                             :separate
-                             [(result/line-series :hv hv-values)])))
-
-(defn- calculate-keltner-channels
-  [data params]
-  (let [period (parse-period (:period params) 20 2 200)
-        result (math-adapter/keltner-channels (field-values data :high)
-                                              (field-values data :low)
-                                              (field-values data :close)
-                                              {:period period})]
-    (result/indicator-result :keltner-channels
-                             :overlay
-                             [(result/line-series :upper (normalize-values (:upper result)))
-                              (result/line-series :middle (normalize-values (:middle result)))
-                              (result/line-series :lower (normalize-values (:lower result)))])))
-
-(defn- calculate-moving-average-channel
-  [data params]
-  (let [period (parse-period (:period params) 20 2 400)
-        multiplier (parse-number (:multiplier params) 1.5)
-        close-values (field-values data :close)
-        basis (sma-aligned-values close-values period)
-        spread (stddev-aligned-values close-values period)
-        upper (mapv (fn [b s]
-                      (when (and (finite-number? b)
-                                 (finite-number? s))
-                        (+ b (* multiplier s))))
-                    basis spread)
-        lower (mapv (fn [b s]
-                      (when (and (finite-number? b)
-                                 (finite-number? s))
-                        (- b (* multiplier s))))
-                    basis spread)]
-    (result/indicator-result :moving-average-channel
-                             :overlay
-                             [(result/line-series :upper upper)
-                              (result/line-series :basis basis)
-                              (result/line-series :lower lower)])))
-
 (defn- calculate-standard-deviation
   [data params]
   (let [period (parse-period (:period params) 20 2 400)
@@ -291,40 +185,10 @@
                              :separate
                              [(result/line-series :stddev values)])))
 
-(defn- rs-rolling
-  [values period]
-  (let [size (count values)]
-    (mapv (fn [idx]
-            (when-let [window (imath/window-for-index values idx period :aligned)]
-              (when (every? finite-number? window)
-                (let [x-values (vec (range period))
-                      x-mean (/ (reduce + 0 x-values) period)
-                      y-mean (imath/mean window)
-                      sxx (reduce + 0 (map (fn [x]
-                                             (let [dx (- x x-mean)]
-                                               (* dx dx)))
-                                           x-values))
-                      sxy (reduce + 0 (map (fn [x y]
-                                             (* (- x x-mean)
-                                                (- y y-mean)))
-                                           x-values window))
-                      slope (if (zero? sxx) 0 (/ sxy sxx))
-                      intercept (- y-mean (* slope x-mean))
-                      residuals (map (fn [x y]
-                                       (- y (+ intercept (* slope x))))
-                                     x-values window)
-                      rss (reduce + 0 (map #(* % %) residuals))
-                      denom (max 1 (- period 2))]
-                  {:slope slope
-                   :intercept intercept
-                   :standard-error (js/Math.sqrt (/ rss denom))
-                   :center (+ intercept (* slope (dec period)))}))))
-          (range size))))
-
 (defn- calculate-standard-error
   [data params]
   (let [period (parse-period (:period params) 20 3 400)
-        regressions (rs-rolling (field-values data :close) period)
+        regressions (mstats/rolling-regression (field-values data :close) period)
         values (mapv :standard-error regressions)]
     (result/indicator-result :standard-error
                              :separate
@@ -334,7 +198,7 @@
   [data params]
   (let [period (parse-period (:period params) 20 3 400)
         multiplier (or (:multiplier params) 2)
-        regressions (rs-rolling (field-values data :close) period)
+        regressions (mstats/rolling-regression (field-values data :close) period)
         center (mapv :center regressions)
         se (mapv :standard-error regressions)
         upper (mapv (fn [c s]
@@ -465,11 +329,11 @@
    :bollinger-bands calculate-bollinger-bands
    :bollinger-bands-percent-b calculate-bollinger-bands-percent-b
    :bollinger-bands-width calculate-bollinger-bands-width
-   :donchian-channels calculate-donchian-channels
-   :price-channel calculate-price-channel
-   :historical-volatility calculate-historical-volatility
-   :keltner-channels calculate-keltner-channels
-   :moving-average-channel calculate-moving-average-channel
+   :donchian-channels channels/calculate-donchian-channels
+   :price-channel channels/calculate-price-channel
+   :historical-volatility channels/calculate-historical-volatility
+   :keltner-channels channels/calculate-keltner-channels
+   :moving-average-channel channels/calculate-moving-average-channel
    :standard-deviation calculate-standard-deviation
    :standard-error calculate-standard-error
    :standard-error-bands calculate-standard-error-bands
@@ -478,16 +342,15 @@
    :volatility-ohlc calculate-volatility-ohlc
    :volatility-zero-trend-close-to-close calculate-volatility-zero-trend-close-to-close})
 
+(def ^:private volatility-family
+  (family-runtime/build-family :volatility
+                               volatility-indicator-definitions
+                               volatility-calculators))
+
 (defn supported-volatility-indicator-ids
   []
-  (set (keys volatility-calculators)))
+  (family-runtime/supported-indicator-ids volatility-family))
 
 (defn calculate-volatility-indicator
   [indicator-type data params]
-  (let [config (or params {})
-        calculator (get volatility-calculators indicator-type)]
-    (when (and calculator
-               (contracts/valid-indicator-input? indicator-type data config))
-      (contracts/enforce-indicator-result indicator-type
-                                          (count data)
-                                          (calculator data config)))))
+  (family-runtime/calculate volatility-family indicator-type data params))

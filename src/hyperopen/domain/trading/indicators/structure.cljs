@@ -1,43 +1,24 @@
 (ns hyperopen.domain.trading.indicators.structure
   (:require [hyperopen.domain.trading.indicators.catalog.structure :as catalog]
-            [hyperopen.domain.trading.indicators.contracts :as contracts]
+            [hyperopen.domain.trading.indicators.family-runtime :as family-runtime]
+            [hyperopen.domain.trading.indicators.math.patterns :as patterns]
+            [hyperopen.domain.trading.indicators.math.statistics :as mstats]
             [hyperopen.domain.trading.indicators.math :as imath]
             [hyperopen.domain.trading.indicators.result :as result]))
 
 (def ^:private structure-indicator-definitions catalog/structure-indicator-definitions)
 
+(declare structure-family)
+
 (defn get-structure-indicators
   []
-  structure-indicator-definitions)
+  (family-runtime/indicators structure-family))
 
 (def ^:private finite-number? imath/finite-number?)
 (def ^:private parse-period imath/parse-period)
 (def ^:private parse-number imath/parse-number)
 (def ^:private times imath/times)
 (def ^:private field-values imath/field-values)
-
-(defn- tie-aware-ranks
-  [values]
-  (let [indexed (map-indexed vector values)
-        sorted (vec (sort-by second indexed))
-        size (count sorted)]
-    (loop [idx 0
-           ranks (vec (repeat size nil))]
-      (if (= idx size)
-        ranks
-        (let [value (second (nth sorted idx))
-              same-run-end (loop [j idx]
-                             (if (and (< (inc j) size)
-                                      (= value (second (nth sorted (inc j)))))
-                               (recur (inc j))
-                               j))
-              avg-rank (/ (+ (inc idx) (inc same-run-end)) 2)
-              updated (reduce (fn [acc k]
-                                (let [orig-idx (first (nth sorted k))]
-                                  (assoc acc orig-idx avg-rank)))
-                              ranks
-                              (range idx (inc same-run-end)))]
-          (recur (inc same-run-end) updated))))))
 
 (defn- calculate-pivot-points-standard
   [data params]
@@ -84,7 +65,7 @@
         size (count data)
         values (mapv (fn [idx]
                        (when-let [window (imath/window-for-index close-values idx period :aligned)]
-                         (let [price-ranks (tie-aware-ranks window)
+                         (let [price-ranks (mstats/tie-aware-ranks window)
                                time-ranks (vec (range 1 (inc period)))
                                d-squared (reduce + 0
                                                  (map (fn [time-rank price-rank]
@@ -139,112 +120,13 @@
                              []
                              markers)))
 
-(defn- zigzag-pivots
-  [close-values threshold]
-  (let [size (count close-values)]
-    (if (zero? size)
-      []
-      (loop [idx 1
-             trend nil
-             last-pivot-idx 0
-             last-pivot-price (nth close-values 0)
-             candidate-idx 0
-             candidate-price (nth close-values 0)
-             pivots [{:idx 0 :price (nth close-values 0)}]]
-        (if (= idx size)
-          (let [last-candidate {:idx candidate-idx :price candidate-price}]
-            (if (= (:idx (last pivots)) (:idx last-candidate))
-              pivots
-              (conj pivots last-candidate)))
-          (let [price (nth close-values idx)]
-            (cond
-              (nil? trend)
-              (cond
-                (>= price (* last-pivot-price (+ 1 threshold)))
-                (recur (inc idx) :up last-pivot-idx last-pivot-price idx price pivots)
-
-                (<= price (* last-pivot-price (- 1 threshold)))
-                (recur (inc idx) :down last-pivot-idx last-pivot-price idx price pivots)
-
-                (or (> price candidate-price)
-                    (< price candidate-price))
-                (recur (inc idx)
-                       nil
-                       last-pivot-idx
-                       last-pivot-price
-                       idx
-                       price
-                       pivots)
-
-                :else
-                (recur (inc idx) trend last-pivot-idx last-pivot-price candidate-idx candidate-price pivots))
-
-              (= trend :up)
-              (cond
-                (> price candidate-price)
-                (recur (inc idx) :up last-pivot-idx last-pivot-price idx price pivots)
-
-                (<= price (* candidate-price (- 1 threshold)))
-                (let [pivot {:idx candidate-idx :price candidate-price}]
-                  (recur (inc idx)
-                         :down
-                         (:idx pivot)
-                         (:price pivot)
-                         idx
-                         price
-                         (if (= (:idx (last pivots)) (:idx pivot))
-                           pivots
-                           (conj pivots pivot))))
-
-                :else
-                (recur (inc idx) :up last-pivot-idx last-pivot-price candidate-idx candidate-price pivots))
-
-              :else
-              (cond
-                (< price candidate-price)
-                (recur (inc idx) :down last-pivot-idx last-pivot-price idx price pivots)
-
-                (>= price (* candidate-price (+ 1 threshold)))
-                (let [pivot {:idx candidate-idx :price candidate-price}]
-                  (recur (inc idx)
-                         :up
-                         (:idx pivot)
-                         (:price pivot)
-                         idx
-                         price
-                         (if (= (:idx (last pivots)) (:idx pivot))
-                           pivots
-                           (conj pivots pivot))))
-
-                :else
-                (recur (inc idx) :down last-pivot-idx last-pivot-price candidate-idx candidate-price pivots)))))))))
-
-(defn- interpolate-zigzag
-  [size pivots]
-  (let [initial (vec (repeat size nil))
-        with-segments (reduce (fn [acc [a b]]
-                                (let [i1 (:idx a)
-                                      p1 (:price a)
-                                      i2 (:idx b)
-                                      p2 (:price b)
-                                      length (max 1 (- i2 i1))]
-                                  (reduce (fn [inner idx]
-                                            (let [ratio (/ (- idx i1) length)
-                                                  value (+ p1 (* ratio (- p2 p1)))]
-                                              (assoc inner idx value)))
-                                          acc
-                                          (range i1 (inc i2)))))
-                              initial
-                              (partition 2 1 pivots))]
-    with-segments))
-
 (defn- calculate-zig-zag
   [data params]
   (let [threshold-percent (parse-number (:threshold-percent params) 5)
         threshold (max 0.001 (/ threshold-percent 100))
         close-values (field-values data :close)
-        pivots (zigzag-pivots close-values threshold)
-        values (interpolate-zigzag (count data) pivots)]
+        pivots (patterns/zigzag-pivots close-values threshold)
+        values (patterns/interpolate-zigzag (count data) pivots)]
     (result/indicator-result :zig-zag
                              :overlay
                              [(result/line-series :zig-zag values)])))
@@ -255,16 +137,15 @@
    :williams-fractal calculate-williams-fractal
    :zig-zag calculate-zig-zag})
 
+(def ^:private structure-family
+  (family-runtime/build-family :structure
+                               structure-indicator-definitions
+                               structure-calculators))
+
 (defn supported-structure-indicator-ids
   []
-  (set (keys structure-calculators)))
+  (family-runtime/supported-indicator-ids structure-family))
 
 (defn calculate-structure-indicator
   [indicator-type data params]
-  (let [config (or params {})
-        calculator (get structure-calculators indicator-type)]
-    (when (and calculator
-               (contracts/valid-indicator-input? indicator-type data config))
-      (contracts/enforce-indicator-result indicator-type
-                                          (count data)
-                                          (calculator data config)))))
+  (family-runtime/calculate structure-family indicator-type data params))

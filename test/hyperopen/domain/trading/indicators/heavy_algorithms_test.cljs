@@ -1,7 +1,7 @@
 (ns hyperopen.domain.trading.indicators.heavy-algorithms-test
   (:require [cljs.test :refer-macros [deftest is]]
-            [hyperopen.domain.trading.indicators.structure :as structure]
-            [hyperopen.domain.trading.indicators.volatility :as volatility]))
+            [hyperopen.domain.trading.indicators.math.patterns :as patterns]
+            [hyperopen.domain.trading.indicators.math.statistics :as mstats]))
 
 (defn- finite-number?
   [value]
@@ -20,10 +20,9 @@
 
 (deftest tie-aware-ranks-determinism-and-performance-test
   (let [values (synthetic-close-values 2500)
-        tie-aware-ranks (deref #'structure/tie-aware-ranks)
         start-ms (js/Date.now)
-        result-a (tie-aware-ranks values)
-        result-b (tie-aware-ranks values)
+        result-a (mstats/tie-aware-ranks values)
+        result-b (mstats/tie-aware-ranks values)
         elapsed-ms (- (js/Date.now) start-ms)]
     (is (= result-a result-b))
     (is (= (count values) (count result-a)))
@@ -33,10 +32,9 @@
 
 (deftest zigzag-pivots-determinism-and-performance-test
   (let [close-values (synthetic-close-values 4000)
-        zigzag-pivots (deref #'structure/zigzag-pivots)
         start-ms (js/Date.now)
-        pivots-a (zigzag-pivots close-values 0.03)
-        pivots-b (zigzag-pivots close-values 0.03)
+        pivots-a (patterns/zigzag-pivots close-values 0.03)
+        pivots-b (patterns/zigzag-pivots close-values 0.03)
         elapsed-ms (- (js/Date.now) start-ms)]
     (is (= pivots-a pivots-b))
     (is (seq pivots-a))
@@ -48,10 +46,9 @@
 
 (deftest rolling-regression-determinism-and-performance-test
   (let [close-values (synthetic-close-values 3000)
-        rs-rolling (deref #'volatility/rs-rolling)
         start-ms (js/Date.now)
-        regressions-a (rs-rolling close-values 30)
-        regressions-b (rs-rolling close-values 30)
+        regressions-a (mstats/rolling-regression close-values 30)
+        regressions-b (mstats/rolling-regression close-values 30)
         elapsed-ms (- (js/Date.now) start-ms)
         realized (filter some? regressions-a)]
     (is (= regressions-a regressions-b))

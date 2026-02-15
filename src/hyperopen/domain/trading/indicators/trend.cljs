@@ -1,6 +1,6 @@
 (ns hyperopen.domain.trading.indicators.trend
   (:require [hyperopen.domain.trading.indicators.catalog.trend :as catalog]
-            [hyperopen.domain.trading.indicators.contracts :as contracts]
+            [hyperopen.domain.trading.indicators.family-runtime :as family-runtime]
             [hyperopen.domain.trading.indicators.math-adapter :as math-adapter]
             [hyperopen.domain.trading.indicators.math :as imath]
             [hyperopen.domain.trading.indicators.trend.regression :as regression]
@@ -8,9 +8,11 @@
 
 (def ^:private trend-indicator-definitions catalog/trend-indicator-definitions)
 
+(declare trend-family)
+
 (defn get-trend-indicators
   []
-  trend-indicator-definitions)
+  (family-runtime/indicators trend-family))
 
 (def ^:private finite-number? imath/finite-number?)
 (def ^:private parse-period imath/parse-period)
@@ -776,16 +778,15 @@
    :vwma calculate-vwma
    :williams-alligator calculate-williams-alligator})
 
+(def ^:private trend-family
+  (family-runtime/build-family :trend
+                               trend-indicator-definitions
+                               trend-calculators))
+
 (defn supported-trend-indicator-ids
   []
-  (set (keys trend-calculators)))
+  (family-runtime/supported-indicator-ids trend-family))
 
 (defn calculate-trend-indicator
   [indicator-type data params]
-  (let [config (or params {})
-        calculator (get trend-calculators indicator-type)]
-    (when (and calculator
-               (contracts/valid-indicator-input? indicator-type data config))
-      (contracts/enforce-indicator-result indicator-type
-                                          (count data)
-                                          (calculator data config)))))
+  (family-runtime/calculate trend-family indicator-type data params))

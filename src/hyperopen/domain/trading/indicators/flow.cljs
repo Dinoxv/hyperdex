@@ -1,15 +1,17 @@
 (ns hyperopen.domain.trading.indicators.flow
   (:require [hyperopen.domain.trading.indicators.catalog.flow :as catalog]
-            [hyperopen.domain.trading.indicators.contracts :as contracts]
+            [hyperopen.domain.trading.indicators.family-runtime :as family-runtime]
             [hyperopen.domain.trading.indicators.math-adapter :as math-adapter]
             [hyperopen.domain.trading.indicators.math :as imath]
             [hyperopen.domain.trading.indicators.result :as result]))
 
 (def ^:private flow-indicator-definitions catalog/flow-indicator-definitions)
 
+(declare flow-family)
+
 (defn get-flow-indicators
   []
-  flow-indicator-definitions)
+  (family-runtime/indicators flow-family))
 
 (def ^:private field-values imath/field-values)
 (def ^:private parse-period imath/parse-period)
@@ -235,16 +237,15 @@
    :elders-force-index calculate-elders-force-index
    :money-flow-index calculate-money-flow-index})
 
+(def ^:private flow-family
+  (family-runtime/build-family :flow
+                               flow-indicator-definitions
+                               flow-calculators))
+
 (defn supported-flow-indicator-ids
   []
-  (set (keys flow-calculators)))
+  (family-runtime/supported-indicator-ids flow-family))
 
 (defn calculate-flow-indicator
   [indicator-type data params]
-  (let [config (or params {})
-        calculator (get flow-calculators indicator-type)]
-    (when (and calculator
-               (contracts/valid-indicator-input? indicator-type data config))
-      (contracts/enforce-indicator-result indicator-type
-                                          (count data)
-                                          (calculator data config)))))
+  (family-runtime/calculate flow-family indicator-type data params))

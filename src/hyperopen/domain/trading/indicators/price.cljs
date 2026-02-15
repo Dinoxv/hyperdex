@@ -1,14 +1,16 @@
 (ns hyperopen.domain.trading.indicators.price
   (:require [hyperopen.domain.trading.indicators.catalog.price :as catalog]
-            [hyperopen.domain.trading.indicators.contracts :as contracts]
+            [hyperopen.domain.trading.indicators.family-runtime :as family-runtime]
             [hyperopen.domain.trading.indicators.math :as imath]
             [hyperopen.domain.trading.indicators.result :as result]))
 
 (def ^:private price-indicator-definitions catalog/price-indicator-definitions)
 
+(declare price-family)
+
 (defn get-price-indicators
   []
-  price-indicator-definitions)
+  (family-runtime/indicators price-family))
 
 (def ^:private field-values imath/field-values)
 
@@ -63,16 +65,15 @@
    :median-price calculate-median-price
    :typical-price calculate-typical-price})
 
+(def ^:private price-family
+  (family-runtime/build-family :price
+                               price-indicator-definitions
+                               price-calculators))
+
 (defn supported-price-indicator-ids
   []
-  (set (keys price-calculators)))
+  (family-runtime/supported-indicator-ids price-family))
 
 (defn calculate-price-indicator
   [indicator-type data params]
-  (let [config (or params {})
-        calculator (get price-calculators indicator-type)]
-    (when (and calculator
-               (contracts/valid-indicator-input? indicator-type data config))
-      (contracts/enforce-indicator-result indicator-type
-                                          (count data)
-                                          (calculator data config)))))
+  (family-runtime/calculate price-family indicator-type data params))

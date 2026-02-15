@@ -1,42 +1,11 @@
 (ns hyperopen.domain.trading.indicators.oscillators.statistics
-  (:require [hyperopen.domain.trading.indicators.math :as imath]
+  (:require [hyperopen.domain.trading.indicators.math.statistics :as mstats]
+            [hyperopen.domain.trading.indicators.math :as imath]
             [hyperopen.domain.trading.indicators.result :as result]))
 
 (def ^:private finite-number? imath/finite-number?)
 (def ^:private parse-period imath/parse-period)
 (def ^:private field-values imath/field-values)
-
-(defn- pearson-correlation
-  [xs ys]
-  (when (and (= (count xs) (count ys))
-             (seq xs)
-             (every? finite-number? xs)
-             (every? finite-number? ys))
-    (let [mx (imath/mean xs)
-          my (imath/mean ys)
-          cov (reduce + 0 (map (fn [x y]
-                                 (* (- x mx) (- y my)))
-                               xs ys))
-          sx (reduce + 0 (map (fn [x]
-                                (let [d (- x mx)]
-                                  (* d d)))
-                              xs))
-          sy (reduce + 0 (map (fn [y]
-                                (let [d (- y my)]
-                                  (* d d)))
-                              ys))
-          denom (js/Math.sqrt (* sx sy))]
-      (when (and (finite-number? denom) (> denom 0))
-        (/ cov denom)))))
-
-(defn- rolling-correlation-with-time
-  [values period]
-  (let [time-axis (vec (range 1 (inc period)))
-        size (count values)]
-    (mapv (fn [idx]
-            (when-let [window (imath/window-for-index values idx period :aligned)]
-              (pearson-correlation window time-axis)))
-          (range size))))
 
 (defn- tsi-core
   [close-values short-period long-period]
@@ -64,7 +33,7 @@
 (defn calculate-correlation-coefficient
   [data params]
   (let [period (parse-period (:period params) 20 3 400)
-        values (rolling-correlation-with-time (field-values data :close) period)]
+        values (mstats/rolling-correlation-with-time (field-values data :close) period)]
     (result/indicator-result :correlation-coefficient
                              :separate
                              [(result/line-series :correlation values)])))
@@ -78,7 +47,7 @@
                                   (pos? price))
                          (js/Math.log price)))
                      close-values)
-        values (rolling-correlation-with-time logged period)]
+        values (mstats/rolling-correlation-with-time logged period)]
     (result/indicator-result :correlation-log
                              :separate
                              [(result/line-series :correlation-log values)])))

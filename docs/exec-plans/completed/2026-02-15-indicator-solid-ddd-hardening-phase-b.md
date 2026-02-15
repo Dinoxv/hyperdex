@@ -18,9 +18,9 @@ The indicator architecture has improved, but there are still gaps against SOLID/
 - [x] (2026-02-15 19:30Z) Milestone 5 completed: required validation gates passed (`npm run check`, `npm test`, `npm run test:websocket`).
 - [x] (2026-02-15 19:32Z) Milestone 6 completed: phase evidence recorded; plan kept active for follow-on SOLID/DDD slices.
 - [x] (2026-02-15 20:10Z) Milestone 7 completed: moved style metadata from view adapter into dedicated style catalog namespace with semantic family projections.
-- [ ] Milestone 8: break large family modules into smaller semantic domain namespaces while preserving registry routing (completed: extracted momentum + statistics oscillators into `/hyperopen/src/hyperopen/domain/trading/indicators/oscillators/{momentum,statistics}.cljs` and extracted trend regression calculators into `/hyperopen/src/hyperopen/domain/trading/indicators/trend/regression.cljs`; remaining: split additional oscillator/trend/volatility semantic slices).
-- [ ] Milestone 9: remove remaining dual-maintenance coupling between catalog definitions and calculator maps (completed: added family parity guards and tests; remaining: move from guardrails to single-source declaration model).
-- [ ] Milestone 10: extract remaining heavy private math/stat helpers to dedicated reusable math/statistics namespaces.
+- [x] (2026-02-15 21:35Z) Milestone 8 completed: extended semantic extraction to volatility channels via `/hyperopen/src/hyperopen/domain/trading/indicators/volatility/channels.cljs`, while preserving registry routing and public indicator interfaces.
+- [x] (2026-02-15 21:40Z) Milestone 9 completed: replaced per-family duplicated dispatch/contract plumbing with shared `family-runtime` single-source declaration model in all six family modules.
+- [x] (2026-02-15 21:45Z) Milestone 10 completed: extracted heavy math/pattern helpers to reusable domain math namespaces (`/hyperopen/src/hyperopen/domain/trading/indicators/math/statistics.cljs` and `/hyperopen/src/hyperopen/domain/trading/indicators/math/patterns.cljs`) and rewired callers/tests.
 
 ## Surprises & Discoveries
 
@@ -40,6 +40,10 @@ The indicator architecture has improved, but there are still gaps against SOLID/
   Evidence: LSMA/LRC/LRS calculators now live in `/hyperopen/src/hyperopen/domain/trading/indicators/trend/regression.cljs` and are referenced through the existing trend calculator map.
 - Observation: parity guardrails can catch catalog/calculator drift immediately with minimal runtime impact.
   Evidence: `test/hyperopen/domain/trading/indicators/family_parity_test.cljs` asserts equality between catalog IDs and supported calculator IDs for all six families.
+- Observation: replacing per-family plumbing with a shared runtime introduced forward-reference compiler warnings where `get-*-indicators` called `*-family` before it was defined.
+  Evidence: `npm run check` reported `:undeclared-var` warnings in all six family modules until explicit `declare` forms were added.
+- Observation: extracting heavy math helpers into dedicated modules allows tests to exercise stable public math APIs instead of dereferencing private vars in family modules.
+  Evidence: `/hyperopen/test/hyperopen/domain/trading/indicators/heavy_algorithms_test.cljs` now imports `/hyperopen/src/hyperopen/domain/trading/indicators/math/{statistics,patterns}.cljs`.
 
 ## Decision Log
 
@@ -64,12 +68,21 @@ The indicator architecture has improved, but there are still gaps against SOLID/
 - Decision: implement interim family parity guardrails as the first Milestone 9 step.
   Rationale: this prevents silent drift while larger single-source calculator/metadata unification is still in progress.
   Date/Author: 2026-02-15 / Codex
+- Decision: converge all indicator families on one shared family runtime abstraction (`build-family`, `indicators`, `supported-indicator-ids`, `calculate`).
+  Rationale: this removes repeated dispatch/contract code and turns catalog-calculator parity into a load-time invariant at a single boundary.
+  Date/Author: 2026-02-15 / Codex
+- Decision: complete semantic sharding with a volatility channels module before closing Milestone 8.
+  Rationale: Milestone 8 explicitly targeted oscillator, trend, and volatility decomposition; channels are a cohesive volatility subgroup with minimal external dependencies.
+  Date/Author: 2026-02-15 / Codex
+- Decision: keep legacy family public entrypoints intact while moving implementations into semantic submodules and math helpers.
+  Rationale: this preserves view-facing and registry-facing APIs while improving DDD boundary shape internally.
+  Date/Author: 2026-02-15 / Codex
 
 ## Outcomes & Retrospective
 
-This phase delivered concrete SOLID/DDD improvements: contracts are now indicator-aware and enforce series-length invariants, the SMA facade path is routed through the same domain registry boundary as other indicators, and semantic naming replaced `wave2/wave3` vocabulary in core view-indicator tests. Required quality gates passed after aligning Ichimoku output to the new cardinality contract.
+This phase delivered concrete SOLID/DDD improvements end to end: contracts are indicator-aware and enforce series-length invariants; the SMA facade path uses the same domain registry boundary as other indicators; style metadata has a dedicated catalog boundary; semantic wording replaced `wave2/wave3` in tests; family modules share one runtime declaration model with parity checks; and heavy math/pattern helpers now live in reusable domain math namespaces.
 
-Remaining work in this plan is structural: continue semantic sharding beyond the first momentum slice, reduce catalog/calculator dual-maintenance friction, and extract heavy private math helpers into dedicated math/stat namespaces.
+Milestones 8, 9, and 10 are now complete. The architecture is materially less coupled: family modules focus on business calculations, shared runtime concerns are centralized, and reusable math kernels are no longer hidden in view-adjacent family files. Remaining future work is optional hardening/optimization, not required for this phase.
 
 ## Context and Orientation
 
@@ -138,6 +151,7 @@ Validation evidence from `/hyperopen`:
 - After momentum sub-namespace extraction, gates passed again: `npm run check`, `npm test`, and `npm run test:websocket` with zero failures.
 - After trend regression extraction, gates passed again: `npm run check`, `npm test`, and `npm run test:websocket` with zero failures.
 - After family parity guardrails were added, gates passed again: `npm run check`, `npm test`, and `npm run test:websocket` with zero failures.
+- After family-runtime unification, heavy-helper extraction, and volatility channels semantic split, gates passed again: `npm run check`, `npm test`, and `npm run test:websocket` with zero failures.
 
 ## Interfaces and Dependencies
 
@@ -156,3 +170,6 @@ Plan revision note: 2026-02-15 20:25Z - Started Milestone 8 with momentum oscill
 Plan revision note: 2026-02-15 20:45Z - Extended Milestone 8 with statistics oscillator extraction and revalidated all required gates.
 Plan revision note: 2026-02-15 21:00Z - Extended Milestone 8 with trend regression extraction and revalidated all required gates.
 Plan revision note: 2026-02-15 21:15Z - Started Milestone 9 with catalog/calculator parity guardrails and revalidated all required gates.
+Plan revision note: 2026-02-15 21:40Z - Completed Milestone 9 with `family-runtime` single-source declaration model across all indicator families.
+Plan revision note: 2026-02-15 21:45Z - Completed Milestone 10 by extracting reusable math/pattern helpers and rewiring callers and heavy-algorithm tests.
+Plan revision note: 2026-02-15 21:50Z - Completed Milestone 8 by extracting volatility channel calculators into a semantic sub-namespace and revalidating required gates.

@@ -1,6 +1,6 @@
 (ns hyperopen.domain.trading.indicators.oscillators
   (:require [hyperopen.domain.trading.indicators.catalog.oscillators :as catalog]
-            [hyperopen.domain.trading.indicators.contracts :as contracts]
+            [hyperopen.domain.trading.indicators.family-runtime :as family-runtime]
             [hyperopen.domain.trading.indicators.math-adapter :as math-adapter]
             [hyperopen.domain.trading.indicators.oscillators.momentum :as momentum]
             [hyperopen.domain.trading.indicators.oscillators.statistics :as statistics]
@@ -9,9 +9,11 @@
 
 (def ^:private oscillator-indicator-definitions catalog/oscillator-indicator-definitions)
 
+(declare oscillator-family)
+
 (defn get-oscillator-indicators
   []
-  oscillator-indicator-definitions)
+  (family-runtime/indicators oscillator-family))
 
 (def ^:private finite-number? imath/finite-number?)
 (def ^:private clamp imath/clamp)
@@ -843,16 +845,15 @@
    :williams-r momentum/calculate-williams-r
    :ultimate-oscillator calculate-ultimate-oscillator})
 
+(def ^:private oscillator-family
+  (family-runtime/build-family :oscillators
+                               oscillator-indicator-definitions
+                               oscillator-calculators))
+
 (defn supported-oscillator-indicator-ids
   []
-  (set (keys oscillator-calculators)))
+  (family-runtime/supported-indicator-ids oscillator-family))
 
 (defn calculate-oscillator-indicator
   [indicator-type data params]
-  (let [config (or params {})
-        calculator (get oscillator-calculators indicator-type)]
-    (when (and calculator
-               (contracts/valid-indicator-input? indicator-type data config))
-      (contracts/enforce-indicator-result indicator-type
-                                          (count data)
-                                          (calculator data config)))))
+  (family-runtime/calculate oscillator-family indicator-type data params))
