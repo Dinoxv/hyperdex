@@ -1,5 +1,6 @@
 (ns hyperopen.views.trading-chart.utils.indicators-wave2
-  (:require ["indicatorts" :refer [apo cci cmf cmo dema ema emv fi ichimokuCloud kc macd mfi mi mstd movingLeastSquare movingLinearRegressionUsingLeastSquare obv pvo psar rma roc rsi stoch tema trix typprice vpt vortex vwap vwma willr]]))
+  (:require [hyperopen.domain.trading.indicators.math :as imath]
+            ["indicatorts" :refer [apo cci cmf cmo dema ema emv fi ichimokuCloud kc macd mfi mi mstd movingLeastSquare movingLinearRegressionUsingLeastSquare obv pvo psar rma roc rsi stoch tema trix typprice vpt vortex vwap vwma willr]]))
 
 (def ^:private wave2-indicator-definitions
   [{:id :bollinger-bands-percent-b
@@ -481,110 +482,36 @@
   []
   wave2-indicator-definitions)
 
-(defn- finite-number?
-  [value]
-  (and (number? value)
-       (not (js/isNaN value))
-       (js/isFinite value)))
-
-(defn- ensure-vec
-  [values]
-  (cond
-    (vector? values) values
-    (array? values) (vec (array-seq values))
-    (sequential? values) (vec values)
-    :else []))
-
-(defn- normalize-values
-  ([values]
-   (normalize-values values {}))
-  ([values {:keys [zero-as-nil?]}]
-   (mapv (fn [value]
-           (cond
-             (not (finite-number? value)) nil
-             (and zero-as-nil? (zero? value)) nil
-             :else value))
-         (ensure-vec values))))
-
-(defn- clamp
-  [value minimum maximum]
-  (-> value
-      (max minimum)
-      (min maximum)))
-
-(defn- parse-period
-  [value default minimum maximum]
-  (let [base (if (number? value)
-               value
-               (js/parseInt (str value) 10))
-        numeric (if (js/isNaN base) default base)]
-    (clamp (int numeric) minimum maximum)))
-
-(defn- parse-number
-  [value default]
-  (let [numeric (if (number? value)
-                  value
-                  (js/parseFloat (str value)))]
-    (if (js/isNaN numeric) default numeric)))
-
-(defn- times
-  [data]
-  (mapv :time data))
-
-(defn- field-values
-  [data field]
-  (mapv (fn [candle]
-          (let [value (get candle field)]
-            (if (number? value)
-              value
-              (js/parseFloat (str value)))))
-        data))
+(def ^:private finite-number? imath/finite-number?)
+(def ^:private normalize-values imath/normalize-values)
+(def ^:private parse-period imath/parse-period)
+(def ^:private parse-number imath/parse-number)
+(def ^:private times imath/times)
+(def ^:private field-values imath/field-values)
 
 (defn- js-array
   [values]
   (clj->js values))
 
-(defn- mean
-  [values]
-  (when (seq values)
-    (/ (reduce + 0 values)
-       (count values))))
-
 (defn- window-for-index
   [values idx period]
-  (when (and (pos? period) (>= idx (dec period)))
-    (subvec values (- (inc idx) period) (inc idx))))
+  (imath/window-for-index values idx period :aligned))
 
 (defn- rolling-apply
   [values period f]
-  (let [size (count values)]
-    (mapv (fn [idx]
-            (when-let [window (window-for-index values idx period)]
-              (when (every? finite-number? window)
-                (f window))))
-          (range size))))
+  (imath/rolling-apply values period f :aligned))
 
 (defn- rolling-sum
   [values period]
-  (rolling-apply values period (fn [window] (reduce + 0 window))))
+  (imath/rolling-sum values period :aligned))
 
 (defn- sma-values
   [values period]
-  (rolling-apply values period mean))
-
-(defn- stddev
-  [values]
-  (let [avg (mean values)
-        variance (/ (reduce + 0 (map (fn [value]
-                                       (let [delta (- value avg)]
-                                         (* delta delta)))
-                                     values))
-                    (count values))]
-    (js/Math.sqrt variance)))
+  (imath/sma-values values period :aligned))
 
 (defn- stddev-values
   [values period]
-  (rolling-apply values period stddev))
+  (imath/stddev-values values period :aligned))
 
 (defn- point
   [time value]
@@ -663,21 +590,7 @@
 
 (defn- rma-values-local
   [values period]
-  (let [size (count values)]
-    (loop [idx 0
-           prev nil
-           result []]
-      (if (= idx size)
-        result
-        (if (< idx period)
-          (recur (inc idx) prev (conj result nil))
-          (if (nil? prev)
-            (let [seed (mean (window-for-index values idx period))]
-              (recur (inc idx) seed (conj result seed)))
-            (let [next-value (/ (+ (* prev (dec period))
-                                   (nth values idx))
-                                period)]
-              (recur (inc idx) next-value (conj result next-value)))))))))
+  (imath/rma-values values period :lagged))
 
 (defn- plus-minus-di-values
   [data period]
@@ -1746,64 +1659,67 @@
                       :separate
                       [(line-series :williams-r "%R" "#e879f9" time-values values)])))
 
+(def ^:private wave2-calculators
+  {:bollinger-bands-percent-b calculate-bollinger-bands-percent-b
+   :bollinger-bands-width calculate-bollinger-bands-width
+   :chaikin-money-flow calculate-chaikin-money-flow
+   :chaikin-oscillator calculate-chaikin-oscillator
+   :chande-momentum-oscillator calculate-chande-momentum-oscillator
+   :choppiness-index calculate-choppiness-index
+   :commodity-channel-index calculate-commodity-channel-index
+   :detrended-price-oscillator calculate-detrended-price-oscillator
+   :directional-movement calculate-directional-movement
+   :donchian-channels calculate-donchian-channels
+   :double-ema calculate-double-ema
+   :ease-of-movement calculate-ease-of-movement
+   :elders-force-index calculate-elders-force-index
+   :ema-cross calculate-ema-cross
+   :envelopes calculate-envelopes
+   :historical-volatility calculate-historical-volatility
+   :hull-moving-average calculate-hull-moving-average
+   :ichimoku-cloud calculate-ichimoku-cloud
+   :keltner-channels calculate-keltner-channels
+   :least-squares-moving-average calculate-least-squares-moving-average
+   :linear-regression-curve calculate-linear-regression-curve
+   :linear-regression-slope calculate-linear-regression-slope
+   :ma-cross calculate-ma-cross
+   :ma-with-ema-cross calculate-ma-with-ema-cross
+   :macd calculate-macd
+   :mass-index calculate-mass-index
+   :median-price calculate-median-price
+   :momentum calculate-momentum
+   :money-flow-index calculate-money-flow-index
+   :moving-average-channel calculate-moving-average-channel
+   :moving-average-double calculate-moving-average-double
+   :moving-average-exponential calculate-moving-average-exponential
+   :moving-average-multiple calculate-moving-average-multiple
+   :moving-average-triple calculate-moving-average-triple
+   :moving-average-weighted calculate-moving-average-weighted
+   :net-volume calculate-net-volume
+   :on-balance-volume calculate-on-balance-volume
+   :parabolic-sar calculate-parabolic-sar
+   :price-channel calculate-price-channel
+   :price-oscillator calculate-price-oscillator
+   :price-volume-trend calculate-price-volume-trend
+   :rate-of-change calculate-rate-of-change
+   :relative-strength-index calculate-relative-strength-index
+   :smoothed-moving-average calculate-smoothed-moving-average
+   :standard-deviation calculate-standard-deviation
+   :stochastic calculate-stochastic
+   :stochastic-rsi calculate-stochastic-rsi
+   :supertrend calculate-supertrend
+   :triple-ema calculate-triple-ema
+   :trix calculate-trix
+   :typical-price calculate-typical-price
+   :volume-oscillator calculate-volume-oscillator
+   :vortex-indicator calculate-vortex-indicator
+   :vwap calculate-vwap
+   :vwma calculate-vwma
+   :williams-r calculate-williams-r})
+
 (defn calculate-wave2-indicator
   [indicator-type data params]
-  (let [config (or params {})]
-    (case indicator-type
-      :bollinger-bands-percent-b (calculate-bollinger-bands-percent-b data config)
-      :bollinger-bands-width (calculate-bollinger-bands-width data config)
-      :chaikin-money-flow (calculate-chaikin-money-flow data config)
-      :chaikin-oscillator (calculate-chaikin-oscillator data config)
-      :chande-momentum-oscillator (calculate-chande-momentum-oscillator data config)
-      :choppiness-index (calculate-choppiness-index data config)
-      :commodity-channel-index (calculate-commodity-channel-index data config)
-      :detrended-price-oscillator (calculate-detrended-price-oscillator data config)
-      :directional-movement (calculate-directional-movement data config)
-      :donchian-channels (calculate-donchian-channels data config)
-      :double-ema (calculate-double-ema data config)
-      :ease-of-movement (calculate-ease-of-movement data config)
-      :elders-force-index (calculate-elders-force-index data config)
-      :ema-cross (calculate-ema-cross data config)
-      :envelopes (calculate-envelopes data config)
-      :historical-volatility (calculate-historical-volatility data config)
-      :hull-moving-average (calculate-hull-moving-average data config)
-      :ichimoku-cloud (calculate-ichimoku-cloud data config)
-      :keltner-channels (calculate-keltner-channels data config)
-      :least-squares-moving-average (calculate-least-squares-moving-average data config)
-      :linear-regression-curve (calculate-linear-regression-curve data config)
-      :linear-regression-slope (calculate-linear-regression-slope data config)
-      :ma-cross (calculate-ma-cross data config)
-      :ma-with-ema-cross (calculate-ma-with-ema-cross data config)
-      :macd (calculate-macd data config)
-      :mass-index (calculate-mass-index data config)
-      :median-price (calculate-median-price data config)
-      :momentum (calculate-momentum data config)
-      :money-flow-index (calculate-money-flow-index data config)
-      :moving-average-channel (calculate-moving-average-channel data config)
-      :moving-average-double (calculate-moving-average-double data config)
-      :moving-average-exponential (calculate-moving-average-exponential data config)
-      :moving-average-multiple (calculate-moving-average-multiple data config)
-      :moving-average-triple (calculate-moving-average-triple data config)
-      :moving-average-weighted (calculate-moving-average-weighted data config)
-      :net-volume (calculate-net-volume data config)
-      :on-balance-volume (calculate-on-balance-volume data config)
-      :parabolic-sar (calculate-parabolic-sar data config)
-      :price-channel (calculate-price-channel data config)
-      :price-oscillator (calculate-price-oscillator data config)
-      :price-volume-trend (calculate-price-volume-trend data config)
-      :rate-of-change (calculate-rate-of-change data config)
-      :relative-strength-index (calculate-relative-strength-index data config)
-      :smoothed-moving-average (calculate-smoothed-moving-average data config)
-      :standard-deviation (calculate-standard-deviation data config)
-      :stochastic (calculate-stochastic data config)
-      :stochastic-rsi (calculate-stochastic-rsi data config)
-      :supertrend (calculate-supertrend data config)
-      :triple-ema (calculate-triple-ema data config)
-      :trix (calculate-trix data config)
-      :typical-price (calculate-typical-price data config)
-      :volume-oscillator (calculate-volume-oscillator data config)
-      :vortex-indicator (calculate-vortex-indicator data config)
-      :vwap (calculate-vwap data config)
-      :vwma (calculate-vwma data config)
-      :williams-r (calculate-williams-r data config)
-      nil)))
+  (let [config (or params {})
+        calculator (get wave2-calculators indicator-type)]
+    (when calculator
+      (calculator data config))))

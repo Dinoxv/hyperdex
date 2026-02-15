@@ -1,5 +1,6 @@
 (ns hyperopen.views.trading-chart.utils.indicators
-  (:require [hyperopen.views.trading-chart.utils.indicators-wave2 :as wave2]
+  (:require [hyperopen.domain.trading.indicators.math :as imath]
+            [hyperopen.views.trading-chart.utils.indicators-wave2 :as wave2]
             [hyperopen.views.trading-chart.utils.indicators-wave3 :as wave3]))
 
 (def ^:private seconds-per-week (* 7 24 60 60))
@@ -115,94 +116,31 @@
     :max-period 200
     :default-config {:period 20}}])
 
-(defn- finite-number?
-  [value]
-  (and (number? value)
-       (not (js/isNaN value))
-       (js/isFinite value)))
-
-(defn- clamp
-  [value minimum maximum]
-  (-> value
-      (max minimum)
-      (min maximum)))
-
-(defn- parse-period
-  [value default minimum maximum]
-  (let [base (if (number? value)
-               value
-               (js/parseInt (str value) 10))
-        numeric (if (js/isNaN base) default base)]
-    (clamp (int numeric) minimum maximum)))
-
-(defn- times
-  [data]
-  (mapv :time data))
-
-(defn- field-values
-  [data field]
-  (mapv (fn [candle]
-          (let [value (get candle field)]
-            (if (number? value)
-              value
-              (js/parseFloat (str value)))))
-        data))
-
-(defn- mean
-  [values]
-  (when (seq values)
-    (/ (reduce + 0 values)
-       (count values))))
+(def ^:private finite-number? imath/finite-number?)
+(def ^:private parse-period imath/parse-period)
+(def ^:private times imath/times)
+(def ^:private field-values imath/field-values)
+(def ^:private mean imath/mean)
 
 (defn- window-for-index
   [values idx period]
-  (when (and (pos? period) (>= idx period))
-    (subvec values (inc (- idx period)) (inc idx))))
+  (imath/window-for-index values idx period :lagged))
 
 (defn- rolling-apply
   [values period f]
-  (let [size (count values)]
-    (mapv (fn [idx]
-            (when-let [window (window-for-index values idx period)]
-              (when (every? finite-number? window)
-                (f window))))
-          (range size))))
+  (imath/rolling-apply values period f :lagged))
 
 (defn- sma-values
   [values period]
-  (rolling-apply values period mean))
-
-(defn- population-stddev
-  [values]
-  (let [avg (mean values)
-        squared-diffs (map (fn [value]
-                             (let [delta (- value avg)]
-                               (* delta delta)))
-                           values)]
-    (js/Math.sqrt (/ (reduce + 0 squared-diffs)
-                     (count values)))))
+  (imath/sma-values values period :lagged))
 
 (defn- stddev-values
   [values period]
-  (rolling-apply values period population-stddev))
+  (imath/stddev-values values period :lagged))
 
 (defn- rma-values
   [values period]
-  (let [size (count values)]
-    (loop [idx 0
-           previous nil
-           result []]
-      (if (= idx size)
-        result
-        (if (< idx period)
-          (recur (inc idx) previous (conj result nil))
-          (if (nil? previous)
-            (let [seed (mean (window-for-index values idx period))]
-              (recur (inc idx) seed (conj result seed)))
-            (let [next-value (/ (+ (* previous (dec period))
-                                   (nth values idx))
-                                period)]
-              (recur (inc idx) next-value (conj result next-value)))))))))
+  (imath/rma-values values period :lagged))
 
 (defn- point
   [time value]
@@ -688,30 +626,35 @@
                (wave2/get-wave2-indicators)
                (wave3/get-wave3-indicators))))
 
+(def ^:private indicator-calculators
+  {:week-52-high-low calculate-52-week-high-low
+   :accelerator-oscillator calculate-accelerator-oscillator
+   :accumulation-distribution calculate-accumulation-distribution
+   :accumulative-swing-index calculate-accumulative-swing-index
+   :advance-decline calculate-advance-decline
+   :alma calculate-alma
+   :aroon calculate-aroon
+   :adx calculate-adx
+   :average-price calculate-average-price
+   :atr calculate-atr
+   :awesome-oscillator calculate-awesome-oscillator
+   :balance-of-power calculate-balance-of-power
+   :bollinger-bands calculate-bollinger-bands
+   :sma (fn [data config]
+          (indicator-result :sma
+                            :overlay
+                            [(line-series :sma
+                                          "MA"
+                                          "#38bdf8"
+                                          (times data)
+                                          (mapv :value (calculate-sma data (:period config 20))))]))})
+
 (defn calculate-indicator
   "Calculate indicator based on type and parameters"
   [indicator-type data params]
-  (let [config (or params {})]
-    (case indicator-type
-      :week-52-high-low (calculate-52-week-high-low data config)
-      :accelerator-oscillator (calculate-accelerator-oscillator data config)
-      :accumulation-distribution (calculate-accumulation-distribution data config)
-      :accumulative-swing-index (calculate-accumulative-swing-index data config)
-      :advance-decline (calculate-advance-decline data config)
-      :alma (calculate-alma data config)
-      :aroon (calculate-aroon data config)
-      :adx (calculate-adx data config)
-      :average-price (calculate-average-price data config)
-      :atr (calculate-atr data config)
-      :awesome-oscillator (calculate-awesome-oscillator data config)
-      :balance-of-power (calculate-balance-of-power data config)
-      :bollinger-bands (calculate-bollinger-bands data config)
-      :sma (indicator-result :sma
-                             :overlay
-                             [(line-series :sma
-                                           "MA"
-                                           "#38bdf8"
-                                           (times data)
-                                           (mapv :value (calculate-sma data (:period config 20))))])
-      (or (wave2/calculate-wave2-indicator indicator-type data config)
-          (wave3/calculate-wave3-indicator indicator-type data config)))))
+  (let [config (or params {})
+        calculator (get indicator-calculators indicator-type)]
+    (or (when calculator
+          (calculator data config))
+        (wave2/calculate-wave2-indicator indicator-type data config)
+        (wave3/calculate-wave3-indicator indicator-type data config))))

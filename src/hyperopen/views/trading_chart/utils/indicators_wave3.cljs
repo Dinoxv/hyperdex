@@ -1,4 +1,5 @@
-(ns hyperopen.views.trading-chart.utils.indicators-wave3)
+(ns hyperopen.views.trading-chart.utils.indicators-wave3
+  (:require [hyperopen.domain.trading.indicators.math :as imath]))
 
 (def ^:private wave3-indicator-definitions
   [{:id :chaikin-volatility
@@ -317,60 +318,12 @@
   []
   wave3-indicator-definitions)
 
-(defn- finite-number?
-  [value]
-  (and (number? value)
-       (not (js/isNaN value))
-       (js/isFinite value)))
-
-(defn- ensure-vec
-  [values]
-  (cond
-    (vector? values) values
-    (array? values) (vec (array-seq values))
-    (sequential? values) (vec values)
-    :else []))
-
-(defn- normalize-values
-  [values]
-  (mapv (fn [value]
-          (when (finite-number? value)
-            value))
-        (ensure-vec values)))
-
-(defn- clamp
-  [value minimum maximum]
-  (-> value
-      (max minimum)
-      (min maximum)))
-
-(defn- parse-period
-  [value default minimum maximum]
-  (let [base (if (number? value)
-               value
-               (js/parseInt (str value) 10))
-        numeric (if (js/isNaN base) default base)]
-    (clamp (int numeric) minimum maximum)))
-
-(defn- parse-number
-  [value default]
-  (let [numeric (if (number? value)
-                  value
-                  (js/parseFloat (str value)))]
-    (if (js/isNaN numeric) default numeric)))
-
-(defn- times
-  [data]
-  (mapv :time data))
-
-(defn- field-values
-  [data field]
-  (mapv (fn [candle]
-          (let [value (get candle field)]
-            (if (number? value)
-              value
-              (js/parseFloat (str value)))))
-        data))
+(def ^:private finite-number? imath/finite-number?)
+(def ^:private clamp imath/clamp)
+(def ^:private parse-period imath/parse-period)
+(def ^:private parse-number imath/parse-number)
+(def ^:private times imath/times)
+(def ^:private field-values imath/field-values)
 
 (defn- highs [data] (field-values data :high))
 (defn- lows [data] (field-values data :low))
@@ -378,83 +331,31 @@
 (defn- closes [data] (field-values data :close))
 (defn- volumes [data] (field-values data :volume))
 
-(defn- mean
-  [values]
-  (when (seq values)
-    (/ (reduce + 0 values)
-       (count values))))
+(def ^:private mean imath/mean)
 
 (defn- window-for-index
   [values idx period]
-  (when (and (pos? period) (>= idx (dec period)))
-    (subvec values (- (inc idx) period) (inc idx))))
+  (imath/window-for-index values idx period :aligned))
 
 (defn- rolling-apply
   [values period f]
-  (let [size (count values)]
-    (mapv (fn [idx]
-            (when-let [window (window-for-index values idx period)]
-              (when (every? finite-number? window)
-                (f window))))
-          (range size))))
+  (imath/rolling-apply values period f :aligned))
 
 (defn- rolling-sum
   [values period]
-  (rolling-apply values period #(reduce + 0 %)))
+  (imath/rolling-sum values period :aligned))
 
 (defn- sma-values
   [values period]
-  (rolling-apply values period mean))
+  (imath/sma-values values period :aligned))
 
 (defn- ema-values
   [values period]
-  (let [alpha (/ 2 (inc period))
-        size (count values)]
-    (loop [idx 0
-           prev nil
-           out []]
-      (if (= idx size)
-        out
-        (let [value (nth values idx)
-              seeded? (and (nil? prev)
-                           (>= idx (dec period))
-                           (every? finite-number?
-                                   (subvec values (- (inc idx) period) (inc idx))))
-              seed (when seeded?
-                     (mean (subvec values (- (inc idx) period) (inc idx))))
-              current (cond
-                        (not (finite-number? value)) nil
-                        seeded? seed
-                        (finite-number? prev) (+ prev (* alpha (- value prev)))
-                        :else nil)]
-          (recur (inc idx)
-                 current
-                 (conj out current)))))))
+  (imath/ema-values values period))
 
 (defn- rma-values
   [values period]
-  (let [size (count values)]
-    (loop [idx 0
-           prev nil
-           out []]
-      (if (= idx size)
-        out
-        (let [value (nth values idx)
-              seeded? (and (nil? prev)
-                           (>= idx (dec period))
-                           (every? finite-number?
-                                   (subvec values (- (inc idx) period) (inc idx))))
-              seed (when seeded?
-                     (mean (subvec values (- (inc idx) period) (inc idx))))
-              current (cond
-                        (not (finite-number? value)) nil
-                        seeded? seed
-                        (finite-number? prev) (/ (+ (* prev (dec period)) value)
-                                                  period)
-                        :else nil)]
-          (recur (inc idx)
-                 current
-                 (conj out current)))))))
+  (imath/rma-values values period :aligned))
 
 (defn- wma-values
   [values period]
@@ -495,25 +396,15 @@
 
 (defn- rolling-max
   [values period]
-  (rolling-apply values period #(apply max %)))
+  (imath/rolling-max values period :aligned))
 
 (defn- rolling-min
   [values period]
-  (rolling-apply values period #(apply min %)))
-
-(defn- stddev
-  [values]
-  (let [avg (mean values)
-        squared (map (fn [value]
-                       (let [delta (- value avg)]
-                         (* delta delta)))
-                     values)]
-    (js/Math.sqrt (/ (reduce + 0 squared)
-                     (count values)))))
+  (imath/rolling-min values period :aligned))
 
 (defn- stddev-values
   [values period]
-  (rolling-apply values period stddev))
+  (imath/stddev-values values period :aligned))
 
 (defn- roc-percent-values
   [values period]
@@ -1739,43 +1630,46 @@
                       :overlay
                       [(line-series :zig-zag "Zig Zag" "#f97316" time-values values)])))
 
+(def ^:private wave3-calculators
+  {:chaikin-volatility calculate-chaikin-volatility
+   :chande-kroll-stop calculate-chande-kroll-stop
+   :chop-zone calculate-chop-zone
+   :connors-rsi calculate-connors-rsi
+   :coppock-curve calculate-coppock-curve
+   :correlation-log calculate-correlation-log
+   :correlation-coefficient calculate-correlation-coefficient
+   :fisher-transform calculate-fisher-transform
+   :guppy-multiple-moving-average calculate-guppy-multiple-moving-average
+   :klinger-oscillator calculate-klinger-oscillator
+   :know-sure-thing calculate-know-sure-thing
+   :majority-rule calculate-majority-rule
+   :mcginley-dynamic calculate-mcginley-dynamic
+   :moving-average-adaptive calculate-moving-average-adaptive
+   :moving-average-hamming calculate-moving-average-hamming
+   :pivot-points-standard calculate-pivot-points-standard
+   :rank-correlation-index calculate-rank-correlation-index
+   :ratio calculate-ratio
+   :relative-vigor-index calculate-relative-vigor-index
+   :relative-volatility-index calculate-relative-volatility-index
+   :smi-ergodic calculate-smi-ergodic
+   :spread calculate-spread
+   :standard-error calculate-standard-error
+   :standard-error-bands calculate-standard-error-bands
+   :trend-strength-index calculate-trend-strength-index
+   :true-strength-index calculate-true-strength-index
+   :ultimate-oscillator calculate-ultimate-oscillator
+   :volatility-close-to-close calculate-volatility-close-to-close
+   :volatility-index calculate-volatility-index
+   :volatility-ohlc calculate-volatility-ohlc
+   :volatility-zero-trend-close-to-close calculate-volatility-zero-trend-close-to-close
+   :volume calculate-volume
+   :williams-alligator calculate-williams-alligator
+   :williams-fractal calculate-williams-fractal
+   :zig-zag calculate-zig-zag})
+
 (defn calculate-wave3-indicator
   [indicator-type data params]
-  (let [config (or params {})]
-    (case indicator-type
-      :chaikin-volatility (calculate-chaikin-volatility data config)
-      :chande-kroll-stop (calculate-chande-kroll-stop data config)
-      :chop-zone (calculate-chop-zone data config)
-      :connors-rsi (calculate-connors-rsi data config)
-      :coppock-curve (calculate-coppock-curve data config)
-      :correlation-log (calculate-correlation-log data config)
-      :correlation-coefficient (calculate-correlation-coefficient data config)
-      :fisher-transform (calculate-fisher-transform data config)
-      :guppy-multiple-moving-average (calculate-guppy-multiple-moving-average data config)
-      :klinger-oscillator (calculate-klinger-oscillator data config)
-      :know-sure-thing (calculate-know-sure-thing data config)
-      :majority-rule (calculate-majority-rule data config)
-      :mcginley-dynamic (calculate-mcginley-dynamic data config)
-      :moving-average-adaptive (calculate-moving-average-adaptive data config)
-      :moving-average-hamming (calculate-moving-average-hamming data config)
-      :pivot-points-standard (calculate-pivot-points-standard data config)
-      :rank-correlation-index (calculate-rank-correlation-index data config)
-      :ratio (calculate-ratio data config)
-      :relative-vigor-index (calculate-relative-vigor-index data config)
-      :relative-volatility-index (calculate-relative-volatility-index data config)
-      :smi-ergodic (calculate-smi-ergodic data config)
-      :spread (calculate-spread data config)
-      :standard-error (calculate-standard-error data config)
-      :standard-error-bands (calculate-standard-error-bands data config)
-      :trend-strength-index (calculate-trend-strength-index data config)
-      :true-strength-index (calculate-true-strength-index data config)
-      :ultimate-oscillator (calculate-ultimate-oscillator data config)
-      :volatility-close-to-close (calculate-volatility-close-to-close data config)
-      :volatility-index (calculate-volatility-index data config)
-      :volatility-ohlc (calculate-volatility-ohlc data config)
-      :volatility-zero-trend-close-to-close (calculate-volatility-zero-trend-close-to-close data config)
-      :volume (calculate-volume data config)
-      :williams-alligator (calculate-williams-alligator data config)
-      :williams-fractal (calculate-williams-fractal data config)
-      :zig-zag (calculate-zig-zag data config)
-      nil)))
+  (let [config (or params {})
+        calculator (get wave3-calculators indicator-type)]
+    (when calculator
+      (calculator data config))))
