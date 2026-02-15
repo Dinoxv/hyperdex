@@ -2,6 +2,7 @@
   (:require [hyperopen.domain.trading.indicators.catalog.oscillators :as catalog]
             [hyperopen.domain.trading.indicators.contracts :as contracts]
             [hyperopen.domain.trading.indicators.math-adapter :as math-adapter]
+            [hyperopen.domain.trading.indicators.oscillators.momentum :as momentum]
             [hyperopen.domain.trading.indicators.math :as imath]
             [hyperopen.domain.trading.indicators.result :as result]))
 
@@ -313,84 +314,6 @@
                              :separate
                              [(result/line-series :bop values)])))
 
-(defn- calculate-rate-of-change
-  [data params]
-  (let [period (parse-period (:period params) 9 1 400)
-        close-values (field-values data :close)
-        values (roc-percent-values close-values period)]
-    (result/indicator-result :rate-of-change
-                             :separate
-                             [(result/line-series :roc values)])))
-
-(defn- calculate-momentum
-  [data params]
-  (let [period (parse-period (:period params) 10 1 400)
-        close-values (field-values data :close)
-        values (mapv (fn [idx]
-                       (if (< idx period)
-                         nil
-                         (- (nth close-values idx)
-                            (nth close-values (- idx period)))))
-                     (range (count close-values)))]
-    (result/indicator-result :momentum
-                             :separate
-                             [(result/line-series :momentum values)])))
-
-(defn- calculate-chande-momentum-oscillator
-  [data params]
-  (let [period (parse-period (:period params) 14 2 200)
-        close-values (field-values data :close)
-        diffs (mapv (fn [idx]
-                      (if (zero? idx)
-                        0
-                        (- (nth close-values idx) (nth close-values (dec idx)))))
-                    (range (count close-values)))
-        gains (mapv (fn [value] (max value 0)) diffs)
-        losses (mapv (fn [value] (max (- value) 0)) diffs)
-        sum-gains (rolling-sum-aligned gains period)
-        sum-losses (rolling-sum-aligned losses period)
-        values (mapv (fn [g l]
-                       (let [total (+ (or g 0) (or l 0))]
-                         (when (and (finite-number? g)
-                                    (finite-number? l)
-                                    (pos? total))
-                           (* 100 (/ (- g l) total)))))
-                     sum-gains sum-losses)]
-    (result/indicator-result :chande-momentum-oscillator
-                             :separate
-                             [(result/line-series :cmo values)])))
-
-(defn- calculate-detrended-price-oscillator
-  [data params]
-  (let [period (parse-period (:period params) 20 2 400)
-        close-values (field-values data :close)
-        sma-line (sma-aligned-values close-values period)
-        shift (+ (int (js/Math.floor (/ period 2))) 1)
-        size (count close-values)
-        values (mapv (fn [idx]
-                       (let [shifted-idx (- idx shift)]
-                         (when (>= shifted-idx 0)
-                           (let [price (nth close-values shifted-idx)
-                                 avg (nth sma-line shifted-idx)]
-                             (when (and (finite-number? price)
-                                        (finite-number? avg))
-                               (- price avg))))))
-                     (range size))]
-    (result/indicator-result :detrended-price-oscillator
-                             :separate
-                             [(result/line-series :dpo values)])))
-
-(defn- calculate-price-oscillator
-  [data params]
-  (let [fast (parse-period (:fast params) 12 1 200)
-        slow (parse-period (:slow params) 26 2 400)
-        values (normalize-values
-                (math-adapter/absolute-price-oscillator (field-values data :close)
-                                                        {:fast fast :slow slow}))]
-    (result/indicator-result :price-oscillator
-                             :separate
-                             [(result/line-series :apo values)])))
-
 (defn- calculate-stochastic
   [data params]
   (let [k-period (parse-period (:kPeriod params) 14 1 200)
@@ -434,28 +357,6 @@
                              :separate
                              [(result/line-series :k k-values)
                               (result/line-series :d d-values)])))
-
-(defn- calculate-trix
-  [data params]
-  (let [period (parse-period (:period params) 15 2 400)
-        values (normalize-values
-                (math-adapter/trix (field-values data :close)
-                                   {:period period}))]
-    (result/indicator-result :trix
-                             :separate
-                             [(result/line-series :trix values)])))
-
-(defn- calculate-williams-r
-  [data params]
-  (let [period (parse-period (:period params) 14 2 200)
-        values (normalize-values
-                (math-adapter/williams-r (field-values data :high)
-                                         (field-values data :low)
-                                         (field-values data :close)
-                                         {:period period}))]
-    (result/indicator-result :williams-r
-                             :separate
-                             [(result/line-series :williams-r values)])))
 
 (defn- calculate-choppiness-index
   [data params]
@@ -1028,10 +929,10 @@
    :awesome-oscillator calculate-awesome-oscillator
    :balance-of-power calculate-balance-of-power
    :coppock-curve calculate-coppock-curve
-   :chande-momentum-oscillator calculate-chande-momentum-oscillator
+   :chande-momentum-oscillator momentum/calculate-chande-momentum-oscillator
    :choppiness-index calculate-choppiness-index
    :commodity-channel-index calculate-commodity-channel-index
-   :detrended-price-oscillator calculate-detrended-price-oscillator
+   :detrended-price-oscillator momentum/calculate-detrended-price-oscillator
    :fisher-transform calculate-fisher-transform
    :macd calculate-macd
    :mass-index calculate-mass-index
@@ -1043,9 +944,9 @@
    :correlation-log calculate-correlation-log
    :klinger-oscillator calculate-klinger-oscillator
    :know-sure-thing calculate-know-sure-thing
-   :momentum calculate-momentum
-   :price-oscillator calculate-price-oscillator
-   :rate-of-change calculate-rate-of-change
+   :momentum momentum/calculate-momentum
+   :price-oscillator momentum/calculate-price-oscillator
+   :rate-of-change momentum/calculate-rate-of-change
    :relative-strength-index calculate-relative-strength-index
    :ratio calculate-ratio
    :correlation-coefficient calculate-correlation-coefficient
@@ -1055,10 +956,10 @@
    :spread calculate-spread
    :stochastic calculate-stochastic
    :stochastic-rsi calculate-stochastic-rsi
-   :trix calculate-trix
+   :trix momentum/calculate-trix
    :true-strength-index calculate-true-strength-index
    :trend-strength-index calculate-trend-strength-index
-   :williams-r calculate-williams-r
+   :williams-r momentum/calculate-williams-r
    :ultimate-oscillator calculate-ultimate-oscillator})
 
 (defn calculate-oscillator-indicator

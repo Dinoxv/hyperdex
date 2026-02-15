@@ -17,8 +17,8 @@ The indicator architecture has improved, but there are still gaps against SOLID/
 - [x] (2026-02-15 19:22Z) Milestone 4 completed: removed `wave2/wave3` terminology from indicator facade tests and helper sets.
 - [x] (2026-02-15 19:30Z) Milestone 5 completed: required validation gates passed (`npm run check`, `npm test`, `npm run test:websocket`).
 - [x] (2026-02-15 19:32Z) Milestone 6 completed: phase evidence recorded; plan kept active for follow-on SOLID/DDD slices.
-- [ ] Milestone 7: modularize view adapter style metadata into semantic family style catalogs.
-- [ ] Milestone 8: break large family modules into smaller semantic domain namespaces while preserving registry routing.
+- [x] (2026-02-15 20:10Z) Milestone 7 completed: moved style metadata from view adapter into dedicated style catalog namespace with semantic family projections.
+- [ ] Milestone 8: break large family modules into smaller semantic domain namespaces while preserving registry routing (completed: extracted momentum oscillators into `/hyperopen/src/hyperopen/domain/trading/indicators/oscillators/momentum.cljs`; remaining: split additional oscillator/trend/volatility semantic slices).
 - [ ] Milestone 9: remove remaining dual-maintenance coupling between catalog definitions and calculator maps.
 - [ ] Milestone 10: extract remaining heavy private math/stat helpers to dedicated reusable math/statistics namespaces.
 
@@ -30,6 +30,10 @@ The indicator architecture has improved, but there are still gaps against SOLID/
   Evidence: `/hyperopen/src/hyperopen/domain/trading/indicators/contracts.cljs` uses a global `numeric-param-keys` set.
 - Observation: strict cardinality surfaced a real mismatch in Ichimoku output lengths from the math adapter path.
   Evidence: `npm test` initially failed in `calculate-indicator-ichimoku-and-vwap-shape-test` because `:ichimoku-cloud` was rejected by the new output-length contract.
+- Observation: indicator view adapter was carrying a very large mixed-responsibility style map that made adapter logic noisy and harder to reason about.
+  Evidence: `/hyperopen/src/hyperopen/views/trading_chart/utils/indicator_view_adapter.cljs` previously contained line/histogram/marker style maps plus projection logic in one namespace.
+- Observation: oscillator semantic splitting can be done incrementally without registry/interface churn by extracting focused calculator namespaces and delegating through the existing calculator map.
+  Evidence: momentum-family calculators now live in `/hyperopen/src/hyperopen/domain/trading/indicators/oscillators/momentum.cljs` while `/hyperopen/src/hyperopen/domain/trading/indicators/oscillators.cljs` preserves public entrypoints.
 
 ## Decision Log
 
@@ -42,12 +46,18 @@ The indicator architecture has improved, but there are still gaps against SOLID/
 - Decision: keep cardinality enforcement strict and normalize Ichimoku series lengths in-domain.
   Rationale: output contracts should remain invariant; calculator implementations should adapt to satisfy the contract.
   Date/Author: 2026-02-15 / Codex
+- Decision: extract style metadata into a dedicated style catalog namespace and compute semantic family style maps there.
+  Rationale: this keeps the adapter focused on projection behavior while moving presentation configuration to a separate boundary.
+  Date/Author: 2026-02-15 / Codex
+- Decision: start Milestone 8 decomposition with momentum oscillators first.
+  Rationale: momentum calculators are cohesive and low-risk to move, enabling safe incremental decomposition of the largest family module.
+  Date/Author: 2026-02-15 / Codex
 
 ## Outcomes & Retrospective
 
 This phase delivered concrete SOLID/DDD improvements: contracts are now indicator-aware and enforce series-length invariants, the SMA facade path is routed through the same domain registry boundary as other indicators, and semantic naming replaced `wave2/wave3` vocabulary in core view-indicator tests. Required quality gates passed after aligning Ichimoku output to the new cardinality contract.
 
-Remaining work in this plan is structural: modularizing the massive style adapter maps, further semantic sharding of family modules, reducing catalog/calculator dual-maintenance friction, and extracting heavy private math helpers into dedicated math/stat namespaces.
+Remaining work in this plan is structural: continue semantic sharding beyond the first momentum slice, reduce catalog/calculator dual-maintenance friction, and extract heavy private math helpers into dedicated math/stat namespaces.
 
 ## Context and Orientation
 
@@ -112,6 +122,8 @@ Validation evidence from `/hyperopen`:
 - `npm run check` passed (lint + docs checks + app/test compile).
 - `npm test` passed after Ichimoku cardinality normalization (`Ran 782 tests containing 3019 assertions. 0 failures, 0 errors.`).
 - `npm run test:websocket` passed (`Ran 86 tests containing 267 assertions. 0 failures, 0 errors.`).
+- After style-catalog extraction, gates passed again: `npm run check`, `npm test`, and `npm run test:websocket` with zero failures.
+- After momentum sub-namespace extraction, gates passed again: `npm run check`, `npm test`, and `npm run test:websocket` with zero failures.
 
 ## Interfaces and Dependencies
 
@@ -125,3 +137,5 @@ Public interfaces to preserve:
 
 Plan revision note: 2026-02-15 19:05Z - Initial Phase B plan created for contract hardening, boundary cleanup, and semantic naming alignment.
 Plan revision note: 2026-02-15 19:32Z - Completed Milestones 1-6, recorded validation evidence, and extended plan with follow-on structural milestones 7-10.
+Plan revision note: 2026-02-15 20:10Z - Completed Milestone 7 by extracting style metadata into a dedicated style catalog and revalidating all required gates.
+Plan revision note: 2026-02-15 20:25Z - Started Milestone 8 with momentum oscillator extraction and revalidated all required gates.
