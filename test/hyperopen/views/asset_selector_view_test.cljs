@@ -315,7 +315,7 @@
     (is (contains? classes "truncate"))
     (is (contains? classes "whitespace-nowrap"))))
 
-(deftest asset-list-item-hides-icon-until-load-and-wires-load-events-test
+(deftest asset-list-item-renders-icon-immediately-and-wires-load-events-test
   (let [asset {:key "perp:BTC"
                :symbol "BTC-USDC"
                :coin "BTC"
@@ -329,7 +329,7 @@
         attrs (second img-node)
         classes (set (class-values (:class attrs)))]
     (is (some? img-node))
-    (is (contains? classes "hidden"))
+    (is (not (contains? classes "hidden")))
     (is (= [[:actions/mark-loaded-asset-icon "perp:BTC"]]
            (get-in attrs [:on :load])))
     (is (= [[:actions/mark-missing-asset-icon "perp:BTC"]]

@@ -100,7 +100,7 @@
       :else
       nil)))
 
-(defn asset-icon [market dropdown-visible? missing-icons loaded-icons]
+(defn asset-icon [market dropdown-visible? missing-icons _loaded-icons]
   (let [coin (:coin market)
         base (or (:base market) coin)
         symbol (or (:symbol market) coin)
@@ -108,7 +108,6 @@
         leverage-label (leverage-chip-label market)
         market-type (:market-type market)
         market-key (or (:key market) (markets/coin->market-key coin))
-        loaded-icon? (contains? loaded-icons market-key)
         missing-icon? (contains? missing-icons market-key)
         icon-blocked? (or missing-icon?
                           (and (string? base)
@@ -120,7 +119,6 @@
        [:img.w-6.h-6.rounded-full
         {:src (str "https://app.hyperliquid.xyz/coins/" base ".svg")
          :alt ""
-         :class (when-not loaded-icon? ["hidden"])
          :on {:load [[:actions/mark-loaded-asset-icon market-key]]
               :error [[:actions/mark-missing-asset-icon market-key]]}}])
      [:div.flex.items-center.space-x-2.min-w-0

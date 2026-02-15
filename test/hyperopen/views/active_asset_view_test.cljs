@@ -116,7 +116,7 @@
         path-ds (set (collect-path-ds icon-node))]
     (is (contains? path-ds "M19 9l-7 7-7-7"))))
 
-(deftest asset-icon-hides-image-until-load-test
+(deftest asset-icon-renders-image-immediately-and-wires-load-events-test
   (let [market {:key "perp:BTC"
                 :coin "BTC"
                 :symbol "BTC-USDC"
@@ -127,7 +127,7 @@
         attrs (second img-node)
         classes (set (class-values (:class attrs)))]
     (is (some? img-node))
-    (is (contains? classes "hidden"))
+    (is (not (contains? classes "hidden")))
     (is (= [[:actions/mark-loaded-asset-icon "perp:BTC"]]
            (get-in attrs [:on :load])))))
 

@@ -164,7 +164,7 @@
                (market-fallback-sort-rank b))
       directional-primary)))
 
-(defn asset-list-item [asset selected? favorites missing-icons loaded-icons]
+(defn asset-list-item [asset selected? favorites missing-icons _loaded-icons]
   (let [{:keys [key coin symbol base mark markRaw volume24h change24h change24hPct openInterest fundingRate
                 market-type dex maxLeverage]} asset
         safe-change (when (some? change24h) (fmt/safe-number change24h))
@@ -185,7 +185,6 @@
         is-spot (= market-type :spot)
         favorite? (contains? favorites key)
         icon-name (or base coin)
-        loaded-icon? (contains? loaded-icons key)
         missing-icon? (contains? missing-icons key)
         icon-blocked? (or missing-icon?
                           (and (string? icon-name)
@@ -200,7 +199,6 @@
         [:img.w-5.h-5.rounded-full
          {:src (str "https://app.hyperliquid.xyz/coins/" icon-name ".svg")
           :alt ""
-          :class (when-not loaded-icon? ["hidden"])
           :on {:load [[:actions/mark-loaded-asset-icon key]]
                :error [[:actions/mark-missing-asset-icon key]]}}])
       [:div.flex.items-center.space-x-2.min-w-0.overflow-hidden
