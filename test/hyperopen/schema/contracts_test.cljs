@@ -11,6 +11,23 @@
          #"app state"
          (contracts/assert-app-state! state {:phase :test})))))
 
+(deftest assert-app-state-rejects-order-form-ui-with-non-boolean-flags-test
+  (let [state (assoc (system/default-store-state)
+                     :order-form-ui {:pro-order-type-dropdown-open? false
+                                     :price-input-focused? "yes"
+                                     :tpsl-panel-open? false})]
+    (is (thrown-with-msg?
+         js/Error
+         #"app state"
+         (contracts/assert-app-state! state {:phase :test})))))
+
+(deftest assert-app-state-accepts-valid-order-form-ui-state-test
+  (let [state (assoc (system/default-store-state)
+                     :order-form-ui {:pro-order-type-dropdown-open? false
+                                     :price-input-focused? true
+                                     :tpsl-panel-open? false})]
+    (is (= state (contracts/assert-app-state! state {:phase :test})))))
+
 (deftest assert-signed-exchange-payload-requires-action-map-test
   (is (thrown-with-msg?
        js/Error

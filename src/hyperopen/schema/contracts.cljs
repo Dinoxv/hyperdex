@@ -345,6 +345,15 @@
   (s/and map?
          #(string? (:path %))))
 
+(s/def ::order-form-ui-state
+  (s/and map?
+         #(contains? % :pro-order-type-dropdown-open?)
+         #(contains? % :price-input-focused?)
+         #(contains? % :tpsl-panel-open?)
+         #(boolean? (:pro-order-type-dropdown-open? %))
+         #(boolean? (:price-input-focused? %))
+         #(boolean? (:tpsl-panel-open? %))))
+
 (s/def ::app-state
   (s/and map?
          #(contains? % :active-asset)
@@ -364,7 +373,7 @@
          #(s/valid? ::websocket-ui-state (:websocket-ui %))
          #(s/valid? ::router-state (:router %))
          #(map? (:order-form %))
-         #(map? (:order-form-ui %))))
+         #(s/valid? ::order-form-ui-state (:order-form-ui %))))
 
 (defn- assertion-error
   [label spec value context]

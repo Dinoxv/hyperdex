@@ -292,7 +292,7 @@
 (deftest default-order-form-uses-limit-entry-mode-test
   (is (= :limit (:entry-mode (trading/default-order-form)))))
 
-(deftest order-form-ui-state-defaults-and-legacy-fallback-test
+(deftest order-form-ui-state-defaults-without-legacy-fallback-test
   (let [no-ui-state (assoc base-state
                            :order-form (trading/default-order-form)
                            :order-form-ui nil)
@@ -300,12 +300,17 @@
                                  :order-form (assoc (trading/default-order-form)
                                                     :pro-order-type-dropdown-open? true)
                                  :order-form-ui nil)
+        explicit-ui-state (assoc base-state
+                                 :order-form (trading/default-order-form)
+                                 :order-form-ui {:pro-order-type-dropdown-open? true})
         normalized-no-ui (trading/order-form-ui-state no-ui-state)
-        normalized-legacy (trading/order-form-ui-state legacy-flag-state)]
+        normalized-legacy (trading/order-form-ui-state legacy-flag-state)
+        normalized-explicit (trading/order-form-ui-state explicit-ui-state)]
     (is (false? (:pro-order-type-dropdown-open? normalized-no-ui)))
     (is (false? (:price-input-focused? normalized-no-ui)))
     (is (false? (:tpsl-panel-open? normalized-no-ui)))
-    (is (true? (:pro-order-type-dropdown-open? normalized-legacy)))))
+    (is (false? (:pro-order-type-dropdown-open? normalized-legacy)))
+    (is (true? (:pro-order-type-dropdown-open? normalized-explicit)))))
 
 (deftest normalize-order-form-keeps-entry-mode-and-type-consistent-test
   (let [market-form (trading/normalize-order-form base-state {:entry-mode :market

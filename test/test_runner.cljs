@@ -11,6 +11,7 @@
             [hyperopen.domain.trading.indicators.heavy-algorithms-test]
             [hyperopen.domain.trading.indicators.structure-test]
             [hyperopen.domain.funding-history-test]
+            [hyperopen.domain.market.instrument-test]
             [hyperopen.websocket.acl.hyperliquid-test]
             [hyperopen.websocket.application.runtime-test]
             [hyperopen.websocket.application.runtime-reducer-test]
@@ -90,6 +91,7 @@
              'hyperopen.domain.trading.indicators.heavy-algorithms-test
              'hyperopen.domain.trading.indicators.structure-test
              'hyperopen.domain.funding-history-test
+             'hyperopen.domain.market.instrument-test
              'hyperopen.config-test
              'hyperopen.websocket.acl.hyperliquid-test
              'hyperopen.websocket.application.runtime-test

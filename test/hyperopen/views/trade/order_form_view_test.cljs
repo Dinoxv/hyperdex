@@ -119,14 +119,26 @@
 
     :else []))
 
+(def ^:private order-form-ui-keys
+  #{:pro-order-type-dropdown-open?
+    :price-input-focused?
+    :tpsl-panel-open?})
+
 (defn- base-state
-  ([] (base-state {}))
+  ([] (base-state {} {}))
   ([order-form-overrides]
-   (let [merged-form (merge (trading/default-order-form) order-form-overrides)
-         order-form (if (and (contains? order-form-overrides :type)
-                             (not (contains? order-form-overrides :entry-mode)))
+   (base-state order-form-overrides {}))
+  ([order-form-overrides order-form-ui-overrides]
+   (let [ui-overrides-from-form (select-keys order-form-overrides order-form-ui-keys)
+         normalized-order-form-overrides (reduce dissoc order-form-overrides order-form-ui-keys)
+         merged-form (merge (trading/default-order-form) normalized-order-form-overrides)
+         order-form (if (and (contains? normalized-order-form-overrides :type)
+                             (not (contains? normalized-order-form-overrides :entry-mode)))
                       (assoc merged-form :entry-mode (trading/entry-mode-for-type (:type merged-form)))
-                      merged-form)]
+                      merged-form)
+         order-form-ui (merge (trading/default-order-form-ui)
+                              ui-overrides-from-form
+                              order-form-ui-overrides)]
      {:active-asset "BTC"
       :active-market {:coin "BTC"
                       :quote "USDC"
@@ -138,7 +150,8 @@
                           :asks [{:px "101"}]}}
       :webdata2 {:clearinghouseState {:marginSummary {:accountValue "1000"
                                                       :totalMarginUsed "250"}}}
-      :order-form order-form})))
+      :order-form order-form
+      :order-form-ui order-form-ui})))
 
 (deftest order-form-parity-controls-render-test
   (let [view-node (view/order-form-view (base-state))

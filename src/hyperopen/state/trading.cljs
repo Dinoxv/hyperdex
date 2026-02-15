@@ -38,7 +38,7 @@
 (defn default-order-form-ui []
   (order-form-state/default-order-form-ui))
 
-(def ^:private order-form-ui-flag-keys
+(def ^:private legacy-order-form-ui-flag-keys
   [:pro-order-type-dropdown-open?
    :price-input-focused?
    :tpsl-panel-open?])
@@ -59,10 +59,9 @@
       (= :scale order-type) (assoc :tpsl-panel-open? false))))
 
 (defn order-form-ui-state
-  "Return effective UI flags for order form from :order-form-ui with legacy fallback."
+  "Return effective UI flags for order form from :order-form-ui."
   [state]
-  (let [legacy-flags (select-keys (:order-form state) order-form-ui-flag-keys)
-        ui-state (merge legacy-flags (:order-form-ui state))
+  (let [ui-state (:order-form-ui state)
         normalized-form (normalize-order-form state (:order-form state))]
     (effective-order-form-ui normalized-form ui-state)))
 
@@ -163,7 +162,7 @@
                      :market :market
                      :limit :limit
                      (normalize-pro-order-type normalized-type))
-        normalized-form (-> (reduce dissoc form order-form-ui-flag-keys)
+        normalized-form (-> (reduce dissoc form legacy-order-form-ui-flag-keys)
                             (order-form-state/normalize-order-form)
                             (assoc :entry-mode entry-mode
                                    :type final-type

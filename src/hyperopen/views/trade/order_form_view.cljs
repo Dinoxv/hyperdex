@@ -1,35 +1,8 @@
 (ns hyperopen.views.trade.order-form-view
-  (:require [hyperopen.utils.formatting :as fmt]
-            [hyperopen.views.trade.order-form-commands :as cmd]
-            [hyperopen.views.trade.order-form-components :as components]
+  (:require [hyperopen.views.trade.order-form-commands :as cmd]
+            [hyperopen.views.trade.order-form-component-primitives :as primitives]
+            [hyperopen.views.trade.order-form-component-sections :as sections]
             [hyperopen.views.trade.order-form-vm :as order-form-vm]))
-
-(defn- format-usdc [value]
-  (if (and (number? value) (not (js/isNaN value)))
-    (str (.toLocaleString (js/Number. value) "en-US"
-                          #js {:minimumFractionDigits 2
-                               :maximumFractionDigits 2})
-         " USDC")
-    "N/A"))
-
-(defn- format-position-label [position sz-decimals]
-  (let [size (:abs-size position)
-        coin (:coin position)]
-    (if (and (number? size) (pos? size) (seq coin))
-      (str (.toLocaleString (js/Number. size) "en-US"
-                            #js {:minimumFractionDigits (or sz-decimals 4)
-                                 :maximumFractionDigits (or sz-decimals 4)})
-           " "
-           coin)
-      (str "0.0000 " (or coin "--")))))
-
-(defn- format-percent
-  ([value]
-   (format-percent value 2))
-  ([value decimals]
-   (if (and (number? value) (not (js/isNaN value)))
-     (str (fmt/safe-to-fixed value decimals) "%")
-     "N/A")))
 
 (defn- price-context-accessory [{:keys [label mid-available?]}]
   [:button {:type "button"
@@ -58,7 +31,7 @@
                 spot?
                 hip3?
                 read-only?
-                summary
+                display
                 ui-leverage
                 next-leverage
                 size-percent
@@ -68,19 +41,10 @@
                 price
                 quote-symbol
                 scale-preview-lines
-                order-value
-                margin-required
-                liq-price
-                slippage-est
-                slippage-max
-                fees
                 error
                 submitting?
                 submit]}
         (order-form-vm/order-form-vm state)
-        available-to-trade (:available-to-trade summary)
-        position (:current-position summary)
-        sz-decimals (or (get-in state [:active-market :szDecimals]) 4)
         display-price (:display price)
         price-context (:context price)
         start-preview-line (:start scale-preview-lines)
@@ -108,53 +72,53 @@
 
      [:div {:class (into ["flex" "flex-col" "flex-1" "gap-3"]
                          (when read-only? ["opacity-60" "pointer-events-none"]))}
-      [:div {:class ["grid" "grid-cols-3" "gap-2"]}
-       (components/chip-button "Cross" true :disabled? true)
-       (components/chip-button (str ui-leverage "x")
+     [:div {:class ["grid" "grid-cols-3" "gap-2"]}
+       (primitives/chip-button "Cross" true :disabled? true)
+       (primitives/chip-button (str ui-leverage "x")
                                true
                                :on-click (cmd/set-order-ui-leverage next-leverage))
-       (components/chip-button "Classic" true :disabled? true)]
+       (primitives/chip-button "Classic" true :disabled? true)]
 
-      (components/entry-mode-tabs {:entry-mode entry-mode
-                                   :type type
-                                   :pro-dropdown-open? pro-dropdown-open?
-                                   :pro-tab-label pro-tab-label
-                                   :pro-dropdown-options pro-dropdown-options
-                                   :order-type-label order-form-vm/order-type-label})
+      (sections/entry-mode-tabs {:entry-mode entry-mode
+                                 :type type
+                                 :pro-dropdown-open? pro-dropdown-open?
+                                 :pro-tab-label pro-tab-label
+                                 :pro-dropdown-options pro-dropdown-options
+                                 :order-type-label order-form-vm/order-type-label})
 
       [:div {:class ["flex" "items-center" "gap-2" "bg-base-200" "rounded-md" "p-1"]}
-       (components/side-button "Buy / Long"
+       (primitives/side-button "Buy / Long"
                                :buy
                                (= side :buy)
-                               (cmd/update-order-form [:side] :buy))
-       (components/side-button "Sell / Short"
+                               (cmd/set-order-side :buy))
+       (primitives/side-button "Sell / Short"
                                :sell
                                (= side :sell)
-                               (cmd/update-order-form [:side] :sell))]
+                               (cmd/set-order-side :sell))]
 
       [:div {:class ["space-y-1.5"]}
        [:div {:class ["flex" "items-center" "justify-between"]}
         [:span {:class ["text-sm" "text-gray-400"]} "Available to Trade"]
         [:span {:class ["text-sm" "font-semibold" "text-gray-100" "num"]}
-         (format-usdc available-to-trade)]]
+         (:available-to-trade display)]]
        [:div {:class ["flex" "items-center" "justify-between"]}
         [:span {:class ["text-sm" "text-gray-400"]} "Current position"]
         [:span {:class ["text-sm" "font-semibold" "text-gray-100" "num"]}
-         (format-position-label position sz-decimals)]]]
+         (:current-position display)]]]
 
       (when show-limit-like-controls?
-        (components/row-input display-price
+        (primitives/row-input display-price
                               (str "Price (" quote-symbol ")")
-                              (cmd/update-order-form [:price] [:event.target/value])
+                              (cmd/set-limit-price-input)
                               (price-context-accessory price-context)
                               :input-padding-right "pr-14"
                               :on-focus (cmd/focus-order-price-input)
                               :on-blur (cmd/blur-order-price-input)))
 
-      (components/row-input size-display
+      (primitives/row-input size-display
                             "Size"
-                            (cmd/set-order-size-display [:event.target/value])
-                            (components/quote-accessory quote-symbol))
+                            (cmd/set-order-size-display-input)
+                            (primitives/quote-accessory quote-symbol))
 
       [:div {:class ["flex" "items-center" "gap-2"]}
        [:div {:class ["relative" "flex-1"]}
@@ -165,7 +129,7 @@
                  :step 1
                  :style {:--order-size-slider-progress (str size-percent "%")}
                  :value size-percent
-                 :on {:input (cmd/set-order-size-percent [:event.target/value])}}]
+                 :on {:input (cmd/set-order-size-percent-input)}}]
         [:div {:class ["order-size-slider-notches"
                        "pointer-events-none"
                        "absolute"
@@ -207,12 +171,12 @@
                                "appearance-none"
                                "pl-2.5"
                                "pr-6"]
-                              components/neutral-input-focus-classes)
+                              primitives/neutral-input-focus-classes)
                  :type "text"
                  :inputmode "numeric"
                  :pattern "[0-9]*"
                  :value display-size-percent
-                 :on {:input (cmd/set-order-size-percent [:event.target/value])}}]
+                 :on {:input (cmd/set-order-size-percent-input)}}]
         [:span {:class ["pointer-events-none"
                         "absolute"
                         "right-2.5"
@@ -225,34 +189,34 @@
 
       (for [section order-type-sections]
         ^{:key (str "order-type-section-" (name section))}
-        (components/render-order-type-section section form))
+        (sections/render-order-type-section section form))
 
       [:div {:class ["flex" "items-center" "justify-between" "gap-3"]}
-       (components/row-toggle "Reduce Only"
+       (primitives/row-toggle "Reduce Only"
                               (:reduce-only form)
-                              (cmd/update-order-form [:reduce-only] [:event.target/checked]))
+                              (cmd/toggle-reduce-only))
        (when show-limit-like-controls?
-         (components/tif-inline-control form))]
+         (sections/tif-inline-control form))]
 
       (when (not= :scale type)
-        (components/row-toggle "Take Profit / Stop Loss"
+        (primitives/row-toggle "Take Profit / Stop Loss"
                                tpsl-panel-open?
                                (cmd/toggle-order-tpsl-panel)))
 
       (when (and (not= :scale type) tpsl-panel-open?)
-        (components/tp-sl-panel form))
+        (sections/tp-sl-panel form))
 
       (when (and pro-mode? limit-like?)
-        (components/row-toggle "Post Only"
+        (primitives/row-toggle "Post Only"
                                (:post-only form)
-                               (cmd/update-order-form [:post-only] [:event.target/checked])))
+                               (cmd/toggle-post-only)))
 
       [:div {:class ["flex-1"]}]
 
       (when (= :scale type)
         [:div {:class ["space-y-1.5"]}
-         (components/metric-row "Start" start-preview-line)
-         (components/metric-row "End" end-preview-line)])
+         (primitives/metric-row "Start" start-preview-line)
+         (primitives/metric-row "End" end-preview-line)])
 
       (when error
         [:div {:class ["text-xs" "text-red-400"]} error])
@@ -309,27 +273,15 @@
 
       [:div {:class ["border-t" "border-base-300" "pt-3" "space-y-2"]}
        (when (not= :scale type)
-         (components/metric-row "Liquidation Price"
-                                (if liq-price
-                                  (or (fmt/format-trade-price liq-price) "N/A")
-                                  "N/A")))
-       (components/metric-row "Order Value"
-                              (if order-value
-                                (or (fmt/format-currency order-value) "N/A")
-                                "N/A"))
-       (components/metric-row "Margin Required"
-                              (if margin-required
-                                (or (fmt/format-currency margin-required) "N/A")
-                                "N/A"))
+         (primitives/metric-row "Liquidation Price"
+                                (:liquidation-price display)))
+       (primitives/metric-row "Order Value"
+                              (:order-value display))
+       (primitives/metric-row "Margin Required"
+                              (:margin-required display))
        (when (= :market type)
-         (components/metric-row "Slippage"
-                                (str "Est " (format-percent slippage-est 4)
-                                     " / Max " (format-percent slippage-max 2))
+         (primitives/metric-row "Slippage"
+                                (:slippage display)
                                 "text-primary"))
-       (components/metric-row "Fees"
-                              (if (and (number? (:taker fees)) (number? (:maker fees)))
-                                (str (fmt/safe-to-fixed (:taker fees) 3)
-                                     "% / "
-                                     (fmt/safe-to-fixed (:maker fees) 3)
-                                     "%")
-                                "N/A"))]]]))
+       (primitives/metric-row "Fees"
+                              (:fees display))]]]))

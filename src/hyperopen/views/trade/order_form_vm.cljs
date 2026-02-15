@@ -1,7 +1,8 @@
 (ns hyperopen.views.trade.order-form-vm
   (:require [clojure.string :as str]
             [hyperopen.state.trading :as trading]
-            [hyperopen.utils.formatting :as fmt]))
+            [hyperopen.utils.formatting :as fmt]
+            [hyperopen.views.trade.order-form-presenter :as presenter]))
 
 (def leverage-presets [2 5 10 20 25 40 50])
 
@@ -95,6 +96,8 @@
         limit-like? (trading/limit-like-type? type)
         show-limit-like-controls? (and (not market-mode?) limit-like?)
         summary (trading/order-summary state normalized-form)
+        sz-decimals (or (get-in state [:active-market :szDecimals]) 4)
+        summary-display (presenter/summary-display summary sz-decimals)
         ui-leverage (:ui-leverage normalized-form)
         max-leverage (trading/market-max-leverage state)
         size-percent (trading/clamp-percent (:size-percent normalized-form))
@@ -113,8 +116,7 @@
                         "")
         scale-preview (when (= :scale type)
                         (trading/scale-preview-boundaries normalized-form
-                                                          {:sz-decimals (or (get-in state [:active-market :szDecimals])
-                                                                            4)}))
+                                                          {:sz-decimals sz-decimals}))
         start-preview-line (format-scale-preview-line state
                                                       (:start scale-preview)
                                                       (get-in normalized-form [:scale :start])
@@ -156,6 +158,7 @@
      :hip3? hip3?
      :read-only? read-only?
      :summary summary
+     :display summary-display
      :ui-leverage ui-leverage
      :next-leverage (next-leverage ui-leverage max-leverage)
      :size-percent size-percent
