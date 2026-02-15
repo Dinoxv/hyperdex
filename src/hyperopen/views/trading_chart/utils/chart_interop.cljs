@@ -4,6 +4,8 @@
             [hyperopen.utils.formatting :as fmt]
             [hyperopen.views.trading-chart.utils.chart-options :as chart-options]))
 
+(def ^:private line-type-with-steps 1)
+
 ;; Generic chart creation with volume support
 (defn create-chart-with-volume! [container]
   "Create a chart with volume pane"
@@ -39,6 +41,15 @@
         series (.addSeries ^js chart BarSeries seriesOptions)]
     series))
 
+(defn add-high-low-series! [chart]
+  "Add a high-low bar series to the chart"
+  (let [seriesOptions #js {:upColor "#26a69a"
+                           :downColor "#ef5350"
+                           :openVisible false
+                           :thinBars true}
+        series (.addSeries ^js chart BarSeries seriesOptions)]
+    series))
+
 (defn add-baseline-series! [chart]
   "Add a baseline series to the chart"
   (let [seriesOptions #js {:baseValue #js {:type "price" :price 25}
@@ -61,8 +72,36 @@
         series (.addSeries ^js chart CandlestickSeries seriesOptions)]
     series))
 
+(defn add-hollow-candles-series! [chart]
+  "Add a hollow candlestick series to the chart."
+  (let [seriesOptions #js {:upColor "rgba(0, 0, 0, 0)"
+                           :downColor "#ef5350"
+                           :borderVisible true
+                           :borderUpColor "#26a69a"
+                           :borderDownColor "#ef5350"
+                           :wickUpColor "#26a69a"
+                           :wickDownColor "#ef5350"}
+        series (.addSeries ^js chart CandlestickSeries seriesOptions)]
+    series))
+
+(defn add-heikin-ashi-series! [chart]
+  "Add a candlestick series used for Heikin Ashi candles."
+  (let [seriesOptions #js {:upColor "#26a69a"
+                           :downColor "#ef5350"
+                           :borderVisible false
+                           :wickUpColor "#26a69a"
+                           :wickDownColor "#ef5350"}
+        series (.addSeries ^js chart CandlestickSeries seriesOptions)]
+    series))
+
 (defn add-histogram-series! [chart]
   "Add a histogram series to the chart"
+  (let [seriesOptions #js {:color "#26a69a"}
+        series (.addSeries ^js chart HistogramSeries seriesOptions)]
+    series))
+
+(defn add-columns-series! [chart]
+  "Add a columns-style histogram series to the chart."
   (let [seriesOptions #js {:color "#26a69a"}
         series (.addSeries ^js chart HistogramSeries seriesOptions)]
     series))
@@ -71,6 +110,29 @@
   "Add a line series to the chart"
   (let [seriesOptions #js {:color "#2962FF"}
         series (.addSeries ^js chart LineSeries seriesOptions)]
+    series))
+
+(defn add-line-with-markers-series! [chart]
+  "Add a line series with point markers."
+  (let [seriesOptions #js {:color "#2962FF"
+                           :pointMarkersVisible true
+                           :pointMarkersRadius 3}
+        series (.addSeries ^js chart LineSeries seriesOptions)]
+    series))
+
+(defn add-step-line-series! [chart]
+  "Add a step-line series."
+  (let [seriesOptions #js {:color "#2962FF"
+                           :lineType line-type-with-steps}
+        series (.addSeries ^js chart LineSeries seriesOptions)]
+    series))
+
+(defn add-hlc-area-series! [chart]
+  "Add an HLC area series."
+  (let [seriesOptions #js {:lineColor "#2962FF"
+                           :topColor "#2962FF"
+                           :bottomColor "rgba(41, 98, 255, 0.28)"}
+        series (.addSeries ^js chart AreaSeries seriesOptions)]
     series))
 
 (defn add-volume-series! [chart]
@@ -82,24 +144,114 @@
         series (.addSeries ^js chart HistogramSeries seriesOptions)]
     series))
 
-(defn- series-prices
-  "Extract numeric prices from chart data for precision inference."
+(defn- normalize-main-chart-type
+  [chart-type]
+  (if (= chart-type :histogram) :columns chart-type))
+
+;; Data transformation functions
+(defn- close-value
+  [candle]
+  (:close candle))
+
+(defn- hlc3-value
+  [candle]
+  (/ (+ (:high candle) (:low candle) (:close candle)) 3))
+
+(defn transform-data-for-single-value
+  [data value-fn]
+  "Transform OHLC data to single-value data using `value-fn`."
+  (map (fn [candle]
+         {:value (value-fn candle)
+          :time (:time candle)})
+       data))
+
+(defn transform-data-for-columns
+  [data]
+  "Transform OHLC data to columns data with directional colors."
+  (map (fn [candle]
+         {:value (:close candle)
+          :time (:time candle)
+          :color (if (>= (:close candle) (:open candle)) "#26a69a" "#ef5350")})
+       data))
+
+(defn transform-data-for-heikin-ashi
+  [data]
+  "Transform raw candles into Heikin Ashi candles."
+  (loop [remaining data
+         prev-ha-open nil
+         prev-ha-close nil
+         acc []]
+    (if (empty? remaining)
+      acc
+      (let [candle (first remaining)
+            ha-close (/ (+ (:open candle)
+                           (:high candle)
+                           (:low candle)
+                           (:close candle))
+                        4)
+            ha-open (if (and (number? prev-ha-open)
+                             (number? prev-ha-close))
+                      (/ (+ prev-ha-open prev-ha-close) 2)
+                      (/ (+ (:open candle) (:close candle)) 2))
+            ha-high (apply max [(:high candle) ha-open ha-close])
+            ha-low (apply min [(:low candle) ha-open ha-close])]
+        (recur (rest remaining)
+               ha-open
+               ha-close
+               (conj acc {:time (:time candle)
+                          :open ha-open
+                          :high ha-high
+                          :low ha-low
+                          :close ha-close}))))))
+
+(defn transform-data-for-volume [data]
+  "Transform OHLC data to volume data for volume chart"
+  (map (fn [candle]
+         {:value (:volume candle)
+          :time (:time candle)
+          :color (if (>= (:close candle) (:open candle)) "#26a69a" "#ef5350")}) data))
+
+(defn- transform-main-series-data
   [data chart-type]
-  (let [values (case chart-type
-                 (:area :baseline :line :histogram) (map :close data)
-                 (:bar :candlestick) (mapcat (fn [c] [(:open c) (:high c) (:low c) (:close c)]) data)
-                 (map :close data))]
-    (->> values
-         (map (fn [v]
-                (if (number? v) v (js/parseFloat v))))
-         (filter (fn [v]
-                   (and (number? v) (not (js/isNaN v)))))
-         vec)))
+  (case (normalize-main-chart-type chart-type)
+    (:area :baseline :line :line-with-markers :step-line)
+    (transform-data-for-single-value data close-value)
+
+    :hlc-area
+    (transform-data-for-single-value data hlc3-value)
+
+    :columns
+    (transform-data-for-columns data)
+
+    :heikin-ashi
+    (transform-data-for-heikin-ashi data)
+
+    (:bar :high-low :candlestick :hollow-candles)
+    data
+
+    ;; Default fallback keeps the chart rendering resilient.
+    data))
+
+(defn- extract-series-prices
+  [transformed-data chart-type]
+  (case (normalize-main-chart-type chart-type)
+    (:area :baseline :line :line-with-markers :step-line :hlc-area :columns)
+    (map :value transformed-data)
+
+    (:bar :high-low :candlestick :hollow-candles :heikin-ashi)
+    (mapcat (fn [c] [(:open c) (:high c) (:low c) (:close c)]) transformed-data)
+
+    (map :value transformed-data)))
 
 (defn- infer-series-price-format
-  "Infer Lightweight Charts price format options based on current data."
-  [data chart-type]
-  (let [prices (series-prices data chart-type)
+  "Infer Lightweight Charts price format options based on transformed data."
+  [transformed-data chart-type]
+  (let [prices (->> (extract-series-prices transformed-data chart-type)
+                    (map (fn [v]
+                           (if (number? v) v (js/parseFloat v))))
+                    (filter (fn [v]
+                              (and (number? v) (not (js/isNaN v)))))
+                    vec)
         positive-prices (filter pos? prices)
         reference-price (or (when (seq positive-prices)
                               (apply min positive-prices))
@@ -111,27 +263,11 @@
          :precision decimals
          :minMove min-move}))
 
-;; Data transformation functions
-(defn transform-data-for-single-value [data]
-  "Transform OHLC data to single value (close price) for area, baseline, line, histogram"
-  (map (fn [candle]
-         {:value (:close candle)
-          :time (:time candle)}) data))
-
-(defn transform-data-for-volume [data]
-  "Transform OHLC data to volume data for volume chart"
-  (map (fn [candle]
-         {:value (:volume candle)
-          :time (:time candle)
-          :color (if (>= (:close candle) (:open candle)) "#26a69a" "#ef5350")}) data))
-
 ;; Generic data setting function
 (defn set-series-data! [series data chart-type]
-  "Set data for any series type with appropriate transformation"
-  (let [transformed-data (case chart-type
-                           (:area :baseline :line :histogram) (transform-data-for-single-value data)
-                           (:bar :candlestick) data)]
-    (.applyOptions ^js series #js {:priceFormat (infer-series-price-format data chart-type)})
+  "Set data for any series type with appropriate transformation."
+  (let [transformed-data (transform-main-series-data data chart-type)]
+    (.applyOptions ^js series #js {:priceFormat (infer-series-price-format transformed-data chart-type)})
     (.setData series (clj->js transformed-data))))
 
 (defn set-volume-data! [volume-series data]
@@ -142,13 +278,19 @@
 ;; Generic series creation function
 (defn add-series! [chart chart-type]
   "Add a series of the specified type to the chart"
-  (case chart-type
+  (case (normalize-main-chart-type chart-type)
     :area (add-area-series! chart)
     :bar (add-bar-series! chart)
+    :high-low (add-high-low-series! chart)
     :baseline (add-baseline-series! chart)
+    :hlc-area (add-hlc-area-series! chart)
     :candlestick (add-candlestick-series! chart)
-    :histogram (add-histogram-series! chart)
+    :hollow-candles (add-hollow-candles-series! chart)
+    :heikin-ashi (add-heikin-ashi-series! chart)
+    :columns (add-columns-series! chart)
     :line (add-line-series! chart)
+    :line-with-markers (add-line-with-markers-series! chart)
+    :step-line (add-step-line-series! chart)
     (add-candlestick-series! chart))) ; Default fallback
 
 (defn fit-content! [chart]

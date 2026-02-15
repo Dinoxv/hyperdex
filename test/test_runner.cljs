@@ -29,6 +29,7 @@
             [hyperopen.orderbook.price-aggregation-test]
             [hyperopen.order.feedback-runtime-test]
             [hyperopen.app.effects-test]
+            [hyperopen.chart.settings-test]
             [hyperopen.runtime.api-effects-test]
             [hyperopen.runtime.effect-adapters-test]
             [hyperopen.wallet.actions-test]
@@ -45,8 +46,10 @@
             [hyperopen.views.asset-selector-view-test]
             [hyperopen.views.footer-view-test]
             [hyperopen.views.header-view-test]
+            [hyperopen.views.trading-chart.chart-type-dropdown-test]
             [hyperopen.views.trading-chart.core-test]
             [hyperopen.views.trading-chart.timeframe-dropdown-test]
+            [hyperopen.views.trading-chart.utils.chart-interop-test]
             [hyperopen.views.trading-chart.utils.chart-options-test]
             [hyperopen.views.trading-chart.utils.data-processing-test]
             [hyperopen.views.trading-chart.utils.indicators-test]
@@ -99,6 +102,7 @@
              'hyperopen.orderbook.price-aggregation-test
              'hyperopen.order.feedback-runtime-test
              'hyperopen.app.effects-test
+             'hyperopen.chart.settings-test
              'hyperopen.runtime.api-effects-test
              'hyperopen.runtime.effect-adapters-test
              'hyperopen.wallet.actions-test
@@ -115,8 +119,10 @@
              'hyperopen.views.asset-selector-view-test
              'hyperopen.views.footer-view-test
              'hyperopen.views.header-view-test
+             'hyperopen.views.trading-chart.chart-type-dropdown-test
              'hyperopen.views.trading-chart.core-test
              'hyperopen.views.trading-chart.timeframe-dropdown-test
+             'hyperopen.views.trading-chart.utils.chart-interop-test
              'hyperopen.views.trading-chart.utils.chart-options-test
              'hyperopen.views.trading-chart.utils.data-processing-test
              'hyperopen.views.trading-chart.utils.indicators-test

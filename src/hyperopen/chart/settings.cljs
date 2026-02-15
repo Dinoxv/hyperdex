@@ -5,12 +5,34 @@
   #{:1m :3m :5m :15m :30m :1h :2h :4h :8h :12h :1d :3d :1w :1M})
 
 (def ^:private chart-types
-  #{:area :bar :baseline :candlestick :histogram :line})
+  #{:area
+    :bar
+    :baseline
+    :candlestick
+    :columns
+    :heikin-ashi
+    :high-low
+    :hlc-area
+    :hollow-candles
+    :line
+    :line-with-markers
+    :step-line})
+
+(def ^:private chart-type-aliases
+  {:histogram :columns})
 
 (defn- load-chart-option
   [ls-key default valid-set]
   (let [v (keyword (or (platform/local-storage-get ls-key) (name default)))]
     (if (contains? valid-set v) v default)))
+
+(defn- normalize-chart-type
+  [chart-type]
+  (get chart-type-aliases chart-type chart-type))
+
+(defn- load-chart-type
+  []
+  (normalize-chart-type (load-chart-option "chart-type" :candlestick (into chart-types (keys chart-type-aliases)))))
 
 (defn- serialize-indicators
   [indicators]
@@ -32,7 +54,7 @@
 (defn restore-chart-options!
   [store]
   (let [timeframe (load-chart-option "chart-timeframe" :1d chart-timeframes)
-        chart-type (load-chart-option "chart-type" :candlestick chart-types)
+        chart-type (load-chart-type)
         indicators (load-indicators)]
     (swap! store update-in [:chart-options] merge
            {:selected-timeframe timeframe
