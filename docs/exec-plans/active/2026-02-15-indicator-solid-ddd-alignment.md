@@ -16,7 +16,9 @@ The indicator system still has domain math in view namespaces, fallback dispatch
 - [x] (2026-02-15 15:25Z) Milestone 2 batch A completed: migrated wave3 trend-overlay family (`:guppy-multiple-moving-average`, `:mcginley-dynamic`, `:moving-average-adaptive`, `:moving-average-hamming`, `:williams-alligator`) to domain trend and removed wave3 duplicates.
 - [x] (2026-02-15 15:25Z) Milestone 2 batch B completed: migrated wave3 structure/pattern family (`:pivot-points-standard`, `:rank-correlation-index`, `:williams-fractal`, `:zig-zag`) to a new domain structure namespace and removed wave3 duplicates.
 - [x] (2026-02-15 15:25Z) Validated Milestone 2 batches A+B with required gates: `npm run check`, `npm test`, `npm run test:websocket`.
-- [ ] Milestone 2 in progress: migrate remaining wave3 oscillators/volume family and remove final wave3 fallback implementations.
+- [x] (2026-02-15 15:29Z) Milestone 2 batch C completed: migrated remaining wave3 oscillator/volume family (`:chaikin-volatility`, `:chande-kroll-stop`, `:chop-zone`, `:connors-rsi`, `:correlation-log`, `:klinger-oscillator`, `:know-sure-thing`, `:volume`) to domain modules.
+- [x] (2026-02-15 15:29Z) Milestone 2 completed: removed wave3 fallback path from coordinator and deleted `indicators_wave3.cljs`.
+- [x] (2026-02-15 15:29Z) Validated Milestone 2 batch C and wave3 retirement with required gates: `npm run check`, `npm test`, `npm run test:websocket`.
 - [ ] Milestone 3 pending: begin wave2 semantic extraction and progressively remove migrated wave2 implementations.
 - [ ] Milestone 4 pending: harden boundaries (math adapter isolation, contract validation, parity/performance tests), then retire wave fallbacks.
 
@@ -30,6 +32,8 @@ The indicator system still has domain math in view namespaces, fallback dispatch
   Evidence: trend domain migration used `imath/rma-values` with `:aligned` for alligator lines and validation remained green.
 - Observation: Splitting structure/pattern indicators into a dedicated domain namespace reduced duplicate ownership in oscillators without changing observable test behavior.
   Evidence: removed moved IDs from oscillator definitions, added structure registry routing, and full suites remained green.
+- Observation: The wave3 namespace could be retired cleanly once all remaining IDs were domain-owned and adapter metadata was filled in.
+  Evidence: coordinator no longer references wave3 and all required suites passed after deleting `indicators_wave3.cljs`.
 
 ## Decision Log
 
@@ -45,10 +49,13 @@ The indicator system still has domain math in view namespaces, fallback dispatch
 - Decision: Introduce `domain.trading.indicators.structure` for pivot/rank/zigzag/fractal instead of expanding oscillators further.
   Rationale: These indicators are geometric/market-structure concepts, not momentum oscillators; semantic partitioning improves bounded-context clarity.
   Date/Author: 2026-02-15 / Codex
+- Decision: Keep migrated oscillators in `domain.trading.indicators.oscillators` for this phase (rather than splitting a second new namespace) while retiring wave3 completely.
+  Rationale: This minimizes churn while still eliminating wave3 fallback coupling; finer semantic subdivision can continue in Milestone 3+ with lower risk.
+  Date/Author: 2026-02-15 / Codex
 
 ## Outcomes & Retrospective
 
-Milestone 1 achieved the immediate separation-of-concerns target. Milestone 2 now has two completed batches (trend overlays and structure/pattern), both validated by required gates. Remaining wave3 implementations are limited to oscillator/volume families, reducing fallback scope significantly.
+Milestone 1 achieved the immediate separation-of-concerns target. Milestone 2 is now fully complete: all wave3 indicators are domain-owned and the wave3 fallback namespace has been removed from runtime wiring. Remaining migration scope is wave2 plus boundary-hardening tasks.
 
 ## Context and Orientation
 
@@ -130,3 +137,4 @@ Plan revision note: 2026-02-15 15:11Z - Initial active roadmap created to drive 
 Plan revision note: 2026-02-15 15:18Z - Updated living sections after completing Milestone 1 implementation and validation.
 Plan revision note: 2026-02-15 15:19Z - Updated living sections after completing first Milestone 2 migration batch (wave3 trend overlays) and validation.
 Plan revision note: 2026-02-15 15:25Z - Updated living sections after completing Milestone 2 structure/pattern batch and validation.
+Plan revision note: 2026-02-15 15:29Z - Updated living sections after completing Milestone 2 batch C and retiring wave3 runtime fallback.

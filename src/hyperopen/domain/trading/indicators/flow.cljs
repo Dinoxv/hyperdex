@@ -16,7 +16,14 @@
     :description "Wilder swing index accumulated over time"
     :supports-period? false
     :default-config {}
-    :migrated-from :indicators}])
+    :migrated-from :indicators}
+   {:id :volume
+    :name "Volume"
+    :short-name "VOL"
+    :description "Raw traded volume"
+    :supports-period? false
+    :default-config {}
+    :migrated-from :wave3}])
 
 (defn get-flow-indicators
   []
@@ -105,9 +112,17 @@
                              :separate
                              [(result/line-series :asi values)])))
 
+(defn- calculate-volume
+  [data _params]
+  (let [values (field-values data :volume)]
+    (result/indicator-result :volume
+                             :separate
+                             [(result/histogram-series :volume values)])))
+
 (def ^:private flow-calculators
   {:accumulation-distribution calculate-accumulation-distribution
-   :accumulative-swing-index calculate-accumulative-swing-index})
+   :accumulative-swing-index calculate-accumulative-swing-index
+   :volume calculate-volume})
 
 (defn calculate-flow-indicator
   [indicator-type data params]

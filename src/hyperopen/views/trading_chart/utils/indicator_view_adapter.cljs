@@ -71,7 +71,16 @@
    [:pivot-points-standard :r3] {:name "R3" :color "#15803d"}
    [:pivot-points-standard :s3] {:name "S3" :color "#b91c1c"}
    [:rank-correlation-index :rci] {:name "RCI" :color "#a855f7"}
-   [:zig-zag :zig-zag] {:name "Zig Zag" :color "#f97316"}})
+   [:zig-zag :zig-zag] {:name "Zig Zag" :color "#f97316"}
+   [:chaikin-volatility :chv] {:name "CHV" :color "#22d3ee"}
+   [:chande-kroll-stop :long-stop] {:name "CK Long" :color "#ef4444"}
+   [:chande-kroll-stop :short-stop] {:name "CK Short" :color "#22c55e"}
+   [:connors-rsi :connors-rsi] {:name "Connors RSI" :color "#f97316"}
+   [:correlation-log :correlation-log] {:name "Corr Log" :color "#a78bfa"}
+   [:klinger-oscillator :kvo] {:name "KVO" :color "#22d3ee"}
+   [:klinger-oscillator :signal] {:name "Signal" :color "#f97316"}
+   [:know-sure-thing :kst] {:name "KST" :color "#22d3ee"}
+   [:know-sure-thing :signal] {:name "Signal" :color "#f97316"}})
 
 (def ^:private histogram-series-meta
   {[:awesome-oscillator :ao] {:name "AO"
@@ -82,7 +91,16 @@
                                    :negative-color "#ef4444"}
    [:smi-ergodic :osc] {:name "Osc"
                         :positive-color "#22c55e"
-                        :negative-color "#ef4444"}})
+                        :negative-color "#ef4444"}
+   [:chop-zone :chop-zone] {:name "Chop Zone"
+                            :positive-color "#22c55e"
+                            :negative-color "#ef4444"}
+   [:klinger-oscillator :hist] {:name "KVO Hist"
+                                 :positive-color "#22c55e"
+                                 :negative-color "#ef4444"}
+   [:volume :volume] {:name "Volume"
+                      :positive-color "#22c55e"
+                      :negative-color "#ef4444"}})
 
 (defn point
   [time value]

@@ -56,6 +56,16 @@
     :max-period 400
     :default-config {:period 20}
     :migrated-from :wave3}
+   {:id :correlation-log
+    :name "Correlation - Log"
+    :short-name "Corr Log"
+    :description "Rolling Pearson correlation of log price and time"
+    :supports-period? true
+    :default-period 20
+    :min-period 3
+    :max-period 400
+    :default-config {:period 20}
+    :migrated-from :wave3}
    {:id :true-strength-index
     :name "True Strength Index"
     :short-name "TSI"
@@ -235,6 +245,7 @@
 (def ^:private finite-number? imath/finite-number?)
 (def ^:private clamp imath/clamp)
 (def ^:private parse-period imath/parse-period)
+(def ^:private parse-number imath/parse-number)
 (def ^:private field-values imath/field-values)
 (def ^:private mean imath/mean)
 
@@ -324,6 +335,87 @@
                 100
                 (- 100 (/ 100 (+ 1 (/ g l)))))))
           avg-gains avg-losses)))
+
+(defn- rsi-aligned-values
+  [values period]
+  (let [size (count values)
+        diffs (mapv (fn [idx]
+                      (if (pos? idx)
+                        (- (nth values idx) (nth values (dec idx)))
+                        nil))
+                    (range size))
+        gains (mapv (fn [d]
+                      (when (finite-number? d)
+                        (max d 0)))
+                    diffs)
+        losses (mapv (fn [d]
+                       (when (finite-number? d)
+                         (max (- d) 0)))
+                     diffs)
+        avg-gains (rma-aligned-values gains period)
+        avg-losses (rma-aligned-values losses period)]
+    (mapv (fn [g l]
+            (when (and (finite-number? g)
+                       (finite-number? l))
+              (if (zero? l)
+                100
+                (- 100 (/ 100 (+ 1 (/ g l)))))))
+          avg-gains avg-losses)))
+
+(defn- streak-values
+  [close-values]
+  (let [size (count close-values)]
+    (loop [idx 0
+           prev-close nil
+           prev-streak 0
+           out []]
+      (if (= idx size)
+        out
+        (let [close (nth close-values idx)
+              streak (if (nil? prev-close)
+                       0
+                       (cond
+                         (> close prev-close) (if (pos? prev-streak) (inc prev-streak) 1)
+                         (< close prev-close) (if (neg? prev-streak) (dec prev-streak) -1)
+                         :else 0))]
+          (recur (inc idx)
+                 close
+                 streak
+                 (conj out streak)))))))
+
+(defn- percent-rank-values
+  [values period]
+  (let [size (count values)]
+    (mapv (fn [idx]
+            (when-let [window (imath/window-for-index values idx period :aligned)]
+              (let [current (last window)]
+                (when (finite-number? current)
+                  (let [comparable (filter finite-number? window)
+                        below (count (filter #(< % current) comparable))
+                        denom (max 1 (count comparable))]
+                    (* 100 (/ below denom)))))))
+          (range size))))
+
+(defn- true-range-values
+  [data]
+  (let [high-values (field-values data :high)
+        low-values (field-values data :low)
+        close-values (field-values data :close)
+        size (count data)]
+    (mapv (fn [idx]
+            (let [high (nth high-values idx)
+                  low (nth low-values idx)
+                  prev-close (when (pos? idx)
+                               (nth close-values (dec idx)))
+                  range-1 (- high low)
+                  range-2 (if (finite-number? prev-close)
+                            (js/Math.abs (- high prev-close))
+                            range-1)
+                  range-3 (if (finite-number? prev-close)
+                            (js/Math.abs (- low prev-close))
+                            range-1)]
+              (max range-1 range-2 range-3)))
+          (range size))))
 
 (defn- pearson-correlation
   [xs ys]
@@ -476,6 +568,20 @@
                              :separate
                              [(result/line-series :correlation values)])))
 
+(defn- calculate-correlation-log
+  [data params]
+  (let [period (parse-period (:period params) 20 3 400)
+        close-values (field-values data :close)
+        logged (mapv (fn [price]
+                       (when (and (finite-number? price)
+                                  (pos? price))
+                         (js/Math.log price)))
+                     close-values)
+        values (rolling-correlation-with-time logged period)]
+    (result/indicator-result :correlation-log
+                             :separate
+                             [(result/line-series :correlation-log values)])))
+
 (defn- calculate-true-strength-index
   [data params]
   (let [short-period (parse-period (:short params) 13 2 200)
@@ -521,6 +627,173 @@
     (result/indicator-result :advance-decline
                              :separate
                              [(result/line-series :ad-bars values)])))
+
+(defn- calculate-chaikin-volatility
+  [data params]
+  (let [period (parse-period (:period params) 10 2 200)
+        roc-period (parse-period (:roc-period params) period 1 200)
+        ranges (mapv - (field-values data :high) (field-values data :low))
+        ema-range (imath/ema-values ranges period)
+        size (count data)
+        values (mapv (fn [idx]
+                       (if (< idx roc-period)
+                         nil
+                         (let [current (nth ema-range idx)
+                               base (nth ema-range (- idx roc-period))]
+                           (when (and (finite-number? current)
+                                      (finite-number? base)
+                                      (not= base 0))
+                             (* 100 (/ (- current base) base))))))
+                     (range size))]
+    (result/indicator-result :chaikin-volatility
+                             :separate
+                             [(result/line-series :chv values)])))
+
+(defn- calculate-chande-kroll-stop
+  [data params]
+  (let [period (parse-period (:period params) 10 2 200)
+        atr-period (parse-period (:atr-period params) period 2 200)
+        multiplier (parse-number (:multiplier params) 1.0)
+        high-stop-base (rolling-max-aligned (field-values data :high) period)
+        low-stop-base (rolling-min-aligned (field-values data :low) period)
+        atr-values (rma-aligned-values (true-range-values data) atr-period)
+        long-stop (mapv (fn [high atr]
+                          (when (and (finite-number? high)
+                                     (finite-number? atr))
+                            (- high (* multiplier atr))))
+                        high-stop-base atr-values)
+        short-stop (mapv (fn [low atr]
+                           (when (and (finite-number? low)
+                                      (finite-number? atr))
+                             (+ low (* multiplier atr))))
+                         low-stop-base atr-values)]
+    (result/indicator-result :chande-kroll-stop
+                             :overlay
+                             [(result/line-series :long-stop long-stop)
+                              (result/line-series :short-stop short-stop)])))
+
+(defn- calculate-chop-zone
+  [data params]
+  (let [period (parse-period (:period params) 14 2 200)
+        close-values (field-values data :close)
+        ema-close (imath/ema-values close-values period)
+        atr-values (rma-aligned-values (true-range-values data) period)
+        size (count data)
+        zones (mapv (fn [idx]
+                      (if (zero? idx)
+                        nil
+                        (let [ema-now (nth ema-close idx)
+                              ema-prev (nth ema-close (dec idx))
+                              atr-now (nth atr-values idx)]
+                          (when (and (finite-number? ema-now)
+                                     (finite-number? ema-prev)
+                                     (finite-number? atr-now)
+                                     (pos? atr-now))
+                            (let [strength (* 100 (/ (- ema-now ema-prev) atr-now))]
+                              (cond
+                                (>= strength 35) 4
+                                (>= strength 15) 3
+                                (>= strength 5) 2
+                                (>= strength -5) 1
+                                (>= strength -15) 0
+                                (>= strength -35) -1
+                                :else -2))))))
+                    (range size))]
+    (result/indicator-result :chop-zone
+                             :separate
+                             [(result/histogram-series :chop-zone zones)])))
+
+(defn- calculate-connors-rsi
+  [data params]
+  (let [rsi-period (parse-period (:rsi-period params) 3 2 50)
+        streak-period (parse-period (:streak-period params) 2 2 50)
+        rank-period (parse-period (:rank-period params) 100 2 400)
+        close-values (field-values data :close)
+        streaks (streak-values close-values)
+        close-rsi (rsi-aligned-values close-values rsi-period)
+        streak-rsi (rsi-aligned-values (mapv #(+ 100 %) streaks) streak-period)
+        roc1 (roc-percent-values close-values 1)
+        rank (percent-rank-values roc1 rank-period)
+        values (mapv (fn [a b c]
+                       (when (and (finite-number? a)
+                                  (finite-number? b)
+                                  (finite-number? c))
+                         (/ (+ a b c) 3)))
+                     close-rsi streak-rsi rank)]
+    (result/indicator-result :connors-rsi
+                             :separate
+                             [(result/line-series :connors-rsi values)])))
+
+(defn- calculate-klinger-oscillator
+  [data params]
+  (let [fast (parse-period (:fast params) 34 2 400)
+        slow (parse-period (:slow params) 55 2 400)
+        signal-period (parse-period (:signal params) 13 2 400)
+        highs-v (field-values data :high)
+        lows-v (field-values data :low)
+        closes-v (field-values data :close)
+        volumes-v (field-values data :volume)
+        size (count data)
+        typical (mapv (fn [h l c] (/ (+ h l c) 3)) highs-v lows-v closes-v)
+        vf (mapv (fn [idx]
+                   (if (zero? idx)
+                     nil
+                     (let [tp (nth typical idx)
+                           prev-tp (nth typical (dec idx))
+                           direction (cond
+                                       (> tp prev-tp) 1
+                                       (< tp prev-tp) -1
+                                       :else 0)
+                           dm (- (nth highs-v idx) (nth lows-v idx))
+                           vol (nth volumes-v idx)]
+                       (when (and (finite-number? dm)
+                                  (finite-number? vol))
+                         (* direction vol dm)))))
+                 (range size))
+        fast-ema (imath/ema-values vf fast)
+        slow-ema (imath/ema-values vf slow)
+        kvo (mapv (fn [f s]
+                    (when (and (finite-number? f)
+                               (finite-number? s))
+                      (- f s)))
+                  fast-ema slow-ema)
+        signal (imath/ema-values kvo signal-period)
+        hist (mapv (fn [k s]
+                     (when (and (finite-number? k)
+                                (finite-number? s))
+                       (- k s)))
+                   kvo signal)]
+    (result/indicator-result :klinger-oscillator
+                             :separate
+                             [(result/histogram-series :hist hist)
+                              (result/line-series :kvo kvo)
+                              (result/line-series :signal signal)])))
+
+(defn- calculate-know-sure-thing
+  [data params]
+  (let [roc1 (parse-period (:roc1 params) 10 1 400)
+        roc2 (parse-period (:roc2 params) 15 1 400)
+        roc3 (parse-period (:roc3 params) 20 1 400)
+        roc4 (parse-period (:roc4 params) 30 1 400)
+        sma1 (parse-period (:sma1 params) 10 2 400)
+        sma2 (parse-period (:sma2 params) 10 2 400)
+        sma3 (parse-period (:sma3 params) 10 2 400)
+        sma4 (parse-period (:sma4 params) 15 2 400)
+        signal-period (parse-period (:signal params) 9 2 400)
+        close-values (field-values data :close)
+        rcma1 (sma-aligned-values (roc-percent-values close-values roc1) sma1)
+        rcma2 (sma-aligned-values (roc-percent-values close-values roc2) sma2)
+        rcma3 (sma-aligned-values (roc-percent-values close-values roc3) sma3)
+        rcma4 (sma-aligned-values (roc-percent-values close-values roc4) sma4)
+        kst (mapv (fn [a b c d]
+                    (when (every? finite-number? [a b c d])
+                      (+ a (* 2 b) (* 3 c) (* 4 d))))
+                  rcma1 rcma2 rcma3 rcma4)
+        signal (sma-aligned-values kst signal-period)]
+    (result/indicator-result :know-sure-thing
+                             :separate
+                             [(result/line-series :kst kst)
+                              (result/line-series :signal signal)])))
 
 (defn- calculate-coppock-curve
   [data params]
@@ -780,6 +1053,13 @@
    :coppock-curve calculate-coppock-curve
    :fisher-transform calculate-fisher-transform
    :majority-rule calculate-majority-rule
+   :chaikin-volatility calculate-chaikin-volatility
+   :chande-kroll-stop calculate-chande-kroll-stop
+   :chop-zone calculate-chop-zone
+   :connors-rsi calculate-connors-rsi
+   :correlation-log calculate-correlation-log
+   :klinger-oscillator calculate-klinger-oscillator
+   :know-sure-thing calculate-know-sure-thing
    :rate-of-change calculate-rate-of-change
    :relative-strength-index calculate-relative-strength-index
    :ratio calculate-ratio
