@@ -1,109 +1,11 @@
 (ns hyperopen.domain.trading.indicators.flow
-  (:require [hyperopen.domain.trading.indicators.contracts :as contracts]
+  (:require [hyperopen.domain.trading.indicators.catalog.flow :as catalog]
+            [hyperopen.domain.trading.indicators.contracts :as contracts]
             [hyperopen.domain.trading.indicators.math-adapter :as math-adapter]
             [hyperopen.domain.trading.indicators.math :as imath]
             [hyperopen.domain.trading.indicators.result :as result]))
 
-(def ^:private flow-indicator-definitions
-  [{:id :accumulation-distribution
-    :name "Accumulation/Distribution"
-    :short-name "A/D"
-    :description "Cumulative money flow volume line"
-    :supports-period? false
-    :default-config {}
-    :migrated-from :indicators}
-   {:id :accumulative-swing-index
-    :name "Accumulative Swing Index"
-    :short-name "ASI"
-    :description "Wilder swing index accumulated over time"
-    :supports-period? false
-    :default-config {}
-    :migrated-from :indicators}
-   {:id :volume
-    :name "Volume"
-    :short-name "VOL"
-    :description "Raw traded volume"
-    :supports-period? false
-    :default-config {}
-    :migrated-from :wave3}
-   {:id :net-volume
-    :name "Net Volume"
-    :short-name "Net Vol"
-    :description "Signed per-bar volume based on price direction"
-    :supports-period? false
-    :default-config {}
-    :migrated-from :wave2}
-   {:id :on-balance-volume
-    :name "On Balance Volume"
-    :short-name "OBV"
-    :description "Cumulative signed volume"
-    :supports-period? false
-    :default-config {}
-    :migrated-from :wave2}
-   {:id :price-volume-trend
-    :name "Price Volume Trend"
-    :short-name "PVT"
-    :description "Cumulative volume scaled by price change"
-    :supports-period? false
-    :default-config {}
-    :migrated-from :wave2}
-   {:id :volume-oscillator
-    :name "Volume Oscillator"
-    :short-name "PVO"
-    :description "Percentage volume oscillator"
-    :supports-period? false
-    :default-config {:fast 12
-                     :slow 26
-                     :signal 9}
-    :migrated-from :wave2}
-   {:id :chaikin-money-flow
-    :name "Chaikin Money Flow"
-    :short-name "CMF"
-    :description "Volume-weighted accumulation/distribution over a period"
-    :supports-period? true
-    :default-period 20
-    :min-period 2
-    :max-period 200
-    :default-config {:period 20}
-    :migrated-from :wave2}
-   {:id :chaikin-oscillator
-    :name "Chaikin Oscillator"
-    :short-name "CHO"
-    :description "EMA difference of accumulation/distribution"
-    :supports-period? false
-    :default-config {:fast 3
-                     :slow 10}
-    :migrated-from :wave2}
-   {:id :ease-of-movement
-    :name "Ease Of Movement"
-    :short-name "EOM"
-    :description "Volume-adjusted distance moved"
-    :supports-period? true
-    :default-period 14
-    :min-period 2
-    :max-period 200
-    :default-config {:period 14}
-    :migrated-from :wave2}
-   {:id :elders-force-index
-    :name "Elder's Force Index"
-    :short-name "EFI"
-    :description "EMA of price change multiplied by volume"
-    :supports-period? true
-    :default-period 13
-    :min-period 2
-    :max-period 200
-    :default-config {:period 13}
-    :migrated-from :wave2}
-   {:id :money-flow-index
-    :name "Money Flow Index"
-    :short-name "MFI"
-    :description "Volume-weighted RSI-style oscillator"
-    :supports-period? true
-    :default-period 14
-    :min-period 2
-    :max-period 200
-    :default-config {:period 14}
-    :migrated-from :wave2}])
+(def ^:private flow-indicator-definitions catalog/flow-indicator-definitions)
 
 (defn get-flow-indicators
   []
@@ -338,7 +240,7 @@
   (let [config (or params {})
         calculator (get flow-calculators indicator-type)]
     (when (and calculator
-               (contracts/valid-indicator-input? data config))
+               (contracts/valid-indicator-input? indicator-type data config))
       (contracts/enforce-indicator-result indicator-type
                                           (count data)
                                           (calculator data config)))))

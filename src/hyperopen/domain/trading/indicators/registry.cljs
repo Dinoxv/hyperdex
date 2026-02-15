@@ -26,35 +26,31 @@
     :get-indicators price/get-price-indicators
     :calculate-indicator price/calculate-price-indicator}])
 
-(defonce ^:private registered-families (atom []))
+(defn- valid-family-descriptor?
+  [{:keys [id get-indicators calculate-indicator]}]
+  (and (keyword? id)
+       (fn? get-indicators)
+       (fn? calculate-indicator)))
 
-(defn register-domain-family!
-  "Register an additional indicator family descriptor.
+(defn compose-domain-families
+  "Return deterministic family descriptors for registry orchestration.
 
-  Family descriptor shape:
-  {:id keyword
-   :get-indicators (fn [] [indicator-def ...])
-   :calculate-indicator (fn [indicator-type data params] -> result-or-nil)}"
-  [{:keys [id get-indicators calculate-indicator] :as family}]
-  (when (and (keyword? id)
-             (fn? get-indicators)
-             (fn? calculate-indicator))
-    (swap! registered-families
-           (fn [families]
-             (let [without-id (remove #(= id (:id %)) families)]
-               (conj (vec without-id) family)))))
-  nil)
-
-(defn reset-registered-domain-families!
-  "Clear dynamically registered indicator families.
-  Intended for tests and deterministic startup."
-  []
-  (reset! registered-families [])
-  nil)
-
-(defn- all-families
-  []
-  (concat built-in-families @registered-families))
+  `extra-families` is optional and is interpreted as additive descriptors that
+  can override built-ins by matching `:id`."
+  ([]
+   built-in-families)
+  ([extra-families]
+   (let [extras (->> (or extra-families [])
+                     (filter valid-family-descriptor?)
+                     vec)
+         built-in-by-id (into {} (map (juxt :id identity) built-in-families))
+         extra-by-id (into {} (map (juxt :id identity) extras))
+         order (distinct (concat (map :id built-in-families)
+                                 (map :id extras)))]
+     (mapv (fn [id]
+             (or (get extra-by-id id)
+                 (get built-in-by-id id)))
+           order))))
 
 (defn- dedupe-indicators
   [definitions]
@@ -69,15 +65,19 @@
       (vec out))))
 
 (defn get-domain-indicators
-  []
-  (->> (all-families)
-       (mapcat (fn [{:keys [get-indicators]}]
-                 (get-indicators)))
-       dedupe-indicators))
+  ([]
+   (get-domain-indicators nil))
+  ([extra-families]
+   (->> (compose-domain-families extra-families)
+        (mapcat (fn [{:keys [get-indicators]}]
+                  (get-indicators)))
+        dedupe-indicators)))
 
 (defn calculate-domain-indicator
-  [indicator-type data params]
-  (let [config (or params {})]
-    (some (fn [{:keys [calculate-indicator]}]
-            (calculate-indicator indicator-type data config))
-          (all-families))))
+  ([indicator-type data params]
+   (calculate-domain-indicator indicator-type data params nil))
+  ([indicator-type data params extra-families]
+   (let [config (or params {})]
+     (some (fn [{:keys [calculate-indicator]}]
+             (calculate-indicator indicator-type data config))
+           (compose-domain-families extra-families)))))

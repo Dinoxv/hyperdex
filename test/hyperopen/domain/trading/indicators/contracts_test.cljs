@@ -3,11 +3,17 @@
             [hyperopen.domain.trading.indicators.contracts :as contracts]))
 
 (deftest valid-indicator-input-test
-  (is (true? (contracts/valid-indicator-input? [] {})))
-  (is (true? (contracts/valid-indicator-input? [{:time 1}] {:period 14})))
-  (is (false? (contracts/valid-indicator-input? nil {})))
-  (is (false? (contracts/valid-indicator-input? [1 2] {})))
-  (is (false? (contracts/valid-indicator-input? [] []))))
+  (let [ohlc-candle {:time 1 :open 100 :high 110 :low 95 :close 105}
+        ohlcv-candle (assoc ohlc-candle :volume 1200)]
+    (is (true? (contracts/valid-indicator-input? :sma [ohlc-candle] {})))
+    (is (true? (contracts/valid-indicator-input? :sma [ohlc-candle] {:period 14})))
+    (is (true? (contracts/valid-indicator-input? :on-balance-volume [ohlcv-candle] {})))
+    (is (false? (contracts/valid-indicator-input? [] [ohlc-candle] {})))
+    (is (false? (contracts/valid-indicator-input? :sma nil {})))
+    (is (false? (contracts/valid-indicator-input? :sma [1 2] {})))
+    (is (false? (contracts/valid-indicator-input? :sma [ohlc-candle] [])))
+    (is (false? (contracts/valid-indicator-input? :sma [ohlc-candle] {:period "abc"})))
+    (is (false? (contracts/valid-indicator-input? :on-balance-volume [ohlc-candle] {})))))
 
 (deftest valid-indicator-result-test
   (let [ok-result {:type :supertrend
@@ -38,7 +44,7 @@
                                                     :kind :unknown-kind}])]
     (is (true? (contracts/valid-indicator-result? ok-result :supertrend 2)))
     (is (true? (contracts/valid-indicator-result? semantic-markers :supertrend 2)))
-    (is (true? (contracts/valid-indicator-result? rendered-markers :supertrend 2)))
+    (is (false? (contracts/valid-indicator-result? rendered-markers :supertrend 2)))
     (is (nil? (contracts/enforce-indicator-result :supertrend 2 bad-type)))
     (is (false? (contracts/valid-indicator-result? bad-pane :supertrend 2)))
     (is (false? (contracts/valid-indicator-result? bad-series-shape :supertrend 2)))

@@ -1,15 +1,7 @@
 (ns hyperopen.domain.trading.indicators.registry-test
-  (:require [cljs.test :refer-macros [deftest is use-fixtures]]
+  (:require [cljs.test :refer-macros [deftest is]]
             [hyperopen.domain.trading.indicators.registry :as registry]
             [hyperopen.domain.trading.indicators.result :as result]))
-
-(defn- reset-registry-fixture
-  [f]
-  (registry/reset-registered-domain-families!)
-  (f)
-  (registry/reset-registered-domain-families!))
-
-(use-fixtures :each reset-registry-fixture)
 
 (deftest register-domain-family-extension-test
   (let [family {:id :test-family
@@ -26,9 +18,8 @@
                                                                   :separate
                                                                   [(result/line-series :test [1.0 nil])])))}]
     (is (nil? (registry/calculate-domain-indicator :test-indicator [] {})))
-    (registry/register-domain-family! family)
-    (let [definitions (registry/get-domain-indicators)
-          calc-result (registry/calculate-domain-indicator :test-indicator [{:time 1}] {})]
+    (let [definitions (registry/get-domain-indicators [family])
+          calc-result (registry/calculate-domain-indicator :test-indicator [{:time 1}] {} [family])]
       (is (some #(= :test-indicator (:id %)) definitions))
       (is (some? calc-result))
       (is (= :test-indicator (:type calc-result)))
@@ -37,6 +28,5 @@
 
 (deftest register-domain-family-invalid-input-test
   (let [count-before (count (registry/get-domain-indicators))]
-    (is (nil? (registry/register-domain-family! {:id :broken-family})))
     (is (= count-before
-           (count (registry/get-domain-indicators))))))
+           (count (registry/get-domain-indicators [{:id :broken-family}]))))))

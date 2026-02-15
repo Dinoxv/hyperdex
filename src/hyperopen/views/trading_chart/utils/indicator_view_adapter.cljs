@@ -274,13 +274,10 @@
 (defn- project-marker
   [indicator-type marker]
   (let [kind (:kind marker)]
-    (if (keyword? kind)
-      (if-let [style (get marker-meta [indicator-type kind])]
-        (merge {:id (:id marker)
-                :time (:time marker)}
-               style)
-        marker)
-      marker)))
+    (when-let [style (get marker-meta [indicator-type kind])]
+      (merge {:id (:id marker)
+              :time (:time marker)}
+             style))))
 
 (defn project-domain-indicator
   [data {:keys [type pane series markers]}]
@@ -290,5 +287,7 @@
                                       (project-series type time-values series-def)))
                               vec)
         projected-markers (when (seq markers)
-                            (mapv #(project-marker type %) markers))]
+                            (->> markers
+                                 (keep #(project-marker type %))
+                                 vec))]
     (indicator-result type pane projected-series projected-markers)))

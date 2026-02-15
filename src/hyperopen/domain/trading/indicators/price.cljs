@@ -1,30 +1,10 @@
 (ns hyperopen.domain.trading.indicators.price
-  (:require [hyperopen.domain.trading.indicators.contracts :as contracts]
+  (:require [hyperopen.domain.trading.indicators.catalog.price :as catalog]
+            [hyperopen.domain.trading.indicators.contracts :as contracts]
             [hyperopen.domain.trading.indicators.math :as imath]
             [hyperopen.domain.trading.indicators.result :as result]))
 
-(def ^:private price-indicator-definitions
-  [{:id :average-price
-    :name "Average Price"
-    :short-name "OHLC4"
-    :description "(Open + High + Low + Close) / 4"
-    :supports-period? false
-    :default-config {}
-    :migrated-from :indicators}
-   {:id :median-price
-    :name "Median Price"
-    :short-name "Median"
-    :description "(High + Low) / 2"
-    :supports-period? false
-    :default-config {}
-    :migrated-from :wave2}
-   {:id :typical-price
-    :name "Typical Price"
-    :short-name "Typical"
-    :description "(High + Low + Close) / 3"
-    :supports-period? false
-    :default-config {}
-    :migrated-from :wave2}])
+(def ^:private price-indicator-definitions catalog/price-indicator-definitions)
 
 (defn get-price-indicators
   []
@@ -88,7 +68,7 @@
   (let [config (or params {})
         calculator (get price-calculators indicator-type)]
     (when (and calculator
-               (contracts/valid-indicator-input? data config))
+               (contracts/valid-indicator-input? indicator-type data config))
       (contracts/enforce-indicator-result indicator-type
                                           (count data)
                                           (calculator data config)))))
