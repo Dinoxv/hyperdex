@@ -109,7 +109,8 @@
                                        {:symbol "BTC"
                                         :timeframe-label "1D"
                                         :venue "Hyperopen"
-                                        :candle-data []})
+                                        :candle-data []}
+                                       :1d)
         classes (set (class-values (get-in canvas [1 :class])))
         bg-colors (set (collect-background-colors canvas))]
     (is (contains? classes "bg-base-100"))
