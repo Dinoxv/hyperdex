@@ -28,6 +28,15 @@
                                      :tpsl-panel-open? false})]
     (is (= state (contracts/assert-app-state! state {:phase :test})))))
 
+(deftest assert-app-state-rejects-order-form-runtime-with-invalid-shape-test
+  (let [state (assoc (system/default-store-state)
+                     :order-form-runtime {:submitting? "no"
+                                          :error 42})]
+    (is (thrown-with-msg?
+         js/Error
+         #"app state"
+         (contracts/assert-app-state! state {:phase :test})))))
+
 (deftest assert-signed-exchange-payload-requires-action-map-test
   (is (thrown-with-msg?
        js/Error

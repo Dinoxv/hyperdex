@@ -354,6 +354,14 @@
          #(boolean? (:price-input-focused? %))
          #(boolean? (:tpsl-panel-open? %))))
 
+(s/def ::order-form-runtime-state
+  (s/and map?
+         #(contains? % :submitting?)
+         #(contains? % :error)
+         #(boolean? (:submitting? %))
+         #(or (nil? (:error %))
+              (string? (:error %)))))
+
 (s/def ::app-state
   (s/and map?
          #(contains? % :active-asset)
@@ -365,6 +373,7 @@
          #(contains? % :router)
          #(contains? % :order-form)
          #(contains? % :order-form-ui)
+         #(contains? % :order-form-runtime)
          #(s/valid? ::active-asset (:active-asset %))
          #(s/valid? ::active-market (:active-market %))
          #(s/valid? ::asset-selector-state (:asset-selector %))
@@ -373,7 +382,8 @@
          #(s/valid? ::websocket-ui-state (:websocket-ui %))
          #(s/valid? ::router-state (:router %))
          #(map? (:order-form %))
-         #(s/valid? ::order-form-ui-state (:order-form-ui %))))
+         #(s/valid? ::order-form-ui-state (:order-form-ui %))
+         #(s/valid? ::order-form-runtime-state (:order-form-runtime %))))
 
 (defn- assertion-error
   [label spec value context]

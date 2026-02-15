@@ -1,6 +1,5 @@
 (ns hyperopen.views.trade.order-form-component-sections
-  (:require [hyperopen.views.trade.order-form-commands :as cmd]
-            [hyperopen.views.trade.order-form-component-primitives :as primitives]))
+  (:require [hyperopen.views.trade.order-form-component-primitives :as primitives]))
 
 (defn entry-mode-tabs
   [{:keys [entry-mode
@@ -8,18 +7,24 @@
            pro-dropdown-open?
            pro-tab-label
            pro-dropdown-options
-           order-type-label]}]
+           order-type-label]}
+   {:keys [on-close-dropdown
+           on-select-entry-market
+           on-select-entry-limit
+           on-toggle-dropdown
+           on-dropdown-keydown
+           on-select-pro-order-type]}]
   [:div {:class ["relative"]}
    (when pro-dropdown-open?
      [:div {:class ["fixed" "inset-0" "z-[180]"]
-            :on {:click (cmd/close-pro-order-type-dropdown)}}])
+            :on {:click on-close-dropdown}}])
    [:div {:class ["relative" "z-[190]" "flex" "items-center" "border-b" "border-base-300"]}
     (primitives/mode-button "Market"
                             (= entry-mode :market)
-                            (cmd/select-entry-market))
+                            on-select-entry-market)
     (primitives/mode-button "Limit"
                             (= entry-mode :limit)
-                            (cmd/select-entry-limit))
+                            on-select-entry-limit)
     [:div {:class ["relative" "flex-1"]}
      [:button {:type "button"
                :class (into ["w-full"
@@ -35,8 +40,8 @@
                             (if (= entry-mode :pro)
                               ["text-gray-100" "border-primary"]
                               ["text-gray-400" "border-transparent" "hover:text-gray-200"]))
-               :on {:click (cmd/toggle-pro-order-type-dropdown)
-                    :keydown (cmd/handle-pro-order-type-dropdown-keydown [:event/key])}}
+               :on {:click on-toggle-dropdown
+                    :keydown on-dropdown-keydown}}
       [:span pro-tab-label]
       [:svg {:class (into ["h-3.5" "w-3.5" "transition-transform"]
                           (if pro-dropdown-open?
@@ -73,43 +78,51 @@
                                  (if (= type pro-order-type)
                                    ["bg-base-200" "text-gray-100"]
                                    ["text-gray-300" "hover:bg-base-200" "hover:text-gray-100"]))
-                    :on {:click (cmd/select-pro-order-type pro-order-type)}}
+                    :on {:click (on-select-pro-order-type pro-order-type)}}
            (order-type-label pro-order-type)])])]]])
 
-(defn tp-sl-panel [form]
+(defn tp-sl-panel
+  [form {:keys [on-toggle-tp-enabled
+                on-set-tp-trigger
+                on-toggle-tp-market
+                on-set-tp-limit
+                on-toggle-sl-enabled
+                on-set-sl-trigger
+                on-toggle-sl-market
+                on-set-sl-limit]}]
   [:div {:class ["space-y-2"]}
    (primitives/row-toggle "Enable TP"
                           (get-in form [:tp :enabled?])
-                          (cmd/toggle-tp-enabled))
+                          on-toggle-tp-enabled)
    (when (get-in form [:tp :enabled?])
      [:div {:class ["space-y-2"]}
       (primitives/input (get-in form [:tp :trigger])
-                        (cmd/set-tp-trigger-input)
+                        on-set-tp-trigger
                         :placeholder "TP trigger")
       (primitives/row-toggle "TP Market"
                              (get-in form [:tp :is-market])
-                             (cmd/toggle-tp-market))
+                             on-toggle-tp-market)
       (when (not (get-in form [:tp :is-market]))
         (primitives/input (get-in form [:tp :limit])
-                          (cmd/set-tp-limit-input)
+                          on-set-tp-limit
                           :placeholder "TP limit price"))])
    (primitives/row-toggle "Enable SL"
                           (get-in form [:sl :enabled?])
-                          (cmd/toggle-sl-enabled))
+                          on-toggle-sl-enabled)
    (when (get-in form [:sl :enabled?])
      [:div {:class ["space-y-2"]}
       (primitives/input (get-in form [:sl :trigger])
-                        (cmd/set-sl-trigger-input)
+                        on-set-sl-trigger
                         :placeholder "SL trigger")
       (primitives/row-toggle "SL Market"
                              (get-in form [:sl :is-market])
-                             (cmd/toggle-sl-market))
+                             on-toggle-sl-market)
       (when (not (get-in form [:sl :is-market]))
         (primitives/input (get-in form [:sl :limit])
-                          (cmd/set-sl-limit-input)
+                          on-set-sl-limit
                           :placeholder "SL limit price"))])])
 
-(defn tif-inline-control [form]
+(defn tif-inline-control [form {:keys [on-set-tif]}]
   [:div {:class ["relative" "flex" "items-center" "gap-2"]}
    [:span {:class ["text-xs" "uppercase" "tracking-wide" "text-gray-400"]} "TIF"]
    [:select {:class ["appearance-none"
@@ -124,7 +137,7 @@
                      "focus:shadow-none"
                      "pr-4"]
              :value (name (:tif form))
-             :on {:change (cmd/set-tif-input)}}
+             :on {:change on-set-tif}}
     [:option {:value "gtc"} "GTC"]
     [:option {:value "ioc"} "IOC"]
     [:option {:value "alo"} "ALO"]]
@@ -144,43 +157,47 @@
 
 (def ^:private order-type-section-renderers
   {:trigger
-   (fn [form]
+   (fn [form {:keys [on-set-trigger-price]}]
      [:div
       (primitives/section-label "Trigger")
       (primitives/input (:trigger-px form)
-                        (cmd/set-trigger-price-input)
+                        on-set-trigger-price
                         :placeholder "Trigger price")])
 
    :scale
-   (fn [form]
+   (fn [form {:keys [on-set-scale-start
+                     on-set-scale-end
+                     on-set-scale-count
+                     on-set-scale-skew]}]
      [:div {:class ["space-y-2"]}
       (primitives/section-label "Scale")
       (primitives/input (get-in form [:scale :start])
-                        (cmd/set-scale-start-input)
+                        on-set-scale-start
                         :placeholder "Start price")
       (primitives/input (get-in form [:scale :end])
-                        (cmd/set-scale-end-input)
+                        on-set-scale-end
                         :placeholder "End price")
       [:div {:class ["grid" "grid-cols-2" "gap-2"]}
        (primitives/inline-labeled-scale-input "Total Orders"
                                               (get-in form [:scale :count])
-                                              (cmd/set-scale-count-input))
+                                              on-set-scale-count)
        (primitives/inline-labeled-scale-input "Size Skew"
                                               (get-in form [:scale :skew])
-                                              (cmd/set-scale-skew-input))]])
+                                              on-set-scale-skew)]])
 
    :twap
-   (fn [form]
+   (fn [form {:keys [on-set-twap-minutes
+                     on-toggle-twap-randomize]}]
      [:div {:class ["space-y-2"]}
       (primitives/section-label "TWAP")
       (primitives/input (get-in form [:twap :minutes])
-                        (cmd/set-twap-minutes-input)
+                        on-set-twap-minutes
                         :placeholder "Minutes")
       (primitives/row-toggle "Randomize"
                              (get-in form [:twap :randomize])
-                             (cmd/toggle-twap-randomize)
+                             on-toggle-twap-randomize
                              "trade-toggle-twap-randomize")])})
 
-(defn render-order-type-section [section form]
+(defn render-order-type-section [section form callbacks]
   (when-let [renderer (get order-type-section-renderers section)]
-    (renderer form)))
+    (renderer form callbacks)))

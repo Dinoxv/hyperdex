@@ -84,7 +84,13 @@
                                  :pro-dropdown-open? pro-dropdown-open?
                                  :pro-tab-label pro-tab-label
                                  :pro-dropdown-options pro-dropdown-options
-                                 :order-type-label order-form-vm/order-type-label})
+                                 :order-type-label order-form-vm/order-type-label}
+                                {:on-close-dropdown (cmd/close-pro-order-type-dropdown)
+                                 :on-select-entry-market (cmd/select-entry-market)
+                                 :on-select-entry-limit (cmd/select-entry-limit)
+                                 :on-toggle-dropdown (cmd/toggle-pro-order-type-dropdown)
+                                 :on-dropdown-keydown (cmd/handle-pro-order-type-dropdown-keydown [:event/key])
+                                 :on-select-pro-order-type cmd/select-pro-order-type})
 
       [:div {:class ["flex" "items-center" "gap-2" "bg-base-200" "rounded-md" "p-1"]}
        (primitives/side-button "Buy / Long"
@@ -189,14 +195,23 @@
 
       (for [section order-type-sections]
         ^{:key (str "order-type-section-" (name section))}
-        (sections/render-order-type-section section form))
+        (sections/render-order-type-section section
+                                            form
+                                            {:on-set-trigger-price (cmd/set-trigger-price-input)
+                                             :on-set-scale-start (cmd/set-scale-start-input)
+                                             :on-set-scale-end (cmd/set-scale-end-input)
+                                             :on-set-scale-count (cmd/set-scale-count-input)
+                                             :on-set-scale-skew (cmd/set-scale-skew-input)
+                                             :on-set-twap-minutes (cmd/set-twap-minutes-input)
+                                             :on-toggle-twap-randomize (cmd/toggle-twap-randomize)}))
 
       [:div {:class ["flex" "items-center" "justify-between" "gap-3"]}
        (primitives/row-toggle "Reduce Only"
                               (:reduce-only form)
                               (cmd/toggle-reduce-only))
        (when show-limit-like-controls?
-         (sections/tif-inline-control form))]
+         (sections/tif-inline-control form
+                                      {:on-set-tif (cmd/set-tif-input)}))]
 
       (when (not= :scale type)
         (primitives/row-toggle "Take Profit / Stop Loss"
@@ -204,7 +219,15 @@
                                (cmd/toggle-order-tpsl-panel)))
 
       (when (and (not= :scale type) tpsl-panel-open?)
-        (sections/tp-sl-panel form))
+        (sections/tp-sl-panel form
+                              {:on-toggle-tp-enabled (cmd/toggle-tp-enabled)
+                               :on-set-tp-trigger (cmd/set-tp-trigger-input)
+                               :on-toggle-tp-market (cmd/toggle-tp-market)
+                               :on-set-tp-limit (cmd/set-tp-limit-input)
+                               :on-toggle-sl-enabled (cmd/toggle-sl-enabled)
+                               :on-set-sl-trigger (cmd/set-sl-trigger-input)
+                               :on-toggle-sl-market (cmd/toggle-sl-market)
+                               :on-set-sl-limit (cmd/set-sl-limit-input)}))
 
       (when (and pro-mode? limit-like?)
         (primitives/row-toggle "Post Only"

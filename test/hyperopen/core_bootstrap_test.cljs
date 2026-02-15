@@ -1373,8 +1373,9 @@
   (async done
     (let [store (atom {:wallet {:address "0xabc"
                                 :agent {:status :ready}}
-                       :order-form {:submitting? false
-                                    :error "old-error"}
+                       :order-form {}
+                       :order-form-runtime {:submitting? false
+                                            :error "old-error"}
                        :ui {:toast nil}})
           dispatched (atom [])
           original-submit-order trading-api/submit-order!
@@ -1392,8 +1393,8 @@
       (js/setTimeout
        (fn []
          (try
-           (is (false? (get-in @store [:order-form :submitting?])))
-           (is (nil? (get-in @store [:order-form :error])))
+           (is (false? (get-in @store [:order-form-runtime :submitting?])))
+           (is (nil? (get-in @store [:order-form-runtime :error])))
            (is (= :success (get-in @store [:ui :toast :kind])))
            (is (= "Order submitted."
                   (get-in @store [:ui :toast :message])))
@@ -2160,7 +2161,7 @@
                                   :price "100")}
         effects (core/submit-order state)]
     (is (not-any? #(= (first %) :effects/api-submit-order) effects))
-    (is (= [[:effects/save [:order-form :error] "Enable trading before submitting orders."]]
+    (is (= [[:effects/save [:order-form-runtime :error] "Enable trading before submitting orders."]]
            effects))))
 
 (deftest cancel-order-requires-agent-ready-session-test

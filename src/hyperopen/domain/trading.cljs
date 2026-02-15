@@ -1,6 +1,7 @@
 (ns hyperopen.domain.trading
   (:require [hyperopen.domain.trading.core :as core]
-            [hyperopen.domain.trading.market :as market]
+    [hyperopen.domain.trading.market :as market]
+            [hyperopen.domain.trading.order-values :as order-values]
             [hyperopen.domain.trading.validation :as validation]))
 
 (def order-types core/order-types)
@@ -28,6 +29,14 @@
 (def normalize-pro-order-type core/normalize-pro-order-type)
 (def market-max-leverage core/market-max-leverage)
 (def normalize-ui-leverage core/normalize-ui-leverage)
+;; Value-object helpers for canonical order field normalization.
+(def order-type-value order-values/order-type-value)
+(def tif-value order-values/tif-value)
+(def side-value order-values/side-value)
+(def price-value order-values/price-value)
+(def size-value order-values/size-value)
+(def percent-value order-values/percent-value)
+(def leverage-value order-values/leverage-value)
 
 (def market-identity market/market-identity)
 (def available-to-trade market/available-to-trade)

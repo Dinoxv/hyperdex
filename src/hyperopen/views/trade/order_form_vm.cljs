@@ -85,6 +85,7 @@
   (let [form (:order-form state)
         normalized-form (trading/normalize-order-form state form)
         ui-state (trading/order-form-ui-state state)
+        runtime-state (trading/order-form-runtime-state state)
         {:keys [base-symbol quote-symbol spot? hip3? read-only?] :as market-identity}
         (trading/market-identity state)
         side (:side normalized-form)
@@ -131,7 +132,7 @@
         mid-available? (= :mid (:source price-context-summary))
         price-context {:label (if mid-available? "Mid" "Ref")
                        :mid-available? mid-available?}
-        submitting? (:submitting? normalized-form)
+        submitting? (:submitting? runtime-state)
         submit-policy (trading/submit-policy state normalized-form {:mode :view
                                                                     :submitting? submitting?})
         submit-form (:form submit-policy)
@@ -180,7 +181,7 @@
      :slippage-est (:slippage-est summary)
      :slippage-max (:slippage-max summary)
      :fees (:fees summary)
-     :error (:error normalized-form)
+     :error (:error runtime-state)
      :submitting? submitting?
      :submit {:form submit-form
               :errors submit-errors

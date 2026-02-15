@@ -19,6 +19,14 @@
 (def parse-num trading-domain/parse-num)
 (def clamp-percent trading-domain/clamp-percent)
 (def normalize-scale-skew-number trading-domain/normalize-scale-skew-number)
+;; Value-object adapters for canonical order field semantics.
+(def order-type-value trading-domain/order-type-value)
+(def tif-value trading-domain/tif-value)
+(def side-value trading-domain/side-value)
+(def price-value trading-domain/price-value)
+(def size-value trading-domain/size-value)
+(def percent-value trading-domain/percent-value)
+(def leverage-value trading-domain/leverage-value)
 (def normalize-order-type trading-domain/normalize-order-type)
 (def limit-like-type? trading-domain/limit-like-type?)
 (def entry-mode-for-type trading-domain/entry-mode-for-type)
@@ -38,15 +46,25 @@
 (defn default-order-form-ui []
   (order-form-state/default-order-form-ui))
 
+(defn default-order-form-runtime []
+  (order-form-state/default-order-form-runtime))
+
 (def ^:private legacy-order-form-ui-flag-keys
   [:pro-order-type-dropdown-open?
    :price-input-focused?
    :tpsl-panel-open?])
 
+(def ^:private legacy-order-form-runtime-keys
+  [:submitting?
+   :error])
+
 (declare normalize-order-form build-order-request)
 
 (defn normalize-order-form-ui [ui]
   (order-form-state/normalize-order-form-ui ui))
+
+(defn normalize-order-form-runtime [runtime]
+  (order-form-state/normalize-order-form-runtime runtime))
 
 (defn effective-order-form-ui
   "Return normalized order-form UI flags with type-based invariants."
@@ -64,6 +82,11 @@
   (let [ui-state (:order-form-ui state)
         normalized-form (normalize-order-form state (:order-form state))]
     (effective-order-form-ui normalized-form ui-state)))
+
+(defn order-form-runtime-state
+  "Return normalized runtime workflow state for order form."
+  [state]
+  (normalize-order-form-runtime (:order-form-runtime state)))
 
 (defn market-identity [state]
   (trading-domain/market-identity {:active-asset (:active-asset state)
@@ -156,19 +179,28 @@
 
 (defn normalize-order-form [state form]
   (let [context (trading-context state)
-        normalized-type (normalize-order-type (:type form))
+        normalized-type (:value (trading-domain/order-type-value (:type form)))
         entry-mode (normalize-entry-mode (:entry-mode form) normalized-type)
         final-type (case entry-mode
                      :market :market
                      :limit :limit
                      (normalize-pro-order-type normalized-type))
-        normalized-form (-> (reduce dissoc form legacy-order-form-ui-flag-keys)
+        normalized-side (:value (trading-domain/side-value (:side form)))
+        normalized-tif (:value (trading-domain/tif-value (:tif form)))
+        normalized-percent (:value (trading-domain/percent-value (:size-percent form)))
+        normalized-leverage (:value (trading-domain/leverage-value context (:ui-leverage form)))
+        stripped-form (reduce dissoc
+                              (reduce dissoc form legacy-order-form-ui-flag-keys)
+                              legacy-order-form-runtime-keys)
+        normalized-form (-> stripped-form
                             (order-form-state/normalize-order-form)
                             (assoc :entry-mode entry-mode
                                    :type final-type
+                                   :side normalized-side
+                                   :tif normalized-tif
                                    :size-display (or (:size-display form) (:size form) "")
-                                   :size-percent (clamp-percent (:size-percent form))
-                                   :ui-leverage (trading-domain/normalize-ui-leverage context (:ui-leverage form))))]
+                                   :size-percent normalized-percent
+                                   :ui-leverage normalized-leverage))]
     (cond-> normalized-form
       (= :scale final-type) (assoc-in [:tp :enabled?] false)
       (= :scale final-type) (assoc-in [:sl :enabled?] false))))
@@ -239,10 +271,14 @@
     :error-message string|nil}"
   ([state form]
    (submit-policy state form {}))
-  ([state form {:keys [mode submitting? agent-ready?]
-                :or {mode :view
-                     submitting? false}}]
-   (let [submit-prep (prepare-order-form-for-submit state form)
+  ([state form options]
+   (let [{:keys [mode submitting? agent-ready?]
+          :or {mode :view}} options
+         runtime (order-form-runtime-state state)
+         submitting? (if (contains? options :submitting?)
+                       submitting?
+                       (:submitting? runtime))
+         submit-prep (prepare-order-form-for-submit state form)
          prepared-form (:form submit-prep)
          market-price-missing? (:market-price-missing? submit-prep)
          identity (market-identity state)

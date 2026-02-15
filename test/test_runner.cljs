@@ -12,6 +12,7 @@
             [hyperopen.domain.trading.indicators.structure-test]
             [hyperopen.domain.funding-history-test]
             [hyperopen.domain.market.instrument-test]
+            [hyperopen.domain.trading.order-values-test]
             [hyperopen.websocket.acl.hyperliquid-test]
             [hyperopen.websocket.application.runtime-test]
             [hyperopen.websocket.application.runtime-reducer-test]
@@ -64,6 +65,7 @@
             [hyperopen.views.typography-scale-test]
             [hyperopen.views.trade.order-form-vm-test]
             [hyperopen.views.trade.order-form-view-test]
+            [hyperopen.trading.order-form-transitions-test]
             [hyperopen.startup.init-test]
             [hyperopen.startup.collaborators-test]
             [hyperopen.startup.composition-test]
@@ -92,6 +94,7 @@
              'hyperopen.domain.trading.indicators.structure-test
              'hyperopen.domain.funding-history-test
              'hyperopen.domain.market.instrument-test
+             'hyperopen.domain.trading.order-values-test
              'hyperopen.config-test
              'hyperopen.websocket.acl.hyperliquid-test
              'hyperopen.websocket.application.runtime-test
@@ -145,6 +148,7 @@
              'hyperopen.views.typography-scale-test
              'hyperopen.views.trade.order-form-vm-test
              'hyperopen.views.trade.order-form-view-test
+             'hyperopen.trading.order-form-transitions-test
              'hyperopen.startup.init-test
              'hyperopen.startup.collaborators-test
              'hyperopen.startup.composition-test

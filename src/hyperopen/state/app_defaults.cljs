@@ -107,6 +107,7 @@
            default-agent-state
            default-order-form
            default-order-form-ui
+           default-order-form-runtime
            default-trade-history
            default-funding-history
            default-order-history]}]
@@ -133,6 +134,7 @@
    :router {:path "/trade"}
    :order-form (or default-order-form {})
    :order-form-ui (or default-order-form-ui {})
+   :order-form-runtime (or default-order-form-runtime {})
    :funding-ui {:modal nil}
    :asset-selector (default-asset-selector-state)
    :chart-options (default-chart-options-state)

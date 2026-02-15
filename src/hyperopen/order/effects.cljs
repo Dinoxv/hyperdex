@@ -104,32 +104,32 @@
     (cond
       (nil? address)
       (do
-        (swap! store assoc-in [:order-form :error] "Connect your wallet before submitting.")
+        (swap! store assoc-in [:order-form-runtime :error] "Connect your wallet before submitting.")
         (show-toast! store :error "Connect your wallet before submitting."))
 
       (not= :ready agent-status)
       (do
-        (swap! store assoc-in [:order-form :error] "Enable trading before submitting orders.")
+        (swap! store assoc-in [:order-form-runtime :error] "Enable trading before submitting orders.")
         (show-toast! store :error "Enable trading before submitting orders."))
 
       :else
       (do
-        (swap! store assoc-in [:order-form :submitting?] true)
+        (swap! store assoc-in [:order-form-runtime :submitting?] true)
         (-> (trading-api/submit-order! store address (:action request))
             (.then (fn [resp]
-                     (swap! store assoc-in [:order-form :submitting?] false)
+                     (swap! store assoc-in [:order-form-runtime :submitting?] false)
                      (if (= "ok" (:status resp))
                        (do
-                         (swap! store assoc-in [:order-form :error] nil)
+                         (swap! store assoc-in [:order-form-runtime :error] nil)
                          (show-toast! store :success "Order submitted.")
                          (dispatch! store nil [[:actions/refresh-order-history]]))
                        (let [error-text (str (exchange-response-error resp))]
-                         (swap! store assoc-in [:order-form :error] error-text)
+                         (swap! store assoc-in [:order-form-runtime :error] error-text)
                          (show-toast! store :error (submit-order-error-message exchange-response-error resp))))))
             (.catch (fn [err]
                       (let [error-text (runtime-error-message err)]
-                        (swap! store assoc-in [:order-form :submitting?] false)
-                        (swap! store assoc-in [:order-form :error] error-text)
+                        (swap! store assoc-in [:order-form-runtime :submitting?] false)
+                        (swap! store assoc-in [:order-form-runtime :error] error-text)
                         (show-toast! store :error (str "Order placement failed: " error-text))))))))))
 
 (defn api-cancel-order

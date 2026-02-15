@@ -662,6 +662,14 @@
       (is (false? (:hip3? identity)))
       (is (true? (:read-only? identity)))))
 
+  (testing "canonical market metadata takes precedence over slash heuristics"
+    (let [state {:active-asset "ETH/USDC"
+                 :active-market {:symbol "ETH-USDC"
+                                 :market-type :perp}}
+          identity (trading/market-identity state)]
+      (is (false? (:spot? identity)))
+      (is (false? (:read-only? identity)))))
+
   (testing "infers hip3 and read-only from namespaced asset and dex market"
     (let [asset-only-state {:active-asset "hyna:GOLD"
                             :active-market {:symbol "hyna:GOLD"}}

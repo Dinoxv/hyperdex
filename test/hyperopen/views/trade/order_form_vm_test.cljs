@@ -68,9 +68,35 @@
 
 (deftest order-form-vm-read-only-identity-test
   (let [state (assoc (base-state {:type :limit} {})
-                     :active-asset "ETH/USDC")
+                     :active-asset "ETH/USDC"
+                     :active-market {:coin "ETH/USDC"
+                                     :quote "USDC"
+                                     :market-type :spot})
         view-model (vm/order-form-vm state)]
     (is (true? (:spot? view-model)))
     (is (true? (:read-only? view-model)))
     (is (= "ETH" (:base-symbol view-model)))
     (is (= "USDC" (:quote-symbol view-model)))))
+
+(deftest order-type-plugin-config-contract-test
+  (let [config vm/order-type-config
+        pro-types (set (vm/pro-dropdown-options))]
+    (is (= pro-types (set (keys config))))
+    (doseq [order-type (vm/pro-dropdown-options)]
+      (let [entry (get config order-type)
+            label (:label entry)
+            sections (:sections entry)]
+        (is (string? label))
+        (is (seq label))
+        (is (vector? sections))
+        (is (every? keyword? sections))
+        (is (= sections (vm/order-type-sections order-type))))))
+  (let [state (base-state {:size "1" :price "100"} {})]
+    (doseq [order-type (vm/pro-dropdown-options)]
+      (let [view-model (vm/order-form-vm (assoc state :order-form (assoc (:order-form state)
+                                                                         :entry-mode :pro
+                                                                         :type order-type)))
+            submit (:submit view-model)]
+        (is (map? submit))
+        (is (contains? submit :disabled?))
+        (is (contains? submit :reason))))))

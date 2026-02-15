@@ -22,6 +22,7 @@
     :default-agent-state (agent-session/default-agent-state)
     :default-order-form (trading/default-order-form)
     :default-order-form-ui (trading/default-order-form-ui)
+    :default-order-form-runtime (trading/default-order-form-runtime)
     :default-trade-history (default-trade-history-state)
     :default-funding-history (default-funding-history-state)
     :default-order-history (default-order-history-state)}))

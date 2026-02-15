@@ -6,6 +6,24 @@
         trimmed (some-> s str/trim)]
     (when (seq trimmed) trimmed)))
 
+(defn- canonical-market-type [market]
+  (let [market* (or market {})
+        market-type (:market-type market*)
+        category (:category market*)
+        normalized-market-type (cond
+                                 (keyword? market-type) market-type
+                                 (string? market-type) (keyword (str/lower-case market-type))
+                                 :else nil)
+        normalized-category (cond
+                              (keyword? category) category
+                              (string? category) (keyword (str/lower-case category))
+                              :else nil)]
+    (or normalized-market-type
+        (case normalized-category
+          :spot :spot
+          :perp :perp
+          nil))))
+
 (defn base-symbol-from-value [value]
   (let [text (non-blank-string value)]
     (cond
@@ -56,21 +74,27 @@
 
 (defn spot-instrument?
   [instrument market]
-  (or (= :spot (:market-type market))
+  (let [market-type (canonical-market-type market)]
+    (cond
+      (= :spot market-type) true
+      (= :perp market-type) false
+      :else
       (and (string? instrument)
-           (str/includes? instrument "/"))))
+           (str/includes? instrument "/")))))
 
 (defn hip3-instrument?
   [instrument market]
-  (let [spot? (spot-instrument? instrument market)]
+  (let [spot? (spot-instrument? instrument market)
+        market-type (canonical-market-type market)]
     (or (some? (:dex market))
+        (= :hip3 market-type)
         (and (string? instrument)
              (str/includes? instrument ":")
              (not spot?)))))
 
 (defn infer-market-type
   [instrument market]
-  (or (:market-type market)
+  (or (canonical-market-type market)
       (if (spot-instrument? instrument market) :spot :perp)))
 
 (defn market-identity

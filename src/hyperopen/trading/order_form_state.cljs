@@ -34,9 +34,7 @@
    :sl {:enabled? false
         :trigger ""
         :is-market true
-        :limit ""}
-   :submitting? false
-   :error nil})
+        :limit ""}})
 
 (defn default-order-form-ui []
   {:pro-order-type-dropdown-open? false
@@ -63,6 +61,18 @@
 (defn normalize-order-form [form]
   (-> form
       (assoc :scale (normalize-scale-form (:scale form)))))
+
+(defn default-order-form-runtime []
+  {:submitting? false
+   :error nil})
+
+(defn normalize-order-form-runtime [runtime]
+  (assoc (default-order-form-runtime)
+         :submitting? (boolean (:submitting? runtime))
+         :error (let [error (:error runtime)]
+                  (when (and (string? error)
+                             (seq error))
+                    error))))
 
 (defn normalize-order-form-ui [ui]
   (assoc (default-order-form-ui)

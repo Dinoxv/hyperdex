@@ -1,0 +1,199 @@
+(ns hyperopen.trading.order-form-transitions
+  (:require [clojure.string :as str]
+            [hyperopen.state.trading :as trading]))
+
+(defn- normalize-order-entry-mode [mode]
+  (let [candidate (cond
+                    (keyword? mode) mode
+                    (string? mode) (keyword mode)
+                    :else :market)]
+    (if (contains? #{:market :limit :pro} candidate)
+      candidate
+      :market)))
+
+(defn- cleared-runtime-state [state]
+  (assoc (trading/order-form-runtime-state state) :error nil))
+
+(defn select-entry-mode [state mode]
+  (let [mode* (normalize-order-entry-mode mode)
+        form (:order-form state)
+        ui-state (trading/order-form-ui-state state)
+        close-pro-dropdown? (contains? #{:market :limit} mode*)
+        next-type (case mode*
+                    :market :market
+                    :limit :limit
+                    (trading/normalize-pro-order-type (:type form)))
+        normalized (trading/normalize-order-form state
+                                                 (assoc form
+                                                        :entry-mode mode*
+                                                        :type next-type))
+        next-form (trading/sync-size-from-percent state normalized)
+        next-ui (trading/effective-order-form-ui
+                 next-form
+                 (assoc ui-state
+                        :pro-order-type-dropdown-open?
+                        (if close-pro-dropdown?
+                          false
+                          (boolean (:pro-order-type-dropdown-open? ui-state)))))]
+    {:order-form next-form
+     :order-form-ui next-ui
+     :order-form-runtime (cleared-runtime-state state)}))
+
+(defn select-pro-order-type [state order-type]
+  (let [form (:order-form state)
+        ui-state (trading/order-form-ui-state state)
+        next-type (trading/normalize-pro-order-type order-type)
+        normalized (trading/normalize-order-form state
+                                                 (assoc form
+                                                        :entry-mode :pro
+                                                        :type next-type))
+        next-form (trading/sync-size-from-percent state normalized)
+        next-ui (trading/effective-order-form-ui
+                 next-form
+                 (assoc ui-state :pro-order-type-dropdown-open? false))]
+    {:order-form next-form
+     :order-form-ui next-ui
+     :order-form-runtime (cleared-runtime-state state)}))
+
+(defn toggle-pro-order-type-dropdown [state]
+  (let [ui-state (trading/order-form-ui-state state)
+        open? (boolean (:pro-order-type-dropdown-open? ui-state))]
+    {:order-form-ui (assoc ui-state :pro-order-type-dropdown-open? (not open?))}))
+
+(defn close-pro-order-type-dropdown [state]
+  {:order-form-ui (assoc (trading/order-form-ui-state state)
+                         :pro-order-type-dropdown-open? false)})
+
+(defn handle-pro-order-type-dropdown-keydown [state key]
+  (when (= key "Escape")
+    (close-pro-order-type-dropdown state)))
+
+(defn set-order-ui-leverage [state leverage]
+  (let [form (:order-form state)
+        normalized (trading/normalize-ui-leverage state leverage)
+        updated (assoc form :ui-leverage normalized)
+        next-form (trading/sync-size-from-percent state updated)]
+    {:order-form next-form
+     :order-form-runtime (cleared-runtime-state state)}))
+
+(defn set-order-size-percent [state percent]
+  (let [form (:order-form state)
+        next-form (trading/apply-size-percent state form percent)]
+    {:order-form next-form
+     :order-form-runtime (cleared-runtime-state state)}))
+
+(defn set-order-size-display [state value]
+  (let [raw-value (str (or value ""))
+        form (:order-form state)
+        normalized-form (trading/normalize-order-form state form)
+        reference-price (trading/reference-price state normalized-form)
+        parsed-display-size (trading/parse-num raw-value)
+        canonical-size (when (and (number? parsed-display-size)
+                                  (pos? parsed-display-size)
+                                  (number? reference-price)
+                                  (pos? reference-price))
+                         (trading/base-size-string state (/ parsed-display-size reference-price)))
+        updated (assoc form
+                       :size-display raw-value
+                       :size (or canonical-size ""))
+        next-form (cond
+                    (str/blank? raw-value)
+                    (assoc updated :size "" :size-percent 0)
+
+                    (seq canonical-size)
+                    (trading/sync-size-percent-from-size state updated)
+
+                    :else
+                    (assoc updated :size-percent 0))]
+    {:order-form next-form
+     :order-form-runtime (cleared-runtime-state state)}))
+
+(defn focus-order-price-input [state]
+  (let [form (:order-form state)
+        ui-state (trading/order-form-ui-state state)
+        normalized-form (trading/normalize-order-form state form)
+        raw-price (or (:price normalized-form) "")
+        fallback-price (when (and (trading/limit-like-type? (:type normalized-form))
+                                  (str/blank? raw-price))
+                         (trading/effective-limit-price-string state normalized-form))
+        should-capture-fallback? (seq fallback-price)
+        updated (cond-> form
+                  should-capture-fallback? (assoc :price fallback-price))
+        next-form (if (and should-capture-fallback?
+                           (pos? (or (trading/parse-num (:size-percent updated)) 0)))
+                    (trading/sync-size-from-percent state updated)
+                    updated)
+        next-ui (trading/effective-order-form-ui
+                 next-form
+                 (assoc ui-state :price-input-focused? true))]
+    {:order-form next-form
+     :order-form-ui next-ui
+     :order-form-runtime (cleared-runtime-state state)}))
+
+(defn blur-order-price-input [state]
+  (let [form (:order-form state)
+        ui-state (trading/order-form-ui-state state)
+        next-ui (trading/effective-order-form-ui
+                 form
+                 (assoc ui-state :price-input-focused? false))]
+    {:order-form-ui next-ui
+     :order-form-runtime (cleared-runtime-state state)}))
+
+(defn set-order-price-to-mid [state]
+  (let [form (:order-form state)
+        normalized-form (trading/normalize-order-form state form)
+        mid-price-string (trading/mid-price-string state normalized-form)
+        updated (if (seq mid-price-string)
+                  (assoc form :price mid-price-string)
+                  form)
+        next-form (if (and (seq mid-price-string)
+                           (pos? (or (trading/parse-num (:size-percent updated)) 0)))
+                    (trading/sync-size-from-percent state updated)
+                    updated)]
+    {:order-form next-form
+     :order-form-runtime (cleared-runtime-state state)}))
+
+(defn toggle-order-tpsl-panel [state]
+  (let [form (:order-form state)
+        ui-state (trading/order-form-ui-state state)
+        normalized-form (trading/normalize-order-form state form)]
+    (when (not= :scale (:type normalized-form))
+      (let [next-open? (not (boolean (:tpsl-panel-open? ui-state)))
+            next-form (cond-> form
+                        (not next-open?) (assoc-in [:tp :enabled?] false)
+                        (not next-open?) (assoc-in [:sl :enabled?] false))
+            next-ui (trading/effective-order-form-ui
+                     next-form
+                     (assoc ui-state :tpsl-panel-open? next-open?))]
+        {:order-form next-form
+         :order-form-ui next-ui
+         :order-form-runtime (cleared-runtime-state state)}))))
+
+(defn update-order-form [state path value]
+  (let [normalized-value (cond
+                           (= path [:type]) (:value (trading/order-type-value value))
+                           (= path [:side]) (:value (trading/side-value value))
+                           (= path [:tif]) (:value (trading/tif-value value))
+                           :else value)
+        form (:order-form state)
+        updated (assoc-in form path normalized-value)
+        next-form (cond
+                    (= path [:type])
+                    (let [typed (-> updated
+                                    (update :type trading/normalize-order-type)
+                                    (assoc :entry-mode (trading/entry-mode-for-type (:type updated))))
+                          normalized (trading/normalize-order-form state typed)]
+                      (trading/sync-size-from-percent state normalized))
+
+                    (= path [:size])
+                    (trading/sync-size-percent-from-size state updated)
+
+                    (or (= path [:price]) (= path [:side]))
+                    (if (pos? (or (trading/parse-num (:size-percent updated)) 0))
+                      (trading/sync-size-from-percent state updated)
+                      updated)
+
+                    :else
+                    updated)]
+    {:order-form next-form
+     :order-form-runtime (cleared-runtime-state state)}))

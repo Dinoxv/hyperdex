@@ -28,6 +28,10 @@
     (is (true? (instrument/spot-instrument? "ETH" {:market-type :spot})))
     (is (= :spot (instrument/infer-market-type "ETH/USDC" {}))))
 
+  (testing "canonical market-type takes precedence over slash heuristics"
+    (is (false? (instrument/spot-instrument? "ETH/USDC" {:market-type :perp})))
+    (is (= :perp (instrument/infer-market-type "ETH/USDC" {:market-type :perp}))))
+
   (testing "hip3 markets are inferred by dex or namespace style instruments"
     (is (true? (instrument/hip3-instrument? "hyna:GOLD" {})))
     (is (true? (instrument/hip3-instrument? "BTC" {:dex "dex-a"})))

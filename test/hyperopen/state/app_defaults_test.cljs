@@ -7,6 +7,7 @@
         default-agent-state {:status :ready :address "0xabc"}
         default-order-form {:side :buy}
         default-order-form-ui {:price-input-focused? false}
+        default-order-form-runtime {:submitting? false :error nil}
         default-trade-history {:rows [1 2]}
         default-funding-history {:rows [3]}
         default-order-history {:rows [4 5]}
@@ -15,6 +16,7 @@
                 :default-agent-state default-agent-state
                 :default-order-form default-order-form
                 :default-order-form-ui default-order-form-ui
+                :default-order-form-runtime default-order-form-runtime
                 :default-trade-history default-trade-history
                 :default-funding-history default-funding-history
                 :default-order-history default-order-history})]
@@ -22,6 +24,7 @@
     (is (= default-agent-state (get-in state [:wallet :agent])))
     (is (= default-order-form (get state :order-form)))
     (is (= default-order-form-ui (get state :order-form-ui)))
+    (is (= default-order-form-runtime (get state :order-form-runtime)))
     (is (= default-trade-history (get-in state [:account-info :trade-history])))
     (is (= default-funding-history (get-in state [:account-info :funding-history])))
     (is (= default-order-history (get-in state [:account-info :order-history])))
@@ -35,6 +38,7 @@
                 :default-agent-state {}
                 :default-order-form {}
                 :default-order-form-ui {}
+                :default-order-form-runtime {}
                 :default-trade-history {}
                 :default-funding-history {}
                 :default-order-history {}})]
