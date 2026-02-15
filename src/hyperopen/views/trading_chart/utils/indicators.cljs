@@ -2,14 +2,20 @@
   (:require [clojure.string :as str]
             [hyperopen.domain.trading.indicators.math :as imath]
             [hyperopen.domain.trading.indicators.registry :as domain-registry]
-            [hyperopen.domain.trading.indicators.trend :as domain-trend]
             [hyperopen.views.trading-chart.utils.indicator-view-adapter :as view-adapter]))
 
 (defn calculate-sma
   "Calculate Simple Moving Average for given data and period"
   [data period]
   (let [time-values (imath/times data)
-        values (domain-trend/calculate-sma-values data period)]
+        normalized-data (mapv (fn [{:keys [close] :as candle}]
+                                (assoc candle
+                                       :open (or (:open candle) close)
+                                       :high (or (:high candle) close)
+                                       :low (or (:low candle) close)))
+                              data)
+        domain-result (domain-registry/calculate-domain-indicator :sma normalized-data {:period period})
+        values (get-in domain-result [:series 0 :values])]
     (view-adapter/points-from-values time-values values)))
 
 (defn- dedupe-indicators

@@ -57,6 +57,15 @@
         shifted (concat (repeat shift nil) values)]
     (vec (take size shifted))))
 
+(defn- fit-series-length
+  [values size]
+  (let [series (vec values)
+        current-size (count series)]
+    (cond
+      (= current-size size) series
+      (> current-size size) (subvec series 0 size)
+      :else (into series (repeat (- size current-size) nil)))))
+
 (defn- make-hamming-weights
   [period]
   (if (= period 1)
@@ -339,6 +348,7 @@
         medium (parse-period (:medium params) 26 2 300)
         long (parse-period (:long params) 52 2 400)
         close-shift (parse-period (:close params) 26 1 300)
+        size (count data)
         result (math-adapter/ichimoku-cloud (field-values data :high)
                                             (field-values data :low)
                                             (field-values data :close)
@@ -346,11 +356,11 @@
                                              :medium medium
                                              :long long
                                              :close close-shift})
-        tenkan (normalize-values (:tenkan result) {:zero-as-nil? true})
-        kijun (normalize-values (:kijun result) {:zero-as-nil? true})
-        ssa (normalize-values (:ssa result) {:zero-as-nil? true})
-        ssb (normalize-values (:ssb result) {:zero-as-nil? true})
-        lagging-span (normalize-values (:laggingSpan result) {:zero-as-nil? true})]
+        tenkan (fit-series-length (normalize-values (:tenkan result) {:zero-as-nil? true}) size)
+        kijun (fit-series-length (normalize-values (:kijun result) {:zero-as-nil? true}) size)
+        ssa (fit-series-length (normalize-values (:ssa result) {:zero-as-nil? true}) size)
+        ssb (fit-series-length (normalize-values (:ssb result) {:zero-as-nil? true}) size)
+        lagging-span (fit-series-length (normalize-values (:laggingSpan result) {:zero-as-nil? true}) size)]
     (result/indicator-result :ichimoku-cloud
                              :overlay
                              [(result/line-series :tenkan tenkan)

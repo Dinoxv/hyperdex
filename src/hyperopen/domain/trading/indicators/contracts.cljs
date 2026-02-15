@@ -1,4 +1,5 @@
-(ns hyperopen.domain.trading.indicators.contracts)
+(ns hyperopen.domain.trading.indicators.contracts
+  (:require [hyperopen.domain.trading.indicators.schema :as schema]))
 
 (def ^:private valid-panes #{:overlay :separate})
 (def ^:private valid-series-types #{:line :histogram})
@@ -21,19 +22,6 @@
     :vwap
     :vwma})
 
-(def ^:private numeric-param-keys
-  #{:period :fast :slow :signal
-    :short :medium :long :close
-    :multiplier :annualization
-    :step :max :emaPeriod :miPeriod
-    :kPeriod :dPeriod :rsiPeriod :stochPeriod
-    :kSmoothing :dSmoothing
-    :ma-period :ema-period
-    :jaw-period :jaw-shift :teeth-period :teeth-shift :lips-period :lips-shift
-    :percent :offset :sigma
-    :short-period :long-period
-    :threshold-percent})
-
 (defn- finite-number?
   [value]
   (and (number? value)
@@ -47,6 +35,14 @@
            (let [parsed (js/parseFloat value)]
              (and (not (js/isNaN parsed))
                   (js/isFinite parsed))))))
+
+(defn- numeric-like->number
+  [value]
+  (cond
+    (finite-number? value) value
+    (and (string? value)
+         (numeric-like? value)) (js/parseFloat value)
+    :else nil))
 
 (defn- required-candle-fields
   [indicator-type]
@@ -64,29 +60,44 @@
                (required-candle-fields indicator-type))))
 
 (defn- valid-params?
-  [params]
-  (and (map? params)
-       (every? (fn [[key value]]
-                 (cond
-                   (contains? numeric-param-keys key) (numeric-like? value)
-                   (= key :periods) (and (sequential? value)
-                                         (every? numeric-like? value))
-                   :else true))
-               params)))
+  [indicator-type params]
+  (let [specs (schema/indicator-param-specs indicator-type)
+        valid-value?
+        (fn [{:keys [kind min max]} value]
+          (case kind
+            :number (let [parsed (numeric-like->number value)]
+                      (and (some? parsed)
+                           (if (some? min) (<= min parsed) true)
+                           (if (some? max) (<= parsed max) true)))
+            :number-vector (and (sequential? value)
+                                (every? numeric-like? value))
+            true))]
+    (and (map? params)
+         (every? (fn [[key value]]
+                   (if-let [spec (get specs key)]
+                     (valid-value? spec value)
+                     true))
+                 params)
+         (every? (fn [[key {:keys [required?]}]]
+                   (if required?
+                     (contains? params key)
+                     true))
+                 specs))))
 
 (defn valid-indicator-input?
   [indicator-type data params]
   (and (keyword? indicator-type)
        (sequential? data)
        (every? #(valid-candle? indicator-type %) data)
-       (valid-params? params)))
+       (valid-params? indicator-type params)))
 
 (defn- valid-series?
-  [series _expected-length]
+  [series expected-length]
   (and (map? series)
        (keyword? (:id series))
        (contains? valid-series-types (:series-type series))
-       (vector? (:values series))))
+       (vector? (:values series))
+       (= expected-length (count (:values series)))))
 
 (defn- valid-marker?
   [marker]
