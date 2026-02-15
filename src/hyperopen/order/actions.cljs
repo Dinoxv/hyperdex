@@ -82,7 +82,7 @@
       transition-save-many))
 
 (defn submit-order [state]
-  (let [raw-form (:order-form state)
+  (let [raw-form (trading/raw-order-form-draft state)
         agent-ready? (= :ready (get-in state [:wallet :agent :status]))
         submit-policy (trading/submit-policy state raw-form {:mode :submit
                                                              :agent-ready? agent-ready?})

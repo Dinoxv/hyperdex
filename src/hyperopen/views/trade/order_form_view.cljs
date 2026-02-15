@@ -1,10 +1,10 @@
 (ns hyperopen.views.trade.order-form-view
-  (:require [hyperopen.views.trade.order-form-commands :as cmd]
-            [hyperopen.views.trade.order-form-component-primitives :as primitives]
+  (:require [hyperopen.views.trade.order-form-component-primitives :as primitives]
             [hyperopen.views.trade.order-form-component-sections :as sections]
+            [hyperopen.views.trade.order-form-handlers :as handlers]
             [hyperopen.views.trade.order-form-vm :as order-form-vm]))
 
-(defn- price-context-accessory [{:keys [label mid-available?]}]
+(defn- price-context-accessory [{:keys [label mid-available?]} on-set-to-mid]
   [:button {:type "button"
             :disabled (not mid-available?)
             :class (into ["text-xs" "font-semibold" "transition-colors"]
@@ -12,7 +12,7 @@
                            ["text-primary" "cursor-pointer" "hover:text-primary/80"]
                            ["text-gray-500" "cursor-default"]))
             :on (when mid-available?
-                  {:click (cmd/set-order-price-to-mid)})}
+                  {:click on-set-to-mid})}
    (or label "Ref")])
 
 (defn order-form-view [state]
@@ -45,6 +45,17 @@
                 submitting?
                 submit]}
         (order-form-vm/order-form-vm state)
+        handler-map (handlers/build-handlers)
+        entry-mode-handlers (:entry-mode handler-map)
+        leverage-handlers (:leverage handler-map)
+        side-handlers (:side handler-map)
+        price-handlers (:price handler-map)
+        size-handlers (:size handler-map)
+        section-handlers (:order-type-sections handler-map)
+        toggle-handlers (:toggles handler-map)
+        tif-handlers (:tif handler-map)
+        tp-sl-handlers (:tp-sl handler-map)
+        submit-handlers (:submit handler-map)
         display-price (:display price)
         price-context (:context price)
         start-preview-line (:start scale-preview-lines)
@@ -73,10 +84,10 @@
      [:div {:class (into ["flex" "flex-col" "flex-1" "gap-3"]
                          (when read-only? ["opacity-60" "pointer-events-none"]))}
      [:div {:class ["grid" "grid-cols-3" "gap-2"]}
-       (primitives/chip-button "Cross" true :disabled? true)
+      (primitives/chip-button "Cross" true :disabled? true)
        (primitives/chip-button (str ui-leverage "x")
                                true
-                               :on-click (cmd/set-order-ui-leverage next-leverage))
+                               :on-click ((:on-next-leverage leverage-handlers) next-leverage))
        (primitives/chip-button "Classic" true :disabled? true)]
 
       (sections/entry-mode-tabs {:entry-mode entry-mode
@@ -85,22 +96,17 @@
                                  :pro-tab-label pro-tab-label
                                  :pro-dropdown-options pro-dropdown-options
                                  :order-type-label order-form-vm/order-type-label}
-                                {:on-close-dropdown (cmd/close-pro-order-type-dropdown)
-                                 :on-select-entry-market (cmd/select-entry-market)
-                                 :on-select-entry-limit (cmd/select-entry-limit)
-                                 :on-toggle-dropdown (cmd/toggle-pro-order-type-dropdown)
-                                 :on-dropdown-keydown (cmd/handle-pro-order-type-dropdown-keydown [:event/key])
-                                 :on-select-pro-order-type cmd/select-pro-order-type})
+                                entry-mode-handlers)
 
       [:div {:class ["flex" "items-center" "gap-2" "bg-base-200" "rounded-md" "p-1"]}
        (primitives/side-button "Buy / Long"
                                :buy
                                (= side :buy)
-                               (cmd/set-order-side :buy))
+                               ((:on-select-side side-handlers) :buy))
        (primitives/side-button "Sell / Short"
                                :sell
                                (= side :sell)
-                               (cmd/set-order-side :sell))]
+                               ((:on-select-side side-handlers) :sell))]
 
       [:div {:class ["space-y-1.5"]}
        [:div {:class ["flex" "items-center" "justify-between"]}
@@ -115,15 +121,15 @@
       (when show-limit-like-controls?
         (primitives/row-input display-price
                               (str "Price (" quote-symbol ")")
-                              (cmd/set-limit-price-input)
-                              (price-context-accessory price-context)
+                              (:on-change price-handlers)
+                              (price-context-accessory price-context (:on-set-to-mid price-handlers))
                               :input-padding-right "pr-14"
-                              :on-focus (cmd/focus-order-price-input)
-                              :on-blur (cmd/blur-order-price-input)))
+                              :on-focus (:on-focus price-handlers)
+                              :on-blur (:on-blur price-handlers)))
 
       (primitives/row-input size-display
                             "Size"
-                            (cmd/set-order-size-display-input)
+                            (:on-change-display size-handlers)
                             (primitives/quote-accessory quote-symbol))
 
       [:div {:class ["flex" "items-center" "gap-2"]}
@@ -135,7 +141,7 @@
                  :step 1
                  :style {:--order-size-slider-progress (str size-percent "%")}
                  :value size-percent
-                 :on {:input (cmd/set-order-size-percent-input)}}]
+                 :on {:input (:on-change-percent size-handlers)}}]
         [:div {:class ["order-size-slider-notches"
                        "pointer-events-none"
                        "absolute"
@@ -182,7 +188,7 @@
                  :inputmode "numeric"
                  :pattern "[0-9]*"
                  :value display-size-percent
-                 :on {:input (cmd/set-order-size-percent-input)}}]
+                 :on {:input (:on-change-percent size-handlers)}}]
         [:span {:class ["pointer-events-none"
                         "absolute"
                         "right-2.5"
@@ -197,42 +203,28 @@
         ^{:key (str "order-type-section-" (name section))}
         (sections/render-order-type-section section
                                             form
-                                            {:on-set-trigger-price (cmd/set-trigger-price-input)
-                                             :on-set-scale-start (cmd/set-scale-start-input)
-                                             :on-set-scale-end (cmd/set-scale-end-input)
-                                             :on-set-scale-count (cmd/set-scale-count-input)
-                                             :on-set-scale-skew (cmd/set-scale-skew-input)
-                                             :on-set-twap-minutes (cmd/set-twap-minutes-input)
-                                             :on-toggle-twap-randomize (cmd/toggle-twap-randomize)}))
+                                            section-handlers))
 
       [:div {:class ["flex" "items-center" "justify-between" "gap-3"]}
        (primitives/row-toggle "Reduce Only"
                               (:reduce-only form)
-                              (cmd/toggle-reduce-only))
+                              (:on-toggle-reduce-only toggle-handlers))
        (when show-limit-like-controls?
          (sections/tif-inline-control form
-                                      {:on-set-tif (cmd/set-tif-input)}))]
+                                      tif-handlers))]
 
       (when (not= :scale type)
         (primitives/row-toggle "Take Profit / Stop Loss"
                                tpsl-panel-open?
-                               (cmd/toggle-order-tpsl-panel)))
+                               (:on-toggle-tpsl-panel toggle-handlers)))
 
       (when (and (not= :scale type) tpsl-panel-open?)
-        (sections/tp-sl-panel form
-                              {:on-toggle-tp-enabled (cmd/toggle-tp-enabled)
-                               :on-set-tp-trigger (cmd/set-tp-trigger-input)
-                               :on-toggle-tp-market (cmd/toggle-tp-market)
-                               :on-set-tp-limit (cmd/set-tp-limit-input)
-                               :on-toggle-sl-enabled (cmd/toggle-sl-enabled)
-                               :on-set-sl-trigger (cmd/set-sl-trigger-input)
-                               :on-toggle-sl-market (cmd/toggle-sl-market)
-                               :on-set-sl-limit (cmd/set-sl-limit-input)}))
+        (sections/tp-sl-panel form tp-sl-handlers))
 
       (when (and pro-mode? limit-like?)
         (primitives/row-toggle "Post Only"
                                (:post-only form)
-                               (cmd/toggle-post-only)))
+                               (:on-toggle-post-only toggle-handlers)))
 
       [:div {:class ["flex-1"]}]
 
@@ -265,7 +257,7 @@
                                  "text-primary-content"
                                  "hover:bg-primary/90"]))
                  :disabled submit-disabled?
-                 :on {:click (cmd/submit-order)}}
+                 :on {:click (:on-submit submit-handlers)}}
         (if submitting? "Submitting..." "Place Order")]
        (when (seq submit-tooltip)
          [:div {:class ["order-submit-tooltip"

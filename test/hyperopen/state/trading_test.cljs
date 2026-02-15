@@ -684,6 +684,34 @@
       (is (true? (:hip3? dex-identity)))
       (is (true? (:read-only? dex-identity))))))
 
+(deftest market-info-and-order-draft-selectors-test
+  (let [state {:active-asset "BTC"
+               :active-market {:symbol "BTC-USDC"
+                               :coin "BTC"
+                               :quote "USDC"
+                               :maxLeverage 40
+                               :szDecimals 5
+                               :market-type :perp}
+               :orderbooks {"BTC" {:bids [{:px "99"}]
+                                   :asks [{:px "101"}]}}
+               :webdata2 {:clearinghouseState {:marginSummary {:accountValue "1000"
+                                                               :totalMarginUsed "250"}}}
+               :order-form {:type :limit
+                            :side :buy
+                            :price "100"
+                            :size "1"}
+               :order-form-ui {:pro-order-type-dropdown-open? true}}]
+    (let [raw-draft (trading/raw-order-form-draft state)
+          normalized-draft (trading/order-form-draft state)
+          market-info (trading/market-info state)]
+      (is (= :limit (:type raw-draft)))
+      (is (= :limit (:type normalized-draft)))
+      (is (= :buy (:side normalized-draft)))
+      (is (= "BTC" (:base-symbol market-info)))
+      (is (= "USDC" (:quote-symbol market-info)))
+      (is (= 5 (:sz-decimals market-info)))
+      (is (number? (:max-leverage market-info))))))
+
 (deftest submit-policy-reasons-test
   (testing "view mode reports validation reason and required fields"
     (let [form (assoc (trading/default-order-form) :type :limit :size "" :price "")

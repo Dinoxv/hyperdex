@@ -201,3 +201,6 @@
 (defn render-order-type-section [section form callbacks]
   (when-let [renderer (get order-type-section-renderers section)]
     (renderer form callbacks)))
+
+(defn supported-order-type-sections []
+  (set (keys order-type-section-renderers)))

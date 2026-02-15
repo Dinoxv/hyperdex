@@ -1,6 +1,9 @@
 (ns hyperopen.views.trade.order-form-vm-test
   (:require [cljs.test :refer-macros [deftest is testing]]
+            [hyperopen.trading.order-form-contracts :as contracts]
+            [hyperopen.trading.order-type-registry :as order-type-registry]
             [hyperopen.state.trading :as trading]
+            [hyperopen.views.trade.order-form-component-sections :as sections]
             [hyperopen.views.trade.order-form-vm :as vm]))
 
 (defn- base-state
@@ -79,20 +82,24 @@
     (is (= "USDC" (:quote-symbol view-model)))))
 
 (deftest order-type-plugin-config-contract-test
-  (let [config vm/order-type-config
-        pro-types (set (vm/pro-dropdown-options))]
+  (let [config order-type-registry/order-type-config
+        pro-types (set (order-type-registry/pro-order-types))
+        advanced-types (set trading/advanced-order-types)
+        rendered-sections (sections/supported-order-type-sections)]
     (is (= pro-types (set (keys config))))
-    (doseq [order-type (vm/pro-dropdown-options)]
+    (is (= advanced-types pro-types))
+    (doseq [order-type (order-type-registry/pro-order-types)]
       (let [entry (get config order-type)
             label (:label entry)
-            sections (:sections entry)]
+            section-ids (:sections entry)]
         (is (string? label))
         (is (seq label))
-        (is (vector? sections))
-        (is (every? keyword? sections))
-        (is (= sections (vm/order-type-sections order-type))))))
+        (is (vector? section-ids))
+        (is (every? keyword? section-ids))
+        (is (every? rendered-sections section-ids))
+        (is (= section-ids (vm/order-type-sections order-type))))))
   (let [state (base-state {:size "1" :price "100"} {})]
-    (doseq [order-type (vm/pro-dropdown-options)]
+    (doseq [order-type (order-type-registry/pro-order-types)]
       (let [view-model (vm/order-form-vm (assoc state :order-form (assoc (:order-form state)
                                                                          :entry-mode :pro
                                                                          :type order-type)))
@@ -100,3 +107,19 @@
         (is (map? submit))
         (is (contains? submit :disabled?))
         (is (contains? submit :reason))))))
+
+(deftest order-form-vm-contract-and-order-type-invariants-test
+  (let [state (base-state {:size "1" :price "100"} {})
+        all-order-types (concat [:market :limit] (order-type-registry/pro-order-types))
+        pro-types (set (order-type-registry/pro-order-types))]
+    (doseq [order-type all-order-types]
+      (let [entry-mode (trading/entry-mode-for-type order-type)
+            view-model (vm/order-form-vm (assoc state
+                                                :order-form (assoc (:order-form state)
+                                                                   :entry-mode entry-mode
+                                                                   :type order-type)))]
+        (is (contracts/order-form-vm-valid? view-model) (str "contract failed for " order-type))
+        (is (= order-type (:type view-model)))
+        (if (= entry-mode :pro)
+          (is (contains? pro-types (:type view-model)))
+          (is (= entry-mode (:entry-mode view-model))))))))

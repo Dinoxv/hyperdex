@@ -1,5 +1,7 @@
 (ns hyperopen.trading.order-form-transitions-test
   (:require [cljs.test :refer-macros [deftest is testing]]
+            [hyperopen.trading.order-form-contracts :as contracts]
+            [hyperopen.trading.order-type-registry :as order-type-registry]
             [hyperopen.state.trading :as trading]
             [hyperopen.trading.order-form-transitions :as transitions]))
 
@@ -36,6 +38,7 @@
                         (transitions/set-order-price-to-mid state)
                         (transitions/update-order-form state [:side] :sell)]]
       (is (map? transition))
+      (is (contracts/transition-valid? transition))
       (when-let [runtime (:order-form-runtime transition)]
         (is (boolean? (:submitting? runtime)))
         (is (nil? (:error runtime)))))))
@@ -64,3 +67,31 @@
       (let [policy (trading/submit-policy state form opts)]
         (is (= (boolean (:reason policy))
                (:disabled? policy)))))))
+
+(deftest select-entry-mode-and-pro-type-transitions-preserve-order-type-invariants-test
+  (let [state (base-state {:type :limit})
+        pro-types (set (order-type-registry/pro-order-types))]
+    (doseq [mode [:market :limit :pro]]
+      (let [transition (transitions/select-entry-mode state mode)
+            form (:order-form transition)
+            order-type (:type form)]
+        (is (contracts/transition-valid? transition))
+        (is (= mode (:entry-mode form)))
+        (cond
+          (= mode :market) (is (= :market order-type))
+          (= mode :limit) (is (= :limit order-type))
+          :else (is (contains? pro-types order-type)))))
+    (doseq [order-type (order-type-registry/pro-order-types)]
+      (let [transition (transitions/select-pro-order-type state order-type)
+            form (:order-form transition)]
+        (is (contracts/transition-valid? transition))
+        (is (= :pro (:entry-mode form)))
+        (is (= order-type (:type form)))))))
+
+(deftest update-order-form-rejects-ui-and-runtime-paths-test
+  (let [state (base-state {:type :limit :size "1" :price "100"})
+        transition (transitions/update-order-form state [:price-input-focused?] true)]
+    (is (contracts/transition-valid? transition))
+    (is (nil? (:order-form transition)))
+    (is (nil? (:order-form-ui transition)))
+    (is (= nil (get-in transition [:order-form-runtime :error])))))

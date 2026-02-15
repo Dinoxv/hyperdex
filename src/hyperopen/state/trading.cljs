@@ -58,7 +58,10 @@
   [:submitting?
    :error])
 
-(declare normalize-order-form build-order-request)
+(declare normalize-order-form
+         build-order-request
+         market-identity
+         market-max-leverage)
 
 (defn normalize-order-form-ui [ui]
   (order-form-state/normalize-order-form-ui ui))
@@ -76,17 +79,39 @@
       (not (limit-like-type? order-type)) (assoc :price-input-focused? false)
       (= :scale order-type) (assoc :tpsl-panel-open? false))))
 
+(defn raw-order-form-draft
+  "Return persisted order draft map without applying normalization."
+  [state]
+  (let [form (:order-form state)]
+    (if (map? form) form (default-order-form))))
+
+(defn order-form-draft
+  "Return normalized order draft for domain/application reads."
+  [state]
+  (normalize-order-form state (raw-order-form-draft state)))
+
 (defn order-form-ui-state
   "Return effective UI flags for order form from :order-form-ui."
   [state]
   (let [ui-state (:order-form-ui state)
-        normalized-form (normalize-order-form state (:order-form state))]
+        normalized-form (order-form-draft state)]
     (effective-order-form-ui normalized-form ui-state)))
 
 (defn order-form-runtime-state
   "Return normalized runtime workflow state for order form."
   [state]
   (normalize-order-form-runtime (:order-form-runtime state)))
+
+(defn market-info
+  "Return normalized market info required by order-form selectors."
+  [state]
+  (let [market (or (:active-market state) {})
+        identity (market-identity state)]
+    (assoc identity
+           :sz-decimals (or (:szDecimals market) 4)
+           :max-leverage (market-max-leverage state)
+           :market-type (:market-type market)
+           :dex (:dex market))))
 
 (defn market-identity [state]
   (trading-domain/market-identity {:active-asset (:active-asset state)
