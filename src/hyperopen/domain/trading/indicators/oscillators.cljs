@@ -349,6 +349,14 @@
   [values period]
   (imath/rolling-min values period :aligned))
 
+(defn- rma-aligned-values
+  [values period]
+  (imath/rma-values values period :aligned))
+
+(defn- stddev-aligned-values
+  [values period]
+  (imath/stddev-values values period :aligned))
+
 (defn- wma-aligned-values
   [values period]
   (let [weights (vec (range 1 (inc period)))
@@ -719,6 +727,134 @@
                              :separate
                              [(result/line-series :spread values)])))
 
+(defn- weighted-four
+  [values]
+  (let [size (count values)]
+    (mapv (fn [idx]
+            (when (>= idx 3)
+              (let [v0 (nth values idx)
+                    v1 (nth values (dec idx))
+                    v2 (nth values (- idx 2))
+                    v3 (nth values (- idx 3))]
+                (when (every? finite-number? [v0 v1 v2 v3])
+                  (/ (+ v0 (* 2 v1) (* 2 v2) v3)
+                     6)))))
+          (range size))))
+
+(defn- calculate-relative-vigor-index
+  [data params]
+  (let [period (parse-period (:period params) 10 2 200)
+        co (mapv - (field-values data :close) (field-values data :open))
+        hl (mapv - (field-values data :high) (field-values data :low))
+        num (sma-aligned-values (weighted-four co) period)
+        den (sma-aligned-values (weighted-four hl) period)
+        rvi (mapv (fn [n d]
+                    (when (and (finite-number? n)
+                               (finite-number? d)
+                               (not= d 0))
+                      (/ n d)))
+                  num den)
+        signal (weighted-four rvi)]
+    (result/indicator-result :relative-vigor-index
+                             :separate
+                             [(result/line-series :rvi rvi)
+                              (result/line-series :signal signal)])))
+
+(defn- calculate-relative-volatility-index
+  [data params]
+  (let [period (parse-period (:period params) 14 2 200)
+        close-values (field-values data :close)
+        vol (stddev-aligned-values close-values period)
+        size (count data)
+        up (mapv (fn [idx]
+                   (when (and (pos? idx)
+                              (finite-number? (nth vol idx)))
+                     (if (> (nth close-values idx) (nth close-values (dec idx)))
+                       (nth vol idx)
+                       0)))
+                 (range size))
+        down (mapv (fn [idx]
+                     (when (and (pos? idx)
+                                (finite-number? (nth vol idx)))
+                       (if (< (nth close-values idx) (nth close-values (dec idx)))
+                         (nth vol idx)
+                         0)))
+                   (range size))
+        up-rma (rma-aligned-values up period)
+        down-rma (rma-aligned-values down period)
+        values (mapv (fn [u d]
+                       (when (and (finite-number? u)
+                                  (finite-number? d)
+                                  (pos? (+ u d)))
+                         (* 100 (/ u (+ u d)))))
+                     up-rma down-rma)]
+    (result/indicator-result :relative-volatility-index
+                             :separate
+                             [(result/line-series :rvi-vol values)])))
+
+(defn- calculate-smi-ergodic
+  [data params]
+  (let [short-period (parse-period (:short params) 13 2 200)
+        long-period (parse-period (:long params) 25 2 200)
+        signal-period (parse-period (:signal params) 13 2 200)
+        tsi (tsi-core (field-values data :close) short-period long-period)
+        signal (imath/ema-values tsi signal-period)
+        osc (mapv (fn [t s]
+                    (when (and (finite-number? t)
+                               (finite-number? s))
+                      (- t s)))
+                  tsi signal)]
+    (result/indicator-result :smi-ergodic
+                             :separate
+                             [(result/histogram-series :osc osc)
+                              (result/line-series :indicator tsi)
+                              (result/line-series :signal signal)])))
+
+(defn- calculate-ultimate-oscillator
+  [data params]
+  (let [short-period (parse-period (:short params) 7 2 100)
+        medium-period (parse-period (:medium params) 14 2 200)
+        long-period (parse-period (:long params) 28 2 400)
+        highs-v (field-values data :high)
+        lows-v (field-values data :low)
+        closes-v (field-values data :close)
+        size (count data)
+        bp (mapv (fn [idx]
+                   (let [close (nth closes-v idx)
+                         low (nth lows-v idx)
+                         prev-close (if (pos? idx)
+                                      (nth closes-v (dec idx))
+                                      close)]
+                     (- close (min low prev-close))))
+                 (range size))
+        tr (mapv (fn [idx]
+                   (let [high (nth highs-v idx)
+                         low (nth lows-v idx)
+                         prev-close (if (pos? idx)
+                                      (nth closes-v (dec idx))
+                                      (nth closes-v idx))]
+                     (- (max high prev-close)
+                        (min low prev-close))))
+                 (range size))
+        bp-short (rolling-sum-aligned bp short-period)
+        tr-short (rolling-sum-aligned tr short-period)
+        bp-medium (rolling-sum-aligned bp medium-period)
+        tr-medium (rolling-sum-aligned tr medium-period)
+        bp-long (rolling-sum-aligned bp long-period)
+        tr-long (rolling-sum-aligned tr long-period)
+        values (mapv (fn [bs ts bm tm bl tl]
+                       (when (every? finite-number? [bs ts bm tm bl tl])
+                         (let [a (if (zero? ts) nil (/ bs ts))
+                               b (if (zero? tm) nil (/ bm tm))
+                               c (if (zero? tl) nil (/ bl tl))]
+                           (when (every? finite-number? [a b c])
+                             (* 100 (/ (+ (* 4 a) (* 2 b) c)
+                                       7))))))
+                     bp-short tr-short bp-medium tr-medium bp-long tr-long)]
+    (result/indicator-result :ultimate-oscillator
+                             :separate
+                             [(result/line-series :uo values)])))
+
 (def ^:private oscillator-calculators
   {:accelerator-oscillator calculate-accelerator-oscillator
    :advance-decline calculate-advance-decline
@@ -731,9 +867,13 @@
    :relative-strength-index calculate-relative-strength-index
    :ratio calculate-ratio
    :correlation-coefficient calculate-correlation-coefficient
+   :relative-vigor-index calculate-relative-vigor-index
+   :relative-volatility-index calculate-relative-volatility-index
+   :smi-ergodic calculate-smi-ergodic
    :spread calculate-spread
    :true-strength-index calculate-true-strength-index
-   :trend-strength-index calculate-trend-strength-index})
+   :trend-strength-index calculate-trend-strength-index
+   :ultimate-oscillator calculate-ultimate-oscillator})
 
 (defn calculate-oscillator-indicator
   [indicator-type data params]

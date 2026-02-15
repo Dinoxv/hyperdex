@@ -35,7 +35,13 @@
    [:fisher-transform :signal] {:name "Signal" :color "#22d3ee"}
    [:majority-rule :majority] {:name "Majority %" :color "#4ade80"}
    [:ratio :ratio] {:name "Ratio" :color "#22d3ee"}
-   [:spread :spread] {:name "Spread" :color "#f97316"}})
+   [:spread :spread] {:name "Spread" :color "#f97316"}
+   [:relative-vigor-index :rvi] {:name "RVI" :color "#22d3ee"}
+   [:relative-vigor-index :signal] {:name "Signal" :color "#f97316"}
+   [:relative-volatility-index :rvi-vol] {:name "RVI" :color "#a855f7"}
+   [:smi-ergodic :indicator] {:name "SMI Ergodic" :color "#22d3ee"}
+   [:smi-ergodic :signal] {:name "Signal" :color "#f97316"}
+   [:ultimate-oscillator :uo] {:name "Ultimate Osc" :color "#a78bfa"}})
 
 (def ^:private histogram-series-meta
   {[:awesome-oscillator :ao] {:name "AO"
@@ -43,7 +49,10 @@
                               :negative-color "#ef4444"}
    [:accelerator-oscillator :ac] {:name "AC"
                                    :positive-color "#10b981"
-                                   :negative-color "#ef4444"}})
+                                   :negative-color "#ef4444"}
+   [:smi-ergodic :osc] {:name "Osc"
+                        :positive-color "#22c55e"
+                        :negative-color "#ef4444"}})
 
 (defn point
   [time value]
