@@ -316,6 +316,7 @@
   oscillator-indicator-definitions)
 
 (def ^:private finite-number? imath/finite-number?)
+(def ^:private clamp imath/clamp)
 (def ^:private parse-period imath/parse-period)
 (def ^:private field-values imath/field-values)
 (def ^:private mean imath/mean)
@@ -331,6 +332,33 @@
 (defn- rma-values
   [values period]
   (imath/rma-values values period :lagged))
+
+(defn- sma-aligned-values
+  [values period]
+  (imath/sma-values values period :aligned))
+
+(defn- rolling-sum-aligned
+  [values period]
+  (imath/rolling-sum values period :aligned))
+
+(defn- rolling-max-aligned
+  [values period]
+  (imath/rolling-max values period :aligned))
+
+(defn- rolling-min-aligned
+  [values period]
+  (imath/rolling-min values period :aligned))
+
+(defn- wma-aligned-values
+  [values period]
+  (let [weights (vec (range 1 (inc period)))
+        weight-sum (reduce + 0 weights)]
+    (imath/rolling-apply values
+                         period
+                         (fn [window]
+                           (/ (reduce + 0 (map * window weights))
+                              weight-sum))
+                         :aligned)))
 
 (defn- roc-percent-values
   [values period]
@@ -569,14 +597,141 @@
                              :separate
                              [(result/line-series :ad-bars values)])))
 
+(defn- calculate-coppock-curve
+  [data params]
+  (let [long-roc (parse-period (:long-roc params) 14 1 200)
+        short-roc (parse-period (:short-roc params) 11 1 200)
+        wma-period (parse-period (:wma-period params) 10 2 200)
+        close-values (field-values data :close)
+        roc-a (roc-percent-values close-values long-roc)
+        roc-b (roc-percent-values close-values short-roc)
+        sum-roc (mapv (fn [a b]
+                        (when (and (finite-number? a)
+                                   (finite-number? b))
+                          (+ a b)))
+                      roc-a roc-b)
+        values (wma-aligned-values sum-roc wma-period)]
+    (result/indicator-result :coppock-curve
+                             :separate
+                             [(result/line-series :coppock values)])))
+
+(defn- calculate-fisher-transform
+  [data params]
+  (let [period (parse-period (:period params) 10 2 200)
+        median-price (mapv (fn [high low]
+                             (/ (+ high low) 2))
+                           (field-values data :high)
+                           (field-values data :low))
+        rolling-high (rolling-max-aligned median-price period)
+        rolling-low (rolling-min-aligned median-price period)
+        size (count data)
+        {:keys [fisher signal]}
+        (loop [idx 0
+               prev-value 0
+               prev-fisher 0
+               fisher []
+               signal []]
+          (if (= idx size)
+            {:fisher fisher
+             :signal signal}
+            (let [price (nth median-price idx)
+                  hi (nth rolling-high idx)
+                  lo (nth rolling-low idx)
+                  normalized (when (and (finite-number? price)
+                                        (finite-number? hi)
+                                        (finite-number? lo)
+                                        (> hi lo))
+                               (- (/ (- price lo)
+                                     (- hi lo))
+                                  0.5))
+                  value (if (finite-number? normalized)
+                          (let [raw (+ (* 0.66 normalized)
+                                       (* 0.67 prev-value))]
+                            (clamp raw -0.999 0.999))
+                          nil)
+                  fisher-value (when (finite-number? value)
+                                 (+ (* 0.5 (js/Math.log (/ (+ 1 value)
+                                                           (- 1 value))))
+                                    (* 0.5 prev-fisher)))]
+              (recur (inc idx)
+                     (or value prev-value)
+                     (or fisher-value prev-fisher)
+                     (conj fisher fisher-value)
+                     (conj signal prev-fisher)))))]
+    (result/indicator-result :fisher-transform
+                             :separate
+                             [(result/line-series :fisher fisher)
+                              (result/line-series :signal signal)])))
+
+(defn- calculate-majority-rule
+  [data params]
+  (let [period (parse-period (:period params) 14 2 400)
+        close-values (field-values data :close)
+        sma-close (sma-aligned-values close-values period)
+        above-sma (mapv (fn [close sma]
+                          (when (and (finite-number? close)
+                                     (finite-number? sma))
+                            (if (> close sma) 1 0)))
+                        close-values sma-close)
+        counts (rolling-sum-aligned above-sma period)
+        values (mapv (fn [count]
+                       (when (finite-number? count)
+                         (* 100 (/ count period))))
+                     counts)]
+    (result/indicator-result :majority-rule
+                             :separate
+                             [(result/line-series :majority values)])))
+
+(defn- calculate-ratio
+  [data params]
+  (let [period (parse-period (:period params) 1 1 400)
+        close-values (field-values data :close)
+        size (count data)
+        values (mapv (fn [idx]
+                       (if (< idx period)
+                         nil
+                         (let [current (nth close-values idx)
+                               base (nth close-values (- idx period))]
+                           (when (and (finite-number? current)
+                                      (finite-number? base)
+                                      (not= base 0))
+                             (/ current base)))))
+                     (range size))]
+    (result/indicator-result :ratio
+                             :separate
+                             [(result/line-series :ratio values)])))
+
+(defn- calculate-spread
+  [data params]
+  (let [period (parse-period (:period params) 1 1 400)
+        close-values (field-values data :close)
+        size (count data)
+        values (mapv (fn [idx]
+                       (if (< idx period)
+                         nil
+                         (let [current (nth close-values idx)
+                               base (nth close-values (- idx period))]
+                           (when (and (finite-number? current)
+                                      (finite-number? base))
+                             (- current base)))))
+                     (range size))]
+    (result/indicator-result :spread
+                             :separate
+                             [(result/line-series :spread values)])))
+
 (def ^:private oscillator-calculators
   {:accelerator-oscillator calculate-accelerator-oscillator
    :advance-decline calculate-advance-decline
    :awesome-oscillator calculate-awesome-oscillator
    :balance-of-power calculate-balance-of-power
+   :coppock-curve calculate-coppock-curve
+   :fisher-transform calculate-fisher-transform
+   :majority-rule calculate-majority-rule
    :rate-of-change calculate-rate-of-change
    :relative-strength-index calculate-relative-strength-index
+   :ratio calculate-ratio
    :correlation-coefficient calculate-correlation-coefficient
+   :spread calculate-spread
    :true-strength-index calculate-true-strength-index
    :trend-strength-index calculate-trend-strength-index})
 

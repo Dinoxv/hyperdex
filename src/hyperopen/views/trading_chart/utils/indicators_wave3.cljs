@@ -40,14 +40,6 @@
     :default-config {:rsi-period 3
                      :streak-period 2
                      :rank-period 100}}
-   {:id :coppock-curve
-    :name "Coppock Curve"
-    :short-name "COPP"
-    :description "WMA of summed long and short ROC"
-    :supports-period? false
-    :default-config {:long-roc 14
-                     :short-roc 11
-                     :wma-period 10}}
    {:id :correlation-log
     :name "Correlation - Log"
     :short-name "Corr Log"
@@ -57,15 +49,6 @@
     :min-period 3
     :max-period 400
     :default-config {:period 20}}
-   {:id :fisher-transform
-    :name "Fisher Transform"
-    :short-name "Fisher"
-    :description "Fisher transform of normalized median price"
-    :supports-period? true
-    :default-period 10
-    :min-period 2
-    :max-period 200
-    :default-config {:period 10}}
    {:id :guppy-multiple-moving-average
     :name "Guppy Multiple Moving Average"
     :short-name "GMMA"
@@ -94,15 +77,6 @@
                      :sma3 10
                      :sma4 15
                      :signal 9}}
-   {:id :majority-rule
-    :name "Majority Rule"
-    :short-name "Majority"
-    :description "Percent of bars closing above SMA"
-    :supports-period? true
-    :default-period 14
-    :min-period 2
-    :max-period 400
-    :default-config {:period 14}}
    {:id :mcginley-dynamic
     :name "McGinley Dynamic"
     :short-name "MGD"
@@ -150,15 +124,6 @@
     :min-period 3
     :max-period 400
     :default-config {:period 9}}
-   {:id :ratio
-    :name "Ratio"
-    :short-name "Ratio"
-    :description "Single-stream proxy: close divided by close n bars ago"
-    :supports-period? true
-    :default-period 1
-    :min-period 1
-    :max-period 400
-    :default-config {:period 1}}
    {:id :relative-vigor-index
     :name "Relative Vigor Index"
     :short-name "RVI"
@@ -185,15 +150,6 @@
     :default-config {:short 13
                      :long 25
                      :signal 13}}
-   {:id :spread
-    :name "Spread"
-    :short-name "Spread"
-    :description "Single-stream proxy: close minus close n bars ago"
-    :supports-period? true
-    :default-period 1
-    :min-period 1
-    :max-period 400
-    :default-config {:period 1}}
    {:id :ultimate-oscillator
     :name "Ultimate Oscillator"
     :short-name "UO"
@@ -237,7 +193,6 @@
   wave3-indicator-definitions)
 
 (def ^:private finite-number? imath/finite-number?)
-(def ^:private clamp imath/clamp)
 (def ^:private parse-period imath/parse-period)
 (def ^:private parse-number imath/parse-number)
 (def ^:private times imath/times)
@@ -274,16 +229,6 @@
 (defn- rma-values
   [values period]
   (imath/rma-values values period :aligned))
-
-(defn- wma-values
-  [values period]
-  (let [weights (vec (range 1 (inc period)))
-        weight-sum (reduce + 0 weights)]
-    (rolling-apply values
-                   period
-                   (fn [window]
-                     (/ (reduce + 0 (map * window weights))
-                        weight-sum)))))
 
 (defn- shift-right
   [values shift]
@@ -653,25 +598,6 @@
                       :separate
                       [(line-series :connors-rsi "Connors RSI" "#f97316" time-values values)])))
 
-(defn- calculate-coppock-curve
-  [data params]
-  (let [long-roc (parse-period (:long-roc params) 14 1 200)
-        short-roc (parse-period (:short-roc params) 11 1 200)
-        wma-period (parse-period (:wma-period params) 10 2 200)
-        close-values (closes data)
-        roc-a (roc-percent-values close-values long-roc)
-        roc-b (roc-percent-values close-values short-roc)
-        sum-roc (mapv (fn [a b]
-                        (when (and (finite-number? a)
-                                   (finite-number? b))
-                          (+ a b)))
-                      roc-a roc-b)
-        values (wma-values sum-roc wma-period)
-        time-values (times data)]
-    (indicator-result :coppock-curve
-                      :separate
-                      [(line-series :coppock "Coppock" "#38bdf8" time-values values)])))
-
 (defn- calculate-correlation-log
   [data params]
   (let [period (parse-period (:period params) 20 3 400)
@@ -686,55 +612,6 @@
     (indicator-result :correlation-log
                       :separate
                       [(line-series :correlation-log "Corr Log" "#a78bfa" time-values values)])))
-
-(defn- calculate-fisher-transform
-  [data params]
-  (let [period (parse-period (:period params) 10 2 200)
-        median-price (mapv (fn [high low]
-                             (/ (+ high low) 2))
-                           (highs data)
-                           (lows data))
-        rolling-high (rolling-max median-price period)
-        rolling-low (rolling-min median-price period)
-        size (count data)
-        {:keys [fisher signal]}
-        (loop [idx 0
-               prev-value 0
-               prev-fisher 0
-               fisher []
-               signal []]
-          (if (= idx size)
-            {:fisher fisher
-             :signal signal}
-            (let [price (nth median-price idx)
-                  hi (nth rolling-high idx)
-                  lo (nth rolling-low idx)
-                  normalized (when (and (finite-number? price)
-                                        (finite-number? hi)
-                                        (finite-number? lo)
-                                        (> hi lo))
-                               (- (/ (- price lo)
-                                     (- hi lo))
-                                  0.5))
-                  value (if (finite-number? normalized)
-                          (let [raw (+ (* 0.66 normalized)
-                                       (* 0.67 prev-value))]
-                            (clamp raw -0.999 0.999))
-                          nil)
-                  fisher-value (when (finite-number? value)
-                                 (+ (* 0.5 (js/Math.log (/ (+ 1 value)
-                                                           (- 1 value))))
-                                    (* 0.5 prev-fisher)))]
-              (recur (inc idx)
-                     (or value prev-value)
-                     (or fisher-value prev-fisher)
-                     (conj fisher fisher-value)
-                     (conj signal prev-fisher)))))
-        time-values (times data)]
-    (indicator-result :fisher-transform
-                      :separate
-                      [(line-series :fisher "Fisher" "#f97316" time-values fisher)
-                       (line-series :signal "Signal" "#22d3ee" time-values signal)])))
 
 (defn- calculate-guppy-multiple-moving-average
   [data _params]
@@ -834,26 +711,6 @@
                       :separate
                       [(line-series :kst "KST" "#22d3ee" time-values kst)
                        (line-series :signal "Signal" "#f97316" time-values signal)])))
-
-(defn- calculate-majority-rule
-  [data params]
-  (let [period (parse-period (:period params) 14 2 400)
-        close-values (closes data)
-        sma-close (sma-values close-values period)
-        above-sma (mapv (fn [close sma]
-                          (when (and (finite-number? close)
-                                     (finite-number? sma))
-                            (if (> close sma) 1 0)))
-                        close-values sma-close)
-        counts (rolling-sum above-sma period)
-        values (mapv (fn [count]
-                       (when (finite-number? count)
-                         (* 100 (/ count period))))
-                     counts)
-        time-values (times data)]
-    (indicator-result :majority-rule
-                      :separate
-                      [(line-series :majority "Majority %" "#4ade80" time-values values)])))
 
 (defn- calculate-mcginley-dynamic
   [data params]
@@ -990,26 +847,6 @@
                       :separate
                       [(line-series :rci "RCI" "#a855f7" time-values values)])))
 
-(defn- calculate-ratio
-  [data params]
-  (let [period (parse-period (:period params) 1 1 400)
-        close-values (closes data)
-        size (count data)
-        values (mapv (fn [idx]
-                       (if (< idx period)
-                         nil
-                         (let [current (nth close-values idx)
-                               base (nth close-values (- idx period))]
-                           (when (and (finite-number? current)
-                                      (finite-number? base)
-                                      (not= base 0))
-                             (/ current base)))))
-                     (range size))
-        time-values (times data)]
-    (indicator-result :ratio
-                      :separate
-                      [(line-series :ratio "Ratio" "#22d3ee" time-values values)])))
-
 (defn- weighted-four
   [values]
   (let [size (count values)]
@@ -1118,25 +955,6 @@
                       [(histogram-series :osc "Osc" time-values osc)
                        (line-series :indicator "SMI Ergodic" "#22d3ee" time-values tsi)
                        (line-series :signal "Signal" "#f97316" time-values signal)])))
-
-(defn- calculate-spread
-  [data params]
-  (let [period (parse-period (:period params) 1 1 400)
-        close-values (closes data)
-        size (count data)
-        values (mapv (fn [idx]
-                       (if (< idx period)
-                         nil
-                         (let [current (nth close-values idx)
-                               base (nth close-values (- idx period))]
-                           (when (and (finite-number? current)
-                                      (finite-number? base))
-                             (- current base)))))
-                     (range size))
-        time-values (times data)]
-    (indicator-result :spread
-                      :separate
-                      [(line-series :spread "Spread" "#f97316" time-values values)])))
 
 (defn- calculate-ultimate-oscillator
   [data params]
@@ -1376,23 +1194,18 @@
    :chande-kroll-stop calculate-chande-kroll-stop
    :chop-zone calculate-chop-zone
    :connors-rsi calculate-connors-rsi
-   :coppock-curve calculate-coppock-curve
    :correlation-log calculate-correlation-log
-   :fisher-transform calculate-fisher-transform
    :guppy-multiple-moving-average calculate-guppy-multiple-moving-average
    :klinger-oscillator calculate-klinger-oscillator
    :know-sure-thing calculate-know-sure-thing
-   :majority-rule calculate-majority-rule
    :mcginley-dynamic calculate-mcginley-dynamic
    :moving-average-adaptive calculate-moving-average-adaptive
    :moving-average-hamming calculate-moving-average-hamming
    :pivot-points-standard calculate-pivot-points-standard
    :rank-correlation-index calculate-rank-correlation-index
-   :ratio calculate-ratio
    :relative-vigor-index calculate-relative-vigor-index
    :relative-volatility-index calculate-relative-volatility-index
    :smi-ergodic calculate-smi-ergodic
-   :spread calculate-spread
    :ultimate-oscillator calculate-ultimate-oscillator
    :volume calculate-volume
    :williams-alligator calculate-williams-alligator

@@ -29,7 +29,13 @@
    [:volatility-close-to-close :vol-cc] {:name "Vol C-C" :color "#22d3ee"}
    [:volatility-index :vol-index] {:name "Vol Index" :color "#f97316"}
    [:volatility-ohlc :vol-ohlc] {:name "Vol OHLC" :color "#22d3ee"}
-   [:volatility-zero-trend-close-to-close :vol-zt-cc] {:name "Vol ZT C-C" :color "#a855f7"}})
+   [:volatility-zero-trend-close-to-close :vol-zt-cc] {:name "Vol ZT C-C" :color "#a855f7"}
+   [:coppock-curve :coppock] {:name "Coppock" :color "#38bdf8"}
+   [:fisher-transform :fisher] {:name "Fisher" :color "#f97316"}
+   [:fisher-transform :signal] {:name "Signal" :color "#22d3ee"}
+   [:majority-rule :majority] {:name "Majority %" :color "#4ade80"}
+   [:ratio :ratio] {:name "Ratio" :color "#22d3ee"}
+   [:spread :spread] {:name "Spread" :color "#f97316"}})
 
 (def ^:private histogram-series-meta
   {[:awesome-oscillator :ao] {:name "AO"
