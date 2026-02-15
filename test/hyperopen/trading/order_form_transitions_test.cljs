@@ -1,5 +1,8 @@
 (ns hyperopen.trading.order-form-transitions-test
   (:require [cljs.test :refer-macros [deftest is testing]]
+            [clojure.test.check :as tc]
+            [clojure.test.check.generators :as gen]
+            [clojure.test.check.properties :as prop :include-macros true]
             [hyperopen.schema.order-form-contracts :as contracts]
             [hyperopen.trading.order-type-registry :as order-type-registry]
             [hyperopen.state.trading :as trading]
@@ -74,18 +77,20 @@
     (doseq [mode [:market :limit :pro]]
       (let [transition (transitions/select-entry-mode state mode)
             form (:order-form transition)
+            ui (:order-form-ui transition)
             order-type (:type form)]
         (is (contracts/order-form-transition-valid? transition))
-        (is (= mode (:entry-mode form)))
+        (is (= mode (:entry-mode ui)))
         (cond
           (= mode :market) (is (= :market order-type))
           (= mode :limit) (is (= :limit order-type))
           :else (is (contains? pro-types order-type)))))
     (doseq [order-type (order-type-registry/pro-order-types)]
       (let [transition (transitions/select-pro-order-type state order-type)
-            form (:order-form transition)]
+            form (:order-form transition)
+            ui (:order-form-ui transition)]
         (is (contracts/order-form-transition-valid? transition))
-        (is (= :pro (:entry-mode form)))
+        (is (= :pro (:entry-mode ui)))
         (is (= order-type (:type form)))))))
 
 (deftest update-order-form-rejects-ui-and-runtime-paths-test
@@ -97,116 +102,150 @@
     (is (= nil (get-in transition [:order-form-runtime :error])))))
 
 (def ^:private ui-only-form-paths
-  #{:pro-order-type-dropdown-open?
+  #{:entry-mode
+    :ui-leverage
+    :size-display
+    :pro-order-type-dropdown-open?
     :price-input-focused?
     :tpsl-panel-open?
     :submitting?
     :error})
 
-(defn- next-seed [seed]
-  (mod (+ (* 1103515245 seed) 12345) 2147483648))
+(def ^:private entry-mode-gen
+  (gen/elements [:market :limit :pro]))
 
-(def ^:private simulation-intents
-  [:select-entry-market
-   :select-entry-limit
-   :select-entry-pro
-   :select-pro-order-type
-   :set-ui-leverage
-   :set-size-percent
-   :set-size-display
-   :focus-price
-   :blur-price
-   :set-mid-price
-   :toggle-tpsl
-   :set-side
-   :set-price
-   :set-tif
-   :keydown-pro-dropdown])
+(def ^:private pro-order-type-gen
+  (gen/elements (vec (order-type-registry/pro-order-types))))
 
-(defn- run-intent [state intent seed]
-  (let [pro-types (vec (order-type-registry/pro-order-types))]
-    (case intent
-      :select-entry-market
-      (transitions/select-entry-mode state :market)
+(def ^:private side-gen
+  (gen/elements [:buy :sell]))
 
-      :select-entry-limit
-      (transitions/select-entry-mode state :limit)
+(def ^:private tif-gen
+  (gen/elements [:gtc :ioc :alo]))
 
-      :select-entry-pro
-      (transitions/select-entry-mode state :pro)
+(def ^:private keydown-gen
+  (gen/elements ["Escape" "Enter"]))
 
-      :select-pro-order-type
-      (transitions/select-pro-order-type state (nth pro-types (mod seed (count pro-types))))
+(def ^:private intent-gen
+  (gen/one-of
+   [(gen/fmap (fn [mode] {:intent :select-entry-mode :mode mode}) entry-mode-gen)
+    (gen/fmap (fn [order-type] {:intent :select-pro-order-type :order-type order-type}) pro-order-type-gen)
+    (gen/fmap (fn [leverage] {:intent :set-ui-leverage :leverage leverage}) (gen/choose 1 120))
+    (gen/fmap (fn [percent] {:intent :set-size-percent :percent percent}) (gen/choose -40 160))
+    (gen/fmap (fn [size-display] {:intent :set-size-display :size-display size-display})
+              (gen/fmap str (gen/choose 0 10000)))
+    (gen/return {:intent :focus-price})
+    (gen/return {:intent :blur-price})
+    (gen/return {:intent :set-mid-price})
+    (gen/return {:intent :toggle-tpsl})
+    (gen/fmap (fn [side] {:intent :set-side :side side}) side-gen)
+    (gen/fmap (fn [price] {:intent :set-price :price price})
+              (gen/fmap str (gen/choose 1 300000)))
+    (gen/fmap (fn [tif] {:intent :set-tif :tif tif}) tif-gen)
+    (gen/fmap (fn [key] {:intent :keydown-pro-dropdown :key key}) keydown-gen)
+    (gen/return {:intent :toggle-pro-dropdown})]))
 
-      :set-ui-leverage
-      (transitions/set-order-ui-leverage state (+ 1 (mod seed 80)))
+(defn- run-intent [state {:keys [intent mode order-type leverage percent size-display side price tif key]}]
+  (case intent
+    :select-entry-mode (transitions/select-entry-mode state mode)
+    :select-pro-order-type (transitions/select-pro-order-type state order-type)
+    :set-ui-leverage (transitions/set-order-ui-leverage state leverage)
+    :set-size-percent (transitions/set-order-size-percent state percent)
+    :set-size-display (transitions/set-order-size-display state size-display)
+    :focus-price (transitions/focus-order-price-input state)
+    :blur-price (transitions/blur-order-price-input state)
+    :set-mid-price (transitions/set-order-price-to-mid state)
+    :toggle-tpsl (transitions/toggle-order-tpsl-panel state)
+    :set-side (transitions/update-order-form state [:side] side)
+    :set-price (transitions/update-order-form state [:price] price)
+    :set-tif (transitions/update-order-form state [:tif] tif)
+    :keydown-pro-dropdown (transitions/handle-pro-order-type-dropdown-keydown state key)
+    :toggle-pro-dropdown (transitions/toggle-pro-order-type-dropdown state)
+    nil))
 
-      :set-size-percent
-      (transitions/set-order-size-percent state (- (mod seed 180) 40))
+(defn- apply-model [model {:keys [intent mode order-type key]}]
+  (case intent
+    :select-entry-mode
+    (case mode
+      :market (assoc model :entry-mode :market :type :market :pro-order-type-dropdown-open? false)
+      :limit (assoc model :entry-mode :limit :type :limit :pro-order-type-dropdown-open? false)
+      :pro (assoc model
+                  :entry-mode :pro
+                  :type (trading/normalize-pro-order-type (:type model))))
 
-      :set-size-display
-      (transitions/set-order-size-display state (str (/ (mod seed 5000) 10)))
+    :select-pro-order-type
+    (assoc model :entry-mode :pro
+           :type (trading/normalize-pro-order-type order-type)
+           :pro-order-type-dropdown-open? false)
 
-      :focus-price
-      (transitions/focus-order-price-input state)
+    :toggle-pro-dropdown
+    (update model :pro-order-type-dropdown-open? not)
 
-      :blur-price
-      (transitions/blur-order-price-input state)
+    :keydown-pro-dropdown
+    (if (= key "Escape")
+      (assoc model :pro-order-type-dropdown-open? false)
+      model)
 
-      :set-mid-price
-      (transitions/set-order-price-to-mid state)
+    :toggle-tpsl
+    (if (= :scale (:type model))
+      model
+      (update model :tpsl-panel-open? not))
 
-      :toggle-tpsl
-      (transitions/toggle-order-tpsl-panel state)
-
-      :set-side
-      (transitions/update-order-form state [:side] (if (odd? seed) :buy :sell))
-
-      :set-price
-      (transitions/update-order-form state [:price] (str (/ (mod seed 3000) 10)))
-
-      :set-tif
-      (transitions/update-order-form state [:tif] (if (odd? seed) :gtc :ioc))
-
-      :keydown-pro-dropdown
-      (transitions/handle-pro-order-type-dropdown-keydown state (if (odd? seed) "Escape" "Enter"))
-
-      nil)))
+    model))
 
 (defn- apply-transition [state transition]
   (if (map? transition)
     (merge state transition)
     state))
 
-(deftest transition-state-machine-sequence-invariants-test
-  (let [base (base-state {:entry-mode :limit
-                          :type :limit
+(defn- state-invariants-hold?
+  [state model]
+  (let [form (:order-form state)
+        ui-state (:order-form-ui state)
+        normalized-form (trading/order-form-draft state)
+        effective-ui (trading/order-form-ui-state state)
+        size-percent (:size-percent normalized-form)]
+    (and (map? form)
+         (map? ui-state)
+         (every? #(not (contains? form %)) ui-only-form-paths)
+         (= (:entry-mode normalized-form) (:entry-mode effective-ui))
+         (= (:ui-leverage normalized-form) (:ui-leverage effective-ui))
+         (= (:size-display normalized-form) (:size-display effective-ui))
+         (= (:entry-mode model) (:entry-mode effective-ui))
+         (= (:type model) (:type normalized-form))
+         (= (:pro-order-type-dropdown-open? model)
+            (boolean (:pro-order-type-dropdown-open? effective-ui)))
+         (or (not (= :scale (:type normalized-form)))
+             (false? (:tpsl-panel-open? effective-ui)))
+         (if (number? size-percent)
+           (<= 0 size-percent 100)
+           true))))
+
+(deftest transition-state-machine-generative-model-invariants-test
+  (let [base (base-state {:type :limit
                           :price "100"
                           :size "1"
                           :size-percent 10})
-        seeds [7 13 42 99 2026 4096]]
-    (doseq [seed0 seeds]
-      (loop [seed seed0
-             step 0
-             state base]
-        (when (< step 80)
-          (let [seed* (next-seed seed)
-                intent (nth simulation-intents (mod seed* (count simulation-intents)))
-                transition (run-intent state intent seed*)
-                _ (when (map? transition)
-                    (is (contracts/order-form-transition-valid? transition)
-                        (str "invalid transition at step " step " intent " intent)))
-                next-state (apply-transition state transition)
-                form (:order-form next-state)
-                normalized-form (trading/normalize-order-form next-state form)
-                effective-ui (trading/order-form-ui-state next-state)
-                size-percent (:size-percent normalized-form)]
-            (is (map? form))
-            (is (= (:entry-mode normalized-form) (:entry-mode form)))
-            (is (= (:type normalized-form) (:type form)))
-            (is (every? #(not (contains? form %)) ui-only-form-paths))
-            (when (number? size-percent)
-              (is (<= 0 size-percent 100)))
-            (when (= :scale (:type normalized-form))
-              (is (false? (:tpsl-panel-open? effective-ui))))
-            (recur seed* (inc step) next-state)))))))
+        initial-model {:entry-mode :limit
+                       :type :limit
+                       :pro-order-type-dropdown-open? false
+                       :tpsl-panel-open? false}
+        property (prop/for-all [intents (gen/vector intent-gen 1 120)]
+                   (loop [remaining intents
+                          state base
+                          model initial-model]
+                     (if (empty? remaining)
+                       true
+                       (let [intent (first remaining)
+                             transition (run-intent state intent)
+                             transition-valid? (or (nil? transition)
+                                                   (contracts/order-form-transition-valid? transition))
+                             next-state (apply-transition state transition)
+                             next-model (apply-model model intent)]
+                         (and transition-valid?
+                              (state-invariants-hold? next-state next-model)
+                              (recur (rest remaining) next-state next-model))))))]
+    (let [result (tc/quick-check 120 property)]
+      (is (:pass? result)
+          (str "generative model check failed: "
+               (pr-str (dissoc result :result)))))))

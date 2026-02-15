@@ -289,8 +289,13 @@
                                                         :twap {:minutes 0
                                                                :randomize true}))))))
 
-(deftest default-order-form-uses-limit-entry-mode-test
-  (is (= :limit (:entry-mode (trading/default-order-form)))))
+(deftest default-order-form-and-ui-field-ownership-test
+  (is (nil? (:entry-mode (trading/default-order-form))))
+  (is (nil? (:ui-leverage (trading/default-order-form))))
+  (is (nil? (:size-display (trading/default-order-form))))
+  (is (= :limit (:entry-mode (trading/default-order-form-ui))))
+  (is (number? (:ui-leverage (trading/default-order-form-ui))))
+  (is (= "" (:size-display (trading/default-order-form-ui)))))
 
 (deftest order-form-ui-state-defaults-without-legacy-fallback-test
   (let [no-ui-state (assoc base-state
@@ -309,6 +314,9 @@
     (is (false? (:pro-order-type-dropdown-open? normalized-no-ui)))
     (is (false? (:price-input-focused? normalized-no-ui)))
     (is (false? (:tpsl-panel-open? normalized-no-ui)))
+    (is (= :limit (:entry-mode normalized-no-ui)))
+    (is (number? (:ui-leverage normalized-no-ui)))
+    (is (= "" (:size-display normalized-no-ui)))
     (is (false? (:pro-order-type-dropdown-open? normalized-legacy)))
     (is (true? (:pro-order-type-dropdown-open? normalized-explicit)))))
 

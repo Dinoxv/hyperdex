@@ -345,14 +345,40 @@
   (s/and map?
          #(string? (:path %))))
 
+(def ^:private ui-owned-order-form-keys
+  #{:entry-mode
+    :ui-leverage
+    :size-display})
+
+(def ^:private legacy-ui-and-runtime-order-form-keys
+  #{:pro-order-type-dropdown-open?
+    :price-input-focused?
+    :tpsl-panel-open?
+    :submitting?
+    :error})
+
+(def ^:private order-form-ui-state-keys
+  #{:pro-order-type-dropdown-open?
+    :price-input-focused?
+    :tpsl-panel-open?
+    :entry-mode
+    :ui-leverage
+    :size-display})
+
+(s/def ::order-form-state
+  (s/and map?
+         #(not-any? ui-owned-order-form-keys (keys %))
+         #(not-any? legacy-ui-and-runtime-order-form-keys (keys %))))
+
 (s/def ::order-form-ui-state
   (s/and map?
-         #(contains? % :pro-order-type-dropdown-open?)
-         #(contains? % :price-input-focused?)
-         #(contains? % :tpsl-panel-open?)
+         #(= order-form-ui-state-keys (set (keys %)))
          #(boolean? (:pro-order-type-dropdown-open? %))
          #(boolean? (:price-input-focused? %))
-         #(boolean? (:tpsl-panel-open? %))))
+         #(boolean? (:tpsl-panel-open? %))
+         #(contains? #{:market :limit :pro} (:entry-mode %))
+         #(number? (:ui-leverage %))
+         #(string? (:size-display %))))
 
 (s/def ::order-form-runtime-state
   (s/and map?
@@ -381,7 +407,7 @@
          #(s/valid? ::websocket-state (:websocket %))
          #(s/valid? ::websocket-ui-state (:websocket-ui %))
          #(s/valid? ::router-state (:router %))
-         #(map? (:order-form %))
+         #(s/valid? ::order-form-state (:order-form %))
          #(s/valid? ::order-form-ui-state (:order-form-ui %))
          #(s/valid? ::order-form-runtime-state (:order-form-runtime %))))
 

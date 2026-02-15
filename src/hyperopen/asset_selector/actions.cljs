@@ -1,5 +1,6 @@
 (ns hyperopen.asset-selector.actions
-  (:require [hyperopen.asset-selector.markets :as markets]))
+  (:require [hyperopen.asset-selector.markets :as markets]
+            [hyperopen.state.trading :as trading]))
 
 (def ^:private asset-selector-sort-by-storage-key
   "asset-selector-sort-by")
@@ -90,10 +91,12 @@
                              (not= canonical-coin current-asset))
         reset-order-form (when (and switched-asset?
                                     (map? (:order-form state)))
-                           (assoc (:order-form state)
-                                  :price ""))
+                           (-> (:order-form state)
+                               (assoc :price "")
+                               (trading/persist-order-form)))
         reset-order-form-ui (when switched-asset?
-                              (assoc (or (:order-form-ui state) {})
+                              (assoc (merge (trading/default-order-form-ui)
+                                            (or (:order-form-ui state) {}))
                                      :price-input-focused? false))
         immediate-ui-path-values (cond-> [[[:asset-selector :visible-dropdown] nil]
                                           [[:asset-selector :scroll-top] 0]

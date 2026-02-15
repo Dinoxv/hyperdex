@@ -4,25 +4,35 @@
             [hyperopen.state.trading :as trading]
             [hyperopen.trading.order-form-transitions :as transitions]))
 
+(defn- next-order-form-ui-state
+  [state order-form order-form-ui]
+  (let [working-form (or order-form (trading/order-form-draft state))
+        base-ui (trading/order-form-ui-state state)
+        merged-ui (merge base-ui
+                         (or order-form-ui {})
+                         (trading/order-form-ui-overrides-from-form order-form))]
+    (trading/effective-order-form-ui working-form merged-ui)))
+
 (defn- transition-save-many
-  [{:keys [order-form order-form-ui order-form-runtime]}]
-  (let [path-values (cond-> []
-                      (map? order-form) (conj [[:order-form] order-form])
-                      (map? order-form-ui) (conj [[:order-form-ui] order-form-ui])
+  [state {:keys [order-form order-form-ui order-form-runtime]}]
+  (let [persisted-form (when (map? order-form)
+                         (trading/persist-order-form order-form))
+        persisted-ui (when (or (map? order-form-ui)
+                               (map? order-form))
+                       (next-order-form-ui-state state order-form order-form-ui))
+        path-values (cond-> []
+                      (map? persisted-form) (conj [[:order-form] persisted-form])
+                      (map? persisted-ui) (conj [[:order-form-ui] persisted-ui])
                       (map? order-form-runtime) (conj [[:order-form-runtime] order-form-runtime]))]
     (if (seq path-values)
       [[:effects/save-many path-values]]
       [])))
 
 (defn select-order-entry-mode [state mode]
-  (-> state
-      (transitions/select-entry-mode mode)
-      transition-save-many))
+  (transition-save-many state (transitions/select-entry-mode state mode)))
 
 (defn select-pro-order-type [state order-type]
-  (-> state
-      (transitions/select-pro-order-type order-type)
-      transition-save-many))
+  (transition-save-many state (transitions/select-pro-order-type state order-type)))
 
 (defn toggle-pro-order-type-dropdown [state]
   (let [ui-state (:order-form-ui (transitions/toggle-pro-order-type-dropdown state))
@@ -42,47 +52,33 @@
     []))
 
 (defn set-order-ui-leverage [state leverage]
-  (-> state
-      (transitions/set-order-ui-leverage leverage)
-      transition-save-many))
+  (transition-save-many state (transitions/set-order-ui-leverage state leverage)))
 
 (defn set-order-size-percent [state percent]
-  (-> state
-      (transitions/set-order-size-percent percent)
-      transition-save-many))
+  (transition-save-many state (transitions/set-order-size-percent state percent)))
 
 (defn set-order-size-display [state value]
-  (-> state
-      (transitions/set-order-size-display value)
-      transition-save-many))
+  (transition-save-many state (transitions/set-order-size-display state value)))
 
 (defn focus-order-price-input [state]
-  (-> state
-      transitions/focus-order-price-input
-      transition-save-many))
+  (transition-save-many state (transitions/focus-order-price-input state)))
 
 (defn blur-order-price-input [state]
-  (-> state
-      transitions/blur-order-price-input
-      transition-save-many))
+  (transition-save-many state (transitions/blur-order-price-input state)))
 
 (defn set-order-price-to-mid [state]
-  (-> state
-      transitions/set-order-price-to-mid
-      transition-save-many))
+  (transition-save-many state (transitions/set-order-price-to-mid state)))
 
 (defn toggle-order-tpsl-panel [state]
   (if-let [transition (transitions/toggle-order-tpsl-panel state)]
-    (transition-save-many transition)
+    (transition-save-many state transition)
     []))
 
 (defn update-order-form [state path value]
-  (-> state
-      (transitions/update-order-form path value)
-      transition-save-many))
+  (transition-save-many state (transitions/update-order-form state path value)))
 
 (defn submit-order [state]
-  (let [raw-form (trading/raw-order-form-draft state)
+  (let [raw-form (trading/order-form-draft state)
         agent-ready? (= :ready (get-in state [:wallet :agent :status]))
         submit-policy (trading/submit-policy state raw-form {:mode :submit
                                                              :agent-ready? agent-ready?})
@@ -95,9 +91,12 @@
       [[:effects/save [:order-form-runtime :error] error-message]]
 
       :else
+      (let [persisted-form (trading/persist-order-form form)
+            persisted-ui (next-order-form-ui-state state form nil)]
       [[:effects/save [:order-form-runtime :error] nil]
-       [:effects/save [:order-form] form]
-       [:effects/api-submit-order request]])))
+       [:effects/save [:order-form] persisted-form]
+       [:effects/save [:order-form-ui] persisted-ui]
+       [:effects/api-submit-order request]]))))
 
 (defn prune-canceled-open-orders
   [state request]

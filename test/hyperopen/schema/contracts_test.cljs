@@ -4,6 +4,14 @@
             [hyperopen.schema.order-form-contracts :as order-form-contracts]
             [hyperopen.system :as system]))
 
+(def ^:private valid-order-form-ui
+  {:pro-order-type-dropdown-open? false
+   :price-input-focused? false
+   :tpsl-panel-open? false
+   :entry-mode :limit
+   :ui-leverage 20
+   :size-display ""})
+
 (deftest assert-app-state-rejects-active-market-without-symbol-test
   (let [state (assoc (system/default-store-state)
                      :active-market {:coin "BTC"})]
@@ -16,7 +24,10 @@
   (let [state (assoc (system/default-store-state)
                      :order-form-ui {:pro-order-type-dropdown-open? false
                                      :price-input-focused? "yes"
-                                     :tpsl-panel-open? false})]
+                                     :tpsl-panel-open? false
+                                     :entry-mode :limit
+                                     :ui-leverage 20
+                                     :size-display ""})]
     (is (thrown-with-msg?
          js/Error
          #"app state"
@@ -24,10 +35,18 @@
 
 (deftest assert-app-state-accepts-valid-order-form-ui-state-test
   (let [state (assoc (system/default-store-state)
-                     :order-form-ui {:pro-order-type-dropdown-open? false
-                                     :price-input-focused? true
-                                     :tpsl-panel-open? false})]
+                     :order-form-ui (assoc valid-order-form-ui
+                                           :price-input-focused? true))]
     (is (= state (contracts/assert-app-state! state {:phase :test})))))
+
+(deftest assert-app-state-rejects-order-form-with-ui-owned-fields-test
+  (let [state (assoc (system/default-store-state)
+                     :order-form (assoc (:order-form (system/default-store-state))
+                                        :entry-mode :pro))]
+    (is (thrown-with-msg?
+         js/Error
+         #"app state"
+         (contracts/assert-app-state! state {:phase :test})))))
 
 (deftest assert-app-state-rejects-order-form-runtime-with-invalid-shape-test
   (let [state (assoc (system/default-store-state)
@@ -110,37 +129,58 @@
         {:phase :test}))))
 
 (deftest order-form-vm-schema-contracts-test
-  (let [valid-vm {:form {}
+  (let [valid-vm {:form {:type :limit}
                   :side :buy
                   :type :limit
                   :entry-mode :limit
+                  :pro-dropdown-open? false
+                  :tpsl-panel-open? false
                   :pro-dropdown-options [:scale]
-                  :order-type-sections []
+                  :pro-tab-label "Pro"
                   :spot? false
                   :hip3? false
                   :read-only? false
+                  :display {:available-to-trade "0.00 USDC"
+                            :current-position "0.0000 BTC"
+                            :liquidation-price "N/A"
+                            :order-value "N/A"
+                            :margin-required "N/A"
+                            :slippage "Est 0.0000% / Max 8.00%"
+                            :fees "0.045% / 0.015%"}
+                  :ui-leverage 20
+                  :next-leverage 25
+                  :size-percent 0
+                  :display-size-percent "0"
+                  :notch-overlap-threshold 4
+                  :size-display ""
                   :price {:raw ""
                           :display ""
                           :focused? false
                           :fallback nil
                           :context {:label "Ref"
                                     :mid-available? false}}
-                  :display {}
-                  :controls {:show-limit-like-controls? true
+                  :quote-symbol "USDC"
+                  :scale-preview-lines {:start "N/A"
+                                        :end "N/A"}
+                  :error nil
+                  :submitting? false
+                  :controls {:limit-like? true
+                             :show-limit-like-controls? true
                              :show-tpsl-toggle? true
                              :show-tpsl-panel? false
                              :show-post-only? false
                              :show-scale-preview? false
                              :show-liquidation-row? true
                              :show-slippage-row? false}
-                  :submit {:errors []
+                  :submit {:form {}
+                           :errors []
                            :required-fields []
                            :reason nil
                            :error-message nil
                            :tooltip nil
                            :market-price-missing? false
                            :disabled? false}}
-        invalid-vm (dissoc valid-vm :controls)]
+        invalid-vm (assoc valid-vm :unknown true)]
     (is (true? (order-form-contracts/order-form-vm-valid? valid-vm)))
     (is (false? (order-form-contracts/order-form-vm-valid? invalid-vm)))
     (is (= valid-vm

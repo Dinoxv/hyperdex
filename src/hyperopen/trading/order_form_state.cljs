@@ -8,12 +8,9 @@
 (def default-twap-minutes 5)
 
 (defn default-order-form []
-  {:entry-mode :limit
-   :type :limit
+  {:type :limit
    :side :buy
-   :ui-leverage default-ui-leverage
    :size-percent 0
-   :size-display ""
    :size ""
    :price ""
    :trigger-px ""
@@ -39,7 +36,10 @@
 (defn default-order-form-ui []
   {:pro-order-type-dropdown-open? false
    :tpsl-panel-open? false
-   :price-input-focused? false})
+   :price-input-focused? false
+   :entry-mode :limit
+   :ui-leverage default-ui-leverage
+   :size-display ""})
 
 (defn normalize-scale-form [scale]
   (let [raw-scale (or scale {})
@@ -75,7 +75,21 @@
                     error))))
 
 (defn normalize-order-form-ui [ui]
-  (assoc (default-order-form-ui)
-         :pro-order-type-dropdown-open? (boolean (:pro-order-type-dropdown-open? ui))
-         :price-input-focused? (boolean (:price-input-focused? ui))
-         :tpsl-panel-open? (boolean (:tpsl-panel-open? ui))))
+  (let [entry-mode (let [candidate (cond
+                                     (keyword? (:entry-mode ui)) (:entry-mode ui)
+                                     (string? (:entry-mode ui)) (keyword (:entry-mode ui))
+                                     :else :limit)]
+                     (if (contains? #{:market :limit :pro} candidate)
+                       candidate
+                       :limit))
+        parsed-leverage (trading-domain/parse-num (:ui-leverage ui))
+        normalized-leverage (if (number? parsed-leverage)
+                              (-> parsed-leverage js/Math.round int (max 1))
+                              default-ui-leverage)]
+    (assoc (default-order-form-ui)
+           :pro-order-type-dropdown-open? (boolean (:pro-order-type-dropdown-open? ui))
+           :price-input-focused? (boolean (:price-input-focused? ui))
+           :tpsl-panel-open? (boolean (:tpsl-panel-open? ui))
+           :entry-mode entry-mode
+           :ui-leverage normalized-leverage
+           :size-display (str (or (:size-display ui) "")))))

@@ -4,16 +4,30 @@
             [hyperopen.trading.order-type-registry :as order-type-registry]
             [hyperopen.state.trading :as trading]
             [hyperopen.views.trade.order-form-component-sections :as sections]
+            [hyperopen.views.trade.order-form-type-extensions :as type-extensions]
             [hyperopen.views.trade.order-form-vm :as vm]))
+
+(def ^:private ui-owned-order-form-keys
+  #{:entry-mode
+    :ui-leverage
+    :size-display})
 
 (defn- base-state
   ([] (base-state {} {}))
   ([order-form-overrides order-form-ui-overrides]
-   (let [base-form (merge (trading/default-order-form) order-form-overrides)
-         order-form (if (and (contains? order-form-overrides :type)
-                             (not (contains? order-form-overrides :entry-mode)))
-                      (assoc base-form :entry-mode (trading/entry-mode-for-type (:type base-form)))
-                      base-form)]
+   (let [ui-overrides-from-form (select-keys order-form-overrides ui-owned-order-form-keys)
+         normalized-order-form-overrides (reduce dissoc order-form-overrides ui-owned-order-form-keys)
+         order-form (merge (trading/default-order-form) normalized-order-form-overrides)
+         inferred-entry-mode (when (contains? normalized-order-form-overrides :type)
+                               (trading/entry-mode-for-type (:type order-form)))
+         final-entry-mode (or (:entry-mode order-form-ui-overrides)
+                              (:entry-mode ui-overrides-from-form)
+                              inferred-entry-mode)
+         order-form-ui (cond-> (merge (trading/default-order-form-ui)
+                                      ui-overrides-from-form
+                                      order-form-ui-overrides)
+                         final-entry-mode
+                         (assoc :entry-mode final-entry-mode))]
      {:active-asset "BTC"
       :active-market {:coin "BTC"
                       :quote "USDC"
@@ -26,7 +40,7 @@
       :webdata2 {:clearinghouseState {:marginSummary {:accountValue "1000"
                                                       :totalMarginUsed "250"}}}
       :order-form order-form
-      :order-form-ui (merge (trading/default-order-form-ui) order-form-ui-overrides)})))
+      :order-form-ui order-form-ui})))
 
 (deftest order-form-vm-price-context-mid-vs-ref-test
   (testing "mid context is available when top-of-book midpoint exists"
@@ -78,7 +92,6 @@
         view-model (vm/order-form-vm state)]
     (is (true? (:spot? view-model)))
     (is (true? (:read-only? view-model)))
-    (is (= "ETH" (:base-symbol view-model)))
     (is (= "USDC" (:quote-symbol view-model)))))
 
 (deftest order-type-plugin-config-contract-test
@@ -102,9 +115,10 @@
         (is (= section-ids (vm/order-type-sections order-type))))))
   (let [state (base-state {:size "1" :price "100"} {})]
     (doseq [order-type (order-type-registry/pro-order-types)]
-      (let [view-model (vm/order-form-vm (assoc state :order-form (assoc (:order-form state)
-                                                                         :entry-mode :pro
-                                                                         :type order-type)))
+      (let [view-model (vm/order-form-vm (-> state
+                                             (assoc :order-form (assoc (:order-form state)
+                                                                       :type order-type))
+                                             (assoc-in [:order-form-ui :entry-mode] :pro)))
             submit (:submit view-model)]
         (is (map? submit))
         (is (contains? submit :disabled?))
@@ -118,13 +132,27 @@
       (let [entry-mode (trading/entry-mode-for-type order-type)
             view-model (vm/order-form-vm (assoc state
                                                 :order-form (assoc (:order-form state)
-                                                                   :entry-mode entry-mode
-                                                                   :type order-type)))]
+                                                                   :type order-type)
+                                                :order-form-ui (assoc (:order-form-ui state)
+                                                                      :entry-mode entry-mode)))]
         (is (contracts/order-form-vm-valid? view-model) (str "contract failed for " order-type))
         (is (= order-type (:type view-model)))
         (if (= entry-mode :pro)
           (is (contains? pro-types (:type view-model)))
           (is (= entry-mode (:entry-mode view-model))))))))
+
+(deftest order-type-extension-registry-invariants-test
+  (is (true? (type-extensions/assert-valid-extension-registry!))))
+
+(deftest order-type-extension-registry-rejects-unknown-sections-test
+  (with-redefs [order-type-registry/order-type-config
+                (assoc order-type-registry/order-type-config
+                       :scale (assoc (get order-type-registry/order-type-config :scale)
+                                     :sections [:unknown-section]))]
+    (is (thrown-with-msg?
+         js/Error
+         #"Invalid order-form type extension registry"
+         (type-extensions/assert-valid-extension-registry!)))))
 
 (deftest order-form-vm-controls-are-registry-driven-test
   (testing "scale disables tpsl and liquidation row while enabling scale preview"

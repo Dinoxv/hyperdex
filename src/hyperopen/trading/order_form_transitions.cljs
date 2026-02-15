@@ -15,7 +15,10 @@
   (assoc (trading/order-form-runtime-state state) :error nil))
 
 (def ^:private ui-only-form-paths
-  #{[:pro-order-type-dropdown-open?]
+  #{[:entry-mode]
+    [:ui-leverage]
+    [:size-display]
+    [:pro-order-type-dropdown-open?]
     [:price-input-focused?]
     [:tpsl-panel-open?]
     [:submitting?]
@@ -24,9 +27,30 @@
 (defn- ui-only-form-path? [path]
   (contains? ui-only-form-paths path))
 
+(defn- enforce-field-ownership
+  [state transition]
+  (if-not (map? transition)
+    transition
+    (let [order-form (:order-form transition)
+          order-form-ui (:order-form-ui transition)
+          order-form-runtime (:order-form-runtime transition)
+          persisted-form (when (map? order-form)
+                           (trading/persist-order-form order-form))
+          persisted-ui (when (or (map? order-form-ui)
+                                 (map? order-form))
+                         (let [working-form (or order-form (trading/order-form-draft state))
+                               merged-ui (merge (trading/order-form-ui-state state)
+                                                (or order-form-ui {})
+                                                (trading/order-form-ui-overrides-from-form order-form))]
+                           (trading/effective-order-form-ui working-form merged-ui)))]
+      (cond-> {}
+        (map? persisted-form) (assoc :order-form persisted-form)
+        (map? persisted-ui) (assoc :order-form-ui persisted-ui)
+        (map? order-form-runtime) (assoc :order-form-runtime order-form-runtime)))))
+
 (defn select-entry-mode [state mode]
   (let [mode* (normalize-order-entry-mode mode)
-        form (trading/raw-order-form-draft state)
+        form (trading/order-form-draft state)
         ui-state (trading/order-form-ui-state state)
         close-pro-dropdown? (contains? #{:market :limit} mode*)
         next-type (case mode*
@@ -45,12 +69,14 @@
                         (if close-pro-dropdown?
                           false
                           (boolean (:pro-order-type-dropdown-open? ui-state)))))]
-    {:order-form next-form
-     :order-form-ui next-ui
-     :order-form-runtime (cleared-runtime-state state)}))
+    (enforce-field-ownership
+     state
+     {:order-form next-form
+      :order-form-ui next-ui
+      :order-form-runtime (cleared-runtime-state state)})))
 
 (defn select-pro-order-type [state order-type]
-  (let [form (trading/raw-order-form-draft state)
+  (let [form (trading/order-form-draft state)
         ui-state (trading/order-form-ui-state state)
         next-type (trading/normalize-pro-order-type order-type)
         normalized (trading/normalize-order-form state
@@ -61,40 +87,50 @@
         next-ui (trading/effective-order-form-ui
                  next-form
                  (assoc ui-state :pro-order-type-dropdown-open? false))]
-    {:order-form next-form
-     :order-form-ui next-ui
-     :order-form-runtime (cleared-runtime-state state)}))
+    (enforce-field-ownership
+     state
+     {:order-form next-form
+      :order-form-ui next-ui
+      :order-form-runtime (cleared-runtime-state state)})))
 
 (defn toggle-pro-order-type-dropdown [state]
   (let [ui-state (trading/order-form-ui-state state)
         open? (boolean (:pro-order-type-dropdown-open? ui-state))]
-    {:order-form-ui (assoc ui-state :pro-order-type-dropdown-open? (not open?))}))
+    (enforce-field-ownership
+     state
+     {:order-form-ui (assoc ui-state :pro-order-type-dropdown-open? (not open?))})))
 
 (defn close-pro-order-type-dropdown [state]
-  {:order-form-ui (assoc (trading/order-form-ui-state state)
-                         :pro-order-type-dropdown-open? false)})
+  (enforce-field-ownership
+   state
+   {:order-form-ui (assoc (trading/order-form-ui-state state)
+                          :pro-order-type-dropdown-open? false)}))
 
 (defn handle-pro-order-type-dropdown-keydown [state key]
   (when (= key "Escape")
     (close-pro-order-type-dropdown state)))
 
 (defn set-order-ui-leverage [state leverage]
-  (let [form (trading/raw-order-form-draft state)
+  (let [form (trading/order-form-draft state)
         normalized (trading/normalize-ui-leverage state leverage)
         updated (assoc form :ui-leverage normalized)
         next-form (trading/sync-size-from-percent state updated)]
-    {:order-form next-form
-     :order-form-runtime (cleared-runtime-state state)}))
+    (enforce-field-ownership
+     state
+     {:order-form next-form
+      :order-form-runtime (cleared-runtime-state state)})))
 
 (defn set-order-size-percent [state percent]
-  (let [form (trading/raw-order-form-draft state)
+  (let [form (trading/order-form-draft state)
         next-form (trading/apply-size-percent state form percent)]
-    {:order-form next-form
-     :order-form-runtime (cleared-runtime-state state)}))
+    (enforce-field-ownership
+     state
+     {:order-form next-form
+      :order-form-runtime (cleared-runtime-state state)})))
 
 (defn set-order-size-display [state value]
   (let [raw-value (str (or value ""))
-        form (trading/raw-order-form-draft state)
+        form (trading/order-form-draft state)
         normalized-form (trading/normalize-order-form state form)
         reference-price (trading/reference-price state normalized-form)
         parsed-display-size (trading/parse-num raw-value)
@@ -115,11 +151,13 @@
 
                     :else
                     (assoc updated :size-percent 0))]
-    {:order-form next-form
-     :order-form-runtime (cleared-runtime-state state)}))
+    (enforce-field-ownership
+     state
+     {:order-form next-form
+      :order-form-runtime (cleared-runtime-state state)})))
 
 (defn focus-order-price-input [state]
-  (let [form (trading/raw-order-form-draft state)
+  (let [form (trading/order-form-draft state)
         ui-state (trading/order-form-ui-state state)
         normalized-form (trading/normalize-order-form state form)
         raw-price (or (:price normalized-form) "")
@@ -136,21 +174,25 @@
         next-ui (trading/effective-order-form-ui
                  next-form
                  (assoc ui-state :price-input-focused? true))]
-    {:order-form next-form
-     :order-form-ui next-ui
-     :order-form-runtime (cleared-runtime-state state)}))
+    (enforce-field-ownership
+     state
+     {:order-form next-form
+      :order-form-ui next-ui
+      :order-form-runtime (cleared-runtime-state state)})))
 
 (defn blur-order-price-input [state]
-  (let [form (trading/raw-order-form-draft state)
+  (let [form (trading/order-form-draft state)
         ui-state (trading/order-form-ui-state state)
         next-ui (trading/effective-order-form-ui
                  form
                  (assoc ui-state :price-input-focused? false))]
-    {:order-form-ui next-ui
-     :order-form-runtime (cleared-runtime-state state)}))
+    (enforce-field-ownership
+     state
+     {:order-form-ui next-ui
+      :order-form-runtime (cleared-runtime-state state)})))
 
 (defn set-order-price-to-mid [state]
-  (let [form (trading/raw-order-form-draft state)
+  (let [form (trading/order-form-draft state)
         normalized-form (trading/normalize-order-form state form)
         mid-price-string (trading/mid-price-string state normalized-form)
         updated (if (seq mid-price-string)
@@ -160,11 +202,13 @@
                            (pos? (or (trading/parse-num (:size-percent updated)) 0)))
                     (trading/sync-size-from-percent state updated)
                     updated)]
-    {:order-form next-form
-     :order-form-runtime (cleared-runtime-state state)}))
+    (enforce-field-ownership
+     state
+     {:order-form next-form
+      :order-form-runtime (cleared-runtime-state state)})))
 
 (defn toggle-order-tpsl-panel [state]
-  (let [form (trading/raw-order-form-draft state)
+  (let [form (trading/order-form-draft state)
         ui-state (trading/order-form-ui-state state)
         normalized-form (trading/normalize-order-form state form)]
     (when (not= :scale (:type normalized-form))
@@ -175,19 +219,23 @@
             next-ui (trading/effective-order-form-ui
                      next-form
                      (assoc ui-state :tpsl-panel-open? next-open?))]
-        {:order-form next-form
-         :order-form-ui next-ui
-         :order-form-runtime (cleared-runtime-state state)}))))
+        (enforce-field-ownership
+         state
+         {:order-form next-form
+          :order-form-ui next-ui
+          :order-form-runtime (cleared-runtime-state state)})))))
 
 (defn update-order-form [state path value]
   (if (ui-only-form-path? path)
-    {:order-form-runtime (cleared-runtime-state state)}
+    (enforce-field-ownership
+     state
+     {:order-form-runtime (cleared-runtime-state state)})
     (let [normalized-value (cond
                              (= path [:type]) (:value (trading/order-type-value value))
                              (= path [:side]) (:value (trading/side-value value))
                              (= path [:tif]) (:value (trading/tif-value value))
                              :else value)
-          form (trading/raw-order-form-draft state)
+          form (trading/order-form-draft state)
           updated (assoc-in form path normalized-value)
           next-form (cond
                       (= path [:type])
@@ -207,5 +255,7 @@
 
                       :else
                       updated)]
-      {:order-form next-form
-       :order-form-runtime (cleared-runtime-state state)})))
+      (enforce-field-ownership
+       state
+       {:order-form next-form
+        :order-form-runtime (cleared-runtime-state state)}))))

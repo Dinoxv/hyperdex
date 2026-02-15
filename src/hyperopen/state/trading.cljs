@@ -54,6 +54,11 @@
    :price-input-focused?
    :tpsl-panel-open?])
 
+(def ^:private ui-owned-order-form-keys
+  [:entry-mode
+   :ui-leverage
+   :size-display])
+
 (def ^:private legacy-order-form-runtime-keys
   [:submitting?
    :error])
@@ -62,6 +67,16 @@
          build-order-request
          market-identity
          market-max-leverage)
+
+(defn order-form-ui-overrides-from-form
+  "Extract UI-owned order-form fields from a normalized working form."
+  [form]
+  (select-keys (or form {}) ui-owned-order-form-keys))
+
+(defn persist-order-form
+  "Strip UI-owned order-form fields from persisted domain draft payloads."
+  [form]
+  (reduce dissoc (or form {}) ui-owned-order-form-keys))
 
 (defn normalize-order-form-ui [ui]
   (order-form-state/normalize-order-form-ui ui))
@@ -76,6 +91,12 @@
         normalized-ui (normalize-order-form-ui ui)
         order-type (normalize-order-type (:type normalized-form))]
     (cond-> normalized-ui
+      true (assoc :entry-mode (entry-mode-for-type order-type)
+                  :ui-leverage (or (:ui-leverage normalized-form)
+                                   (:ui-leverage normalized-ui))
+                  :size-display (if (contains? normalized-form :size-display)
+                                  (or (:size-display normalized-form) "")
+                                  (or (:size-display normalized-ui) "")))
       (not (limit-like-type? order-type)) (assoc :price-input-focused? false)
       (= :scale order-type) (assoc :tpsl-panel-open? false))))
 
@@ -85,17 +106,35 @@
   (let [form (:order-form state)]
     (if (map? form) form (default-order-form))))
 
+(defn- compose-order-form-with-ui
+  [form ui]
+  (let [base (or form {})
+        entry-mode (or (:entry-mode base) (:entry-mode ui))
+        ui-leverage (or (:ui-leverage base) (:ui-leverage ui))
+        size-display (if (contains? base :size-display)
+                       (:size-display base)
+                       (:size-display ui))]
+    (assoc base
+           :entry-mode entry-mode
+           :ui-leverage ui-leverage
+           :size-display (or size-display ""))))
+
 (defn order-form-draft
   "Return normalized order draft for domain/application reads."
   [state]
-  (normalize-order-form state (raw-order-form-draft state)))
+  (let [raw-form (raw-order-form-draft state)
+        raw-ui (normalize-order-form-ui (:order-form-ui state))
+        composed (compose-order-form-with-ui raw-form raw-ui)]
+    (normalize-order-form state composed)))
 
 (defn order-form-ui-state
   "Return effective UI flags for order form from :order-form-ui."
   [state]
   (let [ui-state (:order-form-ui state)
-        normalized-form (order-form-draft state)]
-    (effective-order-form-ui normalized-form ui-state)))
+        normalized-form (order-form-draft state)
+        normalized-ui (merge (normalize-order-form-ui ui-state)
+                             (order-form-ui-overrides-from-form normalized-form))]
+    (effective-order-form-ui normalized-form normalized-ui)))
 
 (defn order-form-runtime-state
   "Return normalized runtime workflow state for order form."
