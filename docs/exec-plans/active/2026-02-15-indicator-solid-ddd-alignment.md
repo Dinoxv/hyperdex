@@ -23,6 +23,8 @@ The indicator system still has domain math in view namespaces, fallback dispatch
 - [x] (2026-02-15 15:32Z) Validated Milestone 3 batch A with required gates: `npm run check`, `npm test`, `npm run test:websocket`.
 - [x] (2026-02-15 15:48Z) Milestone 3 batch B completed: migrated wave2 flow family (`:net-volume`, `:on-balance-volume`, `:price-volume-trend`, `:volume-oscillator`) into domain flow and removed wave2 duplicates.
 - [x] (2026-02-15 15:48Z) Validated Milestone 3 batch B with required gates: `npm run check`, `npm test`, `npm run test:websocket`.
+- [x] (2026-02-15 15:54Z) Milestone 3 batch C completed: migrated wave2 moving-average variants (`:double-ema`, `:hull-moving-average`, `:moving-average-double`, `:moving-average-exponential`, `:moving-average-triple`, `:moving-average-weighted`, `:smoothed-moving-average`, `:triple-ema`) into domain trend and removed wave2 duplicates.
+- [x] (2026-02-15 15:54Z) Validated Milestone 3 batch C with required gates: `npm run check`, `npm test`, `npm run test:websocket`.
 - [ ] Milestone 3 in progress: continue wave2 family-by-family extraction (trend/volume/channel groups) until wave2 fallback can be retired.
 - [ ] Milestone 4 pending: harden boundaries (math adapter isolation, contract validation, parity/performance tests), then retire wave fallbacks.
 
@@ -42,6 +44,8 @@ The indicator system still has domain math in view namespaces, fallback dispatch
   Evidence: moved `:median-price`, `:typical-price`, and `:momentum` to domain code and full required suites remained green.
 - Observation: `indicatorts`-backed wave2 flow calculators can move to domain cleanly when style metadata remains in the adapter map.
   Evidence: migrated `:on-balance-volume`, `:price-volume-trend`, and `:volume-oscillator` to domain flow, removed wave2 handlers, and required suites remained green.
+- Observation: Moving-average overlays from wave2 can be semantically consolidated into the trend namespace without changing chart output contracts.
+  Evidence: migrated eight MA-variant IDs into domain trend, updated adapter style mappings, removed wave2 calculators, and required suites remained green.
 
 ## Decision Log
 
@@ -66,10 +70,13 @@ The indicator system still has domain math in view namespaces, fallback dispatch
 - Decision: Take wave2 flow-family indicators as the next migration batch after the starter slice.
   Rationale: The family is cohesive and already semantically aligned with `domain.trading.indicators.flow`, making it a low-risk extension of existing domain ownership.
   Date/Author: 2026-02-15 / Codex
+- Decision: Follow flow-family migration with wave2 moving-average variants in `domain.trading.indicators.trend`.
+  Rationale: These overlays are conceptually trend indicators and share math helpers already present in trend, enabling coherent semantic extraction with contained risk.
+  Date/Author: 2026-02-15 / Codex
 
 ## Outcomes & Retrospective
 
-Milestone 1 achieved the immediate separation-of-concerns target. Milestone 2 is fully complete with wave3 retired from runtime wiring. Milestone 3 is now active with two completed wave2 batches (starter + flow family) validated; remaining migration scope is the rest of wave2 plus boundary-hardening tasks.
+Milestone 1 achieved the immediate separation-of-concerns target. Milestone 2 is fully complete with wave3 retired from runtime wiring. Milestone 3 is now active with three completed wave2 batches (starter + flow + moving-average variants) validated; remaining migration scope is the rest of wave2 plus boundary-hardening tasks.
 
 ## Context and Orientation
 
@@ -154,3 +161,4 @@ Plan revision note: 2026-02-15 15:25Z - Updated living sections after completing
 Plan revision note: 2026-02-15 15:29Z - Updated living sections after completing Milestone 2 batch C and retiring wave3 runtime fallback.
 Plan revision note: 2026-02-15 15:32Z - Updated living sections after completing Milestone 3 wave2 starter batch and validation.
 Plan revision note: 2026-02-15 15:48Z - Updated living sections after completing Milestone 3 wave2 flow-family batch and validation.
+Plan revision note: 2026-02-15 15:54Z - Updated living sections after completing Milestone 3 wave2 moving-average-variants batch and validation.

@@ -1,6 +1,7 @@
 (ns hyperopen.domain.trading.indicators.trend
   (:require [hyperopen.domain.trading.indicators.math :as imath]
-            [hyperopen.domain.trading.indicators.result :as result]))
+            [hyperopen.domain.trading.indicators.result :as result]
+            ["indicatorts" :refer [dema ema rma tema]]))
 
 (def ^:private trend-indicator-definitions
   [{:id :alma
@@ -42,6 +43,86 @@
     :min-period 2
     :max-period 200
     :default-config {:period 20}}
+   {:id :double-ema
+    :name "Double EMA"
+    :short-name "DEMA"
+    :description "Double exponential moving average"
+    :supports-period? true
+    :default-period 20
+    :min-period 2
+    :max-period 400
+    :default-config {:period 20}
+    :migrated-from :wave2}
+   {:id :hull-moving-average
+    :name "Hull Moving Average"
+    :short-name "HMA"
+    :description "Weighted moving average with reduced lag"
+    :supports-period? true
+    :default-period 21
+    :min-period 2
+    :max-period 400
+    :default-config {:period 21}
+    :migrated-from :wave2}
+   {:id :moving-average-double
+    :name "Moving Average Double"
+    :short-name "MA Double"
+    :description "Alias of DEMA"
+    :supports-period? true
+    :default-period 20
+    :min-period 2
+    :max-period 400
+    :default-config {:period 20}
+    :migrated-from :wave2}
+   {:id :moving-average-exponential
+    :name "Moving Average Exponential"
+    :short-name "EMA"
+    :description "Exponential moving average"
+    :supports-period? true
+    :default-period 20
+    :min-period 2
+    :max-period 400
+    :default-config {:period 20}
+    :migrated-from :wave2}
+   {:id :moving-average-triple
+    :name "Moving Average Triple"
+    :short-name "MA Triple"
+    :description "Alias of TEMA"
+    :supports-period? true
+    :default-period 20
+    :min-period 2
+    :max-period 400
+    :default-config {:period 20}
+    :migrated-from :wave2}
+   {:id :moving-average-weighted
+    :name "Moving Average Weighted"
+    :short-name "WMA"
+    :description "Linearly weighted moving average"
+    :supports-period? true
+    :default-period 20
+    :min-period 2
+    :max-period 400
+    :default-config {:period 20}
+    :migrated-from :wave2}
+   {:id :smoothed-moving-average
+    :name "Smoothed Moving Average"
+    :short-name "SMMA"
+    :description "Rolling moving average (RMA)"
+    :supports-period? true
+    :default-period 14
+    :min-period 2
+    :max-period 400
+    :default-config {:period 14}
+    :migrated-from :wave2}
+   {:id :triple-ema
+    :name "Triple EMA"
+    :short-name "TEMA"
+    :description "Triple exponential moving average"
+    :supports-period? true
+    :default-period 20
+    :min-period 2
+    :max-period 400
+    :default-config {:period 20}
+    :migrated-from :wave2}
    {:id :guppy-multiple-moving-average
     :name "Guppy Multiple Moving Average"
     :short-name "GMMA"
@@ -101,6 +182,7 @@
 (def ^:private finite-number? imath/finite-number?)
 (def ^:private parse-period imath/parse-period)
 (def ^:private field-values imath/field-values)
+(def ^:private normalize-values imath/normalize-values)
 
 (defn- window-for-index
   [values idx period]
@@ -155,6 +237,34 @@
                          (fn [window]
                            (reduce + 0 (map * window weights)))
                          :aligned)))
+
+(defn- aligned-window-for-index
+  [values idx period]
+  (imath/window-for-index values idx period :aligned))
+
+(defn- wma-values
+  [values period]
+  (let [weights (range 1 (inc period))
+        divisor (reduce + 0 weights)]
+    (mapv (fn [idx]
+            (when-let [window (aligned-window-for-index values idx period)]
+              (when (every? finite-number? window)
+                (/ (reduce + 0 (map * window weights)) divisor))))
+          (range (count values)))))
+
+(defn- hull-values
+  [close-values period]
+  (let [half-period (max 1 (int (js/Math.floor (/ period 2))))
+        sqrt-period (max 1 (int (js/Math.floor (js/Math.sqrt period))))
+        wma-half (wma-values close-values half-period)
+        wma-full (wma-values close-values period)
+        diff-values (mapv (fn [idx]
+                            (let [a (nth wma-half idx)
+                                  b (nth wma-full idx)]
+                              (when (and (finite-number? a) (finite-number? b))
+                                (- (* 2 a) b))))
+                          (range (count close-values)))]
+    (wma-values diff-values sqrt-period)))
 
 (defn- alma-weights
   [period offset sigma]
@@ -306,6 +416,82 @@
                              :separate
                              [(result/line-series :adx adx-values)])))
 
+(defn- calculate-double-ema
+  [data params]
+  (let [period (parse-period (:period params) 20 2 400)
+        values (normalize-values
+                (dema (into-array (field-values data :close))
+                      #js {:period period}))]
+    (result/indicator-result :double-ema
+                             :overlay
+                             [(result/line-series :dema values)])))
+
+(defn- calculate-hull-moving-average
+  [data params]
+  (let [period (parse-period (:period params) 21 2 400)
+        values (hull-values (field-values data :close) period)]
+    (result/indicator-result :hull-moving-average
+                             :overlay
+                             [(result/line-series :hma values)])))
+
+(defn- calculate-moving-average-double
+  [data params]
+  (let [period (parse-period (:period params) 20 2 400)
+        values (normalize-values
+                (dema (into-array (field-values data :close))
+                      #js {:period period}))]
+    (result/indicator-result :moving-average-double
+                             :overlay
+                             [(result/line-series :double values)])))
+
+(defn- calculate-moving-average-exponential
+  [data params]
+  (let [period (parse-period (:period params) 20 2 400)
+        values (normalize-values
+                (ema (into-array (field-values data :close))
+                     #js {:period period}))]
+    (result/indicator-result :moving-average-exponential
+                             :overlay
+                             [(result/line-series :ema values)])))
+
+(defn- calculate-moving-average-triple
+  [data params]
+  (let [period (parse-period (:period params) 20 2 400)
+        values (normalize-values
+                (tema (into-array (field-values data :close))
+                      #js {:period period}))]
+    (result/indicator-result :moving-average-triple
+                             :overlay
+                             [(result/line-series :triple values)])))
+
+(defn- calculate-moving-average-weighted
+  [data params]
+  (let [period (parse-period (:period params) 20 2 400)
+        values (wma-values (field-values data :close) period)]
+    (result/indicator-result :moving-average-weighted
+                             :overlay
+                             [(result/line-series :wma values)])))
+
+(defn- calculate-smoothed-moving-average
+  [data params]
+  (let [period (parse-period (:period params) 14 2 400)
+        values (normalize-values
+                (rma (into-array (field-values data :close))
+                     #js {:period period}))]
+    (result/indicator-result :smoothed-moving-average
+                             :overlay
+                             [(result/line-series :smma values)])))
+
+(defn- calculate-triple-ema
+  [data params]
+  (let [period (parse-period (:period params) 20 2 400)
+        values (normalize-values
+                (tema (into-array (field-values data :close))
+                      #js {:period period}))]
+    (result/indicator-result :triple-ema
+                             :overlay
+                             [(result/line-series :tema values)])))
+
 (defn- calculate-guppy-multiple-moving-average
   [data _params]
   (let [close-values (field-values data :close)
@@ -418,15 +604,23 @@
   {:alma calculate-alma
    :aroon calculate-aroon
    :adx calculate-adx
+   :double-ema calculate-double-ema
    :guppy-multiple-moving-average calculate-guppy-multiple-moving-average
+   :hull-moving-average calculate-hull-moving-average
    :mcginley-dynamic calculate-mcginley-dynamic
    :moving-average-adaptive calculate-moving-average-adaptive
+   :moving-average-double calculate-moving-average-double
+   :moving-average-exponential calculate-moving-average-exponential
    :moving-average-hamming calculate-moving-average-hamming
+   :moving-average-triple calculate-moving-average-triple
+   :moving-average-weighted calculate-moving-average-weighted
    :sma (fn [data params]
           (result/indicator-result :sma
                                    :overlay
                                    [(result/line-series :sma
                                                         (calculate-sma-values data (:period params 20)))]))
+   :smoothed-moving-average calculate-smoothed-moving-average
+   :triple-ema calculate-triple-ema
    :williams-alligator calculate-williams-alligator})
 
 (defn calculate-trend-indicator

@@ -48,6 +48,14 @@
    [:median-price :median] {:name "Median" :color "#a3e635"}
    [:typical-price :typical] {:name "Typical Price" :color "#a3e635"}
    [:momentum :momentum] {:name "Momentum" :color "#f97316"}
+   [:double-ema :dema] {:name "DEMA" :color "#22d3ee"}
+   [:hull-moving-average :hma] {:name "HMA" :color "#f97316"}
+   [:moving-average-double :double] {:name "MA Double" :color "#22d3ee"}
+   [:moving-average-exponential :ema] {:name "EMA" :color "#38bdf8"}
+   [:moving-average-triple :triple] {:name "MA Triple" :color "#22d3ee"}
+   [:moving-average-weighted :wma] {:name "WMA" :color "#38bdf8"}
+   [:smoothed-moving-average :smma] {:name "SMMA" :color "#22d3ee"}
+   [:triple-ema :tema] {:name "TEMA" :color "#22d3ee"}
    [:on-balance-volume :obv] {:name "OBV" :color "#22c55e"}
    [:price-volume-trend :pvt] {:name "PVT" :color "#06b6d4"}
    [:volume-oscillator :pvo] {:name "PVO" :color "#38bdf8"}

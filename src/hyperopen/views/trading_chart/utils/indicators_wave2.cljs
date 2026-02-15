@@ -1,6 +1,6 @@
 (ns hyperopen.views.trading-chart.utils.indicators-wave2
   (:require [hyperopen.domain.trading.indicators.math :as imath]
-            ["indicatorts" :refer [apo cci cmf cmo dema ema emv fi ichimokuCloud kc macd mfi mi movingLeastSquare movingLinearRegressionUsingLeastSquare psar rma rsi stoch tema trix vortex vwap vwma willr]]))
+            ["indicatorts" :refer [apo cci cmf cmo ema emv fi ichimokuCloud kc macd mfi mi movingLeastSquare movingLinearRegressionUsingLeastSquare psar rsi stoch trix vortex vwap vwma willr]]))
 
 (def ^:private wave2-indicator-definitions
   [{:id :bollinger-bands-percent-b
@@ -93,15 +93,6 @@
     :min-period 2
     :max-period 400
     :default-config {:period 20}}
-   {:id :double-ema
-    :name "Double EMA"
-    :short-name "DEMA"
-    :description "Double exponential moving average"
-    :supports-period? true
-    :default-period 20
-    :min-period 2
-    :max-period 400
-    :default-config {:period 20}}
    {:id :ease-of-movement
     :name "Ease Of Movement"
     :short-name "EOM"
@@ -147,15 +138,6 @@
     :max-period 400
     :default-config {:period 20
                      :annualization 365}}
-   {:id :hull-moving-average
-    :name "Hull Moving Average"
-    :short-name "HMA"
-    :description "Weighted moving average with reduced lag"
-    :supports-period? true
-    :default-period 21
-    :min-period 2
-    :max-period 400
-    :default-config {:period 21}}
    {:id :ichimoku-cloud
     :name "Ichimoku Cloud"
     :short-name "ICHI"
@@ -249,48 +231,12 @@
     :max-period 400
     :default-config {:period 20
                      :multiplier 1.5}}
-   {:id :moving-average-double
-    :name "Moving Average Double"
-    :short-name "MA Double"
-    :description "Alias of DEMA"
-    :supports-period? true
-    :default-period 20
-    :min-period 2
-    :max-period 400
-    :default-config {:period 20}}
-   {:id :moving-average-exponential
-    :name "Moving Average Exponential"
-    :short-name "EMA"
-    :description "Exponential moving average"
-    :supports-period? true
-    :default-period 20
-    :min-period 2
-    :max-period 400
-    :default-config {:period 20}}
    {:id :moving-average-multiple
     :name "Moving Average Multiple"
     :short-name "MA Multi"
     :description "Multiple moving averages (5, 10, 20, 50)"
     :supports-period? false
     :default-config {:periods [5 10 20 50]}}
-   {:id :moving-average-triple
-    :name "Moving Average Triple"
-    :short-name "MA Triple"
-    :description "Alias of TEMA"
-    :supports-period? true
-    :default-period 20
-    :min-period 2
-    :max-period 400
-    :default-config {:period 20}}
-   {:id :moving-average-weighted
-    :name "Moving Average Weighted"
-    :short-name "WMA"
-    :description "Linearly weighted moving average"
-    :supports-period? true
-    :default-period 20
-    :min-period 2
-    :max-period 400
-    :default-config {:period 20}}
    {:id :parabolic-sar
     :name "Parabolic SAR"
     :short-name "PSAR"
@@ -314,15 +260,6 @@
     :supports-period? false
     :default-config {:fast 12
                      :slow 26}}
-   {:id :smoothed-moving-average
-    :name "Smoothed Moving Average"
-    :short-name "SMMA"
-    :description "Rolling moving average (RMA)"
-    :supports-period? true
-    :default-period 14
-    :min-period 2
-    :max-period 400
-    :default-config {:period 14}}
    {:id :stochastic
     :name "Stochastic"
     :short-name "Stoch"
@@ -349,15 +286,6 @@
     :max-period 200
     :default-config {:period 10
                      :multiplier 3}}
-   {:id :triple-ema
-    :name "Triple EMA"
-    :short-name "TEMA"
-    :description "Triple exponential moving average"
-    :supports-period? true
-    :default-period 20
-    :min-period 2
-    :max-period 400
-    :default-config {:period 20}}
    {:id :trix
     :name "TRIX"
     :short-name "TRIX"
@@ -579,30 +507,6 @@
      :upper upper
      :lower lower
      :stdev stdev-values}))
-
-(defn- wma-values
-  [values period]
-  (let [weights (range 1 (inc period))
-        divisor (reduce + 0 weights)]
-    (mapv (fn [idx]
-            (when-let [window (window-for-index values idx period)]
-              (when (every? finite-number? window)
-                (/ (reduce + 0 (map * window weights)) divisor))))
-          (range (count values)))))
-
-(defn- hull-values
-  [close-values period]
-  (let [half-period (max 1 (int (js/Math.floor (/ period 2))))
-        sqrt-period (max 1 (int (js/Math.floor (js/Math.sqrt period))))
-        wma-half (wma-values close-values half-period)
-        wma-full (wma-values close-values period)
-        diff-values (mapv (fn [idx]
-                            (let [a (nth wma-half idx)
-                                  b (nth wma-full idx)]
-                              (when (and (finite-number? a) (finite-number? b))
-                                (- (* 2 a) b))))
-                          (range (count close-values)))]
-    (wma-values diff-values sqrt-period)))
 
 (defn- log-return-values
   [close-values]
@@ -827,17 +731,6 @@
                        (line-series :middle "Donchian Mid" "#f59e0b" time-values middle)
                        (line-series :lower "Donchian Lower" "#ef4444" time-values lower)])))
 
-(defn- calculate-double-ema
-  [data params]
-  (let [period (parse-period (:period params) 20 2 400)
-        time-values (times data)
-        values (normalize-values
-                (dema (js-array (closes data))
-                      #js {:period period}))]
-    (indicator-result :double-ema
-                      :overlay
-                      [(line-series :dema "DEMA" "#22d3ee" time-values values)])))
-
 (defn- calculate-ease-of-movement
   [data params]
   (let [period (parse-period (:period params) 14 2 200)
@@ -911,15 +804,6 @@
     (indicator-result :historical-volatility
                       :separate
                       [(line-series :hv "HV" "#a855f7" time-values hv-values)])))
-
-(defn- calculate-hull-moving-average
-  [data params]
-  (let [period (parse-period (:period params) 21 2 400)
-        time-values (times data)
-        values (hull-values (closes data) period)]
-    (indicator-result :hull-moving-average
-                      :overlay
-                      [(line-series :hma "HMA" "#f97316" time-values values)])))
 
 (defn- calculate-ichimoku-cloud
   [data params]
@@ -1117,28 +1001,6 @@
                        (line-series :basis "MAC Mid" "#f59e0b" time-values basis)
                        (line-series :lower "MAC Lower" "#ef4444" time-values lower)])))
 
-(defn- calculate-moving-average-double
-  [data params]
-  (let [period (parse-period (:period params) 20 2 400)
-        values (normalize-values
-                (dema (js-array (closes data))
-                      #js {:period period}))
-        time-values (times data)]
-    (indicator-result :moving-average-double
-                      :overlay
-                      [(line-series :double "MA Double" "#22d3ee" time-values values)])))
-
-(defn- calculate-moving-average-exponential
-  [data params]
-  (let [period (parse-period (:period params) 20 2 400)
-        values (normalize-values
-                (ema (js-array (closes data))
-                     #js {:period period}))
-        time-values (times data)]
-    (indicator-result :moving-average-exponential
-                      :overlay
-                      [(line-series :ema "EMA" "#38bdf8" time-values values)])))
-
 (defn- calculate-moving-average-multiple
   [data params]
   (let [periods (or (:periods params) [5 10 20 50])
@@ -1158,26 +1020,6 @@
     (indicator-result :moving-average-multiple
                       :overlay
                       (vec series))))
-
-(defn- calculate-moving-average-triple
-  [data params]
-  (let [period (parse-period (:period params) 20 2 400)
-        values (normalize-values
-                (tema (js-array (closes data))
-                      #js {:period period}))
-        time-values (times data)]
-    (indicator-result :moving-average-triple
-                      :overlay
-                      [(line-series :triple "MA Triple" "#22d3ee" time-values values)])))
-
-(defn- calculate-moving-average-weighted
-  [data params]
-  (let [period (parse-period (:period params) 20 2 400)
-        values (wma-values (closes data) period)
-        time-values (times data)]
-    (indicator-result :moving-average-weighted
-                      :overlay
-                      [(line-series :wma "WMA" "#38bdf8" time-values values)])))
 
 (defn- calculate-parabolic-sar
   [data params]
@@ -1226,17 +1068,6 @@
     (indicator-result :price-oscillator
                       :separate
                       [(line-series :apo "APO" "#eab308" time-values values)])))
-
-(defn- calculate-smoothed-moving-average
-  [data params]
-  (let [period (parse-period (:period params) 14 2 400)
-        values (normalize-values
-                (rma (js-array (closes data))
-                     #js {:period period}))
-        time-values (times data)]
-    (indicator-result :smoothed-moving-average
-                      :overlay
-                      [(line-series :smma "SMMA" "#22d3ee" time-values values)])))
 
 (defn- calculate-stochastic
   [data params]
@@ -1377,17 +1208,6 @@
                       [(line-series :up "SuperTrend Up" "#22c55e" time-values up-line)
                        (line-series :down "SuperTrend Down" "#ef4444" time-values down-line)])))
 
-(defn- calculate-triple-ema
-  [data params]
-  (let [period (parse-period (:period params) 20 2 400)
-        values (normalize-values
-                (tema (js-array (closes data))
-                      #js {:period period}))
-        time-values (times data)]
-    (indicator-result :triple-ema
-                      :overlay
-                      [(line-series :tema "TEMA" "#22d3ee" time-values values)])))
-
 (defn- calculate-trix
   [data params]
   (let [period (parse-period (:period params) 15 2 400)
@@ -1464,13 +1284,11 @@
    :detrended-price-oscillator calculate-detrended-price-oscillator
    :directional-movement calculate-directional-movement
    :donchian-channels calculate-donchian-channels
-   :double-ema calculate-double-ema
    :ease-of-movement calculate-ease-of-movement
    :elders-force-index calculate-elders-force-index
    :ema-cross calculate-ema-cross
    :envelopes calculate-envelopes
    :historical-volatility calculate-historical-volatility
-   :hull-moving-average calculate-hull-moving-average
    :ichimoku-cloud calculate-ichimoku-cloud
    :keltner-channels calculate-keltner-channels
    :least-squares-moving-average calculate-least-squares-moving-average
@@ -1482,19 +1300,13 @@
    :mass-index calculate-mass-index
    :money-flow-index calculate-money-flow-index
    :moving-average-channel calculate-moving-average-channel
-   :moving-average-double calculate-moving-average-double
-   :moving-average-exponential calculate-moving-average-exponential
    :moving-average-multiple calculate-moving-average-multiple
-   :moving-average-triple calculate-moving-average-triple
-   :moving-average-weighted calculate-moving-average-weighted
    :parabolic-sar calculate-parabolic-sar
    :price-channel calculate-price-channel
    :price-oscillator calculate-price-oscillator
-   :smoothed-moving-average calculate-smoothed-moving-average
    :stochastic calculate-stochastic
    :stochastic-rsi calculate-stochastic-rsi
    :supertrend calculate-supertrend
-   :triple-ema calculate-triple-ema
    :trix calculate-trix
    :vortex-indicator calculate-vortex-indicator
    :vwap calculate-vwap
