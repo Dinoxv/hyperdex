@@ -8,14 +8,18 @@
                      (swap! calls conj [body opts])
                      (js/Promise.resolve []))]
     (orders/request-frontend-open-orders! post-info! "0xabc" nil {})
+    (orders/request-frontend-open-orders! post-info! "0xabc" "" {})
     (orders/request-frontend-open-orders! post-info! "0xabc" "vault" {:priority :low})
     (is (= [{"type" "frontendOpenOrders"
+             "user" "0xabc"}
+            {"type" "frontendOpenOrders"
              "user" "0xabc"}
             {"type" "frontendOpenOrders"
              "user" "0xabc"
              "dex" "vault"}]
            (mapv first @calls)))
     (is (= [{:priority :high}
+            {:priority :high}
             {:priority :low}]
            (mapv second @calls)))))
 
@@ -42,6 +46,47 @@
                    (is (= 2 (count rows)))
                    (is (= "SOL" (get-in rows [0 :order :coin])))
                    (is (= "BTC" (get-in rows [1 :order :coin])))
+                   (done)))
+          (.catch (fn [err]
+                    (is false (str "Unexpected error: " err))
+                    (done)))))))
+
+(deftest request-historical-orders-normalizes-sequential-payload-and-filters-invalid-rows-test
+  (async done
+    (let [post-info! (fn [_body _opts]
+                       (js/Promise.resolve [nil
+                                            {:coin "SOL" :oid 9}
+                                            "invalid-row"
+                                            {:order {:coin "BTC" :oid 1}}]))]
+      (-> (orders/request-historical-orders! post-info! "0xabc" {})
+          (.then (fn [rows]
+                   (is (= 2 (count rows)))
+                   (is (= "SOL" (get-in rows [0 :order :coin])))
+                   (is (= "BTC" (get-in rows [1 :order :coin])))
+                   (done)))
+          (.catch (fn [err]
+                    (is false (str "Unexpected error: " err))
+                    (done)))))))
+
+(deftest request-historical-orders-supports-alternative-map-payload-keys-test
+  (async done
+    (let [run-request (fn [payload]
+                        (orders/request-historical-orders!
+                         (fn [_body _opts]
+                           (js/Promise.resolve payload))
+                         "0xabc"
+                         {}))]
+      (-> (js/Promise.all
+           #js [(run-request {:historicalOrders [{:coin "ETH" :oid 2}]})
+                (run-request {:data [{:coin "DOGE" :oid 3}]})
+                (run-request {:data {:unexpected true}})
+                (run-request "not-a-map-or-seq")])
+          (.then (fn [results]
+                   (let [results* (vec (array-seq results))]
+                     (is (= "ETH" (get-in results* [0 0 :order :coin])))
+                     (is (= "DOGE" (get-in results* [1 0 :order :coin])))
+                     (is (= [] (nth results* 2)))
+                     (is (= [] (nth results* 3))))
                    (done)))
           (.catch (fn [err]
                     (is false (str "Unexpected error: " err))
