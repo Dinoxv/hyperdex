@@ -16,14 +16,17 @@
 
 (defn set-main-series-markers!
   "Attach/update markers on the main price series."
-  [chart-obj markers]
-  (when-let [main-series (when chart-obj (.-mainSeries ^js chart-obj))]
-    (let [{:keys [plugin series]} (marker-state chart-obj)
-          active-plugin (if (and plugin (identical? series main-series))
-                          plugin
-                          (let [created (createSeriesMarkers main-series #js [])]
-                            (set-marker-state! chart-obj {:plugin created
-                                                          :series main-series})
-                            created))
-          marker-data (if (sequential? markers) markers [])]
-      (.setMarkers ^js active-plugin (clj->js marker-data)))))
+  ([chart-obj markers]
+   (set-main-series-markers! chart-obj markers {}))
+  ([chart-obj markers {:keys [create-markers]
+                       :or {create-markers createSeriesMarkers}}]
+   (when-let [main-series (when chart-obj (.-mainSeries ^js chart-obj))]
+     (let [{:keys [plugin series]} (marker-state chart-obj)
+           active-plugin (if (and plugin (identical? series main-series))
+                           plugin
+                           (let [created (create-markers main-series #js [])]
+                             (set-marker-state! chart-obj {:plugin created
+                                                           :series main-series})
+                             created))
+           marker-data (if (sequential? markers) markers [])]
+       (.setMarkers ^js active-plugin (clj->js marker-data))))))

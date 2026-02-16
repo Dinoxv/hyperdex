@@ -18,7 +18,8 @@
                      (catch :default e
                        (js/console.warn "Error processing candle:" (pr-str c) e)
                        nil)))))
-         (sort-by :time))
+         (sort-by :time)
+         vec)
     []))
 
 (defn process-volume-data [candle-data]

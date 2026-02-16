@@ -1,7 +1,9 @@
 (ns hyperopen.views.trading-chart.core-test
   (:require [clojure.string :as str]
             [cljs.test :refer-macros [deftest is]]
-            [hyperopen.views.trading-chart.core :as chart-core]))
+            [hyperopen.views.trading-chart.core :as chart-core]
+            [hyperopen.views.trading-chart.utils.chart-interop :as chart-interop]
+            [hyperopen.views.trading-chart.utils.data-processing :as data-processing]))
 
 (defn- class-values [class-attr]
   (cond
@@ -110,7 +112,8 @@
                                         :timeframe-label "1D"
                                         :venue "Hyperopen"
                                         :candle-data []}
-                                       :1d)
+                                       :1d
+                                       {})
         classes (set (class-values (get-in canvas [1 :class])))
         bg-colors (set (collect-background-colors canvas))]
     (is (contains? classes "bg-base-100"))
@@ -239,3 +242,21 @@
                                                          :active-indicators {}}})
         cue-node (find-first-node menu #(= "chart-freshness-cue" (get-in % [1 :data-role])))]
     (is (nil? cue-node))))
+
+(deftest chart-candle-pipeline-smoke-test
+  (let [raw-data [{:t 1700000000000 :o "100.0" :h "105.0" :l "98.0" :c "103.0" :v "1000"}
+                  {:t 1700000060000 :o "103.0" :h "106.0" :l "102.0" :c "104.0" :v "900"}]
+        candles (data-processing/process-candle-data raw-data)
+        options* (atom nil)
+        data* (atom nil)
+        series #js {:applyOptions (fn [opts]
+                                    (reset! options* (js->clj opts :keywordize-keys true)))
+                    :setData (fn [points]
+                               (reset! data* (js->clj points :keywordize-keys true)))}]
+    (is (vector? candles))
+    (is (= 2 (count candles)))
+    (chart-interop/set-series-data! series candles :candlestick {:price-decimals 2})
+    (is (= "price" (get-in @options* [:priceFormat :type])))
+    (is (= 2 (get-in @options* [:priceFormat :precision])))
+    (is (= 2 (count @data*)))
+    (is (= 103.0 (:close (first @data*))))))

@@ -1,5 +1,6 @@
 (ns hyperopen.views.trading-chart.utils.chart-interop
   (:require ["lightweight-charts" :refer [createChart HistogramSeries]]
+            [hyperopen.schema.chart-interop-contracts :as chart-contracts]
             [hyperopen.views.trading-chart.utils.chart-interop.baseline :as baseline]
             [hyperopen.views.trading-chart.utils.chart-interop.indicators :as indicator-interop]
             [hyperopen.views.trading-chart.utils.chart-interop.legend :as legend]
@@ -125,33 +126,49 @@
 (defn sync-baseline-base-value-subscription!
   "Ensure baseline base-value subscription state matches current chart type."
   [chart-obj chart-type]
+  (when chart-obj
+    (chart-contracts/assert-chart-handle! chart-obj
+                                          {:boundary :chart-interop/sync-baseline
+                                           :chart-type chart-type}))
   (baseline/sync-baseline-base-value-subscription! chart-obj chart-type))
 
 (defn clear-baseline-base-value-subscription!
   "Clear baseline base-value subscription and sidecar state."
   [chart-obj]
+  (when chart-obj
+    (chart-contracts/assert-chart-handle! chart-obj
+                                          {:boundary :chart-interop/clear-baseline}))
   (baseline/clear-baseline-base-value-subscription! chart-obj))
 
 (defn set-series-data!
   "Set data for any series type with registry-based transformation."
-  [series* data chart-type]
-  (let [chart-type* (transforms/normalize-main-chart-type chart-type)
-        transformed-data (series/transform-main-series-data data chart-type*)
-        base-value (when (= chart-type* :baseline)
-                     (baseline/infer-baseline-base-value transformed-data))
-        price-format* (price-format/infer-series-price-format
-                       transformed-data
-                       (fn [points]
-                         (series/extract-series-prices points chart-type*)))
-        series-options (cond-> {:priceFormat price-format*}
-                         (some? base-value)
-                         (assoc :baseValue {:type "price" :price base-value}))]
-    (.applyOptions ^js series* (clj->js series-options))
-    (.setData series* (clj->js transformed-data))))
+  ([series* data chart-type]
+   (set-series-data! series* data chart-type {}))
+  ([series* data chart-type {:keys [price-decimals]}]
+   (chart-contracts/assert-candles! data
+                                    {:boundary :chart-interop/set-series-data
+                                     :chart-type chart-type})
+   (let [chart-type* (transforms/normalize-main-chart-type chart-type)
+         transformed-data (series/transform-main-series-data data chart-type*)
+         base-value (when (= chart-type* :baseline)
+                      (baseline/infer-baseline-base-value transformed-data))
+         price-format* (price-format/infer-series-price-format
+                        transformed-data
+                        (fn [points]
+                          (series/extract-series-prices points chart-type*))
+                        {:price-decimals price-decimals})
+         series-options (cond-> {:priceFormat price-format*}
+                          (some? base-value)
+                          (assoc :baseValue {:type "price" :price base-value}))]
+     (.applyOptions ^js series* (clj->js series-options))
+     (.setData series* (clj->js transformed-data)))))
 
 (defn set-volume-data!
   "Set volume data for volume series."
   [volume-series data]
+  (chart-contracts/assert-candles! data
+                                   {:boundary :chart-interop/set-volume-data}
+                                   {:require-volume? true})
   (let [volume-data (transforms/transform-data-for-volume data)]
     (.setData volume-series (clj->js volume-data))))
 
@@ -167,18 +184,32 @@
 
 (defn apply-persisted-visible-range!
   "Apply persisted visible range to chart time scale if available."
-  [chart timeframe]
-  (visible-range-persistence/apply-persisted-visible-range! chart timeframe))
+  ([chart timeframe]
+   (apply-persisted-visible-range! chart timeframe {}))
+  ([chart timeframe {:keys [storage-get] :as deps}]
+   (if (contains? deps :storage-get)
+     (visible-range-persistence/apply-persisted-visible-range! chart timeframe
+                                                               {:storage-get storage-get})
+     (visible-range-persistence/apply-persisted-visible-range! chart timeframe))))
 
 (defn subscribe-visible-range-persistence!
   "Subscribe to visible-range changes and persist them by timeframe."
-  [chart timeframe]
-  (visible-range-persistence/subscribe-visible-range-persistence! chart timeframe))
+  ([chart timeframe]
+   (subscribe-visible-range-persistence! chart timeframe {}))
+  ([chart timeframe {:keys [storage-set!] :as deps}]
+   (if (contains? deps :storage-set!)
+     (visible-range-persistence/subscribe-visible-range-persistence! chart timeframe
+                                                                     {:storage-set! storage-set!})
+     (visible-range-persistence/subscribe-visible-range-persistence! chart timeframe))))
 
 (defn create-legend!
   "Create legend element that adapts to different chart types."
-  [container chart legend-meta]
-  (legend/create-legend! container chart legend-meta))
+  ([container chart legend-meta]
+   (create-legend! container chart legend-meta {}))
+  ([container chart legend-meta deps]
+   (chart-contracts/assert-legend-meta! legend-meta
+                                        {:boundary :chart-interop/create-legend})
+   (legend/create-legend! container chart legend-meta deps)))
 
 (defn add-indicator-series!
   "Add an indicator series in the requested pane."
@@ -192,55 +223,72 @@
 
 (defn set-main-series-markers!
   "Attach/update markers on the main price series."
-  [chart-obj markers]
-  (markers/set-main-series-markers! chart-obj markers))
+  ([chart-obj markers]
+   (set-main-series-markers! chart-obj markers {}))
+  ([chart-obj markers deps]
+   (when chart-obj
+     (chart-contracts/assert-chart-handle! chart-obj
+                                           {:boundary :chart-interop/set-main-series-markers}))
+   (markers/set-main-series-markers! chart-obj markers deps)))
 
 (defn create-chart-with-volume-and-series!
   "Create a chart with main series and volume series in separate panes."
-  [container chart-type data]
-  (let [chart (create-chart! container)
-        main-series (add-series! chart chart-type)
-        volume-series (.addSeries ^js chart HistogramSeries
-                                  #js {:color "#26a69a"
-                                       :priceFormat #js {:type "volume"}}
-                                  1)]
-    (set-series-data! main-series data chart-type)
-    (set-volume-data! volume-series data)
-    (let [volume-pane (aget (.panes ^js chart) 1)]
-      (.setHeight ^js volume-pane 150))
-    (fit-content! chart)
-    #js {:chart chart :mainSeries main-series :volumeSeries volume-series}))
+  ([container chart-type data]
+   (create-chart-with-volume-and-series! container chart-type data {}))
+  ([container chart-type data {:keys [series-options]}]
+   (chart-contracts/assert-candles! data
+                                    {:boundary :chart-interop/create-chart-with-volume-and-series
+                                     :chart-type chart-type})
+   (let [chart (create-chart! container)
+         main-series (add-series! chart chart-type)
+         volume-series (.addSeries ^js chart HistogramSeries
+                                   #js {:color "#26a69a"
+                                        :priceFormat #js {:type "volume"}}
+                                   1)]
+     (set-series-data! main-series data chart-type series-options)
+     (set-volume-data! volume-series data)
+     (let [volume-pane (aget (.panes ^js chart) 1)]
+       (.setHeight ^js volume-pane 150))
+     (fit-content! chart)
+     #js {:chart chart :mainSeries main-series :volumeSeries volume-series})))
 
 (defn create-chart-with-indicators!
   "Create a chart with indicators, main series, and volume series."
-  [container chart-type data indicators]
-  (let [chart (create-chart! container)
-        {:keys [next-pane-index assignments]} (indicator-interop/indicator-pane-allocation indicators)
-        indicator-series (mapv (fn [{:keys [indicator series-def pane-index]}]
-                                 (let [series* (add-indicator-series! chart series-def pane-index)]
-                                   (set-indicator-data! series* (:data series-def))
-                                   {:series series*
-                                    :indicator indicator
-                                    :seriesDef series-def
-                                    :paneIndex pane-index}))
-                               assignments)
-        main-series (add-series! chart chart-type)
-        volume-series (.addSeries ^js chart HistogramSeries
-                                  #js {:color "#26a69a"
-                                       :priceFormat #js {:type "volume"}}
-                                  next-pane-index)]
-    (set-series-data! main-series data chart-type)
-    (set-volume-data! volume-series data)
-    (doseq [pane-index (range 1 next-pane-index)]
-      (when-let [pane (aget (.panes ^js chart) pane-index)]
-        (.setHeight ^js pane 120)))
-    (when-let [volume-pane (aget (.panes ^js chart) next-pane-index)]
-      (.setHeight ^js volume-pane 150))
-    (fit-content! chart)
-    #js {:chart chart
-         :mainSeries main-series
-         :volumeSeries volume-series
-         :indicatorSeries (clj->js indicator-series)}))
+  ([container chart-type data indicators]
+   (create-chart-with-indicators! container chart-type data indicators {}))
+  ([container chart-type data indicators {:keys [series-options]}]
+   (chart-contracts/assert-candles! data
+                                    {:boundary :chart-interop/create-chart-with-indicators
+                                     :chart-type chart-type})
+   (chart-contracts/assert-indicators! indicators
+                                       {:boundary :chart-interop/create-chart-with-indicators})
+   (let [chart (create-chart! container)
+         {:keys [next-pane-index assignments]} (indicator-interop/indicator-pane-allocation indicators)
+         indicator-series (mapv (fn [{:keys [indicator series-def pane-index]}]
+                                  (let [series* (add-indicator-series! chart series-def pane-index)]
+                                    (set-indicator-data! series* (:data series-def))
+                                    {:series series*
+                                     :indicator indicator
+                                     :seriesDef series-def
+                                     :paneIndex pane-index}))
+                                assignments)
+         main-series (add-series! chart chart-type)
+         volume-series (.addSeries ^js chart HistogramSeries
+                                   #js {:color "#26a69a"
+                                        :priceFormat #js {:type "volume"}}
+                                   next-pane-index)]
+     (set-series-data! main-series data chart-type series-options)
+     (set-volume-data! volume-series data)
+     (doseq [pane-index (range 1 next-pane-index)]
+       (when-let [pane (aget (.panes ^js chart) pane-index)]
+         (.setHeight ^js pane 120)))
+     (when-let [volume-pane (aget (.panes ^js chart) next-pane-index)]
+       (.setHeight ^js volume-pane 150))
+     (fit-content! chart)
+     #js {:chart chart
+          :mainSeries main-series
+          :volumeSeries volume-series
+          :indicatorSeries (clj->js indicator-series)})))
 
 (defn create-candlestick-chart!
   "Create a chart (legacy function name)."

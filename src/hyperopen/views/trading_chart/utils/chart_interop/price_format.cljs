@@ -1,22 +1,41 @@
 (ns hyperopen.views.trading-chart.utils.chart-interop.price-format
   (:require [hyperopen.utils.formatting :as fmt]))
 
+(defn- normalize-decimals
+  [value]
+  (let [parsed (cond
+                 (number? value) value
+                 (string? value) (js/parseFloat value)
+                 :else js/NaN)]
+    (when-not (js/isNaN parsed)
+      (-> parsed
+          js/Math.floor
+          (max 0)
+          (min 12)))))
+
 (defn infer-series-price-format
-  "Infer Lightweight Charts price format options from transformed price values."
-  [transformed-data extract-prices]
-  (let [prices (->> (extract-prices transformed-data)
-                    (map (fn [v]
-                           (if (number? v) v (js/parseFloat v))))
-                    (filter (fn [v]
-                              (and (number? v) (not (js/isNaN v)))))
-                    vec)
-        positive-prices (filter pos? prices)
-        reference-price (or (when (seq positive-prices)
-                              (apply min positive-prices))
-                            (when (seq prices)
-                              (apply min (map js/Math.abs prices))))
-        decimals (or (fmt/infer-price-decimals reference-price) 2)
+  "Infer Lightweight Charts price format options from metadata or transformed prices.
+   When `:price-decimals` is provided, skip transformed-data scanning."
+  ([transformed-data extract-prices]
+   (infer-series-price-format transformed-data extract-prices nil))
+  ([transformed-data extract-prices {:keys [price-decimals]}]
+   (let [metadata-decimals (normalize-decimals price-decimals)
+         prices (when (nil? metadata-decimals)
+                  (->> (extract-prices transformed-data)
+                       (map (fn [v]
+                              (if (number? v) v (js/parseFloat v))))
+                       (filter (fn [v]
+                                 (and (number? v) (not (js/isNaN v)))))
+                       vec))
+         positive-prices (when (seq prices) (filter pos? prices))
+         reference-price (when (seq prices)
+                           (or (when (seq positive-prices)
+                                 (apply min positive-prices))
+                               (apply min (map js/Math.abs prices))))
+         decimals (or metadata-decimals
+                      (fmt/infer-price-decimals reference-price)
+                      2)
         min-move (js/Math.pow 10 (- decimals))]
     #js {:type "price"
          :precision decimals
-         :minMove min-move}))
+         :minMove min-move})))

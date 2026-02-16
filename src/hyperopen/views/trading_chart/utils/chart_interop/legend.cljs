@@ -61,9 +61,11 @@
      :latest-entry latest-entry}))
 
 (defn- create-value-node!
-  [row label]
-  (let [label-node (js/document.createElement "span")
-        value-node (js/document.createElement "span")]
+  [document row label]
+  (let [label-node (let [doc document]
+                     (.createElement doc "span"))
+        value-node (let [doc document]
+                     (.createElement doc "span"))]
     (set! (.-textContent label-node) label)
     (set! (.-cssText (.-style label-node)) "color:#9ca3af;")
     (set! (.-textContent value-node) "--")
@@ -73,98 +75,114 @@
 
 (defn create-legend!
   "Create legend element that adapts to different chart types."
-  [container chart legend-meta]
-  (let [container-style (.-style container)]
-    (when (or (not (.-position container-style))
-              (= (.-position container-style) "static"))
-      (set! (.-position container-style) "relative")))
-
-  (let [legend (js/document.createElement "div")
-        legend-font-family (chart-options/resolve-chart-font-family)
-        header-row (js/document.createElement "div")
-        header-text-node (js/document.createElement "span")
-        values-row (js/document.createElement "div")
-        open-node (create-value-node! values-row "O")
-        high-node (create-value-node! values-row "H")
-        low-node (create-value-node! values-row "L")
-        close-node (create-value-node! values-row "C")
-        delta-node (js/document.createElement "span")]
-    (set! (.-cssText (.-style legend))
-          (str "position:absolute;left:12px;top:8px;z-index:100;"
-               "font-size:12px;font-family:" legend-font-family ";"
-               "font-variant-numeric:tabular-nums lining-nums;"
-               "font-feature-settings:'tnum' 1,'lnum' 1;"
-               "line-height:1.4;font-weight:500;color:#ffffff;"
-               "padding:6px 10px;border-radius:6px;box-shadow:none;pointer-events:none;"))
-    (set! (.-cssText (.-style header-row))
-          "display:flex;align-items:center;gap:6px;font-weight:600;")
-    (set! (.-cssText (.-style header-text-node)) "color:#e5e7eb;")
-    (.appendChild header-row header-text-node)
-    (set! (.-cssText (.-style values-row))
-          "display:flex;align-items:center;gap:8px;")
-    (set! (.-cssText (.-style delta-node)) "color:#9ca3af;font-weight:600;")
-    (.appendChild values-row delta-node)
-    (.appendChild legend header-row)
-    (.appendChild legend values-row)
-    (.appendChild container legend)
-    (let [state (atom (build-legend-state legend-meta))
-          format-price (fn [price]
-                         (when (number? price)
-                           (fmt/format-trade-price-plain price)))
-          format-delta (fn [delta]
-                         (when (number? delta)
-                           (let [formatted (fmt/format-trade-price-delta delta)]
-                             (if (>= delta 0) (str "+" formatted) formatted))))
-          format-pct (fn [pct]
-                       (when (number? pct)
-                         (let [formatted (.toFixed pct 2)]
-                           (if (>= pct 0) (str "+" formatted "%") (str formatted "%")))))
-          render-legend! (fn [entry]
-                           (let [{:keys [header-text]} @state]
-                             (set! (.-textContent header-text-node) header-text)
-                             (if (and entry (:candle entry))
-                               (let [c (:candle entry)
-                                     baseline (or (:prev-close entry) (:open c))
-                                     close (:close c)
-                                     delta (when (and close baseline) (- close baseline))
-                                     pct (when (and delta baseline (not= baseline 0)) (* 100 (/ delta baseline)))
-                                     delta-color (cond
-                                                   (nil? delta) "#9ca3af"
-                                                   (>= delta 0) "#10b981"
-                                                   :else "#ef4444")]
-                                 (set! (.-textContent open-node) (or (format-price (:open c)) "--"))
-                                 (set! (.-textContent high-node) (or (format-price (:high c)) "--"))
-                                 (set! (.-textContent low-node) (or (format-price (:low c)) "--"))
-                                 (set! (.-textContent close-node) (or (format-price (:close c)) "--"))
-                                 (set! (.-textContent delta-node)
-                                       (str (or (format-delta delta) "--")
-                                            " ("
-                                            (or (format-pct pct) "--")
-                                            ")"))
-                                 (set! (.-color (.-style delta-node)) delta-color))
-                               (do
-                                 (set! (.-textContent open-node) "--")
-                                 (set! (.-textContent high-node) "--")
-                                 (set! (.-textContent low-node) "--")
-                                 (set! (.-textContent close-node) "--")
-                                 (set! (.-textContent delta-node) "-- (--)")
-                                 (set! (.-color (.-style delta-node)) "#9ca3af")))))
-          update-legend (fn [param]
-                          (let [{:keys [candle-lookup latest-entry]} @state
-                                lookup-key (when (and param (some? (.-time param)))
-                                             (normalize-time-key (.-time param)))
-                                entry (when lookup-key
-                                        (get candle-lookup lookup-key))]
-                            (render-legend! (or entry latest-entry))))
-          update! (fn [new-meta]
-                    (reset! state (build-legend-state new-meta))
-                    (update-legend nil))
-          destroy! (fn []
-                     (try
-                       (.unsubscribeCrosshairMove ^js chart update-legend)
-                       (catch :default _ nil))
-                     (when (.-parentNode legend)
-                       (.removeChild (.-parentNode legend) legend)))]
-      (.subscribeCrosshairMove ^js chart update-legend)
-      (update-legend nil)
-      #js {:update update! :destroy destroy!})))
+  ([container chart legend-meta]
+   (create-legend! container chart legend-meta {}))
+  ([container chart legend-meta {:keys [document
+                                        format-price
+                                        format-delta
+                                        format-pct]}]
+   (let [global-document (aget js/globalThis "document")
+         document* (or document global-document)]
+     (when-not document*
+       (throw (js/Error. "Legend rendering requires a DOM document.")))
+     (let [container-style (.-style container)]
+       (when (or (not (.-position container-style))
+                 (= (.-position container-style) "static"))
+         (set! (.-position container-style) "relative")))
+     (let [legend (let [doc document*]
+                    (.createElement doc "div"))
+           legend-font-family (chart-options/resolve-chart-font-family)
+           header-row (let [doc document*]
+                        (.createElement doc "div"))
+           header-text-node (let [doc document*]
+                              (.createElement doc "span"))
+           values-row (let [doc document*]
+                        (.createElement doc "div"))
+           open-node (create-value-node! document* values-row "O")
+           high-node (create-value-node! document* values-row "H")
+           low-node (create-value-node! document* values-row "L")
+           close-node (create-value-node! document* values-row "C")
+           delta-node (let [doc document*]
+                        (.createElement doc "span"))]
+       (set! (.-cssText (.-style legend))
+             (str "position:absolute;left:12px;top:8px;z-index:100;"
+                  "font-size:12px;font-family:" legend-font-family ";"
+                  "font-variant-numeric:tabular-nums lining-nums;"
+                  "font-feature-settings:'tnum' 1,'lnum' 1;"
+                  "line-height:1.4;font-weight:500;color:#ffffff;"
+                  "padding:6px 10px;border-radius:6px;box-shadow:none;pointer-events:none;"))
+       (set! (.-cssText (.-style header-row))
+             "display:flex;align-items:center;gap:6px;font-weight:600;")
+       (set! (.-cssText (.-style header-text-node)) "color:#e5e7eb;")
+       (.appendChild header-row header-text-node)
+       (set! (.-cssText (.-style values-row))
+             "display:flex;align-items:center;gap:8px;")
+       (set! (.-cssText (.-style delta-node)) "color:#9ca3af;font-weight:600;")
+       (.appendChild values-row delta-node)
+       (.appendChild legend header-row)
+       (.appendChild legend values-row)
+       (.appendChild container legend)
+       (let [state (atom (build-legend-state legend-meta))
+             format-price* (or format-price
+                               (fn [price]
+                                 (when (number? price)
+                                   (fmt/format-trade-price-plain price))))
+             format-delta* (or format-delta
+                               (fn [delta]
+                                 (when (number? delta)
+                                   (let [formatted (fmt/format-trade-price-delta delta)]
+                                     (if (>= delta 0) (str "+" formatted) formatted)))))
+             format-pct* (or format-pct
+                             (fn [pct]
+                               (when (number? pct)
+                                 (let [formatted (.toFixed pct 2)]
+                                   (if (>= pct 0) (str "+" formatted "%") (str formatted "%"))))))
+             render-legend! (fn [entry]
+                              (let [{:keys [header-text]} @state]
+                                (set! (.-textContent header-text-node) header-text)
+                                (if (and entry (:candle entry))
+                                  (let [c (:candle entry)
+                                        baseline (or (:prev-close entry) (:open c))
+                                        close (:close c)
+                                        delta (when (and close baseline) (- close baseline))
+                                        pct (when (and delta baseline (not= baseline 0)) (* 100 (/ delta baseline)))
+                                        delta-color (cond
+                                                      (nil? delta) "#9ca3af"
+                                                      (>= delta 0) "#10b981"
+                                                      :else "#ef4444")]
+                                    (set! (.-textContent open-node) (or (format-price* (:open c)) "--"))
+                                    (set! (.-textContent high-node) (or (format-price* (:high c)) "--"))
+                                    (set! (.-textContent low-node) (or (format-price* (:low c)) "--"))
+                                    (set! (.-textContent close-node) (or (format-price* (:close c)) "--"))
+                                    (set! (.-textContent delta-node)
+                                          (str (or (format-delta* delta) "--")
+                                               " ("
+                                               (or (format-pct* pct) "--")
+                                               ")"))
+                                    (set! (.-color (.-style delta-node)) delta-color))
+                                  (do
+                                    (set! (.-textContent open-node) "--")
+                                    (set! (.-textContent high-node) "--")
+                                    (set! (.-textContent low-node) "--")
+                                    (set! (.-textContent close-node) "--")
+                                    (set! (.-textContent delta-node) "-- (--)")
+                                    (set! (.-color (.-style delta-node)) "#9ca3af")))))
+             update-legend (fn [param]
+                             (let [{:keys [candle-lookup latest-entry]} @state
+                                   lookup-key (when (and param (some? (.-time param)))
+                                                (normalize-time-key (.-time param)))
+                                   entry (when lookup-key
+                                           (get candle-lookup lookup-key))]
+                               (render-legend! (or entry latest-entry))))
+             update! (fn [new-meta]
+                       (reset! state (build-legend-state new-meta))
+                       (update-legend nil))
+             destroy! (fn []
+                        (try
+                          (.unsubscribeCrosshairMove ^js chart update-legend)
+                          (catch :default _ nil))
+                        (when (.-parentNode legend)
+                          (.removeChild (.-parentNode legend) legend)))]
+         (.subscribeCrosshairMove ^js chart update-legend)
+         (update-legend nil)
+         #js {:update update! :destroy destroy!})))))

@@ -1,7 +1,38 @@
 (ns hyperopen.views.trading-chart.utils.chart-interop-test
-  (:require [cljs.test :refer-macros [deftest is]]
+  (:require [clojure.string :as str]
+            [cljs.test :refer-macros [deftest is]]
             [hyperopen.platform :as platform]
             [hyperopen.views.trading-chart.utils.chart-interop :as chart-interop]))
+
+(defn- make-fake-element [tag]
+  (let [children (array)
+        element #js {:tagName tag
+                     :style #js {}
+                     :children children
+                     :parentNode nil
+                     :textContent ""}]
+    (set! (.-appendChild element)
+          (fn [child]
+            (.push children child)
+            (set! (.-parentNode child) element)
+            child))
+    (set! (.-removeChild element)
+          (fn [child]
+            (set! (.-parentNode child) nil)
+            child))
+    element))
+
+(defn- make-fake-document []
+  #js {:createElement (fn [tag]
+                        (make-fake-element tag))})
+
+(defn- collect-text-content [node]
+  (let [own (when-let [text (.-textContent node)]
+              (when (and (string? text) (seq text))
+                [text]))
+        children (or (some-> node .-children array-seq) [])]
+    (into (vec own)
+          (mapcat collect-text-content children))))
 
 (deftest apply-persisted-visible-range-applies-stored-time-range-test
   (let [requested-key (atom nil)
@@ -15,6 +46,21 @@
       (is (= true (chart-interop/apply-persisted-visible-range! chart :1d)))
       (is (= "chart-visible-time-range:1d" @requested-key))
       (is (= {:from 10 :to 20} @applied-range)))))
+
+(deftest apply-persisted-visible-range-supports-injected-storage-get-test
+  (let [requested-key (atom nil)
+        applied-range (atom nil)
+        time-scale #js {:setVisibleRange (fn [range]
+                                           (reset! applied-range (js->clj range :keywordize-keys true)))}
+        chart #js {:timeScale (fn [] time-scale)}]
+    (is (= true (chart-interop/apply-persisted-visible-range!
+                 chart
+                 :4h
+                 {:storage-get (fn [key]
+                                 (reset! requested-key key)
+                                 "{\"kind\":\"time\",\"from\":3,\"to\":9}")})))
+    (is (= "chart-visible-time-range:4h" @requested-key))
+    (is (= {:from 3 :to 9} @applied-range))))
 
 (deftest apply-persisted-visible-range-ignores-invalid-storage-test
   (let [applied? (atom false)
@@ -143,6 +189,17 @@
     (is (= "price" (get-in @applied-options [:baseValue :type])))
     (is (= 15 (get-in @applied-options [:baseValue :price])))))
 
+(deftest set-series-data-prefers-metadata-price-decimals-test
+  (let [applied-options (atom nil)
+        series #js {:applyOptions (fn [opts]
+                                    (reset! applied-options (js->clj opts :keywordize-keys true)))
+                    :setData (fn [_] nil)}
+        raw-candles [{:time 1 :open 0.01 :high 0.02 :low 0.009 :close 0.015}
+                     {:time 2 :open 0.015 :high 0.025 :low 0.014 :close 0.02}]]
+    (chart-interop/set-series-data! series raw-candles :line {:price-decimals 5})
+    (is (= 5 (get-in @applied-options [:priceFormat :precision])))
+    (is (= 0.00001 (get-in @applied-options [:priceFormat :minMove])))))
+
 (deftest baseline-subscription-refreshes-base-value-on-visible-range-change-test
   (let [visible-range* (atom {:from 10 :to 30})
         subscribed-handler* (atom nil)
@@ -168,3 +225,86 @@
     (is (= 40 (get-in (last @applied-options*) [:baseValue :price])))
     (chart-interop/sync-baseline-base-value-subscription! chart-obj :line)
     (is @unsubscribed?*)))
+
+(deftest set-series-data-unknown-chart-type-falls-back-to-candlestick-test
+  (let [applied-data (atom nil)
+        series #js {:applyOptions (fn [_] nil)
+                    :setData (fn [data]
+                               (reset! applied-data (js->clj data :keywordize-keys true)))}
+        raw-candles [{:time 1 :open 10 :high 12 :low 9 :close 11}
+                     {:time 2 :open 11 :high 13 :low 10 :close 12}]]
+    (chart-interop/set-series-data! series raw-candles :unknown-chart-type)
+    (is (= raw-candles @applied-data))))
+
+(deftest set-series-data-accepts-sequential-candle-collections-test
+  (let [applied-data (atom nil)
+        series #js {:applyOptions (fn [_] nil)
+                    :setData (fn [data]
+                               (reset! applied-data (js->clj data :keywordize-keys true)))}
+        vector-candles [{:time 1 :open 10 :high 11 :low 9 :close 10.5}
+                        {:time 2 :open 10.5 :high 12 :low 10 :close 11.5}]
+        list-candles (apply list vector-candles)
+        lazy-seq-candles (map identity vector-candles)]
+    (chart-interop/set-series-data! series list-candles :candlestick)
+    (is (= vector-candles @applied-data))
+    (chart-interop/set-series-data! series lazy-seq-candles :candlestick)
+    (is (= vector-candles @applied-data))))
+
+(deftest set-main-series-markers-reuses-plugin-for-same-series-and-recreates-for-new-series-test
+  (let [create-calls (atom 0)
+        plugin-updates (atom [])
+        series-a #js {:id "a"}
+        series-b #js {:id "b"}
+        chart-obj #js {:chart #js {}
+                       :mainSeries series-a}
+        create-markers (fn [series _initial]
+                         (swap! create-calls inc)
+                         (let [plugin-id @create-calls]
+                           #js {:setMarkers (fn [markers]
+                                              (swap! plugin-updates conj {:plugin-id plugin-id
+                                                                          :series-id (.-id series)
+                                                                          :markers (js->clj markers :keywordize-keys true)}))}))]
+    (chart-interop/set-main-series-markers! chart-obj [{:time 1 :position "aboveBar"}]
+                                            {:create-markers create-markers})
+    (chart-interop/set-main-series-markers! chart-obj [{:time 2 :position "belowBar"}]
+                                            {:create-markers create-markers})
+    (set! (.-mainSeries ^js chart-obj) series-b)
+    (chart-interop/set-main-series-markers! chart-obj [{:time 3 :position "aboveBar"}]
+                                            {:create-markers create-markers})
+    (is (= 2 @create-calls))
+    (is (= [1 1 2] (mapv :plugin-id @plugin-updates)))
+    (is (= ["a" "a" "b"] (mapv :series-id @plugin-updates)))))
+
+(deftest create-legend-supports-business-day-crosshair-time-with-injected-document-test
+  (let [document (make-fake-document)
+        container (make-fake-element "div")
+        crosshair-handler* (atom nil)
+        chart #js {:subscribeCrosshairMove (fn [handler]
+                                             (reset! crosshair-handler* handler))
+                   :unsubscribeCrosshairMove (fn [_] nil)}
+        legend-meta {:symbol "BTC"
+                     :timeframe-label "1D"
+                     :venue "TestVenue"
+                     :candle-data [{:time {:year 2026 :month 2 :day 15}
+                                    :open 99 :high 101 :low 98 :close 100}
+                                   {:time {:year 2026 :month 2 :day 16}
+                                    :open 100 :high 103 :low 99 :close 102}]}
+        legend-control (chart-interop/create-legend!
+                        container
+                        chart
+                        legend-meta
+                        {:document document
+                         :format-price (fn [price] (str "P" price))
+                         :format-delta (fn [delta] (str "D" delta))
+                         :format-pct (fn [pct] (str "Q" (.toFixed pct 1)))})]
+    (is (fn? @crosshair-handler*))
+    (@crosshair-handler* #js {:time #js {:year 2026 :month 2 :day 16}})
+    (let [text (str/join " " (collect-text-content (aget (.-children container) 0)))]
+      (is (str/includes? text "BTC · 1D · TestVenue"))
+      (is (str/includes? text "P100"))
+      (is (str/includes? text "P103"))
+      (is (str/includes? text "P99"))
+      (is (str/includes? text "P102"))
+      (is (str/includes? text "D2"))
+      (is (str/includes? text "Q2.0")))
+    (.destroy ^js legend-control)))
