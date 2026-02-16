@@ -69,3 +69,65 @@
             :clear-order-toast
             :set-disconnected]
            @calls))))
+
+(deftest handle-wallet-connected-skips-dispatch-when-predicate-fails-test
+  (let [store (atom {:wallet {:connected? true
+                              :address "0xabc"
+                              :agent {:status :ready}}})
+        dispatch-calls (atom 0)]
+    (connection-runtime/handle-wallet-connected!
+     {:store store
+      :connected-address "0xabc"
+      :should-auto-enable-agent-trading? (fn [_ _] false)
+      :dispatch! (fn [& _]
+                   (swap! dispatch-calls inc))})
+    (is (= 0 @dispatch-calls))))
+
+(deftest connect-and-disconnect-support-plain-js-callbacks-test
+  (let [store (atom {:wallet {:connected? true}})
+        original-events (aget js/globalThis "__walletConnectionEvents")
+        events (array)]
+    (aset js/globalThis "__walletConnectionEvents" events)
+    (try
+      (connection-runtime/connect-wallet!
+       {:store store
+        :log-fn (js/Function. "msg"
+                              "globalThis.__walletConnectionEvents.push(['log-connect', msg]);")
+        :request-connection! (js/Function. "storeArg"
+                                           "globalThis.__walletConnectionEvents.push(['request', !!storeArg]);")})
+      (connection-runtime/disconnect-wallet!
+       {:store store
+        :log-fn (js/Function. "msg"
+                              "globalThis.__walletConnectionEvents.push(['log-disconnect', msg]);")
+        :clear-wallet-copy-feedback-timeout! (js/Function.
+                                              "globalThis.__walletConnectionEvents.push(['clear-copy']);")
+        :clear-order-feedback-toast-timeout! (js/Function.
+                                              "globalThis.__walletConnectionEvents.push(['clear-toast-timeout']);")
+        :clear-order-feedback-toast! (js/Function. "storeArg"
+                                                   "globalThis.__walletConnectionEvents.push(['clear-toast', !!storeArg]);")
+        :set-disconnected! (js/Function. "storeArg"
+                                         "globalThis.__walletConnectionEvents.push(['set-disconnected', !!storeArg]);")})
+      (is (= [["log-connect" "Connecting wallet..."]
+              ["request" true]
+              ["log-disconnect" "Disconnecting wallet..."]
+              ["clear-copy"]
+              ["clear-toast-timeout"]
+              ["clear-toast" true]
+              ["set-disconnected" true]]
+             (js->clj events)))
+      (finally
+        (if (some? original-events)
+          (aset js/globalThis "__walletConnectionEvents" original-events)
+          (js-delete js/globalThis "__walletConnectionEvents"))))))
+
+(deftest should-auto-enable-agent-trading-rejects-missing-addresses-test
+  (is (nil? (connection-runtime/should-auto-enable-agent-trading?
+             {:wallet {:connected? true
+                       :address nil
+                       :agent {:status :not-ready}}}
+             "0xabc")))
+  (is (nil? (connection-runtime/should-auto-enable-agent-trading?
+             {:wallet {:connected? true
+                       :address "0xabc"
+                       :agent {:status :not-ready}}}
+             nil))))

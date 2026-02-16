@@ -18,6 +18,20 @@
       (finally
         (set! (.-localStorage js/globalThis) original-local-storage)))))
 
+(defn- with-test-storages [f]
+  (let [original-local-storage (.-localStorage js/globalThis)
+        original-session-storage (.-sessionStorage js/globalThis)
+        local-storage (fake-storage)
+        session-storage (fake-storage)]
+    (set! (.-localStorage js/globalThis) local-storage)
+    (set! (.-sessionStorage js/globalThis) session-storage)
+    (try
+      (f {:local local-storage
+          :session session-storage})
+      (finally
+        (set! (.-localStorage js/globalThis) original-local-storage)
+        (set! (.-sessionStorage js/globalThis) original-session-storage)))))
+
 (deftest default-agent-state-shape-test
   (let [agent (agent-session/default-agent-state)]
     (is (= :not-ready (:status agent)))
@@ -79,3 +93,115 @@
            (agent-session/load-agent-session storage wallet-address)))
     (agent-session/clear-agent-session! storage wallet-address)
     (is (nil? (agent-session/load-agent-session storage wallet-address)))))
+
+(deftest signature-chain-id-and-storage-mode-normalization-helpers-test
+  (is (= "0xa4b1" (agent-session/default-signature-chain-id-for-environment true)))
+  (is (= "0x66eee" (agent-session/default-signature-chain-id-for-environment false)))
+  (is (= :session (agent-session/normalize-storage-mode :session)))
+  (is (= :session (agent-session/normalize-storage-mode " SESSION ")))
+  (is (= :local (agent-session/normalize-storage-mode :local)))
+  (is (= :local (agent-session/normalize-storage-mode "unknown")))
+  (is (= :local (agent-session/normalize-storage-mode nil))))
+
+(deftest default-agent-state-and-address-normalization-variants-test
+  (let [agent (agent-session/default-agent-state :storage-mode "SESSION")]
+    (is (= :session (:storage-mode agent))))
+  (is (= "0xabc123"
+         (agent-session/normalize-wallet-address " 0xAbC123 ")))
+  (is (nil? (agent-session/normalize-wallet-address nil))))
+
+(deftest build-approve-agent-action-supports-optional-name-and-signature-chain-id-test
+  (let [action (agent-session/build-approve-agent-action
+                "0x1234567890abcdef1234567890abcdef12345678"
+                1700000001111
+                :agent-name "Desk Agent"
+                :signature-chain-id "0x1234")]
+    (is (= "Desk Agent" (:agentName action)))
+    (is (= "0x1234" (:signatureChainId action)))))
+
+(deftest storage-mode-preference-fallbacks-when-storage-unavailable-or-throws-test
+  (let [original-local-storage (.-localStorage js/globalThis)]
+    (try
+      (set! (.-localStorage js/globalThis) nil)
+      (is (= :local (agent-session/load-storage-mode-preference)))
+      (is (false? (agent-session/persist-storage-mode-preference! :session)))
+      (set! (.-localStorage js/globalThis)
+            #js {:getItem (fn [_]
+                            (throw (js/Error. "read boom")))
+                 :setItem (fn [_ _]
+                            (throw (js/Error. "write boom")))})
+      (is (= :local (agent-session/load-storage-mode-preference)))
+      (is (false? (agent-session/persist-storage-mode-preference! :session)))
+      (finally
+        (set! (.-localStorage js/globalThis) original-local-storage)))))
+
+(deftest persist-load-and-clear-agent-session-handle-invalid-and-throwing-storage-test
+  (let [throwing-storage #js {:setItem (fn [_ _]
+                                         (throw (js/Error. "set boom")))
+                              :getItem (fn [_]
+                                         (throw (js/Error. "get boom")))
+                              :removeItem (fn [_]
+                                            (throw (js/Error. "remove boom")))}
+        wallet-address "0xabc123"
+        valid-session {:agent-address "0x9999999999999999999999999999999999999999"
+                       :private-key "0xaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+                       :last-approved-at 1700000002222.9
+                       :nonce-cursor 1700000003333.4}]
+    (is (nil? (agent-session/persist-agent-session! nil wallet-address valid-session)))
+    (is (nil? (agent-session/persist-agent-session! (fake-storage) wallet-address {:agent-address "0xabc"})))
+    (is (false? (agent-session/persist-agent-session! throwing-storage wallet-address valid-session)))
+    (let [storage (fake-storage)]
+      (agent-session/persist-agent-session! storage wallet-address valid-session)
+      (is (= {:agent-address "0x9999999999999999999999999999999999999999"
+              :private-key "0xaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+              :last-approved-at 1700000002222
+              :nonce-cursor 1700000003333}
+             (agent-session/load-agent-session storage wallet-address))))
+    (is (nil? (agent-session/load-agent-session nil wallet-address)))
+    (is (nil? (agent-session/load-agent-session throwing-storage wallet-address)))
+    (is (false? (agent-session/clear-agent-session! throwing-storage wallet-address)))
+    (is (nil? (agent-session/clear-agent-session! nil wallet-address)))))
+
+(deftest load-agent-session-returns-nil-for-empty-or-malformed-json-test
+  (let [wallet-address "0xabc123"
+        empty-storage #js {:getItem (fn [_] "")
+                           :setItem (fn [_ _] nil)
+                           :removeItem (fn [_] nil)}
+        malformed-storage #js {:getItem (fn [_] "{")
+                               :setItem (fn [_ _] nil)
+                               :removeItem (fn [_] nil)}
+        invalid-shape-storage #js {:getItem (fn [_]
+                                              "{\"agent-address\":123,\"private-key\":\"\"}")
+                                   :setItem (fn [_ _] nil)
+                                   :removeItem (fn [_] nil)}]
+    (is (nil? (agent-session/load-agent-session empty-storage wallet-address)))
+    (is (nil? (agent-session/load-agent-session malformed-storage wallet-address)))
+    (is (nil? (agent-session/load-agent-session invalid-shape-storage wallet-address)))))
+
+(deftest by-mode-storage-wrappers-target-local-and-session-storage-test
+  (with-test-storages
+    (fn [{:keys [local]}]
+      (let [wallet-address "0xabc123"
+            session-payload {:agent-address "0x9999999999999999999999999999999999999999"
+                             :private-key "0xaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+                             :last-approved-at 1700000002222
+                             :nonce-cursor 1700000002222}
+            key (agent-session/session-storage-key wallet-address)]
+        (is (true? (agent-session/persist-agent-session-by-mode!
+                    wallet-address
+                    :session
+                    session-payload)))
+        (is (= session-payload
+               (agent-session/load-agent-session-by-mode wallet-address :session)))
+        (is (nil? (.getItem local key)))
+        (is (true? (agent-session/persist-agent-session-by-mode!
+                    wallet-address
+                    :local
+                    session-payload)))
+        (is (= session-payload
+               (agent-session/load-agent-session-by-mode wallet-address :local)))
+        (is (some? (.getItem local key)))
+        (is (true? (agent-session/clear-agent-session-by-mode! wallet-address :session)))
+        (is (true? (agent-session/clear-agent-session-by-mode! wallet-address :local)))
+        (is (nil? (agent-session/load-agent-session-by-mode wallet-address :session)))
+        (is (nil? (agent-session/load-agent-session-by-mode wallet-address :local)))))))

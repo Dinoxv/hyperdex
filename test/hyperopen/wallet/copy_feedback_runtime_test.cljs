@@ -59,10 +59,10 @@
       :clear-wallet-copy-feedback! clear-feedback!
       :clear-wallet-copy-feedback-timeout!
       (fn []
-        (copy-runtime/clear-wallet-copy-feedback-timeout-in-runtime!
-         runtime
-         (fn [timeout-id]
-           (swap! cleared-timeouts conj timeout-id))))
+       (copy-runtime/clear-wallet-copy-feedback-timeout-in-runtime!
+        runtime
+        (fn [timeout-id]
+          (swap! cleared-timeouts conj timeout-id))))
       :wallet-copy-feedback-duration-ms 1500
       :set-timeout-fn (fn [callback _delay-ms]
                         (reset! captured-callback callback)
@@ -143,3 +143,76 @@
     (is (= "No address to copy"
            (get-in @store [:wallet :copy-feedback :message])))
     (is (= 1 @schedule-calls))))
+
+(deftest clear-wallet-copy-feedback-timeout-noops-when-timeout-id-missing-test
+  (let [cleared (atom 0)
+        timeout-id-atom (atom nil)]
+    (copy-runtime/clear-wallet-copy-feedback-timeout!
+     timeout-id-atom
+     (fn [_]
+       (swap! cleared inc)))
+    (is (= 0 @cleared))
+    (is (nil? @timeout-id-atom))))
+
+(deftest clear-wallet-copy-feedback-timeout-in-runtime-noops-when-timeout-missing-test
+  (let [cleared (atom 0)
+        runtime (atom {:timeouts {:wallet-copy nil}})]
+    (copy-runtime/clear-wallet-copy-feedback-timeout-in-runtime!
+     runtime
+     (fn [_]
+       (swap! cleared inc)))
+    (is (= 0 @cleared))
+    (is (nil? (get-in @runtime [:timeouts :wallet-copy])))))
+
+(deftest copy-wallet-address-sets-error-feedback-when-clipboard-write-rejects-test
+  (async done
+    (let [schedule-calls (atom 0)
+          logs (atom [])
+          store (atom {:wallet {:copy-feedback nil}})
+          clipboard #js {:writeText (fn [_]
+                                      (js/Promise.reject (js/Error. "denied")))}]
+      (copy-runtime/copy-wallet-address!
+       {:store store
+        :address "0xabc"
+        :set-wallet-copy-feedback! set-feedback!
+        :clear-wallet-copy-feedback! clear-feedback!
+        :clear-wallet-copy-feedback-timeout! (fn [] nil)
+        :schedule-wallet-copy-feedback-clear! (fn [_]
+                                                (swap! schedule-calls inc))
+        :log-fn (fn [& args]
+                  (swap! logs conj args))
+        :clipboard clipboard})
+      (js/setTimeout
+       (fn []
+         (try
+           (is (= :error (get-in @store [:wallet :copy-feedback :kind])))
+           (is (= "Couldn't copy address"
+                  (get-in @store [:wallet :copy-feedback :message])))
+           (is (= 1 @schedule-calls))
+           (is (= 1 (count @logs)))
+           (finally
+             (done))))
+       0))))
+
+(deftest copy-wallet-address-sets-error-feedback-when-clipboard-write-throws-test
+  (let [schedule-calls (atom 0)
+        logs (atom [])
+        store (atom {:wallet {:copy-feedback nil}})
+        clipboard #js {:writeText (fn [_]
+                                    (throw (js/Error. "sync boom")))}]
+    (copy-runtime/copy-wallet-address!
+     {:store store
+      :address "0xabc"
+      :set-wallet-copy-feedback! set-feedback!
+      :clear-wallet-copy-feedback! clear-feedback!
+      :clear-wallet-copy-feedback-timeout! (fn [] nil)
+      :schedule-wallet-copy-feedback-clear! (fn [_]
+                                              (swap! schedule-calls inc))
+      :log-fn (fn [& args]
+                (swap! logs conj args))
+      :clipboard clipboard})
+    (is (= :error (get-in @store [:wallet :copy-feedback :kind])))
+    (is (= "Couldn't copy address"
+           (get-in @store [:wallet :copy-feedback :message])))
+    (is (= 1 @schedule-calls))
+    (is (= 1 (count @logs)))))

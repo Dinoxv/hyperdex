@@ -46,3 +46,19 @@
          (wallet-actions/copy-wallet-address-action {:wallet {:address "0xabc"}})))
   (is (= [[:effects/copy-wallet-address nil]]
          (wallet-actions/copy-wallet-address-action {:wallet {:address nil}}))))
+
+(deftest actions-accept-plain-js-normalizers-test
+  (let [normalize-js (js/Function. "value"
+                                   "return (value === 'SESSION') ? 'session-js' : 'local-js';")
+        connected-state {:wallet {:connected? true
+                                  :address "0xabc"
+                                  :agent {:storage-mode "SESSION"}}}
+        storage-state {:wallet {:agent {:storage-mode "SESSION"}}}]
+    (is (= [[:effects/save-many [[[:wallet :agent :status] :approving]
+                                 [[:wallet :agent :error] nil]]]
+            [:effects/enable-agent-trading {:storage-mode "session-js"}]]
+           (wallet-actions/enable-agent-trading-action connected-state normalize-js)))
+    (is (= [[:effects/set-agent-storage-mode "local-js"]]
+           (wallet-actions/set-agent-storage-mode-action storage-state "LOCAL" normalize-js)))
+    (is (= []
+           (wallet-actions/set-agent-storage-mode-action storage-state "SESSION" normalize-js)))))
