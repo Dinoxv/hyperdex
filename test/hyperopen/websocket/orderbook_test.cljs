@@ -49,10 +49,22 @@
           (is (= 2 (get-in @orderbook/orderbook-state [:books "BTC" :timestamp])))
           (@scheduled-callback 16)
           (is (= 1 @store-write-count))
-          (is (= {:bids [{:px "99" :sz "4"}]
-                  :asks [{:px "102" :sz "5"}]
-                  :timestamp 2}
-                 (get-in @store [:orderbooks "BTC"])))))
+          (let [book (get-in @store [:orderbooks "BTC"])]
+            (is (= [{:px "99" :sz "4"}] (:bids book)))
+            (is (= [{:px "102" :sz "5"}] (:asks book)))
+            (is (= 2 (:timestamp book)))
+            (is (= [{:px "99" :sz "4" :px-num 99 :sz-num 4}]
+                   (get-in book [:render :display-bids])))
+            (is (= [{:px "102" :sz "5" :px-num 102 :sz-num 5}]
+                   (get-in book [:render :display-asks])))
+            (is (= [{:px "99" :sz "4" :px-num 99 :sz-num 4 :cum-size 4 :cum-value 396}]
+                   (get-in book [:render :bids-with-totals])))
+            (is (= [{:px "102" :sz "5" :px-num 102 :sz-num 5 :cum-size 5 :cum-value 510}]
+                   (get-in book [:render :asks-with-totals])))
+            (is (= {:px "99" :sz "4" :px-num 99 :sz-num 4}
+                   (get-in book [:render :best-bid])))
+            (is (= {:px "102" :sz "5" :px-num 102 :sz-num 5}
+                   (get-in book [:render :best-ask]))))))
       (remove-watch store watch-key))
     (finally
       (reset-orderbook-state!)
@@ -78,4 +90,3 @@
       (remove-watch orderbook/orderbook-state watch-key))
     (finally
       (reset-orderbook-state!))))
-

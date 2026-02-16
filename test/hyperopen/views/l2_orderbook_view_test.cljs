@@ -242,6 +242,23 @@
         (is (>= (:time-ms (first filtered-trades))
                 (:time-ms (second filtered-trades))))))))
 
+(deftest recent-trades-for-coin-prefers-cached-slice-test
+  (with-redefs [ws-trades/get-recent-trades-for-coin (fn [_]
+                                                        [{:coin "BTC"
+                                                          :price 61500.1
+                                                          :price-raw "61500.1"
+                                                          :size 0.03
+                                                          :size-raw "0.03"
+                                                          :side "A"
+                                                          :time-ms 1700000003000
+                                                          :tid "t1"}])
+                ws-trades/get-recent-trades (fn []
+                                              (throw (js/Error. "fallback should not be called")))]
+    (let [trades (view/recent-trades-for-coin "BTC")]
+      (is (= 1 (count trades)))
+      (is (= "BTC" (:coin (first trades))))
+      (is (= 1700000003000 (:time-ms (first trades)))))))
+
 (deftest trades-price-column-is-left-aligned-with-readable-left-inset-test
   (with-redefs [ws-trades/get-recent-trades
                 (fn []
@@ -384,6 +401,27 @@
                                         :price-aggregation-by-coin {"BTC" :full}})
         level-row-count (count-nodes panel (data-role= "orderbook-level-row"))]
     (is (= 24 level-row-count))))
+
+(deftest orderbook-panel-can-render-from-precomputed-slices-without-raw-levels-test
+  (let [panel (view/l2-orderbook-panel "BTC"
+                                       {:market-type :perp
+                                        :base "BTC"
+                                        :quote "USDC"
+                                        :szDecimals 4}
+                                       {:bids []
+                                        :asks []
+                                        :render {:display-bids [{:px "100" :sz "2" :px-num 100 :sz-num 2}]
+                                                 :display-asks [{:px "101" :sz "1" :px-num 101 :sz-num 1}]
+                                                 :bids-with-totals [{:px "100" :sz "2" :px-num 100 :sz-num 2 :cum-size 2 :cum-value 200}]
+                                                 :asks-with-totals [{:px "101" :sz "1" :px-num 101 :sz-num 1 :cum-size 1 :cum-value 101}]
+                                                 :best-bid {:px "100" :sz "2" :px-num 100 :sz-num 2}
+                                                 :best-ask {:px "101" :sz "1" :px-num 101 :sz-num 1}}}
+                                       {:size-unit :base
+                                        :size-unit-dropdown-visible? false
+                                        :price-aggregation-dropdown-visible? false
+                                        :price-aggregation-by-coin {"BTC" :full}})
+        level-row-count (count-nodes panel (data-role= "orderbook-level-row"))]
+    (is (= 2 level-row-count))))
 
 (deftest orderbook-panel-depth-panes-use-flex-constrained-layout-contract-test
   (let [panel (view/l2-orderbook-panel "BTC"

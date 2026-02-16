@@ -154,17 +154,21 @@
       (or (format-total (:size trade) :decimals 8) "0"))))
 
 (defn recent-trades-for-coin [coin]
-  (->> (trades/get-recent-trades)
-       (filter #(trade-matches-coin? % coin))
-       (map normalize-trade)
-       (sort-by (fn [trade] (or (:time-ms trade) 0)) >)
-       (take 100)))
+  (let [cached-trades (trades/get-recent-trades-for-coin coin)]
+    (if (seq cached-trades)
+      (take 100 cached-trades)
+      (->> (trades/get-recent-trades)
+           (filter #(trade-matches-coin? % coin))
+           (map normalize-trade)
+           (sort-by (fn [trade] (or (:time-ms trade) 0)) >)
+           (take 100)))))
 
 (defn order-size-for-unit [order size-unit]
-  (if (= size-unit :quote)
-    (* (or (parse-number (:px order)) 0)
-       (or (parse-number (:sz order)) 0))
-    (parse-number (:sz order))))
+  (let [price (or (:px-num order) (parse-number (:px order)) 0)
+        size (or (:sz-num order) (parse-number (:sz order)) 0)]
+    (if (= size-unit :quote)
+      (* price size)
+      size)))
 
 (defn order-total-for-unit [order size-unit]
   (if (= size-unit :quote)
@@ -178,10 +182,12 @@
 (defn format-order-size [order size-unit]
   (if (= size-unit :quote)
     (or (format-total (order-size-for-unit order size-unit) :decimals 0) "0")
-    (let [raw-size (:sz order)]
+    (let [raw-size (:sz order)
+          size (or (:sz-num order)
+                   (parse-number raw-size))]
       (if (string? raw-size)
         raw-size
-        (or (format-total raw-size :decimals 8) "0")))))
+        (or (format-total size :decimals 8) "0")))))
 
 (defn format-order-total [order size-unit]
   (if (= size-unit :quote)
@@ -394,6 +400,32 @@
           :data-role "orderbook-total-header-cell"}
     [:span {:class ["text-gray-400" "text-xs" "num"]} (str "Total (" size-symbol ")")]]])
 
+(defn- fallback-render-snapshot [orderbook-data]
+  (let [raw-bids (:bids orderbook-data)
+        raw-asks (:asks orderbook-data)
+        sorted-asks (sort-by #(or (parse-number (:px %)) 0) < raw-asks)
+        sorted-bids (sort-by #(or (parse-number (:px %)) 0) > raw-bids)
+        asks-limited (take max-render-levels-per-side sorted-asks)
+        bids-limited (take max-render-levels-per-side sorted-bids)]
+    {:asks-with-totals (calculate-cumulative-totals asks-limited)
+     :bids-with-totals (calculate-cumulative-totals bids-limited)
+     :best-bid (first sorted-bids)
+     :best-ask (first sorted-asks)}))
+
+(defn- render-snapshot [orderbook-data]
+  (let [render (:render orderbook-data)
+        precomputed? (and (map? render)
+                          (contains? render :asks-with-totals)
+                          (contains? render :bids-with-totals)
+                          (contains? render :best-bid)
+                          (contains? render :best-ask))]
+    (if precomputed?
+      {:asks-with-totals (or (:asks-with-totals render) [])
+       :bids-with-totals (or (:bids-with-totals render) [])
+       :best-bid (:best-bid render)
+       :best-ask (:best-ask render)}
+      (fallback-render-snapshot orderbook-data))))
+
 ;; Main order book component
 (defn l2-orderbook-panel
   ([coin market orderbook-data orderbook-ui]
@@ -409,24 +441,11 @@
         base-symbol (resolve-base-symbol coin market)
         quote-symbol (resolve-quote-symbol coin market)
         selected-size-symbol (if (= size-unit :quote) quote-symbol base-symbol)
-        raw-bids (:bids orderbook-data)
-        raw-asks (:asks orderbook-data)
-
-        ;; Sort into display order:
-        ;; Asks: best->worst (lowest->highest). Lowest price = best ask.
-        display-asks (sort-by #(or (parse-number (:px %)) 0) < raw-asks)
-        ;; Bids: best->worst (highest->lowest). Highest price = best bid.
-        display-bids (sort-by #(or (parse-number (:px %)) 0) > raw-bids)
-        asks-limited (take max-render-levels-per-side display-asks)
-        bids-limited (take max-render-levels-per-side display-bids)
-
-        ;; Calculate cumulative totals in display order
-        asks-with-totals (calculate-cumulative-totals asks-limited)
-        bids-with-totals (calculate-cumulative-totals bids-limited)
-
-        ;; Get best prices for spread calculation
-        best-bid (first display-bids)
-        best-ask (first display-asks)
+        snapshot (render-snapshot orderbook-data)
+        asks-with-totals (:asks-with-totals snapshot)
+        bids-with-totals (:bids-with-totals snapshot)
+        best-bid (:best-bid snapshot)
+        best-ask (:best-ask snapshot)
         spread (calculate-spread best-bid best-ask)
 
         reference-price (resolve-reference-price best-bid best-ask market)

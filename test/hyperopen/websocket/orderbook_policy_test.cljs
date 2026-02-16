@@ -17,6 +17,42 @@
       (is (= [101 "100" "99.5"]
              (mapv :px (policy/sort-asks levels)))))))
 
+(deftest normalize-levels-and-cumulative-depth-test
+  (let [levels (policy/normalize-levels [{:px "101.5" :sz "2"}
+                                         {:px "100.5" :sz "3"}])
+        with-totals (policy/calculate-cumulative-totals levels)]
+    (is (= [{:px "101.5" :sz "2" :px-num 101.5 :sz-num 2}
+            {:px "100.5" :sz "3" :px-num 100.5 :sz-num 3}]
+           levels))
+    (is (= [{:px "101.5" :sz "2" :px-num 101.5 :sz-num 2 :cum-size 2 :cum-value 203}
+            {:px "100.5" :sz "3" :px-num 100.5 :sz-num 3 :cum-size 5 :cum-value 504.5}]
+           with-totals))))
+
+(deftest build-book-test
+  (let [book (policy/build-book [{:px "100" :sz "2"}
+                                 {:px "99" :sz "1"}]
+                                [{:px "101" :sz "4"}
+                                 {:px "102" :sz "5"}]
+                                1)]
+    (testing "legacy keys remain sorted in compatibility order"
+      (is (= [{:px "100" :sz "2"} {:px "99" :sz "1"}]
+             (:bids book)))
+      (is (= [{:px "102" :sz "5"} {:px "101" :sz "4"}]
+             (:asks book))))
+    (testing "render snapshot stores limited display and cumulative slices"
+      (is (= [{:px "100" :sz "2" :px-num 100 :sz-num 2}]
+             (get-in book [:render :display-bids])))
+      (is (= [{:px "101" :sz "4" :px-num 101 :sz-num 4}]
+             (get-in book [:render :display-asks])))
+      (is (= [{:px "100" :sz "2" :px-num 100 :sz-num 2 :cum-size 2 :cum-value 200}]
+             (get-in book [:render :bids-with-totals])))
+      (is (= [{:px "101" :sz "4" :px-num 101 :sz-num 4 :cum-size 4 :cum-value 404}]
+             (get-in book [:render :asks-with-totals])))
+      (is (= {:px "100" :sz "2" :px-num 100 :sz-num 2}
+             (get-in book [:render :best-bid])))
+      (is (= {:px "101" :sz "4" :px-num 101 :sz-num 4}
+             (get-in book [:render :best-ask]))))))
+
 (deftest normalize-aggregation-config-test
   (is (= {:nSigFigs 4}
          (policy/normalize-aggregation-config {:nSigFigs 4})))

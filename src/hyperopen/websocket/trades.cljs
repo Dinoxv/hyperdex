@@ -5,11 +5,56 @@
             [hyperopen.utils.interval :as interval]
             [hyperopen.websocket.trades-policy :as policy]))
 
+(def ^:private max-recent-trades 100)
+
 ;; Trades state
 (defonce trades-state (atom {:subscriptions #{}
-                             :trades []}))
+                             :trades []
+                             :trades-by-coin {}}))
 
 (defonce trades-buffer (atom {:pending [] :timer nil}))
+
+(defn- trade-time-ms [trade]
+  (or (:time-ms trade) 0))
+
+(defn- normalize-trade-for-view [trade]
+  (let [price-raw (or (:px trade) (:price trade) (:p trade))
+        size-raw (or (:sz trade) (:size trade) (:s trade))
+        time-raw (or (:time trade) (:t trade) (:ts trade) (:timestamp trade))]
+    {:coin (or (:coin trade) (:symbol trade) (:asset trade))
+     :price (policy/parse-number price-raw)
+     :price-raw price-raw
+     :size (or (policy/parse-number size-raw) 0)
+     :size-raw size-raw
+     :side (or (:side trade) (:dir trade))
+     :time-ms (policy/time->ms time-raw)
+     :tid (or (:tid trade) (:id trade))}))
+
+(defn- upsert-trades-by-coin [trades-by-coin normalized-trades]
+  (let [incoming-by-coin (->> normalized-trades
+                              (filter (fn [trade]
+                                        (let [coin (:coin trade)]
+                                          (and (string? coin)
+                                               (not= "" coin)))))
+                              (group-by :coin))]
+    (reduce-kv (fn [acc coin incoming]
+                 (assoc acc
+                        coin
+                        (->> (concat incoming (get acc coin []))
+                             (sort-by trade-time-ms >)
+                             (take max-recent-trades)
+                             vec)))
+               (or trades-by-coin {})
+               incoming-by-coin)))
+
+(defn- ingest-trades! [incoming-trades]
+  (let [incoming (vec incoming-trades)
+        normalized (mapv normalize-trade-for-view incoming)]
+    (swap! trades-state
+           (fn [state]
+             (-> state
+                 (update :trades #(take max-recent-trades (concat incoming (or % []))))
+                 (update :trades-by-coin upsert-trades-by-coin normalized))))))
 
 ;; Subscribe to trades for a symbol
 (defn subscribe-trades! [symbol]
@@ -81,8 +126,7 @@
   (when (and (map? data) (= (:channel data) "trades"))
     (let [trades (:data data)]
       (when (seq trades)
-        (swap! trades-state update :trades 
-               #(take 100 (concat trades %))) ; Keep last 100 trades
+        (ingest-trades! trades)
         (telemetry/log! "Received" (count trades) "new trades")
         (telemetry/log! "Latest trade:" (first trades))))))
 
@@ -91,8 +135,7 @@
     (when (and (map? data) (= (:channel data) "trades"))
       (let [trades (:data data)]
         (when (seq trades)
-          (swap! trades-state update :trades
-                 #(take 100 (concat trades %)))
+          (ingest-trades! trades)
           (schedule-candle-update! store trades))))))
 
 ;; Get current subscriptions
@@ -103,9 +146,14 @@
 (defn get-recent-trades []
   (:trades @trades-state))
 
+(defn get-recent-trades-for-coin [coin]
+  (if (seq coin)
+    (get-in @trades-state [:trades-by-coin coin] [])
+    []))
+
 ;; Clear all trades data
 (defn clear-trades! []
-  (swap! trades-state assoc :trades []))
+  (swap! trades-state assoc :trades [] :trades-by-coin {}))
 
 ;; Initialize trades module
 (defn init! [store]

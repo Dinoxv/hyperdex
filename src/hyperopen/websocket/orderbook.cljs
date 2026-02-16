@@ -55,9 +55,8 @@
         (when (and coin levels (>= (count levels) 2))
           (let [bids (first levels)
                 asks (second levels)
-                next-book {:bids (policy/sort-bids bids)
-                           :asks (policy/sort-asks asks)
-                           :timestamp (:time book-data)}]
+                next-book (assoc (policy/build-book bids asks)
+                                 :timestamp (:time book-data))]
             ;; Update local state
             (swap! orderbook-state assoc-in [:books coin] next-book)
             ;; Update app store
@@ -83,8 +82,10 @@
 ;; Get best bid and ask for a symbol
 (defn get-best-bid-ask [symbol]
   (when-let [book (get-orderbook symbol)]
-    {:best-bid (first (:bids book))
-     :best-ask (first (:asks book))}))
+    {:best-bid (or (get-in book [:render :best-bid])
+                   (first (:bids book)))
+     :best-ask (or (get-in book [:render :best-ask])
+                   (first (:asks book)))}))
 
 ;; Clear order book data for a specific symbol
 (defn clear-orderbook! [symbol]
