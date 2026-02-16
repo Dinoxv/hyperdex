@@ -75,6 +75,7 @@
                  :io-state io-state
                  :parse-raw-envelope (fn [_]
                                        @parse-result)
+                 :hydrate-envelope identity
                  :dispatch! (fn [msg]
                               (swap! dispatches conj msg))
                  :register-router-handler! (fn [topic handler-fn]
@@ -258,6 +259,12 @@
       (is (= 1 (count @router-registrations)))
       (is (= [{:topic "trades" :payload {:channel "trades"}}]
              @router-envelopes)))
+    (testing "router dispatch hydrates envelope when collaborator is provided"
+      (runtime-effects/interpret-effect! (assoc ctx :hydrate-envelope (fn [envelope]
+                                                                         (assoc-in envelope [:payload :hydrated?] true)))
+                                         {:fx/type :fx/router-dispatch-envelope
+                                          :envelope {:topic "trades" :payload {:channel "trades"}}})
+      (is (= true (get-in (last @router-envelopes) [:payload :hydrated?]))))
     (testing "parse-raw-message dispatches decoded envelopes and parse errors"
       (reset! parse-result {:ok {:topic "decoded" :payload {:channel "decoded"}}})
       (runtime-effects/interpret-effect! ctx {:fx/type :fx/parse-raw-message

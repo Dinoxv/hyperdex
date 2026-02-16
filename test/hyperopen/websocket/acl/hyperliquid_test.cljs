@@ -20,6 +20,38 @@
       (is (= :market (get-in result [:ok :tier])))
       (is (= 42 (get-in result [:ok :socket-id]))))))
 
+(deftest parse-raw-envelope-market-fast-path-defers-full-conversion-test
+  (with-redefs [contracts/validation-enabled? (constantly false)]
+    (let [result (acl/parse-raw-envelope {:raw "{\"channel\":\"trades\",\"seq\":2,\"data\":[{\"coin\":\"BTC\"}]}"
+                                          :socket-id 5
+                                          :now-ms (constantly 200)
+                                          :topic->tier (constantly :market)})
+          envelope (:ok result)
+          payload (:payload envelope)
+          hydrated (acl/hydrate-envelope envelope)]
+      (is (contains? result :ok))
+      (is (= :market (:tier envelope)))
+      (is (= "trades" (:channel payload)))
+      (is (= "BTC" (:coin payload)))
+      (is (nil? (:seq payload)))
+      (is (acl/deferred-market-payload? payload))
+      (is (not (acl/deferred-market-payload? (:payload hydrated))))
+      (is (= 2 (get-in hydrated [:payload :seq])))
+      (is (= "BTC" (get-in hydrated [:payload :data 0 :coin]))))))
+
+(deftest parse-raw-envelope-lossless-path-stays-eager-when-validation-disabled-test
+  (with-redefs [contracts/validation-enabled? (constantly false)]
+    (let [result (acl/parse-raw-envelope {:raw "{\"channel\":\"openOrders\",\"seq\":7,\"data\":{\"user\":\"0xabc\"}}"
+                                          :socket-id 3
+                                          :now-ms (constantly 50)
+                                          :topic->tier (constantly :lossless)})
+          payload (get-in result [:ok :payload])]
+      (is (contains? result :ok))
+      (is (= :lossless (get-in result [:ok :tier])))
+      (is (= 7 (:seq payload)))
+      (is (= "0xabc" (get-in payload [:data :user])))
+      (is (not (acl/deferred-market-payload? payload))))))
+
 (deftest parse-raw-envelope-default-source-and-validation-enabled-branches-test
   (let [assert-calls (atom [])]
     (with-redefs [contracts/validation-enabled? (constantly true)

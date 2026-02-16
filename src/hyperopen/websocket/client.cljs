@@ -195,6 +195,7 @@
     (let [runtime (app-runtime/start-runtime!
                     {:config @connection-config
                      :parse-raw-envelope parse-raw-envelope
+                     :hydrate-envelope acl/hydrate-envelope
                      :topic->tier #(policy/topic->tier (:channel-tier-policy @connection-config) %)
                      :router (current-router)
                      :connection-state connection-state

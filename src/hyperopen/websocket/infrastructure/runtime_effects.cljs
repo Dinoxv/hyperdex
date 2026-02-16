@@ -34,6 +34,7 @@
            clock
            io-state
            parse-raw-envelope
+           hydrate-envelope
            dispatch!
            register-router-handler!
            dispatch-envelope!
@@ -162,7 +163,11 @@
     (register-router-handler! (:topic effect) (:handler-fn effect))
 
     :fx/router-dispatch-envelope
-    (dispatch-envelope! (:envelope effect))
+    (let [envelope (:envelope effect)
+          envelope* (if hydrate-envelope
+                      (hydrate-envelope envelope)
+                      envelope)]
+      (dispatch-envelope! envelope*))
 
     :fx/parse-raw-message
     (let [{:keys [raw socket-id recv-at-ms]} effect

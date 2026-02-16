@@ -150,6 +150,7 @@
 (defn start-runtime!
   [{:keys [config
            parse-raw-envelope
+           hydrate-envelope
            topic->tier
            router
            connection-state
@@ -177,6 +178,7 @@
                                      :clock clock
                                      :io-state io-state
                                      :parse-raw-envelope parse-raw-envelope
+                                     :hydrate-envelope hydrate-envelope
                                      :register-router-handler! #(register-topic-handler! router %1 %2)
                                      :dispatch-envelope! #(route-domain-message! router %)
                                      :connection-state-atom connection-state
