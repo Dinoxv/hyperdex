@@ -68,3 +68,53 @@
             :initialize-remote-data-streams
             [:kick-render true]]
            @calls))))
+
+(deftest reset-startup-state-falls-back-to-runtime-when-startup-runtime-atom-is-absent-test
+  (let [runtime (atom {:startup {:deferred-scheduled? true
+                                 :bootstrapped-address "0xold"
+                                 :summary-logged? true}})
+        marks (atom [])
+        summaries (atom 0)]
+    (startup-init/reset-startup-state!
+     {:runtime runtime
+      :default-startup-runtime-state (fn []
+                                       {:deferred-scheduled? false
+                                        :bootstrapped-address nil
+                                        :summary-logged? false})
+      :mark-performance! (fn [mark]
+                           (swap! marks conj mark))
+      :schedule-startup-summary-log! (fn []
+                                       (swap! summaries inc))})
+    (is (= {:deferred-scheduled? false
+            :bootstrapped-address nil
+            :summary-logged? false}
+           (get @runtime :startup)))
+    (is (= ["app:init:start"] @marks))
+    (is (= 1 @summaries))))
+
+(deftest initialize-systems-invokes-collaborators-with-store-test
+  (let [calls (atom [])
+        store (atom {:wallet {:address nil}})
+        handle-wallet-connected (fn [] :connected)]
+    (startup-init/initialize-systems!
+     {:store store
+      :set-on-connected-handler! (fn [handler]
+                                   (swap! calls conj [:set-handler (= handler handle-wallet-connected)]))
+      :handle-wallet-connected handle-wallet-connected
+      :init-wallet! (fn [store-arg]
+                      (swap! calls conj [:init-wallet (= store store-arg)]))
+      :init-router! (fn [store-arg]
+                      (swap! calls conj [:init-router (= store store-arg)]))
+      :register-icon-service-worker! (fn []
+                                       (swap! calls conj :register-service-worker))
+      :initialize-remote-data-streams! (fn []
+                                         (swap! calls conj :initialize-streams))
+      :kick-render! (fn [store-arg]
+                      (swap! calls conj [:kick-render (= store store-arg)]))})
+    (is (= [[:set-handler true]
+            [:init-wallet true]
+            [:init-router true]
+            :register-service-worker
+            :initialize-streams
+            [:kick-render true]]
+           @calls))))

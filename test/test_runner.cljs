@@ -7,6 +7,7 @@
             [hyperopen.domain.trading.indicators.math-adapter-test]
             [hyperopen.domain.trading.indicators.contracts-test]
             [hyperopen.domain.trading.indicators.family-parity-test]
+            [hyperopen.domain.trading.indicators.flow-branch-coverage-test]
             [hyperopen.domain.trading.indicators.flow-family-coverage-test]
             [hyperopen.domain.trading.indicators.registry-test]
             [hyperopen.domain.trading.indicators.heavy-algorithms-test]
@@ -31,6 +32,8 @@
             [hyperopen.websocket.domain.policy-test]
             [hyperopen.websocket.health-projection-test]
             [hyperopen.websocket.health-runtime-test]
+            [hyperopen.websocket.infrastructure.runtime-effects-test]
+            [hyperopen.websocket.infrastructure.transport-test]
             [hyperopen.asset-selector.markets-test]
             [hyperopen.asset-selector.markets-cache-test]
             [hyperopen.asset-selector.icon-status-runtime-test]
@@ -41,6 +44,7 @@
             [hyperopen.utils.formatting-test]
             [hyperopen.utils.hl-signing-test]
             [hyperopen.utils.interval-test]
+            [hyperopen.websocket.interval-coverage-test]
             [hyperopen.orderbook.price-aggregation-test]
             [hyperopen.order.feedback-runtime-test]
             [hyperopen.app.effects-test]
@@ -76,6 +80,7 @@
             [hyperopen.startup.init-test]
             [hyperopen.startup.collaborators-test]
             [hyperopen.startup.composition-test]
+            [hyperopen.startup.runtime-test]
             [hyperopen.runtime.bootstrap-test]
             [hyperopen.runtime.app-effects-test]
             [hyperopen.runtime.collaborators-test]
@@ -97,6 +102,7 @@
              'hyperopen.domain.trading.indicators.math-adapter-test
              'hyperopen.domain.trading.indicators.contracts-test
              'hyperopen.domain.trading.indicators.family-parity-test
+             'hyperopen.domain.trading.indicators.flow-branch-coverage-test
              'hyperopen.domain.trading.indicators.flow-family-coverage-test
              'hyperopen.domain.trading.indicators.registry-test
              'hyperopen.domain.trading.indicators.heavy-algorithms-test
@@ -122,11 +128,14 @@
              'hyperopen.websocket.domain.policy-test
              'hyperopen.websocket.health-projection-test
              'hyperopen.websocket.health-runtime-test
+             'hyperopen.websocket.infrastructure.runtime-effects-test
+             'hyperopen.websocket.infrastructure.transport-test
              'hyperopen.websocket.subscriptions-runtime-test
              'hyperopen.utils.data-normalization-test
              'hyperopen.utils.formatting-test
              'hyperopen.utils.hl-signing-test
              'hyperopen.utils.interval-test
+             'hyperopen.websocket.interval-coverage-test
              'hyperopen.asset-selector.markets-test
              'hyperopen.asset-selector.markets-cache-test
              'hyperopen.asset-selector.icon-status-runtime-test
@@ -167,6 +176,7 @@
              'hyperopen.startup.init-test
              'hyperopen.startup.collaborators-test
              'hyperopen.startup.composition-test
+             'hyperopen.startup.runtime-test
              'hyperopen.runtime.bootstrap-test
              'hyperopen.runtime.app-effects-test
              'hyperopen.runtime.collaborators-test

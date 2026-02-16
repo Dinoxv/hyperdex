@@ -1,5 +1,6 @@
 (ns hyperopen.websocket.acl.hyperliquid-test
   (:require [cljs.test :refer-macros [deftest is testing]]
+            [hyperopen.schema.contracts :as contracts]
             [hyperopen.websocket.acl.hyperliquid :as acl]
             [hyperopen.websocket.domain.model :as model]))
 
@@ -19,7 +20,34 @@
       (is (= :market (get-in result [:ok :tier])))
       (is (= 42 (get-in result [:ok :socket-id]))))))
 
-(deftest parse-raw-envelope-error-test
+(deftest parse-raw-envelope-default-source-and-validation-enabled-branches-test
+  (let [assert-calls (atom [])]
+    (with-redefs [contracts/validation-enabled? (constantly true)
+                  contracts/assert-provider-message! (fn [provider-message context]
+                                                       (swap! assert-calls conj [provider-message context]))]
+      (let [result (acl/parse-raw-envelope {:raw "{\"channel\":\"trades\",\"data\":[]}"
+                                            :socket-id 7
+                                            :now-ms (constantly 111)
+                                            :topic->tier (constantly :market)})]
+        (is (= 1 (count @assert-calls)))
+        (is (= :ws-acl/parse-raw-envelope
+               (get-in @assert-calls [0 1 :boundary])))
+        (is (= :hyperliquid/ws (get-in result [:ok :source])))
+        (is (= "trades" (get-in result [:ok :topic])))))))
+
+(deftest parse-raw-envelope-channel-shape-errors-with-validation-disabled-test
+  (with-redefs [contracts/validation-enabled? (constantly false)]
+    (doseq [raw ["{\"data\":[]}"
+                 "{\"channel\":42,\"data\":[]}"
+                 "{\"channel\":null,\"data\":[]}"]]
+      (let [result (acl/parse-raw-envelope {:raw raw
+                                            :socket-id 0
+                                            :now-ms (constantly 0)
+                                            :topic->tier (constantly :lossless)})]
+        (is (contains? result :error))
+        (is (not (contains? result :ok)))))))
+
+(deftest parse-raw-envelope-invalid-json-error-test
   (let [result (acl/parse-raw-envelope {:raw "{invalid-json"
                                         :socket-id 0
                                         :now-ms (constantly 0)
@@ -27,22 +55,3 @@
     (testing "Invalid provider payload returns structured error result"
       (is (contains? result :error))
       (is (not (contains? result :ok))))))
-
-(deftest parse-raw-envelope-missing-channel-test
-  (let [result (acl/parse-raw-envelope {:raw "{\"data\":[]}"
-                                        :socket-id 0
-                                        :now-ms (constantly 0)
-                                        :topic->tier (constantly :lossless)})]
-    (testing "Payloads without provider channel are rejected by ACL"
-      (is (contains? result :error))
-      (is (not (contains? result :ok))))))
-
-(deftest parse-raw-envelope-empty-channel-test
-  (let [result (acl/parse-raw-envelope {:raw "{\"channel\":\"\",\"data\":[]}"
-                                        :socket-id 0
-                                        :now-ms (constantly 0)
-                                        :topic->tier (constantly :lossless)})]
-    (testing "Payloads with empty provider channel are rejected by ACL"
-      (is (contains? result :error))
-      (is (not (contains? result :ok))))))
-
