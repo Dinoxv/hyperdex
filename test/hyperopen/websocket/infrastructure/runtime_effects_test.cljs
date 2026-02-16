@@ -285,6 +285,7 @@
                                                 :tier-depth {:market 1}
                                                 :market-coalesce {:pending {}}
                                                 :now-ms 999
+                                                :health-fingerprint {:transport/state :connected}
                                                 :streams {:trades {:status :healthy}}
                                                 :transport {:state :connected}})
         (is (= {:status :connected :ws socket}
@@ -293,6 +294,7 @@
                 :tier-depth {:market 1}
                 :market-coalesce {:pending {}}
                 :now-ms 999
+                :health-fingerprint {:transport/state :connected}
                 :streams {:trades {:status :healthy}}
                 :transport {:state :connected}}
                @stream-runtime-atom))))

@@ -339,6 +339,7 @@
                        :lossless-dispatched 0
                        :ingress-parse-errors 0}
              :now-ms 20000
+             :health-fingerprint nil
              :streams {sub-key {:subscribed? true
                                 :subscribed-at-ms 120
                                 :first-payload-at-ms 130
@@ -391,6 +392,7 @@
                        :lossless-dispatched 0
                        :ingress-parse-errors 0}
              :now-ms 20000
+             :health-fingerprint nil
              :streams {sub-key {:subscribed? true
                                 :subscribed-at-ms 120
                                 :first-payload-at-ms 130
@@ -439,6 +441,7 @@
                        :lossless-dispatched 0
                        :ingress-parse-errors 0}
              :now-ms 20000
+             :health-fingerprint nil
              :streams {sub-key {:subscribed? true
                                 :subscribed-at-ms 120
                                 :first-payload-at-ms 130

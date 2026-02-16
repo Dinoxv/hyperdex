@@ -50,10 +50,11 @@
          runtime-state/diagnostics-timeline-limit))
 
 (defn sync-websocket-health-with-runtime!
-  [runtime store & {:keys [force?]}]
+  [runtime store & {:keys [force? projected-fingerprint]}]
   (health-runtime/sync-websocket-health!
    {:store store
     :force? force?
+    :projected-fingerprint projected-fingerprint
     :get-health-snapshot ws-client/get-health-snapshot
     :websocket-health-fingerprint websocket-health-fingerprint
     :runtime runtime
@@ -65,8 +66,11 @@
     :queue-microtask-fn platform/queue-microtask!}))
 
 (defn sync-websocket-health!
-  [store & {:keys [force?]}]
-  (sync-websocket-health-with-runtime! runtime-state/runtime store :force? force?))
+  [store & {:keys [force? projected-fingerprint]}]
+  (sync-websocket-health-with-runtime! runtime-state/runtime
+                                       store
+                                       :force? force?
+                                       :projected-fingerprint projected-fingerprint))
 
 (defn- set-copy-status!
   [store status]

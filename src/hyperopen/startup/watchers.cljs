@@ -40,6 +40,10 @@
     :disconnected :offline
     nil))
 
+(defn- projected-health-fingerprint
+  [runtime-projection]
+  (:health-fingerprint runtime-projection))
+
 (defn install-websocket-watchers!
   [{:keys [store
            connection-state
@@ -72,7 +76,8 @@
                        (update-in [:websocket-ui :reconnect-count] (fnil inc 0)))))
             (when (and status-transition? transition-event)
               (append-diagnostics-event! store transition-event transition-at-ms))))
-        (sync-websocket-health! store :force? status-transition?)
+        (when status-transition?
+          (sync-websocket-health! store :force? true))
         ;; Notify address watcher only on status transitions.
         (when status-transition?
           (if (= new-status :connected)
@@ -80,5 +85,9 @@
             (on-websocket-disconnected!))))))
 
   (add-watch stream-runtime websocket-health-watch-key
-    (fn [_ _ _ _]
-      (sync-websocket-health! store))))
+    (fn [_ _ old-runtime new-runtime]
+      (let [old-fingerprint (projected-health-fingerprint old-runtime)
+            new-fingerprint (projected-health-fingerprint new-runtime)]
+        (when (not= old-fingerprint new-fingerprint)
+          (sync-websocket-health! store
+                                  :projected-fingerprint new-fingerprint))))))

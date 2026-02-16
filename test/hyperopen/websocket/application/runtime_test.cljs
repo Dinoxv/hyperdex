@@ -11,6 +11,7 @@
                             :lossless-dispatched 0
                             :ingress-parse-errors 0}
                   :now-ms nil
+                  :health-fingerprint nil
                   :streams {}
                   :transport {:state :disconnected
                               :online? true

@@ -45,11 +45,12 @@
        :connection-state ws-client/connection-state
        :stream-runtime ws-client/stream-runtime
        :append-diagnostics-event! runtime-effect-adapters/append-diagnostics-event!
-       :sync-websocket-health! (fn [runtime-store & {:keys [force?]}]
+       :sync-websocket-health! (fn [runtime-store & {:keys [force? projected-fingerprint]}]
                                  (runtime-effect-adapters/sync-websocket-health-with-runtime!
                                   runtime
                                   runtime-store
-                                  :force? force?))
+                                  :force? force?
+                                  :projected-fingerprint projected-fingerprint))
        :on-websocket-connected! address-watcher/on-websocket-connected!
        :on-websocket-disconnected! address-watcher/on-websocket-disconnected!})}
     :validation-deps

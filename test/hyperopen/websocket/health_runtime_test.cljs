@@ -60,6 +60,35 @@
     (is (empty? @dispatches))
     (is (empty? @diagnostics))))
 
+(deftest sync-websocket-health-skips-snapshot-when-projected-fingerprint-unchanged-test
+  (let [store (atom {:websocket {:health {}}
+                     :websocket-ui {:reset-in-progress? false
+                                    :diagnostics-timeline []}})
+        baseline-health (connected-health 1000 :live)
+        baseline-fingerprint (health-projection/websocket-health-fingerprint baseline-health)
+        projection-state (atom {:fingerprint baseline-fingerprint})
+        sync-stats (atom {:writes 0})
+        health-reads (atom 0)]
+    (health-runtime/sync-websocket-health!
+     {:store store
+      :projected-fingerprint baseline-fingerprint
+      :get-health-snapshot (fn []
+                             (swap! health-reads inc)
+                             baseline-health)
+      :websocket-health-fingerprint health-projection/websocket-health-fingerprint
+      :projection-state projection-state
+      :sync-stats sync-stats
+      :auto-recover-enabled-fn (constantly false)
+      :auto-recover-severe-threshold-ms 30000
+      :auto-recover-cooldown-ms 300000
+      :dispatch! (fn [& _] nil)
+      :append-diagnostics-event! (fn [& _] nil)
+      :queue-microtask-fn (fn [f] (f))})
+    (is (= 0 @health-reads))
+    (is (= {:fingerprint baseline-fingerprint} @projection-state))
+    (is (= 0 (:writes @sync-stats)))
+    (is (= {} (get-in @store [:websocket :health])))))
+
 (deftest sync-websocket-health-applies-auto-recover-cooldown-and-dispatch-once-test
   (let [generated-at-ms 1700000000000
         health {:generated-at-ms generated-at-ms

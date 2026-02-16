@@ -18,12 +18,13 @@
     (reset! connection-state-atom
             (assoc connection :ws socket))))
 
-(defn- update-stream-projection! [stream-runtime-atom metrics tier-depth market-coalesce now-ms streams transport]
+(defn- update-stream-projection! [stream-runtime-atom metrics tier-depth market-coalesce now-ms health-fingerprint streams transport]
   (reset! stream-runtime-atom
           {:metrics metrics
            :tier-depth tier-depth
            :market-coalesce market-coalesce
            :now-ms now-ms
+           :health-fingerprint health-fingerprint
            :streams streams
            :transport transport}))
 
@@ -191,6 +192,7 @@
                                (:tier-depth effect)
                                (:market-coalesce effect)
                                (:now-ms effect)
+                               (:health-fingerprint effect)
                                (:streams effect)
                                (:transport effect))
 
