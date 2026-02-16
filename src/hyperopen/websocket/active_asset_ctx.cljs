@@ -1,7 +1,7 @@
 (ns hyperopen.websocket.active-asset-ctx
-  (:require [hyperopen.platform :as platform]
-            [hyperopen.telemetry :as telemetry]
-            [hyperopen.websocket.client :as ws-client]))
+  (:require [hyperopen.telemetry :as telemetry]
+            [hyperopen.websocket.client :as ws-client]
+            [hyperopen.websocket.market-projection-runtime :as market-projection-runtime]))
 
 ;; Active asset context state
 (defonce active-asset-ctx-state (atom {:subscriptions #{}
@@ -48,12 +48,16 @@
                                 :openInterest (parse-number (:openInterest ctx))
                                 :fundingRate (when (number? funding)
                                                (* 100 funding))}]
-            ;; Use setTimeout to avoid nested render issues
-            (platform/set-timeout!
-              #(do
-                 (swap! store assoc-in [:active-assets :contexts coin] formatted-data)
-                 (swap! store assoc-in [:active-assets :loading] false))
-              0)))))))
+            ;; Coalesce market projections so one frame emits one store write.
+            (when store
+              (market-projection-runtime/queue-market-projection!
+               {:store store
+                :coalesce-key [:active-asset-ctx coin]
+                :apply-update-fn
+                (fn [state]
+                  (-> state
+                      (assoc-in [:active-assets :contexts coin] formatted-data)
+                      (assoc-in [:active-assets :loading] false)))}))))))))
 
 ;; Subscribe to active asset context for a coin
 (defn subscribe-active-asset-ctx! [coin]
@@ -71,8 +75,11 @@
     (let [unsubscription-msg {:method "unsubscribe"
                               :subscription {:type "activeAssetCtx"
                                              :coin coin}}]
-      (swap! active-asset-ctx-state update :subscriptions disj coin)
-      (swap! active-asset-ctx-state update :contexts dissoc coin)
+      (swap! active-asset-ctx-state
+             (fn [state]
+               (-> state
+                   (update :subscriptions disj coin)
+                   (update :contexts dissoc coin))))
       (ws-client/send-message! unsubscription-msg)
       (telemetry/log! "Unsubscribed from active asset context for:" coin))))
 

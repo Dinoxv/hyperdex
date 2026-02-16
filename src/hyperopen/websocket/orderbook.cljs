@@ -1,7 +1,7 @@
 (ns hyperopen.websocket.orderbook
-  (:require [hyperopen.platform :as platform]
-            [hyperopen.telemetry :as telemetry]
+  (:require [hyperopen.telemetry :as telemetry]
             [hyperopen.websocket.client :as ws-client]
+            [hyperopen.websocket.market-projection-runtime :as market-projection-runtime]
             [hyperopen.websocket.orderbook-policy :as policy]))
 
 (defn- send-subscribe! [subscription]
@@ -39,8 +39,11 @@
     (when symbol
       (send-unsubscribe! subscription)
       (telemetry/log! "Unsubscribed from order book for:" symbol))
-    (swap! orderbook-state update :subscriptions dissoc symbol)
-    (swap! orderbook-state update :books dissoc symbol)))
+    (swap! orderbook-state
+           (fn [state]
+             (-> state
+                 (update :subscriptions dissoc symbol)
+                 (update :books dissoc symbol))))))
 
 ;; Create a handler function that has access to the store
 (defn create-orderbook-data-handler [store]
@@ -59,9 +62,11 @@
             (swap! orderbook-state assoc-in [:books coin] next-book)
             ;; Update app store
             (when store
-              (platform/set-timeout!
-               #(swap! store assoc-in [:orderbooks coin] next-book)
-               0))))))))
+              (market-projection-runtime/queue-market-projection!
+               {:store store
+                :coalesce-key [:orderbook coin]
+                :apply-update-fn (fn [state]
+                                   (assoc-in state [:orderbooks coin] next-book))}))))))))
 
 ;; Get current subscriptions
 (defn get-subscriptions []

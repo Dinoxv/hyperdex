@@ -58,6 +58,9 @@
             [hyperopen.wallet.agent-runtime-test]
             [hyperopen.websocket.client-test]
             [hyperopen.websocket.orderbook-policy-test]
+            [hyperopen.websocket.orderbook-test]
+            [hyperopen.websocket.active-asset-ctx-test]
+            [hyperopen.websocket.market-projection-runtime-test]
             [hyperopen.websocket.trades-policy-test]
             [hyperopen.websocket.trades-test]
             [hyperopen.views.active-asset-view-test]
@@ -154,6 +157,9 @@
              'hyperopen.wallet.agent-runtime-test
              'hyperopen.websocket.client-test
              'hyperopen.websocket.orderbook-policy-test
+             'hyperopen.websocket.orderbook-test
+             'hyperopen.websocket.active-asset-ctx-test
+             'hyperopen.websocket.market-projection-runtime-test
              'hyperopen.websocket.trades-policy-test
              'hyperopen.websocket.trades-test
              'hyperopen.views.active-asset-view-test

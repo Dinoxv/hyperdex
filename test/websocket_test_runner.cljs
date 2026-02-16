@@ -20,6 +20,9 @@
             [hyperopen.websocket.health-runtime-test]
             [hyperopen.websocket.domain.policy-test]
             [hyperopen.websocket.orderbook-policy-test]
+            [hyperopen.websocket.orderbook-test]
+            [hyperopen.websocket.active-asset-ctx-test]
+            [hyperopen.websocket.market-projection-runtime-test]
             [hyperopen.websocket.trades-policy-test]
             [hyperopen.websocket.trades-test]
             [hyperopen.websocket.user-test]))
@@ -47,6 +50,9 @@
              'hyperopen.websocket.user-test
              'hyperopen.wallet.address-watcher-test
              'hyperopen.websocket.orderbook-policy-test
+             'hyperopen.websocket.orderbook-test
+             'hyperopen.websocket.active-asset-ctx-test
+             'hyperopen.websocket.market-projection-runtime-test
              'hyperopen.websocket.trades-policy-test
              'hyperopen.websocket.trades-test))
 
