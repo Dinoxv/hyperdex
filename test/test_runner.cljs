@@ -3,6 +3,7 @@
             [hyperopen.config-test]
             [hyperopen.api-test]
             [hyperopen.api.projections-test]
+            [hyperopen.api.gateway.orders.commands-test]
             [hyperopen.account.history.effects-test]
             [hyperopen.domain.trading.indicators.math-adapter-test]
             [hyperopen.domain.trading.indicators.contracts-test]
@@ -102,6 +103,7 @@
   []
   (run-tests 'hyperopen.api-test
              'hyperopen.api.projections-test
+             'hyperopen.api.gateway.orders.commands-test
              'hyperopen.account.history.effects-test
              'hyperopen.domain.trading.indicators.math-adapter-test
              'hyperopen.domain.trading.indicators.contracts-test
