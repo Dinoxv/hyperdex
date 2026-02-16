@@ -1,6 +1,7 @@
 (ns hyperopen.views.trading-chart.core-test
   (:require [clojure.string :as str]
             [cljs.test :refer-macros [deftest is]]
+            [hyperopen.views.trading-chart.derived-cache :as derived-cache]
             [hyperopen.views.trading-chart.core :as chart-core]
             [hyperopen.views.trading-chart.utils.chart-interop :as chart-interop]
             [hyperopen.views.trading-chart.utils.data-processing :as data-processing]))
@@ -260,3 +261,71 @@
     (is (= 2 (get-in @options* [:priceFormat :precision])))
     (is (= 2 (count @data*)))
     (is (= 103.0 (:close (first @data*))))))
+
+(deftest trading-chart-view-memoizes-candle-transform-by-candles-and-timeframe-test
+  (let [raw-candles [{:t 1700000000000 :o "100" :h "101" :l "99" :c "100" :v "10"}
+                     {:t 1700000060000 :o "100" :h "102" :l "98" :c "101" :v "12"}]
+        transformed [{:time 1700000000 :open 100 :high 101 :low 99 :close 100 :volume 10}]
+        calls* (atom 0)
+        base-state {:active-asset "BTC"
+                    :candles {"BTC" {:1d raw-candles
+                                     :1h raw-candles}}
+                    :chart-options {:selected-timeframe :1d
+                                    :selected-chart-type :candlestick
+                                    :active-indicators {}}}
+        timeframe-changed-state (assoc-in base-state [:chart-options :selected-timeframe] :1h)
+        candles-changed-state (assoc-in timeframe-changed-state [:candles "BTC" :1h] (mapv identity raw-candles))]
+    (derived-cache/reset-derived-cache!)
+    (binding [derived-cache/*process-candle-data* (fn [_]
+                                                    (swap! calls* inc)
+                                                    transformed)]
+      (chart-core/trading-chart-view base-state)
+      (chart-core/trading-chart-view base-state)
+      (is (= 1 @calls*) "unchanged candles/timeframe should hit memoized candle transform")
+
+      (chart-core/trading-chart-view timeframe-changed-state)
+      (is (= 2 @calls*) "timeframe change should recompute candle transform once")
+
+      (chart-core/trading-chart-view timeframe-changed-state)
+      (is (= 2 @calls*) "repeated render after timeframe change should hit cache")
+
+      (chart-core/trading-chart-view candles-changed-state)
+      (is (= 3 @calls*) "new candle vector identity should recompute candle transform"))))
+
+(deftest chart-canvas-memoizes-indicator-outputs-by-candles-timeframe-and-config-test
+  (let [candle-data [{:time 1700000000 :open 100 :high 101 :low 99 :close 100 :volume 10}
+                     {:time 1700000060 :open 100 :high 102 :low 98 :close 101 :volume 12}]
+        candle-data-new-identity (mapv identity candle-data)
+        active-indicators-a {:sma {:period 20}}
+        active-indicators-b {:sma {:period 50}}
+        legend-meta {:symbol "BTC"
+                     :timeframe-label "1D"
+                     :venue "Hyperopen"
+                     :candle-data candle-data}
+        chart-runtime-options {}
+        calls* (atom 0)]
+    (derived-cache/reset-derived-cache!)
+    (binding [derived-cache/*calculate-indicator* (fn [indicator-type _ config]
+                                                    (swap! calls* inc)
+                                                    {:series [{:id (name indicator-type)
+                                                               :config config
+                                                               :data [{:time 1700000000 :value 100}]}]
+                                                     :markers [{:time 1700000000
+                                                                :position "aboveBar"
+                                                                :shape "circle"
+                                                                :color "#10b981"}]})]
+      (chart-core/chart-canvas candle-data :candlestick active-indicators-a legend-meta :1d chart-runtime-options)
+      (chart-core/chart-canvas candle-data :candlestick active-indicators-a legend-meta :1d chart-runtime-options)
+      (is (= 1 @calls*) "unchanged candles/timeframe/config should hit memoized indicator output")
+
+      (chart-core/chart-canvas candle-data :candlestick active-indicators-b legend-meta :1d chart-runtime-options)
+      (is (= 2 @calls*) "indicator config change should recompute indicator output once")
+
+      (chart-core/chart-canvas candle-data :candlestick active-indicators-b legend-meta :4h chart-runtime-options)
+      (is (= 3 @calls*) "timeframe change should recompute indicator output once")
+
+      (chart-core/chart-canvas candle-data :candlestick active-indicators-b legend-meta :4h chart-runtime-options)
+      (is (= 3 @calls*) "repeated render after timeframe change should hit cache")
+
+      (chart-core/chart-canvas candle-data-new-identity :candlestick active-indicators-b legend-meta :4h chart-runtime-options)
+      (is (= 4 @calls*) "new candle data identity should recompute indicator output"))))

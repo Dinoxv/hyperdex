@@ -89,6 +89,7 @@
             [hyperopen.runtime.collaborators-test]
             [hyperopen.runtime.registry-composition-test]
             [hyperopen.runtime.state-test]
+            [hyperopen.schema.chart-interop-contracts-test]
             [hyperopen.schema.contracts-test]
             [hyperopen.schema.contracts-coverage-test]
             [hyperopen.runtime.validation-test]
@@ -188,6 +189,7 @@
              'hyperopen.runtime.collaborators-test
              'hyperopen.runtime.registry-composition-test
              'hyperopen.runtime.state-test
+             'hyperopen.schema.chart-interop-contracts-test
              'hyperopen.schema.contracts-test
              'hyperopen.schema.contracts-coverage-test
              'hyperopen.runtime.validation-test

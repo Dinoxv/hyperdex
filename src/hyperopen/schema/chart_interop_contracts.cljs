@@ -74,13 +74,13 @@
      (<= from to))))
 
 (s/def ::series-type keyword?)
-(s/def ::series-data vector?)
+(s/def ::data vector?)
 (s/def ::color string?)
 (s/def ::line-width finite-number?)
 (s/def ::base finite-number?)
 (s/def ::series-def
   (s/and
-   (s/keys :req-un [::series-type ::series-data]
+   (s/keys :req-un [::series-type ::data]
            :opt-un [::color ::line-width ::base])
    (fn [{:keys [series-type]}]
      (contains? #{:line :histogram} series-type))))

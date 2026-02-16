@@ -3,8 +3,7 @@
             [hyperopen.utils.formatting :as fmt]
             [hyperopen.views.trading-chart.runtime-state :as chart-runtime]
             [hyperopen.views.trading-chart.utils.chart-interop :as ci]
-            [hyperopen.views.trading-chart.utils.data-processing :as dp]
-            [hyperopen.views.trading-chart.utils.indicators :as indicators]
+            [hyperopen.views.trading-chart.derived-cache :as derived-cache]
             [hyperopen.views.trading-chart.timeframe-dropdown :refer [timeframe-dropdown]]
             [hyperopen.views.trading-chart.chart-type-dropdown :refer [chart-type-dropdown]]
             [hyperopen.views.trading-chart.indicators-dropdown :refer [indicators-dropdown]]
@@ -97,26 +96,10 @@
          (:text freshness-cue)]])]))
 
 ;; Generic chart component that supports all chart types with volume
-(defn- sorted-active-indicator-configs
-  [active-indicators]
-  (sort-by (comp name key) active-indicators))
-
-(defn- flatten-indicator-series
-  [indicators-data]
-  (vec (mapcat :series indicators-data)))
-
-(defn- flatten-indicator-markers
-  [indicators-data]
-  (vec (mapcat :markers indicators-data)))
-
 (defn chart-canvas [candle-data chart-type active-indicators legend-meta selected-timeframe chart-runtime-options]
-  (let [;; Calculate indicators data
-        indicators-data-vec (->> (sorted-active-indicator-configs active-indicators)
-                                 (keep (fn [[indicator-type config]]
-                                         (indicators/calculate-indicator indicator-type candle-data config)))
-                                 vec)
-        indicator-series-data-vec (flatten-indicator-series indicators-data-vec)
-        indicator-marker-data-vec (flatten-indicator-markers indicators-data-vec)
+  (let [{:keys [indicators-data indicator-markers]
+         indicator-series-data :indicator-series}
+        (derived-cache/memoized-indicator-outputs candle-data selected-timeframe active-indicators)
         series-options (:series-options chart-runtime-options)
         legend-deps (:legend-deps chart-runtime-options)
         persistence-deps (:persistence-deps chart-runtime-options)
@@ -130,8 +113,8 @@
                    :replicant.life-cycle/mount
                    (try
                      ;; Create chart with indicators support
-                     (let [chart-obj (if (seq indicators-data-vec)
-                                       (ci/create-chart-with-indicators! node chart-type candle-data indicators-data-vec
+                     (let [chart-obj (if (seq indicators-data)
+                                       (ci/create-chart-with-indicators! node chart-type candle-data indicators-data
                                                                          {:series-options series-options})
                                        (ci/create-chart-with-volume-and-series! node chart-type candle-data
                                                                                 {:series-options series-options}))
@@ -142,7 +125,7 @@
                                            (ci/apply-persisted-visible-range! chart selected-timeframe persistence-deps))
                            visible-range-cleanup (when data-ready?
                                                   (ci/subscribe-visible-range-persistence! chart selected-timeframe persistence-deps))]
-                       (ci/set-main-series-markers! chart-obj indicator-marker-data-vec)
+                       (ci/set-main-series-markers! chart-obj indicator-markers)
                        (ci/sync-baseline-base-value-subscription! chart-obj chart-type)
                        (chart-runtime/set-state! node {:chart-obj chart-obj
                                                        :legend-control legend-control
@@ -195,9 +178,9 @@
                                                     (ci/subscribe-visible-range-persistence! chart selected-timeframe persistence-deps)
                                                     :visible-range-persistence-subscribed? true))
                        (when chart-obj
-                         (ci/set-main-series-markers! chart-obj indicator-marker-data-vec))
-                       (when (and indicator-series (seq indicator-series-data-vec))
-                         (doseq [[idx series-entry] (map-indexed vector indicator-series-data-vec)]
+                         (ci/set-main-series-markers! chart-obj indicator-markers))
+                       (when (and indicator-series (seq indicator-series-data))
+                         (doseq [[idx series-entry] (map-indexed vector indicator-series-data)]
                            (when-let [^js indicator-series-entry (aget ^js indicator-series idx)]
                              (when-let [series (.-series indicator-series-entry)]
                                (ci/set-indicator-data! series (:data series-entry))))))
@@ -242,7 +225,7 @@
         raw-candles (if (vector? api-response)
                       api-response  ; Direct array
                       (get api-response :data []))  ; Wrapped in :data
-        candle-data (dp/process-candle-data raw-candles)
+        candle-data (derived-cache/memoized-candle-data raw-candles selected-timeframe)
         symbol (or active-asset "—")
         timeframe-label (str/upper-case (name selected-timeframe))
         price-decimals (or (:price-decimals active-market)
