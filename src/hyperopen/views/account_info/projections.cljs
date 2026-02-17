@@ -22,6 +22,14 @@
     (when (and (number? num) (not (js/isNaN num)))
       (js/Math.floor num))))
 
+(defn resolve-open-order-oid
+  [order]
+  (some parse-optional-int
+        [(:oid order)
+         (:o order)
+         (get-in order [:order :oid])
+         (get-in order [:order :o])]))
+
 (defn parse-time-ms [value]
   (when-let [num (parse-optional-num value)]
     (js/Math.floor num)))
@@ -168,12 +176,86 @@
         dex-orders (open-orders-by-dex snapshot-by-dex)]
     (concat (if (seq live) live fallback) dex-orders)))
 
-(defn normalized-open-orders [orders snapshot snapshot-by-dex]
-  (->> (open-orders-source orders snapshot snapshot-by-dex)
-       (map normalize-open-order)
-       (remove nil?)
-       (filter (fn [o] (and (:coin o) (:oid o))))
+(defn pending-cancel-oid-set
+  [pending-cancel-oids]
+  (->> (cond
+         (nil? pending-cancel-oids) []
+         (set? pending-cancel-oids) pending-cancel-oids
+         (sequential? pending-cancel-oids) pending-cancel-oids
+         :else [pending-cancel-oids])
+       (keep parse-optional-int)
+       set))
+
+(defn order-pending-cancel?
+  [order pending-cancel-oids]
+  (let [pending-set (if (set? pending-cancel-oids)
+                      pending-cancel-oids
+                      (pending-cancel-oid-set pending-cancel-oids))
+        oid (resolve-open-order-oid order)]
+    (and (seq pending-set)
+         (some? oid)
+         (contains? pending-set oid))))
+
+(defn normalized-open-orders
+  ([orders snapshot snapshot-by-dex]
+   (normalized-open-orders orders snapshot snapshot-by-dex nil))
+  ([orders snapshot snapshot-by-dex pending-cancel-oids]
+   (let [pending-set (pending-cancel-oid-set pending-cancel-oids)]
+     (->> (open-orders-source orders snapshot snapshot-by-dex)
+          (remove #(order-pending-cancel? % pending-set))
+          (map normalize-open-order)
+          (remove nil?)
+          (filter (fn [o] (and (:coin o) (:oid o))))
+          vec))))
+
+(defn- normalized-coin-token [coin]
+  (some-> coin non-blank-text str/upper-case))
+
+(defn- base-coin-token [coin]
+  (some-> coin parse-coin-namespace :base normalized-coin-token))
+
+(defn open-order-for-active-asset?
+  [active-asset order]
+  (let [active-token (normalized-coin-token active-asset)
+        order-token (normalized-coin-token (:coin order))
+        active-base (base-coin-token active-asset)
+        order-base (base-coin-token (:coin order))]
+    (boolean
+     (and (seq active-token)
+          (seq order-token)
+          (or (= active-token order-token)
+              (and (seq active-base) (= active-base order-token))
+              (and (seq order-base) (= order-base active-token))
+              (and (seq active-base)
+                   (seq order-base)
+                   (= active-base order-base)))))))
+
+(defn- dedupe-open-orders-by-identity [orders]
+  (->> (or orders [])
+       (reduce (fn [{:keys [seen rows] :as acc} order]
+                 (let [identity-key (when (and (:coin order) (:oid order))
+                                      [(normalized-coin-token (:coin order))
+                                       (:oid order)])]
+                   (if (and identity-key (contains? seen identity-key))
+                     acc
+                     {:seen (if identity-key
+                              (conj seen identity-key)
+                              seen)
+                      :rows (conj rows order)})))
+               {:seen #{}
+                :rows []})
+       :rows
        vec))
+
+(defn normalized-open-orders-for-active-asset
+  ([orders snapshot snapshot-by-dex active-asset]
+   (normalized-open-orders-for-active-asset orders snapshot snapshot-by-dex active-asset nil))
+  ([orders snapshot snapshot-by-dex active-asset pending-cancel-oids]
+   (if (seq (non-blank-text active-asset))
+     (->> (normalized-open-orders orders snapshot snapshot-by-dex pending-cancel-oids)
+          (filter #(open-order-for-active-asset? active-asset %))
+          dedupe-open-orders-by-identity)
+     [])))
 
 (def ^:private balance-contract-id-pattern
   #"^(?:0[xX][0-9a-fA-F]{8,}|[0-9A-Za-z]{10,})$")

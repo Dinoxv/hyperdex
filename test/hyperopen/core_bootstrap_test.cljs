@@ -1462,10 +1462,13 @@
                (js/Promise.resolve ["dex-a"]))))
       (core/api-cancel-order nil store {:action {:type "cancel"
                                                  :cancels [{:a 0 :o 22}]}})
+      (is (= #{22}
+             (get-in @store [:orders :pending-cancel-oids])))
       (js/setTimeout
        (fn []
          (try
            (is (nil? (get-in @store [:orders :cancel-error])))
+           (is (nil? (get-in @store [:orders :pending-cancel-oids])))
            (is (= []
                   (get-in @store [:orders :open-orders])))
            (is (= :success
@@ -1481,6 +1484,41 @@
              (set! nxr/dispatch original-dispatch)
              (set! api/request-frontend-open-orders! original-request-open-orders)
              (set! api/ensure-perp-dexs-data! original-ensure-perp-dexs-data)
+             (done))))
+       0))))
+
+(deftest api-cancel-order-effect-restores-optimistically-hidden-order-on-failure-test
+  (async done
+    (let [store (atom {:wallet {:address "0xabc"
+                                :agent {:status :ready}}
+                       :orders {:open-orders [{:order {:coin "BTC" :oid 22}}]
+                                :open-orders-snapshot []
+                                :open-orders-snapshot-by-dex {}}
+                       :ui {:toast nil}})
+          original-cancel-order trading-api/cancel-order!]
+      (clear-order-feedback-toast-timeout!)
+      (set! trading-api/cancel-order!
+            (fn [_store _address _action]
+              (js/Promise.resolve {:status "error"
+                                   :response {:type "error"
+                                              :data "cancel failed"}})))
+      (core/api-cancel-order nil store {:action {:type "cancel"
+                                                 :cancels [{:a 0 :o 22}]}})
+      (is (= #{22}
+             (get-in @store [:orders :pending-cancel-oids])))
+      (js/setTimeout
+       (fn []
+         (try
+           (is (str/includes? (or (get-in @store [:orders :cancel-error]) "")
+                              "cancel failed"))
+           (is (nil? (get-in @store [:orders :pending-cancel-oids])))
+           (is (= [22]
+                  (->> (get-in @store [:orders :open-orders])
+                       (mapv #(get-in % [:order :oid])))))
+           (is (= :error (get-in @store [:ui :toast :kind])))
+           (finally
+             (clear-order-feedback-toast-timeout!)
+             (set! trading-api/cancel-order! original-cancel-order)
              (done))))
        0))))
 

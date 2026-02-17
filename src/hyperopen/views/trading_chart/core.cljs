@@ -25,12 +25,14 @@
   (let [active-asset (:active-asset state)
         open-orders-source (preferred-orders-value state :open-orders)
         open-orders-snapshot-source (preferred-orders-value state :open-orders-snapshot)
-        open-orders-snapshot-by-dex-source (preferred-orders-value state :open-orders-snapshot-by-dex)]
+        open-orders-snapshot-by-dex-source (preferred-orders-value state :open-orders-snapshot-by-dex)
+        pending-cancel-oids (get-in state [:orders :pending-cancel-oids])]
     (account-projections/normalized-open-orders-for-active-asset
      open-orders-source
      open-orders-snapshot-source
      open-orders-snapshot-by-dex-source
-     active-asset)))
+     active-asset
+     pending-cancel-oids)))
 
 (defn- dispatch-chart-cancel-order!
   [order]

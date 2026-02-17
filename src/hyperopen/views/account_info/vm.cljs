@@ -50,14 +50,16 @@
              #{}
              (concat base-positions extra-positions)))))
 
-(defn- open-orders-tab-count [orders snapshot snapshot-by-dex]
-  (->> (projections/open-orders-source orders snapshot snapshot-by-dex)
-       (reduce (fn [acc order]
-                 (let [root (or (:order order) order)]
-                   (if (and (:coin root) (:oid root))
-                     (inc acc)
-                     acc)))
-               0)))
+(defn- open-orders-tab-count [orders snapshot snapshot-by-dex pending-cancel-oids]
+  (let [pending-set (projections/pending-cancel-oid-set pending-cancel-oids)]
+    (->> (projections/open-orders-source orders snapshot snapshot-by-dex)
+         (remove #(projections/order-pending-cancel? % pending-set))
+         (reduce (fn [acc order]
+                   (let [root (or (:order order) order)]
+                     (if (and (:coin root) (:oid root))
+                       (inc acc)
+                       acc)))
+                 0))))
 
 (defn- prefer-orders-value [orders webdata2 k]
   (if (contains? orders k)
@@ -72,13 +74,15 @@
                                  open-orders
                                  open-orders-snapshot
                                  open-orders-snapshot-by-dex
+                                 pending-cancel-oids
                                  market-by-key]
   (case selected-tab
     :balances {:balance-rows (derived-cache/memoized-balance-rows webdata2 spot-data account market-by-key)}
     :positions {:positions (derived-cache/memoized-positions webdata2 perp-dex-states)}
     :open-orders {:open-orders (derived-cache/memoized-open-orders open-orders
                                                                    open-orders-snapshot
-                                                                   open-orders-snapshot-by-dex)}
+                                                                   open-orders-snapshot-by-dex
+                                                                   pending-cancel-oids)}
     {}))
 
 (defn reset-account-info-vm-cache! []
@@ -100,6 +104,7 @@
         open-orders-source (prefer-orders-value orders webdata2 :open-orders)
         open-orders-snapshot-source (prefer-orders-value orders webdata2 :open-orders-snapshot)
         open-orders-snapshot-by-dex-source (prefer-orders-value orders webdata2 :open-orders-snapshot-by-dex)
+        pending-cancel-oids (:pending-cancel-oids orders)
         {:keys [balance-rows positions open-orders]} (selected-tab-derivations selected-tab
                                                                                 webdata2
                                                                                 spot-data
@@ -108,6 +113,7 @@
                                                                                 open-orders-source
                                                                                 open-orders-snapshot-source
                                                                                 open-orders-snapshot-by-dex-source
+                                                                                pending-cancel-oids
                                                                                 market-by-key)
         trade-history-state (assoc (get-in state [:account-info :trade-history] {})
                                    :market-by-key market-by-key)
@@ -116,7 +122,8 @@
                                    :market-by-key market-by-key)
         tab-counts {:open-orders (open-orders-tab-count open-orders-source
                                                         open-orders-snapshot-source
-                                                        open-orders-snapshot-by-dex-source)
+                                                        open-orders-snapshot-by-dex-source
+                                                        pending-cancel-oids)
                     :positions (positions-tab-count webdata2 perp-dex-states)
                     :balances (balance-tab-count webdata2 spot-data account)}
         open-orders-sort (get-in state [:account-info :open-orders-sort] {:column "Time" :direction :desc})

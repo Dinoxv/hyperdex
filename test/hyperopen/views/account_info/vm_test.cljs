@@ -66,7 +66,7 @@
               derived-cache/*collect-positions* (fn [_webdata2 _perp-dex-states]
                                                  (swap! calls update :positions inc)
                                                  [])
-              derived-cache/*normalized-open-orders* (fn [_orders _snapshot _snapshot-by-dex]
+              derived-cache/*normalized-open-orders* (fn [_orders _snapshot _snapshot-by-dex _pending-cancel-oids]
                                                       (swap! calls update :open-orders inc)
                                                       [])]
       (vm/reset-account-info-vm-cache!)
@@ -96,7 +96,7 @@
                :account {:mode :classic}
                :perp-dex-clearinghouse {}}
         normalize-calls (atom 0)]
-    (binding [derived-cache/*normalized-open-orders* (fn [_orders _snapshot _snapshot-by-dex]
+    (binding [derived-cache/*normalized-open-orders* (fn [_orders _snapshot _snapshot-by-dex _pending-cancel-oids]
                                                         (swap! normalize-calls inc)
                                                         [{:coin "ETH" :oid 11}])]
       (vm/reset-account-info-vm-cache!)

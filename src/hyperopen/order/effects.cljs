@@ -11,6 +11,30 @@
                (trading-api/resolve-cancel-order-oid cancel)))
        set))
 
+(defn- add-pending-cancel-oids
+  [state cancel-oids]
+  (if (seq cancel-oids)
+    (update-in state [:orders :pending-cancel-oids]
+               (fn [pending]
+                 (into (if (set? pending)
+                         pending
+                         (set (or pending [])))
+                       cancel-oids)))
+    state))
+
+(defn- remove-pending-cancel-oids
+  [state cancel-oids]
+  (if (seq cancel-oids)
+    (update-in state [:orders :pending-cancel-oids]
+               (fn [pending]
+                 (let [pending-set (if (set? pending)
+                                     pending
+                                     (set (or pending [])))
+                       next-set (reduce disj pending-set cancel-oids)]
+                   (when (seq next-set)
+                     next-set))))
+    state))
+
 (defn- remove-canceled-open-orders-seq
   [orders cancel-oids]
   (->> (or orders [])
@@ -140,6 +164,7 @@
            show-toast!]} _ store request]
   (let [address (get-in @store [:wallet :address])
         agent-status (get-in @store [:wallet :agent :status])
+        cancel-oids (cancel-request-oids request)
         prune-fn (or prune-canceled-open-orders-fn
                      prune-canceled-open-orders)]
     (cond
@@ -154,23 +179,35 @@
         (show-toast! store :error "Enable trading before cancelling orders."))
 
       :else
-      (-> (trading-api/cancel-order! store address (:action request))
-          (.then (fn [resp]
-                   (if (= "ok" (:status resp))
-                     (do
-                       (swap! store
-                              (fn [state]
-                                (-> state
-                                    (assoc-in [:orders :cancel-error] nil)
-                                    (assoc-in [:orders :cancel-response] resp)
-                                    (prune-fn request))))
-                       (show-toast! store :success "Order canceled.")
-                       (refresh-open-orders-after-cancel! store address)
-                       (dispatch! store nil [[:actions/refresh-order-history]]))
-                     (let [error-text (str (exchange-response-error resp))]
-                       (swap! store assoc-in [:orders :cancel-error] error-text)
-                       (show-toast! store :error (cancel-order-error-message exchange-response-error resp))))))
-          (.catch (fn [err]
-                    (let [error-text (runtime-error-message err)]
-                      (swap! store assoc-in [:orders :cancel-error] error-text)
-                      (show-toast! store :error (str "Order cancellation failed: " error-text)))))))))
+      (do
+        ;; Hide targeted orders immediately; rollback by clearing pending ids on failure.
+        (swap! store add-pending-cancel-oids cancel-oids)
+        (-> (trading-api/cancel-order! store address (:action request))
+            (.then (fn [resp]
+                     (if (= "ok" (:status resp))
+                       (do
+                         (swap! store
+                                (fn [state]
+                                  (-> state
+                                      (assoc-in [:orders :cancel-error] nil)
+                                      (assoc-in [:orders :cancel-response] resp)
+                                      (prune-fn request)
+                                      (remove-pending-cancel-oids cancel-oids))))
+                         (show-toast! store :success "Order canceled.")
+                         (refresh-open-orders-after-cancel! store address)
+                         (dispatch! store nil [[:actions/refresh-order-history]]))
+                       (let [error-text (str (exchange-response-error resp))]
+                         (swap! store
+                                (fn [state]
+                                  (-> state
+                                      (assoc-in [:orders :cancel-error] error-text)
+                                      (remove-pending-cancel-oids cancel-oids))))
+                         (show-toast! store :error (cancel-order-error-message exchange-response-error resp))))))
+            (.catch (fn [err]
+                      (let [error-text (runtime-error-message err)]
+                        (swap! store
+                               (fn [state]
+                                 (-> state
+                                     (assoc-in [:orders :cancel-error] error-text)
+                                     (remove-pending-cancel-oids cancel-oids))))
+                        (show-toast! store :error (str "Order cancellation failed: " error-text))))))))))

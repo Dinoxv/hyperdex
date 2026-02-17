@@ -76,14 +76,20 @@
       (or (when (pred node) node)
           (some #(find-dom-node % pred) children)))))
 
-(defn- click-dom-node! [node]
+(defn- dispatch-dom-event! [node event-name]
   (when node
     (let [listeners (.-listeners ^js node)
           handler (when listeners
-                    (aget listeners "click"))]
+                    (aget listeners event-name))]
       (when (fn? handler)
         (handler #js {:preventDefault (fn [] nil)
                       :stopPropagation (fn [] nil)})))))
+
+(defn- click-dom-node! [node]
+  (dispatch-dom-event! node "click"))
+
+(defn- pointer-down-dom-node! [node]
+  (dispatch-dom-event! node "pointerdown"))
 
 (deftest apply-persisted-visible-range-applies-stored-time-range-test
   (let [requested-key (atom nil)
@@ -902,3 +908,47 @@
     (chart-interop/clear-open-order-overlays! chart-obj)
     (is (= 0 (alength (.-children container))))
     (is (= 6 @unsubscribes*))))
+
+(deftest open-order-overlays-inline-cancel-pointerdown-dispatches-once-test
+  (let [document (make-fake-document)
+        container (make-fake-element "div")
+        subscribe-fn (fn [_] nil)
+        time-scale #js {:subscribeVisibleTimeRangeChange subscribe-fn
+                        :unsubscribeVisibleTimeRangeChange subscribe-fn
+                        :subscribeVisibleLogicalRangeChange subscribe-fn
+                        :unsubscribeVisibleLogicalRangeChange subscribe-fn
+                        :subscribeSizeChange subscribe-fn
+                        :unsubscribeSizeChange subscribe-fn}
+        chart #js {:timeScale (fn [] time-scale)
+                   :subscribeCrosshairMove subscribe-fn
+                   :unsubscribeCrosshairMove subscribe-fn
+                   :subscribeClick subscribe-fn
+                   :unsubscribeClick subscribe-fn}
+        main-series #js {:priceToCoordinate (fn [price]
+                                              (* 2 price))
+                         :subscribeDataChanged subscribe-fn
+                         :unsubscribeDataChanged subscribe-fn}
+        chart-obj #js {:chart chart
+                       :mainSeries main-series}
+        canceled-oids* (atom [])
+        order {:coin "SOL"
+               :oid 11
+               :side "B"
+               :type "limit"
+               :sz "1.00"
+               :px "60.0"}]
+    (chart-interop/sync-open-order-overlays!
+     chart-obj
+     container
+     [order]
+     {:document document
+      :on-cancel-order (fn [order*]
+                         (swap! canceled-oids* conj (:oid order*)))})
+    (let [overlay-root (aget (.-children container) 0)
+          cancel-button (find-dom-node overlay-root
+                                       #(= "button" (some-> (.-tagName %) str/lower-case)))]
+      (is (some? cancel-button))
+      (pointer-down-dom-node! cancel-button)
+      (click-dom-node! cancel-button))
+    (is (= [11] @canceled-oids*))
+    (chart-interop/clear-open-order-overlays! chart-obj)))

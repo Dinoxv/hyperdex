@@ -227,14 +227,21 @@
       "color" text-color
       "cursor" "pointer"
       "pointerEvents" "auto"})
-    (.addEventListener
-     cancel-button
-     "click"
-     (fn [event]
-       (.preventDefault event)
-       (.stopPropagation event)
-       (when (fn? on-cancel-order)
-         (on-cancel-order order))))
+    (let [cancel-dispatched? (atom false)
+          emit-cancel!
+          (fn [event]
+            (when event
+              (.preventDefault event)
+              (.stopPropagation event))
+            (when (and (not @cancel-dispatched?)
+                       (fn? on-cancel-order))
+              (reset! cancel-dispatched? true)
+              (on-cancel-order order)))]
+      ;; Pointer-first handling avoids chart repaint hooks consuming the first click.
+      (.addEventListener cancel-button "pointerdown" emit-cancel!)
+      (.addEventListener cancel-button "touchstart" emit-cancel!)
+      (.addEventListener cancel-button "mousedown" emit-cancel!)
+      (.addEventListener cancel-button "click" emit-cancel!))
     (.appendChild badge label)
     (.appendChild badge cancel-button)
     (.appendChild row line)

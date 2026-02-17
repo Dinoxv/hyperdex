@@ -42,20 +42,27 @@
         result))))
 
 (defn memoized-open-orders
-  [orders snapshot snapshot-by-dex]
-  (let [cache @open-orders-cache
-        cache-hit? (and (map? cache)
-                        (identical? orders (:orders cache))
-                        (identical? snapshot (:snapshot cache))
-                        (identical? snapshot-by-dex (:snapshot-by-dex cache)))]
-    (if cache-hit?
-      (:result cache)
-      (let [result (*normalized-open-orders* orders snapshot snapshot-by-dex)]
-        (reset! open-orders-cache {:orders orders
-                                   :snapshot snapshot
-                                   :snapshot-by-dex snapshot-by-dex
-                                   :result result})
-        result))))
+  ([orders snapshot snapshot-by-dex]
+   (memoized-open-orders orders snapshot snapshot-by-dex nil))
+  ([orders snapshot snapshot-by-dex pending-cancel-oids]
+   (let [cache @open-orders-cache
+         cache-hit? (and (map? cache)
+                         (identical? orders (:orders cache))
+                         (identical? snapshot (:snapshot cache))
+                         (identical? snapshot-by-dex (:snapshot-by-dex cache))
+                         (identical? pending-cancel-oids (:pending-cancel-oids cache)))]
+     (if cache-hit?
+       (:result cache)
+       (let [result (*normalized-open-orders* orders
+                                              snapshot
+                                              snapshot-by-dex
+                                              pending-cancel-oids)]
+         (reset! open-orders-cache {:orders orders
+                                    :snapshot snapshot
+                                    :snapshot-by-dex snapshot-by-dex
+                                    :pending-cancel-oids pending-cancel-oids
+                                    :result result})
+         result)))))
 
 (defn reset-derived-cache!
   []
