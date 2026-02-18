@@ -64,6 +64,7 @@
             [hyperopen.websocket.orderbook-policy-test]
             [hyperopen.websocket.orderbook-test]
             [hyperopen.websocket.active-asset-ctx-test]
+            [hyperopen.websocket.webdata2-test]
             [hyperopen.websocket.market-projection-runtime-test]
             [hyperopen.websocket.trades-policy-test]
             [hyperopen.websocket.trades-test]
@@ -168,6 +169,7 @@
              'hyperopen.websocket.orderbook-policy-test
              'hyperopen.websocket.orderbook-test
              'hyperopen.websocket.active-asset-ctx-test
+             'hyperopen.websocket.webdata2-test
              'hyperopen.websocket.market-projection-runtime-test
              'hyperopen.websocket.trades-policy-test
              'hyperopen.websocket.trades-test

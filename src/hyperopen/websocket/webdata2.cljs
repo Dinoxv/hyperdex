@@ -1,7 +1,7 @@
 (ns hyperopen.websocket.webdata2
   (:require [hyperopen.telemetry :as telemetry]
             [hyperopen.websocket.client :as ws-client]
-            [hyperopen.utils.data-normalization :refer [preprocess-webdata2 normalize-asset-contexts]]))
+            [hyperopen.utils.data-normalization :as data-normalization]))
 
 ;; WebData2 state
 (defonce webdata2-state (atom {:subscriptions #{}
@@ -28,22 +28,47 @@
       (ws-client/send-message! unsubscription-msg)
       (telemetry/log! "Unsubscribed from WebData2 for address:" address))))
 
+(defn- meta-index-signature
+  [meta]
+  (let [universe (vec (or (:universe meta) []))
+        margin-tables (vec (or (:marginTables meta) []))]
+    {:universe-count (count universe)
+     :margin-table-count (count margin-tables)
+     :meta-hash (hash [universe margin-tables])}))
+
 ;; Create a handler function that has access to the store
 (defn create-webdata2-handler [store]
-  (fn [data]
-    (when (and (map? data)
-               (= "webData2" (:channel data)))
-      (let [webdata2-data  (:data data)
-            base-update    {:webdata2 webdata2-data}
-            full-update    (if (and (map? webdata2-data)
-                                    (:meta        webdata2-data)
-                                    (:assetCtxs   webdata2-data))
-                             {:asset-contexts
-                              (-> webdata2-data
-                                  preprocess-webdata2
-                                  normalize-asset-contexts)}
-                             {})]
-        (swap! store merge base-update full-update)))))
+  (let [meta-index-cache (atom nil)]
+    (fn [data]
+      (when (and (map? data)
+                 (= "webData2" (:channel data)))
+        (let [webdata2-data (:data data)]
+          (if (and (map? webdata2-data)
+                   (:meta webdata2-data)
+                   (:assetCtxs webdata2-data))
+            (let [meta (:meta webdata2-data)
+                  asset-ctxs (:assetCtxs webdata2-data)
+                  signature (meta-index-signature meta)
+                  cached @meta-index-cache
+                  rebuild-index? (or (nil? cached)
+                                     (not= signature (:signature cached)))
+                  meta-index (if rebuild-index?
+                               (let [next-index (data-normalization/build-asset-context-meta-index meta)]
+                                 (reset! meta-index-cache {:signature signature
+                                                           :meta-index next-index})
+                                 next-index)
+                               (:meta-index cached))]
+              (swap! store
+                     (fn [state]
+                       (let [seed-contexts (if rebuild-index? {} (:asset-contexts state))
+                             next-contexts (data-normalization/patch-asset-contexts
+                                            seed-contexts
+                                            meta-index
+                                            asset-ctxs)]
+                         (-> state
+                             (assoc :webdata2 webdata2-data)
+                             (assoc :asset-contexts next-contexts))))))
+            (swap! store assoc :webdata2 webdata2-data)))))))
 
 ;; Get current subscriptions
 (defn get-subscriptions []
@@ -71,4 +96,4 @@
   (telemetry/log! "Registering WebData2 handler with store:" store)
   ;; Register handler for webData2 channel with store access
   (ws-client/register-handler! "webData2" (create-webdata2-handler store))
-  (telemetry/log! "WebData2 handler registered successfully")) 
+  (telemetry/log! "WebData2 handler registered successfully"))
