@@ -1,7 +1,22 @@
 (ns hyperopen.websocket.trades-test
-  (:require [cljs.test :refer-macros [deftest is]]
+  (:require [cljs.test :refer [use-fixtures]
+             :refer-macros [deftest is]]
+            [hyperopen.platform :as platform]
             [hyperopen.websocket.trades :as trades]
             [hyperopen.websocket.trades-policy :as policy]))
+
+(defn- reset-trades-fixture [f]
+  (reset! trades/trades-state {:subscriptions #{}
+                               :trades []
+                               :trades-by-coin {}})
+  (reset! trades/trades-buffer {:pending [] :timer nil})
+  (f)
+  (reset! trades/trades-state {:subscriptions #{}
+                               :trades []
+                               :trades-by-coin {}})
+  (reset! trades/trades-buffer {:pending [] :timer nil}))
+
+(use-fixtures :each reset-trades-fixture)
 
 (deftest update-candles-from-trades-normalizes-filters-and-sorts-before-upsert-test
   (let [store (atom {:active-asset "BTC"
@@ -20,7 +35,7 @@
     (is (= [{:time-ms 5 :price 0.5 :coin "BTC"}
             {:time-ms 10 :price 1 :coin "BTC"}
             {:time-ms 15 :price 1.5 :coin nil}]
-           (get-in @store [:candles "BTC" :1m])))))
+           (mapv #(dissoc % :size) (get-in @store [:candles "BTC" :1m]))))))
 
 (deftest update-candles-from-trades-preserves-map-entry-shape-when-updating-data-test
   (let [store (atom {:active-asset "BTC"
@@ -37,13 +52,56 @@
       (is (= :keep (:meta entry)))
       (is (= [{:time-ms 100 :price 1 :coin "BTC"}
               {:time-ms 200 :price 2 :coin "BTC"}]
-             (:data entry))))))
+             (mapv #(dissoc % :size) (:data entry)))))))
+
+(deftest ingest-trades-coin-cache-merges-batches-in-time-order-test
+  (@#'trades/ingest-trades! [{:coin "BTC" :px "3" :sz "0.1" :time 1700000003}
+                             {:coin "BTC" :px "1" :sz "0.1" :time 1700000001}])
+  (@#'trades/ingest-trades! [{:coin "BTC" :px "4" :sz "0.1" :time 1700000004}
+                             {:coin "BTC" :px "2" :sz "0.1" :time 1700000002}])
+  (is (= [1700000004000 1700000003000 1700000002000 1700000001000]
+         (mapv :time-ms (trades/get-recent-trades-for-coin "BTC"))))
+  (is (= ["4" "3" "2" "1"]
+         (mapv :price-raw (trades/get-recent-trades-for-coin "BTC")))))
+
+(deftest ingest-trades-coin-cache-is-bounded-to-max-recent-trades-test
+  (let [base-time 1700000000
+        incoming (mapv (fn [offset]
+                         {:coin "BTC"
+                          :px (str offset)
+                          :sz "0.1"
+                          :time (+ base-time offset)})
+                       (reverse (range 120)))]
+    (@#'trades/ingest-trades! incoming))
+  (let [recent (trades/get-recent-trades-for-coin "BTC")]
+    (is (= 100 (count recent)))
+    (is (= 1700000119000 (:time-ms (first recent))))
+    (is (= 1700000020000 (:time-ms (last recent))))))
+
+(deftest schedule-candle-update-incrementally-merges-pending-trades-test
+  (let [store (atom {:active-asset "BTC"
+                     :chart-options {:selected-timeframe :1m}
+                     :candles {"BTC" {:1m []}}})
+        timeout-callback (atom nil)
+        flushed-pending (atom nil)]
+    (with-redefs [platform/set-timeout! (fn [f _delay-ms]
+                                          (reset! timeout-callback f)
+                                          :timer-1)
+                  trades/update-candles-from-normalized-trades! (fn [_ pending]
+                                                                  (reset! flushed-pending pending))]
+      (@#'trades/schedule-candle-update! store [{:coin "BTC" :px "3" :sz "1" :time 1700000003}
+                                                {:coin "BTC" :px "1" :sz "1" :time 1700000001}])
+      (@#'trades/schedule-candle-update! store [{:coin "BTC" :px "2" :sz "1" :time 1700000002}])
+      (is (= [1700000001000 1700000002000 1700000003000]
+             (mapv :time-ms (:pending @trades/trades-buffer))))
+      (is (= :timer-1 (:timer @trades/trades-buffer)))
+      (@timeout-callback))
+    (is (= [1700000001000 1700000002000 1700000003000]
+           (mapv :time-ms @flushed-pending)))
+    (is (= {:pending [] :timer nil}
+           @trades/trades-buffer))))
 
 (deftest create-trades-handler-updates-coin-indexed-display-cache-test
-  (reset! trades/trades-state {:subscriptions #{}
-                               :trades []
-                               :trades-by-coin {}})
-  (reset! trades/trades-buffer {:pending [] :timer nil})
   (let [handler (trades/create-trades-handler (atom {}))]
     (with-redefs [trades/schedule-candle-update! (fn [& _] nil)]
       (handler {:channel "trades"
@@ -56,11 +114,7 @@
     (is (= [1700000003000 1700000002000]
            (mapv :time-ms (trades/get-recent-trades-for-coin "BTC"))))
     (is (= "3010.5"
-           (:price-raw (first (trades/get-recent-trades-for-coin "ETH"))))))
-  (reset! trades/trades-state {:subscriptions #{}
-                               :trades []
-                               :trades-by-coin {}})
-  (reset! trades/trades-buffer {:pending [] :timer nil}))
+           (:price-raw (first (trades/get-recent-trades-for-coin "ETH")))))))
 
 (deftest clear-trades-clears-coin-indexed-cache-test
   (reset! trades/trades-state {:subscriptions #{}
