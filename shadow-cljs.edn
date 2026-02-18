@@ -26,7 +26,7 @@
   :ws-test {:target :node-test
             :output-to "out/ws-test.js"
             :compiler-options {:source-map true}
-            :ns-regexp "^(hyperopen\\.websocket\\..*-test)$"}
+            :ns-regexp "^(hyperopen\\.websocket\\..*-test|hyperopen\\.wallet\\.address-watcher-test)$"}
   
   :release {:target :browser
             :output-dir "resources/public/js"
