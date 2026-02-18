@@ -2,6 +2,9 @@
 
 > An open source hyperliquid client
 
+[![Tests](https://github.com/thegeronimo/hyperopen/actions/workflows/tests.yml/badge.svg)](https://github.com/thegeronimo/hyperopen/actions/workflows/tests.yml)
+[![codecov](https://codecov.io/gh/thegeronimo/hyperopen/branch/main/graph/badge.svg)](https://codecov.io/gh/thegeronimo/hyperopen)
+
 A ClojureScript trading interface built with [Replicant](https://github.com/cjohansen/replicant) for data-driven rendering and [Nexus](https://github.com/cjohansen/nexus) for action-based state management.
 
 ## Architecture

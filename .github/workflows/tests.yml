@@ -55,3 +55,21 @@ jobs:
 
       - name: Run WebSocket Test Gate
         run: npm run test:websocket
+
+      - name: Generate Coverage Report
+        run: npm run coverage
+
+      - name: Upload Coverage Artifact
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: coverage-report
+          path: coverage
+          if-no-files-found: error
+
+      - name: Upload Coverage to Codecov
+        if: github.event_name != 'pull_request' || github.event.pull_request.head.repo.fork == false
+        uses: codecov/codecov-action@v5
+        with:
+          files: ./coverage/lcov.info
+          fail_ci_if_error: false
