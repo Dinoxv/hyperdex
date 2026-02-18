@@ -1,5 +1,5 @@
 {
-  "reporter": ["text-summary", "html", "lcov"],
+  "reporter": ["text-summary", "html", "lcov", "json-summary"],
   "reports-dir": "coverage",
   "include": [".shadow-cljs/builds/**/cljs-runtime/hyperopen*.js"],
   "exclude": [

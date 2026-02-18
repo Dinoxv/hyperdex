@@ -5,6 +5,9 @@ on:
   push:
   workflow_dispatch:
 
+permissions:
+  contents: write
+
 jobs:
   tests:
     runs-on: ubuntu-latest
@@ -12,6 +15,8 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v4
+        with:
+          ref: ${{ github.ref }}
 
       - name: Setup Node
         uses: actions/setup-node@v4
@@ -59,6 +64,9 @@ jobs:
       - name: Generate Coverage Report
         run: npm run coverage
 
+      - name: Generate Coverage Badge Data
+        run: npm run coverage:badge
+
       - name: Upload Coverage Artifact
         if: always()
         uses: actions/upload-artifact@v4
@@ -67,9 +75,16 @@ jobs:
           path: coverage
           if-no-files-found: error
 
-      - name: Upload Coverage to Codecov
-        if: github.event_name != 'pull_request' || github.event.pull_request.head.repo.fork == false
-        uses: codecov/codecov-action@v5
-        with:
-          files: ./coverage/lcov.info
-          fail_ci_if_error: false
+      - name: Commit Coverage Badge
+        if: github.event_name == 'push' && github.ref == 'refs/heads/main' && github.actor != 'github-actions[bot]'
+        run: |
+          if git diff --quiet -- .github/badges/coverage.json; then
+            echo "Coverage badge unchanged."
+            exit 0
+          fi
+
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add .github/badges/coverage.json
+          git commit -m "chore: update coverage badge [skip ci]"
+          git push origin "HEAD:${GITHUB_REF#refs/heads/}"
