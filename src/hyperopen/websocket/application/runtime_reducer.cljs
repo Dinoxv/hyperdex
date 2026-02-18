@@ -133,6 +133,15 @@
                :attempt (:attempt state)
                :last-close (:last-close state)}})
 
+(defn- connection-projection-fingerprint
+  [connection active-socket-id]
+  {:connection connection
+   :active-socket-id active-socket-id})
+
+(defn- stream-projection-fingerprint
+  [stream]
+  stream)
+
 (defn- refresh-health-hysteresis [state]
   (let [now-ms (:now-ms state)]
     (if (number? now-ms)
@@ -175,12 +184,19 @@
     state))
 
 (defn- append-projections [state effects]
-  (-> effects
-      (conj (model/make-runtime-effect :fx/project-connection-state
-                                       {:connection (connection-projection state)
-                                        :active-socket-id (:active-socket-id state)}))
-      (conj (model/make-runtime-effect :fx/project-stream-metrics
-                                       (stream-projection state)))))
+  (let [connection (connection-projection state)
+        active-socket-id (:active-socket-id state)
+        stream (stream-projection state)]
+    (-> effects
+        (conj (model/make-runtime-effect :fx/project-connection-state
+                                         {:connection connection
+                                          :active-socket-id active-socket-id
+                                          :projection-fingerprint (connection-projection-fingerprint connection
+                                                                                                      active-socket-id)}))
+        (conj (model/make-runtime-effect :fx/project-stream-metrics
+                                         (assoc stream
+                                                :projection-fingerprint
+                                                (stream-projection-fingerprint stream)))))))
 
 (defn- result [state effects msg-type force-health-refresh?]
   (let [state* (maybe-refresh-health-hysteresis state msg-type force-health-refresh?)]

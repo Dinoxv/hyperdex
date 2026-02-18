@@ -42,10 +42,13 @@
                                 :last-close nil
                                 :queue-size 0})
         stream-runtime (atom {:health-fingerprint nil})
+        queue-microtask-calls (atom 0)
         sync-calls (atom [])
         connected-calls (atom 0)
         disconnected-calls (atom 0)]
-    (with-redefs [platform/queue-microtask! (fn [f] (f))
+    (with-redefs [platform/queue-microtask! (fn [f]
+                                              (swap! queue-microtask-calls inc)
+                                              (f))
                   platform/now-ms (constantly 2000)]
       (watchers/install-websocket-watchers!
        {:store store
@@ -57,10 +60,49 @@
         :on-websocket-connected! #(swap! connected-calls inc)
         :on-websocket-disconnected! #(swap! disconnected-calls inc)})
       (swap! connection-state assoc :attempt 1)
-      (testing "Non-status updates do not force health sync"
+      (testing "Non-status legacy projection updates do not force health sync"
         (is (empty? @sync-calls)))
       (swap! connection-state assoc :status :connected)
       (testing "Status transitions force sync and notify connected callback"
         (is (= [{:force? true}] @sync-calls))
         (is (= 1 @connected-calls))
-        (is (= 0 @disconnected-calls))))))
+        (is (= 0 @disconnected-calls))
+        (is (= 2 @queue-microtask-calls))
+        (is (= {:status :connected
+                :attempt 1
+                :next-retry-at-ms nil
+                :last-close nil
+                :queue-size 0}
+               (:websocket @store)))))))
+
+(deftest connection-watch-skips-store-merge-for-now-only-churn-test
+  (let [store (atom (base-store))
+        connection-state (atom {:status :connected
+                                :attempt 0
+                                :next-retry-at-ms nil
+                                :last-close nil
+                                :queue-size 0
+                                :now-ms 1000
+                                :last-activity-at-ms 900})
+        stream-runtime (atom {:health-fingerprint nil})
+        queue-microtask-calls (atom 0)]
+    (with-redefs [platform/queue-microtask! (fn [f]
+                                              (swap! queue-microtask-calls inc)
+                                              (f))
+                  platform/now-ms (constantly 2000)]
+      (watchers/install-websocket-watchers!
+       {:store store
+        :connection-state connection-state
+        :stream-runtime stream-runtime
+        :append-diagnostics-event! (fn [& _] nil)
+        :sync-websocket-health! (fn [& _] nil)
+        :on-websocket-connected! (fn [] nil)
+        :on-websocket-disconnected! (fn [] nil)})
+      (swap! connection-state assoc
+             :now-ms 2000
+             :last-activity-at-ms 1900)
+      (is (= 0 @queue-microtask-calls))
+      (is (= {} (:websocket @store)))
+      (swap! connection-state assoc :queue-size 1)
+      (is (= 1 @queue-microtask-calls))
+      (is (= 1 (get-in @store [:websocket :queue-size]))))))

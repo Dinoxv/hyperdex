@@ -45,6 +45,12 @@
        last
        :health-fingerprint))
 
+(defn- projection-fingerprint [effects fx-type]
+  (->> effects
+       (filter #(= fx-type (:fx/type %)))
+       last
+       :projection-fingerprint))
+
 (deftest reducer-determinism-test
   (let [state (reducer/initial-runtime-state test-config)
         msg (model/make-runtime-msg :cmd/init-connection 1000 {:ws-url "wss://example.test/ws"})
@@ -52,6 +58,26 @@
         b (step state msg)]
     (testing "Same state+msg yields same state/effects"
       (is (= a b)))))
+
+(deftest projection-effects-emit-fingerprints-for-effect-boundary-dedupe-test
+  (let [state (reducer/initial-runtime-state test-config)
+        ignored-open-a (step state (model/make-runtime-msg :evt/socket-open 100 {:socket-id 999 :at-ms 100}))
+        ignored-open-b (step state (model/make-runtime-msg :evt/socket-open 200 {:socket-id 999 :at-ms 200}))
+        init-connect (step state (model/make-runtime-msg :cmd/init-connection 300 {:ws-url "wss://example.test/ws"}))
+        connection-fingerprint-a (projection-fingerprint (:effects ignored-open-a) :fx/project-connection-state)
+        stream-fingerprint-a (projection-fingerprint (:effects ignored-open-a) :fx/project-stream-metrics)
+        connection-fingerprint-b (projection-fingerprint (:effects ignored-open-b) :fx/project-connection-state)
+        stream-fingerprint-b (projection-fingerprint (:effects ignored-open-b) :fx/project-stream-metrics)
+        connection-fingerprint-init (projection-fingerprint (:effects init-connect) :fx/project-connection-state)
+        stream-fingerprint-init (projection-fingerprint (:effects init-connect) :fx/project-stream-metrics)]
+    (testing "Projection effects always include deterministic fingerprint payloads"
+      (is (some? connection-fingerprint-a))
+      (is (some? stream-fingerprint-a))
+      (is (= connection-fingerprint-a connection-fingerprint-b))
+      (is (= stream-fingerprint-a stream-fingerprint-b)))
+    (testing "Fingerprint changes when projected runtime state changes"
+      (is (not= connection-fingerprint-a connection-fingerprint-init))
+      (is (not= stream-fingerprint-a stream-fingerprint-init)))))
 
 (deftest send-message-queues-and-requests-connect-test
   (let [state (assoc (reducer/initial-runtime-state test-config)

@@ -44,6 +44,14 @@
   [runtime-projection]
   (:health-fingerprint runtime-projection))
 
+(defn- legacy-websocket-projection
+  [connection-projection]
+  (select-keys connection-projection [:status
+                                      :attempt
+                                      :next-retry-at-ms
+                                      :last-close
+                                      :queue-size]))
+
 (defn install-websocket-watchers!
   [{:keys [store
            connection-state
@@ -58,24 +66,23 @@
       (let [old-status (:status old-state)
             new-status (:status new-state)
             status-transition? (not= old-status new-status)
-            legacy-projection (select-keys new-state [:status
-                                                      :attempt
-                                                      :next-retry-at-ms
-                                                      :last-close
-                                                      :queue-size])
+            old-legacy-projection (legacy-websocket-projection old-state)
+            new-legacy-projection (legacy-websocket-projection new-state)
+            legacy-projection-transition? (not= old-legacy-projection new-legacy-projection)
             transition-event (status->diagnostics-event new-status)
             transition-at-ms (or (:now-ms new-state) (platform/now-ms))]
-        ;; Defer store update to next tick to avoid nested renders.
-        (platform/queue-microtask!
-         #(do
-            (swap! store
-                   (fn [state]
-                     (cond-> (update state :websocket merge legacy-projection)
-                       (and status-transition?
-                            (= :reconnecting new-status))
-                       (update-in [:websocket-ui :reconnect-count] (fnil inc 0)))))
-            (when (and status-transition? transition-event)
-              (append-diagnostics-event! store transition-event transition-at-ms))))
+        (when legacy-projection-transition?
+          ;; Defer store update to next tick to avoid nested renders.
+          (platform/queue-microtask!
+           #(do
+              (swap! store
+                     (fn [state]
+                       (cond-> (update state :websocket merge new-legacy-projection)
+                         (and status-transition?
+                              (= :reconnecting new-status))
+                         (update-in [:websocket-ui :reconnect-count] (fnil inc 0)))))
+              (when (and status-transition? transition-event)
+                (append-diagnostics-event! store transition-event transition-at-ms)))))
         (when status-transition?
           (sync-websocket-health! store :force? true))
         ;; Notify address watcher only on status transitions.

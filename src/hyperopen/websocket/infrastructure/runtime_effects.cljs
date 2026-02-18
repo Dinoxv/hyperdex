@@ -13,20 +13,48 @@
 (defn- socket-for-id [io-state socket-id]
   (get-in @io-state [:sockets socket-id]))
 
-(defn- update-connection-projection! [connection-state-atom io-state connection active-socket-id]
-  (let [socket (socket-for-id io-state active-socket-id)]
-    (reset! connection-state-atom
-            (assoc connection :ws socket))))
+(def ^:private projection-fingerprint-path
+  [:projection-fingerprints])
 
-(defn- update-stream-projection! [stream-runtime-atom metrics tier-depth market-coalesce now-ms health-fingerprint streams transport]
-  (reset! stream-runtime-atom
-          {:metrics metrics
-           :tier-depth tier-depth
-           :market-coalesce market-coalesce
-           :now-ms now-ms
-           :health-fingerprint health-fingerprint
-           :streams streams
-           :transport transport}))
+(defn- applied-projection-fingerprint
+  [io-state projection-key]
+  (get-in @io-state (conj projection-fingerprint-path projection-key)))
+
+(defn- store-projection-fingerprint!
+  [io-state projection-key projection-fingerprint]
+  (swap! io-state assoc-in (conj projection-fingerprint-path projection-key) projection-fingerprint))
+
+(defn- maybe-update-projection!
+  [io-state projection-key projection-fingerprint update-projection-fn]
+  (when (not= (applied-projection-fingerprint io-state projection-key)
+              projection-fingerprint)
+    (update-projection-fn)
+    (store-projection-fingerprint! io-state projection-key projection-fingerprint)))
+
+(defn- update-connection-projection!
+  [connection-state-atom io-state connection active-socket-id projection-fingerprint]
+  (let [fingerprint (or projection-fingerprint
+                        {:connection connection
+                         :active-socket-id active-socket-id})]
+    (maybe-update-projection! io-state :connection fingerprint
+                              (fn []
+                                (let [socket (socket-for-id io-state active-socket-id)]
+                                  (reset! connection-state-atom
+                                          (assoc connection :ws socket)))))))
+
+(defn- update-stream-projection!
+  [stream-runtime-atom io-state metrics tier-depth market-coalesce now-ms health-fingerprint streams transport projection-fingerprint]
+  (let [projection {:metrics metrics
+                    :tier-depth tier-depth
+                    :market-coalesce market-coalesce
+                    :now-ms now-ms
+                    :health-fingerprint health-fingerprint
+                    :streams streams
+                    :transport transport}
+        fingerprint (or projection-fingerprint projection)]
+    (maybe-update-projection! io-state :stream fingerprint
+                              (fn []
+                                (reset! stream-runtime-atom projection)))))
 
 (defn interpret-effect!
   [{:keys [transport
@@ -189,17 +217,20 @@
     (update-connection-projection! connection-state-atom
                                    io-state
                                    (:connection effect)
-                                   (:active-socket-id effect))
+                                   (:active-socket-id effect)
+                                   (:projection-fingerprint effect))
 
     :fx/project-stream-metrics
     (update-stream-projection! stream-runtime-atom
+                               io-state
                                (:metrics effect)
                                (:tier-depth effect)
                                (:market-coalesce effect)
                                (:now-ms effect)
                                (:health-fingerprint effect)
                                (:streams effect)
-                               (:transport effect))
+                               (:transport effect)
+                               (:projection-fingerprint effect))
 
     :fx/log
     (let [{:keys [level message error]} effect]

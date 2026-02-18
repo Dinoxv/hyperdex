@@ -282,11 +282,31 @@
       (is (= 222 (:ts (nth @dispatches (- (count @dispatches) 2)))))
       (is (number? (:ts (last @dispatches)))))
     (testing "projection effects refresh public runtime atoms"
-      (let [socket (js-obj "readyState" infra/ws-ready-state-open)]
+      (let [socket (js-obj "readyState" infra/ws-ready-state-open)
+            connection-watch-count (atom 0)
+            stream-watch-count (atom 0)]
+        (add-watch connection-state-atom ::connection-watch
+                   (fn [_ _ _ _]
+                     (swap! connection-watch-count inc)))
+        (add-watch stream-runtime-atom ::stream-watch
+                   (fn [_ _ _ _]
+                     (swap! stream-watch-count inc)))
         (swap! io-state assoc-in [:sockets :active] socket)
         (runtime-effects/interpret-effect! ctx {:fx/type :fx/project-connection-state
                                                 :connection {:status :connected}
-                                                :active-socket-id :active})
+                                                :active-socket-id :active
+                                                :projection-fingerprint {:status :connected
+                                                                         :active-socket-id :active}})
+        (runtime-effects/interpret-effect! ctx {:fx/type :fx/project-connection-state
+                                                :connection {:status :connected}
+                                                :active-socket-id :active
+                                                :projection-fingerprint {:status :connected
+                                                                         :active-socket-id :active}})
+        (runtime-effects/interpret-effect! ctx {:fx/type :fx/project-connection-state
+                                                :connection {:status :reconnecting}
+                                                :active-socket-id :active
+                                                :projection-fingerprint {:status :reconnecting
+                                                                         :active-socket-id :active}})
         (runtime-effects/interpret-effect! ctx {:fx/type :fx/project-stream-metrics
                                                 :metrics {:market-coalesced 2}
                                                 :tier-depth {:market 1}
@@ -294,17 +314,43 @@
                                                 :now-ms 999
                                                 :health-fingerprint {:transport/state :connected}
                                                 :streams {:trades {:status :healthy}}
-                                                :transport {:state :connected}})
-        (is (= {:status :connected :ws socket}
+                                                :transport {:state :connected}
+                                                :projection-fingerprint {:metrics {:market-coalesced 2}
+                                                                         :health-fingerprint {:transport/state :connected}}})
+        (runtime-effects/interpret-effect! ctx {:fx/type :fx/project-stream-metrics
+                                                :metrics {:market-coalesced 2}
+                                                :tier-depth {:market 1}
+                                                :market-coalesce {:pending {}}
+                                                :now-ms 1000
+                                                :health-fingerprint {:transport/state :connected}
+                                                :streams {:trades {:status :healthy}}
+                                                :transport {:state :connected}
+                                                :projection-fingerprint {:metrics {:market-coalesced 2}
+                                                                         :health-fingerprint {:transport/state :connected}}})
+        (runtime-effects/interpret-effect! ctx {:fx/type :fx/project-stream-metrics
+                                                :metrics {:market-coalesced 3}
+                                                :tier-depth {:market 1}
+                                                :market-coalesce {:pending {}}
+                                                :now-ms 1001
+                                                :health-fingerprint {:transport/state :connected}
+                                                :streams {:trades {:status :healthy}}
+                                                :transport {:state :connected}
+                                                :projection-fingerprint {:metrics {:market-coalesced 3}
+                                                                         :health-fingerprint {:transport/state :connected}}})
+        (is (= 2 @connection-watch-count))
+        (is (= 2 @stream-watch-count))
+        (is (= {:status :reconnecting :ws socket}
                @connection-state-atom))
-        (is (= {:metrics {:market-coalesced 2}
+        (is (= {:metrics {:market-coalesced 3}
                 :tier-depth {:market 1}
                 :market-coalesce {:pending {}}
-                :now-ms 999
+                :now-ms 1001
                 :health-fingerprint {:transport/state :connected}
                 :streams {:trades {:status :healthy}}
                 :transport {:state :connected}}
-               @stream-runtime-atom))))
+               @stream-runtime-atom))
+        (remove-watch connection-state-atom ::connection-watch)
+        (remove-watch stream-runtime-atom ::stream-watch)))
     (testing "log and dead-letter effects emit telemetry with default level and formatted error"
       (with-redefs [telemetry/dev-enabled? (constantly true)]
         (telemetry/clear-events!)
