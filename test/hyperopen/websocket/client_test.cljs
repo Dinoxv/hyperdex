@@ -49,7 +49,7 @@
             (is (= 1 (count @created)))
             (is (= :connecting (:status @ws-client/connection-state)))
             (done))
-          20)))))
+          0)))))
 
 (deftest reconnect-schedules-exponential-backoff-test
   (async done
@@ -85,8 +85,8 @@
                 (is (= 500 (:delay-ms (first @timeouts))))
                 (is (= 1500 (:next-retry-at-ms @ws-client/connection-state)))
                 (done))
-              20))
-          20)))))
+              0))
+          0)))))
 
 (deftest hidden-tab-retry-cap-is-higher-than-visible-cap-test
   (let [cfg {:base-delay-ms 500
@@ -148,11 +148,11 @@
                           (fn []
                             (is (= 4 (count @created)))
                             (done))
-                          20))
-                      20))
-                  20))
-              20))
-          20)))))
+                          0))
+                      0))
+                  0))
+              0))
+          0)))))
 
 (deftest queued-messages-flush-in-fifo-order-on-open-test
   (async done
@@ -183,8 +183,8 @@
                         {:type "beta" :n 2}]
                        (mapv decode-payload @sent)))
                 (done))
-              25))
-          25)))))
+              0))
+          0)))))
 
 (deftest desired-subscriptions-replay-after-reconnect-test
   (async done
@@ -232,11 +232,11 @@
                                            %)
                                         (map decode-payload @sent)))
                               (done))
-                            30))
-                        20))
-                    20))
-                20)))
-          20)))))
+                            0))
+                        0))
+                    0))
+                0)))
+          0)))))
 
 (deftest watchdog-closes-stale-connection-and-retries-test
   (async done
@@ -277,8 +277,8 @@
                 (is (= :reconnecting (:status @ws-client/connection-state)))
                 (is (= 1 (count @timeouts)))
                 (done))
-              30))
-          20)))))
+              0))
+          0)))))
 
 (deftest disconnect-does-not-auto-reconnect-test
   (async done
@@ -310,8 +310,8 @@
                 (is (= :disconnected (:status @ws-client/connection-state)))
                 (is (empty? @timeouts))
                 (done))
-              20))
-          20)))))
+              0))
+          0)))))
 
 (deftest health-snapshot-accessor-includes-close-reason-and-derived-status-test
   (let [sub-key ["trades" "BTC" nil nil nil]]

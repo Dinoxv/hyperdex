@@ -1,6 +1,8 @@
 (ns dev.hiccup-lint
   (:require [clojure.java.io :as io]
-            [clojure.string :as str]))
+            [clojure.java.shell :as shell]
+            [clojure.string :as str]
+            [edamame.core :as edamame]))
 
 (def root (.getCanonicalPath (io/file ".")))
 (def src-dir (io/file root "src"))
@@ -8,34 +10,13 @@
 (def ignored-dirs
   #{"node_modules" ".git" ".shadow-cljs" "out" "output" "tmp"})
 
-(def keyword-boundary-chars
-  #{\, \( \) \[ \] \{ \} \" \;})
-
-(def token-boundary-chars
-  #{\, \( \) \[ \] \{ \} \;})
-
-(def bracket-pairs
-  {\( \)
-   \[ \]
-   \{ \}})
-
-(defn char-at
-  [^String text idx]
-  (let [length (.length text)]
-    (when (and (<= 0 idx) (< idx length))
-      (.charAt text idx))))
-
-(defn boundary?
-  [ch]
-  (or (nil? ch)
-      (Character/isWhitespace ^char ch)
-      (contains? keyword-boundary-chars ch)))
-
-(defn token-boundary?
-  [ch]
-  (or (nil? ch)
-      (Character/isWhitespace ^char ch)
-      (contains? token-boundary-chars ch)))
+(def parse-opts
+  {:all true
+   :read-cond :allow
+   :features #{:cljs}
+   :readers {'js identity
+             'inst identity
+             'uuid identity}})
 
 (defn walk-cljs-files
   [root-dir]
@@ -58,259 +39,144 @@
                       [])))))]
     (vec (walk (io/file root-dir)))))
 
-(defn skip-whitespace-and-comments
-  [^String text start]
-  (let [length (.length text)]
-    (loop [i start]
-      (if (>= i length)
-        length
-        (let [ch (char-at text i)]
-          (cond
-            (or (Character/isWhitespace ^char ch)
-                (= ch \,))
-            (recur (inc i))
+(defn- rg-candidate-files
+  [root-dir keyword]
+  (try
+    (let [{:keys [exit out]} (shell/sh "rg"
+                                       "-l"
+                                       "--glob"
+                                       "*.cljs"
+                                       keyword
+                                       (.getPath (io/file root-dir)))]
+      (when (<= exit 1)
+        (->> (str/split-lines out)
+             (remove str/blank?)
+             (map #(-> (io/file %) .getPath))
+             sort
+             vec)))
+    (catch Throwable _
+      nil)))
 
-            (= ch \;)
-            (recur
-             (loop [j i]
-               (if (or (>= j length)
-                       (= (char-at text j) \newline))
-                 j
-                 (recur (inc j)))))
+(defn- fallback-candidate-files
+  [root-dir keyword]
+  (->> (walk-cljs-files root-dir)
+       (filter (fn [file-path]
+                 (str/includes? (slurp file-path) keyword)))
+       sort
+       vec))
 
-            :else
-            i))))))
+(defn- candidate-cljs-files
+  [root-dir keyword]
+  (if-let [files (rg-candidate-files root-dir keyword)]
+    files
+    (fallback-candidate-files root-dir keyword)))
 
-(defn parse-string-end
-  [^String text start]
-  (let [length (.length text)]
-    (loop [i (inc start) escaped? false]
-      (if (>= i length)
-        length
-        (let [ch (char-at text i)]
-          (cond
-            escaped?
-            (recur (inc i) false)
+(defn- parse-forms-with-string-locations
+  [^String text]
+  (let [string-locs (java.util.IdentityHashMap.)
+        forms (edamame/parse-string-all
+               text
+               (assoc parse-opts
+                      :postprocess
+                      (fn [{:keys [obj loc]}]
+                        (when (string? obj)
+                          (.put string-locs obj loc))
+                        obj)))]
+    {:forms forms
+     :string-locs string-locs}))
 
-            (= ch \\)
-            (recur (inc i) true)
+(defn- string-line
+  [^java.util.IdentityHashMap string-locs ^String value]
+  (let [loc (.get string-locs value)]
+    (if (map? loc)
+      (or (:row loc) 1)
+      1)))
 
-            (= ch \")
-            (inc i)
-
-            :else
-            (recur (inc i) false)))))))
-
-(defn parse-form-end
-  [^String text start]
-  (let [length (.length text)]
-    (cond
-      (>= start length)
-      length
-
-      (= (char-at text start) \")
-      (parse-string-end text start)
-
-      (contains? bracket-pairs (char-at text start))
-      (loop [i (inc start)
-             stack [(get bracket-pairs (char-at text start))]
-             in-string? false
-             in-comment? false
-             escaped? false]
-        (if (>= i length)
-          length
-          (let [ch (char-at text i)]
-            (cond
-              in-comment?
-              (recur (inc i) stack in-string? (not= ch \newline) escaped?)
-
-              in-string?
+(defn- collect-class-literals
+  [value]
+  (let [literals (transient [])]
+    (letfn [(walk [x]
               (cond
-                escaped?
-                (recur (inc i) stack true false false)
+                (string? x)
+                (when (re-find #"\s" x)
+                  (conj! literals x))
 
-                (= ch \\)
-                (recur (inc i) stack true false true)
+                (map? x)
+                (doseq [[k v] x]
+                  (walk k)
+                  (walk v))
 
-                (= ch \")
-                (recur (inc i) stack false false false)
+                (or (vector? x) (list? x) (set? x) (seq? x))
+                (doseq [item x]
+                  (walk item))
 
                 :else
-                (recur (inc i) stack true false false))
+                nil))]
+      (walk value)
+      (persistent! literals))))
 
-              (= ch \;)
-              (recur (inc i) stack false true false)
+(defn- class-violations-in-forms
+  [file-path forms ^java.util.IdentityHashMap string-locs]
+  (let [violations (transient [])]
+    (letfn [(walk [x]
+              (cond
+                (map? x)
+                (doseq [[k v] x]
+                  (when (= k :class)
+                    (doseq [literal (collect-class-literals v)]
+                      (conj! violations
+                             {:file-path file-path
+                              :line (string-line string-locs literal)
+                              :literal literal})))
+                  (walk k)
+                  (walk v))
 
-              (= ch \")
-              (recur (inc i) stack true false false)
+                (or (vector? x) (list? x) (set? x) (seq? x))
+                (doseq [item x]
+                  (walk item))
 
-              (contains? bracket-pairs ch)
-              (recur (inc i) (conj stack (get bracket-pairs ch)) false false false)
+                :else
+                nil))]
+      (doseq [form forms]
+        (walk form))
+      (persistent! violations))))
 
-              (= ch (peek stack))
-              (let [next-stack (pop stack)
-                    next-i (inc i)]
-                (if (empty? next-stack)
-                  next-i
-                  (recur next-i next-stack false false false)))
+(defn- style-map-string-key-violations-in-forms
+  [file-path forms ^java.util.IdentityHashMap string-locs]
+  (let [violations (transient [])]
+    (letfn [(walk [x]
+              (cond
+                (map? x)
+                (doseq [[k v] x]
+                  (when (and (= k :style) (map? v))
+                    (doseq [[style-k _] v]
+                      (when (string? style-k)
+                        (conj! violations
+                               {:file-path file-path
+                                :line (string-line string-locs style-k)
+                                :literal style-k}))))
+                  (walk k)
+                  (walk v))
 
-              :else
-              (recur (inc i) stack false false false)))))
+                (or (vector? x) (list? x) (set? x) (seq? x))
+                (doseq [item x]
+                  (walk item))
 
-      :else
-      (loop [i start]
-        (if (token-boundary? (char-at text i))
-          (if (= i start)
-            (inc start)
-            i)
-          (recur (inc i)))))))
-
-(defn find-keyword-positions
-  [^String text keyword]
-  (let [length (.length text)
-        keyword-length (.length ^String keyword)]
-    (loop [i 0 in-string? false in-comment? false escaped? false positions []]
-      (if (>= i length)
-        positions
-        (let [ch (char-at text i)]
-          (cond
-            in-comment?
-            (recur (inc i) in-string? (not= ch \newline) escaped? positions)
-
-            in-string?
-            (cond
-              escaped?
-              (recur (inc i) true false false positions)
-
-              (= ch \\)
-              (recur (inc i) true false true positions)
-
-              (= ch \")
-              (recur (inc i) false false false positions)
-
-              :else
-              (recur (inc i) true false false positions))
-
-            (= ch \;)
-            (recur (inc i) false true false positions)
-
-            (= ch \")
-            (recur (inc i) true false false positions)
-
-            (and (<= (+ i keyword-length) length)
-                 (.startsWith text keyword i))
-            (let [prev (char-at text (dec i))
-                  next (char-at text (+ i keyword-length))
-                  next-i (+ i keyword-length)
-                  next-positions (if (and (boundary? prev) (boundary? next))
-                                   (conj positions i)
-                                   positions)]
-              (recur next-i false false false next-positions))
-
-            :else
-            (recur (inc i) false false false positions)))))))
-
-(defn build-line-starts
-  [^String text]
-  (let [length (.length text)]
-    (loop [i 0 starts [0]]
-      (if (>= i length)
-        starts
-        (if (= (char-at text i) \newline)
-          (recur (inc i) (conj starts (inc i)))
-          (recur (inc i) starts))))))
-
-(defn line-for-index
-  [line-starts index]
-  (loop [low 0 high (dec (count line-starts))]
-    (if (> low high)
-      (inc high)
-      (let [mid (quot (+ low high) 2)]
-        (if (<= (nth line-starts mid) index)
-          (recur (inc mid) high)
-          (recur low (dec mid)))))))
-
-(defn collect-class-violations-in-form
-  [file-path ^String text line-starts form-start form-end]
-  (loop [i form-start in-comment? false violations []]
-    (if (>= i form-end)
-      violations
-      (let [ch (char-at text i)]
-        (cond
-          in-comment?
-          (recur (inc i) (not= ch \newline) violations)
-
-          (= ch \;)
-          (recur (inc i) true violations)
-
-          (= ch \")
-          (let [string-end (parse-string-end text i)
-                literal-start (inc i)
-                literal-end (max literal-start (dec string-end))
-                literal (subs text literal-start literal-end)
-                next-violations (if (re-find #"\s" literal)
-                                  (conj violations
-                                        {:file-path file-path
-                                         :line (line-for-index line-starts i)
-                                         :literal literal})
-                                  violations)]
-            (recur string-end false next-violations))
-
-          :else
-          (recur (inc i) false violations))))))
-
-(defn collect-style-map-string-key-violations
-  [file-path ^String text line-starts form-start form-end]
-  (if (not= (char-at text form-start) \{)
-    []
-    (loop [i (skip-whitespace-and-comments text (inc form-start))
-           violations []]
-      (if (>= i (dec form-end))
-        violations
-        (let [ch (char-at text i)]
-          (if (= ch \})
-            violations
-            (let [key-start i
-                  key-end (parse-form-end text key-start)
-                  next-violations (if (= (char-at text key-start) \")
-                                    (let [literal-start (inc key-start)
-                                          literal-end (max literal-start (dec key-end))
-                                          literal (subs text literal-start literal-end)]
-                                      (conj violations
-                                            {:file-path file-path
-                                             :line (line-for-index line-starts key-start)
-                                             :literal literal}))
-                                    violations)
-                  value-start (skip-whitespace-and-comments text key-end)]
-              (if (>= value-start (dec form-end))
-                next-violations
-                (let [value-end (parse-form-end text value-start)]
-                  (recur (skip-whitespace-and-comments text value-end)
-                         next-violations))))))))))
+                :else
+                nil))]
+      (doseq [form forms]
+        (walk form))
+      (persistent! violations))))
 
 (defn class-violations-in-text
   [file-path ^String text]
-  (let [line-starts (build-line-starts text)
-        positions (find-keyword-positions text ":class")]
-    (vec
-     (mapcat
-      (fn [keyword-pos]
-        (let [form-start (skip-whitespace-and-comments text (+ keyword-pos 6))
-              form-end (parse-form-end text form-start)]
-          (collect-class-violations-in-form file-path text line-starts form-start form-end)))
-      positions))))
+  (let [{:keys [forms string-locs]} (parse-forms-with-string-locations text)]
+    (class-violations-in-forms file-path forms string-locs)))
 
 (defn style-map-string-key-violations-in-text
   [file-path ^String text]
-  (let [line-starts (build-line-starts text)
-        positions (find-keyword-positions text ":style")]
-    (vec
-     (mapcat
-      (fn [keyword-pos]
-        (let [form-start (skip-whitespace-and-comments text (+ keyword-pos 6))
-              form-end (parse-form-end text form-start)]
-          (collect-style-map-string-key-violations file-path text line-starts form-start form-end)))
-      positions))))
+  (let [{:keys [forms string-locs]} (parse-forms-with-string-locations text)]
+    (style-map-string-key-violations-in-forms file-path forms string-locs)))
 
 (defn class-violations-in-file
   [file-path]
@@ -322,7 +188,7 @@
 
 (defn sort-violations
   [violations]
-  (sort-by (juxt :file-path :line) violations))
+  (sort-by (juxt :file-path :line :literal) violations))
 
 (defn relative-path
   [root-path file-path]
@@ -336,7 +202,7 @@
     (do
       (println "No src directory found; skipping class attr check.")
       0)
-    (let [violations (->> (walk-cljs-files src-dir)
+    (let [violations (->> (candidate-cljs-files src-dir ":class")
                           (mapcat class-violations-in-file)
                           sort-violations
                           vec)]
@@ -360,7 +226,7 @@
     (do
       (println "No src directory found; skipping style key check.")
       0)
-    (let [violations (->> (walk-cljs-files src-dir)
+    (let [violations (->> (candidate-cljs-files src-dir ":style")
                           (mapcat style-map-string-key-violations-in-file)
                           sort-violations
                           vec)]
@@ -378,3 +244,9 @@
         (do
           (println "No string keys found in literal :style maps.")
           0)))))
+
+(defn check-hiccup-attrs!
+  []
+  (let [class-status (check-class-attrs!)
+        style-status (check-style-map-string-keys!)]
+    (if (zero? (+ class-status style-status)) 0 1)))

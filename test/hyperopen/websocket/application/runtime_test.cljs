@@ -129,7 +129,7 @@
           (is (= "trades" (:channel (first @calls))))
           (runtime/stop-router! router)
           (done))
-        20))))
+        10))))
 
 (deftest market-coalescing-invariant-test
   (async done
@@ -172,7 +172,7 @@
           (is (= 1 (get-in @stream-runtime [:metrics :market-dispatched])))
           (runtime/stop-runtime! rt)
           (done))
-        50))))
+        10))))
 
 (deftest lossless-ordering-invariant-test
   (async done
@@ -212,7 +212,7 @@
           (is (= [1 2] @routed))
           (runtime/stop-runtime! rt)
           (done))
-        30))))
+        0))))
 
 (deftest health-tick-event-updates-stream-runtime-now-ms-test
   (async done
@@ -239,4 +239,4 @@
           (is (= 5000 (:now-ms @stream-runtime)))
           (runtime/stop-runtime! rt)
           (done))
-        30))))
+        0))))
