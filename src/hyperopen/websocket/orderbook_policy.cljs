@@ -39,17 +39,28 @@
 (defn- sort-levels [levels comparator]
   (vec (sort-by #(or (level-price %) 0) comparator levels)))
 
+(defn- sorted-normalized-levels [levels comparator]
+  (sort-levels (normalize-levels levels) comparator))
+
+(defn- strip-normalized-levels [levels]
+  (mapv strip-normalized-level levels))
+
+(defn- take-leading-levels [levels limit*]
+  (if (> (count levels) limit*)
+    (subvec levels 0 limit*)
+    levels))
+
 (defn sort-display-asks [asks]
   (sort-levels (normalize-levels asks) <))
 
 (defn sort-bids [bids]
-  (mapv strip-normalized-level
-        (sort-levels (normalize-levels bids) >)))
+  (strip-normalized-levels
+   (sorted-normalized-levels bids >)))
 
 (defn sort-asks [asks]
   ;; Keep legacy sort direction for compatibility with existing consumers.
-  (mapv strip-normalized-level
-        (sort-levels (normalize-levels asks) >)))
+  (strip-normalized-levels
+   (sorted-normalized-levels asks >)))
 
 (defn calculate-cumulative-totals [orders]
   (if (empty? orders)
@@ -83,25 +94,18 @@
    (build-book bids asks default-max-render-levels-per-side))
   ([bids asks max-levels]
    (let [limit* (normalized-depth-limit max-levels)
-         normalized-bids (normalize-levels bids)
-         normalized-asks (normalize-levels asks)
-         sorted-bids (sort-levels normalized-bids >)
-         legacy-asks (sort-levels normalized-asks >)
-         display-asks (sort-levels normalized-asks <)
-         display-bids-limited (->> sorted-bids
-                                   (take limit*)
-                                   vec)
-         display-asks-limited (->> display-asks
-                                   (take limit*)
-                                   vec)]
-     {:bids (mapv strip-normalized-level sorted-bids)
-      :asks (mapv strip-normalized-level legacy-asks)
+         sorted-bids (sorted-normalized-levels bids >)
+         sorted-asks (sorted-normalized-levels asks >)
+         display-bids-limited (take-leading-levels sorted-bids limit*)
+         display-asks-limited (into [] (take limit* (rseq sorted-asks)))]
+     {:bids (strip-normalized-levels sorted-bids)
+      :asks (strip-normalized-levels sorted-asks)
       :render {:display-bids display-bids-limited
                :display-asks display-asks-limited
                :bids-with-totals (calculate-cumulative-totals display-bids-limited)
                :asks-with-totals (calculate-cumulative-totals display-asks-limited)
                :best-bid (first sorted-bids)
-               :best-ask (first display-asks)}})))
+               :best-ask (peek sorted-asks)}})))
 
 (defn normalize-aggregation-config [aggregation-config]
   (let [n-sig-figs (:nSigFigs aggregation-config)]

@@ -53,6 +53,22 @@
       (is (= {:px "101" :sz "4" :px-num 101 :sz-num 4}
              (get-in book [:render :best-ask]))))))
 
+(deftest build-book-ask-derivation-compatibility-test
+  (let [book (policy/build-book [{:px "100" :sz "1"}]
+                                [{:px "103" :sz "1"}
+                                 {:px "101" :sz "1"}
+                                 {:px "102" :sz "1"}]
+                                2)]
+    (is (= [{:px "103" :sz "1"}
+            {:px "102" :sz "1"}
+            {:px "101" :sz "1"}]
+           (:asks book)))
+    (is (= [{:px "101" :sz "1" :px-num 101 :sz-num 1}
+            {:px "102" :sz "1" :px-num 102 :sz-num 1}]
+           (get-in book [:render :display-asks])))
+    (is (= {:px "101" :sz "1" :px-num 101 :sz-num 1}
+           (get-in book [:render :best-ask])))))
+
 (deftest normalize-aggregation-config-test
   (is (= {:nSigFigs 4}
          (policy/normalize-aggregation-config {:nSigFigs 4})))
