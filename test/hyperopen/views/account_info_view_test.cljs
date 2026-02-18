@@ -1491,9 +1491,9 @@
         snapshot-by-dex {:dex-a [{:order {:coin "SOL" :oid 3 :side "B" :sz "3.0" :limitPx "50" :timestamp 800}}]}
         with-live (view/normalized-open-orders live-orders snapshot-orders snapshot-by-dex)
         without-live (view/normalized-open-orders nil snapshot-orders snapshot-by-dex)]
-    (is (= #{1 3} (set (map :oid with-live))))
+    (is (= #{"1" "3"} (set (map :oid with-live))))
     (is (= #{"BTC" "SOL"} (set (map :coin with-live))))
-    (is (= #{2 3} (set (map :oid without-live))))
+    (is (= #{"2" "3"} (set (map :oid without-live))))
     (is (= #{"ETH" "SOL"} (set (map :coin without-live))))))
 
 (deftest open-orders-coin-labels-are-bold-and-side-colored-test
