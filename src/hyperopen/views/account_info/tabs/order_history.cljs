@@ -192,6 +192,32 @@
       (reverse sorted)
       sorted)))
 
+(defonce ^:private sorted-order-history-cache (atom nil))
+
+(defn reset-order-history-sort-cache! []
+  (reset! sorted-order-history-cache nil))
+
+(defn- memoized-order-history-rows [order-history status-filter sort-state]
+  (let [column (:column sort-state)
+        direction (:direction sort-state)
+        cache @sorted-order-history-cache
+        cache-hit? (and (map? cache)
+                        (identical? order-history (:order-history cache))
+                        (= status-filter (:status-filter cache))
+                        (= column (:column cache))
+                        (= direction (:direction cache)))]
+    (if cache-hit?
+      (:result cache)
+      (let [normalized (normalized-order-history order-history)
+            filtered (vec (order-history-filter-status normalized status-filter))
+            result (vec (sort-order-history-by-column filtered column direction))]
+        (reset! sorted-order-history-cache {:order-history order-history
+                                            :status-filter status-filter
+                                            :column column
+                                            :direction direction
+                                            :result result})
+        result))))
+
 (defn sortable-order-history-header [column-name sort-state]
   (table/sortable-header-button column-name sort-state :actions/sort-order-history))
 
@@ -199,11 +225,7 @@
   (let [sort-state (order-history-sort-state order-history-state)
         status-filter (order-history-status-filter-key order-history-state)
         market-by-key (or (:market-by-key order-history-state) {})
-        normalized (normalized-order-history order-history)
-        filtered (vec (order-history-filter-status normalized status-filter))
-        sorted (vec (sort-order-history-by-column filtered
-                                                  (:column sort-state)
-                                                  (:direction sort-state)))
+        sorted (memoized-order-history-rows order-history status-filter sort-state)
         {:keys [rows] :as pagination} (history-pagination/paginate-history-rows sorted order-history-state)]
     (if (seq sorted)
       (table/tab-table-content

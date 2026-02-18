@@ -2,7 +2,10 @@
   (:require [clojure.string :as str]
             [cljs.test :refer-macros [deftest is testing]]
             [hyperopen.utils.formatting :as fmt]
+            [hyperopen.views.account-info.tabs.funding-history :as funding-history-tab]
             [hyperopen.views.account-info.tabs.open-orders :as open-orders-tab]
+            [hyperopen.views.account-info.tabs.order-history :as order-history-tab]
+            [hyperopen.views.account-info.tabs.positions :as positions-tab]
             [hyperopen.views.account-info.tabs.trade-history :as trade-history-tab]
             [hyperopen.views.account-info-view :as view]))
 
@@ -382,6 +385,102 @@
                                                :market-by-key
                                                {"spot:ETH/USDC" {:coin "spot:ETH/USDC"
                                                                  :symbol "ETH/USDC"}}))
+        (is (= 3 @sort-calls))))))
+
+(deftest order-history-tab-content-memoizes-normalize-and-sort-by-input-identity-filter-and-sort-state-test
+  (let [raw-rows [{:order {:coin "ETH"
+                           :oid 1
+                           :side "B"
+                           :origSz "1.0"
+                           :remainingSz "0.0"
+                           :limitPx "100"
+                           :orderType "Limit"
+                           :isTrigger false
+                           :isPositionTpsl false
+                           :timestamp 1700000000000}
+                   :status "filled"
+                   :statusTimestamp 1700000000000}]
+        normalized-row {:time-ms 1700000000000
+                        :type "Limit"
+                        :coin "ETH"
+                        :side "B"
+                        :size 1
+                        :filled-size 1
+                        :order-value 100
+                        :px "100"
+                        :status-key :filled
+                        :status-label "Filled"
+                        :oid "1"}
+        table-state {:sort {:column "Time" :direction :desc}
+                     :status-filter :all
+                     :loading? false}
+        normalize-calls (atom 0)
+        sort-calls (atom 0)]
+    (order-history-tab/reset-order-history-sort-cache!)
+    (with-redefs [order-history-tab/normalized-order-history
+                  (fn [_rows]
+                    (swap! normalize-calls inc)
+                    [normalized-row])
+                  order-history-tab/sort-order-history-by-column
+                  (fn [rows _column _direction]
+                    (swap! sort-calls inc)
+                    rows)]
+      (view/order-history-tab-content raw-rows table-state)
+      (view/order-history-tab-content raw-rows table-state)
+      (is (= 1 @normalize-calls))
+      (is (= 1 @sort-calls))
+
+      (let [asc-state (assoc-in table-state [:sort :direction] :asc)]
+        (view/order-history-tab-content raw-rows asc-state)
+        (view/order-history-tab-content raw-rows asc-state)
+        (is (= 2 @normalize-calls))
+        (is (= 2 @sort-calls))
+
+        (view/order-history-tab-content (into [] raw-rows) asc-state)
+        (is (= 3 @normalize-calls))
+        (is (= 3 @sort-calls))))))
+
+(deftest funding-history-tab-content-memoizes-sorting-by-input-identity-and-sort-state-test
+  (let [fundings [(funding-history-row 1)]
+        table-state {:sort {:column "Time" :direction :desc}
+                     :loading? false}
+        sort-calls (atom 0)]
+    (funding-history-tab/reset-funding-history-sort-cache!)
+    (with-redefs [funding-history-tab/sort-funding-history-by-column
+                  (fn [rows _column _direction]
+                    (swap! sort-calls inc)
+                    rows)]
+      (view/funding-history-tab-content fundings table-state fundings)
+      (view/funding-history-tab-content fundings table-state fundings)
+      (is (= 1 @sort-calls))
+
+      (let [asc-state (assoc-in table-state [:sort :direction] :asc)]
+        (view/funding-history-tab-content fundings asc-state fundings)
+        (view/funding-history-tab-content fundings asc-state fundings)
+        (is (= 2 @sort-calls))
+
+        (view/funding-history-tab-content (into [] fundings) asc-state fundings)
+        (is (= 3 @sort-calls))))))
+
+(deftest positions-tab-content-memoizes-sorting-by-input-identity-and-sort-state-test
+  (let [positions [sample-position-data]
+        sort-state {:column "Coin" :direction :asc}
+        sort-calls (atom 0)]
+    (positions-tab/reset-positions-sort-cache!)
+    (with-redefs [positions-tab/sort-positions-by-column
+                  (fn [rows _column _direction]
+                    (swap! sort-calls inc)
+                    rows)]
+      (view/positions-tab-content positions sort-state)
+      (view/positions-tab-content positions sort-state)
+      (is (= 1 @sort-calls))
+
+      (let [desc-state (assoc sort-state :direction :desc)]
+        (view/positions-tab-content positions desc-state)
+        (view/positions-tab-content positions desc-state)
+        (is (= 2 @sort-calls))
+
+        (view/positions-tab-content (into [] positions) desc-state)
         (is (= 3 @sort-calls))))))
 
 (deftest sort-funding-history-by-column-respects-direction-and-deterministic-fallback-test

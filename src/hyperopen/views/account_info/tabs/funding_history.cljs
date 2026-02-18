@@ -218,6 +218,28 @@
       (reverse sorted)
       sorted)))
 
+(defonce ^:private sorted-funding-history-cache (atom nil))
+
+(defn reset-funding-history-sort-cache! []
+  (reset! sorted-funding-history-cache nil))
+
+(defn- memoized-sorted-funding-history [fundings sort-state]
+  (let [column (:column sort-state)
+        direction (:direction sort-state)
+        cache @sorted-funding-history-cache
+        cache-hit? (and (map? cache)
+                        (identical? fundings (:fundings cache))
+                        (= column (:column cache))
+                        (= direction (:direction cache)))]
+    (if cache-hit?
+      (:result cache)
+      (let [result (vec (sort-funding-history-by-column fundings column direction))]
+        (reset! sorted-funding-history-cache {:fundings fundings
+                                              :column column
+                                              :direction direction
+                                              :result result})
+        result))))
+
 (defn sortable-funding-history-header [column-name sort-state]
   (table/sortable-header-button column-name sort-state :actions/sort-funding-history))
 
@@ -232,9 +254,7 @@
 
 (defn funding-history-table [fundings funding-history-state]
   (let [sort-state (funding-history-sort-state funding-history-state)
-        sorted-fundings (vec (sort-funding-history-by-column fundings
-                                                             (:column sort-state)
-                                                             (:direction sort-state)))
+        sorted-fundings (memoized-sorted-funding-history fundings sort-state)
         {:keys [rows] :as pagination} (history-pagination/paginate-history-rows sorted-fundings funding-history-state)]
     (if (seq sorted-fundings)
       (table/tab-table-content

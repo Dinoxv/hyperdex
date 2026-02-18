@@ -213,6 +213,7 @@
 (def sortable-header positions-tab/sortable-header)
 (def position-table-header positions-tab/position-table-header)
 (def positions-tab-content positions-tab/positions-tab-content)
+(def reset-positions-sort-cache! positions-tab/reset-positions-sort-cache!)
 
 (def format-side open-orders-tab/format-side)
 (def normalize-open-order open-orders-tab/normalize-open-order)
@@ -246,6 +247,7 @@
 (def funding-history-controls funding-history-tab/funding-history-controls)
 (def funding-history-table funding-history-tab/funding-history-table)
 (def funding-history-tab-content funding-history-tab/funding-history-tab-content)
+(def reset-funding-history-sort-cache! funding-history-tab/reset-funding-history-sort-cache!)
 
 (def default-order-history-sort order-history-tab/default-order-history-sort)
 (def order-history-sort-state order-history-tab/order-history-sort-state)
@@ -262,6 +264,7 @@
 (def order-history-long-coin-color order-history-tab/order-history-long-coin-color)
 (def order-history-tab-content order-history-tab/order-history-tab-content)
 (def order-history-table order-history-tab/order-history-table)
+(def reset-order-history-sort-cache! order-history-tab/reset-order-history-sort-cache!)
 
 (defn placeholder-tab-content [tab-name]
   [:div.p-4

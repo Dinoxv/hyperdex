@@ -125,6 +125,28 @@
       (reverse sorted-positions)
       sorted-positions)))
 
+(defonce ^:private sorted-positions-cache (atom nil))
+
+(defn reset-positions-sort-cache! []
+  (reset! sorted-positions-cache nil))
+
+(defn- memoized-sorted-positions [positions sort-state]
+  (let [column (:column sort-state)
+        direction (:direction sort-state)
+        cache @sorted-positions-cache
+        cache-hit? (and (map? cache)
+                        (identical? positions (:positions cache))
+                        (= column (:column cache))
+                        (= direction (:direction cache)))]
+    (if cache-hit?
+      (:result cache)
+      (let [result (vec (sort-positions-by-column positions column direction))]
+        (reset! sorted-positions-cache {:positions positions
+                                        :column column
+                                        :direction direction
+                                        :result result})
+        result))))
+
 (defn sortable-header [column-name sort-state]
   (table/sortable-header-button column-name sort-state :actions/sort-positions))
 
@@ -151,9 +173,7 @@
   ([positions sort-state]
    (let [positions* (or positions [])
          sorted-positions (if (seq positions*)
-                            (sort-positions-by-column positions*
-                                                      (:column sort-state)
-                                                      (:direction sort-state))
+                            (memoized-sorted-positions positions* sort-state)
                             [])]
      (if (seq positions*)
        (table/tab-table-content (position-table-header sort-state)
