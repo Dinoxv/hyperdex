@@ -113,6 +113,8 @@
     add-indicator
     remove-indicator
     update-indicator-period
+    show-volume-indicator
+    hide-volume-indicator
     select-account-info-tab
     set-funding-history-filters
     toggle-funding-history-filter-open

@@ -76,6 +76,7 @@
    :chart-type-dropdown-visible false
    :selected-chart-type :candlestick
    :indicators-dropdown-visible false
+   :volume-visible? true
    :active-indicators {}
    :indicators-search-term ""})
 

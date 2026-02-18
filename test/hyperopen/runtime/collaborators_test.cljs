@@ -4,6 +4,7 @@
             [hyperopen.account.history.effects :as account-history-effects]
             [hyperopen.asset-selector.actions :as asset-actions]
             [hyperopen.chart.actions :as chart-actions]
+            [hyperopen.chart.settings :as chart-settings]
             [hyperopen.order.actions :as order-actions]
             [hyperopen.runtime.collaborators :as collaborators]
             [hyperopen.wallet.actions :as wallet-actions]))
@@ -29,6 +30,8 @@
                     (get-in deps [:asset-selector :select-asset])))
     (is (identical? chart-actions/select-chart-type
                     (get-in deps [:chart :select-chart-type])))
+    (is (identical? chart-settings/hide-volume-indicator
+                    (get-in deps [:chart :hide-volume-indicator])))
     (is (identical? account-history-actions/select-account-info-tab
                     (get-in deps [:account-history :select-account-info-tab])))
     (is (identical? order-actions/submit-order

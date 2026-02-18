@@ -30,7 +30,8 @@
     (is (= default-order-history (get-in state [:account-info :order-history])))
     (is (= "/trade" (get-in state [:router :path])))
     (is (= :bootstrap (get-in state [:asset-selector :phase])))
-    (is (= :orderbook (get-in state [:orderbook-ui :active-tab])))))
+    (is (= :orderbook (get-in state [:orderbook-ui :active-tab])))
+    (is (= true (get-in state [:chart-options :volume-visible?])))))
 
 (deftest default-app-state-initializes-empty-runtime-collections-test
   (let [state (app-defaults/default-app-state

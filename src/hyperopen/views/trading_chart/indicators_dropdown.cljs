@@ -8,7 +8,7 @@
 
 (defn indicators-dropdown
   "Dropdown component for selecting and managing indicators."
-  [{:keys [indicators-dropdown-visible active-indicators search-term]}]
+  [{:keys [indicators-dropdown-visible volume-visible? active-indicators search-term]}]
   (let [available-indicators (indicators/get-available-indicators)
         indicator-by-id (into {} (map (juxt :id identity)) available-indicators)
         query (str/lower-case (str/trim (or search-term "")))
@@ -48,14 +48,39 @@
           [:circle {:cx "8.5" :cy "8.5" :r "5.5"}]
           [:line {:x1 "12.5" :y1 "12.5" :x2 "17" :y2 "17"}]]
          [:input
-          {:id "chart-indicators-search"
-           :type "search"
-           :value (or search-term "")
+         {:id "chart-indicators-search"
+          :type "search"
+          :value (or search-term "")
            :placeholder "Search"
            :class ["w-full" "border-0" "bg-transparent" "p-0" "text-lg" "text-gray-200"
                    "placeholder:text-gray-500" "focus:outline-none" "focus:ring-0"]
            :on {:input [[:actions/update-indicators-search [:event.target/value]]]}
            :aria-label "Search indicators"}]]
+        [:div
+         {:class ["px-4" "py-3" "border-b" "border-base-300"]}
+         [:div
+          {:class ["mb-2" "text-xs" "uppercase" "tracking-wide" "text-gray-500"]}
+          "Chart Indicators"]
+         (let [click-action (if volume-visible?
+                              [:actions/hide-volume-indicator]
+                              [:actions/show-volume-indicator])]
+           [:button
+            {:type "button"
+             :class (into ["w-full" "px-3" "py-2.5" "text-left" "text-sm" "transition-colors"
+                           "flex" "items-center" "justify-between" "gap-3" "rounded"
+                           "focus:outline-none" "focus-visible:ring-1" "focus-visible:ring-base-content/40"]
+                          (if volume-visible?
+                            ["text-trading-green" "bg-base-200/50" "hover:bg-base-200/70"]
+                            ["text-white" "bg-base-200/20" "hover:bg-base-200/45"]))
+             :on {:click [click-action]}
+             :aria-label (if volume-visible?
+                           "Remove built-in volume indicator"
+                           "Add built-in volume indicator")
+             :aria-pressed (boolean volume-visible?)}
+            [:span "Volume"]
+            (when volume-visible?
+              [:span {:class ["text-xs" "font-medium" "tracking-wide" "text-trading-green"]}
+               "Added"])])]
         [:div
          {:class ["max-h-72" "overflow-y-auto"]}
          [:div

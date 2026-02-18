@@ -1,5 +1,6 @@
 (ns hyperopen.chart.settings
-  (:require [hyperopen.platform :as platform]))
+  (:require [clojure.string :as str]
+            [hyperopen.platform :as platform]))
 
 (def ^:private chart-timeframes
   #{:1m :3m :5m :15m :30m :1h :2h :4h :8h :12h :1d :3d :1w :1M})
@@ -20,6 +21,9 @@
 
 (def ^:private chart-type-aliases
   {:histogram :columns})
+
+(def ^:private chart-volume-visible-storage-key
+  "chart-volume-visible")
 
 (defn- load-chart-option
   [ls-key default valid-set]
@@ -51,14 +55,36 @@
     (catch :default _
       {})))
 
+(defn- parse-bool
+  [value default]
+  (cond
+    (boolean? value) value
+    (nil? value) default
+    :else (let [text (some-> value str str/trim str/lower-case)]
+            (cond
+              (= text "true") true
+              (= text "false") false
+              :else default))))
+
+(defn- load-volume-visible?
+  []
+  (parse-bool (platform/local-storage-get chart-volume-visible-storage-key) true))
+
+(defn- save-volume-visible-effects
+  [visible?]
+  [[:effects/save [:chart-options :volume-visible?] visible?]
+   [:effects/local-storage-set chart-volume-visible-storage-key (if visible? "true" "false")]])
+
 (defn restore-chart-options!
   [store]
   (let [timeframe (load-chart-option "chart-timeframe" :1d chart-timeframes)
         chart-type (load-chart-type)
-        indicators (load-indicators)]
+        indicators (load-indicators)
+        volume-visible? (load-volume-visible?)]
     (swap! store update-in [:chart-options] merge
            {:selected-timeframe timeframe
             :selected-chart-type chart-type
+            :volume-visible? volume-visible?
             :active-indicators indicators})))
 
 (defn add-indicator
@@ -86,3 +112,11 @@
         updated-indicators (assoc-in current-indicators [indicator-type :period] period)]
     [[:effects/save [:chart-options :active-indicators] updated-indicators]
      [:effects/local-storage-set-json "chart-active-indicators" (serialize-indicators updated-indicators)]]))
+
+(defn show-volume-indicator
+  [_state]
+  (save-volume-visible-effects true))
+
+(defn hide-volume-indicator
+  [_state]
+  (save-volume-visible-effects false))

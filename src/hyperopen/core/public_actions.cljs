@@ -127,6 +127,12 @@
 (def update-indicator-period
   chart-settings/update-indicator-period)
 
+(def show-volume-indicator
+  chart-settings/show-volume-indicator)
+
+(def hide-volume-indicator
+  chart-settings/hide-volume-indicator)
+
 (def select-account-info-tab
   account-history-actions/select-account-info-tab)
 

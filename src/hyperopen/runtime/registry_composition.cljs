@@ -188,7 +188,9 @@
            select-orderbook-tab
            add-indicator
            remove-indicator
-           update-indicator-period]}]
+           update-indicator-period
+           show-volume-indicator
+           hide-volume-indicator]}]
   {:toggle-timeframes-dropdown toggle-timeframes-dropdown
    :select-chart-timeframe select-chart-timeframe
    :toggle-chart-type-dropdown toggle-chart-type-dropdown
@@ -202,7 +204,9 @@
    :select-orderbook-tab select-orderbook-tab
    :add-indicator add-indicator
    :remove-indicator remove-indicator
-   :update-indicator-period update-indicator-period})
+   :update-indicator-period update-indicator-period
+   :show-volume-indicator show-volume-indicator
+   :hide-volume-indicator hide-volume-indicator})
 
 (defn- account-history-action-handlers
   [{:keys [select-account-info-tab

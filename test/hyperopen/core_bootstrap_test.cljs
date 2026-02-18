@@ -1889,6 +1889,18 @@
     (is (= [[:effects/save [:chart-options :indicators-search-term] "sma"]]
            effects))))
 
+(deftest show-volume-indicator-persists-visible-state-test
+  (let [effects (core/show-volume-indicator {})]
+    (is (= [[:effects/save [:chart-options :volume-visible?] true]
+            [:effects/local-storage-set "chart-volume-visible" "true"]]
+           effects))))
+
+(deftest hide-volume-indicator-persists-visible-state-test
+  (let [effects (core/hide-volume-indicator {})]
+    (is (= [[:effects/save [:chart-options :volume-visible?] false]
+            [:effects/local-storage-set "chart-volume-visible" "false"]]
+           effects))))
+
 (deftest toggle-open-indicators-dropdown-clears-search-and-closes-all-chart-menus-test
   (let [effects (core/toggle-indicators-dropdown
                  {:chart-options {:timeframes-dropdown-visible true

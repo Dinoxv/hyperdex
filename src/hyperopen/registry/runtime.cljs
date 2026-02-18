@@ -94,6 +94,8 @@
    [:actions/add-indicator :add-indicator]
    [:actions/remove-indicator :remove-indicator]
    [:actions/update-indicator-period :update-indicator-period]
+   [:actions/show-volume-indicator :show-volume-indicator]
+   [:actions/hide-volume-indicator :hide-volume-indicator]
    [:actions/select-account-info-tab :select-account-info-tab]
    [:actions/set-funding-history-filters :set-funding-history-filters]
    [:actions/toggle-funding-history-filter-open :toggle-funding-history-filter-open]

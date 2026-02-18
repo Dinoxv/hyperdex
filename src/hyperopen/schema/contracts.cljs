@@ -209,6 +209,8 @@
    :actions/add-indicator ::add-indicator-args
    :actions/remove-indicator ::keyword-args
    :actions/update-indicator-period ::update-indicator-period-args
+   :actions/show-volume-indicator ::no-args
+   :actions/hide-volume-indicator ::no-args
    :actions/select-account-info-tab ::tab-args
    :actions/set-funding-history-filters ::funding-history-filter-args
    :actions/toggle-funding-history-filter-open ::no-args

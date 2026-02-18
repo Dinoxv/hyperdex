@@ -186,6 +186,32 @@
     (is (some? remove-node))
     (is (= true (get-in remove-node [1 :aria-pressed])))))
 
+(deftest chart-top-menu-chart-volume-row-renders-hide-action-when-volume-visible-test
+  (let [menu (chart-core/chart-top-menu {:chart-options {:timeframes-dropdown-visible false
+                                                          :selected-timeframe :1d
+                                                          :chart-type-dropdown-visible false
+                                                          :selected-chart-type :candlestick
+                                                          :indicators-dropdown-visible true
+                                                          :volume-visible? true
+                                                          :active-indicators {}}})
+        hide-node (find-first-node menu #(= [[:actions/hide-volume-indicator]]
+                                             (get-in % [1 :on :click])))]
+    (is (some? hide-node))
+    (is (= true (get-in hide-node [1 :aria-pressed])))))
+
+(deftest chart-top-menu-chart-volume-row-renders-show-action-when-volume-hidden-test
+  (let [menu (chart-core/chart-top-menu {:chart-options {:timeframes-dropdown-visible false
+                                                          :selected-timeframe :1d
+                                                          :chart-type-dropdown-visible false
+                                                          :selected-chart-type :candlestick
+                                                          :indicators-dropdown-visible true
+                                                          :volume-visible? false
+                                                          :active-indicators {}}})
+        show-node (find-first-node menu #(= [[:actions/show-volume-indicator]]
+                                             (get-in % [1 :on :click])))]
+    (is (some? show-node))
+    (is (= false (get-in show-node [1 :aria-pressed])))))
+
 (deftest chart-top-menu-renders-trades-freshness-cue-from-health-snapshot-test
   (let [menu (chart-core/chart-top-menu {:active-asset "BTC"
                                          :websocket-ui {:show-surface-freshness-cues? true}

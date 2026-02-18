@@ -54,7 +54,9 @@
    :select-orderbook-tab orderbook-actions/select-orderbook-tab
    :add-indicator chart-settings/add-indicator
    :remove-indicator chart-settings/remove-indicator
-   :update-indicator-period chart-settings/update-indicator-period})
+   :update-indicator-period chart-settings/update-indicator-period
+   :show-volume-indicator chart-settings/show-volume-indicator
+   :hide-volume-indicator chart-settings/hide-volume-indicator})
 
 (defn- account-history-action-deps []
   {:select-account-info-tab account-history-actions/select-account-info-tab

@@ -42,6 +42,13 @@
       (dispatch-fn {:replicant/trigger :chart-order-overlay-cancel}
                    [[:actions/cancel-order order]]))))
 
+(defn- dispatch-hide-volume-indicator!
+  []
+  (let [dispatch-fn replicant-core/*dispatch*]
+    (when (ifn? dispatch-fn)
+      (dispatch-fn {:replicant/trigger :chart-volume-indicator-remove}
+                   [[:actions/hide-volume-indicator]]))))
+
 (defn- format-chart-overlay-size
   [value]
   (fmt/format-fixed-number value 2))
@@ -53,6 +60,7 @@
         chart-type-dropdown-visible (get-in state [:chart-options :chart-type-dropdown-visible])
         selected-chart-type (get-in state [:chart-options :selected-chart-type] :candlestick)
         indicators-dropdown-visible (get-in state [:chart-options :indicators-dropdown-visible])
+        volume-visible? (boolean (get-in state [:chart-options :volume-visible?] true))
         active-indicators (get-in state [:chart-options :active-indicators] {})
         indicators-search-term (get-in state [:chart-options :indicators-search-term] "")
         show-surface-freshness-cues?
@@ -117,6 +125,7 @@
           (when has-active-indicators?
             [:span {:class ["text-xs" "text-gray-400"]} (str "(" active-count ")")])])
        (indicators-dropdown {:indicators-dropdown-visible indicators-dropdown-visible
+                            :volume-visible? volume-visible?
                             :active-indicators active-indicators
                             :search-term indicators-search-term})]]
 
@@ -141,14 +150,19 @@
          series-options (:series-options chart-runtime-options)
          legend-deps (:legend-deps chart-runtime-options)
          persistence-deps (:persistence-deps chart-runtime-options)
+         volume-visible? (boolean (get chart-runtime-options :volume-visible? true))
+         on-hide-volume-indicator (:on-hide-volume-indicator chart-runtime-options)
          overlay-deps {:on-cancel-order on-cancel-order
                        :format-price fmt/format-trade-price-plain
                        :format-size format-chart-overlay-size}
+         volume-indicator-deps {:on-remove on-hide-volume-indicator}
          legend-key (str (or (:symbol legend-meta) "")
                          "-"
                          (or (:timeframe-label legend-meta) "")
                          "-"
-                         (or (:venue legend-meta) ""))
+                         (or (:venue legend-meta) "")
+                         "-"
+                         volume-visible?)
          mount! (fn [{:keys [:replicant/life-cycle :replicant/node]}]
                   (case life-cycle
                     :replicant.life-cycle/mount
@@ -156,9 +170,11 @@
                       ;; Create chart with indicators support
                       (let [chart-obj (if (seq indicators-data)
                                         (ci/create-chart-with-indicators! node chart-type candle-data indicators-data
-                                                                          {:series-options series-options})
+                                                                          {:series-options series-options
+                                                                           :volume-visible? volume-visible?})
                                         (ci/create-chart-with-volume-and-series! node chart-type candle-data
-                                                                                 {:series-options series-options}))
+                                                                                 {:series-options series-options
+                                                                                  :volume-visible? volume-visible?}))
                             chart (.-chart chart-obj)
                             legend-control (ci/create-legend! node chart legend-meta legend-deps)
                             data-ready? (boolean (seq candle-data))
@@ -169,6 +185,7 @@
                         (ci/set-main-series-markers! chart-obj indicator-markers)
                         (ci/sync-baseline-base-value-subscription! chart-obj chart-type)
                         (ci/sync-open-order-overlays! chart-obj node open-order-overlays overlay-deps)
+                        (ci/sync-volume-indicator-overlay! chart-obj node candle-data volume-indicator-deps)
                         (chart-runtime/set-state! node {:chart-obj chart-obj
                                                         :legend-control legend-control
                                                         :chart-type chart-type
@@ -222,6 +239,7 @@
                         (when chart-obj
                           (ci/set-main-series-markers! chart-obj indicator-markers)
                           (ci/sync-open-order-overlays! chart-obj node open-order-overlays overlay-deps))
+                        (ci/sync-volume-indicator-overlay! chart-obj node candle-data volume-indicator-deps)
                         (when (and indicator-series (seq indicator-series-data))
                           (doseq [[idx series-entry] (map-indexed vector indicator-series-data)]
                             (when-let [^js indicator-series-entry (aget ^js indicator-series idx)]
@@ -239,6 +257,7 @@
                       (when legend-control
                         (.destroy ^js legend-control))
                       (ci/clear-open-order-overlays! chart-obj)
+                      (ci/clear-volume-indicator-overlay! chart-obj)
                       (ci/clear-baseline-base-value-subscription! chart-obj)
                       (when visible-range-cleanup
                         (try
@@ -253,7 +272,7 @@
                     nil))]
      [:div {:class ["w-full" "relative" "flex-1" "h-full" "min-h-[360px]" "bg-base-100" "trading-chart-host"]
             :data-parity-id "chart-canvas"
-            :replicant/key (str "chart-" (hash active-indicators) "-" legend-key)
+            :replicant/key (str "chart-" (hash active-indicators) "-" legend-key "-" volume-visible?)
             :replicant/on-render mount!}])))
 
 (defn trading-chart-view [state]
@@ -282,6 +301,8 @@
         chart-runtime-options {:series-options {:price-decimals price-decimals}
                                :legend-deps {:format-price fmt/format-trade-price-plain
                                              :format-delta fmt/format-trade-price-delta}
+                               :volume-visible? (boolean (get-in state [:chart-options :volume-visible?] true))
+                               :on-hide-volume-indicator dispatch-hide-volume-indicator!
                                :persistence-deps {}}
         legend-meta {:symbol symbol
                      :timeframe-label timeframe-label

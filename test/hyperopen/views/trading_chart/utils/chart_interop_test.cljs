@@ -11,6 +11,7 @@
             [hyperopen.views.trading-chart.utils.chart-interop.markers :as markers]
             [hyperopen.views.trading-chart.utils.chart-interop.price-format :as price-format]
             [hyperopen.views.trading-chart.utils.chart-interop.series :as series]
+            [hyperopen.views.trading-chart.utils.chart-interop.volume-indicator-overlay :as volume-indicator-overlay]
             [hyperopen.views.trading-chart.utils.chart-interop.transforms :as transforms]))
 
 (defn- make-fake-element [tag]
@@ -607,6 +608,134 @@
       (is (= :ok (chart-interop/set-indicator-data! series* data))))
     (is (= [[chart series-def 2]] @add-calls))
     (is (= [[series* data]] @set-calls))))
+
+(deftest volume-indicator-overlay-wrapper-delegates-and-guards-volume-contract-test
+  (let [assert-calls (atom [])
+        sync-calls (atom [])
+        clear-calls (atom 0)
+        chart-with-volume #js {:chart #js {}
+                               :mainSeries #js {}
+                               :volumeSeries #js {}}
+        chart-without-volume #js {:chart #js {}
+                                  :mainSeries #js {}}
+        container (make-fake-element "div")
+        candles [{:time 1 :open 10 :high 12 :low 9 :close 11 :volume 55}]]
+    (with-redefs [chart-contracts/assert-candles! (fn
+                                                    ([value context]
+                                                     (swap! assert-calls conj {:value value
+                                                                               :context context
+                                                                               :opts nil})
+                                                     value)
+                                                    ([value context opts]
+                                                     (swap! assert-calls conj {:value value
+                                                                               :context context
+                                                                               :opts opts})
+                                                     value))
+                  volume-indicator-overlay/sync-volume-indicator-overlay! (fn
+                                                                            ([chart* container* candles*]
+                                                                             (swap! sync-calls conj [chart* container* candles* nil])
+                                                                             :synced)
+                                                                            ([chart* container* candles* opts]
+                                                                             (swap! sync-calls conj [chart* container* candles* opts])
+                                                                             :synced))
+                  volume-indicator-overlay/clear-volume-indicator-overlay! (fn [_]
+                                                                              (swap! clear-calls inc)
+                                                                              :cleared)]
+      (is (= :synced
+             (chart-interop/sync-volume-indicator-overlay! chart-with-volume
+                                                           container
+                                                           candles
+                                                           {:on-remove (fn [] nil)})))
+      (is (= :synced
+             (chart-interop/sync-volume-indicator-overlay! chart-without-volume
+                                                           container
+                                                           candles)))
+      (is (= :cleared
+             (chart-interop/clear-volume-indicator-overlay! chart-with-volume))))
+    (is (= 1 (count @assert-calls)))
+    (is (= {:require-volume? true}
+           (:opts (first @assert-calls))))
+    (is (= 2 (count @sync-calls)))
+    (is (= 1 @clear-calls))))
+
+(deftest create-chart-with-volume-and-series-skips-volume-pane-when-hidden-test
+  (let [chart #js {:addSeries (fn [& _]
+                                (throw (js/Error. "volume series should not be created when hidden")))}
+        set-main-data-calls (atom 0)
+        main-series #js {:id "main"
+                         :applyOptions (fn [_] nil)
+                         :setData (fn [_]
+                                    (swap! set-main-data-calls inc))}
+        set-volume-data-calls (atom 0)
+        fit-content-calls (atom 0)
+        candles [{:time 1 :open 10 :high 11 :low 9 :close 10.5 :volume 100}]
+        chart-obj (with-redefs [chart-contracts/assert-candles! (fn
+                                                                   ([value _context]
+                                                                    value)
+                                                                   ([value _context _opts]
+                                                                    value))
+                                chart-interop/create-chart! (fn [_]
+                                                              chart)
+                                chart-interop/add-series! (fn [_ _]
+                                                            main-series)
+                                chart-interop/set-volume-data! (fn [_ _]
+                                                                 (swap! set-volume-data-calls inc))
+                                chart-interop/fit-content! (fn [_]
+                                                             (swap! fit-content-calls inc))]
+                    (chart-interop/create-chart-with-volume-and-series!
+                     (make-fake-element "div")
+                     :candlestick
+                     candles
+                     {:series-options {:price-decimals 2}
+                      :volume-visible? false}))]
+    (is (identical? main-series (.-mainSeries ^js chart-obj)))
+    (is (nil? (.-volumeSeries ^js chart-obj)))
+    (is (nil? (.-volumePaneIndex ^js chart-obj)))
+    (is (= 1 @set-main-data-calls))
+    (is (zero? @set-volume-data-calls))
+    (is (= 1 @fit-content-calls))))
+
+(deftest create-chart-with-indicators-skips-volume-pane-when-hidden-test
+  (let [chart #js {:addSeries (fn [& _]
+                                (throw (js/Error. "volume series should not be created when hidden")))}
+        set-main-data-calls (atom 0)
+        main-series #js {:id "main"
+                         :applyOptions (fn [_] nil)
+                         :setData (fn [_]
+                                    (swap! set-main-data-calls inc))}
+        set-volume-data-calls (atom 0)
+        fit-content-calls (atom 0)
+        candles [{:time 1 :open 10 :high 11 :low 9 :close 10.5 :volume 100}]
+        indicators []
+        chart-obj (with-redefs [chart-contracts/assert-candles! (fn
+                                                                   ([value _context]
+                                                                    value)
+                                                                   ([value _context _opts]
+                                                                    value))
+                                chart-contracts/assert-indicators! (fn [value _context]
+                                                                      value)
+                                chart-interop/create-chart! (fn [_]
+                                                              chart)
+                                chart-interop/add-series! (fn [_ _]
+                                                            main-series)
+                                chart-interop/set-volume-data! (fn [_ _]
+                                                                 (swap! set-volume-data-calls inc))
+                                chart-interop/fit-content! (fn [_]
+                                                             (swap! fit-content-calls inc))]
+                    (chart-interop/create-chart-with-indicators!
+                     (make-fake-element "div")
+                     :candlestick
+                     candles
+                     indicators
+                     {:series-options {:price-decimals 2}
+                      :volume-visible? false}))]
+    (is (identical? main-series (.-mainSeries ^js chart-obj)))
+    (is (nil? (.-volumeSeries ^js chart-obj)))
+    (is (nil? (.-volumePaneIndex ^js chart-obj)))
+    (is (zero? (alength (.-indicatorSeries ^js chart-obj))))
+    (is (= 1 @set-main-data-calls))
+    (is (zero? @set-volume-data-calls))
+    (is (= 1 @fit-content-calls))))
 
 (deftest set-main-series-markers-two-arity-allows-nil-chart-test
   (is (nil? (chart-interop/set-main-series-markers! nil [{:time 1 :position "aboveBar"}]))))

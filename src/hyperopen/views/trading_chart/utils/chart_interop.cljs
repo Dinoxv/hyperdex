@@ -9,6 +9,7 @@
             [hyperopen.views.trading-chart.utils.chart-interop.price-format :as price-format]
             [hyperopen.views.trading-chart.utils.chart-interop.series :as series]
             [hyperopen.views.trading-chart.utils.chart-interop.transforms :as transforms]
+            [hyperopen.views.trading-chart.utils.chart-interop.volume-indicator-overlay :as volume-indicator-overlay]
             [hyperopen.views.trading-chart.utils.chart-interop.visible-range-persistence :as visible-range-persistence]
             [hyperopen.views.trading-chart.utils.chart-options :as chart-options]))
 
@@ -21,7 +22,7 @@
                                                              :priceScaleId ""
                                                              :scaleMargins #js {:top 0.8 :bottom 0}
                                                              :color transforms/hyperliquid-volume-up-color})]
-    #js {:chart chart :volumeSeries volume-series}))
+    #js {:chart chart :volumeSeries volume-series :volumePaneIndex 1}))
 
 (defn create-chart!
   "Create a chart with common options."
@@ -367,32 +368,61 @@
                                           {:boundary :chart-interop/clear-open-order-overlays}))
   (open-order-overlays/clear-open-order-overlays! chart-obj))
 
+(defn sync-volume-indicator-overlay!
+  "Attach/update the volume-pane indicator overlay with value + controls."
+  ([chart-obj container candles]
+   (sync-volume-indicator-overlay! chart-obj container candles {}))
+  ([chart-obj container candles {:as opts}]
+   (when (and chart-obj (.-volumeSeries ^js chart-obj))
+     (chart-contracts/assert-candles! candles
+                                      {:boundary :chart-interop/sync-volume-indicator-overlay}
+                                      {:require-volume? true}))
+   (volume-indicator-overlay/sync-volume-indicator-overlay! chart-obj container candles opts)))
+
+(defn clear-volume-indicator-overlay!
+  "Clear volume-pane indicator overlay DOM/subscriptions."
+  [chart-obj]
+  (volume-indicator-overlay/clear-volume-indicator-overlay! chart-obj))
+
+(defn- create-volume-series!
+  [chart pane-index]
+  (.addSeries ^js chart HistogramSeries
+              #js {:color transforms/hyperliquid-volume-up-color
+                   :priceFormat #js {:type "volume"}}
+              pane-index))
+
 (defn create-chart-with-volume-and-series!
   "Create a chart with main series and volume series in separate panes."
   ([container chart-type data]
    (create-chart-with-volume-and-series! container chart-type data {}))
-  ([container chart-type data {:keys [series-options]}]
+  ([container chart-type data {:keys [series-options volume-visible?]
+                               :or {volume-visible? true}}]
    (chart-contracts/assert-candles! data
                                     {:boundary :chart-interop/create-chart-with-volume-and-series
                                      :chart-type chart-type})
    (let [chart (create-chart! container)
          main-series (add-series! chart chart-type)
-         volume-series (.addSeries ^js chart HistogramSeries
-                                   #js {:color transforms/hyperliquid-volume-up-color
-                                        :priceFormat #js {:type "volume"}}
-                                   1)]
+         volume-pane-index (when volume-visible? 1)
+         volume-series (when volume-visible?
+                         (create-volume-series! chart volume-pane-index))]
      (set-series-data! main-series data chart-type series-options)
-     (set-volume-data! volume-series data)
-     (let [volume-pane (aget (.panes ^js chart) 1)]
+     (when volume-series
+       (set-volume-data! volume-series data))
+     (when-let [volume-pane (some->> volume-pane-index
+                                     (aget (.panes ^js chart)))]
        (.setHeight ^js volume-pane 150))
      (fit-content! chart)
-     #js {:chart chart :mainSeries main-series :volumeSeries volume-series})))
+     #js {:chart chart
+          :mainSeries main-series
+          :volumeSeries volume-series
+          :volumePaneIndex volume-pane-index})))
 
 (defn create-chart-with-indicators!
   "Create a chart with indicators, main series, and volume series."
   ([container chart-type data indicators]
    (create-chart-with-indicators! container chart-type data indicators {}))
-  ([container chart-type data indicators {:keys [series-options]}]
+  ([container chart-type data indicators {:keys [series-options volume-visible?]
+                                          :or {volume-visible? true}}]
    (chart-contracts/assert-candles! data
                                     {:boundary :chart-interop/create-chart-with-indicators
                                      :chart-type chart-type})
@@ -409,21 +439,23 @@
                                      :paneIndex pane-index}))
                                 assignments)
          main-series (add-series! chart chart-type)
-         volume-series (.addSeries ^js chart HistogramSeries
-                                   #js {:color transforms/hyperliquid-volume-up-color
-                                        :priceFormat #js {:type "volume"}}
-                                   next-pane-index)]
+         volume-pane-index (when volume-visible? next-pane-index)
+         volume-series (when volume-visible?
+                         (create-volume-series! chart volume-pane-index))]
      (set-series-data! main-series data chart-type series-options)
-     (set-volume-data! volume-series data)
+     (when volume-series
+       (set-volume-data! volume-series data))
      (doseq [pane-index (range 1 next-pane-index)]
        (when-let [pane (aget (.panes ^js chart) pane-index)]
          (.setHeight ^js pane 120)))
-     (when-let [volume-pane (aget (.panes ^js chart) next-pane-index)]
+     (when-let [volume-pane (some->> volume-pane-index
+                                     (aget (.panes ^js chart)))]
        (.setHeight ^js volume-pane 150))
      (fit-content! chart)
      #js {:chart chart
           :mainSeries main-series
           :volumeSeries volume-series
+          :volumePaneIndex volume-pane-index
           :indicatorSeries (clj->js indicator-series)})))
 
 (defn create-candlestick-chart!
