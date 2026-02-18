@@ -138,6 +138,11 @@
       (let [codes (set (map :code (docs/check-repo root (test-config))))]
         (is (contains? codes :missing-index-link))))))
 
+(deftest legacy-prd-ppd-readmes-are-not-required
+  (let [required (set docs/default-required-files)]
+    (is (not (contains? required "PRDs/README.md")))
+    (is (not (contains? required "PPDs/README.md")))))
+
 (defn -main
   [& _args]
   (let [{:keys [fail error]} (run-tests 'dev.check-docs-test)]

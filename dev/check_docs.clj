@@ -22,8 +22,7 @@
    "docs/exec-plans/tech-debt-tracker.md"
    "docs/generated/index.md"
    "docs/product-specs/index.md"
-   "docs/references/index.md"
-   "PRDs/README.md"])
+   "docs/references/index.md"])
 
 (def default-governed-explicit
   ["AGENTS.md"
