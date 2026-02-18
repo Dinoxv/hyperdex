@@ -1,4 +1,5 @@
-(ns hyperopen.runtime.bootstrap)
+(ns hyperopen.runtime.bootstrap
+  (:require [hyperopen.platform :as platform]))
 
 (defn register-runtime!
   [{:keys [register-effects!
@@ -18,16 +19,30 @@
            set-dispatch!
            dispatch!
            render!
-           document?]}]
+           document?
+           request-animation-frame!]}]
   (set-dispatch! #(dispatch! store %1 %2))
   (when (if (some? document?)
           document?
           (exists? js/document))
-    (remove-watch store render-watch-key)
-    (add-watch store
-               render-watch-key
-               (fn [_ _ _ new-state]
-                 (render! new-state)))))
+    (let [request-frame! (or request-animation-frame!
+                             platform/request-animation-frame!)
+          pending-state (atom nil)
+          frame-pending? (atom false)]
+      (remove-watch store render-watch-key)
+      (add-watch store
+                 render-watch-key
+                 (fn [_ _ _ new-state]
+                   (reset! pending-state new-state)
+                   (when-not @frame-pending?
+                     (reset! frame-pending? true)
+                     (request-frame!
+                      (fn [_]
+                        (let [state-to-render @pending-state]
+                          (reset! pending-state nil)
+                          (reset! frame-pending? false)
+                          (when (some? state-to-render)
+                            (render! state-to-render)))))))))))
 
 (defn install-runtime-watchers!
   [{:keys [store

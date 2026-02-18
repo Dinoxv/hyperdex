@@ -7,6 +7,7 @@
             [hyperopen.runtime.state :as runtime-state]
             [hyperopen.runtime.validation :as runtime-validation]
             [hyperopen.runtime.wiring :as runtime-wiring]
+            [hyperopen.platform :as platform]
             [hyperopen.telemetry :as telemetry]
             [hyperopen.startup.watchers :as startup-watchers]
             [hyperopen.startup.wiring :as startup-wiring]
@@ -30,7 +31,8 @@
                        :set-dispatch! r/set-dispatch!
                        :dispatch! nxr/dispatch
                        :render! render-app!
-                       :document? (exists? js/document)}
+                       :document? (exists? js/document)
+                       :request-animation-frame! platform/request-animation-frame!}
     :watchers-deps
     {:store store
      :install-store-cache-watchers! startup-watchers/install-store-cache-watchers!

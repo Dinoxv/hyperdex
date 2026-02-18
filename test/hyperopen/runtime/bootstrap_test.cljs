@@ -25,10 +25,11 @@
     (is (= 1 @system-calls))
     (is (= 1 @placeholder-calls))))
 
-(deftest install-render-loop-wires-dispatch-and-state-watch-render-test
+(deftest install-render-loop-wires-dispatch-and-batches-renders-per-frame-test
   (let [store (atom {:count 0})
         dispatch-calls (atom [])
         render-calls (atom [])
+        scheduled-frame-callbacks (atom [])
         captured-dispatch-fn (atom nil)]
     (runtime-bootstrap/install-render-loop!
      {:store store
@@ -39,11 +40,21 @@
                    (swap! dispatch-calls conj [runtime-store event effects]))
       :render! (fn [state]
                  (swap! render-calls conj state))
-      :document? true})
+      :document? true
+      :request-animation-frame! (fn [cb]
+                                  (swap! scheduled-frame-callbacks conj cb)
+                                  :frame-id)})
     (@captured-dispatch-fn :event [[:actions/navigate "/trade"]])
     (swap! store assoc :count 1)
+    (swap! store assoc :count 2)
+    (is (empty? @render-calls))
+    (is (= 1 (count @scheduled-frame-callbacks)))
+    ((first @scheduled-frame-callbacks) 0)
+    (swap! store assoc :count 3)
+    (is (= 2 (count @scheduled-frame-callbacks)))
+    ((second @scheduled-frame-callbacks) 0)
     (is (= [[store :event [[:actions/navigate "/trade"]]]] @dispatch-calls))
-    (is (= [{:count 1}] @render-calls))))
+    (is (= [{:count 2} {:count 3}] @render-calls))))
 
 (deftest install-render-loop-skips-watch-registration-when-document-missing-test
   (let [store (atom {:count 0})
