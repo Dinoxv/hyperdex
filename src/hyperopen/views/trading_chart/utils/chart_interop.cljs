@@ -141,6 +141,84 @@
                                           {:boundary :chart-interop/clear-baseline}))
   (baseline/clear-baseline-base-value-subscription! chart-obj))
 
+(defonce ^:private main-series-sync-sidecar (js/WeakMap.))
+(defonce ^:private volume-series-sync-sidecar (js/WeakMap.))
+
+(defn- series-sync-state
+  [sidecar series*]
+  (if series*
+    (or (.get sidecar series*) {})
+    {}))
+
+(defn- set-series-sync-state!
+  [sidecar series* state]
+  (when series*
+    (.set sidecar series* state))
+  state)
+
+(defn- vectorize-candles
+  [candles]
+  (if (vector? candles) candles (vec candles)))
+
+(defn- candle-prefix-equal?
+  [candles-a candles-b prefix-count]
+  (loop [idx 0]
+    (if (>= idx prefix-count)
+      true
+      (if (= (nth candles-a idx) (nth candles-b idx))
+        (recur (inc idx))
+        false))))
+
+(defn- infer-candle-sync-mode
+  [previous-candles next-candles]
+  (let [previous-candles* (or previous-candles [])
+        prev-count (count previous-candles*)
+        next-count (count next-candles)]
+    (cond
+      (and (zero? prev-count) (zero? next-count))
+      :noop
+
+      (identical? previous-candles next-candles)
+      :noop
+
+      (zero? prev-count)
+      :full-reset
+
+      (zero? next-count)
+      :full-reset
+
+      (= next-count prev-count)
+      (let [prefix-count (max 0 (dec next-count))
+            previous-last (nth previous-candles* (dec prev-count))
+            next-last (nth next-candles (dec next-count))]
+        (if (and (candle-prefix-equal? previous-candles* next-candles prefix-count)
+                 (= (:time previous-last) (:time next-last)))
+          (if (= previous-last next-last)
+            :noop
+            :update-last)
+          :full-reset))
+
+      (= next-count (inc prev-count))
+      (let [previous-last (nth previous-candles* (dec prev-count))
+            next-last (nth next-candles (dec next-count))]
+        (if (and (candle-prefix-equal? previous-candles* next-candles prev-count)
+                 (not= (:time previous-last) (:time next-last)))
+          :append-last
+          :full-reset))
+
+      :else
+      :full-reset)))
+
+(defn- update-series-point!
+  [series* point]
+  (let [update-fn (when series*
+                    (aget series* "update"))]
+    (if (and (fn? update-fn) (some? point))
+      (do
+        (.call update-fn series* (clj->js point))
+        true)
+      false)))
+
 (defn set-series-data!
   "Set data for any series type with registry-based transformation."
   ([series* data chart-type]
@@ -149,20 +227,45 @@
    (chart-contracts/assert-candles! data
                                     {:boundary :chart-interop/set-series-data
                                      :chart-type chart-type})
-   (let [chart-type* (transforms/normalize-main-chart-type chart-type)
-         transformed-data (series/transform-main-series-data data chart-type*)
-         base-value (when (= chart-type* :baseline)
-                      (baseline/infer-baseline-base-value transformed-data))
-         price-format* (price-format/infer-series-price-format
-                        transformed-data
-                        (fn [points]
-                          (series/extract-series-prices points chart-type*))
-                        {:price-decimals price-decimals})
-         series-options (cond-> {:priceFormat price-format*}
-                          (some? base-value)
-                          (assoc :baseValue {:type "price" :price base-value}))]
-     (.applyOptions ^js series* (clj->js series-options))
-     (.setData series* (clj->js transformed-data)))))
+   (let [data* (vectorize-candles data)
+         chart-type* (transforms/normalize-main-chart-type chart-type)
+         state (series-sync-state main-series-sync-sidecar series*)
+         config-changed?
+         (or (not= chart-type* (:chart-type state))
+             (not= price-decimals (:price-decimals state)))
+         data-sync-mode (if config-changed?
+                          :full-reset
+                          (infer-candle-sync-mode (:source-data state) data*))]
+     (when (or config-changed?
+               (not= data-sync-mode :noop))
+       (let [transformed-data (series/transform-main-series-data data* chart-type*)
+             base-value (when (= chart-type* :baseline)
+                          (baseline/infer-baseline-base-value transformed-data))
+             price-format* (price-format/infer-series-price-format
+                            transformed-data
+                            (fn [points]
+                              (series/extract-series-prices points chart-type*))
+                            {:price-decimals price-decimals})
+             series-options (cond-> {:priceFormat price-format*}
+                              (some? base-value)
+                              (assoc :baseValue {:type "price" :price base-value}))
+             options-changed? (not= series-options (:series-options state))]
+         (when options-changed?
+           (.applyOptions ^js series* (clj->js series-options)))
+         (case data-sync-mode
+           :append-last (when-not (update-series-point! series* (peek transformed-data))
+                          (.setData series* (clj->js transformed-data)))
+           :update-last (when-not (update-series-point! series* (peek transformed-data))
+                          (.setData series* (clj->js transformed-data)))
+           :full-reset (.setData series* (clj->js transformed-data))
+           nil)
+         (set-series-sync-state!
+          main-series-sync-sidecar
+          series*
+          {:source-data data*
+           :chart-type chart-type*
+           :price-decimals price-decimals
+           :series-options series-options}))))))
 
 (defn set-volume-data!
   "Set volume data for volume series."
@@ -170,8 +273,22 @@
   (chart-contracts/assert-candles! data
                                    {:boundary :chart-interop/set-volume-data}
                                    {:require-volume? true})
-  (let [volume-data (transforms/transform-data-for-volume data)]
-    (.setData volume-series (clj->js volume-data))))
+  (let [data* (vectorize-candles data)
+        state (series-sync-state volume-series-sync-sidecar volume-series)
+        data-sync-mode (infer-candle-sync-mode (:source-data state) data*)]
+    (when (not= data-sync-mode :noop)
+      (let [volume-data (vec (transforms/transform-data-for-volume data*))]
+        (case data-sync-mode
+          :append-last (when-not (update-series-point! volume-series (peek volume-data))
+                         (.setData volume-series (clj->js volume-data)))
+          :update-last (when-not (update-series-point! volume-series (peek volume-data))
+                         (.setData volume-series (clj->js volume-data)))
+          :full-reset (.setData volume-series (clj->js volume-data))
+          nil)
+        (set-series-sync-state!
+         volume-series-sync-sidecar
+         volume-series
+         {:source-data data*})))))
 
 (defn add-series!
   "Add a series of the specified type to the chart."

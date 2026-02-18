@@ -10,6 +10,7 @@
 (def ^:private sell-badge-color "rgba(227, 95, 120, 0.14)")
 (def ^:private buy-text-color "rgb(151, 252, 228)")
 (def ^:private sell-text-color "rgb(244, 187, 198)")
+(def ^:private no-orders [])
 
 (defn- overlay-state
   [chart-obj]
@@ -354,20 +355,36 @@
                                      (teardown-subscription! current-subscription)
                                      (subscribe-overlay-repaint! chart-obj chart main-series))
                                    current-subscription)
-               orders* (if (sequential? orders)
-                         (vec orders)
-                         [])]
-           (set-overlay-state!
-            chart-obj
-            (assoc state
-                   :root root
-                   :chart chart
-                   :main-series main-series
-                   :orders orders*
-                   :document document*
-                   :format-price format-price
-                   :format-size format-size
-                   :on-cancel-order on-cancel-order
-                   :subscription next-subscription))
-           (render-overlays! chart-obj))
+               orders-ref (when (sequential? orders) orders)
+               orders* (cond
+                         (vector? orders) orders
+                         (sequential? orders) (vec orders)
+                         :else no-orders)
+               unchanged-inputs?
+               (and (not needs-resubscribe?)
+                    (identical? root (:root state))
+                    (identical? chart (:chart state))
+                    (identical? main-series (:main-series state))
+                    (identical? document* (:document state))
+                    (identical? format-price (:format-price state))
+                    (identical? format-size (:format-size state))
+                    (identical? on-cancel-order (:on-cancel-order state))
+                    (identical? orders-ref (:orders-ref state)))]
+           (if unchanged-inputs?
+             state
+             (do
+               (set-overlay-state!
+                chart-obj
+                (assoc state
+                       :root root
+                       :chart chart
+                       :main-series main-series
+                       :orders-ref orders-ref
+                       :orders orders*
+                       :document document*
+                       :format-price format-price
+                       :format-size format-size
+                       :on-cancel-order on-cancel-order
+                       :subscription next-subscription))
+               (render-overlays! chart-obj))))
          (clear-open-order-overlays! chart-obj))))))

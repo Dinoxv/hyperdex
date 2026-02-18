@@ -42,6 +42,10 @@
       (dispatch-fn {:replicant/trigger :chart-order-overlay-cancel}
                    [[:actions/cancel-order order]]))))
 
+(defn- format-chart-overlay-size
+  [value]
+  (fmt/format-fixed-number value 2))
+
 ;; Top menu component with timeframe selection and bars indicator
 (defn chart-top-menu [state]
   (let [timeframes-dropdown-visible (get-in state [:chart-options :timeframes-dropdown-visible])
@@ -139,8 +143,7 @@
          persistence-deps (:persistence-deps chart-runtime-options)
          overlay-deps {:on-cancel-order on-cancel-order
                        :format-price fmt/format-trade-price-plain
-                       :format-size (fn [value]
-                                      (fmt/format-fixed-number value 2))}
+                       :format-size format-chart-overlay-size}
          legend-key (str (or (:symbol legend-meta) "")
                          "-"
                          (or (:timeframe-label legend-meta) "")

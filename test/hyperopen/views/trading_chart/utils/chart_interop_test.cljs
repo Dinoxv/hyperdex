@@ -307,6 +307,79 @@
     (chart-interop/set-series-data! series lazy-seq-candles :candlestick)
     (is (= vector-candles @applied-data))))
 
+(deftest set-series-data-identity-gates-repeated-candle-reference-test
+  (let [set-calls* (atom 0)
+        update-calls* (atom 0)
+        candles [{:time 1 :open 10 :high 11 :low 9 :close 10.5}
+                 {:time 2 :open 10.5 :high 12 :low 10 :close 11.5}]
+        series #js {:applyOptions (fn [_] nil)
+                    :setData (fn [_]
+                               (swap! set-calls* inc))
+                    :update (fn [_]
+                              (swap! update-calls* inc))}]
+    (chart-interop/set-series-data! series candles :candlestick)
+    (chart-interop/set-series-data! series candles :candlestick)
+    (is (= 1 @set-calls*))
+    (is (zero? @update-calls*))))
+
+(deftest set-series-data-uses-incremental-update-for-tail-edit-and-append-test
+  (let [calls* (atom [])
+        candles [{:time 1 :open 10 :high 11 :low 9 :close 10.5}
+                 {:time 2 :open 10.5 :high 12 :low 10 :close 11.5}]
+        updated-last [{:time 1 :open 10 :high 11 :low 9 :close 10.5}
+                      {:time 2 :open 10.5 :high 12.5 :low 10 :close 12.0}]
+        appended (conj updated-last {:time 3 :open 12.0 :high 12.2 :low 11.6 :close 11.8})
+        series #js {:applyOptions (fn [_] nil)
+                    :setData (fn [data]
+                               (swap! calls* conj [:set (js->clj data :keywordize-keys true)]))
+                    :update (fn [point]
+                              (swap! calls* conj [:update (js->clj point :keywordize-keys true)]))}]
+    (chart-interop/set-series-data! series candles :candlestick)
+    (chart-interop/set-series-data! series updated-last :candlestick)
+    (chart-interop/set-series-data! series appended :candlestick)
+    (is (= :set (ffirst @calls*)))
+    (is (= [:update {:time 2 :open 10.5 :high 12.5 :low 10 :close 12.0}]
+           (second @calls*)))
+    (is (= [:update {:time 3 :open 12.0 :high 12.2 :low 11.6 :close 11.8}]
+           (nth @calls* 2)))))
+
+(deftest set-series-data-non-tail-mutation-falls-back-to-full-reset-test
+  (let [calls* (atom [])
+        candles [{:time 1 :open 10 :high 11 :low 9 :close 10.5}
+                 {:time 2 :open 10.5 :high 12 :low 10 :close 11.5}]
+        mutated-prefix [{:time 1 :open 10 :high 13 :low 9 :close 12.5}
+                        {:time 2 :open 10.5 :high 12 :low 10 :close 11.5}]
+        series #js {:applyOptions (fn [_] nil)
+                    :setData (fn [_]
+                               (swap! calls* conj :set))
+                    :update (fn [_]
+                              (swap! calls* conj :update))}]
+    (chart-interop/set-series-data! series candles :candlestick)
+    (chart-interop/set-series-data! series mutated-prefix :candlestick)
+    (is (= [:set :set] @calls*))))
+
+(deftest set-volume-data-identity-gates-and-incrementally-updates-tail-test
+  (let [calls* (atom [])
+        candles [{:time 1 :open 10 :high 11 :low 9 :close 10.5 :volume 100}
+                 {:time 2 :open 10.5 :high 12 :low 10 :close 11.5 :volume 120}]
+        updated-last [{:time 1 :open 10 :high 11 :low 9 :close 10.5 :volume 100}
+                      {:time 2 :open 10.5 :high 12 :low 10 :close 11.0 :volume 140}]
+        appended (conj updated-last {:time 3 :open 11.0 :high 11.4 :low 10.9 :close 11.2 :volume 90})
+        volume-series #js {:setData (fn [data]
+                                      (swap! calls* conj [:set (js->clj data :keywordize-keys true)]))
+                           :update (fn [point]
+                                     (swap! calls* conj [:update (js->clj point :keywordize-keys true)]))}]
+    (chart-interop/set-volume-data! volume-series candles)
+    (chart-interop/set-volume-data! volume-series candles)
+    (chart-interop/set-volume-data! volume-series updated-last)
+    (chart-interop/set-volume-data! volume-series appended)
+    (is (= :set (ffirst @calls*)))
+    (is (= 3 (count @calls*)))
+    (is (= [:update {:value 140 :time 2 :color "#26a69a"}]
+           (second @calls*)))
+    (is (= [:update {:value 90 :time 3 :color "#26a69a"}]
+           (nth @calls* 2)))))
+
 (deftest set-main-series-markers-reuses-plugin-for-same-series-and-recreates-for-new-series-test
   (let [create-calls (atom 0)
         plugin-updates (atom [])
@@ -789,6 +862,7 @@
         plugin-sets (atom [])
         main-series #js {:id "main"}
         chart-obj #js {:mainSeries main-series}
+        stable-markers [{:time 1 :position "aboveBar"}]
         create-markers (fn [series initial]
                          (swap! create-calls inc)
                          (is (= [] (js->clj initial)))
@@ -797,7 +871,8 @@
                                                                      :markers (js->clj markers :keywordize-keys true)}))})]
     (is (nil? (markers/set-main-series-markers! nil [{:time 1}] {:create-markers create-markers})))
     (markers/set-main-series-markers! chart-obj {:not "sequential"} {:create-markers create-markers})
-    (markers/set-main-series-markers! chart-obj [{:time 1 :position "aboveBar"}] {:create-markers create-markers})
+    (markers/set-main-series-markers! chart-obj stable-markers {:create-markers create-markers})
+    (markers/set-main-series-markers! chart-obj stable-markers {:create-markers create-markers})
     (is (= 1 @create-calls))
     (is (= [] (:markers (first @plugin-sets))))
     (is (= [{:time 1 :position "aboveBar"}]
@@ -951,4 +1026,61 @@
       (pointer-down-dom-node! cancel-button)
       (click-dom-node! cancel-button))
     (is (= [11] @canceled-oids*))
+    (chart-interop/clear-open-order-overlays! chart-obj)))
+
+(deftest open-order-overlays-sync-skips-rerender-for-unchanged-identities-test
+  (let [document (make-fake-document)
+        container (make-fake-element "div")
+        subscribe-fn (fn [_] nil)
+        time-scale #js {:subscribeVisibleTimeRangeChange subscribe-fn
+                        :unsubscribeVisibleTimeRangeChange subscribe-fn
+                        :subscribeVisibleLogicalRangeChange subscribe-fn
+                        :unsubscribeVisibleLogicalRangeChange subscribe-fn
+                        :subscribeSizeChange subscribe-fn
+                        :unsubscribeSizeChange subscribe-fn}
+        chart #js {:timeScale (fn [] time-scale)
+                   :subscribeCrosshairMove subscribe-fn
+                   :unsubscribeCrosshairMove subscribe-fn
+                   :subscribeClick subscribe-fn
+                   :unsubscribeClick subscribe-fn}
+        price-to-coordinate-calls* (atom 0)
+        main-series #js {:priceToCoordinate (fn [price]
+                                              (swap! price-to-coordinate-calls* inc)
+                                              (* 2 price))
+                         :subscribeDataChanged subscribe-fn
+                         :unsubscribeDataChanged subscribe-fn}
+        chart-obj #js {:chart chart
+                       :mainSeries main-series}
+        orders [{:coin "SOL" :oid 101 :side "B" :type "limit" :sz "1.0" :px "10"}
+                {:coin "SOL" :oid 102 :side "A" :type "limit" :sz "2.0" :px "11"}]
+        format-price (fn [price _raw] (str price))
+        format-size (fn [size] (str size))
+        on-cancel-order (fn [_] nil)]
+    (chart-interop/sync-open-order-overlays!
+     chart-obj
+     container
+     orders
+     {:document document
+      :format-price format-price
+      :format-size format-size
+      :on-cancel-order on-cancel-order})
+    (is (= 2 @price-to-coordinate-calls*))
+    (chart-interop/sync-open-order-overlays!
+     chart-obj
+     container
+     orders
+     {:document document
+      :format-price format-price
+      :format-size format-size
+      :on-cancel-order on-cancel-order})
+    (is (= 2 @price-to-coordinate-calls*))
+    (chart-interop/sync-open-order-overlays!
+     chart-obj
+     container
+     (mapv identity orders)
+     {:document document
+      :format-price format-price
+      :format-size format-size
+      :on-cancel-order on-cancel-order})
+    (is (= 4 @price-to-coordinate-calls*))
     (chart-interop/clear-open-order-overlays! chart-obj)))
