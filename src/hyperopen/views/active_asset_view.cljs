@@ -1,6 +1,7 @@
 (ns hyperopen.views.active-asset-view
   (:require [clojure.string :as str]
             [hyperopen.websocket.active-asset-ctx :as active-ctx]
+            [hyperopen.views.asset-icon :as asset-icon]
             [hyperopen.views.asset-selector-view :as asset-selector]
             [hyperopen.utils.formatting :as fmt]
             [hyperopen.asset-selector.markets :as markets]))
@@ -102,20 +103,14 @@
 
 (defn asset-icon [market dropdown-visible? missing-icons _loaded-icons]
   (let [coin (:coin market)
-        base (some-> (or (:base market) coin) str str/trim)
         symbol (or (:symbol market) coin)
         dex-label (market-dex-label market)
         leverage-label (leverage-chip-label market)
         market-type (:market-type market)
         market-key (or (:key market) (markets/coin->market-key coin))
         missing-icon? (contains? missing-icons market-key)
-        component-market? (seq dex-label)
-        icon-blocked? (or missing-icon?
-                          component-market?
-                          (not (seq base))
-                          (str/starts-with? base "@"))
-        icon-src (when-not icon-blocked?
-                   (str "https://app.hyperliquid.xyz/coins/" base ".svg"))]
+        icon-src (when-not missing-icon?
+                   (asset-icon/market-icon-url market))]
     [:div {:class ["flex" "items-center" "gap-2" "cursor-pointer" "hover:bg-base-300"
                    "rounded" "pr-2" "py-1" "transition-colors" "min-w-0"]
            :on {:click [[:actions/toggle-asset-dropdown :asset-selector]]}}

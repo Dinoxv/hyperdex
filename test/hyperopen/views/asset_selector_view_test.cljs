@@ -336,7 +336,7 @@
     (is (= [[:actions/mark-missing-asset-icon "perp:BTC"]]
            (get-in attrs [:on :error])))))
 
-(deftest asset-list-item-omits-icon-for-component-markets-test
+(deftest asset-list-item-renders-namespaced-icon-for-component-markets-test
   (let [asset {:key "perp:xyz:XYZ100"
                :symbol "XYZ100-USDC"
                :coin "xyz:XYZ100"
@@ -347,5 +347,8 @@
                :volume24h 10
                :change24hPct 1}
         row (view/asset-list-item asset false #{} #{} #{})
-        img-node (find-first-img-node row)]
-    (is (nil? img-node))))
+        img-node (find-first-img-node row)
+        attrs (second img-node)]
+    (is (some? img-node))
+    (is (= "https://app.hyperliquid.xyz/coins/xyz:XYZ100.svg"
+           (:src attrs)))))

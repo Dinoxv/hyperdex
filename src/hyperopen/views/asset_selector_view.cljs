@@ -1,6 +1,7 @@
 (ns hyperopen.views.asset-selector-view
   (:require [clojure.string :as str]
             [replicant.dom :as r]
+            [hyperopen.views.asset-icon :as asset-icon]
             [hyperopen.utils.formatting :as fmt]))
 
 ;; Asset selector dropdown component
@@ -165,7 +166,7 @@
       directional-primary)))
 
 (defn asset-list-item [asset selected? favorites missing-icons _loaded-icons]
-  (let [{:keys [key coin symbol base mark markRaw volume24h change24h change24hPct openInterest fundingRate
+  (let [{:keys [key coin symbol mark markRaw volume24h change24h change24hPct openInterest fundingRate
                 market-type dex maxLeverage]} asset
         safe-change (when (some? change24h) (fmt/safe-number change24h))
         safe-change-pct (when (some? change24hPct) (fmt/safe-number change24hPct))
@@ -184,15 +185,9 @@
         funding-color (if funding-positive "text-success" "text-error")
         is-spot (= market-type :spot)
         favorite? (contains? favorites key)
-        icon-name (some-> (or base coin) str str/trim)
         missing-icon? (contains? missing-icons key)
-        component-market? (seq (some-> dex str str/trim))
-        icon-blocked? (or missing-icon?
-                          component-market?
-                          (not (seq icon-name))
-                          (str/starts-with? icon-name "@"))
-        icon-src (when-not icon-blocked?
-                   (str "https://app.hyperliquid.xyz/coins/" icon-name ".svg"))]
+        icon-src (when-not missing-icon?
+                   (asset-icon/market-icon-url asset))]
     [:div.grid.grid-cols-12.gap-3.items-center.px-4.h-12.box-border.cursor-pointer.bg-base-100.hover:bg-base-200.transition-colors.border-b.border-base-300
      {:class (when selected? ["bg-base-200" "ring-1" "ring-inset" "ring-primary"])
       :on {:click [[:actions/select-asset asset]]}}
