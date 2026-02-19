@@ -27,7 +27,8 @@
     (is (= [[:effects/save-many [[[:asset-selector :visible-dropdown] :asset-selector]
                                  [[:asset-selector :scroll-top] 0]
                                  [[:asset-selector :render-limit]
-                                  actions/asset-selector-default-render-limit]]]
+                                  actions/asset-selector-default-render-limit]
+                                 [[:asset-selector :last-render-limit-increase-ms] nil]]]
             [:effects/fetch-asset-selector-markets]]
            open-effects))
     (is (= [[:effects/save-many [[[:asset-selector :visible-dropdown] nil]]]]
@@ -37,7 +38,8 @@
   (is (= [[:effects/save-many [[[:asset-selector :visible-dropdown] nil]
                                [[:asset-selector :scroll-top] 0]
                                [[:asset-selector :render-limit]
-                                actions/asset-selector-default-render-limit]]]]
+                                actions/asset-selector-default-render-limit]
+                               [[:asset-selector :last-render-limit-increase-ms] nil]]]]
          (actions/close-asset-dropdown {}))))
 
 (deftest select-asset-covers-fallback-map-and-invalid-input-branches-test
@@ -65,6 +67,7 @@
                                    [[:asset-selector :scroll-top] 0]
                                    [[:asset-selector :render-limit]
                                     actions/asset-selector-default-render-limit]
+                                   [[:asset-selector :last-render-limit-increase-ms] nil]
                                    [[:orderbook-ui :price-aggregation-dropdown-visible?] false]
                                    [[:orderbook-ui :size-unit-dropdown-visible?] false]
                                    [[:active-market] nil]]]
@@ -77,14 +80,16 @@
   (is (= [[:effects/save-many [[[:asset-selector :search-term] ""]
                                [[:asset-selector :scroll-top] 0]
                                [[:asset-selector :render-limit]
-                                actions/asset-selector-default-render-limit]]]]
+                                actions/asset-selector-default-render-limit]
+                               [[:asset-selector :last-render-limit-increase-ms] nil]]]]
          (actions/update-asset-search {} nil)))
 
   (is (= [[:effects/save-many [[[:asset-selector :sort-by] :volume]
                                [[:asset-selector :sort-direction] :desc]
                                [[:asset-selector :scroll-top] 0]
                                [[:asset-selector :render-limit]
-                                actions/asset-selector-default-render-limit]]]
+                                actions/asset-selector-default-render-limit]
+                               [[:asset-selector :last-render-limit-increase-ms] nil]]]
           [:effects/local-storage-set "asset-selector-sort-by" "volume"]
           [:effects/local-storage-set "asset-selector-sort-direction" "desc"]]
          (actions/update-asset-selector-sort
@@ -96,7 +101,8 @@
                                [[:asset-selector :sort-direction] :asc]
                                [[:asset-selector :scroll-top] 0]
                                [[:asset-selector :render-limit]
-                                actions/asset-selector-default-render-limit]]]
+                                actions/asset-selector-default-render-limit]
+                               [[:asset-selector :last-render-limit-increase-ms] nil]]]
           [:effects/local-storage-set "asset-selector-sort-by" "volume"]
           [:effects/local-storage-set "asset-selector-sort-direction" "asc"]]
          (actions/update-asset-selector-sort
@@ -107,7 +113,8 @@
   (is (= [[:effects/save-many [[[:asset-selector :strict?] true]
                                [[:asset-selector :scroll-top] 0]
                                [[:asset-selector :render-limit]
-                                actions/asset-selector-default-render-limit]]]
+                                actions/asset-selector-default-render-limit]
+                               [[:asset-selector :last-render-limit-increase-ms] nil]]]
           [:effects/local-storage-set "asset-selector-strict" "true"]]
          (actions/toggle-asset-selector-strict
            {:asset-selector {:strict? false}})))
@@ -131,13 +138,15 @@
   (is (= [[:effects/save-many [[[:asset-selector :favorites-only?] false]
                                [[:asset-selector :scroll-top] 0]
                                [[:asset-selector :render-limit]
-                                actions/asset-selector-default-render-limit]]]]
+                                actions/asset-selector-default-render-limit]
+                               [[:asset-selector :last-render-limit-increase-ms] nil]]]]
          (actions/set-asset-selector-favorites-only {} nil)))
 
   (is (= [[:effects/save-many [[[:asset-selector :active-tab] :hip3]
                                [[:asset-selector :scroll-top] 0]
                                [[:asset-selector :render-limit]
-                                actions/asset-selector-default-render-limit]]]
+                                actions/asset-selector-default-render-limit]
+                               [[:asset-selector :last-render-limit-increase-ms] nil]]]
           [:effects/local-storage-set "asset-selector-active-tab" "hip3"]]
          (actions/set-asset-selector-tab {} :hip3))))
 
@@ -174,11 +183,37 @@
            {:asset-selector {:markets (vec (repeat 400 {:key "perp:T"}))
                              :render-limit 120}}
            0)))
-  (is (= [[:effects/save [:asset-selector :render-limit] 200]]
+  (is (= [[:effects/save [:asset-selector :render-limit] 160]]
          (actions/maybe-increase-asset-selector-render-limit
            {:asset-selector {:markets (vec (repeat 400 {:key "perp:T"}))
                              :render-limit 120}}
            "5100"))))
+
+(deftest maybe-increase-asset-selector-render-limit-throttles-when-event-time-is-too-close-test
+  (is (= [[:effects/save-many [[[:asset-selector :render-limit] 160]
+                               [[:asset-selector :last-render-limit-increase-ms] 1000]]]]
+         (actions/maybe-increase-asset-selector-render-limit
+           {:asset-selector {:markets (vec (repeat 400 {:key "perp:T"}))
+                             :render-limit 120}}
+           5100
+           1000)))
+
+  (is (= []
+         (actions/maybe-increase-asset-selector-render-limit
+           {:asset-selector {:markets (vec (repeat 400 {:key "perp:T"}))
+                             :render-limit 120
+                             :last-render-limit-increase-ms 1000}}
+           5100
+           1050)))
+
+  (is (= [[:effects/save-many [[[:asset-selector :render-limit] 160]
+                               [[:asset-selector :last-render-limit-increase-ms] 1095]]]]
+         (actions/maybe-increase-asset-selector-render-limit
+           {:asset-selector {:markets (vec (repeat 400 {:key "perp:T"}))
+                             :render-limit 120
+                             :last-render-limit-increase-ms 1000}}
+           5100
+           1095))))
 
 (deftest icon-status-actions-cover-unknown-and-idempotent-branches-test
   (let [status (actions/apply-asset-icon-status-updates

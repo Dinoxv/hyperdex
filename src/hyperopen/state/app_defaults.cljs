@@ -58,6 +58,7 @@
    :market-by-key {}
    :scroll-top 0
    :render-limit 120
+   :last-render-limit-increase-ms nil
    :loading? false
    :phase :bootstrap
    :cache-hydrated? false

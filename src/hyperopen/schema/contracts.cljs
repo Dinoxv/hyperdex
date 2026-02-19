@@ -136,6 +136,8 @@
 (s/def ::keyword-args (s/tuple keyword?))
 (s/def ::keyword-or-string-args (s/tuple ::keyword-or-string))
 (s/def ::single-input-args (s/tuple any?))
+(s/def ::single-or-double-input-args (s/or :single (s/tuple any?)
+                                           :double (s/tuple any? any?)))
 (s/def ::tab-args (s/tuple ::tab))
 (s/def ::market-or-coin-args (s/tuple ::market-or-coin))
 (s/def ::market-key-args (s/tuple ::market-key))
@@ -191,7 +193,7 @@
    :actions/set-asset-selector-scroll-top ::single-input-args
    :actions/increase-asset-selector-render-limit ::no-args
    :actions/show-all-asset-selector-markets ::no-args
-   :actions/maybe-increase-asset-selector-render-limit ::single-input-args
+   :actions/maybe-increase-asset-selector-render-limit ::single-or-double-input-args
    :actions/refresh-asset-markets ::no-args
    :actions/mark-loaded-asset-icon ::market-key-args
    :actions/mark-missing-asset-icon ::market-key-args

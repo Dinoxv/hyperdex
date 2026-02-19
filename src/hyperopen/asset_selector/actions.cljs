@@ -21,7 +21,7 @@
   120)
 
 (def ^:private asset-selector-render-limit-step
-  80)
+  40)
 
 (def ^:private asset-selector-render-prefetch-px
   320)
@@ -32,6 +32,9 @@
 (def ^:private asset-selector-viewport-height-px
   384)
 
+(def ^:private asset-selector-scroll-throttle-ms
+  90)
+
 (defn- parse-int-value
   [value]
   (let [num (cond
@@ -41,6 +44,17 @@
     (when (and (number? num)
                (not (js/isNaN num)))
       (js/Math.floor num))))
+
+(defn- parse-time-ms
+  [value]
+  (let [num (cond
+              (number? value) value
+              (string? value) (js/parseFloat value)
+              :else js/NaN)]
+    (when (and (number? num)
+               (not (js/isNaN num))
+               (>= num 0))
+      num)))
 
 (defn toggle-asset-dropdown
   [state coin]
@@ -53,7 +67,8 @@
         path-values (cond-> [[[:asset-selector :visible-dropdown] next-dropdown]]
                       (and (= coin :asset-selector) (some? next-dropdown))
                       (conj [[:asset-selector :scroll-top] 0]
-                            [[:asset-selector :render-limit] asset-selector-default-render-limit]))
+                            [[:asset-selector :render-limit] asset-selector-default-render-limit]
+                            [[:asset-selector :last-render-limit-increase-ms] nil]))
         effects [[:effects/save-many path-values]]]
     (cond-> effects
       should-refresh?
@@ -63,7 +78,8 @@
   [_state]
   [[:effects/save-many [[[:asset-selector :visible-dropdown] nil]
                         [[:asset-selector :scroll-top] 0]
-                        [[:asset-selector :render-limit] asset-selector-default-render-limit]]]])
+                        [[:asset-selector :render-limit] asset-selector-default-render-limit]
+                        [[:asset-selector :last-render-limit-increase-ms] nil]]]])
 
 (defn select-asset
   [state market-or-coin]
@@ -101,6 +117,7 @@
         immediate-ui-path-values (cond-> [[[:asset-selector :visible-dropdown] nil]
                                           [[:asset-selector :scroll-top] 0]
                                           [[:asset-selector :render-limit] asset-selector-default-render-limit]
+                                          [[:asset-selector :last-render-limit-increase-ms] nil]
                                           [[:orderbook-ui :price-aggregation-dropdown-visible?] false]
                                           [[:orderbook-ui :size-unit-dropdown-visible?] false]
                                           [[:active-market] resolved-market]]
@@ -124,7 +141,8 @@
   [_state value]
   [[:effects/save-many [[[:asset-selector :search-term] (str value)]
                         [[:asset-selector :scroll-top] 0]
-                        [[:asset-selector :render-limit] asset-selector-default-render-limit]]]])
+                        [[:asset-selector :render-limit] asset-selector-default-render-limit]
+                        [[:asset-selector :last-render-limit-increase-ms] nil]]]])
 
 (defn update-asset-selector-sort
   [state sort-field]
@@ -136,7 +154,8 @@
     [[:effects/save-many [[[:asset-selector :sort-by] sort-field]
                           [[:asset-selector :sort-direction] new-direction]
                           [[:asset-selector :scroll-top] 0]
-                          [[:asset-selector :render-limit] asset-selector-default-render-limit]]]
+                          [[:asset-selector :render-limit] asset-selector-default-render-limit]
+                          [[:asset-selector :last-render-limit-increase-ms] nil]]]
      [:effects/local-storage-set asset-selector-sort-by-storage-key (name sort-field)]
      [:effects/local-storage-set asset-selector-sort-direction-storage-key (name new-direction)]]))
 
@@ -145,7 +164,8 @@
   (let [new-value (not (get-in state [:asset-selector :strict?] false))]
     [[:effects/save-many [[[:asset-selector :strict?] new-value]
                           [[:asset-selector :scroll-top] 0]
-                          [[:asset-selector :render-limit] asset-selector-default-render-limit]]]
+                          [[:asset-selector :render-limit] asset-selector-default-render-limit]
+                          [[:asset-selector :last-render-limit-increase-ms] nil]]]
      [:effects/local-storage-set asset-selector-strict-storage-key (str new-value)]]))
 
 (defn toggle-asset-favorite
@@ -155,20 +175,23 @@
                         (disj favorites market-key)
                         (conj favorites market-key))]
     [[:effects/save-many [[[:asset-selector :favorites] new-favorites]
-                          [[:asset-selector :render-limit] asset-selector-default-render-limit]]]
+                          [[:asset-selector :render-limit] asset-selector-default-render-limit]
+                          [[:asset-selector :last-render-limit-increase-ms] nil]]]
      [:effects/local-storage-set-json asset-selector-favorites-storage-key (vec new-favorites)]]))
 
 (defn set-asset-selector-favorites-only
   [_state enabled?]
   [[:effects/save-many [[[:asset-selector :favorites-only?] (boolean enabled?)]
                         [[:asset-selector :scroll-top] 0]
-                        [[:asset-selector :render-limit] asset-selector-default-render-limit]]]])
+                        [[:asset-selector :render-limit] asset-selector-default-render-limit]
+                        [[:asset-selector :last-render-limit-increase-ms] nil]]]])
 
 (defn set-asset-selector-tab
   [_state tab]
   [[:effects/save-many [[[:asset-selector :active-tab] tab]
                         [[:asset-selector :scroll-top] 0]
-                        [[:asset-selector :render-limit] asset-selector-default-render-limit]]]
+                        [[:asset-selector :render-limit] asset-selector-default-render-limit]
+                        [[:asset-selector :last-render-limit-increase-ms] nil]]]
    [:effects/local-storage-set asset-selector-active-tab-storage-key (name tab)]])
 
 (defn set-asset-selector-scroll-top
@@ -207,23 +230,34 @@
       [])))
 
 (defn maybe-increase-asset-selector-render-limit
-  [state scroll-top]
-  (let [markets (get-in state [:asset-selector :markets] [])
-        total (count markets)
-        current-limit (current-asset-selector-render-limit state total)
-        scroll-top* (max 0 (or (parse-int-value scroll-top) 0))
-        rendered-height (* current-limit asset-selector-row-height-px)
-        near-bottom? (and (pos? rendered-height)
-                          (>= (+ scroll-top*
-                                 asset-selector-viewport-height-px
-                                 asset-selector-render-prefetch-px)
-                              rendered-height))
-        next-limit (if near-bottom?
-                     (min total (+ current-limit asset-selector-render-limit-step))
-                     current-limit)]
-    (if (> next-limit current-limit)
-      [[:effects/save [:asset-selector :render-limit] next-limit]]
-      [])))
+  ([state scroll-top]
+   (maybe-increase-asset-selector-render-limit state scroll-top nil))
+  ([state scroll-top event-time-ms]
+   (let [markets (get-in state [:asset-selector :markets] [])
+         total (count markets)
+         current-limit (current-asset-selector-render-limit state total)
+         scroll-top* (max 0 (or (parse-int-value scroll-top) 0))
+         rendered-height (* current-limit asset-selector-row-height-px)
+         near-bottom? (and (pos? rendered-height)
+                           (>= (+ scroll-top*
+                                  asset-selector-viewport-height-px
+                                  asset-selector-render-prefetch-px)
+                               rendered-height))
+         last-increase-ms (parse-time-ms (get-in state [:asset-selector :last-render-limit-increase-ms]))
+         current-event-ms (parse-time-ms event-time-ms)
+         throttle-open? (or (nil? current-event-ms)
+                            (nil? last-increase-ms)
+                            (>= (- current-event-ms last-increase-ms)
+                                asset-selector-scroll-throttle-ms))
+         next-limit (if (and near-bottom? throttle-open?)
+                      (min total (+ current-limit asset-selector-render-limit-step))
+                      current-limit)]
+     (if (> next-limit current-limit)
+       (if (some? current-event-ms)
+         [[:effects/save-many [[[:asset-selector :render-limit] next-limit]
+                               [[:asset-selector :last-render-limit-increase-ms] current-event-ms]]]]
+         [[:effects/save [:asset-selector :render-limit] next-limit]])
+       []))))
 
 (defn apply-asset-icon-status-updates
   [state status-by-market]

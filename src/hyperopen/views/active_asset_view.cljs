@@ -367,6 +367,7 @@
                                                          :loaded-icons #{}
                                                          :scroll-top 0
                                                          :render-limit 120
+                                                         :last-render-limit-increase-ms nil
                                                          :favorites-only? false
                                                          :strict? false
                                                          :active-tab :all})]

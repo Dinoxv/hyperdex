@@ -206,4 +206,8 @@
 
   (nxr/register-placeholder! :event.target/scrollTop
     (fn [{:replicant/keys [dom-event]}]
-      (some-> dom-event .-target .-scrollTop))))
+      (some-> dom-event .-target .-scrollTop)))
+
+  (nxr/register-placeholder! :event/timeStamp
+    (fn [{:replicant/keys [dom-event]}]
+      (some-> dom-event .-timeStamp))))

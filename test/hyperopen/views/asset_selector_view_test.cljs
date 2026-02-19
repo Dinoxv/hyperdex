@@ -201,7 +201,8 @@
         attrs (second scroll-container)
         strings (set (collect-strings hiccup))]
     (is (= [[:actions/maybe-increase-asset-selector-render-limit
-             [:event.target/scrollTop]]]
+             [:event.target/scrollTop]
+             [:event/timeStamp]]]
            (get-in attrs [:on :scroll])))
     (is (= 40 (count-selectable-asset-rows hiccup)))
     (is (contains? strings "Showing 40 of 150 markets"))

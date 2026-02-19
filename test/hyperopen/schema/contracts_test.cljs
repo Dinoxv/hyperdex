@@ -128,6 +128,25 @@
         ["not-a-vector"]
         {:phase :test}))))
 
+(deftest assert-action-args-allows-asset-selector-scroll-prefetch-single-or-double-payload-test
+  (is (= [5100]
+         (contracts/assert-action-args!
+          :actions/maybe-increase-asset-selector-render-limit
+          [5100]
+          {:phase :test})))
+  (is (= [5100 1234.5]
+         (contracts/assert-action-args!
+          :actions/maybe-increase-asset-selector-render-limit
+          [5100 1234.5]
+          {:phase :test})))
+  (is (thrown-with-msg?
+       js/Error
+       #"action payload"
+       (contracts/assert-action-args!
+        :actions/maybe-increase-asset-selector-render-limit
+        [5100 1234.5 9999]
+        {:phase :test}))))
+
 (deftest order-form-vm-schema-contracts-test
   (let [valid-vm {:form {:type :limit}
                   :side :buy

@@ -259,7 +259,8 @@
         [:div
          [:div.max-h-96.overflow-y-auto.scrollbar-hide
           {:on {:scroll [[:actions/maybe-increase-asset-selector-render-limit
-                          [:event.target/scrollTop]]]}}
+                          [:event.target/scrollTop]
+                          [:event/timeStamp]]]}}
           (into [:div] rows)]
          (when has-more?
            [:div.py-3.text-center.text-xs.text-gray-500.border-t.border-base-300
