@@ -138,21 +138,6 @@
       (drop 2 node)
       (drop 1 node))))
 
-(defn- find-buttons-with-text [node text]
-  (cond
-    (vector? node)
-    (let [children (node-children node)
-          button? (and (keyword? (first node))
-                       (str/starts-with? (name (first node)) "button"))
-          text? (some #(= text %) (collect-strings node))
-          self-match (when (and button? text?) [node])]
-      (concat self-match (mapcat #(find-buttons-with-text % text) children)))
-
-    (seq? node)
-    (mapcat #(find-buttons-with-text % text) node)
-
-    :else []))
-
 (defn- count-selectable-asset-rows [node]
   (cond
     (vector? node)
@@ -168,27 +153,6 @@
 
     :else 0))
 
-(deftest asset-list-renders-footer-controls-outside-scroll-container-test
-  (let [assets (vec (for [n (range 150)]
-                      {:key (str "perp:T" n)
-                       :symbol (str "T" n "-USDC")
-                       :coin (str "T" n)
-                       :base (str "T" n)
-                       :market-type :perp}))
-        hiccup (view/asset-list assets nil #{} #{} #{} 40 0)
-        children (vec (node-children hiccup))
-        scroll-container (first children)
-        footer-container (second children)
-        load-more-button (first (find-buttons-with-text footer-container "Load more"))
-        show-all-button (first (find-buttons-with-text footer-container "Show all"))]
-    (is (= 2 (count children)))
-    (is (some? scroll-container))
-    (is (some? footer-container))
-    (is (= [[:actions/increase-asset-selector-render-limit]]
-           (get-in (second load-more-button) [:on :click])))
-    (is (= [[:actions/show-all-asset-selector-markets]]
-           (get-in (second show-all-button) [:on :click])))))
-
 (deftest asset-list-wires-scroll-action-and-renders-progressive-chunk-test
   (let [assets (vec (for [n (range 150)]
                       {:key (str "perp:T" n)
@@ -197,7 +161,7 @@
                        :base (str "T" n)
                        :market-type :perp}))
         hiccup (view/asset-list assets nil #{} #{} #{} 40 0)
-        scroll-container (first (node-children hiccup))
+        scroll-container hiccup
         attrs (second scroll-container)
         inner-wrapper (first (node-children scroll-container))
         inner-attrs (second inner-wrapper)
@@ -210,9 +174,9 @@
     (is (= "none" (get-in inner-attrs [:style :overflow-anchor])))
     (is (< (count-selectable-asset-rows hiccup) 40))
     (is (>= (count-selectable-asset-rows hiccup) 8))
-    (is (contains? strings "Showing 40 of 150 markets"))
-    (is (contains? strings "Load more"))
-    (is (contains? strings "Show all"))))
+    (is (not (contains? strings "Showing 40 of 150 markets")))
+    (is (not (contains? strings "Load more")))
+    (is (not (contains? strings "Show all")))))
 
 (deftest asset-list-renders-all-rows-when-render-limit-exceeds-total-test
   (let [assets (vec (for [n (range 8)]

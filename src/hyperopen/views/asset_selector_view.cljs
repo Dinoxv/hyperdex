@@ -288,37 +288,23 @@
             {:keys [start-index end-index top-spacer-px bottom-spacer-px]}
             (virtual-window limit scroll-top*)
             visible-assets (subvec assets* start-index end-index)
-            has-more? (< limit total)
             rows (mapv (fn [asset]
                          ^{:key (:key asset)}
                          (asset-list-item asset (= selected-market-key (:key asset)) favorites missing-icons loaded-icons))
                        visible-assets)]
-        [:div
-         [:div.max-h-96.overflow-y-auto.scrollbar-hide
-          {:style {:overflow-anchor "none"}
-           :on {:scroll [[:actions/maybe-increase-asset-selector-render-limit
-                          [:event.target/scrollTop]
-                          [:event/timeStamp]]]}}
-          (into
-            [:div {:style {:overflow-anchor "none"}}]
-            (concat
-              (when (pos? top-spacer-px)
-                [[:div {:style {:height (str top-spacer-px "px")}}]])
-              rows
-              (when (pos? bottom-spacer-px)
-                [[:div {:style {:height (str bottom-spacer-px "px")}}]])))]
-         (when has-more?
-           [:div.py-3.text-center.text-xs.text-gray-500.border-t.border-base-300
-            [:div.mb-2 (str "Showing " limit " of " total " markets")]
-            [:div.flex.items-center.justify-center.gap-2
-             [:button.px-2.py-1.rounded.border.border-base-300.hover:bg-base-200.transition-colors
-              {:type "button"
-               :on {:click [[:actions/increase-asset-selector-render-limit]]}}
-              "Load more"]
-             [:button.px-2.py-1.rounded.border.border-base-300.hover:bg-base-200.transition-colors
-              {:type "button"
-               :on {:click [[:actions/show-all-asset-selector-markets]]}}
-              "Show all"]]])]))))
+        [:div.max-h-96.overflow-y-auto.scrollbar-hide
+         {:style {:overflow-anchor "none"}
+          :on {:scroll [[:actions/maybe-increase-asset-selector-render-limit
+                         [:event.target/scrollTop]
+                         [:event/timeStamp]]]}}
+         (into
+           [:div {:style {:overflow-anchor "none"}}]
+           (concat
+             (when (pos? top-spacer-px)
+               [[:div {:style {:height (str top-spacer-px "px")}}]])
+             rows
+             (when (pos? bottom-spacer-px)
+               [[:div {:style {:height (str bottom-spacer-px "px")}}]])))]))))
 
 (defn matches-search? [asset search-term strict?]
   (let [query (str/lower-case (or search-term ""))
