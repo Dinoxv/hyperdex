@@ -146,6 +146,20 @@
     (is (= "https://app.hyperliquid.xyz/coins/xyz:XYZ100.svg"
            (:src attrs)))))
 
+(deftest asset-icon-renders-cross-dex-alias-icon-when-primary-key-missing-test
+  (let [market {:key "perp:cash:MSFT"
+                :coin "cash:MSFT"
+                :symbol "MSFT-USDT0"
+                :base "MSFT"
+                :dex "cash"
+                :market-type :perp}
+        icon-node (view/asset-icon market false #{} #{})
+        img-node (find-first-img-node icon-node)
+        attrs (second img-node)]
+    (is (some? img-node))
+    (is (= "https://app.hyperliquid.xyz/coins/xyz:MSFT.svg"
+           (:src attrs)))))
+
 (deftest active-asset-row-uses-app-shell-left-gutter-test
   (let [ctx-data {:coin "SOL"
                   :mark 87.0

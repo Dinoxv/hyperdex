@@ -29,6 +29,44 @@
         (subs icon-key* 1)
         icon-key*))))
 
+(def ^:private icon-key-aliases
+  {"abcd:USA500" "cash:USA500"
+   "cash:GOLD" "xyz:GOLD"
+   "cash:INTC" "xyz:INTC"
+   "cash:MSFT" "xyz:MSFT"
+   "cash:SILVER" "xyz:SILVER"
+   "flx:BTC" "BTC"
+   "flx:GAS" "GAS"
+   "flx:PALLADIUM" "xyz:PALLADIUM"
+   "flx:PLATINUM" "xyz:PLATINUM"
+   "hyna:ADA" "ADA"
+   "hyna:BCH" "BCH"
+   "hyna:BNB" "BNB"
+   "hyna:DOGE" "DOGE"
+   "hyna:ENA" "ENA"
+   "hyna:FARTCOIN" "FARTCOIN"
+   "hyna:IP" "IP"
+   "hyna:LINK" "LINK"
+   "hyna:LIT" "LIT"
+   "hyna:LTC" "LTC"
+   "hyna:PUMP" "PUMP"
+   "hyna:SUI" "SUI"
+   "hyna:XMR" "XMR"
+   "hyna:XPL" "XPL"
+   "km:AAPL" "xyz:AAPL"
+   "km:EUR" "xyz:EUR"
+   "km:GOLD" "xyz:GOLD"
+   "km:GOOGL" "xyz:GOOGL"
+   "km:MU" "xyz:MU"
+   "km:NVDA" "xyz:NVDA"
+   "km:SILVER" "xyz:SILVER"
+   "xyz:COPPER" "flx:COPPER"})
+
+(defn- alias-icon-key
+  [icon-key]
+  (or (get icon-key-aliases icon-key)
+      icon-key))
+
 (defn market-icon-key
   [{:keys [coin base]}]
   (let [coin* (non-blank-text coin)
@@ -37,10 +75,11 @@
                       (when-not (str/starts-with? (or coin* "") "@")
                         coin*)
                       base*)
-        normalized (normalize-icon-key candidate)]
-    (when (and normalized
-               (not (str/starts-with? normalized "@")))
-      normalized)))
+        normalized (normalize-icon-key candidate)
+        aliased (some-> normalized alias-icon-key)]
+    (when (and aliased
+               (not (str/starts-with? aliased "@")))
+      aliased)))
 
 (defn market-icon-url
   [market]

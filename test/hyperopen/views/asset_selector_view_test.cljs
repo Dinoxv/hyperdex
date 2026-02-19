@@ -352,3 +352,20 @@
     (is (some? img-node))
     (is (= "https://app.hyperliquid.xyz/coins/xyz:XYZ100.svg"
            (:src attrs)))))
+
+(deftest asset-list-item-renders-cross-dex-alias-icon-when-primary-key-missing-test
+  (let [asset {:key "perp:xyz:COPPER"
+               :symbol "COPPER-USDC"
+               :coin "xyz:COPPER"
+               :base "COPPER"
+               :dex "xyz"
+               :market-type :perp
+               :mark 1
+               :volume24h 10
+               :change24hPct 1}
+        row (view/asset-list-item asset false #{} #{} #{})
+        img-node (find-first-img-node row)
+        attrs (second img-node)]
+    (is (some? img-node))
+    (is (= "https://app.hyperliquid.xyz/coins/flx:COPPER.svg"
+           (:src attrs)))))
