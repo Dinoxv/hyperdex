@@ -150,6 +150,7 @@
            toggle-asset-favorite
            set-asset-selector-favorites-only
            set-asset-selector-tab
+           handle-asset-selector-shortcut
            set-asset-selector-scroll-top
            increase-asset-selector-render-limit
            show-all-asset-selector-markets
@@ -166,6 +167,7 @@
    :toggle-asset-favorite toggle-asset-favorite
    :set-asset-selector-favorites-only set-asset-selector-favorites-only
    :set-asset-selector-tab set-asset-selector-tab
+   :handle-asset-selector-shortcut handle-asset-selector-shortcut
    :set-asset-selector-scroll-top set-asset-selector-scroll-top
    :increase-asset-selector-render-limit increase-asset-selector-render-limit
    :show-all-asset-selector-markets show-all-asset-selector-markets

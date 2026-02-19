@@ -95,30 +95,35 @@
 
 (defn init!
   [system]
-  (startup-composition/init!
-   (merge
-    (startup-base-deps system)
-    {:default-startup-runtime-state startup-runtime-lib/default-startup-runtime-state
-     :schedule-startup-summary-log! (fn []
-                                      (schedule-startup-summary-log! system))
-     :restore-ui-font-preference! ui-preferences/restore-ui-font-preference!
-     :restore-asset-selector-sort-settings! asset-selector-settings/restore-asset-selector-sort-settings!
-     :restore-chart-options! chart-settings/restore-chart-options!
-     :restore-orderbook-ui! orderbook-settings/restore-orderbook-ui!
-     :restore-agent-storage-mode! startup-restore/restore-agent-storage-mode!
-     :restore-active-asset! runtime-effect-adapters/restore-active-asset!
-     :restore-asset-selector-markets-cache! runtime-effect-adapters/restore-asset-selector-markets-cache!
-     :restore-open-orders-sort-settings! account-history-actions/restore-open-orders-sort-settings!
-     :restore-funding-history-pagination-settings! account-history-actions/restore-funding-history-pagination-settings!
-     :restore-trade-history-pagination-settings! account-history-actions/restore-trade-history-pagination-settings!
-     :restore-order-history-pagination-settings! account-history-actions/restore-order-history-pagination-settings!
-     :set-on-connected-handler! wallet/set-on-connected-handler!
-     :handle-wallet-connected runtime-action-adapters/handle-wallet-connected
-     :init-wallet! wallet/init-wallet!
-     :init-router! router/init!
-     :register-icon-service-worker! (fn []
-                                      (register-icon-service-worker! system))
-     :initialize-remote-data-streams! (fn []
-                                        (initialize-remote-data-streams! system))
-     :kick-render! (fn [runtime-store]
-                     (swap! runtime-store identity))})))
+  (let [base-deps (startup-base-deps system)]
+    (startup-composition/init!
+     (merge
+      base-deps
+      {:default-startup-runtime-state startup-runtime-lib/default-startup-runtime-state
+       :schedule-startup-summary-log! (fn []
+                                        (schedule-startup-summary-log! system))
+       :restore-ui-font-preference! ui-preferences/restore-ui-font-preference!
+       :restore-asset-selector-sort-settings! asset-selector-settings/restore-asset-selector-sort-settings!
+       :restore-chart-options! chart-settings/restore-chart-options!
+       :restore-orderbook-ui! orderbook-settings/restore-orderbook-ui!
+       :restore-agent-storage-mode! startup-restore/restore-agent-storage-mode!
+       :restore-active-asset! runtime-effect-adapters/restore-active-asset!
+       :restore-asset-selector-markets-cache! runtime-effect-adapters/restore-asset-selector-markets-cache!
+       :restore-open-orders-sort-settings! account-history-actions/restore-open-orders-sort-settings!
+       :restore-funding-history-pagination-settings! account-history-actions/restore-funding-history-pagination-settings!
+       :restore-trade-history-pagination-settings! account-history-actions/restore-trade-history-pagination-settings!
+       :restore-order-history-pagination-settings! account-history-actions/restore-order-history-pagination-settings!
+       :set-on-connected-handler! wallet/set-on-connected-handler!
+       :handle-wallet-connected runtime-action-adapters/handle-wallet-connected
+       :init-wallet! wallet/init-wallet!
+       :init-router! router/init!
+       :install-asset-selector-shortcuts! (fn []
+                                            (startup-runtime-lib/install-asset-selector-shortcuts!
+                                             {:store (:store base-deps)
+                                              :dispatch! (:dispatch! base-deps)}))
+       :register-icon-service-worker! (fn []
+                                        (register-icon-service-worker! system))
+       :initialize-remote-data-streams! (fn []
+                                          (initialize-remote-data-streams! system))
+       :kick-render! (fn [runtime-store]
+                       (swap! runtime-store identity))}))))

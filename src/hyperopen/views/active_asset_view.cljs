@@ -142,7 +142,12 @@
   [:button {:class ["flex" "items-center" "space-x-2" "cursor-pointer" "hover:bg-base-300"
                     "rounded" "pr-2" "py-1" "transition-colors"]
             :type "button"
-    :on {:click [[:actions/toggle-asset-dropdown :asset-selector]]}}
+            :on {:click [[:actions/toggle-asset-dropdown :asset-selector]]
+                 :keydown [[:actions/handle-asset-selector-shortcut
+                            [:event/key]
+                            [:event/metaKey]
+                            [:event/ctrlKey]
+                            []]]}}
    [:div.w-6.h-6.rounded-full.bg-base-300.flex.items-center.justify-center
     [:svg.w-4.h-4.text-gray-400 {:fill "none" :stroke "currentColor" :viewBox "0 0 24 24"}
      [:path {:stroke-linecap "round" :stroke-linejoin "round" :stroke-width 2 :d "m21 21-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"}]]]
@@ -347,6 +352,7 @@
           :favorites-only? (:favorites-only? dropdown-state false)
           :missing-icons (:missing-icons dropdown-state #{})
           :loaded-icons (:loaded-icons dropdown-state #{})
+          :highlighted-market-key (:highlighted-market-key dropdown-state nil)
           :scroll-top (:scroll-top dropdown-state 0)
           :render-limit (:render-limit dropdown-state 120)
           :strict? (:strict? dropdown-state false)
@@ -366,6 +372,7 @@
                                                          :favorites #{}
                                                          :missing-icons #{}
                                                          :loaded-icons #{}
+                                                         :highlighted-market-key nil
                                                          :scroll-top 0
                                                          :render-limit 120
                                                          :last-render-limit-increase-ms nil

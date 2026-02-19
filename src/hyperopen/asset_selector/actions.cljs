@@ -1,5 +1,6 @@
 (ns hyperopen.asset-selector.actions
-  (:require [hyperopen.asset-selector.markets :as markets]
+  (:require [clojure.string :as str]
+            [hyperopen.asset-selector.markets :as markets]
             [hyperopen.state.trading :as trading]))
 
 (def ^:private asset-selector-sort-by-storage-key
@@ -35,6 +36,17 @@
 (def ^:private asset-selector-scroll-throttle-ms
   90)
 
+(def ^:private asset-selector-shortcut-open-key
+  "k")
+
+(def ^:private asset-selector-shortcut-favorite-key
+  "s")
+
+(declare toggle-asset-dropdown
+         close-asset-dropdown
+         select-asset
+         toggle-asset-favorite)
+
 (defn- parse-int-value
   [value]
   (let [num (cond
@@ -56,6 +68,107 @@
                (>= num 0))
       num)))
 
+(defn- normalize-shortcut-key
+  [key]
+  (some-> key str str/lower-case))
+
+(defn- normalize-shortcut-market-keys
+  [market-keys]
+  (if (sequential? market-keys)
+    (vec (keep (fn [market-key]
+                 (when (string? market-key)
+                   market-key))
+               market-keys))
+    []))
+
+(defn- market-key-index
+  [market-keys market-key]
+  (some (fn [[idx candidate]]
+          (when (= candidate market-key)
+            idx))
+        (map-indexed vector market-keys)))
+
+(defn- highlighted-or-selected-market-key
+  [state market-keys]
+  (let [highlighted-market-key (get-in state [:asset-selector :highlighted-market-key])
+        selected-market-key (get-in state [:active-market :key])]
+    (cond
+      (some? (market-key-index market-keys highlighted-market-key))
+      highlighted-market-key
+
+      (some? (market-key-index market-keys selected-market-key))
+      selected-market-key
+
+      :else
+      (first market-keys))))
+
+(defn- move-highlighted-market-key
+  [state market-keys step]
+  (if (empty? market-keys)
+    []
+    (let [current-market-key (highlighted-or-selected-market-key state market-keys)
+          current-index (or (market-key-index market-keys current-market-key) 0)
+          max-index (dec (count market-keys))
+          next-index (-> (+ current-index step)
+                         (max 0)
+                         (min max-index))
+          next-market-key (nth market-keys next-index)
+          current-highlighted-market-key (get-in state [:asset-selector :highlighted-market-key])]
+      (if (= next-market-key current-highlighted-market-key)
+        []
+        [[:effects/save [:asset-selector :highlighted-market-key] next-market-key]]))))
+
+(defn- select-highlighted-market
+  [state market-keys]
+  (let [market-key (highlighted-or-selected-market-key state market-keys)
+        market (get-in state [:asset-selector :market-by-key market-key])]
+    (if (map? market)
+      (select-asset state market)
+      [])))
+
+(defn- toggle-highlighted-market-favorite
+  [state market-keys]
+  (if-let [market-key (highlighted-or-selected-market-key state market-keys)]
+    (toggle-asset-favorite state market-key)
+    []))
+
+(defn handle-asset-selector-shortcut
+  [state key meta-key? ctrl-key? market-keys]
+  (let [normalized-key (normalize-shortcut-key key)
+        meta-or-ctrl? (or (true? meta-key?) (true? ctrl-key?))
+        open-shortcut? (and meta-or-ctrl?
+                            (= normalized-key asset-selector-shortcut-open-key))
+        favorite-shortcut? (and meta-or-ctrl?
+                                (= normalized-key asset-selector-shortcut-favorite-key))
+        selector-visible? (= :asset-selector (get-in state [:asset-selector :visible-dropdown]))
+        market-keys* (normalize-shortcut-market-keys market-keys)]
+    (cond
+      open-shortcut?
+      (if selector-visible?
+        []
+        (toggle-asset-dropdown state :asset-selector))
+
+      (not selector-visible?)
+      []
+
+      (= key "Escape")
+      (close-asset-dropdown state)
+
+      (= key "ArrowDown")
+      (move-highlighted-market-key state market-keys* 1)
+
+      (= key "ArrowUp")
+      (move-highlighted-market-key state market-keys* -1)
+
+      (= key "Enter")
+      (select-highlighted-market state market-keys*)
+
+      favorite-shortcut?
+      (toggle-highlighted-market-favorite state market-keys*)
+
+      :else
+      [])))
+
 (defn toggle-asset-dropdown
   [state coin]
   (let [current-dropdown (get-in state [:asset-selector :visible-dropdown])
@@ -68,7 +181,8 @@
                       (and (= coin :asset-selector) (some? next-dropdown))
                       (conj [[:asset-selector :scroll-top] 0]
                             [[:asset-selector :render-limit] asset-selector-default-render-limit]
-                            [[:asset-selector :last-render-limit-increase-ms] nil]))
+                            [[:asset-selector :last-render-limit-increase-ms] nil]
+                            [[:asset-selector :highlighted-market-key] nil]))
         effects [[:effects/save-many path-values]]]
     (cond-> effects
       should-refresh?
@@ -79,7 +193,8 @@
   [[:effects/save-many [[[:asset-selector :visible-dropdown] nil]
                         [[:asset-selector :scroll-top] 0]
                         [[:asset-selector :render-limit] asset-selector-default-render-limit]
-                        [[:asset-selector :last-render-limit-increase-ms] nil]]]])
+                        [[:asset-selector :last-render-limit-increase-ms] nil]
+                        [[:asset-selector :highlighted-market-key] nil]]]])
 
 (defn select-asset
   [state market-or-coin]
@@ -118,6 +233,7 @@
                                           [[:asset-selector :scroll-top] 0]
                                           [[:asset-selector :render-limit] asset-selector-default-render-limit]
                                           [[:asset-selector :last-render-limit-increase-ms] nil]
+                                          [[:asset-selector :highlighted-market-key] nil]
                                           [[:orderbook-ui :price-aggregation-dropdown-visible?] false]
                                           [[:orderbook-ui :size-unit-dropdown-visible?] false]
                                           [[:active-market] resolved-market]]
@@ -142,7 +258,8 @@
   [[:effects/save-many [[[:asset-selector :search-term] (str value)]
                         [[:asset-selector :scroll-top] 0]
                         [[:asset-selector :render-limit] asset-selector-default-render-limit]
-                        [[:asset-selector :last-render-limit-increase-ms] nil]]]])
+                        [[:asset-selector :last-render-limit-increase-ms] nil]
+                        [[:asset-selector :highlighted-market-key] nil]]]])
 
 (defn update-asset-selector-sort
   [state sort-field]
@@ -155,7 +272,8 @@
                           [[:asset-selector :sort-direction] new-direction]
                           [[:asset-selector :scroll-top] 0]
                           [[:asset-selector :render-limit] asset-selector-default-render-limit]
-                          [[:asset-selector :last-render-limit-increase-ms] nil]]]
+                          [[:asset-selector :last-render-limit-increase-ms] nil]
+                          [[:asset-selector :highlighted-market-key] nil]]]
      [:effects/local-storage-set asset-selector-sort-by-storage-key (name sort-field)]
      [:effects/local-storage-set asset-selector-sort-direction-storage-key (name new-direction)]]))
 
@@ -165,7 +283,8 @@
     [[:effects/save-many [[[:asset-selector :strict?] new-value]
                           [[:asset-selector :scroll-top] 0]
                           [[:asset-selector :render-limit] asset-selector-default-render-limit]
-                          [[:asset-selector :last-render-limit-increase-ms] nil]]]
+                          [[:asset-selector :last-render-limit-increase-ms] nil]
+                          [[:asset-selector :highlighted-market-key] nil]]]
      [:effects/local-storage-set asset-selector-strict-storage-key (str new-value)]]))
 
 (defn toggle-asset-favorite
@@ -176,7 +295,8 @@
                         (conj favorites market-key))]
     [[:effects/save-many [[[:asset-selector :favorites] new-favorites]
                           [[:asset-selector :render-limit] asset-selector-default-render-limit]
-                          [[:asset-selector :last-render-limit-increase-ms] nil]]]
+                          [[:asset-selector :last-render-limit-increase-ms] nil]
+                          [[:asset-selector :highlighted-market-key] nil]]]
      [:effects/local-storage-set-json asset-selector-favorites-storage-key (vec new-favorites)]]))
 
 (defn set-asset-selector-favorites-only
@@ -184,14 +304,16 @@
   [[:effects/save-many [[[:asset-selector :favorites-only?] (boolean enabled?)]
                         [[:asset-selector :scroll-top] 0]
                         [[:asset-selector :render-limit] asset-selector-default-render-limit]
-                        [[:asset-selector :last-render-limit-increase-ms] nil]]]])
+                        [[:asset-selector :last-render-limit-increase-ms] nil]
+                        [[:asset-selector :highlighted-market-key] nil]]]])
 
 (defn set-asset-selector-tab
   [_state tab]
   [[:effects/save-many [[[:asset-selector :active-tab] tab]
                         [[:asset-selector :scroll-top] 0]
                         [[:asset-selector :render-limit] asset-selector-default-render-limit]
-                        [[:asset-selector :last-render-limit-increase-ms] nil]]]
+                        [[:asset-selector :last-render-limit-increase-ms] nil]
+                        [[:asset-selector :highlighted-market-key] nil]]]
    [:effects/local-storage-set asset-selector-active-tab-storage-key (name tab)]])
 
 (defn set-asset-selector-scroll-top

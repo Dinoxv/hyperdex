@@ -28,7 +28,8 @@
                                  [[:asset-selector :scroll-top] 0]
                                  [[:asset-selector :render-limit]
                                   actions/asset-selector-default-render-limit]
-                                 [[:asset-selector :last-render-limit-increase-ms] nil]]]
+                                 [[:asset-selector :last-render-limit-increase-ms] nil]
+                                 [[:asset-selector :highlighted-market-key] nil]]]
             [:effects/fetch-asset-selector-markets]]
            open-effects))
     (is (= [[:effects/save-many [[[:asset-selector :visible-dropdown] nil]]]]
@@ -39,7 +40,8 @@
                                [[:asset-selector :scroll-top] 0]
                                [[:asset-selector :render-limit]
                                 actions/asset-selector-default-render-limit]
-                               [[:asset-selector :last-render-limit-increase-ms] nil]]]]
+                               [[:asset-selector :last-render-limit-increase-ms] nil]
+                               [[:asset-selector :highlighted-market-key] nil]]]]
          (actions/close-asset-dropdown {}))))
 
 (deftest select-asset-covers-fallback-map-and-invalid-input-branches-test
@@ -68,6 +70,7 @@
                                    [[:asset-selector :render-limit]
                                     actions/asset-selector-default-render-limit]
                                    [[:asset-selector :last-render-limit-increase-ms] nil]
+                                   [[:asset-selector :highlighted-market-key] nil]
                                    [[:orderbook-ui :price-aggregation-dropdown-visible?] false]
                                    [[:orderbook-ui :size-unit-dropdown-visible?] false]
                                    [[:active-market] nil]]]
@@ -81,7 +84,8 @@
                                [[:asset-selector :scroll-top] 0]
                                [[:asset-selector :render-limit]
                                 actions/asset-selector-default-render-limit]
-                               [[:asset-selector :last-render-limit-increase-ms] nil]]]]
+                               [[:asset-selector :last-render-limit-increase-ms] nil]
+                               [[:asset-selector :highlighted-market-key] nil]]]]
          (actions/update-asset-search {} nil)))
 
   (is (= [[:effects/save-many [[[:asset-selector :sort-by] :volume]
@@ -89,7 +93,8 @@
                                [[:asset-selector :scroll-top] 0]
                                [[:asset-selector :render-limit]
                                 actions/asset-selector-default-render-limit]
-                               [[:asset-selector :last-render-limit-increase-ms] nil]]]
+                               [[:asset-selector :last-render-limit-increase-ms] nil]
+                               [[:asset-selector :highlighted-market-key] nil]]]
           [:effects/local-storage-set "asset-selector-sort-by" "volume"]
           [:effects/local-storage-set "asset-selector-sort-direction" "desc"]]
          (actions/update-asset-selector-sort
@@ -102,7 +107,8 @@
                                [[:asset-selector :scroll-top] 0]
                                [[:asset-selector :render-limit]
                                 actions/asset-selector-default-render-limit]
-                               [[:asset-selector :last-render-limit-increase-ms] nil]]]
+                               [[:asset-selector :last-render-limit-increase-ms] nil]
+                               [[:asset-selector :highlighted-market-key] nil]]]
           [:effects/local-storage-set "asset-selector-sort-by" "volume"]
           [:effects/local-storage-set "asset-selector-sort-direction" "asc"]]
          (actions/update-asset-selector-sort
@@ -114,7 +120,8 @@
                                [[:asset-selector :scroll-top] 0]
                                [[:asset-selector :render-limit]
                                 actions/asset-selector-default-render-limit]
-                               [[:asset-selector :last-render-limit-increase-ms] nil]]]
+                               [[:asset-selector :last-render-limit-increase-ms] nil]
+                               [[:asset-selector :highlighted-market-key] nil]]]
           [:effects/local-storage-set "asset-selector-strict" "true"]]
          (actions/toggle-asset-selector-strict
            {:asset-selector {:strict? false}})))
@@ -139,16 +146,108 @@
                                [[:asset-selector :scroll-top] 0]
                                [[:asset-selector :render-limit]
                                 actions/asset-selector-default-render-limit]
-                               [[:asset-selector :last-render-limit-increase-ms] nil]]]]
+                               [[:asset-selector :last-render-limit-increase-ms] nil]
+                               [[:asset-selector :highlighted-market-key] nil]]]]
          (actions/set-asset-selector-favorites-only {} nil)))
 
   (is (= [[:effects/save-many [[[:asset-selector :active-tab] :hip3]
                                [[:asset-selector :scroll-top] 0]
                                [[:asset-selector :render-limit]
                                 actions/asset-selector-default-render-limit]
-                               [[:asset-selector :last-render-limit-increase-ms] nil]]]
+                               [[:asset-selector :last-render-limit-increase-ms] nil]
+                               [[:asset-selector :highlighted-market-key] nil]]]
           [:effects/local-storage-set "asset-selector-active-tab" "hip3"]]
          (actions/set-asset-selector-tab {} :hip3))))
+
+(deftest handle-asset-selector-shortcut-covers-open-navigation-select-favorite-and-close-test
+  (testing "cmd/ctrl+k toggles selector open even when currently hidden"
+    (is (= [[:effects/save-many [[[:asset-selector :visible-dropdown] :asset-selector]
+                                 [[:asset-selector :scroll-top] 0]
+                                 [[:asset-selector :render-limit]
+                                  actions/asset-selector-default-render-limit]
+                                 [[:asset-selector :last-render-limit-increase-ms] nil]
+                                 [[:asset-selector :highlighted-market-key] nil]]]
+            [:effects/fetch-asset-selector-markets]]
+           (actions/handle-asset-selector-shortcut
+             {:asset-selector {:visible-dropdown nil
+                               :markets []
+                               :phase :bootstrap}}
+             "k"
+             true
+             false
+             []))))
+
+  (testing "cmd/ctrl+k is a no-op when selector is already visible"
+    (is (= []
+           (actions/handle-asset-selector-shortcut
+             {:asset-selector {:visible-dropdown :asset-selector}}
+             "k"
+             true
+             false
+             []))))
+
+  (testing "non-shortcut keys are ignored when selector is hidden"
+    (is (= []
+           (actions/handle-asset-selector-shortcut
+             {:asset-selector {:visible-dropdown nil}}
+             "ArrowDown"
+             false
+             false
+             ["perp:BTC"]))))
+
+  (testing "arrow keys move highlighted market in filtered order"
+    (is (= [[:effects/save [:asset-selector :highlighted-market-key] "perp:ETH"]]
+           (actions/handle-asset-selector-shortcut
+             {:asset-selector {:visible-dropdown :asset-selector
+                               :highlighted-market-key nil}
+              :active-market {:key "perp:BTC"}}
+             "ArrowDown"
+             false
+             false
+             ["perp:BTC" "perp:ETH" "perp:SOL"]))))
+
+  (testing "enter selects highlighted market and preserves deterministic immediate-ui envelope"
+    (let [market {:key "perp:ETH" :coin "ETH" :symbol "ETH-USDC"}
+          effects (actions/handle-asset-selector-shortcut
+                    {:active-asset nil
+                     :asset-selector {:visible-dropdown :asset-selector
+                                      :highlighted-market-key "perp:ETH"
+                                      :market-by-key {"perp:ETH" market}}}
+                    "Enter"
+                    false
+                    false
+                    ["perp:BTC" "perp:ETH"])]
+      (is (= market (path-value effects [:active-market])))
+      (is (= [[:effects/subscribe-active-asset "ETH"]
+              [:effects/subscribe-orderbook "ETH"]
+              [:effects/subscribe-trades "ETH"]]
+             (subvec effects 1)))))
+
+  (testing "cmd/ctrl+s toggles favorite on highlighted market"
+    (let [effects (actions/handle-asset-selector-shortcut
+                    {:asset-selector {:visible-dropdown :asset-selector
+                                      :highlighted-market-key "perp:ETH"
+                                      :favorites #{}}}
+                    "s"
+                    true
+                    false
+                    ["perp:BTC" "perp:ETH"])]
+      (is (= #{"perp:ETH"}
+             (path-value effects [:asset-selector :favorites])))))
+
+  (testing "escape closes selector and resets keyboard highlight"
+    (is (= [[:effects/save-many [[[:asset-selector :visible-dropdown] nil]
+                                 [[:asset-selector :scroll-top] 0]
+                                 [[:asset-selector :render-limit]
+                                  actions/asset-selector-default-render-limit]
+                                 [[:asset-selector :last-render-limit-increase-ms] nil]
+                                 [[:asset-selector :highlighted-market-key] nil]]]]
+           (actions/handle-asset-selector-shortcut
+             {:asset-selector {:visible-dropdown :asset-selector}}
+             "Escape"
+             false
+             false
+             ["perp:BTC"])))))
 
 (deftest scroll-and-render-limit-actions-cover-noop-and-growth-branches-test
   (is (= []

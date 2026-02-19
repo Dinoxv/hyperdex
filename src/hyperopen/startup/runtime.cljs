@@ -1,5 +1,6 @@
 (ns hyperopen.startup.runtime
-  (:require [hyperopen.platform :as platform]))
+  (:require [clojure.string :as str]
+            [hyperopen.platform :as platform]))
 
 (defn default-startup-runtime-state
   []
@@ -69,6 +70,45 @@
                    (log-fn "Registered icon cache service worker.")))
           (.catch (fn [err]
                     (log-fn "Service worker registration failed:" err)))))))
+
+(defonce ^:private asset-selector-shortcuts-cleanup
+  (atom nil))
+
+(defn install-asset-selector-shortcuts!
+  [{:keys [store dispatch!]}]
+  (let [window-object (when (exists? js/window) js/window)
+        add-event-listener (some-> window-object (.-addEventListener))
+        remove-event-listener (some-> window-object (.-removeEventListener))]
+    (when (and (fn? add-event-listener)
+               (fn? remove-event-listener)
+               (some? store)
+               (fn? dispatch!))
+      (when-let [cleanup @asset-selector-shortcuts-cleanup]
+        (cleanup)
+        (reset! asset-selector-shortcuts-cleanup nil))
+      (let [handler (fn [event]
+                      (let [key (some-> event .-key)
+                            meta-key? (true? (some-> event .-metaKey))
+                            ctrl-key? (true? (some-> event .-ctrlKey))
+                            key-token (some-> key str str/lower-case)
+                            open-shortcut? (and (or meta-key? ctrl-key?)
+                                                (= key-token "k"))
+                            selector-visible? (= :asset-selector
+                                                 (get-in @store [:asset-selector :visible-dropdown]))]
+                        (when (or open-shortcut?
+                                  (and selector-visible?
+                                       (= key "Escape")))
+                          (when open-shortcut?
+                            (.preventDefault event))
+                          (dispatch! store nil [[:actions/handle-asset-selector-shortcut
+                                                 key
+                                                 meta-key?
+                                                 ctrl-key?
+                                                 nil]]))))]
+        (.addEventListener window-object "keydown" handler)
+        (reset! asset-selector-shortcuts-cleanup
+                (fn []
+                  (.removeEventListener window-object "keydown" handler)))))))
 
 (defn stage-b-account-bootstrap!
   [{:keys [store

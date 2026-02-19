@@ -59,6 +59,7 @@
    :scroll-top 0
    :render-limit 120
    :last-render-limit-increase-ms nil
+   :highlighted-market-key nil
    :loading? false
    :phase :bootstrap
    :cache-hydrated? false

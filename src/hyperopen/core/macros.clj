@@ -83,6 +83,7 @@
     toggle-asset-favorite
     set-asset-selector-favorites-only
     set-asset-selector-tab
+    handle-asset-selector-shortcut
     set-asset-selector-scroll-top
     increase-asset-selector-render-limit
     show-all-asset-selector-markets

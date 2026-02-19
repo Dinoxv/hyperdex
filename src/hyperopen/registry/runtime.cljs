@@ -73,6 +73,7 @@
    [:actions/toggle-asset-favorite :toggle-asset-favorite]
    [:actions/set-asset-selector-favorites-only :set-asset-selector-favorites-only]
    [:actions/set-asset-selector-tab :set-asset-selector-tab]
+   [:actions/handle-asset-selector-shortcut :handle-asset-selector-shortcut]
    [:actions/set-asset-selector-scroll-top :set-asset-selector-scroll-top]
    [:actions/increase-asset-selector-render-limit :increase-asset-selector-render-limit]
    [:actions/show-all-asset-selector-markets :show-all-asset-selector-markets]
@@ -203,6 +204,14 @@
   (nxr/register-placeholder! :event/key
     (fn [{:replicant/keys [dom-event]}]
       (some-> dom-event .-key)))
+
+  (nxr/register-placeholder! :event/metaKey
+    (fn [{:replicant/keys [dom-event]}]
+      (some-> dom-event .-metaKey)))
+
+  (nxr/register-placeholder! :event/ctrlKey
+    (fn [{:replicant/keys [dom-event]}]
+      (some-> dom-event .-ctrlKey)))
 
   (nxr/register-placeholder! :event.target/scrollTop
     (fn [{:replicant/keys [dom-event]}]

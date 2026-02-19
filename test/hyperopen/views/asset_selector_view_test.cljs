@@ -160,7 +160,7 @@
                        :coin (str "T" n)
                        :base (str "T" n)
                        :market-type :perp}))
-        hiccup (view/asset-list assets nil #{} #{} #{} 40 0)
+        hiccup (view/asset-list assets nil nil #{} #{} #{} 40 0)
         scroll-container hiccup
         attrs (second scroll-container)
         inner-wrapper (first (node-children scroll-container))
@@ -185,7 +185,7 @@
                        :coin (str "T" n)
                        :base (str "T" n)
                        :market-type :perp}))
-        hiccup (view/asset-list assets nil #{} #{} #{} 120 0)
+        hiccup (view/asset-list assets nil nil #{} #{} #{} 120 0)
         strings (set (collect-strings hiccup))]
     (is (= 8 (count-selectable-asset-rows hiccup)))
     (is (not (contains? strings "Showing 120 of 8 markets")))))
@@ -197,8 +197,8 @@
                        :coin (str "T" n)
                        :base (str "T" n)
                        :market-type :perp}))
-        top-hiccup (view/asset-list assets nil #{} #{} #{} 120 0)
-        deep-hiccup (view/asset-list assets nil #{} #{} #{} 120 4300)
+        top-hiccup (view/asset-list assets nil nil #{} #{} #{} 120 0)
+        deep-hiccup (view/asset-list assets nil nil #{} #{} #{} 120 4300)
         top-strings (set (collect-strings top-hiccup))
         deep-strings (set (collect-strings deep-hiccup))]
     (is (contains? top-strings "T0-USDC"))
@@ -218,7 +218,7 @@
                  :change24hPct -13.95
                  :fundingRate 0.001
                  :market-type :perp}
-          hiccup (view/asset-list-item asset false #{} #{} #{})
+          hiccup (view/asset-list-item asset false false #{} #{} #{})
           strings (collect-strings hiccup)
           rendered (set strings)]
       (is (contains? rendered "$0.002028"))
@@ -230,10 +230,21 @@
                :coin "ABC"
                :base "ABC"
                :market-type :perp}
-        hiccup (view/asset-list-item asset false #{} #{} #{})
+        hiccup (view/asset-list-item asset false false #{} #{} #{})
         strings (set (collect-strings hiccup))]
     (is (contains? strings "—"))
     (is (not (contains? strings "+0.00 (0.00%)")))))
+
+(deftest asset-list-item-applies-highlight-class-for-keyboard-navigation-test
+  (let [asset {:key "perp:ABC"
+               :symbol "ABC-USDC"
+               :coin "ABC"
+               :base "ABC"
+               :market-type :perp}
+        row (view/asset-list-item asset false true #{} #{} #{})
+        classes (set (collect-all-classes row))]
+    (is (contains? classes "bg-base-200"))
+    (is (not (contains? classes "ring-primary")))))
 
 (deftest asset-selector-loading-state-test
   (let [base-props {:visible? true
@@ -246,13 +257,46 @@
                     :favorites-only? false
                     :strict? false
                     :active-tab :all
-                    :missing-icons #{}}
+                    :missing-icons #{}
+                    :loaded-icons #{}
+                    :highlighted-market-key nil}
         full-view (view/asset-selector-dropdown (assoc base-props :loading? true :phase :full))
         bootstrap-view (view/asset-selector-dropdown (assoc base-props :loading? true :phase :bootstrap))
         full-strings (set (collect-strings full-view))
         bootstrap-strings (set (collect-strings bootstrap-view))]
     (is (contains? full-strings "Loading markets..."))
     (is (contains? bootstrap-strings "Loading markets (bootstrap)..."))))
+
+(deftest asset-selector-dropdown-renders-shortcut-footer-and-keydown-dispatch-test
+  (let [dropdown (view/asset-selector-dropdown
+                   {:visible? true
+                    :markets sample-markets
+                    :selected-market-key "perp:BTC"
+                    :search-term ""
+                    :sort-by :name
+                    :sort-direction :asc
+                    :favorites #{}
+                    :favorites-only? false
+                    :strict? false
+                    :active-tab :all
+                    :missing-icons #{}
+                    :loaded-icons #{}
+                    :highlighted-market-key nil
+                    :render-limit 120
+                    :scroll-top 0})
+        attrs (second dropdown)
+        strings (set (collect-strings dropdown))]
+    (is (= [[:actions/handle-asset-selector-shortcut
+             [:event/key]
+             [:event/metaKey]
+             [:event/ctrlKey]
+             ["perp:BTC" "perp:xyz:GOLD" "spot:PURR/USDC"]]]
+           (get-in attrs [:on :keydown])))
+    (is (contains? strings "Cmd/Ctrl+K"))
+    (is (contains? strings "Up/Down"))
+    (is (contains? strings "Enter"))
+    (is (contains? strings "Cmd/Ctrl+S"))
+    (is (contains? strings "Esc"))))
 
 (deftest asset-list-item-applies-left-aligned-numeric-utilities-test
   (let [asset {:key "perp:SOL"
@@ -267,7 +311,7 @@
                :fundingRate 0.0001
                :openInterest 99999
                :market-type :perp}
-        row (view/asset-list-item asset false #{} #{} #{})
+        row (view/asset-list-item asset false false #{} #{} #{})
         classes (set (collect-all-classes row))]
     (is (contains? classes "num"))
     (is (contains? classes "text-left"))
@@ -284,7 +328,7 @@
                :mark 10
                :volume24h 100
                :change24hPct 1}
-        row (view/asset-list-item asset false #{} #{} #{})
+        row (view/asset-list-item asset false false #{} #{} #{})
         classes (set (collect-all-classes row))]
     (is (contains? classes "h-12"))
     (is (contains? classes "box-border"))
@@ -301,7 +345,7 @@
                :mark 1
                :volume24h 10
                :change24hPct 1}
-        row (view/asset-list-item asset false #{} #{} #{})
+        row (view/asset-list-item asset false false #{} #{} #{})
         img-node (find-first-node
                    row
                    (fn [candidate]

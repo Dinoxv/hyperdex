@@ -54,6 +54,7 @@
            handle-wallet-connected
            init-wallet!
            init-router!
+           install-asset-selector-shortcuts!
            register-icon-service-worker!
            initialize-remote-data-streams!
            kick-render!]}]
@@ -62,6 +63,9 @@
   (init-wallet! store)
   ;; Initialize router.
   (init-router! store)
+  ;; Install global keyboard shortcuts that should work regardless of focus target.
+  (when (fn? install-asset-selector-shortcuts!)
+    (install-asset-selector-shortcuts!))
   ;; Register icon cache service worker for cross-reload symbol icon caching.
   (register-icon-service-worker!)
   ;; Initialize remote data streams.

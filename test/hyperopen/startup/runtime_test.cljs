@@ -142,6 +142,47 @@
           0))
        0))))
 
+(deftest install-asset-selector-shortcuts-registers-global-keydown-and-dispatches-supported-shortcuts-test
+  (let [registered-handlers (atom {})
+        removed-handlers (atom [])
+        dispatch-calls (atom [])
+        prevent-default-calls (atom 0)
+        store (atom {:asset-selector {:visible-dropdown nil}})
+        dispatch! (fn [store-arg _ctx effects]
+                    (swap! dispatch-calls conj {:store store-arg
+                                                :effects effects}))]
+    (with-global-property
+      "window"
+      #js {:addEventListener (fn [event-name handler]
+                               (swap! registered-handlers assoc event-name handler))
+           :removeEventListener (fn [event-name handler]
+                                  (swap! removed-handlers conj [event-name handler]))}
+      (fn []
+        (startup-runtime/install-asset-selector-shortcuts!
+         {:store store
+          :dispatch! dispatch!})
+        (let [keydown-handler (get @registered-handlers "keydown")]
+          (is (fn? keydown-handler))
+          (keydown-handler #js {:key "k"
+                                :metaKey true
+                                :ctrlKey false
+                                :preventDefault (fn []
+                                                  (swap! prevent-default-calls inc))})
+          (is (= 1 @prevent-default-calls))
+          (is (= [[:actions/handle-asset-selector-shortcut "k" true false nil]]
+                 (-> @dispatch-calls first :effects)))
+          (swap! store assoc-in [:asset-selector :visible-dropdown] :asset-selector)
+          (keydown-handler #js {:key "Escape"
+                                :metaKey false
+                                :ctrlKey false
+                                :preventDefault (fn [] nil)})
+          (is (= [[:actions/handle-asset-selector-shortcut "Escape" false false nil]]
+                 (-> @dispatch-calls second :effects)))
+          (startup-runtime/install-asset-selector-shortcuts!
+           {:store store
+            :dispatch! dispatch!})
+          (is (= 1 (count @removed-handlers))))))))
+
 (deftest stage-b-account-bootstrap-covers-guarded-and-empty-dex-branches-test
   (let [timeouts (atom [])
         open-orders-calls (atom [])

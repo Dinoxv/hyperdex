@@ -37,6 +37,9 @@
 (def set-asset-selector-tab
   asset-actions/set-asset-selector-tab)
 
+(def handle-asset-selector-shortcut
+  asset-actions/handle-asset-selector-shortcut)
+
 (def set-asset-selector-scroll-top
   asset-actions/set-asset-selector-scroll-top)
 

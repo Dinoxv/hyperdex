@@ -132,6 +132,7 @@
 (s/def ::dropdown-target (s/or :keyword keyword?
                                :coin ::non-empty-string))
 (s/def ::dropdown-target-args (s/tuple ::dropdown-target))
+(s/def ::booleanish #(or (nil? %) (boolean? %)))
 (s/def ::boolean-args (s/tuple boolean?))
 (s/def ::keyword-args (s/tuple keyword?))
 (s/def ::keyword-or-string-args (s/tuple ::keyword-or-string))
@@ -139,6 +140,11 @@
 (s/def ::single-or-double-input-args (s/or :single (s/tuple any?)
                                            :double (s/tuple any? any?)))
 (s/def ::tab-args (s/tuple ::tab))
+(s/def ::asset-selector-shortcut-market-keys
+  (s/and vector?
+         (s/coll-of ::market-key :kind vector?)))
+(s/def ::asset-selector-shortcut-args
+  (s/tuple (s/nilable string?) ::booleanish ::booleanish (s/nilable ::asset-selector-shortcut-market-keys)))
 (s/def ::market-or-coin-args (s/tuple ::market-or-coin))
 (s/def ::market-key-args (s/tuple ::market-key))
 (s/def ::max-page-args (s/tuple (s/nilable ::intish)))
@@ -190,6 +196,7 @@
    :actions/toggle-asset-favorite ::market-key-args
    :actions/set-asset-selector-favorites-only ::boolean-args
    :actions/set-asset-selector-tab ::tab-args
+   :actions/handle-asset-selector-shortcut ::asset-selector-shortcut-args
    :actions/set-asset-selector-scroll-top ::single-input-args
    :actions/increase-asset-selector-render-limit ::no-args
    :actions/show-all-asset-selector-markets ::no-args

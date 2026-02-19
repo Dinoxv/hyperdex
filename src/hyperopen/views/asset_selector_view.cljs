@@ -164,7 +164,7 @@
                (market-fallback-sort-rank b))
       directional-primary)))
 
-(defn asset-list-item [asset selected? favorites _missing-icons _loaded-icons]
+(defn asset-list-item [asset selected? highlighted? favorites _missing-icons _loaded-icons]
   (let [{:keys [key coin symbol mark markRaw volume24h change24h change24hPct openInterest fundingRate
                 market-type dex maxLeverage]} asset
         safe-change (when (some? change24h) (fmt/safe-number change24h))
@@ -183,9 +183,12 @@
                               (>= safe-funding-rate 0))
         funding-color (if funding-positive "text-success" "text-error")
         is-spot (= market-type :spot)
-        favorite? (contains? favorites key)]
+        favorite? (contains? favorites key)
+        row-highlight-classes (cond-> []
+                                highlighted? (into ["bg-base-200"])
+                                selected? (into ["ring-1" "ring-inset" "ring-primary"]))]
     [:div.grid.grid-cols-12.gap-3.items-center.px-4.h-12.box-border.cursor-pointer.bg-base-100.hover:bg-base-200.transition-colors.border-b.border-base-300
-     {:class (when selected? ["bg-base-200" "ring-1" "ring-inset" "ring-primary"])
+     {:class row-highlight-classes
       :on {:click [[:actions/select-asset asset]]}}
      ;; Symbol column
      [:div.col-span-3.flex.items-center.space-x-2.min-w-0
@@ -275,7 +278,61 @@
      :top-spacer-px top-spacer-px
      :bottom-spacer-px bottom-spacer-px}))
 
-(defn asset-list [assets selected-market-key favorites missing-icons loaded-icons render-limit scroll-top]
+(defn- market-key-present?
+  [market-key assets]
+  (some (fn [asset]
+          (= market-key (:key asset)))
+        assets))
+
+(defn- effective-highlighted-market-key
+  [assets selected-market-key highlighted-market-key]
+  (cond
+    (and (string? highlighted-market-key)
+         (market-key-present? highlighted-market-key assets))
+    highlighted-market-key
+
+    (and (string? selected-market-key)
+         (market-key-present? selected-market-key assets))
+    selected-market-key
+
+    :else
+    (:key (first assets))))
+
+(defn- shortcut-keycap [label]
+  [:span {:class ["rounded"
+                  "border"
+                  "border-base-300"
+                  "bg-base-200"
+                  "px-1.5"
+                  "py-0.5"
+                  "text-xs"
+                  "font-medium"
+                  "text-gray-200"]}
+   label])
+
+(defn- shortcut-item [key-label label]
+  [:div {:class ["flex" "items-center" "gap-1.5" "text-xs" "text-gray-400"]}
+   (shortcut-keycap key-label)
+   [:span label]])
+
+(defn- selector-shortcut-footer []
+  [:div {:class ["flex"
+                 "items-center"
+                 "gap-3"
+                 "overflow-x-auto"
+                 "border-t"
+                 "border-base-300"
+                 "bg-base-100"
+                 "px-4"
+                 "py-2"
+                 "scrollbar-hide"]}
+   (shortcut-item "Cmd/Ctrl+K" "Open")
+   (shortcut-item "Up/Down" "Navigate")
+   (shortcut-item "Enter" "Select")
+   (shortcut-item "Cmd/Ctrl+S" "Favorite")
+   (shortcut-item "Esc" "Close")])
+
+(defn asset-list [assets selected-market-key highlighted-market-key favorites missing-icons loaded-icons render-limit scroll-top]
   (let [assets* (if (vector? assets) assets (vec assets))
         total (count assets*)]
     (if (zero? total)
@@ -290,7 +347,12 @@
             visible-assets (subvec assets* start-index end-index)
             rows (mapv (fn [asset]
                          ^{:key (:key asset)}
-                         (asset-list-item asset (= selected-market-key (:key asset)) favorites missing-icons loaded-icons))
+                         (asset-list-item asset
+                                          (= selected-market-key (:key asset))
+                                          (= highlighted-market-key (:key asset))
+                                          favorites
+                                          missing-icons
+                                          loaded-icons))
                        visible-assets)]
         [:div.max-h-96.overflow-y-auto.scrollbar-hide
          {:style {:overflow-anchor "none"}
@@ -394,19 +456,30 @@
    - :active-tab - current tab
    - :missing-icons - set of market keys with missing icons
    - :loaded-icons - set of market keys with loaded icons
+   - :highlighted-market-key - keyboard navigation highlighted row
    - :render-limit - max rows currently rendered in list
    - :scroll-top - current row-viewport scroll offset
    - :loading? - whether market refresh is in flight
    - :phase - :bootstrap | :full"
   [{:keys [visible? markets selected-market-key search-term sort-by sort-direction
            favorites favorites-only? strict? active-tab missing-icons loaded-icons
-           render-limit scroll-top loading? phase]}]
+           highlighted-market-key render-limit scroll-top loading? phase]}]
   (when visible?
     (let [processed-assets-list (processed-assets markets search-term sort-by sort-direction
-                                                  favorites favorites-only? strict? active-tab)]
+                                                  favorites favorites-only? strict? active-tab)
+          ordered-market-keys (mapv :key processed-assets-list)
+          highlighted-market-key* (effective-highlighted-market-key
+                                    processed-assets-list
+                                    selected-market-key
+                                    highlighted-market-key)]
       [:div
        {:class ["absolute" "top-full" "left-0" "right-0" "mt-1" "bg-base-100"
                 "border" "border-base-300" "rounded-none" "shadow-none" "z-[220]" "isolate"]
+        :on {:keydown [[:actions/handle-asset-selector-shortcut
+                        [:event/key]
+                        [:event/metaKey]
+                        [:event/ctrlKey]
+                        ordered-market-keys]]}
         :style {:transition "opacity 0.2s ease-in-out, transform 0.2s ease-in-out"
                 :opacity 1
                 :transform "translateY(0)"
@@ -425,7 +498,8 @@
         (search-controls search-term strict? favorites-only?)
         (tab-row active-tab)
         (sort-controls sort-by sort-direction)
-        (asset-list processed-assets-list selected-market-key favorites missing-icons loaded-icons render-limit scroll-top)]])))
+        (asset-list processed-assets-list selected-market-key highlighted-market-key* favorites missing-icons loaded-icons render-limit scroll-top)
+        (selector-shortcut-footer)]])))
 
 ;; Wrapper component that can be used in active-asset-view
 (defn asset-selector-wrapper [props]
