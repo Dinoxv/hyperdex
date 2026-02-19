@@ -330,23 +330,22 @@
         classes (set (class-values (:class attrs)))]
     (is (some? img-node))
     (is (not (contains? classes "hidden")))
+    (is (not (contains? classes "opacity-0")))
     (is (= [[:actions/mark-loaded-asset-icon "perp:BTC"]]
            (get-in attrs [:on :load])))
     (is (= [[:actions/mark-missing-asset-icon "perp:BTC"]]
            (get-in attrs [:on :error])))))
 
-(deftest asset-list-item-shows-icon-after-load-test
-  (let [asset {:key "perp:BTC"
-               :symbol "BTC-USDC"
-               :coin "BTC"
-               :base "BTC"
+(deftest asset-list-item-omits-icon-for-component-markets-test
+  (let [asset {:key "perp:xyz:XYZ100"
+               :symbol "XYZ100-USDC"
+               :coin "xyz:XYZ100"
+               :base "XYZ100"
+               :dex "xyz"
                :market-type :perp
                :mark 1
                :volume24h 10
                :change24hPct 1}
-        row (view/asset-list-item asset false #{} #{} #{"perp:BTC"})
-        img-node (find-first-img-node row)
-        attrs (second img-node)
-        classes (set (class-values (:class attrs)))]
-    (is (some? img-node))
-    (is (not (contains? classes "hidden")))))
+        row (view/asset-list-item asset false #{} #{} #{})
+        img-node (find-first-img-node row)]
+    (is (nil? img-node))))

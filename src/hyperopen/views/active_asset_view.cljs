@@ -102,22 +102,26 @@
 
 (defn asset-icon [market dropdown-visible? missing-icons _loaded-icons]
   (let [coin (:coin market)
-        base (or (:base market) coin)
+        base (some-> (or (:base market) coin) str str/trim)
         symbol (or (:symbol market) coin)
         dex-label (market-dex-label market)
         leverage-label (leverage-chip-label market)
         market-type (:market-type market)
         market-key (or (:key market) (markets/coin->market-key coin))
         missing-icon? (contains? missing-icons market-key)
+        component-market? (seq dex-label)
         icon-blocked? (or missing-icon?
-                          (and (string? base)
-                               (str/starts-with? base "@")))]
+                          component-market?
+                          (not (seq base))
+                          (str/starts-with? base "@"))
+        icon-src (when-not icon-blocked?
+                   (str "https://app.hyperliquid.xyz/coins/" base ".svg"))]
     [:div {:class ["flex" "items-center" "gap-2" "cursor-pointer" "hover:bg-base-300"
                    "rounded" "pr-2" "py-1" "transition-colors" "min-w-0"]
            :on {:click [[:actions/toggle-asset-dropdown :asset-selector]]}}
-     (when-not icon-blocked?
-       [:img.w-6.h-6.rounded-full
-        {:src (str "https://app.hyperliquid.xyz/coins/" base ".svg")
+     (when icon-src
+       [:img {:class ["w-6" "h-6" "rounded-full"]
+         :src icon-src
          :alt ""
          :on {:load [[:actions/mark-loaded-asset-icon market-key]]
               :error [[:actions/mark-missing-asset-icon market-key]]}}])

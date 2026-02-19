@@ -128,8 +128,20 @@
         classes (set (class-values (:class attrs)))]
     (is (some? img-node))
     (is (not (contains? classes "hidden")))
+    (is (not (contains? classes "opacity-0")))
     (is (= [[:actions/mark-loaded-asset-icon "perp:BTC"]]
            (get-in attrs [:on :load])))))
+
+(deftest asset-icon-omits-image-for-component-markets-test
+  (let [market {:key "perp:xyz:XYZ100"
+                :coin "xyz:XYZ100"
+                :symbol "XYZ100-USDC"
+                :base "XYZ100"
+                :dex "xyz"
+                :market-type :perp}
+        icon-node (view/asset-icon market false #{} #{})
+        img-node (find-first-img-node icon-node)]
+    (is (nil? img-node))))
 
 (deftest active-asset-row-uses-app-shell-left-gutter-test
   (let [ctx-data {:coin "SOL"

@@ -184,20 +184,24 @@
         funding-color (if funding-positive "text-success" "text-error")
         is-spot (= market-type :spot)
         favorite? (contains? favorites key)
-        icon-name (or base coin)
+        icon-name (some-> (or base coin) str str/trim)
         missing-icon? (contains? missing-icons key)
+        component-market? (seq (some-> dex str str/trim))
         icon-blocked? (or missing-icon?
-                          (and (string? icon-name)
-                               (str/starts-with? icon-name "@")))]
+                          component-market?
+                          (not (seq icon-name))
+                          (str/starts-with? icon-name "@"))
+        icon-src (when-not icon-blocked?
+                   (str "https://app.hyperliquid.xyz/coins/" icon-name ".svg"))]
     [:div.grid.grid-cols-12.gap-3.items-center.px-4.h-12.box-border.cursor-pointer.bg-base-100.hover:bg-base-200.transition-colors.border-b.border-base-300
      {:class (when selected? ["bg-base-200" "ring-1" "ring-inset" "ring-primary"])
       :on {:click [[:actions/select-asset asset]]}}
      ;; Symbol column
      [:div.col-span-3.flex.items-center.space-x-2.min-w-0
       (favorite-button favorite? key)
-      (when-not icon-blocked?
-        [:img.w-5.h-5.rounded-full
-         {:src (str "https://app.hyperliquid.xyz/coins/" icon-name ".svg")
+      (when icon-src
+        [:img {:class ["w-5" "h-5" "rounded-full"]
+               :src icon-src
           :alt ""
           :on {:load [[:actions/mark-loaded-asset-icon key]]
                :error [[:actions/mark-missing-asset-icon key]]}}])
