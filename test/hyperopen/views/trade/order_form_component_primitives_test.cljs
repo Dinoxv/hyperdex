@@ -16,6 +16,13 @@
 
     :else []))
 
+(defn- collect-strings [node]
+  (cond
+    (string? node) [node]
+    (vector? node) (mapcat collect-strings node)
+    (seq? node) (mapcat collect-strings node)
+    :else []))
+
 (deftest row-toggle-builds-stable-id-and-event-binding-test
   (let [node (apply primitives/row-toggle
                     ["Enable TP" true [[:actions/toggle-tp-enabled]]])
@@ -135,3 +142,20 @@
         custom-classes (set (get-in custom-node [3 1 :class]))]
     (is (contains? default-classes "text-gray-100"))
     (is (contains? custom-classes "text-primary"))))
+
+(deftest metric-row-tooltip-renders-dashed-label-and-tooltip-body-test
+  (let [tooltip-text "Position risk is low, so there is no liquidation price for the time being. Note that increasing the position or reducing the margin will increase the risk."
+        node (apply primitives/metric-row ["Liquidation Price" "N/A" nil tooltip-text])
+        trigger-node (first (filter #(contains? (set (get-in % [1 :class]))
+                                                "decoration-dashed")
+                                    (collect-nodes-by-tag node :span)))
+        trigger-classes (set (get-in trigger-node [1 :class]))
+        wrapper-node (first (filter #(= 0 (get-in % [1 :tabindex]))
+                                    (collect-nodes-by-tag node :div)))
+        wrapper-classes (set (get-in wrapper-node [1 :class]))]
+    (is (contains? trigger-classes "underline"))
+    (is (contains? trigger-classes "decoration-dashed"))
+    (is (= 0 (get-in wrapper-node [1 :tabindex])))
+    (is (contains? wrapper-classes "group"))
+    (is (contains? wrapper-classes "relative"))
+    (is (contains? (set (collect-strings node)) tooltip-text))))

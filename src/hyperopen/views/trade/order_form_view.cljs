@@ -178,11 +178,19 @@
                     "group-focus:translate-y-0"]}
       submit-tooltip])])
 
+(def ^:private liquidation-price-tooltip
+  "Position risk is low, so there is no liquidation price for the time being. Note that increasing the position or reducing the margin will increase the risk.")
+
 (defn- footer-metrics [display show-liquidation-row? show-slippage-row?]
-  [:div {:class ["border-t" "border-base-300" "pt-3" "space-y-2"]}
-   (when show-liquidation-row?
-     (primitives/metric-row "Liquidation Price"
-                            (:liquidation-price display)))
+  (let [liquidation-price (:liquidation-price display)
+        liquidation-tooltip (when (= liquidation-price "N/A")
+                              liquidation-price-tooltip)]
+    [:div {:class ["border-t" "border-base-300" "pt-3" "space-y-2"]}
+     (when show-liquidation-row?
+       (primitives/metric-row "Liquidation Price"
+                              liquidation-price
+                              nil
+                              liquidation-tooltip))
    (primitives/metric-row "Order Value"
                           (:order-value display))
    (primitives/metric-row "Margin Required"
@@ -192,7 +200,7 @@
                             (:slippage display)
                             "text-primary"))
    (primitives/metric-row "Fees"
-                          (:fees display))])
+                          (:fees display))]))
 
 (defn order-form-view [state]
   (let [{:keys [form

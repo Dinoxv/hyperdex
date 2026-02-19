@@ -230,12 +230,63 @@
               on-click)
      label]))
 
+(defn- metric-label [title]
+  [:span {:class ["text-sm" "text-gray-400"]} title])
+
+(defn- metric-label-with-tooltip [title tooltip]
+  [:div {:class ["group" "relative" "inline-flex" "items-center"]
+         :tabindex 0}
+   [:span {:class ["text-sm"
+                   "text-gray-400"
+                   "underline"
+                   "decoration-dashed"
+                   "underline-offset-2"]}
+    title]
+   [:div {:class ["pointer-events-none"
+                  "absolute"
+                  "right-0"
+                  "bottom-full"
+                  "mb-1"
+                  "z-[100]"
+                  "w-[400px]"
+                  "max-w-[calc(100vw-20px)]"
+                  "opacity-0"
+                  "transition-opacity"
+                  "duration-150"
+                  "group-hover:opacity-100"
+                  "group-focus:opacity-100"]}
+    [:div {:class ["relative"
+                   "rounded-[5px]"
+                   "bg-[rgb(39,48,53)]"
+                   "px-[10px]"
+                   "py-[6px]"
+                   "text-left"
+                   "font-normal"
+                   "leading-[1.35]"
+                   "text-white"]
+           :style {:font-size "11px"}}
+     tooltip
+     [:div {:class ["absolute"
+                    "left-1/2"
+                    "-translate-x-1/2"
+                    "top-full"
+                    "h-0"
+                    "w-0"
+                    "border-x-4"
+                    "border-x-transparent"
+                    "border-t-4"
+                    "border-t-[rgb(39,48,53)]"]}]]]])
+
 (defn metric-row
   ([title value]
-   (metric-row title value nil))
+   (metric-row title value nil nil))
   ([title value value-class]
+   (metric-row title value value-class nil))
+  ([title value value-class label-tooltip]
    [:div {:class ["flex" "items-center" "justify-between"]}
-    [:span {:class ["text-sm" "text-gray-400"]} title]
+    (if (seq label-tooltip)
+      (metric-label-with-tooltip title label-tooltip)
+      (metric-label title))
     [:span {:class (into ["text-sm" "font-semibold" "num"]
                          (if (seq value-class)
                            [value-class]

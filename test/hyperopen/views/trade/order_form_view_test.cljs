@@ -119,6 +119,9 @@
 
     :else []))
 
+(def ^:private liquidation-price-tooltip-text
+  "Position risk is low, so there is no liquidation price for the time being. Note that increasing the position or reducing the margin will increase the risk.")
+
 (def ^:private order-form-ui-keys
   #{:entry-mode
     :ui-leverage
@@ -780,6 +783,37 @@
                                                          :assetPositions []}}))
         view-node (view/order-form-view state)]
     (is (= "$52.00" (metric-value-text view-node "Liquidation Price")))))
+
+(deftest liquidation-price-na-renders-hyperliquid-tooltip-copy-test
+  (let [view-node (view/order-form-view (base-state {:type :limit :size "" :price ""}))
+        strings (set (collect-strings view-node))
+        underlined-liquidation-label (find-first-node view-node
+                                                      (fn [node]
+                                                        (let [attrs (when (map? (second node)) (second node))
+                                                              classes (set (:class attrs))
+                                                              children (if attrs (drop 2 node) (drop 1 node))]
+                                                          (and (= :span (first node))
+                                                               (contains? classes "decoration-dashed")
+                                                               (contains? classes "underline")
+                                                               (contains? (set (collect-strings children))
+                                                                          "Liquidation Price")))))]
+    (is (contains? strings liquidation-price-tooltip-text))
+    (is (some? underlined-liquidation-label))))
+
+(deftest liquidation-price-value-omits-na-tooltip-copy-test
+  (let [state (-> (base-state {:type :limit :side :buy :size "2" :price "100"})
+                  (assoc :active-market {:coin "SOL"
+                                         :quote "USDC"
+                                         :mark 100
+                                         :maxLeverage 50
+                                         :market-type :perp
+                                         :szDecimals 4})
+                  (assoc :webdata2 {:clearinghouseState {:marginSummary {:accountValue "100"
+                                                                         :totalMarginUsed "0"}
+                                                         :assetPositions []}}))
+        view-node (view/order-form-view state)
+        strings (set (collect-strings view-node))]
+    (is (not (contains? strings liquidation-price-tooltip-text)))))
 
 (deftest available-to-trade-prefers-unified-spot-usdc-balance-test
   (let [state (-> (base-state)
