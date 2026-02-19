@@ -281,8 +281,9 @@
        [:nav.hidden.md:flex.flex-1.items-center.justify-start.space-x-8.ml-8
         {:data-parity-id "header-nav"}
         (nav-link "Trade" "/trade" true)
-        (nav-link "Vaults" "/vaults" false)
         (nav-link "Portfolio" "/portfolio" false)
+        (nav-link "Earn" "/earn" false)
+        (nav-link "Vaults" "/vaults" false)
         (nav-link "Staking" "/staking" false)
         (nav-link "Referrals" "/referrals" false)
         (nav-link "Leaderboard" "/leaderboard" false)
