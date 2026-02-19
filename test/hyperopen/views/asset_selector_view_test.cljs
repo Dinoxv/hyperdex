@@ -285,18 +285,33 @@
                     :render-limit 120
                     :scroll-top 0})
         attrs (second dropdown)
-        strings (set (collect-strings dropdown))]
+        strings (set (collect-strings dropdown))
+        navigate-icon (find-first-node
+                        dropdown
+                        (fn [candidate]
+                          (and (vector? candidate)
+                               (= :svg (first candidate))
+                               (= "0 0 22 13"
+                                  (get-in candidate [1 :viewBox])))))]
     (is (= [[:actions/handle-asset-selector-shortcut
              [:event/key]
              [:event/metaKey]
              [:event/ctrlKey]
              ["perp:BTC" "perp:xyz:GOLD" "spot:PURR/USDC"]]]
            (get-in attrs [:on :keydown])))
-    (is (contains? strings "Cmd/Ctrl+K"))
-    (is (contains? strings "Up/Down"))
+    (is (contains? strings "⌘K"))
+    (is (contains? strings "Navigate"))
     (is (contains? strings "Enter"))
-    (is (contains? strings "Cmd/Ctrl+S"))
-    (is (contains? strings "Esc"))))
+    (is (contains? strings "⌘S"))
+    (is (contains? strings "Esc"))
+    (is (contains? strings "Open"))
+    (is (contains? strings "Select"))
+    (is (contains? strings "Favorite"))
+    (is (contains? strings "Close"))
+    (is (not (contains? strings "Cmd/Ctrl+K")))
+    (is (not (contains? strings "Cmd/Ctrl+S")))
+    (is (not (contains? strings "Up/Down")))
+    (is (some? navigate-icon))))
 
 (deftest asset-list-item-applies-left-aligned-numeric-utilities-test
   (let [asset {:key "perp:SOL"

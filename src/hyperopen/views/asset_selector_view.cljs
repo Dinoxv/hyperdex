@@ -297,38 +297,48 @@
     :else
     (:key (first assets))))
 
-(defn- shortcut-keycap [label]
-  [:span {:class ["rounded"
-                  "border"
-                  "border-base-300"
-                  "bg-base-200"
-                  "px-1.5"
-                  "py-0.5"
-                  "text-xs"
-                  "font-medium"
-                  "text-gray-200"]}
-   label])
+(defn- navigate-shortcut-icon []
+  [:svg {:width 16
+         :height 9.454545454545455
+         :fill "none"
+         :stroke "currentColor"
+         :focusable "false"
+         :aria-hidden "true"
+         :viewBox "0 0 22 13"}
+   [:path {:d "M3.81809 12.6989L-8.88109e-05 8.88068L0.656161 8.22443L3.34934 10.9261V1.77273L0.656161 4.47443L-8.88109e-05 3.81818L3.81809 -1.43051e-06L7.63628 3.81818L6.98855 4.47443L4.28684 1.77273V10.9261L6.98855 8.22443L7.63628 8.88068L3.81809 12.6989ZM18.432 6.76691H17.748C18.132 5.91491 18.528 5.26691 18.9 4.84691H10.152V3.99491H18.9C18.516 3.57491 18.132 2.92691 17.748 2.08691H18.432C19.272 3.07091 20.16 3.79091 21.072 4.25891V4.59491C20.16 5.06291 19.272 5.78291 18.432 6.76691ZM12.792 11.4469C11.952 10.4629 11.064 9.74291 10.152 9.27491V8.93891C11.064 8.47091 11.952 7.75091 12.792 6.76691H13.476C13.092 7.60691 12.708 8.25491 12.324 8.67491H21.072V9.52691H12.324C12.696 9.94691 13.092 10.5949 13.476 11.4469H12.792Z"
+           :fill "currentColor"}]])
 
-(defn- shortcut-item [key-label label]
-  [:div {:class ["flex" "items-center" "gap-1.5" "text-xs" "text-gray-400"]}
-   (shortcut-keycap key-label)
-   [:span label]])
+(defn- shortcut-keycap [content]
+  [:div {:class ["rounded"
+                 "text-xs"
+                 "leading-none"
+                 "text-white"
+                 "whitespace-nowrap"]
+         :style {:background "rgb(39, 48, 53)"
+                 :border-radius "5px"
+                 :padding "2px 4px"}}
+   content])
+
+(defn- shortcut-item [key-content label]
+  [:div {:class ["flex" "items-center" "gap-2" "whitespace-nowrap"]}
+   (shortcut-keycap key-content)
+   [:div {:class ["text-xs" "text-gray-400"]}
+    label]])
 
 (defn- selector-shortcut-footer []
   [:div {:class ["flex"
                  "items-center"
-                 "gap-3"
+                 "gap-4"
+                 "mt-4"
                  "overflow-x-auto"
-                 "border-t"
-                 "border-base-300"
                  "bg-base-100"
                  "px-4"
-                 "py-2"
+                 "py-0.5"
                  "scrollbar-hide"]}
-   (shortcut-item "Cmd/Ctrl+K" "Open")
-   (shortcut-item "Up/Down" "Navigate")
+   (shortcut-item "⌘K" "Open")
+   (shortcut-item (navigate-shortcut-icon) "Navigate")
    (shortcut-item "Enter" "Select")
-   (shortcut-item "Cmd/Ctrl+S" "Favorite")
+   (shortcut-item "⌘S" "Favorite")
    (shortcut-item "Esc" "Close")])
 
 (defn asset-list [assets selected-market-key highlighted-market-key favorites missing-icons loaded-icons render-limit scroll-top]
