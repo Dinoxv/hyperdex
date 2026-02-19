@@ -98,7 +98,7 @@
                 (swap! store api-projections/apply-open-orders-error err)
                 (js/Promise.reject err)))))
 
-(defn- refresh-open-orders-after-cancel!
+(defn- refresh-open-orders-after-order-mutation!
   [store address]
   (when address
     (refresh-open-orders-snapshot! store address nil {:priority :high})
@@ -146,6 +146,7 @@
                        (do
                          (swap! store assoc-in [:order-form-runtime :error] nil)
                          (show-toast! store :success "Order submitted.")
+                         (refresh-open-orders-after-order-mutation! store address)
                          (dispatch! store nil [[:actions/refresh-order-history]]))
                        (let [error-text (str (exchange-response-error resp))]
                          (swap! store assoc-in [:order-form-runtime :error] error-text)
@@ -194,7 +195,7 @@
                                       (prune-fn request)
                                       (remove-pending-cancel-oids cancel-oids))))
                          (show-toast! store :success "Order canceled.")
-                         (refresh-open-orders-after-cancel! store address)
+                         (refresh-open-orders-after-order-mutation! store address)
                          (dispatch! store nil [[:actions/refresh-order-history]]))
                        (let [error-text (str (exchange-response-error resp))]
                          (swap! store

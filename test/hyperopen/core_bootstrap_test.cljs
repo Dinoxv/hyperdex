@@ -1391,7 +1391,7 @@
           (js/Object.defineProperty js/globalThis navigator-prop original-navigator-descriptor)
           (js/Reflect.deleteProperty js/globalThis navigator-prop))))))
 
-(deftest api-submit-order-effect-shows-success-toast-and-refreshes-history-test
+(deftest api-submit-order-effect-shows-success-toast-and-refreshes-history-and-open-orders-test
   (async done
     (let [store (atom {:wallet {:address "0xabc"
                                 :agent {:status :ready}}
@@ -1400,8 +1400,11 @@
                                             :error "old-error"}
                        :ui {:toast nil}})
           dispatched (atom [])
+          refresh-calls (atom [])
           original-submit-order trading-api/submit-order!
-          original-dispatch nxr/dispatch]
+          original-dispatch nxr/dispatch
+          original-request-open-orders api/request-frontend-open-orders!
+          original-ensure-perp-dexs-data api/ensure-perp-dexs-data!]
       (clear-order-feedback-toast-timeout!)
       (set! trading-api/submit-order!
             (fn [_store _address _action]
@@ -1409,6 +1412,21 @@
       (set! nxr/dispatch
             (fn [_store _evt actions]
               (swap! dispatched conj actions)))
+      (set! api/request-frontend-open-orders!
+            (fn request-frontend-open-orders-mock
+              ([address]
+               (request-frontend-open-orders-mock address {}))
+              ([address opts]
+               (request-frontend-open-orders-mock address (:dex opts) (dissoc opts :dex)))
+              ([address dex opts]
+               (swap! refresh-calls conj [address dex opts])
+               (js/Promise.resolve []))))
+      (set! api/ensure-perp-dexs-data!
+            (fn ensure-perp-dexs-data-mock
+              ([_store]
+               (ensure-perp-dexs-data-mock nil {}))
+              ([_store _opts]
+               (js/Promise.resolve ["dex-a"]))))
       (core/api-submit-order nil store {:action {:type "order"
                                                  :orders []
                                                  :grouping "na"}})
@@ -1422,10 +1440,13 @@
                   (get-in @store [:ui :toast :message])))
            (is (= [[[:actions/refresh-order-history]]]
                   @dispatched))
+           (is (= 2 (count @refresh-calls)))
            (finally
              (clear-order-feedback-toast-timeout!)
              (set! trading-api/submit-order! original-submit-order)
              (set! nxr/dispatch original-dispatch)
+             (set! api/request-frontend-open-orders! original-request-open-orders)
+             (set! api/ensure-perp-dexs-data! original-ensure-perp-dexs-data)
              (done))))
        0))))
 
