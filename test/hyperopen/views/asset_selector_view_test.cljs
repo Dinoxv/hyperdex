@@ -52,7 +52,7 @@
       (is (= 1 (count results)))
       (is (= :spot (:market-type (first results))))))
 
-  (testing "hip3 tab applies eligibility gate when available and keeps legacy cached rows visible"
+  (testing "hip3 tab strict mode parity: strict off shows full HIP3 set, strict on applies eligibility"
     (let [assets [{:key "perp:xyz:USA500"
                    :symbol "USA500-USDT"
                    :coin "xyz:USA500"
@@ -83,9 +83,15 @@
                    :market-type :perp
                    :category :crypto
                    :hip3? false}]
-          results (view/filter-and-sort-assets assets "" :name :asc #{} false false :hip3)]
+          strict-off-results (view/filter-and-sort-assets assets "" :name :asc #{} false false :hip3)
+          strict-on-results (view/filter-and-sort-assets assets "" :name :asc #{} false true :hip3)
+          perps-strict-on-results (view/filter-and-sort-assets assets "" :name :asc #{} false true :perps)]
+      (is (= ["perp:xyz:ILLQ" "perp:xyz:LEGACY" "perp:xyz:USA500"]
+             (mapv :key strict-off-results)))
       (is (= ["perp:xyz:LEGACY" "perp:xyz:USA500"]
-             (mapv :key results))))))
+             (mapv :key strict-on-results)))
+      (is (= ["perp:BTC" "perp:xyz:LEGACY" "perp:xyz:USA500"]
+             (mapv :key perps-strict-on-results))))))
 
 (deftest filter-and-sort-assets-preserves-cache-order-when-sort-values-missing-test
   (let [cached-markets [{:key "spot:AAA/USDC"
