@@ -43,7 +43,10 @@
       (is (= 112 (get-in view-model [:summary :total-equity])))
       (is (true? (get-in view-model [:summary :show-perps-account-equity?])))
       (is (= "Spot Account Equity" (get-in view-model [:summary :spot-equity-label])))
-      (is (true? (get-in view-model [:summary :show-earn-balance?]))))))
+      (is (true? (get-in view-model [:summary :show-earn-balance?])))
+      (is (= :pnl (get-in view-model [:chart :selected-tab])))
+      (is (= 3 (count (get-in view-model [:chart :points]))))
+      (is (seq (get-in view-model [:chart :path]))))))
 
 (deftest portfolio-vm-uses-user-fees-payload-for-14d-volume-and-fee-rates-test
   (with-redefs [account-equity-view/account-equity-metrics (fn [_]
@@ -111,4 +114,54 @@
       (testing "missing data fallback behavior"
         (is (= 0 (get-in view-model [:summary :pnl])))
         (is (= 0 (get-in view-model [:summary :volume])))
-        (is (nil? (get-in view-model [:summary :max-drawdown-pct])))))))
+        (is (nil? (get-in view-model [:summary :max-drawdown-pct])))
+        (is (= :pnl (get-in view-model [:chart :selected-tab])))
+        (is (empty? (get-in view-model [:chart :points])))
+        (is (= [{:value 3 :y-ratio 0}
+                {:value 2 :y-ratio (/ 1 3)}
+                {:value 1 :y-ratio (/ 2 3)}
+                {:value 0 :y-ratio 1}]
+               (get-in view-model [:chart :y-ticks])))))))
+
+(deftest portfolio-vm-chart-tab-selection-switches-history-source-test
+  (with-redefs [account-equity-view/account-equity-metrics (fn [_]
+                                                              {:spot-equity 10
+                                                               :perps-value 10
+                                                               :cross-account-value 10
+                                                               :unrealized-pnl 0})]
+    (let [state {:account {:mode :classic}
+                 :portfolio-ui {:summary-scope :all
+                                :summary-time-range :month
+                                :chart-tab "pnl"}
+                 :portfolio {:summary-by-key {:month {:pnlHistory [[1 -10] [2 5]]
+                                                      :accountValueHistory [[1 100] [2 200]]
+                                                      :vlm 10}}}
+                 :webdata2 {:clearinghouseState {:marginSummary {:accountValue 10}}
+                           :totalVaultEquity 0}
+                 :borrow-lend {:total-supplied-usd 0}}
+          view-model (vm/portfolio-vm state)]
+      (is (= :pnl (get-in view-model [:chart :selected-tab])))
+      (is (= [-10 5]
+             (mapv :value (get-in view-model [:chart :points]))))
+      (is (= ["Account Value" "PNL"]
+             (mapv :label (get-in view-model [:chart :tabs])))))))
+
+(deftest portfolio-vm-chart-y-axis-uses-readable-step-ticks-test
+  (with-redefs [account-equity-view/account-equity-metrics (fn [_]
+                                                              {:spot-equity 10
+                                                               :perps-value 10
+                                                               :cross-account-value 10
+                                                               :unrealized-pnl 0})]
+    (let [state {:account {:mode :classic}
+                 :portfolio-ui {:summary-scope :all
+                                :summary-time-range :month
+                                :chart-tab :pnl}
+                 :portfolio {:summary-by-key {:month {:pnlHistory [[1 0] [2 90000]]
+                                                      :accountValueHistory [[1 100] [2 200]]
+                                                      :vlm 10}}}
+                 :webdata2 {:clearinghouseState {:marginSummary {:accountValue 10}}
+                           :totalVaultEquity 0}
+                 :borrow-lend {:total-supplied-usd 0}}
+          view-model (vm/portfolio-vm state)]
+      (is (= [90000 60000 30000 0]
+             (mapv :value (get-in view-model [:chart :y-ticks])))))))

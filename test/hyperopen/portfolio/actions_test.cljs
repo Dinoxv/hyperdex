@@ -45,3 +45,17 @@
                                [[:portfolio-ui :summary-scope-dropdown-open?] false]
                                [[:portfolio-ui :summary-time-range-dropdown-open?] false]]]]
          (actions/select-portfolio-summary-time-range {} :unknown))))
+
+(deftest select-portfolio-chart-tab-normalizes-and-saves-selected-tab-test
+  (is (= [[:effects/save
+           [:portfolio-ui :chart-tab]
+           :account-value]]
+         (actions/select-portfolio-chart-tab {} "accountValue")))
+  (is (= [[:effects/save
+           [:portfolio-ui :chart-tab]
+           :pnl]]
+         (actions/select-portfolio-chart-tab {} :pnl)))
+  (is (= [[:effects/save
+           [:portfolio-ui :chart-tab]
+           :pnl]]
+         (actions/select-portfolio-chart-tab {} :unknown))))

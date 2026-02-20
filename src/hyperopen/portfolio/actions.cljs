@@ -7,11 +7,17 @@
 (def default-summary-time-range
   :month)
 
+(def default-chart-tab
+  :pnl)
+
 (def ^:private summary-scope-options
   #{:all :perps})
 
 (def ^:private summary-time-range-options
   #{:day :week :month :all-time})
+
+(def ^:private chart-tab-options
+  #{:account-value :pnl})
 
 (defn- normalize-keyword-like
   [value]
@@ -46,6 +52,17 @@
       normalized
       default-summary-time-range)))
 
+(defn normalize-portfolio-chart-tab
+  [value]
+  (let [token (normalize-keyword-like value)
+        normalized (case token
+                     :accountvalue :account-value
+                     :account :account-value
+                     token)]
+    (if (contains? chart-tab-options normalized)
+      normalized
+      default-chart-tab)))
+
 (defn- selector-visibility-path-values
   [open-dropdown]
   [[[:portfolio-ui :summary-scope-dropdown-open?] (= open-dropdown :scope)]
@@ -79,3 +96,9 @@
   [_state time-range]
   [(selector-projection-effect nil [[[:portfolio-ui :summary-time-range]
                                      (normalize-summary-time-range time-range)]])])
+
+(defn select-portfolio-chart-tab
+  [_state chart-tab]
+  [[:effects/save
+    [:portfolio-ui :chart-tab]
+    (normalize-portfolio-chart-tab chart-tab)]])

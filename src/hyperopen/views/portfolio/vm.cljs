@@ -24,6 +24,21 @@
    {:value :all-time
     :label "All-time"}])
 
+(def ^:private chart-tab-options
+  [{:value :account-value
+    :label "Account Value"}
+   {:value :pnl
+    :label "PNL"}])
+
+(def ^:private chart-y-tick-count
+  4)
+
+(def ^:private chart-empty-y-ticks
+  [{:value 3 :y-ratio 0}
+   {:value 2 :y-ratio (/ 1 3)}
+   {:value 1 :y-ratio (/ 2 3)}
+   {:value 0 :y-ratio 1}])
+
 (defn- optional-number [value]
   (projections/parse-optional-num value))
 
@@ -147,6 +162,151 @@
 
     :else
     nil))
+
+(defn- history-point-time-ms [row]
+  (cond
+    (and (sequential? row)
+         (seq row))
+    (optional-number (first row))
+
+    (map? row)
+    (or (optional-number (:time row))
+        (optional-number (:timestamp row))
+        (optional-number (:time-ms row))
+        (optional-number (:timeMs row))
+        (optional-number (:ts row))
+        (optional-number (:t row)))
+
+    :else
+    nil))
+
+(defn- chart-history-rows [summary chart-tab]
+  (let [source (case chart-tab
+                 :pnl (:pnlHistory summary)
+                 :account-value (:accountValueHistory summary)
+                 (:accountValueHistory summary))]
+    (if (sequential? source)
+      source
+      [])))
+
+(defn- chart-data-points [summary chart-tab]
+  (->> (chart-history-rows summary chart-tab)
+       (map-indexed (fn [idx row]
+                      (let [value (history-point-value row)
+                            ;; Hyperliquid chart rounds each point to an integer before plotting.
+                            value* (when (number? value)
+                                     (if (zero? value)
+                                       0
+                                       (js/parseInt (.toFixed value 0) 10)))]
+                        (when (number? value*)
+                          {:index idx
+                           :time-ms (or (history-point-time-ms row) idx)
+                           :value value*}))))
+       (keep identity)
+       vec))
+
+(defn- non-zero-span
+  [domain-min domain-max]
+  (let [span (- domain-max domain-min)]
+    (if (zero? span) 1 span)))
+
+(defn- normalize-degenerate-domain [min-value max-value]
+  (if (= min-value max-value)
+    (let [pad (max 1 (* 0.05 (js/Math.abs min-value)))]
+      [(- min-value pad) (+ min-value pad)])
+    [min-value max-value]))
+
+(defn- chart-domain [values]
+  (if (seq values)
+    (let [[min-value max-value] (normalize-degenerate-domain (apply min values)
+                                                             (apply max values))
+          step (/ (non-zero-span min-value max-value) (dec chart-y-tick-count))]
+      {:min min-value
+       :max max-value
+       :step step})
+    {:min 0
+     :max 3
+     :step 1}))
+
+(defn- chart-y-ticks [{:keys [min max step]}]
+  (let [step* (if (and (number? step)
+                       (pos? step))
+                step
+                (/ (non-zero-span min max) (dec chart-y-tick-count)))
+        span (non-zero-span min max)]
+    (mapv (fn [idx]
+            (let [value (if (= idx (dec chart-y-tick-count))
+                          min
+                          (- max (* step* idx)))]
+              {:value value
+               :y-ratio (/ (- max value) span)}))
+          (range chart-y-tick-count))))
+
+(defn- normalize-chart-points [points {:keys [min max]}]
+  (let [point-count (count points)
+        span (non-zero-span min max)]
+    (mapv (fn [idx {:keys [value] :as point}]
+            (let [x-ratio (if (> point-count 1)
+                            (/ idx (dec point-count))
+                            0)
+                  y-ratio (/ (- max value) span)]
+              (assoc point
+                     :x-ratio x-ratio
+                     :y-ratio y-ratio)))
+          (range point-count)
+          points)))
+
+(defn- format-svg-number [value]
+  (let [rounded (/ (js/Math.round (* value 1000)) 1000)]
+    (if (== rounded -0)
+      0
+      rounded)))
+
+(defn- chart-step-path [points]
+  (when (seq points)
+    (let [{start-x-ratio :x-ratio
+           start-y-ratio :y-ratio} (first points)
+          start-x (format-svg-number (* 100 start-x-ratio))
+          start-y (format-svg-number (* 100 start-y-ratio))]
+      (if (= 1 (count points))
+        (str "M " start-x " " start-y
+             " L 100 " start-y)
+        (let [commands (loop [parts [(str "M " start-x " " start-y)]
+                              previous (first points)
+                              remaining (rest points)]
+                         (if-let [{x-ratio :x-ratio
+                                   y-ratio :y-ratio} (first remaining)]
+                           (let [x (format-svg-number (* 100 x-ratio))
+                                 y (format-svg-number (* 100 y-ratio))
+                                 prev-y (format-svg-number (* 100 (:y-ratio previous)))]
+                             (recur (conj parts
+                                          (str "L " x " " prev-y)
+                                          (str "L " x " " y))
+                                    (first remaining)
+                                    (rest remaining)))
+                           parts))]
+          (str/join " " commands))))))
+
+(defn- build-chart-model [state summary-entry]
+  (let [selected-tab (portfolio-actions/normalize-portfolio-chart-tab
+                      (get-in state [:portfolio-ui :chart-tab]
+                              portfolio-actions/default-chart-tab))
+        points (chart-data-points summary-entry selected-tab)]
+    (if (seq points)
+      (let [domain (chart-domain (map :value points))
+            chart-points (normalize-chart-points points domain)]
+        {:selected-tab selected-tab
+         :tabs chart-tab-options
+         :points chart-points
+         :path (chart-step-path chart-points)
+         :y-ticks (chart-y-ticks domain)
+         :has-data? true})
+      {:selected-tab selected-tab
+       :tabs chart-tab-options
+       :points []
+       :path nil
+       :y-ticks chart-empty-y-ticks
+       :has-data? false})))
 
 (defn- pnl-delta [summary]
   (let [values (keep history-point-value (or (:pnlHistory summary) []))]
@@ -317,9 +477,11 @@
         fees-default {:taker (number-or-zero (:taker trading/default-fees))
                       :maker (number-or-zero (:maker trading/default-fees))}
         fees (or (fees-from-user-fees (get-in state [:portfolio :user-fees]))
-                 fees-default)]
+                 fees-default)
+        chart (build-chart-model state summary-entry)]
     {:volume-14d-usd volume-14d
      :fees fees
+     :chart chart
      :selectors {:summary-scope {:value summary-scope
                                  :label (selector-option-label summary-scope-options summary-scope)
                                  :open? (boolean (get-in state [:portfolio-ui :summary-scope-dropdown-open?]))
