@@ -230,10 +230,6 @@
      [:button {:class ["btn" "btn-xs" "btn-ghost" "justify-start" "px-0" "text-trading-green" "hover:bg-transparent"]}
       "View Fee Schedule"]])])
 
-(defn- top-banner []
-  [:div {:class ["rounded-lg" "bg-[#b3002f]" "px-3" "py-2" "text-xs" "font-medium" "text-white"]}
-   "You are accessing our products and services from a restricted jurisdiction. If this is an error, please refresh the page or contact support."])
-
 (defn- header-actions []
   [:div {:class ["flex" "flex-wrap" "items-center" "justify-between" "gap-3"]}
    [:h1 {:class ["text-5xl" "font-medium" "tracking-tight" "text-trading-text"]}
@@ -255,7 +251,6 @@
                    "md:py-5"]
            :style {:background-image "radial-gradient(circle at 15% 0%, rgba(0, 212, 170, 0.10), transparent 35%), radial-gradient(circle at 85% 100%, rgba(0, 212, 170, 0.08), transparent 40%)"}
            :data-parity-id "portfolio-root"}
-     (top-banner)
      (header-actions)
      [:div {:class ["grid"
                     "grid-cols-1"
