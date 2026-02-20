@@ -1,6 +1,26 @@
 (ns hyperopen.wallet.agent-session-test
-  (:require [cljs.test :refer-macros [deftest is testing]]
+  (:require [cljs.test :refer-macros [deftest is testing use-fixtures]]
             [hyperopen.wallet.agent-session :as agent-session]))
+
+(def ^:private baseline-load-agent-session-by-mode
+  agent-session/load-agent-session-by-mode)
+
+(def ^:private baseline-persist-agent-session-by-mode!
+  agent-session/persist-agent-session-by-mode!)
+
+(def ^:private baseline-clear-agent-session-by-mode!
+  agent-session/clear-agent-session-by-mode!)
+
+(use-fixtures
+  :each
+  {:before (fn []
+             (set! agent-session/load-agent-session-by-mode baseline-load-agent-session-by-mode)
+             (set! agent-session/persist-agent-session-by-mode! baseline-persist-agent-session-by-mode!)
+             (set! agent-session/clear-agent-session-by-mode! baseline-clear-agent-session-by-mode!))
+   :after (fn []
+            (set! agent-session/load-agent-session-by-mode baseline-load-agent-session-by-mode)
+            (set! agent-session/persist-agent-session-by-mode! baseline-persist-agent-session-by-mode!)
+            (set! agent-session/clear-agent-session-by-mode! baseline-clear-agent-session-by-mode!))})
 
 (defn- fake-storage []
   (let [store (atom {})]

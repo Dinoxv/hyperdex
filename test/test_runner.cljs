@@ -45,7 +45,16 @@
             [hyperopen.asset-selector.icon-status-runtime-test]
             [hyperopen.websocket.subscriptions-runtime-test]
             [hyperopen.core-public-actions-test]
-            [hyperopen.core-bootstrap-test]
+            [hyperopen.core-bootstrap.runtime-startup-test]
+            [hyperopen.core-bootstrap.asset-selector-actions-test]
+            [hyperopen.core-bootstrap.account-history-actions-test]
+            [hyperopen.core-bootstrap.asset-cache-persistence-test]
+            [hyperopen.core-bootstrap.websocket-diagnostics-test]
+            [hyperopen.core-bootstrap.wallet-actions-effects-test]
+            [hyperopen.core-bootstrap.order-effects-test]
+            [hyperopen.core-bootstrap.chart-menu-and-storage-test]
+            [hyperopen.core-bootstrap.order-entry-actions-test]
+            [hyperopen.core-bootstrap.agent-trading-lifecycle-test]
             [hyperopen.utils.data-normalization-test]
             [hyperopen.utils.formatting-test]
             [hyperopen.utils.hl-signing-test]
@@ -178,7 +187,16 @@
              'hyperopen.asset-selector.markets-cache-test
              'hyperopen.asset-selector.icon-status-runtime-test
              'hyperopen.core-public-actions-test
-             'hyperopen.core-bootstrap-test
+             'hyperopen.core-bootstrap.runtime-startup-test
+             'hyperopen.core-bootstrap.asset-selector-actions-test
+             'hyperopen.core-bootstrap.account-history-actions-test
+             'hyperopen.core-bootstrap.asset-cache-persistence-test
+             'hyperopen.core-bootstrap.websocket-diagnostics-test
+             'hyperopen.core-bootstrap.wallet-actions-effects-test
+             'hyperopen.core-bootstrap.order-effects-test
+             'hyperopen.core-bootstrap.chart-menu-and-storage-test
+             'hyperopen.core-bootstrap.order-entry-actions-test
+             'hyperopen.core-bootstrap.agent-trading-lifecycle-test
              'hyperopen.orderbook.actions-test
              'hyperopen.orderbook.settings-test
              'hyperopen.orderbook.price-aggregation-test
