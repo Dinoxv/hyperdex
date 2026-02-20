@@ -74,6 +74,17 @@
             [hyperopen.websocket.trades-policy-test]
             [hyperopen.websocket.trades-test]
             [hyperopen.views.active-asset-view-test]
+            [hyperopen.views.account-info-view-test]
+            [hyperopen.views.account-info.navigation-test]
+            [hyperopen.views.account-info.table-contract-test]
+            [hyperopen.views.account-info.tabs.balances-test]
+            [hyperopen.views.account-info.tabs.positions-test]
+            [hyperopen.views.account-info.tabs.open-orders-test]
+            [hyperopen.views.account-info.tabs.trade-history-test]
+            [hyperopen.views.account-info.tabs.order-history-test]
+            [hyperopen.views.account-info.tabs.funding-history-test]
+            [hyperopen.views.account-info.projections-test]
+            [hyperopen.views.account-info.vm-test]
             [hyperopen.views.app-shell-spacing-test]
             [hyperopen.views.asset-selector-view-test]
             [hyperopen.views.footer-view-test]
@@ -191,6 +202,17 @@
              'hyperopen.websocket.trades-policy-test
              'hyperopen.websocket.trades-test
              'hyperopen.views.active-asset-view-test
+             'hyperopen.views.account-info-view-test
+             'hyperopen.views.account-info.navigation-test
+             'hyperopen.views.account-info.table-contract-test
+             'hyperopen.views.account-info.tabs.balances-test
+             'hyperopen.views.account-info.tabs.positions-test
+             'hyperopen.views.account-info.tabs.open-orders-test
+             'hyperopen.views.account-info.tabs.trade-history-test
+             'hyperopen.views.account-info.tabs.order-history-test
+             'hyperopen.views.account-info.tabs.funding-history-test
+             'hyperopen.views.account-info.projections-test
+             'hyperopen.views.account-info.vm-test
              'hyperopen.views.app-shell-spacing-test
              'hyperopen.views.asset-selector-view-test
              'hyperopen.views.footer-view-test

@@ -1,0 +1,482 @@
+(ns hyperopen.views.account-info.tabs.trade-history-test
+  (:require [clojure.string :as str]
+            [cljs.test :refer-macros [deftest is testing use-fixtures]]
+            [hyperopen.views.account-info.test-support.fixtures :as fixtures]
+            [hyperopen.views.account-info.test-support.hiccup :as hiccup]
+            [hyperopen.utils.formatting :as fmt]
+            [hyperopen.views.account-info.tabs.trade-history :as trade-history-tab]
+            [hyperopen.views.account-info-view :as view]))
+
+(defn- reset-trade-history-sort-cache-fixture
+  [f]
+  (trade-history-tab/reset-trade-history-sort-cache!)
+  (f)
+  (trade-history-tab/reset-trade-history-sort-cache!))
+
+(use-fixtures :each reset-trade-history-sort-cache-fixture)
+
+(deftest trade-history-sortable-header-uses-secondary-text-hover-and-action-test
+  (let [header-node (view/sortable-trade-history-header "Time" {:column "Time" :direction :asc})
+        sort-icon-node (second (vec (hiccup/node-children header-node)))]
+    (is (contains? (hiccup/node-class-set header-node) "text-trading-text-secondary"))
+    (is (contains? (hiccup/node-class-set header-node) "hover:text-trading-text"))
+    (is (= [[:actions/sort-trade-history "Time"]]
+           (get-in header-node [1 :on :click])))
+    (is (= "↑" (last sort-icon-node)))))
+
+(deftest sort-trade-history-by-column-is-deterministic-on-ties-and-formats-derived-values-test
+  (let [rows [{:tid 2
+               :coin "xyz:NVDA"
+               :side "B"
+               :sz "2"
+               :px "10"
+               :fee "0.1"
+               :time 1700000000000}
+              {:tid 1
+               :coin "BTC"
+               :side "A"
+               :sz "1"
+               :px "15"
+               :fee "0.2"
+               :time 1700000000000}
+              {:tid 3
+               :coin "ETH"
+               :dir "Open Long (Price Improved)"
+               :sz "3"
+               :px "8"
+               :tradeValue "24"
+               :closedPnl "-0.3"
+               :fee "0.05"
+               :time 1700000001000}]
+        time-asc (view/sort-trade-history-by-column rows "Time" :asc {})
+        value-desc (view/sort-trade-history-by-column rows "Trade Value" :desc {})
+        direction-asc (view/sort-trade-history-by-column rows "Direction" :asc {})]
+    (is (= [1 2 3] (mapv :tid time-asc)))
+    (is (= [3 2 1] (mapv :tid value-desc)))
+    (is (= [2 3 1] (mapv :tid direction-asc)))))
+
+(deftest trade-history-tab-content-memoizes-sorting-by-input-identity-sort-and-market-map-test
+  (let [fills [{:tid 1
+                :coin "ETH"
+                :side "B"
+                :sz "1.0"
+                :px "100.0"
+                :fee "0.1"
+                :time 1700000000000}]
+        trade-history-state {:sort {:column "Time" :direction :desc}
+                             :market-by-key {}}
+        sort-calls (atom 0)]
+    (trade-history-tab/reset-trade-history-sort-cache!)
+    (with-redefs [trade-history-tab/sort-trade-history-by-column
+                  (fn
+                    ([rows _column _direction]
+                     (swap! sort-calls inc)
+                     rows)
+                    ([rows _column _direction _market-by-key]
+                     (swap! sort-calls inc)
+                     rows))]
+      (view/trade-history-tab-content fills trade-history-state)
+      (view/trade-history-tab-content fills trade-history-state)
+      (is (= 1 @sort-calls))
+
+      (let [sort-state-asc (assoc-in trade-history-state [:sort :direction] :asc)]
+        (view/trade-history-tab-content fills sort-state-asc)
+        (view/trade-history-tab-content fills sort-state-asc)
+        (is (= 2 @sort-calls))
+
+        (view/trade-history-tab-content fills
+                                        (assoc sort-state-asc
+                                               :market-by-key
+                                               {"spot:ETH/USDC" {:coin "spot:ETH/USDC"
+                                                                 :symbol "ETH/USDC"}}))
+        (is (= 3 @sort-calls))))))
+
+(deftest trade-history-headers-match-hyperliquid-order-and-contrast-test
+  (let [fills [{:tid 1
+                :coin "xyz:NVDA"
+                :dir "Open Long"
+                :side "B"
+                :sz "0.500"
+                :px "187.88"
+                :tradeValue "93.94"
+                :fee "0.01"
+                :closedPnl "-0.01"
+                :time 1700000000000}]
+        content (view/trade-history-tab-content fills)
+        header-node (hiccup/tab-header-node content)
+        header-cells (vec (hiccup/node-children header-node))
+        header-buttons (mapv #(first (vec (hiccup/node-children %))) header-cells)
+        header-labels (mapv #(first (hiccup/collect-strings %)) header-buttons)]
+    (is (= ["Time" "Coin" "Direction" "Price" "Size" "Trade Value" "Fee" "Closed PNL"]
+           header-labels))
+    (is (every? #(= :button (first %)) header-buttons))
+    (is (every? #(contains? (hiccup/node-class-set %) "text-trading-text-secondary") header-buttons))
+    (is (contains? (hiccup/node-class-set header-node) "text-trading-text-secondary"))))
+
+(deftest trade-history-parity-renders-coin-direction-and-usdc-fields-test
+  (let [fills [{:tid 1
+                :coin "xyz:NVDA"
+                :side "A"
+                :dir "Open Long (Price Improved)"
+                :sz "0.500"
+                :px "187.88"
+                :tradeValue "93.94"
+                :fee "0.01"
+                :closedPnl "-0.01"
+                :time 1700000000000}
+               {:tid 2
+                :coin "HYPE"
+                :side "S"
+                :sz "2"
+                :px "10"
+                :fee "0.02"
+                :time 1700000001000}]
+        content (view/trade-history-tab-content fills)
+        viewport (hiccup/tab-rows-viewport-node content)
+        rendered-rows (vec (hiccup/node-children viewport))
+        nvda-row (some #(when (contains? (set (hiccup/collect-strings %)) "NVDA") %) rendered-rows)
+        hype-row (some #(when (contains? (set (hiccup/collect-strings %)) "HYPE") %) rendered-rows)
+        nvda-row-cells (vec (hiccup/node-children nvda-row))
+        hype-row-cells (vec (hiccup/node-children hype-row))
+        nvda-coin-strings (set (hiccup/collect-strings (nth nvda-row-cells 1)))
+        nvda-row-strings (set (hiccup/collect-strings nvda-row))
+        nvda-direction-strings (set (hiccup/collect-strings (nth nvda-row-cells 2)))
+        hype-direction-strings (set (hiccup/collect-strings (nth hype-row-cells 2)))]
+    (is (some? nvda-row))
+    (is (some? hype-row))
+    (is (contains? nvda-coin-strings "NVDA"))
+    (is (contains? nvda-coin-strings "xyz"))
+    (is (not (contains? nvda-row-strings "xyz:NVDA")))
+    (is (contains? nvda-direction-strings "Open Long (Price Improved)"))
+    (is (contains? hype-direction-strings "Open Short"))
+    (is (contains? (hiccup/direct-texts (nth hype-row-cells 5)) "20.00 USDC"))
+    (is (contains? (hiccup/direct-texts (nth nvda-row-cells 6)) "0.01 USDC"))
+    (is (contains? (hiccup/direct-texts (nth nvda-row-cells 7)) "-0.01 USDC"))
+    (is (contains? (hiccup/direct-texts (nth hype-row-cells 7)) "--"))))
+
+(deftest trade-history-direction-and-coin-colors-follow-action-intent-test
+  (let [fills [{:tid 1
+                :coin "xyz:NVDA"
+                :side "B"
+                :dir "Open Long"
+                :sz "0.500"
+                :px "187.88"
+                :fee "0.01"
+                :time 1700000000000}
+               {:tid 2
+                :coin "PUMP"
+                :side "A"
+                :dir "Sell"
+                :sz "2"
+                :px "10"
+                :fee "0.02"
+                :time 1700000001000}
+               {:tid 3
+                :coin "HYPE"
+                :side "A"
+                :dir "Market Order Liquidation: Close Long"
+                :liquidation {:markPx "0.001780"
+                              :method "market"}
+                :sz "100"
+                :px "0.001765"
+                :fee "0.01"
+                :time 1700000002000}]
+        content (view/trade-history-tab-content fills)
+        viewport (hiccup/tab-rows-viewport-node content)
+        rendered-rows (vec (hiccup/node-children viewport))
+        row-for (fn [needle]
+                  (some #(when (contains? (set (hiccup/collect-strings %)) needle)
+                           %)
+                        rendered-rows))
+        nvda-row (row-for "NVDA")
+        pump-row (row-for "PUMP")
+        hype-row (row-for "HYPE")
+        nvda-cells (vec (hiccup/node-children nvda-row))
+        pump-cells (vec (hiccup/node-children pump-row))
+        hype-cells (vec (hiccup/node-children hype-row))
+        nvda-coin-cell (nth nvda-cells 1)
+        pump-coin-cell (nth pump-cells 1)
+        hype-coin-cell (nth hype-cells 1)
+        nvda-coin-base (hiccup/find-first-node nvda-coin-cell #(and (= :span (first %))
+                                                              (contains? (hiccup/direct-texts %) "NVDA")))
+        pump-coin-base (hiccup/find-first-node pump-coin-cell #(and (= :span (first %))
+                                                              (contains? (hiccup/direct-texts %) "PUMP")))
+        hype-coin-base (hiccup/find-first-node hype-coin-cell #(and (= :span (first %))
+                                                              (contains? (hiccup/direct-texts %) "HYPE")))
+        xyz-chip (hiccup/find-first-node nvda-coin-cell #(and (= :span (first %))
+                                                       (contains? (hiccup/direct-texts %) "xyz")))
+        nvda-direction-cell (nth nvda-cells 2)
+        pump-direction-cell (nth pump-cells 2)
+        hype-direction-cell (nth hype-cells 2)]
+    (is (some? nvda-row))
+    (is (some? pump-row))
+    (is (some? hype-row))
+    (is (some? nvda-coin-base))
+    (is (some? pump-coin-base))
+    (is (some? hype-coin-base))
+    (is (some? xyz-chip))
+    (is (contains? (hiccup/node-class-set nvda-direction-cell) "text-success"))
+    (is (contains? (hiccup/node-class-set nvda-coin-base) "text-success"))
+    (is (contains? (hiccup/node-class-set pump-direction-cell) "text-error"))
+    (is (contains? (hiccup/node-class-set pump-coin-base) "text-error"))
+    (is (contains? (hiccup/node-class-set hype-direction-cell) "text-error"))
+    (is (contains? (hiccup/node-class-set hype-coin-base) "text-error"))
+    (is (contains? (set (hiccup/collect-strings pump-direction-cell)) "Sell"))
+    (is (contains? (set (hiccup/collect-strings hype-direction-cell))
+                   "Market Order Liquidation: Close Long"))))
+
+(deftest trade-history-price-improved-direction-renders-liquidation-tooltip-test
+  (let [tooltip-copy "This fill price was more favorable to you than the price chart at that time, because your order provided liquidity to another user's liquidation."
+        fills [{:tid 1
+                :coin "PUMP"
+                :side "B"
+                :dir "Open Long (Price Improved)"
+                :sz "100"
+                :px "0.001765"
+                :fee "0.01"
+                :time 1700000000000}]
+        content (view/trade-history-tab-content fills)
+        row-node (hiccup/first-viewport-row content)
+        direction-cell (nth (vec (hiccup/node-children row-node)) 2)
+        direction-strings (set (hiccup/collect-strings direction-cell))
+        group-node (hiccup/find-first-node direction-cell #(and (= :div (first %))
+                                                         (contains? (hiccup/node-class-set %) "group")))
+        focusable-label (hiccup/find-first-node direction-cell #(and (= :span (first %))
+                                                              (= 0 (get-in % [1 :tab-index]))))
+        focusable-label-classes (hiccup/node-class-set focusable-label)
+        tooltip-panel-node (hiccup/find-first-node direction-cell #(and (= :div (first %))
+                                                                 (contains? (hiccup/node-class-set %) "group-hover:opacity-100")
+                                                                 (contains? (hiccup/node-class-set %) "group-focus-within:opacity-100")))
+        tooltip-panel-classes (hiccup/node-class-set tooltip-panel-node)
+        tooltip-bubble-node (hiccup/find-first-node tooltip-panel-node #(and (= :div (first %))
+                                                                      (contains? (hiccup/node-class-set %) "w-[520px]")))
+        tooltip-bubble-classes (hiccup/node-class-set tooltip-bubble-node)]
+    (is (contains? direction-strings "Open Long (Price Improved)"))
+    (is (some? group-node))
+    (is (some? focusable-label))
+    (is (some? tooltip-panel-node))
+    (is (some? tooltip-bubble-node))
+    (is (contains? (set (hiccup/collect-strings tooltip-panel-node)) tooltip-copy))
+    (is (contains? focusable-label-classes "underline"))
+    (is (contains? focusable-label-classes "decoration-dotted"))
+    (is (contains? focusable-label-classes "underline-offset-2"))
+    (is (contains? tooltip-panel-classes "bottom-full"))
+    (is (contains? tooltip-panel-classes "mb-2"))
+    (is (contains? tooltip-panel-classes "group-hover:opacity-100"))
+    (is (contains? tooltip-panel-classes "group-focus-within:opacity-100"))
+    (is (contains? tooltip-bubble-classes "w-[520px]"))))
+
+(deftest trade-history-standard-direction-does-not-render-liquidation-tooltip-test
+  (let [tooltip-copy "This fill price was more favorable to you than the price chart at that time, because your order provided liquidity to another user's liquidation."
+        fills [{:tid 1
+                :coin "PUMP"
+                :side "B"
+                :dir "Open Long"
+                :sz "100"
+                :px "0.001765"
+                :fee "0.01"
+                :time 1700000000000}]
+        content (view/trade-history-tab-content fills)
+        row-node (hiccup/first-viewport-row content)
+        direction-cell (nth (vec (hiccup/node-children row-node)) 2)
+        tooltip-panel-node (hiccup/find-first-node direction-cell #(and (= :div (first %))
+                                                                 (contains? (hiccup/node-class-set %) "group-hover:opacity-100")
+                                                                 (contains? (hiccup/node-class-set %) "group-focus-within:opacity-100")))
+        direction-strings (set (hiccup/collect-strings direction-cell))]
+    (is (contains? direction-strings "Open Long"))
+    (is (not (contains? direction-strings tooltip-copy)))
+    (is (nil? tooltip-panel-node))))
+
+(deftest trade-history-liquidation-metadata-infers-price-improved-direction-test
+  (let [tooltip-copy "This fill price was more favorable to you than the price chart at that time, because your order provided liquidity to another user's liquidation."
+        fills [{:tid 1
+                :coin "PUMP"
+                :side "B"
+                :dir "Open Long"
+                :liquidation {:markPx "0.001780"
+                              :method "market"}
+                :sz "100"
+                :px "0.001765"
+                :fee "0.01"
+                :time 1700000000000}]
+        content (view/trade-history-tab-content fills)
+        row-node (hiccup/first-viewport-row content)
+        direction-cell (nth (vec (hiccup/node-children row-node)) 2)
+        direction-strings (set (hiccup/collect-strings direction-cell))
+        tooltip-panel-node (hiccup/find-first-node direction-cell #(and (= :div (first %))
+                                                                 (contains? (hiccup/node-class-set %) "group-hover:opacity-100")
+                                                                 (contains? (hiccup/node-class-set %) "group-focus-within:opacity-100")))]
+    (is (contains? direction-strings "Open Long (Price Improved)"))
+    (is (contains? direction-strings tooltip-copy))
+    (is (some? tooltip-panel-node))))
+
+(deftest trade-history-liquidation-direction-remains-unmodified-test
+  (let [fills [{:tid 1
+                :coin "PUMP"
+                :side "A"
+                :dir "Market Order Liquidation: Close Long"
+                :liquidation {:markPx "0.001780"
+                              :method "market"}
+                :sz "100"
+                :px "0.001765"
+                :fee "0.01"
+                :time 1700000000000}]
+        content (view/trade-history-tab-content fills)
+        row-node (hiccup/first-viewport-row content)
+        direction-cell (nth (vec (hiccup/node-children row-node)) 2)
+        direction-strings (set (hiccup/collect-strings direction-cell))]
+    (is (contains? direction-strings "Market Order Liquidation: Close Long"))
+    (is (not (contains? direction-strings "Market Order Liquidation: Close Long (Price Improved)")))))
+
+(deftest trade-history-liquidation-close-direction-is-inferred-from-metadata-test
+  (let [fills [{:tid 1
+                :coin "PUMP"
+                :side "A"
+                :dir "Close Long"
+                :liquidation {:markPx "0.001780"
+                              :method "market"}
+                :sz "100"
+                :px "0.001765"
+                :fee "0.01"
+                :time 1700000000000}]
+        content (view/trade-history-tab-content fills)
+        row-node (hiccup/first-viewport-row content)
+        direction-cell (nth (vec (hiccup/node-children row-node)) 2)
+        direction-strings (set (hiccup/collect-strings direction-cell))]
+    (is (contains? direction-strings "Market Order Liquidation: Close Long"))
+    (is (not (contains? direction-strings "Close Long (Price Improved)")))
+    (is (not (contains? direction-strings "Market Order Liquidation: Close Long (Price Improved)")))))
+
+(deftest trade-history-time-cell-renders-explorer-link-when-valid-hash-present-test
+  (let [hash-value "0xcb13be47d7d3e736cc8d04346f1535020494002d72d706086edc699a96d7c121"
+        fills [{:tid 1
+                :coin "HYPE"
+                :side "B"
+                :sz "1.2"
+                :px "100.0"
+                :fee "0.1"
+                :time 1700000000000
+                :hash hash-value}]
+        content (view/trade-history-tab-content fills)
+        row-node (hiccup/first-viewport-row content)
+        time-cell (first (vec (hiccup/node-children row-node)))
+        time-cell-classes (hiccup/node-class-set time-cell)
+        link-node (hiccup/find-first-node time-cell #(= :a (first %)))
+        link-classes (hiccup/node-class-set link-node)
+        icon-node (hiccup/find-first-node link-node #(= :svg (first %)))
+        expected-time (view/format-open-orders-time 1700000000000)
+        strings (set (hiccup/collect-strings time-cell))]
+    (is (some? link-node))
+    (is (contains? time-cell-classes "whitespace-nowrap"))
+    (is (contains? link-classes "whitespace-nowrap"))
+    (is (= (str "https://app.hyperliquid.xyz/explorer/tx/" hash-value)
+           (get-in link-node [1 :href])))
+    (is (= "_blank" (get-in link-node [1 :target])))
+    (is (= "noopener noreferrer" (get-in link-node [1 :rel])))
+    (is (contains? strings expected-time))
+    (is (some? icon-node))))
+
+(deftest time-format-wrapper-parity-test
+  (let [ms 1700000000000
+        expected (fmt/format-local-date-time ms)]
+    (is (= expected (view/format-open-orders-time ms)))
+    (is (= expected (view/format-funding-history-time ms)))
+    (is (nil? (view/format-open-orders-time nil)))
+    (is (nil? (view/format-funding-history-time nil)))))
+
+(deftest trade-history-time-cell-falls-back-to-plain-text-when-hash-missing-or-invalid-test
+  (let [fills [{:tid 1
+                :coin "HYPE"
+                :side "B"
+                :sz "1.2"
+                :px "100.0"
+                :fee "0.1"
+                :time 1700000000000}
+               {:tid 2
+                :coin "BTC"
+                :side "A"
+                :sz "0.8"
+                :px "95.0"
+                :fee "0.05"
+                :time 1700000001000
+                :hash "0x1234"}]
+        content (view/trade-history-tab-content fills)
+        viewport (hiccup/tab-rows-viewport-node content)
+        rendered-rows (vec (hiccup/node-children viewport))
+        expected-times (set (mapv (comp view/format-open-orders-time :time) fills))
+        rendered-times (->> rendered-rows
+                            (map (fn [row]
+                                   (let [time-cell (first (vec (hiccup/node-children row)))]
+                                     (is (nil? (hiccup/find-first-node time-cell #(= :a (first %)))))
+                                     (hiccup/collect-strings time-cell))))
+                            (reduce into #{}))]
+    (doseq [expected expected-times]
+      (is (contains? rendered-times expected)))))
+
+(deftest trade-history-pagination-renders-only-current-page-rows-test
+  (let [rows (mapv fixtures/trade-history-row (range 55))
+        content (@#'view/trade-history-table rows {:page-size 25
+                                                   :page 2
+                                                   :page-input "2"})
+        viewport (hiccup/tab-rows-viewport-node content)
+        rendered-rows (vec (hiccup/node-children viewport))
+        all-strings (set (hiccup/collect-strings content))]
+    (is (= 25 (count rendered-rows)))
+    (is (contains? all-strings "Page 2 of 3"))
+    (is (contains? all-strings "Total: 55"))))
+
+(deftest trade-history-pagination-controls-disable-prev-next-at-edges-test
+  (let [rows (mapv fixtures/trade-history-row (range 51))
+        first-page (@#'view/trade-history-table rows {:page-size 25
+                                                      :page 1
+                                                      :page-input "1"})
+        first-prev (hiccup/find-first-node first-page #(and (= :button (first %))
+                                                     (contains? (hiccup/direct-texts %) "Prev")))
+        first-next (hiccup/find-first-node first-page #(and (= :button (first %))
+                                                     (contains? (hiccup/direct-texts %) "Next")))
+        last-page (@#'view/trade-history-table rows {:page-size 25
+                                                     :page 3
+                                                     :page-input "3"})
+        last-prev (hiccup/find-first-node last-page #(and (= :button (first %))
+                                                   (contains? (hiccup/direct-texts %) "Prev")))
+        last-next (hiccup/find-first-node last-page #(and (= :button (first %))
+                                                   (contains? (hiccup/direct-texts %) "Next")))]
+    (is (= true (get-in first-prev [1 :disabled])))
+    (is (not= true (get-in first-next [1 :disabled])))
+    (is (not= true (get-in last-prev [1 :disabled])))
+    (is (= true (get-in last-next [1 :disabled])))))
+
+(deftest trade-history-pagination-controls-wire-actions-test
+  (let [rows (mapv fixtures/trade-history-row (range 12))
+        content (@#'view/trade-history-table rows {:page-size 25
+                                                   :page 1
+                                                   :page-input "4"})
+        page-size-select (hiccup/find-first-node content #(and (= :select (first %))
+                                                        (= "trade-history-page-size" (get-in % [1 :id]))))
+        jump-input (hiccup/find-first-node content #(and (= :input (first %))
+                                                  (= "trade-history-page-input" (get-in % [1 :id]))))
+        go-button (hiccup/find-first-node content #(and (= :button (first %))
+                                                 (contains? (hiccup/direct-texts %) "Go")))]
+    (is (= [[:actions/set-trade-history-page-size [:event.target/value]]]
+           (get-in page-size-select [1 :on :change])))
+    (is (= [[:actions/set-trade-history-page-input [:event.target/value]]]
+           (get-in jump-input [1 :on :input])))
+    (is (= [[:actions/set-trade-history-page-input [:event.target/value]]]
+           (get-in jump-input [1 :on :change])))
+    (is (= [[:actions/handle-trade-history-page-input-keydown [:event/key] 1]]
+           (get-in jump-input [1 :on :keydown])))
+    (is (= [[:actions/apply-trade-history-page-input 1]]
+           (get-in go-button [1 :on :click])))))
+
+(deftest trade-history-pagination-clamps-page-when-data-shrinks-test
+  (let [rows (mapv fixtures/trade-history-row (range 10))
+        content (@#'view/trade-history-table rows {:page-size 25
+                                                   :page 4
+                                                   :page-input "4"})
+        viewport (hiccup/tab-rows-viewport-node content)
+        jump-input (hiccup/find-first-node content #(and (= :input (first %))
+                                                  (= "trade-history-page-input" (get-in % [1 :id]))))
+        all-strings (set (hiccup/collect-strings content))]
+    (is (= 10 (count (vec (hiccup/node-children viewport)))))
+    (is (contains? all-strings "Page 1 of 1"))
+    (is (= "1" (get-in jump-input [1 :value])))))

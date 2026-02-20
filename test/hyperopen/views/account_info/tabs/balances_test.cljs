@@ -1,0 +1,562 @@
+(ns hyperopen.views.account-info.tabs.balances-test
+  (:require [clojure.string :as str]
+            [cljs.test :refer-macros [deftest is testing]]
+            [hyperopen.views.account-info.test-support.fixtures :as fixtures]
+            [hyperopen.views.account-info.test-support.hiccup :as hiccup]
+            [hyperopen.views.account-info-view :as view]))
+
+(deftest balances-header-contrast-test
+  (let [header-node (view/balance-table-header fixtures/default-sort-state)
+        sortable-node (view/sortable-balances-header "Coin" fixtures/default-sort-state)
+        sortable-left-node (view/sortable-balances-header "Total Balance" fixtures/default-sort-state :left)
+        non-sortable-node (view/non-sortable-header "Send")
+        non-sortable-center-node (view/non-sortable-header "Send" :center)]
+    (is (contains? (hiccup/node-class-set header-node) "text-trading-text"))
+    (is (contains? (hiccup/node-class-set sortable-node) "text-trading-text-secondary"))
+    (is (contains? (hiccup/node-class-set sortable-node) "justify-start"))
+    (is (contains? (hiccup/node-class-set sortable-left-node) "justify-start"))
+    (is (contains? (hiccup/node-class-set sortable-node) "hover:text-trading-text"))
+    (is (contains? (hiccup/node-class-set non-sortable-node) "text-trading-text-secondary"))
+    (is (contains? (hiccup/node-class-set non-sortable-center-node) "justify-center"))))
+
+(deftest balances-header-includes-contract-column-as-final-cell-test
+  (let [header-node (view/balance-table-header fixtures/default-sort-state)
+        header-cells (vec (hiccup/node-children header-node))
+        header-labels (mapv #(first (hiccup/collect-strings %)) header-cells)]
+    (is (= 8 (count header-cells)))
+    (is (= ["Coin"
+            "Total Balance"
+            "Available Balance"
+            "USDC Value"
+            "PNL (ROE %)"
+            "Send"
+            "Transfer"
+            "Contract"]
+           header-labels))))
+
+(deftest sort-balances-by-column-keeps-usdc-partition-on-top-for-coin-sort-test
+  (let [rows [{:key "spot-usdc" :coin "USDC (Spot)"}
+              {:key "hype" :coin "HYPE"}
+              {:key "perps-usdc" :coin "USDC (Perps)"}
+              {:key "btc" :coin "BTC"}]
+        coin-asc (view/sort-balances-by-column rows "Coin" :asc)
+        coin-desc (view/sort-balances-by-column rows "Coin" :desc)]
+    (is (= ["USDC (Perps)" "USDC (Spot)" "BTC" "HYPE"]
+           (mapv :coin coin-asc)))
+    (is (= ["USDC (Spot)" "USDC (Perps)" "HYPE" "BTC"]
+           (mapv :coin coin-desc)))))
+
+(deftest sort-balances-by-column-keeps-usdc-partition-on-top-for-numeric-columns-test
+  (let [rows [{:key "usdc-low" :coin "USDC (Spot)" :usdc-value 5}
+              {:key "coin-high" :coin "AAA" :usdc-value 1000}
+              {:key "usdc-high" :coin "USDC (Perps)" :usdc-value 100}
+              {:key "coin-low" :coin "BBB" :usdc-value 1}]
+        value-asc (view/sort-balances-by-column rows "USDC Value" :asc)
+        value-desc (view/sort-balances-by-column rows "USDC Value" :desc)]
+    (is (= ["USDC (Spot)" "USDC (Perps)" "BBB" "AAA"]
+           (mapv :coin value-asc)))
+    (is (= ["USDC (Perps)" "USDC (Spot)" "AAA" "BBB"]
+           (mapv :coin value-desc)))))
+
+(deftest sort-balances-by-column-is-deterministic-on-ties-with-coin-then-key-test
+  (let [rows [{:key "u-b" :coin "USDC Beta" :usdc-value 10}
+              {:key "u-a2" :coin "USDC Alpha" :usdc-value 10}
+              {:key "u-a1" :coin "USDC Alpha" :usdc-value 10}
+              {:key "n-z" :coin "ZZZ" :usdc-value 20}
+              {:key "n-a2" :coin "AAA" :usdc-value 20}
+              {:key "n-a1" :coin "AAA" :usdc-value 20}]
+        asc-result (view/sort-balances-by-column rows "USDC Value" :asc)
+        desc-result (view/sort-balances-by-column rows "USDC Value" :desc)
+        expected [["USDC Alpha" "u-a1"]
+                  ["USDC Alpha" "u-a2"]
+                  ["USDC Beta" "u-b"]
+                  ["AAA" "n-a1"]
+                  ["AAA" "n-a2"]
+                  ["ZZZ" "n-z"]]]
+    (is (= expected
+           (mapv (juxt :coin :key) asc-result)))
+    (is (= expected
+           (mapv (juxt :coin :key) desc-result)))))
+
+(deftest build-balance-rows-attaches-contract-id-for-non-usdc-spot-and-leaves-usdc-rows-empty-test
+  (let [rows (view/build-balance-rows
+              {:clearinghouseState {:marginSummary {:accountValue "12.5"
+                                                    :totalMarginUsed "2.5"}}
+               :spotAssetCtxs []}
+              {:meta {:tokens [{:index 0
+                                :name "USDC"
+                                :weiDecimals 8
+                                :tokenId "0x11111111111111111111111111111111"}
+                               {:index 1
+                                :name "HYPE"
+                                :weiDecimals 5
+                                :tokenId "0x22222222222222222222222222222222"}]
+                      :universe []}
+               :clearinghouse-state {:balances [{:coin "USDC"
+                                                 :token 0
+                                                 :hold "0.0"
+                                                 :total "5.0"
+                                                 :entryNtl "0"}
+                                                {:coin "HYPE"
+                                                 :token 1
+                                                 :hold "0.0"
+                                                 :total "7.0"
+                                                 :entryNtl "0"}]}})
+        by-coin (into {} (map (juxt :coin identity)) rows)]
+    (is (nil? (:contract-id (get by-coin "USDC (Perps)"))))
+    (is (nil? (:contract-id (get by-coin "USDC (Spot)"))))
+    (is (= 5.0
+           (view/parse-num (:usdc-value (get by-coin "USDC (Spot)")))))
+    (is (= "0x22222222222222222222222222222222"
+           (:contract-id (get by-coin "HYPE"))))))
+
+(deftest build-balance-rows-attaches-contract-id-when-token-reference-is-symbol-test
+  (let [rows (view/build-balance-rows
+              {:clearinghouseState {:marginSummary {:accountValue "1.0"
+                                                    :totalMarginUsed "0.0"}}
+               :spotAssetCtxs []}
+              {:meta {:tokens [{:index 0
+                                :name "USDC"
+                                :weiDecimals 8}
+                               {:name "MEOW"
+                                :weiDecimals 5
+                                :contractAddress "0x3333333333333333333333333333333333333333"}]
+                      :universe []}
+               :clearinghouse-state {:balances [{:coin "USDC"
+                                                 :token 0
+                                                 :hold "0.0"
+                                                 :total "5.0"
+                                                 :entryNtl "0"}
+                                                {:coin "MEOW"
+                                                 :token "MEOW"
+                                                 :hold "0.0"
+                                                 :total "7.0"
+                                                 :entryNtl "0"}]}})
+        by-coin (into {} (map (juxt :coin identity)) rows)]
+    (is (= "0x3333333333333333333333333333333333333333"
+           (:contract-id (get by-coin "MEOW"))))))
+
+(deftest build-balance-rows-attaches-contract-id-from-balance-payload-keys-test
+  (let [rows (view/build-balance-rows
+              {:clearinghouseState {:marginSummary {:accountValue "1.0"
+                                                    :totalMarginUsed "0.0"}}
+               :spotAssetCtxs []}
+              {:meta {:tokens [{:index 0
+                                :name "USDC"
+                                :weiDecimals 8}
+                               {:index 1
+                                :name "HYPE"
+                                :weiDecimals 5}]
+                      :universe []}
+               :clearinghouse-state {:balances [{:coin "USDC"
+                                                 :token 0
+                                                 :hold "0.0"
+                                                 :total "5.0"
+                                                 :entryNtl "0"}
+                                                {:coin "HYPE"
+                                                 :token 1
+                                                 :tokenAddress "0x4444444444444444444444444444444444444444"
+                                                 :hold "0.0"
+                                                 :total "7.0"
+                                                 :entryNtl "0"}]}})
+        by-coin (into {} (map (juxt :coin identity)) rows)]
+    (is (= "0x4444444444444444444444444444444444444444"
+           (:contract-id (get by-coin "HYPE"))))))
+
+(deftest build-balance-rows-attaches-contract-id-from-nested-token-metadata-test
+  (let [rows (view/build-balance-rows
+              {:clearinghouseState {:marginSummary {:accountValue "1.0"
+                                                    :totalMarginUsed "0.0"}}
+               :spotAssetCtxs []}
+              {:meta {:tokens [{:index 0
+                                :name "USDC"
+                                :weiDecimals 8}
+                               {:index 1
+                                :name "PUFF"
+                                :weiDecimals 5
+                                :tokenInfo {:evmContract {:address "0X5555555555555555555555555555555555555555"}}}]
+                      :universe []}
+               :clearinghouse-state {:balances [{:coin "USDC"
+                                                 :token 0
+                                                 :hold "0.0"
+                                                 :total "5.0"
+                                                 :entryNtl "0"}
+                                                {:coin "PUFF"
+                                                 :token 1
+                                                 :hold "0.0"
+                                                 :total "7.0"
+                                                 :entryNtl "0"}]}})
+        by-coin (into {} (map (juxt :coin identity)) rows)]
+    (is (= "0X5555555555555555555555555555555555555555"
+           (:contract-id (get by-coin "PUFF"))))))
+
+(deftest build-balance-rows-extracts-embedded-hex-contract-id-test
+  (let [rows (view/build-balance-rows
+              {:clearinghouseState {:marginSummary {:accountValue "1.0"
+                                                    :totalMarginUsed "0.0"}}
+               :spotAssetCtxs []}
+              {:meta {:tokens [{:index 0
+                                :name "USDC"
+                                :weiDecimals 8}
+                               {:index 1
+                                :name "BOLT"
+                                :weiDecimals 5
+                                :contractAddress "eip155:42161/erc20:0x6666666666666666666666666666666666666666"}]
+                      :universe []}
+               :clearinghouse-state {:balances [{:coin "USDC"
+                                                 :token 0
+                                                 :hold "0.0"
+                                                 :total "5.0"
+                                                 :entryNtl "0"}
+                                                {:coin "BOLT"
+                                                 :token 1
+                                                 :hold "0.0"
+                                                 :total "7.0"
+                                                 :entryNtl "0"}]}})
+        by-coin (into {} (map (juxt :coin identity)) rows)]
+    (is (= "0x6666666666666666666666666666666666666666"
+           (:contract-id (get by-coin "BOLT"))))))
+
+(deftest build-balance-rows-ignores-generic-address-keys-for-contract-id-test
+  (let [rows (view/build-balance-rows
+              {:clearinghouseState {:marginSummary {:accountValue "1.0"
+                                                    :totalMarginUsed "0.0"}}
+               :spotAssetCtxs []}
+              {:meta {:tokens [{:index 0
+                                :name "USDC"
+                                :weiDecimals 8}
+                               {:index 1
+                                :name "HYPE"
+                                :weiDecimals 5
+                                :address "0x7777777777777777777777777777777777777777"}]
+                      :universe []}
+               :clearinghouse-state {:balances [{:coin "USDC"
+                                                 :token 0
+                                                 :hold "0.0"
+                                                 :total "5.0"
+                                                 :entryNtl "0"}
+                                                {:coin "HYPE"
+                                                 :token 1
+                                                 :address "0x8888888888888888888888888888888888888888"
+                                                 :hold "0.0"
+                                                 :total "7.0"
+                                                 :entryNtl "0"}]}})
+        by-coin (into {} (map (juxt :coin identity)) rows)]
+    (is (nil? (:contract-id (get by-coin "HYPE"))))))
+
+(deftest build-balance-rows-unified-mode-prefers-spot-usdc-without-perps-double-count-test
+  (let [rows (view/build-balance-rows-for-account
+              {:clearinghouseState {:marginSummary {:accountValue "3.03"
+                                                    :totalMarginUsed "0.0"}}
+               :spotAssetCtxs [{:markPx "1"}]}
+              {:meta {:tokens [{:index 0
+                                :name "USDC"
+                                :weiDecimals 6
+                                :tokenId "0x11111111111111111111111111111111"}
+                               {:index 1
+                                :name "MEOW"
+                                :weiDecimals 6
+                                :tokenId "0x22222222222222222222222222222222"}]
+                      :universe [{:tokens [0 0]
+                                  :index 0}]}
+               :clearinghouse-state {:balances [{:coin "USDC"
+                                                 :token 0
+                                                 :hold "0.0"
+                                                 :total "201.42"
+                                                 :entryNtl "0"}
+                                                {:coin "MEOW"
+                                                 :token 1
+                                                 :hold "0.0"
+                                                 :total "1.0"
+                                                 :entryNtl "0"}]}}
+              {:mode :unified
+               :abstraction-raw "unifiedAccount"})
+        by-coin (into {} (map (juxt :coin identity)) rows)
+        usdc-row (get by-coin "USDC")]
+    (is (= 2 (count rows)))
+    (is (some? usdc-row))
+    (is (= 201.42 (view/parse-num (:total-balance usdc-row))))
+    (is (= 201.42 (view/parse-num (:usdc-value usdc-row))))
+    (is (true? (:transfer-disabled? usdc-row)))
+    (is (nil? (get by-coin "USDC (Spot)")))
+    (is (nil? (get by-coin "USDC (Perps)")))))
+
+(deftest build-balance-rows-unified-mode-falls-back-to-perps-usdc-when-spot-usdc-missing-test
+  (let [rows (view/build-balance-rows-for-account
+              {:clearinghouseState {:marginSummary {:accountValue "3.03"
+                                                    :totalMarginUsed "0.0"}}
+               :spotAssetCtxs []}
+              {:meta {:tokens [{:index 0
+                                :name "USDC"
+                                :weiDecimals 6}
+                               {:index 1
+                                :name "MEOW"
+                                :weiDecimals 6}]
+                      :universe []}
+               :clearinghouse-state {:balances [{:coin "MEOW"
+                                                 :token 1
+                                                 :hold "0.0"
+                                                 :total "1.0"
+                                                 :entryNtl "0"}]}}
+              {:mode :unified
+               :abstraction-raw "unifiedAccount"})
+        by-coin (into {} (map (juxt :coin identity)) rows)
+        usdc-row (get by-coin "USDC")]
+    (is (= 2 (count rows)))
+    (is (some? usdc-row))
+    (is (= 3.03 (view/parse-num (:total-balance usdc-row))))
+    (is (= 3.03 (view/parse-num (:usdc-value usdc-row))))
+    (is (true? (:transfer-disabled? usdc-row)))))
+
+(deftest build-balance-rows-usdc-value-falls-back-to-coin-identity-when-meta-missing-test
+  (let [rows (view/build-balance-rows-for-account
+              {:clearinghouseState {:marginSummary {:accountValue "0.0"
+                                                    :totalMarginUsed "0.0"}}
+               :spotAssetCtxs []}
+              {:meta {:tokens []
+                      :universe []}
+               :clearinghouse-state {:balances [{:coin "USDC"
+                                                 :token 0
+                                                 :hold "3.03000000"
+                                                 :total "204.41936500"
+                                                 :entryNtl "0"}]}}
+              {:mode :unified
+               :abstraction-raw "unifiedAccount"})
+        usdc-row (first rows)]
+    (is (= 1 (count rows)))
+    (is (= "USDC" (:coin usdc-row)))
+    (is (= 204.419365 (view/parse-num (:usdc-value usdc-row))))
+    (is (= 201.389365 (view/parse-num (:available-balance usdc-row))))))
+
+(deftest build-balance-rows-usdc-identity-invariant-holds-without-pricing-context-test
+  (let [rows (view/build-balance-rows
+              {:spotAssetCtxs nil}
+              {:meta nil
+               :clearinghouse-state {:balances [{:coin "USDC"
+                                                 :token 0
+                                                 :hold "0.0"
+                                                 :total "204.41"
+                                                 :entryNtl "0"}
+                                                {:coin "USDC.e"
+                                                 :token 1
+                                                 :hold "0.0"
+                                                 :total "0.04"
+                                                 :entryNtl "0"}]}})
+        usdc-like-rows (filter #(str/starts-with? (:coin %) "USDC") rows)]
+    (is (= 2 (count usdc-like-rows)))
+    (doseq [row usdc-like-rows]
+      (is (= (view/parse-num (:total-balance row))
+             (view/parse-num (:usdc-value row)))))))
+
+(deftest build-balance-rows-filters-zero-balance-rows-by-default-test
+  (let [rows (view/build-balance-rows
+              {:clearinghouseState {:marginSummary {:accountValue "0.0"
+                                                    :totalMarginUsed "0.0"}}
+               :spotAssetCtxs [{:markPx "1"}]}
+              {:meta {:tokens [{:index 0
+                                :name "USDC"
+                                :weiDecimals 6}
+                               {:index 1
+                                :name "USDE"
+                                :weiDecimals 6}
+                               {:index 2
+                                :name "HYPE"
+                                :weiDecimals 6}]
+                      :universe [{:tokens [0 0]
+                                  :index 0}]}
+               :clearinghouse-state {:balances [{:coin "USDC"
+                                                 :token 0
+                                                 :hold "0.0"
+                                                 :total "10.0"
+                                                 :entryNtl "0"}
+                                                {:coin "USDE"
+                                                 :token 1
+                                                 :hold "0.0"
+                                                 :total "0.0"
+                                                 :entryNtl "0"}
+                                                {:coin "HYPE"
+                                                 :token 2
+                                                 :hold "0.0"
+                                                 :total "1.0"
+                                                 :entryNtl "0"}]}})
+        coins (set (map :coin rows))]
+    (is (contains? coins "USDC (Spot)"))
+    (is (contains? coins "HYPE"))
+    (is (not (contains? coins "USDE")))
+    (is (not (contains? coins "USDC (Perps)")))))
+
+(deftest balances-tab-content-without-active-sort-preserves-input-order-test
+  (let [rows [{:key "row-1" :coin "HYPE" :total-balance 1 :available-balance 1 :usdc-value 1}
+              {:key "row-2" :coin "USDC (Spot)" :total-balance 2 :available-balance 2 :usdc-value 2}
+              {:key "row-3" :coin "BTC" :total-balance 3 :available-balance 3 :usdc-value 3}]
+        tab-content (view/balances-tab-content rows false {:column nil :direction :asc})]
+    (is (= ["HYPE" "USDC (Spot)" "BTC"]
+           (hiccup/balance-tab-coins tab-content)))))
+
+(deftest balances-tab-content-does-not-render-legacy-subheader-row-test
+  (let [content (view/balances-tab-content [fixtures/sample-balance-row] false fixtures/default-sort-state)
+        title-node (hiccup/find-first-node content #(contains? (hiccup/direct-texts %) "Balances ("))
+        filter-label-node (hiccup/find-first-node content #(contains? (hiccup/direct-texts %) "Hide Small Balances"))]
+    (is (nil? title-node))
+    (is (nil? filter-label-node))))
+
+(deftest balances-tab-viewport-has-no-artificial-top-gap-test
+  (let [content (view/balances-tab-content [fixtures/sample-balance-row] false fixtures/default-sort-state)
+        rows-viewport-classes (hiccup/node-class-set (hiccup/tab-rows-viewport-node content))]
+    (is (not (contains? rows-viewport-classes "-mt-8")))
+    (is (not (contains? rows-viewport-classes "pt-12")))))
+
+(deftest balance-row-primary-value-and-action-contrast-test
+  (let [row-node (view/balance-row fixtures/sample-balance-row)
+        coin-node (hiccup/find-first-node row-node #(contains? (hiccup/direct-texts %) "USDC (Spot)"))
+        send-button-node (hiccup/find-first-node row-node #(contains? (hiccup/direct-texts %) "Send"))
+        transfer-button-node (hiccup/find-first-node row-node #(contains? (hiccup/direct-texts %) "Transfer"))]
+    (is (contains? (hiccup/node-class-set row-node) "text-trading-text"))
+    (is (contains? (hiccup/node-class-set coin-node) "font-semibold"))
+    (is (contains? (hiccup/node-class-set send-button-node) "text-trading-text"))
+    (is (contains? (hiccup/node-class-set transfer-button-node) "text-trading-text"))))
+
+(deftest balance-row-renders-unified-transfer-disabled-label-test
+  (let [row-node (view/balance-row (assoc fixtures/sample-balance-row
+                                          :coin "USDC"
+                                          :transfer-disabled? true))
+        transfer-label-node (hiccup/find-first-node row-node #(contains? (hiccup/direct-texts %) "Unified"))
+        transfer-button-node (hiccup/find-first-node row-node #(contains? (hiccup/direct-texts %) "Transfer"))]
+    (is (some? transfer-label-node))
+    (is (contains? (hiccup/node-class-set transfer-label-node) "text-trading-text-secondary"))
+    (is (nil? transfer-button-node))))
+
+(deftest balance-row-unified-available-balance-renders-dashed-tooltip-test
+  (let [row-node (view/balance-row {:key "unified-usdc"
+                                    :coin "USDC"
+                                    :total-balance 204.419365
+                                    :available-balance 201.389365
+                                    :usdc-value 204.41
+                                    :pnl-value nil
+                                    :pnl-pct nil
+                                    :amount-decimals 8
+                                    :transfer-disabled? true})
+        tooltip-trigger-node (hiccup/find-first-node row-node #(and (contains? (hiccup/node-class-set %) "decoration-dashed")
+                                                              (contains? (hiccup/direct-texts %) "201.38936500")))
+        tooltip-panel-node (hiccup/find-first-node row-node #(and (= :div (first %))
+                                                           (contains? (hiccup/node-class-set %) "group-hover:opacity-100")))
+        tooltip-panel-classes (hiccup/node-class-set tooltip-panel-node)
+        tooltip-bubble-node (hiccup/find-first-node tooltip-panel-node #(and (= :div (first %))
+                                                                      (contains? (hiccup/node-class-set %) "w-[520px]")))
+        tooltip-bubble-classes (hiccup/node-class-set tooltip-bubble-node)
+        tooltip-text (str/join " " (hiccup/collect-strings tooltip-panel-node))]
+    (is (some? tooltip-trigger-node))
+    (is (contains? (hiccup/node-class-set tooltip-trigger-node) "underline"))
+    (is (contains? (hiccup/node-class-set tooltip-trigger-node) "underline-offset-2"))
+    (is (some? tooltip-panel-node))
+    (is (contains? tooltip-panel-classes "left-1/2"))
+    (is (contains? tooltip-panel-classes "-translate-x-1/2"))
+    (is (not (contains? tooltip-panel-classes "right-0")))
+    (is (contains? tooltip-panel-classes "bottom-full"))
+    (is (contains? tooltip-panel-classes "mb-2"))
+    (is (contains? tooltip-panel-classes "z-[120]"))
+    (is (not (contains? tooltip-panel-classes "top-full")))
+    (is (some? tooltip-bubble-node))
+    (is (contains? tooltip-bubble-classes "text-left"))
+    (is (str/includes? tooltip-text "201.38936500 USDC is available to withdraw or transfer."))))
+
+(deftest balances-tab-content-first-row-tooltip-falls-back-below-test
+  (let [rows [{:key "unified-usdc"
+               :coin "USDC"
+               :total-balance 204.419365
+               :available-balance 201.389365
+               :usdc-value 204.41
+               :pnl-value nil
+               :pnl-pct nil
+               :amount-decimals 8
+               :transfer-disabled? true}
+              (assoc fixtures/sample-balance-row :key "spot-usdc" :coin "USDC (Spot)")]
+        content (view/balances-tab-content rows false fixtures/default-sort-state)
+        first-row (hiccup/first-viewport-row content)
+        tooltip-panel-node (hiccup/find-first-node first-row #(and (= :div (first %))
+                                                            (contains? (hiccup/node-class-set %) "group-hover:opacity-100")))
+        tooltip-panel-classes (hiccup/node-class-set tooltip-panel-node)]
+    (is (some? tooltip-panel-node))
+    (is (contains? tooltip-panel-classes "top-full"))
+    (is (contains? tooltip-panel-classes "mt-2"))
+    (is (not (contains? tooltip-panel-classes "bottom-full")))))
+
+(deftest balance-row-contract-cell-renders-explorer-link-with-abbreviated-id-test
+  (let [contract-id "0x1234567890abcdef"
+        row-node (view/balance-row (assoc fixtures/sample-balance-row :contract-id contract-id))
+        contract-cell (hiccup/balance-row-contract-cell row-node)
+        link-node (hiccup/find-first-node contract-cell #(= :a (first %)))
+        icon-node (hiccup/find-first-node contract-cell #(= :svg (first %)))
+        strings (set (hiccup/collect-strings contract-cell))]
+    (is (some? link-node))
+    (is (some? icon-node))
+    (is (= (str "https://app.hyperliquid.xyz/explorer/token/" contract-id)
+           (get-in link-node [1 :href])))
+    (is (= "_blank" (get-in link-node [1 :target])))
+    (is (= "noopener noreferrer" (get-in link-node [1 :rel])))
+    (is (contains? strings "0x1234...cdef"))))
+
+(deftest balance-row-contract-cell-stays-blank-when-contract-id-missing-or-invalid-test
+  (let [missing-row (view/balance-row fixtures/sample-balance-row)
+        invalid-row (view/balance-row (assoc fixtures/sample-balance-row :contract-id "bad id"))
+        missing-cell (hiccup/balance-row-contract-cell missing-row)
+        invalid-cell (hiccup/balance-row-contract-cell invalid-row)
+        missing-link (hiccup/find-first-node missing-cell #(= :a (first %)))
+        invalid-link (hiccup/find-first-node invalid-cell #(= :a (first %)))]
+    (is (some? missing-cell))
+    (is (some? invalid-cell))
+    (is (nil? missing-link))
+    (is (nil? invalid-link))
+    (is (empty? (hiccup/collect-strings missing-cell)))
+    (is (empty? (hiccup/collect-strings invalid-cell)))))
+
+(deftest balance-row-contract-abbreviation-rules-test
+  (let [short-id "1234567890"
+        no-prefix-id "abcdefghijklmnop"
+        short-row (view/balance-row (assoc fixtures/sample-balance-row :contract-id short-id))
+        no-prefix-row (view/balance-row (assoc fixtures/sample-balance-row :contract-id no-prefix-id))
+        short-strings (set (hiccup/collect-strings (hiccup/balance-row-contract-cell short-row)))
+        no-prefix-strings (set (hiccup/collect-strings (hiccup/balance-row-contract-cell no-prefix-row)))]
+    (is (contains? short-strings short-id))
+    (is (contains? no-prefix-strings "abcd...mnop"))))
+
+(deftest balance-pnl-color-and-placeholder-contrast-test
+  (testing "pnl uses success/error colors and white placeholders"
+    (let [positive (view/format-pnl 2.0 1.5)
+          negative (view/format-pnl -3.0 -2.0)
+          zero (view/format-pnl 0 0)
+          missing (view/format-pnl nil nil)]
+      (is (contains? (hiccup/node-class-set positive) "text-success"))
+      (is (contains? (hiccup/node-class-set negative) "text-error"))
+      (is (contains? (hiccup/node-class-set zero) "text-trading-text"))
+      (is (contains? (hiccup/node-class-set missing) "text-trading-text")))))
+
+(deftest balances-and-positions-values-use-semibold-weight-test
+  (let [balance-row-node (view/balance-row fixtures/sample-balance-row)
+        position-row-node (view/position-row fixtures/sample-position-data)
+        balance-value-node (hiccup/find-first-node balance-row-node
+                                            #(let [classes (hiccup/node-class-set %)]
+                                               (and (contains? classes "font-semibold")
+                                                    (contains? classes "num"))))
+        position-value-node (hiccup/find-first-node position-row-node
+                                             #(let [classes (hiccup/node-class-set %)]
+                                                (and (contains? classes "font-semibold")
+                                                     (contains? classes "num"))))]
+    (is (some? balance-value-node))
+    (is (some? position-value-node))))
+
+(deftest balance-row-coin-cell-does-not-use-position-gradient-background-test
+  (let [row-node (view/balance-row fixtures/sample-balance-row)
+        coin-cell (first (vec (hiccup/node-children row-node)))]
+    (is (nil? (get-in coin-cell [1 :style :background])))))
+
+(deftest balance-row-non-usdc-coin-uses-highlight-color-test
+  (let [row-node (view/balance-row (assoc fixtures/sample-balance-row :coin "HYPE"))
+        coin-cell (first (vec (hiccup/node-children row-node)))]
+    (is (= "rgb(151, 252, 228)"
+           (get-in coin-cell [1 :style :color])))))
+
+(deftest balance-row-usdc-coin-keeps-default-color-test
+  (let [row-node (view/balance-row (assoc fixtures/sample-balance-row :coin "USDC (Perps)"))
+        coin-cell (first (vec (hiccup/node-children row-node)))]
+    (is (nil? (get-in coin-cell [1 :style :color])))))
