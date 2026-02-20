@@ -90,6 +90,24 @@
    :price-aggregation-by-coin {}
    :active-tab :orderbook})
 
+(defn default-portfolio-ui-state
+  []
+  {:summary-scope :all
+   :summary-time-range :month
+   :summary-scope-dropdown-open? false
+   :summary-time-range-dropdown-open? false})
+
+(defn default-portfolio-state
+  []
+  {:summary-by-key {}
+   :user-fees nil
+   :loading? false
+   :user-fees-loading? false
+   :error nil
+   :user-fees-error nil
+   :loaded-at-ms nil
+   :user-fees-loaded-at-ms nil})
+
 (defn default-account-info-state
   [{:keys [default-trade-history
            default-funding-history
@@ -142,6 +160,8 @@
    :asset-selector (default-asset-selector-state)
    :chart-options (default-chart-options-state)
    :orderbook-ui (default-orderbook-ui-state)
+   :portfolio-ui (default-portfolio-ui-state)
+   :portfolio (default-portfolio-state)
    :account-info (default-account-info-state {:default-trade-history default-trade-history
                                               :default-funding-history default-funding-history
                                               :default-order-history default-order-history})})

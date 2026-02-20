@@ -31,6 +31,8 @@
     (is (= "/trade" (get-in state [:router :path])))
     (is (= :bootstrap (get-in state [:asset-selector :phase])))
     (is (= :orderbook (get-in state [:orderbook-ui :active-tab])))
+    (is (= :all (get-in state [:portfolio-ui :summary-scope])))
+    (is (= :month (get-in state [:portfolio-ui :summary-time-range])))
     (is (= true (get-in state [:chart-options :volume-visible?])))))
 
 (deftest default-app-state-initializes-empty-runtime-collections-test
@@ -47,4 +49,6 @@
     (is (= [] (get-in state [:orders :open-orders])))
     (is (= #{} (get-in state [:asset-selector :favorites])))
     (is (= #{} (get-in state [:asset-selector :loaded-icons])))
-    (is (= #{} (get-in state [:asset-selector :missing-icons])))))
+    (is (= #{} (get-in state [:asset-selector :missing-icons])))
+    (is (= {} (get-in state [:portfolio :summary-by-key])))
+    (is (nil? (get-in state [:portfolio :user-fees])))))

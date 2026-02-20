@@ -6,6 +6,7 @@
             [hyperopen.chart.actions :as chart-actions]
             [hyperopen.chart.settings :as chart-settings]
             [hyperopen.order.actions :as order-actions]
+            [hyperopen.portfolio.actions :as portfolio-actions]
             [hyperopen.runtime.collaborators :as collaborators]
             [hyperopen.wallet.actions :as wallet-actions]))
 
@@ -30,6 +31,8 @@
                     (get-in deps [:asset-selector :select-asset])))
     (is (identical? chart-actions/select-chart-type
                     (get-in deps [:chart :select-chart-type])))
+    (is (identical? portfolio-actions/toggle-portfolio-summary-scope-dropdown
+                    (get-in deps [:chart :toggle-portfolio-summary-scope-dropdown])))
     (is (identical? chart-settings/hide-volume-indicator
                     (get-in deps [:chart :hide-volume-indicator])))
     (is (identical? account-history-actions/select-account-info-tab

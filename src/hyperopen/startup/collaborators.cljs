@@ -29,6 +29,8 @@
    :request-user-fills! (resolve-api-op api-instance :request-user-fills! api-default/request-user-fills!)
    :request-spot-clearinghouse-state! (resolve-api-op api-instance :request-spot-clearinghouse-state! api-default/request-spot-clearinghouse-state!)
    :request-user-abstraction! (resolve-api-op api-instance :request-user-abstraction! api-default/request-user-abstraction!)
+   :request-portfolio! (resolve-api-op api-instance :request-portfolio! api-default/request-portfolio!)
+   :request-user-fees! (resolve-api-op api-instance :request-user-fees! api-default/request-user-fees!)
    :ensure-perp-dexs-data! (resolve-api-op api-instance :ensure-perp-dexs-data! api-default/ensure-perp-dexs-data!)
    :request-asset-contexts! (resolve-api-op api-instance :request-asset-contexts! api-default/request-asset-contexts!)
    :request-asset-selector-markets! (resolve-api-op api-instance :request-asset-selector-markets! api-default/request-asset-selector-markets!)})
@@ -108,6 +110,38 @@
            (.catch (fn [err]
                      (js/Promise.reject err))))))))
 
+(defn- fetch-portfolio!
+  ([api-ops store address]
+   (fetch-portfolio! api-ops store address {}))
+  ([{:keys [request-portfolio!]} store address opts]
+   (if-not address
+     (js/Promise.resolve {})
+     (do
+       (swap! store api-projections/begin-portfolio-load)
+       (-> (request-portfolio! address opts)
+           (.then (fn [snapshot]
+                    (swap! store api-projections/apply-portfolio-success snapshot)
+                    snapshot))
+           (.catch (fn [err]
+                     (swap! store api-projections/apply-portfolio-error err)
+                     (js/Promise.reject err))))))))
+
+(defn- fetch-user-fees!
+  ([api-ops store address]
+   (fetch-user-fees! api-ops store address {}))
+  ([{:keys [request-user-fees!]} store address opts]
+   (if-not address
+     (js/Promise.resolve nil)
+     (do
+       (swap! store api-projections/begin-user-fees-load)
+       (-> (request-user-fees! address opts)
+           (.then (fn [payload]
+                    (swap! store api-projections/apply-user-fees-success payload)
+                    payload))
+           (.catch (fn [err]
+                     (swap! store api-projections/apply-user-fees-error err)
+                     (js/Promise.reject err))))))))
+
 (defn- ensure-perp-dexs!
   ([api-ops store]
    (ensure-perp-dexs! api-ops store {}))
@@ -178,6 +212,16 @@
                                   (fetch-user-abstraction! api-ops store address))
                                  ([store address opts]
                                   (fetch-user-abstraction! api-ops store address opts)))
+      :fetch-portfolio! (fn
+                          ([store address]
+                           (fetch-portfolio! api-ops store address))
+                          ([store address opts]
+                           (fetch-portfolio! api-ops store address opts)))
+      :fetch-user-fees! (fn
+                          ([store address]
+                           (fetch-user-fees! api-ops store address))
+                          ([store address opts]
+                           (fetch-user-fees! api-ops store address opts)))
       :fetch-and-merge-funding-history! account-history-effects/fetch-and-merge-funding-history!
       :ensure-perp-dexs! (fn
                            ([store]

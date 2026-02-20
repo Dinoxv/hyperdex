@@ -6,6 +6,7 @@
             [hyperopen.order.actions :as order-actions]
             [hyperopen.orderbook.actions :as orderbook-actions]
             [hyperopen.orderbook.settings :as orderbook-settings]
+            [hyperopen.portfolio.actions :as portfolio-actions]
             [hyperopen.runtime.action-adapters :as action-adapters]
             [hyperopen.startup.restore :as startup-restore]
             [hyperopen.ui.preferences :as ui-preferences]))
@@ -105,6 +106,18 @@
 
 (def update-indicators-search
   chart-actions/update-indicators-search)
+
+(def toggle-portfolio-summary-scope-dropdown
+  portfolio-actions/toggle-portfolio-summary-scope-dropdown)
+
+(def select-portfolio-summary-scope
+  portfolio-actions/select-portfolio-summary-scope)
+
+(def toggle-portfolio-summary-time-range-dropdown
+  portfolio-actions/toggle-portfolio-summary-time-range-dropdown)
+
+(def select-portfolio-summary-time-range
+  portfolio-actions/select-portfolio-summary-time-range)
 
 (def toggle-orderbook-size-unit-dropdown
   orderbook-actions/toggle-orderbook-size-unit-dropdown)

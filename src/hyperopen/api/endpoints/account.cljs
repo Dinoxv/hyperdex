@@ -135,3 +135,100 @@
       (post-info! body
                   (merge {:priority :high}
                          opts)))))
+
+(defn- normalize-portfolio-summary-key
+  [value]
+  (let [text (some-> value str str/trim)]
+    (when (seq text)
+      (let [token (-> text
+                      (str/replace #"([a-z0-9])([A-Z])" "$1-$2")
+                      str/lower-case
+                      (str/replace #"[^a-z0-9]+" "-")
+                      (str/replace #"(^-+)|(-+$)" ""))]
+        (case token
+          "day" :day
+          "week" :week
+          "month" :month
+          "alltime" :all-time
+          "all-time" :all-time
+          "perpday" :perp-day
+          "perp-day" :perp-day
+          "perpweek" :perp-week
+          "perp-week" :perp-week
+          "perpmonth" :perp-month
+          "perp-month" :perp-month
+          "perpalltime" :perp-all-time
+          "perp-all-time" :perp-all-time
+          (keyword token))))))
+
+(defn- portfolio-summary-pairs
+  [payload]
+  (cond
+    (sequential? payload)
+    (keep (fn [entry]
+            (cond
+              (and (sequential? entry)
+                   (= 2 (count entry)))
+              (let [[k v] entry]
+                [k v])
+
+              (map? entry)
+              (let [account-key (or (:account entry)
+                                    (:key entry)
+                                    (:range entry))]
+                (when account-key
+                  [account-key entry]))
+
+              :else
+              nil))
+          payload)
+
+    (map? payload)
+    (let [data (:data payload)]
+      (cond
+        (map? data)
+        (seq data)
+
+        (map? (:portfolio payload))
+        (seq (:portfolio payload))
+
+        :else
+        (seq payload)))
+
+    :else
+    []))
+
+(defn normalize-portfolio-summary
+  [payload]
+  (reduce (fn [acc [raw-key row]]
+            (let [summary-key (normalize-portfolio-summary-key raw-key)]
+              (if (and summary-key (map? row))
+                (assoc acc summary-key row)
+                acc)))
+          {}
+          (portfolio-summary-pairs payload)))
+
+(defn request-portfolio!
+  [post-info! address opts]
+  (if-not address
+    (js/Promise.resolve {})
+    (let [requested-address (some-> address str str/lower-case)
+          opts* (merge {:priority :high
+                        :dedupe-key [:portfolio requested-address]}
+                       opts)]
+      (-> (post-info! {"type" "portfolio"
+                       "user" address}
+                      opts*)
+          (.then normalize-portfolio-summary)))))
+
+(defn request-user-fees!
+  [post-info! address opts]
+  (if-not address
+    (js/Promise.resolve nil)
+    (let [requested-address (some-> address str str/lower-case)
+          opts* (merge {:priority :high
+                        :dedupe-key [:user-fees requested-address]}
+                       opts)]
+      (post-info! {"type" "userFees"
+                   "user" address}
+                  opts*))))

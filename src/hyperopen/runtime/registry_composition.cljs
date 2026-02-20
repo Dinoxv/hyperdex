@@ -183,6 +183,10 @@
            select-chart-type
            toggle-indicators-dropdown
            update-indicators-search
+           toggle-portfolio-summary-scope-dropdown
+           select-portfolio-summary-scope
+           toggle-portfolio-summary-time-range-dropdown
+           select-portfolio-summary-time-range
            toggle-orderbook-size-unit-dropdown
            select-orderbook-size-unit
            toggle-orderbook-price-aggregation-dropdown
@@ -199,6 +203,10 @@
    :select-chart-type select-chart-type
    :toggle-indicators-dropdown toggle-indicators-dropdown
    :update-indicators-search update-indicators-search
+   :toggle-portfolio-summary-scope-dropdown toggle-portfolio-summary-scope-dropdown
+   :select-portfolio-summary-scope select-portfolio-summary-scope
+   :toggle-portfolio-summary-time-range-dropdown toggle-portfolio-summary-time-range-dropdown
+   :select-portfolio-summary-time-range select-portfolio-summary-time-range
    :toggle-orderbook-size-unit-dropdown toggle-orderbook-size-unit-dropdown
    :select-orderbook-size-unit select-orderbook-size-unit
    :toggle-orderbook-price-aggregation-dropdown toggle-orderbook-price-aggregation-dropdown

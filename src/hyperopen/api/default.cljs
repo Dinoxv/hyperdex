@@ -23,6 +23,8 @@
 
 (declare request-spot-clearinghouse-state!)
 (declare request-user-abstraction!)
+(declare request-portfolio!)
+(declare request-user-fees!)
 (declare ensure-perp-dexs-data!)
 (declare request-asset-selector-markets!)
 (declare request-historical-orders-data!)
@@ -437,6 +439,24 @@
    (request-user-abstraction! address {}))
   ([address opts]
    (account-gateway/request-user-abstraction!
+    {:post-info! post-info!}
+    address
+    opts)))
+
+(defn request-portfolio!
+  ([address]
+   (request-portfolio! address {}))
+  ([address opts]
+   (account-gateway/request-portfolio!
+    {:post-info! post-info!}
+    address
+    opts)))
+
+(defn request-user-fees!
+  ([address]
+   (request-user-fees! address {}))
+  ([address opts]
+   (account-gateway/request-user-fees!
     {:post-info! post-info!}
     address
     opts)))

@@ -106,6 +106,10 @@
     select-chart-type
     toggle-indicators-dropdown
     update-indicators-search
+    toggle-portfolio-summary-scope-dropdown
+    select-portfolio-summary-scope
+    toggle-portfolio-summary-time-range-dropdown
+    select-portfolio-summary-time-range
     toggle-orderbook-size-unit-dropdown
     select-orderbook-size-unit
     toggle-orderbook-price-aggregation-dropdown

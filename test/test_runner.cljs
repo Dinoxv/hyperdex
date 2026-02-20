@@ -53,6 +53,7 @@
             [hyperopen.orderbook.actions-test]
             [hyperopen.orderbook.settings-test]
             [hyperopen.orderbook.price-aggregation-test]
+            [hyperopen.portfolio.actions-test]
             [hyperopen.order.feedback-runtime-test]
             [hyperopen.app.effects-test]
             [hyperopen.chart.settings-test]
@@ -168,6 +169,7 @@
              'hyperopen.orderbook.actions-test
              'hyperopen.orderbook.settings-test
              'hyperopen.orderbook.price-aggregation-test
+             'hyperopen.portfolio.actions-test
              'hyperopen.order.feedback-runtime-test
              'hyperopen.app.effects-test
              'hyperopen.chart.settings-test

@@ -252,6 +252,10 @@
                                                    (swap! stage-a-calls conj [:spot address opts]))
                 :fetch-user-abstraction! (fn [_store address opts]
                                            (swap! stage-a-calls conj [:abstraction address opts]))
+                :fetch-portfolio! (fn [_store address opts]
+                                    (swap! stage-a-calls conj [:portfolio address opts]))
+                :fetch-user-fees! (fn [_store address opts]
+                                    (swap! stage-a-calls conj [:user-fees address opts]))
                 :fetch-and-merge-funding-history! (fn [_store address opts]
                                                     (swap! stage-a-calls conj [:fundings address opts]))
                 :ensure-perp-dexs! (fn [_store _opts]
@@ -267,7 +271,7 @@
       (startup-runtime/bootstrap-account-data! (assoc deps :address "0xabc"))
       (js/setTimeout
        (fn []
-         (is (= 5 (count @stage-a-calls)))
+         (is (= 7 (count @stage-a-calls)))
          (is (= [["0xabc" ["dex-a" "dex-b"]]] @stage-b-calls))
          (is (= "0xabc" (:bootstrapped-address @startup-runtime-atom)))
          (is (= {} (get-in @store [:orders :open-orders-snapshot-by-dex])))
@@ -276,15 +280,15 @@
          (is (= [] (get-in @store [:orders :order-history])))
          (startup-runtime/bootstrap-account-data! (assoc deps :address "0xabc"))
          (js/setTimeout
-          (fn []
-            (is (= 5 (count @stage-a-calls)))
+         (fn []
+            (is (= 7 (count @stage-a-calls)))
             (is (= 1 (count @stage-b-calls)))
             (reset! ensure-mode :reject)
             (startup-runtime/bootstrap-account-data! (assoc deps :address "0xdef"))
             (js/setTimeout
              (fn []
                (is (= "0xdef" (:bootstrapped-address @startup-runtime-atom)))
-               (is (= 10 (count @stage-a-calls)))
+               (is (= 14 (count @stage-a-calls)))
                (is (= 1 (count @stage-b-calls)))
                (is (= "Error bootstrapping per-dex account data:"
                       (first (last @log-calls))))
@@ -299,6 +303,14 @@
                               :fundings [2]
                               :order-history [3]}
                      :perp-dex-clearinghouse {"dex-a" {:assetPositions []}}
+                     :portfolio {:summary-by-key {:day {:vlm 10}}
+                                 :user-fees {:dailyUserVlm [[0 1]]}
+                                 :loading? true
+                                 :user-fees-loading? true
+                                 :error "portfolio-error"
+                                 :user-fees-error "user-fees-error"
+                                 :loaded-at-ms 1
+                                 :user-fees-loaded-at-ms 2}
                      :spot {:clearinghouse-state {:time 1}}
                      :account {:mode :unified
                                :abstraction-raw "raw"}})
@@ -346,6 +358,14 @@
       (is (= [] (get-in @store [:orders :order-history])))
       (is (= {} (get-in @store [:perp-dex-clearinghouse])))
       (is (nil? (get-in @store [:spot :clearinghouse-state])))
+      (is (= {} (get-in @store [:portfolio :summary-by-key])))
+      (is (nil? (get-in @store [:portfolio :user-fees])))
+      (is (false? (get-in @store [:portfolio :loading?])))
+      (is (false? (get-in @store [:portfolio :user-fees-loading?])))
+      (is (nil? (get-in @store [:portfolio :error])))
+      (is (nil? (get-in @store [:portfolio :user-fees-error])))
+      (is (nil? (get-in @store [:portfolio :loaded-at-ms])))
+      (is (nil? (get-in @store [:portfolio :user-fees-loaded-at-ms])))
       (is (= {:mode :classic
               :abstraction-raw nil}
              (:account @store))))))

@@ -83,6 +83,48 @@
         (assoc-in [:orders :fills-error] message)
         (assoc-in [:orders :fills-error-category] category))))
 
+(defn begin-portfolio-load
+  [state]
+  (-> state
+      (assoc-in [:portfolio :loading?] true)
+      (assoc-in [:portfolio :error] nil)))
+
+(defn apply-portfolio-success
+  [state summary-by-key]
+  (-> state
+      (assoc-in [:portfolio :summary-by-key] (or summary-by-key {}))
+      (assoc-in [:portfolio :loading?] false)
+      (assoc-in [:portfolio :error] nil)
+      (assoc-in [:portfolio :loaded-at-ms] (.now js/Date))))
+
+(defn apply-portfolio-error
+  [state err]
+  (let [{:keys [message]} (normalized-error err)]
+    (-> state
+        (assoc-in [:portfolio :loading?] false)
+        (assoc-in [:portfolio :error] message))))
+
+(defn begin-user-fees-load
+  [state]
+  (-> state
+      (assoc-in [:portfolio :user-fees-loading?] true)
+      (assoc-in [:portfolio :user-fees-error] nil)))
+
+(defn apply-user-fees-success
+  [state payload]
+  (-> state
+      (assoc-in [:portfolio :user-fees] payload)
+      (assoc-in [:portfolio :user-fees-loading?] false)
+      (assoc-in [:portfolio :user-fees-error] nil)
+      (assoc-in [:portfolio :user-fees-loaded-at-ms] (.now js/Date))))
+
+(defn apply-user-fees-error
+  [state err]
+  (let [{:keys [message]} (normalized-error err)]
+    (-> state
+        (assoc-in [:portfolio :user-fees-loading?] false)
+        (assoc-in [:portfolio :user-fees-error] message))))
+
 (defn begin-asset-selector-load
   [state phase]
   (-> state

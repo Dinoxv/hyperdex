@@ -72,6 +72,18 @@
    opts]
   (account-endpoints/request-user-abstraction! post-info! address opts))
 
+(defn request-portfolio!
+  [{:keys [post-info!]}
+   address
+   opts]
+  (account-endpoints/request-portfolio! post-info! address opts))
+
+(defn request-user-fees!
+  [{:keys [post-info!]}
+   address
+   opts]
+  (account-endpoints/request-user-fees! post-info! address opts))
+
 (defn fetch-user-abstraction!
   [{:keys [log-fn
            request-user-abstraction!

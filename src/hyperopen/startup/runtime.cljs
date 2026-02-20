@@ -134,6 +134,8 @@
            fetch-user-fills!
            fetch-spot-clearinghouse-state!
            fetch-user-abstraction!
+           fetch-portfolio!
+           fetch-user-fees!
            fetch-and-merge-funding-history!
            ensure-perp-dexs!
            stage-b-account-bootstrap!
@@ -147,11 +149,21 @@
       (swap! store assoc-in [:orders :fundings] [])
       (swap! store assoc-in [:orders :order-history] [])
       (swap! store assoc-in [:perp-dex-clearinghouse] {})
+      (swap! store assoc-in [:portfolio :summary-by-key] {})
+      (swap! store assoc-in [:portfolio :user-fees] nil)
+      (swap! store assoc-in [:portfolio :loading?] false)
+      (swap! store assoc-in [:portfolio :user-fees-loading?] false)
+      (swap! store assoc-in [:portfolio :error] nil)
+      (swap! store assoc-in [:portfolio :user-fees-error] nil)
+      (swap! store assoc-in [:portfolio :loaded-at-ms] nil)
+      (swap! store assoc-in [:portfolio :user-fees-loaded-at-ms] nil)
       ;; Stage A: critical account data.
       (fetch-frontend-open-orders! store address {:priority :high})
       (fetch-user-fills! store address {:priority :high})
       (fetch-spot-clearinghouse-state! store address {:priority :high})
       (fetch-user-abstraction! store address {:priority :high})
+      (fetch-portfolio! store address {:priority :high})
+      (fetch-user-fees! store address {:priority :high})
       (fetch-and-merge-funding-history! store address {:priority :high})
       ;; Stage B: low-priority, staggered per-dex data.
       (-> (ensure-perp-dexs! store {:priority :low})
@@ -190,6 +202,14 @@
           (swap! store assoc-in [:orders :order-history] [])
           (swap! store assoc-in [:perp-dex-clearinghouse] {})
           (swap! store assoc-in [:spot :clearinghouse-state] nil)
+          (swap! store assoc-in [:portfolio :summary-by-key] {})
+          (swap! store assoc-in [:portfolio :user-fees] nil)
+          (swap! store assoc-in [:portfolio :loading?] false)
+          (swap! store assoc-in [:portfolio :user-fees-loading?] false)
+          (swap! store assoc-in [:portfolio :error] nil)
+          (swap! store assoc-in [:portfolio :user-fees-error] nil)
+          (swap! store assoc-in [:portfolio :loaded-at-ms] nil)
+          (swap! store assoc-in [:portfolio :user-fees-loaded-at-ms] nil)
           (swap! store assoc :account {:mode :classic
                                        :abstraction-raw nil}))))
     address-handler-name))

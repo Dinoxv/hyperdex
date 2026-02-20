@@ -6,6 +6,7 @@
             [hyperopen.chart.settings :as chart-settings]
             [hyperopen.order.actions :as order-actions]
             [hyperopen.orderbook.actions :as orderbook-actions]
+            [hyperopen.portfolio.actions :as portfolio-actions]
             [hyperopen.wallet.actions :as wallet-actions]))
 
 (defn- merge-nested
@@ -48,6 +49,10 @@
    :select-chart-type chart-actions/select-chart-type
    :toggle-indicators-dropdown chart-actions/toggle-indicators-dropdown
    :update-indicators-search chart-actions/update-indicators-search
+   :toggle-portfolio-summary-scope-dropdown portfolio-actions/toggle-portfolio-summary-scope-dropdown
+   :select-portfolio-summary-scope portfolio-actions/select-portfolio-summary-scope
+   :toggle-portfolio-summary-time-range-dropdown portfolio-actions/toggle-portfolio-summary-time-range-dropdown
+   :select-portfolio-summary-time-range portfolio-actions/select-portfolio-summary-time-range
    :toggle-orderbook-size-unit-dropdown orderbook-actions/toggle-orderbook-size-unit-dropdown
    :select-orderbook-size-unit orderbook-actions/select-orderbook-size-unit
    :toggle-orderbook-price-aggregation-dropdown orderbook-actions/toggle-orderbook-price-aggregation-dropdown

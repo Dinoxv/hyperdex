@@ -1,5 +1,6 @@
 (ns hyperopen.views.portfolio.vm-test
-  (:require [cljs.test :refer-macros [deftest is]]
+  (:require [cljs.test :refer-macros [deftest is testing]]
+            [hyperopen.views.account-equity-view :as account-equity-view]
             [hyperopen.views.portfolio.vm :as vm]))
 
 (def ^:private day-ms
@@ -18,18 +19,96 @@
                                 {:sz "2" :px "25"}]}}]
     (is (= 100 (vm/volume-14d-usd state)))))
 
-(deftest portfolio-vm-includes-default-fees-and-summary-shape-test
-  (let [state {:orders {:fills [{:time (.now js/Date)
-                                 :sz "1"
-                                 :px "100"}]}
-               :account {:mode :classic}
-               :webdata2 {}
-               :spot {:meta nil
-                      :clearinghouse-state nil}
-               :perp-dex-clearinghouse {}}
-        view-model (vm/portfolio-vm state)]
-    (is (= {:taker 0.045
-            :maker 0.015}
-           (:fees view-model)))
-    (is (number? (get-in view-model [:summary :total-equity])))
-    (is (number? (get-in view-model [:summary :pnl])))))
+(deftest portfolio-vm-derives-selected-summary-and-drawdown-from-portfolio-payload-test
+  (with-redefs [account-equity-view/account-equity-metrics (fn [_]
+                                                              {:spot-equity 40
+                                                               :perps-value 60
+                                                               :cross-account-value 60
+                                                               :unrealized-pnl 11})]
+    (let [state {:account {:mode :classic}
+                 :portfolio-ui {:summary-scope :all
+                                :summary-time-range :month}
+                 :portfolio {:summary-by-key {:month {:pnlHistory [[1 10] [2 30] [3 15]]
+                                                      :accountValueHistory [[1 100] [2 100] [3 100]]
+                                                      :vlm 123}}
+                             :user-fees nil}
+                 :webdata2 {:clearinghouseState {:marginSummary {:accountValue 60}}
+                           :totalVaultEquity 5}
+                 :borrow-lend {:total-supplied-usd 7}}
+          view-model (vm/portfolio-vm state)]
+      (is (= 0 (:volume-14d-usd view-model)))
+      (is (= 5 (get-in view-model [:summary :pnl])))
+      (is (= 123 (get-in view-model [:summary :volume])))
+      (is (< (js/Math.abs (- 0.15 (get-in view-model [:summary :max-drawdown-pct]))) 1e-12))
+      (is (= 112 (get-in view-model [:summary :total-equity])))
+      (is (true? (get-in view-model [:summary :show-perps-account-equity?])))
+      (is (= "Spot Account Equity" (get-in view-model [:summary :spot-equity-label])))
+      (is (true? (get-in view-model [:summary :show-earn-balance?]))))))
+
+(deftest portfolio-vm-uses-user-fees-payload-for-14d-volume-and-fee-rates-test
+  (with-redefs [account-equity-view/account-equity-metrics (fn [_]
+                                                              {:spot-equity 10
+                                                               :perps-value 20
+                                                               :cross-account-value 20
+                                                               :unrealized-pnl 1})]
+    (let [state {:account {:mode :classic}
+                 :portfolio-ui {:summary-scope :all
+                                :summary-time-range :month}
+                 :portfolio {:summary-by-key {:month {:pnlHistory [[1 1] [2 2]]
+                                                      :accountValueHistory [[1 100] [2 100]]
+                                                      :vlm 44}}
+                             :user-fees {:userCrossRate 0.0005
+                                         :userAddRate 0.0001
+                                         :activeReferralDiscount 0.1
+                                         :dailyUserVlm [{:exchange 100
+                                                         :userCross 60
+                                                         :userAdd 20}
+                                                        {:exchange 10
+                                                         :userCross 1
+                                                         :userAdd 1}]}}
+                 :webdata2 {:clearinghouseState {:marginSummary {:accountValue 20}}
+                           :totalVaultEquity 0}
+                 :borrow-lend {:total-supplied-usd 0}}
+          view-model (vm/portfolio-vm state)]
+      (is (= 80 (:volume-14d-usd view-model)))
+      (is (< (js/Math.abs (- 0.045 (get-in view-model [:fees :taker]))) 1e-12))
+      (is (< (js/Math.abs (- 0.009 (get-in view-model [:fees :maker]))) 1e-12)))))
+
+(deftest portfolio-vm-hides-perps-and-earn-rows-when-unified-account-mode-enabled-test
+  (with-redefs [account-equity-view/account-equity-metrics (fn [_]
+                                                              {:spot-equity 50
+                                                               :perps-value 200
+                                                               :cross-account-value 200
+                                                               :unrealized-pnl 0})]
+    (let [state {:account {:mode :unified}
+                 :portfolio-ui {:summary-scope :all
+                                :summary-time-range :month}
+                 :portfolio {:summary-by-key {:month {:pnlHistory [[1 1] [2 1]]
+                                                      :accountValueHistory [[1 100] [2 100]]
+                                                      :vlm 10}}}
+                 :webdata2 {:clearinghouseState {:marginSummary {:accountValue 200}}
+                           :totalVaultEquity 20}
+                 :borrow-lend {:total-supplied-usd 100}}
+          view-model (vm/portfolio-vm state)]
+      (is (= 70 (get-in view-model [:summary :total-equity])))
+      (is (false? (get-in view-model [:summary :show-perps-account-equity?])))
+      (is (= "Trading Equity" (get-in view-model [:summary :spot-equity-label])))
+      (is (false? (get-in view-model [:summary :show-earn-balance?]))))))
+
+(deftest portfolio-vm-defaults-selector-labels-and-fallbacks-when-summary-missing-test
+  (with-redefs [account-equity-view/account-equity-metrics (fn [_]
+                                                              {:spot-equity 0
+                                                               :perps-value 0
+                                                               :cross-account-value 0
+                                                               :unrealized-pnl 0})]
+    (let [view-model (vm/portfolio-vm {:portfolio {:summary-by-key {}}
+                                       :portfolio-ui {}})]
+      (testing "selector defaults"
+        (is (= :all (get-in view-model [:selectors :summary-scope :value])))
+        (is (= "Perps + Spot + Vaults" (get-in view-model [:selectors :summary-scope :label])))
+        (is (= :month (get-in view-model [:selectors :summary-time-range :value])))
+        (is (= "30D" (get-in view-model [:selectors :summary-time-range :label]))))
+      (testing "missing data fallback behavior"
+        (is (= 0 (get-in view-model [:summary :pnl])))
+        (is (= 0 (get-in view-model [:summary :volume])))
+        (is (nil? (get-in view-model [:summary :max-drawdown-pct])))))))

@@ -320,6 +320,8 @@
           original-request-user-fills api/request-user-fills!
           original-request-spot-state api/request-spot-clearinghouse-state!
           original-request-user-abstraction api/request-user-abstraction!
+          original-request-portfolio api/request-portfolio!
+          original-request-user-fees api/request-user-fees!
           original-ensure-perp-dexs-data api/ensure-perp-dexs-data!
           original-fetch-and-merge-funding-history account-history-effects/fetch-and-merge-funding-history!
           original-stage-b app-startup/stage-b-account-bootstrap!]
@@ -354,6 +356,20 @@
               ([address opts]
                (swap! stage-a-calls conj [:abstraction [address opts]])
                (js/Promise.resolve "default"))))
+      (set! api/request-portfolio!
+            (fn request-portfolio-mock
+              ([address]
+               (request-portfolio-mock address {}))
+              ([address opts]
+               (swap! stage-a-calls conj [:portfolio [address opts]])
+               (js/Promise.resolve {}))))
+      (set! api/request-user-fees!
+            (fn request-user-fees-mock
+              ([address]
+               (request-user-fees-mock address {}))
+              ([address opts]
+               (swap! stage-a-calls conj [:user-fees [address opts]])
+               (js/Promise.resolve nil))))
       (set! api/ensure-perp-dexs-data!
             (fn ensure-perp-dexs-data-mock
               ([store]
@@ -372,6 +388,8 @@
                 (set! api/request-user-fills! original-request-user-fills)
                 (set! api/request-spot-clearinghouse-state! original-request-spot-state)
                 (set! api/request-user-abstraction! original-request-user-abstraction)
+                (set! api/request-portfolio! original-request-portfolio)
+                (set! api/request-user-fees! original-request-user-fees)
                 (set! api/ensure-perp-dexs-data! original-ensure-perp-dexs-data)
                 (set! account-history-effects/fetch-and-merge-funding-history! original-fetch-and-merge-funding-history)
                 (set! app-startup/stage-b-account-bootstrap! original-stage-b))]
@@ -381,8 +399,10 @@
          "0xabc")
         (js/setTimeout
          (fn []
-           (is (= 5 (count @stage-a-calls)))
+           (is (= 7 (count @stage-a-calls)))
            (is (some #(= :abstraction (first %)) @stage-a-calls))
+           (is (some #(= :portfolio (first %)) @stage-a-calls))
+           (is (some #(= :user-fees (first %)) @stage-a-calls))
            (is (= [["0xabc" ["dex-1" "dex-2"]]] @stage-b-calls))
            ;; Same address should not trigger stage A/B again.
            (app-startup/bootstrap-account-data!
@@ -391,7 +411,7 @@
             "0xabc")
            (js/setTimeout
             (fn []
-              (is (= 5 (count @stage-a-calls)))
+              (is (= 7 (count @stage-a-calls)))
               (is (= 1 (count @stage-b-calls)))
               (restore!)
               (done))
@@ -405,6 +425,14 @@
                                    :fundings [2]
                                    :order-history [3]}
                           :perp-dex-clearinghouse {"dex-a" {:assetPositions []}}
+                          :portfolio {:summary-by-key {:day {:vlm 1}}
+                                      :user-fees {:dailyUserVlm [[0 1]]}
+                                      :loading? true
+                                      :user-fees-loading? true
+                                      :error "portfolio-error"
+                                      :user-fees-error "user-fees-error"
+                                      :loaded-at-ms 1
+                                      :user-fees-loaded-at-ms 2}
                           :spot {:clearinghouse-state {:time 1}}
                           :account {:mode :unified
                                     :abstraction-raw "unifiedAccount"}})]
@@ -425,7 +453,15 @@
         (is (= [] (get-in @test-store [:orders :fundings])))
         (is (= [] (get-in @test-store [:orders :order-history])))
         (is (= {} (get-in @test-store [:perp-dex-clearinghouse])))
-        (is (nil? (get-in @test-store [:spot :clearinghouse-state])))))))
+        (is (nil? (get-in @test-store [:spot :clearinghouse-state])))
+        (is (= {} (get-in @test-store [:portfolio :summary-by-key])))
+        (is (nil? (get-in @test-store [:portfolio :user-fees])))
+        (is (false? (get-in @test-store [:portfolio :loading?])))
+        (is (false? (get-in @test-store [:portfolio :user-fees-loading?])))
+        (is (nil? (get-in @test-store [:portfolio :error])))
+        (is (nil? (get-in @test-store [:portfolio :user-fees-error])))
+        (is (nil? (get-in @test-store [:portfolio :loaded-at-ms])))
+        (is (nil? (get-in @test-store [:portfolio :user-fees-loaded-at-ms])))))))
 
 (deftest select-account-info-tab-funding-history-saves-selection-before-fetch-test
   (let [state {:account-info {:selected-tab :balances

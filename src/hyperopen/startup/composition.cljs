@@ -46,6 +46,8 @@
            fetch-user-fills!
            fetch-spot-clearinghouse-state!
            fetch-user-abstraction!
+           fetch-portfolio!
+           fetch-user-fees!
            fetch-and-merge-funding-history!
            ensure-perp-dexs!
            stage-b-account-bootstrap!
@@ -60,6 +62,8 @@
     :fetch-user-fills! fetch-user-fills!
     :fetch-spot-clearinghouse-state! fetch-spot-clearinghouse-state!
     :fetch-user-abstraction! fetch-user-abstraction!
+    :fetch-portfolio! fetch-portfolio!
+    :fetch-user-fees! fetch-user-fees!
     :fetch-and-merge-funding-history! fetch-and-merge-funding-history!
     :ensure-perp-dexs! ensure-perp-dexs!
     :stage-b-account-bootstrap! stage-b-account-bootstrap!

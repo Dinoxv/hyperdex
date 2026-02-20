@@ -29,6 +29,21 @@
 
 (def sample-state
   {:account {:mode :classic}
+   :portfolio-ui {:summary-scope :all
+                  :summary-time-range :month
+                  :summary-scope-dropdown-open? false
+                  :summary-time-range-dropdown-open? false}
+   :portfolio {:summary-by-key {:month {:pnlHistory [[1 10] [2 15]]
+                                        :accountValueHistory [[1 100] [2 100]]
+                                        :vlm 2255561.85}}
+               :user-fees {:userCrossRate 0.00045
+                           :userAddRate 0.00015
+                           :dailyUserVlm [{:exchange 100
+                                           :userCross 70
+                                           :userAdd 30}
+                                          {:exchange 50
+                                           :userCross 20
+                                           :userAdd 10}]}}
    :account-info {:selected-tab :balances
                   :loading false
                   :error nil
@@ -45,6 +60,7 @@
             :fundings []
             :order-history []}
    :webdata2 {}
+   :borrow-lend {:total-supplied-usd 0}
    :spot {:meta nil
           :clearinghouse-state nil}
    :perp-dex-clearinghouse {}})
@@ -56,6 +72,8 @@
         volume-card (find-first-node view-node #(= "portfolio-14d-volume-card" (get-in % [1 :data-role])))
         fees-card (find-first-node view-node #(= "portfolio-fees-card" (get-in % [1 :data-role])))
         summary-card (find-first-node view-node #(= "portfolio-account-summary-card" (get-in % [1 :data-role])))
+        scope-selector (find-first-node view-node #(= "portfolio-summary-scope-selector" (get-in % [1 :data-role])))
+        time-range-selector (find-first-node view-node #(= "portfolio-summary-time-range-selector" (get-in % [1 :data-role])))
         chart-shell (find-first-node view-node #(= "portfolio-chart-shell" (get-in % [1 :data-role])))
         account-table (find-first-node view-node #(= "portfolio-account-table" (get-in % [1 :data-role])))
         all-text (set (collect-strings view-node))]
@@ -64,9 +82,16 @@
     (is (some? volume-card))
     (is (some? fees-card))
     (is (some? summary-card))
+    (is (some? scope-selector))
+    (is (some? time-range-selector))
     (is (some? chart-shell))
     (is (some? account-table))
     (is (contains? all-text "Portfolio"))
     (is (contains? all-text "14 Day Volume"))
     (is (contains? all-text "Fees (Taker / Maker)"))
+    (is (contains? all-text "Perps + Spot + Vaults"))
+    (is (contains? all-text "30D"))
+    (is (contains? all-text "Max Drawdown"))
+    (is (contains? all-text "Vault Equity"))
+    (is (contains? all-text "Staking Account"))
     (is (some #(str/includes? % "Open Orders") all-text))))

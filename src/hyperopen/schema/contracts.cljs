@@ -210,6 +210,10 @@
    :actions/select-chart-type ::keyword-args
    :actions/toggle-indicators-dropdown ::no-args
    :actions/update-indicators-search ::single-input-args
+   :actions/toggle-portfolio-summary-scope-dropdown ::no-args
+   :actions/select-portfolio-summary-scope ::keyword-or-string-args
+   :actions/toggle-portfolio-summary-time-range-dropdown ::no-args
+   :actions/select-portfolio-summary-time-range ::keyword-or-string-args
    :actions/toggle-orderbook-size-unit-dropdown ::no-args
    :actions/select-orderbook-size-unit ::keyword-or-string-args
    :actions/toggle-orderbook-price-aggregation-dropdown ::no-args

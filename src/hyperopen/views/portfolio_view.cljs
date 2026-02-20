@@ -9,6 +9,11 @@
    #js {:notation "compact"
         :maximumFractionDigits 1}))
 
+(def ^:private integer-formatter
+  (js/Intl.NumberFormat.
+   "en-US"
+   #js {:maximumFractionDigits 0}))
+
 (def ^:private action-items
   [{:label "Link Staking"
     :action [:actions/navigate "/staking"]}
@@ -44,6 +49,15 @@
   (let [n (if (number? pct) pct 0)]
     (str (.toFixed n 2) "%")))
 
+(defn- format-drawdown [ratio]
+  (if (number? ratio)
+    (format-percent (* ratio 100))
+    "N/A"))
+
+(defn- format-hype [value]
+  (let [n (if (number? value) value 0)]
+    (str (.format integer-formatter n) " HYPE")))
+
 (defn- action-button [{:keys [label action primary?]}]
   [:button {:type "button"
             :class (into ["btn" "btn-sm" "rounded-lg" "border" "border-base-300" "bg-base-100" "text-trading-text-secondary" "hover:text-trading-text" "hover:bg-base-200"]
@@ -72,6 +86,69 @@
                 (format-currency (js/Math.abs n)))
      :class [color-class]}))
 
+(defn- summary-selector
+  [{:keys [label open? options value]}
+   toggle-action
+   select-action
+   data-role]
+  [:div {:class ["relative"]
+         :data-role data-role}
+   [:button {:type "button"
+             :class ["flex"
+                     "items-center"
+                     "gap-1.5"
+                     "rounded-md"
+                     "px-2"
+                     "py-1"
+                     "text-xs"
+                     "font-normal"
+                     "text-trading-text"
+                     "hover:bg-base-200"]
+             :aria-expanded (boolean open?)
+             :on {:click [[toggle-action]]}}
+    [:span label]
+    [:svg {:class (into ["h-4" "w-4" "text-trading-text-secondary" "transition-transform"]
+                        (when open?
+                          ["rotate-180"]))
+           :fill "none"
+           :stroke "currentColor"
+           :viewBox "0 0 24 24"}
+     [:path {:stroke-linecap "round"
+             :stroke-linejoin "round"
+             :stroke-width 2
+             :d "M19 9l-7 7-7-7"}]]]
+   [:div {:class (into ["absolute"
+                        "right-0"
+                        "top-full"
+                        "mt-1"
+                        "min-w-[160px]"
+                        "overflow-hidden"
+                        "rounded-md"
+                        "border"
+                        "border-base-300"
+                        "bg-base-100"
+                        "shadow-lg"
+                        "z-30"]
+                       (if open?
+                         ["opacity-100" "scale-y-100" "translate-y-0"]
+                         ["opacity-0" "scale-y-95" "-translate-y-1" "pointer-events-none"]))
+          :style {:transition "all 80ms ease-in-out"}}
+    (for [{option-value :value option-label :label} options]
+      ^{:key (str data-role "-" (name option-value))}
+      [:button {:type "button"
+                :class (into ["block"
+                              "w-full"
+                              "px-3"
+                              "py-2"
+                              "text-left"
+                              "text-xs"
+                              "hover:bg-base-200"]
+                             (if (= option-value value)
+                               ["text-trading-text" "bg-base-200"]
+                               ["text-trading-text-secondary"]))
+                :on {:click [[select-action option-value]]}}
+       option-label])]])
+
 (defn- section-card [data-role & children]
   (into [:div {:class ["rounded-xl"
                        "border"
@@ -81,23 +158,35 @@
                :data-role data-role}]
         children))
 
-(defn- summary-card [{:keys [summary]}]
-  (let [pnl-info (pnl-summary (:pnl summary))]
+(defn- summary-card [{:keys [summary selectors]}]
+  (let [pnl-info (pnl-summary (:pnl summary))
+        summary-scope (:summary-scope selectors)
+        summary-time-range (:summary-time-range selectors)]
     (section-card
      "portfolio-account-summary-card"
      [:div {:class ["flex" "items-center" "justify-between" "border-b" "border-base-300" "px-4" "py-3"]}
-      [:button {:class ["btn" "btn-xs" "btn-ghost" "font-normal" "text-trading-text"]}
-       "Perps + Spot + Vaults"]
-      [:button {:class ["btn" "btn-xs" "btn-ghost" "font-normal" "text-trading-text"]}
-       "30D"]]
+      (summary-selector summary-scope
+                        :actions/toggle-portfolio-summary-scope-dropdown
+                        :actions/select-portfolio-summary-scope
+                        "portfolio-summary-scope-selector")
+      (summary-selector summary-time-range
+                        :actions/toggle-portfolio-summary-time-range-dropdown
+                        :actions/select-portfolio-summary-time-range
+                        "portfolio-summary-time-range-selector")]
      [:div {:class ["space-y-2.5" "px-4" "py-3"]}
       (summary-row "PNL" (:value pnl-info) (:class pnl-info))
       (summary-row "Volume" (format-currency (:volume summary)))
-      (summary-row "Max Drawdown" (format-percent (:max-drawdown-pct summary)))
+      (summary-row "Max Drawdown" (format-drawdown (:max-drawdown-pct summary)))
       (summary-row "Total Equity" (format-currency (:total-equity summary)))
-      (summary-row "Perps Account Equity" (format-currency (:perps-account-equity summary)))
-      (summary-row "Spot Account Equity" (format-currency (:spot-account-equity summary)))
-      (summary-row "Earn Balance" (format-currency (:earn-balance summary)))])))
+      (when (:show-perps-account-equity? summary)
+        (summary-row "Perps Account Equity" (format-currency (:perps-account-equity summary))))
+      (summary-row (:spot-equity-label summary) (format-currency (:spot-account-equity summary)))
+      (when (:show-vault-equity? summary)
+        (summary-row "Vault Equity" (format-currency (:vault-equity summary))))
+      (when (:show-earn-balance? summary)
+        (summary-row "Earn Balance" (format-currency (:earn-balance summary))))
+      (when (:show-staking-account? summary)
+        (summary-row "Staking Account" (format-hype (:staking-account-hype summary))))])))
 
 (defn- chart-card []
   (section-card

@@ -211,6 +211,22 @@
               {:post-info! post-info!}
               address
               opts)))
+          (request-portfolio!
+            ([address]
+             (request-portfolio! address {}))
+            ([address opts]
+             (account-gateway/request-portfolio!
+              {:post-info! post-info!}
+              address
+              opts)))
+          (request-user-fees!
+            ([address]
+             (request-user-fees! address {}))
+            ([address opts]
+             (account-gateway/request-user-fees!
+              {:post-info! post-info!}
+              address
+              opts)))
           (request-clearinghouse-state!
             ([address dex]
              (request-clearinghouse-state! address dex {}))
@@ -223,6 +239,8 @@
     {:request-user-funding-history! request-user-funding-history!
      :request-spot-clearinghouse-state! request-spot-clearinghouse-state!
      :request-user-abstraction! request-user-abstraction!
+     :request-portfolio! request-portfolio!
+     :request-user-fees! request-user-fees!
      :request-clearinghouse-state! request-clearinghouse-state!}))
 
 (defn make-api
