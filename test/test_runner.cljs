@@ -112,6 +112,7 @@
             [hyperopen.views.trading-chart.utils.chart-interop.indicators-test]
             [hyperopen.views.trading-chart.utils.chart-interop.volume-indicator-overlay-test]
             [hyperopen.views.trading-chart.utils.chart-interop.open-order-overlays-test]
+            [hyperopen.views.trading-chart.utils.chart-interop.chart-creation-test]
             [hyperopen.views.trading-chart.utils.chart-options-test]
             [hyperopen.views.trading-chart.utils.data-processing-test]
             [hyperopen.views.trading-chart.utils.indicators-test]
@@ -259,6 +260,7 @@
              'hyperopen.views.trading-chart.utils.chart-interop.indicators-test
              'hyperopen.views.trading-chart.utils.chart-interop.volume-indicator-overlay-test
              'hyperopen.views.trading-chart.utils.chart-interop.open-order-overlays-test
+             'hyperopen.views.trading-chart.utils.chart-interop.chart-creation-test
              'hyperopen.views.trading-chart.utils.chart-options-test
              'hyperopen.views.trading-chart.utils.data-processing-test
              'hyperopen.views.trading-chart.utils.indicators-test

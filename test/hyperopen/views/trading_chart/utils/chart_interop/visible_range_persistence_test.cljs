@@ -75,3 +75,38 @@
           (is (= {:kind "logical" :from 5 :to 8} payload)))
         (cleanup)))))
 
+
+(deftest apply-persisted-visible-range-supports-injected-storage-get-test
+  (let [requested-key (atom nil)
+        applied-range (atom nil)
+        time-scale #js {:setVisibleRange (fn [range]
+                                           (reset! applied-range (js->clj range :keywordize-keys true)))}
+        chart #js {:timeScale (fn [] time-scale)}]
+    (is (= true (chart-interop/apply-persisted-visible-range!
+                 chart
+                 :4h
+                 {:storage-get (fn [key]
+                                 (reset! requested-key key)
+                                 "{\"kind\":\"time\",\"from\":3,\"to\":9}")})))
+    (is (= "chart-visible-time-range:4h" @requested-key))
+    (is (= {:from 3 :to 9} @applied-range))))
+
+
+(deftest subscribe-visible-range-persistence-supports-injected-storage-set-test
+  (let [handler* (atom nil)
+        writes (atom [])
+        storage-set! (fn [key value]
+                       (swap! writes conj [key value]))
+        time-scale #js {:subscribeVisibleTimeRangeChange (fn [handler]
+                                                           (reset! handler* handler))
+                        :unsubscribeVisibleTimeRangeChange (fn [_] nil)}
+        chart #js {:timeScale (fn [] time-scale)}
+        cleanup (chart-interop/subscribe-visible-range-persistence! chart :15m
+                                                                    {:storage-set! storage-set!})]
+    (@handler* #js {:from 11 :to 19})
+    (let [[key raw] (first @writes)
+          payload (js->clj (js/JSON.parse raw) :keywordize-keys true)]
+      (is (= "chart-visible-time-range:15m" key))
+      (is (= {:kind "time" :from 11 :to 19} payload)))
+    (cleanup)))
+

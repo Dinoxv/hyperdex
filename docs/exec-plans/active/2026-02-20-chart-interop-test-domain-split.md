@@ -26,6 +26,8 @@ A user-visible proof is that tests for one concern (for example volume indicator
 - [x] (2026-02-20 14:00Z) Reduced `/hyperopen/test/hyperopen/views/trading_chart/utils/chart_interop_test.cljs` from 1398 lines to a 327-line facade/integration slice.
 - [x] (2026-02-20 14:00Z) Updated `/hyperopen/test/test_runner.cljs` with explicit requires and `run-tests` entries for every new chart interop test namespace.
 - [x] (2026-02-20 14:00Z) Ran required gates successfully: `npm run check`, `npm test`, `npm run test:websocket`.
+- [x] (2026-02-20 15:06Z) Follow-up pass: further reduced facade file by moving domain-specific facade-entry tests into module files and adding dedicated chart creation namespace.
+- [x] (2026-02-20 15:06Z) Validated follow-up topology via `npm test` (0 failures, 0 errors).
 
 ## Surprises & Discoveries
 
@@ -43,6 +45,9 @@ A user-visible proof is that tests for one concern (for example volume indicator
 
 - Observation: extracting exact `deftest` blocks to temporary files first made the split behavior-preserving and count-preserving.
   Evidence: final split still contains exactly 50 tests (`13 + 4 + 3 + 12 + 2 + 4 + 3 + 2 + 1 + 3 + 3 = 50`) and `npm test` remained green.
+
+- Observation: keeping chart creation behavior inside the facade test namespace still left a mixed concern hotspot after the first split.
+  Evidence: post-split `/hyperopen/test/hyperopen/views/trading_chart/utils/chart_interop_test.cljs` was 327 lines and still included chart creation/hide-volume behavior.
 
 ## Decision Log
 
@@ -66,12 +71,17 @@ A user-visible proof is that tests for one concern (for example volume indicator
   Rationale: those tests still document the owning behavioral domain (for example open-order overlays, legend, and visible-range persistence) and improve discoverability for targeted maintenance.
   Date/Author: 2026-02-20 / Codex
 
+- Decision: add `/hyperopen/test/hyperopen/views/trading_chart/utils/chart_interop/chart_creation_test.cljs` for chart-construction behaviors instead of keeping them in the thin facade wrapper file.
+  Rationale: chart creation checks are integration-style behavior and form a coherent domain that would otherwise bloat the facade contract namespace.
+  Date/Author: 2026-02-20 / Codex
+
 ## Outcomes & Retrospective
 
 Implementation completed as a behavior-preserving test topology refactor.
 
 - Added shared helper namespace: `/hyperopen/test/hyperopen/views/trading_chart/test_support/fake_dom.cljs`.
 - Added domain-focused test namespaces under `/hyperopen/test/hyperopen/views/trading_chart/utils/chart_interop/`:
+  - `chart_creation_test.cljs`
   - `visible_range_persistence_test.cljs`
   - `transforms_test.cljs`
   - `series_test.cljs`
@@ -83,6 +93,7 @@ Implementation completed as a behavior-preserving test topology refactor.
   - `volume_indicator_overlay_test.cljs`
   - `open_order_overlays_test.cljs`
 - Reduced facade file: `/hyperopen/test/hyperopen/views/trading_chart/utils/chart_interop_test.cljs` from 1398 lines to 327 lines.
+- Follow-up reduction: `/hyperopen/test/hyperopen/views/trading_chart/utils/chart_interop_test.cljs` from 327 lines to 180 lines.
 - Preserved total chart interop test count at 50 tests while distributing by domain.
 - Updated explicit test runner wiring in `/hyperopen/test/test_runner.cljs` for all new namespaces.
 
@@ -91,6 +102,8 @@ Validation outcomes:
 - `npm run check`: pass (all lint/docs checks green; `shadow-cljs compile app` and `shadow-cljs compile test` with 0 warnings)
 - `npm test`: pass (`Ran 1168 tests containing 5445 assertions. 0 failures, 0 errors.`)
 - `npm run test:websocket`: pass (`Ran 135 tests containing 587 assertions. 0 failures, 0 errors.`)
+- Follow-up validation:
+  - `npm test`: pass (`Ran 1168 tests containing 5445 assertions. 0 failures, 0 errors.`)
 
 Residual risk is low. Main risk area is future drift if new chart-interop submodules are added without corresponding runner wiring updates in `/hyperopen/test/test_runner.cljs`.
 
@@ -194,21 +207,23 @@ Initial audit evidence:
 Final implementation evidence:
 
 - Final chart interop test distribution by file:
-  - `/hyperopen/test/hyperopen/views/trading_chart/utils/chart_interop_test.cljs`: 13 tests
-  - `/hyperopen/test/hyperopen/views/trading_chart/utils/chart_interop/visible_range_persistence_test.cljs`: 4 tests
+  - `/hyperopen/test/hyperopen/views/trading_chart/utils/chart_interop_test.cljs`: 6 tests
+  - `/hyperopen/test/hyperopen/views/trading_chart/utils/chart_interop/visible_range_persistence_test.cljs`: 6 tests
   - `/hyperopen/test/hyperopen/views/trading_chart/utils/chart_interop/transforms_test.cljs`: 3 tests
   - `/hyperopen/test/hyperopen/views/trading_chart/utils/chart_interop/series_test.cljs`: 12 tests
   - `/hyperopen/test/hyperopen/views/trading_chart/utils/chart_interop/price_format_test.cljs`: 2 tests
   - `/hyperopen/test/hyperopen/views/trading_chart/utils/chart_interop/baseline_test.cljs`: 4 tests
-  - `/hyperopen/test/hyperopen/views/trading_chart/utils/chart_interop/legend_test.cljs`: 3 tests
-  - `/hyperopen/test/hyperopen/views/trading_chart/utils/chart_interop/markers_test.cljs`: 2 tests
+  - `/hyperopen/test/hyperopen/views/trading_chart/utils/chart_interop/legend_test.cljs`: 4 tests
+  - `/hyperopen/test/hyperopen/views/trading_chart/utils/chart_interop/markers_test.cljs`: 3 tests
   - `/hyperopen/test/hyperopen/views/trading_chart/utils/chart_interop/indicators_test.cljs`: 1 test
   - `/hyperopen/test/hyperopen/views/trading_chart/utils/chart_interop/volume_indicator_overlay_test.cljs`: 3 tests
   - `/hyperopen/test/hyperopen/views/trading_chart/utils/chart_interop/open_order_overlays_test.cljs`: 3 tests
+  - `/hyperopen/test/hyperopen/views/trading_chart/utils/chart_interop/chart_creation_test.cljs`: 3 tests
 - Total preserved chart interop tests: 50.
 - Line-count change:
   - before: `/hyperopen/test/hyperopen/views/trading_chart/utils/chart_interop_test.cljs` = 1398 lines
-  - after: `/hyperopen/test/hyperopen/views/trading_chart/utils/chart_interop_test.cljs` = 327 lines
+  - after initial split: `/hyperopen/test/hyperopen/views/trading_chart/utils/chart_interop_test.cljs` = 327 lines
+  - after follow-up split: `/hyperopen/test/hyperopen/views/trading_chart/utils/chart_interop_test.cljs` = 180 lines
 - Runner evidence: `npm test` output includes all new namespaces under `hyperopen.views.trading-chart.utils.chart-interop.*-test`.
 
 ## Interfaces and Dependencies
@@ -228,6 +243,7 @@ Expected new test namespaces:
 - `hyperopen.views.trading-chart.utils.chart-interop.indicators-test`
 - `hyperopen.views.trading-chart.utils.chart-interop.volume-indicator-overlay-test`
 - `hyperopen.views.trading-chart.utils.chart-interop.open-order-overlays-test`
+- `hyperopen.views.trading-chart.utils.chart-interop.chart-creation-test`
 - `hyperopen.views.trading-chart.utils.chart-interop-test` (thin facade retained)
 
 Dependencies that must remain consistent:
@@ -238,3 +254,4 @@ Dependencies that must remain consistent:
 
 Plan revision note: 2026-02-20 00:00Z - Initial plan created from chart interop test audit with module-aligned split strategy, fake DOM helper extraction, and required validation gates.
 Plan revision note: 2026-02-20 14:00Z - Completed implementation: extracted fake DOM support, split chart interop tests into 10 module-focused namespaces plus thin facade file, updated test runner wiring, and passed all required validation gates.
+Plan revision note: 2026-02-20 15:06Z - Follow-up split completed: moved remaining domain-heavy cases out of facade file, added `chart_creation_test`, and revalidated with `npm test`.

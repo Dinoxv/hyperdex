@@ -49,3 +49,7 @@
     (is (= [{:time 1 :position "aboveBar"}]
            (:markers (second @plugin-sets))))))
 
+
+(deftest set-main-series-markers-two-arity-allows-nil-chart-test
+  (is (nil? (chart-interop/set-main-series-markers! nil [{:time 1 :position "aboveBar"}]))))
+

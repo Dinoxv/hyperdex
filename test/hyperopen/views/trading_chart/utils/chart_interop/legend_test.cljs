@@ -110,3 +110,23 @@
     (is (identical? @crosshair-handler* @unsubscribed-handler*))
     (is (zero? (alength (.-children container))))))
 
+
+(deftest create-legend-three-arity-uses-global-document-test
+  (let [original-document (aget js/globalThis "document")
+        document (fake-dom/make-fake-document)
+        container (fake-dom/make-fake-element "div")
+        crosshair-handler* (atom nil)
+        chart #js {:subscribeCrosshairMove (fn [handler]
+                                             (reset! crosshair-handler* handler))
+                   :unsubscribeCrosshairMove (fn [_] nil)}
+        legend-meta {:candle-data [{:time 1 :open 10 :high 12 :low 9 :close 11}]}]
+    (aset js/globalThis "document" document)
+    (try
+      (let [legend-control (chart-interop/create-legend! container chart legend-meta)
+            text (str/join " " (fake-dom/collect-text-content (aget (.-children container) 0)))]
+        (is (fn? @crosshair-handler*))
+        (is (str/includes? text "— · — · —"))
+        (.destroy ^js legend-control))
+      (finally
+        (aset js/globalThis "document" original-document)))))
+
