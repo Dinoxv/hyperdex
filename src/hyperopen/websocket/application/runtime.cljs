@@ -143,6 +143,8 @@
                        (model/make-runtime-msg :evt/lifecycle-online (:ts event)))
    :lifecycle/offline (fn [event]
                         (model/make-runtime-msg :evt/lifecycle-offline (:ts event)))
+   :lifecycle/hidden (fn [event]
+                       (model/make-runtime-msg :evt/lifecycle-hidden (:ts event)))
    :lifecycle/visible (fn [event]
                         (model/make-runtime-msg :evt/lifecycle-visible (:ts event)))
    :timer/retry (fn [event]

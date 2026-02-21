@@ -61,6 +61,7 @@
     :lifecycle/focus
     :lifecycle/online
     :lifecycle/offline
+    :lifecycle/hidden
     :lifecycle/visible
     :timer/watchdog
     :timer/retry
@@ -94,6 +95,7 @@
     :evt/lifecycle-focus
     :evt/lifecycle-online
     :evt/lifecycle-offline
+    :evt/lifecycle-hidden
     :evt/lifecycle-visible
     :evt/timer-retry-fired
     :evt/timer-watchdog-fired

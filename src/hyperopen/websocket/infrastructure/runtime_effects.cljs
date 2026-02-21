@@ -172,9 +172,10 @@
                             (dispatch! {:msg/type :evt/lifecycle-offline
                                         :ts (now-ms clock)}))
           visibility-handler (fn [_]
-                               (when-not (infra/hidden-tab?* scheduler)
-                                 (dispatch! {:msg/type :evt/lifecycle-visible
-                                             :ts (now-ms clock)})))]
+                               (dispatch! {:msg/type (if (infra/hidden-tab?* scheduler)
+                                                       :evt/lifecycle-hidden
+                                                       :evt/lifecycle-visible)
+                                           :ts (now-ms clock)}))]
       (infra/add-event-listener* scheduler (infra/window-object* scheduler) "focus" focus-handler)
       (infra/add-event-listener* scheduler (infra/window-object* scheduler) "online" online-handler)
       (infra/add-event-listener* scheduler (infra/window-object* scheduler) "offline" offline-handler)
@@ -207,11 +208,13 @@
     (if ok
       (dispatch! {:msg/type :evt/decoded-envelope
                   :envelope ok
+                  :socket-id socket-id
                   :recv-at-ms decode-at-ms
                   :ts decode-at-ms})
       (dispatch! {:msg/type :evt/parse-error
                   :error error
                   :raw raw
+                  :socket-id socket-id
                   :recv-at-ms decode-at-ms
                   :ts decode-at-ms}))))
 

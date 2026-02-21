@@ -405,3 +405,153 @@
       (is (false? (:seq-gap-detected? stream-after-resubscribe)))
       (is (= 0 (:seq-gap-count stream-after-resubscribe)))
       (is (nil? (:last-gap stream-after-resubscribe))))))
+
+(deftest stale-socket-decoded-and-parse-events-are-ignored-test
+  (let [base (-> (reducer/initial-runtime-state test-config)
+                 (assoc :status :connected
+                        :active-socket-id 2
+                        :online? true))
+        stale-envelope {:topic "trades"
+                        :tier :market
+                        :ts 100
+                        :payload {:channel "trades"
+                                  :data [{:coin "BTC"}]
+                                  :seq 9}}
+        decoded-result (step base
+                             (model/make-runtime-msg :evt/decoded-envelope
+                                                     100
+                                                     {:socket-id 1
+                                                      :recv-at-ms 100
+                                                      :envelope stale-envelope}))
+        parse-result (step base
+                           (model/make-runtime-msg :evt/parse-error
+                                                   101
+                                                   {:socket-id 1
+                                                    :raw "{}"
+                                                    :error (js/Error. "stale")}))]
+    (testing "Decoded envelope from stale socket does not mutate runtime buffers"
+      (is (empty? (get-in decoded-result [:state :market-coalesce :pending])))
+      (is (= 0 (get-in decoded-result [:state :metrics :market-coalesced])))
+      (is (= 0 (get-in decoded-result [:state :metrics :market-dispatched])))
+      (is (not-any? #(= :fx/timer-set-timeout (:fx/type %))
+                    (:effects decoded-result))))
+    (testing "Parse errors from stale socket do not increment parse metrics"
+      (is (= 0 (get-in parse-result [:state :metrics :ingress-parse-errors])))
+      (is (not-any? #(= :fx/dead-letter (:fx/type %))
+                    (:effects parse-result))))))
+
+(deftest disconnect-clears-market-pending-and-detaches-socket-test
+  (let [pending-key ["trades" "BTC"]
+        base (-> (reducer/initial-runtime-state test-config)
+                 (assoc :status :connected
+                        :active-socket-id 7
+                        :socket-id 7
+                        :watchdog-active? true
+                        :health-tick-active? true
+                        :market-flush-active? true)
+                 (assoc-in [:market-coalesce :pending pending-key]
+                           {:topic "trades"
+                            :tier :market
+                            :ts 100
+                            :payload {:channel "trades"
+                                      :data [{:coin "BTC"}]}}))
+        {:keys [state effects]} (step base (model/make-runtime-msg :cmd/disconnect 200))]
+    (testing "Disconnect clears pending market coalesce state"
+      (is (false? (:market-flush-active? state)))
+      (is (empty? (get-in state [:market-coalesce :pending]))))
+    (testing "Disconnect detaches handlers and closes socket"
+      (is (some #(= :fx/socket-detach-handlers (:fx/type %)) effects))
+      (is (some #(= :fx/socket-close (:fx/type %)) effects)))))
+
+(deftest lifecycle-offline-clears-retry-market-state-and-detaches-socket-test
+  (let [pending-key ["l2Book" "ETH"]
+        base (-> (reducer/initial-runtime-state test-config)
+                 (assoc :status :connected
+                        :active-socket-id 8
+                        :socket-id 8
+                        :online? true
+                        :retry-timer-active? true
+                        :next-retry-at-ms 777
+                        :market-flush-active? true)
+                 (assoc-in [:market-coalesce :pending pending-key]
+                           {:topic "l2Book"
+                            :tier :market
+                            :ts 11
+                            :payload {:channel "l2Book"
+                                      :data {:coin "ETH"}}}))
+        {:keys [state effects]} (step base (model/make-runtime-msg :evt/lifecycle-offline 500))]
+    (testing "Offline transition clears retry and market coalesce runtime state"
+      (is (false? (:retry-timer-active? state)))
+      (is (nil? (:next-retry-at-ms state)))
+      (is (false? (:market-flush-active? state)))
+      (is (empty? (get-in state [:market-coalesce :pending])))
+      (is (= :disconnected (:status state)))
+      (is (= false (:online? state))))
+    (testing "Offline transition detaches and closes active socket"
+      (is (some #(and (= :fx/timer-clear-timeout (:fx/type %))
+                      (= :retry (:timer-key %)))
+                effects))
+      (is (some #(and (= :fx/timer-clear-timeout (:fx/type %))
+                      (= :market-flush (:timer-key %)))
+                effects))
+      (is (some #(= :fx/socket-detach-handlers (:fx/type %)) effects))
+      (is (some #(= :fx/socket-close (:fx/type %)) effects)))))
+
+(deftest force-reconnect-clears-market-pending-before-new-connect-test
+  (let [pending-key ["activeAssetCtx" "BTC"]
+        base (-> (reducer/initial-runtime-state test-config)
+                 (assoc :status :connected
+                        :ws-url "wss://example.test/ws"
+                        :online? true
+                        :socket-id 5
+                        :active-socket-id 5
+                        :market-flush-active? true)
+                 (assoc-in [:market-coalesce :pending pending-key]
+                           {:topic "activeAssetCtx"
+                            :tier :market
+                            :ts 12
+                            :payload {:channel "activeAssetCtx"
+                                      :coin "BTC"}}))
+        {:keys [state effects]} (step base (model/make-runtime-msg :cmd/force-reconnect 600))]
+    (testing "Force reconnect discards stale market pending payloads"
+      (is (empty? (get-in state [:market-coalesce :pending])))
+      (is (false? (:market-flush-active? state))))
+    (testing "Force reconnect tears down old socket and requests a new connect"
+      (is (some #(= :fx/socket-detach-handlers (:fx/type %)) effects))
+      (is (some #(= :fx/socket-close (:fx/type %)) effects))
+      (is (some #(= :fx/socket-connect (:fx/type %)) effects)))))
+
+(deftest replay-subscriptions-use-domain-key-order-test
+  (let [sub-a {:type "trades" :coin "BTC"}
+        sub-b {:type "l2Book" :coin "ETH"}
+        sub-c {:type "openOrders" :user "0xabc"}
+        desired {(model/subscription-key sub-a) sub-a
+                 (model/subscription-key sub-b) sub-b
+                 (model/subscription-key sub-c) sub-c}
+        state (-> (reducer/initial-runtime-state test-config)
+                  (assoc :status :connecting
+                         :online? true
+                         :socket-id 10
+                         :active-socket-id 10
+                         :desired-subscriptions desired))
+        {:keys [effects]} (step state (model/make-runtime-msg :evt/socket-open 700 {:socket-id 10 :at-ms 700}))
+        replay-sends (->> effects
+                          (filter #(= :fx/socket-send (:fx/type %)))
+                          (mapv :data)
+                          (filterv #(= "subscribe" (:method %))))
+        expected-order (->> (vals desired)
+                            (sort-by model/subscription-key)
+                            (mapv (fn [subscription]
+                                    {:method "subscribe"
+                                     :subscription subscription})))]
+    (testing "Replay subscribe payloads are sorted by domain subscription key"
+      (is (= expected-order replay-sends)))))
+
+(deftest lifecycle-hidden-and-visible-toggle-hidden-flag-test
+  (let [base (reducer/initial-runtime-state test-config)
+        hidden-result (step base (model/make-runtime-msg :evt/lifecycle-hidden 100))
+        visible-result (step (:state hidden-result) (model/make-runtime-msg :evt/lifecycle-visible 200))]
+    (testing "Hidden event toggles runtime hidden flag on"
+      (is (true? (get-in hidden-result [:state :hidden?]))))
+    (testing "Visible event toggles runtime hidden flag off"
+      (is (false? (get-in visible-result [:state :hidden?]))))))

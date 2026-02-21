@@ -242,6 +242,7 @@
           (is (= [:evt/lifecycle-focus
                   :evt/lifecycle-online
                   :evt/lifecycle-offline
+                  :evt/lifecycle-hidden
                   :evt/lifecycle-visible]
                  (->> @dispatches
                       (drop dispatch-count-before)
@@ -279,7 +280,9 @@
              (->> @dispatches
                   (take-last 2)
                   (mapv :msg/type))))
+      (is (= :primary (:socket-id (nth @dispatches (- (count @dispatches) 2)))))
       (is (= 222 (:ts (nth @dispatches (- (count @dispatches) 2)))))
+      (is (= :primary (:socket-id (last @dispatches))))
       (is (number? (:ts (last @dispatches)))))
     (testing "projection effects refresh public runtime atoms"
       (let [socket (js-obj "readyState" infra/ws-ready-state-open)

@@ -1,9 +1,51 @@
 (ns hyperopen.websocket.application.runtime-reducer
-  (:require [hyperopen.websocket.domain.model :as model]
+  (:require [hyperopen.websocket.application.runtime.connection :as connection]
+            [hyperopen.websocket.application.runtime.market :as market]
+            [hyperopen.websocket.application.runtime.subscriptions :as subscriptions]
+            [hyperopen.websocket.domain.model :as model]
             [hyperopen.websocket.health :as health]))
 
+(def ^:private default-runtime-config
+  {:max-queue-size 1000
+   :watchdog-interval-ms 10000
+   :health-tick-interval-ms 1000
+   :transport-live-threshold-ms health/default-transport-live-threshold-ms
+   :freshness-hysteresis-consecutive health/default-freshness-hysteresis-consecutive
+   :stale-threshold-ms health/default-stream-stale-threshold-ms
+   :stale-visible-ms 45000
+   :stale-hidden-ms 180000
+   :market-coalesce-window-ms 16})
+
+(defn- normalize-runtime-config
+  [config]
+  (let [config* (merge default-runtime-config (or config {}))]
+    ;; Reducer defaults keep direct reducer usage safe in tests/replay tooling.
+    (assert (pos-int? (:max-queue-size config*)) "runtime config :max-queue-size must be a positive integer")
+    (assert (pos-int? (:watchdog-interval-ms config*)) "runtime config :watchdog-interval-ms must be a positive integer")
+    (assert (pos-int? (:health-tick-interval-ms config*)) "runtime config :health-tick-interval-ms must be a positive integer")
+    (assert (pos-int? (:stale-visible-ms config*)) "runtime config :stale-visible-ms must be a positive integer")
+    (assert (pos-int? (:stale-hidden-ms config*)) "runtime config :stale-hidden-ms must be a positive integer")
+    (assert (pos-int? (:market-coalesce-window-ms config*)) "runtime config :market-coalesce-window-ms must be a positive integer")
+    config*))
+
 (defn initial-runtime-state [config]
-  {:config config
+  ;; Runtime message time semantics:
+  ;; - :ts is message creation time.
+  ;; - :at-ms / :recv-at-ms are transport-originated timestamps when present.
+  ;; - :now-ms in state is reducer's latest known runtime time.
+  ;;
+  ;; Runtime states:
+  ;; - :disconnected, :connecting, :connected, :reconnecting.
+  ;;
+  ;; Tier meanings:
+  ;; - :market streams are coalesced briefly before dispatch.
+  ;; - :lossless streams dispatch immediately in order.
+  ;;
+  ;; Expected traffic:
+  ;; - true when subscribed streams have stale-threshold policy and transport freshness
+  ;;   should degrade when payloads stop arriving.
+  (let [config* (normalize-runtime-config config)]
+    {:config config*
    :ws-url nil
    :status :disconnected
    :attempt 0
@@ -37,7 +79,7 @@
              :lossless-dispatched 0
              :ingress-parse-errors 0}
    :health-projection-fingerprint nil
-   :health-projection-last-refresh-at-ms nil})
+   :health-projection-last-refresh-at-ms nil}))
 
 (def ^:private default-health-projection-interval-ms
   1000)
@@ -50,6 +92,8 @@
     :evt/socket-open
     :evt/socket-close
     :evt/lifecycle-online
+    :evt/lifecycle-hidden
+    :evt/lifecycle-visible
     :evt/lifecycle-offline
     :evt/timer-retry-fired
     :evt/timer-health-tick})
@@ -203,234 +247,6 @@
     {:state state*
      :effects (append-projections state* (vec effects))}))
 
-(defn- can-connect? [state]
-  (and (:ws-url state)
-       (:online? state)
-       (not (:intentional-close? state))
-       (nil? (:active-socket-id state))))
-
-(defn- ensure-connect [state effects]
-  (if (can-connect? state)
-    (let [socket-id (inc (:socket-id state))
-          status (if (pos? (:attempt state)) :reconnecting :connecting)]
-      [(assoc state
-              :socket-id socket-id
-              :active-socket-id socket-id
-              :status status
-              :next-retry-at-ms nil)
-       (conj effects
-             (model/make-runtime-effect :fx/socket-connect
-                                        {:ws-url (:ws-url state)
-                                         :socket-id socket-id}))])
-    [state effects]))
-
-(defn- with-now [state now-ms]
-  (if (number? now-ms)
-    (assoc state :now-ms now-ms)
-    state))
-
-(defn- with-overflow-bound [queue max-size data]
-  (let [next-queue (conj (vec queue) data)]
-    (if (> (count next-queue) max-size)
-      [(vec (rest next-queue)) true]
-      [next-queue false])))
-
-(defn- schedule-retry
-  [{:keys [calculate-retry-delay-ms]} state effects ts]
-  (cond
-    (:intentional-close? state)
-    [(assoc state :status :disconnected :next-retry-at-ms nil :retry-timer-active? false)
-     effects]
-
-    (not (:ws-url state))
-    [(assoc state :status :disconnected :next-retry-at-ms nil :retry-timer-active? false)
-     effects]
-
-    (not (:online? state))
-    [(assoc state :status :disconnected :next-retry-at-ms nil :retry-timer-active? false)
-     effects]
-
-    :else
-    (let [attempt (max 1 (:attempt state))
-          delay-ms (calculate-retry-delay-ms attempt (:hidden? state) (:config state) 0.5)
-          retry-at (+ ts delay-ms)
-          effects* (cond-> effects
-                     (:retry-timer-active? state)
-                     (conj (model/make-runtime-effect :fx/timer-clear-timeout {:timer-key :retry}))
-
-                     true
-                     (conj (model/make-runtime-effect :fx/timer-set-timeout
-                                                     {:timer-key :retry
-                                                      :ms delay-ms
-                                                      :msg {:msg/type :evt/timer-retry-fired}})))]
-      [(assoc state
-              :status :reconnecting
-              :next-retry-at-ms retry-at
-              :retry-timer-active? true)
-       effects*])))
-
-(defn- maybe-start-health-tick [state effects]
-  (if (:health-tick-active? state)
-    [state effects]
-    [(assoc state :health-tick-active? true)
-     (conj effects
-           (model/make-runtime-effect :fx/timer-set-interval
-                                      {:timer-key :health-tick
-                                       :ms (or (get-in state [:config :health-tick-interval-ms]) 1000)
-                                       :msg {:msg/type :evt/timer-health-tick}}))]))
-
-(defn- maybe-clear-watchdog [state effects]
-  (if (:watchdog-active? state)
-    [(assoc state :watchdog-active? false)
-     (conj effects (model/make-runtime-effect :fx/timer-clear-interval {:timer-key :watchdog}))]
-    [state effects]))
-
-(defn- maybe-clear-retry [state effects]
-  (if (:retry-timer-active? state)
-    [(assoc state :retry-timer-active? false :next-retry-at-ms nil)
-     (conj effects (model/make-runtime-effect :fx/timer-clear-timeout {:timer-key :retry}))]
-    [state effects]))
-
-(defn- maybe-clear-market-flush [state effects]
-  (if (:market-flush-active? state)
-    [(assoc state :market-flush-active? false)
-     (conj effects (model/make-runtime-effect :fx/timer-clear-timeout {:timer-key :market-flush}))]
-    [state effects]))
-
-(defn- maybe-clear-health-tick [state effects]
-  (if (:health-tick-active? state)
-    [(assoc state :health-tick-active? false)
-     (conj effects (model/make-runtime-effect :fx/timer-clear-interval {:timer-key :health-tick}))]
-    [state effects]))
-
-(defn- flush-market-pending [state effects]
-  (let [pending (vals (get-in state [:market-coalesce :pending] {}))
-        sorted (sort-by :ts pending)
-        effects* (into effects
-                       (map (fn [envelope]
-                              (model/make-runtime-effect :fx/router-dispatch-envelope {:envelope envelope})))
-                       sorted)
-        dispatched (count sorted)]
-    [(-> state
-         (assoc-in [:market-coalesce :pending] {})
-         (assoc :market-flush-active? false)
-         (update-in [:metrics :market-dispatched] (fnil + 0) dispatched))
-     effects*]))
-
-(defn- refresh-expected-traffic [state]
-  (assoc-in state
-            [:transport :expected-traffic?]
-            (health/transport-expected-traffic? (:streams state))))
-
-(defn- baseline-stream-entry [state subscription]
-  (let [topic (:type subscription)]
-    {:descriptor subscription
-     :topic topic
-     :group (model/topic->group topic)
-     :stale-threshold-ms (health/stream-stale-threshold-ms (:config state) topic)
-     :status :idle
-     :status-pending-status nil
-     :status-pending-count 0
-     :last-seq nil
-     :seq-gap-detected? false
-     :seq-gap-count 0
-     :last-gap nil}))
-
-(defn- mark-subscribe [state subscription subscribed-at-ms]
-  (let [sub-key (model/subscription-key subscription)
-        existing (get-in state [:streams sub-key] {})
-        next-stream (merge existing
-                           (baseline-stream-entry state subscription)
-                           {:subscribed? true
-                            :subscribed-at-ms subscribed-at-ms
-                            :first-payload-at-ms nil
-                            :last-payload-at-ms nil
-                            :message-count 0
-                            :status :idle
-                            :status-pending-status nil
-                            :status-pending-count 0
-                            :last-seq nil
-                            :seq-gap-detected? false
-                            :seq-gap-count 0
-                            :last-gap nil})]
-    (assoc-in state [:streams sub-key] next-stream)))
-
-(defn- mark-unsubscribe [state subscription]
-  (let [sub-key (model/subscription-key subscription)
-        existing (get-in state [:streams sub-key] {})
-        next-stream (merge existing
-                           (baseline-stream-entry state subscription)
-                           {:subscribed? false
-                            :subscribed-at-ms nil
-                            :first-payload-at-ms nil
-                            :status :idle
-                            :status-pending-status nil
-                            :status-pending-count 0
-                            :last-seq nil
-                            :seq-gap-detected? false
-                            :seq-gap-count 0
-                            :last-gap nil})]
-    (assoc-in state [:streams sub-key] next-stream)))
-
-(defn- apply-stream-intent [state data at-ms]
-  (let [method (model/normalize-method (:method data))
-        subscription (:subscription data)]
-    (if (map? subscription)
-      (case method
-        "subscribe" (mark-subscribe state subscription at-ms)
-        "unsubscribe" (mark-unsubscribe state subscription)
-        state)
-      state)))
-
-(defn- replay-subscriptions-as-active [state at-ms]
-  (reduce (fn [acc subscription]
-            (mark-subscribe acc subscription at-ms))
-          state
-          (vals (:desired-subscriptions state))))
-
-(defn- update-stream-payload [stream recv-at-ms]
-  (if (and (map? stream) (:subscribed? stream))
-    (-> stream
-        (assoc :first-payload-at-ms (or (:first-payload-at-ms stream) recv-at-ms)
-               :last-payload-at-ms recv-at-ms)
-        (update :message-count (fnil inc 0)))
-    stream))
-
-(defn- update-stream-seq
-  [stream seq-value recv-at-ms]
-  (if (and (map? stream)
-           (:subscribed? stream)
-           (number? seq-value))
-    (let [last-seq (:last-seq stream)
-          gap? (and (number? last-seq)
-                    (> seq-value (inc last-seq)))
-          next-last-seq (if (number? last-seq)
-                          (max last-seq seq-value)
-                          seq-value)]
-      (cond-> (assoc stream :last-seq next-last-seq)
-        gap?
-        (-> (assoc :seq-gap-detected? true
-                   :last-gap {:expected (inc last-seq)
-                              :actual seq-value
-                              :at-ms recv-at-ms})
-            (update :seq-gap-count (fnil inc 0)))))
-    stream))
-
-(defn- record-stream-payload [state envelope recv-at-ms]
-  (let [stream-keys (health/match-stream-keys (:streams state) envelope)
-        seq-value (get-in envelope [:payload :seq])]
-    (reduce (fn [acc sub-key]
-              (if (contains? (:streams acc) sub-key)
-                (update-in acc
-                           [:streams sub-key]
-                           (fn [stream]
-                             (-> stream
-                                 (update-stream-payload recv-at-ms)
-                                 (update-stream-seq seq-value recv-at-ms))))
-                acc))
-            state
-            stream-keys)))
-
 (defn- emit-runtime-result
   [msg-type state effects]
   (result state effects msg-type false))
@@ -451,7 +267,7 @@
         state* (-> state
                    (assoc :ws-url (:ws-url msg)
                           :intentional-close? false)
-                   (with-now ts))
+                   (connection/with-now ts))
         [state1 effects1] (if (:lifecycle-installed? state*)
                             [state* []]
                             [(assoc state* :lifecycle-installed? true)
@@ -464,8 +280,8 @@
                                                               {:timer-key :watchdog
                                                                :ms (or (:watchdog-interval-ms config) 10000)
                                                                :msg {:msg/type :evt/timer-watchdog-fired}}))])
-        [state3 effects3] (maybe-start-health-tick state2 effects2)
-        [state4 effects4] (ensure-connect state3 effects3)]
+        [state3 effects3] (connection/maybe-start-health-tick state2 effects2)
+        [state4 effects4] (connection/ensure-connect state3 effects3)]
     (emit-runtime-result msg-type state4 effects4)))
 
 (defmethod handle-runtime-msg :cmd/disconnect
@@ -473,17 +289,13 @@
   (let [msg-type (:msg/type msg)
         ts (:ts msg)
         socket-id (:active-socket-id state)
-        [state1 effects1] (maybe-clear-retry state [])
-        [state2 effects2] (maybe-clear-watchdog state1 effects1)
-        [state3 effects3] (maybe-clear-market-flush state2 effects2)
-        [state4 effects4] (maybe-clear-health-tick state3 effects3)
-        effects5 (cond-> effects4
-                   socket-id (conj (model/make-runtime-effect :fx/socket-detach-handlers {:socket-id socket-id})
-                                   (model/make-runtime-effect :fx/socket-close {:socket-id socket-id
-                                                                                :code 1000
-                                                                                :reason "Intentional disconnect"})))
+        [state1 effects1] (connection/maybe-clear-retry state [])
+        [state2 effects2] (connection/maybe-clear-watchdog state1 effects1)
+        [state3 effects3] (market/maybe-clear-market-flush state2 effects2)
+        [state4 effects4] (connection/maybe-clear-health-tick state3 effects3)
+        effects5 (connection/add-socket-teardown-effects effects4 socket-id 1000 "Intentional disconnect")
         state5 (-> state4
-                   (with-now ts)
+                   (connection/with-now ts)
                    (assoc :intentional-close? true
                           :status :disconnected
                           :active-socket-id nil
@@ -496,18 +308,15 @@
   (let [msg-type (:msg/type msg)
         ts (:ts msg)
         socket-id (:active-socket-id state)
-        [state1 effects1] (maybe-clear-retry (-> state
+        [state0 effects0] (connection/maybe-clear-retry (-> state
                                                 (assoc :intentional-close? false)
-                                                (with-now ts))
+                                                (connection/with-now ts))
                                              [])
-        effects2 (cond-> effects1
-                   socket-id (conj (model/make-runtime-effect :fx/socket-detach-handlers {:socket-id socket-id})
-                                   (model/make-runtime-effect :fx/socket-close {:socket-id socket-id
-                                                                                :code 4000
-                                                                                :reason "Force reconnect"})))
+        [state1 effects1] (market/maybe-clear-market-flush state0 effects0)
+        effects2 (connection/add-socket-teardown-effects effects1 socket-id 4000 "Force reconnect")
         state2 (assoc state1 :active-socket-id nil)
-        [state3 effects3] (maybe-start-health-tick state2 effects2)
-        [state4 effects4] (ensure-connect state3 effects3)]
+        [state3 effects3] (connection/maybe-start-health-tick state2 effects2)
+        [state4 effects4] (connection/ensure-connect state3 effects3)]
     (emit-runtime-result msg-type state4 effects4)))
 
 (defmethod handle-runtime-msg :cmd/send-message
@@ -519,17 +328,17 @@
         at-ms (or (:at-ms msg) ts)
         desired* (model/apply-subscription-intent (:desired-subscriptions state) data)
         state* (-> state
-                   (with-now at-ms)
+                   (connection/with-now at-ms)
                    (assoc :desired-subscriptions desired*)
-                   (apply-stream-intent data at-ms)
-                   (refresh-expected-traffic))]
+                   (subscriptions/apply-stream-intent data at-ms)
+                   (subscriptions/refresh-expected-traffic))]
     (if (and (= :connected (:status state*))
              (:active-socket-id state*))
       (emit-runtime-result msg-type state*
                            [(model/make-runtime-effect :fx/socket-send
                                                        {:socket-id (:active-socket-id state*)
                                                         :data data})])
-      (let [[queue* dropped?] (with-overflow-bound (:queue state*)
+      (let [[queue* dropped?] (connection/with-overflow-bound (:queue state*)
                                                    (:max-queue-size config)
                                                    data)
             state1 (assoc state* :queue queue*)
@@ -537,7 +346,7 @@
                        dropped? (conj (model/make-runtime-effect :fx/log
                                                                  {:level :warn
                                                                   :message "WebSocket queue overflow, dropping oldest queued message"})))
-            [state2 effects2] (ensure-connect state1 effects1)]
+            [state2 effects2] (connection/ensure-connect state1 effects1)]
         (emit-runtime-result msg-type state2 effects2)))))
 
 (defmethod handle-runtime-msg :cmd/register-handler
@@ -545,7 +354,7 @@
   (let [msg-type (:msg/type msg)
         ts (:ts msg)]
     (emit-runtime-result msg-type
-                         (with-now state ts)
+                         (connection/with-now state ts)
                          [(model/make-runtime-effect :fx/router-register-handler
                                                      {:topic (:topic msg)
                                                       :handler-fn (:handler-fn msg)})])))
@@ -556,13 +365,13 @@
         ts (:ts msg)]
     (if (= (:socket-id msg) (:active-socket-id state))
       (let [open-at-ms (or (:at-ms msg) ts)
-            [state1 effects1] (maybe-clear-retry state [])
+            [state1 effects1] (connection/maybe-clear-retry state [])
             state2 (-> state1
-                       (with-now open-at-ms)
-                       (replay-subscriptions-as-active open-at-ms)
-                       (refresh-expected-traffic))
+                       (connection/with-now open-at-ms)
+                       (subscriptions/replay-subscriptions-as-active open-at-ms)
+                       (subscriptions/refresh-expected-traffic))
             replay-msgs (->> (vals (:desired-subscriptions state2))
-                             (sort-by pr-str)
+                             (sort-by model/subscription-key)
                              (mapv (fn [subscription]
                                      {:method "subscribe"
                                       :subscription subscription})))
@@ -594,17 +403,18 @@
                         :was-clean? (boolean (:was-clean? msg))
                         :at-ms close-at-ms}
             state1 (-> state
-                       (with-now close-at-ms)
+                       (connection/with-now close-at-ms)
                        (assoc :active-socket-id nil
                               :last-close close-info)
-                       (assoc-in [:transport :connected-at-ms] nil))]
+                       (assoc-in [:transport :connected-at-ms] nil))
+            [state1* effects1*] (market/maybe-clear-market-flush state1 [])]
         (if (:intentional-close? state1)
-          (let [[state2 effects2] (maybe-clear-retry (assoc state1 :status :disconnected) [])]
+          (let [[state2 effects2] (connection/maybe-clear-retry (assoc state1* :status :disconnected) effects1*)]
             (emit-runtime-result msg-type state2 effects2))
-          (let [state2 (-> state1
+          (let [state2 (-> state1*
                            (update :attempt (fnil inc 0))
                            (assoc :status :reconnecting))
-                [state3 effects3] (schedule-retry deps state2 [] close-at-ms)]
+                [state3 effects3] (connection/schedule-retry deps state2 effects1* close-at-ms)]
             (emit-runtime-result msg-type state3 effects3))))
       (emit-runtime-result msg-type state []))))
 
@@ -613,7 +423,7 @@
   (let [msg-type (:msg/type msg)
         ts (:ts msg)]
     (emit-runtime-result msg-type
-                         (with-now state ts)
+                         (connection/with-now state ts)
                          [(model/make-runtime-effect :fx/log
                                                      {:level :warn
                                                       :message "WebSocket error"
@@ -625,8 +435,8 @@
         ts (:ts msg)
         state1 (-> state
                    (assoc :online? true)
-                   (with-now ts))
-        [state2 effects2] (ensure-connect state1 [])]
+                   (connection/with-now ts))
+        [state2 effects2] (connection/ensure-connect state1 [])]
     (emit-runtime-result msg-type state2 effects2)))
 
 (defmethod handle-runtime-msg :evt/lifecycle-offline
@@ -634,36 +444,41 @@
   (let [msg-type (:msg/type msg)
         ts (:ts msg)
         socket-id (:active-socket-id state)
-        [state1 effects1] (maybe-clear-retry (-> state
+        [state0 effects0] (connection/maybe-clear-retry (-> state
                                                 (assoc :online? false
                                                        :status :disconnected
                                                        :active-socket-id nil)
-                                                (with-now ts)
+                                                (connection/with-now ts)
                                                 (assoc-in [:transport :connected-at-ms] nil))
                                              [])
-        effects2 (cond-> effects1
-                   socket-id (conj (model/make-runtime-effect :fx/socket-close
-                                                              {:socket-id socket-id
-                                                               :code 4001
-                                                               :reason "Offline"})))]
+        [state1 effects1] (market/maybe-clear-market-flush state0 effects0)
+        effects2 (connection/add-socket-teardown-effects effects1 socket-id 4001 "Offline")]
     (emit-runtime-result msg-type state1 effects2)))
 
 (defmethod handle-runtime-msg :evt/lifecycle-focus
   [_ state msg]
   (let [msg-type (:msg/type msg)
         ts (:ts msg)
-        [state1 effects1] (ensure-connect (with-now state ts) [])]
+        [state1 effects1] (connection/ensure-connect (connection/with-now state ts) [])]
     (emit-runtime-result msg-type state1 effects1)))
 
 (defmethod handle-runtime-msg :evt/lifecycle-visible
   [_ state msg]
   (let [msg-type (:msg/type msg)
         ts (:ts msg)
-        [state1 effects1] (ensure-connect (-> state
+        [state1 effects1] (connection/ensure-connect (-> state
                                              (assoc :hidden? false)
-                                             (with-now ts))
+                                             (connection/with-now ts))
                                           [])]
     (emit-runtime-result msg-type state1 effects1)))
+
+(defmethod handle-runtime-msg :evt/lifecycle-hidden
+  [_ state msg]
+  (emit-runtime-result (:msg/type msg)
+                       (-> state
+                           (assoc :hidden? true)
+                           (connection/with-now (:ts msg)))
+                       []))
 
 (defmethod handle-runtime-msg :evt/timer-retry-fired
   [_ state msg]
@@ -672,14 +487,14 @@
         state1 (-> state
                    (assoc :retry-timer-active? false
                           :next-retry-at-ms nil)
-                   (with-now ts))
-        [state2 effects2] (ensure-connect state1 [])]
+                   (connection/with-now ts))
+        [state2 effects2] (connection/ensure-connect state1 [])]
     (emit-runtime-result msg-type state2 effects2)))
 
 (defmethod handle-runtime-msg :evt/timer-health-tick
   [_ state msg]
   (emit-runtime-result (:msg/type msg)
-                       (with-now state (or (:now-ms msg) (:ts msg)))
+                       (connection/with-now state (or (:now-ms msg) (:ts msg)))
                        []))
 
 (defmethod handle-runtime-msg :evt/timer-watchdog-fired
@@ -695,7 +510,7 @@
                     (:active-socket-id state)
                     (number? (:last-activity-at-ms state))
                     (> (- tick-at-ms (:last-activity-at-ms state)) threshold-ms))
-        state1 (with-now state tick-at-ms)]
+        state1 (connection/with-now state tick-at-ms)]
     (if stale?
       (emit-runtime-result msg-type state1
                            [(model/make-runtime-effect :fx/log
@@ -714,7 +529,7 @@
     (if (= (:socket-id msg) (:active-socket-id state))
       (let [recv-at-ms (or (:recv-at-ms msg) ts)
             state1 (-> state
-                       (with-now recv-at-ms)
+                       (connection/with-now recv-at-ms)
                        (assoc :last-activity-at-ms recv-at-ms)
                        (assoc-in [:transport :last-recv-at-ms] recv-at-ms))]
         (emit-runtime-result msg-type state1
@@ -726,60 +541,64 @@
 
 (defmethod handle-runtime-msg :evt/decoded-envelope
   [_ state msg]
-  (let [msg-type (:msg/type msg)
-        ts (:ts msg)
-        config (:config state)
-        envelope (:envelope msg)
-        recv-at-ms (or (:recv-at-ms msg) ts)
-        state0 (-> state
-                   (with-now recv-at-ms)
-                   (record-stream-payload envelope recv-at-ms)
-                   (refresh-expected-traffic))]
-    (if (= :market (:tier envelope))
-      (let [key (model/market-coalesce-key envelope)
-            replacing? (contains? (get-in state0 [:market-coalesce :pending] {}) key)
-            state1 (-> state0
-                       (assoc-in [:market-coalesce :pending key] envelope)
-                       (cond-> replacing? (update-in [:metrics :market-coalesced] (fnil inc 0))))
-            [state2 effects2] (if (:market-flush-active? state1)
-                                [state1 []]
-                                [(assoc state1 :market-flush-active? true)
-                                 [(model/make-runtime-effect :fx/timer-set-timeout
-                                                             {:timer-key :market-flush
-                                                              :ms (or (:market-coalesce-window-ms config) 16)
-                                                              :msg {:msg/type :evt/timer-market-flush-fired}})]])]
-        (emit-runtime-result msg-type state2 effects2))
-      (let [state1 (update-in state0 [:metrics :lossless-dispatched] (fnil inc 0))]
-        (emit-runtime-result-force-health msg-type state1
-                                          [(model/make-runtime-effect :fx/router-dispatch-envelope
-                                                                      {:envelope envelope})])))))
+  (let [msg-type (:msg/type msg)]
+    (if-not (connection/msg-from-active-socket? state msg)
+      (emit-runtime-result msg-type state [])
+      (let [ts (:ts msg)
+            config (:config state)
+            envelope (:envelope msg)
+            recv-at-ms (or (:recv-at-ms msg) ts)
+            state0 (-> state
+                       (connection/with-now recv-at-ms)
+                       (subscriptions/record-stream-payload envelope recv-at-ms)
+                       (subscriptions/refresh-expected-traffic))]
+        (if (= :market (:tier envelope))
+          (let [key (model/market-coalesce-key envelope)
+                replacing? (contains? (get-in state0 [:market-coalesce :pending] {}) key)
+                state1 (-> state0
+                           (assoc-in [:market-coalesce :pending key] envelope)
+                           (cond-> replacing? (update-in [:metrics :market-coalesced] (fnil inc 0))))
+                [state2 effects2] (if (:market-flush-active? state1)
+                                    [state1 []]
+                                    [(assoc state1 :market-flush-active? true)
+                                     [(model/make-runtime-effect :fx/timer-set-timeout
+                                                                 {:timer-key :market-flush
+                                                                  :ms (or (:market-coalesce-window-ms config) 16)
+                                                                  :msg {:msg/type :evt/timer-market-flush-fired}})]])]
+            (emit-runtime-result msg-type state2 effects2))
+          (let [state1 (update-in state0 [:metrics :lossless-dispatched] (fnil inc 0))]
+            (emit-runtime-result-force-health msg-type state1
+                                              [(model/make-runtime-effect :fx/router-dispatch-envelope
+                                                                          {:envelope envelope})])))))))
 
 (defmethod handle-runtime-msg :evt/timer-market-flush-fired
   [_ state msg]
   (let [msg-type (:msg/type msg)
         ts (:ts msg)
-        [state1 effects1] (flush-market-pending (with-now state ts) [])]
+        [state1 effects1] (market/flush-market-pending (connection/with-now state ts) [])]
     (emit-runtime-result msg-type state1 effects1)))
 
 (defmethod handle-runtime-msg :evt/parse-error
   [_ state msg]
-  (let [msg-type (:msg/type msg)
-        ts (:ts msg)
-        state1 (-> state
-                   (with-now ts)
-                   (update-in [:metrics :ingress-parse-errors] (fnil inc 0)))]
-    (emit-runtime-result msg-type state1
-                         [(model/make-runtime-effect :fx/dead-letter
-                                                     {:reason :parse-error
-                                                      :error (:error msg)
-                                                      :raw (:raw msg)})])))
+  (let [msg-type (:msg/type msg)]
+    (if-not (connection/msg-from-active-socket? state msg)
+      (emit-runtime-result msg-type state [])
+      (let [ts (:ts msg)
+            state1 (-> state
+                       (connection/with-now ts)
+                       (update-in [:metrics :ingress-parse-errors] (fnil inc 0)))]
+        (emit-runtime-result msg-type state1
+                             [(model/make-runtime-effect :fx/dead-letter
+                                                         {:reason :parse-error
+                                                          :error (:error msg)
+                                                          :raw (:raw msg)})])))))
 
 (defmethod handle-runtime-msg :default
   [_ state msg]
   (let [msg-type (:msg/type msg)
         ts (:ts msg)]
     (emit-runtime-result msg-type
-                         (with-now state ts)
+                         (connection/with-now state ts)
                          [(model/make-runtime-effect :fx/dead-letter
                                                      {:reason :unknown-message
                                                       :message msg})])))
