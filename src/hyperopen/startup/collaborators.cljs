@@ -3,6 +3,7 @@
             [nexus.registry :as nxr]
             [hyperopen.api.default :as api-default]
             [hyperopen.api.endpoints.account :as account-endpoints]
+            [hyperopen.api.promise-effects :as promise-effects]
             [hyperopen.api.projections :as api-projections]
             [hyperopen.account.history.effects :as account-history-effects]
             [hyperopen.runtime.api-effects :as runtime-api-effects]
@@ -42,12 +43,13 @@
    (let [opts* (or opts {})
          dex (:dex opts*)]
      (-> (request-frontend-open-orders! address opts*)
-       (.then (fn [rows]
-                (swap! store api-projections/apply-open-orders-success dex rows)
-                rows))
-       (.catch (fn [err]
-                 (swap! store api-projections/apply-open-orders-error err)
-                 (js/Promise.reject err))))))
+         (.then (promise-effects/apply-success-and-return
+                 store
+                 api-projections/apply-open-orders-success
+                 dex))
+         (.catch (promise-effects/apply-error-and-reject
+                  store
+                  api-projections/apply-open-orders-error)))))
   ([api-ops store address dex opts]
    (fetch-frontend-open-orders! api-ops store address
                                 (cond-> (or opts {})
@@ -58,24 +60,25 @@
    (fetch-clearinghouse-state! api-ops store address dex {}))
   ([{:keys [request-clearinghouse-state!]} store address dex opts]
    (-> (request-clearinghouse-state! address dex opts)
-       (.then (fn [data]
-                (swap! store api-projections/apply-perp-dex-clearinghouse-success dex data)
-                data))
-       (.catch (fn [err]
-                 (swap! store api-projections/apply-perp-dex-clearinghouse-error err)
-                 (js/Promise.reject err))))))
+       (.then (promise-effects/apply-success-and-return
+               store
+               api-projections/apply-perp-dex-clearinghouse-success
+               dex))
+       (.catch (promise-effects/apply-error-and-reject
+                store
+                api-projections/apply-perp-dex-clearinghouse-error)))))
 
 (defn- fetch-user-fills!
   ([api-ops store address]
    (fetch-user-fills! api-ops store address {}))
   ([{:keys [request-user-fills!]} store address opts]
    (-> (request-user-fills! address opts)
-       (.then (fn [rows]
-                (swap! store api-projections/apply-user-fills-success rows)
-                rows))
-       (.catch (fn [err]
-                 (swap! store api-projections/apply-user-fills-error err)
-                 (js/Promise.reject err))))))
+       (.then (promise-effects/apply-success-and-return
+               store
+               api-projections/apply-user-fills-success))
+       (.catch (promise-effects/apply-error-and-reject
+                store
+                api-projections/apply-user-fills-error)))))
 
 (defn- fetch-spot-clearinghouse-state!
   ([api-ops store address]
@@ -86,12 +89,12 @@
      (do
        (swap! store api-projections/begin-spot-balances-load)
        (-> (request-spot-clearinghouse-state! address opts)
-           (.then (fn [data]
-                    (swap! store api-projections/apply-spot-balances-success data)
-                    data))
-           (.catch (fn [err]
-                     (swap! store api-projections/apply-spot-balances-error err)
-                     (js/Promise.reject err))))))))
+           (.then (promise-effects/apply-success-and-return
+                   store
+                   api-projections/apply-spot-balances-success))
+           (.catch (promise-effects/apply-error-and-reject
+                    store
+                    api-projections/apply-spot-balances-error)))))))
 
 (defn- fetch-user-abstraction!
   ([api-ops store address]
@@ -107,8 +110,7 @@
                                     :abstraction-raw payload}]
                       (swap! store api-projections/apply-user-abstraction-snapshot requested-address snapshot)
                       snapshot)))
-           (.catch (fn [err]
-                     (js/Promise.reject err))))))))
+           (.catch promise-effects/reject-error))))))
 
 (defn- fetch-portfolio!
   ([api-ops store address]
@@ -119,12 +121,12 @@
      (do
        (swap! store api-projections/begin-portfolio-load)
        (-> (request-portfolio! address opts)
-           (.then (fn [snapshot]
-                    (swap! store api-projections/apply-portfolio-success snapshot)
-                    snapshot))
-           (.catch (fn [err]
-                     (swap! store api-projections/apply-portfolio-error err)
-                     (js/Promise.reject err))))))))
+           (.then (promise-effects/apply-success-and-return
+                   store
+                   api-projections/apply-portfolio-success))
+           (.catch (promise-effects/apply-error-and-reject
+                    store
+                    api-projections/apply-portfolio-error)))))))
 
 (defn- fetch-user-fees!
   ([api-ops store address]
@@ -135,36 +137,36 @@
      (do
        (swap! store api-projections/begin-user-fees-load)
        (-> (request-user-fees! address opts)
-           (.then (fn [payload]
-                    (swap! store api-projections/apply-user-fees-success payload)
-                    payload))
-           (.catch (fn [err]
-                     (swap! store api-projections/apply-user-fees-error err)
-                     (js/Promise.reject err))))))))
+           (.then (promise-effects/apply-success-and-return
+                   store
+                   api-projections/apply-user-fees-success))
+           (.catch (promise-effects/apply-error-and-reject
+                    store
+                    api-projections/apply-user-fees-error)))))))
 
 (defn- ensure-perp-dexs!
   ([api-ops store]
    (ensure-perp-dexs! api-ops store {}))
   ([{:keys [ensure-perp-dexs-data!]} store opts]
    (-> (ensure-perp-dexs-data! store opts)
-       (.then (fn [dexs]
-                (swap! store api-projections/apply-perp-dexs-success dexs)
-                dexs))
-       (.catch (fn [err]
-                 (swap! store api-projections/apply-perp-dexs-error err)
-                 (js/Promise.reject err))))))
+       (.then (promise-effects/apply-success-and-return
+               store
+               api-projections/apply-perp-dexs-success))
+       (.catch (promise-effects/apply-error-and-reject
+                store
+                api-projections/apply-perp-dexs-error)))))
 
 (defn- fetch-asset-contexts!
   ([api-ops store]
    (fetch-asset-contexts! api-ops store {}))
   ([{:keys [request-asset-contexts!]} store opts]
    (-> (request-asset-contexts! opts)
-       (.then (fn [rows]
-                (swap! store api-projections/apply-asset-contexts-success rows)
-                rows))
-       (.catch (fn [err]
-                 (swap! store api-projections/apply-asset-contexts-error err)
-                 (js/Promise.reject err))))))
+       (.then (promise-effects/apply-success-and-return
+               store
+               api-projections/apply-asset-contexts-success))
+       (.catch (promise-effects/apply-error-and-reject
+                store
+                api-projections/apply-asset-contexts-error)))))
 
 (defn- fetch-asset-selector-markets!
   ([api-ops store]

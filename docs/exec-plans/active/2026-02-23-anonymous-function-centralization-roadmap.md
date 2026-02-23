@@ -17,10 +17,11 @@ After implementing this plan, a developer should be able to change shared sortin
 - [x] (2026-02-23 18:29Z) Reworked Milestone 0 tooling structure into categorized namespaces (`cli-options`, `filesystem`, `analyzer`, `report-output`) and removed the generic single-file script naming.
 - [x] (2026-02-23 18:39Z) Implemented Milestone 1 by adding `/hyperopen/src/hyperopen/views/account_info/sort_kernel.cljs`, migrating account-info tab sort orchestration to the shared kernel, and adding shared kernel tests in `/hyperopen/test/hyperopen/views/account_info/sort_kernel_test.cljs`.
 - [x] (2026-02-23 18:51Z) Implemented Milestone 2 by extending `/hyperopen/src/hyperopen/domain/trading/indicators/math.cljs` with shared kernels (`finite-subtract`, band helpers, guarded ratio helpers, true-range helpers, ROC% helpers, HL2 helpers), migrating indicator families to consume those kernels, and adding parity coverage in `/hyperopen/test/hyperopen/domain/trading/indicators/math_kernels_test.cljs`, `/hyperopen/test/hyperopen/domain/trading/indicators/heavy_algorithms_test.cljs`, and `/hyperopen/test/hyperopen/domain/trading/indicators/family_parity_test.cljs`.
-- [ ] Milestone 3 complete: repeated promise success/error lambdas centralized for API/startup/order flows.
+- [x] (2026-02-23 19:00Z) Implemented Milestone 3 by adding `/hyperopen/src/hyperopen/api/promise_effects.cljs`, migrating repeated promise success/error callback lambdas in `/hyperopen/src/hyperopen/api/fetch_compat.cljs`, `/hyperopen/src/hyperopen/runtime/api_effects.cljs`, `/hyperopen/src/hyperopen/startup/collaborators.cljs`, `/hyperopen/src/hyperopen/order/effects.cljs`, and `/hyperopen/src/hyperopen/api/market_metadata/facade.cljs`, and adding helper coverage in `/hyperopen/test/hyperopen/api/promise_effects_test.cljs`.
 - [ ] Milestone 4 complete: formatting/time/parsing lambdas and websocket matcher lambdas centralized.
 - [ ] Milestone 5 complete: test-suite lambda helpers centralized and reused.
 - [x] (2026-02-23 18:53Z) Required validation gates pass after Milestone 2 changes (`npm run check`, `npm test`, `npm run test:websocket`).
+- [x] (2026-02-23 19:00Z) Required validation gates pass after Milestone 3 changes (`npm run check`, `npm test`, `npm run test:websocket`).
 
 ## Surprises & Discoveries
 
@@ -70,12 +71,17 @@ After implementing this plan, a developer should be able to change shared sortin
 - Decision: Preserve the pre-existing first-candle true-range semantics per caller while centralizing the arithmetic kernel.
   Rationale: This avoids subtle numeric drift in edge data while still removing repeated true-range formulas and index scaffolding from indicator modules.
   Date/Author: 2026-02-23 / Codex
+- Decision: Place Milestone 3 promise helper combinators in `/hyperopen/src/hyperopen/api/promise_effects.cljs`.
+  Rationale: The refactor target is API-facing effect behavior across API/runtime/startup/order namespaces, and the API namespace avoids introducing a reverse dependency from API code into runtime-only modules.
+  Date/Author: 2026-02-23 / Codex
 
 ## Outcomes & Retrospective
 
-Milestones 0, 1, and 2 are complete. The repository now contains a reusable baseline generator at `/hyperopen/tools/anonymous_function_duplication_report.clj`, checked-in baseline outputs at `/hyperopen/docs/exec-plans/active/artifacts/2026-02-23-anonymous-function-centralization-*.txt`, a shared account-info sorting kernel at `/hyperopen/src/hyperopen/views/account_info/sort_kernel.cljs`, and a centralized indicator-math kernel surface in `/hyperopen/src/hyperopen/domain/trading/indicators/math.cljs`.
+Milestones 0, 1, 2, and 3 are complete. The repository now contains a reusable baseline generator at `/hyperopen/tools/anonymous_function_duplication_report.clj`, checked-in baseline outputs at `/hyperopen/docs/exec-plans/active/artifacts/2026-02-23-anonymous-function-centralization-*.txt`, a shared account-info sorting kernel at `/hyperopen/src/hyperopen/views/account_info/sort_kernel.cljs`, a centralized indicator-math kernel surface in `/hyperopen/src/hyperopen/domain/trading/indicators/math.cljs`, and a shared promise branch helper surface in `/hyperopen/src/hyperopen/api/promise_effects.cljs`.
 
 Milestone 2 migrated indicator arithmetic duplicates across oscillators, trend, volatility, and price modules to shared helpers for finite subtraction, band arithmetic, safe percent ratios, true-range calculation, ROC-percent derivation, and HL2 median derivation. The parity harness now includes explicit kernel tests in `/hyperopen/test/hyperopen/domain/trading/indicators/math_kernels_test.cljs` plus deterministic integration checks in `/hyperopen/test/hyperopen/domain/trading/indicators/heavy_algorithms_test.cljs` and `/hyperopen/test/hyperopen/domain/trading/indicators/family_parity_test.cljs`. Required validation gates are green for this milestone (`npm run check`, `npm test`, `npm run test:websocket`).
+
+Milestone 3 migrated repeated promise `.then`/`.catch` callback lambdas to shared combinators (`apply-success-and-return`, `apply-error-and-reject`, `log-error-and-reject`, `log-apply-error-and-reject`, `reject-error`) in `/hyperopen/src/hyperopen/api/promise_effects.cljs`. API/runtime/startup/order/market-metadata flows now reuse these helpers while preserving existing signatures and return payload behavior. New coverage in `/hyperopen/test/hyperopen/api/promise_effects_test.cljs` validates helper behavior directly, and required validation gates are green for this milestone (`npm run check`, `npm test`, `npm run test:websocket`).
 
 ## Context and Orientation
 
@@ -384,3 +390,4 @@ Dependencies remain internal to existing namespaces; no third-party libraries ar
 - 2026-02-23 / Codex: Refactored Milestone 0 tooling to category-scoped namespaces under `/hyperopen/tools/anonymous_function_duplication/` and removed the generic single-file baseline script naming.
 - 2026-02-23 / Codex: Implemented Milestone 1 by introducing `/hyperopen/src/hyperopen/views/account_info/sort_kernel.cljs`, centralizing account-info tab sort scaffolding across funding/order/trade/open-orders/positions tabs, and adding `/hyperopen/test/hyperopen/views/account_info/sort_kernel_test.cljs`.
 - 2026-02-23 / Codex: Implemented Milestone 2 by extending `/hyperopen/src/hyperopen/domain/trading/indicators/math.cljs` with shared arithmetic kernels, migrating indicator families (`oscillators`, `trend`, `volatility`, `price`) to reuse those kernels, and extending indicator parity coverage in `/hyperopen/test/hyperopen/domain/trading/indicators/math_kernels_test.cljs`, `/hyperopen/test/hyperopen/domain/trading/indicators/heavy_algorithms_test.cljs`, and `/hyperopen/test/hyperopen/domain/trading/indicators/family_parity_test.cljs`.
+- 2026-02-23 / Codex: Implemented Milestone 3 by adding `/hyperopen/src/hyperopen/api/promise_effects.cljs`, refactoring repeated promise success/error callbacks across API/runtime/startup/order/market-metadata flows, and adding helper-focused tests in `/hyperopen/test/hyperopen/api/promise_effects_test.cljs`.

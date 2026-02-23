@@ -1,4 +1,5 @@
-(ns hyperopen.runtime.api-effects)
+(ns hyperopen.runtime.api-effects
+  (:require [hyperopen.api.promise-effects :as promise-effects]))
 
 (defn fetch-asset-selector-markets!
   [{:keys [store
@@ -17,9 +18,9 @@
                    (swap! store apply-spot-meta-success spot-meta))
                  (swap! store apply-asset-selector-success phase market-state)
                  (:markets market-state)))
-        (.catch (fn [err]
-                  (swap! store apply-asset-selector-error err)
-                  (js/Promise.reject err))))))
+        (.catch (promise-effects/apply-error-and-reject
+                 store
+                 apply-asset-selector-error)))))
 
 (defn load-user-data!
   [{:keys [store
@@ -33,17 +34,18 @@
            fetch-and-merge-funding-history!]}]
   (when address
     (-> (request-frontend-open-orders! address {:priority :high})
-        (.then (fn [rows]
-                 (swap! store apply-open-orders-success nil rows)
-                 rows))
-        (.catch (fn [err]
-                  (swap! store apply-open-orders-error err)
-                  (js/Promise.reject err))))
+        (.then (promise-effects/apply-success-and-return
+                store
+                apply-open-orders-success
+                nil))
+        (.catch (promise-effects/apply-error-and-reject
+                 store
+                 apply-open-orders-error)))
     (-> (request-user-fills! address {:priority :high})
-        (.then (fn [rows]
-                 (swap! store apply-user-fills-success rows)
-                 rows))
-        (.catch (fn [err]
-                  (swap! store apply-user-fills-error err)
-                  (js/Promise.reject err))))
+        (.then (promise-effects/apply-success-and-return
+                store
+                apply-user-fills-success))
+        (.catch (promise-effects/apply-error-and-reject
+                 store
+                 apply-user-fills-error)))
     (fetch-and-merge-funding-history! store address {:priority :high})))

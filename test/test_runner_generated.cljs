@@ -22,6 +22,7 @@
             [hyperopen.api.market-metadata.facade-test]
             [hyperopen.api.market-metadata.perp-dexs-test]
             [hyperopen.api.projections-test]
+            [hyperopen.api.promise-effects-test]
             [hyperopen.api.runtime-test]
             [hyperopen.api.service-test]
             [hyperopen.api.trading-test]
@@ -222,6 +223,7 @@
              'hyperopen.api.market-metadata.facade-test
              'hyperopen.api.market-metadata.perp-dexs-test
              'hyperopen.api.projections-test
+             'hyperopen.api.promise-effects-test
              'hyperopen.api.runtime-test
              'hyperopen.api.service-test
              'hyperopen.api.trading-test

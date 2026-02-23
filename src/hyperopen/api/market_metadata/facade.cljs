@@ -1,5 +1,6 @@
 (ns hyperopen.api.market-metadata.facade
-  (:require [hyperopen.api.market-metadata.perp-dexs :as perp-dexs]))
+  (:require [hyperopen.api.market-metadata.perp-dexs :as perp-dexs]
+            [hyperopen.api.promise-effects :as promise-effects]))
 
 (defn payload->dex-names
   [payload]
@@ -19,14 +20,15 @@
            apply-perp-dexs-error]}
    opts]
   (-> (request-perp-dexs! opts)
-      (.then (fn [payload]
-               (swap! store apply-perp-dexs-success payload)
-               (payload->dex-names payload)))
-      (.catch (fn [err]
-                (when log-fn
-                  (log-fn "Error fetching perp DEX list:" err))
-                (swap! store apply-perp-dexs-error err)
-                (js/Promise.reject err)))))
+      (.then (promise-effects/apply-success-and-return
+              store
+              apply-perp-dexs-success))
+      (.then payload->dex-names)
+      (.catch (promise-effects/log-apply-error-and-reject
+               log-fn
+               "Error fetching perp DEX list:"
+               store
+               apply-perp-dexs-error))))
 
 (defn ensure-and-apply-perp-dex-metadata!
   [{:keys [store
@@ -35,12 +37,13 @@
            apply-perp-dexs-error]}
    opts]
   (-> (ensure-perp-dexs-data! store opts)
-      (.then (fn [payload]
-               (swap! store apply-perp-dexs-success payload)
-               (payload->dex-names payload)))
-      (.catch (fn [err]
-                (swap! store apply-perp-dexs-error err)
-                (js/Promise.reject err)))))
+      (.then (promise-effects/apply-success-and-return
+              store
+              apply-perp-dexs-success))
+      (.then payload->dex-names)
+      (.catch (promise-effects/apply-error-and-reject
+               store
+               apply-perp-dexs-error))))
 
 (defn ensure-perp-dex-names!
   [{:keys [ensure-perp-dexs-data!]}

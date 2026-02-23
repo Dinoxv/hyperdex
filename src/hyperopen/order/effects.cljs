@@ -1,6 +1,7 @@
 (ns hyperopen.order.effects
   (:require [hyperopen.api.default :as api]
             [hyperopen.api.market-metadata.facade :as market-metadata]
+            [hyperopen.api.promise-effects :as promise-effects]
             [hyperopen.api.projections :as api-projections]
             [hyperopen.telemetry :as telemetry]
             [hyperopen.api.trading :as trading-api]))
@@ -92,12 +93,13 @@
   (-> (api/request-frontend-open-orders! address
                                          (cond-> (or opts {})
                                            (and dex (not= dex "")) (assoc :dex dex)))
-      (.then (fn [rows]
-               (swap! store api-projections/apply-open-orders-success dex rows)
-               rows))
-      (.catch (fn [err]
-                (swap! store api-projections/apply-open-orders-error err)
-                (js/Promise.reject err)))))
+      (.then (promise-effects/apply-success-and-return
+              store
+              api-projections/apply-open-orders-success
+              dex))
+      (.catch (promise-effects/apply-error-and-reject
+               store
+               api-projections/apply-open-orders-error))))
 
 (defn- refresh-open-orders-after-order-mutation!
   [store address]
