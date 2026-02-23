@@ -283,8 +283,8 @@
     (is (vector? candles))
     (is (= 2 (count candles)))
     (chart-interop/set-series-data! series candles :candlestick {:price-decimals 2})
-    (is (= "price" (get-in @options* [:priceFormat :type])))
-    (is (= 2 (get-in @options* [:priceFormat :precision])))
+    (is (= "custom" (get-in @options* [:priceFormat :type])))
+    (is (= "64,205.00" ((get-in @options* [:priceFormat :formatter]) 64205)))
     (is (= 2 (count @data*)))
     (is (= 103.0 (:close (first @data*))))))
 

@@ -5,59 +5,59 @@
 
 (deftest infer-series-price-format-prefers-metadata-decimals-and-clamps-range-test
   (let [extract-called? (atom false)
-        from-string (js->clj (price-format/infer-series-price-format
-                              [{:time 1 :value 1}]
-                              (fn [_]
-                                (reset! extract-called? true)
-                                [1 2 3])
-                              {:price-decimals "5.9"})
-                             :keywordize-keys true)
-        from-negative (js->clj (price-format/infer-series-price-format
-                                [{:time 1 :value 1}]
-                                (fn [_] [1 2 3])
-                                {:price-decimals -3})
-                               :keywordize-keys true)
-        from-large (js->clj (price-format/infer-series-price-format
-                             [{:time 1 :value 1}]
-                             (fn [_] [1 2 3])
-                             {:price-decimals "99"})
-                            :keywordize-keys true)]
+        from-string (price-format/infer-series-price-format
+                     [{:time 1 :value 1}]
+                     (fn [_]
+                       (reset! extract-called? true)
+                       [1 2 3])
+                     {:price-decimals "5.9"})
+        from-negative (price-format/infer-series-price-format
+                       [{:time 1 :value 1}]
+                       (fn [_] [1 2 3])
+                       {:price-decimals -3})
+        from-large (price-format/infer-series-price-format
+                    [{:time 1 :value 1}]
+                    (fn [_] [1 2 3])
+                    {:price-decimals "99"})
+        from-string-map (js->clj from-string :keywordize-keys true)
+        from-negative-map (js->clj from-negative :keywordize-keys true)
+        from-large-map (js->clj from-large :keywordize-keys true)]
     (is (false? @extract-called?))
-    (is (= {:type "price" :precision 5 :minMove 0.00001}
-           from-string))
-    (is (= 0 (:precision from-negative)))
-    (is (== 1 (:minMove from-negative)))
-    (is (= 12 (:precision from-large)))
-    (is (== 1e-12 (:minMove from-large)))))
+    (is (= "custom" (:type from-string-map)))
+    (is (== 0.00001 (:minMove from-string-map)))
+    (is (= "1,234.00000" ((.-formatter ^js from-string) 1234)))
+    (is (== 1 (:minMove from-negative-map)))
+    (is (= "1,234" ((.-formatter ^js from-negative) 1234)))
+    (is (== 1e-12 (:minMove from-large-map)))
+    (is (= "1.000000000000" ((.-formatter ^js from-large) 1)))))
 
 (deftest infer-series-price-format-infers-from-prices-and-falls-back-to-default-test
   (let [captured (atom [])
         from-positive (with-redefs [fmt/infer-price-decimals (fn [price]
                                                                 (swap! captured conj price)
                                                                 4)]
-                        (js->clj (price-format/infer-series-price-format
-                                  [{:time 1}]
-                                  (fn [_] [0 -5 "2.5" "bad" 10]))
-                                 :keywordize-keys true))
+                        (price-format/infer-series-price-format
+                         [{:time 1}]
+                         (fn [_] [0 -5 "2.5" "bad" 10])))
         from-absolute (with-redefs [fmt/infer-price-decimals (fn [price]
                                                                 (swap! captured conj price)
                                                                 3)]
-                        (js->clj (price-format/infer-series-price-format
-                                  [{:time 1}]
-                                  (fn [_] [-8 "-2.5"]))
-                                 :keywordize-keys true))
+                        (price-format/infer-series-price-format
+                         [{:time 1}]
+                         (fn [_] [-8 "-2.5"])))
         from-fallback (with-redefs [fmt/infer-price-decimals (fn [price]
                                                                 (swap! captured conj price)
                                                                 nil)]
-                        (js->clj (price-format/infer-series-price-format
-                                  []
-                                  (fn [_] ["bad" nil]))
-                                 :keywordize-keys true))]
+                        (price-format/infer-series-price-format
+                         []
+                         (fn [_] ["bad" nil])))
+        from-positive-map (js->clj from-positive :keywordize-keys true)
+        from-absolute-map (js->clj from-absolute :keywordize-keys true)
+        from-fallback-map (js->clj from-fallback :keywordize-keys true)]
     (is (= [2.5 2.5 nil] @captured))
-    (is (= 4 (:precision from-positive)))
-    (is (== 0.0001 (:minMove from-positive)))
-    (is (= 3 (:precision from-absolute)))
-    (is (== 0.001 (:minMove from-absolute)))
-    (is (= 2 (:precision from-fallback)))
-    (is (== 0.01 (:minMove from-fallback)))))
-
+    (is (== 0.0001 (:minMove from-positive-map)))
+    (is (= "10.0000" ((.-formatter ^js from-positive) 10)))
+    (is (== 0.001 (:minMove from-absolute-map)))
+    (is (= "-8.000" ((.-formatter ^js from-absolute) -8)))
+    (is (== 0.01 (:minMove from-fallback-map)))
+    (is (= "1,234.50" ((.-formatter ^js from-fallback) 1234.5)))))

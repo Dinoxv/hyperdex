@@ -18,7 +18,7 @@
     (is (= [{:time 1 :value 12}
             {:time 2 :value 14.666666666666666}]
            @applied-data))
-    (is (= "price" (get-in @applied-options [:priceFormat :type])))))
+    (is (= "custom" (get-in @applied-options [:priceFormat :type])))))
 
 (deftest set-series-data-baseline-applies-midpoint-base-level-test
   (let [applied-options (atom nil)
@@ -36,7 +36,7 @@
             {:time 2 :value 15}
             {:time 3 :value 18}]
            @applied-data))
-    (is (= "price" (get-in @applied-options [:priceFormat :type])))
+    (is (= "custom" (get-in @applied-options [:priceFormat :type])))
     (is (= "price" (get-in @applied-options [:baseValue :type])))
     (is (= 15 (get-in @applied-options [:baseValue :price])))))
 
@@ -49,8 +49,9 @@
         raw-candles [{:time 1 :open 0.01 :high 0.02 :low 0.009 :close 0.015}
                      {:time 2 :open 0.015 :high 0.025 :low 0.014 :close 0.02}]]
     (chart-interop/set-series-data! series raw-candles :line {:price-decimals 5})
-    (is (= 5 (get-in @applied-options [:priceFormat :precision])))
-    (is (= 0.00001 (get-in @applied-options [:priceFormat :minMove])))))
+    (is (= "custom" (get-in @applied-options [:priceFormat :type])))
+    (is (= 0.00001 (get-in @applied-options [:priceFormat :minMove])))
+    (is (= "0.01234" ((get-in @applied-options [:priceFormat :formatter]) 0.01234)))))
 
 (deftest set-series-data-unknown-chart-type-falls-back-to-candlestick-test
   (let [applied-data (atom nil)

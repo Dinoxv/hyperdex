@@ -19,6 +19,16 @@
   ;; Normalize IEEE-754 drift from Math.pow for deterministic minMove values.
   (js/parseFloat (.toFixed (js/Math.pow 10 (- decimals)) decimals)))
 
+(defn- commaized-price-formatter
+  [decimals]
+  (fn [value]
+    (if-let [num (numeric/coerce-number value)]
+      (.toLocaleString (js/Number. num)
+                       "en-US"
+                       #js {:minimumFractionDigits decimals
+                            :maximumFractionDigits decimals})
+      (str value))))
+
 (defn infer-series-price-format
   "Infer Lightweight Charts price format options from metadata or transformed prices.
    When `:price-decimals` is provided, skip transformed-data scanning."
@@ -38,6 +48,6 @@
                       (fmt/infer-price-decimals reference-price)
                       2)
          min-move (min-move-for-decimals decimals)]
-    #js {:type "price"
-         :precision decimals
-         :minMove min-move})))
+    #js {:type "custom"
+         :minMove min-move
+         :formatter (commaized-price-formatter decimals)})))
