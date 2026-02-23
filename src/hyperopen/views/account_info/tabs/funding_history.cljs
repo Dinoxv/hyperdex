@@ -1,6 +1,7 @@
 (ns hyperopen.views.account-info.tabs.funding-history
   (:require [hyperopen.views.account-info.history-pagination :as history-pagination]
             [hyperopen.views.account-info.shared :as shared]
+            [hyperopen.views.account-info.sort-kernel :as sort-kernel]
             [hyperopen.views.account-info.table :as table]))
 
 (def default-funding-history-sort
@@ -191,32 +192,29 @@
            (or (:funding-rate-raw row) (:fundingRate row) 0))))
 
 (defn sort-funding-history-by-column [rows column direction]
-  (let [sort-fn (case column
-                  "Time" (fn [row]
-                           (shared/parse-num (or (:time-ms row) (:time row))))
-                  "Coin" (fn [row]
-                           (or (:coin row) ""))
-                  "Size" (fn [row]
-                           (js/Math.abs
-                            (shared/parse-num (or (:position-size-raw row)
-                                                   (:positionSize row)
-                                                   (:size-raw row)))))
-                  "Position Side" (fn [row]
-                                    (name (funding-side-value row)))
-                  "Payment" (fn [row]
-                              (shared/parse-num (or (:payment-usdc-raw row)
-                                                     (:payment row))))
-                  "Rate" (fn [row]
-                           (shared/parse-num (or (:funding-rate-raw row)
-                                                  (:fundingRate row))))
-                  (fn [_] 0))
-        sorted (sort-by (fn [row]
-                          [(sort-fn row)
-                           (funding-row-sort-id row)])
-                        rows)]
-    (if (= direction :desc)
-      (reverse sorted)
-      sorted)))
+  (sort-kernel/sort-rows-by-column
+   rows
+   {:column column
+    :direction direction
+    :accessor-by-column
+    {"Time" (fn [row]
+              (shared/parse-num (or (:time-ms row) (:time row))))
+     "Coin" (fn [row]
+              (or (:coin row) ""))
+     "Size" (fn [row]
+              (js/Math.abs
+               (shared/parse-num (or (:position-size-raw row)
+                                      (:positionSize row)
+                                      (:size-raw row)))))
+     "Position Side" (fn [row]
+                       (name (funding-side-value row)))
+     "Payment" (fn [row]
+                 (shared/parse-num (or (:payment-usdc-raw row)
+                                        (:payment row))))
+     "Rate" (fn [row]
+              (shared/parse-num (or (:funding-rate-raw row)
+                                     (:fundingRate row))))}
+    :tie-breaker funding-row-sort-id}))
 
 (defonce ^:private sorted-funding-history-cache (atom nil))
 

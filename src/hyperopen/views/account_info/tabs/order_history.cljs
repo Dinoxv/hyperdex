@@ -2,6 +2,7 @@
   (:require [hyperopen.views.account-info.history-pagination :as history-pagination]
             [hyperopen.views.account-info.projections :as projections]
             [hyperopen.views.account-info.shared :as shared]
+            [hyperopen.views.account-info.sort-kernel :as sort-kernel]
             [hyperopen.views.account-info.table :as table]
             [hyperopen.views.account-info.tabs.open-orders :as open-orders-tab]
             [hyperopen.utils.formatting :as fmt]))
@@ -166,38 +167,35 @@
             rows)))
 
 (defn sort-order-history-by-column [rows column direction]
-  (let [sort-fn (case column
-                  "Time" (fn [row] (or (:time-ms row) 0))
-                  "Type" (fn [row] (title-case-label (:type row)))
-                  "Coin" (fn [row] (or (:coin row) ""))
-                  "Direction" (fn [row] (open-orders-tab/direction-label (:side row)))
-                  "Size" (fn [row] (or (:size-num row) 0))
-                  "Filled Size" (fn [row] (or (:filled-size row) 0))
-                  "Order Value" (fn [row] (or (:order-value row) 0))
-                  "Price" (fn [row] (or (shared/parse-optional-num (:px row)) 0))
-                  "Reduce Only" (fn [row]
-                                  (case (:reduce-only row)
-                                    true 1
-                                    false 0
-                                    -1))
-                  "Trigger Conditions" (fn [row]
-                                         (format-order-history-trigger row))
-                  "TP/SL" (fn [row] (if (:is-position-tpsl row) 1 0))
-                  "Status" (fn [row] (or (:status-label row) ""))
-                  "Order ID" (fn [row]
-                               (let [oid (:oid row)
-                                     oid-num (shared/parse-optional-num oid)]
-                                 (if (number? oid-num)
-                                   [0 oid-num]
-                                   [1 (str (or oid ""))])))
-                  (fn [_] 0))
-        sorted (sort-by (fn [row]
-                          [(sort-fn row)
-                           (order-history-row-sort-id row)])
-                        rows)]
-    (if (= direction :desc)
-      (reverse sorted)
-      sorted)))
+  (sort-kernel/sort-rows-by-column
+   rows
+   {:column column
+    :direction direction
+    :accessor-by-column
+    {"Time" (fn [row] (or (:time-ms row) 0))
+     "Type" (fn [row] (title-case-label (:type row)))
+     "Coin" (fn [row] (or (:coin row) ""))
+     "Direction" (fn [row] (open-orders-tab/direction-label (:side row)))
+     "Size" (fn [row] (or (:size-num row) 0))
+     "Filled Size" (fn [row] (or (:filled-size row) 0))
+     "Order Value" (fn [row] (or (:order-value row) 0))
+     "Price" (fn [row] (or (shared/parse-optional-num (:px row)) 0))
+     "Reduce Only" (fn [row]
+                     (case (:reduce-only row)
+                       true 1
+                       false 0
+                       -1))
+     "Trigger Conditions" (fn [row]
+                            (format-order-history-trigger row))
+     "TP/SL" (fn [row] (if (:is-position-tpsl row) 1 0))
+     "Status" (fn [row] (or (:status-label row) ""))
+     "Order ID" (fn [row]
+                  (let [oid (:oid row)
+                        oid-num (shared/parse-optional-num oid)]
+                    (if (number? oid-num)
+                      [0 oid-num]
+                      [1 (str (or oid ""))])))}
+    :tie-breaker order-history-row-sort-id}))
 
 (defonce ^:private sorted-order-history-cache (atom nil))
 

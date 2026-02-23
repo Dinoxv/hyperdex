@@ -112,6 +112,7 @@
             [hyperopen.views.account-info-view-test]
             [hyperopen.views.account-info.navigation-test]
             [hyperopen.views.account-info.projections-test]
+            [hyperopen.views.account-info.sort-kernel-test]
             [hyperopen.views.account-info.table-contract-test]
             [hyperopen.views.account-info.tabs.balances-test]
             [hyperopen.views.account-info.tabs.funding-history-test]
@@ -311,6 +312,7 @@
              'hyperopen.views.account-info-view-test
              'hyperopen.views.account-info.navigation-test
              'hyperopen.views.account-info.projections-test
+             'hyperopen.views.account-info.sort-kernel-test
              'hyperopen.views.account-info.table-contract-test
              'hyperopen.views.account-info.tabs.balances-test
              'hyperopen.views.account-info.tabs.funding-history-test

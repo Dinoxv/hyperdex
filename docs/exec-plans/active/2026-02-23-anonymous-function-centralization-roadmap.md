@@ -15,12 +15,12 @@ After implementing this plan, a developer should be able to change shared sortin
 - [x] (2026-02-23 17:50Z) Authored this ExecPlan from the repository-wide anonymous-function audit and converted findings into a priority-ordered implementation roadmap.
 - [x] (2026-02-23 18:22Z) Implemented Milestone 0 by adding `/hyperopen/tools/anonymous_function_duplication_report.clj`, generating checked-in baseline artifacts under `/hyperopen/docs/exec-plans/active/artifacts/`, and linking reproducible commands plus evidence from this plan.
 - [x] (2026-02-23 18:29Z) Reworked Milestone 0 tooling structure into categorized namespaces (`cli-options`, `filesystem`, `analyzer`, `report-output`) and removed the generic single-file script naming.
-- [ ] Milestone 1 complete: account-info tab sort lambdas centralized.
+- [x] (2026-02-23 18:39Z) Implemented Milestone 1 by adding `/hyperopen/src/hyperopen/views/account_info/sort_kernel.cljs`, migrating account-info tab sort orchestration to the shared kernel, and adding shared kernel tests in `/hyperopen/test/hyperopen/views/account_info/sort_kernel_test.cljs`.
 - [ ] Milestone 2 complete: indicator math lambdas centralized into reusable kernels.
 - [ ] Milestone 3 complete: repeated promise success/error lambdas centralized for API/startup/order flows.
 - [ ] Milestone 4 complete: formatting/time/parsing lambdas and websocket matcher lambdas centralized.
 - [ ] Milestone 5 complete: test-suite lambda helpers centralized and reused.
-- [ ] Required validation gates pass (`npm run check`, `npm test`, `npm run test:websocket`).
+- [x] (2026-02-23 18:43Z) Required validation gates pass (`npm run check`, `npm test`, `npm run test:websocket`).
 
 ## Surprises & Discoveries
 
@@ -63,9 +63,9 @@ After implementing this plan, a developer should be able to change shared sortin
 
 ## Outcomes & Retrospective
 
-Milestone 0 is complete. The repository now contains a reusable baseline generator at `/hyperopen/tools/anonymous_function_duplication_report.clj` and checked-in baseline outputs at `/hyperopen/docs/exec-plans/active/artifacts/2026-02-23-anonymous-function-centralization-*.txt`, summarized in `/hyperopen/docs/exec-plans/active/artifacts/2026-02-23-anonymous-function-centralization-baseline.md`.
+Milestones 0 and 1 are complete. The repository now contains a reusable baseline generator at `/hyperopen/tools/anonymous_function_duplication_report.clj`, checked-in baseline outputs at `/hyperopen/docs/exec-plans/active/artifacts/2026-02-23-anonymous-function-centralization-*.txt`, and a shared account-info sorting kernel at `/hyperopen/src/hyperopen/views/account_info/sort_kernel.cljs`.
 
-The baseline captures current duplication with parser-validated scope coverage (`src`: `241` files, `test`: `209` files) and records top duplicate clusters. This gives future threads concrete before/after comparators for each milestone.
+The baseline captures current duplication with parser-validated scope coverage (`src`: `241` files, `test`: `209` files) and records top duplicate clusters. Milestone 1 now routes funding/order/trade/open-orders/positions sort orchestration through the shared kernel with tab-specific accessors kept local, giving future threads a clearer foundation for additional duplicate reductions.
 
 ## Context and Orientation
 
@@ -364,3 +364,4 @@ Dependencies remain internal to existing namespaces; no third-party libraries ar
 - 2026-02-23 / Codex: Initial version created to convert the lambda duplication audit into a priority-ordered, implementation-ready ExecPlan for future threads.
 - 2026-02-23 / Codex: Implemented Milestone 0 by adding `/hyperopen/tools/anonymous_function_duplication_report.clj`, generating parser-validated `src`/`test` baseline artifacts under `/hyperopen/docs/exec-plans/active/artifacts/`, and updating this plan with reproducible commands and evidence links.
 - 2026-02-23 / Codex: Refactored Milestone 0 tooling to category-scoped namespaces under `/hyperopen/tools/anonymous_function_duplication/` and removed the generic single-file baseline script naming.
+- 2026-02-23 / Codex: Implemented Milestone 1 by introducing `/hyperopen/src/hyperopen/views/account_info/sort_kernel.cljs`, centralizing account-info tab sort scaffolding across funding/order/trade/open-orders/positions tabs, and adding `/hyperopen/test/hyperopen/views/account_info/sort_kernel_test.cljs`.

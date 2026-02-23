@@ -3,6 +3,7 @@
             [hyperopen.views.account-info.history-pagination :as history-pagination]
             [hyperopen.views.account-info.projections :as projections]
             [hyperopen.views.account-info.shared :as shared]
+            [hyperopen.views.account-info.sort-kernel :as sort-kernel]
             [hyperopen.views.account-info.table :as table]
             [hyperopen.utils.formatting :as fmt]))
 
@@ -286,34 +287,31 @@
   ([rows column direction]
    (sort-trade-history-by-column rows column direction {}))
   ([rows column direction market-by-key]
-   (let [sort-fn (case column
-                   "Time" (fn [row]
-                            (or (trade-history-time-ms row) 0))
-                   "Coin" (fn [row]
-                            (or (some-> (shared/resolve-coin-display (trade-history-coin row) market-by-key)
-                                        :base-label
-                                        str/lower-case)
-                                ""))
-                   "Direction" (fn [row]
-                                 (or (trade-history-direction-label row) ""))
-                   "Price" (fn [row]
-                             (or (shared/parse-optional-num (or (:px row) (:price row) (:p row))) 0))
-                   "Size" (fn [row]
-                            (or (shared/parse-optional-num (or (:sz row) (:size row) (:s row))) 0))
-                   "Trade Value" (fn [row]
-                                   (or (trade-history-value-number row) 0))
-                   "Fee" (fn [row]
-                           (or (projections/trade-history-fee-number row) 0))
-                   "Closed PNL" (fn [row]
-                                  (or (projections/trade-history-closed-pnl-number row) 0))
-                   (fn [_] 0))
-         sorted (sort-by (fn [row]
-                           [(sort-fn row)
-                            (trade-history-row-id row)])
-                         rows)]
-     (if (= direction :desc)
-       (reverse sorted)
-       sorted))))
+   (sort-kernel/sort-rows-by-column
+    rows
+    {:column column
+     :direction direction
+     :accessor-by-column
+     {"Time" (fn [row]
+               (or (trade-history-time-ms row) 0))
+      "Coin" (fn [row]
+               (or (some-> (shared/resolve-coin-display (trade-history-coin row) market-by-key)
+                           :base-label
+                           str/lower-case)
+                   ""))
+      "Direction" (fn [row]
+                    (or (trade-history-direction-label row) ""))
+      "Price" (fn [row]
+                (or (shared/parse-optional-num (or (:px row) (:price row) (:p row))) 0))
+      "Size" (fn [row]
+               (or (shared/parse-optional-num (or (:sz row) (:size row) (:s row))) 0))
+      "Trade Value" (fn [row]
+                      (or (trade-history-value-number row) 0))
+      "Fee" (fn [row]
+              (or (projections/trade-history-fee-number row) 0))
+      "Closed PNL" (fn [row]
+                     (or (projections/trade-history-closed-pnl-number row) 0))}
+     :tie-breaker trade-history-row-id})))
 
 (defonce ^:private sorted-trade-history-cache (atom nil))
 

@@ -1,6 +1,7 @@
 (ns hyperopen.views.account-info.tabs.open-orders
   (:require [hyperopen.views.account-info.projections :as projections]
             [hyperopen.views.account-info.shared :as shared]
+            [hyperopen.views.account-info.sort-kernel :as sort-kernel]
             [hyperopen.views.account-info.table :as table]))
 
 (def ^:private long-coin-color "rgb(151, 252, 228)")
@@ -95,20 +96,19 @@
        [:span {:class shared/position-chip-classes} prefix-label])]))
 
 (defn sort-open-orders-by-column [orders column direction]
-  (let [sort-fn (case column
-                  "Time" (fn [o] (shared/parse-num (:time o)))
-                  "Type" (fn [o] (or (:type o) ""))
-                  "Coin" (fn [o] (or (:coin o) ""))
-                  "Direction" (fn [o] (direction-label (:side o)))
-                  "Size" (fn [o] (shared/parse-num (:sz o)))
-                  "Original Size" (fn [o] (shared/parse-num (or (:orig-sz o) (:sz o))))
-                  "Order Value" (fn [o] (or (order-value o) 0))
-                  "Price" (fn [o] (shared/parse-num (:px o)))
-                  (fn [_] 0))
-        sorted (sort-by sort-fn orders)]
-    (if (= direction :desc)
-      (reverse sorted)
-      sorted)))
+  (sort-kernel/sort-rows-by-column
+   orders
+   {:column column
+    :direction direction
+    :accessor-by-column
+    {"Time" (fn [o] (shared/parse-num (:time o)))
+     "Type" (fn [o] (or (:type o) ""))
+     "Coin" (fn [o] (or (:coin o) ""))
+     "Direction" (fn [o] (direction-label (:side o)))
+     "Size" (fn [o] (shared/parse-num (:sz o)))
+     "Original Size" (fn [o] (shared/parse-num (or (:orig-sz o) (:sz o))))
+     "Order Value" (fn [o] (or (order-value o) 0))
+     "Price" (fn [o] (shared/parse-num (:px o)))}}))
 
 (defonce ^:private sorted-open-orders-cache (atom nil))
 

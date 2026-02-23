@@ -1,6 +1,7 @@
 (ns hyperopen.views.account-info.tabs.positions
   (:require [hyperopen.views.account-info.projections :as projections]
             [hyperopen.views.account-info.shared :as shared]
+            [hyperopen.views.account-info.sort-kernel :as sort-kernel]
             [hyperopen.views.account-info.table :as table]))
 
 (defn- empty-state [message]
@@ -106,24 +107,23 @@
       [:button.btn.btn-xs.btn-ghost "-- / --"]]]))
 
 (defn sort-positions-by-column [positions column direction]
-  (let [sort-fn (case column
-                  "Coin" (fn [pos] (:coin (:position pos)))
-                  "Size" (fn [pos] (or (shared/parse-optional-num (:szi (:position pos))) 0))
-                  "Position Value" (fn [pos] (or (shared/parse-optional-num (:positionValue (:position pos))) 0))
-                  "Entry Price" (fn [pos] (or (shared/parse-optional-num (:entryPx (:position pos))) 0))
-                  "Mark Price" (fn [pos] (or (shared/parse-optional-num (calculate-mark-price (:position pos))) 0))
-                  "PNL (ROE %)" (fn [pos] (or (shared/parse-optional-num (:unrealizedPnl (:position pos))) 0))
-                  "Liq. Price" (fn [pos] (let [liq (:liquidationPx (:position pos))]
-                                            (if liq
-                                              (or (shared/parse-optional-num liq) js/Number.MAX_VALUE)
-                                              js/Number.MAX_VALUE)))
-                  "Margin" (fn [pos] (or (shared/parse-optional-num (:marginUsed (:position pos))) 0))
-                  "Funding" (fn [pos] (or (shared/parse-optional-num (get-in (:position pos) [:cumFunding :allTime])) 0))
-                  (fn [_] 0))
-        sorted-positions (sort-by sort-fn positions)]
-    (if (= direction :desc)
-      (reverse sorted-positions)
-      sorted-positions)))
+  (sort-kernel/sort-rows-by-column
+   positions
+   {:column column
+    :direction direction
+    :accessor-by-column
+    {"Coin" (fn [pos] (:coin (:position pos)))
+     "Size" (fn [pos] (or (shared/parse-optional-num (:szi (:position pos))) 0))
+     "Position Value" (fn [pos] (or (shared/parse-optional-num (:positionValue (:position pos))) 0))
+     "Entry Price" (fn [pos] (or (shared/parse-optional-num (:entryPx (:position pos))) 0))
+     "Mark Price" (fn [pos] (or (shared/parse-optional-num (calculate-mark-price (:position pos))) 0))
+     "PNL (ROE %)" (fn [pos] (or (shared/parse-optional-num (:unrealizedPnl (:position pos))) 0))
+     "Liq. Price" (fn [pos] (let [liq (:liquidationPx (:position pos))]
+                              (if liq
+                                (or (shared/parse-optional-num liq) js/Number.MAX_VALUE)
+                                js/Number.MAX_VALUE)))
+     "Margin" (fn [pos] (or (shared/parse-optional-num (:marginUsed (:position pos))) 0))
+     "Funding" (fn [pos] (or (shared/parse-optional-num (get-in (:position pos) [:cumFunding :allTime])) 0))}}))
 
 (defonce ^:private sorted-positions-cache (atom nil))
 
