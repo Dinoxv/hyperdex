@@ -4,6 +4,8 @@
             [hyperopen.domain.trading.indicators.result :as result]))
 
 (def ^:private finite-number? imath/finite-number?)
+(def ^:private finite-subtract imath/finite-subtract)
+(def ^:private safe-percent-ratio imath/safe-percent-ratio)
 (def ^:private parse-period imath/parse-period)
 (def ^:private field-values imath/field-values)
 
@@ -24,10 +26,7 @@
         abs-ema1 (imath/ema-values abs-mtm short-period)
         abs-ema2 (imath/ema-values abs-ema1 long-period)]
     (mapv (fn [a b]
-            (when (and (finite-number? a)
-                       (finite-number? b)
-                       (not= b 0))
-              (* 100 (/ a b))))
+            (safe-percent-ratio a b))
           ema2 abs-ema2)))
 
 (defn calculate-correlation-coefficient
@@ -85,9 +84,7 @@
         tsi (tsi-core (field-values data :close) short-period long-period)
         signal (imath/ema-values tsi signal-period)
         osc (mapv (fn [t s]
-                    (when (and (finite-number? t)
-                               (finite-number? s))
-                      (- t s)))
+                    (finite-subtract t s))
                   tsi signal)]
     (result/indicator-result :smi-ergodic
                              :separate

@@ -3,6 +3,7 @@
             [hyperopen.domain.trading.indicators.flow :as flow]
             [hyperopen.domain.trading.indicators.oscillators :as oscillators]
             [hyperopen.domain.trading.indicators.price :as price]
+            [hyperopen.domain.trading.indicators.support :as support]
             [hyperopen.domain.trading.indicators.structure :as structure]
             [hyperopen.domain.trading.indicators.trend :as trend]
             [hyperopen.domain.trading.indicators.volatility :as volatility]))
@@ -30,3 +31,21 @@
   (testing "price parity"
     (is (= (ids-from-definitions (price/get-price-indicators))
            (price/supported-price-indicator-ids)))))
+
+(deftest migrated-kernel-indicators-remain-deterministic-test
+  (let [candles support/sample-candles
+        roc-a (oscillators/calculate-oscillator-indicator :rate-of-change candles {:period 9})
+        roc-b (oscillators/calculate-oscillator-indicator :rate-of-change candles {:period 9})
+        supertrend-a (trend/calculate-trend-indicator :supertrend candles {:period 10 :multiplier 3})
+        supertrend-b (trend/calculate-trend-indicator :supertrend candles {:period 10 :multiplier 3})
+        mac-a (volatility/calculate-volatility-indicator :moving-average-channel candles {:period 20 :multiplier 1.5})
+        mac-b (volatility/calculate-volatility-indicator :moving-average-channel candles {:period 20 :multiplier 1.5})]
+    (is (= roc-a roc-b))
+    (is (= supertrend-a supertrend-b))
+    (is (= mac-a mac-b))
+    (is (= (count candles)
+           (count (get-in roc-a [:series 0 :values]))))
+    (is (= (count candles)
+           (count (get-in supertrend-a [:series 0 :values]))))
+    (is (= (count candles)
+           (count (get-in mac-a [:series 0 :values]))))))

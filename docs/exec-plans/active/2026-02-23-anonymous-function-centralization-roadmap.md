@@ -16,11 +16,11 @@ After implementing this plan, a developer should be able to change shared sortin
 - [x] (2026-02-23 18:22Z) Implemented Milestone 0 by adding `/hyperopen/tools/anonymous_function_duplication_report.clj`, generating checked-in baseline artifacts under `/hyperopen/docs/exec-plans/active/artifacts/`, and linking reproducible commands plus evidence from this plan.
 - [x] (2026-02-23 18:29Z) Reworked Milestone 0 tooling structure into categorized namespaces (`cli-options`, `filesystem`, `analyzer`, `report-output`) and removed the generic single-file script naming.
 - [x] (2026-02-23 18:39Z) Implemented Milestone 1 by adding `/hyperopen/src/hyperopen/views/account_info/sort_kernel.cljs`, migrating account-info tab sort orchestration to the shared kernel, and adding shared kernel tests in `/hyperopen/test/hyperopen/views/account_info/sort_kernel_test.cljs`.
-- [ ] Milestone 2 complete: indicator math lambdas centralized into reusable kernels.
+- [x] (2026-02-23 18:51Z) Implemented Milestone 2 by extending `/hyperopen/src/hyperopen/domain/trading/indicators/math.cljs` with shared kernels (`finite-subtract`, band helpers, guarded ratio helpers, true-range helpers, ROC% helpers, HL2 helpers), migrating indicator families to consume those kernels, and adding parity coverage in `/hyperopen/test/hyperopen/domain/trading/indicators/math_kernels_test.cljs`, `/hyperopen/test/hyperopen/domain/trading/indicators/heavy_algorithms_test.cljs`, and `/hyperopen/test/hyperopen/domain/trading/indicators/family_parity_test.cljs`.
 - [ ] Milestone 3 complete: repeated promise success/error lambdas centralized for API/startup/order flows.
 - [ ] Milestone 4 complete: formatting/time/parsing lambdas and websocket matcher lambdas centralized.
 - [ ] Milestone 5 complete: test-suite lambda helpers centralized and reused.
-- [x] (2026-02-23 18:43Z) Required validation gates pass (`npm run check`, `npm test`, `npm run test:websocket`).
+- [x] (2026-02-23 18:53Z) Required validation gates pass after Milestone 2 changes (`npm run check`, `npm test`, `npm run test:websocket`).
 
 ## Surprises & Discoveries
 
@@ -36,6 +36,10 @@ After implementing this plan, a developer should be able to change shared sortin
   Evidence: `/hyperopen/src/hyperopen/views/account_info/table.cljs` currently centralizes headers/layout only.
 - Observation: A full parser-based baseline can be captured without parse failures across the complete `src` and `test` ClojureScript surfaces.
   Evidence: `/hyperopen/docs/exec-plans/active/artifacts/2026-02-23-anonymous-function-centralization-src-baseline.txt` and `/hyperopen/docs/exec-plans/active/artifacts/2026-02-23-anonymous-function-centralization-test-baseline.txt` both report `parse_errors=0` (`241` `src` files and `209` `test` files scanned).
+- Observation: The parity-test target file named in Milestone 2 (`/hyperopen/test/hyperopen/domain/trading/indicators/math_kernels_test.cljs`) already existed with benchmark and parity coverage, so Milestone 2 should extend this file instead of introducing a duplicate test namespace.
+  Evidence: `/hyperopen/test/hyperopen/domain/trading/indicators/math_kernels_test.cljs` existed before this milestone and now includes shared-kernel tests for finite subtraction, band arithmetic, safe percent ratios, true range, ROC%, and HL2.
+- Observation: True-range logic had two first-candle conventions in production code (`prev-close = nil` fallback vs `prev-close = current close`). The shared kernel supports both call patterns without forcing semantic drift.
+  Evidence: `/hyperopen/src/hyperopen/domain/trading/indicators/math.cljs` now provides `true-range-at`, `true-range-index`, and `true-range-values`; `/hyperopen/src/hyperopen/domain/trading/indicators/oscillators/helpers.cljs` preserves its first-candle behavior while `/hyperopen/src/hyperopen/domain/trading/indicators/trend/strength.cljs` and `/hyperopen/src/hyperopen/domain/trading/indicators/volatility/range.cljs` use the canonical indexed variant.
 
 ## Decision Log
 
@@ -60,12 +64,18 @@ After implementing this plan, a developer should be able to change shared sortin
 - Decision: Use a descriptive entrypoint name and category-based helper namespaces for baseline tooling.
   Rationale: The tool now communicates intent at the path level and keeps parsing, filesystem, analysis, and rendering concerns separated for maintainability.
   Date/Author: 2026-02-23 / Codex
+- Decision: Implement Milestone 2 by extending the existing `/hyperopen/src/hyperopen/domain/trading/indicators/math.cljs` namespace rather than creating a sibling `math_kernels.cljs`.
+  Rationale: Most target indicator modules already depend on `math.cljs`, so extending it minimizes wiring churn while preserving stable public interfaces.
+  Date/Author: 2026-02-23 / Codex
+- Decision: Preserve the pre-existing first-candle true-range semantics per caller while centralizing the arithmetic kernel.
+  Rationale: This avoids subtle numeric drift in edge data while still removing repeated true-range formulas and index scaffolding from indicator modules.
+  Date/Author: 2026-02-23 / Codex
 
 ## Outcomes & Retrospective
 
-Milestones 0 and 1 are complete. The repository now contains a reusable baseline generator at `/hyperopen/tools/anonymous_function_duplication_report.clj`, checked-in baseline outputs at `/hyperopen/docs/exec-plans/active/artifacts/2026-02-23-anonymous-function-centralization-*.txt`, and a shared account-info sorting kernel at `/hyperopen/src/hyperopen/views/account_info/sort_kernel.cljs`.
+Milestones 0, 1, and 2 are complete. The repository now contains a reusable baseline generator at `/hyperopen/tools/anonymous_function_duplication_report.clj`, checked-in baseline outputs at `/hyperopen/docs/exec-plans/active/artifacts/2026-02-23-anonymous-function-centralization-*.txt`, a shared account-info sorting kernel at `/hyperopen/src/hyperopen/views/account_info/sort_kernel.cljs`, and a centralized indicator-math kernel surface in `/hyperopen/src/hyperopen/domain/trading/indicators/math.cljs`.
 
-The baseline captures current duplication with parser-validated scope coverage (`src`: `241` files, `test`: `209` files) and records top duplicate clusters. Milestone 1 now routes funding/order/trade/open-orders/positions sort orchestration through the shared kernel with tab-specific accessors kept local, giving future threads a clearer foundation for additional duplicate reductions.
+Milestone 2 migrated indicator arithmetic duplicates across oscillators, trend, volatility, and price modules to shared helpers for finite subtraction, band arithmetic, safe percent ratios, true-range calculation, ROC-percent derivation, and HL2 median derivation. The parity harness now includes explicit kernel tests in `/hyperopen/test/hyperopen/domain/trading/indicators/math_kernels_test.cljs` plus deterministic integration checks in `/hyperopen/test/hyperopen/domain/trading/indicators/heavy_algorithms_test.cljs` and `/hyperopen/test/hyperopen/domain/trading/indicators/family_parity_test.cljs`. Required validation gates are green for this milestone (`npm run check`, `npm test`, `npm run test:websocket`).
 
 ## Context and Orientation
 
@@ -336,12 +346,20 @@ Preferred reusable interfaces at completion:
 
 - In `/hyperopen/src/hyperopen/domain/trading/indicators/math.cljs` (or new sibling kernel module), provide arithmetic helpers:
 
-    (defn finite-diff [a b] ...)
-    (defn finite-band-upper [base spread multiplier] ...)
-    (defn finite-band-lower [base spread multiplier] ...)
+    (defn finite-subtract [a b] ...)
+    (defn band-upper-value [base spread multiplier] ...)
+    (defn band-lower-value [base spread multiplier] ...)
+    (defn band-upper-values [base-values spread-values multiplier] ...)
+    (defn band-lower-values [base-values spread-values multiplier] ...)
+    (defn finite-ratio [numerator denominator] ...)
     (defn safe-percent-ratio [numerator denominator] ...)
-    (defn true-range-at-index [highs lows closes idx] ...)
+    (defn true-range-at [high low prev-close] ...)
+    (defn true-range-index [high-values low-values close-values idx] ...)
+    (defn true-range-values [high-values low-values close-values] ...)
+    (defn roc-percent-at [values idx period] ...)
     (defn roc-percent-values [values period] ...)
+    (defn hl2-at [high-values low-values idx] ...)
+    (defn hl2-values [high-values low-values] ...)
 
 - In `/hyperopen/src/hyperopen/runtime/promise_effects.cljs` (or `/hyperopen/src/hyperopen/api/promise_effects.cljs`), provide promise branch helpers:
 
@@ -365,3 +383,4 @@ Dependencies remain internal to existing namespaces; no third-party libraries ar
 - 2026-02-23 / Codex: Implemented Milestone 0 by adding `/hyperopen/tools/anonymous_function_duplication_report.clj`, generating parser-validated `src`/`test` baseline artifacts under `/hyperopen/docs/exec-plans/active/artifacts/`, and updating this plan with reproducible commands and evidence links.
 - 2026-02-23 / Codex: Refactored Milestone 0 tooling to category-scoped namespaces under `/hyperopen/tools/anonymous_function_duplication/` and removed the generic single-file baseline script naming.
 - 2026-02-23 / Codex: Implemented Milestone 1 by introducing `/hyperopen/src/hyperopen/views/account_info/sort_kernel.cljs`, centralizing account-info tab sort scaffolding across funding/order/trade/open-orders/positions tabs, and adding `/hyperopen/test/hyperopen/views/account_info/sort_kernel_test.cljs`.
+- 2026-02-23 / Codex: Implemented Milestone 2 by extending `/hyperopen/src/hyperopen/domain/trading/indicators/math.cljs` with shared arithmetic kernels, migrating indicator families (`oscillators`, `trend`, `volatility`, `price`) to reuse those kernels, and extending indicator parity coverage in `/hyperopen/test/hyperopen/domain/trading/indicators/math_kernels_test.cljs`, `/hyperopen/test/hyperopen/domain/trading/indicators/heavy_algorithms_test.cljs`, and `/hyperopen/test/hyperopen/domain/trading/indicators/family_parity_test.cljs`.

@@ -7,6 +7,11 @@
 (def field-values imath/field-values)
 (def mean imath/mean)
 (def normalize-values imath/normalize-values)
+(def finite-subtract imath/finite-subtract)
+(def finite-ratio imath/finite-ratio)
+(def safe-percent-ratio imath/safe-percent-ratio)
+(def roc-percent-values imath/roc-percent-values)
+(def true-range-at imath/true-range-at)
 
 (defn sma-values
   [values period]
@@ -43,20 +48,6 @@
 (defn stddev-aligned-values
   [values period]
   (imath/stddev-values values period :aligned))
-
-(defn roc-percent-values
-  [values period]
-  (let [size (count values)]
-    (mapv (fn [idx]
-            (if (< idx period)
-              nil
-              (let [current (nth values idx)
-                    base (nth values (- idx period))]
-                (when (and (finite-number? current)
-                           (finite-number? base)
-                           (not= base 0))
-                  (* 100 (/ (- current base) base))))))
-          (range size))))
 
 (defn- rsi-core
   [values period rma-fn]
@@ -99,16 +90,9 @@
         close-values (field-values data :close)
         size (count data)]
     (mapv (fn [idx]
-            (let [high (nth high-values idx)
-                  low (nth low-values idx)
-                  prev-close (when (pos? idx)
-                               (nth close-values (dec idx)))
-                  range-1 (- high low)
-                  range-2 (if (finite-number? prev-close)
-                            (js/Math.abs (- high prev-close))
-                            range-1)
-                  range-3 (if (finite-number? prev-close)
-                            (js/Math.abs (- low prev-close))
-                            range-1)]
-              (max range-1 range-2 range-3)))
+            (let [prev-close (when (pos? idx)
+                               (nth close-values (dec idx)))]
+              (true-range-at (nth high-values idx)
+                             (nth low-values idx)
+                             prev-close)))
           (range size))))

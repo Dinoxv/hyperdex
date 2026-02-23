@@ -5,24 +5,14 @@
 (def ^:private seconds-per-week (* 7 24 60 60))
 
 (def ^:private finite-number? imath/finite-number?)
+(def ^:private safe-percent-ratio imath/safe-percent-ratio)
 (def ^:private parse-period imath/parse-period)
 (def ^:private field-values imath/field-values)
+(def ^:private true-range-values imath/true-range-values)
 
 (defn- rma-values
   [values period]
   (imath/rma-values values period :lagged))
-
-(defn- true-range-values
-  [highs lows closes]
-  (let [size (count highs)]
-    (mapv (fn [idx]
-            (let [high (nth highs idx)
-                  low (nth lows idx)
-                  prev-close (if (zero? idx) (nth closes idx) (nth closes (dec idx)))]
-              (max (- high low)
-                   (js/Math.abs (- high prev-close))
-                   (js/Math.abs (- low prev-close)))))
-          (range size))))
 
 (defn calculate-52-week-high-low
   [data params]
@@ -80,7 +70,7 @@
                        (when (and (finite-number? a)
                                   (finite-number? c)
                                   (not= c 0))
-                         (* 100 (/ a c))))
+                         (safe-percent-ratio a c)))
                      atr close-values)]
     (result/indicator-result :volatility-index
                              :separate

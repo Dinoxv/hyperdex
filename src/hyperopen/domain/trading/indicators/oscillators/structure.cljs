@@ -4,6 +4,12 @@
             [hyperopen.domain.trading.indicators.result :as result]))
 
 (def ^:private finite-number? helpers/finite-number?)
+(def ^:private finite-subtract imath/finite-subtract)
+(def ^:private finite-ratio imath/finite-ratio)
+(def ^:private safe-percent-ratio imath/safe-percent-ratio)
+(def ^:private band-upper-value imath/band-upper-value)
+(def ^:private band-lower-value imath/band-lower-value)
+(def ^:private roc-percent-values imath/roc-percent-values)
 (def ^:private parse-period helpers/parse-period)
 (def ^:private parse-number helpers/parse-number)
 (def ^:private field-values helpers/field-values)
@@ -42,17 +48,7 @@
         roc-period (parse-period (:roc-period params) period 1 200)
         ranges (mapv - (field-values data :high) (field-values data :low))
         ema-range (imath/ema-values ranges period)
-        size (count data)
-        values (mapv (fn [idx]
-                       (if (< idx roc-period)
-                         nil
-                         (let [current (nth ema-range idx)
-                               base (nth ema-range (- idx roc-period))]
-                           (when (and (finite-number? current)
-                                      (finite-number? base)
-                                      (not= base 0))
-                             (* 100 (/ (- current base) base))))))
-                     (range size))]
+        values (roc-percent-values ema-range roc-period)]
     (result/indicator-result :chaikin-volatility
                              :separate
                              [(result/line-series :chv values)])))
@@ -66,14 +62,10 @@
         low-stop-base (rolling-min-aligned (field-values data :low) period)
         atr-values (rma-aligned-values (true-range-values data) atr-period)
         long-stop (mapv (fn [high atr]
-                          (when (and (finite-number? high)
-                                     (finite-number? atr))
-                            (- high (* multiplier atr))))
+                          (band-lower-value high atr multiplier))
                         high-stop-base atr-values)
         short-stop (mapv (fn [low atr]
-                           (when (and (finite-number? low)
-                                      (finite-number? atr))
-                             (+ low (* multiplier atr))))
+                           (band-upper-value low atr multiplier))
                          low-stop-base atr-values)]
     (result/indicator-result :chande-kroll-stop
                              :overlay
@@ -97,7 +89,8 @@
                                      (finite-number? ema-prev)
                                      (finite-number? atr-now)
                                      (pos? atr-now))
-                            (let [strength (* 100 (/ (- ema-now ema-prev) atr-now))]
+                            (let [strength (safe-percent-ratio (finite-subtract ema-now ema-prev)
+                                                               atr-now)]
                               (cond
                                 (>= strength 35) 4
                                 (>= strength 15) 3
@@ -124,7 +117,7 @@
         counts (rolling-sum-aligned above-sma period)
         values (mapv (fn [count]
                        (when (finite-number? count)
-                         (* 100 (/ count period))))
+                         (safe-percent-ratio count period)))
                      counts)]
     (result/indicator-result :majority-rule
                              :separate
@@ -140,10 +133,7 @@
                          nil
                          (let [current (nth close-values idx)
                                base (nth close-values (- idx period))]
-                           (when (and (finite-number? current)
-                                      (finite-number? base)
-                                      (not= base 0))
-                             (/ current base)))))
+                           (finite-ratio current base))))
                      (range size))]
     (result/indicator-result :ratio
                              :separate
@@ -159,9 +149,7 @@
                          nil
                          (let [current (nth close-values idx)
                                base (nth close-values (- idx period))]
-                           (when (and (finite-number? current)
-                                      (finite-number? base))
-                             (- current base)))))
+                           (finite-subtract current base))))
                      (range size))]
     (result/indicator-result :spread
                              :separate
@@ -226,7 +214,7 @@
                        (when (and (finite-number? u)
                                   (finite-number? d)
                                   (pos? (+ u d)))
-                         (* 100 (/ u (+ u d)))))
+                         (safe-percent-ratio u (+ u d))))
                      up-rma down-rma)]
     (result/indicator-result :relative-volatility-index
                              :separate

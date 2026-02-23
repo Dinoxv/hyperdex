@@ -13,6 +13,7 @@
   (family-runtime/indicators price-family))
 
 (def ^:private field-values imath/field-values)
+(def ^:private hl2-values imath/hl2-values)
 
 (defn- calculate-average-price
   [data _params]
@@ -36,11 +37,7 @@
   [data _params]
   (let [high-values (field-values data :high)
         low-values (field-values data :low)
-        values (mapv (fn [idx]
-                       (/ (+ (nth high-values idx)
-                             (nth low-values idx))
-                          2))
-                     (range (count high-values)))]
+        values (hl2-values high-values low-values)]
     (result/indicator-result :median-price
                              :overlay
                              [(result/line-series :median values)])))

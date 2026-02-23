@@ -4,6 +4,8 @@
             [hyperopen.domain.trading.indicators.result :as result]))
 
 (def ^:private finite-number? helpers/finite-number?)
+(def ^:private finite-subtract imath/finite-subtract)
+(def ^:private hl2-values imath/hl2-values)
 (def ^:private clamp imath/clamp)
 (def ^:private parse-period helpers/parse-period)
 (def ^:private field-values helpers/field-values)
@@ -108,15 +110,11 @@
         fast-ema (imath/ema-values vf fast)
         slow-ema (imath/ema-values vf slow)
         kvo (mapv (fn [f s]
-                    (when (and (finite-number? f)
-                               (finite-number? s))
-                      (- f s)))
+                    (finite-subtract f s))
                   fast-ema slow-ema)
         signal (imath/ema-values kvo signal-period)
         hist (mapv (fn [k s]
-                     (when (and (finite-number? k)
-                                (finite-number? s))
-                       (- k s)))
+                     (finite-subtract k s))
                    kvo signal)]
     (result/indicator-result :klinger-oscillator
                              :separate
@@ -171,10 +169,8 @@
 (defn calculate-fisher-transform
   [data params]
   (let [period (parse-period (:period params) 10 2 200)
-        median-price (mapv (fn [high low]
-                             (/ (+ high low) 2))
-                           (field-values data :high)
-                           (field-values data :low))
+        median-price (hl2-values (field-values data :high)
+                                 (field-values data :low))
         rolling-high (rolling-max-aligned median-price period)
         rolling-low (rolling-min-aligned median-price period)
         size (count data)

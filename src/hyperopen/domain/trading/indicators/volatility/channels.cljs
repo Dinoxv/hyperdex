@@ -8,6 +8,8 @@
 (def ^:private parse-number imath/parse-number)
 (def ^:private field-values imath/field-values)
 (def ^:private normalize-values imath/normalize-values)
+(def ^:private band-upper-values imath/band-upper-values)
+(def ^:private band-lower-values imath/band-lower-values)
 
 (defn- rolling-max-aligned
   [values period]
@@ -112,16 +114,8 @@
         close-values (field-values data :close)
         basis (sma-aligned-values close-values period)
         spread (stddev-aligned-values close-values period)
-        upper (mapv (fn [b s]
-                      (when (and (finite-number? b)
-                                 (finite-number? s))
-                        (+ b (* multiplier s))))
-                    basis spread)
-        lower (mapv (fn [b s]
-                      (when (and (finite-number? b)
-                                 (finite-number? s))
-                        (- b (* multiplier s))))
-                    basis spread)]
+        upper (band-upper-values basis spread multiplier)
+        lower (band-lower-values basis spread multiplier)]
     (result/indicator-result :moving-average-channel
                              :overlay
                              [(result/line-series :upper upper)

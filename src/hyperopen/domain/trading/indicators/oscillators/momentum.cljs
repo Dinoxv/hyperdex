@@ -7,6 +7,9 @@
 (def ^:private parse-period imath/parse-period)
 (def ^:private field-values imath/field-values)
 (def ^:private normalize-values imath/normalize-values)
+(def ^:private finite-subtract imath/finite-subtract)
+(def ^:private safe-percent-ratio imath/safe-percent-ratio)
+(def ^:private roc-percent-values imath/roc-percent-values)
 
 (defn- sma-aligned-values
   [values period]
@@ -15,20 +18,6 @@
 (defn- rolling-sum-aligned
   [values period]
   (imath/rolling-sum values period :aligned))
-
-(defn- roc-percent-values
-  [values period]
-  (let [size (count values)]
-    (mapv (fn [idx]
-            (if (< idx period)
-              nil
-              (let [current (nth values idx)
-                    base (nth values (- idx period))]
-                (when (and (finite-number? current)
-                           (finite-number? base)
-                           (not= base 0))
-                  (* 100 (/ (- current base) base))))))
-          (range size))))
 
 (defn calculate-rate-of-change
   [data params]
@@ -71,7 +60,8 @@
                          (when (and (finite-number? g)
                                     (finite-number? l)
                                     (pos? total))
-                           (* 100 (/ (- g l) total)))))
+                           (safe-percent-ratio (finite-subtract g l)
+                                               total))))
                      sum-gains sum-losses)]
     (result/indicator-result :chande-momentum-oscillator
                              :separate
@@ -91,7 +81,7 @@
                                  avg (nth sma-line shifted-idx)]
                              (when (and (finite-number? price)
                                         (finite-number? avg))
-                               (- price avg))))))
+                               (finite-subtract price avg))))))
                      (range size))]
     (result/indicator-result :detrended-price-oscillator
                              :separate

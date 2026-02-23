@@ -1,9 +1,13 @@
 (ns hyperopen.domain.trading.indicators.oscillators.classic
   (:require [hyperopen.domain.trading.indicators.math-engine :as math-engine]
+            [hyperopen.domain.trading.indicators.math :as imath]
             [hyperopen.domain.trading.indicators.oscillators.helpers :as helpers]
             [hyperopen.domain.trading.indicators.result :as result]))
 
 (def ^:private finite-number? helpers/finite-number?)
+(def ^:private finite-subtract imath/finite-subtract)
+(def ^:private safe-percent-ratio imath/safe-percent-ratio)
+(def ^:private hl2-values imath/hl2-values)
 (def ^:private parse-period helpers/parse-period)
 (def ^:private field-values helpers/field-values)
 (def ^:private mean helpers/mean)
@@ -21,17 +25,13 @@
   (let [highs (field-values data :high)
         lows (field-values data :low)
         size (count data)
-        median-values (mapv (fn [idx]
-                              (/ (+ (nth highs idx) (nth lows idx)) 2))
-                            (range size))
+        median-values (hl2-values highs lows)
         fast-values (sma-values median-values 5)
         slow-values (sma-values median-values 34)
         values (mapv (fn [idx]
                        (let [fast (nth fast-values idx)
                              slow (nth slow-values idx)]
-                         (when (and (finite-number? fast)
-                                    (finite-number? slow))
-                           (- fast slow))))
+                         (finite-subtract fast slow)))
                      (range size))]
     (result/indicator-result :awesome-oscillator
                              :separate
@@ -42,25 +42,19 @@
   (let [highs (field-values data :high)
         lows (field-values data :low)
         size (count data)
-        median-values (mapv (fn [idx]
-                              (/ (+ (nth highs idx) (nth lows idx)) 2))
-                            (range size))
+        median-values (hl2-values highs lows)
         fast-values (sma-values median-values 5)
         slow-values (sma-values median-values 34)
         ao-values (mapv (fn [idx]
                           (let [fast (nth fast-values idx)
                                 slow (nth slow-values idx)]
-                            (when (and (finite-number? fast)
-                                       (finite-number? slow))
-                              (- fast slow))))
+                            (finite-subtract fast slow)))
                         (range size))
         ao-signal (rolling-apply ao-values 5 mean)
         values (mapv (fn [idx]
                        (let [ao (nth ao-values idx)
                              signal (nth ao-signal idx)]
-                         (when (and (finite-number? ao)
-                                    (finite-number? signal))
-                           (- ao signal))))
+                         (finite-subtract ao signal)))
                      (range size))]
     (result/indicator-result :accelerator-oscillator
                              :separate
@@ -122,7 +116,8 @@
                                    (finite-number? mn)
                                    (finite-number? mx)
                                    (pos? range-value))
-                          (* 100 (/ (- r mn) range-value)))))
+                          (safe-percent-ratio (finite-subtract r mn)
+                                              range-value))))
                     (range (count rsi-series)))
         k-values (sma-aligned-values raw-k k-smoothing)
         d-values (sma-aligned-values k-values d-smoothing)]
@@ -155,9 +150,7 @@
         macd-line (normalize-values (:macdLine result))
         signal-line (normalize-values (:signalLine result))
         histogram (mapv (fn [m s]
-                          (when (and (finite-number? m)
-                                     (finite-number? s))
-                            (- m s)))
+                          (finite-subtract m s))
                         macd-line signal-line)]
     (result/indicator-result :macd
                              :separate

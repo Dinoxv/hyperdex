@@ -46,6 +46,101 @@
                   (js/parseFloat (str value)))]
     (if (js/isNaN numeric) default numeric)))
 
+(defn finite-subtract
+  [a b]
+  (when (and (finite-number? a)
+             (finite-number? b))
+    (- a b)))
+
+(defn band-upper-value
+  [base spread multiplier]
+  (when (and (finite-number? base)
+             (finite-number? spread))
+    (+ base (* multiplier spread))))
+
+(defn band-lower-value
+  [base spread multiplier]
+  (when (and (finite-number? base)
+             (finite-number? spread))
+    (- base (* multiplier spread))))
+
+(defn band-upper-values
+  [base-values spread-values multiplier]
+  (mapv (fn [base spread]
+          (band-upper-value base spread multiplier))
+        base-values spread-values))
+
+(defn band-lower-values
+  [base-values spread-values multiplier]
+  (mapv (fn [base spread]
+          (band-lower-value base spread multiplier))
+        base-values spread-values))
+
+(defn finite-ratio
+  [numerator denominator]
+  (when (and (finite-number? numerator)
+             (finite-number? denominator)
+             (not (zero? denominator)))
+    (/ numerator denominator)))
+
+(defn safe-percent-ratio
+  [numerator denominator]
+  (when-let [ratio (finite-ratio numerator denominator)]
+    (* 100 ratio)))
+
+(defn true-range-at
+  [high low prev-close]
+  (let [range-1 (- high low)
+        range-2 (if (finite-number? prev-close)
+                  (js/Math.abs (- high prev-close))
+                  range-1)
+        range-3 (if (finite-number? prev-close)
+                  (js/Math.abs (- low prev-close))
+                  range-1)]
+    (max range-1 range-2 range-3)))
+
+(defn true-range-index
+  [high-values low-values close-values idx]
+  (let [high (nth high-values idx)
+        low (nth low-values idx)
+        prev-close (if (zero? idx)
+                     (nth close-values idx)
+                     (nth close-values (dec idx)))]
+    (true-range-at high low prev-close)))
+
+(defn true-range-values
+  [high-values low-values close-values]
+  (mapv (fn [idx]
+          (true-range-index high-values low-values close-values idx))
+        (range (count high-values))))
+
+(defn roc-percent-at
+  [values idx period]
+  (if (< idx period)
+    nil
+    (let [current (nth values idx)
+          base (nth values (- idx period))]
+      (safe-percent-ratio (finite-subtract current base)
+                          base))))
+
+(defn roc-percent-values
+  [values period]
+  (mapv (fn [idx]
+          (roc-percent-at values idx period))
+        (range (count values))))
+
+(defn hl2-at
+  [high-values low-values idx]
+  (/ (+ (nth high-values idx)
+        (nth low-values idx))
+     2))
+
+(defn hl2-values
+  [high-values low-values]
+  (mapv (fn [idx]
+          (hl2-at high-values low-values idx))
+        (range (count high-values))))
+
 (defn times
   [data]
   (mapv :time data))

@@ -1,5 +1,6 @@
 (ns hyperopen.domain.trading.indicators.heavy-algorithms-test
   (:require [cljs.test :refer-macros [deftest is]]
+            [hyperopen.domain.trading.indicators.math :as imath]
             [hyperopen.domain.trading.indicators.math.patterns :as patterns]
             [hyperopen.domain.trading.indicators.math.statistics :as mstats]))
 
@@ -17,6 +18,25 @@
              (* 2.5 (js/Math.sin (/ idx 7)))
              (* 1.1 (js/Math.cos (/ idx 13)))))
         (range n)))
+
+(deftest shared-kernels-determinism-and-performance-test
+  (let [close-values (synthetic-close-values 5000)
+        highs (mapv #(+ % 1.8) close-values)
+        lows (mapv #(- % 1.4) close-values)
+        start-ms (js/Date.now)
+        tr-a (imath/true-range-values highs lows close-values)
+        tr-b (imath/true-range-values highs lows close-values)
+        roc-a (imath/roc-percent-values close-values 12)
+        roc-b (imath/roc-percent-values close-values 12)
+        elapsed-ms (- (js/Date.now) start-ms)]
+    (is (= tr-a tr-b))
+    (is (= roc-a roc-b))
+    (is (= (count close-values) (count tr-a)))
+    (is (= (count close-values) (count roc-a)))
+    (is (every? finite-number? tr-a))
+    (is (every? #(or (nil? %) (finite-number? %)) roc-a))
+    (is (< elapsed-ms 8000)
+        (str "shared kernels took too long: " elapsed-ms "ms"))))
 
 (deftest tie-aware-ranks-determinism-and-performance-test
   (let [values (synthetic-close-values 2500)

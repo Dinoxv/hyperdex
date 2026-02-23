@@ -4,6 +4,12 @@
             [hyperopen.domain.trading.indicators.result :as result]))
 
 (def ^:private finite-number? imath/finite-number?)
+(def ^:private finite-subtract imath/finite-subtract)
+(def ^:private safe-percent-ratio imath/safe-percent-ratio)
+(def ^:private band-upper-value imath/band-upper-value)
+(def ^:private band-lower-value imath/band-lower-value)
+(def ^:private hl2-values imath/hl2-values)
+(def ^:private true-range-values imath/true-range-values)
 (def ^:private parse-period imath/parse-period)
 (def ^:private parse-number imath/parse-number)
 (def ^:private field-values imath/field-values)
@@ -24,18 +30,6 @@
       (< idx 0) nil
       (= (nth values idx) target) idx
       :else (recur (dec idx)))))
-
-(defn- true-range-values
-  [highs lows closes]
-  (let [size (count highs)]
-    (mapv (fn [idx]
-            (let [high (nth highs idx)
-                  low (nth lows idx)
-                  prev-close (if (zero? idx) (nth closes idx) (nth closes (dec idx)))]
-              (max (- high low)
-                   (js/Math.abs (- high prev-close))
-                   (js/Math.abs (- low prev-close)))))
-          (range size))))
 
 (defn- plus-minus-di-values
   [data period]
@@ -71,7 +65,7 @@
                           (when (and (finite-number? atr)
                                      (finite-number? value)
                                      (pos? atr))
-                            (* 100 (/ value atr)))))
+                            (safe-percent-ratio value atr))))
                       (range size))
         minus-di (mapv (fn [idx]
                          (let [atr (nth atr-values idx)
@@ -79,7 +73,7 @@
                            (when (and (finite-number? atr)
                                       (finite-number? value)
                                       (pos? atr))
-                             (* 100 (/ value atr)))))
+                             (safe-percent-ratio value atr))))
                        (range size))]
     {:plus-di plus-di
      :minus-di minus-di}))
@@ -154,7 +148,7 @@
                           (when (and (finite-number? atr)
                                      (finite-number? value)
                                      (pos? atr))
-                            (* 100 (/ value atr)))))
+                            (safe-percent-ratio value atr))))
                       (range size))
         minus-di (mapv (fn [idx]
                          (let [atr (nth atr-values idx)
@@ -162,7 +156,7 @@
                            (when (and (finite-number? atr)
                                       (finite-number? value)
                                       (pos? atr))
-                             (* 100 (/ value atr)))))
+                             (safe-percent-ratio value atr))))
                        (range size))
         dx-values (mapv (fn [idx]
                           (let [plus (nth plus-di idx)
@@ -171,7 +165,8 @@
                             (when (and (finite-number? plus)
                                        (finite-number? minus)
                                        (pos? total))
-                              (* 100 (/ (js/Math.abs (- plus minus)) total)))))
+                              (safe-percent-ratio (js/Math.abs (finite-subtract plus minus))
+                                                  total))))
                         (range size))
         adx-raw (rma-values (mapv #(or % 0) dx-values) smoothing)
         warmup (+ period smoothing)
@@ -204,25 +199,13 @@
         tr-values (true-range-values high-values low-values close-values)
         atr-values (rma-values tr-values period)
         size (count close-values)
-        hl2 (mapv (fn [idx]
-                    (/ (+ (nth high-values idx)
-                          (nth low-values idx))
-                       2))
-                  (range size))
-        basic-upper (mapv (fn [idx]
-                            (let [mid (nth hl2 idx)
-                                  atr (nth atr-values idx)]
-                              (when (and (finite-number? mid)
-                                         (finite-number? atr))
-                                (+ mid (* multiplier atr)))))
-                          (range size))
-        basic-lower (mapv (fn [idx]
-                            (let [mid (nth hl2 idx)
-                                  atr (nth atr-values idx)]
-                              (when (and (finite-number? mid)
-                                         (finite-number? atr))
-                                (- mid (* multiplier atr)))))
-                          (range size))
+        hl2 (hl2-values high-values low-values)
+        basic-upper (mapv (fn [mid atr]
+                            (band-upper-value mid atr multiplier))
+                          hl2 atr-values)
+        basic-lower (mapv (fn [mid atr]
+                            (band-lower-value mid atr multiplier))
+                          hl2 atr-values)
         [final-upper final-lower supertrend trend-up]
         (loop [idx 0
                prev-final-upper nil

@@ -4,9 +4,12 @@
             [hyperopen.domain.trading.indicators.result :as result]))
 
 (def ^:private finite-number? imath/finite-number?)
+(def ^:private finite-subtract imath/finite-subtract)
 (def ^:private parse-period imath/parse-period)
 (def ^:private parse-number imath/parse-number)
 (def ^:private field-values imath/field-values)
+(def ^:private band-upper-values imath/band-upper-values)
+(def ^:private band-lower-values imath/band-lower-values)
 
 (defn- sma-values
   [values period]
@@ -28,16 +31,8 @@
   [close-values period multiplier]
   (let [basis (sma-aligned-values close-values period)
         stdev-values (stddev-aligned-values close-values period)
-        upper (mapv (fn [b s]
-                      (when (and (finite-number? b)
-                                 (finite-number? s))
-                        (+ b (* multiplier s))))
-                    basis stdev-values)
-        lower (mapv (fn [b s]
-                      (when (and (finite-number? b)
-                                 (finite-number? s))
-                        (- b (* multiplier s))))
-                    basis stdev-values)]
+        upper (band-upper-values basis stdev-values multiplier)
+        lower (band-lower-values basis stdev-values multiplier)]
     {:basis basis
      :upper upper
      :lower lower}))
@@ -49,20 +44,8 @@
         closes (field-values data :close)
         basis-values (sma-values closes period)
         std-values (stddev-values closes period)
-        upper-values (mapv (fn [idx]
-                             (let [basis (nth basis-values idx)
-                                   stdev (nth std-values idx)]
-                               (when (and (finite-number? basis)
-                                          (finite-number? stdev))
-                                 (+ basis (* multiplier stdev)))))
-                           (range (count closes)))
-        lower-values (mapv (fn [idx]
-                             (let [basis (nth basis-values idx)
-                                   stdev (nth std-values idx)]
-                               (when (and (finite-number? basis)
-                                          (finite-number? stdev))
-                                 (- basis (* multiplier stdev)))))
-                           (range (count closes)))]
+        upper-values (band-upper-values basis-values std-values multiplier)
+        lower-values (band-lower-values basis-values std-values multiplier)]
     (result/indicator-result :bollinger-bands
                              :overlay
                              [(result/line-series :upper upper-values)
@@ -76,12 +59,12 @@
         close-values (field-values data :close)
         {:keys [upper lower]} (bollinger-components-aligned close-values period multiplier)
         percent-b (mapv (fn [close u l]
-                          (let [spread (- (or u 0) (or l 0))]
+                          (let [spread (finite-subtract u l)]
                             (when (and (finite-number? close)
                                        (finite-number? u)
                                        (finite-number? l)
                                        (not (zero? spread)))
-                              (/ (- close l) spread))))
+                              (/ (finite-subtract close l) spread))))
                         close-values upper lower)]
     (result/indicator-result :bollinger-bands-percent-b
                              :separate
@@ -94,11 +77,12 @@
         close-values (field-values data :close)
         {:keys [basis upper lower]} (bollinger-components-aligned close-values period multiplier)
         width (mapv (fn [b u l]
-                      (when (and (finite-number? b)
-                                 (finite-number? u)
-                                 (finite-number? l)
-                                 (not (zero? b)))
-                        (/ (- u l) b)))
+                      (let [spread (finite-subtract u l)]
+                        (when (and (finite-number? b)
+                                   (finite-number? u)
+                                   (finite-number? l)
+                                   (not (zero? b)))
+                          (/ spread b))))
                     basis upper lower)]
     (result/indicator-result :bollinger-bands-width
                              :separate
@@ -128,16 +112,8 @@
         regressions (mstats/rolling-regression (field-values data :close) period)
         center (mapv :center regressions)
         se (mapv :standard-error regressions)
-        upper (mapv (fn [c s]
-                      (when (and (finite-number? c)
-                                 (finite-number? s))
-                        (+ c (* multiplier s))))
-                    center se)
-        lower (mapv (fn [c s]
-                      (when (and (finite-number? c)
-                                 (finite-number? s))
-                        (- c (* multiplier s))))
-                    center se)]
+        upper (band-upper-values center se multiplier)
+        lower (band-lower-values center se multiplier)]
     (result/indicator-result :standard-error-bands
                              :overlay
                              [(result/line-series :upper upper)
@@ -213,7 +189,7 @@
         detrended (mapv (fn [close avg]
                           (when (and (finite-number? close)
                                      (finite-number? avg))
-                            (- close avg)))
+                            (finite-subtract close avg)))
                         close-values trend)
         returns (mapv (fn [idx]
                         (if (zero? idx)
@@ -222,7 +198,7 @@
                                 previous (nth detrended (dec idx))]
                             (when (and (finite-number? current)
                                        (finite-number? previous))
-                              (- current previous)))))
+                              (finite-subtract current previous)))))
                       (range size))
         values (mapv (fn [stdev]
                        (when (finite-number? stdev)

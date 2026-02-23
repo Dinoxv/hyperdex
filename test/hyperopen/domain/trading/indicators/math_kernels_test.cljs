@@ -1,6 +1,7 @@
 (ns hyperopen.domain.trading.indicators.math-kernels-test
   (:require [cljs.test :refer-macros [deftest is]]
             [hyperopen.domain.trading.indicators.math-kernel-bench-baselines :as baselines]
+            [hyperopen.domain.trading.indicators.math :as imath]
             [hyperopen.domain.trading.indicators.math.patterns :as patterns]
             [hyperopen.domain.trading.indicators.math.statistics :as mstats]))
 
@@ -28,6 +29,43 @@
 (defn- strict-bench-mode?
   []
   (= "1" (aget (.-env js/process) baselines/strict-benchmark-env-key)))
+
+(deftest finite-subtract-and-band-kernels-test
+  (is (= 5 (imath/finite-subtract 9 4)))
+  (is (nil? (imath/finite-subtract js/NaN 4)))
+  (is (= 14 (imath/band-upper-value 10 2 2)))
+  (is (= 6 (imath/band-lower-value 10 2 2)))
+  (is (= [14 nil 7]
+         (imath/band-upper-values [10 5 1] [2 nil 3] 2)))
+  (is (= [6 nil -5]
+         (imath/band-lower-values [10 5 1] [2 nil 3] 2))))
+
+(deftest safe-percent-ratio-and-ratio-kernels-test
+  (is (= 0.25 (imath/finite-ratio 1 4)))
+  (is (nil? (imath/finite-ratio 1 0)))
+  (is (= 25 (imath/safe-percent-ratio 1 4)))
+  (is (nil? (imath/safe-percent-ratio 3 0)))
+  (is (nil? (imath/safe-percent-ratio js/NaN 3))))
+
+(deftest true-range-kernels-test
+  (let [highs [11 15 14]
+        lows [9 10 8]
+        closes [10 12 9]]
+    (is (= 2 (imath/true-range-at 11 9 nil)))
+    (is (= 5 (imath/true-range-index highs lows closes 1)))
+    (is (= [2 5 6]
+           (imath/true-range-values highs lows closes)))))
+
+(deftest roc-and-hl2-kernels-test
+  (let [close-values [100 110 121 108.9]
+        roc-values (imath/roc-percent-values close-values 1)]
+    (is (= nil (nth roc-values 0)))
+    (is (approx= 10 (nth roc-values 1)))
+    (is (approx= 10 (nth roc-values 2)))
+    (is (approx= -10 (nth roc-values 3)))
+    (is (nil? (imath/roc-percent-at [0 10] 1 1)))
+    (is (= [8 12 16]
+           (imath/hl2-values [10 14 20] [6 10 12])))))
 
 (defn- benchmark-trend
   [kernel-id elapsed-ms]
