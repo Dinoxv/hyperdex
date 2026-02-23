@@ -135,36 +135,39 @@
 (defn sortable-open-orders-header [column-name sort-state]
   (table/sortable-header-button column-name sort-state :actions/sort-open-orders))
 
+(def ^:private open-orders-grid-template-class
+  "grid-cols-[minmax(130px,1.45fr)_minmax(70px,0.75fr)_minmax(60px,0.7fr)_minmax(70px,0.8fr)_minmax(60px,0.7fr)_minmax(80px,0.85fr)_minmax(100px,1fr)_minmax(70px,0.8fr)_minmax(80px,0.95fr)_minmax(120px,1.35fr)_minmax(70px,0.8fr)_minmax(80px,0.9fr)]")
+
 (defn open-orders-tab-content [normalized sort-state]
   (let [sorted (memoized-sorted-open-orders normalized sort-state)]
     (if (seq sorted)
       (table/tab-table-content
-       [:div {:class ["grid" "gap-2" "py-1" "px-3" "bg-base-200" "text-xs" "font-medium" "grid-cols-[130px_70px_60px_70px_60px_80px_100px_70px_70px_120px_50px_70px]"]}
-        [:div.pr-2.whitespace-nowrap (sortable-open-orders-header "Time" sort-state)]
-        [:div.pl-1 (sortable-open-orders-header "Type" sort-state)]
-        [:div (sortable-open-orders-header "Coin" sort-state)]
-        [:div (sortable-open-orders-header "Direction" sort-state)]
-        [:div.text-right (sortable-open-orders-header "Size" sort-state)]
-        [:div.text-right (sortable-open-orders-header "Original Size" sort-state)]
-        [:div.text-right (sortable-open-orders-header "Order Value" sort-state)]
-        [:div.text-right (sortable-open-orders-header "Price" sort-state)]
-        [:div.text-left.whitespace-nowrap "Reduce Only"]
-        [:div.text-left.whitespace-nowrap "Trigger Conditions"]
-        [:div.text-left "TP/SL"]
-        [:div.text-left "Cancel All"]]
+       [:div {:class ["grid" "gap-2" "py-1" "px-3" "bg-base-200" "text-xs" "font-medium" open-orders-grid-template-class]}
+        [:div.pr-2.text-left.whitespace-nowrap (sortable-open-orders-header "Time" sort-state)]
+        [:div.pl-1.text-left (sortable-open-orders-header "Type" sort-state)]
+        [:div.text-left (sortable-open-orders-header "Coin" sort-state)]
+        [:div.text-left (sortable-open-orders-header "Direction" sort-state)]
+        [:div.text-left (sortable-open-orders-header "Size" sort-state)]
+        [:div.text-left (sortable-open-orders-header "Original Size" sort-state)]
+        [:div.text-left (sortable-open-orders-header "Order Value" sort-state)]
+        [:div.text-left (sortable-open-orders-header "Price" sort-state)]
+        [:div.text-left.whitespace-nowrap (table/non-sortable-header "Reduce Only")]
+        [:div.text-left.whitespace-nowrap (table/non-sortable-header "Trigger Conditions")]
+        [:div.text-left (table/non-sortable-header "TP/SL")]
+        [:div.text-left (table/non-sortable-header "Cancel All")]]
        (for [o sorted]
          ^{:key (str (:oid o) "-" (:coin o))}
-         [:div {:class ["grid" "gap-2" "py-px" "px-3" "hover:bg-base-300" "text-xs" "grid-cols-[130px_70px_60px_70px_60px_80px_100px_70px_70px_120px_50px_70px]"]}
-          [:div.pr-2.whitespace-nowrap (shared/format-open-orders-time (:time o))]
-          [:div.pl-1 (or (:type o) "Order")]
-          [:div (open-orders-coin-node (:coin o) (:side o))]
-          [:div {:class (direction-class (:side o))} (direction-label (:side o))]
-          [:div.text-right.num.num-right (shared/format-currency (:sz o))]
-          [:div.text-right.num.num-right (shared/format-currency (or (:orig-sz o) (:sz o)))]
-          [:div.text-right.num.num-right (if-let [val (order-value o)]
-                                            (str (shared/format-currency val) " USDC")
-                                            "--")]
-          [:div.text-right.num.num-right (shared/format-trade-price (:px o))]
+         [:div {:class ["grid" "gap-2" "py-px" "px-3" "hover:bg-base-300" "text-xs" open-orders-grid-template-class]}
+          [:div.pr-2.text-left.whitespace-nowrap (shared/format-open-orders-time (:time o))]
+          [:div.pl-1.text-left (or (:type o) "Order")]
+          [:div.text-left (open-orders-coin-node (:coin o) (:side o))]
+          [:div {:class ["text-left" (direction-class (:side o))]} (direction-label (:side o))]
+          [:div.text-left.num (shared/format-currency (:sz o))]
+          [:div.text-left.num (shared/format-currency (or (:orig-sz o) (:sz o)))]
+          [:div.text-left.num (if-let [val (order-value o)]
+                                 (str (shared/format-currency val) " USDC")
+                                 "--")]
+          [:div.text-left.num (shared/format-trade-price (:px o))]
           [:div.text-left (if (:reduce-only o) "Yes" "No")]
           [:div.text-left (format-trigger-conditions o)]
           [:div.text-left (format-tp-sl o)]
