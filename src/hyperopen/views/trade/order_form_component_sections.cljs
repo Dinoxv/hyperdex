@@ -128,6 +128,8 @@
    [:span {:class ["text-xs" "uppercase" "tracking-wide" "text-gray-400"]} "TIF"]
    [:select {:class ["appearance-none"
                      "bg-transparent"
+                     "bg-none"
+                     "[background-image:none]"
                      "border-0"
                      "border-none"
                      "text-sm"
