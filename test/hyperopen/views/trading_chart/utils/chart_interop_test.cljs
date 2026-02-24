@@ -4,6 +4,7 @@
             [hyperopen.views.trading-chart.utils.chart-interop :as chart-interop]
             [hyperopen.views.trading-chart.utils.chart-interop.baseline :as baseline]
             [hyperopen.views.trading-chart.utils.chart-interop.indicators :as indicator-interop]
+            [hyperopen.views.trading-chart.utils.chart-interop.position-overlays :as position-overlays]
             [hyperopen.views.trading-chart.utils.chart-interop.series :as series]
             [hyperopen.views.trading-chart.utils.chart-interop.transforms :as transforms]
             [hyperopen.views.trading-chart.utils.chart-interop.volume-indicator-overlay :as volume-indicator-overlay]
@@ -178,3 +179,43 @@
            (:opts (first @assert-calls))))
     (is (= 2 (count @sync-calls)))
     (is (= 1 @clear-calls))))
+
+(deftest position-overlay-wrapper-delegates-and-guards-chart-contract-test
+  (let [assert-calls (atom [])
+        sync-calls (atom [])
+        clear-calls (atom [])
+        chart-handle #js {:chart #js {}
+                          :mainSeries #js {}}
+        container (fake-dom/make-fake-element "div")
+        overlay {:entry-price 100
+                 :unrealized-pnl 12.5}]
+    (with-redefs [chart-contracts/assert-chart-handle! (fn [value context]
+                                                         (swap! assert-calls conj {:value value
+                                                                                   :context context})
+                                                         value)
+                  position-overlays/sync-position-overlays! (fn
+                                                              ([chart-obj* container* overlay*]
+                                                               (swap! sync-calls conj [chart-obj* container* overlay* nil])
+                                                               :synced)
+                                                              ([chart-obj* container* overlay* opts]
+                                                               (swap! sync-calls conj [chart-obj* container* overlay* opts])
+                                                               :synced))
+                  position-overlays/clear-position-overlays! (fn [chart-obj*]
+                                                               (swap! clear-calls conj chart-obj*)
+                                                               :cleared)]
+      (is (= :synced
+             (chart-interop/sync-position-overlays! chart-handle
+                                                    container
+                                                    overlay
+                                                    {:format-price str})))
+      (is (= :synced
+             (chart-interop/sync-position-overlays! nil container overlay)))
+      (is (= :cleared
+             (chart-interop/clear-position-overlays! chart-handle)))
+      (is (= :cleared
+             (chart-interop/clear-position-overlays! nil))))
+    (is (= 2 (count @sync-calls)))
+    (is (= 2 (count @clear-calls)))
+    (is (= #{:chart-interop/sync-position-overlays
+             :chart-interop/clear-position-overlays}
+           (set (map (comp :boundary :context) @assert-calls))))))

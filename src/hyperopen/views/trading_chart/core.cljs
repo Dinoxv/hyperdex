@@ -2,10 +2,12 @@
   (:require [clojure.string :as str]
             [replicant.core :as replicant-core]
             [hyperopen.utils.formatting :as fmt]
+            [hyperopen.state.trading :as trading-state]
             [hyperopen.views.account-info.projections :as account-projections]
             [hyperopen.views.trading-chart.runtime-state :as chart-runtime]
             [hyperopen.views.trading-chart.utils.chart-interop :as ci]
             [hyperopen.views.trading-chart.derived-cache :as derived-cache]
+            [hyperopen.views.trading-chart.utils.position-overlay-model :as position-overlay-model]
             [hyperopen.views.trading-chart.timeframe-dropdown :refer [timeframe-dropdown]]
             [hyperopen.views.trading-chart.chart-type-dropdown :refer [chart-type-dropdown]]
             [hyperopen.views.trading-chart.indicators-dropdown :refer [indicators-dropdown]]
@@ -34,6 +36,14 @@
      active-asset
      pending-cancel-oids)))
 
+(defn- chart-fills
+  [state]
+  (let [fills-source (preferred-orders-value state :fills)]
+    (cond
+      (vector? fills-source) fills-source
+      (sequential? fills-source) (vec fills-source)
+      :else [])))
+
 (defn- dispatch-chart-cancel-order!
   [order]
   (let [dispatch-fn replicant-core/*dispatch*]
@@ -52,6 +62,17 @@
 (defn- format-chart-overlay-size
   [value]
   (fmt/format-fixed-number value 2))
+
+(defn- merge-main-series-markers
+  [indicator-markers position-overlay]
+  (let [base-markers (cond
+                       (vector? indicator-markers) indicator-markers
+                       (sequential? indicator-markers) (vec indicator-markers)
+                       :else [])
+        entry-marker (:entry-marker position-overlay)]
+    (if (map? entry-marker)
+      (conj base-markers entry-marker)
+      base-markers)))
 
 ;; Top menu component with timeframe selection and bars indicator
 (defn chart-top-menu [state]
@@ -149,14 +170,18 @@
    (let [{:keys [indicators-data indicator-markers]
           indicator-series-data :indicator-series}
          (derived-cache/memoized-indicator-outputs candle-data selected-timeframe active-indicators)
+         position-overlay (:position-overlay chart-runtime-options)
          series-options (:series-options chart-runtime-options)
          legend-deps (:legend-deps chart-runtime-options)
          persistence-deps (:persistence-deps chart-runtime-options)
          volume-visible? (boolean (get chart-runtime-options :volume-visible? true))
          on-hide-volume-indicator (:on-hide-volume-indicator chart-runtime-options)
+         main-series-markers (merge-main-series-markers indicator-markers position-overlay)
          overlay-deps {:on-cancel-order on-cancel-order
                        :format-price fmt/format-trade-price-plain
                        :format-size format-chart-overlay-size}
+         position-overlay-deps {:format-price fmt/format-trade-price-plain
+                                :format-size format-chart-overlay-size}
          volume-indicator-deps {:on-remove on-hide-volume-indicator}
          legend-key (str (or (:symbol legend-meta) "")
                          "-"
@@ -184,8 +209,9 @@
                                             (ci/apply-persisted-visible-range! chart selected-timeframe persistence-deps))
                             visible-range-cleanup (when data-ready?
                                                    (ci/subscribe-visible-range-persistence! chart selected-timeframe persistence-deps))]
-                        (ci/set-main-series-markers! chart-obj indicator-markers)
+                        (ci/set-main-series-markers! chart-obj main-series-markers)
                         (ci/sync-baseline-base-value-subscription! chart-obj chart-type)
+                        (ci/sync-position-overlays! chart-obj node position-overlay position-overlay-deps)
                         (ci/sync-open-order-overlays! chart-obj node open-order-overlays overlay-deps)
                         (ci/sync-volume-indicator-overlay! chart-obj node candle-data volume-indicator-deps)
                         (chart-runtime/set-state! node {:chart-obj chart-obj
@@ -239,7 +265,8 @@
                                                      (ci/subscribe-visible-range-persistence! chart selected-timeframe persistence-deps)
                                                      :visible-range-persistence-subscribed? true))
                         (when chart-obj
-                          (ci/set-main-series-markers! chart-obj indicator-markers)
+                          (ci/set-main-series-markers! chart-obj main-series-markers)
+                          (ci/sync-position-overlays! chart-obj node position-overlay position-overlay-deps)
                           (ci/sync-open-order-overlays! chart-obj node open-order-overlays overlay-deps))
                         (ci/sync-volume-indicator-overlay! chart-obj node candle-data volume-indicator-deps)
                         (when (and indicator-series (seq indicator-series-data))
@@ -259,6 +286,7 @@
                       (when legend-control
                         (.destroy ^js legend-control))
                       (ci/clear-open-order-overlays! chart-obj)
+                      (ci/clear-position-overlays! chart-obj)
                       (ci/clear-volume-indicator-overlay! chart-obj)
                       (ci/clear-baseline-base-value-subscription! chart-obj)
                       (when visible-range-cleanup
@@ -280,8 +308,11 @@
 (defn trading-chart-view [state]
   (let [active-asset (:active-asset state)
         active-open-orders (chart-open-orders state)
+        active-fills (chart-fills state)
         candles-map (:candles state)
         active-market (or (:active-market state) {})
+        market-by-key (get-in state [:asset-selector :market-by-key] {})
+        active-position (trading-state/position-for-active-asset state)
         ;; Use selected timeframe from state
         selected-timeframe (get-in state [:chart-options :selected-timeframe] :1d)
         selected-chart-type (get-in state [:chart-options :selected-chart-type] :candlestick)
@@ -293,6 +324,13 @@
                       api-response  ; Direct array
                       (get api-response :data []))  ; Wrapped in :data
         candle-data (derived-cache/memoized-candle-data raw-candles selected-timeframe)
+        position-overlay (position-overlay-model/build-position-overlay
+                          {:active-asset active-asset
+                           :position active-position
+                           :fills active-fills
+                           :market-by-key market-by-key
+                           :selected-timeframe selected-timeframe
+                           :candle-data candle-data})
         symbol (or active-asset "—")
         timeframe-label (str/upper-case (name selected-timeframe))
         price-decimals (or (:price-decimals active-market)
@@ -306,7 +344,8 @@
                                :volume-visible? (boolean (get-in state [:chart-options :volume-visible?] true))
                                :on-hide-volume-indicator dispatch-hide-volume-indicator!
                                :persistence-deps {:asset active-asset
-                                                  :candles candle-data}}
+                                                  :candles candle-data}
+                               :position-overlay position-overlay}
         legend-meta {:symbol symbol
                      :timeframe-label timeframe-label
                      :venue "Hyperopen"

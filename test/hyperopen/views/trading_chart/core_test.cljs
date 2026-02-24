@@ -1,9 +1,11 @@
 (ns hyperopen.views.trading-chart.core-test
   (:require [clojure.string :as str]
             [cljs.test :refer-macros [deftest is]]
+            [hyperopen.state.trading :as trading-state]
             [hyperopen.views.trading-chart.derived-cache :as derived-cache]
             [hyperopen.views.trading-chart.core :as chart-core]
             [hyperopen.views.trading-chart.utils.chart-interop :as chart-interop]
+            [hyperopen.views.trading-chart.utils.position-overlay-model :as position-overlay-model]
             [hyperopen.views.trading-chart.utils.data-processing :as data-processing]))
 
 (defn- class-values [class-attr]
@@ -356,10 +358,14 @@
       (chart-core/chart-canvas candle-data-new-identity :candlestick active-indicators-b legend-meta :4h chart-runtime-options)
       (is (= 4 @calls*) "new candle data identity should recompute indicator output"))))
 
-(deftest trading-chart-view-passes-asset-and-candles-into-persistence-deps-test
+(deftest trading-chart-view-passes-asset-candles-and-position-overlay-into-runtime-options-test
   (let [raw-candles [{:t 1700000000000 :o "100" :h "101" :l "99" :c "100" :v "10"}
                      {:t 1700000060000 :o "100" :h "102" :l "98" :c "101" :v "12"}]
         transformed [{:time 1700000000 :open 100 :high 101 :low 99 :close 100 :volume 10}]
+        overlay-inputs* (atom nil)
+        overlay-result {:side :long
+                        :entry-price 100
+                        :unrealized-pnl 5}
         captured-args (atom nil)
         state {:active-asset "BTC"
                :candles {"BTC" {:1d raw-candles}}
@@ -368,7 +374,14 @@
                                :active-indicators {}}}]
     (derived-cache/reset-derived-cache!)
     (binding [derived-cache/*process-candle-data* (fn [_] transformed)]
-      (with-redefs [chart-core/chart-canvas (fn
+      (with-redefs [trading-state/position-for-active-asset (fn [_]
+                                                               {:coin "BTC"
+                                                                :szi "1"
+                                                                :entryPx "100"})
+                    position-overlay-model/build-position-overlay (fn [opts]
+                                                                    (reset! overlay-inputs* opts)
+                                                                    overlay-result)
+                    chart-core/chart-canvas (fn
                                               ([a b c d e f]
                                                (reset! captured-args [a b c d e f])
                                                [:div])
@@ -379,4 +392,9 @@
     (let [runtime-options (nth @captured-args 5)
           persistence-deps (:persistence-deps runtime-options)]
       (is (= "BTC" (:asset persistence-deps)))
-      (is (= transformed (:candles persistence-deps))))))
+      (is (= transformed (:candles persistence-deps)))
+      (is (= overlay-result (:position-overlay runtime-options)))
+      (is (= "BTC" (:active-asset @overlay-inputs*)))
+      (is (= transformed (:candle-data @overlay-inputs*)))
+      (is (= :1d (:selected-timeframe @overlay-inputs*)))
+      (is (= [] (:fills @overlay-inputs*))))))

@@ -6,6 +6,7 @@
             [hyperopen.views.trading-chart.utils.chart-interop.legend :as legend]
             [hyperopen.views.trading-chart.utils.chart-interop.markers :as markers]
             [hyperopen.views.trading-chart.utils.chart-interop.open-order-overlays :as open-order-overlays]
+            [hyperopen.views.trading-chart.utils.chart-interop.position-overlays :as position-overlays]
             [hyperopen.views.trading-chart.utils.chart-interop.price-format :as price-format]
             [hyperopen.views.trading-chart.utils.chart-interop.series :as series]
             [hyperopen.views.trading-chart.utils.chart-interop.transforms :as transforms]
@@ -361,6 +362,24 @@
     (chart-contracts/assert-chart-handle! chart-obj
                                           {:boundary :chart-interop/clear-open-order-overlays}))
   (open-order-overlays/clear-open-order-overlays! chart-obj))
+
+(defn sync-position-overlays!
+  "Attach/update chart position overlays aligned to entry/liquidation price coordinates."
+  ([chart-obj container overlay]
+   (sync-position-overlays! chart-obj container overlay {}))
+  ([chart-obj container overlay opts]
+   (when chart-obj
+     (chart-contracts/assert-chart-handle! chart-obj
+                                           {:boundary :chart-interop/sync-position-overlays}))
+   (position-overlays/sync-position-overlays! chart-obj container overlay opts)))
+
+(defn clear-position-overlays!
+  "Clear chart position overlays and remove overlay listeners/DOM."
+  [chart-obj]
+  (when chart-obj
+    (chart-contracts/assert-chart-handle! chart-obj
+                                          {:boundary :chart-interop/clear-position-overlays}))
+  (position-overlays/clear-position-overlays! chart-obj))
 
 (defn sync-volume-indicator-overlay!
   "Attach/update the volume-pane indicator overlay with value + controls."

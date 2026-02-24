@@ -157,6 +157,7 @@
             [hyperopen.views.trading-chart.utils.chart-interop.legend-test]
             [hyperopen.views.trading-chart.utils.chart-interop.markers-test]
             [hyperopen.views.trading-chart.utils.chart-interop.open-order-overlays-test]
+            [hyperopen.views.trading-chart.utils.chart-interop.position-overlays-test]
             [hyperopen.views.trading-chart.utils.chart-interop.price-format-test]
             [hyperopen.views.trading-chart.utils.chart-interop.series-test]
             [hyperopen.views.trading-chart.utils.chart-interop.transforms-test]
@@ -165,6 +166,7 @@
             [hyperopen.views.trading-chart.utils.chart-options-test]
             [hyperopen.views.trading-chart.utils.data-processing-test]
             [hyperopen.views.trading-chart.utils.indicators-test]
+            [hyperopen.views.trading-chart.utils.position-overlay-model-test]
             [hyperopen.views.typography-scale-test]
             [hyperopen.wallet.actions-test]
             [hyperopen.wallet.address-watcher-test]
@@ -362,6 +364,7 @@
              'hyperopen.views.trading-chart.utils.chart-interop.legend-test
              'hyperopen.views.trading-chart.utils.chart-interop.markers-test
              'hyperopen.views.trading-chart.utils.chart-interop.open-order-overlays-test
+             'hyperopen.views.trading-chart.utils.chart-interop.position-overlays-test
              'hyperopen.views.trading-chart.utils.chart-interop.price-format-test
              'hyperopen.views.trading-chart.utils.chart-interop.series-test
              'hyperopen.views.trading-chart.utils.chart-interop.transforms-test
@@ -370,6 +373,7 @@
              'hyperopen.views.trading-chart.utils.chart-options-test
              'hyperopen.views.trading-chart.utils.data-processing-test
              'hyperopen.views.trading-chart.utils.indicators-test
+             'hyperopen.views.trading-chart.utils.position-overlay-model-test
              'hyperopen.views.typography-scale-test
              'hyperopen.wallet.actions-test
              'hyperopen.wallet.address-watcher-test
