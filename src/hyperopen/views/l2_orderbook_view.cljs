@@ -363,7 +363,8 @@
         bar-width (cumulative-bar-width cum-total max-cum-size)
         bar-color (if is-ask? ask-depth-bar-class bid-depth-bar-class)
         price-text-color (if is-ask? ask-price-text-class bid-price-text-class)]
-    [:div.flex.items-center.h-6.relative.bg-base-100.text-xs {:data-role "orderbook-level-row"}
+    [:div {:class ["flex" "items-center" "h-[23px]" "relative" "bg-base-100" "text-xs" "orderbook-level-row"]
+           :data-role "orderbook-level-row"}
      ;; Size bar background - always positioned from left
      [:div.absolute.inset-0.flex.items-center.justify-start
       [:div {:class ["h-full" bar-color "transition-all" "duration-300" "ease-[cubic-bezier(0.68,-0.6,0.32,1.6)]"]
@@ -373,20 +374,23 @@
             :data-role "orderbook-level-content-row"}
       [:div {:class ["text-left"]
              :data-role "orderbook-level-price-cell"}
-       [:span {:class [price-text-color "num"]} (or (format-price price price) "0.00")]]
+       [:span {:class [price-text-color "num" "orderbook-level-value"]}
+        (or (format-price price price) "0.00")]]
       [:div {:class ["text-right" "num-right"]
              :data-role "orderbook-level-size-cell"}
-       [:span {:class [body-neutral-text-class "num"]} (format-order-size order size-unit)]]
+       [:span {:class [body-neutral-text-class "num" "orderbook-level-value"]}
+        (format-order-size order size-unit)]]
       [:div {:class ["text-right" "num-right"]
              :data-role "orderbook-level-total-cell"}
-       [:span {:class [body-neutral-text-class "num"]} (format-order-total order size-unit)]]]]))
+       [:span {:class [body-neutral-text-class "num" "orderbook-level-value"]}
+        (format-order-total order size-unit)]]]]))
 
 ;; Spread component
 (defn spread-row [spread]
   (let [absolute (:absolute spread)
         percentage (:percentage spread)]
-    [:div.flex.items-center.justify-center.h-6.bg-base-100.border-y.border-base-300.text-xs
-     [:div.flex.items-center.space-x-3.text-white.num
+    [:div {:class ["flex" "items-center" "justify-center" "h-[23px]" "bg-base-100" "border-y" "border-base-300" "text-xs"]}
+     [:div {:class ["flex" "items-center" "space-x-3" "text-white" "num" "orderbook-level-value"]}
       [:span "Spread"]
       [:span (format-price absolute)]
       [:span (str (format-percent percentage 3) "%")]]]))
@@ -471,7 +475,7 @@
                                                    :selector {:coin coin}
                                                    :live-prefix "Updated"}))
         depth-dimmed? (boolean (and freshness-cue (:delayed? freshness-cue)))]
-    [:div {:class ["bg-base-100" "border" "border-base-300" "rounded-none" "overflow-hidden" "h-full" "flex" "flex-col" "num" "num-dense"]}
+    [:div {:class ["bg-base-100" "border" "border-base-300" "rounded-none" "overflow-hidden" "h-full" "flex" "flex-col" "num" "orderbook-panel-aligned"]}
      ;; Header
      (orderbook-header selected-option
                        price-options

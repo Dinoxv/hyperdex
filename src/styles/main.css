@@ -247,6 +247,23 @@
     @apply hover:bg-trading-red/10;
   }
 
+  .orderbook-panel-aligned {
+    font-family: var(--font-ui);
+  }
+
+  .orderbook-level-row {
+    height: 23px;
+  }
+
+  .orderbook-level-value {
+    line-height: 23px;
+  }
+
+  .orderbook-level-row:hover .orderbook-level-value {
+    font-weight: 600;
+    letter-spacing: -0.2px;
+  }
+
   /* Chart container */
   .chart-container {
     @apply bg-trading-surface border border-trading-border rounded-lg overflow-hidden;

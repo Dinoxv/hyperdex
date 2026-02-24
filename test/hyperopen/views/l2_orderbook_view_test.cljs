@@ -336,7 +336,7 @@
     (is (contains? classes "border-base-300"))
     (is (not (contains? classes "bg-gray-900")))))
 
-(deftest dense-orderbook-and-trades-use-numeric-utilities-test
+(deftest orderbook-and-trades-use-scoped-numeric-typography-utilities-test
   (let [orderbook-panel (view/l2-orderbook-panel "BTC"
                                                  {:market-type :perp
                                                   :base "BTC"
@@ -348,9 +348,18 @@
                                                   :size-unit-dropdown-visible? false
                                                   :price-aggregation-dropdown-visible? false
                                                   :price-aggregation-by-coin {"BTC" :full}})
-        orderbook-classes (set (collect-all-classes orderbook-panel))]
+        orderbook-classes (set (collect-all-classes orderbook-panel))
+        trades-view (with-redefs [ws-trades/get-recent-trades
+                                  (fn []
+                                    [{:coin "BTC" :px "61500.1" :sz "0.03" :side "A" :time 1700000003}])]
+                      (view/l2-orderbook-view {:coin "BTC"
+                                               :market {:base "BTC" :quote "USDC"}
+                                               :orderbook-ui {:active-tab :trades}}))
+        trades-classes (set (collect-all-classes trades-view))]
     (is (contains? orderbook-classes "num"))
-    (is (contains? orderbook-classes "num-dense"))))
+    (is (contains? orderbook-classes "orderbook-panel-aligned"))
+    (is (not (contains? orderbook-classes "num-dense")))
+    (is (contains? trades-classes "num-dense"))))
 
 (deftest trades-tab-viewport-is-scrollable-with-hidden-scrollbar-test
   (with-redefs [ws-trades/get-recent-trades
