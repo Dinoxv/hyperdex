@@ -458,7 +458,9 @@
     (is (some? bids-pane))
     (is (every? depth-body-classes #{"flex-1" "min-h-0" "flex" "flex-col"}))
     (is (every? asks-pane-classes #{"flex-1" "min-h-0" "overflow-hidden" "flex" "flex-col" "justify-end"}))
-    (is (every? bids-pane-classes #{"flex-1" "min-h-0" "overflow-hidden" "flex" "flex-col"}))))
+    (is (every? bids-pane-classes #{"flex-1" "min-h-0" "overflow-hidden" "flex" "flex-col"}))
+    (is (contains? asks-pane-classes "gap-0.5"))
+    (is (contains? bids-pane-classes "gap-0.5"))))
 
 (deftest orderbook-panel-renders-freshness-cue-from-health-snapshot-test
   (let [panel (view/l2-orderbook-panel "BTC"

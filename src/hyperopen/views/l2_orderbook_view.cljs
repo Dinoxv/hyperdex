@@ -491,7 +491,7 @@
                      depth-dimmed? (conj "opacity-90"))
             :data-role "orderbook-depth-body"}
       ;; Asks (sell orders) - top section, rendered worst->best (reversed for display)
-      [:div {:class ["flex-1" "min-h-0" "overflow-hidden" "flex" "flex-col" "justify-end"]
+      [:div {:class ["flex-1" "min-h-0" "overflow-hidden" "flex" "flex-col" "gap-0.5" "justify-end"]
              :data-role "orderbook-asks-pane"}
        (for [ask (reverse asks-with-totals)]
          ^{:key (str "ask-" (:px ask))}
@@ -502,7 +502,7 @@
         (spread-row spread))
 
       ;; Bids (buy orders) - bottom section, rendered best->worst
-      [:div {:class ["flex-1" "min-h-0" "overflow-hidden" "flex" "flex-col"]
+      [:div {:class ["flex-1" "min-h-0" "overflow-hidden" "flex" "flex-col" "gap-0.5"]
              :data-role "orderbook-bids-pane"}
        (for [bid bids-with-totals]
          ^{:key (str "bid-" (:px bid))}
