@@ -10,6 +10,12 @@
    (position-tpsl/from-position-row
     (fixtures/sample-position-row "xyz:NVDA" 10 "0.500"))))
 
+(defn- first-index-of [items target]
+  (first (keep-indexed (fn [idx item]
+                         (when (= item target)
+                           idx))
+                       items)))
+
 (deftest position-tpsl-modal-text-inputs-use-event-target-value-placeholder-vector-test
   (let [modal-view (sample-modal-view)
         text-inputs (hiccup/find-all-nodes
@@ -43,6 +49,68 @@
     (doseq [checkbox-node checkbox-inputs]
       (is (= [:event.target/checked]
              (last (first (get-in checkbox-node [1 :on :change]))))))))
+
+(deftest position-tpsl-modal-configure-amount-controls-render-and-dispatch-test
+  (let [modal (-> (position-tpsl/from-position-row
+                   (fixtures/sample-position-row "xyz:NVDA" 10 "0.500"))
+                  (assoc :configure-amount? true
+                         :size-input "0.25"
+                         :size-percent-input "50"))
+        modal-view (position-tpsl-modal/position-tpsl-modal-view modal)
+        slider-input (hiccup/find-first-node
+                      modal-view
+                      #(and (= :input (first %))
+                            (= "range" (get-in % [1 :type]))))
+        percent-input (hiccup/find-first-node
+                       modal-view
+                       #(and (= :input (first %))
+                             (contains? (hiccup/node-class-set %)
+                                        "order-size-percent-input")))
+        size-input (hiccup/find-first-node
+                    modal-view
+                    #(and (= :input (first %))
+                          (= "text" (get-in % [1 :type]))
+                          (= [:actions/set-position-tpsl-modal-field
+                              [:size-input]
+                              [:event.target/value]]
+                             (first (get-in % [1 :on :input])))))
+        max-button (hiccup/find-first-node
+                    modal-view
+                    #(and (= :button (first %))
+                          (contains? (hiccup/direct-texts %) "MAX")))
+        modal-strings (vec (hiccup/collect-strings modal-view))
+        configure-label-index (first-index-of modal-strings "Configure Amount")
+        amount-label-index (first-index-of modal-strings "Amount")]
+    (is (= 50 (get-in slider-input [1 :value])))
+    (is (= [[:actions/set-position-tpsl-modal-field
+             [:size-percent-input]
+             [:event.target/value]]]
+           (get-in slider-input [1 :on :input])))
+    (is (= [[:actions/set-position-tpsl-modal-field
+             [:size-percent-input]
+             [:event.target/value]]]
+           (get-in percent-input [1 :on :input])))
+    (is (= [[:actions/set-position-tpsl-modal-field
+             [:size-input]
+             [:event.target/value]]]
+           (get-in size-input [1 :on :input])))
+    (is (= [[:actions/set-position-tpsl-modal-field
+             [:size-percent-input]
+             "100"]]
+           (get-in max-button [1 :on :click])))
+    (is (some? configure-label-index))
+    (is (some? amount-label-index))
+    (is (> amount-label-index configure-label-index))))
+
+(deftest position-tpsl-modal-size-metric-stays-at-full-position-size-test
+  (let [modal (-> (position-tpsl/from-position-row
+                   (fixtures/sample-position-row "xyz:NVDA" 10 "0.500"))
+                  (assoc :configure-amount? true
+                         :size-input "0.25"
+                         :size-percent-input "50"))
+        modal-strings (set (hiccup/collect-strings (position-tpsl-modal/position-tpsl-modal-view modal)))]
+    (is (contains? modal-strings "0.5 NVDA"))
+    (is (not (contains? modal-strings "0.25 NVDA")))))
 
 (deftest position-tpsl-modal-gain-and-loss-inputs-default-to-zero-and-select-on-entry-test
   (let [modal-view (sample-modal-view)

@@ -12,6 +12,7 @@
     (is (= :long (:position-side long-modal)))
     (is (= 0.5 (:position-size long-modal)))
     (is (= "0.5" (:size-input long-modal)))
+    (is (= "100" (:size-percent-input long-modal)))
     (is (= 10 (:entry-price long-modal)))
     (is (= 10 (:mark-price long-modal)))
     (is (= 12 (:margin-used long-modal)))
@@ -20,7 +21,8 @@
     (is (= :usd (position-tpsl/sl-loss-mode long-modal)))
     (is (= :short (:position-side short-modal)))
     (is (= 0.75 (:position-size short-modal)))
-    (is (= "0.75" (:size-input short-modal)))))
+    (is (= "0.75" (:size-input short-modal)))
+    (is (= "100" (:size-percent-input short-modal)))))
 
 (deftest validate-modal-covers-core-position-constraints-test
   (let [modal (position-tpsl/from-position-row
@@ -122,6 +124,77 @@
     (is (= "" (:tp-price cleared-tp)))
     (is (= "" (:sl-price invalid-sl)))
     (is (nil? (:error cleared-error)))))
+
+(deftest set-modal-field-syncs-configure-size-amount-and-percent-test
+  (let [base-modal (-> (position-tpsl/from-position-row
+                        (fixtures/sample-position-row "xyz:NVDA" 10 "0.500"))
+                       (assoc :configure-amount? true))
+        from-size (position-tpsl/set-modal-field base-modal [:size-input] "0.25")
+        from-percent (position-tpsl/set-modal-field base-modal [:size-percent-input] "40")
+        over-max-percent (position-tpsl/set-modal-field base-modal [:size-percent-input] "140")
+        blank-percent (position-tpsl/set-modal-field base-modal [:size-percent-input] "")
+        reset-unconfigured (position-tpsl/set-configure-amount
+                            (assoc from-percent :configure-amount? true)
+                            false)]
+    (is (= "50" (:size-percent-input from-size)))
+    (is (= 50 (position-tpsl/configured-size-percent from-size)))
+    (is (= "0.2" (:size-input from-percent)))
+    (is (= "40" (:size-percent-input from-percent)))
+    (is (= 40 (position-tpsl/configured-size-percent from-percent)))
+    (is (= "100" (:size-percent-input over-max-percent)))
+    (is (= "0.5" (:size-input over-max-percent)))
+    (is (= "" (:size-percent-input blank-percent)))
+    (is (= "" (:size-input blank-percent)))
+    (is (= "0.5" (:size-input reset-unconfigured)))
+    (is (= "100" (:size-percent-input reset-unconfigured)))))
+
+(deftest set-modal-field-size-changes-preserve-usd-pnl-targets-test
+  (let [base-modal (-> (position-tpsl/from-position-row
+                        (fixtures/sample-position-row "xyz:NVDA" 10 "0.500"))
+                       (assoc :configure-amount? true)
+                       (position-tpsl/set-modal-field [:tp-gain] "1")
+                       (position-tpsl/set-modal-field [:sl-loss] "0.5"))
+        resized-modal (position-tpsl/set-modal-field base-modal [:size-percent-input] "50")
+        base-gain-percent (position-tpsl/estimated-gain-percent base-modal)
+        resized-gain-percent (position-tpsl/estimated-gain-percent resized-modal)]
+    (is (= "0.25" (:size-input resized-modal)))
+    (is (= "50" (:size-percent-input resized-modal)))
+    (is (= "14" (:tp-price resized-modal)))
+    (is (= "8" (:sl-price resized-modal)))
+    (is (< (js/Math.abs (- (position-tpsl/estimated-gain-usd resized-modal) 1)) 0.000001))
+    (is (< (js/Math.abs (- (position-tpsl/estimated-loss-usd resized-modal) 0.5)) 0.000001))
+    (is (> resized-gain-percent base-gain-percent))))
+
+(deftest set-modal-field-size-changes-preserve-percent-pnl-targets-test
+  (let [base-modal (-> (position-tpsl/from-position-row
+                        (fixtures/sample-position-row "xyz:NVDA" 10 "0.500"))
+                       (assoc :configure-amount? true)
+                       (position-tpsl/set-modal-field [:tp-gain-mode] :percent)
+                       (position-tpsl/set-modal-field [:sl-loss-mode] :percent)
+                       (position-tpsl/set-modal-field [:tp-gain] "10")
+                       (position-tpsl/set-modal-field [:sl-loss] "5"))
+        resized-modal (position-tpsl/set-modal-field base-modal [:size-input] "0.25")
+        base-gain-usd (position-tpsl/estimated-gain-usd base-modal)
+        resized-gain-usd (position-tpsl/estimated-gain-usd resized-modal)]
+    (is (= "50" (:size-percent-input resized-modal)))
+    (is (= "12.4" (:tp-price resized-modal)))
+    (is (= "8.8" (:sl-price resized-modal)))
+    (is (< (js/Math.abs (- (position-tpsl/estimated-gain-percent resized-modal) 10)) 0.000001))
+    (is (< (js/Math.abs (- (position-tpsl/estimated-loss-percent resized-modal) 5)) 0.000001))
+    (is (< resized-gain-usd base-gain-usd))))
+
+(deftest set-configure-amount-reset-preserves-usd-pnl-targets-test
+  (let [base-modal (-> (position-tpsl/from-position-row
+                        (fixtures/sample-position-row "xyz:NVDA" 10 "0.500"))
+                       (assoc :configure-amount? true)
+                       (position-tpsl/set-modal-field [:tp-gain] "1"))
+        resized-modal (position-tpsl/set-modal-field base-modal [:size-input] "0.25")
+        reset-modal (position-tpsl/set-configure-amount resized-modal false)]
+    (is (= "14" (:tp-price resized-modal)))
+    (is (= "0.5" (:size-input reset-modal)))
+    (is (= "100" (:size-percent-input reset-modal)))
+    (is (= "12" (:tp-price reset-modal)))
+    (is (< (js/Math.abs (- (position-tpsl/estimated-gain-usd reset-modal) 1)) 0.000001))))
 
 (deftest set-modal-field-supports-percent-gain-and-loss-modes-test
   (let [long-modal (position-tpsl/from-position-row

@@ -151,6 +151,103 @@
                    :on {:click toggle-action}}
           (reverse-icon)])])]))
 
+(def ^:private size-slider-notch-overlap-threshold 2)
+(def ^:private size-slider-notch-values [0 25 50 75 100])
+
+(defn- configure-amount-controls
+  [{:keys [size-input size-percent-input]} coin configure-size-percent]
+  (let [slider-percent (js/Math.round configure-size-percent)]
+    [:div {:class ["space-y-2"]}
+     [:div {:class ["flex" "justify-end"]}
+      [:button {:type "button"
+                :class ["rounded-md"
+                        "border"
+                        "border-base-300"
+                        "bg-base-200"
+                        "px-2.5"
+                        "py-1"
+                        "text-xs"
+                        "font-semibold"
+                        "text-gray-200"
+                        "hover:bg-base-300"
+                        "focus:outline-none"
+                        "focus:ring-1"
+                        "focus:ring-[#8a96a6]/40"
+                        "focus:ring-offset-0"
+                        "focus:shadow-none"]
+                :on {:click [[:actions/set-position-tpsl-modal-field [:size-percent-input] "100"]]}}
+       "MAX"]]
+     (input-row "Amount"
+                size-input
+                [[:actions/set-position-tpsl-modal-field [:size-input] [:event.target/value]]]
+                {:unit coin
+                 :select-on-focus? true})
+     [:div {:class ["flex" "items-center" "gap-2"]}
+      [:div {:class ["relative" "flex-1"]}
+       [:input {:class ["order-size-slider" "range" "range-sm" "w-full" "relative" "z-20"]
+                :type "range"
+                :min 0
+                :max 100
+                :step 1
+                :style {:--order-size-slider-progress (str slider-percent "%")}
+                :value slider-percent
+                :on {:input [[:actions/set-position-tpsl-modal-field [:size-percent-input] [:event.target/value]]]}}]
+       [:div {:class ["order-size-slider-notches"
+                      "pointer-events-none"
+                      "absolute"
+                      "inset-x-0"
+                      "top-1/2"
+                      "z-30"
+                      "flex"
+                      "items-center"
+                      "justify-between"
+                      "px-0.5"]}
+        (for [pct size-slider-notch-values]
+          ^{:key (str "position-tpsl-size-slider-notch-" pct)}
+          [:span {:class (into ["order-size-slider-notch"
+                                "block"
+                                "h-[7px]"
+                                "w-[7px]"
+                                "-translate-y-1/2"
+                                "rounded-full"]
+                               (remove nil?
+                                       [(if (>= slider-percent pct)
+                                          "order-size-slider-notch-active"
+                                          "order-size-slider-notch-inactive")
+                                        (when (<= (js/Math.abs (- slider-percent pct))
+                                                  size-slider-notch-overlap-threshold)
+                                          "opacity-0")]))}])]]
+      [:div {:class ["relative" "w-[82px]"]}
+       [:input {:class (into ["order-size-percent-input"
+                              "h-10"
+                              "w-full"
+                              "bg-base-200/80"
+                              "border"
+                              "border-base-300"
+                              "rounded-lg"
+                              "text-right"
+                              "text-sm"
+                              "font-semibold"
+                              "text-gray-100"
+                              "num"
+                              "appearance-none"
+                              "pl-2.5"
+                              "pr-6"]
+                             neutral-input-focus-classes)
+                :type "text"
+                :inputmode "decimal"
+                :value (or size-percent-input "")
+                :on {:input [[:actions/set-position-tpsl-modal-field [:size-percent-input] [:event.target/value]]]}}]
+       [:span {:class ["pointer-events-none"
+                       "absolute"
+                       "right-2.5"
+                       "top-1/2"
+                       "-translate-y-1/2"
+                       "text-sm"
+                       "font-semibold"
+                       "text-gray-300"]}
+        "%"]]]]))
+
 (def ^:private panel-gap-px 8)
 (def ^:private panel-margin-px 16)
 (def ^:private preferred-panel-width-px 500)
@@ -203,13 +300,14 @@
             submit-disabled? (or submitting?
                                (not (:is-ok preview)))
             coin (coin-label (:coin modal*))
-            active-size (position-tpsl/active-size modal*)
+            position-size (:position-size modal*)
             gain (position-tpsl/estimated-gain-usd modal*)
             loss (position-tpsl/estimated-loss-usd modal*)
             gain-percent (position-tpsl/estimated-gain-percent modal*)
             loss-percent (position-tpsl/estimated-loss-percent modal*)
             gain-mode (position-tpsl/tp-gain-mode modal*)
             loss-mode (position-tpsl/sl-loss-mode modal*)
+            configure-size-percent (position-tpsl/configured-size-percent modal*)
             gain-input-value (if (= gain-mode :percent)
                                (percent-text gain-percent)
                                (usd-input-text gain))
@@ -248,7 +346,7 @@
 
           [:div {:class ["space-y-1.5"]}
            (metric-row "Asset" coin)
-           (metric-row "Size" (str (amount-text active-size) " " coin))
+           (metric-row "Size" (str (amount-text position-size) " " coin))
            (metric-row "Value" (str (shared/format-currency (:position-value modal*)) " USDC"))
            (metric-row "Entry Price" (shared/format-trade-price (:entry-price modal*)))
            (metric-row "Mark Price" (shared/format-trade-price (:mark-price modal*)))]
@@ -303,11 +401,6 @@
                         [[:actions/set-position-tpsl-modal-field [:sl-limit] [:event.target/value]]])
              [:div]])
 
-          (when (boolean (:configure-amount? modal*))
-            (input-row "Amount"
-                       (:size-input modal*)
-                       [[:actions/set-position-tpsl-modal-field [:size-input] [:event.target/value]]]))
-
           [:div {:class ["space-y-1"]}
            (checkbox-row "position-tpsl-configure-amount"
                          "Configure Amount"
@@ -317,6 +410,9 @@
                          "Limit Price"
                          (:limit-price? modal*)
                          [[:actions/set-position-tpsl-limit-price [:event.target/checked]]])]
+
+          (when (boolean (:configure-amount? modal*))
+            (configure-amount-controls modal* coin configure-size-percent))
 
           (when (seq (:error modal*))
             [:div {:class ["text-xs" "text-[#ED7088]"]} (:error modal*)])

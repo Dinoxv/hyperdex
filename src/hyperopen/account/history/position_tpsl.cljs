@@ -19,6 +19,7 @@
    :margin-used 0
    :leverage 0
    :size-input ""
+   :size-percent-input ""
    :configure-amount? false
    :limit-price? false
    :tp-price ""
@@ -151,6 +152,43 @@
         (when (and (number? idx)
                    (or (nil? dex) (= "" dex)))
           idx))))
+
+(def ^:private max-configure-size-percent 100)
+
+(defn- clamp
+  [value min-value max-value]
+  (-> value
+      (max min-value)
+      (min max-value)))
+
+(defn- full-position-size-input
+  [modal]
+  (let [size (parse-num (:position-size modal))]
+    (if (positive-number? size)
+      (trading-domain/number->clean-string size 8)
+      "")))
+
+(defn- default-size-percent-input
+  [modal]
+  (if (positive-number? (parse-num (:position-size modal)))
+    "100"
+    "0"))
+
+(defn- size->percent
+  [size position-size]
+  (when (and (number? size)
+             (positive-number? position-size))
+    (clamp (* 100 (/ size position-size))
+           0
+           max-configure-size-percent)))
+
+(defn- percent->size
+  [percent position-size]
+  (when (and (number? percent)
+             (positive-number? position-size))
+    (* position-size
+       (/ (clamp percent 0 max-configure-size-percent)
+          100))))
 
 (defn- parsed-inputs [modal]
   (let [tp-trigger (parse-num (:tp-price modal))
@@ -362,17 +400,64 @@
             :leverage leverage
             :size-input (if (positive-number? size)
                           (trading-domain/number->clean-string size 8)
-                          "")))))
+                          "")
+            :size-percent-input (if (positive-number? size) "100" "0")))))
 
 (def ^:private updatable-paths
-  #{[:size-input]
-    [:tp-price]
+  #{[:tp-price]
     [:tp-limit]
     [:sl-price]
     [:sl-limit]})
 
 (defn- normalize-input-text [value]
   (str (or value "")))
+
+(defn- percent->input-text
+  [percent]
+  (if (number? percent)
+    (trading-domain/number->clean-string percent 2)
+    ""))
+
+(defn- sync-size-percent-input
+  [modal]
+  (let [size-text (normalize-input-text (:size-input modal))
+        size-value (parse-num size-text)
+        position-size (or (parse-num (:position-size modal)) 0)
+        percent-text (if (str/blank? size-text)
+                       ""
+                       (if-let [percent (size->percent size-value position-size)]
+                         (percent->input-text percent)
+                         ""))]
+    (assoc modal :size-percent-input percent-text)))
+
+(defn- apply-size-percent-input
+  [modal raw-value]
+  (let [raw-text (normalize-input-text raw-value)
+        percent-value (parse-num raw-text)
+        position-size (or (parse-num (:position-size modal)) 0)]
+    (cond
+      (str/blank? raw-text)
+      (-> modal
+          (assoc :size-percent-input ""
+                 :size-input ""
+                 :error nil))
+
+      (and (number? percent-value)
+           (positive-number? position-size))
+      (let [clamped-percent (clamp percent-value 0 max-configure-size-percent)
+            next-size (percent->size clamped-percent position-size)]
+        (-> modal
+            (assoc :size-percent-input (percent->input-text clamped-percent)
+                   :size-input (if (number? next-size)
+                                 (trading-domain/number->clean-string next-size 8)
+                                 "")
+                   :error nil)))
+
+      :else
+      (-> modal
+          (assoc :size-percent-input raw-text
+                 :size-input ""
+                 :error nil)))))
 
 (defn- pnl->price
   [modal pnl-value mode]
@@ -442,6 +527,60 @@
         "")
       "")))
 
+(declare estimated-gain-usd
+         estimated-loss-usd
+         estimated-gain-percent
+         estimated-loss-percent)
+
+(defn- capture-configured-size-pnl-targets
+  [modal]
+  (let [{:keys [active-size]} (parsed-inputs modal)
+        tp-price (parse-num (:tp-price modal))
+        sl-price (parse-num (:sl-price modal))
+        gain-mode (tp-gain-mode modal)
+        loss-mode (sl-loss-mode modal)]
+    (if-not (positive-number? active-size)
+      {}
+      {:tp (when (positive-number? tp-price)
+             {:mode gain-mode
+              :value (if (= gain-mode :percent)
+                       (estimated-gain-percent modal)
+                       (estimated-gain-usd modal))})
+       :sl (when (positive-number? sl-price)
+             {:mode loss-mode
+              :value (if (= loss-mode :percent)
+                       (estimated-loss-percent modal)
+                       (estimated-loss-usd modal))})})))
+
+(defn- target-value->input-text
+  [value]
+  (when (number? value)
+    (trading-domain/number->clean-string value 8)))
+
+(defn- target->price-text
+  [modal side {:keys [mode value]}]
+  (when-let [input-text (target-value->input-text value)]
+    ((if (= mode :percent)
+       pnl-percent-input->price-text
+       pnl-input->price-text)
+     modal
+     input-text
+     side)))
+
+(defn- reprice-configured-size-targets
+  [modal targets]
+  (let [{:keys [active-size]} (parsed-inputs modal)
+        tp-price (target->price-text modal :tp (:tp targets))
+        sl-price (target->price-text modal :sl (:sl targets))]
+    (cond-> modal
+      (and (positive-number? active-size)
+           (seq tp-price))
+      (assoc :tp-price tp-price)
+
+      (and (positive-number? active-size)
+           (seq sl-price))
+      (assoc :sl-price sl-price))))
+
 (defn- parse-pnl-mode-command [value]
   (let [as-keyword (cond
                      (keyword? value) value
@@ -470,6 +609,19 @@
   (let [path* (if (vector? path) path [path])
         value* (normalize-input-text value)]
     (cond
+      (= path* [:size-input])
+      (let [targets (capture-configured-size-pnl-targets modal)]
+        (-> modal
+            (assoc :size-input value*
+                   :error nil)
+            sync-size-percent-input
+            (reprice-configured-size-targets targets)))
+
+      (= path* [:size-percent-input])
+      (let [targets (capture-configured-size-pnl-targets modal)]
+        (-> (apply-size-percent-input modal value*)
+            (reprice-configured-size-targets targets)))
+
       (contains? updatable-paths path*)
       (-> modal
           (assoc-in path* value*)
@@ -509,14 +661,22 @@
       modal)))
 
 (defn set-configure-amount [modal checked]
-  (let [checked? (bool checked)
+  (let [targets (capture-configured-size-pnl-targets modal)
+        checked? (bool checked)
         next-modal (assoc modal :configure-amount? checked?
-                                :error nil)]
-    (if checked?
-      next-modal
-      (assoc next-modal :size-input (if (positive-number? (:position-size modal))
-                                      (trading-domain/number->clean-string (:position-size modal) 8)
-                                      "")))))
+                                :error nil)
+        default-size-text (full-position-size-input modal)
+        default-percent-text (default-size-percent-input modal)]
+    (-> (if checked?
+          (if (str/blank? (:size-input next-modal))
+            (assoc next-modal
+                   :size-input default-size-text
+                   :size-percent-input default-percent-text)
+            (sync-size-percent-input next-modal))
+          (assoc next-modal
+                 :size-input default-size-text
+                 :size-percent-input default-percent-text))
+        (reprice-configured-size-targets targets))))
 
 (defn set-limit-price [modal checked]
   (let [checked? (bool checked)
@@ -530,6 +690,20 @@
   (let [{:keys [active-size]} (parsed-inputs modal)]
     (if (positive-number? active-size)
       active-size
+      0)))
+
+(defn configured-size-percent [modal]
+  (let [percent-input (parse-num (:size-percent-input modal))
+        position-size (or (parse-num (:position-size modal)) 0)
+        configured-size (parse-num (:size-input modal))]
+    (cond
+      (number? percent-input)
+      (clamp percent-input 0 max-configure-size-percent)
+
+      (number? configured-size)
+      (or (size->percent configured-size position-size) 0)
+
+      :else
       0)))
 
 (defn estimated-gain-usd [modal]
