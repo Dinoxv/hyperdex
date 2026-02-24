@@ -116,6 +116,81 @@
         (min 8)
         int)))
 
+(def ^:private max-market-price-significant-figures 5)
+(def ^:private max-perp-price-decimals 6)
+(def ^:private max-spot-price-decimals 8)
+
+(defn- normalized-market-type [value]
+  (cond
+    (keyword? value) value
+    (string? value) (some-> value str/trim str/lower-case keyword)
+    :else nil))
+
+(defn- spot-market? [context]
+  (let [market-type (normalized-market-type (get-in context [:market :market-type]))]
+    (or (= :spot market-type)
+        (:spot? (market-identity {:active-asset (:active-asset context)
+                                  :market (:market context)})))))
+
+(defn- max-price-decimals [context]
+  (let [max-decimals (if (spot-market? context)
+                       max-spot-price-decimals
+                       max-perp-price-decimals)]
+    (-> (- max-decimals (size-decimals context))
+        (max 0)
+        int)))
+
+(defn- finite-positive-number? [value]
+  (and (number? value)
+       (not (js/isNaN value))
+       (js/isFinite value)
+       (pos? value)))
+
+(defn- integer-number? [value]
+  (and (number? value)
+       (not (js/isNaN value))
+       (js/isFinite value)
+       (= value (js/Math.trunc value))))
+
+(defn- truncate-to-decimals [value decimals]
+  (let [safe-decimals (-> (or decimals 0)
+                          (max 0)
+                          int)
+        factor (js/Math.pow 10 safe-decimals)]
+    (/ (js/Math.floor (* value factor)) factor)))
+
+(defn- truncate-to-significant-figures [value significant-figures]
+  (let [safe-significant-figures (-> (or significant-figures 1)
+                                     (max 1)
+                                     int)]
+    (if (finite-positive-number? value)
+      (let [magnitude (js/Math.floor (/ (js/Math.log value)
+                                        (js/Math.log 10)))
+            shift (- (inc magnitude) safe-significant-figures)]
+        (if (<= shift 0)
+          (truncate-to-decimals value (- shift))
+          (let [factor (js/Math.pow 10 shift)]
+            (* (js/Math.floor (/ value factor)) factor))))
+      0)))
+
+(defn- canonical-market-price-string
+  "Format market IOC prices according to Hyperliquid tick+sig-fig constraints."
+  [context price]
+  (when (finite-positive-number? price)
+    (let [decimals (max-price-decimals context)
+          integer-input? (integer-number? price)
+          decimals-truncated (truncate-to-decimals price decimals)
+          sig-truncated (if integer-input?
+                          decimals-truncated
+                          (truncate-to-significant-figures decimals-truncated
+                                                           max-market-price-significant-figures))
+          formatted (core/number->clean-string sig-truncated decimals)
+          parsed (core/parse-num formatted)]
+      (when (and (seq formatted)
+                 (number? parsed)
+                 (pos? parsed))
+        formatted))))
+
 (defn base-size-string
   "Format canonical base size by truncating to market szDecimals."
   [context value]
@@ -439,7 +514,13 @@
 (defn apply-market-price [context form]
   (let [side (:side form)
         px (best-price context side)
-        slippage (or (core/parse-num (:slippage form)) 0.5)
-        adj (if (= side :buy) (+ 1 (/ slippage 100)) (- 1 (/ slippage 100)))]
-    (when px
-      (assoc form :price (core/number->clean-string (* px adj) 8)))))
+        slippage (let [parsed (core/parse-num (:slippage form))]
+                   (core/clamp-percent
+                    (if (number? parsed)
+                      parsed
+                      core/default-market-slippage-pct)))
+        adj (if (= side :buy) (+ 1 (/ slippage 100)) (- 1 (/ slippage 100)))
+        adjusted-price (when (finite-positive-number? px)
+                         (* px adj))]
+    (when-let [market-price (canonical-market-price-string context adjusted-price)]
+      (assoc form :price market-price))))

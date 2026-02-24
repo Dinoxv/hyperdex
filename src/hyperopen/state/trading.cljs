@@ -11,6 +11,7 @@
 (def limit-like-order-types trading-domain/limit-like-order-types)
 (def tif-options trading-domain/tif-options)
 (def default-max-slippage-pct trading-domain/default-max-slippage-pct)
+(def default-market-slippage-pct trading-domain/default-market-slippage-pct)
 (def default-fees trading-domain/default-fees)
 (def legacy-scale-skew->number trading-domain/legacy-scale-skew->number)
 (def scale-min-order-count trading-domain/scale-min-order-count)

@@ -1,5 +1,6 @@
 (ns hyperopen.order.effects
-  (:require [hyperopen.api.default :as api]
+  (:require [clojure.string :as str]
+            [hyperopen.api.default :as api]
             [hyperopen.api.market-metadata.facade :as market-metadata]
             [hyperopen.api.promise-effects :as promise-effects]
             [hyperopen.api.projections :as api-projections]
@@ -125,6 +126,62 @@
   [exchange-response-error resp]
   (str "Order cancellation failed: " (exchange-response-error resp)))
 
+(defn- submit-status-entries
+  [resp]
+  (let [statuses (get-in resp [:response :data :statuses])
+        status (get-in resp [:response :data :status])]
+    (cond
+      (sequential? statuses) (vec statuses)
+      (some? status) [status]
+      :else [])))
+
+(defn- submit-status-error
+  [idx status-entry]
+  (let [error-value (when (map? status-entry)
+                      (:error status-entry))]
+    (when (some? error-value)
+      (let [message (cond
+                      (string? error-value) error-value
+                      (map? error-value) (or (:message error-value)
+                                             (pr-str error-value))
+                      :else (str error-value))
+            trimmed (str/trim (or message ""))]
+        (when (seq trimmed)
+          (str "Order " (inc idx) ": " trimmed))))))
+
+(defn- submit-outcome
+  [exchange-response-error resp]
+  (let [top-level-ok? (= "ok" (:status resp))
+        statuses (submit-status-entries resp)
+        status-errors (->> statuses
+                           (map-indexed submit-status-error)
+                           (keep identity)
+                           vec)
+        status-count (count statuses)
+        error-count (count status-errors)
+        success-count (max 0 (- status-count error-count))
+        partial? (and (pos? success-count) (pos? error-count))]
+    (cond
+      (not top-level-ok?)
+      {:ok? false
+       :success-count 0
+       :error-text (str (exchange-response-error resp))
+       :toast-message (submit-order-error-message exchange-response-error resp)}
+
+      (pos? error-count)
+      (let [prefix (if partial?
+                     "Order placement partially failed: "
+                     "Order placement failed: ")
+            error-detail (str/join "; " status-errors)]
+        {:ok? false
+         :success-count success-count
+         :error-text error-detail
+         :toast-message (str prefix error-detail)})
+
+      :else
+      {:ok? true
+       :success-count success-count})))
+
 (defn api-submit-order
   [{:keys [dispatch! exchange-response-error runtime-error-message show-toast!]} _ store request]
   (let [address (get-in @store [:wallet :address])
@@ -146,15 +203,20 @@
         (-> (trading-api/submit-order! store address (:action request))
             (.then (fn [resp]
                      (swap! store assoc-in [:order-form-runtime :submitting?] false)
-                     (if (= "ok" (:status resp))
+                     (let [{:keys [ok? success-count error-text toast-message]}
+                           (submit-outcome exchange-response-error resp)]
+                       (if ok?
                        (do
                          (swap! store assoc-in [:order-form-runtime :error] nil)
                          (show-toast! store :success "Order submitted.")
                          (refresh-open-orders-after-order-mutation! store address)
                          (dispatch! store nil [[:actions/refresh-order-history]]))
-                       (let [error-text (str (exchange-response-error resp))]
+                       (do
                          (swap! store assoc-in [:order-form-runtime :error] error-text)
-                         (show-toast! store :error (submit-order-error-message exchange-response-error resp))))))
+                         (show-toast! store :error toast-message)
+                         (when (pos? success-count)
+                           (refresh-open-orders-after-order-mutation! store address)
+                           (dispatch! store nil [[:actions/refresh-order-history]])))))))
             (.catch (fn [err]
                       (let [error-text (runtime-error-message err)]
                         (swap! store assoc-in [:order-form-runtime :submitting?] false)

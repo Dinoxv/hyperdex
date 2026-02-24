@@ -10,6 +10,7 @@
 (def limit-like-order-types core/limit-like-order-types)
 (def tif-options core/tif-options)
 (def default-max-slippage-pct core/default-max-slippage-pct)
+(def default-market-slippage-pct core/default-market-slippage-pct)
 (def default-fees core/default-fees)
 (def legacy-scale-skew->number core/legacy-scale-skew->number)
 (def scale-min-order-count core/scale-min-order-count)

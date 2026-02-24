@@ -68,6 +68,7 @@
 (def tif-options [:gtc :ioc :alo])
 
 (def default-max-slippage-pct 8.0)
+(def default-market-slippage-pct 5.0)
 
 (def default-fees
   {:taker 0.045

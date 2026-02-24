@@ -4,7 +4,7 @@
 (def default-scale-order-count 5)
 (def default-scale-skew "1.00")
 (def default-ui-leverage 20)
-(def default-slippage 0.5)
+(def default-slippage trading-domain/default-market-slippage-pct)
 (def default-twap-minutes 5)
 (def default-size-input-mode :quote)
 (def default-size-input-source :manual)
