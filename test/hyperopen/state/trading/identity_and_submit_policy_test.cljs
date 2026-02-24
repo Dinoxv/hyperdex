@@ -182,3 +182,24 @@
       (is (= :submitting (:reason policy)))
       (is (true? (:disabled? policy)))
       (is (nil? (:error-message policy))))))
+
+(deftest prepare-order-form-for-submit-clamps-market-price-to-eight-decimals-test
+  (let [state {:active-asset "MON"
+               :active-market {:coin "MON"
+                               :asset-id 215
+                               :mark 0.020397
+                               :maxLeverage 20
+                               :szDecimals 4}
+               :orderbooks {"MON" {:bids [{:px "0.020397"}]
+                                   :asks [{:px "0.02045"}]}}
+               :webdata2 {:clearinghouseState {:marginSummary {:accountValue "1000"
+                                                               :totalMarginUsed "250"}}}}
+        form (assoc (trading/default-order-form)
+                    :type :market
+                    :side :sell
+                    :size "98"
+                    :slippage "0.5")
+        prepared (trading/prepare-order-form-for-submit state form)
+        request (trading/build-order-request state (:form prepared))]
+    (is (false? (:market-price-missing? prepared)))
+    (is (= "0.02029501" (get-in request [:action :orders 0 :p])))))

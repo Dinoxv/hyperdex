@@ -442,4 +442,4 @@
         slippage (or (core/parse-num (:slippage form)) 0.5)
         adj (if (= side :buy) (+ 1 (/ slippage 100)) (- 1 (/ slippage 100)))]
     (when px
-      (assoc form :price (str (* px adj))))))
+      (assoc form :price (core/number->clean-string (* px adj) 8)))))

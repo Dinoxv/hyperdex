@@ -278,3 +278,43 @@
              (set! agent-session/persist-agent-session-by-mode! original-persist)
              (set! signing/sign-l1-action-with-private-key! original-sign)
              (restore-fetch!)))))))
+
+(deftest submit-order-surfaces-plain-text-exchange-errors-test
+  (async done
+    (let [store (support/ready-agent-store 1700000021000)
+          original-load agent-session/load-agent-session-by-mode
+          original-persist agent-session/persist-agent-session-by-mode!
+          original-sign signing/sign-l1-action-with-private-key!
+          restore-fetch! (support/install-fetch-stub!
+                          (fn [_url _opts]
+                            (js/Promise.resolve
+                             #js {:ok false
+                                  :status 422
+                                  :text (fn []
+                                          (js/Promise.resolve
+                                           "Failed to deserialize the JSON body into the target type"))})))]
+      (set! agent-session/load-agent-session-by-mode
+            (fn [_wallet-address _storage-mode]
+              {:agent-address "0x8fd379246834eac74b8419ffda202cf8051f7a03"
+               :private-key "0xaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+               :nonce-cursor 1700000021000}))
+      (set! agent-session/persist-agent-session-by-mode!
+            (fn [_wallet-address _storage-mode _session] true))
+      (set! signing/sign-l1-action-with-private-key! (api-stubs/signing-stub))
+      (-> (trading/submit-order! store
+                                 support/owner-address
+                                 {:type "order"
+                                  :orders []
+                                  :grouping "na"})
+          (.then (fn [resp]
+                   (is (= "err" (:status resp)))
+                   (is (re-find #"Failed to deserialize"
+                                (str (:error resp))))
+                   (done)))
+          (.catch (async-support/unexpected-error done))
+          (.finally
+           (fn []
+             (set! agent-session/load-agent-session-by-mode original-load)
+             (set! agent-session/persist-agent-session-by-mode! original-persist)
+             (set! signing/sign-l1-action-with-private-key! original-sign)
+             (restore-fetch!)))))))

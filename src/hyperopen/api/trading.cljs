@@ -15,10 +15,29 @@
                       :headers {"Content-Type" "application/json"}
                       :body (js/JSON.stringify (clj->js body))})))
 
+(defn- parse-text-body
+  [raw status]
+  (let [raw* (some-> raw str str/trim)]
+    (if (str/blank? raw*)
+      {:status "err"
+       :error (str "HTTP " status)}
+      (try
+        (js->clj (js/JSON.parse raw*) :keywordize-keys true)
+        (catch :default _
+          {:status "err"
+           :error raw*})))))
+
 (defn- parse-json! [resp]
-  (-> (.json resp)
-      (.then (fn [payload]
-               (let [parsed (js->clj payload :keywordize-keys true)]
+  (let [parse-response-promise
+        (if (fn? (.-text resp))
+          (-> (.text resp)
+              (.then (fn [raw]
+                       (parse-text-body raw (.-status resp)))))
+          (-> (.json resp)
+              (.then (fn [payload]
+                       (js->clj payload :keywordize-keys true)))))]
+    (-> parse-response-promise
+        (.then (fn [parsed]
                  (when (contracts/validation-enabled?)
                    (contracts/assert-exchange-response!
                     parsed
