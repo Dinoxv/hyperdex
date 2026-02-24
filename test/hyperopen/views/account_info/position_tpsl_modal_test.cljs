@@ -67,3 +67,34 @@
     (is (contains? usd-mode-strings "Expected profit:"))
     (is (contains? usd-mode-strings "8.33%"))
     (is (contains? percent-mode-strings "1.00 USDC"))))
+
+(deftest position-tpsl-modal-expected-loss-swaps-between-percent-and-usdc-test
+  (let [base-modal (-> (position-tpsl/from-position-row
+                        (fixtures/sample-position-row "xyz:NVDA" 10 "0.500"))
+                       (assoc :sl-price "8"))
+        percent-mode-modal (position-tpsl/set-modal-field base-modal [:sl-loss-mode] :toggle)
+        usd-mode-strings (set (hiccup/collect-strings (position-tpsl-modal/position-tpsl-modal-view base-modal)))
+        percent-mode-strings (set (hiccup/collect-strings (position-tpsl-modal/position-tpsl-modal-view percent-mode-modal)))]
+    (is (contains? usd-mode-strings "Expected loss:"))
+    (is (contains? usd-mode-strings "8.33%"))
+    (is (contains? percent-mode-strings "1.00 USDC"))))
+
+(deftest position-tpsl-modal-hides-expected-profit-and-loss-at-zero-test
+  (let [modal (position-tpsl/from-position-row
+               (fixtures/sample-position-row "xyz:NVDA" 10 "0.500"))
+        modal-strings (set (hiccup/collect-strings (position-tpsl-modal/position-tpsl-modal-view modal)))]
+    (is (not (contains? modal-strings "Expected profit:")))
+    (is (not (contains? modal-strings "Expected loss:")))))
+
+(deftest position-tpsl-modal-editable-inputs-use-neutral-focus-theme-test
+  (let [modal-view (sample-modal-view)
+        editable-text-inputs (filter #(and (= :input (first %))
+                                           (= "text" (get-in % [1 :type]))
+                                           (contains? (get-in % [1 :on]) :input))
+                                     (hiccup/find-all-nodes modal-view vector?))]
+    (is (= 4 (count editable-text-inputs)))
+    (doseq [input-node editable-text-inputs]
+      (let [classes (hiccup/node-class-set input-node)]
+        (is (contains? classes "focus:ring-offset-0"))
+        (is (contains? classes "focus:shadow-none"))
+        (is (contains? classes "focus:border-[#8a96a6]"))))))

@@ -58,6 +58,21 @@
    [:path {:d "M14 12H5"}]
    [:path {:d "M6.5 10.5L5 12l1.5 1.5"}]])
 
+(def ^:private neutral-input-focus-classes
+  ["outline-none"
+   "transition-[border-color,box-shadow]"
+   "duration-150"
+   "hover:border-[#6f7a88]"
+   "hover:ring-1"
+   "hover:ring-[#6f7a88]/30"
+   "hover:ring-offset-0"
+   "focus:outline-none"
+   "focus:ring-1"
+   "focus:ring-[#8a96a6]/40"
+   "focus:ring-offset-0"
+   "focus:shadow-none"
+   "focus:border-[#8a96a6]"])
+
 (defn- input-row
   ([label value action]
    (input-row label value action {}))
@@ -71,22 +86,20 @@
                     "text-sm"
                     "text-gray-500"]}
      label]
-    [:input (cond-> {:class ["h-10"
-                             "w-full"
-                             "rounded-lg"
-                             "border"
-                             "border-base-300"
-                             "bg-base-200"
-                             "pl-24"
-                             (if unit "pr-20" "pr-3")
-                             "text-right"
-                             "text-sm"
-                             "font-semibold"
-                             "text-gray-100"
-                             "num"
-                             "focus:outline-none"
-                             "focus:ring-1"
-                             "focus:ring-[#8a96a6]/40"]
+    [:input (cond-> {:class (into ["h-10"
+                                   "w-full"
+                                   "rounded-lg"
+                                   "border"
+                                   "border-base-300"
+                                   "bg-base-200"
+                                   "pl-24"
+                                   (if unit "pr-20" "pr-3")
+                                   "text-right"
+                                   "text-sm"
+                                   "font-semibold"
+                                   "text-gray-100"
+                                   "num"]
+                                  neutral-input-focus-classes)
                      :type "text"
                      :value (or value "")}
               (some? action) (assoc :on {:input action})
@@ -113,7 +126,9 @@
                            "hover:text-gray-200"
                            "focus:outline-none"
                            "focus:ring-1"
-                           "focus:ring-[#8a96a6]/40"]
+                           "focus:ring-[#8a96a6]/40"
+                           "focus:ring-offset-0"
+                           "focus:shadow-none"]
                    :aria-label (or toggle-aria-label "Reverse input mode")
                    :on {:click toggle-action}}
           (reverse-icon)])])]))
@@ -186,6 +201,9 @@
             expected-profit-value (if (= gain-mode :percent)
                                     (str (shared/format-currency gain) " USDC")
                                     (str (percent-text gain-percent) "%"))
+            expected-loss-value (if (= loss-mode :percent)
+                                  (str (shared/format-currency loss) " USDC")
+                                  (str (percent-text loss-percent) "%"))
             layout-style (modal-layout-style modal*)]
         [:div {:class ["fixed"
                        "z-[260]"
@@ -228,10 +246,11 @@
                        :toggle-action [[:actions/set-position-tpsl-modal-field [:tp-gain-mode] :toggle]]
                        :toggle-aria-label "Toggle gain unit"})]
 
-          [:div {:class ["flex" "justify-end" "pr-1" "text-sm"]}
-           [:span {:class ["text-gray-400"]} "Expected profit:"]
-           [:span {:class ["ml-1" "font-semibold" "text-gray-100" "num"]}
-            expected-profit-value]]
+          (when (pos? gain)
+            [:div {:class ["flex" "justify-end" "pr-1" "text-sm"]}
+             [:span {:class ["text-gray-400"]} "Expected profit:"]
+             [:span {:class ["ml-1" "font-semibold" "text-gray-100" "num"]}
+              expected-profit-value]])
 
           (when (boolean (:limit-price? modal*))
             [:div {:class ["grid" "grid-cols-2" "gap-2"]}
@@ -250,6 +269,12 @@
                       {:unit (if (= loss-mode :percent) "%" "$")
                        :toggle-action [[:actions/set-position-tpsl-modal-field [:sl-loss-mode] :toggle]]
                        :toggle-aria-label "Toggle loss unit"})]
+
+          (when (pos? loss)
+            [:div {:class ["flex" "justify-end" "pr-1" "text-sm"]}
+             [:span {:class ["text-gray-400"]} "Expected loss:"]
+             [:span {:class ["ml-1" "font-semibold" "text-gray-100" "num"]}
+              expected-loss-value]])
 
           (when (boolean (:limit-price? modal*))
             [:div {:class ["grid" "grid-cols-2" "gap-2"]}
