@@ -147,32 +147,36 @@
     (is (= "text-red-400" (view/trade-side->price-class "S")))
     (is (= "text-gray-100" (view/trade-side->price-class "X")))))
 
-(deftest order-row-renders-white-size-and-total-columns-test
+(deftest order-row-renders-hyperliquid-neutral-size-and-total-columns-test
   (let [order {:px "101.5"
                :sz "2"
                :cum-size 2
                :cum-value 203}
         ask-classes (frequencies (collect-all-classes (view/order-row order 3 true :base)))
         bid-classes (frequencies (collect-all-classes (view/order-row order 3 false :base)))]
-    (testing "ask rows keep price red while rendering size/total as white"
+    (testing "ask rows keep price red while rendering size/total in Hyperliquid neutral tone"
       (is (= 1 (get ask-classes "text-[rgb(237,112,136)]" 0)))
-      (is (= 2 (get ask-classes "text-white" 0))))
-    (testing "bid rows keep price green while rendering size/total as white"
+      (is (= 2 (get ask-classes "text-[rgb(210,218,215)]" 0)))
+      (is (= 0 (get ask-classes "text-white" 0))))
+    (testing "bid rows keep price green while rendering size/total in Hyperliquid neutral tone"
       (is (= 1 (get bid-classes "text-[rgb(31,166,125)]" 0)))
-      (is (= 2 (get bid-classes "text-white" 0))))))
+      (is (= 2 (get bid-classes "text-[rgb(210,218,215)]" 0)))
+      (is (= 0 (get bid-classes "text-white" 0))))))
 
-(deftest order-row-uses-20pct-depth-bar-translucency-test
+(deftest order-row-uses-15pct-depth-bar-translucency-test
   (let [order {:px "101.5"
                :sz "2"
                :cum-size 2
                :cum-value 203}
         ask-classes (set (collect-all-classes (view/order-row order 3 true :base)))
         bid-classes (set (collect-all-classes (view/order-row order 3 false :base)))]
-    (testing "ask depth bars use Hyperliquid red at 20pct translucency"
-      (is (contains? ask-classes "bg-[rgba(237,112,136,0.20)]"))
+    (testing "ask depth bars use Hyperliquid red at 15pct translucency"
+      (is (contains? ask-classes "bg-[rgba(237,112,136,0.15)]"))
+      (is (not (contains? ask-classes "bg-[rgba(237,112,136,0.20)]")))
       (is (not (contains? ask-classes "bg-red-500/30"))))
-    (testing "bid depth bars use Hyperliquid green at 20pct translucency"
-      (is (contains? bid-classes "bg-[rgba(31,166,125,0.20)]"))
+    (testing "bid depth bars use Hyperliquid green at 15pct translucency"
+      (is (contains? bid-classes "bg-[rgba(31,166,125,0.15)]"))
+      (is (not (contains? bid-classes "bg-[rgba(31,166,125,0.20)]")))
       (is (not (contains? bid-classes "bg-green-500/30"))))))
 
 (deftest orderbook-price-column-is-left-aligned-with-readable-left-inset-test
@@ -220,6 +224,10 @@
       (is (contains? total-header-classes "text-right"))
       (is (contains? size-level-classes "text-right"))
       (is (contains? total-level-classes "text-right")))
+
+    (testing "orderbook rows use tighter Hyperliquid-style 1:2:2 column allocation"
+      (is (contains? header-row-classes "grid-cols-[1fr_2fr_2fr]"))
+      (is (contains? level-content-row-classes "grid-cols-[1fr_2fr_2fr]")))
 
     (testing "readable inset contract keeps small left padding without large horizontal gutters"
       (is (contains? header-row-classes "pl-2"))
@@ -298,6 +306,10 @@
         (is (contains? time-header-classes "text-right"))
         (is (contains? size-level-classes "text-right"))
         (is (contains? time-level-classes "text-right")))
+
+      (testing "trades rows use tighter Hyperliquid-style 1:2:2 column allocation"
+        (is (contains? header-row-classes "grid-cols-[1fr_2fr_2fr]"))
+        (is (contains? trade-content-row-classes "grid-cols-[1fr_2fr_2fr]")))
 
       (testing "readable inset contract keeps small left padding without large horizontal gutters"
         (is (contains? header-row-classes "pl-2"))

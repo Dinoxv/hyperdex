@@ -18,6 +18,13 @@
   #{:orderbook :trades})
 
 (def ^:private max-render-levels-per-side 80)
+(def ^:private orderbook-columns-class "grid-cols-[1fr_2fr_2fr]")
+(def ^:private header-neutral-text-class "text-[rgb(148,158,156)]")
+(def ^:private body-neutral-text-class "text-[rgb(210,218,215)]")
+(def ^:private ask-depth-bar-class "bg-[rgba(237,112,136,0.15)]")
+(def ^:private bid-depth-bar-class "bg-[rgba(31,166,125,0.15)]")
+(def ^:private ask-price-text-class "text-[rgb(237,112,136)]")
+(def ^:private bid-price-text-class "text-[rgb(31,166,125)]")
 
 (defn normalize-orderbook-tab [tab]
   (let [tab* (cond
@@ -306,32 +313,32 @@
    content])
 
 (defn trades-column-headers [base-symbol]
-  [:div {:class ["grid" "grid-cols-3" "items-center" "py-2" "pl-2" "pr-2" "bg-base-100" "border-b" "border-base-300"]
+  [:div {:class ["grid" orderbook-columns-class "items-center" "py-2" "pl-2" "pr-2" "bg-base-100" "border-b" "border-base-300"]
          :data-role "trades-column-headers-row"}
    [:div {:class ["text-left"]
           :data-role "trades-price-header-cell"}
-    [:span {:class ["text-gray-400" "text-xs" "num"]} "Price"]]
+    [:span {:class [header-neutral-text-class "text-xs" "num"]} "Price"]]
    [:div {:class ["text-right" "num-right"]
           :data-role "trades-size-header-cell"}
-    [:span {:class ["text-gray-400" "text-xs" "num"]} (str "Size (" base-symbol ")")]]
+    [:span {:class [header-neutral-text-class "text-xs" "num"]} (str "Size (" base-symbol ")")]]
    [:div {:class ["text-right" "num-right"]
           :data-role "trades-time-header-cell"}
-    [:span {:class ["text-gray-400" "text-xs" "num"]} "Time"]]])
+    [:span {:class [header-neutral-text-class "text-xs" "num"]} "Time"]]])
 
 (defn trades-row [trade]
   (let [price-class (trade-side->price-class (:side trade))]
     [:div {:class ["flex" "items-center" "h-6" "relative" "bg-base-100" "text-xs" "border-b" "border-base-300"]}
-     [:div {:class ["grid" "grid-cols-3" "w-full" "items-center" "pl-2" "pr-2"]
+     [:div {:class ["grid" orderbook-columns-class "w-full" "items-center" "pl-2" "pr-2"]
             :data-role "trades-level-content-row"}
       [:div {:class ["text-left"]
              :data-role "trades-level-price-cell"}
        [:span {:class [price-class "num"]} (or (format-price (:price trade) (:price-raw trade)) "0.00")]]
       [:div {:class ["text-right" "num-right"]
              :data-role "trades-level-size-cell"}
-       [:span {:class ["text-gray-100" "num"]} (format-trade-size trade)]]
+       [:span {:class [body-neutral-text-class "num"]} (format-trade-size trade)]]
       [:div {:class ["text-right" "num-right"]
              :data-role "trades-level-time-cell"}
-       [:span {:class ["text-gray-100" "num"]} (or (format-trade-time (:time-ms trade)) "--:--:--")]]]]))
+       [:span {:class [body-neutral-text-class "num"]} (or (format-trade-time (:time-ms trade)) "--:--:--")]]]]))
 
 (defn empty-trades []
   [:div {:class ["flex" "flex-col" "items-center" "justify-center" "p-8" "text-center" "bg-base-100" "rounded-none" "border" "border-base-300" "h-full"]}
@@ -354,25 +361,25 @@
   (let [price (:px order)
         cum-total (order-total-for-unit order size-unit)
         bar-width (cumulative-bar-width cum-total max-cum-size)
-        bar-color (if is-ask? "bg-[rgba(237,112,136,0.20)]" "bg-[rgba(31,166,125,0.20)]")
-        price-text-color (if is-ask? "text-[rgb(237,112,136)]" "text-[rgb(31,166,125)]")]
+        bar-color (if is-ask? ask-depth-bar-class bid-depth-bar-class)
+        price-text-color (if is-ask? ask-price-text-class bid-price-text-class)]
     [:div.flex.items-center.h-6.relative.bg-base-100.text-xs {:data-role "orderbook-level-row"}
      ;; Size bar background - always positioned from left
      [:div.absolute.inset-0.flex.items-center.justify-start
       [:div {:class ["h-full" bar-color "transition-all" "duration-300" "ease-[cubic-bezier(0.68,-0.6,0.32,1.6)]"]
              :style {:width (str (or bar-width 0) "%")}}]]
      ;; Content
-     [:div {:class ["grid" "grid-cols-3" "w-full" "items-center" "pl-2" "pr-2" "relative" "z-10"]
+     [:div {:class ["grid" orderbook-columns-class "w-full" "items-center" "pl-2" "pr-2" "relative" "z-10"]
             :data-role "orderbook-level-content-row"}
       [:div {:class ["text-left"]
              :data-role "orderbook-level-price-cell"}
        [:span {:class [price-text-color "num"]} (or (format-price price price) "0.00")]]
       [:div {:class ["text-right" "num-right"]
              :data-role "orderbook-level-size-cell"}
-       [:span {:class ["text-white" "num"]} (format-order-size order size-unit)]]
+       [:span {:class [body-neutral-text-class "num"]} (format-order-size order size-unit)]]
       [:div {:class ["text-right" "num-right"]
              :data-role "orderbook-level-total-cell"}
-       [:span {:class ["text-white" "num"]} (format-order-total order size-unit)]]]]))
+       [:span {:class [body-neutral-text-class "num"]} (format-order-total order size-unit)]]]]))
 
 ;; Spread component
 (defn spread-row [spread]
@@ -386,17 +393,17 @@
 
 ;; Column headers
 (defn column-headers [size-symbol]
-  [:div {:class ["grid" "grid-cols-3" "items-center" "py-2" "pl-2" "pr-2" "bg-base-100" "border-b" "border-base-300"]
+  [:div {:class ["grid" orderbook-columns-class "items-center" "py-2" "pl-2" "pr-2" "bg-base-100" "border-b" "border-base-300"]
          :data-role "orderbook-column-headers-row"}
    [:div {:class ["text-left"]
           :data-role "orderbook-price-header-cell"}
-    [:span {:class ["text-gray-400" "text-xs" "num"]} "Price"]]
+    [:span {:class [header-neutral-text-class "text-xs" "num"]} "Price"]]
    [:div {:class ["text-right" "num-right"]
           :data-role "orderbook-size-header-cell"}
-    [:span {:class ["text-gray-400" "text-xs" "num"]} (str "Size (" size-symbol ")")]]
+    [:span {:class [header-neutral-text-class "text-xs" "num"]} (str "Size (" size-symbol ")")]]
    [:div {:class ["text-right" "num-right"]
           :data-role "orderbook-total-header-cell"}
-    [:span {:class ["text-gray-400" "text-xs" "num"]} (str "Total (" size-symbol ")")]]])
+    [:span {:class [header-neutral-text-class "text-xs" "num"]} (str "Total (" size-symbol ")")]]])
 
 (defn- fallback-render-snapshot [orderbook-data]
   (let [raw-bids (:bids orderbook-data)
