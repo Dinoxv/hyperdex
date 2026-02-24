@@ -120,13 +120,56 @@
     (is (contains? enabled-placeholders "SL trigger"))
     (is (not (contains? enabled-placeholders "SL limit price")))))
 
-(deftest tif-inline-control-renders-current-value-and-change-handler-test
+(deftest tif-inline-control-renders-custom-trigger-caret-and-dispatches-toggle-test
   (let [node (sections/tif-inline-control {:tif :ioc}
-                                          {:on-set-tif [[:actions/update-order-form [:tif] [:event.target/value]]]})
-        select-node (first (collect-nodes-by-tag node :select))]
-    (is (= "ioc" (get-in select-node [1 :value])))
-    (is (= [[:actions/update-order-form [:tif] [:event.target/value]]]
-           (get-in select-node [1 :on :change])))))
+                                          {:dropdown-open? false
+                                           :on-toggle-dropdown [[:actions/toggle-tif-dropdown]]
+                                           :on-close-dropdown [[:actions/close-tif-dropdown]]
+                                           :on-dropdown-keydown [[:actions/handle-tif-dropdown-keydown [:event/key]]]
+                                           :on-select-tif (fn [tif]
+                                                            [[:actions/close-tif-dropdown]
+                                                             [:actions/update-order-form [:tif] tif]])})
+        button-nodes (collect-nodes-by-tag node :button)
+        trigger (first (filter #(= "Time in force" (get-in % [1 :aria-label])) button-nodes))
+        chevron (first (collect-nodes-by-tag node :svg))
+        menu (first (filter #(= "TIF options" (get-in % [1 :aria-label]))
+                            (collect-nodes-by-tag node :div)))]
+    (is (some? trigger))
+    (is (contains? (set (collect-strings trigger)) "IOC"))
+    (is (= [[:actions/toggle-tif-dropdown]]
+           (get-in trigger [1 :on :click])))
+    (is (= [[:actions/handle-tif-dropdown-keydown [:event/key]]]
+           (get-in trigger [1 :on :keydown])))
+    (is (contains? (set (get-in chevron [1 :class])) "rotate-0"))
+    (is (true? (get-in menu [1 :aria-hidden])))))
+
+(deftest tif-inline-control-renders-open-menu-overlay-and-option-actions-test
+  (let [node (sections/tif-inline-control {:tif :gtc}
+                                          {:dropdown-open? true
+                                           :on-toggle-dropdown [[:actions/toggle-tif-dropdown]]
+                                           :on-close-dropdown [[:actions/close-tif-dropdown]]
+                                           :on-dropdown-keydown [[:actions/handle-tif-dropdown-keydown [:event/key]]]
+                                           :on-select-tif (fn [tif]
+                                                            [[:actions/close-tif-dropdown]
+                                                             [:actions/update-order-form [:tif] tif]])})
+        button-nodes (collect-nodes-by-tag node :button)
+        overlay (first (filter #(= "Close TIF menu" (get-in % [1 :aria-label])) button-nodes))
+        options (filter #(= "option" (get-in % [1 :role])) button-nodes)
+        selected-option (first (filter #(contains? (set (collect-strings %)) "GTC") options))
+        ioc-option (first (filter #(contains? (set (collect-strings %)) "IOC") options))
+        chevron (first (collect-nodes-by-tag node :svg))
+        menu (first (filter #(= "TIF options" (get-in % [1 :aria-label]))
+                            (collect-nodes-by-tag node :div)))]
+    (is (= [[:actions/close-tif-dropdown]]
+           (get-in overlay [1 :on :click])))
+    (is (= 3 (count options)))
+    (is (= [[:actions/close-tif-dropdown]
+            [:actions/update-order-form [:tif] :ioc]]
+           (get-in ioc-option [1 :on :click])))
+    (is (true? (get-in selected-option [1 :aria-selected])))
+    (is (contains? (set (get-in selected-option [1 :class])) "text-[#F6FEFD]"))
+    (is (contains? (set (get-in chevron [1 :class])) "rotate-180"))
+    (is (false? (get-in menu [1 :aria-hidden])))))
 
 (deftest section-module-delegates-to-type-extensions-test
   (with-redefs [type-extensions/render-order-type-sections

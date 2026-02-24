@@ -37,6 +37,15 @@
 (defn handle-size-unit-dropdown-keydown [key]
   (command :order-form/handle-size-unit-dropdown-keydown key))
 
+(defn toggle-tif-dropdown []
+  (command :order-form/toggle-tif-dropdown))
+
+(defn close-tif-dropdown []
+  (command :order-form/close-tif-dropdown))
+
+(defn handle-tif-dropdown-keydown [key]
+  (command :order-form/handle-tif-dropdown-keydown key))
+
 (defn select-pro-order-type [order-type]
   (command :order-form/select-pro-order-type order-type))
 
@@ -87,6 +96,9 @@
 
 (defn set-tif-input []
   (update-order-field [:tif] event-target-value))
+
+(defn set-order-tif [tif]
+  (update-order-field [:tif] tif))
 
 (defn set-trigger-price-input []
   (update-order-field [:trigger-px] event-target-value))

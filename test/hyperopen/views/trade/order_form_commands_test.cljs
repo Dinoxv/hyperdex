@@ -13,6 +13,9 @@
    (commands/toggle-size-unit-dropdown)
    (commands/close-size-unit-dropdown)
    (commands/handle-size-unit-dropdown-keydown commands/event-key)
+   (commands/toggle-tif-dropdown)
+   (commands/close-tif-dropdown)
+   (commands/handle-tif-dropdown-keydown commands/event-key)
    (commands/select-pro-order-type :scale)
    (commands/set-order-ui-leverage 25)
    (commands/update-order-form [:side] :buy)
@@ -28,6 +31,7 @@
    (commands/toggle-reduce-only)
    (commands/toggle-post-only)
    (commands/set-tif-input)
+   (commands/set-order-tif :ioc)
    (commands/set-trigger-price-input)
    (commands/set-scale-start-input)
    (commands/set-scale-end-input)
@@ -52,6 +56,9 @@
   (is (= {:command-id :order-form/set-order-ui-leverage
           :args [25]}
          (commands/set-order-ui-leverage 25)))
+  (is (= {:command-id :order-form/toggle-tif-dropdown
+          :args []}
+         (commands/toggle-tif-dropdown)))
   (is (= {:command-id :order-form/update-order-form
           :args [[:side] :sell]}
          (commands/set-order-side :sell))))

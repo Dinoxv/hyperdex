@@ -342,6 +342,7 @@
         (order-form-vm/order-form-vm state)
         handler-map (handlers/build-handlers)
         size-unit-dropdown-open? (boolean (get-in state [:order-form-ui :size-unit-dropdown-open?]))
+        tif-dropdown-open? (boolean (get-in state [:order-form-ui :tif-dropdown-open?]))
         entry-mode-handlers (:entry-mode handler-map)
         leverage-handlers (:leverage handler-map)
         side-handlers (:side handler-map)
@@ -421,7 +422,8 @@
                               (:on-toggle-reduce-only toggle-handlers))
        (when show-limit-like-controls?
          (sections/tif-inline-control form
-                                      tif-handlers))]
+                                      (assoc tif-handlers
+                                             :dropdown-open? tif-dropdown-open?)))]
 
       (when show-tpsl-toggle?
         (primitives/row-toggle "Take Profit / Stop Loss"

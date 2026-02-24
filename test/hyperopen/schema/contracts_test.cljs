@@ -7,6 +7,7 @@
 (def ^:private valid-order-form-ui
   {:pro-order-type-dropdown-open? false
    :size-unit-dropdown-open? false
+   :tif-dropdown-open? false
    :price-input-focused? false
    :tpsl-panel-open? false
    :entry-mode :limit
@@ -27,6 +28,7 @@
   (let [state (assoc (system/default-store-state)
                      :order-form-ui {:pro-order-type-dropdown-open? false
                                      :size-unit-dropdown-open? false
+                                     :tif-dropdown-open? false
                                      :price-input-focused? "yes"
                                      :tpsl-panel-open? false
                                      :entry-mode :limit

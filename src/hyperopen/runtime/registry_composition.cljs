@@ -309,6 +309,9 @@
            toggle-size-unit-dropdown
            close-size-unit-dropdown
            handle-size-unit-dropdown-keydown
+           toggle-tif-dropdown
+           close-tif-dropdown
+           handle-tif-dropdown-keydown
            set-order-ui-leverage
            set-order-size-percent
            set-order-size-display
@@ -330,6 +333,9 @@
    :toggle-size-unit-dropdown toggle-size-unit-dropdown
    :close-size-unit-dropdown close-size-unit-dropdown
    :handle-size-unit-dropdown-keydown handle-size-unit-dropdown-keydown
+   :toggle-tif-dropdown toggle-tif-dropdown
+   :close-tif-dropdown close-tif-dropdown
+   :handle-tif-dropdown-keydown handle-tif-dropdown-keydown
    :set-order-ui-leverage set-order-ui-leverage
    :set-order-size-percent set-order-size-percent
    :set-order-size-display set-order-size-display

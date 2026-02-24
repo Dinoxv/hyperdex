@@ -47,7 +47,14 @@
              :on-toggle-post-only (dispatch-command (cmd/toggle-post-only))
              :on-toggle-tpsl-panel (dispatch-command (cmd/toggle-order-tpsl-panel))}
 
-   :tif {:on-set-tif (dispatch-command (cmd/set-tif-input))}
+   :tif {:on-toggle-dropdown (dispatch-command (cmd/toggle-tif-dropdown))
+         :on-close-dropdown (dispatch-command (cmd/close-tif-dropdown))
+         :on-dropdown-keydown (dispatch-command (cmd/handle-tif-dropdown-keydown cmd/event-key))
+         :on-select-tif (fn [tif]
+                          (into []
+                                (concat
+                                 (dispatch-command (cmd/close-tif-dropdown))
+                                 (dispatch-command (cmd/set-order-tif tif)))))}
 
    :tp-sl {:on-toggle-tp-enabled (dispatch-command (cmd/toggle-tp-enabled))
            :on-set-tp-trigger (dispatch-command (cmd/set-tp-trigger-input))

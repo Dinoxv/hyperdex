@@ -68,6 +68,23 @@
                              (boolean (:size-unit-dropdown-open? ui-state))]]]])
     []))
 
+(defn toggle-tif-dropdown [state]
+  (let [ui-state (:order-form-ui (transitions/toggle-tif-dropdown state))
+        next-open? (boolean (:tif-dropdown-open? ui-state))]
+    [[:effects/save-many [[[:order-form-ui :tif-dropdown-open?] next-open?]]]]))
+
+(defn close-tif-dropdown [state]
+  (let [ui-state (:order-form-ui (transitions/close-tif-dropdown state))]
+    [[:effects/save-many [[[:order-form-ui :tif-dropdown-open?]
+                           (boolean (:tif-dropdown-open? ui-state))]]]]))
+
+(defn handle-tif-dropdown-keydown [state key]
+  (if-let [transition (transitions/handle-tif-dropdown-keydown state key)]
+    (let [ui-state (:order-form-ui transition)]
+      [[:effects/save-many [[[:order-form-ui :tif-dropdown-open?]
+                             (boolean (:tif-dropdown-open? ui-state))]]]])
+    []))
+
 (defn set-order-ui-leverage [state leverage]
   (transition-save-many state (transitions/set-order-ui-leverage state leverage)))
 

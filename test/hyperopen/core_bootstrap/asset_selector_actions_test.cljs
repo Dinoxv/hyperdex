@@ -109,6 +109,7 @@
                                  [[:active-market] market]
                                  [[:order-form-ui] {:pro-order-type-dropdown-open? false
                                                     :size-unit-dropdown-open? false
+                                                    :tif-dropdown-open? false
                                                     :tpsl-panel-open? false
                                                     :price-input-focused? false
                                                     :entry-mode :limit
@@ -142,6 +143,7 @@
                                  [[:active-market] market]
                                  [[:order-form-ui] {:pro-order-type-dropdown-open? false
                                                     :size-unit-dropdown-open? false
+                                                    :tif-dropdown-open? false
                                                     :tpsl-panel-open? false
                                                     :price-input-focused? false
                                                     :entry-mode :limit
@@ -175,6 +177,7 @@
                                  [[:active-market] resolved-market]
                                  [[:order-form-ui] {:pro-order-type-dropdown-open? false
                                                     :size-unit-dropdown-open? false
+                                                    :tif-dropdown-open? false
                                                     :tpsl-panel-open? false
                                                     :price-input-focused? false
                                                     :entry-mode :limit

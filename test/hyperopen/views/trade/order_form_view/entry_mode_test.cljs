@@ -128,6 +128,37 @@
     (is (not (contains? strings "75%")))
     (is (not (contains? strings "100%")))))
 
+(deftest limit-mode-tif-trigger-dispatches-toggle-and-keydown-actions-test
+  (let [view-node (view/order-form-view (base-state {:type :limit}))
+        tif-trigger (find-first-node view-node
+                                     (fn [candidate]
+                                       (and (= :button (first candidate))
+                                            (= "Time in force"
+                                               (get-in candidate [1 :aria-label])))))]
+    (is (= [[:actions/toggle-tif-dropdown]]
+           (get-in tif-trigger [1 :on :click])))
+    (is (= [[:actions/handle-tif-dropdown-keydown [:event/key]]]
+           (get-in tif-trigger [1 :on :keydown])))))
+
+(deftest limit-mode-open-tif-dropdown-renders-overlay-and-option-actions-test
+  (let [view-node (view/order-form-view (base-state {:type :limit :tif :gtc}
+                                                     {:tif-dropdown-open? true}))
+        overlay (find-first-node view-node
+                                 (fn [candidate]
+                                   (and (= :button (first candidate))
+                                        (= "Close TIF menu"
+                                           (get-in candidate [1 :aria-label])))))
+        ioc-option (find-first-node view-node
+                                    (fn [candidate]
+                                      (and (= :button (first candidate))
+                                           (= "option" (get-in candidate [1 :role]))
+                                           (some #{"IOC"} (collect-strings candidate)))))]
+    (is (= [[:actions/close-tif-dropdown]]
+           (get-in overlay [1 :on :click])))
+    (is (= [[:actions/close-tif-dropdown]
+            [:actions/update-order-form [:tif] :ioc]]
+           (get-in ioc-option [1 :on :click])))))
+
 (deftest pro-mode-renders-advanced-controls-test
   (let [view-node (view/order-form-view (base-state {:type :stop-market}))
         strings (set (collect-strings view-node))]
@@ -139,4 +170,3 @@
   (let [view-node (view/order-form-view (base-state {:type :limit}))
         strings (set (collect-strings view-node))]
     (is (contains? strings "Take Profit / Stop Loss"))))
-

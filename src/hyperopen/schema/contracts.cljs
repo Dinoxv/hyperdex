@@ -272,6 +272,9 @@
    :actions/toggle-size-unit-dropdown ::no-args
    :actions/close-size-unit-dropdown ::no-args
    :actions/handle-size-unit-dropdown-keydown ::key-args
+   :actions/toggle-tif-dropdown ::no-args
+   :actions/close-tif-dropdown ::no-args
+   :actions/handle-tif-dropdown-keydown ::key-args
    :actions/set-order-ui-leverage ::single-input-args
    :actions/set-order-size-percent ::single-input-args
    :actions/set-order-size-display ::single-input-args
@@ -375,6 +378,7 @@
 (def ^:private legacy-ui-and-runtime-order-form-keys
   #{:pro-order-type-dropdown-open?
     :size-unit-dropdown-open?
+    :tif-dropdown-open?
     :price-input-focused?
     :tpsl-panel-open?
     :submitting?
@@ -383,6 +387,7 @@
 (def ^:private order-form-ui-state-keys
   #{:pro-order-type-dropdown-open?
     :size-unit-dropdown-open?
+    :tif-dropdown-open?
     :price-input-focused?
     :tpsl-panel-open?
     :entry-mode
@@ -401,6 +406,7 @@
          #(= order-form-ui-state-keys (set (keys %)))
          #(boolean? (:pro-order-type-dropdown-open? %))
          #(boolean? (:size-unit-dropdown-open? %))
+         #(boolean? (:tif-dropdown-open? %))
          #(boolean? (:price-input-focused? %))
          #(boolean? (:tpsl-panel-open? %))
          #(contains? #{:market :limit :pro} (:entry-mode %))

@@ -22,6 +22,7 @@
     [:size-display]
     [:pro-order-type-dropdown-open?]
     [:size-unit-dropdown-open?]
+    [:tif-dropdown-open?]
     [:price-input-focused?]
     [:tpsl-panel-open?]
     [:submitting?]
@@ -148,7 +149,8 @@
                         (if close-pro-dropdown?
                           false
                           (boolean (:pro-order-type-dropdown-open? ui-state)))
-                        :size-unit-dropdown-open? false))]
+                        :size-unit-dropdown-open? false
+                        :tif-dropdown-open? false))]
     (enforce-field-ownership
      state
      {:order-form next-form
@@ -168,7 +170,8 @@
                  next-form
                  (assoc ui-state
                         :pro-order-type-dropdown-open? false
-                        :size-unit-dropdown-open? false))]
+                        :size-unit-dropdown-open? false
+                        :tif-dropdown-open? false))]
     (enforce-field-ownership
      state
      {:order-form next-form
@@ -208,6 +211,23 @@
 (defn handle-size-unit-dropdown-keydown [state key]
   (when (= key "Escape")
     (close-size-unit-dropdown state)))
+
+(defn toggle-tif-dropdown [state]
+  (let [ui-state (trading/order-form-ui-state state)
+        open? (boolean (:tif-dropdown-open? ui-state))]
+    (enforce-field-ownership
+     state
+     {:order-form-ui (assoc ui-state :tif-dropdown-open? (not open?))})))
+
+(defn close-tif-dropdown [state]
+  (enforce-field-ownership
+   state
+   {:order-form-ui (assoc (trading/order-form-ui-state state)
+                          :tif-dropdown-open? false)}))
+
+(defn handle-tif-dropdown-keydown [state key]
+  (when (= key "Escape")
+    (close-tif-dropdown state)))
 
 (defn set-order-ui-leverage [state leverage]
   (let [form (trading/order-form-draft state)
@@ -348,8 +368,14 @@
                       (reconcile-size-after-context-change state updated)
 
                       :else
-                      updated)]
+                      updated)
+          next-ui (when (= path [:tif])
+                    (trading/effective-order-form-ui
+                     next-form
+                     (assoc (trading/order-form-ui-state state)
+                            :tif-dropdown-open? false)))]
       (enforce-field-ownership
        state
-       {:order-form next-form
-        :order-form-runtime (cleared-runtime-state state)}))))
+       (cond-> {:order-form next-form
+                :order-form-runtime (cleared-runtime-state state)}
+         (map? next-ui) (assoc :order-form-ui next-ui))))))

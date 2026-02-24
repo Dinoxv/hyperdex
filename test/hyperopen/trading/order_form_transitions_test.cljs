@@ -137,6 +137,29 @@
         (is (= :pro (:entry-mode ui)))
         (is (= order-type (:type form)))))))
 
+(deftest tif-dropdown-transitions-toggle-close-and-reset-on-entry-mode-change-test
+  (let [state (base-state {:type :limit})
+        toggled (transitions/toggle-tif-dropdown state)
+        open-ui (:order-form-ui toggled)
+        escaped (transitions/handle-tif-dropdown-keydown (merge state toggled) "Escape")
+        escaped-ui (:order-form-ui escaped)
+        reopen (transitions/toggle-tif-dropdown state)
+        market-transition (transitions/select-entry-mode (merge state reopen) :market)
+        market-ui (:order-form-ui market-transition)]
+    (is (true? (:tif-dropdown-open? open-ui)))
+    (is (false? (:tif-dropdown-open? escaped-ui)))
+    (is (false? (:tif-dropdown-open? market-ui)))))
+
+(deftest update-order-form-tif-closes-tif-dropdown-test
+  (let [state (assoc (base-state {:type :limit :tif :gtc})
+                     :order-form-ui (assoc (trading/default-order-form-ui)
+                                           :tif-dropdown-open? true))
+        transition (transitions/update-order-form state [:tif] :ioc)
+        form (:order-form transition)
+        ui (:order-form-ui transition)]
+    (is (= :ioc (:tif form)))
+    (is (false? (:tif-dropdown-open? ui)))))
+
 (deftest update-order-form-rejects-ui-and-runtime-paths-test
   (let [state (base-state {:type :limit :size "1" :price "100"})
         transition (transitions/update-order-form state [:price-input-focused?] true)]
@@ -153,6 +176,7 @@
     :size-display
     :pro-order-type-dropdown-open?
     :size-unit-dropdown-open?
+    :tif-dropdown-open?
     :price-input-focused?
     :tpsl-panel-open?
     :submitting?
@@ -190,7 +214,9 @@
               (gen/fmap str (gen/choose 1 300000)))
     (gen/fmap (fn [tif] {:intent :set-tif :tif tif}) tif-gen)
     (gen/fmap (fn [key] {:intent :keydown-pro-dropdown :key key}) keydown-gen)
-    (gen/return {:intent :toggle-pro-dropdown})]))
+    (gen/fmap (fn [key] {:intent :keydown-tif-dropdown :key key}) keydown-gen)
+    (gen/return {:intent :toggle-pro-dropdown})
+    (gen/return {:intent :toggle-tif-dropdown})]))
 
 (defn- run-intent [state {:keys [intent mode order-type leverage percent size-display side price tif key]}]
   (case intent
@@ -208,22 +234,34 @@
     :set-tif (transitions/update-order-form state [:tif] tif)
     :keydown-pro-dropdown (transitions/handle-pro-order-type-dropdown-keydown state key)
     :toggle-pro-dropdown (transitions/toggle-pro-order-type-dropdown state)
+    :keydown-tif-dropdown (transitions/handle-tif-dropdown-keydown state key)
+    :toggle-tif-dropdown (transitions/toggle-tif-dropdown state)
     nil))
 
 (defn- apply-model [model {:keys [intent mode order-type key]}]
   (case intent
     :select-entry-mode
     (case mode
-      :market (assoc model :entry-mode :market :type :market :pro-order-type-dropdown-open? false)
-      :limit (assoc model :entry-mode :limit :type :limit :pro-order-type-dropdown-open? false)
+      :market (assoc model
+                     :entry-mode :market
+                     :type :market
+                     :pro-order-type-dropdown-open? false
+                     :tif-dropdown-open? false)
+      :limit (assoc model
+                    :entry-mode :limit
+                    :type :limit
+                    :pro-order-type-dropdown-open? false
+                    :tif-dropdown-open? false)
       :pro (assoc model
                   :entry-mode :pro
-                  :type (trading/normalize-pro-order-type (:type model))))
+                  :type (trading/normalize-pro-order-type (:type model))
+                  :tif-dropdown-open? false))
 
     :select-pro-order-type
     (assoc model :entry-mode :pro
            :type (trading/normalize-pro-order-type order-type)
-           :pro-order-type-dropdown-open? false)
+           :pro-order-type-dropdown-open? false
+           :tif-dropdown-open? false)
 
     :toggle-pro-dropdown
     (update model :pro-order-type-dropdown-open? not)
@@ -232,6 +270,19 @@
     (if (= key "Escape")
       (assoc model :pro-order-type-dropdown-open? false)
       model)
+
+    :toggle-tif-dropdown
+    (if (trading/limit-like-type? (:type model))
+      (update model :tif-dropdown-open? not)
+      (assoc model :tif-dropdown-open? false))
+
+    :keydown-tif-dropdown
+    (if (= key "Escape")
+      (assoc model :tif-dropdown-open? false)
+      model)
+
+    :set-tif
+    (assoc model :tif-dropdown-open? false)
 
     :toggle-tpsl
     (if (= :scale (:type model))
@@ -262,6 +313,8 @@
          (= (:type model) (:type normalized-form))
          (= (:pro-order-type-dropdown-open? model)
             (boolean (:pro-order-type-dropdown-open? effective-ui)))
+         (= (:tif-dropdown-open? model)
+            (boolean (:tif-dropdown-open? effective-ui)))
          (or (not (= :scale (:type normalized-form)))
              (false? (:tpsl-panel-open? effective-ui)))
          (if (number? size-percent)
@@ -313,6 +366,7 @@
         initial-model {:entry-mode :limit
                        :type :limit
                        :pro-order-type-dropdown-open? false
+                       :tif-dropdown-open? false
                        :tpsl-panel-open? false}
         property (prop/for-all [intents (gen/vector intent-gen 1 120)]
                    (:ok? (evaluate-intents base initial-model intents)))]

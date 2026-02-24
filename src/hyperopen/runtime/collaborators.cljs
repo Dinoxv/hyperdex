@@ -115,6 +115,9 @@
    :toggle-size-unit-dropdown order-actions/toggle-size-unit-dropdown
    :close-size-unit-dropdown order-actions/close-size-unit-dropdown
    :handle-size-unit-dropdown-keydown order-actions/handle-size-unit-dropdown-keydown
+   :toggle-tif-dropdown order-actions/toggle-tif-dropdown
+   :close-tif-dropdown order-actions/close-tif-dropdown
+   :handle-tif-dropdown-keydown order-actions/handle-tif-dropdown-keydown
    :set-order-ui-leverage order-actions/set-order-ui-leverage
    :set-order-size-percent order-actions/set-order-size-percent
    :set-order-size-display order-actions/set-order-size-display

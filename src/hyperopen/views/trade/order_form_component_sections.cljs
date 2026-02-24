@@ -1,5 +1,6 @@
 (ns hyperopen.views.trade.order-form-component-sections
-  (:require [hyperopen.views.trade.order-form-component-primitives :as primitives]
+  (:require [clojure.string :as str]
+            [hyperopen.views.trade.order-form-component-primitives :as primitives]
             [hyperopen.views.trade.order-form-type-extensions :as type-extensions]))
 
 (defn entry-mode-tabs
@@ -123,47 +124,127 @@
                           on-set-sl-limit
                           :placeholder "SL limit price"))])])
 
-(defn tif-inline-control [form {:keys [on-set-tif]}]
-  [:div {:class ["relative" "flex" "items-center" "gap-2"]}
-   [:span {:class ["text-xs" "uppercase" "tracking-wide" "text-gray-400"]} "TIF"]
-   [:select {:class ["appearance-none"
-                     "bg-transparent"
-                     "bg-none"
-                     "[background-image:none]"
-                     "border-0"
-                     "border-none"
-                     "text-sm"
-                     "font-semibold"
-                     "text-gray-100"
-                     "outline-none"
-                     "focus:outline-none"
-                     "focus-visible:outline-none"
-                     "focus:border-0"
-                     "focus:border-none"
-                     "focus-visible:border-0"
-                     "focus-visible:border-none"
-                     "focus:ring-0"
-                     "focus:ring-offset-0"
-                     "focus:shadow-none"
-                     "pr-4"]
-             :value (name (:tif form))
-             :on {:change on-set-tif}}
-    [:option {:value "gtc"} "GTC"]
-    [:option {:value "ioc"} "IOC"]
-    [:option {:value "alo"} "ALO"]]
-   [:svg {:class ["pointer-events-none"
-                  "absolute"
-                  "right-0"
-                  "top-1/2"
-                  "-translate-y-1/2"
-                  "w-3.5"
-                  "h-3.5"
-                  "text-gray-400"]
-          :viewBox "0 0 20 20"
-          :fill "currentColor"}
-    [:path {:fill-rule "evenodd"
-            :clip-rule "evenodd"
-            :d "M5.293 7.293a1 1 0 011.414 0L10 10.586l3.293-3.293a1 1 0 111.414 1.414l-4 4a1 1 0 01-1.414 0l-4-4a1 1 0 010-1.414z"}]]])
+(def ^:private tif-options
+  [[:gtc "GTC"]
+   [:ioc "IOC"]
+   [:alo "ALO"]])
+
+(defn- tif-option-row [selected-tif tif label on-select-tif]
+  [:button {:type "button"
+            :class (into ["flex"
+                          "h-6"
+                          "w-full"
+                          "items-center"
+                          "justify-start"
+                          "text-left"
+                          "text-xs"
+                          "leading-6"
+                          "transition-colors"]
+                         (if (= selected-tif tif)
+                           ["text-[#F6FEFD]"]
+                           ["text-[#949E9C]" "hover:text-[#F6FEFD]"]))
+            :role "option"
+            :aria-selected (boolean (= selected-tif tif))
+            :on {:click (on-select-tif tif)}}
+   label])
+
+(defn tif-inline-control
+  [form {:keys [dropdown-open?
+                on-toggle-dropdown
+                on-close-dropdown
+                on-dropdown-keydown
+                on-select-tif]}]
+  (let [selected-tif (keyword (name (or (:tif form) :gtc)))
+        selected-label (some-> selected-tif name str/upper-case)
+        open? (boolean dropdown-open?)]
+    [:div {:class ["relative" "flex" "items-center" "gap-2"]
+           :style (when open?
+                    {:z-index 1200})}
+     (when open?
+       [:button {:type "button"
+                 :class ["absolute" "bg-transparent" "cursor-default"]
+                 :style {:left "-100vmax"
+                         :top "-100vmax"
+                         :width "200vmax"
+                         :height "200vmax"
+                         :z-index 1200}
+                 :aria-label "Close TIF menu"
+                 :on {:click on-close-dropdown}}])
+     [:span {:class ["text-xs" "uppercase" "tracking-wide" "text-gray-400"]} "TIF"]
+     [:button {:type "button"
+               :class ["inline-flex"
+                       "items-center"
+                       "gap-1.5"
+                       "bg-transparent"
+                       "text-sm"
+                       "font-normal"
+                       "leading-6"
+                       "text-[#949E9C]"
+                       "transition-colors"
+                       "duration-200"
+                       "ease-in-out"
+                       "hover:text-[#F6FEFD]"
+                       "outline-none"
+                       "focus:outline-none"
+                       "focus:ring-0"
+                       "focus:ring-offset-0"
+                       "focus:shadow-none"]
+               :aria-label "Time in force"
+               :aria-haspopup "listbox"
+               :aria-expanded open?
+               :style (when open?
+                        {:z-index 1201})
+               :on {:click on-toggle-dropdown
+                    :keydown on-dropdown-keydown}}
+      [:span selected-label]
+      [:svg {:class (into ["pointer-events-none"
+                           "h-3.5"
+                           "w-3.5"
+                           "text-gray-400"
+                           "transition-transform"
+                           "duration-300"
+                           "ease-out"]
+                          (if open?
+                            ["rotate-180"]
+                            ["rotate-0"]))
+             :viewBox "0 0 20 20"
+             :fill "currentColor"}
+       [:path {:fill-rule "evenodd"
+               :clip-rule "evenodd"
+               :d "M5.293 7.293a1 1 0 011.414 0L10 10.586l3.293-3.293a1 1 0 111.414 1.414l-4 4a1 1 0 01-1.414 0l-4-4a1 1 0 010-1.414z"}]]]
+     [:div {:class (into ["absolute"
+                          "right-0"
+                          "top-full"
+                          "mt-1"
+                          "min-w-[46px]"
+                          "rounded-lg"
+                          "border"
+                          "border-[#273035]"
+                          "bg-[#1B2429]"
+                          "px-2"
+                          "py-1"
+                          "origin-top-right"
+                          "transition-all"
+                          "duration-300"
+                          "ease-out"
+                          "shadow-[0_8px_16px_rgba(0,0,0,0.25)]"]
+                         (if open?
+                           ["visible"
+                            "opacity-100"
+                            "translate-y-0"
+                            "pointer-events-auto"]
+                           ["invisible"
+                            "opacity-0"
+                            "-translate-y-[5px]"
+                            "pointer-events-none"]))
+            :style {:z-index 1202}
+            :role "listbox"
+            :aria-label "TIF options"
+            :aria-hidden (not open?)
+            :on {:keydown on-dropdown-keydown}}
+      (for [[tif label] tif-options]
+        ^{:key (name tif)}
+        (tif-option-row selected-tif tif label on-select-tif))]]))
 
 (defn render-order-type-sections [order-type form callbacks]
   (type-extensions/render-order-type-sections order-type form callbacks))
