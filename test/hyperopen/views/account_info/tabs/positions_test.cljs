@@ -198,9 +198,29 @@
     (is (some? pnl-header-label))
     (is (some? margin-header-label))
     (is (some? funding-header-label))
-    (is (contains? header-strings "Unrealized PNL with return on equity (ROE) shown in parentheses."))
-    (is (contains? header-strings "Margin currently allocated to this position."))
-    (is (contains? header-strings "Funding paid or received for this position."))))
+    (is (contains? header-strings "Mark price is used to estimate unrealized PNL. Only trade prices are used for realized PNL."))
+    (is (contains? header-strings "For isolated positions, margin includes unrealized pnl."))
+    (is (contains? header-strings "Net funding payments since the position was opened. Hover for all-time and since changed."))))
+
+(deftest position-row-funding-tooltip-uses-hyperliquid-copy-with-since-change-fallback-test
+  (let [base-row (fixtures/sample-position-row "xyz:NVDA" 10 "0.500")
+        with-since-change-row (assoc-in base-row [:position :cumFunding] {:allTime "0.5"
+                                                                           :sinceChange "0.25"})
+        with-since-open-row (assoc-in base-row [:position :cumFunding] {:allTime "0.5"
+                                                                         :sinceOpen "0.1"})
+        without-since-change-row (assoc-in base-row [:position :cumFunding] {:allTime "0.5"})
+        with-since-change-cell (nth (vec (hiccup/node-children (view/position-row with-since-change-row))) 8)
+        with-since-open-cell (nth (vec (hiccup/node-children (view/position-row with-since-open-row))) 8)
+        without-since-change-cell (nth (vec (hiccup/node-children (view/position-row without-since-change-row))) 8)
+        with-since-change-strings (set (hiccup/collect-strings with-since-change-cell))
+        with-since-open-strings (set (hiccup/collect-strings with-since-open-cell))
+        without-since-change-strings (set (hiccup/collect-strings without-since-change-cell))]
+    (is (contains? with-since-change-strings "All-time: $-0.50 Since change: $-0.25"))
+    (is (contains? with-since-open-strings "All-time: $-0.50 Since change: $-0.10"))
+    (is (contains? without-since-change-strings "All-time: $-0.50 Since change: --"))
+    (is (not-any? #(str/includes? % "NaN") (hiccup/collect-strings with-since-change-cell)))
+    (is (not-any? #(str/includes? % "NaN") (hiccup/collect-strings with-since-open-cell)))
+    (is (not-any? #(str/includes? % "NaN") (hiccup/collect-strings without-since-change-cell)))))
 
 (deftest position-row-tpsl-cell-includes-edit-affordance-icon-test
   (let [row-node (view/position-row (fixtures/sample-position-row "xyz:NVDA" 10 "0.500"))

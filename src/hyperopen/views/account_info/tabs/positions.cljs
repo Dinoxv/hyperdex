@@ -94,6 +94,21 @@
       (str value-text " " pct-text))
     "--"))
 
+(defn- funding-display-value [funding-num]
+  (when (number? funding-num)
+    (if (pos? funding-num)
+      (- funding-num)
+      funding-num)))
+
+(defn- format-funding-tooltip [all-time-funding since-change-funding]
+  (let [all-time-text (if (number? all-time-funding)
+                        (str "$" (shared/format-currency all-time-funding))
+                        "--")
+        since-change-text (if (number? since-change-funding)
+                            (str "$" (shared/format-currency since-change-funding))
+                            "--")]
+    (str "All-time: " all-time-text " Since change: " since-change-text)))
+
 (defn- edit-icon []
   [:svg {:class ["h-3" "w-3" "shrink-0" "text-trading-green"]
          :viewBox "0 0 20 20"
@@ -134,13 +149,14 @@
         liq-price (:liquidationPx pos)
         margin (:marginUsed pos)
         funding-num (shared/parse-optional-num (get-in pos [:cumFunding :allTime]))
-        display-funding (when (number? funding-num)
-                          (if (pos? funding-num)
-                            (- funding-num)
-                            funding-num))
-        funding-tooltip (when (number? funding-num)
-                          (str "All-time funding: $"
-                               (shared/format-currency display-funding)))
+        since-change-funding-num (or (shared/parse-optional-num (get-in pos [:cumFunding :sinceChange]))
+                                     (shared/parse-optional-num (get-in pos [:cumFunding :since-change]))
+                                     (shared/parse-optional-num (get-in pos [:cumFunding :sinceOpen]))
+                                     (shared/parse-optional-num (get-in pos [:cumFunding :since-open])))
+        display-funding (funding-display-value funding-num)
+        display-since-change-funding (funding-display-value since-change-funding-num)
+        funding-tooltip (when (number? display-funding)
+                          (format-funding-tooltip display-funding display-since-change-funding))
         liq-explanation (or (shared/non-blank-text (:liquidationExplanation pos))
                             (shared/non-blank-text (:liquidation-explanation pos))
                             (shared/non-blank-text (:liquidation-explanation position-data)))]
@@ -233,13 +249,13 @@
         result))))
 
 (def ^:private pnl-header-explanation
-  "Unrealized PNL with return on equity (ROE) shown in parentheses.")
+  "Mark price is used to estimate unrealized PNL. Only trade prices are used for realized PNL.")
 
 (def ^:private margin-header-explanation
-  "Margin currently allocated to this position.")
+  "For isolated positions, margin includes unrealized pnl.")
 
 (def ^:private funding-header-explanation
-  "Funding paid or received for this position.")
+  "Net funding payments since the position was opened. Hover for all-time and since changed.")
 
 (defn sortable-header
   ([column-name sort-state]
