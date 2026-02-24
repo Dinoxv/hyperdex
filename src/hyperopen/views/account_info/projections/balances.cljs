@@ -1,5 +1,6 @@
 (ns hyperopen.views.account-info.projections.balances
   (:require [clojure.string :as str]
+            [hyperopen.account.history.position-identity :as position-identity]
             [hyperopen.asset-selector.markets :as markets]
             [hyperopen.views.account-info.projections.coins :as coins]
             [hyperopen.views.account-info.projections.parse :as parse]))
@@ -446,7 +447,7 @@
      rows)))
 
 (defn position-unique-key [position-data]
-  (str (get-in position-data [:position :coin]) "|" (or (:dex position-data) "default")))
+  (position-identity/position-unique-key position-data))
 
 (defn collect-positions [webdata2 perp-dex-states]
   (let [base-positions (->> (get-in webdata2 [:clearinghouseState :assetPositions])

@@ -230,3 +230,38 @@
     (is (= "7.6" (:tp-price short-gain-percent->tp)))
     (is (= "7.6" (:sl-price long-loss-percent->sl)))
     (is (= :usd (position-tpsl/tp-gain-mode gain-mode-reset)))))
+
+(deftest from-position-row-normalizes-anchor-values-test
+  (let [modal (position-tpsl/from-position-row
+               (fixtures/sample-position-row "xyz:NVDA" 10 "0.500")
+               {:left "12.5"
+                :top 24
+                :height "bad"
+                :extra "ignored"})]
+    (is (= {:left 12.5
+            :top 24}
+           (:anchor modal)))))
+
+(deftest position-tpsl-facade-behavior-is-deterministic-for-identical-inputs-test
+  (let [base-modal (-> (position-tpsl/from-position-row
+                        (fixtures/sample-position-row "xyz:NVDA" 10 "0.500"))
+                       (assoc :configure-amount? true
+                              :size-input "0.25"
+                              :tp-price "12"
+                              :sl-price "9"))
+        market-state {:asset-selector {:market-by-key {"perp:xyz:NVDA"
+                                                       {:coin "xyz:NVDA"
+                                                        :market-type :perp
+                                                        :asset-id 123}}}}
+        first-validation (position-tpsl/validate-modal base-modal)
+        second-validation (position-tpsl/validate-modal base-modal)
+        first-submit (position-tpsl/prepare-submit market-state base-modal)
+        second-submit (position-tpsl/prepare-submit market-state base-modal)
+        first-size-update (position-tpsl/set-modal-field base-modal [:size-percent-input] "40")
+        second-size-update (position-tpsl/set-modal-field base-modal [:size-percent-input] "40")
+        first-limit-toggle (position-tpsl/set-limit-price base-modal true)
+        second-limit-toggle (position-tpsl/set-limit-price base-modal true)]
+    (is (= first-validation second-validation))
+    (is (= first-submit second-submit))
+    (is (= first-size-update second-size-update))
+    (is (= first-limit-toggle second-limit-toggle))))
