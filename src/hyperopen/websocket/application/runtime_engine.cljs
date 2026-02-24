@@ -11,6 +11,14 @@
       (catch :default _
         false))))
 
+(defn- safe-callback!
+  [callback & args]
+  (when callback
+    (try
+      (apply callback args)
+      (catch :default _
+        nil))))
+
 (defn start-engine!
   [{:keys [initial-state
            reducer
@@ -18,7 +26,10 @@
            context
            mailbox-size
            effects-size
-           now-ms]
+           now-ms
+           record-runtime-msg!
+           record-runtime-effects!
+           record-runtime-drop!]
     :or {mailbox-size 4096
          effects-size 4096
          now-ms platform/now-ms}}]
@@ -26,11 +37,19 @@
         effects-ch (chan (async/buffer effects-size))
         state (atom initial-state)
         closed? (atom false)
+        record-msg! #(safe-callback! record-runtime-msg! %)
+        record-effects! #(safe-callback! record-runtime-effects! %1 %2)
+        record-drop! #(safe-callback! record-runtime-drop! %)
         dispatch! (fn [msg]
-                    (safe-put! mailbox-ch
-                               (if (number? (:ts msg))
+                    (let [msg* (if (number? (:ts msg))
                                  msg
-                                 (assoc msg :ts (now-ms)))))]
+                                 (assoc msg :ts (now-ms)))
+                          _ (record-msg! msg*)
+                          enqueued? (safe-put! mailbox-ch msg*)]
+                      (when-not enqueued?
+                        (record-drop! {:reason :mailbox-enqueue-failure
+                                       :message msg*}))
+                      enqueued?))]
     (go-loop []
       (when-let [msg (<! mailbox-ch)]
         (try
@@ -38,13 +57,16 @@
                 resolved-state (or (:next-state result) (:state result) @state)
                 effects (:effects result)]
             (reset! state resolved-state)
+            (record-effects! msg effects)
             (doseq [fx (or effects [])]
               (>! effects-ch fx)))
           (catch :default e
-            (>! effects-ch {:fx/type :fx/dead-letter
-                            :reason :engine-reducer-failure
-                            :error e
-                            :message msg})))
+            (let [dead-letter {:fx/type :fx/dead-letter
+                               :reason :engine-reducer-failure
+                               :error e
+                               :message msg}]
+              (record-effects! msg [dead-letter])
+              (>! effects-ch dead-letter))))
         (recur)))
     (go-loop []
       (when-let [fx (<! effects-ch)]
@@ -54,6 +76,9 @@
                                     :get-state (fn [] @state))
                              fx)
           (catch :default e
+            (record-drop! {:reason :interpreter-failure
+                           :effect fx
+                           :error (str e)})
             (telemetry/emit! :websocket/runtime-interpreter-failure
                              {:error (str e)
                               :effect fx})))

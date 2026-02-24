@@ -2,10 +2,16 @@
   (:require [hyperopen.platform :as platform]
             [hyperopen.websocket.acl.hyperliquid :as acl]
             [hyperopen.websocket.application.runtime :as app-runtime]
+            [hyperopen.websocket.application.runtime-reducer :as runtime-reducer]
             [hyperopen.websocket.domain.model :as model]
             [hyperopen.websocket.domain.policy :as policy]
+            [hyperopen.websocket.flight-recorder :as flight-recorder]
             [hyperopen.websocket.health :as health]
             [hyperopen.websocket.infrastructure.transport :as infra]))
+
+(def ^:private default-flight-recorder-config
+  {:enabled? ^boolean goog.DEBUG
+   :capacity 4000})
 
 (def ^:private default-config
   (merge {:base-delay-ms 500
@@ -21,6 +27,7 @@
           :stale-threshold-ms health/default-stream-stale-threshold-ms
           :stale-visible-ms 45000
           :stale-hidden-ms 180000
+          :flight-recorder default-flight-recorder-config
           :channel-tier-policy policy/default-channel-tier-policy}
          policy/default-backpressure-policy))
 
@@ -56,7 +63,8 @@
          :transport nil
          :scheduler nil
          :clock nil
-         :router nil}))
+         :router nil
+         :flight-recorder nil}))
 
 (defonce stream-runtime (atom {:tier-depth {:market 0 :lossless 0}
                                :metrics {:market-coalesced 0
@@ -149,7 +157,21 @@
                (update :clock #(or % (build-clock)))
                (update :scheduler #(or % (build-scheduler)))
                (update :transport #(or % (build-transport)))
-               (update :router #(or % (make-router)))))))
+               (update :router #(or % (make-router)))
+               (update :flight-recorder
+                       (fn [existing]
+                         (let [{:keys [enabled? capacity]} (:flight-recorder @connection-config)]
+                           (cond
+                             (and enabled? existing)
+                             existing
+
+                             enabled?
+                             (flight-recorder/create-recorder
+                               {:capacity (or capacity (:capacity default-flight-recorder-config))
+                                :now-ms now-ms})
+
+                             :else
+                             nil))))))))
 
 (defn- current-clock []
   (:clock @runtime-state))
@@ -202,6 +224,7 @@
                      :router (current-router)
                      :connection-state connection-state
                      :stream-runtime stream-runtime
+                     :flight-recorder (:flight-recorder @runtime-state)
                      :transport (current-transport)
                      :scheduler (current-scheduler)
                      :clock (current-clock)
@@ -297,6 +320,28 @@
 (defn get-tier-depths []
   (:tier-depth @stream-runtime))
 
+(defn get-flight-recording []
+  (when-let [recorder (:flight-recorder @runtime-state)]
+    (flight-recorder/snapshot recorder)))
+
+(defn get-flight-recording-redacted []
+  (when-let [recorder (:flight-recorder @runtime-state)]
+    (flight-recorder/redacted-snapshot recorder)))
+
+(defn clear-flight-recording! []
+  (when-let [recorder (:flight-recorder @runtime-state)]
+    (flight-recorder/clear-recorder! recorder)))
+
+(defn replay-flight-recording []
+  (when-let [recording (get-flight-recording)]
+    (let [reducer (fn [state msg]
+                    (runtime-reducer/step {:calculate-retry-delay-ms calculate-retry-delay-ms}
+                                          state
+                                          msg))
+          replay (flight-recorder/replay-runtime-messages {:recording recording
+                                                           :reducer reducer})]
+      (assoc replay :recording-event-count (:event-count recording)))))
+
 (defn get-health-snapshot []
   (let [connection @connection-state
         runtime @stream-runtime
@@ -353,4 +398,5 @@
          :transport nil
          :scheduler nil
          :clock nil
-         :router nil))
+         :router nil
+         :flight-recorder nil))

@@ -173,6 +173,8 @@
             [hyperopen.wallet.core-test]
             [hyperopen.websocket.acl.hyperliquid-test]
             [hyperopen.websocket.active-asset-ctx-test]
+            [hyperopen.websocket.application.flight-recorder-test]
+            [hyperopen.websocket.application.runtime-engine-test]
             [hyperopen.websocket.application.runtime-reducer-test]
             [hyperopen.websocket.application.runtime-test]
             [hyperopen.websocket.client-test]
@@ -374,6 +376,8 @@
              'hyperopen.wallet.core-test
              'hyperopen.websocket.acl.hyperliquid-test
              'hyperopen.websocket.active-asset-ctx-test
+             'hyperopen.websocket.application.flight-recorder-test
+             'hyperopen.websocket.application.runtime-engine-test
              'hyperopen.websocket.application.runtime-reducer-test
              'hyperopen.websocket.application.runtime-test
              'hyperopen.websocket.client-test

@@ -1,6 +1,7 @@
 (ns hyperopen.websocket.application.runtime
   (:require [cljs.core.async :as async :refer [<! chan close! put!]]
             [hyperopen.telemetry :as telemetry]
+            [hyperopen.websocket.flight-recorder :as flight-recorder]
             [hyperopen.websocket.application.runtime-engine :as engine]
             [hyperopen.websocket.application.runtime-reducer :as reducer]
             [hyperopen.websocket.domain.model :as model]
@@ -190,6 +191,7 @@
            router
            connection-state
            stream-runtime
+           flight-recorder
            transport
            scheduler
            clock
@@ -203,10 +205,24 @@
                   (reducer/step {:calculate-retry-delay-ms calculate-retry-delay-ms}
                                 state
                                 msg))
+        initial-state (reducer/initial-runtime-state config)
+        _ (when flight-recorder
+            (flight-recorder/start-session!
+              flight-recorder
+              {:runtime :websocket
+               :config (or config {})
+               :initial-state initial-state}))
         engine-instance (engine/start-engine!
-                          {:initial-state (reducer/initial-runtime-state config)
+                          {:initial-state initial-state
                            :reducer step-fn
                            :now-ms #(infra/now-ms* clock)
+                           :record-runtime-msg! (when flight-recorder
+                                                  #(flight-recorder/record-runtime-msg! flight-recorder %))
+                           :record-runtime-effects! (when flight-recorder
+                                                      #(flight-recorder/record-runtime-effects!
+                                                         flight-recorder %1 %2))
+                           :record-runtime-drop! (when flight-recorder
+                                                   #(flight-recorder/record-runtime-drop! flight-recorder %))
                            :interpret-effect! runtime-effects/interpret-effect!
                            :context {:transport transport
                                      :scheduler scheduler

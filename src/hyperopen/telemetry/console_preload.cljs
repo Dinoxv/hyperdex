@@ -14,7 +14,8 @@
    :runtime-state @app-system/runtime
    :websocket {:connection-state @ws-client/connection-state
                :stream-runtime @ws-client/stream-runtime
-               :client-runtime-state @ws-client/runtime-state}
+               :client-runtime-state @ws-client/runtime-state
+               :flight-recording (ws-client/get-flight-recording-redacted)}
    :telemetry {:event-count (count (telemetry/events))
                :events (telemetry/events)}})
 
@@ -42,11 +43,36 @@
       (js/URL.revokeObjectURL object-url))
     true))
 
+(defn- download-flight-recording!
+  []
+  (when-let [document (some-> js/globalThis .-document)]
+    (let [recording (ws-client/get-flight-recording-redacted)
+          payload (js/JSON.stringify (clj->js recording) nil 2)
+          blob (js/Blob. #js [payload] #js {:type "application/json"})
+          object-url (js/URL.createObjectURL blob)
+          link (.createElement document "a")
+          timestamp (platform/now-ms)]
+      (set! (.-href link) object-url)
+      (set! (.-download link) (str "hyperopen-flight-recording-" timestamp ".json"))
+      (.appendChild (.-body document) link)
+      (.click link)
+      (.remove link)
+      (js/URL.revokeObjectURL object-url))
+    true))
+
 (defn- debug-api
   []
   #js {:snapshot snapshot-js
        :snapshotJson snapshot-json
        :downloadSnapshot download-snapshot!
+       :flightRecording (fn []
+                          (clj->js (ws-client/get-flight-recording)))
+       :flightRecordingRedacted (fn []
+                                  (clj->js (ws-client/get-flight-recording-redacted)))
+       :clearFlightRecording ws-client/clear-flight-recording!
+       :replayFlightRecording (fn []
+                               (clj->js (ws-client/replay-flight-recording)))
+       :downloadFlightRecording download-flight-recording!
        :events (fn []
                  (clj->js (telemetry/events)))
        :eventsJson telemetry/events-json

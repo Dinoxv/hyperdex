@@ -7,6 +7,7 @@ Explain the development telemetry feature in Hyperopen:
 - where telemetry lives,
 - what telemetry events exist,
 - how to request a full debug snapshot from the browser console,
+- how to capture/replay websocket runtime flight recordings,
 - and how production behavior differs.
 
 ## Scope and Environment
@@ -21,6 +22,8 @@ Relevant implementation:
 
 - `/hyperopen/src/hyperopen/telemetry.cljs`
 - `/hyperopen/src/hyperopen/telemetry/console_preload.cljs`
+- `/hyperopen/src/hyperopen/websocket/flight_recorder.cljs`
+- `/hyperopen/src/hyperopen/websocket/client.cljs`
 - `/hyperopen/shadow-cljs.edn`
 
 ## Architecture
@@ -63,6 +66,16 @@ The preload is configured only for app devtools:
 
 No preload is configured for `:test`, `:ws-test`, or `:release`.
 
+### 4. Runtime flight recorder
+
+`/hyperopen/src/hyperopen/websocket/flight_recorder.cljs` provides a bounded in-memory recorder for normalized websocket runtime transitions:
+
+- runtime messages (`:runtime/msg`),
+- emitted effect batches (`:runtime/effects`),
+- enqueue/interpreter drops (`:runtime/drop`).
+
+The recorder is enabled by default in dev builds (`goog.DEBUG`) through `/hyperopen/src/hyperopen/websocket/client.cljs` config and is available from `HYPEROPEN_DEBUG`.
+
 ## Console API
 
 `HYPEROPEN_DEBUG` exposes:
@@ -74,6 +87,11 @@ No preload is configured for `:test`, `:ws-test`, or `:release`.
   - telemetry events.
 - `snapshotJson()` => pretty JSON string of `snapshot()`.
 - `downloadSnapshot()` => downloads JSON snapshot file.
+- `flightRecording()` => raw in-memory websocket runtime flight recording.
+- `flightRecordingRedacted()` => redacted recording safe for sharing.
+- `clearFlightRecording()` => clears current recording buffer.
+- `replayFlightRecording()` => deterministic replay summary for captured runtime messages.
+- `downloadFlightRecording()` => downloads redacted flight recording JSON.
 - `events()` => telemetry events only.
 - `eventsJson()` => telemetry events JSON string.
 - `clearEvents()` => clears telemetry event buffer.
@@ -101,9 +119,15 @@ Current high-level event types include:
 2. Reproduce behavior.
 3. In browser console, request snapshot:
    - `HYPEROPEN_DEBUG.snapshot()`
-4. If needed, export/share:
+4. Inspect runtime transitions:
+   - `HYPEROPEN_DEBUG.flightRecording()`
+5. Re-run reducer deterministically on captured messages:
+   - `HYPEROPEN_DEBUG.replayFlightRecording()`
+6. If needed, export/share:
    - `HYPEROPEN_DEBUG.snapshotJson()`
    - `HYPEROPEN_DEBUG.downloadSnapshot()`
+   - `HYPEROPEN_DEBUG.flightRecordingRedacted()`
+   - `HYPEROPEN_DEBUG.downloadFlightRecording()`
 
 ## Security and Data Hygiene
 
@@ -115,12 +139,15 @@ Telemetry must remain non-sensitive:
 
 If user-facing support export is exposed, add explicit redaction before download.
 
+Current recorder exports use diagnostics redaction rules (`sanitize-value :redact`) for sensitive fields and addresses.
+
 ## Production Behavior (Current)
 
 Current production behavior is intentionally conservative:
 
 - telemetry API is a no-op when `goog.DEBUG` is false,
 - no dev console preload globals in release,
+- flight recorder is disabled by default when `goog.DEBUG` is false,
 - no runtime telemetry transport enabled in production yet.
 
 ## Suggested Production Strategy (Next Step)

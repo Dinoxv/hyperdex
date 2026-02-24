@@ -473,3 +473,34 @@
       (is (= {:expected 7 :actual 9 :at-ms 130}
              (get-in snapshot [:streams sub-key :last-gap])))
       (is (true? (get-in snapshot [:groups :market_data :gap-detected?]))))))
+
+(deftest flight-recording-api-captures-clears-and-replays-test
+  (async done
+    (let [created (atom [])
+          sent (atom [])
+          closes (atom [])]
+      (swap! ws-client/connection-config assoc :flight-recorder {:enabled? true
+                                                                  :capacity 64})
+      (with-redefs [hyperopen.websocket.client/create-websocket
+                    (fn [ws-url]
+                      (let [socket (make-fake-socket sent closes)]
+                        (swap! created conj {:url ws-url :socket socket})
+                        socket))
+                    hyperopen.websocket.client/add-event-listener! (fn [& _] nil)
+                    hyperopen.websocket.client/schedule-interval! (fn [& _] :watchdog)]
+        (ws-client/init-connection! "wss://example.test/ws")
+        (js/setTimeout
+          (fn []
+            (let [recording (ws-client/get-flight-recording)
+                  redacted (ws-client/get-flight-recording-redacted)
+                  replay (ws-client/replay-flight-recording)]
+              (is (map? recording))
+              (is (pos? (:event-count recording)))
+              (is (map? redacted))
+              (is (map? replay))
+              (is (= (:event-count recording) (:recording-event-count replay)))
+              (is (pos? (:step-count replay)))
+              (ws-client/clear-flight-recording!)
+              (is (= 0 (:event-count (ws-client/get-flight-recording))))
+              (done)))
+          0)))))
