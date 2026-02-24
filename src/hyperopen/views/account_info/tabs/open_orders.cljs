@@ -1,5 +1,6 @@
 (ns hyperopen.views.account-info.tabs.open-orders
-  (:require [hyperopen.views.account-info.projections :as projections]
+  (:require [clojure.string :as str]
+            [hyperopen.views.account-info.projections :as projections]
             [hyperopen.views.account-info.shared :as shared]
             [hyperopen.views.account-info.sort-kernel :as sort-kernel]
             [hyperopen.views.account-info.table :as table]))
@@ -50,8 +51,23 @@
         (str "Trigger @ " price)))
     "--"))
 
-(defn format-tp-sl [{:keys [is-position-tpsl]}]
-  (if is-position-tpsl
+(defn- tpsl-type?
+  [order]
+  (let [type-text (some-> (:type order) str str/lower-case)]
+    (boolean
+     (or (and (string? (:tpsl order))
+              (contains? #{"tp" "sl"} (str/lower-case (:tpsl order))))
+         (and (string? type-text)
+              (or (str/includes? type-text "take profit")
+                  (str/includes? type-text "stop loss")
+                  (str/includes? type-text "take market")
+                  (str/includes? type-text "take limit")
+                  (str/includes? type-text "stop market")
+                  (str/includes? type-text "stop limit")))))))
+
+(defn format-tp-sl [{:keys [is-position-tpsl reduce-only] :as order}]
+  (if (or is-position-tpsl
+          (and reduce-only (tpsl-type? order)))
     "TP/SL"
     "-- / --"))
 

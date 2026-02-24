@@ -122,6 +122,31 @@
     (is (true? (:is-trigger true-trigger-order)))
     (is (= "63.5" (:px true-trigger-order)))))
 
+(deftest normalize-open-order-reads-nested-trigger-payload-fields-test
+  (let [order (projections/normalize-open-order {:order {:coin "SOL"
+                                                          :oid "3"
+                                                          :type "Take Profit Market"
+                                                          :dex "dex-a"
+                                                          :isPositionTpsl true
+                                                          :t {:trigger {:triggerPx "64.2"
+                                                                        :tpsl "tp"}}}})]
+    (is (true? (:is-trigger order)))
+    (is (= "64.2" (:trigger-px order)))
+    (is (= "64.2" (:px order)))
+    (is (= "tp" (:tpsl order)))
+    (is (= "dex-a" (:dex order)))))
+
+(deftest open-orders-by-dex-tags-rows-with-dex-when-missing-test
+  (let [rows (projections/open-orders-by-dex {:dex-a [{:coin "SOL" :oid 1}]
+                                              :dex-b [{:order {:coin "BTC" :oid 2}}]})]
+    (is (= #{"dex-a" "dex-b"}
+           (set (map #(let [value (or (:dex %)
+                                      (get-in % [:order :dex]))]
+                        (if (keyword? value)
+                          (name value)
+                          (str value)))
+                     rows))))))
+
 (deftest parse-time-ms-normalizes-seconds-and-milliseconds-test
   (is (= 1710000000000 (projections/parse-time-ms 1710000000)))
   (is (= 1710000000000 (projections/parse-time-ms 1710000000000)))

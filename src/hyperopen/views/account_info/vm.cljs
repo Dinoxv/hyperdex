@@ -1,5 +1,6 @@
 (ns hyperopen.views.account-info.vm
-  (:require [hyperopen.views.account-info.derived-cache :as derived-cache]
+  (:require [clojure.string :as str]
+            [hyperopen.views.account-info.derived-cache :as derived-cache]
             [hyperopen.views.account-info.projections :as projections]
             [hyperopen.views.websocket-freshness :as ws-freshness]))
 
@@ -66,6 +67,100 @@
     (get orders k)
     (get webdata2 k)))
 
+(def ^:private tp-side-markers
+  #{"tp" "takeprofit" "take-profit" "take profit"})
+
+(def ^:private sl-side-markers
+  #{"sl" "stoploss" "stop-loss" "stop loss"})
+
+(defn- normalize-dex-value
+  [value]
+  (some-> value projections/non-blank-text str/lower-case))
+
+(defn- order-matches-position?
+  [position order]
+  (let [position-coin (get-in position [:position :coin])
+        position-dex (normalize-dex-value (:dex position))
+        order-dex (normalize-dex-value (:dex order))]
+    (and (projections/open-order-for-active-asset? position-coin order)
+         (or (nil? position-dex)
+             (nil? order-dex)
+             (= position-dex order-dex)))))
+
+(defn- parse-order-tpsl-side
+  [value]
+  (let [text (some-> value str str/trim str/lower-case)]
+    (cond
+      (contains? tp-side-markers text) :tp
+      (contains? sl-side-markers text) :sl
+      :else nil)))
+
+(defn- infer-order-tpsl-side
+  [order]
+  (or (parse-order-tpsl-side (:tpsl order))
+      (let [type-text (some-> (:type order) str str/trim str/lower-case)]
+        (cond
+          (and type-text
+               (or (str/includes? type-text "take profit")
+                   (str/includes? type-text "take-profit")
+                   (str/includes? type-text "take")))
+          :tp
+
+          (and type-text
+               (or (str/includes? type-text "stop loss")
+                   (str/includes? type-text "stop-loss")
+                   (str/includes? type-text "stop")
+                   (str/includes? type-text "loss")))
+          :sl
+
+          :else nil))))
+
+(defn- position-tpsl-order?
+  [order]
+  (let [trigger-px (projections/parse-optional-num (:trigger-px order))
+        tpsl-side (infer-order-tpsl-side order)]
+    (and (#{:tp :sl} tpsl-side)
+         (number? trigger-px)
+         (pos? trigger-px)
+         (or (:is-position-tpsl order)
+             (:reduce-only order)))))
+
+(defn- order-time-ms
+  [order]
+  (or (projections/parse-time-ms (:time-ms order))
+      (projections/parse-time-ms (:time order))
+      0))
+
+(defn- newest-order
+  [orders]
+  (reduce (fn [best order]
+            (if (or (nil? best)
+                    (> (order-time-ms order)
+                       (order-time-ms best)))
+              order
+              best))
+          nil
+          orders))
+
+(defn- attach-position-tpsl-trigger-prices
+  [positions normalized-open-orders]
+  (let [orders* (or normalized-open-orders [])]
+    (->> (or positions [])
+         (mapv (fn [position]
+                 (let [matching (->> orders*
+                                     (filter (fn [order]
+                                               (and (position-tpsl-order? order)
+                                                    (order-matches-position? position order)))))
+                       tp-order (->> matching
+                                     (filter #(= :tp (infer-order-tpsl-side %)))
+                                     newest-order)
+                       sl-order (->> matching
+                                     (filter #(= :sl (infer-order-tpsl-side %)))
+                                     newest-order)]
+                   (cond-> position
+                     (some? tp-order) (assoc :position-tp-trigger-px (:trigger-px tp-order))
+                     (some? sl-order) (assoc :position-sl-trigger-px (:trigger-px sl-order)))))))))
+
 (defn- selected-tab-derivations [selected-tab
                                  webdata2
                                  spot-data
@@ -78,7 +173,13 @@
                                  market-by-key]
   (case selected-tab
     :balances {:balance-rows (derived-cache/memoized-balance-rows webdata2 spot-data account market-by-key)}
-    :positions {:positions (derived-cache/memoized-positions webdata2 perp-dex-states)}
+    :positions (let [positions (derived-cache/memoized-positions webdata2 perp-dex-states)
+                     normalized-open-orders (derived-cache/memoized-open-orders open-orders
+                                                                                 open-orders-snapshot
+                                                                                 open-orders-snapshot-by-dex
+                                                                                 pending-cancel-oids)]
+                 {:positions (attach-position-tpsl-trigger-prices positions
+                                                                  normalized-open-orders)})
     :open-orders {:open-orders (derived-cache/memoized-open-orders open-orders
                                                                    open-orders-snapshot
                                                                    open-orders-snapshot-by-dex

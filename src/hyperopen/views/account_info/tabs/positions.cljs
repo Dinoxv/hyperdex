@@ -111,6 +111,52 @@
                             "--")]
     (str "All-time: " all-time-text " Since change: " since-change-text)))
 
+(defn- valid-trigger-price
+  [value]
+  (let [num (shared/parse-optional-num value)]
+    (when (and (number? num)
+               (pos? num))
+      value)))
+
+(defn- resolve-position-trigger-price
+  [position-data side]
+  (let [pos (or (:position position-data) {})
+        candidates (case side
+                     :tp [(:position-tp-trigger-px position-data)
+                          (:tp-trigger-px position-data)
+                          (:tpTriggerPx position-data)
+                          (:takeProfitPx position-data)
+                          (:takeProfitTriggerPx position-data)
+                          (:tpPx position-data)
+                          (:tpTriggerPx pos)
+                          (:takeProfitPx pos)
+                          (:takeProfitTriggerPx pos)
+                          (:tpPx pos)]
+                     :sl [(:position-sl-trigger-px position-data)
+                          (:sl-trigger-px position-data)
+                          (:slTriggerPx position-data)
+                          (:stopLossPx position-data)
+                          (:stopLossTriggerPx position-data)
+                          (:slPx position-data)
+                          (:slTriggerPx pos)
+                          (:stopLossPx pos)
+                          (:stopLossTriggerPx pos)
+                          (:slPx pos)]
+                     [])]
+    (some valid-trigger-price candidates)))
+
+(defn- tpsl-cell-copy
+  [position-data]
+  (let [tp-trigger (resolve-position-trigger-price position-data :tp)
+        sl-trigger (resolve-position-trigger-price position-data :sl)
+        tp-text (if tp-trigger
+                  (shared/format-trade-price tp-trigger)
+                  "--")
+        sl-text (if sl-trigger
+                  (shared/format-trade-price sl-trigger)
+                  "--")]
+    (str tp-text " / " sl-text)))
+
 (defn- edit-icon []
   [:svg {:class ["h-3" "w-3" "shrink-0" "text-trading-green"]
          :viewBox "0 0 20 20"
@@ -165,6 +211,7 @@
          liq-explanation (or (shared/non-blank-text (:liquidationExplanation pos))
                              (shared/non-blank-text (:liquidation-explanation pos))
                              (shared/non-blank-text (:liquidation-explanation position-data)))
+         tpsl-copy (tpsl-cell-copy position-data)
          active-modal?
          (and (position-tpsl/open? modal)
               (= (projections/position-unique-key position-data)
@@ -211,11 +258,21 @@
            "--")]
         funding-tooltip)]
       [:div {:class ["text-left" "relative"]}
-       [:button {:class ["btn" "btn-xs" "btn-ghost" "gap-1" "px-1.5" "font-normal" "text-trading-text"]
+       [:button {:class ["btn"
+                         "btn-xs"
+                         "btn-ghost"
+                         "w-full"
+                         "justify-start"
+                         "gap-1"
+                         "px-1.5"
+                         "font-normal"
+                         "text-trading-text"
+                         "flex-nowrap"
+                         "whitespace-nowrap"]
                  :type "button"
                  :data-position-tpsl-trigger "true"
                  :on {:click [[:actions/open-position-tpsl-modal position-data :event.currentTarget/bounds]]}}
-        [:span "-- / --"]
+        [:span {:class ["whitespace-nowrap"]} tpsl-copy]
         (edit-icon)]
        (when active-modal?
          (position-tpsl-modal/position-tpsl-modal-view modal))]])))

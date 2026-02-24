@@ -38,10 +38,18 @@
      (or (get labels status-key)
          (coins/title-case-label status)))))
 
+(defn- order-trigger-map
+  [order-map]
+  (when (map? order-map)
+    (or (get-in order-map [:t :trigger])
+        (get-in order-map [:trigger]))))
+
 (defn normalize-open-order [order]
   (let [root (or (:order order) order)
         root-map (if (map? root) root {})
         order-map (if (map? order) order {})
+        root-trigger (order-trigger-map root-map)
+        order-trigger (order-trigger-map order-map)
         coin (or (:coin root-map) (:coin order-map))
         oid (or (resolve-open-order-oid root-map)
                 (resolve-open-order-oid order-map))
@@ -50,10 +58,25 @@
         orig-sz (or (:origSz root-map) (:origSz order-map))
         limit-px (or (:limitPx root-map) (:limitPx order-map))
         fallback-px (or (:px root-map) (:px order-map))
-        trigger-px (or (:triggerPx root-map) (:triggerPx order-map))
-        is-trigger? (true? (parse/boolean-value (or (:isTrigger root-map) (:isTrigger order-map))))
+        trigger-px (or (:triggerPx root-map)
+                       (:triggerPx order-map)
+                       (:triggerPx root-trigger)
+                       (:triggerPx order-trigger))
+        is-trigger-value (parse/boolean-value (or (:isTrigger root-map)
+                                                  (:isTrigger order-map)))
+        is-trigger? (if (some? is-trigger-value)
+                      (true? is-trigger-value)
+                      (or (map? root-trigger)
+                          (map? order-trigger)))
         trigger-condition (or (:triggerCondition root-map) (:triggerCondition order-map)
-                              (:triggerCond root-map) (:triggerCond order-map))
+                              (:triggerCond root-map) (:triggerCond order-map)
+                              (:triggerCondition root-trigger) (:triggerCondition order-trigger)
+                              (:triggerCond root-trigger) (:triggerCond order-trigger))
+        tpsl (or (:tpsl root-map)
+                 (:tpsl order-map)
+                 (:tpsl root-trigger)
+                 (:tpsl order-trigger))
+        dex (or (:dex root-map) (:dex order-map))
         candidate (or limit-px fallback-px)
         px (if (and is-trigger?
                     (zero? (or (parse/parse-optional-num candidate) 0)))
@@ -89,6 +112,8 @@
        :is-trigger is-trigger?
        :trigger-condition trigger-condition
        :trigger-px trigger-px
+       :tpsl tpsl
+       :dex dex
        :is-position-tpsl is-position-tpsl})))
 
 (defn open-orders-seq [orders]
@@ -102,9 +127,28 @@
                       :else []))
     :else []))
 
+(defn- attach-order-dex
+  [order dex]
+  (cond
+    (not (map? order))
+    order
+
+    (and (map? (:order order))
+         (nil? (get-in order [:order :dex]))
+         (nil? (:dex order)))
+    (assoc-in order [:order :dex] dex)
+
+    (nil? (:dex order))
+    (assoc order :dex dex)
+
+    :else
+    order))
+
 (defn open-orders-by-dex [orders-by-dex]
-  (->> (vals (or orders-by-dex {}))
-       (mapcat open-orders-seq)))
+  (->> (or orders-by-dex {})
+       (mapcat (fn [[dex orders]]
+                 (->> (open-orders-seq orders)
+                      (map #(attach-order-dex % dex)))))))
 
 (defn open-orders-source [orders snapshot snapshot-by-dex]
   (let [live (open-orders-seq orders)

@@ -228,9 +228,26 @@
         row-cells (vec (hiccup/node-children row-node))
         tpsl-cell (nth row-cells 9)
         edit-icon-node (hiccup/find-first-node tpsl-cell #(= :svg (first %)))
+        action-button (hiccup/find-first-node tpsl-cell #(= :button (first %)))
         tpsl-strings (set (hiccup/collect-strings tpsl-cell))]
     (is (contains? tpsl-strings "-- / --"))
-    (is (some? edit-icon-node))))
+    (is (some? edit-icon-node))
+    (is (contains? (hiccup/node-class-set action-button) "flex-nowrap"))
+    (is (contains? (hiccup/node-class-set action-button) "whitespace-nowrap"))))
+
+(deftest position-row-tpsl-cell-renders-derived-trigger-prices-when-present-test
+  (let [row-data (-> (fixtures/sample-position-row "xyz:NVDA" 10 "0.500")
+                     (assoc :position-tp-trigger-px "12.5"
+                            :position-sl-trigger-px "9.5"))
+        row-node (view/position-row row-data)
+        row-cells (vec (hiccup/node-children row-node))
+        tpsl-cell (nth row-cells 9)
+        expected-copy (str (view/format-trade-price "12.5")
+                           " / "
+                           (view/format-trade-price "9.5"))
+        tpsl-strings (set (hiccup/collect-strings tpsl-cell))]
+    (is (contains? tpsl-strings expected-copy))
+    (is (not (contains? tpsl-strings "-- / --")))))
 
 (deftest position-row-tpsl-cell-dispatches-open-modal-action-test
   (let [row-data (fixtures/sample-position-row "xyz:NVDA" 10 "0.500")
@@ -272,14 +289,14 @@
     (is (nil? panel-node))))
 
 (deftest position-table-layout-prioritizes-coin-column-over-right-edge-actions-test
-  (let [grid-template-class "grid-cols-[minmax(170px,1.9fr)_minmax(130px,1.2fr)_minmax(110px,1fr)_minmax(110px,1fr)_minmax(110px,1fr)_minmax(130px,1.3fr)_minmax(110px,1fr)_minmax(100px,1fr)_minmax(100px,1fr)_minmax(80px,0.8fr)]"
+  (let [grid-template-class "grid-cols-[minmax(170px,1.9fr)_minmax(130px,1.2fr)_minmax(110px,1fr)_minmax(110px,1fr)_minmax(110px,1fr)_minmax(130px,1.3fr)_minmax(110px,1fr)_minmax(100px,1fr)_minmax(100px,1fr)_minmax(120px,1fr)]"
         header-node (view/position-table-header fixtures/default-sort-state)
         row-node (view/position-row (fixtures/sample-position-row "xyz:NVDA" 10 "0.500"))
         coin-cell (first (vec (hiccup/node-children row-node)))
         coin-label-node (hiccup/find-first-node coin-cell #(contains? (hiccup/direct-texts %) "NVDA"))]
     (is (contains? (hiccup/node-class-set header-node) grid-template-class))
-    (is (contains? (hiccup/node-class-set header-node) "min-w-[1140px]"))
+    (is (contains? (hiccup/node-class-set header-node) "min-w-[1200px]"))
     (is (contains? (hiccup/node-class-set row-node) grid-template-class))
-    (is (contains? (hiccup/node-class-set row-node) "min-w-[1140px]"))
+    (is (contains? (hiccup/node-class-set row-node) "min-w-[1200px]"))
     (is (contains? (hiccup/node-class-set coin-label-node) "whitespace-nowrap"))
     (is (not (contains? (hiccup/node-class-set coin-label-node) "truncate")))))

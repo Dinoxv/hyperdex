@@ -79,11 +79,77 @@
 
       (vm/reset-account-info-vm-cache!)
       (vm/account-info-vm (assoc-in base-state [:account-info :selected-tab] :positions))
-      (is (= {:balances 1 :positions 1 :open-orders 0} @calls))
+      (is (= {:balances 1 :positions 1 :open-orders 1} @calls))
 
       (vm/reset-account-info-vm-cache!)
       (vm/account-info-vm (assoc-in base-state [:account-info :selected-tab] :open-orders))
-      (is (= {:balances 1 :positions 1 :open-orders 1} @calls)))))
+      (is (= {:balances 1 :positions 1 :open-orders 2} @calls)))))
+
+(deftest account-info-vm-attaches-position-tpsl-trigger-prices-from-open-orders-test
+  (let [state {:account-info {:selected-tab :positions}
+               :webdata2 {:clearinghouseState {:assetPositions [{:position {:coin "HYPE"
+                                                                             :szi "1.0"
+                                                                             :entryPx "10"
+                                                                             :positionValue "10"
+                                                                             :unrealizedPnl "0.5"
+                                                                             :returnOnEquity "0.1"
+                                                                             :liquidationPx "5"
+                                                                             :marginUsed "1"
+                                                                             :cumFunding {:allTime "0"}}}]}}
+               :orders {:open-orders [{:coin "HYPE"
+                                       :oid 101
+                                       :orderType "Take Profit Market"
+                                       :isTrigger true
+                                       :triggerPx "11.5"
+                                       :isPositionTpsl true
+                                       :timestamp 1700000001000}
+                                      {:coin "HYPE"
+                                       :oid 102
+                                       :orderType "Stop Market"
+                                       :isTrigger true
+                                       :triggerPx "9.5"
+                                       :isPositionTpsl true
+                                       :timestamp 1700000000000}]
+                        :open-orders-snapshot []
+                        :open-orders-snapshot-by-dex {}}
+               :spot {:meta nil
+                      :clearinghouse-state nil}
+               :account {:mode :classic}
+               :perp-dex-clearinghouse {}}
+        view-model (vm/account-info-vm state)
+        row (first (:positions view-model))]
+    (is (= "11.5" (:position-tp-trigger-px row)))
+    (is (= "9.5" (:position-sl-trigger-px row)))))
+
+(deftest account-info-vm-attaches-reduce-only-tpsl-triggers-even-when-is-position-flag-missing-test
+  (let [state {:account-info {:selected-tab :positions}
+               :webdata2 {:clearinghouseState {:assetPositions [{:position {:coin "BERA"
+                                                                             :szi "169.3"
+                                                                             :entryPx "0.59014"
+                                                                             :positionValue "99.80"
+                                                                             :unrealizedPnl "0.11"
+                                                                             :returnOnEquity "0.005"
+                                                                             :liquidationPx "1.63655604"
+                                                                             :marginUsed "19.96"
+                                                                             :cumFunding {:allTime "0"}}}]}}
+               :orders {:open-orders [{:coin "BERA"
+                                       :oid 201
+                                       :orderType "Take Profit Market"
+                                       :isTrigger true
+                                       :triggerPx "0.57831"
+                                       :reduceOnly true
+                                       :isPositionTpsl false
+                                       :timestamp 1700000001000}]
+                        :open-orders-snapshot []
+                        :open-orders-snapshot-by-dex {}}
+               :spot {:meta nil
+                      :clearinghouse-state nil}
+               :account {:mode :classic}
+               :perp-dex-clearinghouse {}}
+        view-model (vm/account-info-vm state)
+        row (first (:positions view-model))]
+    (is (= "0.57831" (:position-tp-trigger-px row)))
+    (is (nil? (:position-sl-trigger-px row)))))
 
 (deftest account-info-vm-memoizes-selected-tab-derived-rows-by-input-identity-test
   (let [state {:account-info {:selected-tab :open-orders}

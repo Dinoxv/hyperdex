@@ -182,3 +182,13 @@
            (get-in long-coin-base [1 :style :color])))
     (is (= "rgb(234, 175, 184)"
            (get-in short-coin-base [1 :style :color])))))
+
+(deftest format-tp-sl-treats-reduce-only-take-profit-orders-as-position-tpsl-test
+  (is (= "TP/SL"
+         (view/format-tp-sl {:is-position-tpsl false
+                             :reduce-only true
+                             :type "Take Profit Market"})))
+  (is (= "-- / --"
+         (view/format-tp-sl {:is-position-tpsl false
+                             :reduce-only false
+                             :type "Take Profit Market"}))))
