@@ -305,21 +305,15 @@
   "Apply persisted visible range to chart time scale if available."
   ([chart timeframe]
    (apply-persisted-visible-range! chart timeframe {}))
-  ([chart timeframe {:keys [storage-get] :as deps}]
-   (if (contains? deps :storage-get)
-     (visible-range-persistence/apply-persisted-visible-range! chart timeframe
-                                                               {:storage-get storage-get})
-     (visible-range-persistence/apply-persisted-visible-range! chart timeframe))))
+  ([chart timeframe deps]
+   (visible-range-persistence/apply-persisted-visible-range! chart timeframe deps)))
 
 (defn subscribe-visible-range-persistence!
-  "Subscribe to visible-range changes and persist them by timeframe."
+  "Subscribe to visible-range changes and persist them by asset + timeframe."
   ([chart timeframe]
    (subscribe-visible-range-persistence! chart timeframe {}))
-  ([chart timeframe {:keys [storage-set!] :as deps}]
-   (if (contains? deps :storage-set!)
-     (visible-range-persistence/subscribe-visible-range-persistence! chart timeframe
-                                                                     {:storage-set! storage-set!})
-     (visible-range-persistence/subscribe-visible-range-persistence! chart timeframe))))
+  ([chart timeframe deps]
+   (visible-range-persistence/subscribe-visible-range-persistence! chart timeframe deps)))
 
 (defn create-legend!
   "Create legend element that adapts to different chart types."

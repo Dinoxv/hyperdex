@@ -305,7 +305,8 @@
                                              :format-delta fmt/format-trade-price-delta}
                                :volume-visible? (boolean (get-in state [:chart-options :volume-visible?] true))
                                :on-hide-volume-indicator dispatch-hide-volume-indicator!
-                               :persistence-deps {}}
+                               :persistence-deps {:asset active-asset
+                                                  :candles candle-data}}
         legend-meta {:symbol symbol
                      :timeframe-label timeframe-label
                      :venue "Hyperopen"

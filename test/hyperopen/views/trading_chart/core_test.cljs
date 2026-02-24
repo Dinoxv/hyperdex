@@ -355,3 +355,28 @@
 
       (chart-core/chart-canvas candle-data-new-identity :candlestick active-indicators-b legend-meta :4h chart-runtime-options)
       (is (= 4 @calls*) "new candle data identity should recompute indicator output"))))
+
+(deftest trading-chart-view-passes-asset-and-candles-into-persistence-deps-test
+  (let [raw-candles [{:t 1700000000000 :o "100" :h "101" :l "99" :c "100" :v "10"}
+                     {:t 1700000060000 :o "100" :h "102" :l "98" :c "101" :v "12"}]
+        transformed [{:time 1700000000 :open 100 :high 101 :low 99 :close 100 :volume 10}]
+        captured-args (atom nil)
+        state {:active-asset "BTC"
+               :candles {"BTC" {:1d raw-candles}}
+               :chart-options {:selected-timeframe :1d
+                               :selected-chart-type :candlestick
+                               :active-indicators {}}}]
+    (derived-cache/reset-derived-cache!)
+    (binding [derived-cache/*process-candle-data* (fn [_] transformed)]
+      (with-redefs [chart-core/chart-canvas (fn
+                                              ([a b c d e f]
+                                               (reset! captured-args [a b c d e f])
+                                               [:div])
+                                              ([a b c d e f g h]
+                                               (reset! captured-args [a b c d e f g h])
+                                               [:div]))]
+        (chart-core/trading-chart-view state)))
+    (let [runtime-options (nth @captured-args 5)
+          persistence-deps (:persistence-deps runtime-options)]
+      (is (= "BTC" (:asset persistence-deps)))
+      (is (= transformed (:candles persistence-deps))))))
