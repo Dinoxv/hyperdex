@@ -183,6 +183,48 @@
             :dispatch! dispatch!})
           (is (= 1 (count @removed-handlers))))))))
 
+(deftest install-position-tpsl-clickaway-registers-mousedown-and-closes-on-outside-click-test
+  (let [registered-handlers (atom {})
+        removed-handlers (atom [])
+        dispatch-calls (atom [])
+        store (atom {:positions-ui {:tpsl-modal {:open? true}}})
+        dispatch! (fn [store-arg _ctx effects]
+                    (swap! dispatch-calls conj {:store store-arg
+                                                :effects effects}))
+        inside-panel-target #js {:closest (fn [selector]
+                                            (when (= selector "[data-position-tpsl-surface='true']")
+                                              #js {}))}
+        inside-trigger-target #js {:closest (fn [selector]
+                                              (when (= selector "[data-position-tpsl-trigger='true']")
+                                                #js {}))}
+        outside-target #js {:closest (fn [_selector] nil)}]
+    (with-global-property
+      "window"
+      #js {:addEventListener (fn [event-name handler]
+                               (swap! registered-handlers assoc event-name handler))
+           :removeEventListener (fn [event-name handler]
+                                  (swap! removed-handlers conj [event-name handler]))}
+      (fn []
+        (startup-runtime/install-position-tpsl-clickaway!
+         {:store store
+          :dispatch! dispatch!})
+        (let [mousedown-handler (get @registered-handlers "mousedown")]
+          (is (fn? mousedown-handler))
+          (mousedown-handler #js {:target inside-panel-target})
+          (mousedown-handler #js {:target inside-trigger-target})
+          (is (empty? @dispatch-calls))
+          (mousedown-handler #js {:target outside-target})
+          (is (= [[:actions/close-position-tpsl-modal]]
+                 (-> @dispatch-calls first :effects)))
+          (reset! dispatch-calls [])
+          (swap! store assoc-in [:positions-ui :tpsl-modal :open?] false)
+          (mousedown-handler #js {:target outside-target})
+          (is (empty? @dispatch-calls))
+          (startup-runtime/install-position-tpsl-clickaway!
+           {:store store
+            :dispatch! dispatch!})
+          (is (= 1 (count @removed-handlers))))))))
+
 (deftest stage-b-account-bootstrap-covers-shape-guard-and-empty-dex-branches-test
   (let [timeouts (atom [])
         open-orders-calls (atom [])

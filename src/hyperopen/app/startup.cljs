@@ -121,6 +121,10 @@
                                             (startup-runtime-lib/install-asset-selector-shortcuts!
                                              {:store (:store base-deps)
                                               :dispatch! (:dispatch! base-deps)}))
+       :install-position-tpsl-clickaway! (fn []
+                                           (startup-runtime-lib/install-position-tpsl-clickaway!
+                                            {:store (:store base-deps)
+                                             :dispatch! (:dispatch! base-deps)}))
        :register-icon-service-worker! (fn []
                                         (register-icon-service-worker! system))
        :initialize-remote-data-streams! (fn []

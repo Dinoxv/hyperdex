@@ -151,6 +151,7 @@
      :positions-sort positions-sort
      :balances-sort balances-sort
      :open-orders-sort open-orders-sort
+     :position-tpsl-modal (get-in state [:positions-ui :tpsl-modal])
      :hide-small? hide-small?
      :perp-dex-states perp-dex-states
      :webdata2 webdata2

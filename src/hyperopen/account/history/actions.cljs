@@ -477,9 +477,13 @@
 (defn set-hide-small-balances [_state checked]
   [[:effects/save [:account-info :hide-small-balances?] checked]])
 
-(defn open-position-tpsl-modal [_state position-data]
-  [[:effects/save [:positions-ui :tpsl-modal]
-    (position-tpsl/from-position-row position-data)]])
+(defn open-position-tpsl-modal
+  ([_state position-data]
+   [[:effects/save [:positions-ui :tpsl-modal]
+     (position-tpsl/from-position-row position-data)]])
+  ([_state position-data trigger-bounds]
+   [[:effects/save [:positions-ui :tpsl-modal]
+     (position-tpsl/from-position-row position-data trigger-bounds)]]))
 
 (defn close-position-tpsl-modal [_state]
   [[:effects/save [:positions-ui :tpsl-modal]

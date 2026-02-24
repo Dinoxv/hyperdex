@@ -239,4 +239,18 @@
 
   (nxr/register-placeholder! :event/timeStamp
     (fn [{:replicant/keys [dom-event]}]
-      (some-> dom-event .-timeStamp))))
+      (some-> dom-event .-timeStamp)))
+
+  (nxr/register-placeholder! :event.currentTarget/bounds
+    (fn [{:replicant/keys [dom-event]}]
+      (when-let [target (some-> dom-event .-currentTarget)]
+        (when (fn? (.-getBoundingClientRect target))
+          (let [rect (.getBoundingClientRect target)]
+            {:left (.-left rect)
+             :right (.-right rect)
+             :top (.-top rect)
+             :bottom (.-bottom rect)
+             :width (.-width rect)
+             :height (.-height rect)
+             :viewport-width (some-> js/globalThis .-innerWidth)
+             :viewport-height (some-> js/globalThis .-innerHeight)}))))))

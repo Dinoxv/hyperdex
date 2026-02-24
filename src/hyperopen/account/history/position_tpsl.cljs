@@ -8,6 +8,7 @@
 (defn default-modal-state []
   {:open? false
    :position-key nil
+   :anchor nil
    :coin nil
    :dex nil
    :position-side nil
@@ -45,6 +46,21 @@
   (let [text (some-> value str str/trim)]
     (when (seq text)
       text)))
+
+(def ^:private anchor-keys
+  [:left :right :top :bottom :width :height :viewport-width :viewport-height])
+
+(defn- normalize-anchor
+  [anchor]
+  (when (map? anchor)
+    (let [normalized (reduce (fn [acc k]
+                               (if-let [n (parse-num (get anchor k))]
+                                 (assoc acc k n)
+                                 acc))
+                             {}
+                             anchor-keys)]
+      (when (seq normalized)
+        normalized))))
 
 (defn- bool [value]
   (boolean value))
@@ -287,28 +303,32 @@
             {:ok? false
              :display-message "Place Order"}))))))
 
-(defn from-position-row [position-data]
-  (let [position (or (:position position-data) {})
-        side (position-side (:szi position))
-        size (absolute-position-size (:szi position))
-        entry-price (or (parse-num (:entryPx position)) 0)
-        mark-price (calculate-mark-price position)
-        position-value (or (parse-num (:positionValue position))
-                           (* size entry-price)
-                           0)]
-    (assoc (default-modal-state)
-           :open? true
-           :position-key (projections/position-unique-key position-data)
-           :coin (:coin position)
-           :dex (normalize-display-text (:dex position-data))
-           :position-side side
-           :entry-price entry-price
-           :mark-price mark-price
-           :position-size size
-           :position-value position-value
-           :size-input (if (positive-number? size)
-                         (trading-domain/number->clean-string size 8)
-                         ""))))
+(defn from-position-row
+  ([position-data]
+   (from-position-row position-data nil))
+  ([position-data anchor]
+   (let [position (or (:position position-data) {})
+         side (position-side (:szi position))
+         size (absolute-position-size (:szi position))
+         entry-price (or (parse-num (:entryPx position)) 0)
+         mark-price (calculate-mark-price position)
+         position-value (or (parse-num (:positionValue position))
+                            (* size entry-price)
+                            0)]
+     (assoc (default-modal-state)
+            :open? true
+            :position-key (projections/position-unique-key position-data)
+            :anchor (normalize-anchor anchor)
+            :coin (:coin position)
+            :dex (normalize-display-text (:dex position-data))
+            :position-side side
+            :entry-price entry-price
+            :mark-price mark-price
+            :position-size size
+            :position-value position-value
+            :size-input (if (positive-number? size)
+                          (trading-domain/number->clean-string size 8)
+                          "")))))
 
 (def ^:private updatable-paths
   #{[:size-input]

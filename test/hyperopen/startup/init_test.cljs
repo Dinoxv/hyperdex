@@ -42,6 +42,8 @@
       :init-router! (record-store-call :init-router)
       :install-asset-selector-shortcuts! (fn []
                                            (swap! calls conj :install-asset-selector-shortcuts))
+      :install-position-tpsl-clickaway! (fn []
+                                          (swap! calls conj :install-position-tpsl-clickaway))
       :register-icon-service-worker! (fn []
                                        (swap! calls conj :register-icon-service-worker))
       :initialize-remote-data-streams! (fn []
@@ -67,6 +69,7 @@
             [:init-wallet true]
             [:init-router true]
             :install-asset-selector-shortcuts
+            :install-position-tpsl-clickaway
             :register-icon-service-worker
             :initialize-remote-data-streams
             [:kick-render true]]
@@ -110,6 +113,8 @@
                       (swap! calls conj [:init-router (= store store-arg)]))
       :install-asset-selector-shortcuts! (fn []
                                            (swap! calls conj :install-asset-selector-shortcuts))
+      :install-position-tpsl-clickaway! (fn []
+                                          (swap! calls conj :install-position-tpsl-clickaway))
       :register-icon-service-worker! (fn []
                                        (swap! calls conj :register-service-worker))
       :initialize-remote-data-streams! (fn []
@@ -120,6 +125,7 @@
             [:init-wallet true]
             [:init-router true]
             :install-asset-selector-shortcuts
+            :install-position-tpsl-clickaway
             :register-service-worker
             :initialize-streams
             [:kick-render true]]

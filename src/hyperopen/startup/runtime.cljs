@@ -74,6 +74,9 @@
 (defonce ^:private asset-selector-shortcuts-cleanup
   (atom nil))
 
+(defonce ^:private position-tpsl-clickaway-cleanup
+  (atom nil))
+
 (defn- non-blank-text
   [value]
   (let [text (some-> value str str/trim)]
@@ -131,6 +134,43 @@
         (reset! asset-selector-shortcuts-cleanup
                 (fn []
                   (.removeEventListener window-object "keydown" handler)))))))
+
+(defn- event-target-with-closest
+  [event]
+  (let [target (some-> event .-target)]
+    (cond
+      (fn? (some-> target .-closest)) target
+      (fn? (some-> target .-parentElement .-closest)) (.-parentElement target)
+      :else nil)))
+
+(defn- within-position-tpsl-surface?
+  [target]
+  (boolean
+   (or (some-> target (.closest "[data-position-tpsl-surface='true']"))
+       (some-> target (.closest "[data-position-tpsl-trigger='true']")))))
+
+(defn install-position-tpsl-clickaway!
+  [{:keys [store dispatch!]}]
+  (let [window-object (when (exists? js/window) js/window)
+        add-event-listener (some-> window-object (.-addEventListener))
+        remove-event-listener (some-> window-object (.-removeEventListener))]
+    (when (and (fn? add-event-listener)
+               (fn? remove-event-listener)
+               (some? store)
+               (fn? dispatch!))
+      (when-let [cleanup @position-tpsl-clickaway-cleanup]
+        (cleanup)
+        (reset! position-tpsl-clickaway-cleanup nil))
+      (let [handler (fn [event]
+                      (let [open? (true? (get-in @store [:positions-ui :tpsl-modal :open?]))]
+                        (when open?
+                          (let [target (event-target-with-closest event)]
+                            (when-not (within-position-tpsl-surface? target)
+                              (dispatch! store nil [[:actions/close-position-tpsl-modal]]))))))]
+        (.addEventListener window-object "mousedown" handler)
+        (reset! position-tpsl-clickaway-cleanup
+                (fn []
+                  (.removeEventListener window-object "mousedown" handler)))))))
 
 (defn stage-b-account-bootstrap!
   [{:keys [store

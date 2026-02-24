@@ -55,6 +55,7 @@
            init-wallet!
            init-router!
            install-asset-selector-shortcuts!
+           install-position-tpsl-clickaway!
            register-icon-service-worker!
            initialize-remote-data-streams!
            kick-render!]}]
@@ -66,6 +67,9 @@
   ;; Install global keyboard shortcuts that should work regardless of focus target.
   (when (fn? install-asset-selector-shortcuts!)
     (install-asset-selector-shortcuts!))
+  ;; Install TP/SL click-away behavior without blocking background pointer interaction.
+  (when (fn? install-position-tpsl-clickaway!)
+    (install-position-tpsl-clickaway!))
   ;; Register icon cache service worker for cross-reload symbol icon caching.
   (register-icon-service-worker!)
   ;; Initialize remote data streams.

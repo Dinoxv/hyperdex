@@ -72,38 +72,78 @@
              (some? action) (assoc :on {:input action})
              (nil? action) (assoc :readonly true))]])
 
-(defn position-tpsl-modal-view [state]
-  (let [modal (or (get-in state [:positions-ui :tpsl-modal])
-                  (position-tpsl/default-modal-state))]
-    (when (position-tpsl/open? modal)
-      (let [preview (position-tpsl/validate-modal modal)
-            submitting? (boolean (:submitting? modal))
+(def ^:private panel-gap-px 8)
+(def ^:private panel-margin-px 16)
+(def ^:private preferred-panel-width-px 500)
+(def ^:private fallback-viewport-width 1280)
+(def ^:private fallback-anchor-top 640)
+
+(defn- clamp
+  [value min-value max-value]
+  (-> value
+      (max min-value)
+      (min max-value)))
+
+(defn- anchor-number
+  [anchor k default]
+  (let [value (get anchor k)]
+    (if (number? value)
+      value
+      default)))
+
+(defn- modal-layout-style
+  [modal]
+  (let [anchor (or (:anchor modal) {})
+        viewport-width (max 320
+                           (anchor-number anchor :viewport-width fallback-viewport-width)
+                           (+ (anchor-number anchor :right 0) panel-margin-px))
+        anchor-right (anchor-number anchor :right (- viewport-width panel-margin-px))
+        anchor-top (anchor-number anchor :top fallback-anchor-top)
+        panel-width (clamp (- viewport-width (* 2 panel-margin-px))
+                           280
+                           preferred-panel-width-px)
+        left (clamp (- anchor-right panel-width)
+                    panel-margin-px
+                    (- viewport-width panel-width panel-margin-px))
+        available-above (max 1 (- anchor-top panel-margin-px panel-gap-px))]
+    {:left (str left "px")
+     :top (str (- anchor-top panel-gap-px) "px")
+     :transform "translateY(-100%)"
+     :width (str panel-width "px")
+     :max-height (str available-above "px")}))
+
+(defn position-tpsl-modal-view
+  [modal]
+  (let [modal* (or modal (position-tpsl/default-modal-state))]
+    (when (position-tpsl/open? modal*)
+      (let [preview (position-tpsl/validate-modal modal*)
+            submitting? (boolean (:submitting? modal*))
             submit-label (if submitting?
                            "Submitting..."
                            (:display-message preview))
             submit-disabled? (or submitting?
-                                (not (:is-ok preview)))
-            coin (coin-label (:coin modal))
-            active-size (position-tpsl/active-size modal)
-            gain (position-tpsl/estimated-gain-usd modal)
-            loss (position-tpsl/estimated-loss-usd modal)]
-        [:div {:class ["fixed" "inset-0" "z-[260]" "flex" "items-center" "justify-center" "px-3"]
+                               (not (:is-ok preview)))
+            coin (coin-label (:coin modal*))
+            active-size (position-tpsl/active-size modal*)
+            gain (position-tpsl/estimated-gain-usd modal*)
+            loss (position-tpsl/estimated-loss-usd modal*)
+            layout-style (modal-layout-style modal*)]
+        [:div {:class ["fixed"
+                       "z-[260]"
+                       "rounded-[10px]"
+                       "border"
+                       "border-[#273449]"
+                       "bg-[#0A1422]"
+                       "p-4"
+                       "text-sm"
+                       "shadow-[0_24px_60px_rgba(0,0,0,0.45)]"
+                       "space-y-3"
+                       "overflow-y-auto"]
+               :style layout-style
                :role "dialog"
-               :aria-modal "true"
+               :aria-label "Position TP/SL"
+               :data-position-tpsl-surface "true"
                :on {:keydown [[:actions/handle-position-tpsl-modal-keydown :event/key]]}}
-         [:div {:class ["absolute" "inset-0" "bg-black/60"]
-                :on {:click [[:actions/close-position-tpsl-modal]]}}]
-         [:div {:class ["relative"
-                        "w-full"
-                        "max-w-[500px]"
-                        "rounded-[10px]"
-                        "border"
-                        "border-[#273449]"
-                        "bg-[#0A1422]"
-                        "p-4"
-                        "text-sm"
-                        "shadow-[0_24px_60px_rgba(0,0,0,0.45)]"
-                        "space-y-3"]}
           [:div {:class ["flex" "items-center" "justify-between"]}
            [:h2 {:class ["text-2xl" "font-semibold" "text-gray-100"]} "Position TP/SL"]
            [:button {:type "button"
@@ -114,57 +154,57 @@
           [:div {:class ["space-y-1.5"]}
            (metric-row "Asset" coin)
            (metric-row "Size" (str (amount-text active-size) " " coin))
-           (metric-row "Value" (str (shared/format-currency (:position-value modal)) " USDC"))
-           (metric-row "Entry Price" (shared/format-trade-price (:entry-price modal)))
-           (metric-row "Mark Price" (shared/format-trade-price (:mark-price modal)))]
+           (metric-row "Value" (str (shared/format-currency (:position-value modal*)) " USDC"))
+           (metric-row "Entry Price" (shared/format-trade-price (:entry-price modal*)))
+           (metric-row "Mark Price" (shared/format-trade-price (:mark-price modal*)))]
 
           [:div {:class ["grid" "grid-cols-2" "gap-2"]}
            (input-row "TP Price"
-                      (:tp-price modal)
+                      (:tp-price modal*)
                       [[:actions/set-position-tpsl-modal-field [:tp-price] :event.target/value]])
            (input-row "Gain"
                       (str (shared/format-currency gain) " $")
                       nil)]
 
-          (when (boolean (:limit-price? modal))
+          (when (boolean (:limit-price? modal*))
             [:div {:class ["grid" "grid-cols-2" "gap-2"]}
              (input-row "TP Limit"
-                        (:tp-limit modal)
+                        (:tp-limit modal*)
                         [[:actions/set-position-tpsl-modal-field [:tp-limit] :event.target/value]])
              [:div]])
 
           [:div {:class ["grid" "grid-cols-2" "gap-2"]}
            (input-row "SL Price"
-                      (:sl-price modal)
+                      (:sl-price modal*)
                       [[:actions/set-position-tpsl-modal-field [:sl-price] :event.target/value]])
            (input-row "Loss"
                       (str (shared/format-currency loss) " $")
                       nil)]
 
-          (when (boolean (:limit-price? modal))
+          (when (boolean (:limit-price? modal*))
             [:div {:class ["grid" "grid-cols-2" "gap-2"]}
              (input-row "SL Limit"
-                        (:sl-limit modal)
+                        (:sl-limit modal*)
                         [[:actions/set-position-tpsl-modal-field [:sl-limit] :event.target/value]])
              [:div]])
 
-          (when (boolean (:configure-amount? modal))
+          (when (boolean (:configure-amount? modal*))
             (input-row "Amount"
-                       (:size-input modal)
+                       (:size-input modal*)
                        [[:actions/set-position-tpsl-modal-field [:size-input] :event.target/value]]))
 
           [:div {:class ["space-y-1"]}
            (checkbox-row "position-tpsl-configure-amount"
                          "Configure Amount"
-                         (:configure-amount? modal)
+                         (:configure-amount? modal*)
                          [[:actions/set-position-tpsl-configure-amount :event.target/checked]])
            (checkbox-row "position-tpsl-limit-price"
                          "Limit Price"
-                         (:limit-price? modal)
+                         (:limit-price? modal*)
                          [[:actions/set-position-tpsl-limit-price :event.target/checked]])]
 
-          (when (seq (:error modal))
-            [:div {:class ["text-xs" "text-[#ED7088]"]} (:error modal)])
+          (when (seq (:error modal*))
+            [:div {:class ["text-xs" "text-[#ED7088]"]} (:error modal*)])
 
           [:div {:class ["grid" "grid-cols-2" "gap-3" "pt-1"]}
            [:button {:type "button"
@@ -191,4 +231,4 @@
                              "text-gray-100"
                              "hover:bg-base-300"]
                      :on {:click [[:actions/close-position-tpsl-modal]]}}
-            "Close"]]]]))))
+            "Close"]]]))))

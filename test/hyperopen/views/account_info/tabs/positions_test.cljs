@@ -1,6 +1,7 @@
 (ns hyperopen.views.account-info.tabs.positions-test
   (:require [clojure.string :as str]
             [cljs.test :refer-macros [deftest is testing use-fixtures]]
+            [hyperopen.account.history.position-tpsl :as position-tpsl]
             [hyperopen.views.account-info.test-support.fixtures :as fixtures]
             [hyperopen.views.account-info.test-support.hiccup :as hiccup]
             [hyperopen.views.account-info.tabs.positions :as positions-tab]
@@ -242,7 +243,33 @@
     (is (= :actions/open-position-tpsl-modal
            (first (first click-actions))))
     (is (= row-data
-           (second (first click-actions))))))
+           (second (first click-actions))))
+    (is (= :event.currentTarget/bounds
+           (nth (first click-actions) 2)))
+    (is (= "true" (get-in action-button [1 :data-position-tpsl-trigger])))))
+
+(deftest position-row-renders-inline-position-tpsl-panel-for-active-row-key-test
+  (let [row-data (fixtures/sample-position-row "xyz:NVDA" 10 "0.500")
+        modal (position-tpsl/from-position-row row-data)
+        row-node (view/position-row row-data modal)
+        panel-node (hiccup/find-first-node
+                    row-node
+                    #(= "true" (get-in % [1 :data-position-tpsl-surface])))]
+    (is (some? panel-node))
+    (is (contains? (hiccup/node-class-set panel-node) "fixed"))
+    (is (not (contains? (hiccup/node-class-set panel-node) "absolute")))
+    (is (contains? (hiccup/node-class-set panel-node) "overflow-y-auto"))
+    (is (not (contains? (hiccup/node-class-set panel-node) "inset-0")))))
+
+(deftest position-row-does-not-render-inline-position-tpsl-panel-for-different-row-key-test
+  (let [row-data (fixtures/sample-position-row "xyz:NVDA" 10 "0.500")
+        other-row (fixtures/sample-position-row "xyz:TSLA" 10 "0.500")
+        modal (position-tpsl/from-position-row other-row)
+        row-node (view/position-row row-data modal)
+        panel-node (hiccup/find-first-node
+                    row-node
+                    #(= "true" (get-in % [1 :data-position-tpsl-surface])))]
+    (is (nil? panel-node))))
 
 (deftest position-table-layout-prioritizes-coin-column-over-right-edge-actions-test
   (let [grid-template-class "grid-cols-[minmax(170px,1.9fr)_minmax(130px,1.2fr)_minmax(110px,1fr)_minmax(110px,1fr)_minmax(110px,1fr)_minmax(130px,1.3fr)_minmax(110px,1fr)_minmax(100px,1fr)_minmax(100px,1fr)_minmax(80px,0.8fr)]"

@@ -274,10 +274,10 @@
 (def ^:private tab-renderers
   {:balances (fn [{:keys [balance-rows hide-small? balances-sort]}]
                (balances-tab-content balance-rows hide-small? balances-sort))
-   :positions (fn [{:keys [positions webdata2 positions-sort perp-dex-states]}]
+   :positions (fn [{:keys [positions webdata2 positions-sort perp-dex-states position-tpsl-modal]}]
                 (if (some? positions)
-                  (positions-tab-content positions positions-sort)
-                  (positions-tab-content webdata2 positions-sort perp-dex-states)))
+                  (positions-tab-content positions positions-sort position-tpsl-modal)
+                  (positions-tab-content webdata2 positions-sort perp-dex-states position-tpsl-modal)))
    :open-orders (fn [{:keys [open-orders open-orders-sort]}]
                   (open-orders-tab-content open-orders open-orders-sort))
    :twap (fn [_]

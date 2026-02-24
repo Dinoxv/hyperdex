@@ -160,7 +160,26 @@
 (s/def ::update-indicator-period-args (s/tuple keyword? any?))
 (s/def ::cancel-order-args (s/tuple map?))
 (s/def ::funding-modal-args (s/tuple any?))
-(s/def ::position-tpsl-open-args (s/tuple map?))
+(s/def ::left number?)
+(s/def ::right number?)
+(s/def ::top number?)
+(s/def ::bottom number?)
+(s/def ::width number?)
+(s/def ::height number?)
+(s/def ::viewport-width number?)
+(s/def ::viewport-height number?)
+(s/def ::position-tpsl-anchor
+  (s/keys :opt-un [::left
+                   ::right
+                   ::top
+                   ::bottom
+                   ::width
+                   ::height
+                   ::viewport-width
+                   ::viewport-height]))
+(s/def ::position-tpsl-open-args
+  (s/or :position-only (s/tuple map?)
+        :position-and-anchor (s/tuple map? any?)))
 (s/def ::position-tpsl-modal-field-args (s/tuple ::state-path any?))
 (s/def ::ws-reset-source-args (s/or :none ::no-args
                                     :source (s/tuple ::source)))

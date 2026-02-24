@@ -1,6 +1,8 @@
 (ns hyperopen.views.account-info.tabs.positions
   (:require [clojure.string :as str]
+            [hyperopen.account.history.position-tpsl :as position-tpsl]
             [hyperopen.views.account-info.projections :as projections]
+            [hyperopen.views.account-info.position-tpsl-modal :as position-tpsl-modal]
             [hyperopen.views.account-info.shared :as shared]
             [hyperopen.views.account-info.sort-kernel :as sort-kernel]
             [hyperopen.views.account-info.table :as table]))
@@ -125,88 +127,98 @@
 (defn collect-positions [webdata2 perp-dex-states]
   (projections/collect-positions webdata2 perp-dex-states))
 
-(defn position-row [position-data]
-  (let [pos (:position position-data)
-        side (position-side pos)
-        chip-classes (shared/position-chip-classes-for-side side)
-        coin-cell-style (shared/position-coin-cell-style-for-side side)
-        coin-tone-class (shared/position-side-tone-class side)
-        size-tone-class (shared/position-side-size-class side)
-        coin-label (display-coin pos)
-        dex-label (dex-chip-label {:coin (:coin pos)
-                                   :dex (:dex position-data)})
-        leverage (get-in pos [:leverage :value])
-        position-value (:positionValue pos)
-        position-value-num (shared/parse-optional-num position-value)
-        entry-price (:entryPx pos)
-        mark-price (calculate-mark-price pos)
-        pnl-num (shared/parse-optional-num (:unrealizedPnl pos))
-        pnl-percent (some-> (:returnOnEquity pos) shared/parse-optional-num (* 100))
-        pnl-color-class (cond
-                          (and (number? pnl-num) (pos? pnl-num)) "text-success"
-                          (and (number? pnl-num) (neg? pnl-num)) "text-error"
+(defn position-row
+  ([position-data]
+   (position-row position-data nil))
+  ([position-data modal]
+   (let [pos (:position position-data)
+         side (position-side pos)
+         chip-classes (shared/position-chip-classes-for-side side)
+         coin-cell-style (shared/position-coin-cell-style-for-side side)
+         coin-tone-class (shared/position-side-tone-class side)
+         size-tone-class (shared/position-side-size-class side)
+         coin-label (display-coin pos)
+         dex-label (dex-chip-label {:coin (:coin pos)
+                                    :dex (:dex position-data)})
+         leverage (get-in pos [:leverage :value])
+         position-value (:positionValue pos)
+         position-value-num (shared/parse-optional-num position-value)
+         entry-price (:entryPx pos)
+         mark-price (calculate-mark-price pos)
+         pnl-num (shared/parse-optional-num (:unrealizedPnl pos))
+         pnl-percent (some-> (:returnOnEquity pos) shared/parse-optional-num (* 100))
+         pnl-color-class (cond
+                           (and (number? pnl-num) (pos? pnl-num)) "text-success"
+                           (and (number? pnl-num) (neg? pnl-num)) "text-error"
+                           :else "text-trading-text")
+         liq-price (:liquidationPx pos)
+         margin (:marginUsed pos)
+         funding-num (shared/parse-optional-num (get-in pos [:cumFunding :allTime]))
+         since-change-funding-num (or (shared/parse-optional-num (get-in pos [:cumFunding :sinceChange]))
+                                      (shared/parse-optional-num (get-in pos [:cumFunding :since-change]))
+                                      (shared/parse-optional-num (get-in pos [:cumFunding :sinceOpen]))
+                                      (shared/parse-optional-num (get-in pos [:cumFunding :since-open])))
+         display-funding (funding-display-value funding-num)
+         display-since-change-funding (funding-display-value since-change-funding-num)
+         funding-tooltip (when (number? display-funding)
+                           (format-funding-tooltip display-funding display-since-change-funding))
+         liq-explanation (or (shared/non-blank-text (:liquidationExplanation pos))
+                             (shared/non-blank-text (:liquidation-explanation pos))
+                             (shared/non-blank-text (:liquidation-explanation position-data)))
+         active-modal?
+         (and (position-tpsl/open? modal)
+              (= (projections/position-unique-key position-data)
+                 (:position-key modal)))]
+     [:div {:class ["grid"
+                    shared/positions-grid-template-class
+                    "gap-2"
+                    "py-0"
+                    "pr-3"
+                    shared/positions-grid-min-width-class
+                    "hover:bg-base-300"
+                    "items-center"
+                    "text-sm"]}
+      [:div {:class ["flex" "items-center" "gap-1.5" "self-stretch" "min-w-[170px]"]
+             :style coin-cell-style}
+       [:span {:class ["font-medium" "whitespace-nowrap" "shrink-0" coin-tone-class]} coin-label]
+       (when (some? leverage)
+         [:span {:class chip-classes} (str leverage "x")])
+       (when dex-label
+         [:span {:class chip-classes} dex-label])]
+      [:div {:class ["text-left" "font-semibold" "num" size-tone-class]} (format-position-size pos)]
+      [:div.text-left.font-semibold.num
+       (if (number? position-value-num)
+         (str (shared/format-currency position-value-num) " USDC")
+         "--")]
+      [:div.text-left.font-semibold.num (shared/format-trade-price entry-price)]
+      [:div.text-left.font-semibold.num (shared/format-trade-price mark-price)]
+      [:div {:class ["text-left" "font-semibold" "num" pnl-color-class]}
+       (format-pnl-inline pnl-num pnl-percent)]
+      [:div.text-left.font-semibold.num
+       (explainable-value-node
+        (if liq-price (shared/format-trade-price liq-price) "N/A")
+        liq-explanation)]
+      [:div.text-left.font-semibold.num "$" (shared/format-currency margin)]
+      [:div.text-left.font-semibold.num
+       (explainable-value-node
+        [:span {:class [(cond
+                          (and (number? display-funding) (neg? display-funding)) "text-error"
+                          (and (number? display-funding) (pos? display-funding)) "text-success"
                           :else "text-trading-text")
-        liq-price (:liquidationPx pos)
-        margin (:marginUsed pos)
-        funding-num (shared/parse-optional-num (get-in pos [:cumFunding :allTime]))
-        since-change-funding-num (or (shared/parse-optional-num (get-in pos [:cumFunding :sinceChange]))
-                                     (shared/parse-optional-num (get-in pos [:cumFunding :since-change]))
-                                     (shared/parse-optional-num (get-in pos [:cumFunding :sinceOpen]))
-                                     (shared/parse-optional-num (get-in pos [:cumFunding :since-open])))
-        display-funding (funding-display-value funding-num)
-        display-since-change-funding (funding-display-value since-change-funding-num)
-        funding-tooltip (when (number? display-funding)
-                          (format-funding-tooltip display-funding display-since-change-funding))
-        liq-explanation (or (shared/non-blank-text (:liquidationExplanation pos))
-                            (shared/non-blank-text (:liquidation-explanation pos))
-                            (shared/non-blank-text (:liquidation-explanation position-data)))]
-    [:div {:class ["grid"
-                   shared/positions-grid-template-class
-                   "gap-2"
-                   "py-0"
-                   "pr-3"
-                   shared/positions-grid-min-width-class
-                   "hover:bg-base-300"
-                   "items-center"
-                   "text-sm"]}
-     [:div {:class ["flex" "items-center" "gap-1.5" "self-stretch" "min-w-[170px]"]
-            :style coin-cell-style}
-      [:span {:class ["font-medium" "whitespace-nowrap" "shrink-0" coin-tone-class]} coin-label]
-      (when (some? leverage)
-        [:span {:class chip-classes} (str leverage "x")])
-      (when dex-label
-        [:span {:class chip-classes} dex-label])]
-     [:div {:class ["text-left" "font-semibold" "num" size-tone-class]} (format-position-size pos)]
-     [:div.text-left.font-semibold.num
-      (if (number? position-value-num)
-        (str (shared/format-currency position-value-num) " USDC")
-        "--")]
-     [:div.text-left.font-semibold.num (shared/format-trade-price entry-price)]
-     [:div.text-left.font-semibold.num (shared/format-trade-price mark-price)]
-     [:div {:class ["text-left" "font-semibold" "num" pnl-color-class]}
-      (format-pnl-inline pnl-num pnl-percent)]
-     [:div.text-left.font-semibold.num
-      (explainable-value-node
-       (if liq-price (shared/format-trade-price liq-price) "N/A")
-       liq-explanation)]
-     [:div.text-left.font-semibold.num "$" (shared/format-currency margin)]
-     [:div.text-left.font-semibold.num
-      (explainable-value-node
-       [:span {:class [(cond
-                         (and (number? display-funding) (neg? display-funding)) "text-error"
-                         (and (number? display-funding) (pos? display-funding)) "text-success"
-                         :else "text-trading-text")
-                       "num"]}
-        (if (number? display-funding)
-          (str "$" (shared/format-currency display-funding))
-          "--")]
-       funding-tooltip)]
-     [:div.text-left
-      [:button {:class ["btn" "btn-xs" "btn-ghost" "gap-1" "px-1.5" "font-normal" "text-trading-text"]
-                :type "button"
-                :on {:click [[:actions/open-position-tpsl-modal position-data]]}}
-       [:span "-- / --"]
-       (edit-icon)]]]))
+                        "num"]}
+         (if (number? display-funding)
+           (str "$" (shared/format-currency display-funding))
+           "--")]
+        funding-tooltip)]
+      [:div {:class ["text-left" "relative"]}
+       [:button {:class ["btn" "btn-xs" "btn-ghost" "gap-1" "px-1.5" "font-normal" "text-trading-text"]
+                 :type "button"
+                 :data-position-tpsl-trigger "true"
+                 :on {:click [[:actions/open-position-tpsl-modal position-data :event.currentTarget/bounds]]}}
+        [:span "-- / --"]
+        (edit-icon)]
+       (when active-modal?
+         (position-tpsl-modal/position-tpsl-modal-view modal))]])))
 
 (defn sort-positions-by-column [positions column direction]
   (sort-kernel/sort-rows-by-column
@@ -286,18 +298,32 @@
    [:div.text-left (sortable-header "Funding" sort-state funding-header-explanation)]
    [:div.text-left (table/non-sortable-header "TP/SL")]])
 
+(defn- positions-tab-content-from-rows
+  [positions sort-state modal]
+  (let [positions* (or positions [])
+        sorted-positions (if (seq positions*)
+                           (memoized-sorted-positions positions* sort-state)
+                           [])]
+    (if (seq positions*)
+      (table/tab-table-content (position-table-header sort-state)
+                               (for [position sorted-positions]
+                                 ^{:key (position-unique-key position)}
+                                 (position-row position modal)))
+      (empty-state "No active positions"))))
+
 (defn positions-tab-content
   ([positions sort-state]
-   (let [positions* (or positions [])
-         sorted-positions (if (seq positions*)
-                            (memoized-sorted-positions positions* sort-state)
-                            [])]
-     (if (seq positions*)
-       (table/tab-table-content (position-table-header sort-state)
-                                (for [position sorted-positions]
-                                  ^{:key (position-unique-key position)}
-                                  (position-row position)))
-       (empty-state "No active positions"))))
-  ([webdata2 sort-state perp-dex-states]
-   (positions-tab-content (collect-positions webdata2 perp-dex-states)
-                          sort-state)))
+   (positions-tab-content-from-rows positions sort-state nil))
+  ([positions-or-webdata2 sort-state modal-or-perp-dex-states]
+   (if (and (map? positions-or-webdata2)
+            (contains? positions-or-webdata2 :clearinghouseState))
+     (positions-tab-content-from-rows
+      (collect-positions positions-or-webdata2 modal-or-perp-dex-states)
+      sort-state
+      nil)
+     (positions-tab-content-from-rows positions-or-webdata2 sort-state modal-or-perp-dex-states)))
+  ([webdata2 sort-state perp-dex-states modal]
+   (positions-tab-content-from-rows
+    (collect-positions webdata2 perp-dex-states)
+    sort-state
+    modal)))
