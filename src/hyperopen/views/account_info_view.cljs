@@ -58,13 +58,13 @@
 
 (defn- funding-history-header-actions []
   [:div {:class ["ml-auto" "flex" "items-center" "justify-end" "gap-2" "px-4" "py-2"]}
-   [:button {:class ["btn" "btn-xs" "btn-ghost" "font-normal" "text-trading-green" "hover:bg-trading-green/10" "hover:text-trading-green"]
+   [:button {:class ["btn" "btn-xs" "btn-ghost" "font-normal" "text-trading-text" "hover:bg-base-100" "hover:text-trading-text"]
              :on {:click [[:actions/toggle-funding-history-filter-open]]}}
     "Filter"]
-   [:button {:class ["btn" "btn-xs" "btn-ghost" "font-normal" "text-trading-green" "hover:bg-trading-green/10" "hover:text-trading-green"]
+   [:button {:class ["btn" "btn-xs" "btn-ghost" "font-normal" "text-trading-text" "hover:bg-base-100" "hover:text-trading-text"]
              :on {:click [[:actions/view-all-funding-history]]}}
     "View All"]
-   [:button {:class ["btn" "btn-xs" "btn-ghost" "font-normal" "text-trading-green" "hover:bg-trading-green/10" "hover:text-trading-green"]
+   [:button {:class ["btn" "btn-xs" "btn-ghost" "font-normal" "text-trading-text" "hover:bg-base-100" "hover:text-trading-text"]
              :on {:click [[:actions/export-funding-history-csv]]}}
     "Export as CSV"]])
 
