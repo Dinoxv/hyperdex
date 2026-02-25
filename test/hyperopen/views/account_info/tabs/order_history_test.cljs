@@ -226,7 +226,7 @@
     (is (= ["1" "2"] (mapv (comp str :oid) time-asc)))
     (is (= ["2" "1"] (mapv (comp str :oid) oid-desc)))))
 
-(deftest order-history-status-filter-controls-and-filtering-test
+(deftest order-history-direction-filter-controls-and-filtering-test
   (let [rows [{:order {:coin "NVDA"
                        :oid 1
                        :side "B"
@@ -246,30 +246,34 @@
                :status "canceled"
                :statusTimestamp 1699999999000}]
         filtered-content (view/order-history-tab-content rows {:sort {:column "Time" :direction :desc}
-                                                               :status-filter :filled
+                                                               :status-filter :long
                                                                :loading? false})
         filtered-strings (set (hiccup/collect-strings filtered-content))
         panel-state (-> fixtures/sample-account-info-state
                         (assoc-in [:account-info :selected-tab] :order-history)
                         (assoc-in [:account-info :order-history]
                                   {:sort {:column "Time" :direction :desc}
-                                   :status-filter :filled
+                                   :status-filter :short
                                    :filter-open? true
                                    :loading? false
                                    :error nil
                                    :request-id 1})
                         (assoc-in [:orders :order-history] rows))
         panel (view/account-info-panel panel-state)
-        filter-button (hiccup/find-first-node panel #(contains? (hiccup/direct-texts %) "Filter"))
-        filled-option (hiccup/find-first-node panel #(contains? (hiccup/direct-texts %) "Filled"))]
-    (is (contains? filtered-strings "Filled"))
-    (is (not (contains? filtered-strings "Canceled")))
+        filter-button (hiccup/find-first-node panel #(and (contains? (hiccup/direct-texts %) "Short")
+                                                           (= [[:actions/toggle-order-history-filter-open]]
+                                                              (get-in % [1 :on :click]))))
+        short-option (hiccup/find-first-node panel #(and (contains? (hiccup/direct-texts %) "Short")
+                                                          (= [[:actions/set-order-history-status-filter :short]]
+                                                              (get-in % [1 :on :click]))))]
+    (is (contains? filtered-strings "NVDA"))
+    (is (not (contains? filtered-strings "PUMP")))
     (is (some? filter-button))
-    (is (some? filled-option))
+    (is (some? short-option))
     (is (= [[:actions/toggle-order-history-filter-open]]
            (get-in filter-button [1 :on :click])))
-    (is (= [[:actions/set-order-history-status-filter :filled]]
-           (get-in filled-option [1 :on :click])))))
+    (is (= [[:actions/set-order-history-status-filter :short]]
+           (get-in short-option [1 :on :click])))))
 
 (deftest order-history-pagination-renders-only-current-page-rows-test
   (let [rows (mapv fixtures/order-history-row (range 55))

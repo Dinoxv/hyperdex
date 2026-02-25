@@ -169,11 +169,11 @@
          (history-actions/set-order-history-page-input nil 8))))
 
 (deftest set-order-history-status-filter-parses-strings-and-falls-back-to-all-test
-  (is (= [[:effects/save-many [[[:account-info :order-history :status-filter] :filled]
+  (is (= [[:effects/save-many [[[:account-info :order-history :status-filter] :short]
                                [[:account-info :order-history :filter-open?] false]
                                [[:account-info :order-history :page] 1]
                                [[:account-info :order-history :page-input] "1"]]]]
-         (history-actions/set-order-history-status-filter nil "FiLlEd")))
+         (history-actions/set-order-history-status-filter nil "ShOrT")))
   (is (= [[:effects/save-many [[[:account-info :order-history :status-filter] :all]
                                [[:account-info :order-history :filter-open?] false]
                                [[:account-info :order-history :page] 1]

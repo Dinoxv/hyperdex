@@ -9,11 +9,8 @@
 
 (def order-history-status-options
   [[:all "All"]
-   [:open "Open"]
-   [:filled "Filled"]
-   [:canceled "Canceled"]
-   [:rejected "Rejected"]
-   [:triggered "Triggered"]])
+   [:long "Long"]
+   [:short "Short"]])
 
 (def order-history-status-labels
   (into {} order-history-status-options))
@@ -29,6 +26,7 @@
 
 (def order-history-long-coin-color "rgb(151, 252, 228)")
 (def order-history-sell-coin-color "rgb(234, 175, 184)")
+(def ^:private short-order-side-values #{"A" "S"})
 
 (defn order-history-status-filter-key [order-history-state]
   (let [status-filter (:status-filter order-history-state)]
@@ -160,11 +158,14 @@
     "--"))
 
 (defn- order-history-filter-status [rows status-filter]
-  (if (= :all status-filter)
-    rows
-    (filter (fn [row]
-              (= status-filter (:status-key row)))
-            rows)))
+  (case status-filter
+    :long (filter (fn [row]
+                    (= "B" (:side row)))
+                  rows)
+    :short (filter (fn [row]
+                     (contains? short-order-side-values (:side row)))
+                   rows)
+    rows))
 
 (defn sort-order-history-by-column [rows column direction]
   (sort-kernel/sort-rows-by-column

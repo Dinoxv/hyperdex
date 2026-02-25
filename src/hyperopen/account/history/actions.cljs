@@ -21,7 +21,7 @@
   #{:all :long :short})
 
 (def ^:private order-history-status-options
-  #{:all :open :filled :canceled :rejected :triggered})
+  #{:all :long :short})
 
 (defn- default-funding-history-filters []
   (let [now (platform/now-ms)]

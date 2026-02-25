@@ -77,38 +77,6 @@
 (defn- order-history-status-filter-key [order-history-state]
   (order-history-tab/order-history-status-filter-key order-history-state))
 
-(defn- order-history-header-actions [order-history-state]
-  (let [filter-open? (boolean (:filter-open? order-history-state))
-        status-filter (order-history-status-filter-key order-history-state)
-        status-label (get order-history-status-labels status-filter "All")]
-    [:div {:class ["ml-auto" "relative" "flex" "items-center" "justify-end" "gap-2" "px-4" "py-2"]}
-     [:button {:class ["btn" "btn-xs" "btn-ghost" "font-normal" "text-trading-green" "hover:bg-trading-green/10" "hover:text-trading-green"]
-               :on {:click [[:actions/toggle-order-history-filter-open]]}}
-      "Filter"
-      [:span {:class ["ml-1" "text-xs" "opacity-70"]} (str "(" status-label ")")]
-      [:span {:class ["ml-1" "text-xs" "opacity-70"]} "v"]]
-     (when filter-open?
-       [:div {:class ["absolute" "right-4" "top-full" "z-20" "mt-1" "w-40" "overflow-hidden" "rounded-md" "border" "border-base-300" "bg-base-100" "shadow-lg"]}
-        (for [[option-key option-label] order-history-status-options]
-          ^{:key (name option-key)}
-          [:button {:class (into ["flex" "w-full" "items-center" "justify-between" "px-3" "py-2" "text-xs" "transition-colors"]
-                                 (if (= status-filter option-key)
-                                   ["bg-base-200" "text-trading-green"]
-                                   ["text-trading-text-secondary" "hover:bg-base-200" "hover:text-trading-text"]))
-                    :on {:click [[:actions/set-order-history-status-filter option-key]]}}
-           option-label
-           (when (= status-filter option-key)
-             [:span {:class ["text-trading-green"]} "*"])])])]))
-
-(def open-orders-direction-filter-options
-  open-orders-tab/open-orders-direction-filter-options)
-
-(def open-orders-direction-filter-labels
-  open-orders-tab/open-orders-direction-filter-labels)
-
-(defn- open-orders-direction-filter-key [open-orders-state]
-  (open-orders-tab/open-orders-direction-filter-key open-orders-state))
-
 (defn- chevron-caret-icon [open?]
   [:svg {:class (into ["ml-1" "h-3" "w-3" "shrink-0" "opacity-70" "transition-transform"]
                       (if open?
@@ -122,6 +90,37 @@
            :stroke-width "1.5"
            :stroke-linecap "round"
            :stroke-linejoin "round"}]])
+
+(defn- order-history-header-actions [order-history-state]
+  (let [filter-open? (boolean (:filter-open? order-history-state))
+        status-filter (order-history-status-filter-key order-history-state)
+        status-label (get order-history-status-labels status-filter "All")]
+    [:div {:class ["ml-auto" "relative" "flex" "items-center" "justify-end" "gap-2" "px-4" "py-2"]}
+     [:button {:class ["btn" "btn-xs" "btn-ghost" "font-normal" "text-trading-text" "hover:bg-base-100" "hover:text-trading-text"]
+               :on {:click [[:actions/toggle-order-history-filter-open]]}}
+      status-label
+      (chevron-caret-icon filter-open?)]
+     (when filter-open?
+       [:div {:class ["absolute" "right-4" "top-full" "z-20" "mt-1" "w-32" "overflow-hidden" "rounded-md" "border" "border-base-300" "bg-base-100" "shadow-lg"]}
+        (for [[option-key option-label] order-history-status-options]
+          ^{:key (name option-key)}
+          [:button {:class (into ["flex" "w-full" "items-center" "justify-between" "px-3" "py-2" "text-xs" "transition-colors"]
+                                 (if (= status-filter option-key)
+                                   ["bg-base-200" "text-trading-text"]
+                                   ["text-trading-text-secondary" "hover:bg-base-200" "hover:text-trading-text"]))
+                    :on {:click [[:actions/set-order-history-status-filter option-key]]}}
+           option-label
+           (when (= status-filter option-key)
+             [:span {:class ["text-trading-text"]} "*"])])])]))
+
+(def open-orders-direction-filter-options
+  open-orders-tab/open-orders-direction-filter-options)
+
+(def open-orders-direction-filter-labels
+  open-orders-tab/open-orders-direction-filter-labels)
+
+(defn- open-orders-direction-filter-key [open-orders-state]
+  (open-orders-tab/open-orders-direction-filter-key open-orders-state))
 
 (defn- open-orders-header-actions [open-orders-state freshness-cue]
   (let [filter-open? (boolean (:filter-open? open-orders-state))

@@ -344,14 +344,14 @@
         set-effects (core/set-order-history-status-filter
                      {:account-info {:order-history {:filter-open? true
                                                      :status-filter :all}}}
-                     :filled)
+                     :short)
         set-invalid-effects (core/set-order-history-status-filter
                              {:account-info {:order-history {:filter-open? true
                                                              :status-filter :all}}}
                              :unknown)]
     (is (= [[:effects/save [:account-info :order-history :filter-open?] true]]
            toggle-effects))
-    (is (= [[:effects/save-many [[[:account-info :order-history :status-filter] :filled]
+    (is (= [[:effects/save-many [[[:account-info :order-history :status-filter] :short]
                                  [[:account-info :order-history :filter-open?] false]
                                  [[:account-info :order-history :page] 1]
                                  [[:account-info :order-history :page-input] "1"]]]]
