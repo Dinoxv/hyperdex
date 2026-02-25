@@ -631,8 +631,16 @@
     [[:effects/save [:positions-ui :reduce-popover]
       (position-reduce/set-limit-price-to-mid popover)]]))
 
-(defn submit-position-reduce-close [_state]
-  [])
+(defn submit-position-reduce-close [state]
+  (let [popover (or (get-in state [:positions-ui :reduce-popover])
+                    (position-reduce/default-popover-state))
+        result (position-reduce/prepare-submit state popover)]
+    (if-not (:ok? result)
+      [[:effects/save [:positions-ui :reduce-popover]
+        (assoc popover :error (:display-message result))]]
+      [[:effects/save [:positions-ui :reduce-popover]
+        (assoc popover :error nil)]
+       [:effects/api-submit-order (:request result)]])))
 
 (defn submit-position-tpsl [state]
   (let [modal (or (get-in state [:positions-ui :tpsl-modal])

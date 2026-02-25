@@ -1,6 +1,8 @@
 (ns hyperopen.account.history.position-reduce
   (:require [clojure.string :as str]
             [hyperopen.account.history.position-identity :as position-identity]
+            [hyperopen.api.gateway.orders.commands :as order-commands]
+            [hyperopen.asset-selector.markets :as markets]
             [hyperopen.domain.trading :as trading-domain]))
 
 (def ^:private anchor-keys
@@ -9,6 +11,16 @@
 (defn- parse-num
   [value]
   (trading-domain/parse-num value))
+
+(defn- parse-int-value
+  [value]
+  (let [num (cond
+              (number? value) value
+              (string? value) (js/parseInt value 10)
+              :else js/NaN)]
+    (when (and (number? num)
+               (not (js/isNaN num)))
+      (js/Math.floor num))))
 
 (defn- clamp
   [value min-value max-value]
@@ -167,6 +179,160 @@
     (if (number? size-num)
       (js/Math.abs size-num)
       0)))
+
+(defn- positive-price
+  [value]
+  (let [price (parse-num value)]
+    (when (and (number? price)
+               (pos? price))
+      price)))
+
+(defn- position-open-side
+  [position-side]
+  (case position-side
+    :short :sell
+    :buy))
+
+(defn- reduce-order-side
+  [popover]
+  (trading-domain/opposite-side (position-open-side (:position-side popover))))
+
+(defn- active-close-size
+  [popover]
+  (let [position-size (parse-num (:position-size popover))
+        size-percent (configured-size-percent popover)]
+    (when (and (number? position-size)
+               (pos? position-size)
+               (number? size-percent)
+               (pos? size-percent))
+      (* position-size
+         (/ size-percent 100)))))
+
+(defn- candidate-market?
+  [market coin dex]
+  (let [coin* (normalize-display-text coin)
+        dex* (normalize-display-text dex)
+        market-coin* (normalize-display-text (:coin market))
+        market-dex* (normalize-display-text (:dex market))]
+    (and (= :perp (:market-type market))
+         (= coin* market-coin*)
+         (= (or dex* "")
+            (or market-dex* "")))))
+
+(defn- resolve-market-by-coin-and-dex
+  [market-by-key coin dex]
+  (let [markets* (vals (or market-by-key {}))
+        exact (some #(when (candidate-market? % coin dex) %) markets*)
+        fallback (markets/resolve-market-by-coin market-by-key coin)]
+    (or exact fallback)))
+
+(defn- resolve-market-asset-id
+  [market]
+  (or (some parse-int-value
+            [(:asset-id market)
+             (:assetId market)])
+      (let [idx (parse-int-value (:idx market))
+            dex (normalize-display-text (:dex market))]
+        (when (and (number? idx)
+                   (or (nil? dex) (= "" dex)))
+          idx))))
+
+(defn- resolve-market-price
+  [popover market]
+  (some positive-price
+        [(:mid-price popover)
+         (:limit-price popover)
+         (:midPx market)
+         (:mid-px market)
+         (:mid-price market)
+         (:mark market)
+         (:markPx market)
+         (:mark-px market)
+         (:markRaw market)
+         (:markPrice market)
+         (:oraclePx market)
+         (:oracle-px market)
+         (:oracle-price market)]))
+
+(defn- submit-price
+  [popover market]
+  (if (limit-close? popover)
+    (positive-price (:limit-price popover))
+    (resolve-market-price popover market)))
+
+(defn validate-popover
+  [popover]
+  (let [popover-open? (open? popover)
+        close-size (active-close-size popover)
+        close-side (reduce-order-side popover)
+        limit-price (positive-price (:limit-price popover))]
+    (cond
+      (not popover-open?)
+      {:is-ok false
+       :display-message "Place Order"}
+
+      (not (contains? #{:buy :sell} close-side))
+      {:is-ok false
+       :display-message "Place Order"}
+
+      (or (nil? close-size) (<= close-size 0))
+      {:is-ok false
+       :display-message "Size must be greater than 0."}
+
+      (and (limit-close? popover)
+           (nil? limit-price))
+      {:is-ok false
+       :display-message "Price is required for limit orders."}
+
+      :else
+      {:is-ok true
+       :display-message "Place Order"})))
+
+(defn- submit-form
+  [popover market]
+  {:type (close-type popover)
+   :side (reduce-order-side popover)
+   :size (active-close-size popover)
+   :price (submit-price popover market)
+   :reduce-only true})
+
+(defn prepare-submit
+  [state popover]
+  (let [validation (validate-popover popover)
+        market-by-key (get-in state [:asset-selector :market-by-key] {})
+        market (resolve-market-by-coin-and-dex market-by-key
+                                               (:coin popover)
+                                               (:dex popover))
+        asset-id (resolve-market-asset-id market)
+        form (submit-form popover market)
+        request (when (number? asset-id)
+                  (order-commands/build-order-request
+                   {:active-asset (:coin popover)
+                    :asset-idx asset-id
+                    :market market}
+                   form))]
+    (cond
+      (not (:is-ok validation))
+      {:ok? false
+       :display-message (:display-message validation)}
+
+      (not (number? asset-id))
+      {:ok? false
+       :display-message "Select an asset and ensure market data is loaded."}
+
+      (and (= :market (close-type popover))
+           (nil? (:price form)))
+      {:ok? false
+       :display-message "Market price unavailable. Try again after market data is loaded."}
+
+      (nil? request)
+      {:ok? false
+       :display-message "Place Order"}
+
+      :else
+      {:ok? true
+       :display-message (:display-message validation)
+       :request {:action (:action request)}})))
 
 (defn from-position-row
   ([position-data]

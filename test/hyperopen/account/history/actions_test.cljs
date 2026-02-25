@@ -294,7 +294,11 @@
            (history-actions/handle-position-reduce-popover-keydown {} "Escape")))
     (is (= []
            (history-actions/handle-position-reduce-popover-keydown {} "Enter")))
-    (is (= [] submit-effects))
+    (is (= [[:effects/save
+             [:positions-ui :reduce-popover]
+             (assoc (position-reduce/default-popover-state)
+                    :error "Place Order")]]
+           submit-effects))
     (is (= [] close-all-effects))))
 
 (deftest submit-position-tpsl-validates-and-emits-submit-effect-test
@@ -326,4 +330,37 @@
                    [:action :orders 0 :t :trigger :tpsl])))
     (is (= [[:effects/save-many [[[:positions-ui :tpsl-modal :submitting?] false]
                                  [[:positions-ui :tpsl-modal :error] "Place Order"]]]]
+           invalid-effects))))
+
+(deftest submit-position-reduce-close-validates-and-emits-submit-effect-test
+  (let [row (fixtures/sample-position-row "xyz:NVDA" 10 "0.500")
+        popover (-> (position-reduce/from-position-row row)
+                    (assoc :close-type :limit
+                           :limit-price "11"))
+        market-state {:asset-selector {:market-by-key {"perp:xyz:NVDA"
+                                                       {:coin "xyz:NVDA"
+                                                        :market-type :perp
+                                                        :asset-id 123
+                                                        :mark 10}}}}
+        valid-effects (history-actions/submit-position-reduce-close
+                       (assoc market-state :positions-ui {:reduce-popover popover}))
+        invalid-effects (history-actions/submit-position-reduce-close
+                         (assoc market-state
+                                :positions-ui {:reduce-popover (assoc popover :limit-price "")}))]
+    (is (= :effects/save
+           (ffirst valid-effects)))
+    (is (nil? (get-in (first valid-effects) [2 :error])))
+    (is (= :effects/api-submit-order
+           (first (second valid-effects))))
+    (is (= "order"
+           (get-in (second (second valid-effects)) [:action :type])))
+    (is (= true
+           (get-in (second (second valid-effects)) [:action :orders 0 :r])))
+    (is (= false
+           (get-in (second (second valid-effects)) [:action :orders 0 :b])))
+    (is (= [[:effects/save
+             [:positions-ui :reduce-popover]
+             (assoc popover
+                    :limit-price ""
+                    :error "Price is required for limit orders.")]]
            invalid-effects))))
