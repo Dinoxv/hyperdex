@@ -201,6 +201,33 @@
     (is (= :effects/save-many (ffirst effects)))
     (is (not-any? #(= (first %) :effects/fetch-candle-snapshot) effects))))
 
+(deftest select-asset-resolves-spot-base-token-to-usdc-pair-test
+  (let [resolved-market {:key "spot:MEOW/USDC"
+                         :coin "MEOW/USDC"
+                         :symbol "MEOW/USDC"
+                         :base "MEOW"
+                         :quote "USDC"
+                         :market-type :spot}
+        effects (core/select-asset {:active-asset "ETH"
+                                    :asset-selector {:visible-dropdown :asset-selector
+                                                     :market-by-key {"spot:MEOW/USDC" resolved-market}}
+                                    :orderbook-ui {:price-aggregation-dropdown-visible? true
+                                                   :size-unit-dropdown-visible? true}}
+                                   "MEOW")
+        save-many-path-values (-> effects first second)
+        saved-active-market (some (fn [[path value]]
+                                    (when (= [:active-market] path)
+                                      value))
+                                  save-many-path-values)]
+    (is (= resolved-market saved-active-market))
+    (is (some #{[:effects/unsubscribe-active-asset "ETH"]} effects))
+    (is (some #{[:effects/unsubscribe-orderbook "ETH"]} effects))
+    (is (some #{[:effects/unsubscribe-trades "ETH"]} effects))
+    (is (some #{[:effects/subscribe-active-asset "MEOW/USDC"]} effects))
+    (is (some #{[:effects/subscribe-orderbook "MEOW/USDC"]} effects))
+    (is (some #{[:effects/subscribe-trades "MEOW/USDC"]} effects))
+    (is (not (some #{[:effects/subscribe-active-asset "MEOW"]} effects)))))
+
 (deftest select-asset-resets-price-input-focus-lock-to-dynamic-state-test
   (let [market {:key :perp/BTC
                 :coin "BTC"}

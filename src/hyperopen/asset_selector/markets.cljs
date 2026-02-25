@@ -52,9 +52,34 @@
 (defn resolve-market-by-coin
   "Resolve a market from market-by-key using deterministic fallback keys."
   [market-by-key coin]
-  (when (and (map? market-by-key) (some? coin))
-    (some #(get market-by-key %)
-          (candidate-market-keys coin))))
+  (let [coin* (when (some? coin) (str coin))]
+    (when (and (map? market-by-key) (seq coin*))
+      (or (some #(get market-by-key %)
+                (candidate-market-keys coin*))
+          (let [base-token (some-> coin* str/trim str/upper-case)
+                base-coin? (and (seq base-token)
+                                (not (numeric-coin-string? coin*))
+                                (not (str/includes? coin* "/"))
+                                (not (str/includes? coin* ":"))
+                                (not (str/starts-with? coin* "@")))]
+            (when base-coin?
+              (some->> (vals market-by-key)
+                       (keep (fn [market]
+                               (let [market-coin* (some-> (:coin market) str str/trim)
+                                     [coin-base coin-quote] (when (and (seq market-coin*)
+                                                                       (str/includes? market-coin* "/"))
+                                                              (str/split market-coin* #"/" 2))
+                                     market-base (some-> (or (:base market) coin-base) str str/trim str/upper-case)
+                                     market-quote (some-> (or (:quote market) coin-quote) str str/trim str/upper-case)]
+                                 (when (and (= :spot (:market-type market))
+                                            (= base-token market-base))
+                                   {:market market
+                                    :rank [(if (= "USDC" market-quote) 0 1)
+                                           (or market-quote "")
+                                           (or (:key market) "")]}))))
+                       (sort-by :rank)
+                       first
+                       :market)))))))
 
 (defn- parse-perp-name [name]
   (if (and name (str/includes? name ":"))

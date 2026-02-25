@@ -96,11 +96,23 @@
     (is (= "perp:BTC" (markets/coin->market-key "BTC")))))
 
 (deftest resolve-market-by-coin-test
-  (testing "resolve-market-by-coin handles perp, spot pair, spot id, and numeric legacy ids"
+  (testing "resolve-market-by-coin handles perp, spot pair, spot id, numeric legacy ids, and spot base fallback"
     (let [market-by-key {"perp:BTC" {:key "perp:BTC" :coin "BTC"}
                          "spot:PURR/USDC" {:key "spot:PURR/USDC" :coin "PURR/USDC"}
-                         "spot:@1" {:key "spot:@1" :coin "@1"}}]
+                         "spot:@1" {:key "spot:@1" :coin "@1"}
+                         "spot:MEOW/USDT" {:key "spot:MEOW/USDT"
+                                           :coin "MEOW/USDT"
+                                           :base "MEOW"
+                                           :quote "USDT"
+                                           :market-type :spot}
+                         "spot:MEOW/USDC" {:key "spot:MEOW/USDC"
+                                           :coin "MEOW/USDC"
+                                           :base "MEOW"
+                                           :quote "USDC"
+                                           :market-type :spot}}]
       (is (= "perp:BTC" (:key (markets/resolve-market-by-coin market-by-key "BTC"))))
       (is (= "spot:PURR/USDC" (:key (markets/resolve-market-by-coin market-by-key "PURR/USDC"))))
       (is (= "spot:@1" (:key (markets/resolve-market-by-coin market-by-key "@1"))))
-      (is (= "spot:@1" (:key (markets/resolve-market-by-coin market-by-key "1")))))))
+      (is (= "spot:@1" (:key (markets/resolve-market-by-coin market-by-key "1"))))
+      (is (= "spot:MEOW/USDC" (:key (markets/resolve-market-by-coin market-by-key "MEOW"))))
+      (is (nil? (markets/resolve-market-by-coin market-by-key "hyna:MEOW"))))))
