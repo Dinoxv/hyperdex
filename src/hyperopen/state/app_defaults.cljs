@@ -121,6 +121,8 @@
    :balances-sort {:column nil :direction :asc}
    :positions-sort {:column nil :direction :asc}
    :open-orders-sort {:column "Time" :direction :desc}
+   :open-orders {:direction-filter :all
+                 :filter-open? false}
    :trade-history default-trade-history
    :funding-history default-funding-history
    :order-history default-order-history})

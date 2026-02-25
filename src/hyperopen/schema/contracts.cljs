@@ -273,6 +273,8 @@
    :actions/sort-positions ::sort-column-args
    :actions/sort-balances ::sort-column-args
    :actions/sort-open-orders ::sort-column-args
+   :actions/toggle-open-orders-direction-filter-open ::no-args
+   :actions/set-open-orders-direction-filter ::keyword-or-string-args
    :actions/sort-funding-history ::sort-column-args
    :actions/sort-order-history ::sort-column-args
    :actions/toggle-order-history-filter-open ::no-args

@@ -7,6 +7,15 @@
 
 (def ^:private long-coin-color "rgb(151, 252, 228)")
 (def ^:private sell-coin-color "rgb(234, 175, 184)")
+(def ^:private short-order-side-values #{"A" "S"})
+
+(def open-orders-direction-filter-options
+  [[:all "All"]
+   [:long "Long"]
+   [:short "Short"]])
+
+(def open-orders-direction-filter-labels
+  (into {} open-orders-direction-filter-options))
 
 (defn- empty-state [message]
   [:div.flex.flex-col.items-center.justify-center.py-12.text-base-content
@@ -91,6 +100,23 @@
     "S" "text-error"
     "text-base-content"))
 
+(defn open-orders-direction-filter-key [open-orders-state]
+  (let [raw-direction (:direction-filter open-orders-state)
+        direction-filter (cond
+                           (keyword? raw-direction) raw-direction
+                           (string? raw-direction) (keyword (str/lower-case raw-direction))
+                           :else :all)]
+    (if (contains? open-orders-direction-filter-labels direction-filter)
+      direction-filter
+      :all)))
+
+(defn filter-open-orders-by-direction [orders direction-filter]
+  (let [orders* (or orders [])]
+    (case direction-filter
+      :long (filterv #(= "B" (:side %)) orders*)
+      :short (filterv #(contains? short-order-side-values (:side %)) orders*)
+      (vec orders*))))
+
 (defn- coin-style [side]
   (case side
     "B" {:color long-coin-color}
@@ -131,18 +157,21 @@
 (defn reset-open-orders-sort-cache! []
   (reset! sorted-open-orders-cache nil))
 
-(defn- memoized-sorted-open-orders [orders sort-state]
+(defn- memoized-sorted-open-orders [orders direction-filter sort-state]
   (let [column (:column sort-state)
         direction (:direction sort-state)
         cache @sorted-open-orders-cache
         cache-hit? (and (map? cache)
                         (identical? orders (:orders cache))
+                        (= direction-filter (:direction-filter cache))
                         (= column (:column cache))
                         (= direction (:direction cache)))]
     (if cache-hit?
       (:result cache)
-      (let [result (vec (sort-open-orders-by-column orders column direction))]
+      (let [filtered (filter-open-orders-by-direction orders direction-filter)
+            result (vec (sort-open-orders-by-column filtered column direction))]
         (reset! sorted-open-orders-cache {:orders orders
+                                          :direction-filter direction-filter
                                           :column column
                                           :direction direction
                                           :result result})
@@ -154,41 +183,45 @@
 (def ^:private open-orders-grid-template-class
   "grid-cols-[minmax(130px,1.45fr)_minmax(70px,0.75fr)_minmax(60px,0.7fr)_minmax(70px,0.8fr)_minmax(60px,0.7fr)_minmax(80px,0.85fr)_minmax(100px,1fr)_minmax(70px,0.8fr)_minmax(80px,0.95fr)_minmax(120px,1.35fr)_minmax(70px,0.8fr)_minmax(80px,0.9fr)]")
 
-(defn open-orders-tab-content [normalized sort-state]
-  (let [sorted (memoized-sorted-open-orders normalized sort-state)]
-    (if (seq sorted)
-      (table/tab-table-content
-       [:div {:class ["grid" "gap-2" "py-1" "px-3" "bg-base-200" "text-xs" "font-medium" open-orders-grid-template-class]}
-        [:div.pr-2.text-left.whitespace-nowrap (sortable-open-orders-header "Time" sort-state)]
-        [:div.pl-1.text-left (sortable-open-orders-header "Type" sort-state)]
-        [:div.text-left (sortable-open-orders-header "Coin" sort-state)]
-        [:div.text-left (sortable-open-orders-header "Direction" sort-state)]
-        [:div.text-left (sortable-open-orders-header "Size" sort-state)]
-        [:div.text-left (sortable-open-orders-header "Original Size" sort-state)]
-        [:div.text-left (sortable-open-orders-header "Order Value" sort-state)]
-        [:div.text-left (sortable-open-orders-header "Price" sort-state)]
-        [:div.text-left.whitespace-nowrap (table/non-sortable-header "Reduce Only")]
-        [:div.text-left.whitespace-nowrap (table/non-sortable-header "Trigger Conditions")]
-        [:div.text-left (table/non-sortable-header "TP/SL")]
-        [:div.text-left (table/non-sortable-header "Cancel All")]]
-       (for [o sorted]
-         ^{:key (str (:oid o) "-" (:coin o))}
-         [:div {:class ["grid" "gap-2" "py-px" "px-3" "hover:bg-base-300" "text-xs" open-orders-grid-template-class]}
-          [:div.pr-2.text-left.whitespace-nowrap (shared/format-open-orders-time (:time o))]
-          [:div.pl-1.text-left (or (:type o) "Order")]
-          [:div.text-left (open-orders-coin-node (:coin o) (:side o))]
-          [:div {:class ["text-left" (direction-class (:side o))]} (direction-label (:side o))]
-          [:div.text-left.num (shared/format-currency (:sz o))]
-          [:div.text-left.num (shared/format-currency (or (:orig-sz o) (:sz o)))]
-          [:div.text-left.num (if-let [val (order-value o)]
-                                 (str (shared/format-currency val) " USDC")
-                                 "--")]
-          [:div.text-left.num (shared/format-trade-price (:px o))]
-          [:div.text-left (if (:reduce-only o) "Yes" "No")]
-          [:div.text-left (format-trigger-conditions o)]
-          [:div.text-left (format-tp-sl o)]
-          [:div.text-left
-           [:button {:class ["btn" "btn-xs" "btn-ghost"]
-                     :on {:click [[:actions/cancel-order o]]}}
-            "Cancel"]]]))
-      (empty-state "No open orders"))))
+(defn open-orders-tab-content
+  ([normalized sort-state]
+   (open-orders-tab-content normalized sort-state {}))
+  ([normalized sort-state open-orders-state]
+   (let [direction-filter (open-orders-direction-filter-key open-orders-state)
+         sorted (memoized-sorted-open-orders normalized direction-filter sort-state)]
+     (if (seq sorted)
+       (table/tab-table-content
+        [:div {:class ["grid" "gap-2" "py-1" "px-3" "bg-base-200" "text-xs" "font-medium" open-orders-grid-template-class]}
+         [:div.pr-2.text-left.whitespace-nowrap (sortable-open-orders-header "Time" sort-state)]
+         [:div.pl-1.text-left (sortable-open-orders-header "Type" sort-state)]
+         [:div.text-left (sortable-open-orders-header "Coin" sort-state)]
+         [:div.text-left (sortable-open-orders-header "Direction" sort-state)]
+         [:div.text-left (sortable-open-orders-header "Size" sort-state)]
+         [:div.text-left (sortable-open-orders-header "Original Size" sort-state)]
+         [:div.text-left (sortable-open-orders-header "Order Value" sort-state)]
+         [:div.text-left (sortable-open-orders-header "Price" sort-state)]
+         [:div.text-left.whitespace-nowrap (table/non-sortable-header "Reduce Only")]
+         [:div.text-left.whitespace-nowrap (table/non-sortable-header "Trigger Conditions")]
+         [:div.text-left (table/non-sortable-header "TP/SL")]
+         [:div.text-left (table/non-sortable-header "Cancel All")]]
+        (for [o sorted]
+          ^{:key (str (:oid o) "-" (:coin o))}
+          [:div {:class ["grid" "gap-2" "py-px" "px-3" "hover:bg-base-300" "text-xs" open-orders-grid-template-class]}
+           [:div.pr-2.text-left.whitespace-nowrap (shared/format-open-orders-time (:time o))]
+           [:div.pl-1.text-left (or (:type o) "Order")]
+           [:div.text-left (open-orders-coin-node (:coin o) (:side o))]
+           [:div {:class ["text-left" (direction-class (:side o))]} (direction-label (:side o))]
+           [:div.text-left.num (shared/format-currency (:sz o))]
+           [:div.text-left.num (shared/format-currency (or (:orig-sz o) (:sz o)))]
+           [:div.text-left.num (if-let [val (order-value o)]
+                                  (str (shared/format-currency val) " USDC")
+                                  "--")]
+           [:div.text-left.num (shared/format-trade-price (:px o))]
+           [:div.text-left (if (:reduce-only o) "Yes" "No")]
+           [:div.text-left (format-trigger-conditions o)]
+           [:div.text-left (format-tp-sl o)]
+           [:div.text-left
+            [:button {:class ["btn" "btn-xs" "btn-ghost"]
+                      :on {:click [[:actions/cancel-order o]]}}
+             "Cancel"]]]))
+       (empty-state "No open orders")))))

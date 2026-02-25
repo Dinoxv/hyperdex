@@ -103,6 +103,101 @@
         (view/open-orders-tab-content (into [] rows) sort-state-asc)
         (is (= 3 @sort-calls))))))
 
+(deftest open-orders-tab-content-filters-rows-by-direction-filter-test
+  (let [rows [{:oid 1001
+               :coin "LONGCOIN"
+               :side "B"
+               :sz "1.0"
+               :orig-sz "1.0"
+               :px "100.0"
+               :type "Limit"
+               :time 1700000002000
+               :reduce-only false
+               :is-trigger false
+               :trigger-condition nil
+               :is-position-tpsl false}
+              {:oid 1002
+               :coin "SHORTA"
+               :side "A"
+               :sz "2.0"
+               :orig-sz "2.0"
+               :px "99.0"
+               :type "Limit"
+               :time 1700000001000
+               :reduce-only false
+               :is-trigger false
+               :trigger-condition nil
+               :is-position-tpsl false}
+              {:oid 1003
+               :coin "SHORTS"
+               :side "S"
+               :sz "3.0"
+               :orig-sz "3.0"
+               :px "98.0"
+               :type "Limit"
+               :time 1700000000000
+               :reduce-only false
+               :is-trigger false
+               :trigger-condition nil
+               :is-position-tpsl false}]
+        sort-state {:column "Time" :direction :desc}
+        all-content (view/open-orders-tab-content rows sort-state {:direction-filter :all})
+        long-content (view/open-orders-tab-content rows sort-state {:direction-filter :long})
+        short-content (view/open-orders-tab-content rows sort-state {:direction-filter :short})
+        all-row-count (count (vec (hiccup/node-children (hiccup/tab-rows-viewport-node all-content))))
+        long-row-count (count (vec (hiccup/node-children (hiccup/tab-rows-viewport-node long-content))))
+        short-row-count (count (vec (hiccup/node-children (hiccup/tab-rows-viewport-node short-content))))
+        long-text (set (hiccup/collect-strings long-content))
+        short-text (set (hiccup/collect-strings short-content))]
+    (is (= 3 all-row-count))
+    (is (= 1 long-row-count))
+    (is (= 2 short-row-count))
+    (is (contains? long-text "LONGCOIN"))
+    (is (not (contains? long-text "SHORTA")))
+    (is (not (contains? long-text "SHORTS")))
+    (is (contains? short-text "SHORTA"))
+    (is (contains? short-text "SHORTS"))
+    (is (not (contains? short-text "LONGCOIN")))))
+
+(deftest open-orders-tab-content-re-sorts-when-direction-filter-changes-test
+  (let [rows [{:oid 1001
+               :coin "ETH"
+               :side "B"
+               :sz "2.0"
+               :orig-sz "2.0"
+               :px "100.0"
+               :type "Limit"
+               :time 1700000000000
+               :reduce-only false
+               :is-trigger false
+               :trigger-condition nil
+               :is-position-tpsl false}
+              {:oid 1002
+               :coin "BTC"
+               :side "A"
+               :sz "1.0"
+               :orig-sz "1.0"
+               :px "99.0"
+               :type "Limit"
+               :time 1699999999000
+               :reduce-only false
+               :is-trigger false
+               :trigger-condition nil
+               :is-position-tpsl false}]
+        sort-state {:column "Time" :direction :desc}
+        sort-calls (atom 0)]
+    (open-orders-tab/reset-open-orders-sort-cache!)
+    (with-redefs [open-orders-tab/sort-open-orders-by-column
+                  (fn [orders _column _direction]
+                    (swap! sort-calls inc)
+                    orders)]
+      (view/open-orders-tab-content rows sort-state {:direction-filter :all})
+      (view/open-orders-tab-content rows sort-state {:direction-filter :all})
+      (is (= 1 @sort-calls))
+      (view/open-orders-tab-content rows sort-state {:direction-filter :short})
+      (view/open-orders-tab-content rows sort-state {:direction-filter :short})
+      (is (= 2 @sort-calls)))))
+
 (deftest open-orders-columns-use-left-alignment-test
   (let [open-orders [{:oid 101
                       :coin "HYPE"

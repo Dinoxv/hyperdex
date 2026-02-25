@@ -17,6 +17,9 @@
 (def ^:private open-orders-sort-directions
   #{:asc :desc})
 
+(def ^:private open-orders-direction-filter-options
+  #{:all :long :short})
+
 (def ^:private order-history-status-options
   #{:all :open :filled :canceled :rejected :triggered})
 
@@ -149,6 +152,16 @@
                   :else :all)]
     (if (contains? order-history-status-options status*)
       status*
+      :all)))
+
+(defn- normalize-open-orders-direction-filter
+  [direction-filter]
+  (let [direction* (cond
+                     (keyword? direction-filter) direction-filter
+                     (string? direction-filter) (keyword (str/lower-case direction-filter))
+                     :else :all)]
+    (if (contains? open-orders-direction-filter-options direction*)
+      direction*
       :all)))
 
 (defn- filtered-funding-rows
@@ -293,6 +306,15 @@
                                                        :direction new-direction}]
      [:effects/local-storage-set "open-orders-sort-by" column]
      [:effects/local-storage-set "open-orders-sort-direction" (name new-direction)]]))
+
+(defn toggle-open-orders-direction-filter-open [state]
+  (let [open? (boolean (get-in state [:account-info :open-orders :filter-open?]))]
+    [[:effects/save [:account-info :open-orders :filter-open?] (not open?)]]))
+
+(defn set-open-orders-direction-filter [_state direction-filter]
+  (let [direction* (normalize-open-orders-direction-filter direction-filter)]
+    [[:effects/save-many [[[:account-info :open-orders :direction-filter] direction*]
+                          [[:account-info :open-orders :filter-open?] false]]]]))
 
 (defn sort-funding-history [state column]
   (let [current-sort (get-in state

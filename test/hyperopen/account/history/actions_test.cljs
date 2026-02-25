@@ -180,6 +180,20 @@
                                [[:account-info :order-history :page-input] "1"]]]]
          (history-actions/set-order-history-status-filter nil "invalid-status"))))
 
+(deftest open-orders-direction-filter-actions-normalize-and-close-dropdown-test
+  (is (= [[:effects/save [:account-info :open-orders :filter-open?] true]]
+         (history-actions/toggle-open-orders-direction-filter-open
+          {:account-info {:open-orders {:filter-open? false}}})))
+  (is (= [[:effects/save [:account-info :open-orders :filter-open?] false]]
+         (history-actions/toggle-open-orders-direction-filter-open
+          {:account-info {:open-orders {:filter-open? true}}})))
+  (is (= [[:effects/save-many [[[:account-info :open-orders :direction-filter] :short]
+                               [[:account-info :open-orders :filter-open?] false]]]]
+         (history-actions/set-open-orders-direction-filter nil "ShOrT")))
+  (is (= [[:effects/save-many [[[:account-info :open-orders :direction-filter] :all]
+                               [[:account-info :open-orders :filter-open?] false]]]]
+         (history-actions/set-open-orders-direction-filter nil "invalid-filter"))))
+
 (deftest set-hide-small-balances-updates-flag-test
   (is (= [[:effects/save [:account-info :hide-small-balances?] true]]
          (history-actions/set-hide-small-balances nil true))))

@@ -41,6 +41,8 @@
     (is (= 1 (count (:funding-history-rows view-model))))
     (is (= 1 (count (:order-history-rows view-model))))
     (is (empty? (:open-orders view-model)))
+    (is (= :all (get-in view-model [:open-orders-state :direction-filter])))
+    (is (false? (get-in view-model [:open-orders-state :filter-open?])))
     (is (= {"xyz:NVDA" {:coin "xyz:NVDA"
                         :symbol "NVDA/USDC"}}
            (get-in view-model [:trade-history-state :market-by-key])))

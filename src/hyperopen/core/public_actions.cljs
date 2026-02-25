@@ -185,6 +185,12 @@
 (def sort-open-orders
   account-history-actions/sort-open-orders)
 
+(def toggle-open-orders-direction-filter-open
+  account-history-actions/toggle-open-orders-direction-filter-open)
+
+(def set-open-orders-direction-filter
+  account-history-actions/set-open-orders-direction-filter)
+
 (def sort-funding-history
   account-history-actions/sort-funding-history)
 

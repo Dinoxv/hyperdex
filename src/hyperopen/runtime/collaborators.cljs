@@ -92,6 +92,8 @@
    :sort-positions account-history-actions/sort-positions
    :sort-balances account-history-actions/sort-balances
    :sort-open-orders account-history-actions/sort-open-orders
+   :toggle-open-orders-direction-filter-open account-history-actions/toggle-open-orders-direction-filter-open
+   :set-open-orders-direction-filter account-history-actions/set-open-orders-direction-filter
    :sort-funding-history account-history-actions/sort-funding-history
    :sort-order-history account-history-actions/sort-order-history
    :toggle-order-history-filter-open account-history-actions/toggle-order-history-filter-open

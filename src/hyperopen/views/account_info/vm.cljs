@@ -228,6 +228,9 @@
                     :positions (positions-tab-count webdata2 perp-dex-states)
                     :balances (balance-tab-count webdata2 spot-data account)}
         open-orders-sort (get-in state [:account-info :open-orders-sort] {:column "Time" :direction :desc})
+        open-orders-state (merge {:direction-filter :all
+                                  :filter-open? false}
+                                 (get-in state [:account-info :open-orders] {}))
         websocket-health (or (:websocket-health state)
                              (get-in state [:websocket :health]))
         wallet-address (get-in state [:wallet :address])
@@ -252,6 +255,7 @@
      :positions-sort positions-sort
      :balances-sort balances-sort
      :open-orders-sort open-orders-sort
+     :open-orders-state open-orders-state
      :position-tpsl-modal (get-in state [:positions-ui :tpsl-modal])
      :hide-small? hide-small?
      :perp-dex-states perp-dex-states

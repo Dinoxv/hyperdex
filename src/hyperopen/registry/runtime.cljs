@@ -129,6 +129,8 @@
    [:actions/sort-positions :sort-positions]
    [:actions/sort-balances :sort-balances]
    [:actions/sort-open-orders :sort-open-orders]
+   [:actions/toggle-open-orders-direction-filter-open :toggle-open-orders-direction-filter-open]
+   [:actions/set-open-orders-direction-filter :set-open-orders-direction-filter]
    [:actions/sort-funding-history :sort-funding-history]
    [:actions/sort-order-history :sort-order-history]
    [:actions/toggle-order-history-filter-open :toggle-order-history-filter-open]

@@ -249,6 +249,8 @@
            sort-positions
            sort-balances
            sort-open-orders
+           toggle-open-orders-direction-filter-open
+           set-open-orders-direction-filter
            sort-funding-history
            sort-order-history
            toggle-order-history-filter-open
@@ -295,6 +297,8 @@
    :sort-positions sort-positions
    :sort-balances sort-balances
    :sort-open-orders sort-open-orders
+   :toggle-open-orders-direction-filter-open toggle-open-orders-direction-filter-open
+   :set-open-orders-direction-filter set-open-orders-direction-filter
    :sort-funding-history sort-funding-history
    :sort-order-history sort-order-history
    :toggle-order-history-filter-open toggle-order-history-filter-open

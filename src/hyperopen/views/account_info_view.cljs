@@ -43,14 +43,17 @@
 
       :else base)))
 
+(defn- freshness-cue-text-classes [tone]
+  (case tone
+    :success ["text-xs" "font-medium" "text-success" "tracking-wide"]
+    :warning ["text-xs" "font-medium" "text-warning" "tracking-wide"]
+    ["text-xs" "font-medium" "text-base-content/70" "tracking-wide"]))
+
 (defn- freshness-cue-node [cue]
   (when (map? cue)
     [:div {:class ["ml-auto" "px-4" "py-2"]
            :data-role "account-tab-freshness-cue"}
-     [:span {:class (case (:tone cue)
-                      :success ["text-xs" "font-medium" "text-success" "tracking-wide"]
-                      :warning ["text-xs" "font-medium" "text-warning" "tracking-wide"]
-                      ["text-xs" "font-medium" "text-base-content/70" "tracking-wide"])}
+     [:span {:class (freshness-cue-text-classes (:tone cue))}
       (:text cue)]]))
 
 (defn- funding-history-header-actions []
@@ -97,12 +100,64 @@
            (when (= status-filter option-key)
              [:span {:class ["text-trading-green"]} "*"])])])]))
 
+(def open-orders-direction-filter-options
+  open-orders-tab/open-orders-direction-filter-options)
+
+(def open-orders-direction-filter-labels
+  open-orders-tab/open-orders-direction-filter-labels)
+
+(defn- open-orders-direction-filter-key [open-orders-state]
+  (open-orders-tab/open-orders-direction-filter-key open-orders-state))
+
+(defn- chevron-caret-icon [open?]
+  [:svg {:class (into ["ml-1" "h-3" "w-3" "shrink-0" "opacity-70" "transition-transform"]
+                      (if open?
+                        ["rotate-180"]
+                        ["rotate-0"]))
+         :viewBox "0 0 12 12"
+         :aria-hidden true}
+   [:path {:d "M3 4.5L6 7.5L9 4.5"
+           :fill "none"
+           :stroke "currentColor"
+           :stroke-width "1.5"
+           :stroke-linecap "round"
+           :stroke-linejoin "round"}]])
+
+(defn- open-orders-header-actions [open-orders-state freshness-cue]
+  (let [filter-open? (boolean (:filter-open? open-orders-state))
+        direction-filter (open-orders-direction-filter-key open-orders-state)
+        direction-label (get open-orders-direction-filter-labels direction-filter "All")]
+    [:div {:class ["ml-auto" "relative" "flex" "items-center" "justify-end" "gap-2" "px-4" "py-2"]}
+     (when (map? freshness-cue)
+       [:div {:class ["px-1" "py-1"]
+              :data-role "account-tab-freshness-cue"}
+        [:span {:class (freshness-cue-text-classes (:tone freshness-cue))}
+         (:text freshness-cue)]])
+     [:button {:class ["btn" "btn-xs" "btn-ghost" "font-normal" "text-trading-text" "hover:bg-base-100" "hover:text-trading-text"]
+               :on {:click [[:actions/toggle-open-orders-direction-filter-open]]}}
+      direction-label
+      (chevron-caret-icon filter-open?)]
+     (when filter-open?
+       [:div {:class ["absolute" "right-4" "top-full" "z-20" "mt-1" "w-32" "overflow-hidden" "rounded-md" "border" "border-base-300" "bg-base-100" "shadow-lg"]}
+        (for [[option-key option-label] open-orders-direction-filter-options]
+          ^{:key (name option-key)}
+          [:button {:class (into ["flex" "w-full" "items-center" "justify-between" "px-3" "py-2" "text-xs" "transition-colors"]
+                                 (if (= direction-filter option-key)
+                                   ["bg-base-200" "text-trading-text"]
+                                   ["text-trading-text-secondary" "hover:bg-base-200" "hover:text-trading-text"]))
+                    :on {:click [[:actions/set-open-orders-direction-filter option-key]]}}
+           option-label
+           (when (= direction-filter option-key)
+             [:span {:class ["text-trading-text"]} "*"])])])]))
+
 (defn tab-navigation
   ([selected-tab counts hide-small? funding-history-state]
-   (tab-navigation selected-tab counts hide-small? funding-history-state {} nil))
-  ([selected-tab counts hide-small? _funding-history-state order-history-state]
-   (tab-navigation selected-tab counts hide-small? _funding-history-state order-history-state nil))
-  ([selected-tab counts hide-small? _funding-history-state order-history-state freshness-cues]
+   (tab-navigation selected-tab counts hide-small? funding-history-state {} {} nil))
+  ([selected-tab counts hide-small? funding-history-state order-history-state]
+   (tab-navigation selected-tab counts hide-small? funding-history-state order-history-state {} nil))
+  ([selected-tab counts hide-small? funding-history-state order-history-state freshness-cues]
+   (tab-navigation selected-tab counts hide-small? funding-history-state order-history-state {} freshness-cues))
+  ([selected-tab counts hide-small? _funding-history-state order-history-state open-orders-state freshness-cues]
    [:div.flex.items-center.justify-between.border-b.border-base-300.bg-base-200
     [:div.flex.items-center
      (for [tab available-tabs]
@@ -147,7 +202,8 @@
       (freshness-cue-node (get freshness-cues :positions))
 
       :open-orders
-      (freshness-cue-node (get freshness-cues :open-orders))
+      (open-orders-header-actions open-orders-state
+                                  (get freshness-cues :open-orders))
 
       nil)]))
 
@@ -278,8 +334,8 @@
                 (if (some? positions)
                   (positions-tab-content positions positions-sort position-tpsl-modal)
                   (positions-tab-content webdata2 positions-sort perp-dex-states position-tpsl-modal)))
-   :open-orders (fn [{:keys [open-orders open-orders-sort]}]
-                  (open-orders-tab-content open-orders open-orders-sort))
+   :open-orders (fn [{:keys [open-orders open-orders-sort open-orders-state]}]
+                  (open-orders-tab-content open-orders open-orders-sort open-orders-state))
    :twap (fn [_]
            (placeholder-tab-content :twap))
    :trade-history (fn [{:keys [trade-history-rows trade-history-state]}]
@@ -321,12 +377,19 @@
                 hide-small?
                 funding-history-state
                 order-history-state
+                open-orders-state
                 freshness-cues
                 error
                 loading?]} view-model]
     [:div {:class ["bg-base-100" "border-t" "border-base-300" "rounded-none" "shadow-none" "overflow-hidden" "w-full" "h-96" "flex" "flex-col" "min-h-0"]
            :data-parity-id "account-tables"}
-     (tab-navigation selected-tab tab-counts hide-small? funding-history-state order-history-state freshness-cues)
+     (tab-navigation selected-tab
+                     tab-counts
+                     hide-small?
+                     funding-history-state
+                     order-history-state
+                     open-orders-state
+                     freshness-cues)
      [:div {:class ["flex-1" "min-h-0" "overflow-hidden"]}
       (cond
         error (error-state error)

@@ -63,6 +63,29 @@
     (is (= [[:actions/set-order-history-status-filter :filled]]
            (get-in filled-option [1 :on :click])))))
 
+(deftest tab-navigation-renders-open-orders-direction-filter-actions-test
+  (let [counts {:balances 2 :positions 4 :open-orders 3}
+        nav (view/tab-navigation :open-orders
+                                 counts
+                                 false
+                                 {}
+                                 {}
+                                 {:direction-filter :short
+                                  :filter-open? true}
+                                 nil)
+        filter-button (hiccup/find-first-node nav #(and (contains? (hiccup/direct-texts %) "Short")
+                                                         (= [[:actions/toggle-open-orders-direction-filter-open]]
+                                                            (get-in % [1 :on :click]))))
+        all-option (hiccup/find-first-node nav #(and (contains? (hiccup/direct-texts %) "All")
+                                                     (= [[:actions/set-open-orders-direction-filter :all]]
+                                                        (get-in % [1 :on :click]))))
+        short-option (hiccup/find-first-node nav #(and (contains? (hiccup/direct-texts %) "Short")
+                                                       (= [[:actions/set-open-orders-direction-filter :short]]
+                                                          (get-in % [1 :on :click]))))]
+    (is (some? filter-button))
+    (is (some? all-option))
+    (is (some? short-option))))
+
 (deftest tab-navigation-renders-positions-count-when-positive-test
   (let [counts {:balances 2 :positions 4 :open-orders 3}
         nav (view/tab-navigation :positions counts false {})
