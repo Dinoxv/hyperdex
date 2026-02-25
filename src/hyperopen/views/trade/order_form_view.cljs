@@ -235,11 +235,7 @@
         size (trading/parse-num (:size form))
         leverage (trading/parse-num ui-leverage)
         tp-inverse (tpsl-policy/inverse-for-leg side :tp)
-        sl-inverse (tpsl-policy/inverse-for-leg side :sl)
-        offset-ready? (tpsl-policy/offset-input-ready? {:unit unit
-                                                        :baseline baseline
-                                                        :size size
-                                                        :leverage leverage})]
+        sl-inverse (tpsl-policy/inverse-for-leg side :sl)]
     {:form form
      :unit unit
      :unit-dropdown-open? (boolean (:tpsl-unit-dropdown-open? ui-state))
@@ -256,9 +252,7 @@
                                              :size size
                                              :leverage leverage
                                              :inverse sl-inverse
-                                             :unit unit})
-     :tp-offset-disabled? (not offset-ready?)
-     :sl-offset-disabled? (not offset-ready?)}))
+                                             :unit unit})}))
 
 (defn- submit-row [{:keys [submitting? submit-disabled? submit-tooltip on-submit]}]
   [:div {:class ["relative" "group"]

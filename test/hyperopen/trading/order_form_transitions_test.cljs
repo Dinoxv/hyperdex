@@ -209,6 +209,22 @@
     (is (true? (get-in tp-transition [:order-form :tp :enabled?])))
     (is (true? (get-in sl-transition [:order-form :sl :enabled?])))))
 
+(deftest tpsl-offset-input-backfills-trigger-when-size-is-entered-later-test
+  (let [state (assoc (base-state {:type :limit
+                                  :side :buy
+                                  :size ""
+                                  :price "100"
+                                  :tpsl {:unit :usd}})
+                     :order-form-ui (assoc (trading/default-order-form-ui)
+                                           :tpsl-panel-open? true))
+        offset-transition (transitions/update-order-form state [:tp :offset-input] "20")
+        sized-transition (transitions/set-order-size-display (merge state offset-transition) "200")]
+    (is (= "" (get-in offset-transition [:order-form :tp :trigger])))
+    (is (= "20" (get-in offset-transition [:order-form :tp :offset-input])))
+    (is (= "110" (get-in sized-transition [:order-form :tp :trigger])))
+    (is (= "20" (get-in sized-transition [:order-form :tp :offset-input])))
+    (is (true? (get-in sized-transition [:order-form :tp :enabled?])))))
+
 (deftest tpsl-trigger-edit-clears-offset-input-cache-test
   (let [state (base-state {:type :limit
                            :tp {:enabled? true

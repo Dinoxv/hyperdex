@@ -172,6 +172,28 @@
                                             :inverse inverse
                                             :unit unit})))
 
+(defn- backfill-tpsl-triggers-from-offset-inputs
+  [state form]
+  (let [panel-open? (boolean (:tpsl-panel-open? (trading/order-form-ui-state state)))]
+    (if (and panel-open?
+             (not (true? (:reduce-only form))))
+      (reduce (fn [next-form leg]
+                (let [trigger (get-in next-form [leg :trigger])
+                      raw-offset (get-in next-form [leg :offset-input])]
+                  (if (and (not (tpsl-policy/trigger-present? trigger))
+                           (tpsl-policy/trigger-present? raw-offset))
+                    (let [resolved-trigger (resolve-tpsl-trigger-from-offset-input state
+                                                                                   next-form
+                                                                                   leg
+                                                                                   raw-offset)]
+                      (if (tpsl-policy/trigger-present? resolved-trigger)
+                        (apply-tpsl-trigger next-form leg resolved-trigger)
+                        next-form))
+                    next-form)))
+              form
+              [:tp :sl])
+      form)))
+
 (defn select-entry-mode [state mode]
   (let [mode* (normalize-order-entry-mode mode)
         form (trading/order-form-draft state)
@@ -304,7 +326,8 @@
   (let [form (trading/order-form-draft state)
         normalized (trading/normalize-ui-leverage state leverage)
         updated (assoc form :ui-leverage normalized)
-        next-form (reconcile-size-after-context-change state updated)]
+        next-form (->> (reconcile-size-after-context-change state updated)
+                       (backfill-tpsl-triggers-from-offset-inputs state))]
     (enforce-field-ownership
      state
      {:order-form next-form
@@ -315,7 +338,8 @@
         next-form (-> (trading/apply-size-percent state
                                                   (assoc form :size-input-source :percent)
                                                   percent)
-                      (assoc :size-input-source :percent))]
+                      (assoc :size-input-source :percent)
+                      (#(backfill-tpsl-triggers-from-offset-inputs state %)))]
     (enforce-field-ownership
      state
      {:order-form next-form
@@ -324,7 +348,8 @@
 (defn set-order-size-display [state value]
   (let [raw-value (str (or value ""))
         form (trading/order-form-draft state)
-        next-form (apply-size-display-input state form raw-value)]
+        next-form (-> (apply-size-display-input state form raw-value)
+                      (#(backfill-tpsl-triggers-from-offset-inputs state %)))]
     (enforce-field-ownership
      state
      {:order-form next-form
@@ -356,7 +381,8 @@
         updated (cond-> form
                   should-capture-fallback? (assoc :price fallback-price))
         next-form (if should-capture-fallback?
-                    (reconcile-size-after-context-change state updated)
+                    (-> (reconcile-size-after-context-change state updated)
+                        (#(backfill-tpsl-triggers-from-offset-inputs state %)))
                     updated)
         next-ui (trading/effective-order-form-ui
                  next-form
@@ -386,7 +412,8 @@
                   (assoc form :price mid-price-string)
                   form)
         next-form (if (seq mid-price-string)
-                    (reconcile-size-after-context-change state updated)
+                    (-> (reconcile-size-after-context-change state updated)
+                        (#(backfill-tpsl-triggers-from-offset-inputs state %)))
                     updated)]
     (enforce-field-ownership
      state
@@ -473,23 +500,24 @@
 
                       :else
                       updated)
+          backfilled-form (backfill-tpsl-triggers-from-offset-inputs state next-form)
           next-ui (cond
                     (= resolved-path [:tif])
                     (trading/effective-order-form-ui
-                     next-form
+                     backfilled-form
                      (assoc (trading/order-form-ui-state state)
                             :tif-dropdown-open? false))
 
                     (= resolved-path [:tpsl :unit])
                     (trading/effective-order-form-ui
-                     next-form
+                     backfilled-form
                      (assoc (trading/order-form-ui-state state)
                             :tpsl-unit-dropdown-open? false))
 
                     (and (= resolved-path [:reduce-only])
                          (true? normalized-value))
                     (trading/effective-order-form-ui
-                     next-form
+                     backfilled-form
                      (assoc (trading/order-form-ui-state state)
                             :tpsl-panel-open? false
                             :tpsl-unit-dropdown-open? false))
@@ -498,6 +526,6 @@
                     nil)]
       (enforce-field-ownership
        state
-       (cond-> {:order-form next-form
+       (cond-> {:order-form backfilled-form
                 :order-form-runtime (cleared-runtime-state state)}
          (map? next-ui) (assoc :order-form-ui next-ui))))))

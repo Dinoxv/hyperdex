@@ -101,3 +101,21 @@
            (policy/offset-display (assoc params
                                          :offset-input "1"
                                          :trigger "120"))))))
+
+(deftest tpsl-offset-display-preserves-raw-input-until-trigger-is-available-test
+  (is (= "20"
+         (policy/offset-display {:offset-input "20"
+                                 :trigger ""
+                                 :baseline 100
+                                 :size nil
+                                 :leverage 20
+                                 :inverse false
+                                 :unit :usd})))
+  (is (= "20"
+         (policy/offset-display {:offset-input "20"
+                                 :trigger ""
+                                 :baseline 100
+                                 :size 2
+                                 :leverage 20
+                                 :inverse false
+                                 :unit :usd}))))

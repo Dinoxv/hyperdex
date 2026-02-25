@@ -135,8 +135,9 @@
                                                 :unit unit})
         trigger-text (str/trim (str (or trigger "")))]
     (if (and (seq (str/trim raw-text))
-             (seq raw-trigger)
-             (= raw-trigger trigger-text))
+             (or (not (seq raw-trigger))
+                 (str/blank? trigger-text)
+                 (= raw-trigger trigger-text)))
       raw-text
       (offset-display-from-trigger {:trigger trigger
                                     :baseline baseline

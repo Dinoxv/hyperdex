@@ -186,6 +186,35 @@
     (is (not (contains? strings "Enable TP")))
     (is (not (contains? strings "Enable SL")))))
 
+(deftest open-tpsl-panel-allows-gain-loss-input-before-price-and-size-test
+  (let [view-node (view/order-form-view (base-state {:type :limit
+                                                      :side :buy
+                                                      :price ""
+                                                      :size ""
+                                                      :tp {:enabled? false
+                                                           :trigger ""
+                                                           :offset-input "12"
+                                                           :is-market true
+                                                           :limit ""}
+                                                      :sl {:enabled? false
+                                                           :trigger ""
+                                                           :offset-input "7"
+                                                           :is-market true
+                                                           :limit ""}}
+                                                     {:tpsl-panel-open? true}))
+        gain-input (find-first-node view-node
+                                    (fn [candidate]
+                                      (and (= :input (first candidate))
+                                           (= "Gain" (get-in candidate [1 :aria-label])))))
+        loss-input (find-first-node view-node
+                                    (fn [candidate]
+                                      (and (= :input (first candidate))
+                                           (= "Loss" (get-in candidate [1 :aria-label])))))]
+    (is (= "12" (get-in gain-input [1 :value])))
+    (is (= "7" (get-in loss-input [1 :value])))
+    (is (false? (boolean (get-in gain-input [1 :disabled]))))
+    (is (false? (boolean (get-in loss-input [1 :disabled]))))))
+
 (deftest open-tpsl-panel-preserves-raw-gain-loss-offset-input-text-test
   (let [view-node (view/order-form-view (base-state {:type :limit
                                                       :side :buy

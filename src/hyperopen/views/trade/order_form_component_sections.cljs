@@ -216,9 +216,7 @@
            unit
            unit-dropdown-open?
            tp-offset
-           sl-offset
-           tp-offset-disabled?
-           sl-offset-disabled?]}
+           sl-offset]}
    {:keys [on-set-tp-trigger
            on-set-tp-offset
            on-set-sl-trigger
@@ -242,12 +240,11 @@
                                                              :menu-enabled? true
                                                              :dropdown-open? unit-dropdown-open?
                                                              :on-toggle-dropdown on-toggle-unit-dropdown
-                                                             :on-close-dropdown on-close-unit-dropdown
-                                                             :on-dropdown-keydown on-unit-dropdown-keydown
-                                                             :on-select-tpsl-unit on-select-tpsl-unit})
+                                  :on-close-dropdown on-close-unit-dropdown
+                                  :on-dropdown-keydown on-unit-dropdown-keydown
+                                  :on-select-tpsl-unit on-select-tpsl-unit})
                                   :inputmode "decimal"
-                                  :overflow-visible? true
-                                  :disabled? tp-offset-disabled?)]
+                                  :overflow-visible? true)]
    [:div {:class ["grid" "grid-cols-2" "gap-[10px]"]}
     (primitives/compact-row-input (get-in form [:sl :trigger])
                                   "SL Price"
@@ -262,11 +259,10 @@
                                                              :menu-enabled? false
                                                              :dropdown-open? unit-dropdown-open?
                                                              :on-toggle-dropdown on-toggle-unit-dropdown
-                                                             :on-close-dropdown on-close-unit-dropdown
-                                                             :on-dropdown-keydown on-unit-dropdown-keydown
-                                                             :on-select-tpsl-unit on-select-tpsl-unit})
-                                  :inputmode "decimal"
-                                  :disabled? sl-offset-disabled?)]])
+                                  :on-close-dropdown on-close-unit-dropdown
+                                  :on-dropdown-keydown on-unit-dropdown-keydown
+                                  :on-select-tpsl-unit on-select-tpsl-unit})
+                                  :inputmode "decimal")]])
 
 (def ^:private tif-options
   [[:gtc "GTC"]
