@@ -204,8 +204,44 @@
         sl-transition (transitions/update-order-form state [:sl :offset-input] "20")]
     (is (= "110" (get-in tp-transition [:order-form :tp :trigger])))
     (is (= "90" (get-in sl-transition [:order-form :sl :trigger])))
+    (is (= "20" (get-in tp-transition [:order-form :tp :offset-input])))
+    (is (= "20" (get-in sl-transition [:order-form :sl :offset-input])))
     (is (true? (get-in tp-transition [:order-form :tp :enabled?])))
     (is (true? (get-in sl-transition [:order-form :sl :enabled?])))))
+
+(deftest tpsl-trigger-edit-clears-offset-input-cache-test
+  (let [state (base-state {:type :limit
+                           :tp {:enabled? true
+                                :trigger "110"
+                                :offset-input "20"
+                                :is-market true
+                                :limit ""}
+                           :sl {:enabled? true
+                                :trigger "90"
+                                :offset-input "20"
+                                :is-market true
+                                :limit ""}})
+        tp-transition (transitions/update-order-form state [:tp :trigger] "120")
+        sl-transition (transitions/update-order-form state [:sl :trigger] "80")]
+    (is (= "" (get-in tp-transition [:order-form :tp :offset-input])))
+    (is (= "" (get-in sl-transition [:order-form :sl :offset-input])))))
+
+(deftest tpsl-unit-change-clears-offset-input-cache-test
+  (let [state (base-state {:type :limit
+                           :tpsl {:unit :usd}
+                           :tp {:enabled? true
+                                :trigger "110"
+                                :offset-input "20"
+                                :is-market true
+                                :limit ""}
+                           :sl {:enabled? true
+                                :trigger "90"
+                                :offset-input "20"
+                                :is-market true
+                                :limit ""}})
+        transition (transitions/update-order-form state [:tpsl :unit] :percent)]
+    (is (= "" (get-in transition [:order-form :tp :offset-input])))
+    (is (= "" (get-in transition [:order-form :sl :offset-input])))))
 
 (deftest update-order-form-tif-closes-tif-dropdown-test
   (let [state (assoc (base-state {:type :limit :tif :gtc})

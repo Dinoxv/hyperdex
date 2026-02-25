@@ -108,6 +108,7 @@
 (defn- tpsl-unit-accessory
   [unit {:keys [interactive?
                 dropdown-open?
+                menu-enabled?
                 on-toggle-dropdown
                 on-close-dropdown
                 on-dropdown-keydown
@@ -115,16 +116,18 @@
   (let [selected-unit (if (= unit :percent) :percent :usd)
         selected-label (if (= selected-unit :percent) "%" "$")
         interactive? (not= false interactive?)
-        open? (and interactive? (boolean dropdown-open?))]
+        menu-enabled? (not= false menu-enabled?)
+        open? (and interactive? (boolean dropdown-open?))
+        menu-open? (and open? menu-enabled?)]
     (if-not interactive?
       [:span {:class ["text-xs"
                       "font-normal"
                       "text-[#F6FEFD]"]}
        selected-label]
       [:div {:class ["relative" "flex" "items-center"]
-             :style (when open?
+             :style (when menu-open?
                       {:z-index 1200})}
-       (when open?
+       (when menu-open?
          [:button {:type "button"
                    :class ["absolute" "bg-transparent" "cursor-default"]
                    :style {:left "-100vmax"
@@ -153,7 +156,7 @@
                  :aria-label "TP/SL gain-loss unit"
                  :aria-haspopup "listbox"
                  :aria-expanded open?
-                 :style (when open?
+                 :style (when menu-open?
                           {:z-index 1201})
                  :on {:click on-toggle-dropdown
                       :keydown on-dropdown-keydown}}
@@ -173,39 +176,40 @@
          [:path {:fill-rule "evenodd"
                  :clip-rule "evenodd"
                  :d "M5.293 7.293a1 1 0 011.414 0L10 10.586l3.293-3.293a1 1 0 111.414 1.414l-4 4a1 1 0 01-1.414 0l-4-4a1 1 0 010-1.414z"}]]]
-       [:div {:class (into ["absolute"
-                            "right-[-4px]"
-                            "top-full"
-                            "mt-1"
-                            "min-w-[44px]"
-                            "rounded-lg"
-                            "border"
-                            "border-[#273035]"
-                            "bg-[#1B2429]"
-                            "px-2"
-                            "py-1"
-                            "origin-top-right"
-                            "transition-all"
-                            "duration-300"
-                            "ease-out"
-                            "shadow-[0_8px_16px_rgba(0,0,0,0.25)]"]
-                           (if open?
-                             ["visible"
-                              "opacity-100"
-                              "translate-y-0"
-                              "pointer-events-auto"]
-                             ["invisible"
-                              "opacity-0"
-                              "-translate-y-[5px]"
-                              "pointer-events-none"]))
-              :style {:z-index 1202}
-              :role "listbox"
-              :aria-label "TP/SL gain-loss unit options"
-              :aria-hidden (not open?)
-              :on {:keydown on-dropdown-keydown}}
-        (for [[option-unit label] tpsl-unit-options]
-          ^{:key (name option-unit)}
-          (tpsl-unit-option-row selected-unit option-unit label on-select-tpsl-unit))]])))
+       (when menu-enabled?
+         [:div {:class (into ["absolute"
+                              "right-[-4px]"
+                              "top-full"
+                              "mt-1"
+                              "min-w-[44px]"
+                              "rounded-lg"
+                              "border"
+                              "border-[#273035]"
+                              "bg-[#1B2429]"
+                              "px-2"
+                              "py-1"
+                              "origin-top-right"
+                              "transition-all"
+                              "duration-300"
+                              "ease-out"
+                              "shadow-[0_8px_16px_rgba(0,0,0,0.25)]"]
+                             (if menu-open?
+                               ["visible"
+                                "opacity-100"
+                                "translate-y-0"
+                                "pointer-events-auto"]
+                               ["invisible"
+                                "opacity-0"
+                                "-translate-y-[5px]"
+                                "pointer-events-none"]))
+                :style {:z-index 1202}
+                :role "listbox"
+                :aria-label "TP/SL gain-loss unit options"
+                :aria-hidden (not menu-open?)
+                :on {:keydown on-dropdown-keydown}}
+          (for [[option-unit label] tpsl-unit-options]
+            ^{:key (name option-unit)}
+            (tpsl-unit-option-row selected-unit option-unit label on-select-tpsl-unit))])])))
 
 (defn tp-sl-panel
   [{:keys [form
@@ -235,6 +239,7 @@
                                   "Gain"
                                   on-set-tp-offset
                                   (tpsl-unit-accessory unit {:interactive? true
+                                                             :menu-enabled? true
                                                              :dropdown-open? unit-dropdown-open?
                                                              :on-toggle-dropdown on-toggle-unit-dropdown
                                                              :on-close-dropdown on-close-unit-dropdown
@@ -253,7 +258,13 @@
     (primitives/compact-row-input sl-offset
                                   "Loss"
                                   on-set-sl-offset
-                                  (tpsl-unit-accessory unit {:interactive? false})
+                                  (tpsl-unit-accessory unit {:interactive? true
+                                                             :menu-enabled? false
+                                                             :dropdown-open? unit-dropdown-open?
+                                                             :on-toggle-dropdown on-toggle-unit-dropdown
+                                                             :on-close-dropdown on-close-unit-dropdown
+                                                             :on-dropdown-keydown on-unit-dropdown-keydown
+                                                             :on-select-tpsl-unit on-select-tpsl-unit})
                                   :inputmode "decimal"
                                   :disabled? sl-offset-disabled?)]])
 

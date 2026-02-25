@@ -243,18 +243,20 @@
     {:form form
      :unit unit
      :unit-dropdown-open? (boolean (:tpsl-unit-dropdown-open? ui-state))
-     :tp-offset (tpsl-policy/offset-display-from-trigger {:trigger (get-in form [:tp :trigger])
-                                                          :baseline baseline
-                                                          :size size
-                                                          :leverage leverage
-                                                          :inverse tp-inverse
-                                                          :unit unit})
-     :sl-offset (tpsl-policy/offset-display-from-trigger {:trigger (get-in form [:sl :trigger])
-                                                          :baseline baseline
-                                                          :size size
-                                                          :leverage leverage
-                                                          :inverse sl-inverse
-                                                          :unit unit})
+     :tp-offset (tpsl-policy/offset-display {:offset-input (get-in form [:tp :offset-input])
+                                             :trigger (get-in form [:tp :trigger])
+                                             :baseline baseline
+                                             :size size
+                                             :leverage leverage
+                                             :inverse tp-inverse
+                                             :unit unit})
+     :sl-offset (tpsl-policy/offset-display {:offset-input (get-in form [:sl :offset-input])
+                                             :trigger (get-in form [:sl :trigger])
+                                             :baseline baseline
+                                             :size size
+                                             :leverage leverage
+                                             :inverse sl-inverse
+                                             :unit unit})
      :tp-offset-disabled? (not offset-ready?)
      :sl-offset-disabled? (not offset-ready?)}))
 

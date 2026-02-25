@@ -74,3 +74,30 @@
                                             :leverage 45
                                             :inverse true
                                             :unit :percent}))))
+
+(deftest tpsl-offset-display-preserves-raw-input-when-math-roundtrip-matches-trigger-test
+  (let [params {:baseline 0.62095
+                :size 102
+                :leverage 20
+                :inverse false
+                :unit :usd}
+        trigger (policy/trigger-from-offset-input (assoc params :raw-input "1"))]
+    (is (= "0.63075" trigger))
+    (is (= "0.99"
+           (policy/offset-display-from-trigger (assoc params :trigger trigger))))
+    (is (= "1"
+           (policy/offset-display (assoc params
+                                         :offset-input "1"
+                                         :trigger trigger))))))
+
+(deftest tpsl-offset-display-falls-back-to-derived-value-when-raw-input-is-stale-test
+  (let [params {:baseline 100
+                :size 2
+                :leverage 20
+                :inverse false
+                :unit :usd}
+        derived (policy/offset-display-from-trigger (assoc params :trigger "120"))]
+    (is (= derived
+           (policy/offset-display (assoc params
+                                         :offset-input "1"
+                                         :trigger "120"))))))

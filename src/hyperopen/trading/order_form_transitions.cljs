@@ -420,6 +420,9 @@
      state
      {:order-form-runtime (cleared-runtime-state state)})
     (let [form (trading/order-form-draft state)
+          tp-offset-input? (= path [:tp :offset-input])
+          sl-offset-input? (= path [:sl :offset-input])
+          raw-input (str (or value ""))
           resolved-path (case path
                           [:tp :offset-input] [:tp :trigger]
                           [:sl :offset-input] [:sl :trigger]
@@ -434,7 +437,15 @@
                              (= resolved-path [:tif]) (:value (trading/tif-value resolved-value))
                              (= resolved-path [:tpsl :unit]) (tpsl-policy/normalize-unit resolved-value)
                              :else resolved-value)
-          updated (assoc-in form resolved-path normalized-value)
+          updated (cond-> (assoc-in form resolved-path normalized-value)
+                    tp-offset-input? (assoc-in [:tp :offset-input] raw-input)
+                    sl-offset-input? (assoc-in [:sl :offset-input] raw-input)
+                    (and (= resolved-path [:tp :trigger])
+                         (not tp-offset-input?)) (assoc-in [:tp :offset-input] "")
+                    (and (= resolved-path [:sl :trigger])
+                         (not sl-offset-input?)) (assoc-in [:sl :offset-input] "")
+                    (= resolved-path [:tpsl :unit]) (assoc-in [:tp :offset-input] "")
+                    (= resolved-path [:tpsl :unit]) (assoc-in [:sl :offset-input] ""))
           next-form (cond
                       (= resolved-path [:type])
                       (let [typed (-> updated

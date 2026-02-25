@@ -186,12 +186,40 @@
     (is (not (contains? strings "Enable TP")))
     (is (not (contains? strings "Enable SL")))))
 
+(deftest open-tpsl-panel-preserves-raw-gain-loss-offset-input-text-test
+  (let [view-node (view/order-form-view (base-state {:type :limit
+                                                      :side :buy
+                                                      :price "0.62095"
+                                                      :size "102"
+                                                      :ui-leverage 20
+                                                      :tp {:enabled? true
+                                                           :trigger "0.63075"
+                                                           :offset-input "1"
+                                                           :is-market true
+                                                           :limit ""}
+                                                      :sl {:enabled? true
+                                                           :trigger "0.61115"
+                                                           :offset-input "1"
+                                                           :is-market true
+                                                           :limit ""}}
+                                                     {:tpsl-panel-open? true}))
+        gain-input (find-first-node view-node
+                                    (fn [candidate]
+                                      (and (= :input (first candidate))
+                                           (= "Gain" (get-in candidate [1 :aria-label])))))
+        loss-input (find-first-node view-node
+                                    (fn [candidate]
+                                      (and (= :input (first candidate))
+                                           (= "Loss" (get-in candidate [1 :aria-label])))))]
+    (is (= "1" (get-in gain-input [1 :value])))
+    (is (= "1" (get-in loss-input [1 :value])))))
+
 (deftest open-tpsl-panel-renders-custom-unit-dropdown-trigger-without-native-select-test
   (let [view-node (view/order-form-view (base-state {:type :limit
                                                       :price "100"
                                                       :size "1"}
                                                      {:tpsl-panel-open? true}))
-        unit-trigger (find-first-node view-node
+        unit-triggers (find-all-nodes view-node
                                       (fn [candidate]
                                         (and (= :button (first candidate))
                                              (= "TP/SL gain-loss unit"
@@ -199,8 +227,11 @@
         native-selects (find-all-nodes view-node
                                        (fn [candidate]
                                          (= :select (first candidate))))]
-    (is (= [[:actions/toggle-tpsl-unit-dropdown]]
-           (get-in unit-trigger [1 :on :click])))
-    (is (= [[:actions/handle-tpsl-unit-dropdown-keydown [:event/key]]]
-           (get-in unit-trigger [1 :on :keydown])))
+    (is (= 2 (count unit-triggers)))
+    (is (every? #(= [[:actions/toggle-tpsl-unit-dropdown]]
+                    (get-in % [1 :on :click]))
+                unit-triggers))
+    (is (every? #(= [[:actions/handle-tpsl-unit-dropdown-keydown [:event/key]]]
+                    (get-in % [1 :on :keydown]))
+                unit-triggers))
     (is (empty? native-selects))))

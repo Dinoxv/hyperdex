@@ -123,3 +123,24 @@
                      (positive-number? price))
               (trading-domain/number->clean-string price trigger-price-decimals)
               "")))))))
+
+(defn offset-display
+  [{:keys [offset-input trigger baseline size leverage inverse unit]}]
+  (let [raw-text (str (or offset-input ""))
+        raw-trigger (trigger-from-offset-input {:raw-input raw-text
+                                                :baseline baseline
+                                                :size size
+                                                :leverage leverage
+                                                :inverse inverse
+                                                :unit unit})
+        trigger-text (str/trim (str (or trigger "")))]
+    (if (and (seq (str/trim raw-text))
+             (seq raw-trigger)
+             (= raw-trigger trigger-text))
+      raw-text
+      (offset-display-from-trigger {:trigger trigger
+                                    :baseline baseline
+                                    :size size
+                                    :leverage leverage
+                                    :inverse inverse
+                                    :unit unit}))))

@@ -100,8 +100,8 @@
                                                            [[:actions/close-tpsl-unit-dropdown]
                                                             [:actions/update-order-form [:tpsl :unit] unit]])})
         labels (set (collect-strings node))
-        unit-trigger (first (filter #(= "TP/SL gain-loss unit" (get-in % [1 :aria-label]))
-                                    (collect-nodes-by-tag node :button)))
+        unit-triggers (filter #(= "TP/SL gain-loss unit" (get-in % [1 :aria-label]))
+                              (collect-nodes-by-tag node :button))
         tp-price-input (input-node-by-aria-label node "TP Price")
         gain-input (input-node-by-aria-label node "Gain")
         sl-price-input (input-node-by-aria-label node "SL Price")
@@ -129,10 +129,13 @@
     (is (contains? gain-classes "min-w-0"))
     (is (not (contains? tp-price-classes "pl-24")))
     (is (= 0 (count (collect-nodes-by-tag node :select))))
-    (is (= [[:actions/toggle-tpsl-unit-dropdown]]
-           (get-in unit-trigger [1 :on :click])))
-    (is (= [[:actions/handle-tpsl-unit-dropdown-keydown [:event/key]]]
-           (get-in unit-trigger [1 :on :keydown])))))
+    (is (= 2 (count unit-triggers)))
+    (is (every? #(= [[:actions/toggle-tpsl-unit-dropdown]]
+                    (get-in % [1 :on :click]))
+                unit-triggers))
+    (is (every? #(= [[:actions/handle-tpsl-unit-dropdown-keydown [:event/key]]]
+                    (get-in % [1 :on :keydown]))
+                unit-triggers))))
 
 (deftest tp-sl-panel-open-unit-menu-renders-overlay-and-options-test
   (let [node (sections/tp-sl-panel {:form {:tp {:trigger "3000"}
