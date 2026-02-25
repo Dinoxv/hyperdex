@@ -10,6 +10,25 @@
 (def ^:private sell-badge-color "rgba(227, 95, 120, 0.14)")
 (def ^:private buy-text-color "rgb(151, 252, 228)")
 (def ^:private sell-text-color "rgb(244, 187, 198)")
+(def ^:private tp-line-color "rgba(45, 212, 191, 0.9)")
+(def ^:private sl-line-color "rgba(251, 146, 60, 0.9)")
+(def ^:private tp-badge-color "rgba(45, 212, 191, 0.16)")
+(def ^:private sl-badge-color "rgba(251, 146, 60, 0.16)")
+(def ^:private tp-text-color "rgb(153, 246, 228)")
+(def ^:private sl-text-color "rgb(254, 215, 170)")
+(def ^:private tp-chip-bg "rgba(45, 212, 191, 0.28)")
+(def ^:private sl-chip-bg "rgba(251, 146, 60, 0.28)")
+(def ^:private neutral-chip-bg "rgba(148, 163, 184, 0.24)")
+(def ^:private neutral-chip-text "rgb(203, 213, 225)")
+(def ^:private badge-stack-gap-px 24)
+(def ^:private badge-overlap-threshold-px 18)
+(def ^:private badge-horizontal-step-px 18)
+(def ^:private badge-horizontal-max-offset-px 36)
+(def ^:private badge-edge-padding-px 14)
+(def ^:private tp-side-markers
+  #{"tp" "takeprofit" "take-profit" "take profit"})
+(def ^:private sl-side-markers
+  #{"sl" "stoploss" "stop-loss" "stop loss"})
 (def ^:private no-orders [])
 
 (defn- overlay-state
@@ -39,6 +58,12 @@
   [value]
   (account-shared/parse-optional-num value))
 
+(defn- clamp
+  [value min-value max-value]
+  (-> value
+      (max min-value)
+      (min max-value)))
+
 (defn- buy-side?
   [side]
   (= "B" (some-> side str str/trim str/upper-case)))
@@ -46,6 +71,90 @@
 (defn- side-label
   [side]
   (if (buy-side? side) "Buy" "Sell"))
+
+(defn- normalize-order-text
+  [value]
+  (some-> value str str/trim str/lower-case))
+
+(defn- includes-any-fragment?
+  [text fragments]
+  (boolean
+   (some #(str/includes? text %)
+         fragments)))
+
+(defn- order-intent
+  [order]
+  (let [tpsl-text (normalize-order-text (:tpsl order))
+        order-type-text (normalize-order-text (:type order))]
+    (cond
+      (contains? tp-side-markers tpsl-text) :tp
+      (contains? sl-side-markers tpsl-text) :sl
+      (and (seq order-type-text)
+           (includes-any-fragment? order-type-text
+                                   #{"takeprofit"
+                                     "take-profit"
+                                     "take profit"
+                                     "take market"
+                                     "take limit"}))
+      :tp
+      (and (seq order-type-text)
+           (includes-any-fragment? order-type-text
+                                   #{"stoploss"
+                                     "stop-loss"
+                                     "stop loss"
+                                     "stop market"
+                                     "stop limit"}))
+      :sl
+      :else :standard)))
+
+(defn- intent-priority
+  [intent]
+  (case intent
+    :tp 0
+    :sl 1
+    2))
+
+(defn- intent-chip-label
+  [intent]
+  (case intent
+    :tp "TP"
+    :sl "SL"
+    "ORD"))
+
+(defn- intent-display-label
+  [intent]
+  (case intent
+    :tp "take profit"
+    :sl "stop loss"
+    "order"))
+
+(defn- intent-chip-bg
+  [intent]
+  (case intent
+    :tp tp-chip-bg
+    :sl sl-chip-bg
+    neutral-chip-bg))
+
+(defn- intent-chip-text-color
+  [intent]
+  (case intent
+    :tp tp-text-color
+    :sl sl-text-color
+    neutral-chip-text))
+
+(defn- order-execution-label
+  [order]
+  (let [order-type-text (normalize-order-text (:type order))]
+    (cond
+      (and (seq order-type-text)
+           (str/includes? order-type-text "market"))
+      "MKT"
+
+      (and (seq order-type-text)
+           (str/includes? order-type-text "limit"))
+      "LMT"
+
+      :else nil)))
 
 (defn- order-type-label
   [order]
@@ -55,16 +164,25 @@
       "Order")))
 
 (defn- order-line-color
-  [side]
-  (if (buy-side? side) buy-line-color sell-line-color))
+  [side intent]
+  (case intent
+    :tp tp-line-color
+    :sl sl-line-color
+    (if (buy-side? side) buy-line-color sell-line-color)))
 
 (defn- order-badge-color
-  [side]
-  (if (buy-side? side) buy-badge-color sell-badge-color))
+  [side intent]
+  (case intent
+    :tp tp-badge-color
+    :sl sl-badge-color
+    (if (buy-side? side) buy-badge-color sell-badge-color)))
 
 (defn- order-text-color
-  [side]
-  (if (buy-side? side) buy-text-color sell-text-color))
+  [side intent]
+  (case intent
+    :tp tp-text-color
+    :sl sl-text-color
+    (if (buy-side? side) buy-text-color sell-text-color)))
 
 (defn- format-order-price
   [format-price order]
@@ -147,20 +265,103 @@
       (.appendChild container next-root))
     next-root))
 
+(defn- layout-sort-key
+  [{:keys [line-y intent order]}]
+  [line-y
+   (intent-priority intent)
+   (str (or (:oid order) ""))])
+
+(defn- split-overlap-clusters
+  [rows]
+  (reduce (fn [clusters row]
+            (if-let [last-cluster (peek clusters)]
+              (let [last-row (peek last-cluster)
+                    last-y (:line-y last-row)
+                    row-y (:line-y row)]
+                (if (<= (js/Math.abs (- row-y last-y))
+                        badge-overlap-threshold-px)
+                  (conj (pop clusters) (conj last-cluster row))
+                  (conj clusters [row])))
+              [[row]]))
+          []
+          rows))
+
+(defn- cluster-horizontal-offset
+  [idx cluster-size]
+  (let [center (/ (dec cluster-size) 2)
+        raw (* badge-horizontal-step-px
+               (- idx center))]
+    (clamp raw
+           (- badge-horizontal-max-offset-px)
+           badge-horizontal-max-offset-px)))
+
+(defn- cluster-start-y
+  [cluster height]
+  (let [cluster-size (count cluster)
+        center-y (/ (reduce + (map :line-y cluster))
+                    (max cluster-size 1))
+        span (* badge-stack-gap-px
+                (max 0 (dec cluster-size)))
+        raw-start (- center-y (/ span 2))]
+    (if (pos? height)
+      (let [top-bound badge-edge-padding-px
+            bottom-bound (max top-bound
+                              (- height badge-edge-padding-px))
+            max-start (- bottom-bound span)]
+        (if (< max-start top-bound)
+          raw-start
+          (clamp raw-start top-bound max-start)))
+      raw-start)))
+
+(defn- layout-overlapping-badges
+  [rows width height]
+  (let [anchor-x (/ width 2)
+        sorted-rows (sort-by layout-sort-key rows)
+        clusters (split-overlap-clusters sorted-rows)]
+    (->> clusters
+         (mapcat (fn [cluster]
+                   (let [cluster-size (count cluster)
+                         start-y (cluster-start-y cluster height)]
+                     (map-indexed (fn [idx row]
+                                    (assoc row
+                                           :badge-y (+ start-y
+                                                       (* idx badge-stack-gap-px))
+                                           :badge-x (+ anchor-x
+                                                       (cluster-horizontal-offset idx cluster-size))))
+                                  cluster))))
+         vec)))
+
+(defn- overlay-label-text
+  [order intent order-type side-text sz-text px-label]
+  (if (= intent :standard)
+    (str order-type " " sz-text " @ " px-label)
+    (str side-text " " sz-text " @ " px-label
+         (when-let [execution-label (order-execution-label order)]
+           (str " | " execution-label)))))
+
 (defn- build-overlay-row!
-  [document order x y on-cancel-order format-price format-size]
+  [document
+   order
+   {:keys [line-y badge-y badge-x intent]}
+   on-cancel-order
+   format-price
+   format-size]
   (let [side (:side order)
         side-text (side-label side)
         order-type (order-type-label order)
         px-text (format-order-price format-price order)
         px-label (ensure-dollar-prefixed-price px-text)
         sz-text (format-order-size format-size order)
-        line-color (order-line-color side)
-        badge-color (order-badge-color side)
-        text-color (order-text-color side)
+        badge-offset-y (- badge-y line-y)
+        line-color (order-line-color side intent)
+        badge-color (order-badge-color side intent)
+        text-color (order-text-color side intent)
+        kind-text (intent-display-label intent)
         row (.createElement document "div")
         line (.createElement document "div")
+        connector (.createElement document "div")
         badge (.createElement document "div")
+        intent-chip (.createElement document "span")
         label (.createElement document "span")
         cancel-button (.createElement document "button")]
     (apply-inline-style!
@@ -168,7 +369,7 @@
      {"position" "absolute"
       "left" "0px"
       "right" "0px"
-      "top" (str y "px")
+      "top" (str line-y "px")
       "height" "0px"
       "pointerEvents" "none"})
     (apply-inline-style!
@@ -183,33 +384,82 @@
     (apply-inline-style!
      badge
      {"position" "absolute"
-      "left" (str x "px")
-      "top" "0px"
+      "left" (str badge-x "px")
+      "top" (str badge-offset-y "px")
       "transform" "translate(-50%, -50%)"
       "display" "inline-flex"
       "alignItems" "center"
       "gap" "6px"
-      "padding" "2px 4px 2px 6px"
+      "padding" "2px 6px"
+      "minHeight" "24px"
       "fontSize" "11px"
       "lineHeight" "16px"
       "fontWeight" "600"
-      "borderRadius" "3px"
+      "borderRadius" "4px"
       "border" (str "1px solid " line-color)
       "background" badge-color
       "backdropFilter" "blur(0.5px)"
       "color" text-color
       "pointerEvents" "auto"})
+    (.setAttribute badge "data-order-kind"
+                   (case intent
+                     :tp "tp"
+                     :sl "sl"
+                     "order"))
+    (.setAttribute badge "title"
+                   (str (intent-chip-label intent)
+                        " | "
+                        (overlay-label-text order intent order-type side-text sz-text px-label)))
+    (set! (.-textContent intent-chip)
+          (intent-chip-label intent))
+    (apply-inline-style!
+     intent-chip
+     {"display" "inline-flex"
+      "alignItems" "center"
+      "justifyContent" "center"
+      "minWidth" "26px"
+      "height" "16px"
+      "padding" "0px 5px"
+      "borderRadius" "999px"
+      "fontSize" "10px"
+      "lineHeight" "10px"
+      "fontWeight" "700"
+      "letterSpacing" "0.04em"
+      "userSelect" "none"
+      "textTransform" "uppercase"
+      "background" (intent-chip-bg intent)
+      "color" (intent-chip-text-color intent)
+      "border" "1px solid rgba(148, 163, 184, 0.32)"
+      "pointerEvents" "none"})
     (set! (.-textContent label)
-          (str order-type " " sz-text " at " px-label))
+          (overlay-label-text order intent order-type side-text sz-text px-label))
     (apply-inline-style!
      label
      {"whiteSpace" "nowrap"
       "userSelect" "none"
       "pointerEvents" "none"})
+    (when (> (js/Math.abs badge-offset-y) 1)
+      (let [connector-top (min 0 badge-offset-y)
+            connector-height (js/Math.abs badge-offset-y)]
+        (apply-inline-style!
+         connector
+         {"position" "absolute"
+          "left" (str badge-x "px")
+          "top" (str connector-top "px")
+          "height" (str connector-height "px")
+          "borderLeft" (str "1px dashed " line-color)
+          "opacity" "0.72"
+          "pointerEvents" "none"})))
     (.setAttribute cancel-button "type" "button")
     (.setAttribute cancel-button
                    "aria-label"
-                   (str "Cancel " (str/lower-case side-text) " order at " px-label))
+                   (let [cancel-target (if (= intent :standard)
+                                         (str/lower-case side-text)
+                                         (str kind-text " " (str/lower-case side-text)))]
+                     (str "Cancel "
+                          cancel-target
+                          " order at "
+                          px-label)))
     (set! (.-textContent cancel-button) "x")
     (apply-inline-style!
      cancel-button
@@ -243,9 +493,12 @@
       (.addEventListener cancel-button "touchstart" emit-cancel!)
       (.addEventListener cancel-button "mousedown" emit-cancel!)
       (.addEventListener cancel-button "click" emit-cancel!))
+    (.appendChild badge intent-chip)
     (.appendChild badge label)
     (.appendChild badge cancel-button)
     (.appendChild row line)
+    (when (> (js/Math.abs badge-offset-y) 1)
+      (.appendChild row connector))
     (.appendChild row badge)
     row))
 
@@ -295,30 +548,36 @@
               pane-width (some-> pane-size (aget "width"))
               width (non-negative-number pane-width
                                          (non-negative-number (.-clientWidth root) 0))
-              center-x (/ width 2)
-              height (or (.-clientHeight root) 0)]
-          (doseq [order (sort-by (fn [o]
-                                   (or (parse-order-number (:px o)) 0))
-                                 >
-                                 orders)]
-            (let [price (parse-order-number (:px order))
-                  y (when (and (finite-number? price)
-                               (pos? price)
-                               (:oid order)
-                               (:coin order))
-                      (invoke-method main-series "priceToCoordinate" price))]
-              (when (and (finite-number? y)
-                         (or (zero? height)
-                             (and (> y -30)
-                                  (< y (+ height 30)))))
-                (.appendChild root
-                              (build-overlay-row! document
-                                                  order
-                                                  center-x
-                                                  y
-                                                  on-cancel-order
-                                                  format-price
-                                                  format-size))))))))))
+              height (or (.-clientHeight root) 0)
+              visible-rows
+              (->> orders
+                   (sort-by (fn [o]
+                              (or (parse-order-number (:px o)) 0))
+                            >)
+                   (keep (fn [order]
+                           (let [price (parse-order-number (:px order))
+                                 y (when (and (finite-number? price)
+                                              (pos? price)
+                                              (:oid order)
+                                              (:coin order))
+                                     (invoke-method main-series "priceToCoordinate" price))]
+                             (when (and (finite-number? y)
+                                        (or (zero? height)
+                                            (and (> y -30)
+                                                 (< y (+ height 30)))))
+                               {:order order
+                                :line-y y
+                                :intent (order-intent order)}))))
+                   vec)
+              laid-out-rows (layout-overlapping-badges visible-rows width height)]
+          (doseq [row laid-out-rows]
+            (.appendChild root
+                          (build-overlay-row! document
+                                              (:order row)
+                                              row
+                                              on-cancel-order
+                                              format-price
+                                              format-size))))))))
 
 (defn clear-open-order-overlays!
   [chart-obj]

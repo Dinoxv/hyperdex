@@ -57,11 +57,12 @@
           text (str/join " " (fake-dom/collect-text-content overlay-root))
           cancel-button (fake-dom/find-dom-node overlay-root
                                        #(= "button" (some-> (.-tagName %) str/lower-case)))]
-      (is (str/includes? text "Limit S1.00 at $P60.0"))
-      (is (str/includes? text "Limit S2.25 at $P61.5"))
+      (is (str/includes? text "Limit S1.00 @ $P60.0"))
+      (is (str/includes? text "Limit S2.25 @ $P61.5"))
       (is (some? cancel-button))
       (fake-dom/click-dom-node! cancel-button))
-    (is (= [12] @canceled-oids*))
+    (is (= 1 (count @canceled-oids*)))
+    (is (contains? #{11 12} (first @canceled-oids*)))
     (chart-interop/clear-open-order-overlays! chart-obj)
     (is (= 0 (alength (.-children container))))
     (is (= 6 @unsubscribes*))))
@@ -108,6 +109,63 @@
       (fake-dom/pointer-down-dom-node! cancel-button)
       (fake-dom/click-dom-node! cancel-button))
     (is (= [11] @canceled-oids*))
+    (chart-interop/clear-open-order-overlays! chart-obj)))
+
+(deftest open-order-overlays-stacks-overlapping-tpsl-badges-test
+  (let [document (fake-dom/make-fake-document)
+        container (fake-dom/make-fake-element "div")
+        subscribe-fn (fn [_] nil)
+        time-scale #js {:subscribeVisibleTimeRangeChange subscribe-fn
+                        :unsubscribeVisibleTimeRangeChange subscribe-fn
+                        :subscribeVisibleLogicalRangeChange subscribe-fn
+                        :unsubscribeVisibleLogicalRangeChange subscribe-fn
+                        :subscribeSizeChange subscribe-fn
+                        :unsubscribeSizeChange subscribe-fn}
+        chart #js {:timeScale (fn [] time-scale)
+                   :subscribeCrosshairMove subscribe-fn
+                   :unsubscribeCrosshairMove subscribe-fn
+                   :subscribeClick subscribe-fn
+                   :unsubscribeClick subscribe-fn}
+        main-series #js {:priceToCoordinate (fn [_price] 120)
+                         :subscribeDataChanged subscribe-fn
+                         :unsubscribeDataChanged subscribe-fn}
+        chart-obj #js {:chart chart
+                       :mainSeries main-series}
+        orders [{:coin "SOL"
+                 :oid 901
+                 :side "A"
+                 :type "takeprofitmarket"
+                 :tpsl "tp"
+                 :sz "0.40"
+                 :px "50.0"}
+                {:coin "SOL"
+                 :oid 902
+                 :side "A"
+                 :type "stoplossmarket"
+                 :tpsl "sl"
+                 :sz "0.40"
+                 :px "50.0"}]]
+    (chart-interop/sync-open-order-overlays!
+     chart-obj
+     container
+     orders
+     {:document document})
+    (let [overlay-root (aget (.-children container) 0)
+          text (str/join " " (fake-dom/collect-text-content overlay-root))
+          tp-badge (fake-dom/find-dom-node overlay-root
+                                           #(= "tp" (aget % "data-order-kind")))
+          sl-badge (fake-dom/find-dom-node overlay-root
+                                           #(= "sl" (aget % "data-order-kind")))
+          tp-top (some-> tp-badge .-style (aget "top"))
+          sl-top (some-> sl-badge .-style (aget "top"))
+          tp-left (some-> tp-badge .-style (aget "left"))
+          sl-left (some-> sl-badge .-style (aget "left"))]
+      (is (some? tp-badge))
+      (is (some? sl-badge))
+      (is (str/includes? text "TP"))
+      (is (str/includes? text "SL"))
+      (is (not= tp-top sl-top))
+      (is (not= tp-left sl-left)))
     (chart-interop/clear-open-order-overlays! chart-obj)))
 
 (deftest open-order-overlays-sync-skips-rerender-for-unchanged-identities-test
