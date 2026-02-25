@@ -183,22 +183,22 @@
                                (seq (str/trim (str (or value "")))))
                         short-label
                         label)
+        has-accessory? (some? accessory)
         container-classes (cond-> (into ["flex"
                                          "h-[33px]"
                                          "w-full"
                                          "items-center"
-                                         "gap-1.5"
                                          "rounded-lg"
                                          "border"
                                          "border-base-300"
                                          "bg-transparent"
                                          (if overflow-visible?
                                            "overflow-visible"
-                                           "overflow-hidden")
-                                         "py-[5px]"
-                                         "pr-3"
-                                         "pl-2.5"]
-                                        compact-container-focus-classes)
+                                           "overflow-hidden")]
+                                        (concat (if has-accessory?
+                                                  ["gap-1" "py-[5px]" "pr-2" "pl-2"]
+                                                  ["gap-1.5" "py-[5px]" "pr-3" "pl-2.5"])
+                                                compact-container-focus-classes))
                            disabled? (into ["opacity-60"]))
         input-attrs (-> (cond-> {:class (into ["min-w-0"
                                                "w-full"
@@ -221,9 +221,12 @@
                                                "focus:ring-0"
                                                "focus:ring-offset-0"
                                                "focus:shadow-none"]
-                                              (if disabled?
-                                                ["cursor-not-allowed"]
-                                                ["cursor-default"]))
+                                              (concat (if has-accessory?
+                                                        ["tracking-tight"]
+                                                        [])
+                                                      (if disabled?
+                                                        ["cursor-not-allowed"]
+                                                        ["cursor-default"])))
                                  :type "text"
                                  :aria-label label
                                  :placeholder ""

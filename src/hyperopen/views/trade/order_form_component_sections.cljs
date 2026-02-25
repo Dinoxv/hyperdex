@@ -144,12 +144,13 @@
                  :class ["relative"
                          "inline-flex"
                          "items-center"
-                         "gap-1"
+                         "gap-0.5"
                          "bg-transparent"
                          "p-0"
                          "text-xs"
                          "font-normal"
                          "leading-4"
+                         "whitespace-nowrap"
                          "text-[#F6FEFD]"
                          "outline-none"
                          "focus:outline-none"
@@ -166,8 +167,8 @@
                       :keydown on-dropdown-keydown}}
         [:span selected-label]
         [:svg {:class (into ["pointer-events-none"
-                             "h-3"
-                             "w-3"
+                             "h-2.5"
+                             "w-2.5"
                              "text-[#94A0A6]"
                              "transition-transform"
                              "duration-300"
@@ -231,7 +232,7 @@
            on-select-tpsl-unit]}]
   (let [selected-unit (tpsl-policy/normalize-unit unit)]
     [:div {:class ["grid" "grid-cols-1" "gap-[10px]"]}
-     [:div {:class ["grid" "grid-cols-2" "gap-[10px]"]}
+     [:div {:class ["grid" "grid-cols-[minmax(0,_0.93fr)_minmax(0,_1.07fr)]" "gap-[10px]"]}
       (primitives/compact-row-input (get-in form [:tp :trigger])
                                     "TP Price"
                                     on-set-tp-trigger
@@ -250,7 +251,7 @@
                                                                         :on-select-tpsl-unit on-select-tpsl-unit})
                                     :inputmode "decimal"
                                     :overflow-visible? true)]
-     [:div {:class ["grid" "grid-cols-2" "gap-[10px]"]}
+     [:div {:class ["grid" "grid-cols-[minmax(0,_0.93fr)_minmax(0,_1.07fr)]" "gap-[10px]"]}
       (primitives/compact-row-input (get-in form [:sl :trigger])
                                     "SL Price"
                                     on-set-sl-trigger
