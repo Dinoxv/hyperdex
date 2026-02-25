@@ -1,9 +1,12 @@
 (ns hyperopen.core-bootstrap.chart-menu-and-storage-test
   (:require [cljs.test :refer-macros [deftest is]]
             [hyperopen.core.compat :as core]
+            [hyperopen.core-bootstrap.test-support.effect-extractors :as effect-extractors]
             [hyperopen.core-bootstrap.test-support.browser-mocks :as browser-mocks]))
 
 (def with-test-local-storage browser-mocks/with-test-local-storage)
+(def ^:private chart-timeframe-heavy-effect-ids
+  #{:effects/fetch-candle-snapshot})
 
 (deftest toggle-timeframes-dropdown-opens-timeframes-and-closes-other-chart-menus-test
   (let [effects (core/toggle-timeframes-dropdown
@@ -92,6 +95,9 @@
                effects))
         (is (= 1 (count (filter #(= :effects/fetch-candle-snapshot (first %)) effects))))
         (is (= :effects/save-many (ffirst effects)))
+        (is (effect-extractors/projection-before-heavy? effects chart-timeframe-heavy-effect-ids))
+        (is (effect-extractors/phase-order-valid? effects chart-timeframe-heavy-effect-ids))
+        (is (empty? (effect-extractors/duplicate-heavy-effect-ids effects chart-timeframe-heavy-effect-ids)))
         (is (= :effects/fetch-candle-snapshot (first (last effects))))))))
 
 (deftest select-chart-type-emits-single-batched-projection-and-no-network-effects-test

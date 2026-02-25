@@ -23,6 +23,49 @@
            #"effect request"
            (wrapped {}))))))
 
+(deftest wrap-action-handler-allows-projection-before-heavy-for-covered-action-test
+  (with-redefs [validation/validation-enabled? (constantly true)]
+    (let [wrapped (validation/wrap-action-handler :actions/select-chart-timeframe
+                                                  (fn [_state timeframe]
+                                                    [[:effects/save [:chart-options :selected-timeframe] timeframe]
+                                                     [:effects/fetch-candle-snapshot :interval timeframe]]))]
+      (is (= [[:effects/save [:chart-options :selected-timeframe] :5m]
+              [:effects/fetch-candle-snapshot :interval :5m]]
+             (wrapped {} :5m))))))
+
+(deftest wrap-action-handler-rejects-heavy-before-projection-for-covered-action-test
+  (with-redefs [validation/validation-enabled? (constantly true)]
+    (let [wrapped (validation/wrap-action-handler :actions/select-chart-timeframe
+                                                  (fn [_state timeframe]
+                                                    [[:effects/fetch-candle-snapshot :interval timeframe]
+                                                     [:effects/save [:chart-options :selected-timeframe] timeframe]]))]
+      (is (thrown-with-msg?
+           js/Error
+           #"rule=heavy-before-projection-phase"
+           (wrapped {} :5m))))))
+
+(deftest wrap-action-handler-rejects-duplicate-heavy-effects-for-covered-action-test
+  (with-redefs [validation/validation-enabled? (constantly true)]
+    (let [wrapped (validation/wrap-action-handler :actions/select-orderbook-price-aggregation
+                                                  (fn [_state mode]
+                                                    [[:effects/save [:orderbook-ui :price-aggregation-dropdown-visible?] false]
+                                                     [:effects/subscribe-orderbook "BTC"]
+                                                     [:effects/subscribe-orderbook (str mode)]]))]
+      (is (thrown-with-msg?
+           js/Error
+           #"rule=duplicate-heavy-effect"
+           (wrapped {} "BTC"))))))
+
+(deftest wrap-action-handler-does-not-apply-order-contract-to-uncovered-actions-test
+  (with-redefs [validation/validation-enabled? (constantly true)]
+    (let [wrapped (validation/wrap-action-handler :actions/refresh-asset-markets
+                                                  (fn [_state]
+                                                    [[:effects/fetch-asset-selector-markets]
+                                                     [:effects/save [:asset-selector :visible-dropdown] nil]]))]
+      (is (= [[:effects/fetch-asset-selector-markets]
+              [:effects/save [:asset-selector :visible-dropdown] nil]]
+             (wrapped {}))))))
+
 (deftest wrap-effect-handler-rejects-invalid-save-args-test
   (with-redefs [validation/validation-enabled? (constantly true)]
     (let [wrapped (validation/wrap-effect-handler :effects/save

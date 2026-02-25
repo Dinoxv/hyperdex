@@ -1,5 +1,6 @@
 (ns hyperopen.runtime.validation
   (:require [goog.object :as gobj]
+            [hyperopen.runtime.effect-order-contract :as effect-order-contract]
             [hyperopen.schema.contracts :as contracts]))
 
 (defn validation-enabled?
@@ -78,6 +79,11 @@
         (contracts/assert-action-args! action-id (vec args) {:phase :dispatch})
         (let [effects (apply handler state args)]
           (contracts/assert-emitted-effects!
+           effects
+           {:phase :action-emission
+            :action-id action-id})
+          (effect-order-contract/assert-action-effect-order!
+           action-id
            effects
            {:phase :action-emission
             :action-id action-id})

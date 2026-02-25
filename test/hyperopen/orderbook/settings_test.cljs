@@ -1,7 +1,11 @@
 (ns hyperopen.orderbook.settings-test
   (:require [cljs.test :refer-macros [deftest is]]
+            [hyperopen.core-bootstrap.test-support.effect-extractors :as effect-extractors]
             [hyperopen.orderbook.settings :as settings]
             [hyperopen.platform :as platform]))
+
+(def ^:private orderbook-aggregation-heavy-effect-ids
+  #{:effects/subscribe-orderbook})
 
 (defn- local-storage-get-stub
   [values]
@@ -54,21 +58,29 @@
          (settings/select-orderbook-size-unit {} :something-else))))
 
 (deftest select-orderbook-price-aggregation-persists-and-resubscribes-with-active-coin-test
-  (is (= [[:effects/save [:orderbook-ui :price-aggregation-by-coin] {"BTC" :sf3}]
-          [:effects/save [:orderbook-ui :price-aggregation-dropdown-visible?] false]
-          [:effects/local-storage-set-json "orderbook-price-aggregation-by-coin" {"BTC" :sf3}]
-          [:effects/subscribe-orderbook "BTC"]]
-         (settings/select-orderbook-price-aggregation {:active-asset "BTC"
-                                                       :orderbook-ui {:price-aggregation-by-coin {}}}
-                                                      :sf3))))
+  (let [effects (settings/select-orderbook-price-aggregation {:active-asset "BTC"
+                                                              :orderbook-ui {:price-aggregation-by-coin {}}}
+                                                             :sf3)]
+    (is (= [[:effects/save [:orderbook-ui :price-aggregation-by-coin] {"BTC" :sf3}]
+            [:effects/save [:orderbook-ui :price-aggregation-dropdown-visible?] false]
+            [:effects/local-storage-set-json "orderbook-price-aggregation-by-coin" {"BTC" :sf3}]
+            [:effects/subscribe-orderbook "BTC"]]
+           effects))
+    (is (effect-extractors/projection-before-heavy? effects orderbook-aggregation-heavy-effect-ids))
+    (is (effect-extractors/phase-order-valid? effects orderbook-aggregation-heavy-effect-ids))
+    (is (empty? (effect-extractors/duplicate-heavy-effect-ids effects orderbook-aggregation-heavy-effect-ids)))))
 
 (deftest select-orderbook-price-aggregation-normalizes-mode-and-skips-resubscribe-without-active-coin-test
-  (is (= [[:effects/save [:orderbook-ui :price-aggregation-by-coin] {"ETH" :sf2}]
-          [:effects/save [:orderbook-ui :price-aggregation-dropdown-visible?] false]
-          [:effects/local-storage-set-json "orderbook-price-aggregation-by-coin" {"ETH" :sf2}]]
-         (settings/select-orderbook-price-aggregation {:active-asset nil
-                                                       :orderbook-ui {:price-aggregation-by-coin {"ETH" :sf2}}}
-                                                      :invalid-mode))))
+  (let [effects (settings/select-orderbook-price-aggregation {:active-asset nil
+                                                              :orderbook-ui {:price-aggregation-by-coin {"ETH" :sf2}}}
+                                                             :invalid-mode)]
+    (is (= [[:effects/save [:orderbook-ui :price-aggregation-by-coin] {"ETH" :sf2}]
+            [:effects/save [:orderbook-ui :price-aggregation-dropdown-visible?] false]
+            [:effects/local-storage-set-json "orderbook-price-aggregation-by-coin" {"ETH" :sf2}]]
+           effects))
+    (is (effect-extractors/projection-before-heavy? effects orderbook-aggregation-heavy-effect-ids))
+    (is (effect-extractors/phase-order-valid? effects orderbook-aggregation-heavy-effect-ids))
+    (is (empty? (effect-extractors/duplicate-heavy-effect-ids effects orderbook-aggregation-heavy-effect-ids)))))
 
 (deftest select-orderbook-tab-normalizes-keyword-string-and-invalid-inputs-test
   (is (= [[:effects/save [:orderbook-ui :active-tab] :trades]

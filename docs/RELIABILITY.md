@@ -56,6 +56,10 @@ source_of_truth: true
 - User-visible close/save projection effects come before heavy subscription/fetch effects.
 - One logical interaction should avoid duplicate side effects.
 - Multi-write flows should use one atomic transition when intermediate states are not intentional.
+- Effect-order authority for covered interaction actions lives in runtime validation contract enforcement:
+  `/hyperopen/src/hyperopen/runtime/effect_order_contract.cljs` is enforced by
+  `/hyperopen/src/hyperopen/runtime/validation.cljs`.
+- New interaction-critical actions MUST opt into the centralized effect-order contract and add regression tests that prove projection-before-heavy ordering and no duplicate heavy effects.
 
 ## Anti-Patterns (DO NOT)
 - DO NOT perform side effects inside reducer transitions.

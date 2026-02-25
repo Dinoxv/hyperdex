@@ -1,6 +1,10 @@
 (ns hyperopen.wallet.actions-test
   (:require [cljs.test :refer-macros [deftest is]]
+            [hyperopen.core-bootstrap.test-support.effect-extractors :as effect-extractors]
             [hyperopen.wallet.actions :as wallet-actions]))
+
+(def ^:private enable-agent-trading-heavy-effect-ids
+  #{:effects/enable-agent-trading})
 
 (deftest connect-and-disconnect-wallet-actions-emit-effects-test
   (is (= [[:effects/connect-wallet]]
@@ -20,6 +24,9 @@
            (-> immediate second first)))
     (is (= [[:wallet :agent :error] nil]
            (-> immediate second second)))
+    (is (effect-extractors/projection-before-heavy? effects enable-agent-trading-heavy-effect-ids))
+    (is (effect-extractors/phase-order-valid? effects enable-agent-trading-heavy-effect-ids))
+    (is (empty? (effect-extractors/duplicate-heavy-effect-ids effects enable-agent-trading-heavy-effect-ids)))
     (is (= [:effects/enable-agent-trading {:storage-mode :session}] io-effect))))
 
 (deftest enable-agent-trading-action-errors-when-wallet-not-connected-test

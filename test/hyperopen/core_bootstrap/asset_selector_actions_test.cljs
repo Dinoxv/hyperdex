@@ -1,9 +1,18 @@
 (ns hyperopen.core-bootstrap.asset-selector-actions-test
   (:require [cljs.test :refer-macros [deftest is]]
             [hyperopen.core.compat :as core]
+            [hyperopen.core-bootstrap.test-support.effect-extractors :as effect-extractors]
             [hyperopen.runtime.effect-adapters :as effect-adapters]
             [hyperopen.runtime.state :as runtime-state]
             [hyperopen.state.trading :as trading]))
+
+(def ^:private select-asset-heavy-effect-ids
+  #{:effects/unsubscribe-active-asset
+    :effects/unsubscribe-orderbook
+    :effects/unsubscribe-trades
+    :effects/subscribe-active-asset
+    :effects/subscribe-orderbook
+    :effects/subscribe-trades})
 
 (deftest mark-loaded-asset-icon-promotes-key-to-loaded-and-clears-missing-test
   (let [state {:asset-selector {:loaded-icons #{}
@@ -127,6 +136,9 @@
             [:effects/subscribe-trades "BTC"]]
            effects))
     (is (not-any? #(= (first %) :effects/fetch-candle-snapshot) effects))
+    (is (effect-extractors/projection-before-heavy? effects select-asset-heavy-effect-ids))
+    (is (effect-extractors/phase-order-valid? effects select-asset-heavy-effect-ids))
+    (is (empty? (effect-extractors/duplicate-heavy-effect-ids effects select-asset-heavy-effect-ids)))
     (is (not-any? #(and (= (first %) :effects/save)
                         (= (second %) [:asset-selector :visible-dropdown]))
                   effects))))

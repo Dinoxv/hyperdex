@@ -1,9 +1,15 @@
 (ns hyperopen.core-bootstrap.account-history-actions-test
   (:require [cljs.test :refer-macros [deftest is]]
             [hyperopen.core.compat :as core]
+            [hyperopen.core-bootstrap.test-support.effect-extractors :as effect-extractors]
             [hyperopen.core-bootstrap.test-support.browser-mocks :as browser-mocks]))
 
 (def with-test-local-storage browser-mocks/with-test-local-storage)
+(def ^:private account-tab-heavy-effect-ids
+  #{:effects/api-fetch-user-funding-history
+    :effects/api-fetch-historical-orders})
+(def ^:private funding-history-heavy-effect-ids
+  #{:effects/api-fetch-user-funding-history})
 
 (deftest select-account-info-tab-funding-history-saves-selection-before-fetch-test
   (let [state {:account-info {:selected-tab :balances
@@ -20,6 +26,9 @@
            (-> path-values first first)))
     (is (= :funding-history
            (-> path-values first second)))
+    (is (effect-extractors/projection-before-heavy? effects account-tab-heavy-effect-ids))
+    (is (effect-extractors/phase-order-valid? effects account-tab-heavy-effect-ids))
+    (is (empty? (effect-extractors/duplicate-heavy-effect-ids effects account-tab-heavy-effect-ids)))
     (is (= [:effects/api-fetch-user-funding-history 3]
            (second effects)))))
 
@@ -45,6 +54,9 @@
               (-> no-refetch first second)))
     (is (not-any? #(= :effects/api-fetch-user-funding-history (first %))
                   no-refetch))
+    (is (effect-extractors/projection-before-heavy? with-refetch funding-history-heavy-effect-ids))
+    (is (effect-extractors/phase-order-valid? with-refetch funding-history-heavy-effect-ids))
+    (is (empty? (effect-extractors/duplicate-heavy-effect-ids with-refetch funding-history-heavy-effect-ids)))
     (is (some #(= :effects/api-fetch-user-funding-history (first %))
               with-refetch))))
 
@@ -90,6 +102,9 @@
         path-values (-> effects first second)]
     (is (some #(= [[:account-info :funding-history :page] 1] %) path-values))
     (is (some #(= [[:account-info :funding-history :page-input] "1"] %) path-values))
+    (is (effect-extractors/projection-before-heavy? effects funding-history-heavy-effect-ids))
+    (is (effect-extractors/phase-order-valid? effects funding-history-heavy-effect-ids))
+    (is (empty? (effect-extractors/duplicate-heavy-effect-ids effects funding-history-heavy-effect-ids)))
     (is (= [:effects/api-fetch-user-funding-history 4]
            (second effects)))))
 
@@ -308,6 +323,9 @@
            (-> path-values first first)))
     (is (= :order-history
            (-> path-values first second)))
+    (is (effect-extractors/projection-before-heavy? effects account-tab-heavy-effect-ids))
+    (is (effect-extractors/phase-order-valid? effects account-tab-heavy-effect-ids))
+    (is (empty? (effect-extractors/duplicate-heavy-effect-ids effects account-tab-heavy-effect-ids)))
     (is (= [:effects/api-fetch-historical-orders 3]
            (second effects)))))
 

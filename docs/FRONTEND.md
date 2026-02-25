@@ -19,6 +19,9 @@ If guidance conflicts, this document wins for UI runtime behavior and invariant 
 ## UI Interaction Runtime Rules (MUST)
 - MUST apply user-visible UI state transitions first in an action pipeline (example: close dropdown immediately before unsubscribe/subscribe/fetch effects).
 - MUST batch related UI state writes caused by one interaction into a single state projection effect when feasible.
+- MUST keep effect-order authority centralized in runtime validation contract enforcement:
+  `/hyperopen/src/hyperopen/runtime/effect_order_contract.cljs` via `/hyperopen/src/hyperopen/runtime/validation.cljs`.
+- MUST add an action policy entry in the centralized contract before introducing a new interaction-critical action that emits heavy I/O effects.
 - MUST batch logically related writes to the same atom/store into a single `swap!` (or equivalent single transition) when intermediate states are not intentionally observable.
 - MUST NOT emit multiple sequential `swap!` calls for one logical UI/domain transition when a single atomic update can represent the same transition.
 - If staged intermediate states are intentional, MUST document the reason and add ordering/regression tests that cover the staged behavior.
@@ -33,6 +36,7 @@ If guidance conflicts, this document wins for UI runtime behavior and invariant 
 
 ## Canonical UI Rules
 - Apply user-visible state transitions before subscription/fetch side effects.
+- Runtime validation effect-order contract is the single authority for covered interaction actions.
 - Keep one owner per projection path (`:active-asset`, `:selected-asset`, `:active-market`).
 - Avoid duplicate side-effect issuance in a single interaction flow.
 - Represent multi-token classes as collections in Hiccup attrs.

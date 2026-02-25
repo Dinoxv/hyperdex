@@ -1,6 +1,10 @@
 (ns hyperopen.websocket.diagnostics-actions-test
   (:require [cljs.test :refer-macros [deftest is]]
+            [hyperopen.core-bootstrap.test-support.effect-extractors :as effect-extractors]
             [hyperopen.websocket.diagnostics-actions :as diagnostics-actions]))
+
+(def ^:private reconnect-heavy-effect-ids
+  #{:effects/reconnect-websocket})
 
 (deftest toggle-ws-diagnostics-opens-and-refreshes-health-test
   (is (= [[:effects/save-many [[[:websocket-ui :diagnostics-open?] true]
@@ -20,12 +24,16 @@
                      :websocket {:health {:generated-at-ms 5000
                                           :transport {:state :connected}}}}]
     (is (= [] (diagnostics-actions/ws-diagnostics-reconnect-now blocked-state deps)))
-    (is (= [[:effects/save-many [[[:websocket-ui :diagnostics-open?] false]
-                                 [[:websocket-ui :reveal-sensitive?] false]
-                                 [[:websocket-ui :copy-status] nil]]]
-            [:effects/save [:websocket-ui :reconnect-cooldown-until-ms] 10000]
-            [:effects/reconnect-websocket]]
-           (diagnostics-actions/ws-diagnostics-reconnect-now ready-state deps)))))
+    (let [effects (diagnostics-actions/ws-diagnostics-reconnect-now ready-state deps)]
+      (is (= [[:effects/save-many [[[:websocket-ui :diagnostics-open?] false]
+                                   [[:websocket-ui :reveal-sensitive?] false]
+                                   [[:websocket-ui :copy-status] nil]]]
+              [:effects/save [:websocket-ui :reconnect-cooldown-until-ms] 10000]
+              [:effects/reconnect-websocket]]
+             effects))
+      (is (effect-extractors/projection-before-heavy? effects reconnect-heavy-effect-ids))
+      (is (effect-extractors/phase-order-valid? effects reconnect-heavy-effect-ids))
+      (is (empty? (effect-extractors/duplicate-heavy-effect-ids effects reconnect-heavy-effect-ids))))))
 
 (deftest ws-diagnostics-reset-subscriptions-skips-when-blocked-test
   (let [deps {:effective-now-ms (fn [generated-at-ms] generated-at-ms)}
