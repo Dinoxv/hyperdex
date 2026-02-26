@@ -1,6 +1,9 @@
 (ns hyperopen.websocket.user
-  (:require [hyperopen.domain.funding-history :as funding-history]
+  (:require [clojure.string :as str]
+            [hyperopen.domain.funding-history :as funding-history]
+            [hyperopen.order.feedback-runtime :as order-feedback-runtime]
             [hyperopen.platform :as platform]
+            [hyperopen.runtime.state :as runtime-state]
             [hyperopen.telemetry :as telemetry]
             [hyperopen.websocket.client :as ws-client]
             [hyperopen.wallet.address-watcher :as address-watcher]))
@@ -56,6 +59,92 @@
       {:rows []
        :snapshot? false})))
 
+(defn- clear-order-feedback-toast-timeout!
+  []
+  (order-feedback-runtime/clear-order-feedback-toast-timeout-in-runtime!
+   runtime-state/runtime
+   platform/clear-timeout!))
+
+(defn- schedule-order-feedback-toast-clear!
+  [store]
+  (order-feedback-runtime/schedule-order-feedback-toast-clear!
+   {:store store
+    :runtime runtime-state/runtime
+    :clear-order-feedback-toast! order-feedback-runtime/clear-order-feedback-toast!
+    :clear-order-feedback-toast-timeout! clear-order-feedback-toast-timeout!
+    :order-feedback-toast-duration-ms runtime-state/order-feedback-toast-duration-ms
+    :set-timeout-fn platform/set-timeout!}))
+
+(defn- fill-identity
+  [fill]
+  (when (map? fill)
+    (or (some-> (or (:tid fill)
+                    (:fill-id fill)
+                    (:fillId fill)
+                    (:id fill))
+                (vector :id))
+        (let [time-token (or (:time fill)
+                             (:timestamp fill)
+                             (:ts fill)
+                             (:t fill))
+              coin-token (or (:coin fill)
+                             (:symbol fill)
+                             (:asset fill))
+              side-token (or (:side fill)
+                             (:dir fill))
+              size-token (or (:sz fill)
+                             (:size fill))
+              price-token (or (:px fill)
+                              (:price fill)
+                              (:fillPx fill)
+                              (:avgPx fill))]
+          (when (or (some? time-token)
+                    (some? coin-token)
+                    (some? side-token)
+                    (some? size-token)
+                    (some? price-token))
+            [:fallback time-token coin-token side-token size-token price-token])))))
+
+(defn- novel-fills
+  [existing incoming]
+  (let [known (->> (or existing [])
+                   (keep fill-identity)
+                   set)]
+    (second
+     (reduce (fn [[seen acc] fill]
+               (if-let [identity (fill-identity fill)]
+                 (if (contains? seen identity)
+                   [seen acc]
+                   [(conj seen identity) (conj acc fill)])
+                 [seen (conj acc fill)]))
+             [known []]
+             (or incoming [])))))
+
+(defn- fill-toast-message
+  [rows]
+  (let [rows* (vec (or rows []))
+        count* (count rows*)]
+    (when (pos? count*)
+      (if (= 1 count*)
+        (let [coin* (some-> (or (:coin (first rows*))
+                                (:symbol (first rows*))
+                                (:asset (first rows*)))
+                            str
+                            str/trim)]
+          (if (seq coin*)
+            (str "Order filled: " coin* ".")
+            "Order filled."))
+        (str count* " orders filled.")))))
+
+(defn- show-user-fill-toast!
+  [store rows]
+  (when-let [message (fill-toast-message rows)]
+    (order-feedback-runtime/show-order-feedback-toast!
+     store
+     :success
+     message
+     schedule-order-feedback-toast-clear!)))
+
 (defn create-user-handler [subscribe-fn unsubscribe-fn]
   (reify address-watcher/IAddressChangeHandler
     (on-address-changed [_ old-address new-address]
@@ -75,7 +164,11 @@
         (when (seq rows)
           (if snapshot?
             (swap! store assoc-in [:orders :fills] rows)
-            (swap! store update-in [:orders :fills] #(upsert-seq (or % []) rows))))))))
+            (let [existing (get-in @store [:orders :fills] [])
+                  new-rows (vec (novel-fills existing rows))]
+              (when (seq new-rows)
+                (swap! store update-in [:orders :fills] #(upsert-seq (or % []) new-rows))
+                (show-user-fill-toast! store new-rows)))))))))
 
 (defn- user-fundings-handler [store]
   (fn [msg]

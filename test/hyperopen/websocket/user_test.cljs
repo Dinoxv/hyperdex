@@ -1,5 +1,7 @@
 (ns hyperopen.websocket.user-test
   (:require [cljs.test :refer-macros [deftest is testing]]
+            [hyperopen.platform :as platform]
+            [hyperopen.runtime.state :as runtime-state]
             [hyperopen.websocket.client :as ws-client]
             [hyperopen.websocket.user :as user-ws]))
 
@@ -8,6 +10,7 @@
                   :fundings []
                   :fundings-raw []
                   :ledger []}
+         :ui {:toast nil}
          :account-info {:funding-history {:filters {:coin-set #{}
                                                    :start-time-ms 0
                                                    :end-time-ms 9999999999999}}}}))
@@ -26,7 +29,8 @@
           :data {:isSnapshot true
                  :fills [{:tid 1 :coin "BTC" :time 1000}]}})
         (is (= [{:tid 1 :coin "BTC" :time 1000}]
-               (get-in @store [:orders :fills]))))
+               (get-in @store [:orders :fills])))
+        (is (nil? (get-in @store [:ui :toast]))))
       (testing "userFundings snapshot normalizes nested :data :fundings"
         ((get @handlers "userFundings")
          {:channel "userFundings"
@@ -53,7 +57,10 @@
     (with-redefs [ws-client/register-handler!
                   (fn [message-type handler-fn]
                     (swap! handlers assoc message-type handler-fn)
-                    true)]
+                    true)
+                  runtime-state/runtime (atom (runtime-state/default-runtime-state))
+                  platform/set-timeout! (fn [_ _] 1234)
+                  platform/clear-timeout! (fn [_] nil)]
       (user-ws/init! store)
       ((get @handlers "userFills")
        {:channel "userFills"
@@ -64,6 +71,16 @@
         :data {:isSnapshot false
                :fills [{:tid 2 :coin "ETH" :time 2000}]}})
       (is (= [2 1] (mapv :tid (get-in @store [:orders :fills]))))
+      (is (= :success (get-in @store [:ui :toast :kind])))
+      (is (= "Order filled: ETH."
+             (get-in @store [:ui :toast :message])))
+      (swap! store assoc-in [:ui :toast] nil)
+      ((get @handlers "userFills")
+       {:channel "userFills"
+        :data {:isSnapshot false
+               :fills [{:tid 2 :coin "ETH" :time 2000}]}})
+      (is (= [2 1] (mapv :tid (get-in @store [:orders :fills]))))
+      (is (nil? (get-in @store [:ui :toast])))
       ((get @handlers "userFundings")
        {:channel "userFundings"
         :data {:isSnapshot true
