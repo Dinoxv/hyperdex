@@ -160,7 +160,7 @@
     (is (some #(re-find #"\+[0-9]+\.[0-9]{2}%" %) all-text))
     (is (some #(re-find #"-[0-9]+\.[0-9]{2}%" %) all-text))))
 
-(deftest portfolio-view-returns-tab-renders-benchmark-selector-legend-and-secondary-path-test
+(deftest portfolio-view-returns-tab-renders-benchmark-selector-chip-rail-and-secondary-path-test
   (let [state (-> sample-state
                   (assoc-in [:portfolio-ui :chart-tab] :returns)
                   (assoc-in [:portfolio-ui :returns-benchmark-coins] ["SPY"])
@@ -183,12 +183,18 @@
                              {:t 4 :c 60}]))
         view-node (portfolio-view/portfolio-view state)
         selector-node (find-first-node view-node #(= "portfolio-returns-benchmark-selector" (get-in % [1 :data-role])))
+        chip-rail-node (find-first-node view-node #(= "portfolio-returns-benchmark-chip-rail" (get-in % [1 :data-role])))
+        chip-node (find-first-node view-node #(= "portfolio-returns-benchmark-chip-SPY" (get-in % [1 :data-role])))
         legend-node (find-first-node view-node #(= "portfolio-chart-legend" (get-in % [1 :data-role])))
         benchmark-path-node (find-first-node view-node #(= "portfolio-chart-path-benchmark-0" (get-in % [1 :data-role])))
-        all-text (set (collect-strings view-node))]
+        all-text (set (collect-strings view-node))
+        chip-border-color (get-in chip-node [1 :style :border-color])]
     (is (some? selector-node))
+    (is (some? chip-rail-node))
+    (is (some? chip-node))
     (is (some? legend-node))
     (is (some? benchmark-path-node))
+    (is (= "rgba(242, 207, 102, 0.58)" chip-border-color))
     (is (contains? all-text "Benchmarks"))
     (is (contains? all-text "Strategy"))
     (is (contains? all-text "SPY (SPOT)"))))

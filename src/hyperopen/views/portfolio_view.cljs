@@ -213,37 +213,55 @@
                :data-role data-role}]
         children))
 
-(defn- returns-benchmark-chip [{:keys [value label]}]
-  [:span {:class ["inline-flex"
-                  "max-w-full"
-                  "items-center"
-                  "gap-1"
-                  "rounded-md"
-                  "border"
-                  "border-base-300"
-                  "bg-base-200"
-                  "px-1.5"
-                  "py-1"]
-          :data-role (str "portfolio-returns-benchmark-chip-" value)}
-   [:span {:class ["min-w-0" "truncate" "text-xs" "text-trading-text"]}
-    label]
-   [:button {:type "button"
-             :class ["inline-flex"
-                     "h-6"
-                     "w-6"
-                     "items-center"
-                     "justify-center"
-                     "rounded"
-                     "text-trading-text-secondary"
-                     "transition-colors"
-                     "hover:bg-base-300"
-                     "hover:text-trading-text"
-                     "focus:outline-none"
-                     "focus:ring-0"
-                     "focus:ring-offset-0"]
-             :aria-label (str "Remove benchmark " label)
-             :on {:click [[:actions/remove-portfolio-returns-benchmark value]]}}
-    "x"]])
+(defn- hex-color->rgba [hex alpha]
+  (let [hex* (if (and (string? hex)
+                      (= \# (first hex)))
+               (subs hex 1)
+               hex)]
+    (when (and (string? hex*)
+               (re-matches #"[0-9A-Fa-f]{6}" hex*))
+      (let [r (js/Number.parseInt (subs hex* 0 2) 16)
+            g (js/Number.parseInt (subs hex* 2 4) 16)
+            b (js/Number.parseInt (subs hex* 4 6) 16)]
+        (str "rgba(" r ", " g ", " b ", " alpha ")")))))
+
+(defn- returns-benchmark-chip [{:keys [value label stroke]}]
+  (let [accent-color (or stroke "#9fb3be")
+        border-color (or (hex-color->rgba stroke 0.58)
+                         "rgba(120, 141, 154, 0.5)")
+        background-color (or (hex-color->rgba stroke 0.14)
+                             "rgba(120, 141, 154, 0.16)")]
+    [:span {:class ["inline-flex"
+                    "max-w-full"
+                    "items-center"
+                    "gap-1.5"
+                    "rounded-lg"
+                    "border"
+                    "px-1.5"
+                    "py-1"]
+            :style {:border-color border-color
+                    :background-color background-color}
+            :data-role (str "portfolio-returns-benchmark-chip-" value)}
+     [:span {:class ["h-2" "w-2" "shrink-0" "rounded-full"]
+             :style {:background-color accent-color}}]
+     [:span {:class ["min-w-0" "truncate" "text-xs" "text-trading-text"]}
+      label]
+     [:button {:type "button"
+               :class ["inline-flex"
+                       "h-6"
+                       "w-6"
+                       "items-center"
+                       "justify-center"
+                       "rounded"
+                       "transition-colors"
+                       "hover:bg-base-300"
+                       "focus:outline-none"
+                       "focus:ring-0"
+                       "focus:ring-offset-0"]
+               :style {:color accent-color}
+               :aria-label (str "Remove benchmark " label)
+               :on {:click [[:actions/remove-portfolio-returns-benchmark value]]}}
+      "x"]]))
 
 (defn- returns-benchmark-suggestion-row [{:keys [value label]}]
   [:button {:type "button"
@@ -266,45 +284,38 @@
             :on {:mousedown [[:actions/select-portfolio-returns-benchmark value]]}}
    label])
 
-(defn- returns-benchmark-selector [{:keys [selected-options
-                                           coin-search
+(defn- returns-benchmark-selector [{:keys [coin-search
                                            suggestions-open?
                                            candidates
                                            top-coin
                                            empty-message]}]
-  (let [selected-options* (vec (or selected-options []))
-        candidates* (vec (or candidates []))]
+  (let [candidates* (vec (or candidates []))]
     [:div {:class ["relative" "w-[320px]"]
            :data-role "portfolio-returns-benchmark-selector"}
      [:div {:class ["mb-1" "text-xs" "font-medium" "uppercase" "tracking-[0.04em]" "text-trading-text-secondary"]}
       "Benchmarks"]
-     [:div {:class ["rounded-md" "border" "border-base-300" "bg-base-100" "px-2" "py-1.5"]}
-      [:div {:class ["flex" "max-h-20" "flex-wrap" "items-center" "gap-1.5" "overflow-y-auto"]}
-       (for [{:keys [value] :as option} selected-options*]
-         ^{:key (str "portfolio-returns-benchmark-chip-" value)}
-         (returns-benchmark-chip option))
-       [:input {:id "portfolio-returns-benchmark-search"
-                :class ["h-8"
-                        "min-w-[9rem]"
-                        "flex-1"
-                        "border-0"
-                        "bg-transparent"
-                        "px-1"
-                        "text-xs"
-                        "text-trading-text"
-                        "focus:outline-none"
-                        "focus:ring-0"
-                        "focus:ring-offset-0"]
-                :type "search"
-                :placeholder "Search symbols and press Enter"
-                :aria-label "Search benchmark symbols"
-                :autocomplete "off"
-                :spellcheck false
-                :value (or coin-search "")
-                :on {:input [[:actions/set-portfolio-returns-benchmark-search [:event.target/value]]]
-                     :focus [[:actions/set-portfolio-returns-benchmark-suggestions-open true]]
-                     :blur [[:actions/set-portfolio-returns-benchmark-suggestions-open false]]
-                     :keydown [[:actions/handle-portfolio-returns-benchmark-search-keydown [:event/key] top-coin]]}}]]]
+     [:div {:class ["rounded-md" "border" "border-base-300" "bg-base-100" "px-2"]}
+      [:input {:id "portfolio-returns-benchmark-search"
+               :class ["h-9"
+                       "w-full"
+                       "border-0"
+                       "bg-transparent"
+                       "px-1"
+                       "text-xs"
+                       "text-trading-text"
+                       "focus:outline-none"
+                       "focus:ring-0"
+                       "focus:ring-offset-0"]
+               :type "search"
+               :placeholder "Search symbols and press Enter"
+               :aria-label "Search benchmark symbols"
+               :autocomplete "off"
+               :spellcheck false
+               :value (or coin-search "")
+               :on {:input [[:actions/set-portfolio-returns-benchmark-search [:event.target/value]]]
+                    :focus [[:actions/set-portfolio-returns-benchmark-suggestions-open true]]
+                    :blur [[:actions/set-portfolio-returns-benchmark-suggestions-open false]]
+                    :keydown [[:actions/handle-portfolio-returns-benchmark-search-keydown [:event/key] top-coin]]}}]]
      (when suggestions-open?
        [:div {:class ["absolute"
                       "left-0"
@@ -326,6 +337,41 @@
             (returns-benchmark-suggestion-row option))
           [:div {:class ["px-2" "py-1.5" "text-xs" "text-trading-text-secondary"]}
            (or empty-message "No matching symbols.")])])]))
+
+(defn- returns-benchmark-chip-rail [{:keys [selected-options]}]
+  (let [chips (vec (or selected-options []))]
+    (when (seq chips)
+      [:div {:class ["rounded-md"
+                     "border"
+                     "border-base-300"
+                     "bg-base-100/92"
+                     "p-1.5"
+                     "shadow-md"]
+             :data-role "portfolio-returns-benchmark-chip-rail"}
+       [:div {:class ["flex" "flex-wrap" "items-center" "gap-1.5" "pr-1"]}
+        (for [{:keys [value] :as option} chips]
+          ^{:key (str "portfolio-returns-benchmark-chip-rail-item-" value)}
+          (returns-benchmark-chip option))]])))
+
+(defn- benchmark-series-color-by-coin [series]
+  (reduce (fn [acc {:keys [coin stroke]}]
+            (if (and (string? coin)
+                     (seq coin)
+                     (string? stroke)
+                     (seq stroke))
+              (assoc acc coin stroke)
+              acc))
+          {}
+          (or series [])))
+
+(defn- add-benchmark-chip-colors [returns-benchmark series]
+  (let [color-by-coin (benchmark-series-color-by-coin series)]
+    (update returns-benchmark
+            :selected-options
+            (fn [options]
+              (mapv (fn [{:keys [value] :as option}]
+                      (assoc option :stroke (get color-by-coin value)))
+                    (or options []))))))
 
 (defn- chart-series-path [{:keys [id path stroke]}]
   (when (seq path)
@@ -401,6 +447,7 @@
 (defn- chart-card [{:keys [chart selectors]}]
   (let [{:keys [tabs selected-tab axis-kind y-ticks series]} chart
         returns-benchmark (:returns-benchmark selectors)
+        returns-benchmark* (add-benchmark-chip-colors returns-benchmark series)
         y-axis-width (y-axis-gutter-width axis-kind y-ticks)
         plot-left (+ y-axis-width 10)]
     (section-card
@@ -418,55 +465,58 @@
                   :aria-pressed (= tab-value selected-tab)
                   :on {:click [[:actions/select-portfolio-chart-tab tab-value]]}}
          tab-label])
-      (when (= selected-tab :returns)
+     (when (= selected-tab :returns)
         [:div {:class ["ml-auto" "px-3" "py-2"]}
-         (returns-benchmark-selector returns-benchmark)])]
-     [:div {:class ["h-[182px]" "px-4" "py-3" "relative"]
+         (returns-benchmark-selector returns-benchmark*)])]
+     [:div {:class ["px-4" "py-3" "space-y-2"]
             :data-role "portfolio-chart-shell"}
-      [:div {:class ["absolute" "left-0" "top-3" "bottom-3"]
-             :data-role "portfolio-chart-y-axis"
-             :style {:width (str y-axis-width "px")}}
-       (for [{:keys [value y-ratio]} y-ticks]
-         ^{:key (str "portfolio-chart-tick-" y-ratio "-" value)}
-         [:span {:class ["absolute"
-                         "right-2"
-                         "-translate-y-1/2"
-                         "num"
-                         "text-right"
-                         "text-xs"
-                         "text-trading-text-secondary"]
-                 :style {:top (str (* 100 y-ratio) "%")}}
-          (format-axis-label axis-kind value)])
-       [:div {:class ["absolute"
-                      "right-0"
-                      "top-0"
-                      "bottom-0"
-                      "border-l"
-                      "border-base-300"]}]
-       (for [{:keys [y-ratio]} y-ticks]
-         ^{:key (str "portfolio-chart-axis-tick-" y-ratio)}
-         [:div {:class ["absolute"
-                        "right-0"
-                        "w-1.5"
-                        "border-t"
-                        "border-base-300"]
-                :style {:top (str (* 100 y-ratio) "%")}}])]
-      (chart-legend series)
-      [:div {:class ["absolute" "right-2" "top-3" "bottom-3"]
-             :style {:left (str plot-left "px")}}
-       [:svg {:viewBox "0 0 100 100"
-              :preserveAspectRatio "none"
-              :class ["h-full" "w-full"]}
-        [:line {:x1 0
-                :y1 100
-                :x2 100
-                :y2 100
-                :stroke "#28414a"
-                :stroke-width 0.8
-                :vector-effect "non-scaling-stroke"}]
-        (for [{series-id :id :as series-entry} (or series [])]
-          ^{:key (str "portfolio-chart-path-" (name series-id))}
-          (chart-series-path series-entry))]]])))
+      [:div {:class ["relative" "h-[182px]"]}
+       [:div {:class ["absolute" "left-0" "top-0" "bottom-0"]
+              :data-role "portfolio-chart-y-axis"
+              :style {:width (str y-axis-width "px")}}
+        (for [{:keys [value y-ratio]} y-ticks]
+          ^{:key (str "portfolio-chart-tick-" y-ratio "-" value)}
+          [:span {:class ["absolute"
+                          "right-2"
+                          "-translate-y-1/2"
+                          "num"
+                          "text-right"
+                          "text-xs"
+                          "text-trading-text-secondary"]
+                  :style {:top (str (* 100 y-ratio) "%")}}
+           (format-axis-label axis-kind value)])
+        [:div {:class ["absolute"
+                       "right-0"
+                       "top-0"
+                       "bottom-0"
+                       "border-l"
+                       "border-base-300"]}]
+        (for [{:keys [y-ratio]} y-ticks]
+          ^{:key (str "portfolio-chart-axis-tick-" y-ratio)}
+          [:div {:class ["absolute"
+                         "right-0"
+                         "w-1.5"
+                         "border-t"
+                         "border-base-300"]
+                 :style {:top (str (* 100 y-ratio) "%")}}])]
+       (chart-legend series)
+       [:div {:class ["absolute" "right-2" "top-0" "bottom-0"]
+              :style {:left (str plot-left "px")}}
+        [:svg {:viewBox "0 0 100 100"
+               :preserveAspectRatio "none"
+               :class ["h-full" "w-full"]}
+         [:line {:x1 0
+                 :y1 100
+                 :x2 100
+                 :y2 100
+                 :stroke "#28414a"
+                 :stroke-width 0.8
+                 :vector-effect "non-scaling-stroke"}]
+         (for [{series-id :id :as series-entry} (or series [])]
+           ^{:key (str "portfolio-chart-path-" (name series-id))}
+           (chart-series-path series-entry))]]]
+      (when (= selected-tab :returns)
+        (returns-benchmark-chip-rail returns-benchmark*))])))
 
 (defn- metric-cards [{:keys [volume-14d-usd fees]}]
   [:div {:class ["grid" "grid-cols-1" "gap-3" "md:grid-cols-2" "xl:grid-cols-1"]}
