@@ -116,6 +116,9 @@
 (def toggle-portfolio-summary-time-range-dropdown
   portfolio-actions/toggle-portfolio-summary-time-range-dropdown)
 
+(def toggle-portfolio-performance-metrics-time-range-dropdown
+  portfolio-actions/toggle-portfolio-performance-metrics-time-range-dropdown)
+
 (def select-portfolio-summary-time-range
   portfolio-actions/select-portfolio-summary-time-range)
 

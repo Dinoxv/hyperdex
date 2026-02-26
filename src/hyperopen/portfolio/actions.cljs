@@ -199,7 +199,9 @@
 (defn- selector-visibility-path-values
   [open-dropdown]
   [[[:portfolio-ui :summary-scope-dropdown-open?] (= open-dropdown :scope)]
-   [[:portfolio-ui :summary-time-range-dropdown-open?] (= open-dropdown :time-range)]])
+   [[:portfolio-ui :summary-time-range-dropdown-open?] (= open-dropdown :time-range)]
+   [[:portfolio-ui :performance-metrics-time-range-dropdown-open?]
+    (= open-dropdown :performance-metrics-time-range)]])
 
 (defn- selector-projection-effect
   ([open-dropdown]
@@ -270,6 +272,12 @@
   [state]
   (let [current-visible? (boolean (get-in state [:portfolio-ui :summary-time-range-dropdown-open?]))
         open-dropdown (when-not current-visible? :time-range)]
+    [(selector-projection-effect open-dropdown)]))
+
+(defn toggle-portfolio-performance-metrics-time-range-dropdown
+  [state]
+  (let [current-visible? (boolean (get-in state [:portfolio-ui :performance-metrics-time-range-dropdown-open?]))
+        open-dropdown (when-not current-visible? :performance-metrics-time-range)]
     [(selector-projection-effect open-dropdown)]))
 
 (defn select-portfolio-summary-scope

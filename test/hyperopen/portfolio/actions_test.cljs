@@ -4,55 +4,84 @@
 
 (deftest toggle-portfolio-summary-scope-dropdown-opens-and-closes-test
   (is (= [[:effects/save-many [[[:portfolio-ui :summary-scope-dropdown-open?] true]
-                               [[:portfolio-ui :summary-time-range-dropdown-open?] false]]]]
+                               [[:portfolio-ui :summary-time-range-dropdown-open?] false]
+                               [[:portfolio-ui :performance-metrics-time-range-dropdown-open?] false]]]]
          (actions/toggle-portfolio-summary-scope-dropdown
           {:portfolio-ui {:summary-scope-dropdown-open? false
-                          :summary-time-range-dropdown-open? true}})))
+                          :summary-time-range-dropdown-open? true
+                          :performance-metrics-time-range-dropdown-open? true}})))
   (is (= [[:effects/save-many [[[:portfolio-ui :summary-scope-dropdown-open?] false]
-                               [[:portfolio-ui :summary-time-range-dropdown-open?] false]]]]
+                               [[:portfolio-ui :summary-time-range-dropdown-open?] false]
+                               [[:portfolio-ui :performance-metrics-time-range-dropdown-open?] false]]]]
          (actions/toggle-portfolio-summary-scope-dropdown
           {:portfolio-ui {:summary-scope-dropdown-open? true
-                          :summary-time-range-dropdown-open? false}}))))
+                          :summary-time-range-dropdown-open? false
+                          :performance-metrics-time-range-dropdown-open? false}}))))
 
 (deftest toggle-portfolio-summary-time-range-dropdown-opens-and-closes-test
   (is (= [[:effects/save-many [[[:portfolio-ui :summary-scope-dropdown-open?] false]
-                               [[:portfolio-ui :summary-time-range-dropdown-open?] true]]]]
+                               [[:portfolio-ui :summary-time-range-dropdown-open?] true]
+                               [[:portfolio-ui :performance-metrics-time-range-dropdown-open?] false]]]]
          (actions/toggle-portfolio-summary-time-range-dropdown
           {:portfolio-ui {:summary-scope-dropdown-open? true
-                          :summary-time-range-dropdown-open? false}})))
+                          :summary-time-range-dropdown-open? false
+                          :performance-metrics-time-range-dropdown-open? true}})))
   (is (= [[:effects/save-many [[[:portfolio-ui :summary-scope-dropdown-open?] false]
-                               [[:portfolio-ui :summary-time-range-dropdown-open?] false]]]]
+                               [[:portfolio-ui :summary-time-range-dropdown-open?] false]
+                               [[:portfolio-ui :performance-metrics-time-range-dropdown-open?] false]]]]
          (actions/toggle-portfolio-summary-time-range-dropdown
           {:portfolio-ui {:summary-scope-dropdown-open? false
-                          :summary-time-range-dropdown-open? true}}))))
+                          :summary-time-range-dropdown-open? true
+                          :performance-metrics-time-range-dropdown-open? false}}))))
+
+(deftest toggle-portfolio-performance-metrics-time-range-dropdown-opens-and-closes-test
+  (is (= [[:effects/save-many [[[:portfolio-ui :summary-scope-dropdown-open?] false]
+                               [[:portfolio-ui :summary-time-range-dropdown-open?] false]
+                               [[:portfolio-ui :performance-metrics-time-range-dropdown-open?] true]]]]
+         (actions/toggle-portfolio-performance-metrics-time-range-dropdown
+          {:portfolio-ui {:summary-scope-dropdown-open? true
+                          :summary-time-range-dropdown-open? true
+                          :performance-metrics-time-range-dropdown-open? false}})))
+  (is (= [[:effects/save-many [[[:portfolio-ui :summary-scope-dropdown-open?] false]
+                               [[:portfolio-ui :summary-time-range-dropdown-open?] false]
+                               [[:portfolio-ui :performance-metrics-time-range-dropdown-open?] false]]]]
+         (actions/toggle-portfolio-performance-metrics-time-range-dropdown
+          {:portfolio-ui {:summary-scope-dropdown-open? false
+                          :summary-time-range-dropdown-open? false
+                          :performance-metrics-time-range-dropdown-open? true}}))))
 
 (deftest select-portfolio-summary-scope-normalizes-and-closes-dropdowns-test
   (is (= [[:effects/save-many [[[:portfolio-ui :summary-scope] :perps]
                                [[:portfolio-ui :chart-hover-index] nil]
                                [[:portfolio-ui :summary-scope-dropdown-open?] false]
-                               [[:portfolio-ui :summary-time-range-dropdown-open?] false]]]]
+                               [[:portfolio-ui :summary-time-range-dropdown-open?] false]
+                               [[:portfolio-ui :performance-metrics-time-range-dropdown-open?] false]]]]
          (actions/select-portfolio-summary-scope {} "perp")))
   (is (= [[:effects/save-many [[[:portfolio-ui :summary-scope] :all]
                                [[:portfolio-ui :chart-hover-index] nil]
                                [[:portfolio-ui :summary-scope-dropdown-open?] false]
-                               [[:portfolio-ui :summary-time-range-dropdown-open?] false]]]]
+                               [[:portfolio-ui :summary-time-range-dropdown-open?] false]
+                               [[:portfolio-ui :performance-metrics-time-range-dropdown-open?] false]]]]
          (actions/select-portfolio-summary-scope {} :unknown))))
 
 (deftest select-portfolio-summary-time-range-normalizes-and-closes-dropdowns-test
   (is (= [[:effects/save-many [[[:portfolio-ui :summary-time-range] :three-month]
                                [[:portfolio-ui :chart-hover-index] nil]
                                [[:portfolio-ui :summary-scope-dropdown-open?] false]
-                               [[:portfolio-ui :summary-time-range-dropdown-open?] false]]]]
+                               [[:portfolio-ui :summary-time-range-dropdown-open?] false]
+                               [[:portfolio-ui :performance-metrics-time-range-dropdown-open?] false]]]]
          (actions/select-portfolio-summary-time-range {} "3M")))
   (is (= [[:effects/save-many [[[:portfolio-ui :summary-time-range] :all-time]
                                [[:portfolio-ui :chart-hover-index] nil]
                                [[:portfolio-ui :summary-scope-dropdown-open?] false]
-                               [[:portfolio-ui :summary-time-range-dropdown-open?] false]]]]
+                               [[:portfolio-ui :summary-time-range-dropdown-open?] false]
+                               [[:portfolio-ui :performance-metrics-time-range-dropdown-open?] false]]]]
          (actions/select-portfolio-summary-time-range {} "allTime")))
   (is (= [[:effects/save-many [[[:portfolio-ui :summary-time-range] :week]
                                [[:portfolio-ui :chart-hover-index] nil]
                                [[:portfolio-ui :summary-scope-dropdown-open?] false]
-                               [[:portfolio-ui :summary-time-range-dropdown-open?] false]]]
+                               [[:portfolio-ui :summary-time-range-dropdown-open?] false]
+                               [[:portfolio-ui :performance-metrics-time-range-dropdown-open?] false]]]
           [:effects/fetch-candle-snapshot :coin "BTC" :interval :15m :bars 800]
           [:effects/fetch-candle-snapshot :coin "ETH" :interval :15m :bars 800]]
          (actions/select-portfolio-summary-time-range
@@ -62,7 +91,8 @@
   (is (= [[:effects/save-many [[[:portfolio-ui :summary-time-range] :week]
                                [[:portfolio-ui :chart-hover-index] nil]
                                [[:portfolio-ui :summary-scope-dropdown-open?] false]
-                               [[:portfolio-ui :summary-time-range-dropdown-open?] false]]]
+                               [[:portfolio-ui :summary-time-range-dropdown-open?] false]
+                               [[:portfolio-ui :performance-metrics-time-range-dropdown-open?] false]]]
           [:effects/fetch-candle-snapshot :coin "BTC" :interval :15m :bars 800]]
          (actions/select-portfolio-summary-time-range
           {:portfolio-ui {:returns-benchmark-coin "BTC"}}
@@ -70,7 +100,8 @@
   (is (= [[:effects/save-many [[[:portfolio-ui :summary-time-range] :month]
                                [[:portfolio-ui :chart-hover-index] nil]
                                [[:portfolio-ui :summary-scope-dropdown-open?] false]
-                               [[:portfolio-ui :summary-time-range-dropdown-open?] false]]]]
+                               [[:portfolio-ui :summary-time-range-dropdown-open?] false]
+                               [[:portfolio-ui :performance-metrics-time-range-dropdown-open?] false]]]]
          (actions/select-portfolio-summary-time-range {} :unknown))))
 
 (deftest select-portfolio-chart-tab-normalizes-and-saves-selected-tab-test

@@ -216,6 +216,7 @@
            toggle-portfolio-summary-scope-dropdown
            select-portfolio-summary-scope
            toggle-portfolio-summary-time-range-dropdown
+           toggle-portfolio-performance-metrics-time-range-dropdown
            select-portfolio-summary-time-range
            select-portfolio-chart-tab
            set-portfolio-account-info-tab
@@ -246,6 +247,7 @@
    :toggle-portfolio-summary-scope-dropdown toggle-portfolio-summary-scope-dropdown
    :select-portfolio-summary-scope select-portfolio-summary-scope
    :toggle-portfolio-summary-time-range-dropdown toggle-portfolio-summary-time-range-dropdown
+   :toggle-portfolio-performance-metrics-time-range-dropdown toggle-portfolio-performance-metrics-time-range-dropdown
    :select-portfolio-summary-time-range select-portfolio-summary-time-range
    :select-portfolio-chart-tab select-portfolio-chart-tab
    :set-portfolio-account-info-tab set-portfolio-account-info-tab

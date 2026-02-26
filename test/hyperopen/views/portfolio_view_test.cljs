@@ -62,7 +62,8 @@
                   :summary-time-range :month
                   :chart-tab :account-value
                   :summary-scope-dropdown-open? false
-                  :summary-time-range-dropdown-open? false}
+                  :summary-time-range-dropdown-open? false
+                  :performance-metrics-time-range-dropdown-open? false}
    :portfolio {:summary-by-key {:month {:pnlHistory [[1 10] [2 15]]
                                         :accountValueHistory [[1 100] [2 100]]
                                         :vlm 2255561.85}}
@@ -105,6 +106,7 @@
         performance-metrics-card (find-first-node view-node #(= "portfolio-performance-metrics-card" (get-in % [1 :data-role])))
         scope-selector (find-first-node view-node #(= "portfolio-summary-scope-selector" (get-in % [1 :data-role])))
         time-range-selector (find-first-node view-node #(= "portfolio-summary-time-range-selector" (get-in % [1 :data-role])))
+        metrics-time-range-selector (find-first-node view-node #(= "portfolio-performance-metrics-time-range-selector" (get-in % [1 :data-role])))
         chart-account-value-tab (find-first-node view-node #(= "portfolio-chart-tab-account-value" (get-in % [1 :data-role])))
         chart-pnl-tab (find-first-node view-node #(= "portfolio-chart-tab-pnl" (get-in % [1 :data-role])))
         chart-returns-tab (find-first-node view-node #(= "portfolio-chart-tab-returns" (get-in % [1 :data-role])))
@@ -121,6 +123,10 @@
                              #(= [[:actions/set-portfolio-account-info-tab :balances]
                                   [:actions/select-account-info-tab :balances]]
                                  (get-in % [1 :on :click])))
+        metrics-time-range-button (find-first-node
+                                   view-node
+                                   #(= [[:actions/toggle-portfolio-performance-metrics-time-range-dropdown]]
+                                       (get-in % [1 :on :click])))
         metrics-scroll-node (find-first-node performance-metrics-card
                                              (fn [node]
                                                (contains? (set (class-values node))
@@ -134,6 +140,7 @@
     (is (some? performance-metrics-card))
     (is (some? scope-selector))
     (is (some? time-range-selector))
+    (is (some? metrics-time-range-selector))
     (is (some? chart-account-value-tab))
     (is (some? chart-pnl-tab))
     (is (some? chart-returns-tab))
@@ -143,6 +150,7 @@
     (is (contains? (set (class-values performance-metric-row)) "hover:bg-base-300"))
     (is (some? performance-tab-button))
     (is (some? balances-tab-button))
+    (is (some? metrics-time-range-button))
     (is (contains? (set (class-values performance-tab-button)) "border-primary"))
     (is (contains? (set (class-values balances-tab-button)) "border-transparent"))
     (is (some? metrics-scroll-node))

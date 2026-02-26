@@ -1314,6 +1314,10 @@
                                       :label (selector-option-label summary-time-range-options summary-time-range)
                                       :open? (boolean (get-in state [:portfolio-ui :summary-time-range-dropdown-open?]))
                                       :options summary-time-range-options}
+                 :performance-metrics-time-range {:value summary-time-range
+                                                  :label (selector-option-label summary-time-range-options summary-time-range)
+                                                  :open? (boolean (get-in state [:portfolio-ui :performance-metrics-time-range-dropdown-open?]))
+                                                  :options summary-time-range-options}
                  :returns-benchmark returns-benchmark-selector}
      :summary {:selected-key selected-key
                :pnl pnl

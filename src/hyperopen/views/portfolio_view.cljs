@@ -701,7 +701,8 @@
 
 (defn- performance-metrics-card [{:keys [benchmark-selected?
                                          benchmark-label
-                                         groups]}]
+                                         groups
+                                         time-range-selector]}]
   (let [benchmark-column-label (if benchmark-selected?
                                  benchmark-label
                                  "Benchmark")]
@@ -716,9 +717,18 @@
                     "bg-base-200/35"
                     "px-4"
                     "py-2.5"]}
-      [:span {:class ["text-xs" "font-medium" "uppercase" "tracking-wide" "text-trading-text-secondary"]
-              :data-role "portfolio-performance-metrics-metric-label"}
-       "Metric"]
+      [:div {:class ["flex" "min-w-0" "items-center" "justify-between" "gap-2"]}
+       [:span {:class ["text-xs" "font-medium" "uppercase" "tracking-wide" "text-trading-text-secondary"]
+               :data-role "portfolio-performance-metrics-metric-label"}
+        "Metric"]
+       (when (map? time-range-selector)
+         [:div {:class ["flex" "items-center" "gap-1.5"]}
+          [:span {:class ["text-xs" "font-medium" "uppercase" "tracking-wide" "text-trading-text-secondary"]}
+           "Range"]
+          (summary-selector time-range-selector
+                            :actions/toggle-portfolio-performance-metrics-time-range-dropdown
+                            :actions/select-portfolio-summary-time-range
+                            "portfolio-performance-metrics-time-range-selector")])]
       [:span {:class ["text-xs" "font-medium" "uppercase" "tracking-wide" "text-right" "text-trading-text-secondary"]
               :data-role "portfolio-performance-metrics-benchmark-label"}
        benchmark-column-label]
@@ -804,7 +814,8 @@
        state
        {:extra-tabs [{:id :performance-metrics
                       :label "Performance Metrics"
-                      :content (performance-metrics-card (:performance-metrics view-model))}]
+                      :content (performance-metrics-card (assoc (:performance-metrics view-model)
+                                                                :time-range-selector (get-in view-model [:selectors :performance-metrics-time-range])))}]
         :selected-tab-override (get-in state [:portfolio-ui :account-info-tab] :performance-metrics)
         :default-selected-tab :performance-metrics
         :tab-click-actions-by-tab portfolio-account-tab-click-actions-by-tab})]]))

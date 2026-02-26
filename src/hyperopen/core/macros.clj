@@ -109,6 +109,7 @@
     toggle-portfolio-summary-scope-dropdown
     select-portfolio-summary-scope
     toggle-portfolio-summary-time-range-dropdown
+    toggle-portfolio-performance-metrics-time-range-dropdown
     select-portfolio-summary-time-range
     select-portfolio-chart-tab
     set-portfolio-chart-hover

@@ -54,6 +54,7 @@
    :toggle-portfolio-summary-scope-dropdown portfolio-actions/toggle-portfolio-summary-scope-dropdown
    :select-portfolio-summary-scope portfolio-actions/select-portfolio-summary-scope
    :toggle-portfolio-summary-time-range-dropdown portfolio-actions/toggle-portfolio-summary-time-range-dropdown
+   :toggle-portfolio-performance-metrics-time-range-dropdown portfolio-actions/toggle-portfolio-performance-metrics-time-range-dropdown
    :select-portfolio-summary-time-range portfolio-actions/select-portfolio-summary-time-range
    :select-portfolio-chart-tab portfolio-actions/select-portfolio-chart-tab
    :set-portfolio-account-info-tab portfolio-actions/set-portfolio-account-info-tab

@@ -39,6 +39,8 @@
                     (get-in deps [:chart :select-chart-type])))
     (is (identical? portfolio-actions/toggle-portfolio-summary-scope-dropdown
                     (get-in deps [:chart :toggle-portfolio-summary-scope-dropdown])))
+    (is (identical? portfolio-actions/toggle-portfolio-performance-metrics-time-range-dropdown
+                    (get-in deps [:chart :toggle-portfolio-performance-metrics-time-range-dropdown])))
     (is (identical? portfolio-actions/select-portfolio-chart-tab
                     (get-in deps [:chart :select-portfolio-chart-tab])))
     (is (identical? portfolio-actions/set-portfolio-account-info-tab
