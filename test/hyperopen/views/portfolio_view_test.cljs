@@ -362,8 +362,9 @@
           all-text (set (collect-strings view-node))
           benchmark-label (find-first-node view-node #(= "portfolio-performance-metrics-benchmark-label" (get-in % [1 :data-role])))
           nil-row (find-first-node view-node #(= "portfolio-performance-metric-r2" (get-in % [1 :data-role])))]
-      (is (contains? all-text "Performance Metrics"))
-      (is (= "Benchmark: SPY (SPOT)" (first (collect-strings benchmark-label))))
+      (is (contains? all-text "Metric"))
+      (is (contains? all-text "Portfolio"))
+      (is (= "SPY (SPOT)" (first (collect-strings benchmark-label))))
       (is (contains? all-text "+12.30%"))
       (is (contains? all-text "-4.50%"))
       (is (contains? all-text "1.23"))

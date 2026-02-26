@@ -170,6 +170,8 @@
       (is (= "Time in Market"
              (get-in groups [0 :rows 0 :label])))
       (is (approx= (get-in groups [0 :rows 0 :value]) 1 1e-12))
+      (is (approx= (get-in groups [0 :rows 0 :portfolio-value]) 1 1e-12))
+      (is (nil? (get-in groups [0 :rows 0 :benchmark-value])))
       (is (false? (get-in view-model [:performance-metrics :benchmark-selected?])))
       (is (nil? (:value (performance-metric-row view-model :r2))))
       (is (nil? (:value (performance-metric-row view-model :information-ratio)))))))
@@ -451,11 +453,14 @@
                            :totalVaultEquity 0}
                  :borrow-lend {:total-supplied-usd 0}}
           view-model (vm/portfolio-vm state)
+          cumulative-return-row (performance-metric-row view-model :cumulative-return)
           r2-row (performance-metric-row view-model :r2)
           information-ratio-row (performance-metric-row view-model :information-ratio)]
       (is (true? (get-in view-model [:performance-metrics :benchmark-selected?])))
       (is (= "SPY" (get-in view-model [:performance-metrics :benchmark-coin])))
       (is (= "SPY (SPOT)" (get-in view-model [:performance-metrics :benchmark-label])))
+      (is (number? (:portfolio-value cumulative-return-row)))
+      (is (number? (:benchmark-value cumulative-return-row)))
       (is (number? (:value r2-row)))
       (is (number? (:value information-ratio-row))))))
 

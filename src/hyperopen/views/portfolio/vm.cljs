@@ -726,6 +726,17 @@
       (aligned-benchmark-return-rows candles strategy-time-points))
     []))
 
+(defn- with-performance-metric-columns
+  [groups portfolio-values benchmark-values]
+  (mapv (fn [{:keys [rows] :as group}]
+          (assoc group
+                 :rows (mapv (fn [{:keys [key] :as row}]
+                               (assoc row
+                                      :portfolio-value (get portfolio-values key)
+                                      :benchmark-value (get benchmark-values key)))
+                             (or rows []))))
+        (or groups [])))
+
 (defn- performance-metrics-model
   [state summary-entry summary-scope summary-time-range returns-benchmark-selector]
   (let [strategy-cumulative-rows (portfolio-metrics/returns-history-rows state
@@ -739,19 +750,28 @@
                                                                     benchmark-coin
                                                                     strategy-time-points)
         benchmark-daily-rows (portfolio-metrics/daily-compounded-returns benchmark-cumulative-rows)
-        metric-values (portfolio-metrics/compute-performance-metrics {:strategy-daily-rows strategy-daily-rows
-                                                                      :benchmark-daily-rows benchmark-daily-rows
-                                                                      :rf 0
-                                                                      :periods-per-year 252
-                                                                      :compounded true})
-        groups (portfolio-metrics/metric-rows metric-values)
+        portfolio-values (portfolio-metrics/compute-performance-metrics {:strategy-daily-rows strategy-daily-rows
+                                                                         :benchmark-daily-rows benchmark-daily-rows
+                                                                         :rf 0
+                                                                         :periods-per-year 252
+                                                                         :compounded true})
+        benchmark-values (if (seq benchmark-daily-rows)
+                           (portfolio-metrics/compute-performance-metrics {:strategy-daily-rows benchmark-daily-rows
+                                                                          :rf 0
+                                                                          :periods-per-year 252
+                                                                          :compounded true})
+                           {})
+        groups (with-performance-metric-columns (portfolio-metrics/metric-rows portfolio-values)
+                 portfolio-values
+                 benchmark-values)
         benchmark-label (when (seq benchmark-coin)
                           (or (get-in returns-benchmark-selector [:label-by-coin benchmark-coin])
                               benchmark-coin))]
     {:benchmark-selected? (boolean (seq benchmark-coin))
      :benchmark-coin benchmark-coin
      :benchmark-label benchmark-label
-     :values metric-values
+     :values portfolio-values
+     :benchmark-values benchmark-values
      :groups groups}))
 
 (defn- non-zero-span

@@ -677,38 +677,62 @@
       (when (= selected-tab :returns)
         (returns-benchmark-chip-rail returns-benchmark*))])))
 
-(defn- performance-metric-row [{:keys [key label kind value]}]
-  [:div {:class ["grid" "grid-cols-[1fr_auto]" "items-center" "gap-3"]
-         :data-role (str "portfolio-performance-metric-" (name key))}
-   [:span {:class ["text-sm" "text-trading-text-secondary"]}
-    label]
-   [:span {:class (into ["text-sm" "text-trading-text"]
-                        (when (not= kind :date)
-                          ["num"]))}
-    (format-metric-value kind value)]])
+(defn- performance-metric-value-cell [kind value]
+  [:span {:class (into ["text-sm" "text-trading-text" "text-right"]
+                       (when (not= kind :date)
+                         ["num"]))}
+   (format-metric-value kind value)])
+
+(defn- performance-metric-row [{:keys [key label kind value] :as row}]
+  (let [portfolio-value (if (contains? row :portfolio-value)
+                          (:portfolio-value row)
+                          value)]
+    [:div {:class ["grid"
+                   "grid-cols-[minmax(0,1fr)_minmax(108px,auto)_minmax(108px,auto)]"
+                   "items-center"
+                   "gap-3"]
+           :data-role (str "portfolio-performance-metric-" (name key))}
+     [:span {:class ["text-sm" "text-trading-text-secondary"]}
+      label]
+     (performance-metric-value-cell kind (:benchmark-value row))
+     (performance-metric-value-cell kind portfolio-value)]))
 
 (defn- performance-metrics-card [{:keys [benchmark-selected?
                                          benchmark-label
                                          groups]}]
-  [:div {:class ["flex" "h-full" "min-h-0" "flex-col"]
-         :data-role "portfolio-performance-metrics-card"}
-   [:div {:class ["flex" "items-center" "justify-between" "gap-3" "border-b" "border-base-300" "px-4" "py-3"]}
-    [:h2 {:class ["text-sm" "font-medium" "text-trading-text"]}
-     "Performance Metrics"]
-    (when benchmark-selected?
-      [:span {:class ["text-xs" "text-trading-text-secondary"]
+  (let [benchmark-column-label (if benchmark-selected?
+                                 benchmark-label
+                                 "Benchmark")]
+    [:div {:class ["flex" "h-full" "min-h-0" "flex-col"]
+           :data-role "portfolio-performance-metrics-card"}
+     [:div {:class ["grid"
+                    "grid-cols-[minmax(0,1fr)_minmax(108px,auto)_minmax(108px,auto)]"
+                    "items-center"
+                    "gap-3"
+                    "border-b"
+                    "border-base-300"
+                    "bg-base-200/35"
+                    "px-4"
+                    "py-2.5"]}
+      [:span {:class ["text-xs" "font-medium" "uppercase" "tracking-wide" "text-trading-text-secondary"]
+              :data-role "portfolio-performance-metrics-metric-label"}
+       "Metric"]
+      [:span {:class ["text-xs" "font-medium" "uppercase" "tracking-wide" "text-right" "text-trading-text-secondary"]
               :data-role "portfolio-performance-metrics-benchmark-label"}
-       (str "Benchmark: " benchmark-label)])]
-   [:div {:class ["flex-1" "min-h-0" "space-y-2.5" "overflow-y-auto" "scrollbar-hide" "px-4" "py-3"]}
-    (for [[idx {:keys [id rows]}] (map-indexed vector (or groups []))]
-      ^{:key (str "portfolio-performance-metrics-group-" (name id))}
-      [:div {:class (into ["space-y-1.5"]
-                          (when (pos? idx)
-                            ["border-t" "border-base-300" "pt-2.5"]))
-             :data-role (str "portfolio-performance-metrics-group-" (name id))}
-       (for [{:keys [key] :as row} rows]
-         ^{:key (str "portfolio-performance-metric-row-" (name key))}
-         (performance-metric-row row))])]])
+       benchmark-column-label]
+      [:span {:class ["text-xs" "font-medium" "uppercase" "tracking-wide" "text-right" "text-trading-text-secondary"]
+              :data-role "portfolio-performance-metrics-portfolio-label"}
+       "Portfolio"]]
+     [:div {:class ["flex-1" "min-h-0" "space-y-2.5" "overflow-y-auto" "scrollbar-hide" "px-4" "py-3"]}
+      (for [[idx {:keys [id rows]}] (map-indexed vector (or groups []))]
+        ^{:key (str "portfolio-performance-metrics-group-" (name id))}
+        [:div {:class (into ["space-y-1.5"]
+                            (when (pos? idx)
+                              ["border-t" "border-base-300" "pt-2.5"]))
+               :data-role (str "portfolio-performance-metrics-group-" (name id))}
+         (for [{:keys [key] :as row} rows]
+           ^{:key (str "portfolio-performance-metric-row-" (name key))}
+           (performance-metric-row row))])]]))
 
 (def ^:private portfolio-account-tab-click-actions-by-tab
   (into
