@@ -218,6 +218,7 @@
            toggle-portfolio-summary-time-range-dropdown
            select-portfolio-summary-time-range
            select-portfolio-chart-tab
+           set-portfolio-account-info-tab
            set-portfolio-chart-hover
            clear-portfolio-chart-hover
            set-portfolio-returns-benchmark-search
@@ -247,6 +248,7 @@
    :toggle-portfolio-summary-time-range-dropdown toggle-portfolio-summary-time-range-dropdown
    :select-portfolio-summary-time-range select-portfolio-summary-time-range
    :select-portfolio-chart-tab select-portfolio-chart-tab
+   :set-portfolio-account-info-tab set-portfolio-account-info-tab
    :set-portfolio-chart-hover set-portfolio-chart-hover
    :clear-portfolio-chart-hover clear-portfolio-chart-hover
    :set-portfolio-returns-benchmark-search set-portfolio-returns-benchmark-search

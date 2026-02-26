@@ -111,6 +111,19 @@
         chart-shell (find-first-node view-node #(= "portfolio-chart-shell" (get-in % [1 :data-role])))
         chart-path (find-first-node view-node #(= "portfolio-chart-path" (get-in % [1 :data-role])))
         account-table (find-first-node view-node #(= "portfolio-account-table" (get-in % [1 :data-role])))
+        performance-tab-button (find-first-node
+                                view-node
+                                #(= [[:actions/set-portfolio-account-info-tab :performance-metrics]]
+                                    (get-in % [1 :on :click])))
+        balances-tab-button (find-first-node
+                             view-node
+                             #(= [[:actions/set-portfolio-account-info-tab :balances]
+                                  [:actions/select-account-info-tab :balances]]
+                                 (get-in % [1 :on :click])))
+        metrics-scroll-node (find-first-node performance-metrics-card
+                                             (fn [node]
+                                               (contains? (set (class-values node))
+                                                          "overflow-y-auto")))
         all-text (set (collect-strings view-node))]
     (is (some? root-node))
     (is (some? actions-row))
@@ -126,6 +139,12 @@
     (is (some? chart-shell))
     (is (some? chart-path))
     (is (some? account-table))
+    (is (some? performance-tab-button))
+    (is (some? balances-tab-button))
+    (is (contains? (set (class-values performance-tab-button)) "border-primary"))
+    (is (contains? (set (class-values balances-tab-button)) "border-transparent"))
+    (is (some? metrics-scroll-node))
+    (is (contains? (set (class-values metrics-scroll-node)) "flex-1"))
     (is (contains? all-text "Portfolio"))
     (is (contains? all-text "14 Day Volume"))
     (is (contains? all-text "Fees (Taker / Maker)"))
@@ -330,8 +349,15 @@
                                                                                       :label "R^2"
                                                                                       :kind :ratio
                                                                                       :value nil}]}]}})
-                account-info-view/account-info-view (fn [_]
-                                                      [:div {:data-role "stub-account-info"}])]
+                account-info-view/account-info-view (fn
+                                                      ([_]
+                                                       [:div {:data-role "stub-account-info"}])
+                                                      ([_ {:keys [extra-tabs]}]
+                                                       (or (some (fn [{:keys [id content]}]
+                                                                   (when (= id :performance-metrics)
+                                                                     content))
+                                                                 extra-tabs)
+                                                           [:div {:data-role "stub-account-info"}])))]
     (let [view-node (portfolio-view/portfolio-view {})
           all-text (set (collect-strings view-node))
           benchmark-label (find-first-node view-node #(= "portfolio-performance-metrics-benchmark-label" (get-in % [1 :data-role])))

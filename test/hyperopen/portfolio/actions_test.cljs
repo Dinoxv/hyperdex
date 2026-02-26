@@ -103,6 +103,20 @@
             [[:portfolio-ui :chart-hover-index] nil]]]]
          (actions/select-portfolio-chart-tab {} :unknown))))
 
+(deftest set-portfolio-account-info-tab-normalizes-and-saves-selected-tab-test
+  (is (= [[:effects/save
+           [:portfolio-ui :account-info-tab]
+           :performance-metrics]]
+         (actions/set-portfolio-account-info-tab {} "performanceMetrics")))
+  (is (= [[:effects/save
+           [:portfolio-ui :account-info-tab]
+           :open-orders]]
+         (actions/set-portfolio-account-info-tab {} "openOrders")))
+  (is (= [[:effects/save
+           [:portfolio-ui :account-info-tab]
+           :performance-metrics]]
+         (actions/set-portfolio-account-info-tab {} :unknown))))
+
 (deftest set-and-clear-portfolio-chart-hover-test
   (is (= [[:effects/save [:portfolio-ui :chart-hover-index] 2]]
          (actions/set-portfolio-chart-hover

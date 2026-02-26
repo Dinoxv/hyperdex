@@ -19,6 +19,19 @@
 (def ^:private chart-tab-options
   #{:account-value :pnl :returns})
 
+(def default-account-info-tab
+  :performance-metrics)
+
+(def ^:private account-info-tab-options
+  #{:performance-metrics
+    :balances
+    :positions
+    :open-orders
+    :twap
+    :trade-history
+    :funding-history
+    :order-history})
+
 (def ^:private chart-hover-index-path
   [:portfolio-ui :chart-hover-index])
 
@@ -66,6 +79,22 @@
     (if (contains? chart-tab-options normalized)
       normalized
       default-chart-tab)))
+
+(defn normalize-portfolio-account-info-tab
+  [value]
+  (let [token (normalize-keyword-like value)
+        normalized (case token
+                     :performancemetrics :performance-metrics
+                     :performancemetric :performance-metrics
+                     :performance :performance-metrics
+                     :openorders :open-orders
+                     :tradehistory :trade-history
+                     :fundinghistory :funding-history
+                     :orderhistory :order-history
+                     token)]
+    (if (contains? account-info-tab-options normalized)
+      normalized
+      default-account-info-tab)))
 
 (defn normalize-portfolio-returns-benchmark-coin
   [value]
@@ -237,6 +266,12 @@
             [[[:portfolio-ui :chart-tab] chart-tab*]
              [chart-hover-index-path nil]]]]
           fetch-effects)))
+
+(defn set-portfolio-account-info-tab
+  [_state tab]
+  [[:effects/save
+    [:portfolio-ui :account-info-tab]
+    (normalize-portfolio-account-info-tab tab)]])
 
 (defn set-portfolio-chart-hover
   [state client-x bounds point-count]

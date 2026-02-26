@@ -690,8 +690,8 @@
 (defn- performance-metrics-card [{:keys [benchmark-selected?
                                          benchmark-label
                                          groups]}]
-  (section-card
-   "portfolio-performance-metrics-card"
+  [:div {:class ["flex" "h-full" "min-h-0" "flex-col"]
+         :data-role "portfolio-performance-metrics-card"}
    [:div {:class ["flex" "items-center" "justify-between" "gap-3" "border-b" "border-base-300" "px-4" "py-3"]}
     [:h2 {:class ["text-sm" "font-medium" "text-trading-text"]}
      "Performance Metrics"]
@@ -699,7 +699,7 @@
       [:span {:class ["text-xs" "text-trading-text-secondary"]
               :data-role "portfolio-performance-metrics-benchmark-label"}
        (str "Benchmark: " benchmark-label)])]
-   [:div {:class ["space-y-2.5" "px-4" "py-3"]}
+   [:div {:class ["flex-1" "min-h-0" "space-y-2.5" "overflow-y-auto" "scrollbar-hide" "px-4" "py-3"]}
     (for [[idx {:keys [id rows]}] (map-indexed vector (or groups []))]
       ^{:key (str "portfolio-performance-metrics-group-" (name id))}
       [:div {:class (into ["space-y-1.5"]
@@ -708,7 +708,16 @@
              :data-role (str "portfolio-performance-metrics-group-" (name id))}
        (for [{:keys [key] :as row} rows]
          ^{:key (str "portfolio-performance-metric-row-" (name key))}
-         (performance-metric-row row))])]))
+         (performance-metric-row row))])]])
+
+(def ^:private portfolio-account-tab-click-actions-by-tab
+  (into
+   {:performance-metrics [[:actions/set-portfolio-account-info-tab :performance-metrics]]}
+   (map (fn [tab]
+          [tab
+           [[:actions/set-portfolio-account-info-tab tab]
+            [:actions/select-account-info-tab tab]]])
+        account-info-view/available-tabs)))
 
 (defn- metric-cards [{:keys [volume-14d-usd fees]}]
   [:div {:class ["grid" "grid-cols-1" "gap-3" "md:grid-cols-2" "xl:grid-cols-1"]}
@@ -760,10 +769,16 @@
                     "grid-cols-1"
                     "gap-3"
                     "xl:grid-cols-[320px_minmax(340px,1fr)_minmax(420px,1.35fr)]"]}
-      (metric-cards view-model)
+     (metric-cards view-model)
       (summary-card view-model)
       (chart-card view-model)]
-     (performance-metrics-card (:performance-metrics view-model))
      [:div {:class ["rounded-xl" "border" "border-base-300" "bg-base-100/95" "overflow-hidden"]
             :data-role "portfolio-account-table"}
-      (account-info-view/account-info-view state)]]))
+      (account-info-view/account-info-view
+       state
+       {:extra-tabs [{:id :performance-metrics
+                      :label "Performance Metrics"
+                      :content (performance-metrics-card (:performance-metrics view-model))}]
+        :selected-tab-override (get-in state [:portfolio-ui :account-info-tab] :performance-metrics)
+        :default-selected-tab :performance-metrics
+        :tab-click-actions-by-tab portfolio-account-tab-click-actions-by-tab})]]))

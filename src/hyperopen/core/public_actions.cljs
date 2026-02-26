@@ -122,6 +122,9 @@
 (def select-portfolio-chart-tab
   portfolio-actions/select-portfolio-chart-tab)
 
+(def set-portfolio-account-info-tab
+  portfolio-actions/set-portfolio-account-info-tab)
+
 (def set-portfolio-chart-hover
   portfolio-actions/set-portfolio-chart-hover)
 
