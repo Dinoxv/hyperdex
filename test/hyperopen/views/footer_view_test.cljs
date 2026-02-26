@@ -185,6 +185,51 @@
                           open-view)))
     (is (pos? (count-nodes #(and (vector? %) (= :details (first %))) open-view)))))
 
+(deftest diagnostics-drawer-renders-market-projection-empty-state-test
+  (let [view (footer-view/footer-view (assoc-in (base-state) [:websocket-ui :diagnostics-open?] true))
+        text (node-text view)]
+    (is (str/includes? text "Market projection"))
+    (is (str/includes? text "No market projection telemetry yet."))
+    (is (str/includes? text "No flush events recorded in the telemetry ring."))))
+
+(deftest diagnostics-drawer-renders-market-projection-cards-and-flush-rows-test
+  (let [state (-> (base-state)
+                  (assoc-in [:websocket-ui :diagnostics-open?] true)
+                  (assoc-in [:websocket :health :market-projection]
+                            {:stores [{:store-id "app-store"
+                                       :pending-count 0
+                                       :queued-total 12
+                                       :overwrite-total 3
+                                       :flush-count 4
+                                       :max-pending-depth 5
+                                       :p95-flush-duration-ms 12
+                                       :last-flush-duration-ms 8
+                                       :last-queue-wait-ms 3}]
+                             :flush-events [{:seq 101
+                                             :at-ms 9800
+                                             :store-id "app-store"
+                                             :pending-count 2
+                                             :overwrite-count 1
+                                             :flush-duration-ms 8
+                                             :queue-wait-ms 3}
+                                            {:seq 102
+                                             :at-ms 9900
+                                             :store-id "app-store"
+                                             :pending-count 1
+                                             :overwrite-count 0
+                                             :flush-duration-ms 5
+                                             :queue-wait-ms 2}]}))
+        view (footer-view/footer-view state)
+        text (node-text view)]
+    (is (str/includes? text "Market projection"))
+    (is (str/includes? text "app-store"))
+    (is (str/includes? text "P95 flush 12 ms"))
+    (is (str/includes? text "Recent flushes (2)"))
+    (is (str/includes? text "Flush"))
+    (is (str/includes? text "Queue wait"))
+    (is (str/includes? text "8 ms"))
+    (is (str/includes? text "5 ms"))))
+
 (deftest diagnostics-drawer-renders-configured-app-version-test
   (let [view (footer-view/footer-view (assoc-in (base-state) [:websocket-ui :diagnostics-open?] true))]
     (is (str/includes? (node-text view)

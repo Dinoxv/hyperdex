@@ -28,6 +28,7 @@
             [hyperopen.websocket.diagnostics-runtime :as diagnostics-runtime]
             [hyperopen.websocket.health-projection :as health-projection]
             [hyperopen.websocket.health-runtime :as health-runtime]
+            [hyperopen.websocket.market-projection-runtime :as market-projection-runtime]
             [hyperopen.websocket.orderbook :as orderbook]
             [hyperopen.websocket.subscriptions-runtime :as subscriptions-runtime]
             [hyperopen.websocket.trades :as trades]
@@ -49,13 +50,58 @@
          details
          runtime-state/diagnostics-timeline-limit))
 
+(def ^:private market-projection-flush-event-limit
+  60)
+
+(defn- market-projection-flush-events
+  []
+  (->> (telemetry/events)
+       (filter (fn [entry]
+                 (= :websocket/market-projection-flush (:event entry))))
+       (take-last market-projection-flush-event-limit)
+       (mapv (fn [entry]
+               (select-keys entry
+                            [:seq
+                             :event
+                             :at-ms
+                             :store-id
+                             :pending-count
+                             :overwrite-count
+                             :flush-duration-ms
+                             :queue-wait-ms
+                             :flush-count
+                             :max-pending-depth
+                             :p95-flush-duration-ms
+                             :queued-total
+                             :overwrite-total])))))
+
+(defn- market-projection-diagnostics
+  []
+  (let [snapshot (market-projection-runtime/market-projection-telemetry-snapshot)
+        flush-events (market-projection-flush-events)
+        latest-event (last flush-events)]
+    {:stores (:stores snapshot)
+     :flush-events flush-events
+     :flush-event-limit market-projection-flush-event-limit
+     :flush-event-count (count flush-events)
+     :latest-flush-event-seq (:seq latest-event)
+     :latest-flush-at-ms (:at-ms latest-event)}))
+
+(defn- enrich-health-with-market-projection
+  [health]
+  (assoc (or health {})
+         :market-projection
+         (market-projection-diagnostics)))
+
 (defn sync-websocket-health-with-runtime!
   [_runtime store & {:keys [force? projected-fingerprint]}]
   (health-runtime/sync-websocket-health!
    {:store store
     :force? force?
     :projected-fingerprint projected-fingerprint
-    :get-health-snapshot ws-client/get-health-snapshot
+    :get-health-snapshot (fn []
+                           (enrich-health-with-market-projection
+                            (ws-client/get-health-snapshot)))
     :websocket-health-fingerprint websocket-health-fingerprint
     :projection-state ws-client/websocket-health-projection-state
     :auto-recover-enabled-fn health-runtime/auto-recover-enabled?

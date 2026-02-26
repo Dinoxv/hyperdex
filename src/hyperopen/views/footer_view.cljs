@@ -13,6 +13,20 @@
 (def ^:private diagnostics-timeline-limit
   (get-in app-config/config [:diagnostics :timeline-limit]))
 
+(def ^:private market-flush-sparkline-sample-limit
+  24)
+
+(def ^:private market-flush-table-row-limit
+  25)
+
+(def ^:private market-flush-sparkline-width
+  144)
+
+(def ^:private market-flush-sparkline-height
+  36)
+
+(declare diagnostics-display-value)
+
 (def ^:private neutral-statuses
   #{:idle :n-a nil})
 
@@ -137,6 +151,160 @@
   (if (number? stale-threshold-ms)
     (str stale-threshold-ms " ms")
     "n/a"))
+
+(defn- format-ms [value]
+  (if (number? value)
+    (str (js/Math.round value) " ms")
+    "n/a"))
+
+(defn- sparkline-y
+  [value max-value]
+  (let [height market-flush-sparkline-height
+        ratio (if (and (number? value) (pos? max-value))
+                (/ (double value) (double max-value))
+                0)]
+    (-> (* (- 1 ratio) height)
+        (max 0)
+        (min height))))
+
+(defn- sparkline-points
+  [samples]
+  (let [samples* (->> samples
+                      (filter number?)
+                      (take-last market-flush-sparkline-sample-limit)
+                      vec)
+        sample-count (count samples*)
+        max-value (double (max 1 (or (reduce max 0 samples*) 1)))
+        step-x (if (> sample-count 1)
+                 (/ market-flush-sparkline-width (dec sample-count))
+                 0)]
+    {:samples samples*
+     :max-value max-value
+     :polyline-points (str/join
+                       " "
+                       (map-indexed
+                        (fn [idx sample]
+                          (let [x (js/Math.round (* idx step-x))
+                                y (js/Math.round (sparkline-y sample max-value))]
+                            (str x "," y)))
+                        samples*))}))
+
+(defn- flush-duration-sparkline
+  [samples p95]
+  (let [{:keys [samples max-value polyline-points]} (sparkline-points samples)]
+    (if (seq samples)
+      [:svg {:viewBox (str "0 0 "
+                           market-flush-sparkline-width
+                           " "
+                           market-flush-sparkline-height)
+             :class ["h-9" "w-full"]}
+       (when (number? p95)
+         (let [y (js/Math.round (sparkline-y (min p95 max-value) max-value))]
+           [:line {:x1 0
+                   :x2 market-flush-sparkline-width
+                   :y1 y
+                   :y2 y
+                   :stroke-width 1
+                   :stroke "currentColor"
+                   :class ["text-warning/70"]}]))
+       [:polyline {:fill "none"
+                   :stroke-width 2
+                   :stroke "currentColor"
+                   :class ["text-info"]
+                   :points polyline-points}]]
+      [:div {:class ["h-9" "text-xs" "text-base-content/60" "flex" "items-center"]}
+       "No flush samples"])))
+
+(defn- market-projection-section
+  [health now-ms reveal-sensitive?]
+  (let [market-projection (or (:market-projection health) {})
+        stores (->> (:stores market-projection)
+                    (sort-by :store-id)
+                    vec)
+        flush-events (vec (or (:flush-events market-projection) []))
+        flush-events-by-store (group-by :store-id flush-events)
+        latest-events (->> flush-events
+                           (sort-by (fn [entry]
+                                      (or (:seq entry) 0)))
+                           (take-last market-flush-table-row-limit)
+                           reverse
+                           vec)]
+    [:section {:class ["space-y-2"]
+               :data-role "market-projection-diagnostics"}
+     [:h3 {:class ["text-xs" "font-semibold" "uppercase" "tracking-wide" "text-base-content/70"]}
+      "Market projection"]
+     (if (seq stores)
+       [:div {:class ["grid" "grid-cols-1" "gap-2" "sm:grid-cols-2"]}
+        (for [store-summary stores]
+          ^{:key (str "market-store|" (:store-id store-summary))}
+          (let [store-id* (diagnostics-display-value reveal-sensitive? (:store-id store-summary))
+                store-events (get flush-events-by-store (:store-id store-summary))
+                durations (mapv :flush-duration-ms store-events)]
+            [:article {:class ["rounded"
+                               "border"
+                               "border-base-300"
+                               "bg-base-200/50"
+                               "p-2"
+                               "space-y-1.5"]}
+             [:div {:class ["flex" "items-center" "justify-between" "gap-2"]}
+              [:code {:class ["text-xs" "font-semibold" "break-all"]}
+               (or (str store-id*) "n/a")]
+              [:span {:class ["text-xs" "text-base-content/60"]}
+               (str "Flushes: " (or (:flush-count store-summary) 0))]]
+             [:div {:class ["grid" "grid-cols-2" "gap-x-3" "gap-y-1" "text-xs"]}
+              [:span {:class ["text-base-content/60"]} "Pending"]
+              [:span {:class ["text-right"]} (str (or (:pending-count store-summary) 0))]
+              [:span {:class ["text-base-content/60"]} "Max pending"]
+              [:span {:class ["text-right"]} (str (or (:max-pending-depth store-summary) 0))]
+              [:span {:class ["text-base-content/60"]} "Overwrites"]
+              [:span {:class ["text-right"]} (str (or (:overwrite-total store-summary) 0))]
+              [:span {:class ["text-base-content/60"]} "P95 flush"]
+              [:span {:class ["text-right"]} (format-ms (:p95-flush-duration-ms store-summary))]
+              [:span {:class ["text-base-content/60"]} "Last flush"]
+              [:span {:class ["text-right"]} (format-ms (:last-flush-duration-ms store-summary))]
+              [:span {:class ["text-base-content/60"]} "Last queue wait"]
+              [:span {:class ["text-right"]} (format-ms (:last-queue-wait-ms store-summary))]]
+             [:div {:class ["border-t" "border-base-300/60" "pt-1"]}
+              (flush-duration-sparkline durations
+                                        (:p95-flush-duration-ms store-summary))
+              [:div {:class ["mt-0.5" "text-xs" "text-base-content/60" "flex" "justify-between"]}
+               [:span (str "Samples: " (count durations))]
+               [:span "Blue=flush ms, amber=p95"]]]]))]
+       [:div {:class ["rounded" "border" "border-base-300" "bg-base-200/50" "p-3" "text-xs" "text-base-content/70"]}
+        "No market projection telemetry yet."])
+
+     [:div {:class ["rounded" "border" "border-base-300" "bg-base-200/50" "p-3" "space-y-2"]}
+      [:div {:class ["text-xs" "font-semibold" "uppercase" "tracking-wide" "text-base-content/70"]}
+       (str "Recent flushes (" (count latest-events) ")")]
+      (if (seq latest-events)
+        [:div {:class ["overflow-x-auto"]}
+         [:table {:class ["w-full" "text-xs"]}
+          [:thead
+           [:tr {:class ["text-base-content/60"]}
+            [:th {:class ["py-1" "pr-2" "text-left"]} "Age"]
+            [:th {:class ["py-1" "pr-2" "text-left"]} "Store"]
+            [:th {:class ["py-1" "pr-2" "text-left"]} "Pending"]
+            [:th {:class ["py-1" "pr-2" "text-left"]} "Overwrite"]
+            [:th {:class ["py-1" "pr-2" "text-left"]} "Flush"]
+            [:th {:class ["py-1" "pr-2" "text-left"]} "Queue wait"]]]
+          [:tbody
+           (for [entry latest-events]
+             ^{:key (str "market-flush|" (or (:seq entry)
+                                             (:at-ms entry)
+                                             (:store-id entry)))}
+             (let [event-at-ms (:at-ms entry)
+                   age-ms (when (and (number? now-ms) (number? event-at-ms))
+                            (max 0 (- now-ms event-at-ms)))
+                   store-id* (diagnostics-display-value reveal-sensitive? (:store-id entry))]
+               [:tr {:class ["border-t" "border-base-300/40"]}
+                [:td {:class ["py-1" "pr-2"]} (format-age-ms age-ms)]
+                [:td {:class ["py-1" "pr-2" "max-w-[10rem]" "truncate"]} (or (str store-id*) "n/a")]
+                [:td {:class ["py-1" "pr-2"]} (str (or (:pending-count entry) 0))]
+                [:td {:class ["py-1" "pr-2"]} (str (or (:overwrite-count entry) 0))]
+                [:td {:class ["py-1" "pr-2"]} (format-ms (:flush-duration-ms entry))]
+                [:td {:class ["py-1" "pr-2"]} (format-ms (:queue-wait-ms entry))]]))]]]
+        [:div {:class ["text-xs" "text-base-content/70"]}
+         "No flush events recorded in the telemetry ring."])]]))
 
 (defn- format-last-close [health]
   (let [close-info (get-in health [:transport :last-close])
@@ -424,6 +592,8 @@
                   (pr-str details*)])]))
           [:div {:class ["text-base-content/70"]}
            "No events yet"])]] 
+
+      (market-projection-section health now-ms reveal-sensitive?)
 
       [:section {:class ["space-y-2"]}
        [:h3 {:class ["text-xs" "font-semibold" "uppercase" "tracking-wide" "text-base-content/70"]}

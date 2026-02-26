@@ -53,4 +53,5 @@
                                    (get-in state [:websocket-ui :reset-counts]))
               :auto-recover-count (or (get-in state [:websocket-ui :auto-recover-count]) 0)}
    :timeline (vec (get-in state [:websocket-ui :diagnostics-timeline] []))
-   :streams (diagnostics-stream-rows health)})
+   :streams (diagnostics-stream-rows health)
+   :market-projection (:market-projection health)})

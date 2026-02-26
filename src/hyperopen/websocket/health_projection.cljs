@@ -18,7 +18,11 @@
    :groups/account (get-in health [:groups :account :worst-status])
    :gap/orders_oms (boolean (get-in health [:groups :orders_oms :gap-detected?]))
    :gap/market_data (boolean (get-in health [:groups :market_data :gap-detected?]))
-   :gap/account (boolean (get-in health [:groups :account :gap-detected?]))})
+   :gap/account (boolean (get-in health [:groups :account :gap-detected?]))
+   :market-projection/latest-flush-event-seq
+   (get-in health [:market-projection :latest-flush-event-seq])
+   :market-projection/flush-event-count
+   (get-in health [:market-projection :flush-event-count])})
 
 (defn append-diagnostics-event
   [state event at-ms details timeline-limit]

@@ -29,7 +29,12 @@
         health {:generated-at-ms 1700000000000
                 :transport {:state :connected}
                 :groups {:market_data {:worst-status :live}}
-                :streams {}}
+                :streams {}
+                :market-projection {:stores [{:store-id "app-store"
+                                              :flush-count 2}]
+                                    :flush-events [{:seq 10
+                                                    :store-id "app-store"
+                                                    :flush-duration-ms 5}]}}
         payload (diagnostics-payload/diagnostics-copy-payload state health "0.1.0")]
     (is (= {:market_data 0 :orders_oms 3 :all 0}
            (get-in payload [:counters :reset-counts])))
@@ -37,7 +42,13 @@
     (is (= 1 (get-in payload [:counters :auto-recover-count])))
     (is (= [{:event :connected :at-ms 1}]
            (:timeline payload)))
-    (is (= "0.1.0" (get-in payload [:app :version])))))
+    (is (= "0.1.0" (get-in payload [:app :version])))
+    (is (= {:stores [{:store-id "app-store"
+                      :flush-count 2}]
+            :flush-events [{:seq 10
+                            :store-id "app-store"
+                            :flush-duration-ms 5}]}
+           (:market-projection payload)))))
 
 (deftest copy-status-helpers-return-expected-shapes-test
   (let [health {:generated-at-ms 1700000000000}
