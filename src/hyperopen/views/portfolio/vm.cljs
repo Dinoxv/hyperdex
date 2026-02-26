@@ -2,6 +2,7 @@
   (:require [clojure.string :as str]
             [hyperopen.domain.trading :as trading]
             [hyperopen.portfolio.actions :as portfolio-actions]
+            [hyperopen.portfolio.metrics :as portfolio-metrics]
             [hyperopen.views.account-equity-view :as account-equity-view]
             [hyperopen.views.account-info.projections :as projections]))
 
@@ -595,7 +596,7 @@
 (defn- chart-history-rows [state summary chart-tab summary-scope]
   (let [source (case chart-tab
                  :pnl (pnl-history-rows summary)
-                 :returns (returns-history-rows state summary summary-scope)
+                 :returns (portfolio-metrics/returns-history-rows state summary summary-scope)
                  :account-value (account-value-history-rows summary)
                  (account-value-history-rows summary))]
     (if (sequential? source)

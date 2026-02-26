@@ -1,6 +1,7 @@
 (ns hyperopen.views.portfolio.vm-test
   (:require [cljs.test :refer-macros [deftest is testing]]
             [hyperopen.views.account-equity-view :as account-equity-view]
+            [hyperopen.portfolio.metrics :as portfolio-metrics]
             [hyperopen.views.portfolio.vm :as vm]))
 
 (def ^:private day-ms
@@ -175,6 +176,29 @@
             clamped-hover (get-in clamped-view-model [:chart :hover])]
         (is (= 2 (:index clamped-hover)))
         (is (= 30 (get-in clamped-hover [:point :time-ms])))))))
+
+(deftest portfolio-vm-returns-tab-uses-shared-portfolio-metrics-returns-source-test
+  (with-redefs [account-equity-view/account-equity-metrics (fn [_]
+                                                              {:spot-equity 10
+                                                               :perps-value 10
+                                                               :cross-account-value 10
+                                                               :unrealized-pnl 0})
+                portfolio-metrics/returns-history-rows (fn [_state _summary _summary-scope]
+                                                         [[1 0]
+                                                          [2 50]])]
+    (let [state {:account {:mode :classic}
+                 :portfolio-ui {:summary-scope :all
+                                :summary-time-range :month
+                                :chart-tab :returns}
+                 :portfolio {:summary-by-key {:month {:pnlHistory [[1 0] [2 0]]
+                                                      :accountValueHistory [[1 100] [2 100]]
+                                                      :vlm 10}}}
+                 :webdata2 {:clearinghouseState {:marginSummary {:accountValue 10}}
+                           :totalVaultEquity 0}
+                 :borrow-lend {:total-supplied-usd 0}}
+          view-model (vm/portfolio-vm state)]
+      (is (= [0 50]
+             (mapv :value (get-in view-model [:chart :points])))))))
 
 (deftest portfolio-vm-returns-tab-uses-flow-adjusted-time-weighted-returns-to-avoid-cashflow-spikes-test
   (with-redefs [account-equity-view/account-equity-metrics (fn [_]
