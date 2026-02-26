@@ -1,6 +1,8 @@
 (ns hyperopen.views.portfolio-view-test
   (:require [clojure.string :as str]
             [cljs.test :refer-macros [deftest is]]
+            [hyperopen.views.account-info-view :as account-info-view]
+            [hyperopen.views.portfolio.vm :as portfolio-vm]
             [hyperopen.views.portfolio-view :as portfolio-view]))
 
 (defn- node-children [node]
@@ -100,6 +102,7 @@
         volume-card (find-first-node view-node #(= "portfolio-14d-volume-card" (get-in % [1 :data-role])))
         fees-card (find-first-node view-node #(= "portfolio-fees-card" (get-in % [1 :data-role])))
         summary-card (find-first-node view-node #(= "portfolio-account-summary-card" (get-in % [1 :data-role])))
+        performance-metrics-card (find-first-node view-node #(= "portfolio-performance-metrics-card" (get-in % [1 :data-role])))
         scope-selector (find-first-node view-node #(= "portfolio-summary-scope-selector" (get-in % [1 :data-role])))
         time-range-selector (find-first-node view-node #(= "portfolio-summary-time-range-selector" (get-in % [1 :data-role])))
         chart-account-value-tab (find-first-node view-node #(= "portfolio-chart-tab-account-value" (get-in % [1 :data-role])))
@@ -114,6 +117,7 @@
     (is (some? volume-card))
     (is (some? fees-card))
     (is (some? summary-card))
+    (is (some? performance-metrics-card))
     (is (some? scope-selector))
     (is (some? time-range-selector))
     (is (some? chart-account-value-tab))
@@ -130,6 +134,9 @@
     (is (contains? all-text "Account Value"))
     (is (contains? all-text "PNL"))
     (is (contains? all-text "Returns"))
+    (is (contains? all-text "Performance Metrics"))
+    (is (contains? all-text "Time in Market"))
+    (is (contains? all-text "All-time (ann.)"))
     (is (contains? all-text "Max Drawdown"))
     (is (contains? all-text "Vault Equity"))
     (is (contains? all-text "Staking Account"))
@@ -238,6 +245,105 @@
     (is (some? chip-node))
     (is (contains? chip-text "BTC"))
     (is (not (contains? chip-text "BTC-USDC (PERP)")))))
+
+(deftest portfolio-view-performance-metrics-renders-formatting-and-fallbacks-test
+  (with-redefs [portfolio-vm/portfolio-vm (fn [_]
+                                             {:volume-14d-usd 0
+                                              :fees {:taker 0 :maker 0}
+                                              :chart {:selected-tab :pnl
+                                                      :axis-kind :number
+                                                      :tabs [{:value :account-value :label "Account Value"}
+                                                             {:value :pnl :label "PNL"}
+                                                             {:value :returns :label "Returns"}]
+                                                      :points [{:time-ms 1 :value 0 :x-ratio 0 :y-ratio 1}
+                                                               {:time-ms 2 :value 10 :x-ratio 1 :y-ratio 0}]
+                                                      :path "M 0 100 L 100 0"
+                                                      :series [{:id :strategy
+                                                                :label "Portfolio"
+                                                                :stroke "#f5f7f8"
+                                                                :has-data? true
+                                                                :points [{:time-ms 1 :value 0 :x-ratio 0 :y-ratio 1}
+                                                                         {:time-ms 2 :value 10 :x-ratio 1 :y-ratio 0}]
+                                                                :path "M 0 100 L 100 0"}]
+                                                      :y-ticks [{:value 10 :y-ratio 0}
+                                                                {:value 6 :y-ratio (/ 1 3)}
+                                                                {:value 3 :y-ratio (/ 2 3)}
+                                                                {:value 0 :y-ratio 1}]
+                                                      :has-data? true}
+                                              :selectors {:summary-scope {:value :all
+                                                                          :label "Perps + Spot + Vaults"
+                                                                          :open? false
+                                                                          :options [{:value :all :label "Perps + Spot + Vaults"}]}
+                                                          :summary-time-range {:value :month
+                                                                               :label "30D"
+                                                                               :open? false
+                                                                               :options [{:value :month :label "30D"}]}
+                                                          :returns-benchmark {:selected-coins []
+                                                                              :selected-options []
+                                                                              :coin-search ""
+                                                                              :suggestions-open? false
+                                                                              :candidates []
+                                                                              :top-coin nil
+                                                                              :empty-message nil
+                                                                              :label-by-coin {}}}
+                                              :summary {:selected-key :month
+                                                        :pnl 0
+                                                        :volume 0
+                                                        :max-drawdown-pct nil
+                                                        :total-equity 0
+                                                        :show-perps-account-equity? false
+                                                        :perps-account-equity 0
+                                                        :spot-equity-label "Spot Account Equity"
+                                                        :spot-account-equity 0
+                                                        :show-vault-equity? false
+                                                        :vault-equity 0
+                                                        :show-earn-balance? false
+                                                        :earn-balance 0
+                                                        :show-staking-account? false
+                                                        :staking-account-hype 0}
+                                              :performance-metrics {:benchmark-selected? true
+                                                                    :benchmark-coin "SPY"
+                                                                    :benchmark-label "SPY (SPOT)"
+                                                                    :values {}
+                                                                    :groups [{:id :sample
+                                                                              :rows [{:key :expected-monthly
+                                                                                      :label "Expected Monthly"
+                                                                                      :kind :percent
+                                                                                      :value 0.123}
+                                                                                     {:key :daily-var
+                                                                                      :label "Daily Value-at-Risk"
+                                                                                      :kind :percent
+                                                                                      :value -0.045}
+                                                                                     {:key :information-ratio
+                                                                                      :label "Information Ratio"
+                                                                                      :kind :ratio
+                                                                                      :value 1.2345}
+                                                                                     {:key :max-dd-date
+                                                                                      :label "Max DD Date"
+                                                                                      :kind :date
+                                                                                      :value "2024-01-02"}
+                                                                                     {:key :max-consecutive-wins
+                                                                                      :label "Max Consecutive Wins"
+                                                                                      :kind :integer
+                                                                                      :value 7}
+                                                                                     {:key :r2
+                                                                                      :label "R^2"
+                                                                                      :kind :ratio
+                                                                                      :value nil}]}]}})
+                account-info-view/account-info-view (fn [_]
+                                                      [:div {:data-role "stub-account-info"}])]
+    (let [view-node (portfolio-view/portfolio-view {})
+          all-text (set (collect-strings view-node))
+          benchmark-label (find-first-node view-node #(= "portfolio-performance-metrics-benchmark-label" (get-in % [1 :data-role])))
+          nil-row (find-first-node view-node #(= "portfolio-performance-metric-r2" (get-in % [1 :data-role])))]
+      (is (contains? all-text "Performance Metrics"))
+      (is (= "Benchmark: SPY (SPOT)" (first (collect-strings benchmark-label))))
+      (is (contains? all-text "+12.30%"))
+      (is (contains? all-text "-4.50%"))
+      (is (contains? all-text "1.23"))
+      (is (contains? all-text "2024-01-02"))
+      (is (contains? all-text "7"))
+      (is (contains? (set (collect-strings nil-row)) "--")))))
 
 (deftest portfolio-view-chart-plot-area-wires-hover-actions-test
   (let [view-node (portfolio-view/portfolio-view sample-state)
