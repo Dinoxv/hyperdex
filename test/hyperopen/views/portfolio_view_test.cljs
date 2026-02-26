@@ -20,6 +20,19 @@
 
     :else nil))
 
+(defn- count-nodes [node pred]
+  (cond
+    (vector? node)
+    (let [children (node-children node)
+          self-count (if (pred node) 1 0)]
+      (+ self-count
+         (reduce + 0 (map #(count-nodes % pred) children))))
+
+    (seq? node)
+    (reduce + 0 (map #(count-nodes % pred) node))
+
+    :else 0))
+
 (defn- collect-strings [node]
   (cond
     (string? node) [node]
@@ -186,6 +199,7 @@
         chip-rail-node (find-first-node view-node #(= "portfolio-returns-benchmark-chip-rail" (get-in % [1 :data-role])))
         chip-node (find-first-node view-node #(= "portfolio-returns-benchmark-chip-SPY" (get-in % [1 :data-role])))
         legend-node (find-first-node view-node #(= "portfolio-chart-legend" (get-in % [1 :data-role])))
+        legend-count (count-nodes view-node #(= "portfolio-chart-legend" (get-in % [1 :data-role])))
         benchmark-path-node (find-first-node view-node #(= "portfolio-chart-path-benchmark-0" (get-in % [1 :data-role])))
         all-text (set (collect-strings view-node))
         chip-border-color (get-in chip-node [1 :style :border-color])]
@@ -193,6 +207,7 @@
     (is (some? chip-rail-node))
     (is (some? chip-node))
     (is (some? legend-node))
+    (is (= 1 legend-count))
     (is (some? benchmark-path-node))
     (is (= "rgba(242, 207, 102, 0.58)" chip-border-color))
     (is (contains? all-text "Benchmarks"))

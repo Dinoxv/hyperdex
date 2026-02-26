@@ -391,11 +391,8 @@
                             (filter :has-data?)
                             vec)]
     (when (> (count visible-series) 1)
-      [:div {:class ["absolute"
-                     "top-2.5"
-                     "left-2.5"
-                     "z-10"
-                     "flex"
+      [:div {:class ["flex"
+                     "flex-wrap"
                      "items-center"
                      "gap-3"
                      "rounded-md"
@@ -499,7 +496,6 @@
                          "border-t"
                          "border-base-300"]
                  :style {:top (str (* 100 y-ratio) "%")}}])]
-       (chart-legend series)
        [:div {:class ["absolute" "right-2" "top-0" "bottom-0"]
               :style {:left (str plot-left "px")}}
         [:svg {:viewBox "0 0 100 100"
@@ -512,9 +508,10 @@
                  :stroke "#28414a"
                  :stroke-width 0.8
                  :vector-effect "non-scaling-stroke"}]
-         (for [{series-id :id :as series-entry} (or series [])]
-           ^{:key (str "portfolio-chart-path-" (name series-id))}
-           (chart-series-path series-entry))]]]
+        (for [{series-id :id :as series-entry} (or series [])]
+          ^{:key (str "portfolio-chart-path-" (name series-id))}
+          (chart-series-path series-entry))]]]
+      (chart-legend series)
       (when (= selected-tab :returns)
         (returns-benchmark-chip-rail returns-benchmark*))])))
 
