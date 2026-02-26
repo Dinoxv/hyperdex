@@ -37,7 +37,12 @@
             :api-cancel-order (effect-adapters/make-api-cancel-order runtime)
             :api-submit-position-tpsl (effect-adapters/make-api-submit-position-tpsl runtime)}
    :api {:fetch-asset-selector-markets effect-adapters/fetch-asset-selector-markets-effect
-         :api-load-user-data effect-adapters/api-load-user-data-effect}})
+         :api-load-user-data effect-adapters/api-load-user-data-effect
+         :api-fetch-vault-index effect-adapters/api-fetch-vault-index-effect
+         :api-fetch-vault-summaries effect-adapters/api-fetch-vault-summaries-effect
+         :api-fetch-user-vault-equities effect-adapters/api-fetch-user-vault-equities-effect
+         :api-fetch-vault-details effect-adapters/api-fetch-vault-details-effect
+         :api-fetch-vault-webdata2 effect-adapters/api-fetch-vault-webdata2-effect}})
 
 (defn runtime-effect-deps
   ([] (runtime-effect-deps runtime-state/runtime))

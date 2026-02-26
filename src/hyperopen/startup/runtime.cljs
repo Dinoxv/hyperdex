@@ -297,6 +297,7 @@
   [{:keys [store
            bootstrap-account-data!
            init-with-webdata2!
+           dispatch!
            add-handler!
            sync-current-address!
            create-user-handler
@@ -338,7 +339,11 @@
           (swap! store assoc-in [:portfolio :user-fees-loaded-at-ms] nil)
           (swap! store assoc-in [:portfolio :ledger-loaded-at-ms] nil)
           (swap! store assoc :account {:mode :classic
-                                       :abstraction-raw nil}))))
+                                       :abstraction-raw nil})))
+      (when (fn? dispatch!)
+        (dispatch! store nil [[:actions/load-vault-route
+                               (or (get-in @store [:router :path])
+                                   "/trade")]])))
     address-handler-name))
   ;; Ensure already-connected wallets are handled after handlers are in place.
   (sync-current-address! store))
@@ -394,6 +399,9 @@
   ;; Ensure active-asset market streams are requested on startup.
   (when-let [asset (:active-asset @store)]
     (dispatch! store nil [[:actions/subscribe-to-asset asset]]))
+  (dispatch! store nil [[:actions/load-vault-route
+                         (or (get-in @store [:router :path])
+                             "/trade")]])
   (install-address-handlers!)
   (start-critical-bootstrap!)
   (schedule-deferred-bootstrap!))

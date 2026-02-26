@@ -122,6 +122,8 @@
 (s/def ::coin-args (s/tuple ::non-empty-string))
 (s/def ::address-args (s/tuple ::non-empty-string))
 (s/def ::optional-address-args (s/tuple (s/nilable ::non-empty-string)))
+(s/def ::address-and-optional-address-args
+  (s/tuple ::non-empty-string (s/nilable ::non-empty-string)))
 (s/def ::set-agent-storage-mode-args (s/tuple keyword?))
 (s/def ::enable-agent-trading-args (s/tuple map?))
 (s/def ::api-submit-request (s/keys :req-un [::action]))
@@ -382,6 +384,14 @@
    :actions/cancel-order ::cancel-order-args
    :actions/load-user-data ::address-args
    :actions/set-funding-modal ::funding-modal-args
+   :actions/load-vault-route ::path-args
+   :actions/load-vaults ::no-args
+   :actions/load-vault-detail ::address-args
+   :actions/set-vaults-search-query ::single-input-args
+   :actions/toggle-vaults-filter ::keyword-args
+   :actions/set-vaults-snapshot-range ::keyword-or-string-args
+   :actions/set-vaults-sort ::keyword-or-string-args
+   :actions/set-vault-detail-tab ::keyword-or-string-args
    :actions/navigate (s/or :path (s/tuple ::non-empty-string)
                            :path-and-opts (s/tuple ::non-empty-string map?))})
 
@@ -420,7 +430,12 @@
    :effects/api-submit-order ::api-submit-order-args
    :effects/api-cancel-order ::api-cancel-order-args
    :effects/api-submit-position-tpsl ::api-submit-position-tpsl-args
-   :effects/api-load-user-data ::address-args})
+   :effects/api-load-user-data ::address-args
+   :effects/api-fetch-vault-index ::no-args
+   :effects/api-fetch-vault-summaries ::no-args
+   :effects/api-fetch-user-vault-equities ::optional-address-args
+   :effects/api-fetch-vault-details ::address-and-optional-address-args
+   :effects/api-fetch-vault-webdata2 ::address-args})
 
 (defn contracted-action-ids
   []

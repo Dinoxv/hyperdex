@@ -27,17 +27,34 @@ A user can verify this by opening `/vaults`, filtering/searching, opening a vaul
   - Added/updated tests:
     - `/hyperopen/test/hyperopen/state/app_defaults_test.cljs`
     - `/hyperopen/test/hyperopen/api/projections_test.cljs`
-- [ ] Implement vault fetch orchestration and action wiring.
-- [ ] Implement `/vaults` list page (desktop + mobile parity structure).
-- [ ] Implement `/vaults/:vaultAddress` detail page (overview/performance blocks and account context).
-- [ ] Add route/nav integration and state/action wiring.
+- [x] (2026-02-26 18:00Z) Implemented vault fetch orchestration and runtime action/effect wiring:
+  - Added `/hyperopen/src/hyperopen/vaults/actions.cljs` and `/hyperopen/src/hyperopen/vaults/effects.cljs`.
+  - Wired registry/runtime adapters and collaborator dependencies for `:actions/*vault*` and `:effects/api-fetch-vault-*` IDs.
+  - Added effect-order policies to preserve projection-first ordering on vault route transitions.
+- [x] (2026-02-26 18:00Z) Implemented `/vaults` list page (desktop + mobile parity structure):
+  - Added `/hyperopen/src/hyperopen/views/vaults_view.cljs` and `/hyperopen/src/hyperopen/views/vaults/vm.cljs`.
+  - Implemented search, role/closed filters, snapshot range toggle, sorting, TVL summary, grouped list sections, and row navigation.
+- [x] (2026-02-26 18:00Z) Implemented `/vaults/:vaultAddress` detail page (overview/performance blocks and account context):
+  - Added `/hyperopen/src/hyperopen/views/vault_detail_view.cljs` and `/hyperopen/src/hyperopen/views/vaults/detail_vm.cljs`.
+  - Implemented tabs (`About`, `Vault Performance`, `Your Performance`), metric cards, relationship links, portfolio chart, and activity table.
+- [x] (2026-02-26 18:00Z) Added route/nav integration and state/action wiring:
+  - Updated `/hyperopen/src/hyperopen/views/app_view.cljs` route rendering for `/vaults` and `/vaults/:vaultAddress`.
+  - Updated `/hyperopen/src/hyperopen/views/header_view.cljs` active-state handling for vault routes.
+  - Updated startup/runtime path to dispatch vault route loads deterministically.
 - [x] (2026-02-26 17:14Z) Added/updated API tests:
   - New: `/hyperopen/test/hyperopen/api/endpoints/vaults_test.cljs`
   - New: `/hyperopen/test/hyperopen/api/gateway/vaults_test.cljs`
   - Updated: `/hyperopen/test/hyperopen/api/instance_test.cljs`
   - Updated: `/hyperopen/test/hyperopen/api/default_test.cljs`
-- [ ] Add tests for VM derivation, route rendering, and view interactions.
-- [x] (2026-02-26 17:22Z) Ran required validation gates successfully:
+- [x] (2026-02-26 18:00Z) Added tests for VM derivation, route rendering, and view interactions:
+  - New: `/hyperopen/test/hyperopen/vaults/actions_test.cljs`
+  - New: `/hyperopen/test/hyperopen/vaults/effects_test.cljs`
+  - New: `/hyperopen/test/hyperopen/views/vaults/vm_test.cljs`
+  - New: `/hyperopen/test/hyperopen/views/vaults/detail_vm_test.cljs`
+  - New: `/hyperopen/test/hyperopen/views/vaults_view_test.cljs`
+  - New: `/hyperopen/test/hyperopen/views/vault_detail_view_test.cljs`
+  - Updated route/nav/runtime projection suites for vault path coverage.
+- [x] (2026-02-26 18:00Z) Ran required validation gates successfully:
   - `npm run check`
   - `npm test`
   - `npm run test:websocket`
@@ -75,7 +92,7 @@ A user can verify this by opening `/vaults`, filtering/searching, opening a vaul
 
 ## Outcomes & Retrospective
 
-Milestone 1 is complete, and Milestone 2 is partially complete. Vault data ingress/normalization plus vault state defaults/projections are implemented and covered by tests. Current verification command is passing: `npm run test:runner:generate && npx shadow-cljs compile test && node out/test.js`.
+Milestones 1 through 5 and 7 are complete. Vault list/detail ingestion, orchestration, route wiring, and UI parity structure are implemented and covered by dedicated VM/view/action/effect tests. Optional Milestone 6 (transactional vault actions) remains intentionally deferred; CTA affordances are present in disabled `Coming soon` state. Validation gates currently pass: `npm run check`, `npm test`, and `npm run test:websocket`.
 
 ## Context and Orientation
 

@@ -166,3 +166,19 @@
         trade-classes (set (class-values (get-in trade-link [1 :class])))]
     (is (contains? portfolio-classes "header-nav-link-active"))
     (is (not (contains? trade-classes "header-nav-link-active")))))
+
+(deftest header-highlights-vaults-link-when-vault-route-is-active-test
+  (let [view (header-view/header-view {:wallet {}
+                                       :router {:path "/vaults/0x1234567890abcdef1234567890abcdef12345678"}})
+        vaults-link (find-node (fn [candidate]
+                                 (and (= :a (first candidate))
+                                      (some #{"Vaults"} (collect-strings candidate))))
+                               view)
+        portfolio-link (find-node (fn [candidate]
+                                    (and (= :a (first candidate))
+                                         (some #{"Portfolio"} (collect-strings candidate))))
+                                  view)
+        vaults-classes (set (class-values (get-in vaults-link [1 :class])))
+        portfolio-classes (set (class-values (get-in portfolio-link [1 :class])))]
+    (is (contains? vaults-classes "header-nav-link-active"))
+    (is (not (contains? portfolio-classes "header-nav-link-active")))))

@@ -504,9 +504,11 @@
       (startup-runtime/initialize-remote-data-streams! deps)
       (is (some #(= [:init-connection "wss://example.test/ws"] %) @mark-calls))
       (is (some #(= [:dispatch [[:actions/subscribe-to-asset "BTC"]]] %) @mark-calls))
+      (is (some #(= [:dispatch [[:actions/load-vault-route "/trade"]]] %) @mark-calls))
       (swap! (:store deps) assoc :active-asset nil)
       (startup-runtime/initialize-remote-data-streams! deps)
       (is (= 1 (count (filter #(= [:dispatch [[:actions/subscribe-to-asset "BTC"]]] %) @mark-calls))))
+      (is (= 2 (count (filter #(= [:dispatch [[:actions/load-vault-route "/trade"]]] %) @mark-calls))))
       (with-redefs [platform/set-timeout! (fn [_f _delay-ms]
                                             :timer-id)]
         (startup-runtime/start-critical-bootstrap!

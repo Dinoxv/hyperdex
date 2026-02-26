@@ -17,6 +17,7 @@
             [hyperopen.runtime.state :as runtime-state]
             [hyperopen.telemetry :as telemetry]
             [hyperopen.startup.restore :as startup-restore]
+            [hyperopen.vaults.effects :as vault-effects]
             [hyperopen.wallet.agent-runtime :as agent-runtime]
             [hyperopen.wallet.agent-session :as agent-session]
             [hyperopen.wallet.connection-runtime :as wallet-connection-runtime]
@@ -569,3 +570,52 @@
     :apply-user-fills-success api-projections/apply-user-fills-success
     :apply-user-fills-error api-projections/apply-user-fills-error
     :fetch-and-merge-funding-history! account-history-effects/fetch-and-merge-funding-history!}))
+
+(defn api-fetch-vault-index-effect
+  [_ store]
+  (vault-effects/api-fetch-vault-index!
+   {:store store
+    :request-vault-index! api/request-vault-index!
+    :begin-vault-index-load api-projections/begin-vault-index-load
+    :apply-vault-index-success api-projections/apply-vault-index-success
+    :apply-vault-index-error api-projections/apply-vault-index-error}))
+
+(defn api-fetch-vault-summaries-effect
+  [_ store]
+  (vault-effects/api-fetch-vault-summaries!
+   {:store store
+    :request-vault-summaries! api/request-vault-summaries!
+    :begin-vault-summaries-load api-projections/begin-vault-summaries-load
+    :apply-vault-summaries-success api-projections/apply-vault-summaries-success
+    :apply-vault-summaries-error api-projections/apply-vault-summaries-error}))
+
+(defn api-fetch-user-vault-equities-effect
+  [_ store address]
+  (vault-effects/api-fetch-user-vault-equities!
+   {:store store
+    :address address
+    :request-user-vault-equities! api/request-user-vault-equities!
+    :begin-user-vault-equities-load api-projections/begin-user-vault-equities-load
+    :apply-user-vault-equities-success api-projections/apply-user-vault-equities-success
+    :apply-user-vault-equities-error api-projections/apply-user-vault-equities-error}))
+
+(defn api-fetch-vault-details-effect
+  [_ store vault-address user-address]
+  (vault-effects/api-fetch-vault-details!
+   {:store store
+    :vault-address vault-address
+    :user-address user-address
+    :request-vault-details! api/request-vault-details!
+    :begin-vault-details-load api-projections/begin-vault-details-load
+    :apply-vault-details-success api-projections/apply-vault-details-success
+    :apply-vault-details-error api-projections/apply-vault-details-error}))
+
+(defn api-fetch-vault-webdata2-effect
+  [_ store vault-address]
+  (vault-effects/api-fetch-vault-webdata2!
+   {:store store
+    :vault-address vault-address
+    :request-vault-webdata2! api/request-vault-webdata2!
+    :begin-vault-webdata2-load api-projections/begin-vault-webdata2-load
+    :apply-vault-webdata2-success api-projections/apply-vault-webdata2-success
+    :apply-vault-webdata2-error api-projections/apply-vault-webdata2-error}))

@@ -227,53 +227,69 @@
                                                               (or summary-rows [])))]
     (mapv by-address order)))
 
+(defn- vault-list-loading?
+  [state]
+  (or (true? (get-in state [:vaults :loading :index?]))
+      (true? (get-in state [:vaults :loading :summaries?]))))
+
+(defn- vault-detail-loading?
+  [state vault-address]
+  (or (true? (get-in state [:vaults :loading :details-by-address vault-address]))
+      (true? (get-in state [:vaults :loading :webdata-by-vault vault-address]))))
+
 (defn begin-vault-index-load
   [state]
-  (-> state
-      (assoc-in [:vaults :loading :index?] true)
-      (assoc-in [:vaults :errors :index] nil)))
+  (let [state* (-> state
+                   (assoc-in [:vaults :loading :index?] true)
+                   (assoc-in [:vaults :errors :index] nil))]
+    (assoc-in state* [:vaults-ui :list-loading?] (vault-list-loading? state*))))
 
 (defn apply-vault-index-success
   [state rows]
   (let [rows* (if (sequential? rows) (vec rows) [])
-        summaries (get-in state [:vaults :recent-summaries] [])]
-    (-> state
-        (assoc-in [:vaults :index-rows] rows*)
-        (assoc-in [:vaults :merged-index-rows] (merge-vault-rows rows* summaries))
-        (assoc-in [:vaults :loading :index?] false)
-        (assoc-in [:vaults :errors :index] nil)
-        (assoc-in [:vaults :loaded-at-ms :index] (.now js/Date)))))
+        summaries (get-in state [:vaults :recent-summaries] [])
+        state* (-> state
+                   (assoc-in [:vaults :index-rows] rows*)
+                   (assoc-in [:vaults :merged-index-rows] (merge-vault-rows rows* summaries))
+                   (assoc-in [:vaults :loading :index?] false)
+                   (assoc-in [:vaults :errors :index] nil)
+                   (assoc-in [:vaults :loaded-at-ms :index] (.now js/Date)))]
+    (assoc-in state* [:vaults-ui :list-loading?] (vault-list-loading? state*))))
 
 (defn apply-vault-index-error
   [state err]
   (let [{:keys [message]} (normalized-error err)]
-    (-> state
-        (assoc-in [:vaults :loading :index?] false)
-        (assoc-in [:vaults :errors :index] message))))
+    (let [state* (-> state
+                     (assoc-in [:vaults :loading :index?] false)
+                     (assoc-in [:vaults :errors :index] message))]
+      (assoc-in state* [:vaults-ui :list-loading?] (vault-list-loading? state*)))))
 
 (defn begin-vault-summaries-load
   [state]
-  (-> state
-      (assoc-in [:vaults :loading :summaries?] true)
-      (assoc-in [:vaults :errors :summaries] nil)))
+  (let [state* (-> state
+                   (assoc-in [:vaults :loading :summaries?] true)
+                   (assoc-in [:vaults :errors :summaries] nil))]
+    (assoc-in state* [:vaults-ui :list-loading?] (vault-list-loading? state*))))
 
 (defn apply-vault-summaries-success
   [state rows]
   (let [rows* (if (sequential? rows) (vec rows) [])
-        index-rows (get-in state [:vaults :index-rows] [])]
-    (-> state
-        (assoc-in [:vaults :recent-summaries] rows*)
-        (assoc-in [:vaults :merged-index-rows] (merge-vault-rows index-rows rows*))
-        (assoc-in [:vaults :loading :summaries?] false)
-        (assoc-in [:vaults :errors :summaries] nil)
-        (assoc-in [:vaults :loaded-at-ms :summaries] (.now js/Date)))))
+        index-rows (get-in state [:vaults :index-rows] [])
+        state* (-> state
+                   (assoc-in [:vaults :recent-summaries] rows*)
+                   (assoc-in [:vaults :merged-index-rows] (merge-vault-rows index-rows rows*))
+                   (assoc-in [:vaults :loading :summaries?] false)
+                   (assoc-in [:vaults :errors :summaries] nil)
+                   (assoc-in [:vaults :loaded-at-ms :summaries] (.now js/Date)))]
+    (assoc-in state* [:vaults-ui :list-loading?] (vault-list-loading? state*))))
 
 (defn apply-vault-summaries-error
   [state err]
   (let [{:keys [message]} (normalized-error err)]
-    (-> state
-        (assoc-in [:vaults :loading :summaries?] false)
-        (assoc-in [:vaults :errors :summaries] message))))
+    (let [state* (-> state
+                     (assoc-in [:vaults :loading :summaries?] false)
+                     (assoc-in [:vaults :errors :summaries] message))]
+      (assoc-in state* [:vaults-ui :list-loading?] (vault-list-loading? state*)))))
 
 (defn begin-user-vault-equities-load
   [state]
@@ -307,53 +323,59 @@
 (defn begin-vault-details-load
   [state vault-address]
   (if-let [vault-address* (normalize-vault-address vault-address)]
-    (-> state
-        (assoc-in [:vaults :loading :details-by-address vault-address*] true)
-        (assoc-in [:vaults :errors :details-by-address vault-address*] nil))
+    (let [state* (-> state
+                     (assoc-in [:vaults :loading :details-by-address vault-address*] true)
+                     (assoc-in [:vaults :errors :details-by-address vault-address*] nil))]
+      (assoc-in state* [:vaults-ui :detail-loading?] (vault-detail-loading? state* vault-address*)))
     state))
 
 (defn apply-vault-details-success
   [state vault-address payload]
   (if-let [vault-address* (normalize-vault-address vault-address)]
-    (-> state
-        (assoc-in [:vaults :details-by-address vault-address*] payload)
-        (assoc-in [:vaults :loading :details-by-address vault-address*] false)
-        (assoc-in [:vaults :errors :details-by-address vault-address*] nil)
-        (assoc-in [:vaults :loaded-at-ms :details-by-address vault-address*] (.now js/Date)))
+    (let [state* (-> state
+                     (assoc-in [:vaults :details-by-address vault-address*] payload)
+                     (assoc-in [:vaults :loading :details-by-address vault-address*] false)
+                     (assoc-in [:vaults :errors :details-by-address vault-address*] nil)
+                     (assoc-in [:vaults :loaded-at-ms :details-by-address vault-address*] (.now js/Date)))]
+      (assoc-in state* [:vaults-ui :detail-loading?] (vault-detail-loading? state* vault-address*)))
     state))
 
 (defn apply-vault-details-error
   [state vault-address err]
   (if-let [vault-address* (normalize-vault-address vault-address)]
     (let [{:keys [message]} (normalized-error err)]
-      (-> state
-          (assoc-in [:vaults :loading :details-by-address vault-address*] false)
-          (assoc-in [:vaults :errors :details-by-address vault-address*] message)))
+      (let [state* (-> state
+                       (assoc-in [:vaults :loading :details-by-address vault-address*] false)
+                       (assoc-in [:vaults :errors :details-by-address vault-address*] message))]
+        (assoc-in state* [:vaults-ui :detail-loading?] (vault-detail-loading? state* vault-address*))))
     state))
 
 (defn begin-vault-webdata2-load
   [state vault-address]
   (if-let [vault-address* (normalize-vault-address vault-address)]
-    (-> state
-        (assoc-in [:vaults :loading :webdata-by-vault vault-address*] true)
-        (assoc-in [:vaults :errors :webdata-by-vault vault-address*] nil))
+    (let [state* (-> state
+                     (assoc-in [:vaults :loading :webdata-by-vault vault-address*] true)
+                     (assoc-in [:vaults :errors :webdata-by-vault vault-address*] nil))]
+      (assoc-in state* [:vaults-ui :detail-loading?] (vault-detail-loading? state* vault-address*)))
     state))
 
 (defn apply-vault-webdata2-success
   [state vault-address payload]
   (if-let [vault-address* (normalize-vault-address vault-address)]
-    (-> state
-        (assoc-in [:vaults :webdata-by-vault vault-address*] payload)
-        (assoc-in [:vaults :loading :webdata-by-vault vault-address*] false)
-        (assoc-in [:vaults :errors :webdata-by-vault vault-address*] nil)
-        (assoc-in [:vaults :loaded-at-ms :webdata-by-vault vault-address*] (.now js/Date)))
+    (let [state* (-> state
+                     (assoc-in [:vaults :webdata-by-vault vault-address*] payload)
+                     (assoc-in [:vaults :loading :webdata-by-vault vault-address*] false)
+                     (assoc-in [:vaults :errors :webdata-by-vault vault-address*] nil)
+                     (assoc-in [:vaults :loaded-at-ms :webdata-by-vault vault-address*] (.now js/Date)))]
+      (assoc-in state* [:vaults-ui :detail-loading?] (vault-detail-loading? state* vault-address*)))
     state))
 
 (defn apply-vault-webdata2-error
   [state vault-address err]
   (if-let [vault-address* (normalize-vault-address vault-address)]
     (let [{:keys [message]} (normalized-error err)]
-      (-> state
-          (assoc-in [:vaults :loading :webdata-by-vault vault-address*] false)
-          (assoc-in [:vaults :errors :webdata-by-vault vault-address*] message)))
+      (let [state* (-> state
+                       (assoc-in [:vaults :loading :webdata-by-vault vault-address*] false)
+                       (assoc-in [:vaults :errors :webdata-by-vault vault-address*] message))]
+        (assoc-in state* [:vaults-ui :detail-loading?] (vault-detail-loading? state* vault-address*))))
     state))

@@ -79,7 +79,42 @@
    {:required-phase-order [:projection :persistence :heavy-io]
     :require-projection-before-heavy? true
     :allow-duplicate-heavy-effects? false
-    :heavy-effect-ids #{:effects/subscribe-orderbook}}})
+    :heavy-effect-ids #{:effects/subscribe-orderbook}}
+
+   :actions/load-vaults
+   {:required-phase-order [:projection :persistence :heavy-io]
+    :require-projection-before-heavy? true
+    :allow-duplicate-heavy-effects? false
+    :heavy-effect-ids #{:effects/api-fetch-vault-index
+                        :effects/api-fetch-vault-summaries
+                        :effects/api-fetch-user-vault-equities}}
+
+   :actions/load-vault-detail
+   {:required-phase-order [:projection :persistence :heavy-io]
+    :require-projection-before-heavy? true
+    :allow-duplicate-heavy-effects? false
+    :heavy-effect-ids #{:effects/api-fetch-vault-details
+                        :effects/api-fetch-vault-webdata2}}
+
+   :actions/load-vault-route
+   {:required-phase-order [:projection :persistence :heavy-io]
+    :require-projection-before-heavy? true
+    :allow-duplicate-heavy-effects? false
+    :heavy-effect-ids #{:effects/api-fetch-vault-index
+                        :effects/api-fetch-vault-summaries
+                        :effects/api-fetch-user-vault-equities
+                        :effects/api-fetch-vault-details
+                        :effects/api-fetch-vault-webdata2}}
+
+   :actions/navigate
+   {:required-phase-order [:projection :persistence :heavy-io]
+    :require-projection-before-heavy? true
+    :allow-duplicate-heavy-effects? false
+    :heavy-effect-ids #{:effects/api-fetch-vault-index
+                        :effects/api-fetch-vault-summaries
+                        :effects/api-fetch-user-vault-equities
+                        :effects/api-fetch-vault-details
+                        :effects/api-fetch-vault-webdata2}}})
 
 (defn action-policy
   [action-id]

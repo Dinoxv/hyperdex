@@ -73,12 +73,22 @@
            api-fetch-user-funding-history
            api-fetch-historical-orders
            export-funding-history-csv
-           api-load-user-data]}]
+           api-load-user-data
+           api-fetch-vault-index
+           api-fetch-vault-summaries
+           api-fetch-user-vault-equities
+           api-fetch-vault-details
+           api-fetch-vault-webdata2]}]
   {:fetch-asset-selector-markets fetch-asset-selector-markets
    :api-fetch-user-funding-history api-fetch-user-funding-history
    :api-fetch-historical-orders api-fetch-historical-orders
    :export-funding-history-csv export-funding-history-csv
-   :api-load-user-data api-load-user-data})
+   :api-load-user-data api-load-user-data
+   :api-fetch-vault-index api-fetch-vault-index
+   :api-fetch-vault-summaries api-fetch-vault-summaries
+   :api-fetch-user-vault-equities api-fetch-user-vault-equities
+   :api-fetch-vault-details api-fetch-vault-details
+   :api-fetch-vault-webdata2 api-fetch-vault-webdata2})
 
 (defn runtime-effect-handlers
   [{:keys [storage
@@ -107,6 +117,24 @@
    :subscribe-to-webdata2 subscribe-to-webdata2
    :reconnect-websocket-action reconnect-websocket-action
    :navigate navigate})
+
+(defn- vault-action-handlers
+  [{:keys [load-vault-route
+           load-vaults
+           load-vault-detail
+           set-vaults-search-query
+           toggle-vaults-filter
+           set-vaults-snapshot-range
+           set-vaults-sort
+           set-vault-detail-tab]}]
+  {:load-vault-route load-vault-route
+   :load-vaults load-vaults
+   :load-vault-detail load-vault-detail
+   :set-vaults-search-query set-vaults-search-query
+   :toggle-vaults-filter toggle-vaults-filter
+   :set-vaults-snapshot-range set-vaults-snapshot-range
+   :set-vaults-sort set-vaults-sort
+   :set-vault-detail-tab set-vault-detail-tab})
 
 (defn- wallet-action-handlers
   [{:keys [connect-wallet-action
@@ -429,9 +457,11 @@
            asset-selector
            chart
            account-history
+           vaults
            orders]}]
   (merge
    (runtime-core-action-handlers core)
+   (vault-action-handlers vaults)
    (wallet-action-handlers wallet)
    (websocket-diagnostics-action-handlers diagnostics)
    (asset-selector-action-handlers asset-selector)

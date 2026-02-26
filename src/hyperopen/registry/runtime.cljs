@@ -38,7 +38,12 @@
    [:effects/api-submit-order :api-submit-order]
    [:effects/api-cancel-order :api-cancel-order]
    [:effects/api-submit-position-tpsl :api-submit-position-tpsl]
-   [:effects/api-load-user-data :api-load-user-data]])
+   [:effects/api-load-user-data :api-load-user-data]
+   [:effects/api-fetch-vault-index :api-fetch-vault-index]
+   [:effects/api-fetch-vault-summaries :api-fetch-vault-summaries]
+   [:effects/api-fetch-user-vault-equities :api-fetch-user-vault-equities]
+   [:effects/api-fetch-vault-details :api-fetch-vault-details]
+   [:effects/api-fetch-vault-webdata2 :api-fetch-vault-webdata2]])
 
 (defn registered-effect-ids
   []
@@ -181,7 +186,15 @@
     [[:actions/cancel-order :cancel-order]
      [:actions/load-user-data :load-user-data]
      [:actions/set-funding-modal :set-funding-modal]
-     [:actions/navigate :navigate]])))
+     [:actions/navigate :navigate]
+     [:actions/load-vault-route :load-vault-route]
+     [:actions/load-vaults :load-vaults]
+     [:actions/load-vault-detail :load-vault-detail]
+     [:actions/set-vaults-search-query :set-vaults-search-query]
+     [:actions/toggle-vaults-filter :toggle-vaults-filter]
+     [:actions/set-vaults-snapshot-range :set-vaults-snapshot-range]
+     [:actions/set-vaults-sort :set-vaults-sort]
+     [:actions/set-vault-detail-tab :set-vault-detail-tab]])))
 
 (defn registered-action-ids
   []

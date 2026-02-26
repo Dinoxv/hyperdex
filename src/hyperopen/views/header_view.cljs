@@ -288,7 +288,7 @@
         (nav-link "Trade" "/trade" (route-active? route "/trade"))
         (nav-link "Portfolio" "/portfolio" (route-active? route "/portfolio"))
         (nav-link "Earn" "/earn" false)
-        (nav-link "Vaults" "/vaults" false)
+        (nav-link "Vaults" "/vaults" (route-active? route "/vaults"))
         (nav-link "Staking" "/staking" false)
         (nav-link "Referrals" "/referrals" false)
         (nav-link "Leaderboard" "/leaderboard" false)

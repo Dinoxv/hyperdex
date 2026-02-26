@@ -3,6 +3,9 @@
             [hyperopen.views.footer-view :as footer-view]
             [hyperopen.views.header-view :as header-view]
             [hyperopen.views.notifications-view :as notifications-view]
+            [hyperopen.views.vault-detail-view :as vault-detail-view]
+            [hyperopen.views.vaults-view :as vaults-view]
+            [hyperopen.views.vaults.vm :as vault-vm]
             [hyperopen.views.portfolio-view :as portfolio-view]
             [hyperopen.views.trade-view :as trade-view]))
 
@@ -10,6 +13,8 @@
   (let [route (get-in state [:router :path] "/trade")
         trade-route? (str/starts-with? route "/trade")
         portfolio-route? (str/starts-with? route "/portfolio")
+        vault-route? (vault-vm/vault-route? route)
+        vault-detail-route? (vault-vm/vault-detail-route? route)
         root-classes (into ["h-screen" "bg-base-100" "flex" "flex-col" "overflow-y-auto" "scrollbar-hide"]
                            (when trade-route?
                              ["xl:overflow-y-hidden"]))]
@@ -21,6 +26,8 @@
       (cond
         trade-route? (trade-view/trade-view state)
         portfolio-route? (portfolio-view/portfolio-view state)
+        vault-detail-route? (vault-detail-view/vault-detail-view state)
+        vault-route? (vaults-view/vaults-view state)
         :else (trade-view/trade-view state))]
      (when-let [modal (get-in state [:funding-ui :modal])]
        [:div.fixed.inset-0.z-50.flex.items-center.justify-center

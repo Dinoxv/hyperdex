@@ -232,6 +232,43 @@
     (is (some? portfolio-root))
     (is (nil? trade-root))))
 
+(deftest app-view-renders-vault-routes-with-vault-roots-test
+  (let [list-view (app-view/app-view (assoc trade-view-test-state
+                                            :router {:path "/vaults"}
+                                            :wallet {}
+                                            :vaults-ui {:search-query ""
+                                                        :filter-leading? true
+                                                        :filter-deposited? true
+                                                        :filter-others? true
+                                                        :filter-closed? false
+                                                        :snapshot-range :month
+                                                        :sort {:column :tvl
+                                                               :direction :desc}}
+                                            :vaults {:loading {:index? false
+                                                               :summaries? false}
+                                                     :errors {:index nil
+                                                              :summaries nil}
+                                                     :user-equity-by-address {}
+                                                     :merged-index-rows []}))
+        detail-view (app-view/app-view (assoc trade-view-test-state
+                                              :router {:path "/vaults/0x1234567890abcdef1234567890abcdef12345678"}
+                                              :wallet {}
+                                              :vaults-ui {:detail-tab :about
+                                                          :snapshot-range :month
+                                                          :detail-loading? false}
+                                              :vaults {:errors {:details-by-address {}
+                                                                :webdata-by-vault {}}
+                                                       :details-by-address {}
+                                                       :webdata-by-vault {}
+                                                       :user-equity-by-address {}
+                                                       :merged-index-rows []}))
+        list-root (find-first-node list-view #(= "vaults-root"
+                                                 (get-in % [1 :data-parity-id])))
+        detail-root (find-first-node detail-view #(= "vault-detail-root"
+                                                     (get-in % [1 :data-parity-id])))]
+    (is (some? list-root))
+    (is (some? detail-root))))
+
 (deftest app-view-renders-global-order-feedback-toast-when-present-test
   (let [view-node (app-view/app-view (assoc trade-view-test-state
                                             :router {:path "/trade"}

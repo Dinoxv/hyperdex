@@ -7,6 +7,8 @@
             [hyperopen.order.actions :as order-actions]
             [hyperopen.orderbook.actions :as orderbook-actions]
             [hyperopen.portfolio.actions :as portfolio-actions]
+            [hyperopen.vaults.actions :as vault-actions]
+            [hyperopen.vaults.effects :as vault-effects]
             [hyperopen.wallet.actions :as wallet-actions]))
 
 (defn- merge-nested
@@ -165,12 +167,27 @@
    :submit-order order-actions/submit-order
    :cancel-order order-actions/cancel-order})
 
+(defn- vault-action-deps []
+  {:load-vault-route vault-actions/load-vault-route
+   :load-vaults vault-actions/load-vaults
+   :load-vault-detail vault-actions/load-vault-detail
+   :set-vaults-search-query vault-actions/set-vaults-search-query
+   :toggle-vaults-filter vault-actions/toggle-vaults-filter
+   :set-vaults-snapshot-range vault-actions/set-vaults-snapshot-range
+   :set-vaults-sort vault-actions/set-vaults-sort
+   :set-vault-detail-tab vault-actions/set-vault-detail-tab})
+
 (defn runtime-effect-deps
   [effect-overrides]
   (merge-nested
    {:api {:api-fetch-user-funding-history account-history-effects/api-fetch-user-funding-history-effect
           :api-fetch-historical-orders account-history-effects/api-fetch-historical-orders-effect
-          :export-funding-history-csv account-history-effects/export-funding-history-csv-effect}}
+          :export-funding-history-csv account-history-effects/export-funding-history-csv-effect
+          :api-fetch-vault-index vault-effects/api-fetch-vault-index!
+          :api-fetch-vault-summaries vault-effects/api-fetch-vault-summaries!
+          :api-fetch-user-vault-equities vault-effects/api-fetch-user-vault-equities!
+          :api-fetch-vault-details vault-effects/api-fetch-vault-details!
+          :api-fetch-vault-webdata2 vault-effects/api-fetch-vault-webdata2!}}
    effect-overrides))
 
 (defn runtime-action-deps
@@ -181,5 +198,6 @@
     :asset-selector (asset-selector-action-deps)
     :chart (chart-and-orderbook-action-deps)
     :account-history (account-history-action-deps)
+    :vaults (vault-action-deps)
     :orders (order-action-deps)}
    action-overrides))

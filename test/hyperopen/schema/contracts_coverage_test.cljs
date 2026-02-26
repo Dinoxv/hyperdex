@@ -52,7 +52,10 @@
     :actions/set-order-history-page-input
     :actions/apply-order-history-page-input
     :actions/handle-order-history-page-input-keydown
-    :actions/refresh-order-history})
+    :actions/refresh-order-history
+    :actions/load-vault-route
+    :actions/load-vaults
+    :actions/load-vault-detail})
 
 (deftest contracted-action-ids-match-runtime-registered-action-ids-test
   (let [registered (runtime-registry/registered-action-ids)

@@ -8,6 +8,8 @@
             [hyperopen.order.actions :as order-actions]
             [hyperopen.portfolio.actions :as portfolio-actions]
             [hyperopen.runtime.collaborators :as collaborators]
+            [hyperopen.vaults.actions :as vault-actions]
+            [hyperopen.vaults.effects :as vault-effects]
             [hyperopen.wallet.actions :as wallet-actions]))
 
 (deftest runtime-effect-deps-merges-defaults-with-overrides-test
@@ -21,7 +23,11 @@
     (is (identical? account-history-effects/api-fetch-user-funding-history-effect
                     (get-in deps [:api :api-fetch-user-funding-history])))
     (is (identical? account-history-effects/api-fetch-historical-orders-effect
-                    (get-in deps [:api :api-fetch-historical-orders])))))
+                    (get-in deps [:api :api-fetch-historical-orders])))
+    (is (identical? vault-effects/api-fetch-vault-index!
+                    (get-in deps [:api :api-fetch-vault-index])))
+    (is (identical? vault-effects/api-fetch-vault-webdata2!
+                    (get-in deps [:api :api-fetch-vault-webdata2])))))
 
 (deftest runtime-action-deps-provides-default-domain-action-handlers-test
   (let [deps (collaborators/runtime-action-deps {})]
@@ -49,6 +55,10 @@
                     (get-in deps [:account-history :select-account-info-tab])))
     (is (identical? account-history-actions/toggle-positions-direction-filter-open
                     (get-in deps [:account-history :toggle-positions-direction-filter-open])))
+    (is (identical? vault-actions/load-vault-route
+                    (get-in deps [:vaults :load-vault-route])))
+    (is (identical? vault-actions/set-vault-detail-tab
+                    (get-in deps [:vaults :set-vault-detail-tab])))
     (is (identical? order-actions/submit-order
                     (get-in deps [:orders :submit-order])))))
 

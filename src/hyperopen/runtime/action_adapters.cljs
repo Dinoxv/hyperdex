@@ -1,9 +1,11 @@
 (ns hyperopen.runtime.action-adapters
-  (:require [nexus.registry :as nxr]
+  (:require [clojure.string :as str]
+            [nexus.registry :as nxr]
             [hyperopen.platform :as platform]
             [hyperopen.api.trading :as trading-api]
             [hyperopen.router :as router]
             [hyperopen.runtime.state :as runtime-state]
+            [hyperopen.vaults.actions :as vault-actions]
             [hyperopen.wallet.agent-runtime :as agent-runtime]
             [hyperopen.wallet.actions :as wallet-actions]
             [hyperopen.wallet.agent-session :as agent-session]
@@ -32,12 +34,18 @@
   [[:effects/save [:funding-ui :modal] modal]])
 
 (defn navigate
-  [_state path & [opts]]
+  [state path & [opts]]
   (let [p (router/normalize-path path)
-        replace? (boolean (:replace? opts))]
-    (cond-> [[:effects/save [:router :path] p]]
-      replace? (conj [:effects/replace-state p])
-      (not replace?) (conj [:effects/push-state p]))))
+        replace? (boolean (:replace? opts))
+        base-effects (cond-> [[:effects/save [:router :path] p]]
+                       replace? (conj [:effects/replace-state p])
+                       (not replace?) (conj [:effects/push-state p]))
+        route-effects (vault-actions/load-vault-route state p)]
+    (into base-effects route-effects)))
+
+(defn load-vault-route-action
+  [state path]
+  (vault-actions/load-vault-route state path))
 
 (defn connect-wallet-action [state]
   (wallet-actions/connect-wallet-action state))
@@ -53,11 +61,15 @@
 
 (defn handle-wallet-connected
   [store connected-address]
-  (wallet-connection-runtime/handle-wallet-connected!
-   {:store store
-    :connected-address connected-address
-    :should-auto-enable-agent-trading? should-auto-enable-agent-trading?
-    :dispatch! nxr/dispatch}))
+  (let [result (wallet-connection-runtime/handle-wallet-connected!
+                {:store store
+                 :connected-address connected-address
+                 :should-auto-enable-agent-trading? should-auto-enable-agent-trading?
+                 :dispatch! nxr/dispatch})
+        route (get-in @store [:router :path])]
+    (when (str/starts-with? (or route "") "/vaults")
+      (nxr/dispatch store nil [[:actions/load-vault-route route]]))
+    result))
 
 (defn- exchange-response-error
   [resp]
