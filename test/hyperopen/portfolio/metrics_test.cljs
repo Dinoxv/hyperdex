@@ -142,7 +142,7 @@
                  cumulative
                  1e-12))))
 
-(deftest compute-performance-metrics-cagr-uses-elapsed-row-timespan-test
+(deftest compute-performance-metrics-cagr-uses-period-count-annualization-test
   (let [rows [{:day "2023-01-01"
                :time-ms (day->ms "2023-01-01")
                :return 0.10}
@@ -152,16 +152,19 @@
               {:day "2024-01-01"
                :time-ms (day->ms "2024-01-01")
                :return -0.20}]
+        expected-cagr (metrics/cagr (mapv :return rows) {:periods-per-year 365
+                                                         :compounded true})
         metrics* (metrics/compute-performance-metrics {:strategy-daily-rows rows
-                                                        :rf 0
-                                                        :periods-per-year 365
-                                                        :compounded true})
+                                                       :rf 0
+                                                       :periods-per-year 365
+                                                       :compounded true})
         cumulative (:cumulative-return metrics*)
         cagr (:cagr metrics*)]
     (is (approx= cumulative -0.164 1e-12))
-    (is (approx= cagr cumulative 1e-12))))
+    (is (approx= cagr expected-cagr 1e-12))
+    (is (not (approx= cagr cumulative 1e-12)))))
 
-(deftest compute-performance-metrics-cagr-respects-explicit-cagr-years-override-test
+(deftest compute-performance-metrics-ignores-cagr-years-override-key-test
   (let [rows [{:day "2023-01-01"
                :time-ms (day->ms "2023-01-01")
                :return 0.10}
@@ -171,15 +174,45 @@
               {:day "2023-02-01"
                :time-ms (day->ms "2023-02-01")
                :return -0.20}]
+        baseline (metrics/compute-performance-metrics {:strategy-daily-rows rows
+                                                       :rf 0
+                                                       :periods-per-year 365
+                                                       :compounded true})
+        with-override (metrics/compute-performance-metrics {:strategy-daily-rows rows
+                                                            :rf 0
+                                                            :periods-per-year 365
+                                                            :cagr-years 1
+                                                            :compounded true})]
+    (is (approx= (:cagr baseline) (:cagr with-override) 1e-12))
+    (is (approx= (:calmar baseline) (:calmar with-override) 1e-12))))
+
+(deftest compute-performance-metrics-window-boundaries-use-timestamp-anchors-test
+  (let [rows [{:day "2024-03-30"
+               :time-ms (.getTime (js/Date. "2024-03-30T18:00:00.000Z"))
+               :return 0.10}
+              {:day "2024-06-30"
+               :time-ms (.getTime (js/Date. "2024-06-30T12:00:00.000Z"))
+               :return 0.05}]
         metrics* (metrics/compute-performance-metrics {:strategy-daily-rows rows
-                                                        :rf 0
-                                                        :periods-per-year 365
-                                                        :cagr-years 1
-                                                        :compounded true})
-        cumulative (:cumulative-return metrics*)
-        cagr (:cagr metrics*)]
-    (is (approx= cumulative -0.164 1e-12))
-    (is (approx= cagr cumulative 1e-12))))
+                                                       :rf 0
+                                                       :periods-per-year 365
+                                                       :compounded true})]
+    (is (approx= (:m3 metrics*) 0.155 1e-12))))
+
+(deftest compute-performance-metrics-var-and-cvar-follow-quantstats-report-sign-test
+  (let [returns [0.01 0.012 0.011 0.013 0.009]
+        metrics* (metrics/compute-performance-metrics {:strategy-daily-rows (fixture-daily-rows returns)
+                                                       :rf 0
+                                                       :periods-per-year 365
+                                                       :compounded true})
+        raw-var (metrics/value-at-risk returns)
+        raw-cvar (metrics/expected-shortfall returns)]
+    (is (number? raw-var))
+    (is (number? raw-cvar))
+    (is (approx= (:daily-var metrics*) (- (js/Math.abs raw-var)) 1e-12))
+    (is (approx= (:expected-shortfall metrics*) (- (js/Math.abs raw-cvar)) 1e-12))
+    (is (neg? (:daily-var metrics*)))
+    (is (neg? (:expected-shortfall metrics*)))))
 
 (deftest quantstats-ratio-parity-test
   (let [returns quantstats-returns]
