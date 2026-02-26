@@ -320,6 +320,8 @@
 (deftest bootstrap-account-data-covers-nil-repeat-success-and-error-branches-test
   (async done
     (let [store (atom {:wallet {:address "0xabc"}
+                      :account-info {:selected-tab :balances
+                                     :order-history {:request-id 0}}
                       :orders {:open-orders-snapshot-by-dex {"dex-old" [1]}
                                :fundings-raw [1]
                                :fundings [1]
@@ -344,6 +346,8 @@
                                     (swap! stage-a-calls conj [:portfolio address opts]))
                 :fetch-user-fees! (fn [_store address opts]
                                     (swap! stage-a-calls conj [:user-fees address opts]))
+                :fetch-historical-orders! (fn [_store request-id opts]
+                                            (swap! stage-a-calls conj [:order-history request-id opts]))
                 :fetch-and-merge-funding-history! (fn [_store address opts]
                                                     (swap! stage-a-calls conj [:fundings address opts]))
                 :ensure-perp-dexs! (fn [_store _opts]
@@ -361,9 +365,12 @@
       (startup-runtime/bootstrap-account-data! (assoc deps :address "0xabc"))
       (js/setTimeout
        (fn []
-         (is (= 7 (count @stage-a-calls)))
+         (is (= 8 (count @stage-a-calls)))
+         (is (= [:order-history 1 {:priority :low}]
+                (first @stage-a-calls)))
          (is (= [["0xabc" ["dex-a" "dex-b"]]] @stage-b-calls))
          (is (= "0xabc" (:bootstrapped-address @startup-runtime-atom)))
+         (is (= 1 (get-in @store [:account-info :order-history :request-id])))
          (is (= {} (get-in @store [:orders :open-orders-snapshot-by-dex])))
          (is (= [] (get-in @store [:orders :fundings-raw])))
          (is (= [] (get-in @store [:orders :fundings])))
@@ -371,14 +378,14 @@
          (startup-runtime/bootstrap-account-data! (assoc deps :address "0xabc"))
          (js/setTimeout
          (fn []
-            (is (= 7 (count @stage-a-calls)))
+            (is (= 8 (count @stage-a-calls)))
             (is (= 1 (count @stage-b-calls)))
             (reset! ensure-mode :reject)
             (startup-runtime/bootstrap-account-data! (assoc deps :address "0xdef"))
             (js/setTimeout
              (fn []
                (is (= "0xdef" (:bootstrapped-address @startup-runtime-atom)))
-               (is (= 14 (count @stage-a-calls)))
+               (is (= 16 (count @stage-a-calls)))
                (is (= 1 (count @stage-b-calls)))
                (is (= "Error bootstrapping per-dex account data:"
                       (first (last @log-calls))))
@@ -388,7 +395,10 @@
        0))))
 
 (deftest install-address-handlers-covers-bootstrap-and-clear-branches-test
-  (let [store (atom {:orders {:open-orders-snapshot-by-dex {"dex-a" [{}]}
+  (let [store (atom {:account-info {:order-history {:request-id 7
+                                                    :loading? true
+                                                    :error "stale"}}
+                     :orders {:open-orders-snapshot-by-dex {"dex-a" [{}]}
                               :fundings-raw [1]
                               :fundings [2]
                               :order-history [3]}
@@ -446,6 +456,9 @@
       (is (= [] (get-in @store [:orders :fundings-raw])))
       (is (= [] (get-in @store [:orders :fundings])))
       (is (= [] (get-in @store [:orders :order-history])))
+      (is (= 8 (get-in @store [:account-info :order-history :request-id])))
+      (is (false? (get-in @store [:account-info :order-history :loading?])))
+      (is (nil? (get-in @store [:account-info :order-history :error])))
       (is (= {} (get-in @store [:perp-dex-clearinghouse])))
       (is (nil? (get-in @store [:spot :clearinghouse-state])))
       (is (= {} (get-in @store [:portfolio :summary-by-key])))

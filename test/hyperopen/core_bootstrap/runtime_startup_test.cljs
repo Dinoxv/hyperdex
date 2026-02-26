@@ -167,6 +167,9 @@
                         :fetch-user-fees! (fn [_store address opts]
                                             (swap! stage-a-calls conj [:user-fees [address opts]])
                                             (js/Promise.resolve nil))
+                        :fetch-historical-orders! (fn [_store request-id opts]
+                                                    (swap! stage-a-calls conj [:order-history [request-id opts]])
+                                                    (js/Promise.resolve nil))
                         :fetch-and-merge-funding-history! (fn [_store address opts]
                                                             (swap! stage-a-calls conj [:fundings [address opts]])
                                                             (js/Promise.resolve nil))
@@ -179,16 +182,17 @@
         (app-startup/bootstrap-account-data! system "0xabc")
         (js/setTimeout
          (fn []
-           (is (= 7 (count @stage-a-calls)))
+           (is (= 8 (count @stage-a-calls)))
            (is (some #(= :abstraction (first %)) @stage-a-calls))
            (is (some #(= :portfolio (first %)) @stage-a-calls))
            (is (some #(= :user-fees (first %)) @stage-a-calls))
+           (is (some #(= :order-history (first %)) @stage-a-calls))
            (is (= [["0xabc" ["dex-1" "dex-2"]]] @stage-b-calls))
            ;; Same address should not trigger stage A/B again.
            (app-startup/bootstrap-account-data! system "0xabc")
            (js/setTimeout
             (fn []
-              (is (= 7 (count @stage-a-calls)))
+              (is (= 8 (count @stage-a-calls)))
               (is (= 1 (count @stage-b-calls)))
               (done))
             0))

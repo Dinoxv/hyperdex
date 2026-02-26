@@ -132,19 +132,24 @@
                                    (assoc-in [:account-info :funding-history :error] (str err)))
                                state)))))))))
 
-(defn api-fetch-historical-orders-effect
-  [_ store request-id]
-  (let [address (get-in @store [:wallet :address])]
+(defn fetch-historical-orders!
+  [{:keys [store request-id request-historical-orders! opts]
+    :or {request-historical-orders! api/request-historical-orders!}}]
+  (let [address (get-in @store [:wallet :address])
+        opts* (merge {:priority :high}
+                     (or opts {}))]
     (if-not address
-      (swap! store
-             (fn [state]
-               (if (= request-id (account-history-actions/order-history-request-id state))
-                 (-> state
-                     (assoc-in [:account-info :order-history :loading?] false)
-                     (assoc-in [:account-info :order-history :error] nil)
-                     (assoc-in [:orders :order-history] []))
-                 state)))
-      (-> (api/request-historical-orders! address {:priority :high})
+      (do
+        (swap! store
+               (fn [state]
+                 (if (= request-id (account-history-actions/order-history-request-id state))
+                   (-> state
+                       (assoc-in [:account-info :order-history :loading?] false)
+                       (assoc-in [:account-info :order-history :error] nil)
+                       (assoc-in [:orders :order-history] []))
+                   state)))
+        (js/Promise.resolve nil))
+      (-> (request-historical-orders! address opts*)
           (.then (fn [rows]
                    (swap! store
                           (fn [state]
@@ -162,6 +167,11 @@
                                    (assoc-in [:account-info :order-history :loading?] false)
                                    (assoc-in [:account-info :order-history :error] (str err)))
                                state)))))))))
+
+(defn api-fetch-historical-orders-effect
+  [_ store request-id]
+  (fetch-historical-orders! {:store store
+                             :request-id request-id}))
 
 (defn export-funding-history-csv-effect
   [_ _ rows]

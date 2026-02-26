@@ -28,6 +28,7 @@
    :request-frontend-open-orders! (resolve-api-op api-instance :request-frontend-open-orders! api-default/request-frontend-open-orders!)
    :request-clearinghouse-state! (resolve-api-op api-instance :request-clearinghouse-state! api-default/request-clearinghouse-state!)
    :request-user-fills! (resolve-api-op api-instance :request-user-fills! api-default/request-user-fills!)
+   :request-historical-orders! (resolve-api-op api-instance :request-historical-orders! api-default/request-historical-orders!)
    :request-spot-clearinghouse-state! (resolve-api-op api-instance :request-spot-clearinghouse-state! api-default/request-spot-clearinghouse-state!)
    :request-user-abstraction! (resolve-api-op api-instance :request-user-abstraction! api-default/request-user-abstraction!)
    :request-portfolio! (resolve-api-op api-instance :request-portfolio! api-default/request-portfolio!)
@@ -224,6 +225,18 @@
                            (fetch-user-fees! api-ops store address))
                           ([store address opts]
                            (fetch-user-fees! api-ops store address opts)))
+      :fetch-historical-orders! (fn
+                                  ([store request-id]
+                                   (account-history-effects/fetch-historical-orders!
+                                    {:store store
+                                     :request-id request-id
+                                     :request-historical-orders! (:request-historical-orders! api-ops)}))
+                                  ([store request-id opts]
+                                   (account-history-effects/fetch-historical-orders!
+                                    {:store store
+                                     :request-id request-id
+                                     :request-historical-orders! (:request-historical-orders! api-ops)
+                                     :opts opts})))
       :fetch-and-merge-funding-history! account-history-effects/fetch-and-merge-funding-history!
       :ensure-perp-dexs! (fn
                            ([store]

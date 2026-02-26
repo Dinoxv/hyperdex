@@ -111,6 +111,34 @@
          (keep non-blank-text)
          vec)))
 
+(defn- next-order-history-request-id
+  [state]
+  (inc (get-in state [:account-info :order-history :request-id] 0)))
+
+(defn- invalidate-order-history-request!
+  [store]
+  (swap! store
+         (fn [state]
+           (-> state
+               (assoc-in [:account-info :order-history :request-id]
+                         (next-order-history-request-id state))
+               (assoc-in [:account-info :order-history :loading?] false)
+               (assoc-in [:account-info :order-history :error] nil)
+               (assoc-in [:orders :order-history] [])))))
+
+(defn- prefetch-order-history!
+  [{:keys [store fetch-historical-orders!]}]
+  (when (fn? fetch-historical-orders!)
+    (let [selected? (= :order-history (get-in @store [:account-info :selected-tab]))
+          request-id (next-order-history-request-id @store)]
+      (swap! store
+             (fn [state]
+               (-> state
+                   (assoc-in [:account-info :order-history :request-id] request-id)
+                   (assoc-in [:account-info :order-history :loading?] selected?)
+                   (assoc-in [:account-info :order-history :error] nil))))
+      (fetch-historical-orders! store request-id {:priority :low}))))
+
 (defn install-asset-selector-shortcuts!
   [{:keys [store dispatch!]}]
   (let [window-object (when (exists? js/window) js/window)
@@ -218,6 +246,7 @@
            fetch-user-abstraction!
            fetch-portfolio!
            fetch-user-fees!
+           fetch-historical-orders!
            fetch-and-merge-funding-history!
            ensure-perp-dexs!
            stage-b-account-bootstrap!
@@ -239,6 +268,8 @@
       (swap! store assoc-in [:portfolio :user-fees-error] nil)
       (swap! store assoc-in [:portfolio :loaded-at-ms] nil)
       (swap! store assoc-in [:portfolio :user-fees-loaded-at-ms] nil)
+      (prefetch-order-history! {:store store
+                                :fetch-historical-orders! fetch-historical-orders!})
       ;; Stage A: critical account data.
       (fetch-frontend-open-orders! store address {:priority :high})
       (fetch-user-fills! store address {:priority :high})
@@ -284,7 +315,7 @@
           (swap! store assoc-in [:orders :open-orders-snapshot-by-dex] {})
           (swap! store assoc-in [:orders :fundings-raw] [])
           (swap! store assoc-in [:orders :fundings] [])
-          (swap! store assoc-in [:orders :order-history] [])
+          (invalidate-order-history-request! store)
           (swap! store assoc-in [:perp-dex-clearinghouse] {})
           (swap! store assoc-in [:spot :clearinghouse-state] nil)
           (swap! store assoc-in [:portfolio :summary-by-key] {})
