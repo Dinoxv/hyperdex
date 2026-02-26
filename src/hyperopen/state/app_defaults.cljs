@@ -97,8 +97,8 @@
   {:summary-scope :all
    :summary-time-range :month
    :chart-tab :account-value
-   :returns-benchmark-coins []
-   :returns-benchmark-coin nil
+   :returns-benchmark-coins ["BTC"]
+   :returns-benchmark-coin "BTC"
    :returns-benchmark-search ""
    :returns-benchmark-suggestions-open? false
    :summary-scope-dropdown-open? false

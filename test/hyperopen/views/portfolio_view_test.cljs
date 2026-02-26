@@ -211,7 +211,7 @@
     (is (some? benchmark-path-node))
     (is (= "rgba(242, 207, 102, 0.58)" chip-border-color))
     (is (contains? all-text "Benchmarks"))
-    (is (contains? all-text "Strategy"))
+    (is (contains? all-text "Portfolio"))
     (is (contains? all-text "SPY (SPOT)"))))
 
 (deftest portfolio-view-returns-tab-compacts-benchmark-chip-labels-test

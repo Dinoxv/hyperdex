@@ -825,7 +825,7 @@
                                  selected-benchmark-coins)
                            [])
         raw-series (cond-> [{:id :strategy
-                             :label "Strategy"
+                             :label "Portfolio"
                              :stroke strategy-series-stroke
                              :raw-points strategy-points}]
                      (seq benchmark-series)
