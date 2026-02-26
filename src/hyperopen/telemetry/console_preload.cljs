@@ -2,6 +2,7 @@
   (:require [hyperopen.platform :as platform]
             [hyperopen.system :as app-system]
             [hyperopen.telemetry :as telemetry]
+            [hyperopen.websocket.market-projection-runtime :as market-projection-runtime]
             [hyperopen.websocket.client-compat :as ws-client-compat]
             [hyperopen.websocket.client :as ws-client]))
 
@@ -16,6 +17,7 @@
    :websocket {:runtime-view @ws-client/runtime-view
                :compat-projections (ws-client-compat/compat-projections)
                :client-runtime-state @ws-client/runtime-state
+               :market-projection-telemetry (market-projection-runtime/market-projection-telemetry-snapshot)
                :flight-recording (ws-client/get-flight-recording-redacted)}
    :telemetry {:event-count (count (telemetry/events))
                :events (telemetry/events)}})

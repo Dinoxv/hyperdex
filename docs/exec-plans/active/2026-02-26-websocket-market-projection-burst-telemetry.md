@@ -15,10 +15,10 @@ You will be able to verify this by running websocket tests and inspecting determ
 - [x] (2026-02-26 01:10Z) Reviewed `/hyperopen/.agents/PLANS.md`, `/hyperopen/docs/PLANS.md`, and active websocket ExecPlans for required structure and rigor.
 - [x] (2026-02-26 01:11Z) Audited current implementation and tests in `/hyperopen/src/hyperopen/websocket/market_projection_runtime.cljs`, `/hyperopen/test/hyperopen/websocket/market_projection_runtime_test.cljs`, `/hyperopen/src/hyperopen/websocket/orderbook.cljs`, and `/hyperopen/src/hyperopen/websocket/active_asset_ctx.cljs`.
 - [x] (2026-02-26 01:12Z) Authored this ExecPlan with milestones, telemetry payload contract, and acceptance gates.
-- [ ] Implement market projection queue/flush telemetry state and emission contract in runtime code.
-- [ ] Add deterministic websocket tests for queue depth, overwrite counts, flush duration, and percentile summaries under burst simulation.
-- [ ] Surface telemetry stats in debug snapshot output and finalize reliability/docs language.
-- [ ] Run required gates (`npm run check`, `npm test`, `npm run test:websocket`) and record evidence.
+- [x] (2026-02-26 01:38Z) Implemented market projection queue/flush telemetry state, bounded percentile window tracking, and flush event emission contract in `/hyperopen/src/hyperopen/websocket/market_projection_runtime.cljs`.
+- [x] (2026-02-26 01:44Z) Added deterministic websocket telemetry regression tests (queue depth, overwrite counters, flush duration, p95 window behavior, per-flush overwrite reset) in `/hyperopen/test/hyperopen/websocket/market_projection_runtime_test.cljs`.
+- [x] (2026-02-26 01:47Z) Surfaced market projection telemetry in debug snapshot payload via `/hyperopen/src/hyperopen/telemetry/console_preload.cljs`.
+- [x] (2026-02-26 01:56Z) Ran required gates and captured green evidence for `npm run check`, `npm test`, and `npm run test:websocket`.
 
 ## Surprises & Discoveries
 
@@ -33,6 +33,9 @@ You will be able to verify this by running websocket tests and inspecting determ
 
 - Observation: Queueing call sites are concentrated and already route through `queue-market-projection!`, so instrumentation at that boundary will cover orderbook and active asset bursts without touching many call sites.
   Evidence: `/hyperopen/src/hyperopen/websocket/orderbook.cljs` and `/hyperopen/src/hyperopen/websocket/active_asset_ctx.cljs` both call `queue-market-projection!` for store projection writes.
+
+- Observation: `start-engine-records-runtime-messages-and-effects-test` in websocket runtime engine suite was timing-sensitive with `setTimeout 0` and could assert before async go-loops drained mailbox/effects channels in this environment.
+  Evidence: Repeated failures at `/hyperopen/test/hyperopen/websocket/application/runtime_engine_test.cljs` lines 36-39 until assertion delay was increased to `10ms`.
 
 ## Decision Log
 
@@ -54,7 +57,14 @@ You will be able to verify this by running websocket tests and inspecting determ
 
 ## Outcomes & Retrospective
 
-Not started yet. This section must be updated at the end of each implemented milestone with outcomes, gaps, and follow-up risks.
+- Milestone 1 outcome: Runtime state now tracks per-store telemetry (`queued-total`, `overwrite-total`, `flush-count`, `max-pending-depth`, bounded flush/queue-wait samples, p95 summaries) and exposes read-only diagnostics through `market-projection-telemetry-snapshot`.
+- Milestone 2 outcome: `queue-market-projection!` and `flush-store-updates!` now accept optional deterministic seams (`:now-ms-fn`, `:emit-fn`) and emit `:websocket/market-projection-flush` with required payload keys (`store-id`, `pending-count`, `overwrite-count`, `flush-duration-ms`, `queue-wait-ms`, `flush-count`, `max-pending-depth`, `p95-flush-duration-ms`).
+- Milestone 3 outcome: Burst-focused telemetry regressions are covered with deterministic tests in `market_projection_runtime_test` validating queue depth watermarks, overwrite accounting, flush duration telemetry, p95 windowing, and per-flush overwrite reset behavior.
+- Milestone 4 outcome: Debug snapshot output now includes `:websocket :market-projection-telemetry`, and all required gates passed.
+- Validation evidence:
+  - `npm run test:websocket` (pass, 152 tests / 691 assertions, 0 failures, 0 errors).
+  - `npm run check` (pass; docs/test/hiccup lint and app/test compiles green).
+  - `npm test` (pass, 1382 tests / 6829 assertions, 0 failures, 0 errors).
 
 ## Context and Orientation
 

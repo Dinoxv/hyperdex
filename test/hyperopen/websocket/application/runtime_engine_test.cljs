@@ -41,7 +41,7 @@
                  @interpreted))
           (runtime-engine/stop-engine! engine)
           (done))
-        0))))
+        10))))
 
 (deftest dispatch-after-stop-records-drop-payload-test
   (let [drops (atom [])
