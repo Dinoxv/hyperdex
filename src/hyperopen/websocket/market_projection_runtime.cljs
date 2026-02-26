@@ -1,5 +1,6 @@
 (ns hyperopen.websocket.market-projection-runtime
-  (:require [hyperopen.platform :as platform]
+  (:require [clojure.string :as str]
+            [hyperopen.platform :as platform]
             [hyperopen.telemetry :as telemetry]))
 
 (defonce market-projection-runtime
@@ -49,11 +50,29 @@
      :telemetry (merge (default-store-telemetry)
                        (:telemetry entry))}))
 
+(defn- inferred-store-id
+  [store]
+  (cond
+    (nil? store) "market-projection/store-unknown"
+    (string? store) store
+    (keyword? store) (name store)
+    (symbol? store) (str store)
+    (satisfies? IDeref store) (str "market-projection/store-" (hash store))
+    :else (str "market-projection/store-" (hash store))))
+
+(defn- invalid-legacy-store-id?
+  [store-id]
+  (and (string? store-id)
+       (str/starts-with? store-id "#object[")))
+
 (defn- store-id-value
   [store explicit-store-id telemetry]
-  (or (:store-id telemetry)
-      explicit-store-id
-      (pr-str store)))
+  (let [existing-store-id (:store-id telemetry)
+        sanitized-existing-store-id (when-not (invalid-legacy-store-id? existing-store-id)
+                                      existing-store-id)]
+    (or explicit-store-id
+        sanitized-existing-store-id
+        (inferred-store-id store))))
 
 (defn- bounded-conj
   [values value max-size]

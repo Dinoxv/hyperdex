@@ -247,7 +247,8 @@
                                "p-2"
                                "space-y-1.5"]}
              [:div {:class ["flex" "items-center" "justify-between" "gap-2"]}
-              [:code {:class ["text-xs" "font-semibold" "break-all"]}
+              [:code {:class ["max-w-[11rem]" "truncate" "text-xs" "font-semibold"]
+                      :title (str (or store-id* "n/a"))}
                (or (str store-id*) "n/a")]
               [:span {:class ["text-xs" "text-base-content/60"]}
                (str "Flushes: " (or (:flush-count store-summary) 0))]]

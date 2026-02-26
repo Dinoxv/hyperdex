@@ -1,5 +1,6 @@
 (ns hyperopen.websocket.market-projection-runtime-test
-  (:require [cljs.test :refer-macros [deftest is]]
+  (:require [clojure.string :as str]
+            [cljs.test :refer-macros [deftest is]]
             [hyperopen.websocket.market-projection-runtime :as market-runtime]))
 
 (defn- apply-store-with-count
@@ -341,5 +342,29 @@
         (is (= (expected-p95 expected-window)
                (:p95-flush-duration-ms summary)))
         (is (= 10 (:p95-queue-wait-ms summary)))))
+    (finally
+      (market-runtime/reset-market-projection-runtime!))))
+
+(deftest queue-market-projection-default-store-id-is-compact-and-readable-test
+  (market-runtime/reset-market-projection-runtime!)
+  (try
+    (let [store (atom {:orderbooks {}})
+          scheduled-callback (atom nil)
+          schedule-animation-frame! (fn [f]
+                                      (reset! scheduled-callback f)
+                                      :raf-id)]
+      (market-runtime/queue-market-projection!
+       {:store store
+        :coalesce-key [:orderbook "BTC"]
+        :apply-update-fn (fn [state]
+                           (assoc-in state [:orderbooks "BTC"] {:mark 101}))
+        :schedule-animation-frame! schedule-animation-frame!})
+      (let [stores (:stores (market-runtime/market-projection-telemetry-snapshot))
+            summary (first stores)
+            store-id (:store-id summary)]
+        (is (= 1 (count stores)))
+        (is (string? store-id))
+        (is (str/starts-with? store-id "market-projection/store-"))
+        (is (not (str/starts-with? store-id "#object[")))))
     (finally
       (market-runtime/reset-market-projection-runtime!))))
