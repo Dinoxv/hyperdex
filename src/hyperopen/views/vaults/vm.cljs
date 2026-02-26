@@ -5,6 +5,10 @@
 (def ^:private day-ms
   (* 24 60 60 1000))
 
+(def ^:private protocol-vault-names
+  #{"hyperliquidity provider (hlp)"
+    "liquidator"})
+
 (defn- optional-number
   [value]
   (cond
@@ -109,19 +113,27 @@
         name (or (some-> (:name row) str str/trim)
                  vault-address
                  "Unknown Vault")
+        name-token (str/lower-case name)
         leader (normalize-address (:leader row))
         tvl (or (optional-number (:tvl row)) 0)
         apr (normalize-percent-value (:apr row))
         user-equity-row (get equity-by-address vault-address)
         your-deposit (or (optional-number (:equity user-equity-row)) 0)
         snapshot-values (get-in row [:snapshot-by-key snapshot-range] [])
-        snapshot-value (normalize-percent-value (snapshot-last-value snapshot-values))
+        snapshot-series (if (sequential? snapshot-values)
+                          (->> snapshot-values
+                               (keep snapshot-point-value)
+                               (mapv normalize-percent-value))
+                          [])
+        snapshot-value (normalize-percent-value (snapshot-last-value snapshot-series))
         is-leading? (and (seq wallet-address)
                          (= wallet-address leader))
         has-deposit? (pos? your-deposit)
-        is-other? (not is-leading?)
+        is-other? (and (not is-leading?)
+                       (not has-deposit?))
         is-closed? (true? (:is-closed? row))
-        create-time-ms (:create-time-ms row)]
+        create-time-ms (:create-time-ms row)
+        relationship-type (get-in row [:relationship :type] :normal)]
     {:name name
      :vault-address vault-address
      :leader leader
@@ -129,13 +141,15 @@
      :apr apr
      :your-deposit your-deposit
      :snapshot snapshot-value
+     :snapshot-series snapshot-series
      :is-leading? is-leading?
      :has-deposit? has-deposit?
      :is-other? is-other?
      :is-closed? is-closed?
+     :is-protocol? (contains? protocol-vault-names name-token)
      :create-time-ms create-time-ms
      :age-days (normalize-age-days create-time-ms now-ms)
-     :relationship-type (get-in row [:relationship :type] :normal)}))
+     :relationship-type relationship-type}))
 
 (defn- include-by-role-filter?
   [row {:keys [leading? deposited? others?]}]
@@ -145,7 +159,8 @@
 
 (defn- include-vault-row?
   [row {:keys [query filters]}]
-  (and (search-match? row query)
+  (and (not= :child (:relationship-type row))
+       (search-match? row query)
        (or (:show-closed? filters)
            (not (:is-closed? row)))
        (include-by-role-filter? row filters)))
@@ -164,13 +179,17 @@
 
 (defn- compare-rows
   [left right column direction]
-  (let [primary (compare (sort-key left column)
-                         (sort-key right column))
-        primary* (if (= :desc direction) (- primary) primary)]
-    (if (zero? primary*)
-      (compare (str/lower-case (or (:vault-address left) ""))
-               (str/lower-case (or (:vault-address right) "")))
-      primary*)))
+  (let [deposit-priority (compare (if (:has-deposit? left) 0 1)
+                                  (if (:has-deposit? right) 0 1))]
+    (if (not (zero? deposit-priority))
+      deposit-priority
+      (let [primary (compare (sort-key left column)
+                             (sort-key right column))
+            primary* (if (= :desc direction) (- primary) primary)]
+        (if (zero? primary*)
+          (compare (str/lower-case (or (:vault-address left) ""))
+                   (str/lower-case (or (:vault-address right) "")))
+          primary*)))))
 
 (defn- sort-rows
   [rows {:keys [column direction]}]
@@ -183,11 +202,11 @@
 (defn- partition-user-and-protocol-rows
   [rows]
   (reduce (fn [{:keys [user-rows protocol-rows]} row]
-            (if (:is-leading? row)
-              {:user-rows (conj user-rows row)
-               :protocol-rows protocol-rows}
+            (if (:is-protocol? row)
               {:user-rows user-rows
-               :protocol-rows (conj protocol-rows row)}))
+               :protocol-rows (conj protocol-rows row)}
+              {:user-rows (conj user-rows row)
+               :protocol-rows protocol-rows}))
           {:user-rows []
            :protocol-rows []}
           rows))

@@ -58,6 +58,19 @@ A user can verify this by opening `/vaults`, filtering/searching, opening a vaul
   - `npm run check`
   - `npm test`
   - `npm run test:websocket`
+- [x] (2026-02-26 20:11Z) Captured automated browser parity artifacts for Hyperliquid vs Hyperopen vault list:
+  - Compare run: `/hyperopen/tmp/browser-inspection/compare-2026-02-26T20-11-33-993Z-65f55f88/`
+  - Visual diff image: `/hyperopen/tmp/browser-inspection/compare-2026-02-26T20-11-33-993Z-65f55f88/desktop-visual-diff.png`
+  - Semantic/style report: `/hyperopen/tmp/browser-inspection/compare-2026-02-26T20-11-33-993Z-65f55f88/desktop-report.md`
+- [x] (2026-02-26 20:29Z) Implemented vault list parity polish milestone focused on Hyperliquid behavior fidelity:
+  - In `/hyperopen/src/hyperopen/views/vaults/vm.cljs`, excluded `relationship.type = child` rows from list/TVL totals and split protocol vaults using the same protocol names (`Liquidator`, `Hyperliquidity Provider (HLP)`).
+  - In `/hyperopen/src/hyperopen/views/vaults/vm.cljs`, matched Hyperliquid row ordering behavior by prioritizing rows with user deposits before table sort keys.
+  - In `/hyperopen/src/hyperopen/views/vaults_view.cljs`, aligned list presentation toward Hyperliquid semantics: full TVL currency formatting, age in days without suffix, non-compact TVL column values, green/red APR coloring, sparkline snapshot column, dropdown-style filter/range controls, and consolidated list container layout.
+  - Updated `/hyperopen/test/hyperopen/views/vaults/vm_test.cljs` for child-filtering, protocol/user grouping, and deposit-priority ordering expectations.
+- [x] (2026-02-26 20:29Z) Re-ran required validation gates after parity polish:
+  - `npm test`
+  - `npm run check`
+  - `npm run test:websocket`
 
 ## Surprises & Discoveries
 
@@ -76,6 +89,12 @@ A user can verify this by opening `/vaults`, filtering/searching, opening a vaul
 - Observation: Parent/child vault relationships materially affect detail rendering and data fetch strategy.
   Evidence: `relationship.type` in live data includes `parent`, `child`, and `normal`; `/static/js/4114...` conditionally fetches `webData2` for parent-context handling and renders child strategy links under parent vaults.
 
+- Observation: Hyperliquid list TVL discrepancy vs Hyperopen was caused by child-vault double counting.
+  Evidence: Live stats-data totals were `704,416,559.28` for all open rows but `454,078,950.38` when excluding `relationship.type = child`, matching the Hyperliquid page magnitude (`~$454,079,849`).
+
+- Observation: Hyperliquid protocol-vs-user section split on list page is driven by protocol vault names, not leader/deposit status.
+  Evidence: Production bundle module `73412` (`/static/js/7445.80ed9d41.chunk.js`) exports `["Liquidator","Hyperliquidity Provider (HLP)"]` and list-route code uses that set to partition protocol/user sections.
+
 ## Decision Log
 
 - Decision: Use `stats-data` as canonical list source, then merge `vaultSummaries` as recency patch.
@@ -90,9 +109,17 @@ A user can verify this by opening `/vaults`, filtering/searching, opening a vaul
   Rationale: Maintains architecture rules in `/hyperopen/ARCHITECTURE.md` and keeps websocket/runtime decisions deterministic.
   Date/Author: 2026-02-26 / Codex
 
+- Decision: Exclude `relationship.type = child` rows from top-level list rendering and TVL aggregation.
+  Rationale: This matches Hyperliquid list behavior and removes parent+child double-counting that inflated Hyperopen TVL totals.
+  Date/Author: 2026-02-26 / Codex
+
+- Decision: Partition protocol and user sections using protocol name allowlist parity (`Liquidator`, `Hyperliquidity Provider (HLP)`).
+  Rationale: Hyperliquid bundle logic uses protocol name matching for section split; leader/deposit-based partitioning produced materially different sections.
+  Date/Author: 2026-02-26 / Codex
+
 ## Outcomes & Retrospective
 
-Milestones 1 through 5 and 7 are complete. Vault list/detail ingestion, orchestration, route wiring, and UI parity structure are implemented and covered by dedicated VM/view/action/effect tests. Optional Milestone 6 (transactional vault actions) remains intentionally deferred; CTA affordances are present in disabled `Coming soon` state. Validation gates currently pass: `npm run check`, `npm test`, and `npm run test:websocket`.
+Milestones 1 through 5 and 7 are complete, including a post-implementation parity polish pass against Hyperliquid browser captures. Vault list/detail ingestion, orchestration, route wiring, and UI parity structure are implemented and covered by dedicated VM/view/action/effect tests. The remaining meaningful gap is fine-grained style pixel parity and full list pagination UX parity; core data semantics now align on child-vault exclusion and protocol/user sectioning. Optional Milestone 6 (transactional vault actions) remains intentionally deferred; CTA affordances are present in disabled `Coming soon` state. Validation gates currently pass: `npm run check`, `npm test`, and `npm run test:websocket`.
 
 ## Context and Orientation
 
@@ -347,3 +374,4 @@ Stable interfaces that must remain unchanged:
 - Existing trade and portfolio route behavior in `/hyperopen/src/hyperopen/views/app_view.cljs`.
 
 Plan revision note: 2026-02-26 16:53Z - Initial plan authored from live Hyperliquid Vaults bundle/API reconstruction and local Hyperopen architecture audit; selected stats-data + info-endpoint hybrid as canonical ingestion strategy for list/detail parity.
+Plan revision note: 2026-02-26 20:29Z - Updated after browser parity diff + implementation pass to record child-vault exclusion/protocol-section parity decisions, new validation evidence, and residual UI parity gaps.

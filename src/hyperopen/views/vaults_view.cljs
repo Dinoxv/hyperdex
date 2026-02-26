@@ -1,66 +1,132 @@
 (ns hyperopen.views.vaults-view
-  (:require [hyperopen.utils.formatting :as fmt]
+  (:require [clojure.string :as str]
+            [hyperopen.utils.formatting :as fmt]
             [hyperopen.wallet.core :as wallet]
             [hyperopen.views.vaults.vm :as vault-vm]))
 
-(def ^:private compact-currency-formatter
-  (js/Intl.NumberFormat.
-   "en-US"
-   #js {:notation "compact"
-        :maximumFractionDigits 1}))
-
-(defn- format-compact-currency
+(defn- format-total-currency
   [value]
-  (let [n (if (number? value) value 0)]
-    (str "$" (.format compact-currency-formatter n))))
+  (or (fmt/format-large-currency (if (number? value) value 0))
+      "$0"))
 
 (defn- format-currency
   [value]
-  (or (fmt/format-currency value)
+  (or (fmt/format-currency (if (number? value) value 0))
       "$0.00"))
 
 (defn- format-percent
   [value]
-  (let [n (if (number? value) value 0)
-        sign (cond
-               (pos? n) "+"
-               (neg? n) "-"
-               :else "")]
-    (str sign (.toFixed (js/Math.abs n) 2) "%")))
+  (let [n (if (number? value) value 0)]
+    (str (.toFixed n 2) "%")))
+
+(defn- percent-text-class
+  [value]
+  (if (neg? (if (number? value) value 0))
+    ["text-[#ff6b8a]"]
+    ["text-[#36e1d3]"]))
 
 (defn- format-age
   [days]
   (let [n (if (number? days) (max 0 (js/Math.floor days)) 0)]
-    (str n "d")))
+    (str n)))
 
-(defn- filter-chip [label active? action]
+(defn- dropdown-option [label active? action]
   [:button {:type "button"
-            :class (into ["rounded-md"
-                          "border"
+            :class (into ["flex"
+                          "w-full"
+                          "items-center"
+                          "justify-between"
+                          "rounded-md"
                           "px-2.5"
                           "py-1.5"
                           "text-xs"
-                          "font-medium"
                           "transition-colors"]
                          (if active?
-                           ["border-[#2f6b61]" "bg-[#1f5b55]" "text-trading-text"]
-                           ["border-base-300" "bg-base-100" "text-trading-text-secondary" "hover:text-trading-text"]))
-            :on {:click [[action]]}}
-   label])
-
-(defn- range-chip [label selected? range]
-  [:button {:type "button"
-            :class (into ["rounded-md"
-                          "px-2.5"
-                          "py-1.5"
-                          "text-xs"
-                          "font-medium"
-                          "transition-colors"]
-                         (if selected?
-                           ["bg-base-300" "text-trading-text"]
+                           ["bg-[#123a36]" "text-[#97fce4]"]
                            ["text-trading-text-secondary" "hover:bg-base-200" "hover:text-trading-text"]))
-            :on {:click [[:actions/set-vaults-snapshot-range range]]}}
-   label])
+            :on {:click [[action]]}}
+   [:span label]
+   (when active?
+     [:span {:aria-hidden true} "ON"])])
+
+(defn- control-menu [label summary-text options]
+  [:details {:class ["relative"]}
+   [:summary {:class ["flex"
+                      "h-9"
+                      "list-none"
+                      "cursor-pointer"
+                      "items-center"
+                      "gap-2"
+                      "rounded-xl"
+                      "border"
+                      "border-base-300"
+                      "bg-base-100"
+                      "px-3"
+                      "text-xs"
+                      "text-trading-text"
+                      "hover:bg-base-200"
+                      "focus:outline-none"
+                      "focus:ring-0"
+                      "focus:ring-offset-0"]}
+    [:span {:class ["text-trading-text-secondary"]} label]
+    [:span {:class ["max-w-[180px]" "truncate"]} summary-text]
+    [:svg {:class ["h-3.5" "w-3.5" "text-trading-text-secondary"]
+           :viewBox "0 0 20 20"
+           :fill "currentColor"
+           :aria-hidden true}
+     [:path {:fill-rule "evenodd"
+             :clip-rule "evenodd"
+             :d "M5.23 7.21a.75.75 0 0 1 1.06.02L10 11.168l3.71-3.938a.75.75 0 1 1 1.08 1.04l-4.25 4.5a.75.75 0 0 1-1.08 0l-4.25-4.5a.75.75 0 0 1 .02-1.06Z"}]]]
+   [:div {:class ["absolute"
+                  "right-0"
+                  "top-full"
+                  "z-30"
+                  "mt-1.5"
+                  "min-w-[220px]"
+                  "rounded-xl"
+                  "border"
+                  "border-base-300"
+                  "bg-base-100"
+                  "p-2"
+                  "shadow-2xl"]}
+    options]])
+
+(defn- selected-role-labels [{:keys [leading? deposited? others?]}]
+  (cond-> []
+    leading? (conj "Leading")
+    deposited? (conj "Deposited")
+    others? (conj "Others")))
+
+(defn- role-filter-menu [filters]
+  (let [role-labels (selected-role-labels filters)
+        summary-text (if (seq role-labels)
+                       (str/join ", " role-labels)
+                       "None")]
+    (control-menu "Filter"
+                  summary-text
+                  [:div {:class ["space-y-1"]}
+                   (dropdown-option "Leading" (:leading? filters) [:actions/toggle-vaults-filter :leading])
+                   (dropdown-option "Deposited" (:deposited? filters) [:actions/toggle-vaults-filter :deposited])
+                   (dropdown-option "Others" (:others? filters) [:actions/toggle-vaults-filter :others])
+                   [:div {:class ["my-1" "h-px" "bg-base-300"]}]
+                   (dropdown-option "Closed" (:show-closed? filters) [:actions/toggle-vaults-filter :closed])])))
+
+(defn- snapshot-range-label [snapshot-range]
+  (case snapshot-range
+    :day "24H"
+    :week "7D"
+    :month "30D"
+    :all-time "All-time"
+    "30D"))
+
+(defn- range-menu [snapshot-range]
+  (control-menu "Range"
+                (snapshot-range-label snapshot-range)
+                [:div {:class ["space-y-1"]}
+                 (dropdown-option "24H" (= snapshot-range :day) [:actions/set-vaults-snapshot-range :day])
+                 (dropdown-option "7D" (= snapshot-range :week) [:actions/set-vaults-snapshot-range :week])
+                 (dropdown-option "30D" (= snapshot-range :month) [:actions/set-vaults-snapshot-range :month])
+                 (dropdown-option "All-time" (= snapshot-range :all-time) [:actions/set-vaults-snapshot-range :all-time])]))
 
 (defn- sort-header [label column sort-state]
   (let [active? (= column (:column sort-state))
@@ -70,28 +136,74 @@
                       "items-center"
                       "gap-1"
                       "text-xs"
-                      "font-medium"
-                      "uppercase"
-                      "tracking-wide"
+                      "font-normal"
                       "text-trading-text-secondary"
                       "hover:text-trading-text"]
               :on {:click [[:actions/set-vaults-sort column]]}}
-     [:span label]
-     (when active?
+      [:span label]
+      (when active?
        [:span {:class ["text-xs"]}
-        (if (= :asc direction) "↑" "↓")])]))
+        (if (= :asc direction) "^" "v")])]))
 
 (defn- vault-detail-route
   [vault-address]
   (str "/vaults/" vault-address))
 
+(defn- normalize-series [series]
+  (let [values (if (sequential? series)
+                 (->> series
+                      (keep #(when (number? %) %))
+                      vec)
+                 [])]
+    (if (seq values)
+      values
+      [0 0])))
+
+(defn- sparkline-path
+  [series width height]
+  (let [points (normalize-series series)
+        min-value (apply min points)
+        max-value (apply max points)
+        value-span (max 0.000001 (- max-value min-value))
+        step-x (/ width (max 1 (dec (count points))))]
+    (->> points
+         (map-indexed (fn [idx value]
+                        (let [x (* idx step-x)
+                              normalized (/ (- value min-value) value-span)
+                              y (* (- 1 normalized) height)]
+                          (str (if (zero? idx) "M" "L")
+                               (.toFixed x 2)
+                               ","
+                               (.toFixed y 2)))))
+         (str/join " "))))
+
+(defn- snapshot-sparkline [series]
+  (let [values (normalize-series series)
+        start-value (first values)
+        end-value (last values)
+        positive? (>= end-value start-value)
+        stroke (if positive?
+                 "#36e1d3"
+                 "#ff6b8a")]
+    [:svg {:class ["h-7" "w-20"]
+           :viewBox "0 0 80 28"
+           :preserveAspectRatio "none"
+           :aria-label "Vault snapshot trend"}
+     [:path {:d (sparkline-path values 80 28)
+             :fill "none"
+             :stroke stroke
+             :stroke-width 2
+             :stroke-linecap "round"
+             :stroke-linejoin "round"
+             :vector-effect "non-scaling-stroke"}]]))
+
 (defn- vault-row
-  [{:keys [name vault-address leader apr tvl your-deposit age-days snapshot is-closed?]}]
+  [{:keys [name vault-address leader apr tvl your-deposit age-days snapshot-series is-closed?]}]
   [:tr {:class ["border-b"
-                "border-base-300/60"
+                "border-base-300/50"
                 "text-sm"
                 "text-trading-text"
-                "hover:bg-base-200/60"]
+                "hover:bg-base-200/50"]
         :data-role "vault-row"}
    [:td {:class ["px-3" "py-2.5"]}
     [:a {:href (vault-detail-route vault-address)
@@ -103,26 +215,38 @@
                  "focus:ring-offset-0"]
          :data-role "vault-row-link"}
      [:div {:class ["flex" "items-center" "gap-2"]}
-      [:span {:class ["font-medium"]} name]
+      [:span {:class ["truncate" "font-semibold" "text-trading-text"]} name]
       (when is-closed?
-        [:span {:class ["rounded" "border" "border-amber-600/50" "px-1.5" "py-0.5" "text-xs" "uppercase" "tracking-wide" "text-amber-400"]}
-         "Closed"])]
-     [:div {:class ["mt-0.5" "num" "text-xs" "text-trading-text-secondary"]}
-      (wallet/short-addr vault-address)]]]
-   [:td {:class ["px-3" "py-2.5" "num"]}
+        [:span {:class ["rounded"
+                        "border"
+                        "border-amber-600/40"
+                        "px-1.5"
+                        "py-0.5"
+                        "text-xs"
+                        "uppercase"
+                        "tracking-wide"
+                        "text-amber-300"]}
+         "Closed"])]]]
+   [:td {:class ["px-3" "py-2.5" "num" "text-trading-text"]}
     (wallet/short-addr leader)]
-   [:td {:class ["px-3" "py-2.5" "num"]} (format-percent apr)]
-   [:td {:class ["px-3" "py-2.5" "num"]} (format-compact-currency tvl)]
-   [:td {:class ["px-3" "py-2.5" "num"]} (format-currency your-deposit)]
-   [:td {:class ["px-3" "py-2.5" "num"]} (format-age age-days)]
-   [:td {:class ["px-3" "py-2.5" "num"]} (format-percent snapshot)]])
+   [:td {:class (into ["px-3" "py-2.5" "num"]
+                      (percent-text-class apr))}
+    (format-percent apr)]
+   [:td {:class ["px-3" "py-2.5" "num" "text-trading-text"]}
+    (format-currency tvl)]
+   [:td {:class ["px-3" "py-2.5" "num" "text-trading-text"]}
+    (format-currency your-deposit)]
+   [:td {:class ["px-3" "py-2.5" "num" "text-trading-text"]}
+    (format-age age-days)]
+   [:td {:class ["px-3" "py-2.5" "text-right"]}
+    (snapshot-sparkline snapshot-series)]])
 
 (defn- mobile-vault-card
-  [{:keys [name vault-address leader apr tvl your-deposit age-days snapshot]}]
+  [{:keys [name vault-address leader apr tvl your-deposit age-days]}]
   [:a {:href (vault-detail-route vault-address)
        :class ["block"
                "w-full"
-               "rounded-lg"
+               "rounded-xl"
                "border"
                "border-base-300"
                "bg-base-100"
@@ -132,34 +256,40 @@
                "hover:bg-base-200"]}
    [:div {:class ["flex" "items-center" "justify-between" "gap-2"]}
     [:div {:class ["min-w-0"]}
-     [:div {:class ["truncate" "font-medium" "text-trading-text"]} name]
+     [:div {:class ["truncate" "font-semibold" "text-trading-text"]} name]
      [:div {:class ["num" "text-xs" "text-trading-text-secondary"]}
       (wallet/short-addr vault-address)]]
     [:div {:class ["num" "text-xs" "text-trading-text-secondary"]}
      (wallet/short-addr leader)]]
    [:div {:class ["mt-3" "grid" "grid-cols-2" "gap-2" "text-xs"]}
-    [:div [:span {:class ["text-trading-text-secondary"]} "APR "] [:span {:class ["num" "text-trading-text"]} (format-percent apr)]]
-    [:div [:span {:class ["text-trading-text-secondary"]} "TVL "] [:span {:class ["num" "text-trading-text"]} (format-compact-currency tvl)]]
-    [:div [:span {:class ["text-trading-text-secondary"]} "Deposit "] [:span {:class ["num" "text-trading-text"]} (format-currency your-deposit)]]
-    [:div [:span {:class ["text-trading-text-secondary"]} "Snapshot "] [:span {:class ["num" "text-trading-text"]} (format-percent snapshot)]]
+    [:div [:span {:class ["text-trading-text-secondary"]} "APR "] [:span {:class (into ["num"] (percent-text-class apr))} (format-percent apr)]]
+    [:div [:span {:class ["text-trading-text-secondary"]} "TVL "] [:span {:class ["num" "text-trading-text"]} (format-currency tvl)]]
+    [:div [:span {:class ["text-trading-text-secondary"]} "Your Deposit "] [:span {:class ["num" "text-trading-text"]} (format-currency your-deposit)]]
     [:div [:span {:class ["text-trading-text-secondary"]} "Age "] [:span {:class ["num" "text-trading-text"]} (format-age age-days)]]]])
 
 (defn- section-table [label rows sort-state]
-  [:section {:class ["rounded-xl" "border" "border-base-300" "bg-base-100/95" "overflow-hidden"]}
-   [:div {:class ["flex" "items-center" "justify-between" "px-3" "py-2.5" "border-b" "border-base-300"]}
-    [:h3 {:class ["text-sm" "font-semibold" "text-trading-text"]} label]
-    [:span {:class ["num" "text-xs" "text-trading-text-secondary"]} (str (count rows) " vaults")]]
+  [:section {:class ["space-y-2"]}
+   [:h3 {:class ["text-sm" "font-normal" "text-trading-text"]} label]
    [:div {:class ["hidden" "md:block" "overflow-x-auto"]}
-    [:table {:class ["w-full" "border-collapse"] :data-role (str "vaults-" label "-table")}
+    [:table {:class ["w-full" "border-collapse"]
+             :data-role (str "vaults-" (str/lower-case (str/replace label #"\\s+" "-")) "-table")}
+     [:colgroup
+      [:col {:style {:width "24%"}}]
+      [:col {:style {:width "16%"}}]
+      [:col {:style {:width "12%"}}]
+      [:col {:style {:width "12%"}}]
+      [:col {:style {:width "12%"}}]
+      [:col {:style {:width "12%"}}]
+      [:col {:style {:width "12%"}}]]
      [:thead
-      [:tr {:class ["border-b" "border-base-300" "bg-base-200/70"]}
+      [:tr {:class ["border-b" "border-base-300/70"]}
        [:th {:class ["px-3" "py-2" "text-left"]} (sort-header "Vault" :vault sort-state)]
        [:th {:class ["px-3" "py-2" "text-left"]} (sort-header "Leader" :leader sort-state)]
        [:th {:class ["px-3" "py-2" "text-left"]} (sort-header "APR" :apr sort-state)]
        [:th {:class ["px-3" "py-2" "text-left"]} (sort-header "TVL" :tvl sort-state)]
        [:th {:class ["px-3" "py-2" "text-left"]} (sort-header "Your Deposit" :your-deposit sort-state)]
        [:th {:class ["px-3" "py-2" "text-left"]} (sort-header "Age" :age sort-state)]
-       [:th {:class ["px-3" "py-2" "text-left"]} (sort-header "Snapshot" :snapshot sort-state)]]]
+       [:th {:class ["px-3" "py-2" "text-right"]} (sort-header "Snapshot" :snapshot sort-state)]]]
      [:tbody
       (if (seq rows)
         (for [row rows]
@@ -169,12 +299,20 @@
           [:td {:col-span 7
                 :class ["px-3" "py-6" "text-center" "text-sm" "text-trading-text-secondary"]}
            "No vaults match current filters."]]])]]]
-   [:div {:class ["md:hidden" "space-y-2" "p-3"]}
+   [:div {:class ["space-y-2" "md:hidden"]}
     (if (seq rows)
       (for [row rows]
         ^{:key (str "mobile-vault-row-" (:vault-address row))}
         (mobile-vault-card row))
-      [:div {:class ["rounded-lg" "border" "border-base-300" "bg-base-200/60" "px-3" "py-4" "text-center" "text-sm" "text-trading-text-secondary"]}
+      [:div {:class ["rounded-lg"
+                     "border"
+                     "border-base-300"
+                     "bg-base-200/60"
+                     "px-3"
+                     "py-4"
+                     "text-center"
+                     "text-sm"
+                     "text-trading-text-secondary"]}
        "No vaults match current filters."])]] )
 
 (defn vaults-view
@@ -188,71 +326,74 @@
                 protocol-rows
                 user-rows
                 total-visible-tvl]} (vault-vm/vault-list-vm state)]
-    [:div {:class ["w-full" "app-shell-gutter" "py-4" "space-y-4"]
+    [:div {:class ["relative" "w-full" "app-shell-gutter" "py-6"]
            :data-parity-id "vaults-root"}
-     [:div {:class ["flex" "flex-wrap" "items-center" "justify-between" "gap-3"]}
-      [:div
-       [:h1 {:class ["text-xl" "font-semibold" "text-trading-text"]} "Vaults"]
-       [:p {:class ["text-sm" "text-trading-text-secondary"]}
-        "Discover protocol and user vault strategies."]]
-      [:button {:type "button"
-                :disabled true
-                :class ["rounded-lg"
-                        "border"
-                        "border-base-300"
-                        "bg-base-100"
-                        "px-3"
-                        "py-2"
-                        "text-sm"
-                        "text-trading-text-secondary"
-                        "opacity-70"
-                        "cursor-not-allowed"]}
-       "Create Vault (Coming soon)"]]
+     [:div {:class ["pointer-events-none"
+                    "absolute"
+                    "inset-x-0"
+                    "top-0"
+                    "h-[360px]"
+                    "rounded-[24px]"
+                    "opacity-95"]
+            :style {:background-image "radial-gradient(120% 120% at 15% -10%, rgba(0, 148, 111, 0.35), rgba(6, 30, 34, 0.05) 60%), radial-gradient(130% 140% at 85% 20%, rgba(0, 138, 96, 0.22), rgba(6, 30, 34, 0) 68%), linear-gradient(180deg, rgba(4, 43, 36, 0.72) 0%, rgba(6, 27, 32, 0.15) 100%)"}}]
 
-     [:div {:class ["grid" "gap-3" "lg:grid-cols-[280px_minmax(0,1fr)]"]}
-      [:div {:class ["rounded-xl" "border" "border-base-300" "bg-base-100/95" "p-3"]}
-       [:div {:class ["text-xs" "uppercase" "tracking-wide" "text-trading-text-secondary"]}
+     [:div {:class ["relative" "mx-auto" "w-full" "max-w-[1280px]" "space-y-4"]}
+      [:div {:class ["flex" "flex-wrap" "items-center" "justify-between" "gap-3"]}
+       [:h1 {:class ["text-3xl" "font-normal" "text-trading-text" "sm:text-[48px]" "sm:leading-[52px]"]}
+        "Vaults"]
+       [:button {:type "button"
+                 :disabled true
+                 :class ["rounded-xl"
+                         "bg-[#55e6ce]"
+                         "px-5"
+                         "py-2.5"
+                         "text-sm"
+                         "font-medium"
+                         "text-[#043a33]"
+                         "opacity-70"
+                         "cursor-not-allowed"]}
+        "Establish Connection"]]
+
+      [:div {:class ["w-full" "max-w-[360px]" "rounded-2xl" "bg-[#0f1a1f]" "px-3" "py-3"]}
+       [:div {:class ["text-sm" "font-normal" "text-trading-text-secondary"]}
         "Total Value Locked"]
-       [:div {:class ["mt-1" "num" "text-2xl" "font-semibold" "text-trading-text"]}
-        (format-currency total-visible-tvl)]]
+       [:div {:class ["mt-1" "num" "text-[44px]" "leading-[46px]" "font-normal" "text-trading-text"]}
+        (format-total-currency total-visible-tvl)]]
 
-      [:div {:class ["rounded-xl" "border" "border-base-300" "bg-base-100/95" "p-3" "space-y-3"]}
+      [:div {:class ["rounded-2xl" "border" "border-base-300/80" "bg-base-100/90" "p-3"]}
        [:div {:class ["flex" "flex-wrap" "items-center" "gap-2"]}
         [:input {:id "vaults-search-input"
                  :type "search"
                  :class ["h-9"
-                         "min-w-[220px]"
+                         "min-w-[260px]"
                          "flex-1"
-                         "rounded-lg"
+                         "rounded-xl"
                          "border"
                          "border-base-300"
                          "bg-base-100"
                          "px-3"
-                         "text-sm"
+                         "text-xs"
                          "text-trading-text"
+                         "placeholder:text-trading-text-secondary"
                          "focus:outline-none"
                          "focus:ring-0"
                          "focus:ring-offset-0"]
-                 :placeholder "Search vault, leader, or address"
+                 :placeholder "Search by vault address, name or leader..."
                  :value query
                  :on {:input [[:actions/set-vaults-search-query [:event.target/value]]]}}]
-        (filter-chip "Leading" (:leading? filters) [:actions/toggle-vaults-filter :leading])
-        (filter-chip "Deposited" (:deposited? filters) [:actions/toggle-vaults-filter :deposited])
-        (filter-chip "Others" (:others? filters) [:actions/toggle-vaults-filter :others])
-        (filter-chip "Closed" (:show-closed? filters) [:actions/toggle-vaults-filter :closed])]
-       [:div {:class ["flex" "items-center" "gap-1"]}
-        (range-chip "24H" (= snapshot-range :day) :day)
-        (range-chip "7D" (= snapshot-range :week) :week)
-        (range-chip "30D" (= snapshot-range :month) :month)
-        (range-chip "All-time" (= snapshot-range :all-time) :all-time)]]]
+        (role-filter-menu filters)
+        (range-menu snapshot-range)]]
 
-     (when loading?
-       [:div {:class ["rounded-lg" "border" "border-base-300" "bg-base-100" "px-3" "py-2.5" "text-sm" "text-trading-text-secondary"]}
-        "Loading vaults..."])
+      (when loading?
+        [:div {:class ["rounded-xl" "border" "border-base-300" "bg-base-100" "px-3" "py-2.5" "text-sm" "text-trading-text-secondary"]}
+         "Loading vaults..."])
 
-     (when error
-       [:div {:class ["rounded-lg" "border" "border-red-500/40" "bg-red-900/20" "px-3" "py-2.5" "text-sm" "text-red-200"]}
-        error])
+      (when error
+        [:div {:class ["rounded-xl" "border" "border-red-500/40" "bg-red-900/20" "px-3" "py-2.5" "text-sm" "text-red-200"]}
+         error])
 
-     (section-table "Protocol Vaults" protocol-rows sort)
-     (section-table "User Vaults" user-rows sort)]))
+      [:section {:class ["rounded-2xl" "border" "border-base-300/80" "bg-base-100/95" "p-3" "space-y-6"]}
+       (section-table "Protocol Vaults" protocol-rows sort)
+       (section-table "User Vaults" user-rows sort)
+       [:div {:class ["text-right" "text-xs" "text-trading-text-secondary"]}
+        (str (count protocol-rows) " protocol vaults | " (count user-rows) " user vaults")]]]]))
