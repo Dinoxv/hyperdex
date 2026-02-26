@@ -68,9 +68,44 @@
   (let [n (if (number? pct) pct 0)]
     (str (.toFixed n 3) "%")))
 
+(defn- finite-number? [value]
+  (and (number? value)
+       (js/isFinite value)))
+
 (defn- format-percent [pct]
   (let [n (if (number? pct) pct 0)]
     (str (.toFixed n 2) "%")))
+
+(defn- format-signed-percent-from-decimal [value]
+  (when (finite-number? value)
+    (let [pct (* value 100)
+          rounded (/ (js/Math.round (* pct 100)) 100)
+          rounded* (if (== rounded -0) 0 rounded)
+          sign (cond
+                 (pos? rounded*) "+"
+                 (neg? rounded*) "-"
+                 :else "")
+          magnitude (.toFixed (js/Math.abs rounded*) 2)]
+      (str sign magnitude "%"))))
+
+(defn- format-ratio-value [value]
+  (when (finite-number? value)
+    (.toFixed value 2)))
+
+(defn- format-integer-value [value]
+  (when (finite-number? value)
+    (.format integer-formatter (js/Math.round value))))
+
+(defn- format-metric-value [kind value]
+  (case kind
+    :percent (or (format-signed-percent-from-decimal value) "--")
+    :ratio (or (format-ratio-value value) "--")
+    :integer (or (format-integer-value value) "--")
+    :date (if (and (string? value)
+                   (seq (string/trim value)))
+            value
+            "--")
+    "--"))
 
 (defn- format-drawdown [ratio]
   (if (number? ratio)
@@ -642,6 +677,39 @@
       (when (= selected-tab :returns)
         (returns-benchmark-chip-rail returns-benchmark*))])))
 
+(defn- performance-metric-row [{:keys [key label kind value]}]
+  [:div {:class ["grid" "grid-cols-[1fr_auto]" "items-center" "gap-3"]
+         :data-role (str "portfolio-performance-metric-" (name key))}
+   [:span {:class ["text-sm" "text-trading-text-secondary"]}
+    label]
+   [:span {:class (into ["text-sm" "text-trading-text"]
+                        (when (not= kind :date)
+                          ["num"]))}
+    (format-metric-value kind value)]])
+
+(defn- performance-metrics-card [{:keys [benchmark-selected?
+                                         benchmark-label
+                                         groups]}]
+  (section-card
+   "portfolio-performance-metrics-card"
+   [:div {:class ["flex" "items-center" "justify-between" "gap-3" "border-b" "border-base-300" "px-4" "py-3"]}
+    [:h2 {:class ["text-sm" "font-medium" "text-trading-text"]}
+     "Performance Metrics"]
+    (when benchmark-selected?
+      [:span {:class ["text-xs" "text-trading-text-secondary"]
+              :data-role "portfolio-performance-metrics-benchmark-label"}
+       (str "Benchmark: " benchmark-label)])]
+   [:div {:class ["space-y-2.5" "px-4" "py-3"]}
+    (for [[idx {:keys [id rows]}] (map-indexed vector (or groups []))]
+      ^{:key (str "portfolio-performance-metrics-group-" (name id))}
+      [:div {:class (into ["space-y-1.5"]
+                          (when (pos? idx)
+                            ["border-t" "border-base-300" "pt-2.5"]))
+             :data-role (str "portfolio-performance-metrics-group-" (name id))}
+       (for [{:keys [key] :as row} rows]
+         ^{:key (str "portfolio-performance-metric-row-" (name key))}
+         (performance-metric-row row))])]))
+
 (defn- metric-cards [{:keys [volume-14d-usd fees]}]
   [:div {:class ["grid" "grid-cols-1" "gap-3" "md:grid-cols-2" "xl:grid-cols-1"]}
    (section-card
@@ -695,6 +763,7 @@
       (metric-cards view-model)
       (summary-card view-model)
       (chart-card view-model)]
+     (performance-metrics-card (:performance-metrics view-model))
      [:div {:class ["rounded-xl" "border" "border-base-300" "bg-base-100/95" "overflow-hidden"]
             :data-role "portfolio-account-table"}
       (account-info-view/account-info-view state)]]))

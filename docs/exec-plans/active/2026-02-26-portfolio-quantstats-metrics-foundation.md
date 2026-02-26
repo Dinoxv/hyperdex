@@ -25,7 +25,9 @@ A contributor can verify the behavior by opening `/portfolio` and seeing each me
 - [x] (2026-02-26 21:02Z) Implemented Milestone 3 VM integration in `/hyperopen/src/hyperopen/views/portfolio/vm.cljs` by adding `:performance-metrics` payload wiring (grouped metric rows + benchmark metadata) sourced from `compute-performance-metrics`.
 - [x] (2026-02-26 21:02Z) Added Milestone 3 VM wiring regression coverage in `/hyperopen/test/hyperopen/views/portfolio/vm_test.cljs` for benchmark-off and benchmark-on metric behavior.
 - [x] (2026-02-26 21:05Z) Re-ran required gates after Milestone 3 changes: `npm test`, `npm run test:websocket`, `npm run check`.
-- [ ] Render grouped metric rows in portfolio view.
+- [x] (2026-02-26 21:42Z) Implemented Milestone 4 view rendering in `/hyperopen/src/hyperopen/views/portfolio_view.cljs` with grouped QuantStats metric rows, benchmark label context, and deterministic `"--"` fallback formatting.
+- [x] (2026-02-26 21:45Z) Extended `/hyperopen/test/hyperopen/views/portfolio_view_test.cljs` with metric-card rendering and formatting assertions (percent sign formatting, ratio/date/integer rendering, and nil fallback behavior).
+- [x] (2026-02-26 21:49Z) Re-ran required gates after Milestone 4 changes: `npm test`, `npm run test:websocket`, `npm run check`.
 - [x] Extend parity-focused tests for full QuantStats metric coverage.
 
 ## Surprises & Discoveries
@@ -87,14 +89,15 @@ A contributor can verify the behavior by opening `/portfolio` and seeing each me
 ## Outcomes & Retrospective
 
 Milestones 1 through 3 are now implemented. The flow-adjusted return adapter and QuantStats-style formula engine live in `/hyperopen/src/hyperopen/portfolio/metrics.cljs`, and VM now emits grouped performance-metric payloads in `/hyperopen/src/hyperopen/views/portfolio/vm.cljs`.
+Milestone 4 is now also implemented: `/portfolio` view renders grouped performance metrics from VM with deterministic formatting/fallback behavior.
 
 Validation status after this slice:
 
-- `npm test` passed (`Ran 1423 tests containing 7045 assertions. 0 failures, 0 errors.`).
+- `npm test` passed (`Ran 1429 tests containing 7090 assertions. 0 failures, 0 errors.`).
 - `npm run test:websocket` passed (`Ran 153 tests containing 696 assertions. 0 failures, 0 errors.`).
 - `npm run check` passed (docs/hiccup lint + app/test compile).
 
-Remaining work is Milestone 4+: render the grouped `:performance-metrics` payload in `/portfolio` view and add view-level rendering tests.
+This ExecPlan scope is now implemented end-to-end across metrics engine, VM integration, and view rendering with regression coverage.
 
 ## Context and Orientation
 
