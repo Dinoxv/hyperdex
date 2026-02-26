@@ -150,16 +150,61 @@
         status-strings (set (hiccup/collect-strings status-cell))
         underlined-status (hiccup/find-first-node status-cell
                                                   #(contains? (hiccup/node-class-set %)
-                                                              "underline"))]
+                                                              "underline"))
+        status-tooltip-container (hiccup/find-first-node status-cell
+                                                         #(contains? (hiccup/node-class-set %)
+                                                                     "pointer-events-none"))
+        status-tooltip-panel (hiccup/find-first-node status-cell
+                                                     #(contains? (hiccup/node-class-set %)
+                                                                 "bg-gray-800"))]
     (is (contains? status-classes "break-words"))
     (is (contains? status-classes "leading-4"))
     (is (contains? direction-strings "Close Long"))
     (is (contains? status-strings "Canceled"))
     (is (contains? status-strings "Canceled due to reduce only."))
     (is (some? underlined-status))
+    (is (some? status-tooltip-container))
+    (is (contains? (hiccup/node-class-set status-tooltip-container) "left-1/2"))
+    (is (contains? (hiccup/node-class-set status-tooltip-container) "-translate-x-1/2"))
+    (is (some? status-tooltip-panel))
+    (is (contains? (hiccup/node-class-set status-tooltip-panel) "w-max"))
+    (is (= :div (first status-tooltip-panel)))
     (is (contains? order-id-classes "order-history-order-id-text"))
     (is (contains? order-id-classes "tracking-tight"))
     (is (contains? order-id-classes "whitespace-nowrap"))))
+
+(deftest order-history-tab-content-dedupes-open-and-filled-rows-with-the-same-order-id-test
+  (let [rows [{:order {:coin "PUMP"
+                       :oid 330007475448
+                       :side "A"
+                       :origSz "11273"
+                       :remainingSz "11273"
+                       :limitPx "0.001772"
+                       :orderType "Limit"
+                       :timestamp 1700000000000}
+               :status "open"
+               :statusTimestamp 1700000000000}
+              {:order {:coin "PUMP"
+                       :oid 330007475448
+                       :side "A"
+                       :origSz "11273"
+                       :remainingSz "0.0"
+                       :limitPx "0.001772"
+                       :orderType "Limit"
+                       :timestamp 1700000000000}
+               :status "filled"
+               :statusTimestamp 1700000000000}]
+        content (@#'view/order-history-table rows {:sort {:column "Time" :direction :desc}
+                                                   :status-filter :all
+                                                   :loading? false})
+        viewport (hiccup/tab-rows-viewport-node content)
+        rendered-rows (vec (hiccup/node-children viewport))
+        row-strings (set (hiccup/collect-strings (first rendered-rows)))
+        all-strings (hiccup/collect-strings content)]
+    (is (= 1 (count rendered-rows)))
+    (is (contains? row-strings "Filled"))
+    (is (not (contains? row-strings "Open")))
+    (is (= 1 (count (filter #(= "330007475448" %) all-strings))))))
 
 (deftest order-history-coin-labels-are-bold-and-side-colored-test
   (let [rows [{:order {:coin "xyz:NVDA"

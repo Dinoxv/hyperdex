@@ -234,3 +234,30 @@
         normalized (projections/normalize-order-history-row row)]
     (is (= "Partially Filled" (:status-label normalized)))
     (is (< (js/Math.abs (- 12.23 (:filled-size normalized))) 1e-9))))
+
+(deftest normalized-order-history-prefers-filled-rows-over-open-rows-for-the-same-order-id-test
+  (let [open-row {:order {:coin "PUMP"
+                          :oid 330007475448
+                          :side "A"
+                          :origSz "11273"
+                          :remainingSz "11273"
+                          :limitPx "0.001772"
+                          :timestamp 1700000000000}
+                  :status "open"
+                  :statusTimestamp 1700000000000}
+        filled-row {:order {:coin "PUMP"
+                            :oid 330007475448
+                            :side "A"
+                            :origSz "11273"
+                            :remainingSz "0.0"
+                            :limitPx "0.001772"
+                            :timestamp 1700000000000}
+                    :status "filled"
+                    :statusTimestamp 1700000000000}
+        open-first (projections/normalized-order-history [open-row filled-row])
+        filled-first (projections/normalized-order-history [filled-row open-row])]
+    (doseq [rows [open-first filled-first]]
+      (is (= 1 (count rows)))
+      (is (= :filled (:status-key (first rows))))
+      (is (= "Filled" (:status-label (first rows))))
+      (is (= 11273 (:filled-size (first rows)))))))

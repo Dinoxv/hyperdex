@@ -399,6 +399,74 @@
         :status-label status-label
         :status-tooltip status-tooltip}))))
 
+(def ^:private unknown-order-history-time-ms -1)
+(def ^:private unknown-order-history-filled-size -1)
+
+(defn- order-history-status-rank [status-key]
+  (case status-key
+    :filled 5
+    :canceled 4
+    :rejected 4
+    :triggered 3
+    :open 1
+    0))
+
+(defn- order-history-row-preferred?
+  [candidate incumbent]
+  (let [candidate-rank (order-history-status-rank (:status-key candidate))
+        incumbent-rank (order-history-status-rank (:status-key incumbent))]
+    (cond
+      (> candidate-rank incumbent-rank) true
+      (< candidate-rank incumbent-rank) false
+      :else
+      (let [candidate-time (or (:time-ms candidate) unknown-order-history-time-ms)
+            incumbent-time (or (:time-ms incumbent) unknown-order-history-time-ms)]
+        (cond
+          (> candidate-time incumbent-time) true
+          (< candidate-time incumbent-time) false
+          :else
+          (> (or (:filled-size candidate) unknown-order-history-filled-size)
+             (or (:filled-size incumbent) unknown-order-history-filled-size)))))))
+
+(defn- order-history-identity-key [row]
+  (let [oid (parse/normalize-id (:oid row))
+        coin-token (coins/normalized-coin-token (:coin row))]
+    (cond
+      (and (seq coin-token) (some? oid))
+      [coin-token oid]
+
+      (some? oid)
+      [:oid oid]
+
+      :else
+      nil)))
+
+(defn- dedupe-order-history-by-identity [rows]
+  (let [{:keys [rows-by-key key-order rows-without-id]}
+        (reduce (fn [{:keys [rows-by-key key-order] :as acc} row]
+                  (if-let [identity-key (order-history-identity-key row)]
+                    (let [existing (get rows-by-key identity-key)]
+                      (cond
+                        (nil? existing)
+                        (-> acc
+                            (assoc :rows-by-key (assoc rows-by-key identity-key row))
+                            (assoc :key-order (conj key-order identity-key)))
+
+                        (order-history-row-preferred? row existing)
+                        (assoc acc :rows-by-key (assoc rows-by-key identity-key row))
+
+                        :else
+                        acc))
+                    (update acc :rows-without-id conj row)))
+                {:rows-by-key {}
+                 :key-order []
+                 :rows-without-id []}
+                (or rows []))]
+    (->> key-order
+         (map #(get rows-by-key %))
+         (concat rows-without-id)
+         vec)))
+
 (defn normalized-order-history
   ([rows]
    (normalized-order-history rows nil))
@@ -406,4 +474,5 @@
    (->> (or rows [])
         (map #(normalize-order-history-row % order-history-status-labels))
         (remove nil?)
+        dedupe-order-history-by-identity
         vec)))
