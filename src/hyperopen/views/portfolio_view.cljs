@@ -408,6 +408,7 @@
                      "bg-base-100/95"
                      "px-2"
                      "py-1"]
+             :style {:padding-top "15px"}
              :data-role "portfolio-chart-legend"}
        (for [{:keys [id label stroke]} visible-series]
          ^{:key (str "portfolio-chart-legend-item-" (name id))}
