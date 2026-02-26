@@ -29,7 +29,7 @@
 (def order-history-sell-coin-color "rgb(234, 175, 184)")
 (def ^:private short-order-side-values #{"A" "S"})
 (def ^:private order-history-status-tooltip-width-class
-  "w-56")
+  "w-max")
 
 (defn order-history-status-filter-key [order-history-state]
   (let [status-filter (:status-filter order-history-state)]
@@ -225,7 +225,8 @@
         label]
        [:span {:class ["pointer-events-none"
                        "absolute"
-                       "left-0"
+                       "left-1/2"
+                       "-translate-x-1/2"
                        "bottom-full"
                        "z-50"
                        "mb-2"
@@ -234,22 +235,24 @@
                        "duration-200"
                        "group-hover:opacity-100"
                        "group-focus-within:opacity-100"]}
-        [:span {:class ["relative"
-                        order-history-status-tooltip-width-class
-                        "max-w-[calc(100vw-2rem)]"
-                        "rounded-md"
-                        "bg-gray-800"
-                        "px-2.5"
-                        "py-1.5"
-                        "text-xs"
-                        "leading-tight"
-                        "text-gray-100"
-                        "shadow-lg"
-                        "whitespace-normal"]}
+        [:div {:class ["relative"
+                       order-history-status-tooltip-width-class
+                       "max-w-[calc(100vw-2rem)]"
+                       "rounded-md"
+                       "bg-gray-800"
+                       "px-2.5"
+                       "py-1.5"
+                       "text-left"
+                       "text-xs"
+                       "leading-tight"
+                       "text-gray-100"
+                       "shadow-lg"
+                       "whitespace-normal"]}
          tooltip-text
          [:span {:class ["absolute"
                          "top-full"
-                         "left-3"
+                         "left-1/2"
+                         "-translate-x-1/2"
                          "h-0"
                          "w-0"
                          "border-4"
