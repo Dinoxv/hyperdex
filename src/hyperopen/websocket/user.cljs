@@ -1,5 +1,9 @@
 (ns hyperopen.websocket.user
   (:require [clojure.string :as str]
+            [hyperopen.api.default :as api]
+            [hyperopen.api.market-metadata.facade :as market-metadata]
+            [hyperopen.api.promise-effects :as promise-effects]
+            [hyperopen.api.projections :as api-projections]
             [hyperopen.domain.funding-history :as funding-history]
             [hyperopen.order.feedback-runtime :as order-feedback-runtime]
             [hyperopen.platform :as platform]
@@ -9,6 +13,9 @@
             [hyperopen.wallet.address-watcher :as address-watcher]))
 
 (defonce user-state (atom {:subscriptions #{}}))
+(defonce ^:private account-surface-refresh-timeout-id (atom nil))
+
+(def ^:private fill-account-surface-refresh-debounce-ms 250)
 
 (defn- subscribe! [sub]
   (ws-client/send-message! {:method "subscribe"
@@ -41,6 +48,79 @@
 (defn- upsert-seq [current incoming]
   (let [combined (concat incoming current)]
     (vec (take 200 combined))))
+
+(defn- refresh-open-orders-snapshot!
+  [store address dex opts]
+  (-> (api/request-frontend-open-orders! address
+                                         (cond-> (or opts {})
+                                           (and dex (not= dex "")) (assoc :dex dex)))
+      (.then (promise-effects/apply-success-and-return
+              store
+              api-projections/apply-open-orders-success
+              dex))
+      (.catch (promise-effects/apply-error-and-reject
+               store
+               api-projections/apply-open-orders-error))))
+
+(defn- refresh-default-clearinghouse-snapshot!
+  [store address opts]
+  (-> (api/request-clearinghouse-state! address nil opts)
+      (.then (fn [data]
+               (swap! store
+                      (fn [state]
+                        (if (= address (get-in state [:wallet :address]))
+                          (assoc-in state [:webdata2 :clearinghouseState] data)
+                          state)))))
+      (.catch (fn [err]
+                (telemetry/log! "Error refreshing default clearinghouse state after user fill:" err)))))
+
+(defn- refresh-perp-dex-clearinghouse-snapshot!
+  [store address dex opts]
+  (-> (api/request-clearinghouse-state! address dex opts)
+      (.then (promise-effects/apply-success-and-return
+              store
+              api-projections/apply-perp-dex-clearinghouse-success
+              dex))
+      (.catch (promise-effects/apply-error-and-reject
+               store
+               api-projections/apply-perp-dex-clearinghouse-error))))
+
+(defn- refresh-account-surfaces-after-user-fill!
+  [store address]
+  (when address
+    (refresh-open-orders-snapshot! store address nil {:priority :high})
+    (refresh-default-clearinghouse-snapshot! store address {:priority :high})
+    (-> (market-metadata/ensure-and-apply-perp-dex-metadata!
+         {:store store
+          :ensure-perp-dexs-data! api/ensure-perp-dexs-data!
+          :apply-perp-dexs-success api-projections/apply-perp-dexs-success
+          :apply-perp-dexs-error api-projections/apply-perp-dexs-error}
+         {:priority :low})
+        (.then (fn [dex-names]
+                 (doseq [dex dex-names]
+                   (refresh-open-orders-snapshot! store address dex {:priority :low})
+                   (refresh-perp-dex-clearinghouse-snapshot! store address dex {:priority :low}))))
+        (.catch (fn [err]
+                  (telemetry/log! "Error refreshing per-dex account surfaces after user fill:" err))))))
+
+(defn- clear-account-surface-refresh-timeout!
+  []
+  (when-let [timeout-id @account-surface-refresh-timeout-id]
+    (platform/clear-timeout! timeout-id)
+    (reset! account-surface-refresh-timeout-id nil)))
+
+(defn- schedule-account-surface-refresh-after-fill!
+  [store]
+  (let [address (get-in @store [:wallet :address])]
+    (when address
+      (clear-account-surface-refresh-timeout!)
+      (reset! account-surface-refresh-timeout-id
+              (platform/set-timeout!
+               (fn []
+                 (reset! account-surface-refresh-timeout-id nil)
+                 (when (= address (get-in @store [:wallet :address]))
+                   (refresh-account-surfaces-after-user-fill! store address)))
+               fill-account-surface-refresh-debounce-ms)))))
 
 (defn- extract-channel-rows
   [msg collection-key]
@@ -168,7 +248,8 @@
                   new-rows (vec (novel-fills existing rows))]
               (when (seq new-rows)
                 (swap! store update-in [:orders :fills] #(upsert-seq (or % []) new-rows))
-                (show-user-fill-toast! store new-rows)))))))))
+                (show-user-fill-toast! store new-rows)
+                (schedule-account-surface-refresh-after-fill! store)))))))))
 
 (defn- user-fundings-handler [store]
   (fn [msg]

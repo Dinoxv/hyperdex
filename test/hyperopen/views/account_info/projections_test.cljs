@@ -147,6 +147,14 @@
                           (str value)))
                      rows))))))
 
+(deftest open-orders-source-treats-explicit-live-open-orders-payload-as-authoritative-even-when-empty-test
+  (let [live-payload {:user "0xabc"
+                      :isSnapshot false
+                      :openOrders []}
+        fallback [{:coin "SOL" :oid 11}]
+        source (projections/open-orders-source live-payload fallback nil)]
+    (is (= [] (vec source)))))
+
 (deftest parse-time-ms-normalizes-seconds-and-milliseconds-test
   (is (= 1710000000000 (projections/parse-time-ms 1710000000)))
   (is (= 1710000000000 (projections/parse-time-ms 1710000000000)))

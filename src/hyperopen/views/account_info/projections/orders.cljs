@@ -217,11 +217,23 @@
                  (->> (open-orders-seq orders)
                       (map #(attach-order-dex % dex)))))))
 
+(defn- live-open-orders-present?
+  [orders]
+  (cond
+    (nil? orders) false
+    (sequential? orders) true
+    (map? orders) (or (contains? orders :orders)
+                      (contains? orders :openOrders)
+                      (contains? orders :data)
+                      (contains? orders :order))
+    :else false))
+
 (defn open-orders-source [orders snapshot snapshot-by-dex]
   (let [live (open-orders-seq orders)
+        live-present? (live-open-orders-present? orders)
         fallback (open-orders-seq snapshot)
         dex-orders (open-orders-by-dex snapshot-by-dex)]
-    (concat (if (seq live) live fallback) dex-orders)))
+    (concat (if live-present? live fallback) dex-orders)))
 
 (defn pending-cancel-oid-set
   [pending-cancel-oids]
