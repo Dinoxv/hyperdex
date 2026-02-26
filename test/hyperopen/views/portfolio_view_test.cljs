@@ -196,6 +196,7 @@
                              {:t 4 :c 60}]))
         view-node (portfolio-view/portfolio-view state)
         selector-node (find-first-node view-node #(= "portfolio-returns-benchmark-selector" (get-in % [1 :data-role])))
+        benchmark-search-input (find-first-node view-node #(= "portfolio-returns-benchmark-search" (get-in % [1 :id])))
         chip-rail-node (find-first-node view-node #(= "portfolio-returns-benchmark-chip-rail" (get-in % [1 :data-role])))
         chip-node (find-first-node view-node #(= "portfolio-returns-benchmark-chip-SPY" (get-in % [1 :data-role])))
         legend-node (find-first-node view-node #(= "portfolio-chart-legend" (get-in % [1 :data-role])))
@@ -204,13 +205,13 @@
         all-text (set (collect-strings view-node))
         chip-border-color (get-in chip-node [1 :style :border-color])]
     (is (some? selector-node))
+    (is (= "Search benchmarks and press Enter" (get-in benchmark-search-input [1 :placeholder])))
     (is (some? chip-rail-node))
     (is (some? chip-node))
     (is (some? legend-node))
     (is (= 1 legend-count))
     (is (some? benchmark-path-node))
     (is (= "rgba(242, 207, 102, 0.58)" chip-border-color))
-    (is (contains? all-text "Benchmarks"))
     (is (contains? all-text "Portfolio"))
     (is (contains? all-text "SPY (SPOT)"))))
 

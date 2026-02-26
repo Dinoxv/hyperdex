@@ -303,8 +303,6 @@
   (let [candidates* (vec (or candidates []))]
     [:div {:class ["relative" "w-[320px]"]
            :data-role "portfolio-returns-benchmark-selector"}
-     [:div {:class ["mb-1" "text-xs" "font-medium" "uppercase" "tracking-[0.04em]" "text-trading-text-secondary"]}
-      "Benchmarks"]
      [:div {:class ["rounded-md" "border" "border-base-300" "bg-base-100" "px-2"]}
       [:input {:id "portfolio-returns-benchmark-search"
                :class ["h-9"
@@ -318,7 +316,7 @@
                        "focus:ring-0"
                        "focus:ring-offset-0"]
                :type "search"
-               :placeholder "Search symbols and press Enter"
+               :placeholder "Search benchmarks and press Enter"
                :aria-label "Search benchmark symbols"
                :autocomplete "off"
                :spellcheck false
