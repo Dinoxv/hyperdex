@@ -122,6 +122,12 @@
 (def select-portfolio-chart-tab
   portfolio-actions/select-portfolio-chart-tab)
 
+(def set-portfolio-chart-hover
+  portfolio-actions/set-portfolio-chart-hover)
+
+(def clear-portfolio-chart-hover
+  portfolio-actions/clear-portfolio-chart-hover)
+
 (def set-portfolio-returns-benchmark-search
   portfolio-actions/set-portfolio-returns-benchmark-search)
 

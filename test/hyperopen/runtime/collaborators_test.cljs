@@ -35,6 +35,10 @@
                     (get-in deps [:chart :toggle-portfolio-summary-scope-dropdown])))
     (is (identical? portfolio-actions/select-portfolio-chart-tab
                     (get-in deps [:chart :select-portfolio-chart-tab])))
+    (is (identical? portfolio-actions/set-portfolio-chart-hover
+                    (get-in deps [:chart :set-portfolio-chart-hover])))
+    (is (identical? portfolio-actions/clear-portfolio-chart-hover
+                    (get-in deps [:chart :clear-portfolio-chart-hover])))
     (is (identical? portfolio-actions/select-portfolio-returns-benchmark
                     (get-in deps [:chart :select-portfolio-returns-benchmark])))
     (is (identical? portfolio-actions/clear-portfolio-returns-benchmark

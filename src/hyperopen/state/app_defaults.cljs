@@ -97,6 +97,7 @@
   {:summary-scope :all
    :summary-time-range :month
    :chart-tab :account-value
+   :chart-hover-index nil
    :returns-benchmark-coins ["BTC"]
    :returns-benchmark-coin "BTC"
    :returns-benchmark-search ""

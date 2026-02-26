@@ -34,9 +34,30 @@
 
     :else nil))
 
+(defn- parse-number-value
+  [value]
+  (cond
+    (number? value)
+    (when-not (js/isNaN value)
+      value)
+
+    (string? value)
+    (let [text (str/trim value)]
+      (when (seq text)
+        (let [parsed (js/Number text)]
+          (when (and (number? parsed)
+                     (not (js/isNaN parsed)))
+            parsed))))
+
+    :else nil))
+
 (defn- parseable-int?
   [value]
   (some? (parse-int-value value)))
+
+(defn- parseable-number?
+  [value]
+  (some? (parse-number-value value)))
 
 (defn- non-negative-int?
   [value]
@@ -69,6 +90,7 @@
 (s/def ::path-values (s/and vector?
                             (s/coll-of ::path-value :kind vector?)))
 (s/def ::intish parseable-int?)
+(s/def ::numberish parseable-number?)
 (s/def ::non-negative-int non-negative-int?)
 (s/def ::positive-int positive-int?)
 
@@ -184,6 +206,10 @@
                    ::height
                    ::viewport-width
                    ::viewport-height]))
+(s/def ::portfolio-chart-hover-args
+  (s/tuple (s/nilable ::numberish)
+           (s/nilable ::position-tpsl-anchor)
+           ::intish))
 (s/def ::position-tpsl-open-args
   (s/or :position-only (s/tuple map?)
         :position-and-anchor (s/tuple map? any?)))
@@ -248,6 +274,8 @@
    :actions/toggle-portfolio-summary-time-range-dropdown ::no-args
    :actions/select-portfolio-summary-time-range ::keyword-or-string-args
    :actions/select-portfolio-chart-tab ::keyword-or-string-args
+   :actions/set-portfolio-chart-hover ::portfolio-chart-hover-args
+   :actions/clear-portfolio-chart-hover ::no-args
    :actions/set-portfolio-returns-benchmark-search ::single-input-args
    :actions/set-portfolio-returns-benchmark-suggestions-open ::boolean-args
    :actions/select-portfolio-returns-benchmark ::optional-string-args

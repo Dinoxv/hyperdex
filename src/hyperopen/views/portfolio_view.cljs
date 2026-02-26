@@ -15,6 +15,28 @@
    "en-US"
    #js {:maximumFractionDigits 0}))
 
+(def ^:private tooltip-currency-formatter
+  (js/Intl.NumberFormat.
+   "en-US"
+   #js {:style "currency"
+        :currency "USD"
+        :maximumFractionDigits 0
+        :minimumFractionDigits 0}))
+
+(def ^:private tooltip-time-formatter
+  (js/Intl.DateTimeFormat.
+   "en-US"
+   #js {:hour "2-digit"
+        :minute "2-digit"
+        :hour12 false}))
+
+(def ^:private tooltip-date-parts-formatter
+  (js/Intl.DateTimeFormat.
+   "en-US"
+   #js {:year "numeric"
+        :month "short"
+        :day "2-digit"}))
+
 (def ^:private action-items
   [{:label "Link Staking"
     :action [:actions/navigate "/staking"]}
@@ -78,6 +100,48 @@
   (if (= axis-kind :percent)
     (format-axis-percent value)
     (format-axis-number value)))
+
+(defn- clamp-number [value min-value max-value]
+  (cond
+    (< value min-value) min-value
+    (> value max-value) max-value
+    :else value))
+
+(defn- date-part-value [parts token]
+  (some (fn [{:keys [type value]}]
+          (when (= type token)
+            value))
+        parts))
+
+(defn- format-tooltip-date [time-ms]
+  (if (number? time-ms)
+    (let [parts (js->clj (.formatToParts tooltip-date-parts-formatter (js/Date. time-ms))
+                         :keywordize-keys true)
+          year (date-part-value parts "year")
+          month (date-part-value parts "month")
+          day (date-part-value parts "day")]
+      (if (and year month day)
+        (str year " " month " " day)
+        "--"))
+    "--"))
+
+(defn- format-tooltip-time [time-ms]
+  (if (number? time-ms)
+    (.format tooltip-time-formatter (js/Date. time-ms))
+    "--:--"))
+
+(defn- format-tooltip-value [selected-tab value]
+  (if (= selected-tab :returns)
+    (format-axis-percent value)
+    (let [n (if (number? value) value 0)
+          n* (if (== n -0) 0 n)]
+      (.format tooltip-currency-formatter n*))))
+
+(defn- chart-tooltip-label [summary-time-range selected-tab {:keys [time-ms value]}]
+  (let [timestamp-label (if (= summary-time-range :day)
+                          (format-tooltip-time time-ms)
+                          (format-tooltip-date time-ms))]
+    (str timestamp-label ": " (format-tooltip-value selected-tab value))))
 
 (def ^:private axis-label-fallback-char-width-px
   7.5)
@@ -450,11 +514,27 @@
         (summary-row "Staking Account" (format-hype (:staking-account-hype summary))))])))
 
 (defn- chart-card [{:keys [chart selectors]}]
-  (let [{:keys [tabs selected-tab axis-kind y-ticks series]} chart
+  (let [{:keys [tabs selected-tab axis-kind y-ticks series points hover]} chart
         returns-benchmark (:returns-benchmark selectors)
         returns-benchmark* (add-benchmark-chip-colors returns-benchmark series)
+        summary-time-range (get-in selectors [:summary-time-range :value])
         y-axis-width (y-axis-gutter-width axis-kind y-ticks)
-        plot-left (+ y-axis-width 10)]
+        plot-left (+ y-axis-width 10)
+        point-count (count points)
+        hovered-point (:point hover)
+        hover-active? (boolean (:active? hover))
+        hover-line-left-pct (when hover-active?
+                             (* 100 (:x-ratio hovered-point)))
+        hover-tooltip-top-pct (when hover-active?
+                               (clamp-number (- (* 100 (:y-ratio hovered-point)) 8)
+                                             8
+                                             92))
+        hover-tooltip-right? (when hover-active?
+                               (> hover-line-left-pct 74))
+        hover-label (when hover-active?
+                      (chart-tooltip-label summary-time-range
+                                          selected-tab
+                                          hovered-point))]
     (section-card
      "portfolio-chart-card"
      [:div {:class ["flex" "items-center" "border-b" "border-base-300"]}
@@ -504,8 +584,16 @@
                          "border-t"
                          "border-base-300"]
                  :style {:top (str (* 100 y-ratio) "%")}}])]
-       [:div {:class ["absolute" "right-2" "top-0" "bottom-0"]
-              :style {:left (str plot-left "px")}}
+       [:div {:class ["absolute" "right-2" "top-0" "bottom-0" "cursor-crosshair"]
+              :style {:left (str plot-left "px")}
+              :data-role "portfolio-chart-plot-area"
+              :on {:mousemove [[:actions/set-portfolio-chart-hover [:event/clientX] [:event.currentTarget/bounds] point-count]]
+                   :mouseenter [[:actions/set-portfolio-chart-hover [:event/clientX] [:event.currentTarget/bounds] point-count]]
+                   :pointermove [[:actions/set-portfolio-chart-hover [:event/clientX] [:event.currentTarget/bounds] point-count]]
+                   :pointerenter [[:actions/set-portfolio-chart-hover [:event/clientX] [:event.currentTarget/bounds] point-count]]
+                   :mouseleave [[:actions/clear-portfolio-chart-hover]]
+                   :pointerleave [[:actions/clear-portfolio-chart-hover]]
+                   :mouseout [[:actions/clear-portfolio-chart-hover]]}}
         [:svg {:viewBox "0 0 100 100"
                :preserveAspectRatio "none"
                :class ["h-full" "w-full"]}
@@ -516,9 +604,40 @@
                  :stroke "#28414a"
                  :stroke-width 0.8
                  :vector-effect "non-scaling-stroke"}]
-        (for [{series-id :id :as series-entry} (or series [])]
-          ^{:key (str "portfolio-chart-path-" (name series-id))}
-          (chart-series-path series-entry))]]]
+         (for [{series-id :id :as series-entry} (or series [])]
+           ^{:key (str "portfolio-chart-path-" (name series-id))}
+           (chart-series-path series-entry))]
+        (when hover-active?
+          [:div {:class ["absolute"
+                         "top-0"
+                         "bottom-0"
+                         "w-px"
+                         "-translate-x-1/2"
+                         "pointer-events-none"
+                         "bg-[#9fb3be]"
+                         "z-10"]
+                 :data-role "portfolio-chart-hover-line"
+                 :style {:left (str hover-line-left-pct "%")}}])
+        (when hover-active?
+          [:div {:class ["absolute"
+                         "pointer-events-none"
+                         "rounded-sm"
+                         "px-1.5"
+                         "py-0.5"
+                         "text-xs"
+                         "font-medium"
+                         "text-white"
+                         "shadow-sm"
+                         "z-20"]
+                 :data-role "portfolio-chart-hover-tooltip"
+                 :style {:left (str hover-line-left-pct "%")
+                         :top (str hover-tooltip-top-pct "%")
+                         :transform (if hover-tooltip-right?
+                                      "translate(calc(-100% - 8px), -50%)"
+                                      "translate(8px, -50%)")
+                         :background-color "rgba(0, 0, 0, 0.85)"
+                         :white-space "nowrap"}}
+           hover-label])]]
       (chart-legend series)
       (when (= selected-tab :returns)
         (returns-benchmark-chip-rail returns-benchmark*))])))

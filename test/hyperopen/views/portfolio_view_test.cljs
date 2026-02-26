@@ -238,3 +238,49 @@
     (is (some? chip-node))
     (is (contains? chip-text "BTC"))
     (is (not (contains? chip-text "BTC-USDC (PERP)")))))
+
+(deftest portfolio-view-chart-plot-area-wires-hover-actions-test
+  (let [view-node (portfolio-view/portfolio-view sample-state)
+        plot-area-node (find-first-node view-node #(= "portfolio-chart-plot-area" (get-in % [1 :data-role])))
+        mousemove-action (get-in plot-area-node [1 :on :mousemove])
+        mouseenter-action (get-in plot-area-node [1 :on :mouseenter])
+        pointermove-action (get-in plot-area-node [1 :on :pointermove])
+        pointerenter-action (get-in plot-area-node [1 :on :pointerenter])
+        mouseleave-action (get-in plot-area-node [1 :on :mouseleave])]
+    (is (some? plot-area-node))
+    (is (= [[:actions/set-portfolio-chart-hover [:event/clientX] [:event.currentTarget/bounds] 2]]
+           mousemove-action))
+    (is (= [[:actions/set-portfolio-chart-hover [:event/clientX] [:event.currentTarget/bounds] 2]]
+           mouseenter-action))
+    (is (= [[:actions/set-portfolio-chart-hover [:event/clientX] [:event.currentTarget/bounds] 2]]
+           pointermove-action))
+    (is (= [[:actions/set-portfolio-chart-hover [:event/clientX] [:event.currentTarget/bounds] 2]]
+           pointerenter-action))
+    (is (= [[:actions/clear-portfolio-chart-hover]]
+           mouseleave-action))))
+
+(deftest portfolio-view-chart-hover-overlay-renders-date-and-time-tooltip-variants-test
+  (let [time-a (.getTime (js/Date. 2026 1 19 2 4 0))
+        time-b (.getTime (js/Date. 2026 1 26 8 30 0))
+        base-state (-> sample-state
+                       (assoc-in [:portfolio-ui :chart-tab] :pnl)
+                       (assoc-in [:portfolio-ui :chart-hover-index] 1)
+                       (assoc-in [:portfolio :summary-by-key :month :pnlHistory]
+                                 [[time-a 0] [time-b 203]]))
+        month-view-node (portfolio-view/portfolio-view base-state)
+        month-hover-line (find-first-node month-view-node #(= "portfolio-chart-hover-line" (get-in % [1 :data-role])))
+        month-tooltip-node (find-first-node month-view-node #(= "portfolio-chart-hover-tooltip" (get-in % [1 :data-role])))
+        month-tooltip-text (->> month-tooltip-node
+                                collect-strings
+                                (apply str))
+        day-state (assoc-in base-state [:portfolio-ui :summary-time-range] :day)
+        day-view-node (portfolio-view/portfolio-view day-state)
+        day-tooltip-node (find-first-node day-view-node #(= "portfolio-chart-hover-tooltip" (get-in % [1 :data-role])))
+        day-tooltip-text (->> day-tooltip-node
+                              collect-strings
+                              (apply str))]
+    (is (some? month-hover-line))
+    (is (some? month-tooltip-node))
+    (is (= "2026 Feb 26: $203" month-tooltip-text))
+    (is (some? day-tooltip-node))
+    (is (re-matches #"[0-9]{2}:[0-9]{2}: \$203" day-tooltip-text))))

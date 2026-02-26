@@ -96,6 +96,8 @@
    [:actions/toggle-portfolio-summary-time-range-dropdown :toggle-portfolio-summary-time-range-dropdown]
    [:actions/select-portfolio-summary-time-range :select-portfolio-summary-time-range]
    [:actions/select-portfolio-chart-tab :select-portfolio-chart-tab]
+   [:actions/set-portfolio-chart-hover :set-portfolio-chart-hover]
+   [:actions/clear-portfolio-chart-hover :clear-portfolio-chart-hover]
    [:actions/set-portfolio-returns-benchmark-search :set-portfolio-returns-benchmark-search]
    [:actions/set-portfolio-returns-benchmark-suggestions-open :set-portfolio-returns-benchmark-suggestions-open]
    [:actions/select-portfolio-returns-benchmark :select-portfolio-returns-benchmark]
@@ -246,6 +248,10 @@
   (nxr/register-placeholder! :event/timeStamp
     (fn [{:replicant/keys [dom-event]}]
       (some-> dom-event .-timeStamp)))
+
+  (nxr/register-placeholder! :event/clientX
+    (fn [{:replicant/keys [dom-event]}]
+      (some-> dom-event .-clientX)))
 
   (nxr/register-placeholder! :event.currentTarget/bounds
     (fn [{:replicant/keys [dom-event]}]

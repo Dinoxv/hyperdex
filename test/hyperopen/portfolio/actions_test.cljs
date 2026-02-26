@@ -28,20 +28,24 @@
 
 (deftest select-portfolio-summary-scope-normalizes-and-closes-dropdowns-test
   (is (= [[:effects/save-many [[[:portfolio-ui :summary-scope] :perps]
+                               [[:portfolio-ui :chart-hover-index] nil]
                                [[:portfolio-ui :summary-scope-dropdown-open?] false]
                                [[:portfolio-ui :summary-time-range-dropdown-open?] false]]]]
          (actions/select-portfolio-summary-scope {} "perp")))
   (is (= [[:effects/save-many [[[:portfolio-ui :summary-scope] :all]
+                               [[:portfolio-ui :chart-hover-index] nil]
                                [[:portfolio-ui :summary-scope-dropdown-open?] false]
                                [[:portfolio-ui :summary-time-range-dropdown-open?] false]]]]
          (actions/select-portfolio-summary-scope {} :unknown))))
 
 (deftest select-portfolio-summary-time-range-normalizes-and-closes-dropdowns-test
   (is (= [[:effects/save-many [[[:portfolio-ui :summary-time-range] :all-time]
+                               [[:portfolio-ui :chart-hover-index] nil]
                                [[:portfolio-ui :summary-scope-dropdown-open?] false]
                                [[:portfolio-ui :summary-time-range-dropdown-open?] false]]]]
          (actions/select-portfolio-summary-time-range {} "allTime")))
   (is (= [[:effects/save-many [[[:portfolio-ui :summary-time-range] :week]
+                               [[:portfolio-ui :chart-hover-index] nil]
                                [[:portfolio-ui :summary-scope-dropdown-open?] false]
                                [[:portfolio-ui :summary-time-range-dropdown-open?] false]]]
           [:effects/fetch-candle-snapshot :coin "BTC" :interval :15m :bars 800]
@@ -51,6 +55,7 @@
                           :returns-benchmark-coin "DOGE"}}
           :week)))
   (is (= [[:effects/save-many [[[:portfolio-ui :summary-time-range] :week]
+                               [[:portfolio-ui :chart-hover-index] nil]
                                [[:portfolio-ui :summary-scope-dropdown-open?] false]
                                [[:portfolio-ui :summary-time-range-dropdown-open?] false]]]
           [:effects/fetch-candle-snapshot :coin "BTC" :interval :15m :bars 800]]
@@ -58,44 +63,93 @@
           {:portfolio-ui {:returns-benchmark-coin "BTC"}}
           :week)))
   (is (= [[:effects/save-many [[[:portfolio-ui :summary-time-range] :month]
+                               [[:portfolio-ui :chart-hover-index] nil]
                                [[:portfolio-ui :summary-scope-dropdown-open?] false]
                                [[:portfolio-ui :summary-time-range-dropdown-open?] false]]]]
          (actions/select-portfolio-summary-time-range {} :unknown))))
 
 (deftest select-portfolio-chart-tab-normalizes-and-saves-selected-tab-test
-  (is (= [[:effects/save
-           [:portfolio-ui :chart-tab]
-           :account-value]]
+  (is (= [[:effects/save-many
+           [[[:portfolio-ui :chart-tab] :account-value]
+            [[:portfolio-ui :chart-hover-index] nil]]]]
          (actions/select-portfolio-chart-tab {} "accountValue")))
-  (is (= [[:effects/save
-           [:portfolio-ui :chart-tab]
-           :returns]]
+  (is (= [[:effects/save-many
+           [[[:portfolio-ui :chart-tab] :returns]
+            [[:portfolio-ui :chart-hover-index] nil]]]]
          (actions/select-portfolio-chart-tab {} "return")))
-  (is (= [[:effects/save
-           [:portfolio-ui :chart-tab]
-           :returns]
+  (is (= [[:effects/save-many
+           [[[:portfolio-ui :chart-tab] :returns]
+            [[:portfolio-ui :chart-hover-index] nil]]]
           [:effects/fetch-candle-snapshot :coin "ETH" :interval :1h :bars 800]
           [:effects/fetch-candle-snapshot :coin "SPY" :interval :1h :bars 800]]
          (actions/select-portfolio-chart-tab
           {:portfolio-ui {:returns-benchmark-coins ["ETH" "SPY"]
                           :summary-time-range :month}}
           :returns)))
-  (is (= [[:effects/save
-           [:portfolio-ui :chart-tab]
-           :returns]
+  (is (= [[:effects/save-many
+           [[[:portfolio-ui :chart-tab] :returns]
+            [[:portfolio-ui :chart-hover-index] nil]]]
           [:effects/fetch-candle-snapshot :coin "ETH" :interval :1h :bars 800]]
          (actions/select-portfolio-chart-tab
           {:portfolio-ui {:returns-benchmark-coin "ETH"
                           :summary-time-range :month}}
           :returns)))
-  (is (= [[:effects/save
-           [:portfolio-ui :chart-tab]
-           :pnl]]
+  (is (= [[:effects/save-many
+           [[[:portfolio-ui :chart-tab] :pnl]
+            [[:portfolio-ui :chart-hover-index] nil]]]]
          (actions/select-portfolio-chart-tab {} :pnl)))
-  (is (= [[:effects/save
-           [:portfolio-ui :chart-tab]
-           :pnl]]
+  (is (= [[:effects/save-many
+           [[[:portfolio-ui :chart-tab] :pnl]
+            [[:portfolio-ui :chart-hover-index] nil]]]]
          (actions/select-portfolio-chart-tab {} :unknown))))
+
+(deftest set-and-clear-portfolio-chart-hover-test
+  (is (= [[:effects/save [:portfolio-ui :chart-hover-index] 2]]
+         (actions/set-portfolio-chart-hover
+          {}
+          140
+          {:left 100
+           :width 80}
+          5)))
+  (is (= [[:effects/save [:portfolio-ui :chart-hover-index] 4]]
+         (actions/set-portfolio-chart-hover
+          {}
+          1000
+          {:left 100
+           :width 80}
+          5)))
+  (is (= []
+         (actions/set-portfolio-chart-hover
+          {:portfolio-ui {:chart-hover-index 4}}
+          1000
+          {:left 100
+           :width 80}
+          5)))
+  (is (= []
+         (actions/set-portfolio-chart-hover
+          {:portfolio-ui {:chart-hover-index 2}}
+          nil
+          {:left 100
+           :width 80}
+          5)))
+  (is (= [[:effects/save [:portfolio-ui :chart-hover-index] 0]]
+         (actions/set-portfolio-chart-hover
+          {:portfolio-ui {:chart-hover-index nil}}
+          nil
+          nil
+          5)))
+  (is (= []
+         (actions/set-portfolio-chart-hover
+          {:portfolio-ui {:chart-hover-index 2}}
+          nil
+          nil
+          0)))
+  (is (= [[:effects/save [:portfolio-ui :chart-hover-index] nil]]
+         (actions/clear-portfolio-chart-hover
+          {:portfolio-ui {:chart-hover-index 1}})))
+  (is (= []
+         (actions/clear-portfolio-chart-hover
+          {:portfolio-ui {:chart-hover-index nil}}))))
 
 (deftest set-portfolio-returns-benchmark-search-and-open-state-test
   (is (= [[:effects/save

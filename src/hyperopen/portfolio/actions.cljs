@@ -19,6 +19,9 @@
 (def ^:private chart-tab-options
   #{:account-value :pnl :returns})
 
+(def ^:private chart-hover-index-path
+  [:portfolio-ui :chart-hover-index])
+
 (defn- normalize-keyword-like
   [value]
   (let [text (cond
@@ -140,6 +143,58 @@
    [:effects/save-many (into (vec extra-path-values)
                              (selector-visibility-path-values open-dropdown))]))
 
+(defn- finite-number
+  [value]
+  (let [n (cond
+            (number? value) value
+            (string? value) (js/Number value)
+            :else js/NaN)]
+    (when (and (number? n)
+               (js/isFinite n))
+      n)))
+
+(defn- positive-point-count
+  [value]
+  (when-let [n (finite-number value)]
+    (let [count* (js/Math.floor n)]
+      (when (pos? count*)
+        count*))))
+
+(defn- clamp
+  [value min-value max-value]
+  (cond
+    (< value min-value) min-value
+    (> value max-value) max-value
+    :else value))
+
+(defn- hover-index-from-pointer
+  [client-x bounds point-count]
+  (let [point-count* (positive-point-count point-count)]
+    (when point-count*
+      (if (= point-count* 1)
+        0
+        (let [client-x* (finite-number client-x)
+              left (finite-number (:left bounds))
+              width (finite-number (:width bounds))]
+          (when (and (number? client-x*)
+                     (number? left)
+                     (number? width)
+                     (pos? width))
+            (let [x-ratio (clamp (/ (- client-x* left) width) 0 1)
+                  max-index (dec point-count*)
+                  nearest-index (js/Math.round (* x-ratio max-index))]
+              (clamp nearest-index 0 max-index))))))))
+
+(defn- normalize-hover-index
+  [value point-count]
+  (let [point-count* (positive-point-count point-count)
+        idx (finite-number value)]
+    (when (and point-count*
+               (number? idx))
+      (let [max-index (dec point-count*)
+            idx* (js/Math.floor idx)]
+        (clamp idx* 0 max-index)))))
+
 (defn toggle-portfolio-summary-scope-dropdown
   [state]
   (let [current-visible? (boolean (get-in state [:portfolio-ui :summary-scope-dropdown-open?]))
@@ -155,7 +210,8 @@
 (defn select-portfolio-summary-scope
   [_state scope]
   [(selector-projection-effect nil [[[:portfolio-ui :summary-scope]
-                                     (normalize-summary-scope scope)]])])
+                                     (normalize-summary-scope scope)]
+                                    [chart-hover-index-path nil]])])
 
 (defn select-portfolio-summary-time-range
   [state time-range]
@@ -163,7 +219,8 @@
         benchmark-coins (selected-returns-benchmark-coins state)
         fetch-effects (returns-benchmark-fetch-effects time-range* benchmark-coins)]
     (into [(selector-projection-effect nil [[[:portfolio-ui :summary-time-range]
-                                             time-range*]])]
+                                             time-range*]
+                                            [chart-hover-index-path nil]])]
           fetch-effects)))
 
 (defn select-portfolio-chart-tab
@@ -176,10 +233,28 @@
         fetch-effects (if (= chart-tab* :returns)
                         (returns-benchmark-fetch-effects summary-time-range benchmark-coins)
                         [])]
-    (into [[:effects/save
-            [:portfolio-ui :chart-tab]
-            chart-tab*]]
+    (into [[:effects/save-many
+            [[[:portfolio-ui :chart-tab] chart-tab*]
+             [chart-hover-index-path nil]]]]
           fetch-effects)))
+
+(defn set-portfolio-chart-hover
+  [state client-x bounds point-count]
+  (let [current-index (normalize-hover-index (get-in state chart-hover-index-path)
+                                             point-count)
+        pointer-index (hover-index-from-pointer client-x bounds point-count)
+        next-index (or pointer-index
+                       current-index
+                       (normalize-hover-index 0 point-count))]
+    (if (= current-index next-index)
+      []
+      [[:effects/save chart-hover-index-path next-index]])))
+
+(defn clear-portfolio-chart-hover
+  [state]
+  (if (nil? (get-in state chart-hover-index-path))
+    []
+    [[:effects/save chart-hover-index-path nil]]))
 
 (defn set-portfolio-returns-benchmark-search
   [_state search]

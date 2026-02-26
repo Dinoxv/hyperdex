@@ -146,6 +146,36 @@
       (is (= ["Account Value" "PNL" "Returns"]
              (mapv :label (get-in view-model [:chart :tabs])))))))
 
+(deftest portfolio-vm-chart-hover-selects-and-clamps-strategy-point-test
+  (with-redefs [account-equity-view/account-equity-metrics (fn [_]
+                                                              {:spot-equity 10
+                                                               :perps-value 10
+                                                               :cross-account-value 10
+                                                               :unrealized-pnl 0})]
+    (let [base-state {:account {:mode :classic}
+                      :portfolio-ui {:summary-scope :all
+                                     :summary-time-range :month
+                                     :chart-tab :pnl
+                                     :chart-hover-index 1}
+                      :portfolio {:summary-by-key {:month {:pnlHistory [[10 -1] [20 5] [30 9]]
+                                                           :accountValueHistory [[10 100] [20 120] [30 130]]
+                                                           :vlm 10}}}
+                      :webdata2 {:clearinghouseState {:marginSummary {:accountValue 10}}
+                                :totalVaultEquity 0}
+                      :borrow-lend {:total-supplied-usd 0}}
+          view-model (vm/portfolio-vm base-state)
+          hover (get-in view-model [:chart :hover])]
+      (is (true? (:active? hover)))
+      (is (= 1 (:index hover)))
+      (is (= 20 (get-in hover [:point :time-ms])))
+      (is (= 5 (get-in hover [:point :value])))
+      (is (= [10 20 30]
+             (mapv :time-ms (get-in view-model [:chart :points]))))
+      (let [clamped-view-model (vm/portfolio-vm (assoc-in base-state [:portfolio-ui :chart-hover-index] 99))
+            clamped-hover (get-in clamped-view-model [:chart :hover])]
+        (is (= 2 (:index clamped-hover)))
+        (is (= 30 (get-in clamped-hover [:point :time-ms])))))))
+
 (deftest portfolio-vm-returns-tab-uses-flow-adjusted-time-weighted-returns-to-avoid-cashflow-spikes-test
   (with-redefs [account-equity-view/account-equity-metrics (fn [_]
                                                               {:spot-equity 10

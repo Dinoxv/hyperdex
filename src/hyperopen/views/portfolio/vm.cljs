@@ -791,6 +791,18 @@
     :percent
     :number))
 
+(defn- normalize-hover-index
+  [value point-count]
+  (let [point-count* (if (and (number? point-count)
+                              (pos? point-count))
+                       (js/Math.floor point-count)
+                       0)
+        idx (optional-number value)]
+    (when (and (pos? point-count*)
+               (number? idx))
+      (let [idx* (js/Math.floor idx)]
+        (max 0 (min idx* (dec point-count*)))))))
+
 (defn- benchmark-series-stroke
   [idx]
   (let [palette-size (count benchmark-series-strokes)]
@@ -851,13 +863,21 @@
                                   series)
                             {:points []
                              :path nil
-                             :has-data? false})]
+                             :has-data? false})
+        strategy-points (:points strategy-series)
+        hovered-index (normalize-hover-index (get-in state [:portfolio-ui :chart-hover-index])
+                                             (count strategy-points))
+        hovered-point (when (number? hovered-index)
+                        (nth strategy-points hovered-index nil))]
     {:selected-tab selected-tab
      :axis-kind axis-kind
      :tabs chart-tab-options
-     :points (:points strategy-series)
+     :points strategy-points
      :path (:path strategy-series)
      :series series
+     :hover {:index hovered-index
+             :point hovered-point
+             :active? (some? hovered-point)}
      :benchmark-selected? (and (= selected-tab :returns)
                                (seq selected-benchmark-coins))
      :y-ticks (if domain
