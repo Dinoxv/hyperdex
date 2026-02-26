@@ -125,6 +125,8 @@
     set-funding-history-filters
     toggle-funding-history-filter-open
     toggle-funding-history-filter-coin
+    add-funding-history-filter-coin
+    handle-funding-history-coin-search-keydown
     reset-funding-history-filter-draft
     apply-funding-history-filters
     view-all-funding-history

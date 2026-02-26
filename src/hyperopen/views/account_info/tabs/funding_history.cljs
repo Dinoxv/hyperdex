@@ -98,6 +98,82 @@
        sort
        vec))
 
+(defn- funding-filter-selected-coins [coin-set]
+  (->> coin-set
+       (filter string?)
+       sort
+       vec))
+
+(defn- funding-filter-coin-candidates [coin-options coin-set coin-search]
+  (let [query (shared/normalize-coin-search-query coin-search)]
+    (->> coin-options
+         (remove #(contains? coin-set %))
+         (filter #(shared/coin-matches-search? % query))
+         vec)))
+
+(defn- funding-filter-empty-message [coin-options coin-candidates coin-search]
+  (cond
+    (empty? coin-options)
+    "No coin data available for current range."
+
+    (seq coin-candidates)
+    nil
+
+    (seq (shared/normalize-coin-search-query coin-search))
+    "No matching coins."
+
+    :else
+    "All coins selected."))
+
+(defn- funding-filter-selected-chip [coin]
+  [:span {:class ["inline-flex"
+                  "max-w-full"
+                  "items-center"
+                  "gap-1"
+                  "rounded-md"
+                  "border"
+                  "border-base-300"
+                  "bg-base-200"
+                  "px-1.5"
+                  "py-1"]}
+   [:span {:class ["min-w-0"]} (funding-filter-coin-label coin)]
+   [:button {:type "button"
+             :class ["inline-flex"
+                     "h-6"
+                     "w-6"
+                     "items-center"
+                     "justify-center"
+                     "rounded"
+                     "text-trading-text-secondary"
+                     "transition-colors"
+                     "hover:bg-base-300"
+                     "hover:text-trading-text"
+                     "focus:outline-none"
+                     "focus:ring-0"
+                     "focus:ring-offset-0"]
+             :aria-label (str "Remove " coin " filter")
+             :on {:click [[:actions/toggle-funding-history-filter-coin coin]]}}
+    "x"]])
+
+(defn- funding-filter-suggestion-row [coin]
+  [:button {:type "button"
+            :class ["flex"
+                    "w-full"
+                    "items-center"
+                    "justify-start"
+                    "rounded"
+                    "px-2"
+                    "py-1.5"
+                    "text-left"
+                    "text-xs"
+                    "transition-colors"
+                    "hover:bg-base-300"
+                    "focus:outline-none"
+                    "focus:ring-0"
+                    "focus:ring-offset-0"]
+            :on {:mousedown [[:actions/add-funding-history-filter-coin coin]]}}
+   (funding-filter-coin-label coin)])
+
 (defn funding-history-controls [funding-history-state fundings-raw]
   (let [filters (or (:filters funding-history-state) {})
         draft-filters (or (:draft-filters funding-history-state) filters)
@@ -108,7 +184,13 @@
         status-open? (or loading? (some? error))
         start-time-ms (:start-time-ms draft-filters)
         end-time-ms (:end-time-ms draft-filters)
-        coin-options (funding-coin-options fundings-raw)]
+        coin-options (funding-coin-options fundings-raw)
+        coin-search (:coin-search funding-history-state "")
+        suggestions-open? (boolean (:coin-suggestions-open? funding-history-state))
+        selected-coins (funding-filter-selected-coins coin-set)
+        coin-candidates (funding-filter-coin-candidates coin-options coin-set coin-search)
+        top-coin (first coin-candidates)
+        empty-message (funding-filter-empty-message coin-options coin-candidates coin-search)]
     (when (or status-open? filter-open?)
       [:div {:class ["border-b" "border-base-300" "bg-base-200"]}
        (when status-open?
@@ -138,36 +220,49 @@
           [:div {:class ["space-y-2" "md:col-span-2"]}
            [:label {:class ["text-xs" "font-medium" "text-trading-text-secondary"]}
             "Coins"]
-           (if (seq coin-options)
-             [:div {:class ["flex" "max-h-28" "flex-wrap" "gap-2" "overflow-y-auto" "rounded-md" "border" "border-base-300" "bg-base-100" "p-2"]}
-              (for [coin coin-options]
-                ^{:key coin}
-                [:label {:class ["flex" "items-center" "gap-1" "rounded-md" "px-1" "py-px" "hover:bg-base-200"]}
-                 [:input {:class ["h-4"
-                                  "w-4"
-                                  "rounded-[3px]"
-                                  "border"
-                                  "border-base-300"
-                                  "bg-transparent"
-                                  "trade-toggle-checkbox"
-                                  "transition-colors"
-                                  "focus:outline-none"
-                                  "focus:ring-0"
-                                  "focus:ring-offset-0"
-                                  "focus:shadow-none"]
-                          :type "checkbox"
-                          :checked (contains? coin-set coin)
-                          :on {:change [[:actions/toggle-funding-history-filter-coin coin]]}}]
-                 (funding-filter-coin-label coin)])]
-             [:div {:class ["text-xs" "text-trading-text-secondary"]}
-              "No coin data available for current range."])]
+           [:div {:class ["space-y-2"]}
+            [:div {:class ["rounded-md" "border" "border-base-300" "bg-base-100" "px-2" "py-2"]}
+             [:div {:class ["flex" "max-h-24" "flex-wrap" "items-center" "gap-2" "overflow-y-auto"]}
+              (for [coin selected-coins]
+                ^{:key (str "funding-filter-chip-" coin)}
+                (funding-filter-selected-chip coin))
+              [:input {:id "funding-history-coin-search"
+                       :class ["h-8"
+                               "min-w-[8rem]"
+                               "flex-1"
+                               "border-0"
+                               "bg-transparent"
+                               "px-1"
+                               "text-xs"
+                               "text-trading-text"
+                               "focus:outline-none"
+                               "focus:ring-0"
+                               "focus:ring-offset-0"]
+                       :type "search"
+                       :placeholder "Search and press Enter"
+                       :aria-label "Search funding coins"
+                       :autocomplete "off"
+                       :spellcheck false
+                       :value (or coin-search "")
+                       :on {:input [[:actions/set-funding-history-filters :coin-search [:event.target/value]]]
+                            :focus [[:actions/set-funding-history-filters :coin-suggestions-open? true]]
+                            :blur [[:actions/set-funding-history-filters :coin-suggestions-open? false]]
+                            :keydown [[:actions/handle-funding-history-coin-search-keydown [:event/key] top-coin]]}}]]
+             (when suggestions-open?
+               [:div {:class ["max-h-40" "overflow-y-auto" "rounded-md" "border" "border-base-300" "bg-base-100" "p-1"]}
+                (if (seq coin-candidates)
+                  (for [coin coin-candidates]
+                    ^{:key (str "funding-filter-suggestion-" coin)}
+                    (funding-filter-suggestion-row coin))
+                  [:div {:class ["px-2" "py-1.5" "text-xs" "text-trading-text-secondary"]}
+                   (or empty-message "No matching coins.")])])]]
           [:div {:class ["flex" "items-center" "justify-end" "gap-2" "md:col-span-2"]}
            [:button {:class ["btn" "btn-xs" "btn-ghost" "h-8" "px-3" "text-xs" "font-medium" "min-w-[4.5rem]"]
                      :on {:click [[:actions/reset-funding-history-filter-draft]]}}
-            "Cancel"]
+           "Cancel"]
            [:button {:class ["btn" "btn-xs" "btn-primary" "h-8" "px-3" "text-xs" "font-medium" "min-w-[4.5rem]"]
-                     :on {:click [[:actions/apply-funding-history-filters]]}}
-            "Apply"]]])])))
+                      :on {:click [[:actions/apply-funding-history-filters]]}}
+             "Apply"]]]])])))
 
 (defn- funding-row-sort-id [row]
   (or (:id row)

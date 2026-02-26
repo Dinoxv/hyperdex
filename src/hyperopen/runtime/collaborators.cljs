@@ -70,6 +70,8 @@
    :set-funding-history-filters account-history-actions/set-funding-history-filters
    :toggle-funding-history-filter-open account-history-actions/toggle-funding-history-filter-open
    :toggle-funding-history-filter-coin account-history-actions/toggle-funding-history-filter-coin
+   :add-funding-history-filter-coin account-history-actions/add-funding-history-filter-coin
+   :handle-funding-history-coin-search-keydown account-history-actions/handle-funding-history-coin-search-keydown
    :reset-funding-history-filter-draft account-history-actions/reset-funding-history-filter-draft
    :apply-funding-history-filters account-history-actions/apply-funding-history-filters
    :view-all-funding-history account-history-actions/view-all-funding-history

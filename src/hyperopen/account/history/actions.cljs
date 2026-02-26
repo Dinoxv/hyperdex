@@ -46,6 +46,8 @@
      :draft-filters filters
      :sort {:column "Time" :direction :desc}
      :filter-open? false
+     :coin-search ""
+     :coin-suggestions-open? false
      :page-size default-order-history-page-size
      :page 1
      :page-input "1"
@@ -229,6 +231,8 @@
       [[:effects/save-many [[[:account-info :selected-tab] tab]
                             [[:account-info :funding-history :filters] filters]
                             [[:account-info :funding-history :draft-filters] filters]
+                            [[:account-info :funding-history :coin-search] ""]
+                            [[:account-info :funding-history :coin-suggestions-open?] false]
                             [[:account-info :funding-history :loading?] true]
                             [[:account-info :funding-history :error] nil]
                             [[:account-info :funding-history :request-id] request-id]
@@ -254,6 +258,8 @@
                  [:draft-filters :end-time-ms] (parse-datetime-local-ms value)
                  [:filters :start-time-ms] (parse-datetime-local-ms value)
                  [:filters :end-time-ms] (parse-datetime-local-ms value)
+                 [:coin-search] (normalize-coin-search-value value)
+                 [:coin-suggestions-open?] (boolean value)
                  value)]
     [[:effects/save full-path value*]]))
 
@@ -264,21 +270,55 @@
                         (funding-history-draft-filters state)
                         filters)]
     [[:effects/save-many [[[:account-info :funding-history :filter-open?] (not open?)]
-                          [[:account-info :funding-history :draft-filters] draft-filters]]]]))
+                          [[:account-info :funding-history :draft-filters] draft-filters]
+                          [[:account-info :funding-history :coin-search] ""]
+                          [[:account-info :funding-history :coin-suggestions-open?] false]]]]))
+
+(defn- normalize-funding-history-filter-coin
+  [coin]
+  (let [coin* (some-> coin str str/trim)]
+    (when (seq coin*)
+      coin*)))
 
 (defn toggle-funding-history-filter-coin [state coin]
-  (let [draft-filters (funding-history-draft-filters state)
-        current-set (or (:coin-set draft-filters) #{})
-        next-set (if (contains? current-set coin)
-                   (disj current-set coin)
-                   (conj current-set coin))]
-    [[:effects/save [:account-info :funding-history :draft-filters]
-      (assoc draft-filters :coin-set next-set)]]))
+  (if-let [coin* (normalize-funding-history-filter-coin coin)]
+    (let [draft-filters (funding-history-draft-filters state)
+          current-set (or (:coin-set draft-filters) #{})
+          next-set (if (contains? current-set coin*)
+                     (disj current-set coin*)
+                     (conj current-set coin*))]
+      [[:effects/save [:account-info :funding-history :draft-filters]
+        (assoc draft-filters :coin-set next-set)]])
+    []))
+
+(defn add-funding-history-filter-coin [state coin]
+  (if-let [coin* (normalize-funding-history-filter-coin coin)]
+    (let [draft-filters (funding-history-draft-filters state)
+          current-set (or (:coin-set draft-filters) #{})
+          next-set (conj current-set coin*)]
+      [[:effects/save-many [[[:account-info :funding-history :draft-filters]
+                             (assoc draft-filters :coin-set next-set)]
+                            [[:account-info :funding-history :coin-search] ""]
+                            [[:account-info :funding-history :coin-suggestions-open?] true]]]])
+    []))
+
+(defn handle-funding-history-coin-search-keydown [state key top-coin]
+  (cond
+    (= key "Enter")
+    (add-funding-history-filter-coin state top-coin)
+
+    (= key "Escape")
+    [[:effects/save [:account-info :funding-history :coin-suggestions-open?] false]]
+
+    :else
+    []))
 
 (defn reset-funding-history-filter-draft [state]
   (let [filters (funding-history-filters state)]
     [[:effects/save-many [[[:account-info :funding-history :draft-filters] filters]
-                          [[:account-info :funding-history :filter-open?] false]]]]))
+                          [[:account-info :funding-history :filter-open?] false]
+                          [[:account-info :funding-history :coin-search] ""]
+                          [[:account-info :funding-history :coin-suggestions-open?] false]]]]))
 
 (defn apply-funding-history-filters [state]
   (let [current-filters (funding-history-filters state)
@@ -291,6 +331,8 @@
         base-effects [[:effects/save-many [[[:account-info :funding-history :filters] draft-filters]
                                            [[:account-info :funding-history :draft-filters] draft-filters]
                                            [[:account-info :funding-history :filter-open?] false]
+                                           [[:account-info :funding-history :coin-search] ""]
+                                           [[:account-info :funding-history :coin-suggestions-open?] false]
                                            [[:account-info :funding-history :page] 1]
                                            [[:account-info :funding-history :page-input] "1"]
                                            [[:orders :fundings] projected]]]]]
@@ -312,6 +354,8 @@
     [[:effects/save-many [[[:account-info :funding-history :filters] next-filters]
                           [[:account-info :funding-history :draft-filters] next-filters]
                           [[:account-info :funding-history :filter-open?] false]
+                          [[:account-info :funding-history :coin-search] ""]
+                          [[:account-info :funding-history :coin-suggestions-open?] false]
                           [[:account-info :funding-history :page] 1]
                           [[:account-info :funding-history :page-input] "1"]
                           [[:account-info :funding-history :loading?] true]

@@ -155,6 +155,8 @@
 (s/def ::sort-column-args (s/tuple ::non-empty-string))
 (s/def ::key-args (s/tuple ::non-empty-string))
 (s/def ::keydown-with-max-page-args (s/tuple ::non-empty-string (s/nilable ::intish)))
+(s/def ::keydown-with-optional-coin-args
+  (s/tuple ::non-empty-string (s/nilable ::non-empty-string)))
 (s/def ::funding-history-filter-path (s/or :path ::state-path
                                           :key keyword?))
 (s/def ::funding-history-filter-args (s/tuple ::funding-history-filter-path any?))
@@ -257,6 +259,8 @@
    :actions/set-funding-history-filters ::funding-history-filter-args
    :actions/toggle-funding-history-filter-open ::no-args
    :actions/toggle-funding-history-filter-coin ::coin-args
+   :actions/add-funding-history-filter-coin ::coin-args
+   :actions/handle-funding-history-coin-search-keydown ::keydown-with-optional-coin-args
    :actions/reset-funding-history-filter-draft ::no-args
    :actions/apply-funding-history-filters ::no-args
    :actions/view-all-funding-history ::no-args

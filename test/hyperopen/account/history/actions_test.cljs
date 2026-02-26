@@ -54,7 +54,11 @@
     (is (= [[:effects/save [:account-info :funding-history :filters :end-time-ms] nil]]
            (history-actions/set-funding-history-filters {} [:filters :end-time-ms] "  ")))
     (is (= [[:effects/save [:account-info :funding-history :filter-open?] true]]
-           (history-actions/set-funding-history-filters {} :filter-open? true)))))
+           (history-actions/set-funding-history-filters {} :filter-open? true)))
+    (is (= [[:effects/save [:account-info :funding-history :coin-search] "42"]]
+           (history-actions/set-funding-history-filters {} :coin-search 42)))
+    (is (= [[:effects/save [:account-info :funding-history :coin-suggestions-open?] true]]
+           (history-actions/set-funding-history-filters {} :coin-suggestions-open? "yes")))))
 
 (deftest toggle-funding-history-filter-open-covers-open-and-closed-branches-test
   (with-redefs [platform/now-ms (constantly 2000)]
@@ -67,18 +71,24 @@
                          :end-time-ms 40}
           normalized-draft (funding-history/normalize-funding-history-filters draft-filters 2000)]
       (is (= [[:effects/save-many [[[:account-info :funding-history :filter-open?] true]
-                                   [[:account-info :funding-history :draft-filters] normalized-filters]]]]
+                                   [[:account-info :funding-history :draft-filters] normalized-filters]
+                                   [[:account-info :funding-history :coin-search] ""]
+                                   [[:account-info :funding-history :coin-suggestions-open?] false]]]]
              (history-actions/toggle-funding-history-filter-open
               {:account-info {:funding-history {:filter-open? false
                                                 :filters filters}}})))
       (is (= [[:effects/save-many [[[:account-info :funding-history :filter-open?] false]
-                                   [[:account-info :funding-history :draft-filters] normalized-draft]]]]
+                                   [[:account-info :funding-history :draft-filters] normalized-draft]
+                                   [[:account-info :funding-history :coin-search] ""]
+                                   [[:account-info :funding-history :coin-suggestions-open?] false]]]]
              (history-actions/toggle-funding-history-filter-open
               {:account-info {:funding-history {:filter-open? true
                                                 :filters filters
                                                 :draft-filters draft-filters}}})))
       (is (= [[:effects/save-many [[[:account-info :funding-history :filter-open?] false]
-                                   [[:account-info :funding-history :draft-filters] normalized-filters]]]]
+                                   [[:account-info :funding-history :draft-filters] normalized-filters]
+                                   [[:account-info :funding-history :coin-search] ""]
+                                   [[:account-info :funding-history :coin-suggestions-open?] false]]]]
              (history-actions/toggle-funding-history-filter-open
               {:account-info {:funding-history {:filter-open? true
                                                 :filters filters}}}))))))
@@ -105,17 +115,47 @@
            (history-actions/toggle-funding-history-filter-coin
             {:account-info {:funding-history {:draft-filters {:start-time-ms 10
                                                               :end-time-ms 20}}}}
-            "SOL"))))
+            "SOL")))
+    (is (= []
+           (history-actions/toggle-funding-history-filter-coin state "   "))))
   (with-redefs [platform/now-ms (constantly 2000)]
     (let [filters {:coin-set #{"BTC" ""}
                    :start-time-ms 50
                    :end-time-ms 75}
           normalized-filters (funding-history/normalize-funding-history-filters filters 2000)]
       (is (= [[:effects/save-many [[[:account-info :funding-history :draft-filters] normalized-filters]
-                                   [[:account-info :funding-history :filter-open?] false]]]]
+                                   [[:account-info :funding-history :filter-open?] false]
+                                   [[:account-info :funding-history :coin-search] ""]
+                                   [[:account-info :funding-history :coin-suggestions-open?] false]]]]
              (history-actions/reset-funding-history-filter-draft
               {:account-info {:funding-history {:filter-open? true
                                                 :filters filters}}}))))))
+
+(deftest add-funding-history-filter-coin-and-keydown-handler-cover-enter-and-escape-test
+  (let [draft-filters {:coin-set #{"BTC"}
+                       :start-time-ms 10
+                       :end-time-ms 20}
+        state {:account-info {:funding-history {:draft-filters draft-filters}}}]
+    (is (= [[:effects/save-many [[[:account-info :funding-history :draft-filters]
+                                   {:coin-set #{"BTC" "ETH"}
+                                    :start-time-ms 10
+                                    :end-time-ms 20}]
+                                  [[:account-info :funding-history :coin-search] ""]
+                                  [[:account-info :funding-history :coin-suggestions-open?] true]]]]
+           (history-actions/add-funding-history-filter-coin state "ETH")))
+    (is (= []
+           (history-actions/add-funding-history-filter-coin state "  ")))
+    (is (= [[:effects/save-many [[[:account-info :funding-history :draft-filters]
+                                   {:coin-set #{"BTC" "SOL"}
+                                    :start-time-ms 10
+                                    :end-time-ms 20}]
+                                  [[:account-info :funding-history :coin-search] ""]
+                                  [[:account-info :funding-history :coin-suggestions-open?] true]]]]
+           (history-actions/handle-funding-history-coin-search-keydown state "Enter" "SOL")))
+    (is (= [[:effects/save [:account-info :funding-history :coin-suggestions-open?] false]]
+           (history-actions/handle-funding-history-coin-search-keydown state "Escape" nil)))
+    (is (= []
+           (history-actions/handle-funding-history-coin-search-keydown state "Tab" "SOL")))))
 
 (deftest select-account-info-tab-and-export-funding-history-csv-cover-default-and-filtered-projection-test
   (let [btc-row (info-funding-row 1700003600000 "BTC" "0.1000" "10" "0.0001")

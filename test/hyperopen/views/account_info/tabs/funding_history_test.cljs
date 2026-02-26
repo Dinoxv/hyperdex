@@ -320,7 +320,7 @@
     (is (contains? apply-classes "min-w-[4.5rem]"))
     (is (contains? cancel-classes "min-w-[4.5rem]"))))
 
-(deftest funding-history-coin-filter-uses-standard-green-checkboxes-test
+(deftest funding-history-coin-filter-uses-search-input-and-suggestions-with-enter-wiring-test
   (let [funding-row-hype {:id "1700000000000|HYPE|120.0|-0.42|0.0006"
                           :time-ms 1700000000000
                           :coin "HYPE"
@@ -337,35 +337,40 @@
                          :position-side :long
                          :payment-usdc-raw 0.18
                          :funding-rate-raw 0.0002}
-        state (-> fixtures/sample-account-info-state
-                  (assoc-in [:account-info :selected-tab] :funding-history)
-                  (assoc-in [:account-info :funding-history]
-                            {:filters {:coin-set #{}}
-                             :draft-filters {:coin-set #{"HYPE"}}
-                             :filter-open? true
-                             :loading? false
-                             :error nil})
-                  (assoc-in [:orders :fundings-raw] [funding-row-hype funding-row-sol])
-                  (assoc-in [:orders :fundings] [funding-row-hype funding-row-sol]))
-        panel (view/account-info-panel state)
-        coin-checkboxes (hiccup/find-all-nodes panel
-                                        (fn [node]
-                                          (and (= :input (first node))
-                                               (= "checkbox" (get-in node [1 :type]))
-                                               (= :actions/toggle-funding-history-filter-coin
-                                                  (first (first (get-in node [1 :on :change])))))))
-        class-sets (map hiccup/node-class-set coin-checkboxes)]
-    (is (= 2 (count coin-checkboxes)))
-    (is (every? #(contains? % "trade-toggle-checkbox") class-sets))
-    (is (every? #(contains? % "h-4") class-sets))
-    (is (every? #(contains? % "w-4") class-sets))
-    (is (every? #(not (contains? % "checkbox-xs")) class-sets))
-    (is (some true? (map #(get-in % [1 :checked]) coin-checkboxes)))
-    (is (every? #(= :actions/toggle-funding-history-filter-coin
-                    (first (first (get-in % [1 :on :change]))))
-                coin-checkboxes))))
+        funding-row-stx {:id "1700000200000|STX|90.0|0.20|0.0003"
+                         :time-ms 1700000200000
+                         :coin "STX"
+                         :size-raw 90.0
+                         :position-size-raw 90.0
+                         :position-side :long
+                         :payment-usdc-raw 0.20
+                         :funding-rate-raw 0.0003}
+        funding-history-state {:filters {:coin-set #{}}
+                               :draft-filters {:coin-set #{"HYPE"}}
+                               :coin-search "sol"
+                               :coin-suggestions-open? true
+                               :filter-open? true
+                               :loading? false
+                               :error nil}
+        controls (@#'view/funding-history-controls funding-history-state
+                                                   [funding-row-hype funding-row-sol funding-row-stx])
+        search-input (hiccup/find-first-node controls #(= "funding-history-coin-search" (get-in % [1 :id])))
+        suggestion-buttons (hiccup/find-all-nodes controls
+                                                  (fn [node]
+                                                    (= :actions/add-funding-history-filter-coin
+                                                       (first (first (get-in node [1 :on :mousedown]))))))]
+    (is (some? search-input))
+    (is (= "search" (get-in search-input [1 :type])))
+    (is (= "sol" (get-in search-input [1 :value])))
+    (is (= [[:actions/set-funding-history-filters :coin-search [:event.target/value]]]
+           (get-in search-input [1 :on :input])))
+    (is (= [[:actions/handle-funding-history-coin-search-keydown [:event/key] "SOL"]]
+           (get-in search-input [1 :on :keydown])))
+    (is (= 1 (count suggestion-buttons)))
+    (is (= [[:actions/add-funding-history-filter-coin "SOL"]]
+           (get-in (first suggestion-buttons) [1 :on :mousedown])))))
 
-(deftest funding-history-coin-filter-renders-prefixed-coins-as-base-plus-chip-test
+(deftest funding-history-coin-filter-renders-prefixed-coins-as-chip-with-remove-button-test
   (let [funding-row-pump {:id "1700000000000|PUMP|120.0|-0.42|0.0006"
                           :time-ms 1700000000000
                           :coin "PUMP"
@@ -384,24 +389,24 @@
                          :funding-rate-raw 0.0002}
         funding-history-state {:filters {:coin-set #{}}
                                :draft-filters {:coin-set #{"xyz:GOOGL"}}
+                               :coin-search ""
+                               :coin-suggestions-open? true
                                :filter-open? true
                                :loading? false
                                :error nil}
         controls (@#'view/funding-history-controls funding-history-state
                                                    [funding-row-pump funding-row-xyz])
-        coin-checkboxes (hiccup/find-all-nodes controls
-                                        (fn [node]
-                                          (and (= :input (first node))
-                                               (= "checkbox" (get-in node [1 :type]))
-                                               (= :actions/toggle-funding-history-filter-coin
-                                                  (first (first (get-in node [1 :on :change])))))))
         xyz-label (hiccup/find-first-node controls #(contains? (hiccup/direct-texts %) "xyz"))
         googl-label (hiccup/find-first-node controls #(contains? (hiccup/direct-texts %) "GOOGL"))
+        remove-button (hiccup/find-first-node controls #(= "Remove xyz:GOOGL filter" (get-in % [1 :aria-label])))
         controls-strings (set (hiccup/collect-strings controls))]
-    (is (= 2 (count coin-checkboxes)))
     (is (some? xyz-label))
     (is (some? googl-label))
+    (is (some? remove-button))
+    (is (= [[:actions/toggle-funding-history-filter-coin "xyz:GOOGL"]]
+           (get-in remove-button [1 :on :click])))
     (is (contains? (hiccup/node-class-set xyz-label) "bg-emerald-500/20"))
     (is (contains? controls-strings "GOOGL"))
     (is (contains? controls-strings "xyz"))
-    (is (not (contains? controls-strings "xyz:GOOGL")))))
+    (is (not (contains? controls-strings "xyz:GOOGL")))
+    (is (nil? (hiccup/find-first-node controls #(= "checkbox" (get-in % [1 :type])))))))

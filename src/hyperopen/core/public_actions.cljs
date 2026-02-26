@@ -164,6 +164,12 @@
 (def toggle-funding-history-filter-coin
   account-history-actions/toggle-funding-history-filter-coin)
 
+(def add-funding-history-filter-coin
+  account-history-actions/add-funding-history-filter-coin)
+
+(def handle-funding-history-coin-search-keydown
+  account-history-actions/handle-funding-history-coin-search-keydown)
+
 (def reset-funding-history-filter-draft
   account-history-actions/reset-funding-history-filter-draft)
 
