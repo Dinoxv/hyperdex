@@ -382,6 +382,9 @@
 (def ^:private day-ms
   (* 24 60 60 1000))
 
+(def ^:private calendar-days-per-year
+  365)
+
 (def ^:private default-periods-per-year
   252)
 
@@ -493,23 +496,47 @@
         (/ (js/Math.ceil (* exposure-ratio 100))
            100)))))
 
+(defn- row-anchor-ms
+  [row]
+  (or (some-> (:day row) parse-day-ms)
+      (optional-number (:time-ms row))))
+
+(defn- rows-span-years
+  [rows]
+  (let [rows* (vec (or rows []))]
+    (when (>= (count rows*) 2)
+      (let [start-ms (row-anchor-ms (first rows*))
+            end-ms (row-anchor-ms (last rows*))
+            span-ms (when (and (number? start-ms)
+                               (number? end-ms))
+                      (- end-ms start-ms))]
+        (when (and (number? span-ms)
+                   (pos? span-ms))
+          (/ span-ms
+             (* day-ms calendar-days-per-year)))))))
+
 (defn cagr
   ([returns]
    (cagr returns {}))
-  ([returns {:keys [periods-per-year compounded]
+  ([returns {:keys [periods-per-year compounded years]
              :or {periods-per-year default-periods-per-year
                   compounded true}}]
    (let [n (count returns)]
-     (when (and (pos? n)
-                (pos? periods-per-year))
+     (when (pos? n)
        (let [total (if compounded
                      (comp returns)
                      (reduce + 0 returns))
-             years (/ n periods-per-year)]
+             years* (if (and (number? years)
+                             (pos? years))
+                      years
+                      (when (and (number? periods-per-year)
+                                 (pos? periods-per-year))
+                        (/ n periods-per-year)))]
          (when (and (number? total)
-                    (pos? years))
+                    (number? years*)
+                    (pos? years*))
            (- (js/Math.pow (js/Math.abs (+ total 1))
-                           (/ 1 years))
+                           (/ 1 years*))
               1)))))))
 
 (defn volatility
@@ -893,9 +920,10 @@
 (defn calmar
   ([returns]
    (calmar returns {}))
-  ([returns {:keys [periods-per-year]
+  ([returns {:keys [periods-per-year years]
              :or {periods-per-year default-periods-per-year}}]
-   (let [growth (cagr returns {:periods-per-year periods-per-year})
+   (let [growth (cagr returns {:periods-per-year periods-per-year
+                               :years years})
          drawdown (max-drawdown returns)]
      (when (and (number? growth)
                 (number? drawdown)
@@ -1179,6 +1207,7 @@
            benchmark-daily-rows
            rf
            periods-per-year
+           cagr-years
            compounded]
     :or {rf 0
          periods-per-year default-periods-per-year
@@ -1234,11 +1263,17 @@
                   [])
         y10-rows (if (number? y10-ms)
                    (rows-since-ms strategy-rows y10-ms)
-                   [])]
+                   [])
+        strategy-years (rows-span-years strategy-rows)
+        cagr-years* (if (and (number? cagr-years)
+                             (pos? cagr-years))
+                      cagr-years
+                      strategy-years)]
     {:time-in-market (time-in-market strategy-returns)
      :cumulative-return (comp strategy-returns)
      :cagr (cagr strategy-returns {:periods-per-year periods-per-year
-                                   :compounded compounded})
+                                   :compounded compounded
+                                   :years cagr-years*})
      :sharpe (sharpe strategy-returns {:rf rf
                                        :periods-per-year periods-per-year})
      :prob-sharpe-ratio (probabilistic-sharpe-ratio strategy-returns {:rf rf
@@ -1264,7 +1299,8 @@
            (r-squared strategy-aligned benchmark-aligned))
      :information-ratio (when (seq aligned-benchmark)
                           (information-ratio strategy-aligned benchmark-aligned))
-     :calmar (calmar strategy-returns {:periods-per-year periods-per-year})
+     :calmar (calmar strategy-returns {:periods-per-year periods-per-year
+                                       :years cagr-years*})
      :skew (skew strategy-returns)
      :kurtosis (kurtosis strategy-returns)
      :expected-daily (expected-return strategy-rows {:period :day
@@ -1294,13 +1330,17 @@
      :ytd (window-return ytd-rows compounded)
      :y1 (window-return y1-rows compounded)
      :y3-ann (cagr (returns-values y3-rows) {:periods-per-year periods-per-year
-                                             :compounded compounded})
+                                             :compounded compounded
+                                             :years (rows-span-years y3-rows)})
      :y5-ann (cagr (returns-values y5-rows) {:periods-per-year periods-per-year
-                                             :compounded compounded})
+                                             :compounded compounded
+                                             :years (rows-span-years y5-rows)})
      :y10-ann (cagr (returns-values y10-rows) {:periods-per-year periods-per-year
-                                               :compounded compounded})
+                                               :compounded compounded
+                                               :years (rows-span-years y10-rows)})
      :all-time-ann (cagr strategy-returns {:periods-per-year periods-per-year
-                                           :compounded compounded})}))
+                                           :compounded compounded
+                                           :years strategy-years})}))
 
 (def ^:private performance-metric-groups
   [{:id :overview

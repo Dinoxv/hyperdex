@@ -44,6 +44,21 @@
 (def ^:private chart-y-tick-count
   4)
 
+(def ^:private performance-periods-per-year
+  365)
+
+(defn- summary-time-range-years
+  [summary-time-range]
+  (case summary-time-range
+    :day (/ 1 365)
+    :week (/ 7 365)
+    :month (/ 30 365)
+    :three-month (/ 3 12)
+    :six-month 0.5
+    :one-year 1
+    :two-year 2
+    nil))
+
 (def ^:private chart-empty-y-ticks
   [{:value 3 :y-ratio 0}
    {:value 2 :y-ratio (/ 1 3)}
@@ -899,10 +914,12 @@
                                                                     coin
                                                                     strategy-time-points)
         benchmark-daily-rows (portfolio-metrics/daily-compounded-returns benchmark-cumulative-rows)
+        cagr-years (summary-time-range-years summary-time-range)
         values (if (seq benchmark-daily-rows)
                  (portfolio-metrics/compute-performance-metrics {:strategy-daily-rows benchmark-daily-rows
                                                                  :rf 0
-                                                                 :periods-per-year 252
+                                                                 :periods-per-year performance-periods-per-year
+                                                                 :cagr-years cagr-years
                                                                  :compounded true})
                  {})]
     {:coin coin
@@ -954,10 +971,12 @@
         benchmark-coin (:coin primary-benchmark-column)
         benchmark-daily-rows (or (:daily-rows primary-benchmark-column)
                                  [])
+        cagr-years (summary-time-range-years summary-time-range)
         portfolio-values (portfolio-metrics/compute-performance-metrics {:strategy-daily-rows strategy-daily-rows
                                                                          :benchmark-daily-rows benchmark-daily-rows
                                                                          :rf 0
-                                                                         :periods-per-year 252
+                                                                         :periods-per-year performance-periods-per-year
+                                                                         :cagr-years cagr-years
                                                                          :compounded true})
         benchmark-values (or (:values primary-benchmark-column)
                              {})

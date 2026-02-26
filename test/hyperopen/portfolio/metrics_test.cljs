@@ -58,6 +58,10 @@
         (range (count returns))
         returns))
 
+(defn- day->ms
+  [day]
+  (.getTime (js/Date. (str day "T00:00:00.000Z"))))
+
 (deftest returns-history-rows-adjusts-for-cashflows-test
   (let [state {:wallet {:address "0xabc"}
                :portfolio {:ledger-updates [{:time 2
@@ -127,6 +131,55 @@
       (is (= "1970-01-01"
              (get-in daily-returns [0 :day])))
       (is (approx= 0.21 (get-in daily-returns [0 :return]) 1e-12)))))
+
+(deftest cagr-years-override-matches-compounded-growth-over-explicit-span-test
+  (let [returns [0.10 -0.05 -0.20]
+        cumulative (metrics/comp returns)]
+    (is (approx= cumulative -0.164 1e-12))
+    (is (approx= (metrics/cagr returns {:periods-per-year 365
+                                        :compounded true
+                                        :years 1})
+                 cumulative
+                 1e-12))))
+
+(deftest compute-performance-metrics-cagr-uses-elapsed-row-timespan-test
+  (let [rows [{:day "2023-01-01"
+               :time-ms (day->ms "2023-01-01")
+               :return 0.10}
+              {:day "2023-07-01"
+               :time-ms (day->ms "2023-07-01")
+               :return -0.05}
+              {:day "2024-01-01"
+               :time-ms (day->ms "2024-01-01")
+               :return -0.20}]
+        metrics* (metrics/compute-performance-metrics {:strategy-daily-rows rows
+                                                        :rf 0
+                                                        :periods-per-year 365
+                                                        :compounded true})
+        cumulative (:cumulative-return metrics*)
+        cagr (:cagr metrics*)]
+    (is (approx= cumulative -0.164 1e-12))
+    (is (approx= cagr cumulative 1e-12))))
+
+(deftest compute-performance-metrics-cagr-respects-explicit-cagr-years-override-test
+  (let [rows [{:day "2023-01-01"
+               :time-ms (day->ms "2023-01-01")
+               :return 0.10}
+              {:day "2023-01-15"
+               :time-ms (day->ms "2023-01-15")
+               :return -0.05}
+              {:day "2023-02-01"
+               :time-ms (day->ms "2023-02-01")
+               :return -0.20}]
+        metrics* (metrics/compute-performance-metrics {:strategy-daily-rows rows
+                                                        :rf 0
+                                                        :periods-per-year 365
+                                                        :cagr-years 1
+                                                        :compounded true})
+        cumulative (:cumulative-return metrics*)
+        cagr (:cagr metrics*)]
+    (is (approx= cumulative -0.164 1e-12))
+    (is (approx= cagr cumulative 1e-12))))
 
 (deftest quantstats-ratio-parity-test
   (let [returns quantstats-returns]
