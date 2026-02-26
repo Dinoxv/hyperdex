@@ -267,7 +267,119 @@
     [:div [:span {:class ["text-trading-text-secondary"]} "Your Deposit "] [:span {:class ["num" "text-trading-text"]} (format-currency your-deposit)]]
     [:div [:span {:class ["text-trading-text-secondary"]} "Age "] [:span {:class ["num" "text-trading-text"]} (format-age age-days)]]]])
 
-(defn- section-table [label rows sort-state]
+(def ^:private loading-skeleton-row-count
+  5)
+
+(defn- skeleton-block
+  [extra-classes]
+  [:span {:class (into ["block"
+                        "h-3.5"
+                        "rounded"
+                        "bg-base-300/70"
+                        "animate-pulse"]
+                       extra-classes)}])
+
+(defn- desktop-loading-row
+  [idx]
+  [:tr {:class ["border-b" "border-base-300/40"]
+        :data-role "vault-loading-row"
+        :data-index idx}
+   [:td {:class ["px-3" "py-3"]} (skeleton-block ["w-40"])]
+   [:td {:class ["px-3" "py-3"]} (skeleton-block ["w-24"])]
+   [:td {:class ["px-3" "py-3"]} (skeleton-block ["w-14"])]
+   [:td {:class ["px-3" "py-3"]} (skeleton-block ["w-20"])]
+   [:td {:class ["px-3" "py-3"]} (skeleton-block ["w-24"])]
+   [:td {:class ["px-3" "py-3"]} (skeleton-block ["w-10"])]
+   [:td {:class ["px-3" "py-3" "text-right"]} (skeleton-block ["ml-auto" "w-20"])]])
+
+(defn- mobile-loading-card
+  [idx]
+  [:div {:class ["rounded-xl"
+                 "border"
+                 "border-base-300"
+                 "bg-base-100"
+                 "p-3"
+                 "space-y-3"]
+         :data-role "vault-loading-card"
+         :data-index idx}
+   [:div {:class ["flex" "items-center" "justify-between" "gap-3"]}
+    (skeleton-block ["w-28"])
+    (skeleton-block ["w-20"])]
+   [:div {:class ["grid" "grid-cols-2" "gap-2"]}
+    (skeleton-block ["w-20"])
+    (skeleton-block ["w-20"])
+    (skeleton-block ["w-24"])
+    (skeleton-block ["w-16"])]])
+
+(defn- user-vault-pagination-controls
+  [{:keys [total-rows page-size page page-count page-size-options]}]
+  (when (pos? total-rows)
+    [:div {:class ["mt-2"
+                   "flex"
+                   "flex-wrap"
+                   "items-center"
+                   "justify-between"
+                   "gap-2"
+                   "border-t"
+                   "border-base-300/80"
+                   "pt-2"
+                   "text-xs"]}
+     [:div {:class ["flex" "items-center" "gap-2"]}
+      [:label {:for "vaults-user-page-size"
+               :class ["text-trading-text-secondary"]}
+       "Rows"]
+      [:select {:id "vaults-user-page-size"
+                :class ["h-8"
+                        "min-h-8"
+                        "rounded-md"
+                        "border"
+                        "border-base-300"
+                        "bg-base-100"
+                        "px-2"
+                        "text-xs"
+                        "text-trading-text"
+                        "focus:outline-none"
+                        "focus:ring-0"
+                        "focus:ring-offset-0"]
+                :value (str page-size)
+                :on {:change [[:actions/set-vaults-user-page-size [:event.target/value]]]}}
+       (for [size page-size-options]
+         ^{:key (str "vault-page-size-" size)}
+         [:option {:value (str size)}
+          (str size)])]
+      [:span {:class ["text-trading-text-secondary"]}
+       (str "Total: " total-rows)]]
+     [:div {:class ["flex" "items-center" "gap-2"]}
+      [:button {:type "button"
+                :class ["h-7"
+                        "rounded-md"
+                        "border"
+                        "border-base-300"
+                        "px-2"
+                        "text-xs"
+                        "text-trading-text"
+                        "disabled:cursor-not-allowed"
+                        "disabled:opacity-40"]
+                :disabled (<= page 1)
+                :on {:click [[:actions/prev-vaults-user-page page-count]]}}
+       "Prev"]
+      [:span {:class ["min-w-[6rem]" "text-center" "text-trading-text-secondary"]}
+       (str "Page " page " of " page-count)]
+      [:button {:type "button"
+                :class ["h-7"
+                        "rounded-md"
+                        "border"
+                        "border-base-300"
+                        "px-2"
+                        "text-xs"
+                        "text-trading-text"
+                        "disabled:cursor-not-allowed"
+                        "disabled:opacity-40"]
+                :disabled (>= page page-count)
+                :on {:click [[:actions/next-vaults-user-page page-count]]}}
+       "Next"]]]))
+
+(defn- section-table [label rows sort-state {:keys [loading? pagination]}]
   [:section {:class ["space-y-2"]}
    [:h3 {:class ["text-sm" "font-normal" "text-trading-text"]} label]
    [:div {:class ["hidden" "md:block" "overflow-x-auto"]}
@@ -291,19 +403,35 @@
        [:th {:class ["px-3" "py-2" "text-left"]} (sort-header "Age" :age sort-state)]
        [:th {:class ["px-3" "py-2" "text-right"]} (sort-header "Snapshot" :snapshot sort-state)]]]
      [:tbody
-      (if (seq rows)
+      (cond
+        loading?
+        (for [idx (range loading-skeleton-row-count)]
+          ^{:key (str "vault-loading-row-" label "-" idx)}
+          (desktop-loading-row idx))
+
+        (seq rows)
         (for [row rows]
           ^{:key (str "vault-row-" (:vault-address row))}
           (vault-row row))
-        [[:tr
-          [:td {:col-span 7
-                :class ["px-3" "py-6" "text-center" "text-sm" "text-trading-text-secondary"]}
-           "No vaults match current filters."]]])]]]
+
+        :else
+        [:tr
+         [:td {:col-span 7
+               :class ["px-3" "py-6" "text-center" "text-sm" "text-trading-text-secondary"]}
+          "No vaults match current filters."]])]]]
    [:div {:class ["space-y-2" "md:hidden"]}
-    (if (seq rows)
+    (cond
+      loading?
+      (for [idx (range loading-skeleton-row-count)]
+        ^{:key (str "mobile-vault-loading-row-" label "-" idx)}
+        (mobile-loading-card idx))
+
+      (seq rows)
       (for [row rows]
         ^{:key (str "mobile-vault-row-" (:vault-address row))}
         (mobile-vault-card row))
+
+      :else
       [:div {:class ["rounded-lg"
                      "border"
                      "border-base-300"
@@ -313,7 +441,8 @@
                      "text-center"
                      "text-sm"
                      "text-trading-text-secondary"]}
-       "No vaults match current filters."])]] )
+       "No vaults match current filters."])]
+   (user-vault-pagination-controls pagination)])
 
 (defn vaults-view
   [state]
@@ -325,6 +454,8 @@
                 error
                 protocol-rows
                 user-rows
+                visible-user-rows
+                user-pagination
                 total-visible-tvl]} (vault-vm/vault-list-vm state)]
     [:div {:class ["relative" "w-full" "app-shell-gutter" "py-6"]
            :data-parity-id "vaults-root"}
@@ -357,8 +488,11 @@
       [:div {:class ["w-full" "max-w-[360px]" "rounded-2xl" "bg-[#0f1a1f]" "px-3" "py-3"]}
        [:div {:class ["text-sm" "font-normal" "text-trading-text-secondary"]}
         "Total Value Locked"]
-       [:div {:class ["mt-1" "num" "text-[44px]" "leading-[46px]" "font-normal" "text-trading-text"]}
-        (format-total-currency total-visible-tvl)]]
+       (if loading?
+         [:div {:class ["mt-3" "h-10" "w-44" "rounded-md" "bg-base-300/70" "animate-pulse"]}
+         [:div {:class ["sr-only"]} "Loading total value locked"]]
+         [:div {:class ["mt-1" "num" "text-[44px]" "leading-[46px]" "font-normal" "text-trading-text"]}
+          (format-total-currency total-visible-tvl)])]
 
       [:div {:class ["rounded-2xl" "border" "border-base-300/80" "bg-base-100/90" "p-3"]}
        [:div {:class ["flex" "flex-wrap" "items-center" "gap-2"]}
@@ -384,16 +518,13 @@
         (role-filter-menu filters)
         (range-menu snapshot-range)]]
 
-      (when loading?
-        [:div {:class ["rounded-xl" "border" "border-base-300" "bg-base-100" "px-3" "py-2.5" "text-sm" "text-trading-text-secondary"]}
-         "Loading vaults..."])
-
       (when error
         [:div {:class ["rounded-xl" "border" "border-red-500/40" "bg-red-900/20" "px-3" "py-2.5" "text-sm" "text-red-200"]}
          error])
 
       [:section {:class ["rounded-2xl" "border" "border-base-300/80" "bg-base-100/95" "p-3" "space-y-6"]}
-       (section-table "Protocol Vaults" protocol-rows sort)
-       (section-table "User Vaults" user-rows sort)
+       (section-table "Protocol Vaults" protocol-rows sort {:loading? loading?})
+       (section-table "User Vaults" visible-user-rows sort {:loading? loading?
+                                                            :pagination user-pagination})
        [:div {:class ["text-right" "text-xs" "text-trading-text-secondary"]}
         (str (count protocol-rows) " protocol vaults | " (count user-rows) " user vaults")]]]]))

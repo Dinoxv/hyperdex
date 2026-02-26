@@ -211,6 +211,21 @@
            :protocol-rows []}
           rows))
 
+(defn- paginate-user-rows
+  [rows page-size page]
+  (let [total-rows (count rows)
+        page-count (max 1 (int (js/Math.ceil (/ total-rows page-size))))
+        safe-page (vault-actions/normalize-vault-user-page page page-count)
+        start-idx (* (dec safe-page) page-size)
+        end-idx (min total-rows (+ start-idx page-size))
+        page-rows (if (< start-idx total-rows)
+                    (subvec rows start-idx end-idx)
+                    [])]
+    {:rows page-rows
+     :page safe-page
+     :page-count page-count
+     :total-rows total-rows}))
+
 (defn- rows-source
   [state]
   (let [rows (or (get-in state [:vaults :merged-index-rows])
@@ -226,6 +241,10 @@
         query (get-in state [:vaults-ui :search-query] "")
         snapshot-range (vault-actions/normalize-vault-snapshot-range
                         (get-in state [:vaults-ui :snapshot-range]))
+        user-page-size (vault-actions/normalize-vault-user-page-size
+                        (get-in state [:vaults-ui :user-vaults-page-size]))
+        requested-user-page (vault-actions/normalize-vault-user-page
+                             (get-in state [:vaults-ui :user-vaults-page]))
         filters {:leading? (true? (get-in state [:vaults-ui :filter-leading?] true))
                  :deposited? (true? (get-in state [:vaults-ui :filter-deposited?] true))
                  :others? (true? (get-in state [:vaults-ui :filter-others?] true))
@@ -247,6 +266,9 @@
                           (#(sort-rows % sort-state))
                           vec)
         grouped (partition-user-and-protocol-rows visible-rows)
+        user-pagination (paginate-user-rows (:user-rows grouped)
+                                            user-page-size
+                                            requested-user-page)
         list-loading? (or (true? (get-in state [:vaults :loading :index?]))
                           (true? (get-in state [:vaults :loading :summaries?])))
         list-error (or (get-in state [:vaults :errors :index])
@@ -261,6 +283,12 @@
      :rows visible-rows
      :protocol-rows (:protocol-rows grouped)
      :user-rows (:user-rows grouped)
+     :visible-user-rows (:rows user-pagination)
+     :user-pagination {:total-rows (:total-rows user-pagination)
+                       :page-size user-page-size
+                       :page-size-options vault-actions/vault-user-page-size-options
+                       :page (:page user-pagination)
+                       :page-count (:page-count user-pagination)}
      :visible-count (count visible-rows)
      :total-visible-tvl (reduce (fn [acc {:keys [tvl]}]
                                   (+ acc (or tvl 0)))

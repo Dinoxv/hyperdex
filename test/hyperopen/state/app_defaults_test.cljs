@@ -49,6 +49,8 @@
     (is (= :month (get-in state [:vaults-ui :snapshot-range])))
     (is (= :tvl (get-in state [:vaults-ui :sort :column])))
     (is (= :desc (get-in state [:vaults-ui :sort :direction])))
+    (is (= 10 (get-in state [:vaults-ui :user-vaults-page-size])))
+    (is (= 1 (get-in state [:vaults-ui :user-vaults-page])))
     (is (= :about (get-in state [:vaults-ui :detail-tab])))
     (is (= true (get-in state [:chart-options :volume-visible?])))
     (is (= false (get-in state [:positions-ui :tpsl-modal :open?])))

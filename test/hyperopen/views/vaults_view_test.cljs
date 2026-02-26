@@ -34,6 +34,8 @@
                :filter-others? true
                :filter-closed? false
                :snapshot-range :month
+               :user-vaults-page-size 10
+               :user-vaults-page 1
                :sort {:column :tvl
                       :direction :desc}}
    :vaults {:loading {:index? false
@@ -79,3 +81,22 @@
                                               (= "/vaults/0x1111111111111111111111111111111111111111"
                                                  (get-in candidate [1 :href])))))]
     (is (some? row-link-node))))
+
+(deftest vaults-view-renders-user-pagination-controls-test
+  (let [view (vaults-view/vaults-view sample-state)
+        page-size-select (find-first-node view #(= "vaults-user-page-size" (get-in % [1 :id])))
+        text (set (collect-strings view))]
+    (is (some? page-size-select))
+    (is (contains? text "Rows"))
+    (is (contains? text "Prev"))
+    (is (contains? text "Next"))))
+
+(deftest vaults-view-renders-skeleton-rows-when-loading-test
+  (let [view (vaults-view/vaults-view (-> sample-state
+                                          (assoc-in [:vaults :loading :index?] true)
+                                          (assoc-in [:vaults :loading :summaries?] true)
+                                          (assoc-in [:vaults :merged-index-rows] [])))
+        loading-row (find-first-node view #(= "vault-loading-row" (get-in % [1 :data-role])))
+        text (set (collect-strings view))]
+    (is (some? loading-row))
+    (is (not (contains? text "Loading vaults...")))))

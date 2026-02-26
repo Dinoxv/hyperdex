@@ -126,6 +126,10 @@
            toggle-vaults-filter
            set-vaults-snapshot-range
            set-vaults-sort
+           set-vaults-user-page-size
+           set-vaults-user-page
+           next-vaults-user-page
+           prev-vaults-user-page
            set-vault-detail-tab]}]
   {:load-vault-route load-vault-route
    :load-vaults load-vaults
@@ -134,6 +138,10 @@
    :toggle-vaults-filter toggle-vaults-filter
    :set-vaults-snapshot-range set-vaults-snapshot-range
    :set-vaults-sort set-vaults-sort
+   :set-vaults-user-page-size set-vaults-user-page-size
+   :set-vaults-user-page set-vaults-user-page
+   :next-vaults-user-page next-vaults-user-page
+   :prev-vaults-user-page prev-vaults-user-page
    :set-vault-detail-tab set-vault-detail-tab})
 
 (defn- wallet-action-handlers

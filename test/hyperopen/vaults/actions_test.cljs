@@ -47,25 +47,43 @@
           "/vaults/0x1234567890abcdef1234567890abcdef12345678"))))
 
 (deftest vault-ui-actions-normalize-input-and-toggle-states-test
-  (is (= [[:effects/save [:vaults-ui :search-query] "vault"]]
+  (is (= [[:effects/save-many [[[:vaults-ui :search-query] "vault"]
+                               [[:vaults-ui :user-vaults-page] 1]]]]
          (actions/set-vaults-search-query {} "vault")))
-  (is (= [[:effects/save [:vaults-ui :search-query] "42"]]
+  (is (= [[:effects/save-many [[[:vaults-ui :search-query] "42"]
+                               [[:vaults-ui :user-vaults-page] 1]]]]
          (actions/set-vaults-search-query {} 42)))
-  (is (= [[:effects/save [:vaults-ui :filter-leading?] false]]
+  (is (= [[:effects/save-many [[[:vaults-ui :filter-leading?] false]
+                               [[:vaults-ui :user-vaults-page] 1]]]]
          (actions/toggle-vaults-filter {:vaults-ui {:filter-leading? true}} :leading)))
   (is (= []
          (actions/toggle-vaults-filter {:vaults-ui {:filter-leading? true}} :unknown)))
-  (is (= [[:effects/save [:vaults-ui :snapshot-range] :all-time]]
+  (is (= [[:effects/save-many [[[:vaults-ui :snapshot-range] :all-time]
+                               [[:vaults-ui :user-vaults-page] 1]]]]
          (actions/set-vaults-snapshot-range {} "allTime")))
-  (is (= [[:effects/save [:vaults-ui :sort] {:column :tvl
-                                             :direction :asc}]]
+  (is (= [[:effects/save-many [[[:vaults-ui :sort] {:column :tvl
+                                                    :direction :asc}]
+                               [[:vaults-ui :user-vaults-page] 1]]]]
          (actions/set-vaults-sort {:vaults-ui {:sort {:column :tvl
                                                       :direction :desc}}}
                                   :tvl)))
-  (is (= [[:effects/save [:vaults-ui :sort] {:column :apr
-                                             :direction :desc}]]
+  (is (= [[:effects/save-many [[[:vaults-ui :sort] {:column :apr
+                                                    :direction :desc}]
+                               [[:vaults-ui :user-vaults-page] 1]]]]
          (actions/set-vaults-sort {:vaults-ui {:sort {:column :tvl
                                                       :direction :desc}}}
                                   "apr")))
+  (is (= [[:effects/save-many [[[:vaults-ui :user-vaults-page-size] 25]
+                               [[:vaults-ui :user-vaults-page] 1]]]]
+         (actions/set-vaults-user-page-size {} "25")))
+  (is (= [[:effects/save-many [[[:vaults-ui :user-vaults-page-size] 10]
+                               [[:vaults-ui :user-vaults-page] 1]]]]
+         (actions/set-vaults-user-page-size {} "999")))
+  (is (= [[:effects/save [:vaults-ui :user-vaults-page] 2]]
+         (actions/set-vaults-user-page {} "3" 2)))
+  (is (= [[:effects/save [:vaults-ui :user-vaults-page] 4]]
+         (actions/next-vaults-user-page {:vaults-ui {:user-vaults-page 3}} 5)))
+  (is (= [[:effects/save [:vaults-ui :user-vaults-page] 1]]
+         (actions/prev-vaults-user-page {:vaults-ui {:user-vaults-page 2}} 5)))
   (is (= [[:effects/save [:vaults-ui :detail-tab] :vault-performance]]
          (actions/set-vault-detail-tab {} "vaultPerformance"))))

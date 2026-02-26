@@ -177,6 +177,10 @@
    :toggle-vaults-filter vault-actions/toggle-vaults-filter
    :set-vaults-snapshot-range vault-actions/set-vaults-snapshot-range
    :set-vaults-sort vault-actions/set-vaults-sort
+   :set-vaults-user-page-size vault-actions/set-vaults-user-page-size
+   :set-vaults-user-page vault-actions/set-vaults-user-page
+   :next-vaults-user-page vault-actions/next-vaults-user-page
+   :prev-vaults-user-page vault-actions/prev-vaults-user-page
    :set-vault-detail-tab vault-actions/set-vault-detail-tab})
 
 (defn runtime-effect-deps

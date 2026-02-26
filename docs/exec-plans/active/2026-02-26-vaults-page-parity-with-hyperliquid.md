@@ -71,6 +71,12 @@ A user can verify this by opening `/vaults`, filtering/searching, opening a vaul
   - `npm test`
   - `npm run check`
   - `npm run test:websocket`
+- [x] (2026-02-26 23:48Z) Implemented vault list loading and pagination parity pass:
+  - Added structured vault loading skeletons (desktop table + mobile cards) so the list renders component-level loading states instead of plain text.
+  - Fixed malformed empty-table fallback rendering in `/hyperopen/src/hyperopen/views/vaults_view.cljs` that surfaced raw Hiccup vectors.
+  - Added user-vault pagination controls with Hyperliquid-aligned row options (`5/10/25/50`) and page navigation wired through new vault UI actions/state in `/hyperopen/src/hyperopen/vaults/actions.cljs` and `/hyperopen/src/hyperopen/views/vaults/vm.cljs`.
+  - Updated runtime action registry/collaborator wiring and action contracts for the new vault pagination actions.
+  - Expanded action/VM/view/default-state tests for pagination and loading behavior.
 
 ## Surprises & Discoveries
 
@@ -119,7 +125,7 @@ A user can verify this by opening `/vaults`, filtering/searching, opening a vaul
 
 ## Outcomes & Retrospective
 
-Milestones 1 through 5 and 7 are complete, including a post-implementation parity polish pass against Hyperliquid browser captures. Vault list/detail ingestion, orchestration, route wiring, and UI parity structure are implemented and covered by dedicated VM/view/action/effect tests. The remaining meaningful gap is fine-grained style pixel parity and full list pagination UX parity; core data semantics now align on child-vault exclusion and protocol/user sectioning. Optional Milestone 6 (transactional vault actions) remains intentionally deferred; CTA affordances are present in disabled `Coming soon` state. Validation gates currently pass: `npm run check`, `npm test`, and `npm run test:websocket`.
+Milestones 1 through 5 and 7 are complete, including post-implementation parity polish and a dedicated loading/pagination parity pass. Vault list/detail ingestion, orchestration, route wiring, and UI behavior (including user-vault rows-per-page pagination and structured loading placeholders) are implemented and covered by dedicated VM/view/action/effect tests. The remaining meaningful gap is fine-grained visual pixel parity and optional Milestone 6 (transactional vault actions), which remains intentionally deferred. Validation gates currently pass: `npm run check`, `npm test`, and `npm run test:websocket`.
 
 ## Context and Orientation
 

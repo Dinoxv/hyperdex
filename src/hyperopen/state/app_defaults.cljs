@@ -131,6 +131,8 @@
    :snapshot-range :month
    :sort {:column :tvl
           :direction :desc}
+   :user-vaults-page-size 10
+   :user-vaults-page 1
    :detail-tab :about
    :list-loading? false
    :detail-loading? false})

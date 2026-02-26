@@ -61,6 +61,10 @@
                     (get-in deps [:account-history :toggle-positions-direction-filter-open])))
     (is (identical? vault-actions/load-vault-route
                     (get-in deps [:vaults :load-vault-route])))
+    (is (identical? vault-actions/set-vaults-user-page-size
+                    (get-in deps [:vaults :set-vaults-user-page-size])))
+    (is (identical? vault-actions/next-vaults-user-page
+                    (get-in deps [:vaults :next-vaults-user-page])))
     (is (identical? vault-actions/set-vault-detail-tab
                     (get-in deps [:vaults :set-vault-detail-tab])))
     (is (identical? order-actions/submit-order

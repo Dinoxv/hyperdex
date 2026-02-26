@@ -196,6 +196,10 @@
      [:actions/toggle-vaults-filter :toggle-vaults-filter]
      [:actions/set-vaults-snapshot-range :set-vaults-snapshot-range]
      [:actions/set-vaults-sort :set-vaults-sort]
+     [:actions/set-vaults-user-page-size :set-vaults-user-page-size]
+     [:actions/set-vaults-user-page :set-vaults-user-page]
+     [:actions/next-vaults-user-page :next-vaults-user-page]
+     [:actions/prev-vaults-user-page :prev-vaults-user-page]
      [:actions/set-vault-detail-tab :set-vault-detail-tab]])))
 
 (defn registered-action-ids

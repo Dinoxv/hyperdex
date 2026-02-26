@@ -1,5 +1,6 @@
 (ns hyperopen.vaults.actions
-  (:require [clojure.string :as str]))
+  (:require [clojure.string :as str]
+            [hyperopen.utils.parse :as parse-utils]))
 
 (def default-vault-snapshot-range
   :month)
@@ -9,6 +10,12 @@
 
 (def default-vault-sort-direction
   :desc)
+
+(def default-vault-user-page-size
+  10)
+
+(def default-vault-user-page
+  1)
 
 (def default-vault-detail-tab
   :about)
@@ -21,6 +28,12 @@
 
 (def ^:private vault-detail-tabs
   #{:about :vault-performance :your-performance})
+
+(def vault-user-page-size-options
+  [5 10 25 50])
+
+(def ^:private vault-user-page-size-option-set
+  (set vault-user-page-size-options))
 
 (def ^:private vault-filter-paths
   {:leading [:vaults-ui :filter-leading?]
@@ -128,9 +141,36 @@
       normalized
       default-vault-detail-tab)))
 
+(defn normalize-vault-user-page-size
+  [value]
+  (let [candidate (parse-utils/parse-int-value value)]
+    (if (contains? vault-user-page-size-option-set candidate)
+      candidate
+      default-vault-user-page-size)))
+
+(defn normalize-vault-user-page
+  ([value]
+   (normalize-vault-user-page value nil))
+  ([value max-page]
+   (let [candidate (max default-vault-user-page
+                        (or (parse-utils/parse-int-value value)
+                            default-vault-user-page))
+         max-page* (when (some? max-page)
+                     (max default-vault-user-page
+                          (or (parse-utils/parse-int-value max-page)
+                              default-vault-user-page)))]
+     (if max-page*
+       (min candidate max-page*)
+       candidate))))
+
 (defn- vault-wallet-address
   [state]
   (normalize-vault-address (get-in state [:wallet :address])))
+
+(defn- save-vault-ui-with-user-page-reset
+  [path value]
+  [[:effects/save-many [[path value]
+                        [[:vaults-ui :user-vaults-page] default-vault-user-page]]]])
 
 (defn- load-vault-list-effects
   [state]
@@ -168,19 +208,20 @@
 
 (defn set-vaults-search-query
   [_state query]
-  [[:effects/save [:vaults-ui :search-query] (str (or query ""))]])
+  (save-vault-ui-with-user-page-reset [:vaults-ui :search-query] (str (or query ""))))
 
 (defn toggle-vaults-filter
   [state filter-key]
   (if-let [path (get vault-filter-paths filter-key)]
     (let [next-value (not (true? (get-in state path)))]
-      [[:effects/save path next-value]])
+      (save-vault-ui-with-user-page-reset path next-value))
     []))
 
 (defn set-vaults-snapshot-range
   [_state snapshot-range]
-  [[:effects/save [:vaults-ui :snapshot-range]
-    (normalize-vault-snapshot-range snapshot-range)]])
+  (save-vault-ui-with-user-page-reset
+   [:vaults-ui :snapshot-range]
+   (normalize-vault-snapshot-range snapshot-range)))
 
 (defn set-vaults-sort
   [state sort-column]
@@ -191,9 +232,34 @@
         next-direction (if (= column* (:column current))
                          (if (= :asc (:direction current)) :desc :asc)
                          :desc)]
-    [[:effects/save [:vaults-ui :sort]
-      {:column column*
-       :direction next-direction}]]))
+    (save-vault-ui-with-user-page-reset
+     [:vaults-ui :sort]
+     {:column column*
+      :direction next-direction})))
+
+(defn set-vaults-user-page-size
+  [_state page-size]
+  [[:effects/save-many [[[:vaults-ui :user-vaults-page-size]
+                         (normalize-vault-user-page-size page-size)]
+                        [[:vaults-ui :user-vaults-page]
+                         default-vault-user-page]]]])
+
+(defn set-vaults-user-page
+  [_state page max-page]
+  [[:effects/save [:vaults-ui :user-vaults-page]
+    (normalize-vault-user-page page max-page)]])
+
+(defn next-vaults-user-page
+  [state max-page]
+  (let [current-page (normalize-vault-user-page
+                      (get-in state [:vaults-ui :user-vaults-page]))]
+    (set-vaults-user-page state (inc current-page) max-page)))
+
+(defn prev-vaults-user-page
+  [state max-page]
+  (let [current-page (normalize-vault-user-page
+                      (get-in state [:vaults-ui :user-vaults-page]))]
+    (set-vaults-user-page state (dec current-page) max-page)))
 
 (defn set-vault-detail-tab
   [_state tab]

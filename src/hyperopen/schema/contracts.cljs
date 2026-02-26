@@ -393,6 +393,10 @@
    :actions/toggle-vaults-filter ::keyword-args
    :actions/set-vaults-snapshot-range ::keyword-or-string-args
    :actions/set-vaults-sort ::keyword-or-string-args
+   :actions/set-vaults-user-page-size ::single-input-args
+   :actions/set-vaults-user-page ::page-and-max-page-args
+   :actions/next-vaults-user-page ::max-page-args
+   :actions/prev-vaults-user-page ::max-page-args
    :actions/set-vault-detail-tab ::keyword-or-string-args
    :actions/navigate (s/or :path (s/tuple ::non-empty-string)
                            :path-and-opts (s/tuple ::non-empty-string map?))})
