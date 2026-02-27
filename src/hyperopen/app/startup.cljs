@@ -3,6 +3,7 @@
             [hyperopen.asset-selector.settings :as asset-selector-settings]
             [hyperopen.chart.settings :as chart-settings]
             [hyperopen.orderbook.settings :as orderbook-settings]
+            [hyperopen.portfolio.actions :as portfolio-actions]
             [hyperopen.router :as router]
             [hyperopen.runtime.action-adapters :as runtime-action-adapters]
             [hyperopen.runtime.effect-adapters :as runtime-effect-adapters]
@@ -12,6 +13,7 @@
             [hyperopen.startup.restore :as startup-restore]
             [hyperopen.startup.runtime :as startup-runtime-lib]
             [hyperopen.ui.preferences :as ui-preferences]
+            [hyperopen.vaults.actions :as vault-actions]
             [hyperopen.wallet.core :as wallet]))
 
 (defn mark-performance!
@@ -116,6 +118,8 @@
        :restore-asset-selector-sort-settings! asset-selector-settings/restore-asset-selector-sort-settings!
        :restore-chart-options! chart-settings/restore-chart-options!
        :restore-orderbook-ui! orderbook-settings/restore-orderbook-ui!
+       :restore-portfolio-summary-time-range! portfolio-actions/restore-portfolio-summary-time-range!
+       :restore-vaults-snapshot-range! vault-actions/restore-vaults-snapshot-range!
        :restore-agent-storage-mode! startup-restore/restore-agent-storage-mode!
        :restore-active-asset! runtime-effect-adapters/restore-active-asset!
        :restore-asset-selector-markets-cache! runtime-effect-adapters/restore-asset-selector-markets-cache!

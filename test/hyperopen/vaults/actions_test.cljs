@@ -1,5 +1,6 @@
 (ns hyperopen.vaults.actions-test
   (:require [cljs.test :refer-macros [deftest is]]
+            [hyperopen.platform :as platform]
             [hyperopen.vaults.actions :as actions]))
 
 (deftest parse-vault-route-covers-list-detail-and-invalid-address-branches-test
@@ -111,15 +112,18 @@
          (actions/toggle-vaults-filter {:vaults-ui {:filter-leading? true}} :unknown)))
   (is (= [[:effects/save-many [[[:vaults-ui :snapshot-range] :all-time]
                                [[:vaults-ui :user-vaults-page] 1]
-                               [[:vaults-ui :detail-chart-hover-index] nil]]]]
+                               [[:vaults-ui :detail-chart-hover-index] nil]]]
+          [:effects/local-storage-set "vaults-snapshot-range" "all-time"]]
          (actions/set-vaults-snapshot-range {} "allTime")))
   (is (= [[:effects/save-many [[[:vaults-ui :snapshot-range] :three-month]
                                [[:vaults-ui :user-vaults-page] 1]
-                               [[:vaults-ui :detail-chart-hover-index] nil]]]]
+                               [[:vaults-ui :detail-chart-hover-index] nil]]]
+          [:effects/local-storage-set "vaults-snapshot-range" "three-month"]]
          (actions/set-vaults-snapshot-range {} "3m")))
   (is (= [[:effects/save-many [[[:vaults-ui :snapshot-range] :week]
                                [[:vaults-ui :user-vaults-page] 1]
                                [[:vaults-ui :detail-chart-hover-index] nil]]]
+          [:effects/local-storage-set "vaults-snapshot-range" "week"]
           [:effects/fetch-candle-snapshot :coin "BTC" :interval :15m :bars 800]
           [:effects/fetch-candle-snapshot :coin "ETH" :interval :15m :bars 800]]
          (actions/set-vaults-snapshot-range {:vaults-ui {:detail-chart-series :returns
@@ -232,3 +236,13 @@
                                [[:vaults-ui :detail-returns-benchmark-search] ""]
                                [[:vaults-ui :detail-returns-benchmark-suggestions-open?] false]]]]
          (actions/clear-vault-detail-returns-benchmark {}))))
+
+(deftest restore-vaults-snapshot-range-loads-normalized-local-storage-preference-test
+  (let [store (atom {:vaults-ui {:snapshot-range :month}})]
+    (with-redefs [platform/local-storage-get (fn [_] "allTime")]
+      (actions/restore-vaults-snapshot-range! store))
+    (is (= :all-time (get-in @store [:vaults-ui :snapshot-range]))))
+  (let [store (atom {:vaults-ui {:snapshot-range :all-time}})]
+    (with-redefs [platform/local-storage-get (fn [_] "not-a-range")]
+      (actions/restore-vaults-snapshot-range! store))
+    (is (= :month (get-in @store [:vaults-ui :snapshot-range])))))

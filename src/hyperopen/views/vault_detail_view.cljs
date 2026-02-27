@@ -228,37 +228,53 @@
             :on {:click [[:actions/set-vault-detail-chart-series value]]}}
    label])
 
+(defn- timeframe-token
+  [value]
+  (let [token (cond
+                (keyword? value) (name value)
+                (string? value) (str/trim value)
+                :else nil)]
+    (when (seq token)
+      token)))
+
 (defn- chart-timeframe-menu [{:keys [timeframe-options selected-timeframe]}]
-  [:label {:class ["inline-flex"
-                   "items-center"
-                   "gap-1.5"
-                   "rounded-md"
-                   "border"
-                   "border-[#1f3b3c]"
-                   "bg-[#071e25]"
-                   "px-2.5"
-                   "py-1"
-                   "text-xs"
-                   "text-trading-text"]}
-   [:span "Range "]
-   [:select {:class ["bg-transparent"
-                     "text-trading-text"
-                     "outline-none"
-                     "focus:outline-none"
-                     "focus:ring-0"
-                     "focus:border-transparent"
-                     "focus-visible:outline-none"
-                     "focus-visible:ring-0"
-                     "border-none"
-                     "p-0"
-                     "pr-4"
-                     "text-xs"]
-             :value (name selected-timeframe)
-             :on {:change [[:actions/set-vaults-snapshot-range [:event.target/value]]]}}
-    (for [{:keys [value label]} timeframe-options]
-      ^{:key (str "vault-chart-timeframe-" (name value))}
-      [:option {:value (name value)}
-       label])]])
+  (let [selected-token (or (timeframe-token selected-timeframe)
+                           (timeframe-token (ffirst timeframe-options))
+                           "day")]
+    [:label {:class ["inline-flex"
+                     "items-center"
+                     "gap-1.5"
+                     "rounded-md"
+                     "border"
+                     "border-[#1f3b3c]"
+                     "bg-[#071e25]"
+                     "px-2.5"
+                     "py-1"
+                     "text-xs"
+                     "text-trading-text"]}
+     [:span "Range "]
+     [:select {:class ["bg-transparent"
+                       "text-trading-text"
+                       "outline-none"
+                       "focus:outline-none"
+                       "focus:ring-0"
+                       "focus:border-transparent"
+                       "focus-visible:outline-none"
+                       "focus-visible:ring-0"
+                       "border-none"
+                       "p-0"
+                       "pr-4"
+                       "text-xs"]
+               :value selected-token
+               :on {:change [[:actions/set-vaults-snapshot-range [:event.target/value]]]}}
+      (for [{:keys [value label]} timeframe-options
+            :let [option-token (or (timeframe-token value)
+                                   "day")]]
+        ^{:key (str "vault-chart-timeframe-" option-token)}
+        [:option (cond-> {:value option-token}
+                   (= option-token selected-token)
+                   (assoc :selected true))
+         label])]]))
 
 (defn- hex-color->rgba [hex alpha]
   (let [hex* (if (and (string? hex)

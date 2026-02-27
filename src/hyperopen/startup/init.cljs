@@ -18,6 +18,8 @@
            restore-asset-selector-sort-settings!
            restore-chart-options!
            restore-orderbook-ui!
+           restore-portfolio-summary-time-range!
+           restore-vaults-snapshot-range!
            restore-agent-storage-mode!
            restore-active-asset!
            restore-asset-selector-markets-cache!
@@ -33,6 +35,10 @@
   (restore-chart-options! store)
   ;; Restore orderbook UI options from localStorage.
   (restore-orderbook-ui! store)
+  ;; Restore portfolio summary range selector from localStorage.
+  (restore-portfolio-summary-time-range! store)
+  ;; Restore vault snapshot range selector from localStorage.
+  (restore-vaults-snapshot-range! store)
   ;; Restore agent storage preference from localStorage.
   (restore-agent-storage-mode! store)
   ;; Restore selected asset from localStorage (default to BTC).
@@ -54,6 +60,7 @@
            handle-wallet-connected
            init-wallet!
            init-router!
+           restore-vaults-snapshot-range!
            install-asset-selector-shortcuts!
            install-position-tpsl-clickaway!
            register-icon-service-worker!
@@ -64,6 +71,9 @@
   (init-wallet! store)
   ;; Initialize router.
   (init-router! store)
+  ;; Re-apply vault snapshot range after router init for deep-link refreshes.
+  (when (fn? restore-vaults-snapshot-range!)
+    (restore-vaults-snapshot-range! store))
   ;; Install global keyboard shortcuts that should work regardless of focus target.
   (when (fn? install-asset-selector-shortcuts!)
     (install-asset-selector-shortcuts!))

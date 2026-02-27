@@ -1,5 +1,9 @@
 (ns hyperopen.portfolio.actions
-  (:require [clojure.string :as str]))
+  (:require [clojure.string :as str]
+            [hyperopen.platform :as platform]))
+
+(def ^:private portfolio-summary-time-range-storage-key
+  "portfolio-summary-time-range")
 
 (def default-summary-scope
   :all)
@@ -293,8 +297,17 @@
         fetch-effects (returns-benchmark-fetch-effects time-range* benchmark-coins)]
     (into [(selector-projection-effect nil [[[:portfolio-ui :summary-time-range]
                                              time-range*]
-                                            [chart-hover-index-path nil]])]
+                                            [chart-hover-index-path nil]])
+           [:effects/local-storage-set
+            portfolio-summary-time-range-storage-key
+            (name time-range*)]]
           fetch-effects)))
+
+(defn restore-portfolio-summary-time-range!
+  [store]
+  (let [summary-time-range (normalize-summary-time-range
+                            (platform/local-storage-get portfolio-summary-time-range-storage-key))]
+    (swap! store assoc-in [:portfolio-ui :summary-time-range] summary-time-range)))
 
 (defn select-portfolio-chart-tab
   [state chart-tab]

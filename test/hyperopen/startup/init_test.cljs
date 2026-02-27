@@ -28,6 +28,8 @@
       :restore-asset-selector-sort-settings! (record-store-call :restore-asset-selector-sort)
       :restore-chart-options! (record-store-call :restore-chart-options)
       :restore-orderbook-ui! (record-store-call :restore-orderbook-ui)
+      :restore-portfolio-summary-time-range! (record-store-call :restore-portfolio-summary-time-range)
+      :restore-vaults-snapshot-range! (record-store-call :restore-vaults-snapshot-range)
       :restore-agent-storage-mode! (record-store-call :restore-agent-storage-mode)
       :restore-active-asset! (record-store-call :restore-active-asset)
       :restore-asset-selector-markets-cache! (record-store-call :restore-selector-markets-cache)
@@ -58,6 +60,8 @@
             [:restore-asset-selector-sort true]
             [:restore-chart-options true]
             [:restore-orderbook-ui true]
+            [:restore-portfolio-summary-time-range true]
+            [:restore-vaults-snapshot-range true]
             [:restore-agent-storage-mode true]
             [:restore-active-asset true]
             [:restore-selector-markets-cache true]
@@ -68,6 +72,7 @@
             [:set-on-connected-handler true]
             [:init-wallet true]
             [:init-router true]
+            [:restore-vaults-snapshot-range true]
             :install-asset-selector-shortcuts
             :install-position-tpsl-clickaway
             :register-icon-service-worker

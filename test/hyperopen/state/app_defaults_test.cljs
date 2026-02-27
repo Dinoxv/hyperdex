@@ -1,5 +1,6 @@
 (ns hyperopen.state.app-defaults-test
   (:require [cljs.test :refer-macros [deftest is]]
+            [hyperopen.platform :as platform]
             [hyperopen.state.app-defaults :as app-defaults]))
 
 (deftest default-app-state-preserves-injected-defaults-and-core-shape-test
@@ -95,3 +96,21 @@
     (is (= {} (get-in state [:vaults :ledger-updates-by-vault])))
     (is (= {} (get-in state [:perp-dex-fee-config-by-name])))
     (is (nil? (get-in state [:portfolio :user-fees])))))
+
+(deftest default-app-state-loads-persisted-summary-and-vault-ranges-when-present-test
+  (let [state (with-redefs [platform/local-storage-get (fn [key]
+                                                         (case key
+                                                           "portfolio-summary-time-range" "2y"
+                                                           "vaults-snapshot-range" "one-year"
+                                                           nil))]
+                (app-defaults/default-app-state
+                 {:websocket-health {}
+                  :default-agent-state {}
+                  :default-order-form {}
+                  :default-order-form-ui {}
+                  :default-order-form-runtime {}
+                  :default-trade-history {}
+                  :default-funding-history {}
+                  :default-order-history {}}))]
+    (is (= :two-year (get-in state [:portfolio-ui :summary-time-range])))
+    (is (= :one-year (get-in state [:vaults-ui :snapshot-range])))))

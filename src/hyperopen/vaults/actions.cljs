@@ -1,7 +1,11 @@
 (ns hyperopen.vaults.actions
   (:require [clojure.string :as str]
+            [hyperopen.platform :as platform]
             [hyperopen.portfolio.actions :as portfolio-actions]
             [hyperopen.utils.parse :as parse-utils]))
+
+(def ^:private vaults-snapshot-range-storage-key
+  "vaults-snapshot-range")
 
 (def default-vault-snapshot-range
   :month)
@@ -498,7 +502,17 @@
                         (vault-detail-returns-benchmark-fetch-effects snapshot-range*
                                                                       (selected-vault-detail-returns-benchmark-coins state))
                         [])]
-    (into [projection-effect] fetch-effects)))
+    (into [projection-effect
+           [:effects/local-storage-set
+            vaults-snapshot-range-storage-key
+            (name snapshot-range*)]]
+          fetch-effects)))
+
+(defn restore-vaults-snapshot-range!
+  [store]
+  (let [snapshot-range (normalize-vault-snapshot-range
+                        (platform/local-storage-get vaults-snapshot-range-storage-key))]
+    (swap! store assoc-in [:vaults-ui :snapshot-range] snapshot-range)))
 
 (defn set-vaults-sort
   [state sort-column]

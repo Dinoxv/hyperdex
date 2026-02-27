@@ -1,5 +1,6 @@
 (ns hyperopen.portfolio.actions-test
   (:require [cljs.test :refer-macros [deftest is]]
+            [hyperopen.platform :as platform]
             [hyperopen.portfolio.actions :as actions]))
 
 (deftest toggle-portfolio-summary-scope-dropdown-opens-and-closes-test
@@ -69,19 +70,22 @@
                                [[:portfolio-ui :chart-hover-index] nil]
                                [[:portfolio-ui :summary-scope-dropdown-open?] false]
                                [[:portfolio-ui :summary-time-range-dropdown-open?] false]
-                               [[:portfolio-ui :performance-metrics-time-range-dropdown-open?] false]]]]
+                               [[:portfolio-ui :performance-metrics-time-range-dropdown-open?] false]]]
+          [:effects/local-storage-set "portfolio-summary-time-range" "three-month"]]
          (actions/select-portfolio-summary-time-range {} "3M")))
   (is (= [[:effects/save-many [[[:portfolio-ui :summary-time-range] :all-time]
                                [[:portfolio-ui :chart-hover-index] nil]
                                [[:portfolio-ui :summary-scope-dropdown-open?] false]
                                [[:portfolio-ui :summary-time-range-dropdown-open?] false]
-                               [[:portfolio-ui :performance-metrics-time-range-dropdown-open?] false]]]]
+                               [[:portfolio-ui :performance-metrics-time-range-dropdown-open?] false]]]
+          [:effects/local-storage-set "portfolio-summary-time-range" "all-time"]]
          (actions/select-portfolio-summary-time-range {} "allTime")))
   (is (= [[:effects/save-many [[[:portfolio-ui :summary-time-range] :week]
                                [[:portfolio-ui :chart-hover-index] nil]
                                [[:portfolio-ui :summary-scope-dropdown-open?] false]
                                [[:portfolio-ui :summary-time-range-dropdown-open?] false]
                                [[:portfolio-ui :performance-metrics-time-range-dropdown-open?] false]]]
+          [:effects/local-storage-set "portfolio-summary-time-range" "week"]
           [:effects/fetch-candle-snapshot :coin "BTC" :interval :15m :bars 800]
           [:effects/fetch-candle-snapshot :coin "ETH" :interval :15m :bars 800]]
          (actions/select-portfolio-summary-time-range
@@ -93,6 +97,7 @@
                                [[:portfolio-ui :summary-scope-dropdown-open?] false]
                                [[:portfolio-ui :summary-time-range-dropdown-open?] false]
                                [[:portfolio-ui :performance-metrics-time-range-dropdown-open?] false]]]
+          [:effects/local-storage-set "portfolio-summary-time-range" "week"]
           [:effects/fetch-candle-snapshot :coin "BTC" :interval :15m :bars 800]]
          (actions/select-portfolio-summary-time-range
           {:portfolio-ui {:returns-benchmark-coin "BTC"}}
@@ -101,8 +106,19 @@
                                [[:portfolio-ui :chart-hover-index] nil]
                                [[:portfolio-ui :summary-scope-dropdown-open?] false]
                                [[:portfolio-ui :summary-time-range-dropdown-open?] false]
-                               [[:portfolio-ui :performance-metrics-time-range-dropdown-open?] false]]]]
+                               [[:portfolio-ui :performance-metrics-time-range-dropdown-open?] false]]]
+          [:effects/local-storage-set "portfolio-summary-time-range" "month"]]
          (actions/select-portfolio-summary-time-range {} :unknown))))
+
+(deftest restore-portfolio-summary-time-range-loads-normalized-local-storage-preference-test
+  (let [store (atom {:portfolio-ui {:summary-time-range :month}})]
+    (with-redefs [platform/local-storage-get (fn [_] "3M")]
+      (actions/restore-portfolio-summary-time-range! store))
+    (is (= :three-month (get-in @store [:portfolio-ui :summary-time-range]))))
+  (let [store (atom {:portfolio-ui {:summary-time-range :three-month}})]
+    (with-redefs [platform/local-storage-get (fn [_] "not-a-range")]
+      (actions/restore-portfolio-summary-time-range! store))
+    (is (= :month (get-in @store [:portfolio-ui :summary-time-range])))))
 
 (deftest select-portfolio-chart-tab-normalizes-and-saves-selected-tab-test
   (is (= [[:effects/save-many

@@ -220,6 +220,19 @@
     (is (nil? sharpe-row))
     (is (nil? max-drawdown-row))))
 
+(deftest vault-detail-view-selects-active-snapshot-timeframe-option-test
+  (let [state (assoc-in sample-state [:vaults-ui :snapshot-range] :six-month)
+        view (vault-detail-view/vault-detail-view state)
+        selected-timeframe-option (find-first-node view
+                                                   #(and (= :option (first %))
+                                                         (= "six-month" (get-in % [1 :value]))
+                                                         (true? (get-in % [1 :selected]))))
+        timeframe-selector (find-first-node view
+                                            #(and (= :select (first %))
+                                                  (= "six-month" (get-in % [1 :value]))))]
+    (is (some? timeframe-selector))
+    (is (some? selected-timeframe-option))))
+
 (deftest vault-detail-view-shows-invalid-message-when-route-address-is-invalid-test
   (let [view (vault-detail-view/vault-detail-view (assoc-in sample-state [:router :path] "/vaults/not-an-address"))
         text (set (collect-strings view))]

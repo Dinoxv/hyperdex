@@ -1,6 +1,25 @@
 (ns hyperopen.state.app-defaults
   (:require [hyperopen.account.history.position-reduce :as position-reduce]
-            [hyperopen.account.history.position-tpsl :as position-tpsl]))
+            [hyperopen.account.history.position-tpsl :as position-tpsl]
+            [hyperopen.platform :as platform]
+            [hyperopen.portfolio.actions :as portfolio-actions]
+            [hyperopen.vaults.actions :as vault-actions]))
+
+(def ^:private portfolio-summary-time-range-storage-key
+  "portfolio-summary-time-range")
+
+(def ^:private vaults-snapshot-range-storage-key
+  "vaults-snapshot-range")
+
+(defn- default-portfolio-summary-time-range
+  []
+  (portfolio-actions/normalize-summary-time-range
+   (platform/local-storage-get portfolio-summary-time-range-storage-key)))
+
+(defn- default-vaults-snapshot-range
+  []
+  (vault-actions/normalize-vault-snapshot-range
+   (platform/local-storage-get vaults-snapshot-range-storage-key)))
 
 (defn default-websocket-state
   [websocket-health]
@@ -95,7 +114,7 @@
 (defn default-portfolio-ui-state
   []
   {:summary-scope :all
-   :summary-time-range :month
+   :summary-time-range (default-portfolio-summary-time-range)
    :chart-tab :returns
    :account-info-tab :performance-metrics
    :chart-hover-index nil
@@ -128,7 +147,7 @@
    :filter-deposited? true
    :filter-others? true
    :filter-closed? false
-   :snapshot-range :month
+   :snapshot-range (default-vaults-snapshot-range)
    :sort {:column :tvl
           :direction :desc}
    :user-vaults-page-size 10
