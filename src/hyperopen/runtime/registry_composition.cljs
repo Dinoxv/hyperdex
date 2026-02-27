@@ -127,6 +127,8 @@
            set-vaults-snapshot-range
            set-vaults-sort
            set-vaults-user-page-size
+           toggle-vaults-user-page-size-dropdown
+           close-vaults-user-page-size-dropdown
            set-vaults-user-page
            next-vaults-user-page
            prev-vaults-user-page
@@ -139,6 +141,8 @@
    :set-vaults-snapshot-range set-vaults-snapshot-range
    :set-vaults-sort set-vaults-sort
    :set-vaults-user-page-size set-vaults-user-page-size
+   :toggle-vaults-user-page-size-dropdown toggle-vaults-user-page-size-dropdown
+   :close-vaults-user-page-size-dropdown close-vaults-user-page-size-dropdown
    :set-vaults-user-page set-vaults-user-page
    :next-vaults-user-page next-vaults-user-page
    :prev-vaults-user-page prev-vaults-user-page

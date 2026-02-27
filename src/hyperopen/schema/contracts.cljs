@@ -394,6 +394,8 @@
    :actions/set-vaults-snapshot-range ::keyword-or-string-args
    :actions/set-vaults-sort ::keyword-or-string-args
    :actions/set-vaults-user-page-size ::single-input-args
+   :actions/toggle-vaults-user-page-size-dropdown ::no-args
+   :actions/close-vaults-user-page-size-dropdown ::no-args
    :actions/set-vaults-user-page ::page-and-max-page-args
    :actions/next-vaults-user-page ::max-page-args
    :actions/prev-vaults-user-page ::max-page-args

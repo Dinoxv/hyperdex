@@ -63,6 +63,10 @@
                     (get-in deps [:vaults :load-vault-route])))
     (is (identical? vault-actions/set-vaults-user-page-size
                     (get-in deps [:vaults :set-vaults-user-page-size])))
+    (is (identical? vault-actions/toggle-vaults-user-page-size-dropdown
+                    (get-in deps [:vaults :toggle-vaults-user-page-size-dropdown])))
+    (is (identical? vault-actions/close-vaults-user-page-size-dropdown
+                    (get-in deps [:vaults :close-vaults-user-page-size-dropdown])))
     (is (identical? vault-actions/next-vaults-user-page
                     (get-in deps [:vaults :next-vaults-user-page])))
     (is (identical? vault-actions/set-vault-detail-tab

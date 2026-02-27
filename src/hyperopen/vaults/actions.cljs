@@ -242,7 +242,18 @@
   [[:effects/save-many [[[:vaults-ui :user-vaults-page-size]
                          (normalize-vault-user-page-size page-size)]
                         [[:vaults-ui :user-vaults-page]
-                         default-vault-user-page]]]])
+                         default-vault-user-page]
+                        [[:vaults-ui :user-vaults-page-size-dropdown-open?]
+                         false]]]])
+
+(defn toggle-vaults-user-page-size-dropdown
+  [state]
+  [[:effects/save [:vaults-ui :user-vaults-page-size-dropdown-open?]
+    (not (true? (get-in state [:vaults-ui :user-vaults-page-size-dropdown-open?])))]])
+
+(defn close-vaults-user-page-size-dropdown
+  [_state]
+  [[:effects/save [:vaults-ui :user-vaults-page-size-dropdown-open?] false]])
 
 (defn set-vaults-user-page
   [_state page max-page]

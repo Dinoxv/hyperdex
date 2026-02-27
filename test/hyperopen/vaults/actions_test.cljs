@@ -74,11 +74,18 @@
                                                       :direction :desc}}}
                                   "apr")))
   (is (= [[:effects/save-many [[[:vaults-ui :user-vaults-page-size] 25]
-                               [[:vaults-ui :user-vaults-page] 1]]]]
+                               [[:vaults-ui :user-vaults-page] 1]
+                               [[:vaults-ui :user-vaults-page-size-dropdown-open?] false]]]]
          (actions/set-vaults-user-page-size {} "25")))
   (is (= [[:effects/save-many [[[:vaults-ui :user-vaults-page-size] 10]
-                               [[:vaults-ui :user-vaults-page] 1]]]]
+                               [[:vaults-ui :user-vaults-page] 1]
+                               [[:vaults-ui :user-vaults-page-size-dropdown-open?] false]]]]
          (actions/set-vaults-user-page-size {} "999")))
+  (is (= [[:effects/save [:vaults-ui :user-vaults-page-size-dropdown-open?] true]]
+         (actions/toggle-vaults-user-page-size-dropdown
+          {:vaults-ui {:user-vaults-page-size-dropdown-open? false}})))
+  (is (= [[:effects/save [:vaults-ui :user-vaults-page-size-dropdown-open?] false]]
+         (actions/close-vaults-user-page-size-dropdown {})))
   (is (= [[:effects/save [:vaults-ui :user-vaults-page] 2]]
          (actions/set-vaults-user-page {} "3" 2)))
   (is (= [[:effects/save [:vaults-ui :user-vaults-page] 4]]

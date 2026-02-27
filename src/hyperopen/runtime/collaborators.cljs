@@ -178,6 +178,8 @@
    :set-vaults-snapshot-range vault-actions/set-vaults-snapshot-range
    :set-vaults-sort vault-actions/set-vaults-sort
    :set-vaults-user-page-size vault-actions/set-vaults-user-page-size
+   :toggle-vaults-user-page-size-dropdown vault-actions/toggle-vaults-user-page-size-dropdown
+   :close-vaults-user-page-size-dropdown vault-actions/close-vaults-user-page-size-dropdown
    :set-vaults-user-page vault-actions/set-vaults-user-page
    :next-vaults-user-page vault-actions/next-vaults-user-page
    :prev-vaults-user-page vault-actions/prev-vaults-user-page

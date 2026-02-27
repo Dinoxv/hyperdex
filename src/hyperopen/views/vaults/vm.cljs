@@ -287,6 +287,7 @@
      :user-pagination {:total-rows (:total-rows user-pagination)
                        :page-size user-page-size
                        :page-size-options vault-actions/vault-user-page-size-options
+                       :page-size-dropdown-open? (true? (get-in state [:vaults-ui :user-vaults-page-size-dropdown-open?]))
                        :page (:page user-pagination)
                        :page-count (:page-count user-pagination)}
      :visible-count (count visible-rows)

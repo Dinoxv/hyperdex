@@ -133,6 +133,7 @@
           :direction :desc}
    :user-vaults-page-size 10
    :user-vaults-page 1
+   :user-vaults-page-size-dropdown-open? false
    :detail-tab :about
    :list-loading? false
    :detail-loading? false})
