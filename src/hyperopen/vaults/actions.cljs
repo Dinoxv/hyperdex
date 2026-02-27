@@ -434,15 +434,21 @@
 (defn load-vault-detail
   [state vault-address]
   (if-let [vault-address* (normalize-vault-address vault-address)]
-    (into [[:effects/save [:vaults-ui :detail-loading?] true]
-           [:effects/save vault-detail-chart-hover-index-path nil]
-           [:effects/api-fetch-vault-details vault-address* (vault-wallet-address state)]
-           [:effects/api-fetch-vault-webdata2 vault-address*]
-           [:effects/api-fetch-vault-fills vault-address*]
-           [:effects/api-fetch-vault-funding-history vault-address*]
-           [:effects/api-fetch-vault-order-history vault-address*]
-           [:effects/api-fetch-vault-ledger-updates vault-address*]]
-          (component-vault-history-effects state vault-address*))
+    (let [snapshot-range (normalize-vault-snapshot-range
+                          (get-in state [:vaults-ui :snapshot-range]))
+          benchmark-fetch-effects (vault-detail-returns-benchmark-fetch-effects
+                                   snapshot-range
+                                   (selected-vault-detail-returns-benchmark-coins state))]
+      (into [[:effects/save [:vaults-ui :detail-loading?] true]
+             [:effects/save vault-detail-chart-hover-index-path nil]
+             [:effects/api-fetch-vault-details vault-address* (vault-wallet-address state)]
+             [:effects/api-fetch-vault-webdata2 vault-address*]
+             [:effects/api-fetch-vault-fills vault-address*]
+             [:effects/api-fetch-vault-funding-history vault-address*]
+             [:effects/api-fetch-vault-order-history vault-address*]
+             [:effects/api-fetch-vault-ledger-updates vault-address*]]
+            (concat (component-vault-history-effects state vault-address*)
+                    benchmark-fetch-effects)))
     []))
 
 (defn- projection-effect?

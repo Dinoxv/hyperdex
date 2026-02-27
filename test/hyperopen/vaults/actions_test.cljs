@@ -56,6 +56,23 @@
           {:wallet {:address "0xabcdefabcdefabcdefabcdefabcdefabcdefabcd"}}
           "/vaults/0x1234567890abcdef1234567890abcdef12345678"))))
 
+(deftest load-vault-detail-fetches-returns-benchmark-candles-on-initial-load-test
+  (is (= [[:effects/save [:vaults-ui :detail-loading?] true]
+          [:effects/save [:vaults-ui :detail-chart-hover-index] nil]
+          [:effects/api-fetch-vault-details "0x1234567890abcdef1234567890abcdef12345678" "0xabcdefabcdefabcdefabcdefabcdefabcdefabcd"]
+          [:effects/api-fetch-vault-webdata2 "0x1234567890abcdef1234567890abcdef12345678"]
+          [:effects/api-fetch-vault-fills "0x1234567890abcdef1234567890abcdef12345678"]
+          [:effects/api-fetch-vault-funding-history "0x1234567890abcdef1234567890abcdef12345678"]
+          [:effects/api-fetch-vault-order-history "0x1234567890abcdef1234567890abcdef12345678"]
+          [:effects/api-fetch-vault-ledger-updates "0x1234567890abcdef1234567890abcdef12345678"]
+          [:effects/fetch-candle-snapshot :coin "BTC" :interval :1h :bars 800]]
+         (actions/load-vault-detail
+          {:wallet {:address "0xabcdefabcdefabcdefabcdefabcdefabcdefabcd"}
+           :vaults-ui {:snapshot-range :month
+                       :detail-returns-benchmark-coins ["BTC"]
+                       :detail-returns-benchmark-coin "BTC"}}
+          "0x1234567890ABCDEF1234567890ABCDEF12345678"))))
+
 (deftest load-vault-detail-fetches-component-history-for-parent-vaults-test
   (let [state {:wallet {:address "0xabcdefabcdefabcdefabcdefabcdefabcdefabcd"}
                :vaults {:merged-index-rows [{:vault-address "0x1234567890abcdef1234567890abcdef12345678"

@@ -341,9 +341,14 @@
           (swap! store assoc :account {:mode :classic
                                        :abstraction-raw nil})))
       (when (fn? dispatch!)
-        (dispatch! store nil [[:actions/load-vault-route
-                               (or (get-in @store [:router :path])
-                                   "/trade")]])))
+        (let [route (or (get-in @store [:router :path])
+                        "/trade")]
+          (dispatch! store nil [[:actions/load-vault-route route]])
+          (when (and new-address
+                     (str/starts-with? route "/portfolio"))
+            ;; Ensure returns benchmark candles load on initial portfolio view entry.
+            (dispatch! store nil [[:actions/select-portfolio-chart-tab
+                                   (get-in @store [:portfolio-ui :chart-tab])]])))))
     address-handler-name))
   ;; Ensure already-connected wallets are handled after handlers are in place.
   (sync-current-address! store))
