@@ -191,6 +191,9 @@
 (defonce ^:private benchmark-selector-options-cache
   (atom nil))
 
+(defonce ^:private eligible-vault-benchmark-rows-cache
+  (atom nil))
+
 (def ^:private empty-benchmark-markets-signature
   {:count 0
    :rolling-hash 1
@@ -267,9 +270,20 @@
        (take max-vault-benchmark-options)
        vec))
 
+(defn- memoized-eligible-vault-benchmark-rows
+  [rows]
+  (let [cache @eligible-vault-benchmark-rows-cache]
+    (if (and (map? cache)
+             (identical? rows (:rows cache)))
+      (:eligible-rows cache)
+      (let [eligible-rows (eligible-vault-benchmark-rows rows)]
+        (reset! eligible-vault-benchmark-rows-cache {:rows rows
+                                                     :eligible-rows eligible-rows})
+        eligible-rows))))
+
 (defn- build-vault-benchmark-selector-options
   [rows]
-  (let [top-rows (eligible-vault-benchmark-rows rows)]
+  (let [top-rows (memoized-eligible-vault-benchmark-rows rows)]
     (->> top-rows
          (reduce (fn [{:keys [seen options]} row]
                    (if-let [vault-address (normalize-vault-address (:vault-address row))]
@@ -318,7 +332,8 @@
 
 (defn reset-portfolio-vm-cache!
   []
-  (reset! benchmark-selector-options-cache nil))
+  (reset! benchmark-selector-options-cache nil)
+  (reset! eligible-vault-benchmark-rows-cache nil))
 
 (defn- benchmark-selector-options
   [state]
@@ -772,7 +787,7 @@
 
 (defn- vault-benchmark-row-by-address
   [state]
-  (->> (eligible-vault-benchmark-rows (get-in state [:vaults :merged-index-rows]))
+  (->> (memoized-eligible-vault-benchmark-rows (get-in state [:vaults :merged-index-rows]))
        (reduce (fn [rows-by-address row]
                  (if-let [vault-address (normalize-vault-address (:vault-address row))]
                    (assoc rows-by-address vault-address row)
@@ -882,7 +897,9 @@
   (if (and (seq benchmark-coins)
            (seq strategy-time-points))
     (let [{:keys [interval]} (portfolio-actions/returns-benchmark-candle-request summary-time-range)
-          vault-rows-by-address (vault-benchmark-row-by-address state)]
+          any-vault-benchmark? (boolean (some vault-benchmark-address benchmark-coins))
+          vault-rows-by-address (when any-vault-benchmark?
+                                  (vault-benchmark-row-by-address state))]
       (reduce (fn [rows-by-coin coin]
                 (if (seq coin)
                   (if-let [vault-address (vault-benchmark-address coin)]
