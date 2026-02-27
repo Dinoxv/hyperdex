@@ -1,5 +1,6 @@
 (ns hyperopen.views.portfolio.vm-test
   (:require [cljs.test :refer-macros [deftest is testing]]
+            [hyperopen.portfolio.actions :as portfolio-actions]
             [hyperopen.views.account-equity-view :as account-equity-view]
             [hyperopen.portfolio.metrics :as portfolio-metrics]
             [hyperopen.views.portfolio.vm :as vm]))
@@ -526,6 +527,192 @@
       (is (number? (get-in cumulative-return-row [:benchmark-values "QQQ"])))
       (is (number? (:value r2-row)))
       (is (number? (:value information-ratio-row))))))
+
+(deftest portfolio-vm-reuses-benchmark-candle-request-for-chart-and-metrics-test
+  (let [original-request portfolio-actions/returns-benchmark-candle-request
+        request-calls (atom 0)]
+    (with-redefs [account-equity-view/account-equity-metrics (fn [_]
+                                                                {:spot-equity 10
+                                                                 :perps-value 10
+                                                                 :cross-account-value 10
+                                                                 :unrealized-pnl 0})
+                  portfolio-actions/returns-benchmark-candle-request (fn [summary-time-range]
+                                                                        (swap! request-calls inc)
+                                                                        (original-request summary-time-range))]
+      (let [t0 fixture-start-ms
+            t1 (+ fixture-start-ms day-ms)
+            t2 (+ fixture-start-ms (* 2 day-ms))
+            state {:account {:mode :classic}
+                   :portfolio-ui {:summary-scope :all
+                                  :summary-time-range :month
+                                  :chart-tab :returns
+                                  :returns-benchmark-coins ["SPY" "QQQ"]}
+                   :asset-selector {:markets [{:coin "SPY"
+                                               :symbol "SPY"
+                                               :market-type :spot
+                                               :openInterest "200"
+                                               :cache-order 1}
+                                              {:coin "QQQ"
+                                               :symbol "QQQ"
+                                               :market-type :spot
+                                               :openInterest "100"
+                                               :cache-order 2}]}
+                   :portfolio {:summary-by-key {:month {:pnlHistory [[t0 0]
+                                                                     [t1 11]
+                                                                     [t2 19]]
+                                                        :accountValueHistory [[t0 100]
+                                                                              [t1 111]
+                                                                              [t2 119]]
+                                                        :vlm 0}}}
+                   :candles {"SPY" {:1h [{:t t0 :c 50}
+                                         {:t t1 :c 53}
+                                         {:t t2 :c 57}]}
+                             "QQQ" {:1h [{:t t0 :c 100}
+                                         {:t t1 :c 101}
+                                         {:t t2 :c 103}]}}
+                   :webdata2 {:clearinghouseState {:marginSummary {:accountValue 10}}
+                             :totalVaultEquity 0}
+                   :borrow-lend {:total-supplied-usd 0}}
+            view-model (vm/portfolio-vm state)]
+        (is (= 1 @request-calls))
+        (is (= [:strategy :benchmark-0 :benchmark-1]
+               (mapv :id (get-in view-model [:chart :series]))))
+        (is (= ["SPY" "QQQ"]
+               (get-in view-model [:performance-metrics :benchmark-coins])))))))
+
+(deftest portfolio-vm-skips-benchmark-request-when-no-benchmarks-selected-test
+  (let [original-request portfolio-actions/returns-benchmark-candle-request
+        request-calls (atom 0)]
+    (with-redefs [account-equity-view/account-equity-metrics (fn [_]
+                                                                {:spot-equity 10
+                                                                 :perps-value 10
+                                                                 :cross-account-value 10
+                                                                 :unrealized-pnl 0})
+                  portfolio-actions/returns-benchmark-candle-request (fn [summary-time-range]
+                                                                        (swap! request-calls inc)
+                                                                        (original-request summary-time-range))]
+      (let [t0 fixture-start-ms
+            t1 (+ fixture-start-ms day-ms)
+            t2 (+ fixture-start-ms (* 2 day-ms))
+            state {:account {:mode :classic}
+                   :portfolio-ui {:summary-scope :all
+                                  :summary-time-range :month
+                                  :chart-tab :returns}
+                   :portfolio {:summary-by-key {:month {:pnlHistory [[t0 0]
+                                                                     [t1 11]
+                                                                     [t2 19]]
+                                                        :accountValueHistory [[t0 100]
+                                                                              [t1 111]
+                                                                              [t2 119]]
+                                                        :vlm 0}}}
+                   :webdata2 {:clearinghouseState {:marginSummary {:accountValue 10}}
+                             :totalVaultEquity 0}
+                   :borrow-lend {:total-supplied-usd 0}}
+            view-model (vm/portfolio-vm state)]
+        (is (= 0 @request-calls))
+        (is (= [:strategy]
+               (mapv :id (get-in view-model [:chart :series]))))
+        (is (= [] (get-in view-model [:performance-metrics :benchmark-columns])))
+        (is (false? (get-in view-model [:performance-metrics :benchmark-selected?])))))))
+
+(deftest portfolio-vm-computes-returns-history-once-per-build-test
+  (let [t0 fixture-start-ms
+        t1 (+ fixture-start-ms day-ms)
+        t2 (+ fixture-start-ms (* 2 day-ms))
+        returns-history-calls (atom 0)]
+    (with-redefs [account-equity-view/account-equity-metrics (fn [_]
+                                                                {:spot-equity 10
+                                                                 :perps-value 10
+                                                                 :cross-account-value 10
+                                                                 :unrealized-pnl 0})
+                  portfolio-metrics/returns-history-rows (fn [_state _summary _summary-scope]
+                                                           (swap! returns-history-calls inc)
+                                                           [[t0 0]
+                                                            [t1 11]
+                                                            [t2 19]])]
+      (let [state {:account {:mode :classic}
+                   :portfolio-ui {:summary-scope :all
+                                  :summary-time-range :month
+                                  :chart-tab :returns
+                                  :returns-benchmark-coins ["SPY"]}
+                   :asset-selector {:markets [{:coin "SPY"
+                                               :symbol "SPY"
+                                               :market-type :spot
+                                               :openInterest "200"
+                                               :cache-order 1}]}
+                   :portfolio {:summary-by-key {:month {:pnlHistory [[t0 0]
+                                                                     [t1 11]
+                                                                     [t2 19]]
+                                                        :accountValueHistory [[t0 100]
+                                                                              [t1 111]
+                                                                              [t2 119]]
+                                                        :vlm 0}}}
+                   :candles {"SPY" {:1h [{:t t0 :c 50}
+                                         {:t t1 :c 53}
+                                         {:t t2 :c 57}]}}
+                   :webdata2 {:clearinghouseState {:marginSummary {:accountValue 10}}
+                             :totalVaultEquity 0}
+                   :borrow-lend {:total-supplied-usd 0}}
+            view-model (vm/portfolio-vm state)]
+        (is (= 1 @returns-history-calls))
+        (is (= [:strategy :benchmark-0]
+               (mapv :id (get-in view-model [:chart :series]))))
+        (is (true? (get-in view-model [:performance-metrics :benchmark-selected?])))))))
+
+(deftest portfolio-vm-non-returns-chart-tab-keeps-benchmark-metrics-and-single-request-test
+  (let [original-request portfolio-actions/returns-benchmark-candle-request
+        request-calls (atom 0)]
+    (with-redefs [account-equity-view/account-equity-metrics (fn [_]
+                                                                {:spot-equity 10
+                                                                 :perps-value 10
+                                                                 :cross-account-value 10
+                                                                 :unrealized-pnl 0})
+                  portfolio-actions/returns-benchmark-candle-request (fn [summary-time-range]
+                                                                        (swap! request-calls inc)
+                                                                        (original-request summary-time-range))]
+      (let [t0 fixture-start-ms
+            t1 (+ fixture-start-ms day-ms)
+            t2 (+ fixture-start-ms (* 2 day-ms))
+            state {:account {:mode :classic}
+                   :portfolio-ui {:summary-scope :all
+                                  :summary-time-range :month
+                                  :chart-tab :pnl
+                                  :returns-benchmark-coins ["SPY" "QQQ"]}
+                   :asset-selector {:markets [{:coin "SPY"
+                                               :symbol "SPY"
+                                               :market-type :spot
+                                               :openInterest "200"
+                                               :cache-order 1}
+                                              {:coin "QQQ"
+                                               :symbol "QQQ"
+                                               :market-type :spot
+                                               :openInterest "100"
+                                               :cache-order 2}]}
+                   :portfolio {:summary-by-key {:month {:pnlHistory [[t0 0]
+                                                                     [t1 11]
+                                                                     [t2 19]]
+                                                        :accountValueHistory [[t0 100]
+                                                                              [t1 111]
+                                                                              [t2 119]]
+                                                        :vlm 0}}}
+                   :candles {"SPY" {:1h [{:t t0 :c 50}
+                                         {:t t1 :c 53}
+                                         {:t t2 :c 57}]}
+                             "QQQ" {:1h [{:t t0 :c 100}
+                                         {:t t1 :c 101}
+                                         {:t t2 :c 103}]}}
+                   :webdata2 {:clearinghouseState {:marginSummary {:accountValue 10}}
+                             :totalVaultEquity 0}
+                   :borrow-lend {:total-supplied-usd 0}}
+            view-model (vm/portfolio-vm state)]
+        (is (= 1 @request-calls))
+        (is (= :pnl (get-in view-model [:chart :selected-tab])))
+        (is (= [:strategy]
+               (mapv :id (get-in view-model [:chart :series]))))
+        (is (false? (get-in view-model [:chart :benchmark-selected?])))
+        (is (true? (get-in view-model [:performance-metrics :benchmark-selected?])))
+        (is (= ["SPY" "QQQ"]
+               (get-in view-model [:performance-metrics :benchmark-coins])))))))
 
 (deftest portfolio-vm-chart-y-axis-uses-readable-step-ticks-test
   (with-redefs [account-equity-view/account-equity-metrics (fn [_]
