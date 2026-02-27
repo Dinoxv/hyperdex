@@ -57,6 +57,14 @@
     :label "7D"}
    {:value :month
     :label "30D"}
+   {:value :three-month
+    :label "3M"}
+   {:value :six-month
+    :label "6M"}
+   {:value :one-year
+    :label "1Y"}
+   {:value :two-year
+    :label "2Y"}
    {:value :all-time
     :label "All-time"}])
 
@@ -613,14 +621,84 @@
             row))
         (or (get-in state [:vaults :merged-index-rows]) [])))
 
+(defn- with-utc-months-offset
+  [time-ms months]
+  (let [date (js/Date. time-ms)]
+    (.setUTCMonth date (+ (.getUTCMonth date) months))
+    (.getTime date)))
+
+(defn- with-utc-years-offset
+  [time-ms years]
+  (let [date (js/Date. time-ms)]
+    (.setUTCFullYear date (+ (.getUTCFullYear date) years))
+    (.getTime date)))
+
+(defn- summary-window-cutoff-ms
+  [snapshot-range end-time-ms]
+  (when (number? end-time-ms)
+    (case snapshot-range
+      :three-month (with-utc-months-offset end-time-ms -3)
+      :six-month (with-utc-months-offset end-time-ms -6)
+      :one-year (with-utc-years-offset end-time-ms -1)
+      :two-year (with-utc-years-offset end-time-ms -2)
+      nil)))
+
+(defn- normalized-history-rows
+  [rows]
+  (->> (or rows [])
+       (keep (fn [row]
+               (let [time-ms (portfolio-metrics/history-point-time-ms row)
+                     value (portfolio-metrics/history-point-value row)]
+                 (when (and (number? time-ms)
+                            (number? value))
+                   [time-ms value]))))
+       (sort-by first)
+       vec))
+
+(defn- history-window-rows
+  [rows cutoff-ms]
+  (if (number? cutoff-ms)
+    (->> rows
+         (filter (fn [[time-ms _value]]
+                   (>= time-ms cutoff-ms)))
+         vec)
+    []))
+
+(defn- rebase-history-rows
+  [rows]
+  (if-let [baseline (some-> rows first second)]
+    (mapv (fn [[time-ms value]]
+            [time-ms (- value baseline)])
+          rows)
+    []))
+
+(defn- derived-portfolio-summary
+  [all-time-summary snapshot-range]
+  (let [account-rows (normalized-history-rows (:accountValueHistory all-time-summary))
+        pnl-rows (normalized-history-rows (:pnlHistory all-time-summary))
+        end-time-ms (or (some-> account-rows last first)
+                        (some-> pnl-rows last first))
+        cutoff-ms (summary-window-cutoff-ms snapshot-range end-time-ms)]
+    (when (number? cutoff-ms)
+      (let [account-window (history-window-rows account-rows cutoff-ms)
+            pnl-window (history-window-rows pnl-rows cutoff-ms)
+            pnl-window* (rebase-history-rows pnl-window)]
+        (when (or (seq account-window)
+                  (seq pnl-window*))
+          (assoc all-time-summary
+                 :accountValueHistory account-window
+                 :pnlHistory pnl-window*))))))
+
 (defn- portfolio-summary
   [details snapshot-range]
-  (let [portfolio (or (:portfolio details) {})]
+  (let [portfolio (or (:portfolio details) {})
+        all-time-summary (get portfolio :all-time)]
     (or (get portfolio snapshot-range)
+        (derived-portfolio-summary all-time-summary snapshot-range)
         (get portfolio :month)
         (get portfolio :week)
         (get portfolio :day)
-        (get portfolio :all-time)
+        all-time-summary
         {})))
 
 (defn- history-point

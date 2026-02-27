@@ -34,7 +34,7 @@
   :pnl)
 
 (def ^:private vault-snapshot-ranges
-  #{:day :week :month :all-time})
+  #{:day :week :month :three-month :six-month :one-year :two-year :all-time})
 
 (def ^:private vault-sort-columns
   #{:vault :leader :apr :tvl :your-deposit :age :snapshot})
@@ -148,17 +148,7 @@
 
 (defn normalize-vault-snapshot-range
   [value]
-  (let [token (cond
-                (keyword? value) value
-                (string? value) (-> value
-                                    str/trim
-                                    str/lower-case
-                                    (str/replace #"[^a-z0-9]+" "-")
-                                    keyword)
-                :else nil)
-        normalized (case token
-                     :alltime :all-time
-                     token)]
+  (let [normalized (portfolio-actions/normalize-summary-time-range value)]
     (if (contains? vault-snapshot-ranges normalized)
       normalized
       default-vault-snapshot-range)))

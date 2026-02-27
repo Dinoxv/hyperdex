@@ -116,6 +116,10 @@
     :day "24H"
     :week "7D"
     :month "30D"
+    :three-month "3M"
+    :six-month "6M"
+    :one-year "1Y"
+    :two-year "2Y"
     :all-time "All-time"
     "30D"))
 
@@ -126,6 +130,10 @@
                  (dropdown-option "24H" (= snapshot-range :day) [:actions/set-vaults-snapshot-range :day])
                  (dropdown-option "7D" (= snapshot-range :week) [:actions/set-vaults-snapshot-range :week])
                  (dropdown-option "30D" (= snapshot-range :month) [:actions/set-vaults-snapshot-range :month])
+                 (dropdown-option "3M" (= snapshot-range :three-month) [:actions/set-vaults-snapshot-range :three-month])
+                 (dropdown-option "6M" (= snapshot-range :six-month) [:actions/set-vaults-snapshot-range :six-month])
+                 (dropdown-option "1Y" (= snapshot-range :one-year) [:actions/set-vaults-snapshot-range :one-year])
+                 (dropdown-option "2Y" (= snapshot-range :two-year) [:actions/set-vaults-snapshot-range :two-year])
                  (dropdown-option "All-time" (= snapshot-range :all-time) [:actions/set-vaults-snapshot-range :all-time])]))
 
 (defn- sort-header [label column sort-state]

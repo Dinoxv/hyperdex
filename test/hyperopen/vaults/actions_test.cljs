@@ -96,6 +96,10 @@
                                [[:vaults-ui :user-vaults-page] 1]
                                [[:vaults-ui :detail-chart-hover-index] nil]]]]
          (actions/set-vaults-snapshot-range {} "allTime")))
+  (is (= [[:effects/save-many [[[:vaults-ui :snapshot-range] :three-month]
+                               [[:vaults-ui :user-vaults-page] 1]
+                               [[:vaults-ui :detail-chart-hover-index] nil]]]]
+         (actions/set-vaults-snapshot-range {} "3m")))
   (is (= [[:effects/save-many [[[:vaults-ui :snapshot-range] :week]
                                [[:vaults-ui :user-vaults-page] 1]
                                [[:vaults-ui :detail-chart-hover-index] nil]]]

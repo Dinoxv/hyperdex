@@ -136,7 +136,8 @@
     (is (= :pnl (get-in vm [:chart :selected-series])))
     (is (= 3 (count (get-in vm [:chart :series-tabs]))))
     (is (= :month (get-in vm [:chart :selected-timeframe])))
-    (is (= 4 (count (get-in vm [:chart :timeframe-options]))))
+    (is (= ["24H" "7D" "30D" "3M" "6M" "1Y" "2Y" "All-time"]
+           (mapv :label (get-in vm [:chart :timeframe-options]))))
     (is (seq (get-in vm [:performance-metrics :groups])))
     (is (= :performance-metrics (get-in vm [:activity-tabs 0 :value])))
     (is (= :performance-metrics (:selected-activity-tab vm)))
@@ -188,6 +189,28 @@
     (is (= ["BTC"] (get-in vm [:performance-metrics :benchmark-coins])))
     (is (= "BTC (HL PERP)" (get-in vm [:performance-metrics :benchmark-label])))
     (is (seq (get-in vm [:performance-metrics :groups])))))
+
+(deftest vault-detail-vm-derives-one-year-window-from-all-time-when-range-slice-missing-test
+  (let [vault-address "0x1234567890abcdef1234567890abcdef12345678"
+        end-time-ms 1738306800000
+        old-time-ms 1702006800000
+        inside-window-start-ms 1712386800000
+        state (-> sample-state
+                  (assoc-in [:vaults-ui :snapshot-range] :one-year)
+                  (assoc-in [:vaults-ui :detail-chart-series] :pnl)
+                  (assoc-in [:vaults :details-by-address vault-address :portfolio]
+                            {:all-time {:accountValueHistory [[old-time-ms 100]
+                                                              [inside-window-start-ms 120]
+                                                              [end-time-ms 150]]
+                                        :pnlHistory [[old-time-ms 0]
+                                                     [inside-window-start-ms 10]
+                                                     [end-time-ms 20]]}}))
+        vm (detail-vm/vault-detail-vm state)]
+    (is (= :one-year (get-in vm [:chart :selected-timeframe])))
+    (is (= [0 10]
+           (mapv :value (get-in vm [:chart :points]))))
+    (is (= [inside-window-start-ms end-time-ms]
+           (mapv :time-ms (get-in vm [:chart :points]))))))
 
 (deftest vault-detail-vm-aggregates-component-history-and-accepts-channel-shaped-sources-test
   (let [child-address "0xaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"

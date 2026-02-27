@@ -70,7 +70,11 @@
     (is (contains? text "Vaults"))
     (is (contains? text "Total Value Locked"))
     (is (contains? text "Protocol Vaults"))
-    (is (contains? text "User Vaults"))))
+    (is (contains? text "User Vaults"))
+    (is (contains? text "3M"))
+    (is (contains? text "6M"))
+    (is (contains? text "1Y"))
+    (is (contains? text "2Y"))))
 
 (deftest vaults-view-rows-navigate-to-detail-route-test
   (let [view (vaults-view/vaults-view sample-state)
