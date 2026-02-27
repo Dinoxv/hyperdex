@@ -411,6 +411,12 @@
    :actions/close-vault-detail-activity-filter ::no-args
    :actions/set-vault-detail-activity-direction-filter ::keyword-or-string-args
    :actions/set-vault-detail-chart-series ::keyword-or-string-args
+   :actions/set-vault-detail-returns-benchmark-search ::single-input-args
+   :actions/set-vault-detail-returns-benchmark-suggestions-open ::boolean-args
+   :actions/select-vault-detail-returns-benchmark ::optional-string-args
+   :actions/remove-vault-detail-returns-benchmark ::coin-args
+   :actions/handle-vault-detail-returns-benchmark-search-keydown ::keydown-with-optional-coin-args
+   :actions/clear-vault-detail-returns-benchmark ::no-args
    :actions/set-vault-detail-chart-hover ::vault-chart-hover-args
    :actions/clear-vault-detail-chart-hover ::no-args
    :actions/navigate (s/or :path (s/tuple ::non-empty-string)

@@ -140,6 +140,10 @@
    :detail-activity-direction-filter :all
    :detail-activity-filter-open? false
    :detail-chart-series :pnl
+   :detail-returns-benchmark-coins ["BTC"]
+   :detail-returns-benchmark-coin "BTC"
+   :detail-returns-benchmark-search ""
+   :detail-returns-benchmark-suggestions-open? false
    :detail-chart-hover-index nil
    :list-loading? false
    :detail-loading? false})

@@ -190,6 +190,12 @@
    :close-vault-detail-activity-filter vault-actions/close-vault-detail-activity-filter
    :set-vault-detail-activity-direction-filter vault-actions/set-vault-detail-activity-direction-filter
    :set-vault-detail-chart-series vault-actions/set-vault-detail-chart-series
+   :set-vault-detail-returns-benchmark-search vault-actions/set-vault-detail-returns-benchmark-search
+   :set-vault-detail-returns-benchmark-suggestions-open vault-actions/set-vault-detail-returns-benchmark-suggestions-open
+   :select-vault-detail-returns-benchmark vault-actions/select-vault-detail-returns-benchmark
+   :remove-vault-detail-returns-benchmark vault-actions/remove-vault-detail-returns-benchmark
+   :handle-vault-detail-returns-benchmark-search-keydown vault-actions/handle-vault-detail-returns-benchmark-search-keydown
+   :clear-vault-detail-returns-benchmark vault-actions/clear-vault-detail-returns-benchmark
    :set-vault-detail-chart-hover vault-actions/set-vault-detail-chart-hover
    :clear-vault-detail-chart-hover vault-actions/clear-vault-detail-chart-hover})
 

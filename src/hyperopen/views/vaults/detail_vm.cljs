@@ -1,10 +1,26 @@
 (ns hyperopen.views.vaults.detail-vm
   (:require [clojure.string :as str]
+            [hyperopen.portfolio.actions :as portfolio-actions]
+            [hyperopen.portfolio.metrics :as portfolio-metrics]
             [hyperopen.vaults.actions :as vault-actions]
             [hyperopen.views.account-info.sort-kernel :as sort-kernel]))
 
 (def ^:private chart-y-tick-count
   4)
+
+(def ^:private performance-periods-per-year
+  365)
+
+(def ^:private strategy-series-stroke
+  "#e7ecef")
+
+(def ^:private benchmark-series-strokes
+  ["#f2cf66"
+   "#7cc2ff"
+   "#ff9d7c"
+   "#8be28b"
+   "#d8a8ff"
+   "#ffdf8a"])
 
 (def ^:private chart-empty-y-ticks
   [{:value 3 :y-ratio 0}
@@ -104,6 +120,142 @@
   (let [text (some-> value str str/trim)]
     (when (seq text)
       text)))
+
+(defn- parse-cache-order
+  [value]
+  (let [parsed (cond
+                 (number? value) value
+                 (string? value) (js/parseInt value 10)
+                 :else js/NaN)]
+    (when (and (number? parsed)
+               (not (js/isNaN parsed)))
+      (js/Math.floor parsed))))
+
+(defn- market-type-token
+  [value]
+  (cond
+    (keyword? value) value
+    (string? value) (some-> value str/trim str/lower-case keyword)
+    :else nil))
+
+(defn- benchmark-open-interest
+  [market]
+  (let [open-interest (optional-number (:openInterest market))]
+    (if (number? open-interest)
+      open-interest
+      0)))
+
+(defn- benchmark-option-label
+  [market]
+  (let [symbol (some-> (:symbol market) str str/trim)
+        coin (some-> (:coin market) str str/trim)
+        dex (some-> (:dex market) str str/trim str/upper-case)
+        market-type (market-type-token (:market-type market))
+        type-label (case market-type
+                     :spot "SPOT"
+                     :perp "PERP"
+                     nil)
+        primary-label (or symbol coin "")]
+    (cond
+      (and (seq dex) (seq type-label)) (str primary-label " (" dex " " type-label ")")
+      (seq type-label) (str primary-label " (" type-label ")")
+      :else primary-label)))
+
+(defn- benchmark-option-rank
+  [market]
+  [(- (benchmark-open-interest market))
+   (or (parse-cache-order (:cache-order market))
+       js/Number.MAX_SAFE_INTEGER)
+   (str/lower-case (or (some-> (:symbol market) str str/trim) ""))
+   (str/lower-case (or (some-> (:coin market) str str/trim) ""))
+   (str/lower-case (or (some-> (:key market) str str/trim) ""))])
+
+(defn- benchmark-selector-options
+  [state]
+  (let [ordered-markets (->> (or (get-in state [:asset-selector :markets]) [])
+                             (filter map?)
+                             (sort-by benchmark-option-rank))]
+    (->> ordered-markets
+         (reduce (fn [{:keys [seen options]} market]
+                   (if-let [coin (portfolio-actions/normalize-portfolio-returns-benchmark-coin
+                                  (:coin market))]
+                     (if (contains? seen coin)
+                       {:seen seen
+                        :options options}
+                       {:seen (conj seen coin)
+                        :options (conj options
+                                       {:value coin
+                                        :label (benchmark-option-label market)
+                                        :open-interest (benchmark-open-interest market)})})
+                     {:seen seen
+                      :options options}))
+                 {:seen #{}
+                  :options []})
+         :options
+         vec)))
+
+(defn- normalize-benchmark-search-query
+  [value]
+  (-> (or value "")
+      str
+      str/trim
+      str/lower-case))
+
+(defn- benchmark-option-matches-search?
+  [option search-query]
+  (or (str/blank? search-query)
+      (str/includes? (str/lower-case (or (:label option) "")) search-query)
+      (str/includes? (str/lower-case (or (:value option) "")) search-query)))
+
+(defn- selected-vault-detail-returns-benchmark-coins
+  [state]
+  (let [coins (portfolio-actions/normalize-portfolio-returns-benchmark-coins
+               (get-in state [:vaults-ui :detail-returns-benchmark-coins]))]
+    (if (seq coins)
+      coins
+      (if-let [legacy-coin (portfolio-actions/normalize-portfolio-returns-benchmark-coin
+                            (get-in state [:vaults-ui :detail-returns-benchmark-coin]))]
+        [legacy-coin]
+        []))))
+
+(defn- selected-benchmark-options
+  [options selected-coins]
+  (let [options-by-coin (into {} (map (juxt :value identity)) options)]
+    (mapv (fn [coin]
+            (or (get options-by-coin coin)
+                {:value coin
+                 :label coin
+                 :open-interest 0}))
+          selected-coins)))
+
+(defn- returns-benchmark-selector-model
+  [state]
+  (let [selected-coins (selected-vault-detail-returns-benchmark-coins state)
+        selected-coin-set (set selected-coins)
+        options (benchmark-selector-options state)
+        search (or (get-in state [:vaults-ui :detail-returns-benchmark-search]) "")
+        search-query (normalize-benchmark-search-query search)
+        suggestions-open? (boolean (get-in state [:vaults-ui :detail-returns-benchmark-suggestions-open?]))
+        selected-options (selected-benchmark-options options selected-coins)
+        candidates (->> options
+                        (remove (fn [{:keys [value]}]
+                                  (contains? selected-coin-set value)))
+                        (filter #(benchmark-option-matches-search? % search-query))
+                        vec)
+        top-coin (some-> candidates first :value)
+        empty-message (cond
+                        (empty? options) "No benchmark symbols available."
+                        (seq candidates) nil
+                        (seq search-query) "No matching symbols."
+                        :else "All symbols selected.")]
+    {:selected-coins selected-coins
+     :selected-options selected-options
+     :coin-search search
+     :suggestions-open? suggestions-open?
+     :candidates candidates
+     :top-coin top-coin
+     :empty-message empty-message
+     :label-by-coin (into {} (map (juxt :value :label)) options)}))
 
 (defn- normalize-sort-direction
   [value]
@@ -501,6 +653,228 @@
                       (number? value))))
        (sort-by :time-ms)
        vec))
+
+(defn- normalize-chart-point-value
+  [series value]
+  (when (number? value)
+    (if (= series :returns)
+      (let [rounded (/ (js/Math.round (* value 100)) 100)]
+        (if (== rounded -0)
+          0
+          rounded))
+      value)))
+
+(defn- rows->chart-points
+  [rows series]
+  (->> rows
+       (map-indexed (fn [idx row]
+                      (let [{:keys [time-ms value]} (history-point row)
+                            value* (normalize-chart-point-value series value)]
+                        (when (and (number? time-ms)
+                                   (number? value*))
+                          {:index idx
+                           :time-ms time-ms
+                           :value value*}))))
+       (keep identity)
+       vec))
+
+(defn- returns-history-points
+  [summary]
+  (let [points (history-points (:accountValueHistory summary))
+        anchor-index (first (keep-indexed (fn [idx {:keys [value]}]
+                                            (when (and (number? value)
+                                                       (pos? value))
+                                              idx))
+                                          points))]
+    (if (number? anchor-index)
+      (let [points* (subvec points anchor-index)
+            baseline (:value (first points*))]
+        (if (and (number? baseline)
+                 (pos? baseline))
+          (mapv (fn [{:keys [time-ms value]}]
+                  (let [ratio (- (/ value baseline) 1)
+                        pct (* 100 ratio)
+                        rounded (/ (js/Math.round (* pct 100)) 100)
+                        rounded* (if (== rounded -0) 0 rounded)]
+                    {:time-ms time-ms
+                     :value rounded*}))
+                points*)
+          []))
+      [])))
+
+(defn- candle-point-close
+  [row]
+  (cond
+    (map? row)
+    (or (optional-number (:c row))
+        (optional-number (:close row)))
+
+    (and (sequential? row)
+         (>= (count row) 5))
+    (optional-number (nth row 4))
+
+    :else
+    nil))
+
+(defn- benchmark-candle-points
+  [rows]
+  (if (sequential? rows)
+    (->> rows
+         (keep (fn [row]
+                 (let [time-ms (some-> row history-point :time-ms)
+                       close (candle-point-close row)]
+                   (when (and (number? time-ms)
+                              (number? close)
+                              (pos? close))
+                     {:time-ms time-ms
+                      :close close}))))
+         (sort-by :time-ms)
+         vec)
+    []))
+
+(defn- aligned-benchmark-return-rows
+  [benchmark-points strategy-points]
+  (let [benchmark-count (count benchmark-points)
+        strategy-time-points (mapv :time-ms strategy-points)
+        strategy-count (count strategy-time-points)]
+    (loop [time-idx 0
+           candle-idx 0
+           latest-close nil
+           anchor-close nil
+           output []]
+      (if (>= time-idx strategy-count)
+        output
+        (let [time-ms (nth strategy-time-points time-idx)
+              [candle-idx* latest-close*]
+              (loop [idx candle-idx
+                     latest latest-close]
+                (if (>= idx benchmark-count)
+                  [idx latest]
+                  (let [{candle-time-ms :time-ms
+                         close :close} (nth benchmark-points idx)]
+                    (if (<= candle-time-ms time-ms)
+                      (recur (inc idx) close)
+                      [idx latest]))))
+              anchor-close* (or anchor-close latest-close*)
+              output* (if (and (number? latest-close*)
+                               (number? anchor-close*)
+                               (pos? anchor-close*))
+                        (let [cumulative-return (* 100 (- (/ latest-close* anchor-close*) 1))]
+                          (if (number? cumulative-return)
+                            (conj output [time-ms cumulative-return])
+                            output))
+                        output)]
+          (recur (inc time-idx)
+                 candle-idx*
+                 latest-close*
+                 anchor-close*
+                 output*))))))
+
+(defn- benchmark-cumulative-return-points-by-coin
+  [state snapshot-range benchmark-coins strategy-return-points]
+  (if (and (seq benchmark-coins)
+           (seq strategy-return-points))
+    (let [{:keys [interval]} (portfolio-actions/returns-benchmark-candle-request snapshot-range)]
+      (reduce (fn [rows-by-coin coin]
+                (if (seq coin)
+                  (let [candles (benchmark-candle-points (get-in state [:candles coin interval]))
+                        aligned-rows (aligned-benchmark-return-rows candles strategy-return-points)]
+                    (assoc rows-by-coin
+                           coin
+                           (rows->chart-points aligned-rows :returns)))
+                  rows-by-coin))
+              {}
+              benchmark-coins))
+    {}))
+
+(defn- benchmark-series-stroke
+  [idx]
+  (let [palette-size (count benchmark-series-strokes)]
+    (if (pos? palette-size)
+      (nth benchmark-series-strokes (mod idx palette-size))
+      strategy-series-stroke)))
+
+(defn- cumulative-rows
+  [points]
+  (mapv (fn [{:keys [time-ms value]}]
+          [time-ms value])
+        (or points [])))
+
+(defn- benchmark-performance-column
+  [benchmark-cumulative-rows label-by-coin coin]
+  (let [benchmark-daily-rows (portfolio-metrics/daily-compounded-returns benchmark-cumulative-rows)
+        values (if (seq benchmark-daily-rows)
+                 (portfolio-metrics/compute-performance-metrics {:strategy-daily-rows benchmark-daily-rows
+                                                                 :rf 0
+                                                                 :periods-per-year performance-periods-per-year
+                                                                 :compounded true})
+                 {})]
+    {:coin coin
+     :label (or (get label-by-coin coin)
+                coin)
+     :daily-rows benchmark-daily-rows
+     :values values}))
+
+(defn- with-performance-metric-columns
+  [groups portfolio-values benchmark-columns]
+  (let [primary-benchmark-values (or (some-> benchmark-columns first :values)
+                                     {})
+        benchmark-values-by-coin (into {}
+                                       (map (fn [{:keys [coin values]}]
+                                              [coin values]))
+                                       benchmark-columns)]
+    (mapv (fn [{:keys [rows] :as group}]
+            (assoc group
+                   :rows (mapv (fn [{:keys [key] :as row}]
+                                 (assoc row
+                                        :portfolio-value (get portfolio-values key)
+                                        :benchmark-value (get primary-benchmark-values key)
+                                        :benchmark-values (into {}
+                                                               (map (fn [{:keys [coin]}]
+                                                                      [coin (get-in benchmark-values-by-coin [coin key])]))
+                                                               benchmark-columns)))
+                               (or rows []))))
+          (or groups []))))
+
+(defn- performance-metrics-model
+  [returns-benchmark-selector strategy-cumulative-rows benchmark-cumulative-rows-by-coin]
+  (let [strategy-daily-rows (portfolio-metrics/daily-compounded-returns strategy-cumulative-rows)
+        selected-benchmark-coins (vec (or (:selected-coins returns-benchmark-selector)
+                                          []))
+        benchmark-label-by-coin (or (:label-by-coin returns-benchmark-selector)
+                                    {})
+        benchmark-columns (mapv (fn [coin]
+                                  (benchmark-performance-column (or (get benchmark-cumulative-rows-by-coin coin)
+                                                                    [])
+                                                                benchmark-label-by-coin
+                                                                coin))
+                                selected-benchmark-coins)
+        primary-benchmark-column (first benchmark-columns)
+        benchmark-coin (:coin primary-benchmark-column)
+        benchmark-daily-rows (or (:daily-rows primary-benchmark-column)
+                                 [])
+        portfolio-values (portfolio-metrics/compute-performance-metrics {:strategy-daily-rows strategy-daily-rows
+                                                                         :benchmark-daily-rows benchmark-daily-rows
+                                                                         :rf 0
+                                                                         :periods-per-year performance-periods-per-year
+                                                                         :compounded true})
+        benchmark-values (or (:values primary-benchmark-column)
+                             {})
+        groups (with-performance-metric-columns (portfolio-metrics/metric-rows portfolio-values)
+                 portfolio-values
+                 benchmark-columns)
+        benchmark-label (:label primary-benchmark-column)]
+    {:benchmark-selected? (boolean (seq benchmark-columns))
+     :benchmark-coin benchmark-coin
+     :benchmark-label benchmark-label
+     :benchmark-coins (mapv :coin benchmark-columns)
+     :benchmark-columns (mapv (fn [{:keys [coin label]}]
+                                {:coin coin
+                                 :label label})
+                              benchmark-columns)
+     :values portfolio-values
+     :benchmark-values benchmark-values
+     :groups groups}))
 
 (defn- non-zero-span
   [domain-min domain-max]
@@ -997,7 +1371,8 @@
 (defn- chart-series-data
   [summary]
   {:account-value (history-points (:accountValueHistory summary))
-   :pnl (history-points (:pnlHistory summary))})
+   :pnl (history-points (:pnlHistory summary))
+   :returns (returns-history-points summary)})
 
 (defn- resolve-chart-series
   [series-by-key selected-series]
@@ -1005,6 +1380,7 @@
         has-series? (fn [k]
                       (seq (get series-by-key k)))]
     (cond
+      (= :returns selected*) :returns
       (has-series? selected*) selected*
       (has-series? :pnl) :pnl
       (has-series? :account-value) :account-value
@@ -1078,19 +1454,69 @@
                          (optional-number (get-in details [:follower-state :vault-equity])))
         all-time-earned (optional-number (get-in details [:follower-state :all-time-pnl]))
         summary (portfolio-summary details snapshot-range)
+        returns-benchmark-selector (returns-benchmark-selector-model state)
         series-by-key (chart-series-data summary)
         selected-series (resolve-chart-series series-by-key chart-series)
-        raw-chart-points (get series-by-key selected-series)
-        chart-domain-values (mapv :value raw-chart-points)
+        strategy-raw-points (vec (or (get series-by-key selected-series) []))
+        strategy-return-points (vec (or (get series-by-key :returns) []))
+        selected-benchmark-coins (vec (or (:selected-coins returns-benchmark-selector) []))
+        benchmark-label-by-coin (or (:label-by-coin returns-benchmark-selector) {})
+        benchmark-points-by-coin (benchmark-cumulative-return-points-by-coin state
+                                                                          snapshot-range
+                                                                          selected-benchmark-coins
+                                                                          strategy-return-points)
+        benchmark-series (if (= selected-series :returns)
+                           (mapv (fn [idx coin]
+                                   {:id (keyword (str "benchmark-" idx))
+                                    :coin coin
+                                    :label (or (get benchmark-label-by-coin coin)
+                                               coin)
+                                    :stroke (benchmark-series-stroke idx)
+                                    :raw-points (vec (or (get benchmark-points-by-coin coin) []))})
+                                 (range)
+                                 selected-benchmark-coins)
+                           [])
+        raw-series (cond-> [{:id :strategy
+                             :label "Vault"
+                             :stroke strategy-series-stroke
+                             :raw-points strategy-raw-points}]
+                     (seq benchmark-series)
+                     (into benchmark-series))
+        chart-domain-values (->> raw-series
+                                 (mapcat (fn [{:keys [raw-points]}]
+                                           (map :value raw-points)))
+                                 vec)
         domain (when (seq chart-domain-values)
                  (chart-domain chart-domain-values))
-        chart-points (if domain
-                       (normalize-chart-points raw-chart-points domain)
-                       [])
+        series (mapv (fn [{:keys [raw-points] :as entry}]
+                       (let [points (if domain
+                                      (normalize-chart-points raw-points domain)
+                                      [])]
+                         (assoc entry
+                                :points points
+                                :path (line-path points)
+                                :has-data? (seq points))))
+                     raw-series)
+        strategy-series (or (some (fn [series-entry]
+                                    (when (= :strategy (:id series-entry))
+                                      series-entry))
+                                  series)
+                            {:points []
+                             :path nil
+                             :has-data? false})
+        chart-points (vec (or (:points strategy-series) []))
         hovered-index (normalize-hover-index (get-in state [:vaults-ui :detail-chart-hover-index])
                                              (count chart-points))
         hovered-point (when (number? hovered-index)
                         (nth chart-points hovered-index nil))
+        strategy-cumulative-rows (cumulative-rows strategy-return-points)
+        benchmark-cumulative-rows-by-coin (into {}
+                                                (map (fn [coin]
+                                                       [coin (cumulative-rows (get benchmark-points-by-coin coin))]))
+                                                selected-benchmark-coins)
+        performance-metrics (performance-metrics-model returns-benchmark-selector
+                                                       strategy-cumulative-rows
+                                                       benchmark-cumulative-rows-by-coin)
         detail-error (get-in state [:vaults :errors :details-by-address vault-address])
         webdata-error (get-in state [:vaults :errors :webdata-by-vault vault-address])
         fills-error (first-address-error state :fills-by-vault history-addresses)
@@ -1173,21 +1599,33 @@
             {:value :vault-performance
              :label "Vault Performance"}
             {:value :your-performance
-             :label "Your Performance"}]
+             :label "Your Performance"}
+            {:value :performance-metrics
+             :label "Performance Metrics"}]
      :selected-tab detail-tab
      :snapshot-range snapshot-range
      :snapshot {:day (snapshot-value-by-range row :day tvl)
                 :week (snapshot-value-by-range row :week tvl)
                 :month (snapshot-value-by-range row :month tvl)
                 :all-time (snapshot-value-by-range row :all-time tvl)}
-     :chart {:axis-kind (if (= selected-series :pnl) :pnl :account-value)
+     :performance-metrics (assoc performance-metrics
+                                 :timeframe-options chart-timeframe-options
+                                 :selected-timeframe snapshot-range)
+     :chart {:axis-kind (case selected-series
+                          :pnl :pnl
+                          :returns :returns
+                          :account-value :account-value
+                          :account-value)
              :series-tabs [{:value :account-value
                             :label "Account Value"}
                            {:value :pnl
-                            :label "PNL"}]
+                            :label "PNL"}
+                           {:value :returns
+                            :label "Returns"}]
              :timeframe-options chart-timeframe-options
              :selected-timeframe snapshot-range
              :selected-series selected-series
+             :returns-benchmark returns-benchmark-selector
              :hover {:index hovered-index
                      :point hovered-point
                      :active? (some? hovered-point)}
@@ -1195,7 +1633,8 @@
                        (chart-y-ticks domain)
                        chart-empty-y-ticks)
              :points chart-points
-             :path (line-path chart-points)}
+             :path (:path strategy-series)
+             :series series}
      :activity-tabs (mapv (fn [{:keys [value label]}]
                             {:value value
                              :label label

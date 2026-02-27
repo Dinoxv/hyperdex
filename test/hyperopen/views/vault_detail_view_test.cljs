@@ -35,8 +35,28 @@
                :detail-activity-direction-filter :all
                :detail-activity-filter-open? false
                :detail-chart-series :pnl
+               :detail-returns-benchmark-coins ["BTC"]
+               :detail-returns-benchmark-coin "BTC"
+               :detail-returns-benchmark-search ""
+               :detail-returns-benchmark-suggestions-open? false
                :snapshot-range :month
                :detail-loading? false}
+   :asset-selector {:markets [{:coin "BTC"
+                               :symbol "BTC"
+                               :dex "hl"
+                               :market-type :perp
+                               :openInterest 1000}
+                              {:coin "ETH"
+                               :symbol "ETH"
+                               :dex "hl"
+                               :market-type :perp
+                               :openInterest 800}]}
+   :candles {"BTC" {:1h [[1 0 0 0 100]
+                         [2 0 0 0 110]
+                         [3 0 0 0 120]]}
+             "ETH" {:1h [[1 0 0 0 2000]
+                         [2 0 0 0 2100]
+                         [3 0 0 0 2200]]}}
    :vaults {:errors {:details-by-address {}
                      :webdata-by-vault {}
                      :fills-by-vault {}
@@ -122,9 +142,15 @@
         chart-tab-button (find-first-node view
                                           #(= [[:actions/set-vault-detail-chart-series :account-value]]
                                               (get-in % [1 :on :click])))
+        returns-chart-tab-button (find-first-node view
+                                                  #(= [[:actions/set-vault-detail-chart-series :returns]]
+                                                      (get-in % [1 :on :click])))
         timeframe-selector (find-first-node view
                                             #(= [[:actions/set-vaults-snapshot-range [:event.target/value]]]
                                                 (get-in % [1 :on :change])))
+        performance-metrics-tab-button (find-first-node view
+                                                        #(= [[:actions/set-vault-detail-tab :performance-metrics]]
+                                                            (get-in % [1 :on :click])))
         activity-tab-button (find-first-node view
                                              #(= [[:actions/set-vault-detail-activity-tab :open-orders]]
                                                  (get-in % [1 :on :click])))
@@ -132,10 +158,13 @@
     (is (some? root))
     (is (some? detail-tab-button))
     (is (some? chart-tab-button))
+    (is (some? returns-chart-tab-button))
     (is (some? timeframe-selector))
+    (is (some? performance-metrics-tab-button))
     (is (some? activity-tab-button))
     (is (contains? text "Vault Detail"))
     (is (contains? text "Past Month Return"))
+    (is (contains? text "Performance Metrics"))
     (is (contains? text "Range "))
     (is (contains? text "Open Orders (1)"))
     (is (contains? text "Funding History (1)"))))
@@ -158,6 +187,27 @@
     (is (some? title-skeleton))
     (is (contains? text "Loading vault name"))
     (is (not (contains? text vault-address)))))
+
+(deftest vault-detail-view-renders-returns-benchmark-controls-and-performance-metrics-panel-test
+  (let [returns-state (assoc-in sample-state [:vaults-ui :detail-chart-series] :returns)
+        returns-view (vault-detail-view/vault-detail-view returns-state)
+        benchmark-selector (find-first-node returns-view
+                                            #(= "vault-detail-returns-benchmark-selector"
+                                                (get-in % [1 :data-role])))
+        benchmark-chip-rail (find-first-node returns-view
+                                             #(= "vault-detail-returns-benchmark-chip-rail"
+                                                 (get-in % [1 :data-role])))
+        benchmark-input (find-first-node returns-view
+                                         #(= [[:actions/set-vault-detail-returns-benchmark-search [:event.target/value]]]
+                                             (get-in % [1 :on :input])))
+        metrics-state (assoc-in sample-state [:vaults-ui :detail-tab] :performance-metrics)
+        metrics-view (vault-detail-view/vault-detail-view metrics-state)
+        text (set (collect-strings metrics-view))]
+    (is (some? benchmark-selector))
+    (is (some? benchmark-chip-rail))
+    (is (some? benchmark-input))
+    (is (contains? text "Sharpe"))
+    (is (contains? text "Max Drawdown"))))
 
 (deftest vault-detail-view-shows-invalid-message-when-route-address-is-invalid-test
   (let [view (vault-detail-view/vault-detail-view (assoc-in sample-state [:router :path] "/vaults/not-an-address"))

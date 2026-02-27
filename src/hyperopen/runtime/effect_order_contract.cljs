@@ -44,6 +44,24 @@
     :allow-duplicate-heavy-effects? false
     :heavy-effect-ids #{:effects/fetch-candle-snapshot}}
 
+   :actions/set-vaults-snapshot-range
+   {:required-phase-order [:projection :persistence :heavy-io]
+    :require-projection-before-heavy? true
+    :allow-duplicate-heavy-effects? true
+    :heavy-effect-ids #{:effects/fetch-candle-snapshot}}
+
+   :actions/set-vault-detail-chart-series
+   {:required-phase-order [:projection :persistence :heavy-io]
+    :require-projection-before-heavy? true
+    :allow-duplicate-heavy-effects? true
+    :heavy-effect-ids #{:effects/fetch-candle-snapshot}}
+
+   :actions/select-vault-detail-returns-benchmark
+   {:required-phase-order [:projection :persistence :heavy-io]
+    :require-projection-before-heavy? true
+    :allow-duplicate-heavy-effects? false
+    :heavy-effect-ids #{:effects/fetch-candle-snapshot}}
+
    :actions/select-account-info-tab
    {:required-phase-order [:projection :persistence :heavy-io]
     :require-projection-before-heavy? true

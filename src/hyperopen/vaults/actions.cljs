@@ -1,5 +1,6 @@
 (ns hyperopen.vaults.actions
   (:require [clojure.string :as str]
+            [hyperopen.portfolio.actions :as portfolio-actions]
             [hyperopen.utils.parse :as parse-utils]))
 
 (def default-vault-snapshot-range
@@ -39,7 +40,7 @@
   #{:vault :leader :apr :tvl :your-deposit :age :snapshot})
 
 (def ^:private vault-detail-tabs
-  #{:about :vault-performance :your-performance})
+  #{:about :vault-performance :your-performance :performance-metrics})
 
 (def ^:private vault-detail-activity-tabs
   #{:balances
@@ -62,7 +63,8 @@
 
 (def ^:private vault-detail-chart-series-options
   #{:account-value
-    :pnl})
+    :pnl
+    :returns})
 
 (def ^:private projection-effect-ids
   #{:effects/save
@@ -187,6 +189,8 @@
         normalized (case token
                      :vaultperformance :vault-performance
                      :yourperformance :your-performance
+                     :performancemetrics :performance-metrics
+                     :performancemetric :performance-metrics
                      token)]
     (if (contains? vault-detail-tabs normalized)
       normalized
@@ -252,10 +256,58 @@
                 :else nil)
         normalized (case token
                      :accountvalue :account-value
+                     :return :returns
                      token)]
     (if (contains? vault-detail-chart-series-options normalized)
       normalized
       default-vault-detail-chart-series)))
+
+(defn- selected-vault-detail-returns-benchmark-coins
+  [state]
+  (let [coins (portfolio-actions/normalize-portfolio-returns-benchmark-coins
+               (get-in state [:vaults-ui :detail-returns-benchmark-coins]))]
+    (if (seq coins)
+      coins
+      (if-let [legacy-coin (portfolio-actions/normalize-portfolio-returns-benchmark-coin
+                            (get-in state [:vaults-ui :detail-returns-benchmark-coin]))]
+        [legacy-coin]
+        []))))
+
+(defn- vault-detail-returns-chart-selected?
+  [state]
+  (= :returns
+     (normalize-vault-detail-chart-series
+      (get-in state [:vaults-ui :detail-chart-series]))))
+
+(defn- vault-detail-performance-metrics-selected?
+  [state]
+  (= :performance-metrics
+     (normalize-vault-detail-tab
+      (get-in state [:vaults-ui :detail-tab]))))
+
+(defn- vault-detail-benchmark-fetch-enabled?
+  [state]
+  (let [{:keys [kind]} (parse-vault-route (get-in state [:router :path]))]
+    (and (= :detail kind)
+         (or (vault-detail-returns-chart-selected? state)
+             (vault-detail-performance-metrics-selected? state)))))
+
+(defn- vault-detail-returns-benchmark-fetch-effects
+  [snapshot-range benchmark-coins]
+  (let [{:keys [interval bars]} (portfolio-actions/returns-benchmark-candle-request
+                                 (normalize-vault-snapshot-range snapshot-range))]
+    (->> (portfolio-actions/normalize-portfolio-returns-benchmark-coins benchmark-coins)
+         (mapv (fn [coin]
+                 [:effects/fetch-candle-snapshot
+                  :coin coin
+                  :interval interval
+                  :bars bars])))))
+
+(defn- normalize-vault-detail-returns-benchmark-search
+  [value]
+  (if (string? value)
+    value
+    (str (or value ""))))
 
 (defn normalize-vault-user-page-size
   [value]
@@ -439,11 +491,17 @@
     []))
 
 (defn set-vaults-snapshot-range
-  [_state snapshot-range]
-  (let [snapshot-range* (normalize-vault-snapshot-range snapshot-range)]
-    [[:effects/save-many [[[:vaults-ui :snapshot-range] snapshot-range*]
-                          [[:vaults-ui :user-vaults-page] default-vault-user-page]
-                          [vault-detail-chart-hover-index-path nil]]]]))
+  [state snapshot-range]
+  (let [snapshot-range* (normalize-vault-snapshot-range snapshot-range)
+        projection-effect [:effects/save-many
+                           [[[:vaults-ui :snapshot-range] snapshot-range*]
+                            [[:vaults-ui :user-vaults-page] default-vault-user-page]
+                            [vault-detail-chart-hover-index-path nil]]]
+        fetch-effects (if (vault-detail-benchmark-fetch-enabled? state)
+                        (vault-detail-returns-benchmark-fetch-effects snapshot-range*
+                                                                      (selected-vault-detail-returns-benchmark-coins state))
+                        [])]
+    (into [projection-effect] fetch-effects)))
 
 (defn set-vaults-sort
   [state sort-column]
@@ -539,10 +597,87 @@
                         [vault-detail-activity-filter-open-path false]]]])
 
 (defn set-vault-detail-chart-series
-  [_state series]
-  [[:effects/save-many [[[:vaults-ui :detail-chart-series]
-                         (normalize-vault-detail-chart-series series)]
-                        [vault-detail-chart-hover-index-path nil]]]])
+  [state series]
+  (let [series* (normalize-vault-detail-chart-series series)
+        snapshot-range (normalize-vault-snapshot-range
+                        (get-in state [:vaults-ui :snapshot-range]))
+        projection-effect [:effects/save-many
+                           [[[:vaults-ui :detail-chart-series] series*]
+                            [vault-detail-chart-hover-index-path nil]]]
+        fetch-effects (if (= :returns series*)
+                        (vault-detail-returns-benchmark-fetch-effects snapshot-range
+                                                                      (selected-vault-detail-returns-benchmark-coins state))
+                        [])]
+    (into [projection-effect] fetch-effects)))
+
+(defn set-vault-detail-returns-benchmark-search
+  [_state search]
+  [[:effects/save
+    [:vaults-ui :detail-returns-benchmark-search]
+    (normalize-vault-detail-returns-benchmark-search search)]])
+
+(defn set-vault-detail-returns-benchmark-suggestions-open
+  [_state open?]
+  [[:effects/save
+    [:vaults-ui :detail-returns-benchmark-suggestions-open?]
+    (boolean open?)]])
+
+(declare clear-vault-detail-returns-benchmark)
+
+(defn select-vault-detail-returns-benchmark
+  [state benchmark]
+  (if-let [coin (portfolio-actions/normalize-portfolio-returns-benchmark-coin benchmark)]
+    (let [snapshot-range (normalize-vault-snapshot-range
+                          (get-in state [:vaults-ui :snapshot-range]))
+          selected-coins (selected-vault-detail-returns-benchmark-coins state)
+          already-selected? (contains? (set selected-coins) coin)
+          next-coins (if already-selected?
+                       selected-coins
+                       (conj selected-coins coin))
+          projection-effect [:effects/save-many
+                             [[[:vaults-ui :detail-returns-benchmark-coins] next-coins]
+                              [[:vaults-ui :detail-returns-benchmark-coin] (first next-coins)]
+                              [[:vaults-ui :detail-returns-benchmark-search] ""]
+                              [[:vaults-ui :detail-returns-benchmark-suggestions-open?] true]]]
+          fetch-effects (if (and (not already-selected?)
+                                 (vault-detail-benchmark-fetch-enabled? state))
+                          (vault-detail-returns-benchmark-fetch-effects snapshot-range [coin])
+                          [])]
+      (into [projection-effect] fetch-effects))
+    (clear-vault-detail-returns-benchmark state)))
+
+(defn remove-vault-detail-returns-benchmark
+  [state benchmark]
+  (if-let [coin (portfolio-actions/normalize-portfolio-returns-benchmark-coin benchmark)]
+    (let [next-coins (->> (selected-vault-detail-returns-benchmark-coins state)
+                          (remove #(= % coin))
+                          vec)]
+      [[:effects/save-many
+        [[[:vaults-ui :detail-returns-benchmark-coins] next-coins]
+         [[:vaults-ui :detail-returns-benchmark-coin] (first next-coins)]]]])
+    []))
+
+(defn handle-vault-detail-returns-benchmark-search-keydown
+  [state key top-coin]
+  (cond
+    (= key "Enter")
+    (if-let [coin (portfolio-actions/normalize-portfolio-returns-benchmark-coin top-coin)]
+      (select-vault-detail-returns-benchmark state coin)
+      [])
+
+    (= key "Escape")
+    [[:effects/save [:vaults-ui :detail-returns-benchmark-suggestions-open?] false]]
+
+    :else
+    []))
+
+(defn clear-vault-detail-returns-benchmark
+  [_state]
+  [[:effects/save-many
+    [[[:vaults-ui :detail-returns-benchmark-coins] []]
+     [[:vaults-ui :detail-returns-benchmark-coin] nil]
+     [[:vaults-ui :detail-returns-benchmark-search] ""]
+     [[:vaults-ui :detail-returns-benchmark-suggestions-open?] false]]]])
 
 (defn set-vault-detail-chart-hover
   [state client-x bounds point-count]

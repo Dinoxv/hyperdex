@@ -147,6 +147,12 @@
            close-vault-detail-activity-filter
            set-vault-detail-activity-direction-filter
            set-vault-detail-chart-series
+           set-vault-detail-returns-benchmark-search
+           set-vault-detail-returns-benchmark-suggestions-open
+           select-vault-detail-returns-benchmark
+           remove-vault-detail-returns-benchmark
+           handle-vault-detail-returns-benchmark-search-keydown
+           clear-vault-detail-returns-benchmark
            set-vault-detail-chart-hover
            clear-vault-detail-chart-hover]}]
   {:load-vault-route load-vault-route
@@ -169,6 +175,12 @@
    :close-vault-detail-activity-filter close-vault-detail-activity-filter
    :set-vault-detail-activity-direction-filter set-vault-detail-activity-direction-filter
    :set-vault-detail-chart-series set-vault-detail-chart-series
+   :set-vault-detail-returns-benchmark-search set-vault-detail-returns-benchmark-search
+   :set-vault-detail-returns-benchmark-suggestions-open set-vault-detail-returns-benchmark-suggestions-open
+   :select-vault-detail-returns-benchmark select-vault-detail-returns-benchmark
+   :remove-vault-detail-returns-benchmark remove-vault-detail-returns-benchmark
+   :handle-vault-detail-returns-benchmark-search-keydown handle-vault-detail-returns-benchmark-search-keydown
+   :clear-vault-detail-returns-benchmark clear-vault-detail-returns-benchmark
    :set-vault-detail-chart-hover set-vault-detail-chart-hover
    :clear-vault-detail-chart-hover clear-vault-detail-chart-hover})
 

@@ -60,6 +60,14 @@
   (let [n (if (number? value) value 0)
         n* (if (== n -0) 0 n)]
     (case axis-kind
+      :returns (let [rounded (/ (js/Math.round (* n* 100)) 100)
+                     rounded* (if (== rounded -0) 0 rounded)
+                     sign (cond
+                            (pos? rounded*) "+"
+                            (neg? rounded*) "-"
+                            :else "")
+                     magnitude (.toFixed (js/Math.abs rounded*) 2)]
+                 (str sign magnitude "%"))
       :pnl (or (fmt/format-large-currency n*) "$0")
       :account-value (or (fmt/format-large-currency n*) "$0")
       (or (fmt/format-large-currency n*) "$0"))))
@@ -69,6 +77,7 @@
   (let [n (if (number? value) value 0)
         n* (if (== n -0) 0 n)]
     (case axis-kind
+      :returns (format-chart-axis-value :returns n*)
       :pnl (format-currency n* {:missing "$0.00"})
       :account-value (format-currency n* {:missing "$0.00"})
       (format-currency n* {:missing "$0.00"}))))
@@ -251,6 +260,355 @@
       [:option {:value (name value)}
        label])]])
 
+(defn- hex-color->rgba [hex alpha]
+  (let [hex* (if (and (string? hex)
+                      (= \# (first hex)))
+               (subs hex 1)
+               hex)]
+    (when (and (string? hex*)
+               (re-matches #"[0-9A-Fa-f]{6}" hex*))
+      (let [r (js/Number.parseInt (subs hex* 0 2) 16)
+            g (js/Number.parseInt (subs hex* 2 4) 16)
+            b (js/Number.parseInt (subs hex* 4 6) 16)]
+        (str "rgba(" r ", " g ", " b ", " alpha ")")))))
+
+(defn- returns-benchmark-chip [{:keys [value label stroke]}]
+  (let [display-label (let [raw-label (some-> label clojure.core/str str/trim)
+                            label-without-suffix (some-> raw-label
+                                                         (str/replace #"\s*\([^)]*\)\s*$" ""))
+                            primary-token (some-> label-without-suffix
+                                                  (str/split #"-" 2)
+                                                  first
+                                                  str/trim)]
+                        (if (seq primary-token)
+                          primary-token
+                          (or raw-label "")))
+        accent-color (or stroke "#9fb3be")
+        border-color (or (hex-color->rgba stroke 0.58)
+                         "rgba(120, 141, 154, 0.5)")
+        background-color (or (hex-color->rgba stroke 0.14)
+                             "rgba(120, 141, 154, 0.16)")]
+    [:span {:class ["inline-flex"
+                    "max-w-full"
+                    "items-center"
+                    "gap-1"
+                    "rounded-md"
+                    "border"
+                    "px-1"
+                    "py-0.5"]
+            :style {:border-color border-color
+                    :background-color background-color}
+            :data-role (str "vault-detail-returns-benchmark-chip-" value)}
+     [:span {:class ["h-1.5" "w-1.5" "shrink-0" "rounded-full"]
+             :style {:background-color accent-color}}]
+     [:span {:class ["min-w-0" "truncate" "text-xs" "leading-4" "text-trading-text"]}
+      display-label]
+     [:button {:type "button"
+               :class ["inline-flex"
+                       "h-6"
+                       "w-6"
+                       "items-center"
+                       "justify-center"
+                       "rounded"
+                       "transition-colors"
+                       "hover:bg-base-300"
+                       "focus:outline-none"
+                       "focus:ring-0"
+                       "focus:ring-offset-0"]
+               :style {:color accent-color}
+               :aria-label (str "Remove benchmark " label)
+               :on {:click [[:actions/remove-vault-detail-returns-benchmark value]]}}
+      "x"]]))
+
+(defn- returns-benchmark-suggestion-row [{:keys [value label]}]
+  [:button {:type "button"
+            :class ["flex"
+                    "w-full"
+                    "items-center"
+                    "justify-start"
+                    "rounded"
+                    "px-2"
+                    "py-1.5"
+                    "text-left"
+                    "text-xs"
+                    "text-trading-text"
+                    "transition-colors"
+                    "hover:bg-base-300"
+                    "focus:outline-none"
+                    "focus:ring-0"
+                    "focus:ring-offset-0"]
+            :data-role (str "vault-detail-returns-benchmark-suggestion-" value)
+            :on {:mousedown [[:actions/select-vault-detail-returns-benchmark value]]}}
+   label])
+
+(defn- returns-benchmark-selector [{:keys [coin-search
+                                           suggestions-open?
+                                           candidates
+                                           top-coin
+                                           empty-message]}]
+  (let [candidates* (vec (or candidates []))]
+    [:div {:class ["relative" "w-[320px]"]
+           :data-role "vault-detail-returns-benchmark-selector"}
+     [:div {:class ["rounded-md" "border" "border-[#1f3b3c]" "bg-[#071e25]" "px-2"]}
+      [:input {:id "vault-detail-returns-benchmark-search"
+               :class ["h-9"
+                       "w-full"
+                       "border-0"
+                       "bg-transparent"
+                       "px-1"
+                       "text-xs"
+                       "text-trading-text"
+                       "focus:outline-none"
+                       "focus:ring-0"
+                       "focus:ring-offset-0"]
+               :type "search"
+               :placeholder "Search benchmarks and press Enter"
+               :aria-label "Search benchmark symbols"
+               :autocomplete "off"
+               :spellcheck false
+               :value (or coin-search "")
+               :on {:input [[:actions/set-vault-detail-returns-benchmark-search [:event.target/value]]]
+                    :focus [[:actions/set-vault-detail-returns-benchmark-suggestions-open true]]
+                    :blur [[:actions/set-vault-detail-returns-benchmark-suggestions-open false]]
+                    :keydown [[:actions/handle-vault-detail-returns-benchmark-search-keydown [:event/key] top-coin]]}}]]
+     (when suggestions-open?
+       [:div {:class ["absolute"
+                      "left-0"
+                      "right-0"
+                      "top-full"
+                      "mt-1"
+                      "max-h-44"
+                      "overflow-y-auto"
+                      "rounded-md"
+                      "border"
+                      "border-[#1f3b3c]"
+                      "bg-[#081f29]"
+                      "p-1"
+                      "shadow-lg"
+                      "z-40"]}
+        (if (seq candidates*)
+          (for [option candidates*]
+            ^{:key (str "vault-detail-returns-benchmark-suggestion-" (:value option))}
+            (returns-benchmark-suggestion-row option))
+          [:div {:class ["px-2" "py-1.5" "text-xs" "text-[#8aa0a7]"]}
+           (or empty-message "No matching symbols.")])])]))
+
+(defn- returns-benchmark-chip-rail [{:keys [selected-options]}]
+  (let [chips (vec (or selected-options []))]
+    (when (seq chips)
+      [:div {:class ["rounded-md"
+                     "border"
+                     "border-[#1f3b3c]"
+                     "bg-[#081f29]"
+                     "p-1.5"
+                     "shadow-md"]
+             :data-role "vault-detail-returns-benchmark-chip-rail"}
+       [:div {:class ["flex" "flex-wrap" "items-center" "gap-1.5" "pr-1"]}
+        (for [{:keys [value] :as option} chips]
+          ^{:key (str "vault-detail-returns-benchmark-chip-rail-item-" value)}
+          (returns-benchmark-chip option))]])))
+
+(defn- benchmark-series-color-by-coin [series]
+  (reduce (fn [acc {:keys [coin stroke]}]
+            (if (and (string? coin)
+                     (seq coin)
+                     (string? stroke)
+                     (seq stroke))
+              (assoc acc coin stroke)
+              acc))
+          {}
+          (or series [])))
+
+(defn- add-benchmark-chip-colors [returns-benchmark series]
+  (let [color-by-coin (benchmark-series-color-by-coin series)]
+    (update returns-benchmark
+            :selected-options
+            (fn [options]
+              (mapv (fn [{:keys [value] :as option}]
+                      (assoc option :stroke (get color-by-coin value)))
+                    (or options []))))))
+
+(defn- chart-series-path [{:keys [id path stroke]}]
+  (when (seq path)
+    [:path {:d path
+            :fill "none"
+            :stroke stroke
+            :stroke-width 1.0
+            :vector-effect "non-scaling-stroke"
+            :stroke-linecap "square"
+            :stroke-linejoin "miter"
+            :data-role (if (= id :strategy)
+                         "vault-detail-chart-path"
+                         (str "vault-detail-chart-path-" (name id)))}]))
+
+(defn- chart-legend [series]
+  (let [visible-series (->> series
+                            (filter :has-data?)
+                            vec)]
+    (when (> (count visible-series) 1)
+      [:div {:class ["flex"
+                     "flex-wrap"
+                     "items-center"
+                     "gap-3"
+                     "rounded-md"
+                     "bg-[#081f29]"
+                     "px-2"
+                     "py-1.5"]}
+       (for [{:keys [id label stroke]} visible-series]
+         ^{:key (str "vault-detail-chart-legend-item-" (name id))}
+         [:div {:class ["flex" "items-center" "gap-1.5"]}
+          [:span {:class ["h-2" "w-2" "rounded-full"]
+                  :style {:background-color stroke}}]
+          [:span {:class ["text-xs" "text-[#8aa0a7]"]}
+           label]])])))
+
+(defn- finite-number? [value]
+  (and (number? value)
+       (js/isFinite value)))
+
+(defn- format-signed-percent-from-decimal [value]
+  (when (finite-number? value)
+    (let [pct (* value 100)
+          rounded (/ (js/Math.round (* pct 100)) 100)
+          rounded* (if (== rounded -0) 0 rounded)
+          sign (cond
+                 (pos? rounded*) "+"
+                 (neg? rounded*) "-"
+                 :else "")
+          magnitude (.toFixed (js/Math.abs rounded*) 2)]
+      (str sign magnitude "%"))))
+
+(defn- format-ratio-value [value]
+  (when (finite-number? value)
+    (.toFixed value 2)))
+
+(defn- format-integer-value [value]
+  (when (finite-number? value)
+    (str (js/Math.round value))))
+
+(defn- format-metric-value [kind value]
+  (case kind
+    :percent (or (format-signed-percent-from-decimal value) "--")
+    :ratio (or (format-ratio-value value) "--")
+    :integer (or (format-integer-value value) "--")
+    :date (if (and (string? value)
+                   (seq (str/trim value)))
+            value
+            "--")
+    "--"))
+
+(defn- performance-metric-value-cell
+  ([kind value]
+   (performance-metric-value-cell kind value nil))
+  ([kind value attrs]
+   [:span (merge {:class (into ["text-sm" "text-trading-text" "text-right"]
+                               (when (not= kind :date)
+                                 ["num"]))}
+                 attrs)
+    (format-metric-value kind value)]))
+
+(defn- resolved-benchmark-metric-columns
+  [{:keys [benchmark-columns benchmark-selected? benchmark-label benchmark-coin]}]
+  (let [columns (->> (or benchmark-columns [])
+                     (keep (fn [{:keys [coin label]}]
+                             (let [coin* (some-> coin str str/trim)
+                                   label* (some-> label str str/trim)]
+                               (when (seq coin*)
+                                 {:coin coin*
+                                  :label (or label* coin*)}))))
+                     vec)]
+    (if (seq columns)
+      columns
+      [{:coin (or (some-> benchmark-coin str str/trim)
+                  "__benchmark__")
+        :label (if benchmark-selected?
+                 (or benchmark-label "Benchmark")
+                 "Benchmark")}]))
+  )
+
+(defn- benchmark-row-value
+  [row coin]
+  (let [values (:benchmark-values row)]
+    (if (and (map? values)
+             (contains? values coin))
+      (get values coin)
+      (:benchmark-value row))))
+
+(defn- performance-metrics-grid-style
+  [benchmark-column-count]
+  {:grid-template-columns (str/join " "
+                                    (concat ["minmax(0,1fr)"]
+                                            (repeat benchmark-column-count "minmax(108px,auto)")
+                                            ["minmax(108px,auto)"]))})
+
+(defn- performance-metric-row [{:keys [key label kind value] :as row} benchmark-columns grid-style]
+  (let [portfolio-value (if (contains? row :portfolio-value)
+                          (:portfolio-value row)
+                          value)]
+    [:div {:class ["grid"
+                   "items-center"
+                   "gap-3"
+                   "hover:bg-[#0e2630]"]
+           :style grid-style
+           :data-role (str "vault-detail-performance-metric-" (name key))}
+     [:span {:class ["text-sm"]
+             :style {:color "#9CA3AF"}}
+      label]
+     (for [{:keys [coin]} benchmark-columns]
+       ^{:key (str "vault-detail-performance-metric-" (name key) "-benchmark-" coin)}
+       (performance-metric-value-cell kind
+                                      (benchmark-row-value row coin)
+                                      {:data-role (str "vault-detail-performance-metric-" (name key) "-benchmark-value-" coin)}))
+     (performance-metric-value-cell kind portfolio-value)]))
+
+(defn- performance-metrics-card [{:keys [benchmark-selected?
+                                         benchmark-label
+                                         benchmark-columns
+                                         benchmark-coin
+                                         groups
+                                         timeframe-options
+                                         selected-timeframe]}]
+  (let [benchmark-columns* (resolved-benchmark-metric-columns {:benchmark-columns benchmark-columns
+                                                               :benchmark-selected? benchmark-selected?
+                                                               :benchmark-label benchmark-label
+                                                               :benchmark-coin benchmark-coin})
+        grid-style (performance-metrics-grid-style (count benchmark-columns*))]
+    [:div {:class ["flex" "h-full" "min-h-0" "flex-col"]}
+     [:div {:class ["grid"
+                    "items-center"
+                    "gap-3"
+                    "border-b"
+                    "border-[#1f3b3c]"
+                    "bg-[#0a232d]"
+                    "px-4"
+                    "py-2.5"]
+            :style grid-style}
+      [:div {:class ["flex" "min-w-0" "items-center" "justify-between" "gap-2"]}
+       [:span {:class ["text-xs" "font-medium" "uppercase" "tracking-wide" "text-[#8aa0a7]"]}
+        "Metric"]
+       (when (and (seq timeframe-options)
+                  (keyword? selected-timeframe))
+         (chart-timeframe-menu {:timeframe-options timeframe-options
+                                :selected-timeframe selected-timeframe}))]
+      (for [[idx {:keys [coin label]}] (map-indexed vector benchmark-columns*)]
+        ^{:key (str "vault-detail-performance-metrics-benchmark-label-" coin)}
+        [:span {:class ["text-xs" "font-medium" "uppercase" "tracking-wide" "text-right" "text-[#8aa0a7]"]
+                :data-role (if (zero? idx)
+                             "vault-detail-performance-metrics-benchmark-label"
+                             (str "vault-detail-performance-metrics-benchmark-label-" coin))}
+         label])
+      [:span {:class ["text-xs" "font-medium" "uppercase" "tracking-wide" "text-right" "text-[#8aa0a7]"]}
+       "Vault"]]
+     [:div {:class ["flex-1" "min-h-0" "space-y-2.5" "overflow-y-auto" "scrollbar-hide" "px-4" "py-3"]}
+      (for [[idx {:keys [id rows]}] (map-indexed vector (or groups []))]
+        ^{:key (str "vault-detail-performance-metrics-group-" (name id))}
+        [:div {:class (into ["space-y-1.5"]
+                            (when (pos? idx)
+                              ["border-t" "border-[#1f3b3c]" "pt-2.5"]))}
+         (for [{:keys [key] :as row} rows]
+           ^{:key (str "vault-detail-performance-metric-row-" (name key))}
+           (performance-metric-row row benchmark-columns* grid-style))])]]))
+
 (defn- activity-tab-button [{:keys [value label count]} selected-tab]
   [:button {:type "button"
             :class (into ["whitespace-nowrap"
@@ -329,6 +687,7 @@
 
 (defn- render-tab-panel [{:keys [selected-tab] :as vm}]
   (case selected-tab
+    :performance-metrics (performance-metrics-card (:performance-metrics vm))
     :vault-performance (render-vault-performance-panel vm)
     :your-performance (render-your-performance-panel (:metrics vm))
     (render-about-panel vm)))
@@ -989,6 +1348,9 @@
 
          (let [axis-kind (:axis-kind chart)
                y-ticks (:y-ticks chart)
+               selected-series (:selected-series chart)
+               series (:series chart)
+               returns-benchmark* (add-benchmark-chip-colors (:returns-benchmark chart) series)
                y-axis-width (y-axis-gutter-width axis-kind y-ticks)
                plot-left (+ y-axis-width 10)
                point-count (count (:points chart))
@@ -1011,96 +1373,100 @@
                               "border-[#1b393a]"
                               "bg-[#071820]"
                               "p-3"]}
-            [:div {:class ["flex" "items-center" "justify-between" "gap-2" "border-b" "border-[#1f3b3c]" "pb-2"]}
+            [:div {:class ["flex" "flex-wrap" "items-center" "justify-between" "gap-2" "border-b" "border-[#1f3b3c]" "pb-2"]}
              [:div {:class ["flex" "items-center" "gap-2"]}
               (for [{:keys [value label]} (:series-tabs chart)]
                 ^{:key (str "chart-series-" (name value))}
                 (chart-series-button {:value value
                                       :label label}
-                                     (:selected-series chart)))]
-             (chart-timeframe-menu {:timeframe-options (:timeframe-options chart)
-                                    :selected-timeframe (:selected-timeframe chart)})]
-            [:div {:class ["relative" "mt-3" "h-[260px]"]}
-             [:div {:class ["absolute" "left-0" "top-0" "bottom-0"]
-                    :style {:width (str y-axis-width "px")}}
-              (for [{:keys [value y-ratio]} y-ticks]
-                ^{:key (str "vault-chart-tick-" y-ratio "-" value)}
-                [:span {:class ["absolute"
-                                "right-2"
-                                "-translate-y-1/2"
-                                "num"
-                                "text-right"
+                                     selected-series))]
+             [:div {:class ["ml-auto" "flex" "items-center" "gap-2"]}
+              (when (= selected-series :returns)
+                (returns-benchmark-selector returns-benchmark*))
+              (chart-timeframe-menu {:timeframe-options (:timeframe-options chart)
+                                     :selected-timeframe (:selected-timeframe chart)})]]
+            [:div {:class ["space-y-2"]}
+             [:div {:class ["relative" "mt-3" "h-[260px]"]}
+              [:div {:class ["absolute" "left-0" "top-0" "bottom-0"]
+                     :style {:width (str y-axis-width "px")}}
+               (for [{:keys [value y-ratio]} y-ticks]
+                 ^{:key (str "vault-chart-tick-" y-ratio "-" value)}
+                 [:span {:class ["absolute"
+                                 "right-2"
+                                 "-translate-y-1/2"
+                                 "num"
+                                 "text-right"
+                                 "text-xs"
+                                 "text-[#8aa0a7]"]
+                         :style {:top (str (* 100 y-ratio) "%")}}
+                  (format-chart-axis-value axis-kind value)])
+               [:div {:class ["absolute"
+                              "right-0"
+                              "top-0"
+                              "bottom-0"
+                              "border-l"
+                              "border-[#1f3b3c]"]}]
+               (for [{:keys [y-ratio]} y-ticks]
+                 ^{:key (str "vault-chart-axis-tick-" y-ratio)}
+                 [:div {:class ["absolute"
+                                "right-0"
+                                "w-1.5"
+                                "border-t"
+                                "border-[#1f3b3c]"]
+                        :style {:top (str (* 100 y-ratio) "%")}}])]
+              [:div {:class ["absolute" "right-2" "top-0" "bottom-0" "cursor-crosshair"]
+                     :style {:left (str plot-left "px")}
+                     :on {:mousemove [[:actions/set-vault-detail-chart-hover [:event/clientX] [:event.currentTarget/bounds] point-count]]
+                          :mouseenter [[:actions/set-vault-detail-chart-hover [:event/clientX] [:event.currentTarget/bounds] point-count]]
+                          :pointermove [[:actions/set-vault-detail-chart-hover [:event/clientX] [:event.currentTarget/bounds] point-count]]
+                          :pointerenter [[:actions/set-vault-detail-chart-hover [:event/clientX] [:event.currentTarget/bounds] point-count]]
+                          :mouseleave [[:actions/clear-vault-detail-chart-hover]]
+                          :pointerleave [[:actions/clear-vault-detail-chart-hover]]
+                          :mouseout [[:actions/clear-vault-detail-chart-hover]]}}
+               [:svg {:viewBox "0 0 100 100"
+                      :preserveAspectRatio "none"
+                      :class ["h-full" "w-full"]}
+                [:line {:x1 0
+                        :x2 100
+                        :y1 100
+                        :y2 100
+                        :stroke "rgba(140, 157, 165, 0.30)"
+                        :stroke-width 0.8
+                        :vector-effect "non-scaling-stroke"}]
+                (for [{series-id :id :as series-entry} (or series [])]
+                  ^{:key (str "vault-detail-chart-path-" (name series-id))}
+                  (chart-series-path series-entry))]
+               (when hover-active?
+                 [:div {:class ["absolute"
+                                "top-0"
+                                "bottom-0"
+                                "w-px"
+                                "-translate-x-1/2"
+                                "pointer-events-none"
+                                "bg-[#9fb3be]"
+                                "z-10"]
+                        :style {:left (str hover-line-left-pct "%")}}])
+               (when hover-active?
+                 [:div {:class ["absolute"
+                                "pointer-events-none"
+                                "rounded-sm"
+                                "px-1.5"
+                                "py-0.5"
                                 "text-xs"
-                                "text-[#8aa0a7]"]
-                        :style {:top (str (* 100 y-ratio) "%")}}
-                 (format-chart-axis-value axis-kind value)])
-              [:div {:class ["absolute"
-                             "right-0"
-                             "top-0"
-                             "bottom-0"
-                             "border-l"
-                             "border-[#1f3b3c]"]}]
-              (for [{:keys [y-ratio]} y-ticks]
-                ^{:key (str "vault-chart-axis-tick-" y-ratio)}
-                [:div {:class ["absolute"
-                               "right-0"
-                               "w-1.5"
-                               "border-t"
-                               "border-[#1f3b3c]"]
-                       :style {:top (str (* 100 y-ratio) "%")}}])]
-             [:div {:class ["absolute" "right-2" "top-0" "bottom-0" "cursor-crosshair"]
-                    :style {:left (str plot-left "px")}
-                    :on {:mousemove [[:actions/set-vault-detail-chart-hover [:event/clientX] [:event.currentTarget/bounds] point-count]]
-                         :mouseenter [[:actions/set-vault-detail-chart-hover [:event/clientX] [:event.currentTarget/bounds] point-count]]
-                         :pointermove [[:actions/set-vault-detail-chart-hover [:event/clientX] [:event.currentTarget/bounds] point-count]]
-                         :pointerenter [[:actions/set-vault-detail-chart-hover [:event/clientX] [:event.currentTarget/bounds] point-count]]
-                         :mouseleave [[:actions/clear-vault-detail-chart-hover]]
-                         :pointerleave [[:actions/clear-vault-detail-chart-hover]]
-                         :mouseout [[:actions/clear-vault-detail-chart-hover]]}}
-              [:svg {:viewBox "0 0 100 100"
-                     :preserveAspectRatio "none"
-                     :class ["h-full" "w-full"]}
-               [:line {:x1 0
-                       :x2 100
-                       :y1 100
-                       :y2 100
-                       :stroke "rgba(140, 157, 165, 0.30)"
-                       :stroke-width 0.8
-                       :vector-effect "non-scaling-stroke"}]
-               (when (seq (:path chart))
-                 [:path {:d (:path chart)
-                         :fill "none"
-                         :stroke "#e7ecef"
-                         :stroke-width 0.85
-                         :vector-effect "non-scaling-stroke"}])]
-              (when hover-active?
-                [:div {:class ["absolute"
-                               "top-0"
-                               "bottom-0"
-                               "w-px"
-                               "-translate-x-1/2"
-                               "pointer-events-none"
-                               "bg-[#9fb3be]"
-                               "z-10"]
-                       :style {:left (str hover-line-left-pct "%")}}])
-              (when hover-active?
-                [:div {:class ["absolute"
-                               "pointer-events-none"
-                               "rounded-sm"
-                               "px-1.5"
-                               "py-0.5"
-                               "text-xs"
-                               "font-medium"
-                               "text-white"
-                               "shadow-sm"
-                               "z-20"]
-                       :style {:left (str hover-line-left-pct "%")
-                               :top (str hover-tooltip-top-pct "%")
-                               :transform (if hover-tooltip-right?
-                                            "translate(calc(-100% - 8px), -50%)"
-                                            "translate(8px, -50%)")
-                               :background-color "rgba(0, 0, 0, 0.85)"
-                               :white-space "nowrap"}}
-                 hover-label])]]])]
+                                "font-medium"
+                                "text-white"
+                                "shadow-sm"
+                                "z-20"]
+                        :style {:left (str hover-line-left-pct "%")
+                                :top (str hover-tooltip-top-pct "%")
+                                :transform (if hover-tooltip-right?
+                                             "translate(calc(-100% - 8px), -50%)"
+                                             "translate(8px, -50%)")
+                                :background-color "rgba(0, 0, 0, 0.85)"
+                                :white-space "nowrap"}}
+                  hover-label])]]
+             (chart-legend series)
+             (when (= selected-series :returns)
+               (returns-benchmark-chip-rail returns-benchmark*))]])]
 
         (activity-panel vm)])]))

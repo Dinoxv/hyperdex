@@ -7,8 +7,20 @@
    :vaults-ui {:detail-tab :about
                :detail-activity-tab :positions
                :detail-chart-series :pnl
+               :detail-returns-benchmark-coins ["BTC"]
+               :detail-returns-benchmark-coin "BTC"
+               :detail-returns-benchmark-search ""
+               :detail-returns-benchmark-suggestions-open? false
                :snapshot-range :month
                :detail-loading? false}
+   :asset-selector {:markets [{:coin "BTC"
+                               :symbol "BTC"
+                               :dex "hl"
+                               :market-type :perp
+                               :openInterest 1000}]}
+   :candles {"BTC" {:1h [[1 0 0 0 100]
+                         [2 0 0 0 110]
+                         [3 0 0 0 120]]}}
    :vaults {:errors {:details-by-address {}
                      :webdata-by-vault {}
                      :fills-by-vault {}
@@ -122,8 +134,10 @@
     (is (seq (get-in vm [:chart :points])))
     (is (seq (get-in vm [:chart :path])))
     (is (= :pnl (get-in vm [:chart :selected-series])))
+    (is (= 3 (count (get-in vm [:chart :series-tabs]))))
     (is (= :month (get-in vm [:chart :selected-timeframe])))
     (is (= 4 (count (get-in vm [:chart :timeframe-options]))))
+    (is (seq (get-in vm [:performance-metrics :groups])))
     (is (= :positions (:selected-activity-tab vm)))
     (is (= 2 (count (:activity-positions vm))))
     (is (= 1 (count (:activity-open-orders vm))))
@@ -160,6 +174,17 @@
   (let [state (assoc-in sample-state [:vaults-ui :detail-chart-series] :account-value)
         vm (detail-vm/vault-detail-vm state)]
     (is (= :account-value (get-in vm [:chart :selected-series])))))
+
+(deftest vault-detail-vm-builds-returns-chart-series-and-benchmark-performance-columns-test
+  (let [state (assoc-in sample-state [:vaults-ui :detail-chart-series] :returns)
+        vm (detail-vm/vault-detail-vm state)]
+    (is (= :returns (get-in vm [:chart :selected-series])))
+    (is (= :returns (get-in vm [:chart :axis-kind])))
+    (is (= 2 (count (get-in vm [:chart :series]))))
+    (is (seq (get-in vm [:chart :points])))
+    (is (= ["BTC"] (get-in vm [:performance-metrics :benchmark-coins])))
+    (is (= "BTC (HL PERP)" (get-in vm [:performance-metrics :benchmark-label])))
+    (is (seq (get-in vm [:performance-metrics :groups])))))
 
 (deftest vault-detail-vm-aggregates-component-history-and-accepts-channel-shaped-sources-test
   (let [child-address "0xaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"

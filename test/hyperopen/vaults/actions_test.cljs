@@ -96,6 +96,15 @@
                                [[:vaults-ui :user-vaults-page] 1]
                                [[:vaults-ui :detail-chart-hover-index] nil]]]]
          (actions/set-vaults-snapshot-range {} "allTime")))
+  (is (= [[:effects/save-many [[[:vaults-ui :snapshot-range] :week]
+                               [[:vaults-ui :user-vaults-page] 1]
+                               [[:vaults-ui :detail-chart-hover-index] nil]]]
+          [:effects/fetch-candle-snapshot :coin "BTC" :interval :15m :bars 800]
+          [:effects/fetch-candle-snapshot :coin "ETH" :interval :15m :bars 800]]
+         (actions/set-vaults-snapshot-range {:vaults-ui {:detail-chart-series :returns
+                                                         :detail-returns-benchmark-coins ["BTC" "ETH"]}
+                                             :router {:path "/vaults/0x1234567890abcdef1234567890abcdef12345678"}}
+                                            :week)))
   (is (= [[:effects/save-many [[[:vaults-ui :sort] {:column :tvl
                                                     :direction :asc}]
                                [[:vaults-ui :user-vaults-page] 1]]]]
@@ -129,6 +138,8 @@
          (actions/prev-vaults-user-page {:vaults-ui {:user-vaults-page 2}} 5)))
   (is (= [[:effects/save [:vaults-ui :detail-tab] :vault-performance]]
          (actions/set-vault-detail-tab {} "vaultPerformance")))
+  (is (= [[:effects/save [:vaults-ui :detail-tab] :performance-metrics]]
+         (actions/set-vault-detail-tab {} "performanceMetrics")))
   (is (= [[:effects/save-many [[[:vaults-ui :detail-activity-tab] :open-orders]
                                [[:vaults-ui :detail-activity-filter-open?] false]]]]
          (actions/set-vault-detail-activity-tab {} "openOrders")))
@@ -163,6 +174,37 @@
   (is (= [[:effects/save-many [[[:vaults-ui :detail-chart-series] :account-value]
                                [[:vaults-ui :detail-chart-hover-index] nil]]]]
          (actions/set-vault-detail-chart-series {} "accountValue")))
+  (is (= [[:effects/save-many [[[:vaults-ui :detail-chart-series] :returns]
+                               [[:vaults-ui :detail-chart-hover-index] nil]]]
+          [:effects/fetch-candle-snapshot :coin "BTC" :interval :1h :bars 800]]
+         (actions/set-vault-detail-chart-series {:vaults-ui {:snapshot-range :month
+                                                             :detail-returns-benchmark-coins ["BTC"]}}
+                                                :returns)))
   (is (= [[:effects/save-many [[[:vaults-ui :detail-chart-series] :pnl]
                                [[:vaults-ui :detail-chart-hover-index] nil]]]]
-         (actions/set-vault-detail-chart-series {} "unknown-series"))))
+         (actions/set-vault-detail-chart-series {} "unknown-series")))
+  (is (= [[:effects/save [:vaults-ui :detail-returns-benchmark-search] "42"]]
+         (actions/set-vault-detail-returns-benchmark-search {} 42)))
+  (is (= [[:effects/save [:vaults-ui :detail-returns-benchmark-suggestions-open?] true]]
+         (actions/set-vault-detail-returns-benchmark-suggestions-open {} true)))
+  (is (= [[:effects/save-many [[[:vaults-ui :detail-returns-benchmark-coins] ["ETH"]]
+                               [[:vaults-ui :detail-returns-benchmark-coin] "ETH"]
+                               [[:vaults-ui :detail-returns-benchmark-search] ""]
+                               [[:vaults-ui :detail-returns-benchmark-suggestions-open?] true]]]
+          [:effects/fetch-candle-snapshot :coin "ETH" :interval :1h :bars 800]]
+         (actions/select-vault-detail-returns-benchmark {:vaults-ui {:snapshot-range :month
+                                                                     :detail-chart-series :returns
+                                                                     :detail-returns-benchmark-coins []}
+                                                         :router {:path "/vaults/0x1234567890abcdef1234567890abcdef12345678"}}
+                                                        "ETH")))
+  (is (= [[:effects/save-many [[[:vaults-ui :detail-returns-benchmark-coins] ["BTC"]]
+                               [[:vaults-ui :detail-returns-benchmark-coin] "BTC"]]]]
+         (actions/remove-vault-detail-returns-benchmark {:vaults-ui {:detail-returns-benchmark-coins ["BTC" "ETH"]}}
+                                                        "ETH")))
+  (is (= [[:effects/save [:vaults-ui :detail-returns-benchmark-suggestions-open?] false]]
+         (actions/handle-vault-detail-returns-benchmark-search-keydown {} "Escape" nil)))
+  (is (= [[:effects/save-many [[[:vaults-ui :detail-returns-benchmark-coins] []]
+                               [[:vaults-ui :detail-returns-benchmark-coin] nil]
+                               [[:vaults-ui :detail-returns-benchmark-search] ""]
+                               [[:vaults-ui :detail-returns-benchmark-suggestions-open?] false]]]]
+         (actions/clear-vault-detail-returns-benchmark {}))))
