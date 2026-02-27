@@ -20,6 +20,9 @@
 (def default-vault-detail-tab
   :about)
 
+(def default-vault-detail-activity-tab
+  :positions)
+
 (def ^:private vault-snapshot-ranges
   #{:day :week :month :all-time})
 
@@ -28,6 +31,21 @@
 
 (def ^:private vault-detail-tabs
   #{:about :vault-performance :your-performance})
+
+(def ^:private vault-detail-activity-tabs
+  #{:balances
+    :positions
+    :open-orders
+    :twap
+    :trade-history
+    :funding-history
+    :order-history
+    :deposits-withdrawals
+    :depositors})
+
+(def ^:private projection-effect-ids
+  #{:effects/save
+    :effects/save-many})
 
 (def vault-user-page-size-options
   [5 10 25 50])
@@ -141,6 +159,27 @@
       normalized
       default-vault-detail-tab)))
 
+(defn normalize-vault-detail-activity-tab
+  [value]
+  (let [token (cond
+                (keyword? value) value
+                (string? value) (-> value
+                                    str/trim
+                                    str/lower-case
+                                    (str/replace #"[^a-z0-9]+" "-")
+                                    keyword)
+                :else nil)
+        normalized (case token
+                     :openorders :open-orders
+                     :tradehistory :trade-history
+                     :fundinghistory :funding-history
+                     :orderhistory :order-history
+                     :depositswithdrawals :deposits-withdrawals
+                     token)]
+    (if (contains? vault-detail-activity-tabs normalized)
+      normalized
+      default-vault-detail-activity-tab)))
+
 (defn normalize-vault-user-page-size
   [value]
   (let [candidate (parse-utils/parse-int-value value)]
@@ -193,6 +232,17 @@
      [:effects/api-fetch-vault-webdata2 vault-address*]]
     []))
 
+(defn- projection-effect?
+  [effect]
+  (contains? projection-effect-ids (first effect)))
+
+(defn- projection-first-effects
+  [effects]
+  (let [effects* (vec (or effects []))]
+    (into []
+          (concat (filter projection-effect? effects*)
+                  (remove projection-effect? effects*)))))
+
 (defn load-vault-route
   [state path]
   (let [{:keys [kind vault-address]} (parse-vault-route path)]
@@ -201,8 +251,9 @@
       (load-vault-list-effects state)
 
       :detail
-      (into (load-vault-list-effects state)
-            (load-vault-detail state vault-address))
+      (projection-first-effects
+       (into (load-vault-list-effects state)
+             (load-vault-detail state vault-address)))
 
       [])))
 
@@ -276,3 +327,8 @@
   [_state tab]
   [[:effects/save [:vaults-ui :detail-tab]
     (normalize-vault-detail-tab tab)]])
+
+(defn set-vault-detail-activity-tab
+  [_state tab]
+  [[:effects/save [:vaults-ui :detail-activity-tab]
+    (normalize-vault-detail-activity-tab tab)]])

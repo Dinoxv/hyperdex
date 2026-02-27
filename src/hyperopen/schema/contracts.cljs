@@ -400,6 +400,7 @@
    :actions/next-vaults-user-page ::max-page-args
    :actions/prev-vaults-user-page ::max-page-args
    :actions/set-vault-detail-tab ::keyword-or-string-args
+   :actions/set-vault-detail-activity-tab ::keyword-or-string-args
    :actions/navigate (s/or :path (s/tuple ::non-empty-string)
                            :path-and-opts (s/tuple ::non-empty-string map?))})
 

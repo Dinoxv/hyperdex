@@ -135,6 +135,7 @@
    :user-vaults-page 1
    :user-vaults-page-size-dropdown-open? false
    :detail-tab :about
+   :detail-activity-tab :positions
    :list-loading? false
    :detail-loading? false})
 

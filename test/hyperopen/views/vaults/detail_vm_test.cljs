@@ -5,6 +5,7 @@
 (def sample-state
   {:router {:path "/vaults/0x1234567890abcdef1234567890abcdef12345678"}
    :vaults-ui {:detail-tab :about
+               :detail-activity-tab :positions
                :snapshot-range :month
                :detail-loading? false}
    :vaults {:errors {:details-by-address {}
@@ -13,8 +14,9 @@
                                  {:name "Vault Detail"
                                   :leader "0xabcdefabcdefabcdefabcdefabcdefabcdefabcd"
                                   :description "Sample vault"
-                                  :portfolio {:month {:accountValueHistory [[1 10] [2 11] [3 15]]}}
-                                  :followers 3
+                                  :portfolio {:month {:accountValueHistory [[1 10] [2 11] [3 15]]
+                                                      :pnlHistory [[1 -1] [2 0.5] [3 2.5]]}}
+                                  :followers [{:user "0xf1"} {:user "0xf2"}]
                                   :leader-commission 0.15
                                   :relationship {:type :child
                                                  :parent-address "0x9999999999999999999999999999999999999999"}
@@ -31,8 +33,23 @@
                                          :side "sell"
                                          :sz "1.2"
                                          :px "202"}]
-                                :openOrders [1]
-                                :assetPositions [1 2]}}
+                                :openOrders [{:order {:coin "BTC"
+                                                      :side "B"
+                                                      :sz "0.1"
+                                                      :limitPx "100"
+                                                      :timestamp 9}}]
+                                :clearinghouseState {:assetPositions [{:position {:coin "BTC"
+                                                                                   :szi "0.2"
+                                                                                   :entryPx "100"
+                                                                                   :positionValue "20"
+                                                                                   :unrealizedPnl "1"
+                                                                                   :returnOnEquity "0.05"}}
+                                                                       {:position {:coin "ETH"
+                                                                                   :szi "-1.2"
+                                                                                   :entryPx "200"
+                                                                                   :positionValue "240"
+                                                                                   :unrealizedPnl "-2"
+                                                                                   :returnOnEquity "-0.1"}}]}}}
             :user-equity-by-address {"0x1234567890abcdef1234567890abcdef12345678"
                                      {:equity 50}}
             :merged-index-rows [{:name "Vault Detail"
@@ -55,8 +72,12 @@
     (is (= 20 (get-in vm [:metrics :past-month-return])))
     (is (= 50 (get-in vm [:metrics :your-deposit])))
     (is (= 12 (get-in vm [:metrics :all-time-earned])))
+    (is (= 2 (:followers vm)))
     (is (seq (get-in vm [:chart :points])))
     (is (seq (get-in vm [:chart :path])))
+    (is (= :positions (:selected-activity-tab vm)))
+    (is (= 2 (count (:activity-positions vm))))
+    (is (= 1 (count (:activity-open-orders vm))))
     (is (= 2 (count (:activity-fills vm))))
     (is (= 2 (get-in vm [:activity-summary :fill-count])))
     (is (= 1 (get-in vm [:activity-summary :open-order-count])))
@@ -66,3 +87,17 @@
   (let [vm (detail-vm/vault-detail-vm (assoc-in sample-state [:router :path] "/vaults/not-an-address"))]
     (is (= :detail (:kind vm)))
     (is (true? (:invalid-address? vm)))))
+
+(deftest vault-detail-vm-prefers-apr-for-past-month-return-and-normalizes-depositor-count-test
+  (let [state (-> sample-state
+                  (assoc-in [:vaults :details-by-address "0x1234567890abcdef1234567890abcdef12345678" :apr] 0.21)
+                  (assoc-in [:vaults :details-by-address "0x1234567890abcdef1234567890abcdef12345678" :followers] 137)
+                  (assoc-in [:vaults :merged-index-rows 0 :snapshot-by-key :month] [0.0 19098892.322411]))
+        vm (detail-vm/vault-detail-vm state)]
+    (is (= 21 (get-in vm [:metrics :past-month-return])))
+    (is (= 137 (:followers vm)))
+    (is (= 137
+           (some->> (:activity-tabs vm)
+                    (filter #(= :depositors (:value %)))
+                    first
+                    :count)))))

@@ -132,7 +132,8 @@
            set-vaults-user-page
            next-vaults-user-page
            prev-vaults-user-page
-           set-vault-detail-tab]}]
+           set-vault-detail-tab
+           set-vault-detail-activity-tab]}]
   {:load-vault-route load-vault-route
    :load-vaults load-vaults
    :load-vault-detail load-vault-detail
@@ -146,7 +147,8 @@
    :set-vaults-user-page set-vaults-user-page
    :next-vaults-user-page next-vaults-user-page
    :prev-vaults-user-page prev-vaults-user-page
-   :set-vault-detail-tab set-vault-detail-tab})
+   :set-vault-detail-tab set-vault-detail-tab
+   :set-vault-detail-activity-tab set-vault-detail-activity-tab})
 
 (defn- wallet-action-handlers
   [{:keys [connect-wallet-action

@@ -53,6 +53,7 @@
     (is (= 1 (get-in state [:vaults-ui :user-vaults-page])))
     (is (= false (get-in state [:vaults-ui :user-vaults-page-size-dropdown-open?])))
     (is (= :about (get-in state [:vaults-ui :detail-tab])))
+    (is (= :positions (get-in state [:vaults-ui :detail-activity-tab])))
     (is (= true (get-in state [:chart-options :volume-visible?])))
     (is (= false (get-in state [:positions-ui :tpsl-modal :open?])))
     (is (= false (get-in state [:positions-ui :reduce-popover :open?])))))

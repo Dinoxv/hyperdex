@@ -269,6 +269,15 @@
       (when (seq normalized*)
         normalized*))))
 
+(defn- followers-count
+  [followers]
+  (cond
+    (sequential? followers)
+    (count followers)
+
+    :else
+    (or (parse-optional-int followers) 0)))
+
 (defn normalize-vault-details
   [payload]
   (when (map? payload)
@@ -283,7 +292,7 @@
        :follower-state (normalize-follower-state (:followerState payload))
        :leader-fraction (parse-optional-num (:leaderFraction payload))
        :leader-commission (parse-optional-num (:leaderCommission payload))
-       :followers (or (parse-optional-int (:followers payload)) 0)
+       :followers (followers-count (:followers payload))
        :max-distributable (parse-optional-num (:maxDistributable payload))
        :max-withdrawable (parse-optional-num (:maxWithdrawable payload))
        :is-closed? (boolean (or (boolean-value (:isClosed payload))

@@ -202,7 +202,8 @@
      [:actions/set-vaults-user-page :set-vaults-user-page]
      [:actions/next-vaults-user-page :next-vaults-user-page]
      [:actions/prev-vaults-user-page :prev-vaults-user-page]
-     [:actions/set-vault-detail-tab :set-vault-detail-tab]])))
+     [:actions/set-vault-detail-tab :set-vault-detail-tab]
+     [:actions/set-vault-detail-activity-tab :set-vault-detail-activity-tab]])))
 
 (defn registered-action-ids
   []

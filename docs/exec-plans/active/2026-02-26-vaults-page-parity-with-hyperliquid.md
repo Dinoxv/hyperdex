@@ -77,6 +77,40 @@ A user can verify this by opening `/vaults`, filtering/searching, opening a vaul
   - Added user-vault pagination controls with Hyperliquid-aligned row options (`5/10/25/50`) and page navigation wired through new vault UI actions/state in `/hyperopen/src/hyperopen/vaults/actions.cljs` and `/hyperopen/src/hyperopen/views/vaults/vm.cljs`.
   - Updated runtime action registry/collaborator wiring and action contracts for the new vault pagination actions.
   - Expanded action/VM/view/default-state tests for pagination and loading behavior.
+- [x] (2026-02-27 00:56Z) Ran first automated vault-detail parity compare for `0xdfc24b077bc1425ad1dea75bcb6f8158e10df303` and confirmed we were comparing against a different checkout on `:8081` (`/Users//projects/hyperopen`), not this worktree.
+- [x] (2026-02-27 01:11Z) Implemented vault-detail parity remediation pass based on screenshot/diff analysis:
+  - Fixed detail-route metric semantics in `/hyperopen/src/hyperopen/views/vaults/detail_vm.cljs`:
+    - `Past Month Return` now prefers normalized `apr` (removing the large incorrect percent produced by treating absolute PnL snapshots as percentages).
+    - Snapshot derivation now guards large absolute PnL values by normalizing against TVL before rendering percentage rows.
+    - Depositor count now handles normalized numeric followers correctly.
+  - Expanded vault activity position model/view parity:
+    - Added funding extraction from `cumFunding` and rendered `Margin`/`Funding` columns in positions table.
+    - Added Hyperliquid-style activity tab count formatting (`100+` for large counts).
+  - Reworked detail layout density in `/hyperopen/src/hyperopen/views/vault_detail_view.cljs`:
+    - Compact 2x2 metrics grid on mobile; reduced card typography scale.
+    - Hero action row stacks to full-width buttons on mobile to match Hyperliquid flow.
+    - About panel now prioritizes leader/description/component vault list semantics.
+  - Updated tests for VM/view parity semantics:
+    - `/hyperopen/test/hyperopen/views/vaults/detail_vm_test.cljs`
+    - `/hyperopen/test/hyperopen/views/vault_detail_view_test.cljs`
+- [x] (2026-02-27 01:11Z) Re-ran required validation gates after vault-detail remediation:
+  - `npm test`
+  - `npm run check`
+  - `npm run test:websocket`
+- [x] (2026-02-27 01:11Z) Captured updated vault-detail parity compare artifacts from this worktree (`:8082`):
+  - Baseline compare (before this remediation): `/hyperopen/tmp/browser-inspection/compare-2026-02-27T01-02-44-316Z-886084d2/`
+    - desktop visual diff ratio: `0.074623`
+    - mobile visual diff ratio: `0.193680`
+  - Post-remediation compare: `/hyperopen/tmp/browser-inspection/compare-2026-02-27T01-10-23-309Z-3db62b36/`
+    - desktop visual diff ratio: `0.079162`
+    - mobile visual diff ratio: `0.144784`
+  - Net effect: strong mobile parity improvement; desktop slightly regressed due unavoidable shell/top-nav/footer differences and remaining chart/table stylistic gaps.
+- [x] (2026-02-27 01:14Z) Applied final detail-card parity formatting tweak and re-ran compare:
+  - Updated hero `Past Month Return` formatting to integer percent style (`21%`) for Hyperliquid card parity.
+  - Final compare: `/hyperopen/tmp/browser-inspection/compare-2026-02-27T01-14-32-123Z-e2d158d1/`
+    - desktop visual diff ratio: `0.078255`
+    - mobile visual diff ratio: `0.144456`
+  - Net from baseline (`01:02`): desktop `+0.003631` (+4.87%), mobile `-0.049224` (-25.41%).
 
 ## Surprises & Discoveries
 
@@ -101,6 +135,12 @@ A user can verify this by opening `/vaults`, filtering/searching, opening a vaul
 - Observation: Hyperliquid protocol-vs-user section split on list page is driven by protocol vault names, not leader/deposit status.
   Evidence: Production bundle module `73412` (`/static/js/7445.80ed9d41.chunk.js`) exports `["Liquidator","Hyperliquidity Provider (HLP)"]` and list-route code uses that set to partition protocol/user sections.
 
+- Observation: First detail compare run used the wrong local app instance because `localhost:8081` was served from another checkout.
+  Evidence: `lsof -a -p 84695 -d cwd -Fn` reported `n/Users//projects/hyperopen`, while this task’s worktree is `/Users//.codex/worktrees/5e52/hyperopen`.
+
+- Observation: `stats-data` `pnls` snapshots are absolute PnL magnitudes, not percentages.
+  Evidence: `month` snapshot for HLP returned values near `19,098,892`, which rendered as `+19098892.32%` when interpreted as percent; Hyperliquid UI still displayed `21%` from APR.
+
 ## Decision Log
 
 - Decision: Use `stats-data` as canonical list source, then merge `vaultSummaries` as recency patch.
@@ -123,9 +163,19 @@ A user can verify this by opening `/vaults`, filtering/searching, opening a vaul
   Rationale: Hyperliquid bundle logic uses protocol name matching for section split; leader/deposit-based partitioning produced materially different sections.
   Date/Author: 2026-02-26 / Codex
 
+- Decision: Prefer `apr` for detail-card `Past Month Return` and treat large snapshot magnitudes as absolute PnL that must be normalized before percentage rendering.
+  Rationale: This matches observed Hyperliquid output and prevents extreme incorrect percentages from raw `pnls` magnitudes.
+  Date/Author: 2026-02-27 / Codex
+
+- Decision: Prioritize mobile density parity over pixel-level desktop shell parity in this iteration.
+  Rationale: Mobile compare delta was materially larger and user-visible flow divergence was primarily in the hero/metric stack and activity accessibility.
+  Date/Author: 2026-02-27 / Codex
+
 ## Outcomes & Retrospective
 
-Milestones 1 through 5 and 7 are complete, including post-implementation parity polish and a dedicated loading/pagination parity pass. Vault list/detail ingestion, orchestration, route wiring, and UI behavior (including user-vault rows-per-page pagination and structured loading placeholders) are implemented and covered by dedicated VM/view/action/effect tests. The remaining meaningful gap is fine-grained visual pixel parity and optional Milestone 6 (transactional vault actions), which remains intentionally deferred. Validation gates currently pass: `npm run check`, `npm test`, and `npm run test:websocket`.
+Milestones 1 through 5 and 7 are complete, including post-implementation parity polish, loading/pagination parity, and a dedicated vault-detail remediation pass driven by side-by-side screenshot comparison against Hyperliquid. Vault list/detail ingestion, orchestration, route wiring, and UI behavior (including user-vault rows-per-page pagination, structured loading placeholders, APR-aligned month-return semantics, and richer activity table parity columns) are implemented and covered by dedicated VM/view/action/effect tests.
+
+Residual gaps remain in pixel-level desktop parity, primarily from app-shell/header/footer differences and chart rendering sophistication (axis labeling/tooltip behavior) compared with Hyperliquid. Optional Milestone 6 (transactional vault actions) remains intentionally deferred. Validation gates currently pass: `npm run check`, `npm test`, and `npm run test:websocket`.
 
 ## Context and Orientation
 
@@ -350,6 +400,12 @@ Live parity evidence used in this plan:
   - `GET https://stats-data.hyperliquid.xyz/Mainnet/vaults`
   - `POST https://api.hyperliquid.xyz/info` with `vaultSummaries`, `userVaultEquities`, `vaultDetails`, `webData2`
 
+Vault detail compare artifacts (this worktree):
+
+- Baseline compare: `/hyperopen/tmp/browser-inspection/compare-2026-02-27T01-02-44-316Z-886084d2/`
+- Post-remediation compare: `/hyperopen/tmp/browser-inspection/compare-2026-02-27T01-10-23-309Z-3db62b36/`
+- Final formatted pass compare: `/hyperopen/tmp/browser-inspection/compare-2026-02-27T01-14-32-123Z-e2d158d1/`
+
 Reference contracts:
 
 - Info endpoint docs (`vaultDetails`, `userVaultEquities`):
@@ -381,3 +437,5 @@ Stable interfaces that must remain unchanged:
 
 Plan revision note: 2026-02-26 16:53Z - Initial plan authored from live Hyperliquid Vaults bundle/API reconstruction and local Hyperopen architecture audit; selected stats-data + info-endpoint hybrid as canonical ingestion strategy for list/detail parity.
 Plan revision note: 2026-02-26 20:29Z - Updated after browser parity diff + implementation pass to record child-vault exclusion/protocol-section parity decisions, new validation evidence, and residual UI parity gaps.
+Plan revision note: 2026-02-27 01:11Z - Added vault-detail compare diagnostics, corrected month-return semantics (`apr`-first), mobile density and activity-table parity remediation, and before/after compare evidence from this worktree (`:8082`).
+Plan revision note: 2026-02-27 01:14Z - Added final month-return card formatting parity tweak (`21%` style) and final compare artifact set.

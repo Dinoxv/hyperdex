@@ -183,7 +183,8 @@
    :set-vaults-user-page vault-actions/set-vaults-user-page
    :next-vaults-user-page vault-actions/next-vaults-user-page
    :prev-vaults-user-page vault-actions/prev-vaults-user-page
-   :set-vault-detail-tab vault-actions/set-vault-detail-tab})
+   :set-vault-detail-tab vault-actions/set-vault-detail-tab
+   :set-vault-detail-activity-tab vault-actions/set-vault-detail-activity-tab})
 
 (defn runtime-effect-deps
   [effect-overrides]

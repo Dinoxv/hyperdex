@@ -180,7 +180,7 @@
                                        :lockupUntil "222"}
                        :leaderFraction "0.1"
                        :leaderCommission "0.2"
-                       :followers "7"
+                       :followers [{:user "0xA"} {:user "0xB"}]
                        :maxDistributable "120"
                        :maxWithdrawable "80"
                        :isClosed "false"
@@ -209,6 +209,7 @@
                    (is (= {:type :child
                            :parent-address "0xparent"}
                           (:relationship details)))
+                   (is (= 2 (:followers details)))
                    (is (true? (:allow-deposits? details)))
                    (is (false? (:always-close-on-withdraw? details)))
                    (done)))

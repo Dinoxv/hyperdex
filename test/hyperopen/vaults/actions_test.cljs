@@ -36,10 +36,10 @@
   (is (= []
          (actions/load-vault-detail {} "not-a-vault")))
   (is (= [[:effects/save [:vaults-ui :list-loading?] true]
+          [:effects/save [:vaults-ui :detail-loading?] true]
           [:effects/api-fetch-vault-index]
           [:effects/api-fetch-vault-summaries]
           [:effects/api-fetch-user-vault-equities "0xabcdefabcdefabcdefabcdefabcdefabcdefabcd"]
-          [:effects/save [:vaults-ui :detail-loading?] true]
           [:effects/api-fetch-vault-details "0x1234567890abcdef1234567890abcdef12345678" "0xabcdefabcdefabcdefabcdefabcdefabcdefabcd"]
           [:effects/api-fetch-vault-webdata2 "0x1234567890abcdef1234567890abcdef12345678"]]
          (actions/load-vault-route
@@ -93,4 +93,8 @@
   (is (= [[:effects/save [:vaults-ui :user-vaults-page] 1]]
          (actions/prev-vaults-user-page {:vaults-ui {:user-vaults-page 2}} 5)))
   (is (= [[:effects/save [:vaults-ui :detail-tab] :vault-performance]]
-         (actions/set-vault-detail-tab {} "vaultPerformance"))))
+         (actions/set-vault-detail-tab {} "vaultPerformance")))
+  (is (= [[:effects/save [:vaults-ui :detail-activity-tab] :open-orders]]
+         (actions/set-vault-detail-activity-tab {} "openOrders")))
+  (is (= [[:effects/save [:vaults-ui :detail-activity-tab] :positions]]
+         (actions/set-vault-detail-activity-tab {} "unknown-tab"))))

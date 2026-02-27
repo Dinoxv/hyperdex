@@ -71,6 +71,8 @@
                     (get-in deps [:vaults :next-vaults-user-page])))
     (is (identical? vault-actions/set-vault-detail-tab
                     (get-in deps [:vaults :set-vault-detail-tab])))
+    (is (identical? vault-actions/set-vault-detail-activity-tab
+                    (get-in deps [:vaults :set-vault-detail-activity-tab])))
     (is (identical? order-actions/submit-order
                     (get-in deps [:orders :submit-order])))))
 
