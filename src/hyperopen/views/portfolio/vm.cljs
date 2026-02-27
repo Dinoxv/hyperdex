@@ -155,8 +155,50 @@
    (str/lower-case (or (some-> (:coin market) str str/trim) ""))
    (str/lower-case (or (some-> (:key market) str str/trim) ""))])
 
-(defn- benchmark-selector-options [state]
-  (let [ordered-markets (->> (or (get-in state [:asset-selector :markets]) [])
+(defonce ^:private benchmark-selector-options-cache
+  (atom nil))
+
+(def ^:private empty-benchmark-markets-signature
+  {:count 0
+   :rolling-hash 1
+   :xor-hash 0})
+
+(defn- mix-benchmark-markets-hash
+  [rolling market-hash]
+  (let [rolling* (bit-or rolling 0)
+        market-hash* (bit-or market-hash 0)]
+    (bit-or
+     (+ (bit-xor rolling* market-hash*)
+        0x9e3779b9
+        (bit-shift-left rolling* 6)
+        (unsigned-bit-shift-right rolling* 2))
+     0)))
+
+(defn- benchmark-market-signature
+  [market]
+  (hash [(some-> (:coin market) str)
+         (some-> (:symbol market) str)
+         (some-> (:dex market) str)
+         (:market-type market)
+         (:openInterest market)
+         (:cache-order market)
+         (some-> (:key market) str)]))
+
+(defn- benchmark-markets-signature
+  [markets]
+  (reduce (fn [{:keys [count rolling-hash xor-hash] :as signature} market]
+            (if (map? market)
+              (let [market-hash (benchmark-market-signature market)]
+                {:count (inc count)
+                 :rolling-hash (mix-benchmark-markets-hash rolling-hash market-hash)
+                 :xor-hash (bit-xor (bit-or xor-hash 0) (bit-or market-hash 0))})
+              signature))
+          empty-benchmark-markets-signature
+          (or markets [])))
+
+(defn- build-benchmark-selector-options
+  [markets]
+  (let [ordered-markets (->> (or markets [])
                              (filter map?)
                              (sort-by benchmark-option-rank))]
     (->> ordered-markets
@@ -177,6 +219,39 @@
                   :options []})
          :options
          vec)))
+
+(def ^:dynamic *build-benchmark-selector-options*
+  build-benchmark-selector-options)
+
+(defn- memoized-benchmark-selector-options
+  [markets]
+  (let [cache @benchmark-selector-options-cache]
+    (cond
+      (and (map? cache)
+           (identical? markets (:markets cache)))
+      (:options cache)
+
+      :else
+      (let [signature (benchmark-markets-signature markets)]
+        (if (and (map? cache)
+                 (= signature (:markets-signature cache)))
+          (do
+            (reset! benchmark-selector-options-cache (assoc cache
+                                                           :markets markets
+                                                           :markets-signature signature))
+            (:options cache))
+          (let [options (*build-benchmark-selector-options* markets)]
+            (reset! benchmark-selector-options-cache {:markets markets
+                                                      :markets-signature signature
+                                                      :options options})
+            options))))))
+
+(defn reset-portfolio-vm-cache!
+  []
+  (reset! benchmark-selector-options-cache nil))
+
+(defn- benchmark-selector-options [state]
+  (memoized-benchmark-selector-options (get-in state [:asset-selector :markets])))
 
 (defn- normalize-benchmark-search-query [value]
   (-> (or value "")

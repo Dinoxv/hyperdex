@@ -1,5 +1,5 @@
 (ns hyperopen.views.portfolio.vm-test
-  (:require [cljs.test :refer-macros [deftest is testing]]
+  (:require [cljs.test :refer-macros [deftest is testing use-fixtures]]
             [hyperopen.portfolio.actions :as portfolio-actions]
             [hyperopen.views.account-equity-view :as account-equity-view]
             [hyperopen.portfolio.metrics :as portfolio-metrics]
@@ -16,6 +16,12 @@
 
 (def ^:private fixture-start-ms
   (.getTime (js/Date. "2024-01-01T00:00:00.000Z")))
+
+(use-fixtures :each
+  (fn [f]
+    (vm/reset-portfolio-vm-cache!)
+    (f)
+    (vm/reset-portfolio-vm-cache!)))
 
 (defn- performance-metric-row
   [view-model metric-key]
@@ -429,6 +435,57 @@
              (mapv :label (:candidates benchmark-selector))))
       (is (= ["BTC" "SPY"]
              (mapv :value (:candidates benchmark-selector))))))
+
+(deftest portfolio-vm-memoizes-benchmark-selector-options-by-markets-identity-and-signature-test
+  (with-redefs [account-equity-view/account-equity-metrics (fn [_]
+                                                              {:spot-equity 10
+                                                               :perps-value 10
+                                                               :cross-account-value 10
+                                                               :unrealized-pnl 0})]
+    (let [build-count (atom 0)
+          original-builder vm/*build-benchmark-selector-options*
+          markets-a [{:coin "BTC"
+                      :symbol "BTC-USD"
+                      :market-type :perp
+                      :openInterest "900"
+                      :cache-order 1}
+                     {:coin "ETH"
+                      :symbol "ETH-USD"
+                      :market-type :perp
+                      :openInterest "800"
+                      :cache-order 2}]
+          markets-b (mapv identity markets-a)
+          markets-c (assoc-in markets-b [1 :openInterest] "1200")
+          base-state {:account {:mode :classic}
+                      :portfolio-ui {:summary-scope :all
+                                     :summary-time-range :month
+                                     :chart-tab :returns}
+                      :portfolio {:summary-by-key {:month {:pnlHistory [[1 0] [2 0]]
+                                                           :accountValueHistory [[1 100] [2 110]]
+                                                           :vlm 10}}}
+                      :webdata2 {:clearinghouseState {:marginSummary {:accountValue 10}}
+                                :totalVaultEquity 0}
+                      :borrow-lend {:total-supplied-usd 0}}
+          build-vm (fn [markets]
+                     (vm/portfolio-vm (assoc base-state :asset-selector {:markets markets})))]
+      (is (false? (identical? markets-a markets-b)))
+      (with-redefs [vm/*build-benchmark-selector-options*
+                    (fn [markets]
+                      (swap! build-count inc)
+                      (original-builder markets))]
+        (let [selector-a (get-in (build-vm markets-a) [:selectors :returns-benchmark])]
+          (is (= 1 @build-count))
+          (let [selector-identity-hit (get-in (build-vm markets-a) [:selectors :returns-benchmark])]
+            (is (= 1 @build-count))
+            (let [selector-signature-hit (get-in (build-vm markets-b) [:selectors :returns-benchmark])
+                  selector-invalidated (get-in (build-vm markets-c) [:selectors :returns-benchmark])]
+              (is (= 2 @build-count))
+              (is (= ["BTC" "ETH"] (mapv :value (:candidates selector-a))))
+              (is (= ["BTC" "ETH"] (mapv :value (:candidates selector-identity-hit))))
+              (is (= ["BTC" "ETH"] (mapv :value (:candidates selector-signature-hit))))
+              (is (= ["ETH" "BTC"] (mapv :value (:candidates selector-invalidated))))
+              (is (= "BTC" (:top-coin selector-a)))
+              (is (= "ETH" (:top-coin selector-invalidated))))))))))
 
 (deftest portfolio-vm-returns-benchmark-series-aligns-to-portfolio-return-timestamps-test
   (with-redefs [account-equity-view/account-equity-metrics (fn [_]
