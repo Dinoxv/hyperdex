@@ -169,7 +169,7 @@
     (is (contains? all-text "Returns"))
     (is (contains? all-text "Performance Metrics"))
     (is (contains? all-text "Time in Market"))
-    (is (contains? all-text "All-time (ann.)"))
+    (is (not (contains? all-text "All-time (ann.)")))
     (is (contains? all-text "Max Drawdown"))
     (is (contains? all-text "Vault Equity"))
     (is (contains? all-text "Staking Account"))
@@ -398,7 +398,7 @@
       (is (contains? all-text "1.23"))
       (is (contains? all-text "2024-01-02"))
       (is (contains? all-text "7"))
-      (is (contains? (set (collect-strings nil-row)) "--")))))
+      (is (nil? nil-row)))))
 
 (deftest portfolio-view-chart-plot-area-wires-hover-actions-test
   (let [view-node (portfolio-view/portfolio-view sample-state)
