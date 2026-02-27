@@ -73,11 +73,11 @@
             [:init-wallet true]
             [:init-router true]
             [:restore-vaults-snapshot-range true]
+            [:kick-render true]
             :install-asset-selector-shortcuts
             :install-position-tpsl-clickaway
             :register-icon-service-worker
-            :initialize-remote-data-streams
-            [:kick-render true]]
+            :initialize-remote-data-streams]
            @calls))))
 
 (deftest reset-startup-state-falls-back-to-runtime-when-startup-runtime-atom-is-absent-test
@@ -129,9 +129,55 @@
     (is (= [[:set-handler true]
             [:init-wallet true]
             [:init-router true]
+            [:kick-render true]
             :install-asset-selector-shortcuts
             :install-position-tpsl-clickaway
             :register-service-worker
-            :initialize-streams
-            [:kick-render true]]
+            :initialize-streams]
+           @calls))))
+
+(deftest initialize-systems-defers-post-render-startup-when-scheduler-provided-test
+  (let [calls (atom [])
+        scheduled-callback (atom nil)
+        store (atom {:wallet {:address nil}})
+        handle-wallet-connected (fn [] :connected)]
+    (startup-init/initialize-systems!
+     {:store store
+      :set-on-connected-handler! (fn [_handler]
+                                   (swap! calls conj :set-handler))
+      :handle-wallet-connected handle-wallet-connected
+      :init-wallet! (fn [_store-arg]
+                      (swap! calls conj :init-wallet))
+      :init-router! (fn [_store-arg]
+                      (swap! calls conj :init-router))
+      :install-asset-selector-shortcuts! (fn []
+                                           (swap! calls conj :install-asset-selector-shortcuts))
+      :install-position-tpsl-clickaway! (fn []
+                                          (swap! calls conj :install-position-tpsl-clickaway))
+      :register-icon-service-worker! (fn []
+                                       (swap! calls conj :register-service-worker))
+      :initialize-remote-data-streams! (fn []
+                                         (swap! calls conj :initialize-streams))
+      :schedule-post-render-startup! (fn [callback]
+                                       (reset! scheduled-callback callback)
+                                       (swap! calls conj :scheduled))
+      :kick-render! (fn [_store-arg]
+                      (swap! calls conj :kick-render))})
+    (is (= [:set-handler
+            :init-wallet
+            :init-router
+            :kick-render
+            :scheduled]
+           @calls))
+    (is (fn? @scheduled-callback))
+    (@scheduled-callback)
+    (is (= [:set-handler
+            :init-wallet
+            :init-router
+            :kick-render
+            :scheduled
+            :install-asset-selector-shortcuts
+            :install-position-tpsl-clickaway
+            :register-service-worker
+            :initialize-streams]
            @calls))))

@@ -31,6 +31,11 @@
                           #js {:timeout delay-ms})
     (platform/set-timeout! f delay-ms)))
 
+(defn schedule-post-render-startup!
+  [f]
+  ;; Yield one macrotask so browser can paint before startup fetch/subscription work.
+  (platform/set-timeout! f 0))
+
 (defn reify-address-handler
   [on-address-changed-fn handler-name]
   (reify address-watcher/IAddressChangeHandler

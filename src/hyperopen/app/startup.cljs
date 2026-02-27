@@ -24,6 +24,10 @@
   [f]
   (startup-runtime-lib/schedule-idle-or-timeout! runtime-state/deferred-bootstrap-delay-ms f))
 
+(defn schedule-post-render-startup!
+  [f]
+  (startup-runtime-lib/schedule-post-render-startup! f))
+
 (defn startup-base-deps
   [{:keys [runtime store api]}]
   (startup-collaborators/startup-base-deps
@@ -143,5 +147,6 @@
                                         (register-icon-service-worker! system))
        :initialize-remote-data-streams! (fn []
                                           (initialize-remote-data-streams! system))
+       :schedule-post-render-startup! schedule-post-render-startup!
        :kick-render! (fn [runtime-store]
                        (swap! runtime-store identity))}))))

@@ -65,7 +65,8 @@
            install-position-tpsl-clickaway!
            register-icon-service-worker!
            initialize-remote-data-streams!
-           kick-render!]}]
+           kick-render!
+           schedule-post-render-startup!]}]
   (set-on-connected-handler! handle-wallet-connected)
   ;; Initialize wallet system.
   (init-wallet! store)
@@ -74,18 +75,24 @@
   ;; Re-apply vault snapshot range after router init for deep-link refreshes.
   (when (fn? restore-vaults-snapshot-range!)
     (restore-vaults-snapshot-range! store))
-  ;; Install global keyboard shortcuts that should work regardless of focus target.
-  (when (fn? install-asset-selector-shortcuts!)
-    (install-asset-selector-shortcuts!))
-  ;; Install position overlay click-away behavior (TP/SL + Reduce) without blocking pointer interaction.
-  (when (fn? install-position-tpsl-clickaway!)
-    (install-position-tpsl-clickaway!))
-  ;; Register icon cache service worker for cross-reload symbol icon caching.
-  (register-icon-service-worker!)
-  ;; Initialize remote data streams.
-  (initialize-remote-data-streams!)
   ;; Trigger initial render by updating the store.
-  (kick-render! store))
+  (kick-render! store)
+  (let [post-render-startup!
+        (fn []
+          ;; Install global keyboard shortcuts that should work regardless of focus target.
+          (when (fn? install-asset-selector-shortcuts!)
+            (install-asset-selector-shortcuts!))
+          ;; Install position overlay click-away behavior (TP/SL + Reduce) without blocking pointer interaction.
+          (when (fn? install-position-tpsl-clickaway!)
+            (install-position-tpsl-clickaway!))
+          ;; Register icon cache service worker for cross-reload symbol icon caching.
+          (register-icon-service-worker!)
+          ;; Initialize remote data streams.
+          (initialize-remote-data-streams!))]
+    ;; Ensure first render is enqueued before expensive subscriptions/fetch startup work.
+    (if (fn? schedule-post-render-startup!)
+      (schedule-post-render-startup! post-render-startup!)
+      (post-render-startup!))))
 
 (defn init!
   [{:keys [log-fn] :as deps}]
