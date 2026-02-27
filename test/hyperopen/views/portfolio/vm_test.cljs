@@ -1,5 +1,6 @@
 (ns hyperopen.views.portfolio.vm-test
-  (:require [cljs.test :refer-macros [deftest is testing use-fixtures]]
+  (:require [clojure.string :as str]
+            [cljs.test :refer-macros [deftest is testing use-fixtures]]
             [hyperopen.portfolio.actions :as portfolio-actions]
             [hyperopen.views.account-equity-view :as account-equity-view]
             [hyperopen.portfolio.metrics :as portfolio-metrics]
@@ -426,6 +427,53 @@
       (is (= ["BTC" "SPY"]
              (mapv :value (:candidates benchmark-selector))))))
 
+(deftest portfolio-vm-includes-vault-benchmark-options-sorted-by-tvl-test
+  (with-redefs [account-equity-view/account-equity-metrics (fn [_]
+                                                              {:spot-equity 10
+                                                               :perps-value 10
+                                                               :cross-account-value 10
+                                                               :unrealized-pnl 0})]
+    (let [high-address "0x2222222222222222222222222222222222222222"
+          low-address "0x1111111111111111111111111111111111111111"
+          state {:account {:mode :classic}
+                 :portfolio-ui {:summary-scope :all
+                                :summary-time-range :month
+                                :chart-tab :returns
+                                :returns-benchmark-search "vault"}
+                 :asset-selector {:markets [{:coin "BTC"
+                                             :symbol "BTC-USD"
+                                             :market-type :perp
+                                             :openInterest "900"
+                                             :cache-order 1}]}
+                 :vaults {:merged-index-rows [{:name "Low Vault"
+                                               :vault-address low-address
+                                               :relationship {:type :normal}
+                                               :tvl 10}
+                                              {:name "High Vault"
+                                               :vault-address high-address
+                                               :relationship {:type :normal}
+                                               :tvl 100}
+                                              {:name "Child Vault"
+                                               :vault-address "0x3333333333333333333333333333333333333333"
+                                               :relationship {:type :child}
+                                               :tvl 1000}]}
+                 :portfolio {:summary-by-key {:month {:pnlHistory [[1 0] [2 0]]
+                                                      :accountValueHistory [[1 100] [2 110]]
+                                                      :vlm 10}}}
+                 :webdata2 {:clearinghouseState {:marginSummary {:accountValue 10}}
+                           :totalVaultEquity 0}
+                 :borrow-lend {:total-supplied-usd 0}}
+          benchmark-selector (get-in (vm/portfolio-vm state) [:selectors :returns-benchmark])
+          vault-candidates (->> (:candidates benchmark-selector)
+                                (filter (fn [{:keys [value]}]
+                                          (str/starts-with? value "vault:")))
+                                vec)]
+      (is (= ["High Vault (VAULT)" "Low Vault (VAULT)"]
+             (mapv :label vault-candidates)))
+      (is (= [(str "vault:" high-address)
+              (str "vault:" low-address)]
+             (mapv :value vault-candidates))))))
+
 (deftest portfolio-vm-memoizes-benchmark-selector-options-by-markets-identity-and-signature-test
   (with-redefs [account-equity-view/account-equity-metrics (fn [_]
                                                               {:spot-equity 10
@@ -515,6 +563,43 @@
              (mapv :value (:points benchmark-series))))
       (is (= "SPY (SPOT)"
              (:label benchmark-series))))))
+
+(deftest portfolio-vm-builds-vault-benchmark-series-and-performance-columns-test
+  (with-redefs [account-equity-view/account-equity-metrics (fn [_]
+                                                              {:spot-equity 10
+                                                               :perps-value 10
+                                                               :cross-account-value 10
+                                                               :unrealized-pnl 0})]
+    (let [vault-address "0x1234567890abcdef1234567890abcdef12345678"
+          vault-ref (str "vault:" vault-address)
+          state {:account {:mode :classic}
+                 :portfolio-ui {:summary-scope :all
+                                :summary-time-range :month
+                                :chart-tab :returns
+                                :returns-benchmark-coins [vault-ref]
+                                :returns-benchmark-coin vault-ref}
+                 :vaults {:merged-index-rows [{:name "Growi HF"
+                                               :vault-address vault-address
+                                               :relationship {:type :normal}
+                                               :tvl 200
+                                               :snapshot-by-key {:month [0.05 0.15]}}]}
+                 :portfolio {:summary-by-key {:month {:pnlHistory [[1 0] [2 0] [3 0]]
+                                                      :accountValueHistory [[1 100] [2 110] [3 120]]
+                                                      :vlm 10}}}
+                 :webdata2 {:clearinghouseState {:marginSummary {:accountValue 10}}
+                           :totalVaultEquity 0}
+                 :borrow-lend {:total-supplied-usd 0}}
+          view-model (vm/portfolio-vm state)
+          benchmark-series (->> (get-in view-model [:chart :series])
+                                (filter #(= :benchmark-0 (:id %)))
+                                first)]
+      (is (= "Growi HF (VAULT)" (:label benchmark-series)))
+      (is (= [5 15 15]
+             (mapv :value (:points benchmark-series))))
+      (is (= [vault-ref]
+             (get-in view-model [:performance-metrics :benchmark-coins])))
+      (is (= "Growi HF (VAULT)"
+             (get-in view-model [:performance-metrics :benchmark-label]))))))
 
 (deftest portfolio-vm-performance-metrics-include-all-selected-benchmarks-test
   (with-redefs [account-equity-view/account-equity-metrics (fn [_]

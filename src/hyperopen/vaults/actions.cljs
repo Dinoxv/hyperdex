@@ -292,6 +292,8 @@
   (let [{:keys [interval bars]} (portfolio-actions/returns-benchmark-candle-request
                                  (normalize-vault-snapshot-range snapshot-range))]
     (->> (portfolio-actions/normalize-portfolio-returns-benchmark-coins benchmark-coins)
+         (remove (fn [coin]
+                   (str/starts-with? (str/lower-case coin) "vault:")))
          (mapv (fn [coin]
                  [:effects/fetch-candle-snapshot
                   :coin coin

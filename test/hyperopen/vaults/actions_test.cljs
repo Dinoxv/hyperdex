@@ -70,7 +70,8 @@
          (actions/load-vault-detail
           {:wallet {:address "0xabcdefabcdefabcdefabcdefabcdefabcdefabcd"}
            :vaults-ui {:snapshot-range :month
-                       :detail-returns-benchmark-coins ["BTC"]
+                       :detail-returns-benchmark-coins ["BTC"
+                                                        "vault:0x1234567890abcdef1234567890abcdef12345678"]
                        :detail-returns-benchmark-coin "BTC"}}
           "0x1234567890ABCDEF1234567890ABCDEF12345678"))))
 
@@ -127,7 +128,9 @@
           [:effects/fetch-candle-snapshot :coin "BTC" :interval :15m :bars 800]
           [:effects/fetch-candle-snapshot :coin "ETH" :interval :15m :bars 800]]
          (actions/set-vaults-snapshot-range {:vaults-ui {:detail-chart-series :returns
-                                                         :detail-returns-benchmark-coins ["BTC" "ETH"]}
+                                                         :detail-returns-benchmark-coins ["BTC"
+                                                                                          "vault:0x1234567890abcdef1234567890abcdef12345678"
+                                                                                          "ETH"]}
                                              :router {:path "/vaults/0x1234567890abcdef1234567890abcdef12345678"}}
                                             :week)))
   (is (= [[:effects/save-many [[[:vaults-ui :sort] {:column :tvl
@@ -206,7 +209,8 @@
                                [[:vaults-ui :detail-chart-hover-index] nil]]]
           [:effects/fetch-candle-snapshot :coin "BTC" :interval :1h :bars 800]]
          (actions/set-vault-detail-chart-series {:vaults-ui {:snapshot-range :month
-                                                             :detail-returns-benchmark-coins ["BTC"]}}
+                                                             :detail-returns-benchmark-coins ["BTC"
+                                                                                              "vault:0x1234567890abcdef1234567890abcdef12345678"]}}
                                                 :returns)))
   (is (= [[:effects/save-many [[[:vaults-ui :detail-chart-series] :returns]
                                [[:vaults-ui :detail-chart-hover-index] nil]]]]
@@ -225,6 +229,15 @@
                                                                      :detail-returns-benchmark-coins []}
                                                          :router {:path "/vaults/0x1234567890abcdef1234567890abcdef12345678"}}
                                                         "ETH")))
+  (is (= [[:effects/save-many [[[:vaults-ui :detail-returns-benchmark-coins] ["vault:0x1234567890abcdef1234567890abcdef12345678"]]
+                               [[:vaults-ui :detail-returns-benchmark-coin] "vault:0x1234567890abcdef1234567890abcdef12345678"]
+                               [[:vaults-ui :detail-returns-benchmark-search] ""]
+                               [[:vaults-ui :detail-returns-benchmark-suggestions-open?] true]]]]
+         (actions/select-vault-detail-returns-benchmark {:vaults-ui {:snapshot-range :month
+                                                                     :detail-chart-series :returns
+                                                                     :detail-returns-benchmark-coins []}
+                                                         :router {:path "/vaults/0x1234567890abcdef1234567890abcdef12345678"}}
+                                                        "vault:0x1234567890abcdef1234567890abcdef12345678")))
   (is (= [[:effects/save-many [[[:vaults-ui :detail-returns-benchmark-coins] ["BTC"]]
                                [[:vaults-ui :detail-returns-benchmark-coin] "BTC"]]]]
          (actions/remove-vault-detail-returns-benchmark {:vaults-ui {:detail-returns-benchmark-coins ["BTC" "ETH"]}}

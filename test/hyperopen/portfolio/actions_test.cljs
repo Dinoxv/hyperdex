@@ -89,7 +89,10 @@
           [:effects/fetch-candle-snapshot :coin "BTC" :interval :15m :bars 800]
           [:effects/fetch-candle-snapshot :coin "ETH" :interval :15m :bars 800]]
          (actions/select-portfolio-summary-time-range
-          {:portfolio-ui {:returns-benchmark-coins ["BTC" "ETH" "BTC"]
+          {:portfolio-ui {:returns-benchmark-coins ["BTC"
+                                                    "vault:0x1234567890abcdef1234567890abcdef12345678"
+                                                    "ETH"
+                                                    "BTC"]
                           :returns-benchmark-coin "DOGE"}}
           :week)))
   (is (= [[:effects/save-many [[[:portfolio-ui :summary-time-range] :week]
@@ -135,7 +138,9 @@
           [:effects/fetch-candle-snapshot :coin "ETH" :interval :1h :bars 800]
           [:effects/fetch-candle-snapshot :coin "SPY" :interval :1h :bars 800]]
          (actions/select-portfolio-chart-tab
-          {:portfolio-ui {:returns-benchmark-coins ["ETH" "SPY"]
+          {:portfolio-ui {:returns-benchmark-coins ["ETH"
+                                                    "vault:0x1234567890abcdef1234567890abcdef12345678"
+                                                    "SPY"]
                           :summary-time-range :month}}
           :returns)))
   (is (= [[:effects/save-many
@@ -265,6 +270,15 @@
                           :returns-benchmark-coin "SPY"}}
           "SPY")))
   (is (= [[:effects/save-many
+           [[[:portfolio-ui :returns-benchmark-coins] ["vault:0x1234567890abcdef1234567890abcdef12345678"]]
+            [[:portfolio-ui :returns-benchmark-coin] "vault:0x1234567890abcdef1234567890abcdef12345678"]
+            [[:portfolio-ui :returns-benchmark-search] ""]
+            [[:portfolio-ui :returns-benchmark-suggestions-open?] true]]]]
+         (actions/select-portfolio-returns-benchmark
+          {:portfolio-ui {:summary-time-range :all-time
+                          :returns-benchmark-coins []}}
+          "vault:0x1234567890abcdef1234567890abcdef12345678")))
+  (is (= [[:effects/save-many
            [[[:portfolio-ui :returns-benchmark-coins] []]
             [[:portfolio-ui :returns-benchmark-coin] nil]
             [[:portfolio-ui :returns-benchmark-search] ""]
@@ -308,6 +322,15 @@
           {:portfolio-ui {:summary-time-range :week}}
           "Enter"
           "SPY")))
+  (is (= [[:effects/save-many
+           [[[:portfolio-ui :returns-benchmark-coins] ["vault:0x1234567890abcdef1234567890abcdef12345678"]]
+            [[:portfolio-ui :returns-benchmark-coin] "vault:0x1234567890abcdef1234567890abcdef12345678"]
+            [[:portfolio-ui :returns-benchmark-search] ""]
+            [[:portfolio-ui :returns-benchmark-suggestions-open?] true]]]]
+         (actions/handle-portfolio-returns-benchmark-search-keydown
+          {:portfolio-ui {:summary-time-range :week}}
+          "Enter"
+          "vault:0x1234567890abcdef1234567890abcdef12345678")))
   (is (= []
          (actions/handle-portfolio-returns-benchmark-search-keydown
           {:portfolio-ui {:summary-time-range :week}}

@@ -168,6 +168,17 @@
     value
     (str (or value ""))))
 
+(def ^:private vault-benchmark-prefix
+  "vault:")
+
+(defn- fetchable-benchmark-coin
+  [value]
+  (let [coin (normalize-portfolio-returns-benchmark-coin value)
+        coin-lower (some-> coin str/lower-case)]
+    (when (and (seq coin)
+               (not (str/starts-with? coin-lower vault-benchmark-prefix)))
+      coin)))
+
 (defn returns-benchmark-candle-request
   [summary-time-range]
   (case (normalize-summary-time-range summary-time-range)
@@ -194,6 +205,7 @@
   [summary-time-range benchmark-coins]
   (let [{:keys [interval bars]} (returns-benchmark-candle-request summary-time-range)]
     (->> (normalize-portfolio-returns-benchmark-coins benchmark-coins)
+         (keep fetchable-benchmark-coin)
          (mapv (fn [coin]
                  [:effects/fetch-candle-snapshot
                   :coin coin

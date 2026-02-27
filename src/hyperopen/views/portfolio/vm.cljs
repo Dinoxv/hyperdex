@@ -155,6 +155,36 @@
    (str/lower-case (or (some-> (:coin market) str str/trim) ""))
    (str/lower-case (or (some-> (:key market) str str/trim) ""))])
 
+(def ^:private vault-benchmark-prefix
+  "vault:")
+
+(defn- normalize-vault-address [value]
+  (some-> value str str/trim str/lower-case))
+
+(defn- vault-benchmark-value [vault-address]
+  (str vault-benchmark-prefix vault-address))
+
+(defn- vault-benchmark-address [benchmark]
+  (let [benchmark* (some-> benchmark str str/trim)
+        benchmark-lower (some-> benchmark* str/lower-case)]
+    (when (and (seq benchmark-lower)
+               (str/starts-with? benchmark-lower vault-benchmark-prefix))
+      (normalize-vault-address (subs benchmark* (count vault-benchmark-prefix))))))
+
+(defn- benchmark-vault-tvl [row]
+  (let [tvl (optional-number (:tvl row))]
+    (if (finite-number? tvl)
+      tvl
+      0)))
+
+(defn- benchmark-vault-name [row]
+  (some-> (:name row) str str/trim))
+
+(defn- benchmark-vault-option-rank [row]
+  [(- (benchmark-vault-tvl row))
+   (str/lower-case (or (benchmark-vault-name row) ""))
+   (str/lower-case (or (normalize-vault-address (:vault-address row)) ""))])
+
 (defonce ^:private benchmark-selector-options-cache
   (atom nil))
 
@@ -220,6 +250,37 @@
          :options
          vec)))
 
+(defn- benchmark-vault-row?
+  [row]
+  (and (map? row)
+       (seq (normalize-vault-address (:vault-address row)))
+       (not= :child (get-in row [:relationship :type]))))
+
+(defn- build-vault-benchmark-selector-options
+  [rows]
+  (let [ordered-rows (->> (or rows [])
+                          (filter benchmark-vault-row?)
+                          (sort-by benchmark-vault-option-rank))]
+    (->> ordered-rows
+         (reduce (fn [{:keys [seen options]} row]
+                   (if-let [vault-address (normalize-vault-address (:vault-address row))]
+                     (if (contains? seen vault-address)
+                       {:seen seen
+                        :options options}
+                       (let [name (or (benchmark-vault-name row)
+                                      vault-address)]
+                         {:seen (conj seen vault-address)
+                          :options (conj options
+                                         {:value (vault-benchmark-value vault-address)
+                                          :label (str name " (VAULT)")
+                                          :tvl (benchmark-vault-tvl row)})}))
+                     {:seen seen
+                      :options options}))
+                 {:seen #{}
+                  :options []})
+         :options
+         vec)))
+
 (def ^:dynamic *build-benchmark-selector-options*
   build-benchmark-selector-options)
 
@@ -250,8 +311,13 @@
   []
   (reset! benchmark-selector-options-cache nil))
 
-(defn- benchmark-selector-options [state]
-  (memoized-benchmark-selector-options (get-in state [:asset-selector :markets])))
+(defn- benchmark-selector-options
+  [state]
+  (let [market-options (memoized-benchmark-selector-options
+                        (get-in state [:asset-selector :markets]))
+        vault-options (build-vault-benchmark-selector-options
+                       (get-in state [:vaults :merged-index-rows]))]
+    (into (vec market-options) vault-options)))
 
 (defn- normalize-benchmark-search-query [value]
   (-> (or value "")
@@ -689,6 +755,101 @@
                  anchor-close*
                  output*))))))
 
+(defn- vault-benchmark-row-by-address
+  [state]
+  (->> (or (get-in state [:vaults :merged-index-rows]) [])
+       (reduce (fn [rows-by-address row]
+                 (if-let [vault-address (normalize-vault-address (:vault-address row))]
+                   (assoc rows-by-address vault-address row)
+                   rows-by-address))
+               {})))
+
+(defn- vault-snapshot-range-keys
+  [summary-time-range]
+  (case (portfolio-actions/normalize-summary-time-range summary-time-range)
+    :day [:day :week :month :all-time]
+    :week [:week :month :all-time :day]
+    :month [:month :week :all-time :day]
+    :three-month [:all-time :month :week :day]
+    :six-month [:all-time :month :week :day]
+    :one-year [:all-time :month :week :day]
+    :two-year [:all-time :month :week :day]
+    :all-time [:all-time :month :week :day]
+    [:month :week :all-time :day]))
+
+(defn- vault-snapshot-point-value
+  [entry]
+  (cond
+    (number? entry)
+    entry
+
+    (and (sequential? entry)
+         (>= (count entry) 2))
+    (optional-number (second entry))
+
+    (map? entry)
+    (or (optional-number (:value entry))
+        (optional-number (:pnl entry))
+        (optional-number (:account-value entry))
+        (optional-number (:accountValue entry)))
+
+    :else
+    nil))
+
+(defn- normalize-vault-snapshot-return
+  [raw tvl]
+  (cond
+    (not (finite-number? raw))
+    nil
+
+    (and (finite-number? tvl)
+         (pos? tvl)
+         (> (js/Math.abs raw) 1000))
+    (* 100 (/ raw tvl))
+
+    (<= (js/Math.abs raw) 1)
+    (* 100 raw)
+
+    :else
+    raw))
+
+(defn- vault-benchmark-snapshot-values
+  [row summary-time-range]
+  (let [snapshot-by-key (or (:snapshot-by-key row) {})
+        tvl (benchmark-vault-tvl row)]
+    (or (some (fn [snapshot-key]
+                (let [raw-values (get snapshot-by-key snapshot-key)]
+                  (when (sequential? raw-values)
+                    (let [normalized-values (->> raw-values
+                                                 (keep vault-snapshot-point-value)
+                                                 (keep #(normalize-vault-snapshot-return % tvl))
+                                                 vec)]
+                      (when (seq normalized-values)
+                        normalized-values)))))
+              (vault-snapshot-range-keys summary-time-range))
+        [])))
+
+(defn- aligned-vault-return-rows
+  [snapshot-values strategy-points]
+  (let [values (vec (or snapshot-values []))
+        value-count (count values)
+        strategy-time-points (mapv :time-ms strategy-points)
+        strategy-count (count strategy-time-points)]
+    (if (and (pos? value-count)
+             (pos? strategy-count))
+      (mapv (fn [idx time-ms]
+              (let [ratio (if (> strategy-count 1)
+                            (/ idx (dec strategy-count))
+                            0)
+                    value-idx (if (> value-count 1)
+                                (js/Math.round (* ratio (dec value-count)))
+                                0)
+                    value-idx* (max 0 (min (dec value-count) value-idx))]
+                [time-ms (nth values value-idx*)]))
+            (range strategy-count)
+            strategy-time-points)
+      [])))
+
 (defn- cumulative-return-time-points
   [rows]
   (->> (or rows [])
@@ -705,13 +866,21 @@
   [state summary-time-range benchmark-coins strategy-time-points]
   (if (and (seq benchmark-coins)
            (seq strategy-time-points))
-    (let [{:keys [interval]} (portfolio-actions/returns-benchmark-candle-request summary-time-range)]
+    (let [{:keys [interval]} (portfolio-actions/returns-benchmark-candle-request summary-time-range)
+          vault-rows-by-address (vault-benchmark-row-by-address state)]
       (reduce (fn [rows-by-coin coin]
                 (if (seq coin)
-                  (let [candles (benchmark-candle-points (get-in state [:candles coin interval]))]
-                    (assoc rows-by-coin
-                           coin
-                           (aligned-benchmark-return-rows candles strategy-time-points)))
+                  (if-let [vault-address (vault-benchmark-address coin)]
+                    (let [vault-row (get vault-rows-by-address vault-address)]
+                      (assoc rows-by-coin
+                             coin
+                             (aligned-vault-return-rows
+                              (vault-benchmark-snapshot-values vault-row summary-time-range)
+                              strategy-time-points)))
+                    (let [candles (benchmark-candle-points (get-in state [:candles coin interval]))]
+                      (assoc rows-by-coin
+                             coin
+                             (aligned-benchmark-return-rows candles strategy-time-points))))
                   rows-by-coin))
               {}
               benchmark-coins))

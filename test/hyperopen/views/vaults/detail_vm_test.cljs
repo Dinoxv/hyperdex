@@ -1,5 +1,6 @@
 (ns hyperopen.views.vaults.detail-vm-test
-  (:require [cljs.test :refer-macros [deftest is]]
+  (:require [clojure.string :as str]
+            [cljs.test :refer-macros [deftest is]]
             [hyperopen.views.vaults.detail-vm :as detail-vm]))
 
 (def sample-state
@@ -189,6 +190,62 @@
     (is (= ["BTC"] (get-in vm [:performance-metrics :benchmark-coins])))
     (is (= "BTC (HL PERP)" (get-in vm [:performance-metrics :benchmark-label])))
     (is (seq (get-in vm [:performance-metrics :groups])))))
+
+(deftest vault-detail-vm-includes-vault-benchmark-candidates-sorted-by-tvl-test
+  (let [state (-> sample-state
+                  (assoc-in [:vaults-ui :detail-returns-benchmark-search] "vault")
+                  (assoc-in [:vaults :merged-index-rows]
+                            [{:name "Low Vault"
+                              :vault-address "0x1111111111111111111111111111111111111111"
+                              :relationship {:type :normal}
+                              :tvl 10}
+                             {:name "High Vault"
+                              :vault-address "0x2222222222222222222222222222222222222222"
+                              :relationship {:type :normal}
+                              :tvl 200}
+                             {:name "Child Vault"
+                              :vault-address "0x3333333333333333333333333333333333333333"
+                              :relationship {:type :child}
+                              :tvl 1000}]))
+        vm (detail-vm/vault-detail-vm state)
+        candidates (->> (get-in vm [:chart :returns-benchmark :candidates])
+                        (filter (fn [{:keys [value]}]
+                                  (str/starts-with? value "vault:")))
+                        vec)]
+    (is (= ["High Vault (VAULT)" "Low Vault (VAULT)"]
+           (mapv :label candidates)))
+    (is (= ["vault:0x2222222222222222222222222222222222222222"
+            "vault:0x1111111111111111111111111111111111111111"]
+           (mapv :value candidates)))))
+
+(deftest vault-detail-vm-builds-vault-benchmark-series-and-performance-columns-test
+  (let [peer-address "0xaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+        peer-ref (str "vault:" peer-address)
+        state (-> sample-state
+                  (assoc-in [:vaults-ui :detail-chart-series] :returns)
+                  (assoc-in [:vaults-ui :detail-returns-benchmark-coins] [peer-ref])
+                  (assoc-in [:vaults-ui :detail-returns-benchmark-coin] peer-ref)
+                  (assoc-in [:vaults :merged-index-rows]
+                            [{:name "Vault Detail"
+                              :vault-address "0x1234567890abcdef1234567890abcdef12345678"
+                              :leader "0xabcdefabcdefabcdefabcdefabcdefabcdefabcd"
+                              :tvl 200
+                              :apr 0.2
+                              :snapshot-by-key {:month [0.1 0.2]}}
+                             {:name "Peer Vault"
+                              :vault-address peer-address
+                              :relationship {:type :normal}
+                              :tvl 180
+                              :snapshot-by-key {:month [0.02 0.08 0.12]}}]))
+        vm (detail-vm/vault-detail-vm state)
+        benchmark-series (second (get-in vm [:chart :series]))]
+    (is (= "Peer Vault (VAULT)" (:label benchmark-series)))
+    (is (= [2 8 12]
+           (mapv :value (:points benchmark-series))))
+    (is (= [peer-ref]
+           (get-in vm [:performance-metrics :benchmark-coins])))
+    (is (= "Peer Vault (VAULT)"
+           (get-in vm [:performance-metrics :benchmark-label])))))
 
 (deftest vault-detail-vm-derives-one-year-window-from-all-time-when-range-slice-missing-test
   (let [vault-address "0x1234567890abcdef1234567890abcdef12345678"
