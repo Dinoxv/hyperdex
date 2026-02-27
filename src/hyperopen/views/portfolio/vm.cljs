@@ -865,15 +865,6 @@
                  anchor-close*
                  output*))))))
 
-(defn- benchmark-returns-points [state summary-time-range benchmark-coin strategy-points]
-  (if (and (seq benchmark-coin)
-           (seq strategy-points))
-    (let [{:keys [interval]} (portfolio-actions/returns-benchmark-candle-request summary-time-range)
-          candles (benchmark-candle-points (get-in state [:candles benchmark-coin interval]))
-          aligned-returns (aligned-benchmark-return-rows candles strategy-points)]
-      (rows->chart-points aligned-returns :returns))
-    []))
-
 (defn- cumulative-return-time-points
   [rows]
   (->> (or rows [])
@@ -886,22 +877,40 @@
                     :value value}))))
        vec))
 
-(defn- benchmark-cumulative-return-rows
-  [state summary-time-range benchmark-coin strategy-time-points]
-  (if (and (seq benchmark-coin)
+(defn- benchmark-cumulative-return-rows-by-coin
+  [state summary-time-range benchmark-coins strategy-time-points]
+  (if (and (seq benchmark-coins)
            (seq strategy-time-points))
-    (let [{:keys [interval]} (portfolio-actions/returns-benchmark-candle-request summary-time-range)
-          candles (benchmark-candle-points (get-in state [:candles benchmark-coin interval]))]
-      (aligned-benchmark-return-rows candles strategy-time-points))
-    []))
+    (let [{:keys [interval]} (portfolio-actions/returns-benchmark-candle-request summary-time-range)]
+      (reduce (fn [rows-by-coin coin]
+                (if (seq coin)
+                  (let [candles (benchmark-candle-points (get-in state [:candles coin interval]))]
+                    (assoc rows-by-coin
+                           coin
+                           (aligned-benchmark-return-rows candles strategy-time-points)))
+                  rows-by-coin))
+              {}
+              benchmark-coins))
+    {}))
+
+(defn- benchmark-computation-context
+  [state summary-entry summary-scope summary-time-range returns-benchmark-selector]
+  (let [strategy-cumulative-rows (portfolio-metrics/returns-history-rows state
+                                                                          summary-entry
+                                                                          summary-scope)
+        strategy-time-points (cumulative-return-time-points strategy-cumulative-rows)
+        selected-benchmark-coins (vec (or (:selected-coins returns-benchmark-selector)
+                                          []))
+        benchmark-cumulative-rows-by-coin (benchmark-cumulative-return-rows-by-coin state
+                                                                                     summary-time-range
+                                                                                     selected-benchmark-coins
+                                                                                     strategy-time-points)]
+    {:strategy-cumulative-rows strategy-cumulative-rows
+     :benchmark-cumulative-rows-by-coin benchmark-cumulative-rows-by-coin}))
 
 (defn- benchmark-performance-column
-  [state summary-time-range strategy-time-points label-by-coin coin]
-  (let [benchmark-cumulative-rows (benchmark-cumulative-return-rows state
-                                                                    summary-time-range
-                                                                    coin
-                                                                    strategy-time-points)
-        benchmark-daily-rows (portfolio-metrics/daily-compounded-returns benchmark-cumulative-rows)
+  [benchmark-cumulative-rows label-by-coin coin]
+  (let [benchmark-daily-rows (portfolio-metrics/daily-compounded-returns benchmark-cumulative-rows)
         values (if (seq benchmark-daily-rows)
                  (portfolio-metrics/compute-performance-metrics {:strategy-daily-rows benchmark-daily-rows
                                                                  :rf 0
@@ -936,20 +945,19 @@
           (or groups []))))
 
 (defn- performance-metrics-model
-  [state summary-entry summary-scope summary-time-range returns-benchmark-selector]
-  (let [strategy-cumulative-rows (portfolio-metrics/returns-history-rows state
-                                                                          summary-entry
-                                                                          summary-scope)
-        strategy-time-points (cumulative-return-time-points strategy-cumulative-rows)
+  [returns-benchmark-selector benchmark-context]
+  (let [strategy-cumulative-rows (or (:strategy-cumulative-rows benchmark-context)
+                                     [])
+        benchmark-cumulative-rows-by-coin (or (:benchmark-cumulative-rows-by-coin benchmark-context)
+                                              {})
         strategy-daily-rows (portfolio-metrics/daily-compounded-returns strategy-cumulative-rows)
         selected-benchmark-coins (vec (or (:selected-coins returns-benchmark-selector)
                                           []))
         benchmark-label-by-coin (or (:label-by-coin returns-benchmark-selector)
                                     {})
         benchmark-columns (mapv (fn [coin]
-                                  (benchmark-performance-column state
-                                                                summary-time-range
-                                                                strategy-time-points
+                                  (benchmark-performance-column (or (get benchmark-cumulative-rows-by-coin coin)
+                                                                    [])
                                                                 benchmark-label-by-coin
                                                                 coin))
                                 selected-benchmark-coins)
@@ -1087,12 +1095,18 @@
       strategy-series-stroke)))
 
 (defn- build-chart-model
-  [state summary-entry summary-scope summary-time-range returns-benchmark-selector]
+  [state summary-entry summary-scope returns-benchmark-selector benchmark-context]
   (let [selected-tab (portfolio-actions/normalize-portfolio-chart-tab
                       (get-in state [:portfolio-ui :chart-tab]
                               portfolio-actions/default-chart-tab))
         axis-kind (chart-axis-kind selected-tab)
-        strategy-points (chart-data-points state summary-entry selected-tab summary-scope)
+        strategy-cumulative-rows (or (:strategy-cumulative-rows benchmark-context)
+                                     [])
+        benchmark-cumulative-rows-by-coin (or (:benchmark-cumulative-rows-by-coin benchmark-context)
+                                              {})
+        strategy-points (if (= selected-tab :returns)
+                          (rows->chart-points strategy-cumulative-rows :returns)
+                          (chart-data-points state summary-entry selected-tab summary-scope))
         selected-benchmark-coins (if (= selected-tab :returns)
                                    (vec (:selected-coins returns-benchmark-selector))
                                    [])
@@ -1105,10 +1119,9 @@
                                       :coin coin
                                       :label label
                                       :stroke (benchmark-series-stroke idx)
-                                      :raw-points (benchmark-returns-points state
-                                                                            summary-time-range
-                                                                            coin
-                                                                            strategy-points)}))
+                                      :raw-points (rows->chart-points (or (get benchmark-cumulative-rows-by-coin coin)
+                                                                          [])
+                                                                      :returns)}))
                                  (range)
                                  selected-benchmark-coins)
                            [])
@@ -1332,16 +1345,18 @@
         fees (or (fees-from-user-fees (get-in state [:portfolio :user-fees]))
                  fees-default)
         returns-benchmark-selector (returns-benchmark-selector-model state)
-        performance-metrics (performance-metrics-model state
-                                                       summary-entry
-                                                       summary-scope
-                                                       summary-time-range
-                                                       returns-benchmark-selector)
+        benchmark-context (benchmark-computation-context state
+                                                         summary-entry
+                                                         summary-scope
+                                                         summary-time-range
+                                                         returns-benchmark-selector)
+        performance-metrics (performance-metrics-model returns-benchmark-selector
+                                                       benchmark-context)
         chart (build-chart-model state
                                  summary-entry
                                  summary-scope
-                                 summary-time-range
-                                 returns-benchmark-selector)]
+                                 returns-benchmark-selector
+                                 benchmark-context)]
     {:volume-14d-usd volume-14d
      :fees fees
      :performance-metrics performance-metrics
