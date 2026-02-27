@@ -129,6 +129,27 @@
     (str (subs value 0 8) "..." (subs value (- (count value) 6)))
     (or value "—")))
 
+(defn- normalized-text
+  [value]
+  (some-> value str str/trim str/lower-case))
+
+(defn- resolved-vault-name
+  [name-value vault-address]
+  (let [name* (some-> name-value str str/trim)]
+    (when (and (seq name*)
+               (not= (normalized-text name*)
+                     (normalized-text vault-address)))
+      name*)))
+
+(defn- loading-skeleton-block
+  [extra-classes]
+  [:span {:aria-hidden true
+          :class (into ["block"
+                        "rounded"
+                        "bg-[#1a363b]/80"
+                        "animate-pulse"]
+                       extra-classes)}])
+
 (defn- metric-value-size-classes
   [value]
   (let [value-length (count (str (or value "")))]
@@ -838,7 +859,12 @@
                 selected-tab
                 metrics
                 chart] :as vm} (detail-vm/vault-detail-vm state)
-        vault-name (:name vm)
+        resolved-name (resolved-vault-name (:name vm) vault-address)
+        show-name-skeleton? (and loading?
+                                 (nil? resolved-name))
+        vault-name (or resolved-name
+                       (wallet/short-addr vault-address)
+                       "Vault")
         month-return (:past-month-return metrics)
         month-return-accent (cond
                               (and (number? month-return) (pos? month-return)) :positive
@@ -873,7 +899,14 @@
                       :on {:click [[:actions/navigate "/vaults"]]}}
              "Vaults"]
             [:span ">"]
-            [:span {:class ["truncate"]} vault-name]]
+            [:span {:class ["truncate"]}
+             (if show-name-skeleton?
+               [:span {:class ["inline-flex" "items-center"]
+                       :data-role "vault-detail-breadcrumb-skeleton"}
+                (loading-skeleton-block ["h-3"
+                                         "w-24"
+                                         "sm:w-28"])]
+               vault-name)]]
            [:h1 {:class ["text-[34px]"
                          "leading-[1.02]"
                          "font-semibold"
@@ -882,7 +915,15 @@
                          "sm:text-[44px]"
                          "xl:text-[56px]"
                          "break-words"]}
-            vault-name]
+            (if show-name-skeleton?
+              [:span {:class ["inline-block" "align-baseline" "max-w-[18ch]"]
+                      :data-role "vault-detail-title-skeleton"}
+               (loading-skeleton-block ["h-[0.96em]"
+                                        "w-[10ch]"
+                                        "sm:w-[11ch]"])
+               [:span {:class ["sr-only"]}
+                "Loading vault name"]]
+              vault-name)]
            [:div {:class ["mt-1.5" "num" "text-sm" "text-[#89a1a8]"]}
             (or (wallet/short-addr vault-address) vault-address)]
            (relationship-links {:relationship relationship})]

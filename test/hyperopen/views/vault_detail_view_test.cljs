@@ -140,6 +140,25 @@
     (is (contains? text "Open Orders (1)"))
     (is (contains? text "Funding History (1)"))))
 
+(deftest vault-detail-view-shows-name-skeleton-while-detail-name-is-unresolved-test
+  (let [vault-address "0x1234567890abcdef1234567890abcdef12345678"
+        state (-> sample-state
+                  (assoc-in [:vaults-ui :detail-loading?] true)
+                  (assoc-in [:vaults :details-by-address vault-address :name] nil)
+                  (assoc-in [:vaults :merged-index-rows 0 :name] nil))
+        view (vault-detail-view/vault-detail-view state)
+        text (set (collect-strings view))
+        breadcrumb-skeleton (find-first-node view
+                                             #(= "vault-detail-breadcrumb-skeleton"
+                                                 (get-in % [1 :data-role])))
+        title-skeleton (find-first-node view
+                                        #(= "vault-detail-title-skeleton"
+                                            (get-in % [1 :data-role])))]
+    (is (some? breadcrumb-skeleton))
+    (is (some? title-skeleton))
+    (is (contains? text "Loading vault name"))
+    (is (not (contains? text vault-address)))))
+
 (deftest vault-detail-view-shows-invalid-message-when-route-address-is-invalid-test
   (let [view (vault-detail-view/vault-detail-view (assoc-in sample-state [:router :path] "/vaults/not-an-address"))
         text (set (collect-strings view))]
