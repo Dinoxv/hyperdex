@@ -202,12 +202,23 @@
                                              (get-in % [1 :on :input])))
         metrics-state (assoc-in sample-state [:vaults-ui :detail-activity-tab] :performance-metrics)
         metrics-view (vault-detail-view/vault-detail-view metrics-state)
+        time-in-market-row (find-first-node metrics-view
+                                            #(= "vault-detail-performance-metric-time-in-market"
+                                                (get-in % [1 :data-role])))
+        sharpe-row (find-first-node metrics-view
+                                    #(= "vault-detail-performance-metric-sharpe"
+                                        (get-in % [1 :data-role])))
+        max-drawdown-row (find-first-node metrics-view
+                                          #(= "vault-detail-performance-metric-max-drawdown"
+                                              (get-in % [1 :data-role])))
         text (set (collect-strings metrics-view))]
     (is (some? benchmark-selector))
     (is (some? benchmark-chip-rail))
     (is (some? benchmark-input))
-    (is (contains? text "Sharpe"))
-    (is (contains? text "Max Drawdown"))))
+    (is (contains? text "Time in Market"))
+    (is (some? time-in-market-row))
+    (is (nil? sharpe-row))
+    (is (nil? max-drawdown-row))))
 
 (deftest vault-detail-view-shows-invalid-message-when-route-address-is-invalid-test
   (let [view (vault-detail-view/vault-detail-view (assoc-in sample-state [:router :path] "/vaults/not-an-address"))

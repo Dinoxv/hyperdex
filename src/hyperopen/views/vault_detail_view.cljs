@@ -534,6 +534,20 @@
       (get values coin)
       (:benchmark-value row))))
 
+(defn- metric-value-present?
+  [kind value]
+  (not= "--" (format-metric-value kind value)))
+
+(defn- performance-metric-row-visible?
+  [{:keys [kind value] :as row} benchmark-columns]
+  (let [portfolio-value (if (contains? row :portfolio-value)
+                          (:portfolio-value row)
+                          value)]
+    (or (metric-value-present? kind portfolio-value)
+        (some (fn [{:keys [coin]}]
+                (metric-value-present? kind (benchmark-row-value row coin)))
+              benchmark-columns))))
+
 (defn- performance-metrics-grid-style
   [benchmark-column-count]
   {:grid-template-columns (str/join " "
@@ -573,7 +587,15 @@
                                                                :benchmark-selected? benchmark-selected?
                                                                :benchmark-label benchmark-label
                                                                :benchmark-coin benchmark-coin})
-        grid-style (performance-metrics-grid-style (count benchmark-columns*))]
+        grid-style (performance-metrics-grid-style (count benchmark-columns*))
+        visible-groups (->> (or groups [])
+                            (keep (fn [{:keys [rows] :as group}]
+                                    (let [rows* (->> (or rows [])
+                                                     (filter #(performance-metric-row-visible? % benchmark-columns*))
+                                                     vec)]
+                                      (when (seq rows*)
+                                        (assoc group :rows rows*)))))
+                            vec)]
     [:div {:class ["flex" "h-full" "min-h-0" "flex-col"]}
      [:div {:class ["grid"
                     "items-center"
@@ -602,7 +624,7 @@
       [:span {:class ["justify-self-start" "text-xs" "font-medium" "uppercase" "tracking-wide" "text-left" "text-[#8aa0a7]"]}
        "Vault"]]
      [:div {:class ["flex-1" "min-h-0" "space-y-2.5" "overflow-y-auto" "scrollbar-hide" "px-4" "py-3"]}
-      (for [[idx {:keys [id rows]}] (map-indexed vector (or groups []))]
+      (for [[idx {:keys [id rows]}] (map-indexed vector visible-groups)]
         ^{:key (str "vault-detail-performance-metrics-group-" (name id))}
         [:div {:class (into ["space-y-1.5"]
                             (when (pos? idx)
