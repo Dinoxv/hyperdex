@@ -208,7 +208,9 @@
      [:actions/prev-vaults-user-page :prev-vaults-user-page]
      [:actions/set-vault-detail-tab :set-vault-detail-tab]
      [:actions/set-vault-detail-activity-tab :set-vault-detail-activity-tab]
-     [:actions/set-vault-detail-chart-series :set-vault-detail-chart-series]])))
+     [:actions/set-vault-detail-chart-series :set-vault-detail-chart-series]
+     [:actions/set-vault-detail-chart-hover :set-vault-detail-chart-hover]
+     [:actions/clear-vault-detail-chart-hover :clear-vault-detail-chart-hover]])))
 
 (defn registered-action-ids
   []

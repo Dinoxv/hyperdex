@@ -28,6 +28,7 @@
          (actions/load-vaults
           {:wallet {:address "0x1234567890abcdef1234567890abcdef12345678"}})))
   (is (= [[:effects/save [:vaults-ui :detail-loading?] true]
+          [:effects/save [:vaults-ui :detail-chart-hover-index] nil]
           [:effects/api-fetch-vault-details "0x1234567890abcdef1234567890abcdef12345678" "0xabcdefabcdefabcdefabcdefabcdefabcdefabcd"]
           [:effects/api-fetch-vault-webdata2 "0x1234567890abcdef1234567890abcdef12345678"]
           [:effects/api-fetch-vault-fills "0x1234567890abcdef1234567890abcdef12345678"]
@@ -41,6 +42,7 @@
          (actions/load-vault-detail {} "not-a-vault")))
   (is (= [[:effects/save [:vaults-ui :list-loading?] true]
           [:effects/save [:vaults-ui :detail-loading?] true]
+          [:effects/save [:vaults-ui :detail-chart-hover-index] nil]
           [:effects/api-fetch-vault-index]
           [:effects/api-fetch-vault-summaries]
           [:effects/api-fetch-user-vault-equities "0xabcdefabcdefabcdefabcdefabcdefabcdefabcd"]
@@ -63,6 +65,7 @@
                                                                              "0x1234567890abcdef1234567890abcdef12345678"
                                                                              "not-an-address"]}}]}}]
     (is (= [[:effects/save [:vaults-ui :detail-loading?] true]
+            [:effects/save [:vaults-ui :detail-chart-hover-index] nil]
             [:effects/api-fetch-vault-details "0x1234567890abcdef1234567890abcdef12345678" "0xabcdefabcdefabcdefabcdefabcdefabcdefabcd"]
             [:effects/api-fetch-vault-webdata2 "0x1234567890abcdef1234567890abcdef12345678"]
             [:effects/api-fetch-vault-fills "0x1234567890abcdef1234567890abcdef12345678"]
@@ -90,7 +93,8 @@
   (is (= []
          (actions/toggle-vaults-filter {:vaults-ui {:filter-leading? true}} :unknown)))
   (is (= [[:effects/save-many [[[:vaults-ui :snapshot-range] :all-time]
-                               [[:vaults-ui :user-vaults-page] 1]]]]
+                               [[:vaults-ui :user-vaults-page] 1]
+                               [[:vaults-ui :detail-chart-hover-index] nil]]]]
          (actions/set-vaults-snapshot-range {} "allTime")))
   (is (= [[:effects/save-many [[[:vaults-ui :sort] {:column :tvl
                                                     :direction :asc}]
@@ -129,7 +133,9 @@
          (actions/set-vault-detail-activity-tab {} "openOrders")))
   (is (= [[:effects/save [:vaults-ui :detail-activity-tab] :positions]]
          (actions/set-vault-detail-activity-tab {} "unknown-tab")))
-  (is (= [[:effects/save [:vaults-ui :detail-chart-series] :account-value]]
+  (is (= [[:effects/save-many [[[:vaults-ui :detail-chart-series] :account-value]
+                               [[:vaults-ui :detail-chart-hover-index] nil]]]]
          (actions/set-vault-detail-chart-series {} "accountValue")))
-  (is (= [[:effects/save [:vaults-ui :detail-chart-series] :pnl]]
+  (is (= [[:effects/save-many [[[:vaults-ui :detail-chart-series] :pnl]
+                               [[:vaults-ui :detail-chart-hover-index] nil]]]]
          (actions/set-vault-detail-chart-series {} "unknown-series"))))

@@ -212,6 +212,10 @@
   (s/tuple (s/nilable ::numberish)
            (s/nilable ::position-tpsl-anchor)
            ::intish))
+(s/def ::vault-chart-hover-args
+  (s/tuple (s/nilable ::numberish)
+           (s/nilable ::position-tpsl-anchor)
+           ::intish))
 (s/def ::position-tpsl-open-args
   (s/or :position-only (s/tuple map?)
         :position-and-anchor (s/tuple map? any?)))
@@ -402,6 +406,8 @@
    :actions/set-vault-detail-tab ::keyword-or-string-args
    :actions/set-vault-detail-activity-tab ::keyword-or-string-args
    :actions/set-vault-detail-chart-series ::keyword-or-string-args
+   :actions/set-vault-detail-chart-hover ::vault-chart-hover-args
+   :actions/clear-vault-detail-chart-hover ::no-args
    :actions/navigate (s/or :path (s/tuple ::non-empty-string)
                            :path-and-opts (s/tuple ::non-empty-string map?))})
 

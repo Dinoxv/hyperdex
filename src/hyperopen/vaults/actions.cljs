@@ -54,6 +54,9 @@
   #{:effects/save
     :effects/save-many})
 
+(def ^:private vault-detail-chart-hover-index-path
+  [:vaults-ui :detail-chart-hover-index])
+
 (def vault-user-page-size-options
   [5 10 25 50])
 
@@ -226,6 +229,58 @@
        (min candidate max-page*)
        candidate))))
 
+(defn- finite-number
+  [value]
+  (let [n (cond
+            (number? value) value
+            (string? value) (js/Number value)
+            :else js/NaN)]
+    (when (and (number? n)
+               (js/isFinite n))
+      n)))
+
+(defn- positive-point-count
+  [value]
+  (when-let [n (finite-number value)]
+    (let [count* (js/Math.floor n)]
+      (when (pos? count*)
+        count*))))
+
+(defn- clamp
+  [value min-value max-value]
+  (cond
+    (< value min-value) min-value
+    (> value max-value) max-value
+    :else value))
+
+(defn- hover-index-from-pointer
+  [client-x bounds point-count]
+  (let [point-count* (positive-point-count point-count)]
+    (when point-count*
+      (if (= point-count* 1)
+        0
+        (let [client-x* (finite-number client-x)
+              left (finite-number (:left bounds))
+              width (finite-number (:width bounds))]
+          (when (and (number? client-x*)
+                     (number? left)
+                     (number? width)
+                     (pos? width))
+            (let [x-ratio (clamp (/ (- client-x* left) width) 0 1)
+                  max-index (dec point-count*)
+                  nearest-index (js/Math.round (* x-ratio max-index))]
+              (clamp nearest-index 0 max-index))))))))
+
+(defn- normalize-hover-index
+  [value point-count]
+  (let [point-count* (positive-point-count point-count)
+        idx (finite-number value)]
+    (when (and point-count*
+               (number? idx))
+      (let [max-index (dec point-count*)
+            idx* (js/Math.floor idx)]
+        (clamp idx* 0 max-index)))))
+
 (defn- vault-wallet-address
   [state]
   (normalize-vault-address (get-in state [:wallet :address])))
@@ -287,6 +342,7 @@
   [state vault-address]
   (if-let [vault-address* (normalize-vault-address vault-address)]
     (into [[:effects/save [:vaults-ui :detail-loading?] true]
+           [:effects/save vault-detail-chart-hover-index-path nil]
            [:effects/api-fetch-vault-details vault-address* (vault-wallet-address state)]
            [:effects/api-fetch-vault-webdata2 vault-address*]
            [:effects/api-fetch-vault-fills vault-address*]
@@ -334,9 +390,10 @@
 
 (defn set-vaults-snapshot-range
   [_state snapshot-range]
-  (save-vault-ui-with-user-page-reset
-   [:vaults-ui :snapshot-range]
-   (normalize-vault-snapshot-range snapshot-range)))
+  (let [snapshot-range* (normalize-vault-snapshot-range snapshot-range)]
+    [[:effects/save-many [[[:vaults-ui :snapshot-range] snapshot-range*]
+                          [[:vaults-ui :user-vaults-page] default-vault-user-page]
+                          [vault-detail-chart-hover-index-path nil]]]]))
 
 (defn set-vaults-sort
   [state sort-column]
@@ -399,5 +456,24 @@
 
 (defn set-vault-detail-chart-series
   [_state series]
-  [[:effects/save [:vaults-ui :detail-chart-series]
-    (normalize-vault-detail-chart-series series)]])
+  [[:effects/save-many [[[:vaults-ui :detail-chart-series]
+                         (normalize-vault-detail-chart-series series)]
+                        [vault-detail-chart-hover-index-path nil]]]])
+
+(defn set-vault-detail-chart-hover
+  [state client-x bounds point-count]
+  (let [current-index (normalize-hover-index (get-in state vault-detail-chart-hover-index-path)
+                                             point-count)
+        pointer-index (hover-index-from-pointer client-x bounds point-count)
+        next-index (or pointer-index
+                       current-index
+                       (normalize-hover-index 0 point-count))]
+    (if (= current-index next-index)
+      []
+      [[:effects/save vault-detail-chart-hover-index-path next-index]])))
+
+(defn clear-vault-detail-chart-hover
+  [state]
+  (if (nil? (get-in state vault-detail-chart-hover-index-path))
+    []
+    [[:effects/save vault-detail-chart-hover-index-path nil]]))

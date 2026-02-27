@@ -137,6 +137,7 @@
    :detail-tab :about
    :detail-activity-tab :positions
    :detail-chart-series :pnl
+   :detail-chart-hover-index nil
    :list-loading? false
    :detail-loading? false})
 

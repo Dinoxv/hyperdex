@@ -185,7 +185,9 @@
    :prev-vaults-user-page vault-actions/prev-vaults-user-page
    :set-vault-detail-tab vault-actions/set-vault-detail-tab
    :set-vault-detail-activity-tab vault-actions/set-vault-detail-activity-tab
-   :set-vault-detail-chart-series vault-actions/set-vault-detail-chart-series})
+   :set-vault-detail-chart-series vault-actions/set-vault-detail-chart-series
+   :set-vault-detail-chart-hover vault-actions/set-vault-detail-chart-hover
+   :clear-vault-detail-chart-hover vault-actions/clear-vault-detail-chart-hover})
 
 (defn runtime-effect-deps
   [effect-overrides]

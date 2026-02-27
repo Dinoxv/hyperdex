@@ -54,6 +54,73 @@
   (or (fmt/format-local-date-time time-ms)
       "—"))
 
+(defn- format-chart-axis-value
+  [axis-kind value]
+  (let [n (if (number? value) value 0)
+        n* (if (== n -0) 0 n)]
+    (case axis-kind
+      :pnl (or (fmt/format-large-currency n*) "$0")
+      :account-value (or (fmt/format-large-currency n*) "$0")
+      (or (fmt/format-large-currency n*) "$0"))))
+
+(defn- format-chart-tooltip-value
+  [axis-kind value]
+  (let [n (if (number? value) value 0)
+        n* (if (== n -0) 0 n)]
+    (case axis-kind
+      :pnl (format-currency n* {:missing "$0.00"})
+      :account-value (format-currency n* {:missing "$0.00"})
+      (format-currency n* {:missing "$0.00"}))))
+
+(defn- clamp-number
+  [value min-value max-value]
+  (cond
+    (< value min-value) min-value
+    (> value max-value) max-value
+    :else value))
+
+(def ^:private axis-label-fallback-char-width-px
+  7.5)
+
+(def ^:private axis-label-horizontal-padding-px
+  30)
+
+(def ^:private axis-label-min-gutter-width-px
+  56)
+
+(def ^:private axis-label-measure-context
+  (delay
+    (when (and (exists? js/document)
+               (some? js/document))
+      (let [canvas (.createElement js/document "canvas")]
+        (.getContext canvas "2d")))))
+
+(defn- axis-label-width-px [text]
+  (let [context @axis-label-measure-context]
+    (if context
+      (do
+        ;; Match chart tick labels rendered at 12px for reliable gutter width.
+        (set! (.-font context) "12px \"Inter Variable\", system-ui, -apple-system, \"Segoe UI\", sans-serif")
+        (-> context
+            (.measureText text)
+            .-width))
+      (* axis-label-fallback-char-width-px (count text)))))
+
+(defn- y-axis-gutter-width [axis-kind y-ticks]
+  (let [widest-label-px (->> y-ticks
+                             (map (fn [{:keys [value]}]
+                                    (axis-label-width-px (format-chart-axis-value axis-kind value))))
+                             (reduce max 0))
+        gutter-width (+ widest-label-px axis-label-horizontal-padding-px)]
+    (js/Math.ceil (max axis-label-min-gutter-width-px gutter-width))))
+
+(defn- chart-tooltip-label
+  [summary-time-range axis-kind {:keys [time-ms value]}]
+  (let [time-label (if (= summary-time-range :day)
+                     (or (fmt/format-local-time-hh-mm-ss time-ms) "—")
+                     (or (fmt/format-local-date-time time-ms) "—"))]
+    (str time-label ": " (format-chart-tooltip-value axis-kind value))))
+
 (defn- short-hash
   [value]
   (if (and (string? value)
@@ -663,35 +730,120 @@
              (detail-tab-button tab selected-tab))]
           (render-tab-panel vm)]
 
-         [:section {:class ["rounded-2xl"
-                            "border"
-                            "border-[#1b393a]"
-                            "bg-[#071820]"
-                            "p-3"]}
-          [:div {:class ["flex" "items-center" "justify-between" "gap-2" "border-b" "border-[#1f3b3c]" "pb-2"]}
-           [:div {:class ["flex" "items-center" "gap-2"]}
-            (for [{:keys [value label]} (:series-tabs chart)]
-              ^{:key (str "chart-series-" (name value))}
-              (chart-series-button {:value value
-                                    :label label}
-                                   (:selected-series chart)))]
-           (chart-timeframe-menu {:timeframe-options (:timeframe-options chart)
-                                  :selected-timeframe (:selected-timeframe chart)})]
-          [:svg
-           {:class ["mt-3" "h-[260px]" "w-full"]
-            :viewBox (str "0 0 " (:width chart) " " (:height chart))
-            :preserveAspectRatio "none"}
-           [:line {:x1 0
-                   :x2 (:width chart)
-                   :y1 (:height chart)
-                   :y2 (:height chart)
-                   :stroke "rgba(140, 157, 165, 0.30)"
-                   :stroke-width 1}]
-           (when (seq (:path chart))
-             [:path {:d (:path chart)
-                     :fill "none"
-                     :stroke "#e7ecef"
-                     :stroke-width 2
-                     :vector-effect "non-scaling-stroke"}])]]]
+         (let [axis-kind (:axis-kind chart)
+               y-ticks (:y-ticks chart)
+               y-axis-width (y-axis-gutter-width axis-kind y-ticks)
+               plot-left (+ y-axis-width 10)
+               point-count (count (:points chart))
+               hovered-point (get-in chart [:hover :point])
+               hover-active? (boolean (get-in chart [:hover :active?]))
+               hover-line-left-pct (when hover-active?
+                                    (* 100 (:x-ratio hovered-point)))
+               hover-tooltip-top-pct (when hover-active?
+                                      (clamp-number (- (* 100 (:y-ratio hovered-point)) 8)
+                                                    8
+                                                    92))
+               hover-tooltip-right? (when hover-active?
+                                      (> hover-line-left-pct 74))
+               hover-label (when hover-active?
+                             (chart-tooltip-label (:selected-timeframe chart)
+                                                  axis-kind
+                                                  hovered-point))]
+           [:section {:class ["rounded-2xl"
+                              "border"
+                              "border-[#1b393a]"
+                              "bg-[#071820]"
+                              "p-3"]}
+            [:div {:class ["flex" "items-center" "justify-between" "gap-2" "border-b" "border-[#1f3b3c]" "pb-2"]}
+             [:div {:class ["flex" "items-center" "gap-2"]}
+              (for [{:keys [value label]} (:series-tabs chart)]
+                ^{:key (str "chart-series-" (name value))}
+                (chart-series-button {:value value
+                                      :label label}
+                                     (:selected-series chart)))]
+             (chart-timeframe-menu {:timeframe-options (:timeframe-options chart)
+                                    :selected-timeframe (:selected-timeframe chart)})]
+            [:div {:class ["relative" "mt-3" "h-[260px]"]}
+             [:div {:class ["absolute" "left-0" "top-0" "bottom-0"]
+                    :style {:width (str y-axis-width "px")}}
+              (for [{:keys [value y-ratio]} y-ticks]
+                ^{:key (str "vault-chart-tick-" y-ratio "-" value)}
+                [:span {:class ["absolute"
+                                "right-2"
+                                "-translate-y-1/2"
+                                "num"
+                                "text-right"
+                                "text-xs"
+                                "text-[#8aa0a7]"]
+                        :style {:top (str (* 100 y-ratio) "%")}}
+                 (format-chart-axis-value axis-kind value)])
+              [:div {:class ["absolute"
+                             "right-0"
+                             "top-0"
+                             "bottom-0"
+                             "border-l"
+                             "border-[#1f3b3c]"]}]
+              (for [{:keys [y-ratio]} y-ticks]
+                ^{:key (str "vault-chart-axis-tick-" y-ratio)}
+                [:div {:class ["absolute"
+                               "right-0"
+                               "w-1.5"
+                               "border-t"
+                               "border-[#1f3b3c]"]
+                       :style {:top (str (* 100 y-ratio) "%")}}])]
+             [:div {:class ["absolute" "right-2" "top-0" "bottom-0" "cursor-crosshair"]
+                    :style {:left (str plot-left "px")}
+                    :on {:mousemove [[:actions/set-vault-detail-chart-hover [:event/clientX] [:event.currentTarget/bounds] point-count]]
+                         :mouseenter [[:actions/set-vault-detail-chart-hover [:event/clientX] [:event.currentTarget/bounds] point-count]]
+                         :pointermove [[:actions/set-vault-detail-chart-hover [:event/clientX] [:event.currentTarget/bounds] point-count]]
+                         :pointerenter [[:actions/set-vault-detail-chart-hover [:event/clientX] [:event.currentTarget/bounds] point-count]]
+                         :mouseleave [[:actions/clear-vault-detail-chart-hover]]
+                         :pointerleave [[:actions/clear-vault-detail-chart-hover]]
+                         :mouseout [[:actions/clear-vault-detail-chart-hover]]}}
+              [:svg {:viewBox "0 0 100 100"
+                     :preserveAspectRatio "none"
+                     :class ["h-full" "w-full"]}
+               [:line {:x1 0
+                       :x2 100
+                       :y1 100
+                       :y2 100
+                       :stroke "rgba(140, 157, 165, 0.30)"
+                       :stroke-width 0.8
+                       :vector-effect "non-scaling-stroke"}]
+               (when (seq (:path chart))
+                 [:path {:d (:path chart)
+                         :fill "none"
+                         :stroke "#e7ecef"
+                         :stroke-width 0.85
+                         :vector-effect "non-scaling-stroke"}])]
+              (when hover-active?
+                [:div {:class ["absolute"
+                               "top-0"
+                               "bottom-0"
+                               "w-px"
+                               "-translate-x-1/2"
+                               "pointer-events-none"
+                               "bg-[#9fb3be]"
+                               "z-10"]
+                       :style {:left (str hover-line-left-pct "%")}}])
+              (when hover-active?
+                [:div {:class ["absolute"
+                               "pointer-events-none"
+                               "rounded-sm"
+                               "px-1.5"
+                               "py-0.5"
+                               "text-xs"
+                               "font-medium"
+                               "text-white"
+                               "shadow-sm"
+                               "z-20"]
+                       :style {:left (str hover-line-left-pct "%")
+                               :top (str hover-tooltip-top-pct "%")
+                               :transform (if hover-tooltip-right?
+                                            "translate(calc(-100% - 8px), -50%)"
+                                            "translate(8px, -50%)")
+                               :background-color "rgba(0, 0, 0, 0.85)"
+                               :white-space "nowrap"}}
+                 hover-label])]]])]
 
         (activity-panel vm)])]))
