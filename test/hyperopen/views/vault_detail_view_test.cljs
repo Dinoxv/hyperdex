@@ -1,5 +1,6 @@
 (ns hyperopen.views.vault-detail-view-test
-  (:require [cljs.test :refer-macros [deftest is]]
+  (:require [clojure.string :as str]
+            [cljs.test :refer-macros [deftest is]]
             [hyperopen.views.vault-detail-view :as vault-detail-view]))
 
 (defn- node-children [node]
@@ -154,3 +155,30 @@
         view (vault-detail-view/vault-detail-view state)
         text (set (collect-strings view))]
     (is (contains? text "Open Orders (100+)"))))
+
+(deftest vault-detail-view-activity-tab-style-parity-test
+  (let [view (vault-detail-view/vault-detail-view sample-state)
+        positions-tab-button (find-first-node view
+                                              #(= [[:actions/set-vault-detail-activity-tab :positions]]
+                                                  (get-in % [1 :on :click])))
+        classes (set (get-in positions-tab-button [1 :class]))]
+    (is (contains? classes "border-[#303030]"))
+    (is (contains? classes "text-[#f6fefd]"))
+    (is (not (contains? classes "bg-base-100/50")))))
+
+(deftest vault-detail-view-applies-semantic-row-accent-styles-test
+  (let [positions-view (vault-detail-view/vault-detail-view sample-state)
+        accent-cell (find-first-node positions-view
+                                     #(and (= :td (first %))
+                                           (string? (get-in % [1 :style :background]))
+                                           (str/includes? (get-in % [1 :style :background]) "linear-gradient(90deg,rgb(31,166,125)")))
+        order-history-state (assoc-in sample-state [:vaults-ui :detail-activity-tab] :order-history)
+        order-history-view (vault-detail-view/vault-detail-view order-history-state)
+        filled-status-cell (find-first-node order-history-view
+                                            #(and (= :td (first %))
+                                                  (some (fn [s]
+                                                          (= "filled" (str/lower-case s)))
+                                                        (collect-strings %))
+                                                  (some #{"text-[#1fa67d]"} (get-in % [1 :class]))))]
+    (is (some? accent-cell))
+    (is (some? filled-status-cell))))
