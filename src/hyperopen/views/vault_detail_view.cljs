@@ -95,13 +95,14 @@
   [:button {:type "button"
             :class (into ["whitespace-nowrap"
                           "border-b"
-                          "px-3"
-                          "py-2"
+                          "px-4"
+                          "py-2.5"
                           "text-sm"
+                          "font-medium"
                           "transition-colors"]
                          (if (= value selected-tab)
-                           ["border-[#66e3c5]" "text-trading-text"]
-                           ["border-transparent" "text-[#8da0a6]" "hover:text-trading-text"]))
+                           ["border-primary" "text-trading-text" "bg-base-100/50"]
+                           ["border-transparent" "text-trading-text-secondary" "hover:text-trading-text" "hover:bg-base-100/30"]))
             :on {:click [[:actions/set-vault-detail-activity-tab value]]}}
    (if-let [count-label (format-activity-count count)]
      (str label " (" count-label ")")
@@ -187,29 +188,29 @@
 
 (defn- table-header [labels]
   [:thead
-   [:tr {:class ["border-b" "border-[#203b3b]" "bg-[#0a1920]" "text-xs" "uppercase" "tracking-[0.08em]" "text-[#8ca0a8]"]}
+   [:tr {:class ["border-b" "border-base-300" "bg-base-200" "text-xs" "font-medium" "uppercase" "tracking-[0.08em]" "text-trading-text-secondary"]}
     (for [label labels]
       ^{:key (str "activity-header-" label)}
-      [:th {:class ["px-3" "py-2" "text-left"]} label])]])
+      [:th {:class ["px-4" "py-2.5" "text-left" "whitespace-nowrap"]} label])]])
 
 (defn- empty-table-row [col-span message]
   [:tr
    [:td {:col-span col-span
-         :class ["px-3" "py-5" "text-center" "text-sm" "text-[#8da0a6"]}
+         :class ["px-4" "py-8" "text-center" "text-sm" "text-trading-text-secondary"]}
     message]])
 
 (defn- balances-table [rows]
   [:div {:class ["overflow-x-auto"]}
-   [:table {:class ["w-full" "border-collapse"]}
+   [:table {:class ["w-full" "min-w-[540px]" "border-collapse"]}
     (table-header ["Coin" "Total" "Available"])
     [:tbody
      (if (seq rows)
        (for [{:keys [coin total available]} rows]
          ^{:key (str "balance-" coin "-" total)}
-         [:tr {:class ["border-b" "border-[#1e3638]" "text-sm" "text-trading-text"]}
-          [:td {:class ["px-3" "py-2"]} (or coin "—")]
-          [:td {:class ["px-3" "py-2" "num"]} (format-size total)]
-          [:td {:class ["px-3" "py-2" "num"]} (format-size available)]])
+         [:tr {:class ["border-b" "border-base-300/80" "text-sm" "text-trading-text" "hover:bg-base-200/40"]}
+          [:td {:class ["px-4" "py-3" "whitespace-nowrap"]} (or coin "—")]
+          [:td {:class ["px-4" "py-3" "num" "whitespace-nowrap"]} (format-size total)]
+          [:td {:class ["px-4" "py-3" "num" "whitespace-nowrap"]} (format-size available)]])
        (empty-table-row 3 "No balances available."))]]])
 
 (defn- position-pnl-class [pnl]
@@ -220,69 +221,69 @@
 
 (defn- positions-table [rows]
   [:div {:class ["overflow-x-auto"]}
-   [:table {:class ["w-full" "border-collapse"]}
+   [:table {:class ["w-full" "min-w-[1285px]" "border-collapse"]}
     (table-header ["Coin" "Size" "Position Value" "Entry Price" "Mark Price" "PNL (ROE %)" "Liq. Price" "Margin" "Funding"])
     [:tbody
      (if (seq rows)
        (for [{:keys [coin leverage size position-value entry-price mark-price pnl roe liq-price margin funding]} rows]
          ^{:key (str "position-" coin "-" size "-" entry-price)}
-         [:tr {:class ["border-b" "border-[#1e3638]" "text-sm" "text-trading-text"]}
-          [:td {:class ["px-3" "py-2"]}
+         [:tr {:class ["border-b" "border-base-300/80" "text-sm" "text-trading-text" "hover:bg-base-200/40"]}
+          [:td {:class ["px-4" "py-3" "whitespace-nowrap"]}
            (str (or coin "—")
                 (when (number? leverage)
                   (str "  " leverage "x")))]
-          [:td {:class ["px-3" "py-2" "num"]} (format-size size)]
-          [:td {:class ["px-3" "py-2" "num"]}
+          [:td {:class ["px-4" "py-3" "num" "whitespace-nowrap"]} (format-size size)]
+          [:td {:class ["px-4" "py-3" "num" "whitespace-nowrap"]}
            (if (number? position-value)
              (str (fmt/format-currency position-value) " USDC")
              "—")]
-          [:td {:class ["px-3" "py-2" "num"]} (format-price entry-price)]
-          [:td {:class ["px-3" "py-2" "num"]} (format-price mark-price)]
-          [:td {:class ["px-3" "py-2" "num" (position-pnl-class pnl)]}
+          [:td {:class ["px-4" "py-3" "num" "whitespace-nowrap"]} (format-price entry-price)]
+          [:td {:class ["px-4" "py-3" "num" "whitespace-nowrap"]} (format-price mark-price)]
+          [:td {:class ["px-4" "py-3" "num" "whitespace-nowrap" (position-pnl-class pnl)]}
            (if (number? pnl)
              (str (format-currency pnl {:missing "—"}) " (" (format-percent roe) ")")
              "—")]
-          [:td {:class ["px-3" "py-2" "num"]} (format-price liq-price)]
-          [:td {:class ["px-3" "py-2" "num"]}
+          [:td {:class ["px-4" "py-3" "num" "whitespace-nowrap"]} (format-price liq-price)]
+          [:td {:class ["px-4" "py-3" "num" "whitespace-nowrap"]}
            (if (number? margin)
              (str (format-currency margin) " (Cross)")
              "—")]
-          [:td {:class ["px-3" "py-2" "num" (position-pnl-class funding)]}
+          [:td {:class ["px-4" "py-3" "num" "whitespace-nowrap" (position-pnl-class funding)]}
            (format-currency funding)]])
        (empty-table-row 9 "No active positions."))]]])
 
 (defn- open-orders-table [rows]
   [:div {:class ["overflow-x-auto"]}
-   [:table {:class ["w-full" "border-collapse"]}
+   [:table {:class ["w-full" "min-w-[960px]" "border-collapse"]}
     (table-header ["Time" "Coin" "Side" "Size" "Price" "Trigger"])
     [:tbody
      (if (seq rows)
        (for [{:keys [time-ms coin side size price trigger-price]} rows]
          ^{:key (str "open-order-" time-ms "-" coin "-" size "-" price)}
-         [:tr {:class ["border-b" "border-[#1e3638]" "text-sm" "text-trading-text"]}
-          [:td {:class ["px-3" "py-2" "num"]} (or (fmt/format-local-time-hh-mm-ss time-ms) "—")]
-          [:td {:class ["px-3" "py-2"]} (or coin "—")]
-          [:td {:class ["px-3" "py-2"]} (or side "—")]
-          [:td {:class ["px-3" "py-2" "num"]} (format-size size)]
-          [:td {:class ["px-3" "py-2" "num"]} (format-price price)]
-          [:td {:class ["px-3" "py-2" "num"]} (format-price trigger-price)]])
+         [:tr {:class ["border-b" "border-base-300/80" "text-sm" "text-trading-text" "hover:bg-base-200/40"]}
+          [:td {:class ["px-4" "py-3" "num" "whitespace-nowrap"]} (or (fmt/format-local-time-hh-mm-ss time-ms) "—")]
+          [:td {:class ["px-4" "py-3" "whitespace-nowrap"]} (or coin "—")]
+          [:td {:class ["px-4" "py-3" "whitespace-nowrap"]} (or side "—")]
+          [:td {:class ["px-4" "py-3" "num" "whitespace-nowrap"]} (format-size size)]
+          [:td {:class ["px-4" "py-3" "num" "whitespace-nowrap"]} (format-price price)]
+          [:td {:class ["px-4" "py-3" "num" "whitespace-nowrap"]} (format-price trigger-price)]])
        (empty-table-row 6 "No open orders."))]]])
 
 (defn- fills-table [rows]
   [:div {:class ["overflow-x-auto"]}
-   [:table {:class ["w-full" "border-collapse"]}
+   [:table {:class ["w-full" "min-w-[900px]" "border-collapse"]}
     (table-header ["Time" "Coin" "Side" "Size" "Price" "Closed PNL"])
     [:tbody
      (if (seq rows)
        (for [{:keys [time-ms coin side size price closed-pnl]} rows]
          ^{:key (str "fill-" time-ms "-" coin "-" size "-" price)}
-         [:tr {:class ["border-b" "border-[#1e3638]" "text-sm" "text-trading-text"]}
-          [:td {:class ["px-3" "py-2" "num"]} (or (fmt/format-local-time-hh-mm-ss time-ms) "—")]
-          [:td {:class ["px-3" "py-2"]} (or coin "—")]
-          [:td {:class ["px-3" "py-2"]} (or side "—")]
-          [:td {:class ["px-3" "py-2" "num"]} (format-size size)]
-          [:td {:class ["px-3" "py-2" "num"]} (format-price price)]
-          [:td {:class ["px-3" "py-2" "num" (position-pnl-class closed-pnl)]}
+         [:tr {:class ["border-b" "border-base-300/80" "text-sm" "text-trading-text" "hover:bg-base-200/40"]}
+          [:td {:class ["px-4" "py-3" "num" "whitespace-nowrap"]} (or (fmt/format-local-time-hh-mm-ss time-ms) "—")]
+          [:td {:class ["px-4" "py-3" "whitespace-nowrap"]} (or coin "—")]
+          [:td {:class ["px-4" "py-3" "whitespace-nowrap"]} (or side "—")]
+          [:td {:class ["px-4" "py-3" "num" "whitespace-nowrap"]} (format-size size)]
+          [:td {:class ["px-4" "py-3" "num" "whitespace-nowrap"]} (format-price price)]
+          [:td {:class ["px-4" "py-3" "num" "whitespace-nowrap" (position-pnl-class closed-pnl)]}
            (format-currency closed-pnl)]])
        (empty-table-row 6 "No recent fills."))]]])
 
@@ -294,10 +295,11 @@
                                activity-fills]}]
   [:section {:class ["rounded-2xl"
                      "border"
-                     "border-[#1a3737]"
-                     "bg-[#071820]"
-                     "overflow-hidden"]}
-   [:div {:class ["flex" "items-center" "justify-between" "border-b" "border-[#1f3b3c]" "gap-2" "pr-3"]}
+                     "border-base-300"
+                     "bg-base-100"
+                     "overflow-hidden"
+                     "w-full"]}
+   [:div {:class ["flex" "items-center" "justify-between" "border-b" "border-base-300" "bg-base-200" "gap-2" "pr-3"]}
     [:div {:class ["min-w-0" "overflow-x-auto"]}
      [:div {:class ["flex" "min-w-max" "items-center"]}
       (for [tab activity-tabs]
@@ -310,7 +312,7 @@
                       "items-center"
                       "gap-1"
                       "text-xs"
-                      "text-[#8fa2aa]"
+                      "text-trading-text-secondary"
                       "cursor-not-allowed"]}
      "Filter"
      [:span "⌄"]]]
@@ -473,6 +475,6 @@
                      :fill "none"
                      :stroke "#e7ecef"
                      :stroke-width 2
-                     :vector-effect "non-scaling-stroke"}])]]
+                     :vector-effect "non-scaling-stroke"}])]]]
 
-        (activity-panel vm)]])]))
+        (activity-panel vm)])]))
