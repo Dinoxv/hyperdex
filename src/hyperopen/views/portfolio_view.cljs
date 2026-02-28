@@ -630,15 +630,20 @@
                                              hovered-point))]
     (section-card
      "portfolio-chart-card"
-     [:div {:class ["flex" "items-center" "border-b" "border-base-300"]}
+     [:div {:class ["flex" "items-center" "gap-2" "border-b" "border-base-300" "px-3" "py-2"]}
       (for [{tab-value :value
              tab-label :label} tabs]
         ^{:key (str "portfolio-chart-tab-" (name tab-value))}
         [:button {:type "button"
-                  :class (into ["-mb-px" "px-4" "py-3" "text-sm" "transition-colors" "border-b-2" "border-transparent"]
+                  :class (into ["rounded-md"
+                                "border"
+                                "px-2.5"
+                                "py-1"
+                                "text-xs"
+                                "transition-colors"]
                                (if (= tab-value selected-tab)
-                                 ["border-primary" "text-trading-text"]
-                                 ["text-trading-text-secondary" "hover:text-trading-text"]))
+                                 ["border-[#2f5e58]" "bg-[#0d252f]" "text-trading-text"]
+                                 ["border-transparent" "text-[#8ea4ab]" "hover:text-trading-text"]))
                   :data-role (str "portfolio-chart-tab-" (name tab-value))
                   :aria-pressed (= tab-value selected-tab)
                   :on {:click [[:actions/select-portfolio-chart-tab tab-value]]}}
