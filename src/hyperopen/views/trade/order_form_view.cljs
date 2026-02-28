@@ -210,6 +210,9 @@
                           (max 1))
         draft* (trading/normalize-ui-leverage state
                                               (or leverage-draft ui-leverage))
+        displayed-leverage (if popover-open?
+                             draft*
+                             ui-leverage)
         slider-progress (if (> max-leverage* 1)
                           (* 100 (/ (- draft* 1)
                                     (- max-leverage* 1)))
@@ -233,12 +236,13 @@
                        "h-10"
                        "w-full"
                        "items-center"
-                       "justify-center"
-                       "gap-1"
+                       "justify-between"
+                       "gap-1.5"
                        "rounded-lg"
                        "border"
                        "border-base-300"
                        "bg-base-200"
+                       "px-3"
                        "text-sm"
                        "font-semibold"
                        "text-gray-100"
@@ -255,7 +259,21 @@
                         {:z-index 1201})
                :on {:click (:on-toggle-leverage-popover leverage-handlers)
                     :keydown (:on-leverage-popover-keydown leverage-handlers)}}
-      [:span (str ui-leverage "x")]]
+      [:span {:class ["num"]} (str displayed-leverage "x")]
+      [:svg {:class ["pointer-events-none"
+                     "h-3.5"
+                     "w-3.5"
+                     "text-gray-400"
+                     "transition-transform"
+                     (when popover-open? "rotate-180")]
+             :viewBox "0 0 16 16"
+             :fill "none"
+             :aria-hidden true}
+       [:path {:d "M4 6.5L8 10.5L12 6.5"
+               :stroke "currentColor"
+               :stroke-width "1.5"
+               :stroke-linecap "round"
+               :stroke-linejoin "round"}]]]
      (when popover-open?
        [:div {:class ["absolute"
                       "right-0"
