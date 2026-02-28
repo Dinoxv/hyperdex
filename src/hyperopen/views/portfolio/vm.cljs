@@ -1021,25 +1021,55 @@
                                (or rows []))))
           (or groups []))))
 
+(defn- build-metrics-request-data
+  [strategy-cumulative-rows benchmark-cumulative-rows-by-coin selected-benchmark-coins]
+  (let [benchmark-requests (mapv (fn [coin]
+                                   {:coin coin
+                                    :request {:strategy-cumulative-rows (or (get benchmark-cumulative-rows-by-coin coin)
+                                                                            [])}})
+                                 selected-benchmark-coins)
+        portfolio-request {:strategy-cumulative-rows strategy-cumulative-rows
+                           :strategy-daily-rows (portfolio-metrics/daily-compounded-returns strategy-cumulative-rows)
+                           :benchmark-cumulative-rows (or (some-> benchmark-requests first :request :strategy-cumulative-rows)
+                                                          [])}]
+    {:portfolio-request portfolio-request
+     :benchmark-requests benchmark-requests}))
+
+(defn- request-benchmark-daily-rows
+  [portfolio-request]
+  (if (contains? portfolio-request :benchmark-daily-rows)
+    (or (:benchmark-daily-rows portfolio-request) [])
+    (portfolio-metrics/daily-compounded-returns (or (:benchmark-cumulative-rows portfolio-request)
+                                                    []))))
+
+(defn- request-strategy-daily-rows
+  [request]
+  (if (contains? request :strategy-daily-rows)
+    (or (:strategy-daily-rows request) [])
+    (portfolio-metrics/daily-compounded-returns (or (:strategy-cumulative-rows request)
+                                                    []))))
+
 (defn- compute-metrics-sync [request-data]
   (let [portfolio-request (:portfolio-request request-data)
         benchmark-requests (:benchmark-requests request-data)
+        benchmark-daily-rows (request-benchmark-daily-rows portfolio-request)
         portfolio-result (portfolio-metrics/compute-performance-metrics
                           {:strategy-cumulative-rows (:strategy-cumulative-rows portfolio-request)
                            :strategy-daily-rows (:strategy-daily-rows portfolio-request)
-                           :benchmark-daily-rows (:benchmark-daily-rows portfolio-request)
+                           :benchmark-daily-rows benchmark-daily-rows
                            :rf (or (:rf portfolio-request) 0)
                            :mar (or (:mar portfolio-request) 0)
                            :periods-per-year (or (:periods-per-year portfolio-request) 365)
                            :quality-gates (:quality-gates portfolio-request)})
         benchmark-results (into {}
                                 (map (fn [{:keys [coin request]}]
-                                       [coin (portfolio-metrics/compute-performance-metrics
-                                              {:strategy-cumulative-rows (:strategy-cumulative-rows request)
-                                               :strategy-daily-rows (:strategy-daily-rows request)
-                                               :rf 0
-                                               :periods-per-year 365})]))
-                                benchmark-requests)]
+                                       (let [strategy-daily-rows (request-strategy-daily-rows request)]
+                                         [coin (portfolio-metrics/compute-performance-metrics
+                                                {:strategy-cumulative-rows (:strategy-cumulative-rows request)
+                                                 :strategy-daily-rows strategy-daily-rows
+                                                 :rf 0
+                                                 :periods-per-year 365})]))
+                                benchmark-requests))]
     {:portfolio-values portfolio-result
      :benchmark-values-by-coin benchmark-results}))
 
@@ -1049,44 +1079,29 @@
                                      [])
         benchmark-cumulative-rows-by-coin (or (:benchmark-cumulative-rows-by-coin benchmark-context)
                                               {})
-        strategy-daily-rows (portfolio-metrics/daily-compounded-returns strategy-cumulative-rows)
         selected-benchmark-coins (vec (or (:selected-coins returns-benchmark-selector)
                                           []))
         benchmark-label-by-coin (or (:label-by-coin returns-benchmark-selector)
                                     {})
-        
-        ;; prepare requests for worker
-        benchmark-requests (mapv (fn [coin]
-                                   {:coin coin
-                                    :request {:strategy-cumulative-rows (or (get benchmark-cumulative-rows-by-coin coin) [])
-                                              :strategy-daily-rows (portfolio-metrics/daily-compounded-returns (or (get benchmark-cumulative-rows-by-coin coin) []))}})
-                                 selected-benchmark-coins)
-        portfolio-request {:strategy-cumulative-rows strategy-cumulative-rows
-                           :strategy-daily-rows strategy-daily-rows
-                           :benchmark-daily-rows (or (some-> benchmark-requests first :request :strategy-daily-rows) [])}
-        
-        _ (request-metrics-computation! {:portfolio-request portfolio-request
-                                         :benchmark-requests benchmark-requests})
-        
+        request-data (build-metrics-request-data strategy-cumulative-rows
+                                                 benchmark-cumulative-rows-by-coin
+                                                 selected-benchmark-coins)
+        benchmark-requests (:benchmark-requests request-data)
+        _ (request-metrics-computation! request-data)
         metrics-result (if @metrics-worker
                          (get-in state [:portfolio-ui :metrics-result])
-                         (compute-metrics-sync {:portfolio-request portfolio-request
-                                                :benchmark-requests benchmark-requests}))
+                         (compute-metrics-sync request-data))
         loading? (if @metrics-worker
                    (boolean (get-in state [:portfolio-ui :metrics-loading?]))
                    false)
-        
         portfolio-values (or (:portfolio-values metrics-result) {})
         benchmark-values-by-coin-result (or (:benchmark-values-by-coin metrics-result) {})
-        
         benchmark-columns (mapv (fn [{:keys [coin request]}]
                                   {:coin coin
                                    :label (or (get benchmark-label-by-coin coin) coin)
                                    :cumulative-rows (:strategy-cumulative-rows request)
-                                   :daily-rows (:strategy-daily-rows request)
                                    :values (or (get benchmark-values-by-coin-result coin) {})})
                                 benchmark-requests)
-        
         primary-benchmark-column (first benchmark-columns)
         benchmark-coin (:coin primary-benchmark-column)
         benchmark-values (or (:values primary-benchmark-column)
