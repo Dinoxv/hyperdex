@@ -789,6 +789,33 @@
       (finally
         (remove-watch store ::metrics-request-writes)))))
 
+(deftest portfolio-vm-request-metrics-computation-keeps-existing-metrics-visible-test
+  (let [write-count (atom 0)
+        store (atom {:portfolio-ui {:metrics-loading? false
+                                    :metrics-result {:portfolio-values {:metric-status {}
+                                                                        :metric-reason {}}}}})
+        signature {:summary-time-range :month
+                   :selected-benchmark-coins ["SPY"]
+                   :strategy-source-version 101
+                   :benchmark-source-versions [["SPY" 201]]}
+        request-data {:portfolio-request {:strategy-cumulative-rows [[1 0]
+                                                                     [2 1]]}
+                      :benchmark-requests [{:coin "SPY"
+                                            :request {:strategy-cumulative-rows [[1 0]
+                                                                                 [2 3]]}}]}]
+    (add-watch store ::metrics-request-writes
+               (fn [_ _ _ _]
+                 (swap! write-count inc)))
+    (try
+      (with-redefs [system/store store]
+        (@#'vm/request-metrics-computation! request-data signature)
+        (is (= 0 @write-count))
+        (is (false? (get-in @store [:portfolio-ui :metrics-loading?])))
+        (is (= signature
+               (get (deref @#'vm/last-metrics-request) :signature))))
+      (finally
+        (remove-watch store ::metrics-request-writes)))))
+
 (deftest portfolio-vm-metrics-request-signature-captures-time-range-coins-and-source-versions-test
   (let [signature-a (@#'vm/metrics-request-signature :month
                                                       ["SPY" "QQQ"]
