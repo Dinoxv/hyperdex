@@ -381,6 +381,9 @@
    :actions/toggle-pro-order-type-dropdown ::no-args
    :actions/close-pro-order-type-dropdown ::no-args
    :actions/handle-pro-order-type-dropdown-keydown ::key-args
+   :actions/toggle-margin-mode-dropdown ::no-args
+   :actions/close-margin-mode-dropdown ::no-args
+   :actions/handle-margin-mode-dropdown-keydown ::key-args
    :actions/toggle-size-unit-dropdown ::no-args
    :actions/close-size-unit-dropdown ::no-args
    :actions/handle-size-unit-dropdown-keydown ::key-args
@@ -391,6 +394,7 @@
    :actions/close-tif-dropdown ::no-args
    :actions/handle-tif-dropdown-keydown ::key-args
    :actions/set-order-ui-leverage ::single-input-args
+   :actions/set-order-margin-mode ::keyword-or-string-args
    :actions/set-order-size-percent ::single-input-args
    :actions/set-order-size-display ::single-input-args
    :actions/set-order-size-input-mode ::keyword-or-string-args
@@ -531,6 +535,7 @@
   (s/and map?
          #(= order-form-key-policy/order-form-ui-state-keys (set (keys %)))
          #(boolean? (:pro-order-type-dropdown-open? %))
+         #(boolean? (:margin-mode-dropdown-open? %))
          #(boolean? (:size-unit-dropdown-open? %))
          #(boolean? (:tpsl-unit-dropdown-open? %))
          #(boolean? (:tif-dropdown-open? %))
@@ -538,6 +543,7 @@
          #(boolean? (:tpsl-panel-open? %))
          #(contains? #{:market :limit :pro} (:entry-mode %))
          #(number? (:ui-leverage %))
+         #(contains? #{:cross :isolated} (:margin-mode %))
          #(contains? #{:quote :base} (:size-input-mode %))
          #(contains? #{:manual :percent} (:size-input-source %))
          #(string? (:size-display %))))

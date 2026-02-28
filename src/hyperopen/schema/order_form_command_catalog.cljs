@@ -13,6 +13,15 @@
    {:command-id :order-form/handle-pro-order-type-dropdown-keydown
     :action-id :actions/handle-pro-order-type-dropdown-keydown
     :handler-key :handle-pro-order-type-dropdown-keydown}
+   {:command-id :order-form/toggle-margin-mode-dropdown
+    :action-id :actions/toggle-margin-mode-dropdown
+    :handler-key :toggle-margin-mode-dropdown}
+   {:command-id :order-form/close-margin-mode-dropdown
+    :action-id :actions/close-margin-mode-dropdown
+    :handler-key :close-margin-mode-dropdown}
+   {:command-id :order-form/handle-margin-mode-dropdown-keydown
+    :action-id :actions/handle-margin-mode-dropdown-keydown
+    :handler-key :handle-margin-mode-dropdown-keydown}
    {:command-id :order-form/toggle-size-unit-dropdown
     :action-id :actions/toggle-size-unit-dropdown
     :handler-key :toggle-size-unit-dropdown}
@@ -46,6 +55,9 @@
    {:command-id :order-form/set-order-ui-leverage
     :action-id :actions/set-order-ui-leverage
     :handler-key :set-order-ui-leverage}
+   {:command-id :order-form/set-order-margin-mode
+    :action-id :actions/set-order-margin-mode
+    :handler-key :set-order-margin-mode}
    {:command-id :order-form/update-order-form
     :action-id :actions/update-order-form
     :handler-key :update-order-form}

@@ -1,5 +1,6 @@
 (ns hyperopen.api.gateway.orders.commands
-  (:require [hyperopen.domain.trading :as trading-domain]))
+  (:require [clojure.string :as str]
+            [hyperopen.domain.trading :as trading-domain]))
 
 (defn- tif->wire [tif]
   (case tif
@@ -237,6 +238,34 @@
                                            :t randomize))
        :asset-idx asset-idx})))
 
+(defn- normalize-margin-mode
+  [value]
+  (let [candidate (cond
+                    (keyword? value) value
+                    (string? value) (keyword (str/lower-case value))
+                    :else :cross)]
+    (if (= candidate :isolated) :isolated :cross)))
+
+(defn- normalize-leverage
+  [value]
+  (let [parsed (trading-domain/parse-num value)]
+    (when (positive-number? parsed)
+      (-> parsed js/Math.round int (max 1)))))
+
+(defn- build-update-leverage-action
+  [command-context form]
+  (let [asset-idx (:asset-idx command-context)
+        market-type (get-in command-context [:market :market-type])
+        leverage (normalize-leverage (:ui-leverage form))
+        margin-mode (normalize-margin-mode (:margin-mode form))]
+    (when (and (= :perp market-type)
+               (number? asset-idx)
+               (number? leverage))
+      (array-map :type "updateLeverage"
+                 :asset asset-idx
+                 :isCross (not= margin-mode :isolated)
+                 :leverage leverage))))
+
 (def ^:private order-request-builders
   {:build/market (fn [command-context form]
                    (build-standard-order-action :market command-context form))
@@ -258,4 +287,9 @@
         builder-id (trading-domain/order-type-builder-id order-type)
         build-fn (get order-request-builders builder-id)]
     (when build-fn
-      (build-fn command-context (assoc form :type order-type)))))
+      (let [request (build-fn command-context (assoc form :type order-type))
+            update-leverage-action (build-update-leverage-action command-context form)]
+        (cond-> request
+          (and (map? request)
+               (map? update-leverage-action))
+          (assoc :pre-actions [update-leverage-action]))))))

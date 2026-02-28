@@ -151,6 +151,22 @@
     (is (false? (:tif-dropdown-open? escaped-ui)))
     (is (false? (:tif-dropdown-open? market-ui)))))
 
+(deftest margin-mode-transitions-toggle-close-escape-and-select-test
+  (let [state (base-state {:type :limit})
+        toggled (transitions/toggle-margin-mode-dropdown state)
+        open-ui (:order-form-ui toggled)
+        escaped (transitions/handle-margin-mode-dropdown-keydown (merge state toggled) "Escape")
+        escaped-ui (:order-form-ui escaped)
+        reopened (transitions/toggle-margin-mode-dropdown state)
+        selected (transitions/set-order-margin-mode (merge state reopened) :isolated)
+        selected-form (:order-form selected)
+        selected-ui (:order-form-ui selected)]
+    (is (true? (:margin-mode-dropdown-open? open-ui)))
+    (is (false? (:margin-mode-dropdown-open? escaped-ui)))
+    (is (not (contains? selected-form :margin-mode)))
+    (is (= :isolated (:margin-mode selected-ui)))
+    (is (false? (:margin-mode-dropdown-open? selected-ui)))))
+
 (deftest tpsl-unit-dropdown-transitions-toggle-close-and-reset-on-unit-selection-test
   (let [state (assoc (base-state {:type :limit
                                   :tpsl {:unit :usd}})
@@ -450,8 +466,10 @@
          (every? #(not (contains? form %)) ui-only-form-paths)
          (= (:entry-mode normalized-form) (:entry-mode effective-ui))
          (= (:ui-leverage normalized-form) (:ui-leverage effective-ui))
+         (= (:margin-mode normalized-form) (:margin-mode effective-ui))
          (= (:size-display normalized-form) (:size-display effective-ui))
          (= (:entry-mode model) (:entry-mode effective-ui))
+         (= (:margin-mode model) (:margin-mode effective-ui))
          (= (:type model) (:type normalized-form))
          (= (:pro-order-type-dropdown-open? model)
             (boolean (:pro-order-type-dropdown-open? effective-ui)))
@@ -509,6 +527,7 @@
                           :size-percent 10})
         initial-model {:entry-mode :limit
                        :type :limit
+                       :margin-mode :cross
                        :pro-order-type-dropdown-open? false
                        :tpsl-unit-dropdown-open? false
                        :tif-dropdown-open? false

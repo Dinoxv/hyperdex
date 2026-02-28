@@ -220,8 +220,14 @@
                                   :size "1"
                                   :price "100")}
         effects (core/submit-order state)
-        api-submit-effects (filter #(= (first %) :effects/api-submit-order) effects)]
-    (is (= 1 (count api-submit-effects)))))
+        api-submit-effects (filter #(= (first %) :effects/api-submit-order) effects)
+        request (second (first api-submit-effects))
+        pre-action (first (:pre-actions request))]
+    (is (= 1 (count api-submit-effects)))
+    (is (= "updateLeverage" (:type pre-action)))
+    (is (= 0 (:asset pre-action)))
+    (is (= true (:isCross pre-action)))
+    (is (= 20 (:leverage pre-action)))))
 
 (deftest submit-order-limit-with-blank-price-uses-fallback-and-emits-single-submit-effect-test
   (let [state {:active-asset "BTC"
@@ -248,6 +254,34 @@
                          effects)]
     (is (= 1 (count api-submit-effects)))
     (is (seq (:price saved-form)))))
+
+(deftest submit-order-includes-isolated-margin-mode-pre-submit-action-test
+  (let [state {:active-asset "BTC"
+               :active-market {:coin "BTC" :market-type :perp}
+               :asset-contexts {:BTC {:idx 0}}
+               :wallet {:connected? true
+                        :address "0xabc"
+                        :agent {:status :ready
+                                :storage-mode :session
+                                :agent-address "0xagent"}}
+               :orderbooks {"BTC" {:bids [{:px "99"}]
+                                   :asks [{:px "101"}]}}
+               :order-form (assoc (trading/default-order-form)
+                                  :type :limit
+                                  :side :buy
+                                  :size "1"
+                                  :price "100")
+               :order-form-ui (assoc (trading/default-order-form-ui)
+                                     :margin-mode :isolated
+                                     :ui-leverage 25)}
+        effects (core/submit-order state)
+        api-submit-effects (filter #(= (first %) :effects/api-submit-order) effects)
+        request (second (first api-submit-effects))
+        pre-action (first (:pre-actions request))]
+    (is (= 1 (count api-submit-effects)))
+    (is (= "updateLeverage" (:type pre-action)))
+    (is (= false (:isCross pre-action)))
+    (is (= 25 (:leverage pre-action)))))
 
 (deftest submit-order-requires-agent-ready-session-test
   (let [state {:active-asset "BTC"
@@ -334,4 +368,3 @@
            (->> (get-in next-state [:orders :open-orders-snapshot-by-dex "dex-b"])
                 (map #(get-in % [:order :oid]))
                 set)))))
-

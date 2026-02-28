@@ -3,12 +3,14 @@
 (def ui-owned-order-form-keys
   [:entry-mode
    :ui-leverage
+   :margin-mode
    :size-input-mode
    :size-input-source
    :size-display])
 
 (def legacy-order-form-ui-flag-keys
   [:pro-order-type-dropdown-open?
+   :margin-mode-dropdown-open?
    :size-unit-dropdown-open?
    :tpsl-unit-dropdown-open?
    :tif-dropdown-open?

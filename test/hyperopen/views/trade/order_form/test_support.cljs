@@ -121,9 +121,11 @@
 (def ^:private order-form-ui-keys
   #{:entry-mode
     :ui-leverage
+    :margin-mode
     :size-input-mode
     :size-input-source
     :size-display
+    :margin-mode-dropdown-open?
     :size-unit-dropdown-open?
     :tpsl-unit-dropdown-open?
     :tif-dropdown-open?

@@ -155,6 +155,9 @@
    :toggle-pro-order-type-dropdown order-actions/toggle-pro-order-type-dropdown
    :close-pro-order-type-dropdown order-actions/close-pro-order-type-dropdown
    :handle-pro-order-type-dropdown-keydown order-actions/handle-pro-order-type-dropdown-keydown
+   :toggle-margin-mode-dropdown order-actions/toggle-margin-mode-dropdown
+   :close-margin-mode-dropdown order-actions/close-margin-mode-dropdown
+   :handle-margin-mode-dropdown-keydown order-actions/handle-margin-mode-dropdown-keydown
    :toggle-size-unit-dropdown order-actions/toggle-size-unit-dropdown
    :close-size-unit-dropdown order-actions/close-size-unit-dropdown
    :handle-size-unit-dropdown-keydown order-actions/handle-size-unit-dropdown-keydown
@@ -165,6 +168,7 @@
    :close-tif-dropdown order-actions/close-tif-dropdown
    :handle-tif-dropdown-keydown order-actions/handle-tif-dropdown-keydown
    :set-order-ui-leverage order-actions/set-order-ui-leverage
+   :set-order-margin-mode order-actions/set-order-margin-mode
    :set-order-size-percent order-actions/set-order-size-percent
    :set-order-size-display order-actions/set-order-size-display
    :set-order-size-input-mode order-actions/set-order-size-input-mode

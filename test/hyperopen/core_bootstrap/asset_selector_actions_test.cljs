@@ -117,17 +117,7 @@
                                  [[:orderbook-ui :price-aggregation-dropdown-visible?] false]
                                  [[:orderbook-ui :size-unit-dropdown-visible?] false]
                                  [[:active-market] market]
-                                 [[:order-form-ui] {:pro-order-type-dropdown-open? false
-                                                    :size-unit-dropdown-open? false
-                                                    :tpsl-unit-dropdown-open? false
-                                                    :tif-dropdown-open? false
-                                                    :tpsl-panel-open? false
-                                                    :price-input-focused? false
-                                                    :entry-mode :limit
-                                                    :ui-leverage 20
-                                                    :size-input-mode :quote
-                                                    :size-input-source :manual
-                                                    :size-display ""}]]]
+                                 [[:order-form-ui] (trading/default-order-form-ui)]]]
             [:effects/unsubscribe-active-asset "ETH"]
             [:effects/unsubscribe-orderbook "ETH"]
             [:effects/unsubscribe-trades "ETH"]
@@ -156,17 +146,7 @@
                                  [[:orderbook-ui :price-aggregation-dropdown-visible?] false]
                                  [[:orderbook-ui :size-unit-dropdown-visible?] false]
                                  [[:active-market] market]
-                                 [[:order-form-ui] {:pro-order-type-dropdown-open? false
-                                                    :size-unit-dropdown-open? false
-                                                    :tpsl-unit-dropdown-open? false
-                                                    :tif-dropdown-open? false
-                                                    :tpsl-panel-open? false
-                                                    :price-input-focused? false
-                                                    :entry-mode :limit
-                                                    :ui-leverage 20
-                                                    :size-input-mode :quote
-                                                    :size-input-source :manual
-                                                    :size-display ""}]]]
+                                 [[:order-form-ui] (trading/default-order-form-ui)]]]
             [:effects/subscribe-active-asset "SOL"]
             [:effects/subscribe-orderbook "SOL"]
             [:effects/subscribe-trades "SOL"]]
@@ -192,17 +172,7 @@
                                  [[:orderbook-ui :price-aggregation-dropdown-visible?] false]
                                  [[:orderbook-ui :size-unit-dropdown-visible?] false]
                                  [[:active-market] resolved-market]
-                                 [[:order-form-ui] {:pro-order-type-dropdown-open? false
-                                                    :size-unit-dropdown-open? false
-                                                    :tpsl-unit-dropdown-open? false
-                                                    :tif-dropdown-open? false
-                                                    :tpsl-panel-open? false
-                                                    :price-input-focused? false
-                                                    :entry-mode :limit
-                                                    :ui-leverage 20
-                                                    :size-input-mode :quote
-                                                    :size-input-source :manual
-                                                    :size-display ""}]]]
+                                 [[:order-form-ui] (trading/default-order-form-ui)]]]
             [:effects/unsubscribe-active-asset "ETH"]
             [:effects/unsubscribe-orderbook "ETH"]
             [:effects/unsubscribe-trades "ETH"]

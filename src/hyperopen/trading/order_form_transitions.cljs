@@ -201,6 +201,7 @@
                         (if close-pro-dropdown?
                           false
                           (boolean (:pro-order-type-dropdown-open? ui-state)))
+                        :margin-mode-dropdown-open? false
                         :size-unit-dropdown-open? false
                         :tpsl-unit-dropdown-open? false
                         :tif-dropdown-open? false))]
@@ -223,6 +224,7 @@
                  next-form
                  (assoc ui-state
                         :pro-order-type-dropdown-open? false
+                        :margin-mode-dropdown-open? false
                         :size-unit-dropdown-open? false
                         :tpsl-unit-dropdown-open? false
                         :tif-dropdown-open? false))]
@@ -248,6 +250,23 @@
 (defn handle-pro-order-type-dropdown-keydown [state key]
   (when (= key "Escape")
     (close-pro-order-type-dropdown state)))
+
+(defn toggle-margin-mode-dropdown [state]
+  (let [ui-state (trading/order-form-ui-state state)
+        open? (boolean (:margin-mode-dropdown-open? ui-state))]
+    (enforce-field-ownership
+     state
+     {:order-form-ui (assoc ui-state :margin-mode-dropdown-open? (not open?))})))
+
+(defn close-margin-mode-dropdown [state]
+  (enforce-field-ownership
+   state
+   {:order-form-ui (assoc (trading/order-form-ui-state state)
+                          :margin-mode-dropdown-open? false)}))
+
+(defn handle-margin-mode-dropdown-keydown [state key]
+  (when (= key "Escape")
+    (close-margin-mode-dropdown state)))
 
 (defn toggle-size-unit-dropdown [state]
   (let [ui-state (trading/order-form-ui-state state)
@@ -313,6 +332,20 @@
     (enforce-field-ownership
      state
      {:order-form next-form
+      :order-form-runtime (cleared-runtime-state state)})))
+
+(defn set-order-margin-mode [state mode]
+  (let [form (trading/order-form-draft state)
+        ui-state (trading/order-form-ui-state state)
+        mode* (trading/normalize-margin-mode mode)
+        next-form (assoc form :margin-mode mode*)
+        next-ui (trading/effective-order-form-ui
+                 next-form
+                 (assoc ui-state :margin-mode-dropdown-open? false))]
+    (enforce-field-ownership
+     state
+     {:order-form next-form
+      :order-form-ui next-ui
       :order-form-runtime (cleared-runtime-state state)})))
 
 (defn set-order-size-percent [state percent]

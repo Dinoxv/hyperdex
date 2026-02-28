@@ -51,6 +51,23 @@
                              (boolean (:pro-order-type-dropdown-open? ui-state))]]]])
     []))
 
+(defn toggle-margin-mode-dropdown [state]
+  (let [ui-state (:order-form-ui (transitions/toggle-margin-mode-dropdown state))
+        next-open? (boolean (:margin-mode-dropdown-open? ui-state))]
+    [[:effects/save-many [[[:order-form-ui :margin-mode-dropdown-open?] next-open?]]]]))
+
+(defn close-margin-mode-dropdown [state]
+  (let [ui-state (:order-form-ui (transitions/close-margin-mode-dropdown state))]
+    [[:effects/save-many [[[:order-form-ui :margin-mode-dropdown-open?]
+                           (boolean (:margin-mode-dropdown-open? ui-state))]]]]))
+
+(defn handle-margin-mode-dropdown-keydown [state key]
+  (if-let [transition (transitions/handle-margin-mode-dropdown-keydown state key)]
+    (let [ui-state (:order-form-ui transition)]
+      [[:effects/save-many [[[:order-form-ui :margin-mode-dropdown-open?]
+                             (boolean (:margin-mode-dropdown-open? ui-state))]]]])
+    []))
+
 (defn toggle-size-unit-dropdown [state]
   (let [ui-state (:order-form-ui (transitions/toggle-size-unit-dropdown state))
         next-open? (boolean (:size-unit-dropdown-open? ui-state))]
@@ -104,6 +121,9 @@
 
 (defn set-order-ui-leverage [state leverage]
   (transition-save-many state (transitions/set-order-ui-leverage state leverage)))
+
+(defn set-order-margin-mode [state mode]
+  (transition-save-many state (transitions/set-order-margin-mode state mode)))
 
 (defn set-order-size-percent [state percent]
   (transition-save-many state (transitions/set-order-size-percent state percent)))

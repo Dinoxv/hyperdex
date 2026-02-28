@@ -224,3 +224,50 @@
            (get-in overlay-button [1 :on :click])))
     (is (= 1202 (get-in listbox [1 :style :z-index])))))
 
+(deftest leverage-row-margin-mode-dropdown-toggle-and-selection-actions-test
+  (let [closed-view (view/order-form-view (base-state {:type :limit
+                                                        :margin-mode :isolated}
+                                                       {:margin-mode-dropdown-open? false}))
+        open-view (view/order-form-view (base-state {:type :limit
+                                                     :margin-mode :isolated}
+                                                    {:margin-mode-dropdown-open? true}))
+        trigger-button (find-first-node closed-view
+                                        (fn [node]
+                                          (let [attrs (when (map? (second node)) (second node))]
+                                            (and (= :button (first node))
+                                                 (= "Margin mode" (:aria-label attrs))))))
+        overlay-button (find-first-node open-view
+                                        (fn [node]
+                                          (let [attrs (when (map? (second node)) (second node))]
+                                            (and (= :button (first node))
+                                                 (= "Close margin mode menu" (:aria-label attrs))))))
+        listbox (find-first-node open-view
+                                 (fn [node]
+                                   (let [attrs (when (map? (second node)) (second node))]
+                                     (and (= :div (first node))
+                                          (= "Margin mode options" (:aria-label attrs))))))
+        option-buttons (find-all-nodes open-view
+                                       (fn [node]
+                                         (and (= :button (first node))
+                                              (= :actions/set-order-margin-mode
+                                                 (ffirst (get-in node [1 :on :click]))))))
+        isolated-option (first (filter #(some #{"Isolated"} (collect-strings %))
+                                       option-buttons))
+        isolated-option-classes (set (get-in isolated-option [1 :class]))
+        click-payloads (->> option-buttons
+                            (map #(get-in % [1 :on :click]))
+                            set)]
+    (is (some? trigger-button))
+    (is (some #{"Isolated"} (collect-strings trigger-button)))
+    (is (= [[:actions/toggle-margin-mode-dropdown]]
+           (get-in trigger-button [1 :on :click])))
+    (is (= [[:actions/handle-margin-mode-dropdown-keydown [:event/key]]]
+           (get-in trigger-button [1 :on :keydown])))
+    (is (= [[:actions/close-margin-mode-dropdown]]
+           (get-in overlay-button [1 :on :click])))
+    (is (= #{[[:actions/set-order-margin-mode :cross]]
+             [[:actions/set-order-margin-mode :isolated]]}
+           click-payloads))
+    (is (contains? isolated-option-classes "bg-[#273035]"))
+    (is (contains? isolated-option-classes "text-[#50D2C1]"))
+    (is (= 1202 (get-in listbox [1 :style :z-index])))))

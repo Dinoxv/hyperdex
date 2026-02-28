@@ -28,6 +28,15 @@
 (defn handle-pro-order-type-dropdown-keydown [key]
   (command :order-form/handle-pro-order-type-dropdown-keydown key))
 
+(defn toggle-margin-mode-dropdown []
+  (command :order-form/toggle-margin-mode-dropdown))
+
+(defn close-margin-mode-dropdown []
+  (command :order-form/close-margin-mode-dropdown))
+
+(defn handle-margin-mode-dropdown-keydown [key]
+  (command :order-form/handle-margin-mode-dropdown-keydown key))
+
 (defn toggle-size-unit-dropdown []
   (command :order-form/toggle-size-unit-dropdown))
 
@@ -60,6 +69,9 @@
 
 (defn set-order-ui-leverage [leverage]
   (command :order-form/set-order-ui-leverage leverage))
+
+(defn set-order-margin-mode [mode]
+  (command :order-form/set-order-margin-mode mode))
 
 (defn- update-order-field [path value]
   (command :order-form/update-order-form path value))

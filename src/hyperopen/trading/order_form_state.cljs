@@ -7,9 +7,13 @@
 (def default-ui-leverage 20)
 (def default-slippage trading-domain/default-market-slippage-pct)
 (def default-twap-minutes 5)
+(def default-margin-mode :cross)
 (def default-size-input-mode :quote)
 (def default-size-input-source :manual)
 (def default-tpsl-unit :usd)
+
+(def valid-margin-modes
+  #{:cross :isolated})
 
 (def valid-size-input-modes
   #{:quote :base})
@@ -37,6 +41,15 @@
     (if (contains? valid-size-input-sources candidate)
       candidate
       default-size-input-source)))
+
+(defn normalize-margin-mode [mode]
+  (let [candidate (cond
+                    (keyword? mode) mode
+                    (string? mode) (keyword (str/lower-case mode))
+                    :else default-margin-mode)]
+    (if (contains? valid-margin-modes candidate)
+      candidate
+      default-margin-mode)))
 
 (defn normalize-tpsl-unit [unit]
   (let [candidate (cond
@@ -80,6 +93,7 @@
 
 (defn default-order-form-ui []
   {:pro-order-type-dropdown-open? false
+   :margin-mode-dropdown-open? false
    :size-unit-dropdown-open? false
    :tpsl-unit-dropdown-open? false
    :tif-dropdown-open? false
@@ -87,6 +101,7 @@
    :price-input-focused? false
    :entry-mode :limit
    :ui-leverage default-ui-leverage
+   :margin-mode default-margin-mode
    :size-input-mode default-size-input-mode
    :size-input-source default-size-input-source
    :size-display ""})
@@ -138,10 +153,12 @@
         normalized-leverage (if (number? parsed-leverage)
                               (-> parsed-leverage js/Math.round int (max 1))
                               default-ui-leverage)
+        margin-mode (normalize-margin-mode (:margin-mode ui))
         size-input-mode (normalize-size-input-mode (:size-input-mode ui))
         size-input-source (normalize-size-input-source (:size-input-source ui))]
     (assoc (default-order-form-ui)
            :pro-order-type-dropdown-open? (boolean (:pro-order-type-dropdown-open? ui))
+           :margin-mode-dropdown-open? (boolean (:margin-mode-dropdown-open? ui))
            :size-unit-dropdown-open? (boolean (:size-unit-dropdown-open? ui))
            :tpsl-unit-dropdown-open? (boolean (:tpsl-unit-dropdown-open? ui))
            :tif-dropdown-open? (boolean (:tif-dropdown-open? ui))
@@ -149,6 +166,7 @@
            :tpsl-panel-open? (boolean (:tpsl-panel-open? ui))
            :entry-mode entry-mode
            :ui-leverage normalized-leverage
+           :margin-mode margin-mode
            :size-input-mode size-input-mode
            :size-input-source size-input-source
            :size-display (str (or (:size-display ui) "")))))

@@ -36,15 +36,18 @@
                   :price "100"
                   :entry-mode :pro
                   :ui-leverage 25
+                  :margin-mode :isolated
                   :size-input-mode :base
                   :size-input-source :percent
                   :size-display "10"
                   :pro-order-type-dropdown-open? true
+                  :margin-mode-dropdown-open? true
                   :tpsl-panel-open? true
                   :submitting? true
                   :error "oops"}]
     (is (= {:entry-mode :pro
             :ui-leverage 25
+            :margin-mode :isolated
             :size-input-mode :base
             :size-input-source :percent
             :size-display "10"}
@@ -52,6 +55,7 @@
     (is (= {:type :limit
             :price "100"
             :pro-order-type-dropdown-open? true
+            :margin-mode-dropdown-open? true
             :tpsl-panel-open? true
             :submitting? true
             :error "oops"}
@@ -60,6 +64,7 @@
             :price "100"
             :entry-mode :pro
             :ui-leverage 25
+            :margin-mode :isolated
             :size-input-mode :base
             :size-input-source :percent
             :size-display "10"}

@@ -96,6 +96,7 @@
                      :router {:path "/"}
                      :order-form {}
                      :order-form-ui {:pro-order-type-dropdown-open? false
+                                     :margin-mode-dropdown-open? false
                                      :size-unit-dropdown-open? false
                                      :tpsl-unit-dropdown-open? false
                                      :tif-dropdown-open? false
@@ -103,6 +104,7 @@
                                      :tpsl-panel-open? false
                                      :entry-mode :limit
                                      :ui-leverage 20
+                                     :margin-mode :cross
                                      :size-input-mode :quote
                                      :size-input-source :manual
                                      :size-display ""}

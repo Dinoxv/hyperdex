@@ -201,6 +201,28 @@
     (is (= 15 (get-in twap-request [:action :twap :m])))
     (is (= false (get-in twap-request [:action :twap :t])))))
 
+(deftest build-order-request-includes-update-leverage-pre-action-test
+  (let [cross-request (commands/build-order-request command-context {:type :limit
+                                                                     :side :buy
+                                                                     :size "1"
+                                                                     :price "100"
+                                                                     :ui-leverage 17
+                                                                     :margin-mode :cross})
+        isolated-request (commands/build-order-request command-context {:type :limit
+                                                                        :side :buy
+                                                                        :size "1"
+                                                                        :price "100"
+                                                                        :ui-leverage "21"
+                                                                        :margin-mode "ISOLATED"})
+        cross-action (first (:pre-actions cross-request))
+        isolated-action (first (:pre-actions isolated-request))]
+    (is (= "updateLeverage" (:type cross-action)))
+    (is (= 5 (:asset cross-action)))
+    (is (= true (:isCross cross-action)))
+    (is (= 17 (:leverage cross-action)))
+    (is (= false (:isCross isolated-action)))
+    (is (= 21 (:leverage isolated-action)))))
+
 (deftest build-order-request-fails-closed-on-invalid-scale-and-twap-test
   (is (nil? (commands/build-order-request command-context {:type :scale
                                                             :side :buy

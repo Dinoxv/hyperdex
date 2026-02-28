@@ -34,9 +34,11 @@
     (is (= supported-ids
            (command-catalog/supported-command-ids)))
     (is (contains? supported-ids :order-form/select-entry-mode))
+    (is (contains? supported-ids :order-form/toggle-margin-mode-dropdown))
     (is (contains? supported-ids :order-form/toggle-size-unit-dropdown))
     (is (contains? supported-ids :order-form/toggle-tpsl-unit-dropdown))
     (is (contains? supported-ids :order-form/toggle-tif-dropdown))
+    (is (contains? supported-ids :order-form/set-order-margin-mode))
     (is (contains? supported-ids :order-form/set-order-size-input-mode))
     (is (contains? supported-ids :order-form/update-order-form))
     (is (contains? supported-ids :order-form/submit-order))))

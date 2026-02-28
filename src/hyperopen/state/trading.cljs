@@ -44,6 +44,7 @@
 (def scale-preview-boundaries trading-domain/scale-preview-boundaries)
 (def normalize-size-input-mode order-form-state/normalize-size-input-mode)
 (def normalize-size-input-source order-form-state/normalize-size-input-source)
+(def normalize-margin-mode order-form-state/normalize-margin-mode)
 
 (defn default-order-form []
   (order-form-state/default-order-form))
@@ -85,6 +86,9 @@
       true (assoc :entry-mode (entry-mode-for-type order-type)
                   :ui-leverage (or (:ui-leverage normalized-form)
                                    (:ui-leverage normalized-ui))
+                  :margin-mode (normalize-margin-mode
+                                (or (:margin-mode normalized-form)
+                                    (:margin-mode normalized-ui)))
                   :size-input-mode (normalize-size-input-mode
                                     (or (:size-input-mode normalized-form)
                                         (:size-input-mode normalized-ui)))
@@ -113,12 +117,14 @@
         ui-leverage (or (:ui-leverage base) (:ui-leverage ui))
         size-input-mode (or (:size-input-mode base) (:size-input-mode ui))
         size-input-source (or (:size-input-source base) (:size-input-source ui))
+        margin-mode (or (:margin-mode base) (:margin-mode ui))
         size-display (if (contains? base :size-display)
                        (:size-display base)
                        (:size-display ui))]
     (assoc base
            :entry-mode entry-mode
            :ui-leverage ui-leverage
+           :margin-mode margin-mode
            :size-input-mode size-input-mode
            :size-input-source size-input-source
            :size-display (or size-display ""))))

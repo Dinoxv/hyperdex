@@ -39,6 +39,99 @@
             :on {:click (on-select-mode mode)}}
    label])
 
+(defn- margin-mode-label [mode]
+  (if (= mode :isolated) "Isolated" "Cross"))
+
+(defn- margin-mode-option [mode selected? on-select-mode]
+  [:button {:type "button"
+            :class (into ["w-full"
+                          "rounded-md"
+                          "px-3"
+                          "py-1.5"
+                          "text-left"
+                          "text-xs"
+                          "font-semibold"
+                          "transition-colors"]
+                         (if selected?
+                           ["bg-[#273035]" "text-[#50D2C1]"]
+                           ["text-[#D2DAD7]" "hover:bg-[#273035]" "hover:text-[#F6FEFD]"]))
+            :role "option"
+            :aria-selected (boolean selected?)
+            :on {:click (on-select-mode mode)}}
+   (margin-mode-label mode)])
+
+(defn- margin-mode-chip [margin-mode dropdown-open? leverage-handlers]
+  [:div {:class ["relative" "flex-1"]
+         :style (when dropdown-open?
+                  {:z-index 1200})}
+   (when dropdown-open?
+     [:button {:type "button"
+               :class ["absolute" "bg-transparent" "cursor-default"]
+               :style {:left "-100vmax"
+                       :top "-100vmax"
+                       :width "200vmax"
+                       :height "200vmax"
+                       :z-index 1200}
+               :aria-label "Close margin mode menu"
+               :on {:click (:on-close-margin-mode-dropdown leverage-handlers)}}])
+   [:button {:type "button"
+             :class ["relative"
+                     "flex"
+                     "h-10"
+                     "w-full"
+                     "items-center"
+                     "justify-center"
+                     "gap-1"
+                     "rounded-lg"
+                     "border"
+                     "border-base-300"
+                     "bg-base-200"
+                     "text-sm"
+                     "font-semibold"
+                     "text-gray-100"
+                     "transition-colors"
+                     "outline-none"
+                     "focus:outline-none"
+                     "focus:ring-0"
+                     "focus:ring-offset-0"
+                     "focus:shadow-none"]
+             :aria-label "Margin mode"
+             :aria-haspopup "listbox"
+             :aria-expanded (boolean dropdown-open?)
+             :style (when dropdown-open?
+                      {:z-index 1201})
+             :on {:click (:on-toggle-margin-mode-dropdown leverage-handlers)
+                  :keydown (:on-margin-mode-dropdown-keydown leverage-handlers)}}
+    [:span (margin-mode-label margin-mode)]
+    [:svg {:class ["pointer-events-none" "h-3.5" "w-3.5" "text-gray-400"]
+           :viewBox "0 0 20 20"
+           :fill "currentColor"}
+     [:path {:fill-rule "evenodd"
+             :clip-rule "evenodd"
+             :d "M5.293 7.293a1 1 0 011.414 0L10 10.586l3.293-3.293a1 1 0 111.414 1.414l-4 4a1 1 0 01-1.414 0l-4-4a1 1 0 010-1.414z"}]]]
+   (when dropdown-open?
+     [:div {:class ["absolute"
+                    "left-0"
+                    "top-full"
+                    "mt-1"
+                    "min-w-[116px]"
+                    "rounded-lg"
+                    "border"
+                    "border-[#273035]"
+                    "bg-[#1B2429]"
+                    "p-1"
+                    "shadow-[0_10px_24px_rgba(0,0,0,0.35)]"]
+            :style {:z-index 1202}
+            :role "listbox"
+            :aria-label "Margin mode options"
+            :on {:keydown (:on-margin-mode-dropdown-keydown leverage-handlers)}}
+      (margin-mode-option :cross
+                          (= margin-mode :cross)
+                          (:on-select-margin-mode leverage-handlers))
+      (margin-mode-option :isolated
+                          (= margin-mode :isolated)
+                          (:on-select-margin-mode leverage-handlers))])])
+
 (defn- size-unit-accessory [{:keys [size-input-mode quote-symbol base-symbol]}
                             {:keys [dropdown-open?
                                     on-toggle-dropdown
@@ -107,13 +200,14 @@
         (size-unit-option :quote quote-symbol (= selected-mode :quote) on-select-mode)
         (size-unit-option :base base-symbol (= selected-mode :base) on-select-mode)])]))
 
-(defn- leverage-row [ui-leverage next-leverage leverage-handlers]
-  [:div {:class ["grid" "grid-cols-3" "gap-2"]}
-   (primitives/chip-button "Cross" true :disabled? true)
-   (primitives/chip-button (str ui-leverage "x")
-                           true
-                           :on-click ((:on-next-leverage leverage-handlers) next-leverage))
-   (primitives/chip-button "Classic" true :disabled? true)])
+(defn- leverage-row [margin-mode margin-mode-dropdown-open? ui-leverage next-leverage leverage-handlers]
+  (let [mode (trading/normalize-margin-mode margin-mode)]
+    [:div {:class ["grid" "grid-cols-3" "gap-2"]}
+     (margin-mode-chip mode margin-mode-dropdown-open? leverage-handlers)
+     (primitives/chip-button (str ui-leverage "x")
+                             true
+                             :on-click ((:on-next-leverage leverage-handlers) next-leverage))
+     (primitives/chip-button "Classic" true :disabled? true)]))
 
 (defn- side-row [side side-handlers]
   [:div {:class ["flex" "items-center" "gap-2" "bg-base-200" "rounded-md" "p-1"]}
@@ -437,6 +531,7 @@
                 submit]}
         (order-form-vm/order-form-vm state)
         handler-map (handlers/build-handlers)
+        margin-mode-dropdown-open? (boolean (get-in state [:order-form-ui :margin-mode-dropdown-open?]))
         size-unit-dropdown-open? (boolean (get-in state [:order-form-ui :size-unit-dropdown-open?]))
         tif-dropdown-open? (boolean (get-in state [:order-form-ui :tif-dropdown-open?]))
         entry-mode-handlers (:entry-mode handler-map)
@@ -477,7 +572,11 @@
 
      [:div {:class (into ["flex" "flex-col" "flex-1" "gap-3"]
                          (when read-only? ["opacity-60" "pointer-events-none"]))}
-      (leverage-row ui-leverage next-leverage leverage-handlers)
+      (leverage-row (:margin-mode form)
+                    margin-mode-dropdown-open?
+                    ui-leverage
+                    next-leverage
+                    leverage-handlers)
 
       (sections/entry-mode-tabs {:entry-mode entry-mode
                                  :type type

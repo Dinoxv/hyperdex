@@ -210,46 +210,89 @@
       {:ok? true
        :success-count success-count})))
 
+(defn- margin-mode-sync-error-message
+  [error-text]
+  (str "Margin mode update failed: " error-text))
+
+(defn- pre-submit-outcome
+  [exchange-response-error resp]
+  (if (= "ok" (:status resp))
+    {:ok? true}
+    (let [error-text (str (exchange-response-error resp))]
+      {:ok? false
+       :error-text error-text
+       :toast-message (margin-mode-sync-error-message error-text)})))
+
+(defn- run-pre-submit-actions!
+  [store address request exchange-response-error runtime-error-message]
+  (let [pre-actions (->> (:pre-actions request)
+                         (filter map?)
+                         vec)]
+    (letfn [(submit-next! [remaining]
+              (if (empty? remaining)
+                (js/Promise.resolve {:ok? true})
+                (-> (trading-api/submit-order! store address (first remaining))
+                    (.then (fn [resp]
+                             (let [result (pre-submit-outcome exchange-response-error resp)]
+                               (if (:ok? result)
+                                 (submit-next! (rest remaining))
+                                 result))))
+                    (.catch (fn [err]
+                              (let [error-text (runtime-error-message err)]
+                                {:ok? false
+                                 :error-text error-text
+                                 :toast-message (margin-mode-sync-error-message error-text)}))))))]
+      (submit-next! pre-actions))))
+
 (defn api-submit-order
   [{:keys [dispatch! exchange-response-error runtime-error-message show-toast!]} _ store request]
   (let [address (get-in @store [:wallet :address])
         agent-status (get-in @store [:wallet :agent :status])]
-    (cond
-      (nil? address)
+    (if (nil? address)
       (do
         (swap! store assoc-in [:order-form-runtime :error] "Connect your wallet before submitting.")
         (show-toast! store :error "Connect your wallet before submitting."))
-
-      (not= :ready agent-status)
-      (do
-        (swap! store assoc-in [:order-form-runtime :error] "Enable trading before submitting orders.")
-        (show-toast! store :error "Enable trading before submitting orders."))
-
-      :else
-      (do
-        (swap! store assoc-in [:order-form-runtime :submitting?] true)
-        (-> (trading-api/submit-order! store address (:action request))
-            (.then (fn [resp]
-                     (swap! store assoc-in [:order-form-runtime :submitting?] false)
-                     (let [{:keys [ok? success-count error-text toast-message]}
-                           (submit-outcome exchange-response-error resp)]
-                       (if ok?
-                       (do
-                         (swap! store assoc-in [:order-form-runtime :error] nil)
-                         (show-toast! store :success "Order submitted.")
-                         (refresh-account-surfaces-after-order-mutation! store address)
-                         (dispatch! store nil [[:actions/refresh-order-history]]))
-                       (do
-                         (swap! store assoc-in [:order-form-runtime :error] error-text)
-                         (show-toast! store :error toast-message)
-                         (when (pos? success-count)
-                           (refresh-account-surfaces-after-order-mutation! store address)
-                           (dispatch! store nil [[:actions/refresh-order-history]])))))))
-            (.catch (fn [err]
-                      (let [error-text (runtime-error-message err)]
-                        (swap! store assoc-in [:order-form-runtime :submitting?] false)
-                        (swap! store assoc-in [:order-form-runtime :error] error-text)
-                        (show-toast! store :error (str "Order placement failed: " error-text))))))))))
+      (if (not= :ready agent-status)
+        (do
+          (swap! store assoc-in [:order-form-runtime :error] "Enable trading before submitting orders.")
+          (show-toast! store :error "Enable trading before submitting orders."))
+        (do
+          (swap! store assoc-in [:order-form-runtime :submitting?] true)
+          (letfn [(handle-submit-runtime-error! [err]
+                    (let [error-text (runtime-error-message err)]
+                      (swap! store assoc-in [:order-form-runtime :submitting?] false)
+                      (swap! store assoc-in [:order-form-runtime :error] error-text)
+                      (show-toast! store :error (str "Order placement failed: " error-text))))]
+            (-> (run-pre-submit-actions! store
+                                         address
+                                         request
+                                         exchange-response-error
+                                         runtime-error-message)
+                (.then (fn [pre-submit-result]
+                         (if-not (:ok? pre-submit-result)
+                           (do
+                             (swap! store assoc-in [:order-form-runtime :submitting?] false)
+                             (swap! store assoc-in [:order-form-runtime :error] (:error-text pre-submit-result))
+                             (show-toast! store :error (:toast-message pre-submit-result)))
+                           (-> (trading-api/submit-order! store address (:action request))
+                               (.then (fn [resp]
+                                        (swap! store assoc-in [:order-form-runtime :submitting?] false)
+                                        (let [{:keys [ok? success-count error-text toast-message]}
+                                              (submit-outcome exchange-response-error resp)]
+                                          (if ok?
+                                            (do
+                                              (swap! store assoc-in [:order-form-runtime :error] nil)
+                                              (show-toast! store :success "Order submitted.")
+                                              (refresh-account-surfaces-after-order-mutation! store address)
+                                              (dispatch! store nil [[:actions/refresh-order-history]]))
+                                            (do
+                                              (swap! store assoc-in [:order-form-runtime :error] error-text)
+                                              (show-toast! store :error toast-message)
+                                              (when (pos? success-count)
+                                                (refresh-account-surfaces-after-order-mutation! store address)
+                                                (dispatch! store nil [[:actions/refresh-order-history]])))))))
+                               (.catch handle-submit-runtime-error!)))))
+                (.catch handle-submit-runtime-error!))))))))
 
 (defn- update-position-tpsl-modal-error
   [state error-text]

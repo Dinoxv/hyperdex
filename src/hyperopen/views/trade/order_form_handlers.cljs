@@ -15,7 +15,12 @@
                 :on-select-pro-order-type (fn [order-type]
                                             (dispatch-command (cmd/select-pro-order-type order-type)))}
 
-   :leverage {:on-next-leverage (fn [leverage]
+   :leverage {:on-toggle-margin-mode-dropdown (dispatch-command (cmd/toggle-margin-mode-dropdown))
+              :on-close-margin-mode-dropdown (dispatch-command (cmd/close-margin-mode-dropdown))
+              :on-margin-mode-dropdown-keydown (dispatch-command (cmd/handle-margin-mode-dropdown-keydown cmd/event-key))
+              :on-select-margin-mode (fn [mode]
+                                       (dispatch-command (cmd/set-order-margin-mode mode)))
+              :on-next-leverage (fn [leverage]
                                   (dispatch-command (cmd/set-order-ui-leverage leverage)))}
 
    :side {:on-select-side (fn [side]

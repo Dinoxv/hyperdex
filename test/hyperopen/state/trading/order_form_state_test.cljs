@@ -34,6 +34,7 @@
 (deftest default-order-form-and-ui-field-ownership-test
   (is (nil? (:entry-mode (trading/default-order-form))))
   (is (nil? (:ui-leverage (trading/default-order-form))))
+  (is (nil? (:margin-mode (trading/default-order-form))))
   (is (nil? (:size-input-mode (trading/default-order-form))))
   (is (nil? (:size-input-source (trading/default-order-form))))
   (is (nil? (:size-display (trading/default-order-form))))
@@ -42,6 +43,8 @@
          (:slippage (trading/default-order-form))))
   (is (= :limit (:entry-mode (trading/default-order-form-ui))))
   (is (number? (:ui-leverage (trading/default-order-form-ui))))
+  (is (= :cross (:margin-mode (trading/default-order-form-ui))))
+  (is (false? (:margin-mode-dropdown-open? (trading/default-order-form-ui))))
   (is (= :quote (:size-input-mode (trading/default-order-form-ui))))
   (is (= :manual (:size-input-source (trading/default-order-form-ui))))
   (is (false? (:size-unit-dropdown-open? (trading/default-order-form-ui))))
@@ -64,6 +67,7 @@
         normalized-legacy (trading/order-form-ui-state legacy-flag-state)
         normalized-explicit (trading/order-form-ui-state explicit-ui-state)]
     (is (false? (:pro-order-type-dropdown-open? normalized-no-ui)))
+    (is (false? (:margin-mode-dropdown-open? normalized-no-ui)))
     (is (false? (:size-unit-dropdown-open? normalized-no-ui)))
     (is (false? (:tpsl-unit-dropdown-open? normalized-no-ui)))
     (is (false? (:tif-dropdown-open? normalized-no-ui)))
@@ -71,6 +75,7 @@
     (is (false? (:tpsl-panel-open? normalized-no-ui)))
     (is (= :limit (:entry-mode normalized-no-ui)))
     (is (number? (:ui-leverage normalized-no-ui)))
+    (is (= :cross (:margin-mode normalized-no-ui)))
     (is (= :quote (:size-input-mode normalized-no-ui)))
     (is (= :manual (:size-input-source normalized-no-ui)))
     (is (= "" (:size-display normalized-no-ui)))
@@ -88,6 +93,12 @@
         normalized-ui (trading/order-form-ui-state state)]
     (is (true? (:tpsl-panel-open? normalized-ui)))
     (is (true? (:tpsl-unit-dropdown-open? normalized-ui)))))
+
+(deftest normalize-order-form-ui-normalizes-margin-mode-values-test
+  (let [isolated-ui (trading/normalize-order-form-ui {:margin-mode "ISOLATED"})
+        invalid-ui (trading/normalize-order-form-ui {:margin-mode :unknown})]
+    (is (= :isolated (:margin-mode isolated-ui)))
+    (is (= :cross (:margin-mode invalid-ui)))))
 
 (deftest normalize-order-form-keeps-entry-mode-and-type-consistent-test
   (let [market-form (trading/normalize-order-form base-state {:entry-mode :market

@@ -17,6 +17,12 @@
     (is (contains? strings "Buy / Long"))
     (is (contains? strings "Sell / Short"))))
 
+(deftest leverage-row-renders-isolated-margin-label-when-selected-test
+  (let [view-node (view/order-form-view (base-state {:margin-mode :isolated}))
+        strings (set (collect-strings view-node))]
+    (is (contains? strings "Isolated"))
+    (is (not (contains? strings "Cross")))))
+
 (deftest submit-button-renders-before-liquidation-metrics-test
   (let [view-node (view/order-form-view (base-state {:type :limit :size "1" :price "100"}))
         tokens (vec (collect-strings view-node))
