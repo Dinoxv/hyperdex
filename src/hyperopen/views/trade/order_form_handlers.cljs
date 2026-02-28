@@ -20,8 +20,11 @@
               :on-margin-mode-dropdown-keydown (dispatch-command (cmd/handle-margin-mode-dropdown-keydown cmd/event-key))
               :on-select-margin-mode (fn [mode]
                                        (dispatch-command (cmd/set-order-margin-mode mode)))
-              :on-next-leverage (fn [leverage]
-                                  (dispatch-command (cmd/set-order-ui-leverage leverage)))}
+              :on-toggle-leverage-popover (dispatch-command (cmd/toggle-leverage-popover))
+              :on-close-leverage-popover (dispatch-command (cmd/close-leverage-popover))
+              :on-leverage-popover-keydown (dispatch-command (cmd/handle-leverage-popover-keydown cmd/event-key))
+              :on-set-leverage-draft (dispatch-command (cmd/set-order-ui-leverage-draft cmd/event-target-value))
+              :on-confirm-leverage (dispatch-command (cmd/confirm-order-ui-leverage))}
 
    :side {:on-select-side (fn [side]
                             (dispatch-command (cmd/set-order-side side)))}

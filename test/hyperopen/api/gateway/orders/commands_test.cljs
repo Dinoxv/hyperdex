@@ -223,6 +223,36 @@
     (is (= false (:isCross isolated-action)))
     (is (= 21 (:leverage isolated-action)))))
 
+(deftest build-order-request-infers-perp-leverage-pre-action-when-market-type-metadata-is-missing-test
+  (let [context-without-market-type {:active-asset "BTC"
+                                     :asset-idx 5
+                                     :market {:szDecimals 4}}
+        request (commands/build-order-request context-without-market-type {:type :limit
+                                                                           :side :buy
+                                                                           :size "1"
+                                                                           :price "100"
+                                                                           :ui-leverage 9
+                                                                           :margin-mode :cross})
+        pre-action (first (:pre-actions request))]
+    (is (= "updateLeverage" (:type pre-action)))
+    (is (= 5 (:asset pre-action)))
+    (is (= true (:isCross pre-action)))
+    (is (= 9 (:leverage pre-action)))))
+
+(deftest build-order-request-omits-leverage-pre-action-for-spot-like-instrument-with-missing-market-type-test
+  (let [spot-like-context {:active-asset "ETH/USDC"
+                           :asset-idx 12
+                           :market {:coin "ETH/USDC"
+                                    :szDecimals 4}}
+        request (commands/build-order-request spot-like-context {:type :limit
+                                                                 :side :buy
+                                                                 :size "1"
+                                                                 :price "100"
+                                                                 :ui-leverage 7
+                                                                 :margin-mode :cross})]
+    (is (map? request))
+    (is (nil? (:pre-actions request)))))
+
 (deftest build-order-request-fails-closed-on-invalid-scale-and-twap-test
   (is (nil? (commands/build-order-request command-context {:type :scale
                                                             :side :buy

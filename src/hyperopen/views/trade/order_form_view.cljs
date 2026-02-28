@@ -200,13 +200,167 @@
         (size-unit-option :quote quote-symbol (= selected-mode :quote) on-select-mode)
         (size-unit-option :base base-symbol (= selected-mode :base) on-select-mode)])]))
 
-(defn- leverage-row [margin-mode margin-mode-dropdown-open? ui-leverage next-leverage leverage-handlers]
+(defn- leverage-control
+  [state ui-leverage leverage-draft max-leverage popover-open? leverage-handlers]
+  (let [max-leverage* (-> (or (trading/parse-num max-leverage)
+                              (trading/parse-num ui-leverage)
+                              1)
+                          js/Math.round
+                          int
+                          (max 1))
+        draft* (trading/normalize-ui-leverage state
+                                              (or leverage-draft ui-leverage))
+        slider-progress (if (> max-leverage* 1)
+                          (* 100 (/ (- draft* 1)
+                                    (- max-leverage* 1)))
+                          100)]
+    [:div {:class ["relative" "flex-1"]
+           :style (when popover-open?
+                    {:z-index 1200})}
+     (when popover-open?
+       [:button {:type "button"
+                 :class ["absolute" "bg-transparent" "cursor-default"]
+                 :style {:left "-100vmax"
+                         :top "-100vmax"
+                         :width "200vmax"
+                         :height "200vmax"
+                         :z-index 1200}
+                 :aria-label "Close leverage menu"
+                 :on {:click (:on-close-leverage-popover leverage-handlers)}}])
+     [:button {:type "button"
+               :class ["relative"
+                       "flex"
+                       "h-10"
+                       "w-full"
+                       "items-center"
+                       "justify-center"
+                       "gap-1"
+                       "rounded-lg"
+                       "border"
+                       "border-base-300"
+                       "bg-base-200"
+                       "text-sm"
+                       "font-semibold"
+                       "text-gray-100"
+                       "transition-colors"
+                       "outline-none"
+                       "focus:outline-none"
+                       "focus:ring-0"
+                       "focus:ring-offset-0"
+                       "focus:shadow-none"]
+               :aria-label "Adjust leverage"
+               :aria-haspopup "dialog"
+               :aria-expanded (boolean popover-open?)
+               :style (when popover-open?
+                        {:z-index 1201})
+               :on {:click (:on-toggle-leverage-popover leverage-handlers)
+                    :keydown (:on-leverage-popover-keydown leverage-handlers)}}
+      [:span (str ui-leverage "x")]]
+     (when popover-open?
+       [:div {:class ["absolute"
+                      "right-0"
+                      "top-full"
+                      "mt-2"
+                      "w-[320px]"
+                      "rounded-xl"
+                      "border"
+                      "border-[#273035]"
+                      "bg-[#0f1728]"
+                      "p-3"
+                      "shadow-[0_18px_36px_rgba(0,0,0,0.45)]"
+                      "space-y-2.5"]
+              :style {:z-index 1202}
+              :role "dialog"
+              :aria-label "Adjust Leverage"
+              :on {:keydown (:on-leverage-popover-keydown leverage-handlers)}}
+        [:div {:class ["text-sm" "font-semibold" "text-[#E7ECEF]"]} "Adjust Leverage"]
+        [:div {:class ["space-y-1" "text-xs"]}
+         [:div {:class ["flex" "items-center" "justify-between" "gap-2"]}
+          [:span {:class ["text-[#97A3B5]"]} "Maximum leverage"]
+          [:span {:class ["font-semibold" "text-[#E7ECEF]" "num"]} (str max-leverage* "x")]]
+         [:div {:class ["flex" "items-center" "justify-between" "gap-2"]}
+          [:span {:class ["text-[#97A3B5]"]} "Max position size"]
+          [:span {:class ["font-semibold" "text-[#E7ECEF]" "num"]} "N/A"]]]
+        [:div {:class ["pt-1"]}
+         [:input {:class ["leverage-adjust-slider" "range" "range-sm" "w-full"]
+                  :type "range"
+                  :min 1
+                  :max max-leverage*
+                  :step 1
+                  :value draft*
+                  :style {:--leverage-adjust-slider-progress (str slider-progress "%")}
+                  :aria-label "Leverage slider"
+                  :on {:input (:on-set-leverage-draft leverage-handlers)}}]]
+        [:div {:class ["flex" "items-center" "gap-2"]}
+         [:div {:class ["relative" "flex-1"]}
+          [:input {:class (into ["h-10"
+                                 "w-full"
+                                 "rounded-lg"
+                                 "border"
+                                 "border-[#2f3b4c]"
+                                 "bg-[#131f31]"
+                                 "px-3"
+                                 "pr-10"
+                                 "text-right"
+                                 "text-base"
+                                 "font-semibold"
+                                 "text-[#E7ECEF]"
+                                 "num"
+                                 "appearance-none"]
+                                primitives/neutral-input-focus-classes)
+                   :type "text"
+                   :inputmode "numeric"
+                   :pattern "[0-9]*"
+                   :value draft*
+                   :aria-label "Leverage value"
+                   :on {:input (:on-set-leverage-draft leverage-handlers)}}]
+          [:button {:type "button"
+                    :class ["absolute"
+                            "right-1.5"
+                            "top-1/2"
+                            "-translate-y-1/2"
+                            "h-7"
+                            "w-7"
+                            "rounded-md"
+                            "text-sm"
+                            "font-semibold"
+                            "text-[#9BA8B8]"
+                            "hover:bg-[#1e2a3d]"
+                            "hover:text-[#E7ECEF]"
+                            "focus:outline-none"
+                            "focus:ring-0"
+                            "focus:ring-offset-0"]
+                    :aria-label "Close leverage menu"
+                    :on {:click (:on-close-leverage-popover leverage-handlers)}}
+           "x"]]
+         [:button {:type "button"
+                   :class ["h-10"
+                           "min-w-[94px]"
+                           "rounded-lg"
+                           "bg-[#d1d5db]"
+                           "px-3"
+                           "text-sm"
+                           "font-semibold"
+                           "text-[#111827]"
+                           "transition-colors"
+                           "hover:bg-[#e2e6ea]"
+                           "focus:outline-none"
+                           "focus:ring-0"
+                           "focus:ring-offset-0"]
+                   :on {:click (:on-confirm-leverage leverage-handlers)}}
+          "Confirm"]]])]))
+
+(defn- leverage-row
+  [state margin-mode margin-mode-dropdown-open? leverage-popover-open? ui-leverage leverage-draft max-leverage leverage-handlers]
   (let [mode (trading/normalize-margin-mode margin-mode)]
     [:div {:class ["grid" "grid-cols-3" "gap-2"]}
      (margin-mode-chip mode margin-mode-dropdown-open? leverage-handlers)
-     (primitives/chip-button (str ui-leverage "x")
-                             true
-                             :on-click ((:on-next-leverage leverage-handlers) next-leverage))
+     (leverage-control state
+                       ui-leverage
+                       leverage-draft
+                       max-leverage
+                       leverage-popover-open?
+                       leverage-handlers)
      (primitives/chip-button "Classic" true :disabled? true)]))
 
 (defn- side-row [side side-handlers]
@@ -516,7 +670,6 @@
                 read-only?
                 display
                 ui-leverage
-                next-leverage
                 size-percent
                 display-size-percent
                 notch-overlap-threshold
@@ -532,8 +685,11 @@
         (order-form-vm/order-form-vm state)
         handler-map (handlers/build-handlers)
         margin-mode-dropdown-open? (boolean (get-in state [:order-form-ui :margin-mode-dropdown-open?]))
+        leverage-popover-open? (boolean (get-in state [:order-form-ui :leverage-popover-open?]))
+        leverage-draft (get-in state [:order-form-ui :leverage-draft])
         size-unit-dropdown-open? (boolean (get-in state [:order-form-ui :size-unit-dropdown-open?]))
         tif-dropdown-open? (boolean (get-in state [:order-form-ui :tif-dropdown-open?]))
+        max-leverage (trading/market-max-leverage state)
         entry-mode-handlers (:entry-mode handler-map)
         leverage-handlers (:leverage handler-map)
         side-handlers (:side handler-map)
@@ -572,10 +728,13 @@
 
      [:div {:class (into ["flex" "flex-col" "flex-1" "gap-3"]
                          (when read-only? ["opacity-60" "pointer-events-none"]))}
-      (leverage-row (:margin-mode form)
+      (leverage-row state
+                    (:margin-mode form)
                     margin-mode-dropdown-open?
+                    leverage-popover-open?
                     ui-leverage
-                    next-leverage
+                    leverage-draft
+                    max-leverage
                     leverage-handlers)
 
       (sections/entry-mode-tabs {:entry-mode entry-mode

@@ -158,6 +158,11 @@
    :toggle-margin-mode-dropdown order-actions/toggle-margin-mode-dropdown
    :close-margin-mode-dropdown order-actions/close-margin-mode-dropdown
    :handle-margin-mode-dropdown-keydown order-actions/handle-margin-mode-dropdown-keydown
+   :toggle-leverage-popover order-actions/toggle-leverage-popover
+   :close-leverage-popover order-actions/close-leverage-popover
+   :handle-leverage-popover-keydown order-actions/handle-leverage-popover-keydown
+   :set-order-ui-leverage-draft order-actions/set-order-ui-leverage-draft
+   :confirm-order-ui-leverage order-actions/confirm-order-ui-leverage
    :toggle-size-unit-dropdown order-actions/toggle-size-unit-dropdown
    :close-size-unit-dropdown order-actions/close-size-unit-dropdown
    :handle-size-unit-dropdown-keydown order-actions/handle-size-unit-dropdown-keydown

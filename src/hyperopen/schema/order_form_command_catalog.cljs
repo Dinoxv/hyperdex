@@ -13,7 +13,7 @@
    {:command-id :order-form/handle-pro-order-type-dropdown-keydown
     :action-id :actions/handle-pro-order-type-dropdown-keydown
     :handler-key :handle-pro-order-type-dropdown-keydown}
-   {:command-id :order-form/toggle-margin-mode-dropdown
+  {:command-id :order-form/toggle-margin-mode-dropdown
     :action-id :actions/toggle-margin-mode-dropdown
     :handler-key :toggle-margin-mode-dropdown}
    {:command-id :order-form/close-margin-mode-dropdown
@@ -22,6 +22,15 @@
    {:command-id :order-form/handle-margin-mode-dropdown-keydown
     :action-id :actions/handle-margin-mode-dropdown-keydown
     :handler-key :handle-margin-mode-dropdown-keydown}
+   {:command-id :order-form/toggle-leverage-popover
+    :action-id :actions/toggle-leverage-popover
+    :handler-key :toggle-leverage-popover}
+   {:command-id :order-form/close-leverage-popover
+    :action-id :actions/close-leverage-popover
+    :handler-key :close-leverage-popover}
+   {:command-id :order-form/handle-leverage-popover-keydown
+    :action-id :actions/handle-leverage-popover-keydown
+    :handler-key :handle-leverage-popover-keydown}
    {:command-id :order-form/toggle-size-unit-dropdown
     :action-id :actions/toggle-size-unit-dropdown
     :handler-key :toggle-size-unit-dropdown}
@@ -52,6 +61,12 @@
    {:command-id :order-form/select-pro-order-type
     :action-id :actions/select-pro-order-type
     :handler-key :select-pro-order-type}
+   {:command-id :order-form/set-order-ui-leverage-draft
+    :action-id :actions/set-order-ui-leverage-draft
+    :handler-key :set-order-ui-leverage-draft}
+   {:command-id :order-form/confirm-order-ui-leverage
+    :action-id :actions/confirm-order-ui-leverage
+    :handler-key :confirm-order-ui-leverage}
    {:command-id :order-form/set-order-ui-leverage
     :action-id :actions/set-order-ui-leverage
     :handler-key :set-order-ui-leverage}

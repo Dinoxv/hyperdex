@@ -11,6 +11,8 @@
 (def legacy-order-form-ui-flag-keys
   [:pro-order-type-dropdown-open?
    :margin-mode-dropdown-open?
+   :leverage-popover-open?
+   :leverage-draft
    :size-unit-dropdown-open?
    :tpsl-unit-dropdown-open?
    :tif-dropdown-open?

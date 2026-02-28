@@ -54,7 +54,11 @@
 (defn toggle-margin-mode-dropdown [state]
   (let [ui-state (:order-form-ui (transitions/toggle-margin-mode-dropdown state))
         next-open? (boolean (:margin-mode-dropdown-open? ui-state))]
-    [[:effects/save-many [[[:order-form-ui :margin-mode-dropdown-open?] next-open?]]]]))
+    [[:effects/save-many [[[:order-form-ui :margin-mode-dropdown-open?] next-open?]
+                          [[:order-form-ui :leverage-popover-open?]
+                           (boolean (:leverage-popover-open? ui-state))]
+                          [[:order-form-ui :leverage-draft]
+                           (:leverage-draft ui-state)]]]]))
 
 (defn close-margin-mode-dropdown [state]
   (let [ui-state (:order-form-ui (transitions/close-margin-mode-dropdown state))]
@@ -67,6 +71,41 @@
       [[:effects/save-many [[[:order-form-ui :margin-mode-dropdown-open?]
                              (boolean (:margin-mode-dropdown-open? ui-state))]]]])
     []))
+
+(defn toggle-leverage-popover [state]
+  (let [ui-state (:order-form-ui (transitions/toggle-leverage-popover state))]
+    [[:effects/save-many [[[:order-form-ui :margin-mode-dropdown-open?]
+                           (boolean (:margin-mode-dropdown-open? ui-state))]
+                          [[:order-form-ui :leverage-popover-open?]
+                           (boolean (:leverage-popover-open? ui-state))]
+                          [[:order-form-ui :leverage-draft]
+                           (:leverage-draft ui-state)]]]]))
+
+(defn close-leverage-popover [state]
+  (let [ui-state (:order-form-ui (transitions/close-leverage-popover state))]
+    [[:effects/save-many [[[:order-form-ui :leverage-popover-open?]
+                           (boolean (:leverage-popover-open? ui-state))]
+                          [[:order-form-ui :leverage-draft]
+                           (:leverage-draft ui-state)]]]]))
+
+(defn handle-leverage-popover-keydown [state key]
+  (if-let [transition (transitions/handle-leverage-popover-keydown state key)]
+    (let [ui-state (:order-form-ui transition)]
+      [[:effects/save-many [[[:order-form-ui :leverage-popover-open?]
+                             (boolean (:leverage-popover-open? ui-state))]
+                            [[:order-form-ui :leverage-draft]
+                             (:leverage-draft ui-state)]]]])
+    []))
+
+(defn set-order-ui-leverage-draft [state leverage]
+  (let [ui-state (:order-form-ui (transitions/set-order-ui-leverage-draft state leverage))]
+    [[:effects/save-many [[[:order-form-ui :leverage-popover-open?]
+                           (boolean (:leverage-popover-open? ui-state))]
+                          [[:order-form-ui :leverage-draft]
+                           (:leverage-draft ui-state)]]]]))
+
+(defn confirm-order-ui-leverage [state]
+  (transition-save-many state (transitions/confirm-order-ui-leverage state)))
 
 (defn toggle-size-unit-dropdown [state]
   (let [ui-state (:order-form-ui (transitions/toggle-size-unit-dropdown state))

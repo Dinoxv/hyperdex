@@ -13,6 +13,9 @@
    (commands/toggle-margin-mode-dropdown)
    (commands/close-margin-mode-dropdown)
    (commands/handle-margin-mode-dropdown-keydown commands/event-key)
+   (commands/toggle-leverage-popover)
+   (commands/close-leverage-popover)
+   (commands/handle-leverage-popover-keydown commands/event-key)
    (commands/toggle-size-unit-dropdown)
    (commands/close-size-unit-dropdown)
    (commands/handle-size-unit-dropdown-keydown commands/event-key)
@@ -23,6 +26,8 @@
    (commands/close-tif-dropdown)
    (commands/handle-tif-dropdown-keydown commands/event-key)
    (commands/select-pro-order-type :scale)
+   (commands/set-order-ui-leverage-draft 18)
+   (commands/confirm-order-ui-leverage)
    (commands/set-order-ui-leverage 25)
    (commands/set-order-margin-mode :isolated)
    (commands/update-order-form [:side] :buy)
@@ -73,6 +78,9 @@
   (is (= {:command-id :order-form/toggle-margin-mode-dropdown
           :args []}
          (commands/toggle-margin-mode-dropdown)))
+  (is (= {:command-id :order-form/toggle-leverage-popover
+          :args []}
+         (commands/toggle-leverage-popover)))
   (is (= {:command-id :order-form/toggle-tpsl-unit-dropdown
           :args []}
          (commands/toggle-tpsl-unit-dropdown)))
@@ -93,6 +101,12 @@
   (is (= [[:actions/set-order-margin-mode :isolated]]
          (intent-adapter/command->actions
           (commands/set-order-margin-mode :isolated))))
+  (is (= [[:actions/set-order-ui-leverage-draft 18]]
+         (intent-adapter/command->actions
+          (commands/set-order-ui-leverage-draft 18))))
+  (is (= [[:actions/confirm-order-ui-leverage]]
+         (intent-adapter/command->actions
+          (commands/confirm-order-ui-leverage))))
   (is (= [[:actions/update-order-form [:reduce-only] [:event.target/checked]]]
          (intent-adapter/command->actions
           (commands/toggle-reduce-only)))))

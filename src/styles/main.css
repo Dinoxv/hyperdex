@@ -208,6 +208,50 @@
       0 0 0 12px rgba(0, 212, 170, 0.18);
   }
 
+  .leverage-adjust-slider.range {
+    --range-shdw: rgba(212, 216, 222, 0.35);
+    --leverage-adjust-slider-active: rgba(214, 221, 230, 0.95);
+    --leverage-adjust-slider-inactive: rgba(73, 86, 104, 0.6);
+    --leverage-adjust-slider-progress: 0%;
+    overflow: visible;
+  }
+
+  .leverage-adjust-slider.range::-webkit-slider-runnable-track {
+    background: linear-gradient(
+      90deg,
+      var(--leverage-adjust-slider-active) 0%,
+      var(--leverage-adjust-slider-active) var(--leverage-adjust-slider-progress),
+      var(--leverage-adjust-slider-inactive) var(--leverage-adjust-slider-progress),
+      var(--leverage-adjust-slider-inactive) 100%
+    );
+    border: 0;
+    height: 0.35rem;
+    border-radius: 9999px;
+  }
+
+  .leverage-adjust-slider.range::-moz-range-track {
+    background: linear-gradient(
+      90deg,
+      var(--leverage-adjust-slider-active) 0%,
+      var(--leverage-adjust-slider-active) var(--leverage-adjust-slider-progress),
+      var(--leverage-adjust-slider-inactive) var(--leverage-adjust-slider-progress),
+      var(--leverage-adjust-slider-inactive) 100%
+    );
+    border: 0;
+    height: 0.35rem;
+    border-radius: 9999px;
+  }
+
+  .leverage-adjust-slider.range::-webkit-slider-thumb {
+    background-color: rgb(235, 239, 246);
+    box-shadow: 0 0 0 1px rgba(12, 20, 30, 0.38) inset;
+  }
+
+  .leverage-adjust-slider.range::-moz-range-thumb {
+    background-color: rgb(235, 239, 246);
+    box-shadow: 0 0 0 1px rgba(12, 20, 30, 0.38) inset;
+  }
+
   .trade-toggle-checkbox {
     color: #00d4aa;
     border-color: rgb(48 54 61);

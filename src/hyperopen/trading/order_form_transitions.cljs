@@ -19,6 +19,9 @@
 (defn- ui-only-form-path? [path]
   (order-form-key-policy/canonical-write-blocked-order-form-path? path))
 
+(declare current-ui-leverage
+         current-leverage-draft)
+
 (defn- enforce-field-ownership
   [state transition]
   (if-not (map? transition)
@@ -202,6 +205,8 @@
                           false
                           (boolean (:pro-order-type-dropdown-open? ui-state)))
                         :margin-mode-dropdown-open? false
+                        :leverage-popover-open? false
+                        :leverage-draft (:ui-leverage next-form)
                         :size-unit-dropdown-open? false
                         :tpsl-unit-dropdown-open? false
                         :tif-dropdown-open? false))]
@@ -225,6 +230,8 @@
                  (assoc ui-state
                         :pro-order-type-dropdown-open? false
                         :margin-mode-dropdown-open? false
+                        :leverage-popover-open? false
+                        :leverage-draft (:ui-leverage next-form)
                         :size-unit-dropdown-open? false
                         :tpsl-unit-dropdown-open? false
                         :tif-dropdown-open? false))]
@@ -256,7 +263,10 @@
         open? (boolean (:margin-mode-dropdown-open? ui-state))]
     (enforce-field-ownership
      state
-     {:order-form-ui (assoc ui-state :margin-mode-dropdown-open? (not open?))})))
+     {:order-form-ui (assoc ui-state
+                            :margin-mode-dropdown-open? (not open?)
+                            :leverage-popover-open? false
+                            :leverage-draft (current-ui-leverage state))})))
 
 (defn close-margin-mode-dropdown [state]
   (enforce-field-ownership
@@ -267,6 +277,75 @@
 (defn handle-margin-mode-dropdown-keydown [state key]
   (when (= key "Escape")
     (close-margin-mode-dropdown state)))
+
+(defn- current-ui-leverage
+  [state]
+  (let [form (trading/order-form-draft state)]
+    (trading/normalize-ui-leverage state (:ui-leverage form))))
+
+(defn- current-leverage-draft
+  [state]
+  (let [ui-state (trading/order-form-ui-state state)
+        current-leverage (current-ui-leverage state)]
+    (trading/normalize-ui-leverage state
+                                   (or (:leverage-draft ui-state)
+                                       current-leverage))))
+
+(defn toggle-leverage-popover [state]
+  (let [ui-state (trading/order-form-ui-state state)
+        open? (boolean (:leverage-popover-open? ui-state))
+        next-open? (not open?)
+        current-leverage (current-ui-leverage state)
+        draft-leverage (current-leverage-draft state)
+        next-ui (assoc ui-state
+                       :margin-mode-dropdown-open? false
+                       :leverage-popover-open? next-open?
+                       :leverage-draft (if next-open?
+                                         draft-leverage
+                                         current-leverage))]
+    (enforce-field-ownership
+     state
+     {:order-form-ui next-ui})))
+
+(defn close-leverage-popover [state]
+  (let [ui-state (trading/order-form-ui-state state)
+        current-leverage (current-ui-leverage state)]
+    (enforce-field-ownership
+     state
+     {:order-form-ui (assoc ui-state
+                            :leverage-popover-open? false
+                            :leverage-draft current-leverage)})))
+
+(defn handle-leverage-popover-keydown [state key]
+  (when (= key "Escape")
+    (close-leverage-popover state)))
+
+(defn set-order-ui-leverage-draft [state leverage]
+  (let [ui-state (trading/order-form-ui-state state)
+        next-draft (trading/normalize-ui-leverage state leverage)]
+    (enforce-field-ownership
+     state
+     {:order-form-ui (assoc ui-state
+                            :leverage-popover-open? true
+                            :leverage-draft next-draft)})))
+
+(defn confirm-order-ui-leverage [state]
+  (let [form (trading/order-form-draft state)
+        ui-state (trading/order-form-ui-state state)
+        next-leverage (current-leverage-draft state)
+        updated (assoc form :ui-leverage next-leverage)
+        next-form (->> (reconcile-size-after-context-change state updated)
+                       (backfill-tpsl-triggers-from-offset-inputs state))
+        next-ui (trading/effective-order-form-ui
+                 next-form
+                 (assoc ui-state
+                        :leverage-popover-open? false
+                        :leverage-draft next-leverage))]
+    (enforce-field-ownership
+     state
+     {:order-form next-form
+      :order-form-ui next-ui
+      :order-form-runtime (cleared-runtime-state state)})))
 
 (defn toggle-size-unit-dropdown [state]
   (let [ui-state (trading/order-form-ui-state state)
@@ -325,13 +404,20 @@
 
 (defn set-order-ui-leverage [state leverage]
   (let [form (trading/order-form-draft state)
+        ui-state (trading/order-form-ui-state state)
         normalized (trading/normalize-ui-leverage state leverage)
         updated (assoc form :ui-leverage normalized)
         next-form (->> (reconcile-size-after-context-change state updated)
-                       (backfill-tpsl-triggers-from-offset-inputs state))]
+                       (backfill-tpsl-triggers-from-offset-inputs state))
+        next-ui (trading/effective-order-form-ui
+                 next-form
+                 (assoc ui-state
+                        :leverage-popover-open? false
+                        :leverage-draft normalized))]
     (enforce-field-ownership
      state
      {:order-form next-form
+      :order-form-ui next-ui
       :order-form-runtime (cleared-runtime-state state)})))
 
 (defn set-order-margin-mode [state mode]
@@ -341,7 +427,10 @@
         next-form (assoc form :margin-mode mode*)
         next-ui (trading/effective-order-form-ui
                  next-form
-                 (assoc ui-state :margin-mode-dropdown-open? false))]
+                 (assoc ui-state
+                        :margin-mode-dropdown-open? false
+                        :leverage-popover-open? false
+                        :leverage-draft (:ui-leverage next-form)))]
     (enforce-field-ownership
      state
      {:order-form next-form

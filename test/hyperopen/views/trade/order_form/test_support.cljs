@@ -126,6 +126,8 @@
     :size-input-source
     :size-display
     :margin-mode-dropdown-open?
+    :leverage-popover-open?
+    :leverage-draft
     :size-unit-dropdown-open?
     :tpsl-unit-dropdown-open?
     :tif-dropdown-open?

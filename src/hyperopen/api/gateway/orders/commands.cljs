@@ -252,13 +252,38 @@
     (when (positive-number? parsed)
       (-> parsed js/Math.round int (max 1)))))
 
+(defn- normalize-market-type
+  [value]
+  (let [candidate (cond
+                    (keyword? value) value
+                    (string? value) (keyword (str/lower-case value))
+                    :else nil)]
+    (when (contains? #{:perp :spot} candidate)
+      candidate)))
+
+(defn- spot-instrument?
+  [value]
+  (and (string? value)
+       (str/includes? value "/")))
+
+(defn- perp-market?
+  [command-context]
+  (let [market (or (:market command-context) {})
+        market-type (normalize-market-type (:market-type market))
+        instrument (or (:active-asset command-context)
+                       (:coin market))]
+    (case market-type
+      :spot false
+      :perp true
+      (not (spot-instrument? instrument)))))
+
 (defn- build-update-leverage-action
   [command-context form]
   (let [asset-idx (:asset-idx command-context)
-        market-type (get-in command-context [:market :market-type])
+        perp-market-eligible? (perp-market? command-context)
         leverage (normalize-leverage (:ui-leverage form))
         margin-mode (normalize-margin-mode (:margin-mode form))]
-    (when (and (= :perp market-type)
+    (when (and perp-market-eligible?
                (number? asset-idx)
                (number? leverage))
       (array-map :type "updateLeverage"

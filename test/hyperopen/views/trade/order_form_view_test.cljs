@@ -23,6 +23,16 @@
     (is (contains? strings "Isolated"))
     (is (not (contains? strings "Cross")))))
 
+(deftest leverage-popover-renders-adjust-controls-when-open-test
+  (let [view-node (view/order-form-view (base-state {:type :limit}
+                                                     {:leverage-popover-open? true
+                                                      :leverage-draft 18}))
+        strings (set (collect-strings view-node))]
+    (is (contains? strings "Adjust Leverage"))
+    (is (contains? strings "Maximum leverage"))
+    (is (contains? strings "Max position size"))
+    (is (contains? strings "Confirm"))))
+
 (deftest submit-button-renders-before-liquidation-metrics-test
   (let [view-node (view/order-form-view (base-state {:type :limit :size "1" :price "100"}))
         tokens (vec (collect-strings view-node))

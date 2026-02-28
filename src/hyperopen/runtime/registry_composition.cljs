@@ -471,6 +471,9 @@
            toggle-margin-mode-dropdown
            close-margin-mode-dropdown
            handle-margin-mode-dropdown-keydown
+           toggle-leverage-popover
+           close-leverage-popover
+           handle-leverage-popover-keydown
            toggle-size-unit-dropdown
            close-size-unit-dropdown
            handle-size-unit-dropdown-keydown
@@ -480,6 +483,8 @@
            toggle-tif-dropdown
            close-tif-dropdown
            handle-tif-dropdown-keydown
+           set-order-ui-leverage-draft
+           confirm-order-ui-leverage
            set-order-ui-leverage
            set-order-margin-mode
            set-order-size-percent
@@ -502,6 +507,9 @@
    :toggle-margin-mode-dropdown toggle-margin-mode-dropdown
    :close-margin-mode-dropdown close-margin-mode-dropdown
    :handle-margin-mode-dropdown-keydown handle-margin-mode-dropdown-keydown
+   :toggle-leverage-popover toggle-leverage-popover
+   :close-leverage-popover close-leverage-popover
+   :handle-leverage-popover-keydown handle-leverage-popover-keydown
    :toggle-size-unit-dropdown toggle-size-unit-dropdown
    :close-size-unit-dropdown close-size-unit-dropdown
    :handle-size-unit-dropdown-keydown handle-size-unit-dropdown-keydown
@@ -511,6 +519,8 @@
    :toggle-tif-dropdown toggle-tif-dropdown
    :close-tif-dropdown close-tif-dropdown
    :handle-tif-dropdown-keydown handle-tif-dropdown-keydown
+   :set-order-ui-leverage-draft set-order-ui-leverage-draft
+   :confirm-order-ui-leverage confirm-order-ui-leverage
    :set-order-ui-leverage set-order-ui-leverage
    :set-order-margin-mode set-order-margin-mode
    :set-order-size-percent set-order-size-percent

@@ -271,3 +271,57 @@
     (is (contains? isolated-option-classes "bg-[#273035]"))
     (is (contains? isolated-option-classes "text-[#50D2C1]"))
     (is (= 1202 (get-in listbox [1 :style :z-index])))))
+
+(deftest leverage-popover-toggle-and-confirm-actions-test
+  (let [closed-view (view/order-form-view (base-state {:type :limit}
+                                                       {:leverage-popover-open? false}))
+        open-view (view/order-form-view (base-state {:type :limit}
+                                                     {:leverage-popover-open? true
+                                                      :leverage-draft 18}))
+        trigger-button (find-first-node closed-view
+                                        (fn [node]
+                                          (let [attrs (when (map? (second node)) (second node))]
+                                            (and (= :button (first node))
+                                                 (= "Adjust leverage" (:aria-label attrs))))))
+        overlay-button (find-first-node open-view
+                                        (fn [node]
+                                          (let [attrs (when (map? (second node)) (second node))]
+                                            (and (= :button (first node))
+                                                 (= "Close leverage menu" (:aria-label attrs))
+                                                 (= [[:actions/close-leverage-popover]]
+                                                    (get-in attrs [:on :click]))))))
+        slider-input (find-first-node open-view
+                                      (fn [node]
+                                        (let [attrs (when (map? (second node)) (second node))
+                                              classes (set (:class attrs))]
+                                          (and (= :input (first node))
+                                               (= "Leverage slider" (:aria-label attrs))
+                                               (contains? classes "leverage-adjust-slider")))))
+        leverage-input (find-first-node open-view
+                                        (fn [node]
+                                          (let [attrs (when (map? (second node)) (second node))]
+                                            (and (= :input (first node))
+                                                 (= "Leverage value" (:aria-label attrs))))))
+        confirm-button (find-first-node open-view
+                                        (fn [node]
+                                          (let [attrs (when (map? (second node)) (second node))]
+                                            (and (= :button (first node))
+                                                 (= [[:actions/confirm-order-ui-leverage]]
+                                                    (get-in attrs [:on :click]))
+                                                 (some #{"Confirm"} (collect-strings node))))))]
+    (is (= [[:actions/toggle-leverage-popover]]
+           (get-in trigger-button [1 :on :click])))
+    (is (= [[:actions/handle-leverage-popover-keydown [:event/key]]]
+           (get-in trigger-button [1 :on :keydown])))
+    (is (= [[:actions/set-order-ui-leverage-draft [:event.target/value]]]
+           (get-in slider-input [1 :on :input])))
+    (is (= [[:actions/set-order-ui-leverage-draft [:event.target/value]]]
+           (get-in leverage-input [1 :on :input])))
+    (is (= "18" (str (:value (second leverage-input)))))
+    (is (= 1202 (get-in (find-first-node open-view
+                                         (fn [node]
+                                           (let [attrs (when (map? (second node)) (second node))]
+                                             (= "Adjust Leverage" (:aria-label attrs)))))
+                       [1 :style :z-index])))
+    (is (some? overlay-button))
+    (is (some? confirm-button))))

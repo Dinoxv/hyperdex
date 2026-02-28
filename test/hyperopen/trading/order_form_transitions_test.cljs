@@ -30,10 +30,16 @@
       :order-form-runtime (trading/default-order-form-runtime)})))
 
 (deftest transition-runtime-shape-invariant-test
-  (let [state (base-state {:type :limit :size "1" :price "100"})]
+  (let [state (base-state {:type :limit :size "1" :price "100"})
+        leverage-draft-transition (transitions/set-order-ui-leverage-draft state 25)
+        confirm-leverage-transition (transitions/confirm-order-ui-leverage
+                                     (merge state leverage-draft-transition))]
     (doseq [transition [(transitions/select-entry-mode state :market)
                         (transitions/select-entry-mode state :limit)
                         (transitions/select-pro-order-type state :scale)
+                        (transitions/toggle-leverage-popover state)
+                        leverage-draft-transition
+                        confirm-leverage-transition
                         (transitions/set-order-ui-leverage state 25)
                         (transitions/set-order-size-percent state 45)
                         (transitions/set-order-size-display state "123")
@@ -166,6 +172,30 @@
     (is (not (contains? selected-form :margin-mode)))
     (is (= :isolated (:margin-mode selected-ui)))
     (is (false? (:margin-mode-dropdown-open? selected-ui)))))
+
+(deftest leverage-popover-transitions-toggle-draft-escape-and-confirm-test
+  (let [state (base-state {:type :limit})
+        toggled (transitions/toggle-leverage-popover state)
+        open-ui (:order-form-ui toggled)
+        drafted (transitions/set-order-ui-leverage-draft (merge state toggled) "17")
+        drafted-ui (:order-form-ui drafted)
+        escaped (transitions/handle-leverage-popover-keydown (merge state drafted) "Escape")
+        escaped-ui (:order-form-ui escaped)
+        reopened (transitions/toggle-leverage-popover (merge state escaped))
+        confirmed (transitions/confirm-order-ui-leverage
+                   (merge state
+                          reopened
+                          {:order-form-ui (assoc (:order-form-ui reopened)
+                                                 :leverage-draft 23)}))
+        confirmed-ui (:order-form-ui confirmed)]
+    (is (true? (:leverage-popover-open? open-ui)))
+    (is (= 17 (:leverage-draft drafted-ui)))
+    (is (false? (:leverage-popover-open? escaped-ui)))
+    (is (= 20 (:leverage-draft escaped-ui)))
+    (is (= 23 (:ui-leverage confirmed-ui)))
+    (is (= 23 (:leverage-draft confirmed-ui)))
+    (is (false? (:leverage-popover-open? confirmed-ui)))
+    (is (not (contains? (:order-form confirmed) :ui-leverage)))))
 
 (deftest tpsl-unit-dropdown-transitions-toggle-close-and-reset-on-unit-selection-test
   (let [state (assoc (base-state {:type :limit

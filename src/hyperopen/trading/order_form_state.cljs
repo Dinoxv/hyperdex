@@ -11,6 +11,7 @@
 (def default-size-input-mode :quote)
 (def default-size-input-source :manual)
 (def default-tpsl-unit :usd)
+(def default-leverage-draft default-ui-leverage)
 
 (def valid-margin-modes
   #{:cross :isolated})
@@ -94,6 +95,7 @@
 (defn default-order-form-ui []
   {:pro-order-type-dropdown-open? false
    :margin-mode-dropdown-open? false
+   :leverage-popover-open? false
    :size-unit-dropdown-open? false
    :tpsl-unit-dropdown-open? false
    :tif-dropdown-open? false
@@ -101,6 +103,7 @@
    :price-input-focused? false
    :entry-mode :limit
    :ui-leverage default-ui-leverage
+   :leverage-draft default-leverage-draft
    :margin-mode default-margin-mode
    :size-input-mode default-size-input-mode
    :size-input-source default-size-input-source
@@ -153,12 +156,17 @@
         normalized-leverage (if (number? parsed-leverage)
                               (-> parsed-leverage js/Math.round int (max 1))
                               default-ui-leverage)
+        parsed-leverage-draft (trading-domain/parse-num (:leverage-draft ui))
+        normalized-leverage-draft (if (number? parsed-leverage-draft)
+                                    (-> parsed-leverage-draft js/Math.round int (max 1))
+                                    normalized-leverage)
         margin-mode (normalize-margin-mode (:margin-mode ui))
         size-input-mode (normalize-size-input-mode (:size-input-mode ui))
         size-input-source (normalize-size-input-source (:size-input-source ui))]
     (assoc (default-order-form-ui)
            :pro-order-type-dropdown-open? (boolean (:pro-order-type-dropdown-open? ui))
            :margin-mode-dropdown-open? (boolean (:margin-mode-dropdown-open? ui))
+           :leverage-popover-open? (boolean (:leverage-popover-open? ui))
            :size-unit-dropdown-open? (boolean (:size-unit-dropdown-open? ui))
            :tpsl-unit-dropdown-open? (boolean (:tpsl-unit-dropdown-open? ui))
            :tif-dropdown-open? (boolean (:tif-dropdown-open? ui))
@@ -166,6 +174,7 @@
            :tpsl-panel-open? (boolean (:tpsl-panel-open? ui))
            :entry-mode entry-mode
            :ui-leverage normalized-leverage
+           :leverage-draft normalized-leverage-draft
            :margin-mode margin-mode
            :size-input-mode size-input-mode
            :size-input-source size-input-source

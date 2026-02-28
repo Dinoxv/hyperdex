@@ -86,6 +86,9 @@
       true (assoc :entry-mode (entry-mode-for-type order-type)
                   :ui-leverage (or (:ui-leverage normalized-form)
                                    (:ui-leverage normalized-ui))
+                  :leverage-draft (or (:leverage-draft normalized-ui)
+                                      (:ui-leverage normalized-form)
+                                      (:ui-leverage normalized-ui))
                   :margin-mode (normalize-margin-mode
                                 (or (:margin-mode normalized-form)
                                     (:margin-mode normalized-ui)))
