@@ -112,14 +112,13 @@
 (defonce ^:private last-metrics-request (atom nil))
 
 (defn- request-metrics-computation!
-  [request-data]
-  (let [signature (hash request-data)]
-    (when (not= signature (:signature @last-metrics-request))
-      (reset! last-metrics-request {:signature signature :data request-data})
-      (swap! system/store assoc-in [:portfolio-ui :metrics-loading?] true)
-      (when-let [worker @metrics-worker]
-        (.postMessage worker #js {:type "compute-metrics"
-                                  :payload (clj->js request-data)})))))
+  [request-data request-signature]
+  (when (not= request-signature (:signature @last-metrics-request))
+    (reset! last-metrics-request {:signature request-signature})
+    (swap! system/store assoc-in [:portfolio-ui :metrics-loading?] true)
+    (when-let [worker @metrics-worker]
+      (.postMessage worker #js {:type "compute-metrics"
+                                :payload (clj->js request-data)}))))
 
 (def ^:private chart-empty-y-ticks
   [{:value 3 :y-ratio 0}
@@ -974,6 +973,48 @@
                     :value value}))))
        vec))
 
+(def ^:private empty-source-version-counter
+  0)
+
+(defn- sampled-series-source-version-counter
+  [rows]
+  (let [rows* (or rows [])
+        row-count (count rows*)]
+    (if (pos? row-count)
+      (let [mid-idx (quot row-count 2)
+            first-row (nth rows* 0 nil)
+            mid-row (nth rows* mid-idx nil)
+            last-row (nth rows* (dec row-count) nil)]
+        (hash [row-count
+               (history-point-time-ms first-row)
+               (history-point-value first-row)
+               (history-point-time-ms mid-row)
+               (history-point-value mid-row)
+               (history-point-time-ms last-row)
+               (history-point-value last-row)]))
+      empty-source-version-counter)))
+
+(defn- benchmark-source-version-by-coin
+  [benchmark-cumulative-rows-by-coin selected-benchmark-coins]
+  (into {}
+        (map (fn [coin]
+               [coin
+                (sampled-series-source-version-counter
+                 (get benchmark-cumulative-rows-by-coin coin))]))
+        selected-benchmark-coins))
+
+(defn- metrics-request-signature
+  [summary-time-range selected-benchmark-coins strategy-source-version benchmark-source-version-map]
+  (let [selected-coins (vec (or selected-benchmark-coins []))]
+    {:summary-time-range (portfolio-actions/normalize-summary-time-range summary-time-range)
+     :selected-benchmark-coins selected-coins
+     :strategy-source-version strategy-source-version
+     :benchmark-source-versions (mapv (fn [coin]
+                                        [coin
+                                         (get benchmark-source-version-map coin
+                                              empty-source-version-counter)])
+                                      selected-coins)}))
+
 (defn- benchmark-cumulative-return-rows-by-coin
   [state summary-time-range benchmark-coins strategy-time-points]
   (if (and (seq benchmark-coins)
@@ -1011,9 +1052,14 @@
         benchmark-cumulative-rows-by-coin (benchmark-cumulative-return-rows-by-coin state
                                                                                      summary-time-range
                                                                                      selected-benchmark-coins
-                                                                                     strategy-time-points)]
+                                                                                     strategy-time-points)
+        strategy-source-version (sampled-series-source-version-counter strategy-cumulative-rows)
+        benchmark-source-version-map (benchmark-source-version-by-coin benchmark-cumulative-rows-by-coin
+                                                                       selected-benchmark-coins)]
     {:strategy-cumulative-rows strategy-cumulative-rows
-     :benchmark-cumulative-rows-by-coin benchmark-cumulative-rows-by-coin}))
+     :benchmark-cumulative-rows-by-coin benchmark-cumulative-rows-by-coin
+     :strategy-source-version strategy-source-version
+     :benchmark-source-version-map benchmark-source-version-map}))
 
 (defn- benchmark-performance-column
   [benchmark-cumulative-rows label-by-coin coin]
@@ -1117,11 +1163,15 @@
      :benchmark-values-by-coin benchmark-results}))
 
 (defn- performance-metrics-model
-  [state returns-benchmark-selector benchmark-context]
+  [state summary-time-range returns-benchmark-selector benchmark-context]
   (let [strategy-cumulative-rows (or (:strategy-cumulative-rows benchmark-context)
                                      [])
         benchmark-cumulative-rows-by-coin (or (:benchmark-cumulative-rows-by-coin benchmark-context)
                                               {})
+        strategy-source-version (or (:strategy-source-version benchmark-context)
+                                    empty-source-version-counter)
+        benchmark-source-version-map (or (:benchmark-source-version-map benchmark-context)
+                                         {})
         selected-benchmark-coins (vec (or (:selected-coins returns-benchmark-selector)
                                           []))
         benchmark-label-by-coin (or (:label-by-coin returns-benchmark-selector)
@@ -1129,8 +1179,12 @@
         request-data (build-metrics-request-data strategy-cumulative-rows
                                                  benchmark-cumulative-rows-by-coin
                                                  selected-benchmark-coins)
+        request-signature (metrics-request-signature summary-time-range
+                                                     selected-benchmark-coins
+                                                     strategy-source-version
+                                                     benchmark-source-version-map)
         benchmark-requests (:benchmark-requests request-data)
-        _ (request-metrics-computation! request-data)
+        _ (request-metrics-computation! request-data request-signature)
         metrics-result (if @metrics-worker
                          (get-in state [:portfolio-ui :metrics-result])
                          (compute-metrics-sync request-data))
@@ -1529,6 +1583,7 @@
                                                          summary-time-range
                                                          returns-benchmark-selector)
         performance-metrics (performance-metrics-model state
+                                                       summary-time-range
                                                        returns-benchmark-selector
                                                        benchmark-context)
         chart (build-chart-model state

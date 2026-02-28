@@ -2,6 +2,7 @@
   (:require [clojure.string :as str]
             [cljs.test :refer-macros [deftest is testing use-fixtures]]
             [hyperopen.portfolio.actions :as portfolio-actions]
+            [hyperopen.system :as system]
             [hyperopen.views.account-equity-view :as account-equity-view]
             [hyperopen.portfolio.metrics :as portfolio-metrics]
             [hyperopen.views.portfolio.vm :as vm]))
@@ -21,8 +22,10 @@
 (use-fixtures :each
   (fn [f]
     (vm/reset-portfolio-vm-cache!)
+    (reset! @#'vm/last-metrics-request nil)
     (f)
-    (vm/reset-portfolio-vm-cache!)))
+    (vm/reset-portfolio-vm-cache!)
+    (reset! @#'vm/last-metrics-request nil)))
 
 (defn- performance-metric-row
   [view-model metric-key]
@@ -750,6 +753,70 @@
              (:benchmark-daily-rows (first @captured-requests))))
       (is (= expected-spy-daily
              (:strategy-daily-rows (second @captured-requests)))))))
+
+(deftest portfolio-vm-request-metrics-computation-dedupes-by-lightweight-signature-test
+  (let [write-count (atom 0)
+        store (atom {:portfolio-ui {}})
+        signature-a {:summary-time-range :month
+                     :selected-benchmark-coins ["SPY"]
+                     :strategy-source-version 101
+                     :benchmark-source-versions [["SPY" 201]]}
+        signature-b (assoc signature-a :strategy-source-version 102)
+        request-a {:portfolio-request {:strategy-cumulative-rows [[1 0]
+                                                                  [2 1]]}
+                   :benchmark-requests [{:coin "SPY"
+                                         :request {:strategy-cumulative-rows [[1 0]
+                                                                              [2 3]]}}]}
+        request-b {:portfolio-request {:strategy-cumulative-rows [[1 0]
+                                                                  [2 50]
+                                                                  [3 99]]}
+                   :benchmark-requests [{:coin "SPY"
+                                         :request {:strategy-cumulative-rows [[1 0]
+                                                                              [2 60]
+                                                                              [3 120]]}}]}]
+    (add-watch store ::metrics-request-writes
+               (fn [_ _ _ _]
+                 (swap! write-count inc)))
+    (try
+      (with-redefs [system/store store]
+        (@#'vm/request-metrics-computation! request-a signature-a)
+        (@#'vm/request-metrics-computation! request-b signature-a)
+        (@#'vm/request-metrics-computation! request-b signature-b)
+        (is (= 2 @write-count))
+        (is (= signature-b
+               (get (deref @#'vm/last-metrics-request) :signature)))
+        (is (true? (get-in @store [:portfolio-ui :metrics-loading?]))))
+      (finally
+        (remove-watch store ::metrics-request-writes)))))
+
+(deftest portfolio-vm-metrics-request-signature-captures-time-range-coins-and-source-versions-test
+  (let [signature-a (@#'vm/metrics-request-signature :month
+                                                      ["SPY" "QQQ"]
+                                                      101
+                                                      {"SPY" 201
+                                                       "QQQ" 301})
+        signature-b (@#'vm/metrics-request-signature :week
+                                                      ["SPY" "QQQ"]
+                                                      101
+                                                      {"SPY" 201
+                                                       "QQQ" 301})
+        signature-c (@#'vm/metrics-request-signature :month
+                                                      ["SPY" "IWM"]
+                                                      101
+                                                      {"SPY" 201
+                                                       "IWM" 401})
+        signature-d (@#'vm/metrics-request-signature :month
+                                                      ["SPY" "QQQ"]
+                                                      102
+                                                      {"SPY" 201
+                                                       "QQQ" 301})]
+    (is (= :month (:summary-time-range signature-a)))
+    (is (= ["SPY" "QQQ"] (:selected-benchmark-coins signature-a)))
+    (is (= [["SPY" 201] ["QQQ" 301]]
+           (:benchmark-source-versions signature-a)))
+    (is (not= signature-a signature-b))
+    (is (not= signature-a signature-c))
+    (is (not= signature-a signature-d))))
 
 (deftest portfolio-vm-reuses-benchmark-candle-request-for-chart-and-metrics-test
   (let [original-request portfolio-actions/returns-benchmark-candle-request
