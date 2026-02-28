@@ -172,11 +172,37 @@
           n* (if (== n -0) 0 n)]
       (.format tooltip-currency-formatter n*))))
 
-(defn- chart-tooltip-label [summary-time-range selected-tab {:keys [time-ms value]}]
-  (let [timestamp-label (if (= summary-time-range :day)
-                          (format-tooltip-time time-ms)
-                          (format-tooltip-date time-ms))]
-    (str timestamp-label ": " (format-tooltip-value selected-tab value))))
+(defn- tooltip-metric-label [selected-tab]
+  (case selected-tab
+    :account-value "Account Value"
+    :pnl "PNL"
+    :returns "Returns"
+    "Value"))
+
+(defn- tooltip-value-classes [selected-tab value]
+  (let [n (if (number? value) value 0)
+        positive-classes ["text-[#16d6a1]"]
+        negative-classes ["text-[#ff7b72]"]
+        neutral-classes ["text-[#e6edf2]"]]
+    (case selected-tab
+      :account-value ["text-[#ff9f1a]"]
+      :pnl (cond
+             (pos? n) positive-classes
+             (neg? n) negative-classes
+             :else neutral-classes)
+      :returns (cond
+                 (pos? n) positive-classes
+                 (neg? n) negative-classes
+                 :else neutral-classes)
+      neutral-classes)))
+
+(defn- chart-tooltip-model [summary-time-range selected-tab {:keys [time-ms value]}]
+  {:timestamp (if (= summary-time-range :day)
+                (format-tooltip-time time-ms)
+                (format-tooltip-date time-ms))
+   :metric-label (tooltip-metric-label selected-tab)
+   :metric-value (format-tooltip-value selected-tab value)
+   :value-classes (tooltip-value-classes selected-tab value)})
 
 (def ^:private axis-label-fallback-char-width-px
   7.5)
@@ -566,10 +592,10 @@
                                              92))
         hover-tooltip-right? (when hover-active?
                                (> hover-line-left-pct 74))
-        hover-label (when hover-active?
-                      (chart-tooltip-label summary-time-range
-                                          selected-tab
-                                          hovered-point))]
+        hover-tooltip (when hover-active?
+                        (chart-tooltip-model summary-time-range
+                                             selected-tab
+                                             hovered-point))]
     (section-card
      "portfolio-chart-card"
      [:div {:class ["flex" "items-center" "border-b" "border-base-300"]}
@@ -656,13 +682,12 @@
         (when hover-active?
           [:div {:class ["absolute"
                          "pointer-events-none"
-                         "rounded-sm"
-                         "px-1.5"
-                         "py-0.5"
-                         "text-xs"
-                         "font-medium"
-                         "text-white"
-                         "shadow-sm"
+                         "min-w-[188px]"
+                         "rounded-xl"
+                         "border"
+                         "px-3"
+                         "py-2"
+                         "shadow-lg"
                          "z-20"]
                  :data-role "portfolio-chart-hover-tooltip"
                  :style {:left (str hover-line-left-pct "%")
@@ -670,9 +695,32 @@
                          :transform (if hover-tooltip-right?
                                       "translate(calc(-100% - 8px), -50%)"
                                       "translate(8px, -50%)")
-                         :background-color "rgba(0, 0, 0, 0.85)"
-                         :white-space "nowrap"}}
-           hover-label])]]
+                         :white-space "nowrap"
+                         :border-color "rgba(98, 114, 130, 0.65)"
+                         :background "linear-gradient(138deg, rgba(24, 35, 47, 0.95) 0%, rgba(16, 25, 38, 0.95) 56%, rgba(43, 36, 25, 0.86) 100%)"}}
+           [:div {:class ["num"
+                          "text-[12px]"
+                          "font-medium"
+                          "leading-4"
+                          "text-[#8ea1b3]"]}
+            (:timestamp hover-tooltip)]
+           [:div {:class ["mt-2"
+                          "grid"
+                          "grid-cols-[1fr_auto]"
+                          "items-center"
+                          "gap-3"]}
+            [:span {:class ["text-[12px]"
+                            "font-medium"
+                            "leading-4"
+                            "text-[#909fac]"]}
+             (:metric-label hover-tooltip)]
+            [:span {:class (into ["num"
+                                  "text-[16px]"
+                                  "font-semibold"
+                                  "leading-[1]"
+                                  "tracking-tight"]
+                                 (:value-classes hover-tooltip))}
+             (:metric-value hover-tooltip)]]])]]
       (chart-legend series)
       (when (= selected-tab :returns)
         (returns-benchmark-chip-rail returns-benchmark*))])))

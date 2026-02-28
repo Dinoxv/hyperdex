@@ -431,17 +431,20 @@
         month-view-node (portfolio-view/portfolio-view base-state)
         month-hover-line (find-first-node month-view-node #(= "portfolio-chart-hover-line" (get-in % [1 :data-role])))
         month-tooltip-node (find-first-node month-view-node #(= "portfolio-chart-hover-tooltip" (get-in % [1 :data-role])))
-        month-tooltip-text (->> month-tooltip-node
-                                collect-strings
-                                (apply str))
+        month-tooltip-strings (set (collect-strings month-tooltip-node))
+        month-tooltip-classes (set (class-values month-tooltip-node))
         day-state (assoc-in base-state [:portfolio-ui :summary-time-range] :day)
         day-view-node (portfolio-view/portfolio-view day-state)
         day-tooltip-node (find-first-node day-view-node #(= "portfolio-chart-hover-tooltip" (get-in % [1 :data-role])))
-        day-tooltip-text (->> day-tooltip-node
-                              collect-strings
-                              (apply str))]
+        day-tooltip-strings (set (collect-strings day-tooltip-node))]
     (is (some? month-hover-line))
     (is (some? month-tooltip-node))
-    (is (= "2026 Feb 26: $203" month-tooltip-text))
+    (is (contains? month-tooltip-strings "2026 Feb 26"))
+    (is (contains? month-tooltip-strings "PNL"))
+    (is (contains? month-tooltip-strings "$203"))
+    (is (contains? month-tooltip-classes "rounded-xl"))
+    (is (contains? month-tooltip-classes "min-w-[188px]"))
     (is (some? day-tooltip-node))
-    (is (re-matches #"[0-9]{2}:[0-9]{2}: \$203" day-tooltip-text))))
+    (is (contains? day-tooltip-strings "PNL"))
+    (is (contains? day-tooltip-strings "$203"))
+    (is (some #(re-matches #"[0-9]{2}:[0-9]{2}" %) day-tooltip-strings))))
