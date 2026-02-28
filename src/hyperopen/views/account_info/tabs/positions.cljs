@@ -49,6 +49,63 @@
       (and (number? size-num) (pos? size-num)) :long
       :else :flat)))
 
+(def ^:private cross-margin-mode-tokens
+  #{"cross" "crossmargin"})
+
+(def ^:private isolated-margin-mode-tokens
+  #{"isolated" "isolatedmargin" "nocross" "strictisolated"})
+
+(defn- parse-optional-boolean [value]
+  (cond
+    (true? value) true
+    (false? value) false
+
+    (string? value)
+    (let [text (-> value str str/trim str/lower-case)]
+      (case text
+        "true" true
+        "false" false
+        nil))
+
+    :else nil))
+
+(defn- normalize-margin-mode [value]
+  (let [token (some-> value
+                      str
+                      str/trim
+                      str/lower-case
+                      (str/replace #"[\s_\-]" ""))]
+    (cond
+      (contains? cross-margin-mode-tokens token) :cross
+      (contains? isolated-margin-mode-tokens token) :isolated
+      :else nil)))
+
+(defn- position-margin-mode [position-data]
+  (let [position (or (:position position-data) {})
+        leverage-type-mode (normalize-margin-mode
+                            (or (get-in position [:leverage :type])
+                                (get-in position [:leverage :mode])
+                                (:leverageType position)
+                                (:leverage-type position)))
+        is-cross? (or (parse-optional-boolean (:isCross position))
+                      (parse-optional-boolean (:is-cross position))
+                      (parse-optional-boolean (:isCross position-data))
+                      (parse-optional-boolean (:is-cross position-data)))
+        boolean-mode (when (some? is-cross?)
+                       (if is-cross? :cross :isolated))
+        margin-mode (normalize-margin-mode
+                     (or (:marginMode position)
+                         (:margin-mode position)
+                         (:marginMode position-data)
+                         (:margin-mode position-data)))]
+    (or leverage-type-mode boolean-mode margin-mode)))
+
+(defn- margin-mode-display-label [margin-mode]
+  (case margin-mode
+    :cross "Cross"
+    :isolated "Isolated"
+    nil))
+
 (defn positions-direction-filter-key [positions-state]
   (let [raw-direction (:direction-filter positions-state)
         direction-filter (cond
@@ -284,6 +341,8 @@
                            :else "text-trading-text")
          liq-price (:liquidationPx pos)
          margin (:marginUsed pos)
+         margin-mode-label (some-> (position-margin-mode position-data)
+                                   margin-mode-display-label)
          funding-num (shared/parse-optional-num (get-in pos [:cumFunding :allTime]))
          since-change-funding-num (or (shared/parse-optional-num (get-in pos [:cumFunding :sinceChange]))
                                       (shared/parse-optional-num (get-in pos [:cumFunding :since-change]))
@@ -357,8 +416,12 @@
                  :type "button"
                  :data-position-margin-trigger "true"
                  :on {:click [[:actions/open-position-margin-modal position-data :event.currentTarget/bounds]]}}
-        [:span {:class ["num"]}
-         (str "$" (shared/format-currency margin))]
+        [:span {:class ["inline-flex" "items-baseline" "gap-1" "whitespace-nowrap"]}
+         [:span {:class ["num"]}
+          (str "$" (shared/format-currency margin))]
+         (when margin-mode-label
+           [:span {:class ["text-xs" "font-medium" "text-trading-text-secondary"]}
+            (str "(" margin-mode-label ")")])]
         (edit-icon)]
        (when active-margin-modal?
          (position-margin-modal/position-margin-modal-view margin-modal))]

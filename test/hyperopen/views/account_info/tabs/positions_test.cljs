@@ -425,6 +425,20 @@
            (nth (first click-actions) 2)))
     (is (= "true" (get-in action-button [1 :data-position-margin-trigger])))))
 
+(deftest position-row-margin-cell-renders-cross-and-isolated-mode-labels-test
+  (let [isolated-row (assoc-in (fixtures/sample-position-row "xyz:NVDA" 10 "0.500")
+                               [:position :leverage :type]
+                               "isolated")
+        cross-row (assoc-in (fixtures/sample-position-row "xyz:NVDA" 10 "0.500")
+                            [:position :leverage :type]
+                            "cross")
+        isolated-cell (nth (vec (hiccup/node-children (view/position-row isolated-row))) 7)
+        cross-cell (nth (vec (hiccup/node-children (view/position-row cross-row))) 7)
+        isolated-strings (set (hiccup/collect-strings isolated-cell))
+        cross-strings (set (hiccup/collect-strings cross-cell))]
+    (is (contains? isolated-strings "(Isolated)"))
+    (is (contains? cross-strings "(Cross)"))))
+
 (deftest position-row-renders-inline-margin-modal-for-active-row-key-test
   (let [row-data (fixtures/sample-position-row "xyz:NVDA" 10 "0.500")
         margin-modal (position-margin/from-position-row {} row-data)
@@ -513,14 +527,14 @@
     (is (nil? panel-node))))
 
 (deftest position-table-layout-prioritizes-coin-column-over-right-edge-actions-test
-  (let [grid-template-class "grid-cols-[minmax(150px,1.65fr)_minmax(108px,1.05fr)_minmax(98px,0.95fr)_minmax(98px,0.95fr)_minmax(98px,0.95fr)_minmax(115px,1.15fr)_minmax(92px,0.9fr)_minmax(84px,0.85fr)_minmax(84px,0.85fr)_minmax(110px,0.95fr)_minmax(165px,1.3fr)]"
+  (let [grid-template-class "grid-cols-[minmax(150px,1.65fr)_minmax(108px,1.05fr)_minmax(98px,0.95fr)_minmax(98px,0.95fr)_minmax(98px,0.95fr)_minmax(115px,1.15fr)_minmax(92px,0.9fr)_minmax(132px,1.2fr)_minmax(84px,0.85fr)_minmax(110px,0.95fr)_minmax(165px,1.3fr)]"
         header-node (view/position-table-header fixtures/default-sort-state)
         row-node (view/position-row (fixtures/sample-position-row "xyz:NVDA" 10 "0.500"))
         coin-cell (first (vec (hiccup/node-children row-node)))
         coin-label-node (hiccup/find-first-node coin-cell #(contains? (hiccup/direct-texts %) "NVDA"))]
     (is (contains? (hiccup/node-class-set header-node) grid-template-class))
-    (is (contains? (hiccup/node-class-set header-node) "min-w-[1285px]"))
+    (is (contains? (hiccup/node-class-set header-node) "min-w-[1335px]"))
     (is (contains? (hiccup/node-class-set row-node) grid-template-class))
-    (is (contains? (hiccup/node-class-set row-node) "min-w-[1285px]"))
+    (is (contains? (hiccup/node-class-set row-node) "min-w-[1335px]"))
     (is (contains? (hiccup/node-class-set coin-label-node) "whitespace-nowrap"))
     (is (not (contains? (hiccup/node-class-set coin-label-node) "truncate")))))
