@@ -448,3 +448,37 @@
     (is (contains? day-tooltip-strings "PNL"))
     (is (contains? day-tooltip-strings "$203"))
     (is (some #(re-matches #"[0-9]{2}:[0-9]{2}" %) day-tooltip-strings))))
+
+(deftest portfolio-view-returns-tooltip-renders-selected-benchmark-values-with-series-color-test
+  (let [time-a (.getTime (js/Date. 2026 1 19 2 4 0))
+        time-b (.getTime (js/Date. 2026 1 26 8 30 0))
+        time-c (.getTime (js/Date. 2026 2 3 11 15 0))
+        state (-> sample-state
+                  (assoc-in [:portfolio-ui :summary-time-range] :month)
+                  (assoc-in [:portfolio-ui :chart-tab] :returns)
+                  (assoc-in [:portfolio-ui :chart-hover-index] 2)
+                  (assoc-in [:portfolio-ui :returns-benchmark-coins] ["SPY"])
+                  (assoc-in [:asset-selector :markets]
+                            [{:coin "SPY"
+                              :symbol "SPY"
+                              :market-type :spot
+                              :cache-order 1}])
+                  (assoc-in [:portfolio :summary-by-key :month :pnlHistory]
+                            [[time-a 0] [time-b 0] [time-c 0]])
+                  (assoc-in [:portfolio :summary-by-key :month :accountValueHistory]
+                            [[time-a 100] [time-b 110] [time-c 120]])
+                  (assoc-in [:candles "SPY" :1h]
+                            [{:t time-a :c 50}
+                             {:t time-b :c 55}
+                             {:t time-c :c 57}]))
+        view-node (portfolio-view/portfolio-view state)
+        tooltip-node (find-first-node view-node #(= "portfolio-chart-hover-tooltip" (get-in % [1 :data-role])))
+        tooltip-strings (set (collect-strings tooltip-node))
+        benchmark-row (find-first-node view-node #(= "portfolio-chart-hover-tooltip-benchmark-row-SPY" (get-in % [1 :data-role])))
+        benchmark-value (find-first-node view-node #(= "portfolio-chart-hover-tooltip-benchmark-value-SPY" (get-in % [1 :data-role])))]
+    (is (some? tooltip-node))
+    (is (contains? tooltip-strings "Returns"))
+    (is (contains? tooltip-strings "SPY (SPOT)"))
+    (is (contains? tooltip-strings "+14.00%"))
+    (is (some? benchmark-row))
+    (is (= "#f2cf66" (get-in benchmark-value [1 :style :color])))))

@@ -204,6 +204,33 @@
    :metric-value (format-tooltip-value selected-tab value)
    :value-classes (tooltip-value-classes selected-tab value)})
 
+(defn- chart-tooltip-benchmark-values
+  [selected-tab hovered-index series]
+  (if (and (= selected-tab :returns)
+           (number? hovered-index))
+    (->> (or series [])
+         (keep (fn [{:keys [id coin label stroke points]}]
+                 (when (and (keyword? id)
+                            (not= id :strategy))
+                   (let [point (get (or points []) hovered-index)
+                         value (:value point)
+                         coin* (or (some-> coin str string/trim)
+                                   (name id))
+                         label* (or (some-> label str string/trim)
+                                    coin*
+                                    "Benchmark")
+                         stroke* (if (and (string? stroke)
+                                          (seq stroke))
+                                   stroke
+                                   "#e6edf2")]
+                     (when (number? value)
+                       {:coin coin*
+                        :label label*
+                        :value (format-tooltip-value :returns value)
+                        :stroke stroke*})))))
+         vec)
+    []))
+
 (def ^:private axis-label-fallback-char-width-px
   7.5)
 
@@ -583,6 +610,7 @@
         plot-left (+ y-axis-width 10)
         point-count (count points)
         hovered-point (:point hover)
+        hovered-index (:index hover)
         hover-active? (boolean (:active? hover))
         hover-line-left-pct (when hover-active?
                              (* 100 (:x-ratio hovered-point)))
@@ -592,6 +620,10 @@
                                              92))
         hover-tooltip-right? (when hover-active?
                                (> hover-line-left-pct 74))
+        hover-benchmark-values (when hover-active?
+                                 (chart-tooltip-benchmark-values selected-tab
+                                                                 hovered-index
+                                                                 series))
         hover-tooltip (when hover-active?
                         (chart-tooltip-model summary-time-range
                                              selected-tab
@@ -720,7 +752,29 @@
                                   "leading-[1]"
                                   "tracking-tight"]
                                  (:value-classes hover-tooltip))}
-             (:metric-value hover-tooltip)]]])]]
+             (:metric-value hover-tooltip)]]
+           (when (seq hover-benchmark-values)
+             [:div {:class ["mt-1.5" "space-y-1"]}
+              (for [{:keys [coin label value stroke]} hover-benchmark-values]
+                ^{:key (str "portfolio-chart-hover-tooltip-benchmark-row-" coin)}
+                [:div {:class ["grid"
+                               "grid-cols-[1fr_auto]"
+                               "items-center"
+                               "gap-3"]
+                       :data-role (str "portfolio-chart-hover-tooltip-benchmark-row-" coin)}
+                 [:span {:class ["text-[12px]"
+                                 "font-medium"
+                                 "leading-4"
+                                 "text-[#909fac]"]}
+                 label]
+                 [:span {:class ["num"
+                                 "text-sm"
+                                 "font-semibold"
+                                 "leading-[1.1]"
+                                 "tracking-tight"]
+                         :data-role (str "portfolio-chart-hover-tooltip-benchmark-value-" coin)
+                         :style {:color stroke}}
+                  value]])])])]]
       (chart-legend series)
       (when (= selected-tab :returns)
         (returns-benchmark-chip-rail returns-benchmark*))])))
