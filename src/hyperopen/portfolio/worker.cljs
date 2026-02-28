@@ -1,6 +1,5 @@
 (ns hyperopen.portfolio.worker
-  (:require [cljs.reader :as reader]
-            [hyperopen.portfolio.metrics :as metrics]))
+  (:require [hyperopen.portfolio.metrics :as metrics]))
 
 (defn- request-benchmark-daily-rows
   [portfolio-request]
@@ -20,8 +19,8 @@
   (let [data (.-data e)
         id (.-id data)
         type (keyword (.-type data))
-        payload-str (.-payload data)
-        payload (reader/read-string payload-str)]
+        payload-js (.-payload data)
+        payload (js->clj payload-js :keywordize-keys true)]
     (case type
       :compute-metrics
       (let [{:keys [portfolio-request benchmark-requests]} payload
@@ -42,11 +41,12 @@
                                                      :strategy-daily-rows strategy-daily-rows
                                                      :rf 0
                                                      :periods-per-year 365})]))
-                                    benchmark-requests))]
-        (.postMessage js/self (clj->js {:id id
-                                        :type "metrics-result"
-                                        :payload (pr-str {:portfolio-values portfolio-result
-                                                          :benchmark-values-by-coin benchmark-results})})))
+                                    benchmark-requests))
+            payload-result {:portfolio-values portfolio-result
+                            :benchmark-values-by-coin benchmark-results}]
+        (.postMessage js/self #js {:id id
+                                   :type "metrics-result"
+                                   :payload (clj->js payload-result)}))
       
       (js/console.warn "Unknown message type received in portfolio worker:" type))))
 

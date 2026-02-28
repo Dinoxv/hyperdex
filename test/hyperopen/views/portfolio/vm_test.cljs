@@ -233,15 +233,20 @@
           view-model (vm/portfolio-vm state)
           groups (get-in view-model [:performance-metrics :groups])]
       
-      (testing "Worker data serialization integrity"
+      (testing "Worker data structured-clone integrity"
         (let [raw-metrics-result (get-in view-model [:performance-metrics :values])
-              ;; Simulate standard PR-STR and READER loop like the worker uses
-              serialized (pr-str {:portfolio-values raw-metrics-result})
-              deserialized (cljs.reader/read-string serialized)]
+              worker-result {:portfolio-values raw-metrics-result
+                             :benchmark-values-by-coin {"SPY" raw-metrics-result}}
+              deserialized (-> worker-result
+                               clj->js
+                               (js->clj :keywordize-keys true)
+                               (@#'vm/normalize-worker-metrics-result))]
           (is (= :ok (get-in deserialized [:portfolio-values :metric-status :time-in-market]))
-              "Keywords must survive worker serialization round-trip")
+              "Metric status keywords survive worker structured-clone round-trip")
           (is (= :suppressed (get-in deserialized [:portfolio-values :metric-status :r2])))
-          (is (= :benchmark-coverage-gate-failed (get-in deserialized [:portfolio-values :metric-reason :r2])))))
+          (is (= :benchmark-coverage-gate-failed (get-in deserialized [:portfolio-values :metric-reason :r2])))
+          (is (contains? (:benchmark-values-by-coin deserialized) "SPY"))
+          (is (not (contains? (:benchmark-values-by-coin deserialized) :SPY)))))
       
       (is (seq groups))
       (is (= "Time in Market"

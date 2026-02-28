@@ -1,6 +1,5 @@
 (ns hyperopen.views.portfolio.vm
-  (:require [cljs.reader :as reader]
-            [clojure.string :as str]
+  (:require [clojure.string :as str]
             [hyperopen.domain.trading :as trading]
             [hyperopen.portfolio.actions :as portfolio-actions]
             [hyperopen.portfolio.metrics :as portfolio-metrics]
@@ -49,6 +48,49 @@
 (def ^:private performance-periods-per-year
   365)
 
+(defn- metric-token
+  [value]
+  (cond
+    (keyword? value) value
+    (string? value) (let [trimmed (some-> value str/trim)]
+                      (when (seq trimmed)
+                        (keyword trimmed)))
+    :else nil))
+
+(defn- normalize-metric-token-map
+  [token-map]
+  (into {}
+        (map (fn [[metric-key metric-token-value]]
+               [metric-key
+                (or (metric-token metric-token-value)
+                    metric-token-value)]))
+        (or token-map {})))
+
+(defn- normalize-worker-metric-values
+  [metric-values]
+  (if (map? metric-values)
+    (-> metric-values
+        (update :metric-status normalize-metric-token-map)
+        (update :metric-reason normalize-metric-token-map))
+    metric-values))
+
+(defn- normalize-worker-metrics-result
+  [payload]
+  (let [payload* (if (map? payload)
+                   payload
+                   {})
+        benchmark-values-by-coin (or (:benchmark-values-by-coin payload*)
+                                     {})]
+    (assoc payload*
+           :portfolio-values (normalize-worker-metric-values (:portfolio-values payload*))
+           :benchmark-values-by-coin (into {}
+                                           (map (fn [[coin metric-values]]
+                                                  [(if (keyword? coin)
+                                                     (name coin)
+                                                     coin)
+                                                   (normalize-worker-metric-values metric-values)]))
+                                           benchmark-values-by-coin))))
+
 (defonce ^:private metrics-worker
   (delay
    (when (exists? js/Worker)
@@ -57,9 +99,10 @@
                           (fn [^js e]
                             (let [data (.-data e)
                                   type (.-type data)
-                                  payload-str (.-payload data)]
+                                  payload-js (.-payload data)]
                               (when (= type "metrics-result")
-                                (let [payload (reader/read-string payload-str)]
+                                (let [payload (-> (js->clj payload-js :keywordize-keys true)
+                                                  (normalize-worker-metrics-result))]
                                   (swap! system/store (fn [s]
                                                         (-> s
                                                             (assoc-in [:portfolio-ui :metrics-result] payload)
@@ -75,8 +118,8 @@
       (reset! last-metrics-request {:signature signature :data request-data})
       (swap! system/store assoc-in [:portfolio-ui :metrics-loading?] true)
       (when-let [worker @metrics-worker]
-        (.postMessage worker (clj->js {:type "compute-metrics"
-                                       :payload (pr-str request-data)}))))))
+        (.postMessage worker #js {:type "compute-metrics"
+                                  :payload (clj->js request-data)})))))
 
 (def ^:private chart-empty-y-ticks
   [{:value 3 :y-ratio 0}
