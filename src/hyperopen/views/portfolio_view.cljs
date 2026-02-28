@@ -648,7 +648,7 @@
          (returns-benchmark-selector returns-benchmark*)])]
      [:div {:class ["px-4" "py-3" "space-y-2"]
             :data-role "portfolio-chart-shell"}
-      [:div {:class ["relative" "h-[182px]"]}
+      [:div {:class ["relative" "h-[182px]" "xl:h-[210px]"]}
        [:div {:class ["absolute" "left-0" "top-0" "bottom-0"]
               :data-role "portfolio-chart-y-axis"
               :style {:width (str y-axis-width "px")}}
@@ -983,7 +983,7 @@
      [:div {:class ["grid"
                     "grid-cols-1"
                     "gap-3"
-                    "xl:grid-cols-[320px_minmax(340px,1fr)_minmax(420px,1.35fr)]"]}
+                    "xl:grid-cols-[320px_minmax(280px,0.8fr)_minmax(520px,1.8fr)]"]}
      (metric-cards view-model)
       (summary-card view-model)
       (chart-card view-model)]
