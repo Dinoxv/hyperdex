@@ -51,24 +51,43 @@
               nil))]
     (boolean (walk node))))
 
-(defn- find-first-img-node [node]
+(defn- find-img-nodes [node]
   (letfn [(walk [n]
             (cond
               (vector? n)
               (let [tag (first n)
                     attrs (when (map? (second n)) (second n))
-                    children (if attrs (drop 2 n) (drop 1 n))]
+                    children (if attrs (drop 2 n) (drop 1 n))
+                    child-results (mapcat walk children)]
                 (if (and (keyword? tag)
                          (str/starts-with? (name tag) "img"))
-                  n
-                  (some walk children)))
+                  (cons n child-results)
+                  child-results))
 
               (seq? n)
-              (some walk n)
+              (mapcat walk n)
 
               :else
-              nil))]
-    (walk node)))
+              []))]
+    (vec (walk node))))
+
+(defn- find-nodes-with-style-key [node style-key]
+  (letfn [(walk [n]
+            (cond
+              (vector? n)
+              (let [attrs (when (map? (second n)) (second n))
+                    children (if attrs (drop 2 n) (drop 1 n))
+                    child-results (mapcat walk children)]
+                (if (contains? (or (:style attrs) {}) style-key)
+                  (cons n child-results)
+                  child-results))
+
+              (seq? n)
+              (mapcat walk n)
+
+              :else
+              []))]
+    (vec (walk node))))
 
 (deftest active-asset-row-symbol-fallback-test
   (let [ctx-data {:coin "SOL"
@@ -113,28 +132,48 @@
                      :base "HYPE"
                      :market-type :spot}
         icon-node (view/asset-icon spot-market false #{} #{})
-        img-node (find-first-img-node icon-node)
-        img-src (some-> img-node second :src)
+        img-srcs (->> (find-img-nodes icon-node)
+                      (map second)
+                      (map :src)
+                      (remove nil?)
+                      set)
+        strings (set (collect-strings icon-node))
         path-ds (set (collect-path-ds icon-node))]
-    (is (some? img-node))
-    (is (= "https://app.hyperliquid.xyz/coins/HYPE_spot.svg" img-src))
+    (is (contains? strings "HYPE"))
+    (is (contains? img-srcs "https://app.hyperliquid.xyz/coins/HYPE_spot.svg"))
     (is (contains? path-ds "M19 9l-7 7-7-7"))))
 
-(deftest asset-icon-renders-image-immediately-and-wires-load-events-test
+(deftest asset-icon-renders-monogram-while-icon-probes-and-wires-load-events-test
   (let [market {:key "perp:BTC"
                 :coin "BTC"
                 :symbol "BTC-USDC"
                 :base "BTC"
                 :market-type :perp}
         icon-node (view/asset-icon market false #{} #{})
-        img-node (find-first-img-node icon-node)
+        img-node (first (find-img-nodes icon-node))
         attrs (second img-node)
-        classes (set (class-values (:class attrs)))]
+        classes (set (class-values (:class attrs)))
+        strings (set (collect-strings icon-node))]
     (is (some? img-node))
-    (is (not (contains? classes "hidden")))
-    (is (not (contains? classes "opacity-0")))
+    (is (contains? strings "BTC"))
+    (is (contains? classes "opacity-0"))
     (is (= [[:actions/mark-loaded-asset-icon "perp:BTC"]]
            (get-in attrs [:on :load])))))
+
+(deftest asset-icon-renders-visible-image-when-icon-is-marked-loaded-test
+  (let [market {:key "perp:BTC"
+                :coin "BTC"
+                :symbol "BTC-USDC"
+                :base "BTC"
+                :market-type :perp}
+        icon-node (view/asset-icon market false #{} #{"perp:BTC"})
+        img-nodes (find-img-nodes icon-node)
+        icon-layer (first (find-nodes-with-style-key icon-node :background-image))
+        background-image (get-in icon-layer [1 :style :background-image])]
+    (is (empty? img-nodes))
+    (is (some? icon-layer))
+    (is (= "url('https://app.hyperliquid.xyz/coins/BTC.svg')"
+           background-image))))
 
 (deftest asset-icon-renders-namespaced-icon-for-component-markets-test
   (let [market {:key "perp:xyz:XYZ100"
@@ -144,7 +183,7 @@
                 :dex "xyz"
                 :market-type :perp}
         icon-node (view/asset-icon market false #{} #{})
-        img-node (find-first-img-node icon-node)
+        img-node (first (find-img-nodes icon-node))
         attrs (second img-node)]
     (is (some? img-node))
     (is (= "https://app.hyperliquid.xyz/coins/xyz:XYZ100.svg"
@@ -158,7 +197,7 @@
                 :dex "cash"
                 :market-type :perp}
         icon-node (view/asset-icon market false #{} #{})
-        img-node (find-first-img-node icon-node)
+        img-node (first (find-img-nodes icon-node))
         attrs (second img-node)]
     (is (some? img-node))
     (is (= "https://app.hyperliquid.xyz/coins/xyz:MSFT.svg"

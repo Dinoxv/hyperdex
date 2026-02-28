@@ -87,6 +87,21 @@
                             (fmt/safe-to-fixed max-leverage 1))]
         (str leverage-text "x")))))
 
+(defn- base-symbol-segment [value]
+  (let [text (some-> value non-blank-text (str/replace #"^.*:" ""))]
+    (some-> text
+            (str/split #"/|-" 2)
+            first
+            non-blank-text)))
+
+(defn- symbol-monogram [market symbol coin]
+  (let [base-symbol (or (non-blank-text (:base market))
+                        (base-symbol-segment symbol)
+                        (base-symbol-segment coin)
+                        "ASSET")
+        upper-symbol (str/upper-case base-symbol)]
+    (subs upper-symbol 0 (min 5 (count upper-symbol)))))
+
 (defn- resolve-active-market [full-state active-asset]
   (let [projected-market (:active-market full-state)
         market-by-key (get-in full-state [:asset-selector :market-by-key] {})]
@@ -101,7 +116,7 @@
       :else
       nil)))
 
-(defn asset-icon [market dropdown-visible? missing-icons _loaded-icons]
+(defn asset-icon [market dropdown-visible? missing-icons loaded-icons]
   (let [coin (:coin market)
         symbol (or (:symbol market) coin)
         dex-label (market-dex-label market)
@@ -109,17 +124,34 @@
         market-type (:market-type market)
         market-key (or (:key market) (markets/coin->market-key coin))
         missing-icon? (contains? missing-icons market-key)
+        loaded-icon? (contains? loaded-icons market-key)
         icon-src (when-not missing-icon?
-                   (asset-icon/market-icon-url market))]
+                   (asset-icon/market-icon-url market))
+        icon-layer? (seq icon-src)
+        probe-icon? (and icon-layer? (not loaded-icon?))
+        monogram (symbol-monogram market symbol coin)]
     [:div {:class ["flex" "items-center" "gap-2" "cursor-pointer" "hover:bg-base-300"
                    "rounded" "pr-2" "py-1" "transition-colors" "min-w-0"]
            :on {:click [[:actions/toggle-asset-dropdown :asset-selector]]}}
-     (when icon-src
-       [:img {:class ["w-6" "h-6" "rounded-full"]
-         :src icon-src
-         :alt ""
-         :on {:load [[:actions/mark-loaded-asset-icon market-key]]
-              :error [[:actions/mark-missing-asset-icon market-key]]}}])
+     [:div {:class ["relative" "w-6" "h-6" "shrink-0"]}
+      [:div {:class ["w-6" "h-6" "rounded-full" "border" "border-slate-500/40"
+                     "bg-slate-800/80" "text-slate-300/70" "text-[8px]"
+                     "font-semibold" "tracking-tight" "uppercase" "leading-none"
+                     "flex" "items-center" "justify-center" "overflow-hidden"
+                     "px-0.5"]
+             :aria-hidden true}
+       monogram]
+      (when icon-layer?
+        [:div {:class ["absolute" "inset-0" "rounded-full" "bg-center" "bg-cover" "bg-no-repeat"]
+               :aria-hidden true
+               :style {:background-image (str "url('" icon-src "')")}}])
+      (when probe-icon?
+        [:img {:class ["absolute" "inset-0" "w-6" "h-6" "rounded-full" "opacity-0"
+                       "pointer-events-none"]
+               :src icon-src
+               :alt ""
+               :on {:load [[:actions/mark-loaded-asset-icon market-key]]
+                    :error [[:actions/mark-missing-asset-icon market-key]]}}])]
      [:div.flex.items-center.space-x-2.min-w-0
       [:span.font-medium.truncate symbol]
       (when (= market-type :spot)
