@@ -118,6 +118,7 @@
             [hyperopen.utils.hl-signing-test]
             [hyperopen.utils.interval-test]
             [hyperopen.vaults.actions-test]
+            [hyperopen.vaults.detail.types-test]
             [hyperopen.vaults.effects-test]
             [hyperopen.views.account-equity-view-test]
             [hyperopen.views.account-info-view-test]
@@ -339,6 +340,7 @@
              'hyperopen.utils.hl-signing-test
              'hyperopen.utils.interval-test
              'hyperopen.vaults.actions-test
+             'hyperopen.vaults.detail.types-test
              'hyperopen.vaults.effects-test
              'hyperopen.views.account-equity-view-test
              'hyperopen.views.account-info-view-test

@@ -2,6 +2,7 @@
   (:require [clojure.string :as str]
             [hyperopen.platform :as platform]
             [hyperopen.portfolio.actions :as portfolio-actions]
+            [hyperopen.vaults.detail.types :as detail-types]
             [hyperopen.utils.parse :as parse-utils]))
 
 (def ^:private vaults-snapshot-range-storage-key
@@ -338,7 +339,7 @@
                                  (normalize-vault-snapshot-range snapshot-range))]
     (->> (portfolio-actions/normalize-portfolio-returns-benchmark-coins benchmark-coins)
          (remove (fn [coin]
-                   (str/starts-with? (str/lower-case coin) "vault:")))
+                   (some? (detail-types/vault-benchmark-address coin))))
          (mapv (fn [coin]
                  [:effects/fetch-candle-snapshot
                   :coin coin

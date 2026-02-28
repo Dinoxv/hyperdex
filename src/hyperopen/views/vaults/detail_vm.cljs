@@ -3,6 +3,7 @@
             [hyperopen.portfolio.actions :as portfolio-actions]
             [hyperopen.portfolio.metrics :as portfolio-metrics]
             [hyperopen.vaults.actions :as vault-actions]
+            [hyperopen.vaults.detail.types :as detail-types]
             [hyperopen.views.account-info.sort-kernel :as sort-kernel]))
 
 (def ^:private chart-y-tick-count
@@ -306,30 +307,8 @@
    (str/lower-case (or (some-> (:coin market) str str/trim) ""))
    (str/lower-case (or (some-> (:key market) str str/trim) ""))])
 
-(def ^:private vault-benchmark-prefix
-  "vault:")
-
 (def ^:private max-vault-benchmark-options
   100)
-
-(defonce ^:private eligible-vault-benchmark-rows-cache
-  (atom nil))
-
-(defn- normalize-vault-address
-  [value]
-  (some-> value str str/trim str/lower-case))
-
-(defn- vault-benchmark-value
-  [vault-address]
-  (str vault-benchmark-prefix vault-address))
-
-(defn- vault-benchmark-address
-  [benchmark]
-  (let [benchmark* (some-> benchmark str str/trim)
-        benchmark-lower (some-> benchmark* str/lower-case)]
-    (when (and (seq benchmark-lower)
-               (str/starts-with? benchmark-lower vault-benchmark-prefix))
-      (normalize-vault-address (subs benchmark* (count vault-benchmark-prefix))))))
 
 (defn- benchmark-vault-tvl
   [row]
@@ -340,7 +319,7 @@
   [row]
   [(- (benchmark-vault-tvl row))
    (str/lower-case (or (non-blank-text (:name row)) ""))
-   (str/lower-case (or (normalize-vault-address (:vault-address row)) ""))])
+   (str/lower-case (or (detail-types/normalize-vault-address (:vault-address row)) ""))])
 
 (defn- benchmark-market-selector-options
   [state]
@@ -369,7 +348,7 @@
 (defn- benchmark-vault-row?
   [row]
   (and (map? row)
-       (seq (normalize-vault-address (:vault-address row)))
+       (seq (detail-types/normalize-vault-address (:vault-address row)))
        (not= :child (get-in row [:relationship :type]))))
 
 (defn- eligible-vault-benchmark-rows
@@ -382,21 +361,14 @@
 
 (defn- memoized-eligible-vault-benchmark-rows
   [rows]
-  (let [cache @eligible-vault-benchmark-rows-cache]
-    (if (and (map? cache)
-             (identical? rows (:rows cache)))
-      (:eligible-rows cache)
-      (let [eligible-rows (eligible-vault-benchmark-rows rows)]
-        (reset! eligible-vault-benchmark-rows-cache {:rows rows
-                                                     :eligible-rows eligible-rows})
-        eligible-rows))))
+  (eligible-vault-benchmark-rows rows))
 
 (defn- benchmark-vault-selector-options
   [state]
   (let [top-rows (memoized-eligible-vault-benchmark-rows (get-in state [:vaults :merged-index-rows]))]
     (->> top-rows
          (reduce (fn [{:keys [seen options]} row]
-                   (if-let [vault-address (normalize-vault-address (:vault-address row))]
+                   (if-let [vault-address (detail-types/normalize-vault-address (:vault-address row))]
                      (if (contains? seen vault-address)
                        {:seen seen
                         :options options}
@@ -404,7 +376,7 @@
                                       vault-address)]
                          {:seen (conj seen vault-address)
                           :options (conj options
-                                         {:value (vault-benchmark-value vault-address)
+                                         {:value (detail-types/vault-benchmark-value vault-address)
                                           :label (str name " (VAULT)")
                                           :tvl (benchmark-vault-tvl row)})}))
                      {:seen seen
@@ -473,7 +445,7 @@
         option-values (into #{} (map :value) options)
         selected-coins (->> (selected-vault-detail-returns-benchmark-coins state)
                             (filter (fn [coin]
-                                      (if (vault-benchmark-address coin)
+                                      (if (detail-types/vault-benchmark-address coin)
                                         (contains? option-values coin)
                                         true)))
                             vec)
@@ -1098,7 +1070,7 @@
   [state]
   (->> (memoized-eligible-vault-benchmark-rows (get-in state [:vaults :merged-index-rows]))
        (reduce (fn [rows-by-address row]
-                 (if-let [vault-address (normalize-vault-address (:vault-address row))]
+                 (if-let [vault-address (detail-types/normalize-vault-address (:vault-address row))]
                    (assoc rows-by-address vault-address row)
                    rows-by-address))
                {})))
@@ -1194,12 +1166,12 @@
   (if (and (seq benchmark-coins)
            (seq strategy-return-points))
     (let [{:keys [interval]} (portfolio-actions/returns-benchmark-candle-request snapshot-range)
-          any-vault-benchmark? (boolean (some vault-benchmark-address benchmark-coins))
+          any-vault-benchmark? (boolean (some detail-types/vault-benchmark-address benchmark-coins))
           vault-rows-by-address (when any-vault-benchmark?
                                   (vault-benchmark-rows-by-address state))]
       (reduce (fn [rows-by-coin coin]
                 (if (seq coin)
-                  (let [aligned-rows (if-let [vault-address (vault-benchmark-address coin)]
+                  (let [aligned-rows (if-let [vault-address (detail-types/vault-benchmark-address coin)]
                                        (aligned-vault-return-rows
                                         (vault-benchmark-snapshot-values
                                          (get vault-rows-by-address vault-address)
@@ -1581,13 +1553,14 @@
       (str hours "h " minutes "m"))))
 
 (defn- twap-running-times
-  [row]
+  [row now-ms]
   (let [start-ms (or (optional-number (:startTime row))
                      (optional-number (:startTimeMs row))
                      (optional-number (:start row)))
-        now-ms (.now js/Date)
+        now-ms* (or (optional-number now-ms)
+                    (.now js/Date))
         elapsed-ms (when (number? start-ms)
-                     (max 0 (- now-ms start-ms)))
+                     (max 0 (- now-ms* start-ms)))
         total-ms (or (optional-number (:durationMs row))
                      (optional-number (:totalDurationMs row))
                      (optional-number (:totalMs row))
@@ -1606,7 +1579,7 @@
       :else "—")))
 
 (defn- normalize-twap-row
-  [row]
+  [row now-ms]
   (when (map? row)
     (let [state (if (map? (:state row))
                   (:state row)
@@ -1632,7 +1605,7 @@
                             (optional-number (:averagePrice state)))
           reduce-only? (or (as-boolean (:reduceOnly state))
                            (as-boolean (:reduceOnly order)))
-          running-times (twap-running-times state)
+          running-times (twap-running-times state now-ms)
           creation-time-ms (or (optional-int (:creationTime state))
                                (optional-int (:createdAt state))
                                (optional-int (:timestamp state))
@@ -1650,10 +1623,10 @@
        :creation-time-ms creation-time-ms})))
 
 (defn- activity-twaps
-  [webdata]
+  [webdata now-ms]
   (let [rows (rows-from-source webdata [:twapStates :states :twaps])]
     (->> (if (sequential? rows) rows [])
-         (keep normalize-twap-row)
+         (keep #(normalize-twap-row % now-ms))
          (sort-by (fn [{:keys [creation-time-ms]}]
                     (or creation-time-ms 0))
                   >)
@@ -2035,8 +2008,12 @@
       0))
 
 (defn vault-detail-vm
-  [state]
-  (let [route (get-in state [:router :path])
+  ([state]
+   (vault-detail-vm state {:now-ms (.now js/Date)}))
+  ([state {:keys [now-ms]}]
+   (let [now-ms* (or (optional-number now-ms)
+                     (.now js/Date))
+         route (get-in state [:router :path])
         {:keys [kind vault-address]} (vault-actions/parse-vault-route route)
         detail-tab (vault-actions/normalize-vault-detail-tab
                     (get-in state [:vaults-ui :detail-tab]))
@@ -2089,8 +2066,7 @@
                 0)
         apr (or (optional-number (:apr details))
                 (optional-number (:apr row)))
-        month-return (or (normalize-percent-value apr)
-                         (snapshot-value-by-range row :month tvl))
+        month-return (snapshot-value-by-range row :month tvl)
         your-deposit (or (optional-number (:equity user-equity))
                          (optional-number (get-in details [:follower-state :vault-equity])))
         all-time-earned (optional-number (get-in details [:follower-state :all-time-pnl]))
@@ -2252,7 +2228,7 @@
         positions-raw (activity-positions webdata)
         open-orders-raw (activity-open-orders webdata)
         balances-raw (activity-balances webdata)
-        twaps-raw (activity-twaps webdata)
+        twaps-raw (activity-twaps webdata now-ms*)
         fills-raw (activity-fills fills-source)
         funding-history-raw (activity-funding-history funding-source)
         order-history-raw (activity-order-history order-history-source)
@@ -2397,4 +2373,4 @@
      :activity-errors activity-errors
      :activity-summary {:fill-count (count fills)
                         :open-order-count (count open-orders)
-                        :position-count (count positions)}}))
+                        :position-count (count positions)}})))
