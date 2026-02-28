@@ -1,6 +1,7 @@
 (ns hyperopen.views.account-info.tabs.positions-test
   (:require [clojure.string :as str]
             [cljs.test :refer-macros [deftest is testing use-fixtures]]
+            [hyperopen.account.history.position-margin :as position-margin]
             [hyperopen.account.history.position-reduce :as position-reduce]
             [hyperopen.account.history.position-tpsl :as position-tpsl]
             [hyperopen.views.account-info.test-support.fixtures :as fixtures]
@@ -405,6 +406,48 @@
     (is (= :event.currentTarget/bounds
            (nth (first click-actions) 2)))
     (is (= "true" (get-in action-button [1 :data-position-reduce-trigger])))))
+
+(deftest position-row-margin-cell-dispatches-open-modal-action-test
+  (let [row-data (fixtures/sample-position-row "xyz:NVDA" 10 "0.500")
+        row-node (view/position-row row-data)
+        row-cells (vec (hiccup/node-children row-node))
+        margin-cell (nth row-cells 7)
+        action-button (hiccup/find-first-node margin-cell #(= :button (first %)))
+        click-actions (get-in action-button [1 :on :click])
+        margin-strings (set (hiccup/collect-strings margin-cell))]
+    (is (contains? margin-strings "$12.00"))
+    (is (vector? click-actions))
+    (is (= :actions/open-position-margin-modal
+           (first (first click-actions))))
+    (is (= row-data
+           (second (first click-actions))))
+    (is (= :event.currentTarget/bounds
+           (nth (first click-actions) 2)))
+    (is (= "true" (get-in action-button [1 :data-position-margin-trigger])))))
+
+(deftest position-row-renders-inline-margin-modal-for-active-row-key-test
+  (let [row-data (fixtures/sample-position-row "xyz:NVDA" 10 "0.500")
+        margin-modal (position-margin/from-position-row {} row-data)
+        row-node (view/position-row row-data nil nil margin-modal)
+        panel-node (hiccup/find-first-node
+                    row-node
+                    #(= "true" (get-in % [1 :data-position-margin-surface])))]
+    (is (some? panel-node))
+    (is (contains? (hiccup/node-class-set panel-node) "fixed"))
+    (is (contains? (hiccup/node-class-set panel-node) "space-y-3"))))
+
+(deftest position-row-margin-slider-hides-overlapping-notch-test
+  (let [row-data (fixtures/sample-position-row "xyz:NVDA" 10 "0.500")
+        margin-modal (assoc (position-margin/from-position-row {} row-data)
+                            :amount-percent-input "25")
+        row-node (view/position-row row-data nil nil margin-modal)
+        notch-nodes (hiccup/find-all-nodes
+                     row-node
+                     #(contains? (hiccup/node-class-set %) "order-size-slider-notch"))
+        hidden-notch-count (count (filter #(contains? (hiccup/node-class-set %) "opacity-0")
+                                          notch-nodes))]
+    (is (seq notch-nodes))
+    (is (= 1 hidden-notch-count))))
 
 (deftest position-row-renders-inline-reduce-popover-for-active-row-key-test
   (let [row-data (fixtures/sample-position-row "xyz:NVDA" 10 "0.500")

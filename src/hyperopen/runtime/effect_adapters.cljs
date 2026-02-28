@@ -527,6 +527,12 @@
   ([runtime ctx store request]
    (order-effects/api-submit-position-tpsl (order-api-effect-deps runtime) ctx store request)))
 
+(defn api-submit-position-margin
+  ([ctx store request]
+   (api-submit-position-margin runtime-state/runtime ctx store request))
+  ([runtime ctx store request]
+   (order-effects/api-submit-position-margin (order-api-effect-deps runtime) ctx store request)))
+
 (defn make-api-submit-order
   [runtime]
   (fn [ctx store request]
@@ -541,6 +547,11 @@
   [runtime]
   (fn [ctx store request]
     (api-submit-position-tpsl runtime ctx store request)))
+
+(defn make-api-submit-position-margin
+  [runtime]
+  (fn [ctx store request]
+    (api-submit-position-margin runtime ctx store request)))
 
 (defn fetch-asset-selector-markets-effect
   [_ store & [opts]]

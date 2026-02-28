@@ -4,6 +4,7 @@
   (:require [cljs.test :refer-macros [run-tests]]
             [hyperopen.account.history.actions-test]
             [hyperopen.account.history.effects-test]
+            [hyperopen.account.history.position-margin-test]
             [hyperopen.account.history.position-tpsl-test]
             [hyperopen.api-test]
             [hyperopen.api.compat-test]
@@ -223,6 +224,7 @@
   []
   (run-tests 'hyperopen.account.history.actions-test
              'hyperopen.account.history.effects-test
+             'hyperopen.account.history.position-margin-test
              'hyperopen.account.history.position-tpsl-test
              'hyperopen.api-test
              'hyperopen.api.compat-test

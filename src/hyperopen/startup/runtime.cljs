@@ -197,7 +197,9 @@
    (or (some-> target (.closest "[data-position-tpsl-surface='true']"))
        (some-> target (.closest "[data-position-tpsl-trigger='true']"))
        (some-> target (.closest "[data-position-reduce-surface='true']"))
-       (some-> target (.closest "[data-position-reduce-trigger='true']")))))
+       (some-> target (.closest "[data-position-reduce-trigger='true']"))
+       (some-> target (.closest "[data-position-margin-surface='true']"))
+       (some-> target (.closest "[data-position-margin-trigger='true']")))))
 
 (defn install-position-tpsl-clickaway!
   [{:keys [store dispatch!]}]
@@ -214,13 +216,15 @@
       (let [handler (fn [event]
                       (let [tpsl-open? (true? (get-in @store [:positions-ui :tpsl-modal :open?]))
                             reduce-open? (true? (get-in @store [:positions-ui :reduce-popover :open?]))
-                            any-open? (or tpsl-open? reduce-open?)]
+                            margin-open? (true? (get-in @store [:positions-ui :margin-modal :open?]))
+                            any-open? (or tpsl-open? reduce-open? margin-open?)]
                         (when any-open?
                           (let [target (event-target-with-closest event)]
                             (when-not (within-position-overlay-surface? target)
                               (let [close-actions (cond-> []
                                                     tpsl-open? (conj [:actions/close-position-tpsl-modal])
-                                                    reduce-open? (conj [:actions/close-position-reduce-popover]))]
+                                                    reduce-open? (conj [:actions/close-position-reduce-popover])
+                                                    margin-open? (conj [:actions/close-position-margin-modal]))]
                                 (when (seq close-actions)
                                   (dispatch! store nil close-actions))))))))]
         (.addEventListener window-object "mousedown" handler)

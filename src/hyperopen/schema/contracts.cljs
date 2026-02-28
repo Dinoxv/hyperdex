@@ -130,6 +130,7 @@
 (s/def ::api-submit-order-args (s/tuple ::api-submit-request))
 (s/def ::api-cancel-order-args (s/tuple ::api-submit-request))
 (s/def ::api-submit-position-tpsl-args (s/tuple ::api-submit-request))
+(s/def ::api-submit-position-margin-args (s/tuple ::api-submit-request))
 
 (defn- fetch-asset-selector-markets-args?
   [args]
@@ -225,6 +226,10 @@
   (s/or :position-only (s/tuple map?)
         :position-and-anchor (s/tuple map? any?)))
 (s/def ::position-reduce-popover-field-args (s/tuple ::state-path any?))
+(s/def ::position-margin-open-args
+  (s/or :position-only (s/tuple map?)
+        :position-and-anchor (s/tuple map? any?)))
+(s/def ::position-margin-modal-field-args (s/tuple ::state-path any?))
 (s/def ::ws-reset-source-args (s/or :none ::no-args
                                     :source (s/tuple ::source)))
 
@@ -364,6 +369,13 @@
    :actions/set-position-reduce-size-percent ::single-input-args
    :actions/set-position-reduce-limit-price-to-mid ::no-args
    :actions/submit-position-reduce-close ::no-args
+   :actions/open-position-margin-modal ::position-margin-open-args
+   :actions/close-position-margin-modal ::no-args
+   :actions/handle-position-margin-modal-keydown ::key-args
+   :actions/set-position-margin-modal-field ::position-margin-modal-field-args
+   :actions/set-position-margin-amount-percent ::single-input-args
+   :actions/set-position-margin-amount-to-max ::no-args
+   :actions/submit-position-margin-update ::no-args
    :actions/select-order-entry-mode ::keyword-or-string-args
    :actions/select-pro-order-type ::keyword-or-string-args
    :actions/toggle-pro-order-type-dropdown ::no-args
@@ -457,6 +469,7 @@
    :effects/api-submit-order ::api-submit-order-args
    :effects/api-cancel-order ::api-cancel-order-args
    :effects/api-submit-position-tpsl ::api-submit-position-tpsl-args
+   :effects/api-submit-position-margin ::api-submit-position-margin-args
    :effects/api-load-user-data ::address-args
    :effects/api-fetch-vault-index ::no-args
    :effects/api-fetch-vault-summaries ::no-args

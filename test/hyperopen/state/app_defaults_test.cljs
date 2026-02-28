@@ -65,7 +65,8 @@
     (is (= false (get-in state [:vaults-ui :detail-returns-benchmark-suggestions-open?])))
     (is (= true (get-in state [:chart-options :volume-visible?])))
     (is (= false (get-in state [:positions-ui :tpsl-modal :open?])))
-    (is (= false (get-in state [:positions-ui :reduce-popover :open?])))))
+    (is (= false (get-in state [:positions-ui :reduce-popover :open?])))
+    (is (= false (get-in state [:positions-ui :margin-modal :open?])))))
 
 (deftest default-app-state-initializes-empty-runtime-collections-test
   (let [state (app-defaults/default-app-state

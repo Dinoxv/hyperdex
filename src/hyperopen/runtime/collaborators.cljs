@@ -140,7 +140,14 @@
    :set-position-reduce-popover-field account-history-actions/set-position-reduce-popover-field
    :set-position-reduce-size-percent account-history-actions/set-position-reduce-size-percent
    :set-position-reduce-limit-price-to-mid account-history-actions/set-position-reduce-limit-price-to-mid
-   :submit-position-reduce-close account-history-actions/submit-position-reduce-close})
+   :submit-position-reduce-close account-history-actions/submit-position-reduce-close
+   :open-position-margin-modal account-history-actions/open-position-margin-modal
+   :close-position-margin-modal account-history-actions/close-position-margin-modal
+   :handle-position-margin-modal-keydown account-history-actions/handle-position-margin-modal-keydown
+   :set-position-margin-modal-field account-history-actions/set-position-margin-modal-field
+   :set-position-margin-amount-percent account-history-actions/set-position-margin-amount-percent
+   :set-position-margin-amount-to-max account-history-actions/set-position-margin-amount-to-max
+   :submit-position-margin-update account-history-actions/submit-position-margin-update})
 
 (defn- order-action-deps []
   {:select-order-entry-mode order-actions/select-order-entry-mode

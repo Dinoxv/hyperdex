@@ -63,10 +63,12 @@
 (defn- trading-effect-handlers
   [{:keys [api-submit-order
            api-cancel-order
-           api-submit-position-tpsl]}]
+           api-submit-position-tpsl
+           api-submit-position-margin]}]
   {:api-submit-order api-submit-order
    :api-cancel-order api-cancel-order
-   :api-submit-position-tpsl api-submit-position-tpsl})
+   :api-submit-position-tpsl api-submit-position-tpsl
+   :api-submit-position-margin api-submit-position-margin})
 
 (defn- api-effect-handlers
   [{:keys [fetch-asset-selector-markets
@@ -381,7 +383,14 @@
            set-position-reduce-popover-field
            set-position-reduce-size-percent
            set-position-reduce-limit-price-to-mid
-           submit-position-reduce-close]}]
+           submit-position-reduce-close
+           open-position-margin-modal
+           close-position-margin-modal
+           handle-position-margin-modal-keydown
+           set-position-margin-modal-field
+           set-position-margin-amount-percent
+           set-position-margin-amount-to-max
+           submit-position-margin-update]}]
   {:select-account-info-tab select-account-info-tab
    :set-funding-history-filters set-funding-history-filters
    :toggle-funding-history-filter-open toggle-funding-history-filter-open
@@ -444,7 +453,14 @@
    :set-position-reduce-popover-field set-position-reduce-popover-field
    :set-position-reduce-size-percent set-position-reduce-size-percent
    :set-position-reduce-limit-price-to-mid set-position-reduce-limit-price-to-mid
-   :submit-position-reduce-close submit-position-reduce-close})
+   :submit-position-reduce-close submit-position-reduce-close
+   :open-position-margin-modal open-position-margin-modal
+   :close-position-margin-modal close-position-margin-modal
+   :handle-position-margin-modal-keydown handle-position-margin-modal-keydown
+   :set-position-margin-modal-field set-position-margin-modal-field
+   :set-position-margin-amount-percent set-position-margin-amount-percent
+   :set-position-margin-amount-to-max set-position-margin-amount-to-max
+   :submit-position-margin-update submit-position-margin-update})
 
 (defn- order-action-handlers
   [{:keys [select-order-entry-mode

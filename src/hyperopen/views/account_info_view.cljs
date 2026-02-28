@@ -524,18 +524,21 @@
                            perp-dex-states
                            position-tpsl-modal
                            position-reduce-popover
+                           position-margin-modal
                            positions-state]}]
                 (if (some? positions)
                   (positions-tab-content positions
                                          positions-sort
                                          position-tpsl-modal
                                          position-reduce-popover
+                                         position-margin-modal
                                          positions-state)
                   (positions-tab-content webdata2
                                          positions-sort
                                          perp-dex-states
                                          position-tpsl-modal
                                          position-reduce-popover
+                                         position-margin-modal
                                          positions-state)))
    :open-orders (fn [{:keys [open-orders open-orders-sort open-orders-state]}]
                   (open-orders-tab-content open-orders open-orders-sort open-orders-state))

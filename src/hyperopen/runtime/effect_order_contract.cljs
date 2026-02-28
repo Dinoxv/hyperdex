@@ -81,6 +81,12 @@
     :allow-duplicate-heavy-effects? false
     :heavy-effect-ids #{:effects/api-fetch-user-funding-history}}
 
+   :actions/submit-position-margin-update
+   {:required-phase-order [:projection :persistence :heavy-io]
+    :require-projection-before-heavy? true
+    :allow-duplicate-heavy-effects? false
+    :heavy-effect-ids #{:effects/api-submit-position-margin}}
+
    :actions/enable-agent-trading
    {:required-phase-order [:projection :persistence :heavy-io]
     :require-projection-before-heavy? true

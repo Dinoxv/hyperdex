@@ -1,5 +1,6 @@
 (ns hyperopen.account.history.actions
   (:require [clojure.string :as str]
+            [hyperopen.account.history.position-margin :as position-margin]
             [hyperopen.account.history.position-reduce :as position-reduce]
             [hyperopen.account.history.position-tpsl :as position-tpsl]
             [hyperopen.domain.funding-history :as funding-history]
@@ -671,12 +672,16 @@
    [[:effects/save-many [[[:positions-ui :tpsl-modal]
                           (position-tpsl/from-position-row position-data)]
                          [[:positions-ui :reduce-popover]
-                          (position-reduce/default-popover-state)]]]])
+                          (position-reduce/default-popover-state)]
+                         [[:positions-ui :margin-modal]
+                          (position-margin/default-modal-state)]]]])
   ([_state position-data trigger-bounds]
    [[:effects/save-many [[[:positions-ui :tpsl-modal]
                           (position-tpsl/from-position-row position-data trigger-bounds)]
                          [[:positions-ui :reduce-popover]
-                          (position-reduce/default-popover-state)]]]]))
+                          (position-reduce/default-popover-state)]
+                         [[:positions-ui :margin-modal]
+                          (position-margin/default-modal-state)]]]]))
 
 (defn close-position-tpsl-modal [_state]
   [[:effects/save [:positions-ui :tpsl-modal]
@@ -714,12 +719,16 @@
    [[:effects/save-many [[[:positions-ui :reduce-popover]
                           (position-reduce/from-position-row position-data)]
                          [[:positions-ui :tpsl-modal]
-                          (position-tpsl/default-modal-state)]]]])
+                          (position-tpsl/default-modal-state)]
+                         [[:positions-ui :margin-modal]
+                          (position-margin/default-modal-state)]]]])
   ([_state position-data trigger-bounds]
    [[:effects/save-many [[[:positions-ui :reduce-popover]
                           (position-reduce/from-position-row position-data trigger-bounds)]
                          [[:positions-ui :tpsl-modal]
-                          (position-tpsl/default-modal-state)]]]]))
+                          (position-tpsl/default-modal-state)]
+                         [[:positions-ui :margin-modal]
+                          (position-margin/default-modal-state)]]]]))
 
 (defn close-position-reduce-popover [_state]
   [[:effects/save [:positions-ui :reduce-popover]
@@ -759,6 +768,61 @@
       [[:effects/save [:positions-ui :reduce-popover]
         (assoc popover :error nil)]
        [:effects/api-submit-order (:request result)]])))
+
+(defn open-position-margin-modal
+  ([state position-data]
+   [[:effects/save-many [[[:positions-ui :margin-modal]
+                          (position-margin/from-position-row state position-data)]
+                         [[:positions-ui :tpsl-modal]
+                          (position-tpsl/default-modal-state)]
+                         [[:positions-ui :reduce-popover]
+                          (position-reduce/default-popover-state)]]]])
+  ([state position-data trigger-bounds]
+   [[:effects/save-many [[[:positions-ui :margin-modal]
+                          (position-margin/from-position-row state position-data trigger-bounds)]
+                         [[:positions-ui :tpsl-modal]
+                          (position-tpsl/default-modal-state)]
+                         [[:positions-ui :reduce-popover]
+                          (position-reduce/default-popover-state)]]]]))
+
+(defn close-position-margin-modal [_state]
+  [[:effects/save [:positions-ui :margin-modal]
+    (position-margin/default-modal-state)]])
+
+(defn handle-position-margin-modal-keydown [state key]
+  (if (= key "Escape")
+    (close-position-margin-modal state)
+    []))
+
+(defn set-position-margin-modal-field [state path value]
+  (let [modal (or (get-in state [:positions-ui :margin-modal])
+                  (position-margin/default-modal-state))
+        path* (if (vector? path) path [path])]
+    [[:effects/save [:positions-ui :margin-modal]
+      (position-margin/set-modal-field modal path* value)]]))
+
+(defn set-position-margin-amount-percent [state percent]
+  (let [modal (or (get-in state [:positions-ui :margin-modal])
+                  (position-margin/default-modal-state))]
+    [[:effects/save [:positions-ui :margin-modal]
+      (position-margin/set-amount-percent modal percent)]]))
+
+(defn set-position-margin-amount-to-max [state]
+  (let [modal (or (get-in state [:positions-ui :margin-modal])
+                  (position-margin/default-modal-state))]
+    [[:effects/save [:positions-ui :margin-modal]
+      (position-margin/set-amount-to-max modal)]]))
+
+(defn submit-position-margin-update [state]
+  (let [modal (or (get-in state [:positions-ui :margin-modal])
+                  (position-margin/default-modal-state))
+        result (position-margin/prepare-submit state modal)]
+    (if-not (:ok? result)
+      [[:effects/save-many [[[:positions-ui :margin-modal :submitting?] false]
+                            [[:positions-ui :margin-modal :error] (:display-message result)]]]]
+      [[:effects/save-many [[[:positions-ui :margin-modal :submitting?] true]
+                            [[:positions-ui :margin-modal :error] nil]]]
+       [:effects/api-submit-position-margin (:request result)]])))
 
 (defn submit-position-tpsl [state]
   (let [modal (or (get-in state [:positions-ui :tpsl-modal])

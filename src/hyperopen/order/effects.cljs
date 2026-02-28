@@ -5,6 +5,7 @@
             [hyperopen.api.promise-effects :as promise-effects]
             [hyperopen.api.projections :as api-projections]
             [hyperopen.telemetry :as telemetry]
+            [hyperopen.account.history.position-margin :as position-margin]
             [hyperopen.account.history.position-tpsl :as position-tpsl]
             [hyperopen.api.trading :as trading-api]))
 
@@ -318,6 +319,69 @@
                           show-toast!
                           address))
           (.catch (partial handle-position-tpsl-submit-runtime-error!
+                           store
+                           runtime-error-message
+                           show-toast!))))))
+
+(defn- update-position-margin-modal-error
+  [state error-text]
+  (-> state
+      (assoc-in [:positions-ui :margin-modal :submitting?] false)
+      (assoc-in [:positions-ui :margin-modal :error] error-text)))
+
+(defn- set-position-margin-modal-error!
+  [store error-text]
+  (swap! store update-position-margin-modal-error error-text))
+
+(defn- position-margin-submit-precondition-error
+  [address agent-status]
+  (cond
+    (nil? address)
+    "Connect your wallet before updating margin."
+
+    (not= :ready agent-status)
+    "Enable trading before updating margin."
+
+    :else
+    nil))
+
+(defn- reject-position-margin-submit!
+  [store show-toast! error-text]
+  (set-position-margin-modal-error! store error-text)
+  (show-toast! store :error error-text))
+
+(defn- handle-position-margin-submit-response!
+  [store dispatch! exchange-response-error show-toast! address resp]
+  (if (= "ok" (:status resp))
+    (do
+      (swap! store assoc-in [:positions-ui :margin-modal]
+             (position-margin/default-modal-state))
+      (show-toast! store :success "Margin updated.")
+      (refresh-order-surfaces-after-submit! store dispatch! address))
+    (let [error-text (str (exchange-response-error resp))]
+      (set-position-margin-modal-error! store error-text)
+      (show-toast! store :error (str "Margin update failed: " error-text)))))
+
+(defn- handle-position-margin-submit-runtime-error!
+  [store runtime-error-message show-toast! err]
+  (let [error-text (runtime-error-message err)]
+    (set-position-margin-modal-error! store error-text)
+    (show-toast! store :error (str "Margin update failed: " error-text))))
+
+(defn api-submit-position-margin
+  [{:keys [dispatch! exchange-response-error runtime-error-message show-toast!]} _ store request]
+  (let [address (get-in @store [:wallet :address])
+        agent-status (get-in @store [:wallet :agent :status])]
+    (if-let [error-text (position-margin-submit-precondition-error address agent-status)]
+      (reject-position-margin-submit! store show-toast! error-text)
+      (-> (trading-api/submit-order! store address (:action request))
+          (.then (partial handle-position-margin-submit-response!
+                          store
+                          dispatch!
+                          exchange-response-error
+                          show-toast!
+                          address))
+          (.catch (partial handle-position-margin-submit-runtime-error!
                            store
                            runtime-error-message
                            show-toast!))))))

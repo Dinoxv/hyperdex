@@ -1,8 +1,10 @@
 (ns hyperopen.views.account-info.tabs.positions
   (:require [clojure.string :as str]
+            [hyperopen.account.history.position-margin :as position-margin]
             [hyperopen.account.history.position-reduce :as position-reduce]
             [hyperopen.account.history.position-tpsl :as position-tpsl]
             [hyperopen.views.account-info.cache-keys :as cache-keys]
+            [hyperopen.views.account-info.position-margin-modal :as position-margin-modal]
             [hyperopen.views.account-info.position-reduce-popover :as position-reduce-popover]
             [hyperopen.views.account-info.projections :as projections]
             [hyperopen.views.account-info.position-tpsl-modal :as position-tpsl-modal]
@@ -254,10 +256,12 @@
 
 (defn position-row
   ([position-data]
-   (position-row position-data nil nil))
-  ([position-data modal]
-   (position-row position-data modal nil))
-  ([position-data modal reduce-popover]
+   (position-row position-data nil nil nil))
+  ([position-data tpsl-modal]
+   (position-row position-data tpsl-modal nil nil))
+  ([position-data tpsl-modal reduce-popover]
+   (position-row position-data tpsl-modal reduce-popover nil))
+  ([position-data tpsl-modal reduce-popover margin-modal]
    (let [pos (:position position-data)
          side (position-side pos)
          chip-classes (shared/position-chip-classes-for-side side)
@@ -294,13 +298,17 @@
                              (shared/non-blank-text (:liquidation-explanation position-data)))
          tpsl-copy (tpsl-cell-copy position-data)
          active-modal?
-         (and (position-tpsl/open? modal)
+         (and (position-tpsl/open? tpsl-modal)
               (= (projections/position-unique-key position-data)
-                 (:position-key modal)))
+                 (:position-key tpsl-modal)))
          active-reduce-popover?
          (and (position-reduce/open? reduce-popover)
               (= (projections/position-unique-key position-data)
-                 (:position-key reduce-popover)))]
+                 (:position-key reduce-popover)))
+         active-margin-modal?
+         (and (position-margin/open? margin-modal)
+              (= (projections/position-unique-key position-data)
+                 (:position-key margin-modal)))]
      [:div {:class ["grid"
                     shared/positions-grid-template-class
                     "gap-2"
@@ -334,7 +342,26 @@
        (explainable-value-node
         (format-liquidation-price liq-price)
         liq-explanation)]
-      [:div.text-left.font-semibold.num "$" (shared/format-currency margin)]
+      [:div {:class ["text-left" "relative" "font-semibold" "num"]}
+       [:button {:class ["btn"
+                         "btn-xs"
+                         "btn-ghost"
+                         "w-full"
+                         "justify-start"
+                         "gap-0.5"
+                         "px-1"
+                         "font-semibold"
+                         "text-trading-text"
+                         "flex-nowrap"
+                         "whitespace-nowrap"]
+                 :type "button"
+                 :data-position-margin-trigger "true"
+                 :on {:click [[:actions/open-position-margin-modal position-data :event.currentTarget/bounds]]}}
+        [:span {:class ["num"]}
+         (str "$" (shared/format-currency margin))]
+        (edit-icon)]
+       (when active-margin-modal?
+         (position-margin-modal/position-margin-modal-view margin-modal))]
       [:div.text-left.font-semibold.num
        (explainable-value-node
         [:span {:class [(cond
@@ -382,7 +409,7 @@
         [:span {:class ["whitespace-nowrap"]} tpsl-copy]
         (edit-icon)]
        (when active-modal?
-         (position-tpsl-modal/position-tpsl-modal-view modal))]])))
+         (position-tpsl-modal/position-tpsl-modal-view tpsl-modal))]])))
 
 (defn sort-positions-by-column [positions column direction]
   (sort-kernel/sort-rows-by-column
@@ -488,7 +515,7 @@
    [:div.text-left (table/non-sortable-header "TP/SL")]])
 
 (defn- positions-tab-content-from-rows
-  [positions sort-state modal reduce-popover positions-state]
+  [positions sort-state tpsl-modal reduce-popover margin-modal positions-state]
   (let [positions* (or positions [])
         direction-filter (positions-direction-filter-key positions-state)
         coin-search (:coin-search positions-state "")
@@ -499,56 +526,79 @@
       (table/tab-table-content (position-table-header sort-state)
                                (for [position sorted-positions]
                                  ^{:key (position-unique-key position)}
-                                 (position-row position modal reduce-popover)))
+                                 (position-row position tpsl-modal reduce-popover margin-modal)))
       (empty-state "No active positions"))))
 
 (defn positions-tab-content
   ([positions sort-state]
-   (positions-tab-content-from-rows positions sort-state nil nil {}))
-  ([positions-or-webdata2 sort-state modal-or-perp-dex-states]
+   (positions-tab-content-from-rows positions sort-state nil nil nil {}))
+  ([positions-or-webdata2 sort-state tpsl-modal-or-perp-dex-states]
    (if (and (map? positions-or-webdata2)
             (contains? positions-or-webdata2 :clearinghouseState))
      (positions-tab-content-from-rows
-      (collect-positions positions-or-webdata2 modal-or-perp-dex-states)
+      (collect-positions positions-or-webdata2 tpsl-modal-or-perp-dex-states)
       sort-state
+      nil
       nil
       nil
       {})
-     (positions-tab-content-from-rows positions-or-webdata2 sort-state modal-or-perp-dex-states nil {})))
-  ([positions-or-webdata2 sort-state modal-or-perp-dex-states modal-or-positions-state]
+     (positions-tab-content-from-rows positions-or-webdata2 sort-state tpsl-modal-or-perp-dex-states nil nil {})))
+  ([positions-or-webdata2 sort-state tpsl-modal-or-perp-dex-states tpsl-modal-or-positions-state]
    (if (and (map? positions-or-webdata2)
             (contains? positions-or-webdata2 :clearinghouseState))
      (positions-tab-content-from-rows
-      (collect-positions positions-or-webdata2 modal-or-perp-dex-states)
+      (collect-positions positions-or-webdata2 tpsl-modal-or-perp-dex-states)
       sort-state
-      modal-or-positions-state
+      tpsl-modal-or-positions-state
+      nil
       nil
       {})
      (positions-tab-content-from-rows
       positions-or-webdata2
       sort-state
-      modal-or-perp-dex-states
+      tpsl-modal-or-perp-dex-states
       nil
-      modal-or-positions-state)))
-  ([positions-or-webdata2 sort-state modal-or-perp-dex-states reduce-popover-or-modal positions-state]
+      nil
+      tpsl-modal-or-positions-state)))
+  ([positions-or-webdata2 sort-state tpsl-modal-or-perp-dex-states reduce-popover-or-modal positions-state]
    (if (and (map? positions-or-webdata2)
             (contains? positions-or-webdata2 :clearinghouseState))
      (positions-tab-content-from-rows
-      (collect-positions positions-or-webdata2 modal-or-perp-dex-states)
+      (collect-positions positions-or-webdata2 tpsl-modal-or-perp-dex-states)
       sort-state
       reduce-popover-or-modal
+      nil
       nil
       positions-state)
      (positions-tab-content-from-rows
       positions-or-webdata2
       sort-state
-      modal-or-perp-dex-states
+      tpsl-modal-or-perp-dex-states
       reduce-popover-or-modal
+      nil
       positions-state)))
-  ([webdata2 sort-state perp-dex-states modal reduce-popover positions-state]
+  ([positions-or-webdata2 sort-state tpsl-modal-or-perp-dex-states reduce-popover-or-tpsl margin-modal-or-positions-state positions-state]
+   (if (and (map? positions-or-webdata2)
+            (contains? positions-or-webdata2 :clearinghouseState))
+     (positions-tab-content-from-rows
+      (collect-positions positions-or-webdata2 tpsl-modal-or-perp-dex-states)
+      sort-state
+      reduce-popover-or-tpsl
+      margin-modal-or-positions-state
+      nil
+      positions-state)
+     (positions-tab-content-from-rows
+      positions-or-webdata2
+      sort-state
+      tpsl-modal-or-perp-dex-states
+      reduce-popover-or-tpsl
+      margin-modal-or-positions-state
+      positions-state)))
+  ([webdata2 sort-state perp-dex-states tpsl-modal reduce-popover margin-modal positions-state]
    (positions-tab-content-from-rows
     (collect-positions webdata2 perp-dex-states)
     sort-state
-    modal
+    tpsl-modal
     reduce-popover
+    margin-modal
     positions-state)))

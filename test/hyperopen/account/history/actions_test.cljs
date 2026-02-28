@@ -1,6 +1,7 @@
 (ns hyperopen.account.history.actions-test
   (:require [cljs.test :refer-macros [deftest is testing]]
             [hyperopen.account.history.actions :as history-actions]
+            [hyperopen.account.history.position-margin :as position-margin]
             [hyperopen.account.history.position-reduce :as position-reduce]
             [hyperopen.account.history.position-tpsl :as position-tpsl]
             [hyperopen.domain.funding-history :as funding-history]
@@ -294,6 +295,7 @@
         open-effects (history-actions/open-position-tpsl-modal {} row)
         opened-modal (get-in (first open-effects) [1 0 1])
         reset-reduce-popover (get-in (first open-effects) [1 1 1])
+        reset-margin-modal (get-in (first open-effects) [1 2 1])
         updated-effects (history-actions/set-position-tpsl-modal-field
                          {:positions-ui {:tpsl-modal opened-modal}}
                          [:tp-price]
@@ -304,6 +306,7 @@
     (is (true? (:open? opened-modal)))
     (is (= "xyz:NVDA" (:coin opened-modal)))
     (is (= (position-reduce/default-popover-state) reset-reduce-popover))
+    (is (= (position-margin/default-modal-state) reset-margin-modal))
     (is (= "20.25"
            (get-in (nth (first updated-effects) 2) [:tp-price])))
     (is (= [[:effects/save [:positions-ui :tpsl-modal]
@@ -320,6 +323,7 @@
         open-effects (history-actions/open-position-reduce-popover {} row)
         opened-popover (get-in (first open-effects) [1 0 1])
         reset-tpsl-modal (get-in (first open-effects) [1 1 1])
+        reset-margin-modal (get-in (first open-effects) [1 2 1])
         updated-effects (history-actions/set-position-reduce-popover-field
                          {:positions-ui {:reduce-popover opened-popover}}
                          [:size-percent-input]
@@ -338,6 +342,7 @@
     (is (= "xyz:NVDA" (:coin opened-popover)))
     (is (= "10" (:mid-price opened-popover)))
     (is (= (position-tpsl/default-modal-state) reset-tpsl-modal))
+    (is (= (position-margin/default-modal-state) reset-margin-modal))
     (is (= "75"
            (get-in (nth (first updated-effects) 2) [:size-percent-input])))
     (is (= "25"
@@ -421,4 +426,77 @@
              (assoc popover
                     :limit-price ""
                     :error "Price is required for limit orders.")]]
+           invalid-effects))))
+
+(deftest position-margin-modal-actions-open-update-close-test
+  (let [row (fixtures/sample-position-row "xyz:NVDA" 10 "0.500")
+        open-effects (history-actions/open-position-margin-modal {} row)
+        opened-modal (get-in (first open-effects) [1 0 1])
+        reset-tpsl-modal (get-in (first open-effects) [1 1 1])
+        reset-reduce-popover (get-in (first open-effects) [1 2 1])
+        updated-effects (history-actions/set-position-margin-modal-field
+                         {:positions-ui {:margin-modal opened-modal}}
+                         [:amount-input]
+                         "1.5")
+        percent-effects (history-actions/set-position-margin-amount-percent
+                         {:positions-ui {:margin-modal opened-modal}}
+                         25)
+        max-effects (history-actions/set-position-margin-amount-to-max
+                     {:positions-ui {:margin-modal (assoc opened-modal :available-to-add 5)}})
+        closed-effects (history-actions/close-position-margin-modal {})]
+    (is (= :effects/save-many
+           (ffirst open-effects)))
+    (is (true? (:open? opened-modal)))
+    (is (= "xyz:NVDA" (:coin opened-modal)))
+    (is (= (position-tpsl/default-modal-state) reset-tpsl-modal))
+    (is (= (position-reduce/default-popover-state) reset-reduce-popover))
+    (is (= "1.5"
+           (get-in (nth (first updated-effects) 2) [:amount-input])))
+    (is (= "25"
+           (get-in (nth (first percent-effects) 2) [:amount-percent-input])))
+    (is (= "100"
+           (get-in (nth (first max-effects) 2) [:amount-percent-input])))
+    (is (= [[:effects/save [:positions-ui :margin-modal]
+             (position-margin/default-modal-state)]]
+           closed-effects))
+    (is (= [[:effects/save [:positions-ui :margin-modal]
+             (position-margin/default-modal-state)]]
+           (history-actions/handle-position-margin-modal-keydown {} "Escape")))
+    (is (= []
+           (history-actions/handle-position-margin-modal-keydown {} "Enter")))))
+
+(deftest submit-position-margin-update-validates-and-emits-submit-effect-test
+  (let [row (fixtures/sample-position-row "xyz:NVDA" 10 "0.500")
+        modal (-> (position-margin/from-position-row {} row)
+                  (assoc :available-to-add 10
+                         :amount-input "1.25"))
+        state {:positions-ui {:margin-modal modal}
+               :asset-selector {:market-by-key {"perp:xyz:NVDA"
+                                                {:coin "xyz:NVDA"
+                                                 :market-type :perp
+                                                 :asset-id 123}}}}
+        valid-effects (history-actions/submit-position-margin-update state)
+        invalid-effects (history-actions/submit-position-margin-update
+                         {:positions-ui {:margin-modal (assoc (position-margin/from-position-row {} row)
+                                                              :available-to-add 5)}
+                          :asset-selector {:market-by-key {"perp:xyz:NVDA"
+                                                           {:coin "xyz:NVDA"
+                                                            :market-type :perp
+                                                            :asset-id 123}}}})]
+    (is (= :effects/save-many
+           (ffirst valid-effects)))
+    (is (= [[:positions-ui :margin-modal :submitting?] true]
+           (first (second (first valid-effects)))))
+    (is (= :effects/api-submit-position-margin
+           (first (second valid-effects))))
+    (is (= "updateIsolatedMargin"
+           (get-in (second (second valid-effects)) [:action :type])))
+    (is (= 123
+           (get-in (second (second valid-effects)) [:action :asset])))
+    (is (= 1250000
+           (get-in (second (second valid-effects)) [:action :ntli])))
+    (is (= true
+           (get-in (second (second valid-effects)) [:action :isBuy])))
+    (is (= [[:effects/save-many [[[:positions-ui :margin-modal :submitting?] false]
+                                 [[:positions-ui :margin-modal :error] "Select an amount"]]]]
            invalid-effects))))

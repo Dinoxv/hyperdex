@@ -10,7 +10,8 @@
         disconnect-handler (fn [& _] nil)
         copy-handler (fn [& _] nil)
         submit-handler (fn [& _] nil)
-        cancel-handler (fn [& _] nil)]
+        cancel-handler (fn [& _] nil)
+        margin-handler (fn [& _] nil)]
     (with-redefs [effect-adapters/make-queue-asset-icon-status
                   (fn [runtime*]
                     (is (identical? runtime runtime*))
@@ -34,7 +35,11 @@
                   effect-adapters/make-api-cancel-order
                   (fn [runtime*]
                     (is (identical? runtime runtime*))
-                    cancel-handler)]
+                    cancel-handler)
+                  effect-adapters/make-api-submit-position-margin
+                  (fn [runtime*]
+                    (is (identical? runtime runtime*))
+                    margin-handler)]
       (let [deps (app-effects/runtime-effect-deps runtime)]
         (is (identical? queue-handler
                         (get-in deps [:asset-selector :queue-asset-icon-status])))
@@ -47,4 +52,6 @@
         (is (identical? submit-handler
                         (get-in deps [:orders :api-submit-order])))
         (is (identical? cancel-handler
-                        (get-in deps [:orders :api-cancel-order])))))))
+                        (get-in deps [:orders :api-cancel-order])))
+        (is (identical? margin-handler
+                        (get-in deps [:orders :api-submit-position-margin])))))))
