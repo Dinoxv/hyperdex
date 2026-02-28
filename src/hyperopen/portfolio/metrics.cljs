@@ -1,46 +1,20 @@
 (ns hyperopen.portfolio.metrics
   (:refer-clojure :exclude [comp])
   (:require [clojure.string :as str]
-            [hyperopen.views.account-info.projections :as projections]))
+            [hyperopen.portfolio.metrics.catalog :as catalog]
+            [hyperopen.portfolio.metrics.parsing :as parsing]))
 
 (defn- optional-number [value]
-  (projections/parse-optional-num value))
+  (parsing/optional-number value))
 
 (defn- finite-number? [value]
-  (and (number? value)
-       (js/isFinite value)))
+  (parsing/finite-number? value))
 
 (defn history-point-value [row]
-  (cond
-    (and (sequential? row)
-         (>= (count row) 2))
-    (optional-number (second row))
-
-    (map? row)
-    (or (optional-number (:value row))
-        (optional-number (:pnl row))
-        (optional-number (:account-value row))
-        (optional-number (:accountValue row)))
-
-    :else
-    nil))
+  (parsing/history-point-value row))
 
 (defn history-point-time-ms [row]
-  (cond
-    (and (sequential? row)
-         (seq row))
-    (optional-number (first row))
-
-    (map? row)
-    (or (optional-number (:time row))
-        (optional-number (:timestamp row))
-        (optional-number (:time-ms row))
-        (optional-number (:timeMs row))
-        (optional-number (:ts row))
-        (optional-number (:t row)))
-
-    :else
-    nil))
+  (parsing/history-point-time-ms row))
 
 (defn- history-points
   [rows]
@@ -84,8 +58,8 @@
                     :pnl-value pnl-value})))
          vec)))
 
-(defn returns-history-rows
-  [_state summary _summary-scope]
+(defn returns-history-rows-from-summary
+  [summary]
   (let [points (aligned-account-pnl-points summary)
         anchor-index (first (keep-indexed (fn [idx {:keys [account-value]}]
                                             (when (pos? account-value)
@@ -145,6 +119,10 @@
           []))
       [])))
 
+(defn returns-history-rows
+  ([_state summary _summary-scope]
+   (returns-history-rows-from-summary summary)))
+
 (defn cumulative-percent-rows->interval-returns
   [cumulative-percent-rows]
   (let [rows (->> (or cumulative-percent-rows [])
@@ -183,7 +161,7 @@
                           :return period-return*}))))))))
 
 (defn- utc-day-key [time-ms]
-  (subs (.toISOString (js/Date. time-ms)) 0 10))
+  (parsing/day-string-from-ms time-ms))
 
 (defn daily-compounded-returns
   [cumulative-percent-rows]
@@ -261,15 +239,11 @@
 
 (defn- day-string-from-ms
   [time-ms]
-  (subs (.toISOString (js/Date. time-ms)) 0 10))
+  (parsing/day-string-from-ms time-ms))
 
 (defn- parse-day-ms
   [day]
-  (when (string? day)
-    (let [ms (.getTime (js/Date. (str day "T00:00:00.000Z")))]
-      (when (and (number? ms)
-                 (not (js/isNaN ms)))
-        ms))))
+  (parsing/parse-day-ms day))
 
 (defn- clamp-near-zero
   [value]
@@ -1386,6 +1360,362 @@
        day-ms)
     0))
 
+(defn- resolve-cumulative-rows
+  [strategy-cumulative-rows strategy-daily-rows]
+  (let [direct (normalize-cumulative-percent-rows strategy-cumulative-rows)]
+    (if (seq direct)
+      direct
+      (normalize-cumulative-percent-rows
+       (daily-rows->cumulative-percent-rows strategy-daily-rows)))))
+
+(defn- cumulative-rows->pairs
+  [resolved-cumulative-rows]
+  (mapv (fn [{:keys [time-ms percent]}]
+          [time-ms percent])
+        resolved-cumulative-rows))
+
+(defn- resolve-strategy-rows
+  [strategy-daily-rows cumulative-rows*]
+  (let [daily* (normalize-daily-rows strategy-daily-rows)]
+    (if (seq daily*)
+      daily*
+      (daily-compounded-returns cumulative-rows*))))
+
+(defn- annualized-expected-return
+  [cagr* periods]
+  (when (number? cagr*)
+    (- (js/Math.pow (+ 1 cagr*) (/ 1 periods))
+       1)))
+
+(defn- window-anchor-ms
+  [last-ms]
+  (let [last-date (when (number? last-ms) (js/Date. last-ms))]
+    {:month-start-ms (when last-date
+                       (.getTime (js/Date. (.UTC js/Date
+                                                (.getUTCFullYear last-date)
+                                                (.getUTCMonth last-date)
+                                                1))))
+     :year-start-ms (when last-date
+                      (.getTime (js/Date. (.UTC js/Date
+                                               (.getUTCFullYear last-date)
+                                               0
+                                               1))))
+     :m3-ms (when (number? last-ms) (with-utc-months-offset last-ms -3))
+     :m6-ms (when (number? last-ms) (with-utc-months-offset last-ms -6))
+     :y1-ms (when (number? last-ms) (with-utc-years-offset last-ms -1))
+     :y3-ms (when (number? last-ms) (with-utc-months-offset last-ms -35))
+     :y5-ms (when (number? last-ms) (with-utc-months-offset last-ms -59))
+     :y10-ms (when (number? last-ms) (with-utc-years-offset last-ms -10))}))
+
+(defn- cumulative-window
+  [rows threshold-ms]
+  (if (number? threshold-ms)
+    (cumulative-rows-since-ms rows threshold-ms)
+    []))
+
+(defn- build-window-context
+  [resolved-cumulative-rows gates]
+  (let [anchors (window-anchor-ms (some-> resolved-cumulative-rows last :time-ms))
+        mtd-cumulative (cumulative-window resolved-cumulative-rows (:month-start-ms anchors))
+        m3-cumulative (cumulative-window resolved-cumulative-rows (:m3-ms anchors))
+        m6-cumulative (cumulative-window resolved-cumulative-rows (:m6-ms anchors))
+        ytd-cumulative (cumulative-window resolved-cumulative-rows (:year-start-ms anchors))
+        y1-cumulative (cumulative-window resolved-cumulative-rows (:y1-ms anchors))
+        y3-cumulative (cumulative-window resolved-cumulative-rows (:y3-ms anchors))
+        y5-cumulative (cumulative-window resolved-cumulative-rows (:y5-ms anchors))
+        y10-cumulative (cumulative-window resolved-cumulative-rows (:y10-ms anchors))
+        rolling-min-fraction (:rolling-min-fraction gates)]
+    {:mtd-cumulative mtd-cumulative
+     :m3-cumulative m3-cumulative
+     :m6-cumulative m6-cumulative
+     :ytd-cumulative ytd-cumulative
+     :y1-cumulative y1-cumulative
+     :y3-cumulative y3-cumulative
+     :y5-cumulative y5-cumulative
+     :y10-cumulative y10-cumulative
+     :rolling-y3-ok? (>= (window-span-days y3-cumulative)
+                         (* 3 365.2425 rolling-min-fraction))
+     :rolling-y5-ok? (>= (window-span-days y5-cumulative)
+                         (* 5 365.2425 rolling-min-fraction))
+     :rolling-y10-ok? (>= (window-span-days y10-cumulative)
+                          (* 10 365.2425 rolling-min-fraction))
+     :all-time-cumulative-return (window-return-from-cumulative resolved-cumulative-rows)}))
+
+(defn- build-quality-context
+  [intervals strategy-rows mar gates]
+  (let [diagnostics (cadence-diagnostics intervals strategy-rows mar)
+        gates* (compute-quality-gates diagnostics gates)
+        core-enabled? (and (:core-min? gates*)
+                           (not (:structural-gap? gates*)))
+        core-low-confidence? (and core-enabled?
+                                  (not (:core-high-confidence? gates*)))
+        daily-enabled? (and (:daily-min? gates*)
+                            (not (:structural-gap? gates*)))]
+    {:diagnostics diagnostics
+     :gates* gates*
+     :core-enabled? core-enabled?
+     :core-low-confidence? core-low-confidence?
+     :daily-enabled? daily-enabled?
+     :psr-enabled? (and daily-enabled? (:psr-min? gates*))
+     :drawdown-reliable? (and core-enabled? (:drawdown-reliable? gates*))}))
+
+(defn- build-benchmark-context
+  [strategy-rows benchmark-daily-rows gates]
+  (let [aligned-benchmark (align-daily-returns strategy-rows benchmark-daily-rows)]
+    {:aligned-benchmark aligned-benchmark
+     :strategy-aligned (mapv :strategy-return aligned-benchmark)
+     :benchmark-aligned (mapv :benchmark-return aligned-benchmark)
+     :benchmark-min? (>= (count aligned-benchmark)
+                         (:benchmark-min-points gates))}))
+
+(defn- build-core-metric-context
+  [intervals strategy-rows strategy-returns rf mar periods-per-year]
+  (let [cagr* (interval-cagr intervals)
+        sortino-result (sortino-irregular intervals mar)]
+    {:drawdown-stats (max-drawdown-stats strategy-rows)
+     :cagr* cagr*
+     :volatility-ann* (volatility-ann-irregular intervals)
+     :sharpe* (sharpe-irregular intervals rf)
+     :sortino* (:value sortino-result)
+     :sortino-downside-count (:downside-count sortino-result)
+     :expected-daily* (annualized-expected-return cagr* 365.2425)
+     :expected-monthly* (annualized-expected-return cagr* 12)
+     :expected-yearly* cagr*
+     :smart-sharpe* (smart-sharpe strategy-returns {:rf rf
+                                                    :periods-per-year periods-per-year})
+     :smart-sortino* (smart-sortino strategy-returns {:rf rf
+                                                      :periods-per-year periods-per-year})}))
+
+(defn- build-enable-context
+  [quality-context gates benchmark-min? sortino-downside-count]
+  (let [{:keys [core-enabled? daily-enabled?]} quality-context
+        gates* (:gates* quality-context)]
+    {:sortino-enabled? (and core-enabled?
+                            (:sortino-min? gates*)
+                            (>= sortino-downside-count
+                                (:sortino-min-downside gates)))
+     :benchmark-enabled? (and daily-enabled?
+                             benchmark-min?)}))
+
+(defn- assoc-metric-result
+  [acc key value enabled status reason]
+  (let [status* (cond
+                  (not enabled) :suppressed
+                  (nil? value) :suppressed
+                  :else status)
+        value* (when (not= status* :suppressed) value)
+        reason* (when (= status* :suppressed) reason)]
+    (-> acc
+        (assoc key value*)
+        (assoc-in [:metric-status key] status*)
+        (cond-> reason*
+          (assoc-in [:metric-reason key] reason*)))))
+
+(defn- core-status-token
+  [core-low-confidence?]
+  (if core-low-confidence?
+    :low-confidence
+    :ok))
+
+(defn- add-overview-metrics
+  [acc {:keys [intervals
+               resolved-cumulative-rows
+               all-time-cumulative-return
+               cagr*
+               volatility-ann*
+               sharpe*
+               sortino*
+               expected-daily*
+               expected-monthly*
+               expected-yearly*
+               core-enabled?
+               core-low-confidence?
+               sortino-enabled?]}]
+  (let [core-status (core-status-token core-low-confidence?)]
+    (-> acc
+        (assoc-metric-result :time-in-market
+                             (interval-weighted-exposure intervals)
+                             (pos? (count intervals))
+                             :ok
+                             :insufficient-intervals)
+        (assoc-metric-result :cumulative-return
+                             all-time-cumulative-return
+                             (>= (count resolved-cumulative-rows) 2)
+                             :ok
+                             :insufficient-rows)
+        (assoc-metric-result :cagr cagr* core-enabled? core-status :core-gate-failed)
+        (assoc-metric-result :volatility-ann volatility-ann* core-enabled? core-status :core-gate-failed)
+        (assoc-metric-result :sharpe sharpe* core-enabled? core-status :core-gate-failed)
+        (assoc-metric-result :sortino sortino* sortino-enabled? core-status :sortino-gate-failed)
+        (assoc-metric-result :sortino-sqrt2
+                             (some-> sortino* (/ (js/Math.sqrt 2)))
+                             sortino-enabled?
+                             core-status
+                             :sortino-gate-failed)
+        (assoc-metric-result :expected-daily expected-daily* core-enabled? core-status :core-gate-failed)
+        (assoc-metric-result :expected-monthly expected-monthly* core-enabled? core-status :core-gate-failed)
+        (assoc-metric-result :expected-yearly expected-yearly* core-enabled? core-status :core-gate-failed)
+        (assoc-metric-result :all-time-ann cagr* core-enabled? core-status :core-gate-failed))))
+
+(defn- add-drawdown-and-window-metrics
+  [acc {:keys [drawdown-stats
+               drawdown-reliable?
+               strategy-returns
+               periods-per-year
+               mtd-cumulative
+               m3-cumulative
+               m6-cumulative
+               ytd-cumulative
+               y1-cumulative
+               y3-cumulative
+               y5-cumulative
+               y10-cumulative
+               rolling-y3-ok?
+               rolling-y5-ok?
+               rolling-y10-ok?
+               core-low-confidence?]}]
+  (-> acc
+      (assoc-metric-result :max-drawdown (:max-drawdown drawdown-stats)
+                           (boolean drawdown-stats)
+                           (if drawdown-reliable? :ok :low-confidence)
+                           :drawdown-unavailable)
+      (assoc-metric-result :max-dd-date (:max-dd-date drawdown-stats)
+                           (boolean drawdown-stats)
+                           (if drawdown-reliable? :ok :low-confidence)
+                           :drawdown-unavailable)
+      (assoc-metric-result :max-dd-period-start (:max-dd-period-start drawdown-stats)
+                           (boolean drawdown-stats)
+                           (if drawdown-reliable? :ok :low-confidence)
+                           :drawdown-unavailable)
+      (assoc-metric-result :max-dd-period-end (:max-dd-period-end drawdown-stats)
+                           (boolean drawdown-stats)
+                           (if drawdown-reliable? :ok :low-confidence)
+                           :drawdown-unavailable)
+      (assoc-metric-result :longest-dd-days (:longest-dd-days drawdown-stats)
+                           (boolean drawdown-stats)
+                           (if drawdown-reliable? :ok :low-confidence)
+                           :drawdown-unavailable)
+      (assoc-metric-result :calmar
+                           (calmar strategy-returns {:periods-per-year periods-per-year})
+                           drawdown-reliable?
+                           (if drawdown-reliable? :ok :low-confidence)
+                           :drawdown-reliability-gate-failed)
+      (assoc-metric-result :mtd (window-return-from-cumulative mtd-cumulative)
+                           (>= (count mtd-cumulative) 2)
+                           :ok
+                           :window-unavailable)
+      (assoc-metric-result :m3 (window-return-from-cumulative m3-cumulative)
+                           (>= (count m3-cumulative) 2)
+                           :ok
+                           :window-unavailable)
+      (assoc-metric-result :m6 (window-return-from-cumulative m6-cumulative)
+                           (>= (count m6-cumulative) 2)
+                           :ok
+                           :window-unavailable)
+      (assoc-metric-result :ytd (window-return-from-cumulative ytd-cumulative)
+                           (>= (count ytd-cumulative) 2)
+                           :ok
+                           :window-unavailable)
+      (assoc-metric-result :y1 (window-return-from-cumulative y1-cumulative)
+                           (>= (count y1-cumulative) 2)
+                           :ok
+                           :window-unavailable)
+      (assoc-metric-result :y3-ann (window-cagr-from-cumulative y3-cumulative)
+                           rolling-y3-ok?
+                           (core-status-token core-low-confidence?)
+                           :rolling-window-span-insufficient)
+      (assoc-metric-result :y5-ann (window-cagr-from-cumulative y5-cumulative)
+                           rolling-y5-ok?
+                           (core-status-token core-low-confidence?)
+                           :rolling-window-span-insufficient)
+      (assoc-metric-result :y10-ann (window-cagr-from-cumulative y10-cumulative)
+                           rolling-y10-ok?
+                           (core-status-token core-low-confidence?)
+                           :rolling-window-span-insufficient)))
+
+(defn- add-daily-risk-adjusted-metrics
+  [acc {:keys [strategy-returns
+               strategy-rows
+               rf
+               periods-per-year
+               smart-sharpe*
+               smart-sortino*
+               daily-enabled?
+               psr-enabled?]}]
+  (-> acc
+      (assoc-metric-result :omega
+                           (omega strategy-returns {:rf rf
+                                                    :required-return 0
+                                                    :periods-per-year periods-per-year})
+                           daily-enabled?
+                           :ok
+                           :daily-coverage-gate-failed)
+      (assoc-metric-result :smart-sharpe smart-sharpe* daily-enabled? :ok :daily-coverage-gate-failed)
+      (assoc-metric-result :smart-sortino smart-sortino* daily-enabled? :ok :daily-coverage-gate-failed)
+      (assoc-metric-result :smart-sortino-sqrt2
+                           (some-> smart-sortino* (/ (js/Math.sqrt 2)))
+                           daily-enabled?
+                           :ok
+                           :daily-coverage-gate-failed)
+      (assoc-metric-result :prob-sharpe-ratio
+                           (probabilistic-sharpe-ratio strategy-returns {:rf rf
+                                                                           :periods-per-year periods-per-year})
+                           psr-enabled?
+                           :ok
+                           :psr-gate-failed)
+      (assoc-metric-result :gain-pain-ratio (gain-to-pain-ratio strategy-rows :day) daily-enabled? :ok :daily-coverage-gate-failed)
+      (assoc-metric-result :gain-pain-1m (gain-to-pain-ratio strategy-rows :month) daily-enabled? :ok :daily-coverage-gate-failed)))
+
+(defn- add-daily-distribution-metrics
+  [acc {:keys [strategy-returns daily-enabled?]}]
+  (-> acc
+      (assoc-metric-result :payoff-ratio (payoff-ratio strategy-returns) daily-enabled? :ok :daily-coverage-gate-failed)
+      (assoc-metric-result :profit-factor (profit-factor strategy-returns) daily-enabled? :ok :daily-coverage-gate-failed)
+      (assoc-metric-result :common-sense-ratio (common-sense-ratio strategy-returns) daily-enabled? :ok :daily-coverage-gate-failed)
+      (assoc-metric-result :cpc-index (cpc-index strategy-returns) daily-enabled? :ok :daily-coverage-gate-failed)
+      (assoc-metric-result :tail-ratio (tail-ratio strategy-returns) daily-enabled? :ok :daily-coverage-gate-failed)
+      (assoc-metric-result :outlier-win-ratio (outlier-win-ratio strategy-returns) daily-enabled? :ok :daily-coverage-gate-failed)
+      (assoc-metric-result :outlier-loss-ratio (outlier-loss-ratio strategy-returns) daily-enabled? :ok :daily-coverage-gate-failed)
+      (assoc-metric-result :skew (skew strategy-returns) daily-enabled? :ok :daily-coverage-gate-failed)
+      (assoc-metric-result :kurtosis (kurtosis strategy-returns) daily-enabled? :ok :daily-coverage-gate-failed)
+      (assoc-metric-result :kelly-criterion (kelly-criterion strategy-returns) daily-enabled? :ok :daily-coverage-gate-failed)
+      (assoc-metric-result :risk-of-ruin (risk-of-ruin strategy-returns) daily-enabled? :ok :daily-coverage-gate-failed)
+      (assoc-metric-result :daily-var
+                           (some-> (value-at-risk strategy-returns)
+                                   js/Math.abs
+                                   (-))
+                           daily-enabled?
+                           :ok
+                           :daily-coverage-gate-failed)
+      (assoc-metric-result :expected-shortfall
+                           (some-> (expected-shortfall strategy-returns)
+                                   js/Math.abs
+                                   (-))
+                           daily-enabled?
+                           :ok
+                           :daily-coverage-gate-failed)
+      (assoc-metric-result :max-consecutive-wins (consecutive-wins strategy-returns) daily-enabled? :ok :daily-coverage-gate-failed)
+      (assoc-metric-result :max-consecutive-losses (consecutive-losses strategy-returns) daily-enabled? :ok :daily-coverage-gate-failed)))
+
+(defn- add-benchmark-relative-metrics
+  [acc {:keys [aligned-benchmark
+               strategy-aligned
+               benchmark-aligned
+               benchmark-enabled?]}]
+  (-> acc
+      (assoc-metric-result :r2
+                           (when (seq aligned-benchmark)
+                             (r-squared strategy-aligned benchmark-aligned))
+                           benchmark-enabled?
+                           :ok
+                           :benchmark-coverage-gate-failed)
+      (assoc-metric-result :information-ratio
+                           (when (seq aligned-benchmark)
+                             (information-ratio strategy-aligned benchmark-aligned))
+                           benchmark-enabled?
+                           :ok
+                           :benchmark-coverage-gate-failed)))
+
 (defn compute-performance-metrics
   [{:keys [strategy-cumulative-rows
            strategy-daily-rows
@@ -1398,440 +1728,41 @@
          mar 0
          periods-per-year default-periods-per-year}}]
   (let [gates (merge default-quality-gates quality-gates)
-        resolved-cumulative-rows (let [direct (normalize-cumulative-percent-rows strategy-cumulative-rows)]
-                                   (if (seq direct)
-                                     direct
-                                     (normalize-cumulative-percent-rows
-                                      (daily-rows->cumulative-percent-rows strategy-daily-rows))))
-        cumulative-rows* (mapv (fn [{:keys [time-ms percent]}]
-                                 [time-ms percent])
-                               resolved-cumulative-rows)
-        strategy-rows (let [daily* (normalize-daily-rows strategy-daily-rows)]
-                        (if (seq daily*)
-                          daily*
-                          (daily-compounded-returns cumulative-rows*)))
+        resolved-cumulative-rows (resolve-cumulative-rows strategy-cumulative-rows strategy-daily-rows)
+        cumulative-rows* (cumulative-rows->pairs resolved-cumulative-rows)
+        strategy-rows (resolve-strategy-rows strategy-daily-rows cumulative-rows*)
         strategy-returns (returns-values strategy-rows)
         intervals (cumulative-rows->irregular-intervals cumulative-rows*)
-        diagnostics (cadence-diagnostics intervals strategy-rows mar)
-        gates* (compute-quality-gates diagnostics gates)
-        aligned-benchmark (align-daily-returns strategy-rows benchmark-daily-rows)
-        strategy-aligned (mapv :strategy-return aligned-benchmark)
-        benchmark-aligned (mapv :benchmark-return aligned-benchmark)
-        drawdown-stats (max-drawdown-stats strategy-rows)
-        cagr* (interval-cagr intervals)
-        volatility-ann* (volatility-ann-irregular intervals)
-        sharpe* (sharpe-irregular intervals rf)
-        sortino-result (sortino-irregular intervals mar)
-        sortino* (:value sortino-result)
-        sortino-downside-count (:downside-count sortino-result)
-        expected-daily* (when (number? cagr*)
-                          (- (js/Math.pow (+ 1 cagr*) (/ 1 365.2425))
-                             1))
-        expected-monthly* (when (number? cagr*)
-                            (- (js/Math.pow (+ 1 cagr*) (/ 1 12))
-                               1))
-        expected-yearly* cagr*
-        smart-sharpe* (smart-sharpe strategy-returns {:rf rf
-                                                      :periods-per-year periods-per-year})
-        smart-sortino* (smart-sortino strategy-returns {:rf rf
-                                                        :periods-per-year periods-per-year})
-        benchmark-min? (>= (count aligned-benchmark)
-                           (:benchmark-min-points gates))
-        last-ms (some-> resolved-cumulative-rows last :time-ms)
-        last-date (when (number? last-ms) (js/Date. last-ms))
-        month-start-ms (when last-date
-                         (.getTime (js/Date. (.UTC js/Date
-                                                  (.getUTCFullYear last-date)
-                                                  (.getUTCMonth last-date)
-                                                  1))))
-        year-start-ms (when last-date
-                        (.getTime (js/Date. (.UTC js/Date
-                                                 (.getUTCFullYear last-date)
-                                                 0
-                                                 1))))
-        m3-ms (when (number? last-ms) (with-utc-months-offset last-ms -3))
-        m6-ms (when (number? last-ms) (with-utc-months-offset last-ms -6))
-        y1-ms (when (number? last-ms) (with-utc-years-offset last-ms -1))
-        y3-ms (when (number? last-ms) (with-utc-months-offset last-ms -35))
-        y5-ms (when (number? last-ms) (with-utc-months-offset last-ms -59))
-        y10-ms (when (number? last-ms) (with-utc-years-offset last-ms -10))
-        mtd-cumulative (if (number? month-start-ms)
-                         (cumulative-rows-since-ms resolved-cumulative-rows month-start-ms)
-                         [])
-        m3-cumulative (if (number? m3-ms)
-                        (cumulative-rows-since-ms resolved-cumulative-rows m3-ms)
-                        [])
-        m6-cumulative (if (number? m6-ms)
-                        (cumulative-rows-since-ms resolved-cumulative-rows m6-ms)
-                        [])
-        ytd-cumulative (if (number? year-start-ms)
-                         (cumulative-rows-since-ms resolved-cumulative-rows year-start-ms)
-                         [])
-        y1-cumulative (if (number? y1-ms)
-                        (cumulative-rows-since-ms resolved-cumulative-rows y1-ms)
-                        [])
-        y3-cumulative (if (number? y3-ms)
-                        (cumulative-rows-since-ms resolved-cumulative-rows y3-ms)
-                        [])
-        y5-cumulative (if (number? y5-ms)
-                        (cumulative-rows-since-ms resolved-cumulative-rows y5-ms)
-                        [])
-        y10-cumulative (if (number? y10-ms)
-                         (cumulative-rows-since-ms resolved-cumulative-rows y10-ms)
-                         [])
-        rolling-min-fraction (:rolling-min-fraction gates)
-        rolling-y3-ok? (>= (window-span-days y3-cumulative)
-                           (* 3 365.2425 rolling-min-fraction))
-        rolling-y5-ok? (>= (window-span-days y5-cumulative)
-                           (* 5 365.2425 rolling-min-fraction))
-        rolling-y10-ok? (>= (window-span-days y10-cumulative)
-                            (* 10 365.2425 rolling-min-fraction))
-        all-time-cumulative-return (window-return-from-cumulative resolved-cumulative-rows)
-        core-enabled? (and (:core-min? gates*)
-                           (not (:structural-gap? gates*)))
-        core-low-confidence? (and core-enabled?
-                                  (not (:core-high-confidence? gates*)))
-        daily-enabled? (and (:daily-min? gates*)
-                            (not (:structural-gap? gates*)))
-        psr-enabled? (and daily-enabled? (:psr-min? gates*))
-        sortino-enabled? (and core-enabled?
-                              (:sortino-min? gates*)
-                              (>= sortino-downside-count
-                                  (:sortino-min-downside gates)))
-        drawdown-reliable? (and core-enabled? (:drawdown-reliable? gates*))
-        benchmark-enabled? (and daily-enabled?
-                               benchmark-min?)]
-    (letfn [(assoc-metric
-              [acc key value enabled status reason]
-              (let [status* (cond
-                              (not enabled) :suppressed
-                              (nil? value) :suppressed
-                              :else status)
-                    value* (when (not= status* :suppressed) value)
-                    reason* (when (= status* :suppressed)
-                              reason)]
-                (-> acc
-                    (assoc key value*)
-                    (assoc-in [:metric-status key] status*)
-                    (cond-> reason*
-                      (assoc-in [:metric-reason key] reason*)))))
-            (core-status []
-              (if core-low-confidence?
-                :low-confidence
-                :ok))]
-      (-> {:quality (merge diagnostics gates*)
-           :metric-status {}
-           :metric-reason {}}
-          (assoc-metric :time-in-market
-                        (interval-weighted-exposure intervals)
-                        (pos? (count intervals))
-                        :ok
-                        :insufficient-intervals)
-          (assoc-metric :cumulative-return
-                        all-time-cumulative-return
-                        (>= (count resolved-cumulative-rows) 2)
-                        :ok
-                        :insufficient-rows)
-          (assoc-metric :cagr cagr* core-enabled? (core-status) :core-gate-failed)
-          (assoc-metric :volatility-ann volatility-ann* core-enabled? (core-status) :core-gate-failed)
-          (assoc-metric :sharpe sharpe* core-enabled? (core-status) :core-gate-failed)
-          (assoc-metric :sortino sortino* sortino-enabled? (core-status) :sortino-gate-failed)
-          (assoc-metric :sortino-sqrt2
-                        (some-> sortino* (/ (js/Math.sqrt 2)))
-                        sortino-enabled?
-                        (core-status)
-                        :sortino-gate-failed)
-          (assoc-metric :expected-daily expected-daily* core-enabled? (core-status) :core-gate-failed)
-          (assoc-metric :expected-monthly expected-monthly* core-enabled? (core-status) :core-gate-failed)
-          (assoc-metric :expected-yearly expected-yearly* core-enabled? (core-status) :core-gate-failed)
-          (assoc-metric :max-drawdown (:max-drawdown drawdown-stats)
-                        (boolean drawdown-stats)
-                        (if drawdown-reliable? :ok :low-confidence)
-                        :drawdown-unavailable)
-          (assoc-metric :max-dd-date (:max-dd-date drawdown-stats)
-                        (boolean drawdown-stats)
-                        (if drawdown-reliable? :ok :low-confidence)
-                        :drawdown-unavailable)
-          (assoc-metric :max-dd-period-start (:max-dd-period-start drawdown-stats)
-                        (boolean drawdown-stats)
-                        (if drawdown-reliable? :ok :low-confidence)
-                        :drawdown-unavailable)
-          (assoc-metric :max-dd-period-end (:max-dd-period-end drawdown-stats)
-                        (boolean drawdown-stats)
-                        (if drawdown-reliable? :ok :low-confidence)
-                        :drawdown-unavailable)
-          (assoc-metric :longest-dd-days (:longest-dd-days drawdown-stats)
-                        (boolean drawdown-stats)
-                        (if drawdown-reliable? :ok :low-confidence)
-                        :drawdown-unavailable)
-          (assoc-metric :calmar
-                        (calmar strategy-returns {:periods-per-year periods-per-year})
-                        drawdown-reliable?
-                        (if drawdown-reliable? :ok :low-confidence)
-                        :drawdown-reliability-gate-failed)
-          (assoc-metric :mtd (window-return-from-cumulative mtd-cumulative)
-                        (>= (count mtd-cumulative) 2)
-                        :ok
-                        :window-unavailable)
-          (assoc-metric :m3 (window-return-from-cumulative m3-cumulative)
-                        (>= (count m3-cumulative) 2)
-                        :ok
-                        :window-unavailable)
-          (assoc-metric :m6 (window-return-from-cumulative m6-cumulative)
-                        (>= (count m6-cumulative) 2)
-                        :ok
-                        :window-unavailable)
-          (assoc-metric :ytd (window-return-from-cumulative ytd-cumulative)
-                        (>= (count ytd-cumulative) 2)
-                        :ok
-                        :window-unavailable)
-          (assoc-metric :y1 (window-return-from-cumulative y1-cumulative)
-                        (>= (count y1-cumulative) 2)
-                        :ok
-                        :window-unavailable)
-          (assoc-metric :y3-ann (window-cagr-from-cumulative y3-cumulative)
-                        rolling-y3-ok?
-                        (if core-low-confidence? :low-confidence :ok)
-                        :rolling-window-span-insufficient)
-          (assoc-metric :y5-ann (window-cagr-from-cumulative y5-cumulative)
-                        rolling-y5-ok?
-                        (if core-low-confidence? :low-confidence :ok)
-                        :rolling-window-span-insufficient)
-          (assoc-metric :y10-ann (window-cagr-from-cumulative y10-cumulative)
-                        rolling-y10-ok?
-                        (if core-low-confidence? :low-confidence :ok)
-                        :rolling-window-span-insufficient)
-          (assoc-metric :all-time-ann cagr* core-enabled? (core-status) :core-gate-failed)
-          (assoc-metric :omega
-                        (omega strategy-returns {:rf rf
-                                                 :required-return 0
-                                                 :periods-per-year periods-per-year})
-                        daily-enabled?
-                        :ok
-                        :daily-coverage-gate-failed)
-          (assoc-metric :smart-sharpe smart-sharpe* daily-enabled? :ok :daily-coverage-gate-failed)
-          (assoc-metric :smart-sortino smart-sortino* daily-enabled? :ok :daily-coverage-gate-failed)
-          (assoc-metric :smart-sortino-sqrt2
-                        (some-> smart-sortino* (/ (js/Math.sqrt 2)))
-                        daily-enabled?
-                        :ok
-                        :daily-coverage-gate-failed)
-          (assoc-metric :prob-sharpe-ratio
-                        (probabilistic-sharpe-ratio strategy-returns {:rf rf
-                                                                        :periods-per-year periods-per-year})
-                        psr-enabled?
-                        :ok
-                        :psr-gate-failed)
-          (assoc-metric :gain-pain-ratio (gain-to-pain-ratio strategy-rows :day) daily-enabled? :ok :daily-coverage-gate-failed)
-          (assoc-metric :gain-pain-1m (gain-to-pain-ratio strategy-rows :month) daily-enabled? :ok :daily-coverage-gate-failed)
-          (assoc-metric :payoff-ratio (payoff-ratio strategy-returns) daily-enabled? :ok :daily-coverage-gate-failed)
-          (assoc-metric :profit-factor (profit-factor strategy-returns) daily-enabled? :ok :daily-coverage-gate-failed)
-          (assoc-metric :common-sense-ratio (common-sense-ratio strategy-returns) daily-enabled? :ok :daily-coverage-gate-failed)
-          (assoc-metric :cpc-index (cpc-index strategy-returns) daily-enabled? :ok :daily-coverage-gate-failed)
-          (assoc-metric :tail-ratio (tail-ratio strategy-returns) daily-enabled? :ok :daily-coverage-gate-failed)
-          (assoc-metric :outlier-win-ratio (outlier-win-ratio strategy-returns) daily-enabled? :ok :daily-coverage-gate-failed)
-          (assoc-metric :outlier-loss-ratio (outlier-loss-ratio strategy-returns) daily-enabled? :ok :daily-coverage-gate-failed)
-          (assoc-metric :skew (skew strategy-returns) daily-enabled? :ok :daily-coverage-gate-failed)
-          (assoc-metric :kurtosis (kurtosis strategy-returns) daily-enabled? :ok :daily-coverage-gate-failed)
-          (assoc-metric :kelly-criterion (kelly-criterion strategy-returns) daily-enabled? :ok :daily-coverage-gate-failed)
-          (assoc-metric :risk-of-ruin (risk-of-ruin strategy-returns) daily-enabled? :ok :daily-coverage-gate-failed)
-          (assoc-metric :daily-var
-                        (some-> (value-at-risk strategy-returns)
-                                js/Math.abs
-                                (-))
-                        daily-enabled?
-                        :ok
-                        :daily-coverage-gate-failed)
-          (assoc-metric :expected-shortfall
-                        (some-> (expected-shortfall strategy-returns)
-                                js/Math.abs
-                                (-))
-                        daily-enabled?
-                        :ok
-                        :daily-coverage-gate-failed)
-          (assoc-metric :max-consecutive-wins (consecutive-wins strategy-returns) daily-enabled? :ok :daily-coverage-gate-failed)
-          (assoc-metric :max-consecutive-losses (consecutive-losses strategy-returns) daily-enabled? :ok :daily-coverage-gate-failed)
-          (assoc-metric :r2
-                        (when (seq aligned-benchmark)
-                          (r-squared strategy-aligned benchmark-aligned))
-                        benchmark-enabled?
-                        :ok
-                        :benchmark-coverage-gate-failed)
-          (assoc-metric :information-ratio
-                        (when (seq aligned-benchmark)
-                          (information-ratio strategy-aligned benchmark-aligned))
-                        benchmark-enabled?
-                        :ok
-                        :benchmark-coverage-gate-failed)))))
-
-(def ^:private performance-metric-groups
-  [{:id :overview
-    :rows [{:key :time-in-market
-            :label "Time in Market"
-            :kind :percent}
-           {:key :cumulative-return
-            :label "Cumulative Return"
-            :kind :percent}
-           {:key :cagr
-            :label "CAGR"
-            :kind :percent}]}
-   {:id :risk-adjusted
-    :rows [{:key :sharpe
-            :label "Sharpe"
-            :kind :ratio}
-           {:key :prob-sharpe-ratio
-            :label "Prob. Sharpe Ratio"
-            :kind :ratio}
-           {:key :smart-sharpe
-            :label "Smart Sharpe"
-            :kind :ratio}
-           {:key :sortino
-            :label "Sortino"
-            :kind :ratio}
-           {:key :smart-sortino
-            :label "Smart Sortino"
-            :kind :ratio}
-           {:key :sortino-sqrt2
-            :label "Sortino/sqrt(2)"
-            :kind :ratio}
-           {:key :smart-sortino-sqrt2
-            :label "Smart Sortino/sqrt(2)"
-            :kind :ratio}
-           {:key :omega
-            :label "Omega"
-            :kind :ratio}]}
-   {:id :drawdown-and-risk
-    :rows [{:key :max-drawdown
-            :label "Max Drawdown"
-            :kind :percent}
-           {:key :max-dd-date
-            :label "Max DD Date"
-            :kind :date}
-           {:key :max-dd-period-start
-            :label "Max DD Period Start"
-            :kind :date}
-           {:key :max-dd-period-end
-            :label "Max DD Period End"
-            :kind :date}
-           {:key :longest-dd-days
-            :label "Longest DD Days"
-            :kind :integer}
-           {:key :volatility-ann
-            :label "Volatility (ann.)"
-            :kind :percent}
-           {:key :r2
-            :label "R^2"
-            :kind :ratio}
-           {:key :information-ratio
-            :label "Information Ratio"
-            :kind :ratio}
-           {:key :calmar
-            :label "Calmar"
-            :kind :ratio}
-           {:key :skew
-            :label "Skew"
-            :kind :ratio}
-           {:key :kurtosis
-            :label "Kurtosis"
-            :kind :ratio}]}
-   {:id :expectation-and-var
-    :rows [{:key :expected-daily
-            :label "Expected Daily"
-            :kind :percent}
-           {:key :expected-monthly
-            :label "Expected Monthly"
-            :kind :percent}
-           {:key :expected-yearly
-            :label "Expected Yearly"
-            :kind :percent}
-           {:key :kelly-criterion
-            :label "Kelly Criterion"
-            :kind :percent}
-           {:key :risk-of-ruin
-            :label "Risk of Ruin"
-            :kind :ratio}
-           {:key :daily-var
-            :label "Daily Value-at-Risk"
-            :kind :percent}
-           {:key :expected-shortfall
-            :label "Expected Shortfall (cVaR)"
-            :kind :percent}]}
-   {:id :streaks-and-pain
-    :rows [{:key :max-consecutive-wins
-            :label "Max Consecutive Wins"
-            :kind :integer}
-           {:key :max-consecutive-losses
-            :label "Max Consecutive Losses"
-            :kind :integer}
-           {:key :gain-pain-ratio
-            :label "Gain/Pain Ratio"
-            :kind :ratio}
-           {:key :gain-pain-1m
-            :label "Gain/Pain (1M)"
-            :kind :ratio}]}
-   {:id :trade-shape
-    :rows [{:key :payoff-ratio
-            :label "Payoff Ratio"
-            :kind :ratio}
-           {:key :profit-factor
-            :label "Profit Factor"
-            :kind :ratio}
-           {:key :common-sense-ratio
-            :label "Common Sense Ratio"
-            :kind :ratio}
-           {:key :cpc-index
-            :label "CPC Index"
-            :kind :ratio}
-           {:key :tail-ratio
-            :label "Tail Ratio"
-            :kind :ratio}
-           {:key :outlier-win-ratio
-            :label "Outlier Win Ratio"
-            :kind :ratio}
-           {:key :outlier-loss-ratio
-            :label "Outlier Loss Ratio"
-            :kind :ratio}]}
-   {:id :period-returns
-    :rows [{:key :mtd
-            :label "MTD"
-            :kind :percent}
-           {:key :m3
-            :label "3M"
-            :kind :percent}
-           {:key :m6
-            :label "6M"
-            :kind :percent}
-           {:key :ytd
-            :label "YTD"
-            :kind :percent}
-           {:key :y1
-            :label "1Y"
-            :kind :percent}
-           {:key :y3-ann
-            :label "3Y (ann.)"
-            :kind :percent}
-           {:key :y5-ann
-            :label "5Y (ann.)"
-            :kind :percent}
-           {:key :y10-ann
-            :label "10Y (ann.)"
-            :kind :percent}
-           {:key :all-time-ann
-            :label "All-time (ann.)"
-            :kind :percent}]}])
+        quality-context (build-quality-context intervals strategy-rows mar gates)
+        benchmark-context (build-benchmark-context strategy-rows benchmark-daily-rows gates)
+        core-context (build-core-metric-context intervals strategy-rows strategy-returns rf mar periods-per-year)
+        enable-context (build-enable-context quality-context
+                                            gates
+                                            (:benchmark-min? benchmark-context)
+                                            (:sortino-downside-count core-context))
+        window-context (build-window-context resolved-cumulative-rows gates)
+        context (merge quality-context
+                       benchmark-context
+                       core-context
+                       enable-context
+                       window-context
+                       {:rf rf
+                        :periods-per-year periods-per-year
+                        :intervals intervals
+                        :resolved-cumulative-rows resolved-cumulative-rows
+                        :strategy-rows strategy-rows
+                        :strategy-returns strategy-returns
+                        :all-time-cumulative-return (:all-time-cumulative-return window-context)})]
+    (-> {:quality (merge (:diagnostics quality-context)
+                         (:gates* quality-context))
+         :metric-status {}
+         :metric-reason {}}
+        (add-overview-metrics context)
+        (add-drawdown-and-window-metrics context)
+        (add-daily-risk-adjusted-metrics context)
+        (add-daily-distribution-metrics context)
+        (add-benchmark-relative-metrics context))))
 
 (defn metric-rows
   [metric-values]
-  (let [metric-status (or (:metric-status metric-values)
-                          {})
-        metric-reason (or (:metric-reason metric-values)
-                          {})]
-    (mapv (fn [{:keys [rows] :as group}]
-            (assoc group
-                   :rows (mapv (fn [{:keys [key] :as row}]
-                                 (assoc row
-                                        :value (get metric-values key)
-                                        :status (get metric-status key)
-                                        :reason (get metric-reason key)))
-                               rows)))
-          performance-metric-groups)))
+  (catalog/metric-rows metric-values))

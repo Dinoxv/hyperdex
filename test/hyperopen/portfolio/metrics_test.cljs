@@ -106,6 +106,31 @@
     (is (= [0 200 500]
            (mapv second rows)))))
 
+(deftest returns-history-rows-summary-helper-is-compatible-test
+  (let [summary {:accountValueHistory [[1 100]
+                                       [2 105]
+                                       [3 110]]
+                 :pnlHistory [[1 0]
+                              [2 5]
+                              [3 10]]}]
+    (is (= (metrics/returns-history-rows-from-summary summary)
+           (metrics/returns-history-rows {} summary :all)))))
+
+(deftest metric-rows-propagates-status-and-reason-metadata-test
+  (let [rows (->> (metrics/metric-rows {:cagr 0.123
+                                        :metric-status {:cagr :ok
+                                                        :sharpe :suppressed}
+                                        :metric-reason {:sharpe :core-gate-failed}})
+                  (mapcat :rows)
+                  vec)
+        cagr-row (first (filter #(= :cagr (:key %)) rows))
+        sharpe-row (first (filter #(= :sharpe (:key %)) rows))]
+    (is (= 0.123 (:value cagr-row)))
+    (is (= :ok (:status cagr-row)))
+    (is (nil? (:reason cagr-row)))
+    (is (= :suppressed (:status sharpe-row)))
+    (is (= :core-gate-failed (:reason sharpe-row)))))
+
 (deftest daily-compounded-returns-builds-canonical-daily-series-test
   (let [rows [[1000 0]
               [2000 10]
