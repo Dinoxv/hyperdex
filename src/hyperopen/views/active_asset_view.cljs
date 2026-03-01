@@ -265,8 +265,8 @@
                   "bg-slate-600/70"]}]
    [:div {:class ["mb-2.5"]}
     [:div {:class ["grid"
-                   "grid-cols-[minmax(7.25rem,1fr)_minmax(4.75rem,auto)_minmax(5.5rem,auto)]"
-                   "gap-x-3.5"
+                   "grid-cols-[minmax(0,1fr)_8ch_8ch]"
+                   "gap-x-2.5"
                    "gap-y-1"
                    "text-[0.86rem]"
                    "leading-[1.2rem]"]}
@@ -290,7 +290,7 @@
      (for [{:keys [id label rate payment]} projection-rows]
        ^{:key id}
        [:div {:class ["contents"]}
-        [:span {:class ["text-gray-100/95" "text-left" "whitespace-nowrap"]} label]
+        [:span {:class ["text-gray-100/95" "text-left"]} label]
         [:span {:class ["num" "text-left" "whitespace-nowrap" "font-medium" (signed-tone-class rate)]}
          (signed-percentage-text rate 4)]
         [:span {:class ["num" "text-left" "whitespace-nowrap" "font-medium" (signed-tone-class payment)]}
