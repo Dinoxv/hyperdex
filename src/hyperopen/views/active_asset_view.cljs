@@ -231,56 +231,71 @@
                  "border"
                  "border-slate-700/80"
                  "bg-slate-800/95"
-                 "px-3"
-                 "py-2.5"
-                 "text-[12px]"
+                 "px-3.5"
+                 "py-3"
+                 "text-xs"
                  "text-left"
                  "text-gray-100"
                  "shadow-xl"
                  "backdrop-blur-sm"]}
-   [:div {:class ["mb-2.5"]}
-    [:h4 {:class ["mb-1"
-                  "text-[0.95rem]"
+   [:div {:class ["mb-3"]}
+    [:h4 {:class ["mb-1.5"
+                  "text-[0.9rem]"
                   "font-semibold"
+                  "leading-5"
                   "text-gray-100"]}
      "Position"]
     [:div {:class ["grid"
-                   "grid-cols-[minmax(3.5rem,auto)_minmax(0,1fr)]"
-                   "gap-x-3"
-                   "gap-y-0.5"
-                   "text-[0.9rem]"
-                   "leading-5"]}
-     [:span {:class ["text-gray-300" "text-left"]} "Size"]
-     [:span {:class ["num" "text-left" "text-emerald-300" "whitespace-nowrap"]}
+                   "grid-cols-[minmax(3.75rem,auto)_minmax(0,1fr)]"
+                   "gap-x-3.5"
+                   "gap-y-1"
+                   "text-[0.86rem]"
+                   "leading-[1.2rem]"]}
+     [:span {:class ["text-gray-300/95" "text-left"]} "Size"]
+     [:span {:class ["num" "text-left" "text-emerald-300" "whitespace-nowrap" "font-medium"]}
       position-size-label]
-     [:span {:class ["text-gray-300" "text-left"]} "Value"]
-     [:span {:class ["num" "text-left"]}
+     [:span {:class ["text-gray-300/95" "text-left"]} "Value"]
+     [:span {:class ["num" "text-left" "font-medium" "text-gray-100"]}
       (if (number? position-value)
         (str "$" (fmt/format-fixed-number position-value 2))
         "—")]]]
-   [:div {:class ["mb-2"
+   [:div {:class ["mb-2.5"
                   "h-px"
                   "w-full"
                   "bg-slate-600/70"]}]
    [:div {:class ["mb-2.5"]}
     [:div {:class ["grid"
-                   "grid-cols-[minmax(6.75rem,1fr)_minmax(4.75rem,auto)_minmax(5.25rem,auto)]"
-                   "gap-x-3"
-                   "gap-y-0.5"
-                   "text-[0.9rem]"
-                   "leading-5"]}
-     [:span {:class ["text-[0.95rem]" "font-semibold" "text-gray-100"]} "Projections"]
-     [:span {:class ["text-left" "text-gray-300"]} "Rate"]
-     [:span {:class ["text-left" "text-gray-300"]} "Payment"]
+                   "grid-cols-[minmax(7.25rem,1fr)_minmax(4.75rem,auto)_minmax(5.5rem,auto)]"
+                   "gap-x-3.5"
+                   "gap-y-1"
+                   "text-[0.86rem]"
+                   "leading-[1.2rem]"]}
+     [:span {:class ["text-[0.9rem]" "font-semibold" "leading-5" "text-gray-100"]} "Projections"]
+     [:span {:class ["text-left"
+                     "text-[0.75rem]"
+                     "font-medium"
+                     "uppercase"
+                     "tracking-wide"
+                     "leading-5"
+                     "text-gray-400"]}
+      "Rate"]
+     [:span {:class ["text-left"
+                     "text-[0.75rem]"
+                     "font-medium"
+                     "uppercase"
+                     "tracking-wide"
+                     "leading-5"
+                     "text-gray-400"]}
+      "Payment"]
      (for [{:keys [id label rate payment]} projection-rows]
        ^{:key id}
        [:div {:class ["contents"]}
-        [:span {:class ["text-gray-100" "text-left" "whitespace-nowrap"]} label]
-        [:span {:class ["num" "text-left" "whitespace-nowrap" (signed-tone-class rate)]}
+        [:span {:class ["text-gray-100/95" "text-left" "whitespace-nowrap"]} label]
+        [:span {:class ["num" "text-left" "whitespace-nowrap" "font-medium" (signed-tone-class rate)]}
          (signed-percentage-text rate 4)]
-        [:span {:class ["num" "text-left" "whitespace-nowrap" (signed-tone-class payment)]}
+        [:span {:class ["num" "text-left" "whitespace-nowrap" "font-medium" (signed-tone-class payment)]}
          (signed-usd-text payment)]])]]
-   [:p {:class ["italic" "text-[0.85rem]" "text-gray-300"]}
+   [:p {:class ["mt-0.5" "italic" "text-[0.82rem]" "leading-4" "text-gray-300/95"]}
     "* Assume current position and funding rate"]])
 
 (defn- symbol-monogram [market symbol coin]
