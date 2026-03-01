@@ -234,6 +234,7 @@
                  "px-3"
                  "py-2.5"
                  "text-[12px]"
+                 "text-left"
                  "text-gray-100"
                  "shadow-xl"
                  "backdrop-blur-sm"]}
@@ -244,16 +245,16 @@
                   "text-gray-100"]}
      "Position"]
     [:div {:class ["grid"
-                   "grid-cols-[auto_1fr]"
+                   "grid-cols-[minmax(3.5rem,auto)_minmax(0,1fr)]"
                    "gap-x-3"
                    "gap-y-0.5"
                    "text-[0.9rem]"
                    "leading-5"]}
-     [:span {:class ["text-gray-300"]} "Size"]
-     [:span {:class ["text-right" "num" "text-emerald-300"]}
+     [:span {:class ["text-gray-300" "text-left"]} "Size"]
+     [:span {:class ["num" "text-left" "text-emerald-300" "whitespace-nowrap"]}
       position-size-label]
-     [:span {:class ["text-gray-300"]} "Value"]
-     [:span {:class ["text-right" "num"]}
+     [:span {:class ["text-gray-300" "text-left"]} "Value"]
+     [:span {:class ["num" "text-left"]}
       (if (number? position-value)
         (str "$" (fmt/format-fixed-number position-value 2))
         "—")]]]
@@ -262,27 +263,22 @@
                   "w-full"
                   "bg-slate-600/70"]}]
    [:div {:class ["mb-2.5"]}
-    [:h4 {:class ["mb-1"
-                  "text-[0.95rem]"
-                  "font-semibold"
-                  "text-gray-100"]}
-     "Projections"]
     [:div {:class ["grid"
-                   "grid-cols-[1fr_auto_auto]"
+                   "grid-cols-[minmax(6.75rem,1fr)_minmax(4.75rem,auto)_minmax(5.25rem,auto)]"
                    "gap-x-3"
                    "gap-y-0.5"
                    "text-[0.9rem]"
                    "leading-5"]}
-     [:span]
-     [:span {:class ["text-right" "text-gray-300"]} "Rate"]
-     [:span {:class ["text-right" "text-gray-300"]} "Payment"]
+     [:span {:class ["text-[0.95rem]" "font-semibold" "text-gray-100"]} "Projections"]
+     [:span {:class ["text-left" "text-gray-300"]} "Rate"]
+     [:span {:class ["text-left" "text-gray-300"]} "Payment"]
      (for [{:keys [id label rate payment]} projection-rows]
        ^{:key id}
        [:div {:class ["contents"]}
-        [:span {:class ["text-gray-100"]} label]
-        [:span {:class ["text-right" "num" (signed-tone-class rate)]}
+        [:span {:class ["text-gray-100" "text-left" "whitespace-nowrap"]} label]
+        [:span {:class ["num" "text-left" "whitespace-nowrap" (signed-tone-class rate)]}
          (signed-percentage-text rate 4)]
-        [:span {:class ["text-right" "num" (signed-tone-class payment)]}
+        [:span {:class ["num" "text-left" "whitespace-nowrap" (signed-tone-class payment)]}
          (signed-usd-text payment)]])]]
    [:p {:class ["italic" "text-[0.85rem]" "text-gray-300"]}
     "* Assume current position and funding rate"]])
