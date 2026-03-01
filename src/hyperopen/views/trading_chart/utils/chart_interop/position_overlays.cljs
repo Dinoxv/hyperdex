@@ -658,6 +658,7 @@
               base-liq-price (parse-number (:liquidation-price overlay))
               drag-preview-price (some-> drag :preview-liquidation-price parse-number)
               current-liq-price (or (some-> drag :start-liquidation-price parse-number)
+                                    (some-> overlay :current-liquidation-price parse-number)
                                     base-liq-price)
               liq-price (if (finite-number? drag-preview-price)
                           drag-preview-price

@@ -59,6 +59,33 @@
       (dispatch-fn {:replicant/trigger :chart-volume-indicator-remove}
                    [[:actions/hide-volume-indicator]]))))
 
+(defn- parse-positive-number
+  [value]
+  (let [parsed (js/parseFloat (str (or value "")))]
+    (when (and (number? parsed)
+               (js/isFinite parsed)
+               (pos? parsed))
+      parsed)))
+
+(defn- pending-liquidation-preview
+  [state active-position-data]
+  (let [margin-modal (get-in state [:positions-ui :margin-modal])
+        position-key (when (map? active-position-data)
+                       (account-projections/position-unique-key active-position-data))
+        current-liquidation-price (parse-positive-number
+                                   (:prefill-liquidation-current-price margin-modal))
+        target-liquidation-price (parse-positive-number
+                                  (:prefill-liquidation-target-price margin-modal))]
+    (when (and (map? margin-modal)
+               (true? (:open? margin-modal))
+               (= :chart-liquidation-drag (:prefill-source margin-modal))
+               (string? position-key)
+               (= position-key (:position-key margin-modal))
+               (number? current-liquidation-price)
+               (number? target-liquidation-price))
+      {:current-liquidation-price current-liquidation-price
+       :target-liquidation-price target-liquidation-price})))
+
 (defn- dispatch-chart-liquidation-drag-margin-confirm!
   [position-data suggestion]
   (let [dispatch-fn replicant-core/*dispatch*]
@@ -346,13 +373,19 @@
                       api-response  ; Direct array
                       (get api-response :data []))  ; Wrapped in :data
         candle-data (derived-cache/memoized-candle-data raw-candles selected-timeframe)
-        position-overlay (position-overlay-model/build-position-overlay
-                          {:active-asset active-asset
-                           :position active-position
-                           :fills active-fills
-                           :market-by-key market-by-key
-                           :selected-timeframe selected-timeframe
-                           :candle-data candle-data})
+        preview (pending-liquidation-preview state active-position-data)
+        position-overlay-base (position-overlay-model/build-position-overlay
+                               {:active-asset active-asset
+                                :position active-position
+                                :fills active-fills
+                                :market-by-key market-by-key
+                                :selected-timeframe selected-timeframe
+                                :candle-data candle-data})
+        position-overlay (cond-> position-overlay-base
+                           (and (map? position-overlay-base)
+                                (map? preview))
+                           (assoc :current-liquidation-price (:current-liquidation-price preview)
+                                  :liquidation-price (:target-liquidation-price preview)))
         on-liquidation-drag-confirm (fn [suggestion]
                                       (dispatch-chart-liquidation-drag-margin-confirm!
                                        active-position-data

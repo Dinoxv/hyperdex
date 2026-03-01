@@ -245,6 +245,29 @@
           "PNL badge should remain left-aligned even when entry/latest is near right edge"))
     (position-overlays/clear-position-overlays! chart-obj)))
 
+(deftest position-overlays-renders-margin-delta-label-for-preview-liquidation-target-test
+  (let [{:keys [chart-obj document container]}
+        (build-chart-fixture {})
+        overlay {:side :long
+                 :entry-price 100
+                 :unrealized-pnl 2
+                 :abs-size 2
+                 :liquidation-price 95
+                 :current-liquidation-price 100
+                 :entry-time 1700000000
+                 :entry-time-ms 1700000000000
+                 :latest-time 1700003600}]
+    (position-overlays/sync-position-overlays!
+     chart-obj
+     container
+     overlay
+     {:document document})
+    (let [overlay-root (aget (.-children container) 0)
+          text (str/join " " (fake-dom/collect-text-content overlay-root))]
+      (is (str/includes? text "Liq. Price"))
+      (is (str/includes? text "Add $10.00 Margin")))
+    (position-overlays/clear-position-overlays! chart-obj)))
+
 (deftest position-overlays-liquidation-drag-emits-margin-confirmation-suggestion-test
   (let [confirm-calls* (atom [])
         {:keys [chart-obj document container window-target]}
