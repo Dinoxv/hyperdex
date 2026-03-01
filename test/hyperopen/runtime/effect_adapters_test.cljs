@@ -1,8 +1,11 @@
 (ns hyperopen.runtime.effect-adapters-test
-  (:require [cljs.test :refer-macros [deftest is]]
+  (:require [cljs.test :refer-macros [async deftest is]]
             [hyperopen.asset-selector.query :as asset-selector-query]
+            [hyperopen.funding.history-cache :as funding-cache]
+            [hyperopen.platform :as platform]
             [hyperopen.runtime.app-effects :as app-effects]
             [hyperopen.runtime.effect-adapters :as effect-adapters]
+            [hyperopen.test-support.async :as async-support]
             [hyperopen.telemetry :as telemetry]
             [hyperopen.websocket.active-asset-ctx :as active-ctx]
             [hyperopen.websocket.client :as ws-client]
@@ -176,3 +179,64 @@
              (active-ctx/get-subscribed-coins-by-owner :asset-selector)))
       (finally
         (reset! active-ctx/active-asset-ctx-state original-state)))))
+
+(deftest sync-active-asset-funding-predictability-projects-loading-and-success-test
+  (async done
+    (let [store (atom {:active-assets {:contexts {}
+                                       :loading false}})
+          request-calls (atom [])
+          start-ms (platform/now-ms)
+          rows [{:time-ms (- start-ms (* 2 60 60 1000))
+                 :funding-rate-raw 0.001}
+                {:time-ms (- start-ms (* 60 60 1000))
+                 :funding-rate-raw 0.002}]]
+      (with-redefs [funding-cache/sync-market-funding-history-cache!
+                    (fn [coin]
+                      (swap! request-calls conj coin)
+                      (js/Promise.resolve {:rows rows}))]
+        (let [promise (effect-adapters/sync-active-asset-funding-predictability nil store "btc")]
+          (is (= true
+                 (get-in @store [:active-assets :funding-predictability :loading-by-coin "BTC"])))
+          (-> promise
+              (.then (fn [_]
+                       (is (= ["BTC"] @request-calls))
+                       (is (= false
+                              (get-in @store [:active-assets :funding-predictability :loading-by-coin "BTC"])))
+                       (let [summary (get-in @store [:active-assets :funding-predictability :by-coin "BTC"])
+                             loaded-at-ms (get-in @store [:active-assets :funding-predictability :loaded-at-ms-by-coin "BTC"])]
+                         (is (= 2 (:sample-count summary)))
+                         (is (number? (:mean summary)))
+                         (is (number? (:stddev summary)))
+                         (is (number? loaded-at-ms))
+                         (is (>= loaded-at-ms start-ms)))
+                       (is (nil?
+                            (get-in @store [:active-assets :funding-predictability :error-by-coin "BTC"])))
+                       (done)))
+              (.catch (async-support/unexpected-error done))))))))
+
+(deftest sync-active-asset-funding-predictability-projects-error-without-clearing-last-summary-test
+  (async done
+    (let [store (atom {:active-assets {:contexts {}
+                                       :loading false
+                                       :funding-predictability {:by-coin {"BTC" {:mean 0.001}}
+                                                                :loading-by-coin {}
+                                                                :error-by-coin {}
+                                                                :loaded-at-ms-by-coin {}}}})
+          start-ms (platform/now-ms)]
+      (with-redefs [funding-cache/sync-market-funding-history-cache!
+                    (fn [_coin]
+                      (js/Promise.reject (js/Error. "boom")))]
+        (let [promise (effect-adapters/sync-active-asset-funding-predictability nil store "BTC")]
+          (-> promise
+              (.then (fn [_]
+                       (is (= false
+                              (get-in @store [:active-assets :funding-predictability :loading-by-coin "BTC"])))
+                       (is (= "boom"
+                              (get-in @store [:active-assets :funding-predictability :error-by-coin "BTC"])))
+                       (is (= {:mean 0.001}
+                              (get-in @store [:active-assets :funding-predictability :by-coin "BTC"])))
+                       (let [loaded-at-ms (get-in @store [:active-assets :funding-predictability :loaded-at-ms-by-coin "BTC"])]
+                         (is (number? loaded-at-ms))
+                         (is (>= loaded-at-ms start-ms)))
+                       (done)))
+              (.catch (async-support/unexpected-error done))))))))

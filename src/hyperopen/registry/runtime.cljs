@@ -33,6 +33,7 @@
    [:effects/copy-websocket-diagnostics :copy-websocket-diagnostics]
    [:effects/ws-reset-subscriptions :ws-reset-subscriptions]
    [:effects/fetch-asset-selector-markets :fetch-asset-selector-markets]
+   [:effects/sync-active-asset-funding-predictability :sync-active-asset-funding-predictability]
    [:effects/api-fetch-user-funding-history :api-fetch-user-funding-history]
    [:effects/api-fetch-historical-orders :api-fetch-historical-orders]
    [:effects/export-funding-history-csv :export-funding-history-csv]

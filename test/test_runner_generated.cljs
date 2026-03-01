@@ -77,6 +77,7 @@
             [hyperopen.funding-comparison.actions-test]
             [hyperopen.funding-comparison.effects-test]
             [hyperopen.funding.history-cache-test]
+            [hyperopen.funding.predictability-test]
             [hyperopen.order.feedback-runtime-test]
             [hyperopen.orderbook.actions-test]
             [hyperopen.orderbook.price-aggregation-test]
@@ -337,6 +338,7 @@
              'hyperopen.funding-comparison.actions-test
              'hyperopen.funding-comparison.effects-test
              'hyperopen.funding.history-cache-test
+             'hyperopen.funding.predictability-test
              'hyperopen.order.feedback-runtime-test
              'hyperopen.orderbook.actions-test
              'hyperopen.orderbook.price-aggregation-test

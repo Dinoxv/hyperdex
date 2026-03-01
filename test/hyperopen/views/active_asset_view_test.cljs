@@ -347,6 +347,7 @@
             strings (set (collect-strings view-node))]
         (is (contains? strings "Position"))
         (is (contains? strings "Projections"))
+        (is (contains? strings "Predictability (30d)"))
         (is (contains? strings "Size"))
         (is (contains? strings "Value"))
         (is (contains? strings "Rate"))
@@ -392,3 +393,90 @@
         (is (not (contains? strings "+$0.15")))
         (is (contains? strings "+$3.60"))
         (is (contains? strings "+$1,314.00"))))))
+
+(deftest active-asset-row-funding-tooltip-renders-predictability-metrics-test
+  (let [ctx-data {:coin "xyz:GOLD"
+                  :mark 5000.0
+                  :oracle 4998.0
+                  :change24h 5.0
+                  :change24hPct 0.5
+                  :volume24h 2000000
+                  :openInterest 200
+                  :fundingRate 0.01}
+        market {:coin "xyz:GOLD"
+                :symbol "GOLD-USDC"
+                :base "GOLD"
+                :market-type :perp}
+        full-state {:active-asset "xyz:GOLD"
+                    :asset-selector {:missing-icons #{}}
+                    :active-assets {:funding-predictability {:by-coin {"XYZ:GOLD"
+                                                                       {:mean 0.0042
+                                                                        :stddev 0.0187
+                                                                        :autocorrelation {:lag-1d {:value 0.714}
+                                                                                          :lag-5d {:value 0.482}
+                                                                                          :lag-15d {:value 0.21}}}}
+                                                          :loading-by-coin {}
+                                                          :error-by-coin {}}}}]
+    (with-redefs [hyperopen.state.trading/position-for-active-asset
+                  (fn [_]
+                    {:coin "xyz:GOLD"
+                     :szi "1"
+                     :positionValue "5000"})
+                  hyperopen.utils.formatting/format-funding-countdown
+                  (fn [] "00:10:00")]
+      (let [view-node (view/active-asset-row ctx-data market {:visible-dropdown nil} full-state)
+            strings (set (collect-strings view-node))]
+        (is (contains? strings "Predictability (30d)"))
+        (is (contains? strings "Mean"))
+        (is (contains? strings "Volatility (Std Dev)"))
+        (is (contains? strings "ACF Lag 1d"))
+        (is (contains? strings "ACF Lag 5d"))
+        (is (contains? strings "ACF Lag 15d"))
+        (is (contains? strings "+0.0042%"))
+        (is (contains? strings "0.0187%"))
+        (is (contains? strings "+0.714"))
+        (is (contains? strings "+0.482"))
+        (is (contains? strings "+0.210"))))))
+
+(deftest active-asset-row-funding-tooltip-renders-predictability-loading-and-insufficient-copy-test
+  (let [ctx-data {:coin "xyz:GOLD"
+                  :mark 5000.0
+                  :oracle 4998.0
+                  :change24h 5.0
+                  :change24hPct 0.5
+                  :volume24h 2000000
+                  :openInterest 200
+                  :fundingRate 0.01}
+        market {:coin "xyz:GOLD"
+                :symbol "GOLD-USDC"
+                :base "GOLD"
+                :market-type :perp}
+        full-state {:active-asset "xyz:GOLD"
+                    :asset-selector {:missing-icons #{}}
+                    :active-assets {:funding-predictability {:by-coin {"XYZ:GOLD"
+                                                                       {:mean 0.0042
+                                                                        :stddev 0.0187
+                                                                        :autocorrelation {:lag-1d {:value 0.714}
+                                                                                          :lag-5d {:value 0.482}
+                                                                                          :lag-15d {:value nil
+                                                                                                    :lag-days 15
+                                                                                                    :minimum-daily-count 16
+                                                                                                    :insufficient? true}}}}
+                                                          :loading-by-coin {"XYZ:GOLD" true}
+                                                          :error-by-coin {}}}}]
+    (with-redefs [hyperopen.state.trading/position-for-active-asset
+                  (fn [_]
+                    {:coin "xyz:GOLD"
+                     :szi "1"
+                     :positionValue "5000"})
+                  hyperopen.utils.formatting/format-funding-countdown
+                  (fn [] "00:10:00")]
+      (let [loading-view (view/active-asset-row ctx-data market {:visible-dropdown nil} full-state)
+            loading-strings (set (collect-strings loading-view))
+            ready-state (assoc-in full-state
+                                  [:active-assets :funding-predictability :loading-by-coin "XYZ:GOLD"]
+                                  false)
+            ready-view (view/active-asset-row ctx-data market {:visible-dropdown nil} ready-state)
+            ready-strings (set (collect-strings ready-view))]
+        (is (contains? loading-strings "Loading 30d stats..."))
+        (is (contains? ready-strings "Lag 15d needs at least 16 daily points"))))))

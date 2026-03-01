@@ -259,7 +259,11 @@
   {:websocket (default-websocket-state websocket-health)
    :websocket-ui (default-websocket-ui-state)
    :active-assets {:contexts {}
-                   :loading false}
+                   :loading false
+                   :funding-predictability {:by-coin {}
+                                            :loading-by-coin {}
+                                            :error-by-coin {}
+                                            :loaded-at-ms-by-coin {}}}
    :active-asset nil
    :active-market nil
    :orderbooks {}

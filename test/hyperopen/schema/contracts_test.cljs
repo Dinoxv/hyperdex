@@ -174,6 +174,20 @@
         ["not-a-vector"]
         {:phase :test}))))
 
+(deftest assert-effect-args-validates-funding-predictability-sync-coin-test
+  (is (= ["BTC"]
+         (contracts/assert-effect-args!
+          :effects/sync-active-asset-funding-predictability
+          ["BTC"]
+          {:phase :test})))
+  (is (thrown-with-msg?
+       js/Error
+       #"effect request"
+       (contracts/assert-effect-args!
+        :effects/sync-active-asset-funding-predictability
+        [""]
+        {:phase :test}))))
+
 (deftest assert-action-args-allows-asset-selector-scroll-prefetch-single-or-double-payload-test
   (is (= [5100]
          (contracts/assert-action-args!

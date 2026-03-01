@@ -66,6 +66,16 @@
   (let [text (some-> value str str/trim)]
     (when (seq text) text)))
 
+(defn- normalize-coin-key [coin]
+  (some-> coin non-blank-text str/upper-case))
+
+(defn- read-by-coin
+  [by-coin coin]
+  (let [normalized-coin (normalize-coin-key coin)]
+    (or (and (seq normalized-coin)
+             (get by-coin normalized-coin))
+        (get by-coin coin))))
+
 (defn- parse-optional-number [value]
   (let [num (cond
               (number? value) value
@@ -159,6 +169,21 @@
       (str sign (fmt/format-percentage (js/Math.abs normalized) decimals)))
     "—"))
 
+(defn- unsigned-percentage-text [value decimals]
+  (if (number? value)
+    (fmt/format-percentage (js/Math.abs value) decimals)
+    "—"))
+
+(defn- signed-decimal-text [value decimals]
+  (if (number? value)
+    (let [normalized (if (< (js/Math.abs value) 1e-10) 0 value)
+          sign (cond
+                 (pos? normalized) "+"
+                 (neg? normalized) "-"
+                 :else "")]
+      (str sign (fmt/safe-to-fixed (js/Math.abs normalized) decimals)))
+    "—"))
+
 (defn- signed-usd-text [value]
   (if (number? value)
     (let [normalized (if (< (js/Math.abs value) 0.005) 0 value)
@@ -186,7 +211,45 @@
          :short 1
          0))))
 
-(defn- funding-tooltip-model [position market coin mark funding-rate]
+(defn- predictability-rows
+  [summary]
+  [{:id "mean"
+    :label "Mean"
+    :value (:mean summary)
+    :kind :signed-percentage}
+   {:id "volatility"
+    :label "Volatility (Std Dev)"
+    :value (:stddev summary)
+    :kind :unsigned-percentage}
+   {:id "acf-lag-1d"
+    :label "ACF Lag 1d"
+    :value (get-in summary [:autocorrelation :lag-1d :value])
+    :kind :signed-decimal}
+   {:id "acf-lag-5d"
+    :label "ACF Lag 5d"
+    :value (get-in summary [:autocorrelation :lag-5d :value])
+    :kind :signed-decimal}
+   {:id "acf-lag-15d"
+    :label "ACF Lag 15d"
+    :value (get-in summary [:autocorrelation :lag-15d :value])
+    :kind :signed-decimal}])
+
+(defn- predictability-lag-note
+  [summary]
+  (let [lag-order [:lag-1d :lag-5d :lag-15d]
+        first-insufficient (some (fn [lag]
+                                   (let [lag-stat (get-in summary [:autocorrelation lag])]
+                                     (when (:insufficient? lag-stat)
+                                       lag-stat)))
+                                 lag-order)]
+    (when first-insufficient
+      (str "Lag "
+           (:lag-days first-insufficient)
+           "d needs at least "
+           (:minimum-daily-count first-insufficient)
+           " daily points"))))
+
+(defn- funding-tooltip-model [position market coin mark funding-rate predictability-state]
   (let [size-raw (:szi position)
         size (parse-optional-number size-raw)
         direction (direction-from-size size)
@@ -194,7 +257,10 @@
         base-symbol (display-base-symbol market coin)
         next-24h-rate (when (number? funding-rate)
                         (* funding-rate 24))
-        annual-rate (fmt/annualized-funding-rate funding-rate)]
+        annual-rate (fmt/annualized-funding-rate funding-rate)
+        predictability-summary (:summary predictability-state)
+        predictability-loading? (true? (:loading? predictability-state))
+        predictability-error (non-blank-text (:error predictability-state))]
     {:position-size-label (if (and (not= direction :flat)
                                    (number? size))
                             (str (direction-label direction)
@@ -211,9 +277,34 @@
                        {:id "apy"
                         :label "APY"
                         :rate annual-rate
-                        :payment (funding-payment-estimate direction position-value annual-rate)}]}))
+                        :payment (funding-payment-estimate direction position-value annual-rate)}]
+     :predictability-loading? predictability-loading?
+     :predictability-error predictability-error
+     :predictability-rows (when (map? predictability-summary)
+                            (predictability-rows predictability-summary))
+     :predictability-lag-note (when (map? predictability-summary)
+                                (predictability-lag-note predictability-summary))}))
 
-(defn- funding-tooltip-panel [{:keys [position-size-label position-value projection-rows]}]
+(defn- predictability-value-text [{:keys [kind value]}]
+  (case kind
+    :signed-percentage (signed-percentage-text value 4)
+    :unsigned-percentage (unsigned-percentage-text value 4)
+    :signed-decimal (signed-decimal-text value 3)
+    "—"))
+
+(defn- predictability-value-class [{:keys [kind value]}]
+  (if (= kind :signed-decimal)
+    (signed-tone-class value)
+    "text-gray-100"))
+
+(defn- funding-tooltip-panel
+  [{:keys [position-size-label
+           position-value
+           projection-rows
+           predictability-loading?
+           predictability-error
+           predictability-rows
+           predictability-lag-note]}]
   [:div {:class ["w-[18rem]"
                  "rounded-lg"
                  "border"
@@ -282,7 +373,54 @@
         [:span {:class ["num" "text-left" "whitespace-nowrap" "font-medium" (signed-tone-class rate)]}
          (signed-percentage-text rate 4)]
         [:span {:class ["num" "text-left" "whitespace-nowrap" "font-medium" (signed-tone-class payment)]}
-         (signed-usd-text payment)]])]]])
+         (signed-usd-text payment)]])]]
+   [:div {:class ["mb-2.5"
+                  "h-px"
+                  "w-full"
+                  "bg-slate-600/70"]}]
+   [:div
+    [:h4 {:class ["mb-1.5"
+                  "text-[0.9rem]"
+                  "font-semibold"
+                  "leading-5"
+                  "text-gray-100"]}
+     "Predictability (30d)"]
+    (cond
+      predictability-loading?
+      [:div {:class ["text-[0.82rem]" "leading-[1.2rem]" "text-gray-300/90"]}
+       "Loading 30d stats..."]
+
+      (seq predictability-error)
+      [:div {:class ["text-[0.82rem]" "leading-[1.2rem]" "text-red-300/90"]}
+       "Unable to load 30d stats"]
+
+      (seq predictability-rows)
+      [:div {:class ["grid"
+                     "grid-cols-[minmax(0,1fr)_minmax(0,1fr)]"
+                     "gap-x-2.5"
+                     "gap-y-1"
+                     "text-[0.86rem]"
+                     "leading-[1.2rem]"]}
+       (for [{:keys [id label] :as row} predictability-rows]
+         ^{:key id}
+         [:div {:class ["contents"]}
+          [:span {:class ["text-gray-100/95" "text-left"]} label]
+          [:span {:class ["num"
+                          "text-left"
+                          "whitespace-nowrap"
+                          "font-medium"
+                          (predictability-value-class row)]}
+           (predictability-value-text row)]])]
+
+      :else
+      [:div {:class ["num" "text-[0.86rem]" "leading-[1.2rem]" "text-gray-300/90"]}
+       "—"])
+    (when (seq predictability-lag-note)
+      [:p {:class ["mt-1.5"
+                   "text-[0.72rem]"
+                   "leading-[1.05rem]"
+                   "text-gray-400"]}
+       predictability-lag-note])]])
 
 (defn- symbol-monogram [market symbol coin]
   (let [base-symbol (or (non-blank-text (:base market))
@@ -416,11 +554,21 @@
         funding-rate (parse-optional-number (:fundingRate ctx-data))
         countdown-text (fmt/format-funding-countdown)
         active-position (trading-state/position-for-active-asset full-state)
+        funding-predictability-state {:summary (read-by-coin
+                                                (get-in full-state [:active-assets :funding-predictability :by-coin] {})
+                                                coin)
+                                      :loading? (true? (read-by-coin
+                                                        (get-in full-state [:active-assets :funding-predictability :loading-by-coin] {})
+                                                        coin))
+                                      :error (read-by-coin
+                                              (get-in full-state [:active-assets :funding-predictability :error-by-coin] {})
+                                              coin)}
         funding-tooltip (funding-tooltip-model (or active-position {})
                                                market
                                                coin
                                                mark
-                                               funding-rate)
+                                               funding-rate
+                                               funding-predictability-state)
         dropdown-visible? (= (:visible-dropdown dropdown-state) :asset-selector)
         is-spot (= :spot (:market-type market))
         ;; Handle missing data gracefully

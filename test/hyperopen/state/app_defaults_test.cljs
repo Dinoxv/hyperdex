@@ -89,6 +89,10 @@
                 :default-funding-history {}
                 :default-order-history {}})]
     (is (= {} (get-in state [:active-assets :contexts])))
+    (is (= {} (get-in state [:active-assets :funding-predictability :by-coin])))
+    (is (= {} (get-in state [:active-assets :funding-predictability :loading-by-coin])))
+    (is (= {} (get-in state [:active-assets :funding-predictability :error-by-coin])))
+    (is (= {} (get-in state [:active-assets :funding-predictability :loaded-at-ms-by-coin])))
     (is (= [] (get-in state [:orders :open-orders])))
     (is (= #{} (get-in state [:asset-selector :favorites])))
     (is (= #{} (get-in state [:asset-selector :loaded-icons])))

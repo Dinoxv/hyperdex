@@ -74,6 +74,7 @@
 
 (defn- api-effect-handlers
   [{:keys [fetch-asset-selector-markets
+           sync-active-asset-funding-predictability
            api-fetch-user-funding-history
            api-fetch-historical-orders
            export-funding-history-csv
@@ -90,6 +91,7 @@
            api-fetch-vault-ledger-updates
            api-submit-vault-transfer]}]
   {:fetch-asset-selector-markets fetch-asset-selector-markets
+   :sync-active-asset-funding-predictability sync-active-asset-funding-predictability
    :api-fetch-user-funding-history api-fetch-user-funding-history
    :api-fetch-historical-orders api-fetch-historical-orders
    :export-funding-history-csv export-funding-history-csv

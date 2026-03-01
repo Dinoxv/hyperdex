@@ -18,7 +18,8 @@
                         :effects/unsubscribe-trades
                         :effects/subscribe-active-asset
                         :effects/subscribe-orderbook
-                        :effects/subscribe-trades}}
+                        :effects/subscribe-trades
+                        :effects/sync-active-asset-funding-predictability}}
 
    :actions/select-chart-timeframe
    {:required-phase-order [:projection :persistence :heavy-io]

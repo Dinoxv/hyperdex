@@ -13,6 +13,8 @@
             [hyperopen.asset-selector.markets-cache :as markets-cache]
             [hyperopen.asset-selector.markets :as markets]
             [hyperopen.asset-selector.query :as asset-selector-query]
+            [hyperopen.funding.history-cache :as funding-cache]
+            [hyperopen.funding.predictability :as funding-predictability]
             [hyperopen.orderbook.price-aggregation :as price-agg]
             [hyperopen.runtime.app-effects :as app-effects]
             [hyperopen.runtime.api-effects :as api-effects]
@@ -569,6 +571,67 @@
   [runtime]
   (fn [ctx store request]
     (api-submit-position-margin runtime ctx store request)))
+
+(defn- funding-predictability-path
+  [bucket coin]
+  [:active-assets :funding-predictability bucket coin])
+
+(defn- set-funding-predictability-loading!
+  [store coin loading?]
+  (swap! store
+         (fn [state]
+           (-> state
+               (assoc-in (funding-predictability-path :loading-by-coin coin)
+                         loading?)
+               (assoc-in (funding-predictability-path :error-by-coin coin)
+                         nil)))))
+
+(defn- set-funding-predictability-success!
+  [store coin summary loaded-at-ms]
+  (swap! store
+         (fn [state]
+           (-> state
+               (assoc-in (funding-predictability-path :loading-by-coin coin)
+                         false)
+               (assoc-in (funding-predictability-path :error-by-coin coin)
+                         nil)
+               (assoc-in (funding-predictability-path :by-coin coin)
+                         summary)
+               (assoc-in (funding-predictability-path :loaded-at-ms-by-coin coin)
+                         loaded-at-ms)))))
+
+(defn- set-funding-predictability-error!
+  [store coin error-message loaded-at-ms]
+  (swap! store
+         (fn [state]
+           (-> state
+               (assoc-in (funding-predictability-path :loading-by-coin coin)
+                         false)
+               (assoc-in (funding-predictability-path :error-by-coin coin)
+                         error-message)
+               (assoc-in (funding-predictability-path :loaded-at-ms-by-coin coin)
+                         loaded-at-ms)))))
+
+(defn sync-active-asset-funding-predictability
+  [_ store coin]
+  (if-let [coin* (funding-cache/normalize-coin coin)]
+    (do
+      (set-funding-predictability-loading! store coin* true)
+      (-> (apply funding-cache/sync-market-funding-history-cache!
+                 [coin*])
+          (.then (fn [{:keys [rows]}]
+                   (let [now-ms (platform/now-ms)
+                         rows* (funding-cache/rows-for-window rows
+                                                              now-ms
+                                                              funding-predictability/thirty-day-window-ms)
+                         summary (funding-predictability/compute-30d-summary rows* now-ms)]
+                     (set-funding-predictability-success! store coin* summary now-ms))))
+          (.catch (fn [error]
+                    (let [now-ms (platform/now-ms)
+                          error-message (or (some-> error .-message)
+                                            (str error))]
+                      (set-funding-predictability-error! store coin* error-message now-ms))))))
+    (js/Promise.resolve nil)))
 
 (defn fetch-asset-selector-markets-effect
   [_ store & [opts]]

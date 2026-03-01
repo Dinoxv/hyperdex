@@ -263,9 +263,12 @@
                              [])
         subscribe-effects [[:effects/subscribe-active-asset canonical-coin]
                            [:effects/subscribe-orderbook canonical-coin]
-                           [:effects/subscribe-trades canonical-coin]]]
+                           [:effects/subscribe-trades canonical-coin]]
+        subscribe-effects* (cond-> subscribe-effects
+                             (seq canonical-coin)
+                             (conj [:effects/sync-active-asset-funding-predictability canonical-coin]))]
     (into immediate-ui-effects
-          (into unsubscribe-effects subscribe-effects))))
+          (into unsubscribe-effects subscribe-effects*))))
 
 (defn update-asset-search
   [_state value]

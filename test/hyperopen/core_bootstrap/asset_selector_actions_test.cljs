@@ -12,7 +12,8 @@
     :effects/unsubscribe-trades
     :effects/subscribe-active-asset
     :effects/subscribe-orderbook
-    :effects/subscribe-trades})
+    :effects/subscribe-trades
+    :effects/sync-active-asset-funding-predictability})
 
 (deftest mark-loaded-asset-icon-promotes-key-to-loaded-and-clears-missing-test
   (let [state {:asset-selector {:loaded-icons #{}
@@ -127,7 +128,8 @@
             [:effects/unsubscribe-trades "ETH"]
             [:effects/subscribe-active-asset "BTC"]
             [:effects/subscribe-orderbook "BTC"]
-            [:effects/subscribe-trades "BTC"]]
+            [:effects/subscribe-trades "BTC"]
+            [:effects/sync-active-asset-funding-predictability "BTC"]]
            effects))
     (is (not-any? #(= (first %) :effects/fetch-candle-snapshot) effects))
     (is (effect-extractors/projection-before-heavy? effects select-asset-heavy-effect-ids))
@@ -154,7 +156,8 @@
             [:effects/sync-asset-selector-active-ctx-subscriptions]
             [:effects/subscribe-active-asset "SOL"]
             [:effects/subscribe-orderbook "SOL"]
-            [:effects/subscribe-trades "SOL"]]
+            [:effects/subscribe-trades "SOL"]
+            [:effects/sync-active-asset-funding-predictability "SOL"]]
            effects))))
 
 (deftest select-asset-resolves-legacy-spot-id-to-canonical-coin-test
@@ -184,7 +187,8 @@
             [:effects/unsubscribe-trades "ETH"]
             [:effects/subscribe-active-asset "@1"]
             [:effects/subscribe-orderbook "@1"]
-            [:effects/subscribe-trades "@1"]]
+            [:effects/subscribe-trades "@1"]
+            [:effects/sync-active-asset-funding-predictability "@1"]]
            effects))
     (is (= :effects/save-many (ffirst effects)))
     (is (not-any? #(= (first %) :effects/fetch-candle-snapshot) effects))))
@@ -214,6 +218,7 @@
     (is (some #{[:effects/subscribe-active-asset "MEOW/USDC"]} effects))
     (is (some #{[:effects/subscribe-orderbook "MEOW/USDC"]} effects))
     (is (some #{[:effects/subscribe-trades "MEOW/USDC"]} effects))
+    (is (some #{[:effects/sync-active-asset-funding-predictability "MEOW/USDC"]} effects))
     (is (not (some #{[:effects/subscribe-active-asset "MEOW"]} effects)))))
 
 (deftest select-asset-resets-price-input-focus-lock-to-dynamic-state-test

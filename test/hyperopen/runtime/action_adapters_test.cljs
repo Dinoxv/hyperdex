@@ -19,6 +19,13 @@
       (action-adapters/enable-agent-trading nil (atom {}) {}))
     (is (= 4242 @captured-now-ms))))
 
+(deftest subscribe-to-asset-emits-funding-predictability-sync-test
+  (is (= [[:effects/subscribe-active-asset "BTC"]
+          [:effects/subscribe-orderbook "BTC"]
+          [:effects/subscribe-trades "BTC"]
+          [:effects/sync-active-asset-funding-predictability "BTC"]]
+         (action-adapters/subscribe-to-asset {} "BTC"))))
+
 (deftest navigate-appends-vault-route-effects-after-route-projection-test
   (with-redefs [vault-actions/load-vault-route (fn [_state _path]
                                                  [[:effects/save [:vaults-ui :list-loading?] true]

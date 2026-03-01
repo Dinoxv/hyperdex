@@ -486,6 +486,7 @@
    :effects/copy-websocket-diagnostics ::no-args
    :effects/ws-reset-subscriptions ::ws-reset-subscriptions-args
    :effects/fetch-asset-selector-markets ::fetch-asset-selector-markets-args
+   :effects/sync-active-asset-funding-predictability ::coin-args
    :effects/api-fetch-user-funding-history ::request-id-args
    :effects/api-fetch-historical-orders ::request-id-args
    :effects/export-funding-history-csv ::export-funding-history-csv-args

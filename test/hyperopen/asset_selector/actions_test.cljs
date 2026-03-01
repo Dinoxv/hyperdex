@@ -60,7 +60,8 @@
               [:effects/unsubscribe-trades "BTC"]
               [:effects/subscribe-active-asset "BTC"]
               [:effects/subscribe-orderbook "BTC"]
-              [:effects/subscribe-trades "BTC"]]
+              [:effects/subscribe-trades "BTC"]
+              [:effects/sync-active-asset-funding-predictability "BTC"]]
              (subvec effects 2)))
       (is (= [:effects/sync-asset-selector-active-ctx-subscriptions]
              (nth effects 1)))
@@ -234,7 +235,8 @@
       (is (= market (path-value effects [:active-market])))
       (is (= [[:effects/subscribe-active-asset "ETH"]
               [:effects/subscribe-orderbook "ETH"]
-              [:effects/subscribe-trades "ETH"]]
+              [:effects/subscribe-trades "ETH"]
+              [:effects/sync-active-asset-funding-predictability "ETH"]]
              (subvec effects 2)))
       (is (= [:effects/sync-asset-selector-active-ctx-subscriptions]
              (nth effects 1)))))
