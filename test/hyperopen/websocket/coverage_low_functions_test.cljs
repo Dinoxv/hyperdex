@@ -1,5 +1,7 @@
 (ns hyperopen.websocket.coverage-low-functions-test
-  (:require [cljs.test :refer-macros [deftest is]]
+  (:require [cljs.test :refer-macros [async deftest is]]
+            [hyperopen.api.market-metadata.facade :as market-metadata]
+            [hyperopen.api.market-metadata.perp-dexs :as perp-dexs]
             [hyperopen.platform :as platform]
             [hyperopen.schema.contracts :as contracts]
             [hyperopen.telemetry :as telemetry]))
@@ -156,3 +158,127 @@
 
     (is (= valid-state (contracts/assert-app-state! valid-state ctx)))
     (is (= signed (contracts/assert-signed-exchange-payload! signed ctx)))))
+
+(deftest ws-market-metadata-perp-dexs-normalization-coverage-test
+  (let [canonical (perp-dexs/normalize-perp-dex-payload
+                   {:dex-names ["dex-a"]
+                    :fee-config-by-name {"dex-a" {:deployer-fee-scale 0.2}}})
+        legacy (perp-dexs/normalize-perp-dex-payload
+                {:perp-dexs ["dex-b"]
+                 :perp-dex-fee-config-by-name {"dex-b" {:deployer-fee-scale 0.3}}})
+        sequential (perp-dexs/normalize-perp-dex-payload
+                    ["dex-c"
+                     {:name "dex-d" :deployerFeeScale "0.5"}
+                     {:name "dex-e" :deployer-fee-scale 0.75}
+                     {:name "dex-f" :deployerFeeScale "nan-value"}
+                     {:name ""}
+                     {:foo "bar"}
+                     42
+                     nil])]
+    (is (= {:dex-names ["dex-a"]
+            :fee-config-by-name {"dex-a" {:deployer-fee-scale 0.2}}}
+           canonical))
+    (is (= {:dex-names ["dex-b"]
+            :fee-config-by-name {"dex-b" {:deployer-fee-scale 0.3}}}
+           legacy))
+    (is (= ["dex-c" "dex-d" "dex-e" "dex-f"] (:dex-names sequential)))
+    (is (= {"dex-d" {:deployer-fee-scale 0.5}
+            "dex-e" {:deployer-fee-scale 0.75}}
+           (:fee-config-by-name sequential)))
+    (is (= {:dex-names []
+            :fee-config-by-name {}}
+           (perp-dexs/normalize-perp-dex-payload :unsupported)))
+    (is (= ["dex-a"] (perp-dexs/payload->dex-names {:dex-names ["dex-a"]})))
+    (is (= [] (perp-dexs/payload->dex-names nil)))))
+
+(deftest ws-market-metadata-facade-success-coverage-test
+  (async done
+    (let [store (atom {})
+          fetch-calls (atom [])
+          ensure-calls (atom [])
+          ensure-names-calls (atom [])
+          fetch-payload [{:name "dex-a" :deployerFeeScale "0.25"}
+                         "dex-b"
+                         nil]
+          ensure-payload {:dex-names ["dex-c"]}
+          deps-for-fetch {:store store
+                          :log-fn (fn [& _] nil)
+                          :request-perp-dexs! (fn [opts]
+                                                (swap! fetch-calls conj opts)
+                                                (js/Promise.resolve fetch-payload))
+                          :apply-perp-dexs-success (fn [state projected]
+                                                     (assoc state :fetched projected))
+                          :apply-perp-dexs-error (fn [state err]
+                                                   (assoc state :fetch-error (.-message err)))}
+          deps-for-ensure {:store store
+                           :ensure-perp-dexs-data! (fn [store* opts]
+                                                     (swap! ensure-calls conj [store* opts])
+                                                     (js/Promise.resolve ensure-payload))
+                           :apply-perp-dexs-success (fn [state projected]
+                                                      (assoc state :ensured projected))
+                           :apply-perp-dexs-error (fn [state err]
+                                                    (assoc state :ensure-error (.-message err)))}
+          deps-for-names {:ensure-perp-dexs-data! (fn [opts]
+                                                    (swap! ensure-names-calls conj opts)
+                                                    (js/Promise.resolve ["dex-d" nil {:name "dex-e"} {:name ""}]))}]
+      (-> (market-metadata/fetch-and-apply-perp-dex-metadata! deps-for-fetch {:priority :high})
+          (.then (fn [fetch-result]
+                   (is (= ["dex-a" "dex-b"] fetch-result))
+                   (is (= fetch-payload (:fetched @store)))
+                   (is (= [{:priority :high}] @fetch-calls))
+                   (market-metadata/ensure-and-apply-perp-dex-metadata! deps-for-ensure {:priority :low})))
+          (.then (fn [ensure-result]
+                   (is (= ["dex-c"] (vec ensure-result)))
+                   (is (= ensure-payload (:ensured @store)))
+                   (is (= [[store {:priority :low}]] @ensure-calls))
+                   (market-metadata/ensure-perp-dex-names! deps-for-names {:priority :bulk})))
+          (.then (fn [named-result]
+                   (is (= ["dex-d" "dex-e"] named-result))
+                   (is (= [{:priority :bulk}] @ensure-names-calls))
+                   (is (= ["dex-z"]
+                          (market-metadata/payload->named-dex-names
+                           [{:name "dex-z"} nil {:name ""}])))
+                   (done)))
+          (.catch (fn [err]
+                    (is false (str "Unexpected market metadata success-path error: " err))
+                    (done)))))))
+
+(deftest ws-market-metadata-facade-error-coverage-test
+  (async done
+    (let [store (atom {})
+          logs (atom [])
+          deps-for-fetch-error {:store store
+                                :log-fn (fn [& args]
+                                          (swap! logs conj args))
+                                :request-perp-dexs! (fn [_]
+                                                      (js/Promise.reject (js/Error. "fetch failed")))
+                                :apply-perp-dexs-success (fn [state payload]
+                                                           (assoc state :unexpected payload))
+                                :apply-perp-dexs-error (fn [state err]
+                                                         (assoc state :fetch-error (.-message err)))}
+          deps-for-ensure-error {:store store
+                                 :ensure-perp-dexs-data! (fn [_ _]
+                                                           (js/Promise.reject (js/Error. "ensure failed")))
+                                 :apply-perp-dexs-success (fn [state payload]
+                                                            (assoc state :unexpected payload))
+                                 :apply-perp-dexs-error (fn [state err]
+                                                          (assoc state :ensure-error (.-message err)))}]
+      (-> (market-metadata/fetch-and-apply-perp-dex-metadata! deps-for-fetch-error {:priority :low})
+          (.then (fn [_]
+                   (is false "Expected fetch-and-apply-perp-dex-metadata! to reject")
+                   (done)))
+          (.catch (fn [fetch-err]
+                    (is (re-find #"fetch failed" (str fetch-err)))
+                    (is (= "fetch failed" (:fetch-error @store)))
+                    (is (= "Error fetching perp DEX list:"
+                           (ffirst @logs)))
+                    (-> (market-metadata/ensure-and-apply-perp-dex-metadata!
+                         deps-for-ensure-error
+                         {:priority :low})
+                        (.then (fn [_]
+                                 (is false "Expected ensure-and-apply-perp-dex-metadata! to reject")
+                                 (done)))
+                        (.catch (fn [ensure-err]
+                                  (is (re-find #"ensure failed" (str ensure-err)))
+                                  (is (= "ensure failed" (:ensure-error @store)))
+                                  (done))))))))))
