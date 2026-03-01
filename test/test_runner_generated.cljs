@@ -155,6 +155,12 @@
             [hyperopen.views.l2-orderbook-view-test]
             [hyperopen.views.portfolio-view-test]
             [hyperopen.views.portfolio.vm-test]
+            [hyperopen.views.portfolio.vm.benchmarks-test]
+            [hyperopen.views.portfolio.vm.chart-math-test]
+            [hyperopen.views.portfolio.vm.history-test]
+            [hyperopen.views.portfolio.vm.metrics-bridge-test]
+            [hyperopen.views.portfolio.vm.summary-test]
+            [hyperopen.views.portfolio.vm.volume-test]
             [hyperopen.views.trade.order-form-commands-test]
             [hyperopen.views.trade.order-form-component-primitives-test]
             [hyperopen.views.trade.order-form-component-sections-test]
@@ -389,6 +395,12 @@
              'hyperopen.views.l2-orderbook-view-test
              'hyperopen.views.portfolio-view-test
              'hyperopen.views.portfolio.vm-test
+             'hyperopen.views.portfolio.vm.benchmarks-test
+             'hyperopen.views.portfolio.vm.chart-math-test
+             'hyperopen.views.portfolio.vm.history-test
+             'hyperopen.views.portfolio.vm.metrics-bridge-test
+             'hyperopen.views.portfolio.vm.summary-test
+             'hyperopen.views.portfolio.vm.volume-test
              'hyperopen.views.trade.order-form-commands-test
              'hyperopen.views.trade.order-form-component-primitives-test
              'hyperopen.views.trade.order-form-component-sections-test
