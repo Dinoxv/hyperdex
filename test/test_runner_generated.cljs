@@ -243,6 +243,7 @@
             [hyperopen.websocket.market-projection-runtime-test]
             [hyperopen.websocket.orderbook-policy-test]
             [hyperopen.websocket.orderbook-test]
+            [hyperopen.websocket.runtime-state-coverage-test]
             [hyperopen.websocket.subscriptions-runtime-test]
             [hyperopen.websocket.trades-policy-test]
             [hyperopen.websocket.trades-test]
@@ -493,6 +494,7 @@
              'hyperopen.websocket.market-projection-runtime-test
              'hyperopen.websocket.orderbook-policy-test
              'hyperopen.websocket.orderbook-test
+             'hyperopen.websocket.runtime-state-coverage-test
              'hyperopen.websocket.subscriptions-runtime-test
              'hyperopen.websocket.trades-policy-test
              'hyperopen.websocket.trades-test
