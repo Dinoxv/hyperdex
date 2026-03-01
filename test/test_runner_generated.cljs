@@ -76,6 +76,7 @@
             [hyperopen.domain.trading.order-values-test]
             [hyperopen.funding-comparison.actions-test]
             [hyperopen.funding-comparison.effects-test]
+            [hyperopen.funding.history-cache-test]
             [hyperopen.order.feedback-runtime-test]
             [hyperopen.orderbook.actions-test]
             [hyperopen.orderbook.price-aggregation-test]
@@ -224,6 +225,7 @@
             [hyperopen.websocket.application.runtime-engine-test]
             [hyperopen.websocket.application.runtime-reducer-test]
             [hyperopen.websocket.application.runtime-test]
+            [hyperopen.websocket.asset-selector-coverage-test]
             [hyperopen.websocket.client-test]
             [hyperopen.websocket.coverage-low-functions-test]
             [hyperopen.websocket.diagnostics-actions-test]
@@ -234,6 +236,12 @@
             [hyperopen.websocket.diagnostics-sanitize-test]
             [hyperopen.websocket.domain.model-test]
             [hyperopen.websocket.domain.policy-test]
+            [hyperopen.websocket.endpoints-coverage-test]
+            [hyperopen.websocket.formatting-coverage-test]
+            [hyperopen.websocket.gateway.account-test]
+            [hyperopen.websocket.gateway.market-test]
+            [hyperopen.websocket.gateway.orders-test]
+            [hyperopen.websocket.gateway.vaults-test]
             [hyperopen.websocket.health-projection-test]
             [hyperopen.websocket.health-runtime-test]
             [hyperopen.websocket.health-test]
@@ -241,6 +249,7 @@
             [hyperopen.websocket.infrastructure.transport-test]
             [hyperopen.websocket.interval-coverage-test]
             [hyperopen.websocket.market-projection-runtime-test]
+            [hyperopen.websocket.order-feedback-runtime-coverage-test]
             [hyperopen.websocket.orderbook-policy-test]
             [hyperopen.websocket.orderbook-test]
             [hyperopen.websocket.runtime-state-coverage-test]
@@ -327,6 +336,7 @@
              'hyperopen.domain.trading.order-values-test
              'hyperopen.funding-comparison.actions-test
              'hyperopen.funding-comparison.effects-test
+             'hyperopen.funding.history-cache-test
              'hyperopen.order.feedback-runtime-test
              'hyperopen.orderbook.actions-test
              'hyperopen.orderbook.price-aggregation-test
@@ -475,6 +485,7 @@
              'hyperopen.websocket.application.runtime-engine-test
              'hyperopen.websocket.application.runtime-reducer-test
              'hyperopen.websocket.application.runtime-test
+             'hyperopen.websocket.asset-selector-coverage-test
              'hyperopen.websocket.client-test
              'hyperopen.websocket.coverage-low-functions-test
              'hyperopen.websocket.diagnostics-actions-test
@@ -485,6 +496,12 @@
              'hyperopen.websocket.diagnostics-sanitize-test
              'hyperopen.websocket.domain.model-test
              'hyperopen.websocket.domain.policy-test
+             'hyperopen.websocket.endpoints-coverage-test
+             'hyperopen.websocket.formatting-coverage-test
+             'hyperopen.websocket.gateway.account-test
+             'hyperopen.websocket.gateway.market-test
+             'hyperopen.websocket.gateway.orders-test
+             'hyperopen.websocket.gateway.vaults-test
              'hyperopen.websocket.health-projection-test
              'hyperopen.websocket.health-runtime-test
              'hyperopen.websocket.health-test
@@ -492,6 +509,7 @@
              'hyperopen.websocket.infrastructure.transport-test
              'hyperopen.websocket.interval-coverage-test
              'hyperopen.websocket.market-projection-runtime-test
+             'hyperopen.websocket.order-feedback-runtime-coverage-test
              'hyperopen.websocket.orderbook-policy-test
              'hyperopen.websocket.orderbook-test
              'hyperopen.websocket.runtime-state-coverage-test

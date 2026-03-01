@@ -78,6 +78,8 @@
                                                 (record! :fetch-spot-meta [deps store* opts]))
                   market-gateway/request-public-webdata2! (fn [deps opts]
                                                             (record! :request-public-webdata2 [deps opts]))
+                  market-gateway/request-market-funding-history! (fn [deps coin opts]
+                                                                   (record! :request-market-funding-history [deps coin opts]))
                   market-gateway/request-predicted-fundings! (fn [deps opts]
                                                                (record! :request-predicted-fundings [deps opts]))
                   api-compat/ensure-perp-dexs! (fn [deps store* opts]
@@ -257,6 +259,13 @@
              (api/fetch-public-webdata2!)))
       (is (= {:ok :request-public-webdata2}
              (api/fetch-public-webdata2! {:priority :high})))
+      (is (= {:ok :request-market-funding-history}
+             (api/request-market-funding-history! "BTC")))
+      (is (= {:ok :request-market-funding-history}
+             (api/request-market-funding-history! "BTC"
+                                                  {:start-time-ms 1
+                                                   :end-time-ms 2
+                                                   :priority :high})))
       (is (= {:ok :request-predicted-fundings}
              (api/request-predicted-fundings!)))
       (is (= {:ok :request-predicted-fundings}
@@ -330,6 +339,7 @@
 
       (is (some #(= :request-asset-contexts (first %)) @calls))
       (is (some #(= :request-frontend-open-orders (first %)) @calls))
+      (is (some #(= :request-market-funding-history (first %)) @calls))
       (is (some #(= :request-predicted-fundings (first %)) @calls))
       (is (some #(= :build-market-state (first %)) @calls))
       (is (some #(= :fetch-perp-dex-clearinghouse-states (first %)) @calls)))))

@@ -153,6 +153,12 @@
    opts]
   (market-endpoints/request-public-webdata2! post-info! opts))
 
+(defn request-market-funding-history!
+  [{:keys [post-info!]}
+   coin
+   opts]
+  (market-endpoints/request-market-funding-history! post-info! coin opts))
+
 (defn request-predicted-fundings!
   [{:keys [post-info!]}
    opts]

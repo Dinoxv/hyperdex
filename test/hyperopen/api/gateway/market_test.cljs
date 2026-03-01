@@ -157,6 +157,9 @@
                   market-endpoints/request-public-webdata2! (fn [& args]
                                                               (swap! called conj [:webdata2 args])
                                                               {:ok :webdata2})
+                  market-endpoints/request-market-funding-history! (fn [& args]
+                                                                     (swap! called conj [:market-funding-history args])
+                                                                     {:ok :market-funding-history})
                   market-endpoints/request-predicted-fundings! (fn [& args]
                                                                  (swap! called conj [:predicted-fundings args])
                                                                  {:ok :predicted-fundings})
@@ -233,6 +236,12 @@
                                                   {:priority :low})))
       (is (= {:ok :webdata2}
              (market-gateway/request-public-webdata2! {:post-info! post-info!} {:priority :high})))
+      (is (= {:ok :market-funding-history}
+             (market-gateway/request-market-funding-history! {:post-info! post-info!}
+                                                             "BTC"
+                                                             {:start-time-ms 1
+                                                              :end-time-ms 2
+                                                              :priority :high})))
       (is (= {:ok :predicted-fundings}
              (market-gateway/request-predicted-fundings! {:post-info! post-info!} {:priority :high})))
       (is (= {:ok :webdata2}

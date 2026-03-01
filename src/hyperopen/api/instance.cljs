@@ -83,6 +83,14 @@
              (market-gateway/request-public-webdata2!
               {:post-info! post-info!}
               opts)))
+          (request-market-funding-history!
+            ([coin]
+             (request-market-funding-history! coin {}))
+            ([coin opts]
+             (market-gateway/request-market-funding-history!
+              {:post-info! post-info!}
+              coin
+              opts)))
           (request-predicted-fundings!
             ([] (request-predicted-fundings! {}))
             ([opts]
@@ -95,6 +103,7 @@
      :request-candle-snapshot! request-candle-snapshot!
      :request-spot-meta! request-spot-meta!
      :request-public-webdata2! request-public-webdata2!
+     :request-market-funding-history! request-market-funding-history!
      :request-predicted-fundings! request-predicted-fundings!}))
 
 (defn- make-instance-market-state-ops

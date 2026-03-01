@@ -353,6 +353,15 @@
     {:post-info! post-info!}
     opts)))
 
+(defn request-market-funding-history!
+  ([coin]
+   (request-market-funding-history! coin {}))
+  ([coin opts]
+   (market-gateway/request-market-funding-history!
+    {:post-info! post-info!}
+    coin
+    opts)))
+
 (defn request-predicted-fundings!
   ([]
    (request-predicted-fundings! {}))

@@ -58,6 +58,104 @@
               (merge {:priority :high}
                      opts)))
 
+(defn- finite-number?
+  [value]
+  (and (number? value)
+       (not (js/isNaN value))
+       (js/isFinite value)))
+
+(defn- parse-decimal
+  [value]
+  (cond
+    (number? value)
+    (when (finite-number? value)
+      value)
+
+    (string? value)
+    (let [parsed (js/parseFloat value)]
+      (when (finite-number? parsed)
+        parsed))
+
+    :else
+    nil))
+
+(defn- parse-ms
+  [value]
+  (when-let [parsed (parse-decimal value)]
+    (js/Math.floor parsed)))
+
+(defn- normalize-market-funding-history-row
+  [row]
+  (when (map? row)
+    (let [time-ms (or (parse-ms (:time row))
+                      (parse-ms (:time-ms row)))
+          coin (when (string? (:coin row))
+                 (:coin row))
+          funding-rate (parse-decimal (or (:fundingRate row)
+                                          (:funding-rate row)))
+          premium (parse-decimal (:premium row))]
+      (when (and (number? time-ms)
+                 (seq coin)
+                 (number? funding-rate))
+        {:coin coin
+         :time-ms time-ms
+         :time time-ms
+         :funding-rate-raw funding-rate
+         :fundingRate funding-rate
+         :premium premium}))))
+
+(defn- normalize-market-funding-history-rows
+  [rows]
+  (->> rows
+       (keep normalize-market-funding-history-row)
+       (sort-by :time-ms)
+       vec))
+
+(defn- market-funding-history-seq
+  [payload]
+  (cond
+    (sequential? payload)
+    payload
+
+    (map? payload)
+    (let [data (:data payload)
+          nested (or (:fundingHistory payload)
+                     (:funding-history payload)
+                     (when (map? data)
+                       (or (:fundingHistory data)
+                           (:funding-history data)))
+                     data)]
+      (if (sequential? nested)
+        nested
+        []))
+
+    :else
+    []))
+
+(defn request-market-funding-history!
+  [post-info! coin opts]
+  (let [coin* (some-> coin str .trim)
+        start-time-ms (or (:start-time-ms opts)
+                          (:startTime opts))
+        end-time-ms (or (:end-time-ms opts)
+                        (:endTime opts))]
+    (if-not (seq coin*)
+      (js/Promise.resolve [])
+      (let [body (cond-> {"type" "fundingHistory"
+                          "coin" coin*}
+                   (number? start-time-ms) (assoc "startTime" (js/Math.floor start-time-ms))
+                   (number? end-time-ms) (assoc "endTime" (js/Math.floor end-time-ms)))
+            request-opts (merge {:priority :high
+                                 :dedupe-key [:market-funding-history coin* start-time-ms end-time-ms]}
+                                (dissoc (or opts {})
+                                        :start-time-ms
+                                        :end-time-ms
+                                        :startTime
+                                        :endTime))]
+        (-> (post-info! body request-opts)
+            (.then market-funding-history-seq)
+            (.then normalize-market-funding-history-rows))))))
+
 (defn request-predicted-fundings!
   [post-info! opts]
   (post-info! {"type" "predictedFundings"}

@@ -145,6 +145,44 @@
               :dedupe-key :predicted-fundings}
              opts)))))
 
+(deftest request-market-funding-history-builds-request-and-normalizes-rows-test
+  (async done
+    (let [calls (atom [])
+          post-info! (api-stubs/post-info-stub
+                      calls
+                      {:data {:fundingHistory [{:coin "BTC"
+                                                :fundingRate "-0.0001"
+                                                :premium "-0.0003"
+                                                :time "1700000000000"}
+                                               {:coin "BTC"
+                                                :fundingRate "bad"
+                                                :premium "0.01"
+                                                :time 1700003600000}]}})]
+      (-> (market/request-market-funding-history! post-info!
+                                                  "BTC"
+                                                  {:start-time-ms 1699990000000
+                                                   :end-time-ms 1700003600000
+                                                   :priority :low})
+          (.then (fn [rows]
+                   (is (= [{:coin "BTC"
+                            :time-ms 1700000000000
+                            :time 1700000000000
+                            :funding-rate-raw -0.0001
+                            :fundingRate -0.0001
+                            :premium -0.0003}]
+                          rows))
+                   (let [[body opts] (first @calls)]
+                     (is (= {"type" "fundingHistory"
+                             "coin" "BTC"
+                             "startTime" 1699990000000
+                             "endTime" 1700003600000}
+                            body))
+                     (is (= :low (:priority opts)))
+                     (is (= [:market-funding-history "BTC" 1699990000000 1700003600000]
+                            (:dedupe-key opts))))
+                   (done)))
+          (.catch (async-support/unexpected-error done))))))
+
 (deftest build-market-state-bootstrap-uses-default-dex-and-skips-active-market-resolution-test
   (let [perp-calls (atom [])
         now-ms-fn (fn [] 4242)]
