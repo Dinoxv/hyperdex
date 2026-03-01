@@ -103,6 +103,36 @@
       "SELL" "Short"
       token)))
 
+(defn- normalize-side-key
+  [side]
+  (case (some-> side str str/trim str/lower-case)
+    ("long" "buy" "b") :long
+    ("short" "sell" "a" "s") :short
+    nil))
+
+(defn- direction-key-from-size
+  [value]
+  (when-let [n (optional-number value)]
+    (if (neg? n) :short :long)))
+
+(defn- normalize-status-key
+  [status]
+  (let [token (some-> status
+                      non-blank-text
+                      str/upper-case
+                      (str/replace #"[^A-Z0-9]+" ""))]
+    (case token
+      ("FILLED" "TRIGGERED" "EXECUTED" "COMPLETED" "SUCCESS")
+      :positive
+
+      ("CANCELED" "CANCELLED" "REJECTED" "FAILED" "ERROR")
+      :negative
+
+      ("OPEN" "PENDING" "RESTING" "NEW" "PARTIALLYFILLED" "PARTIAL")
+      :neutral
+
+      nil)))
+
 (defn- normalize-position-entry
   [row]
   (cond
@@ -127,20 +157,23 @@
     (->> (if (sequential? rows) rows [])
          (keep (fn [row]
                  (when-let [pos (normalize-position-entry row)]
-                   {:coin (non-blank-text (:coin pos))
-                    :size (optional-number (:szi pos))
-                    :leverage (optional-number (get-in pos [:leverage :value]))
-                    :position-value (optional-number (:positionValue pos))
-                    :entry-price (optional-number (:entryPx pos))
-                    :mark-price (or (optional-number (:markPx pos))
-                                    (optional-number (:markPrice pos))
-                                    (optional-number (:entryPx pos)))
-                    :pnl (optional-number (:unrealizedPnl pos))
-                    :roe (normalize-percent-value (:returnOnEquity pos))
-                    :liq-price (optional-number (:liquidationPx pos))
-                    :margin (optional-number (:marginUsed pos))
-                    :funding (or (optional-number (get-in pos [:cumFunding :sinceOpen]))
-                                 (optional-number (get-in pos [:cumFunding :allTime])))})))
+                   (let [size (optional-number (:szi pos))]
+                     {:coin (non-blank-text (:coin pos))
+                      :size size
+                      :side-key (or (normalize-side-key (:side pos))
+                                    (direction-key-from-size size))
+                      :leverage (optional-number (get-in pos [:leverage :value]))
+                      :position-value (optional-number (:positionValue pos))
+                      :entry-price (optional-number (:entryPx pos))
+                      :mark-price (or (optional-number (:markPx pos))
+                                      (optional-number (:markPrice pos))
+                                      (optional-number (:entryPx pos)))
+                      :pnl (optional-number (:unrealizedPnl pos))
+                      :roe (normalize-percent-value (:returnOnEquity pos))
+                      :liq-price (optional-number (:liquidationPx pos))
+                      :margin (optional-number (:marginUsed pos))
+                      :funding (or (optional-number (get-in pos [:cumFunding :sinceOpen]))
+                                   (optional-number (get-in pos [:cumFunding :allTime])))}))))
          (sort-by (fn [{:keys [position-value]}]
                     (js/Math.abs (or position-value 0)))
                   >)
@@ -163,6 +196,7 @@
                     (optional-number (:time row)))
        :coin (non-blank-text (:coin root*))
        :side (normalize-side (:side root*))
+       :side-key (normalize-side-key (:side root*))
        :size (or (optional-number (:sz root*))
                  (optional-number (:origSz root*)))
        :price (or (optional-number (:limitPx root*))
@@ -298,6 +332,8 @@
                                  (:asset row)))
        :side (normalize-side (or (:side row)
                                  (:dir row)))
+       :side-key (normalize-side-key (or (:side row)
+                                         (:dir row)))
        :size size
        :price price
        :trade-value (when (and (number? size)
@@ -323,7 +359,11 @@
   (when (map? row)
     (let [delta (if (map? (:delta row))
                   (:delta row)
-                  row)]
+                  row)
+          position-size (optional-number (or (:positionSize row)
+                                             (:position-size-raw row)
+                                             (:szi row)
+                                             (:szi delta)))]
       {:time-ms (or (optional-int (:time-ms row))
                     (optional-int (:time row))
                     (optional-int (:timestamp row)))
@@ -332,10 +372,11 @@
        :funding-rate (optional-number (or (:fundingRate row)
                                           (:funding-rate row)
                                           (:fundingRate delta)))
-       :position-size (optional-number (or (:positionSize row)
-                                           (:position-size-raw row)
-                                           (:szi row)
-                                           (:szi delta)))
+       :position-size position-size
+       :side-key (or (normalize-side-key (or (:side row)
+                                             (:dir row)
+                                             (:side delta)))
+                     (direction-key-from-size position-size))
        :payment (optional-number (or (:payment row)
                                      (:payment-usdc-raw row)
                                      (:usdc row)
@@ -356,12 +397,15 @@
   (when (map? row)
     (let [order (if (map? (:order row))
                   (:order row)
-                  row)]
+                  row)
+          side (normalize-side (:side order))
+          status (non-blank-text (:status row))]
       {:time-ms (or (optional-int (:statusTimestamp row))
                     (optional-int (:timestamp order))
                     (optional-int (:time row)))
        :coin (non-blank-text (:coin order))
-       :side (normalize-side (:side order))
+       :side side
+       :side-key (normalize-side-key side)
        :type (non-blank-text (or (:orderType order)
                                  (:type order)
                                  (:tif order)))
@@ -369,7 +413,8 @@
                  (optional-number (:sz order)))
        :price (or (optional-number (:limitPx order))
                   (optional-number (:px order)))
-       :status (non-blank-text (:status row))})))
+       :status status
+       :status-key (normalize-status-key status)})))
 
 (defn order-history
   [rows]
@@ -394,14 +439,24 @@
     (let [delta (if (map? (:delta row))
                   (:delta row)
                   row)
-          type-label (ledger-type-label (:type delta))]
+          type-label (ledger-type-label (:type delta))
+          type-key (case type-label
+                     "Deposit" :deposit
+                     "Withdraw" :withdraw
+                     nil)
+          amount (optional-number (or (:usdc delta)
+                                      (:amount delta)
+                                      (:value delta)))]
       (when type-label
         {:time-ms (or (optional-int (:time row))
                       (optional-int (:timestamp row)))
+         :type-key type-key
          :type-label type-label
-         :amount (optional-number (or (:usdc delta)
-                                      (:amount delta)
-                                      (:value delta)))
+         :amount amount
+         :signed-amount (when (number? amount)
+                          (if (= :withdraw type-key)
+                            (- (js/Math.abs amount))
+                            (js/Math.abs amount)))
          :hash (non-blank-text (:hash row))
          :vault (normalize-address (:vault delta))}))))
 

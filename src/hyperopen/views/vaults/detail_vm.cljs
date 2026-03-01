@@ -280,6 +280,11 @@
                                          (map (fn [{:keys [value]}]
                                                 [value (activity-model/sort-state state value)]))
                                          activity-tabs*)
+        activity-table-config (into {}
+                                    (map (fn [{:keys [value]}]
+                                           [value {:columns (get activity-columns-by-tab value [])
+                                                   :supports-direction-filter? (activity-model/supports-direction-filter? value)}]))
+                                    activity-tabs*)
         positions-raw (webdata-adapter/positions webdata)
         open-orders-raw (webdata-adapter/open-orders webdata)
         balances-raw (webdata-adapter/balances webdata)
@@ -389,6 +394,7 @@
      :activity-direction-filter activity-direction-filter
      :activity-filter-open? activity-filter-open?
      :activity-filter-options activity-model/activity-filter-options
+     :activity-table-config activity-table-config
      :activity-columns-by-tab activity-columns-by-tab
      :activity-sort-state-by-tab activity-sort-state-by-tab
      :selected-activity-sort-state (get activity-sort-state-by-tab activity-tab)
