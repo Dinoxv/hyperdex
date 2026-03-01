@@ -1,11 +1,16 @@
 (ns hyperopen.core-bootstrap.order-entry-actions-test
   (:require [cljs.test :refer-macros [deftest is]]
             [hyperopen.core.compat :as core]
+            [hyperopen.order.actions :as order-actions]
             [hyperopen.state.trading :as trading]
             [hyperopen.core-bootstrap.test-support.effect-extractors :as effect-extractors]))
 
 (def extract-saved-order-form effect-extractors/extract-saved-order-form)
 (def extract-saved-order-form-ui effect-extractors/extract-saved-order-form-ui)
+
+(defn- extract-save-many-path-values
+  [effects]
+  (into {} (second (first effects))))
 
 (deftest select-order-entry-mode-market-emits-single-batched-projection-test
   (let [state {:order-form (assoc (trading/default-order-form)
@@ -89,6 +94,148 @@
     (is (= [[:effects/save-many [[[:order-form-ui :pro-order-type-dropdown-open?] false]]]]
            escape-effects))
     (is (= [] enter-effects))))
+
+(deftest margin-mode-and-leverage-popover-actions-emit-projections-test
+  (let [base-state {:active-market {:coin "BTC" :market-type :perp :maxLeverage 40}
+                    :order-form (assoc (trading/default-order-form)
+                                       :type :limit)
+                    :order-form-ui (assoc (trading/default-order-form-ui)
+                                          :margin-mode-dropdown-open? false
+                                          :leverage-popover-open? false
+                                          :leverage-draft 25)}
+        toggled-margin (extract-save-many-path-values
+                        (order-actions/toggle-margin-mode-dropdown base-state))
+        closed-margin (extract-save-many-path-values
+                       (order-actions/close-margin-mode-dropdown
+                        (assoc-in base-state [:order-form-ui :margin-mode-dropdown-open?] true)))
+        escape-margin (extract-save-many-path-values
+                       (order-actions/handle-margin-mode-dropdown-keydown
+                        (assoc-in base-state [:order-form-ui :margin-mode-dropdown-open?] true)
+                        "Escape"))
+        open-leverage-state (assoc base-state
+                                   :order-form-ui
+                                   (assoc (:order-form-ui base-state)
+                                          :margin-mode-dropdown-open? true
+                                          :leverage-popover-open? false
+                                          :leverage-draft 27))
+        toggled-leverage (extract-save-many-path-values
+                          (order-actions/toggle-leverage-popover open-leverage-state))
+        closed-leverage (extract-save-many-path-values
+                         (order-actions/close-leverage-popover
+                          (assoc-in open-leverage-state [:order-form-ui :leverage-popover-open?] true)))
+        escape-leverage (extract-save-many-path-values
+                         (order-actions/handle-leverage-popover-keydown
+                          (assoc-in open-leverage-state [:order-form-ui :leverage-popover-open?] true)
+                          "Escape"))
+        set-draft (extract-save-many-path-values
+                   (order-actions/set-order-ui-leverage-draft base-state 33))
+        confirmed-ui (extract-saved-order-form-ui
+                      (order-actions/confirm-order-ui-leverage
+                       (assoc base-state
+                              :order-form-ui
+                              (assoc (:order-form-ui base-state)
+                                     :leverage-popover-open? true
+                                     :leverage-draft 33))))]
+    (is (= true (get toggled-margin [:order-form-ui :margin-mode-dropdown-open?])))
+    (is (= false (get toggled-margin [:order-form-ui :leverage-popover-open?])))
+    (is (= 20 (get toggled-margin [:order-form-ui :leverage-draft])))
+    (is (= false (get closed-margin [:order-form-ui :margin-mode-dropdown-open?])))
+    (is (= false (get escape-margin [:order-form-ui :margin-mode-dropdown-open?])))
+    (is (= [] (order-actions/handle-margin-mode-dropdown-keydown base-state "Enter")))
+    (is (= false (get toggled-leverage [:order-form-ui :margin-mode-dropdown-open?])))
+    (is (= true (get toggled-leverage [:order-form-ui :leverage-popover-open?])))
+    (is (= 27 (get toggled-leverage [:order-form-ui :leverage-draft])))
+    (is (= false (get closed-leverage [:order-form-ui :leverage-popover-open?])))
+    (is (= 20 (get closed-leverage [:order-form-ui :leverage-draft])))
+    (is (= false (get escape-leverage [:order-form-ui :leverage-popover-open?])))
+    (is (= [] (order-actions/handle-leverage-popover-keydown base-state "Enter")))
+    (is (= true (get set-draft [:order-form-ui :leverage-popover-open?])))
+    (is (= 33 (get set-draft [:order-form-ui :leverage-draft])))
+    (is (= false (:leverage-popover-open? confirmed-ui)))
+    (is (= 33 (:leverage-draft confirmed-ui)))
+    (is (= 33 (:ui-leverage confirmed-ui)))))
+
+(deftest size-tpsl-and-tif-dropdown-actions-handle-open-close-and-escape-test
+  (let [base-state {:order-form (assoc (trading/default-order-form)
+                                       :type :limit)
+                    :order-form-ui (assoc (trading/default-order-form-ui)
+                                          :size-unit-dropdown-open? false
+                                          :tpsl-panel-open? true
+                                          :tpsl-unit-dropdown-open? false
+                                          :tif-dropdown-open? false)}
+        toggled-size (extract-save-many-path-values
+                      (order-actions/toggle-size-unit-dropdown base-state))
+        closed-size (extract-save-many-path-values
+                     (order-actions/close-size-unit-dropdown
+                      (assoc-in base-state [:order-form-ui :size-unit-dropdown-open?] true)))
+        escape-size (extract-save-many-path-values
+                     (order-actions/handle-size-unit-dropdown-keydown
+                      (assoc-in base-state [:order-form-ui :size-unit-dropdown-open?] true)
+                      "Escape"))
+        tpsl-closed-state (assoc-in base-state [:order-form-ui :tpsl-panel-open?] false)
+        toggled-tpsl-closed (extract-save-many-path-values
+                             (order-actions/toggle-tpsl-unit-dropdown tpsl-closed-state))
+        toggled-tpsl-open (extract-save-many-path-values
+                           (order-actions/toggle-tpsl-unit-dropdown base-state))
+        closed-tpsl (extract-save-many-path-values
+                     (order-actions/close-tpsl-unit-dropdown
+                      (assoc-in base-state [:order-form-ui :tpsl-unit-dropdown-open?] true)))
+        escape-tpsl (extract-save-many-path-values
+                     (order-actions/handle-tpsl-unit-dropdown-keydown
+                      (assoc-in base-state [:order-form-ui :tpsl-unit-dropdown-open?] true)
+                      "Escape"))
+        toggled-tif (extract-save-many-path-values
+                     (order-actions/toggle-tif-dropdown base-state))
+        closed-tif (extract-save-many-path-values
+                    (order-actions/close-tif-dropdown
+                     (assoc-in base-state [:order-form-ui :tif-dropdown-open?] true)))
+        escape-tif (extract-save-many-path-values
+                    (order-actions/handle-tif-dropdown-keydown
+                     (assoc-in base-state [:order-form-ui :tif-dropdown-open?] true)
+                     "Escape"))]
+    (is (= true (get toggled-size [:order-form-ui :size-unit-dropdown-open?])))
+    (is (= false (get closed-size [:order-form-ui :size-unit-dropdown-open?])))
+    (is (= false (get escape-size [:order-form-ui :size-unit-dropdown-open?])))
+    (is (= [] (order-actions/handle-size-unit-dropdown-keydown base-state "Enter")))
+    (is (= false (get toggled-tpsl-closed [:order-form-ui :tpsl-unit-dropdown-open?])))
+    (is (= true (get toggled-tpsl-open [:order-form-ui :tpsl-unit-dropdown-open?])))
+    (is (= false (get closed-tpsl [:order-form-ui :tpsl-unit-dropdown-open?])))
+    (is (= false (get escape-tpsl [:order-form-ui :tpsl-unit-dropdown-open?])))
+    (is (= [] (order-actions/handle-tpsl-unit-dropdown-keydown base-state "Enter")))
+    (is (= true (get toggled-tif [:order-form-ui :tif-dropdown-open?])))
+    (is (= false (get closed-tif [:order-form-ui :tif-dropdown-open?])))
+    (is (= false (get escape-tif [:order-form-ui :tif-dropdown-open?])))
+    (is (= [] (order-actions/handle-tif-dropdown-keydown base-state "Enter")))))
+
+(deftest order-ui-setters-and-update-order-form-emit-single-batch-save-many-test
+  (let [state {:active-asset "BTC"
+               :active-market {:coin "BTC" :market-type :perp :maxLeverage 40 :szDecimals 4}
+               :orderbooks {"BTC" {:bids [{:px "99"}]
+                                   :asks [{:px "101"}]}}
+               :order-form (assoc (trading/default-order-form)
+                                  :type :limit
+                                  :side :buy
+                                  :price "100"
+                                  :size "1")
+               :order-form-ui (assoc (trading/default-order-form-ui)
+                                     :margin-mode :cross
+                                     :size-input-mode :base)}
+        leverage-ui (extract-saved-order-form-ui (order-actions/set-order-ui-leverage state 31))
+        margin-ui (extract-saved-order-form-ui (order-actions/set-order-margin-mode state :isolated))
+        input-mode-ui (extract-saved-order-form-ui (order-actions/set-order-size-input-mode state :quote))
+        updated-form (extract-saved-order-form (order-actions/update-order-form state [:price] "101.5"))
+        blocked-update-paths (->> (order-actions/update-order-form state [:margin-mode] :isolated)
+                                  first
+                                  second
+                                  (map first)
+                                  set)]
+    (is (= 31 (:ui-leverage leverage-ui)))
+    (is (= 31 (:leverage-draft leverage-ui)))
+    (is (= :isolated (:margin-mode margin-ui)))
+    (is (= :quote (:size-input-mode input-mode-ui)))
+    (is (= "101.5" (:price updated-form)))
+    (is (contains? blocked-update-paths [:order-form-runtime]))
+    (is (not (contains? blocked-update-paths [:order-form])))))
 
 (deftest toggle-order-tpsl-panel-noops-for-scale-test
   (let [state {:order-form (assoc (trading/default-order-form)
