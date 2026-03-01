@@ -223,20 +223,29 @@
     (is (= :detail (:kind vm)))
     (is (true? (:invalid-address? vm)))))
 
-(deftest vault-detail-vm-prefers-apr-for-past-month-return-and-normalizes-depositor-count-test
+(deftest vault-detail-vm-uses-month-snapshot-for-past-month-return-and-normalizes-depositor-count-test
   (let [state (-> sample-state
                   (assoc-in [:vaults :details-by-address "0x1234567890abcdef1234567890abcdef12345678" :apr] 0.21)
                   (assoc-in [:vaults :details-by-address "0x1234567890abcdef1234567890abcdef12345678" :followers] [])
                   (assoc-in [:vaults :details-by-address "0x1234567890abcdef1234567890abcdef12345678" :followers-count] 137)
-                  (assoc-in [:vaults :merged-index-rows 0 :snapshot-by-key :month] [0.0 19098892.322411]))
+                  (assoc-in [:vaults :merged-index-rows 0 :snapshot-by-key :month] [0.0 0.19]))
         vm (detail-vm/vault-detail-vm state)]
-    (is (= 21 (get-in vm [:metrics :past-month-return])))
+    (is (= 19 (get-in vm [:metrics :past-month-return])))
+    (is (= 21 (get-in vm [:metrics :apr])))
     (is (= 137 (:followers vm)))
     (is (= 137
            (some->> (:activity-tabs vm)
                     (filter #(= :depositors (:value %)))
                     first
                     :count)))))
+
+(deftest vault-detail-vm-does-not-fallback-to-apr-when-month-snapshot-is-missing-test
+  (let [state (-> sample-state
+                  (assoc-in [:vaults :details-by-address "0x1234567890abcdef1234567890abcdef12345678" :apr] 0.21)
+                  (assoc-in [:vaults :merged-index-rows 0 :snapshot-by-key] {:all-time [0.5]}))
+        vm (detail-vm/vault-detail-vm state)]
+    (is (nil? (get-in vm [:metrics :past-month-return])))
+    (is (= 21 (get-in vm [:metrics :apr])))))
 
 (deftest vault-detail-vm-selects-account-value-series-when-user-selects-it-test
   (let [state (assoc-in sample-state [:vaults-ui :detail-chart-series] :account-value)
@@ -409,6 +418,22 @@
     (is (= 1 (count (:activity-twaps vm))))
     (is (= 1 (count (:activity-deposits-withdrawals vm))))
     (is (= 3 (get-in vm [:activity-summary :fill-count])))))
+
+(deftest vault-detail-vm-accepts-injected-now-ms-for-deterministic-twap-runtime-test
+  (let [state (assoc-in sample-state
+                        [:vaults :webdata-by-vault "0x1234567890abcdef1234567890abcdef12345678" :twapStates]
+                        [{:coin "BTC"
+                          :sz "1.0"
+                          :executedSz "0.2"
+                          :avgPx "101"
+                          :creationTime 12
+                          :startTime 1000
+                          :durationMs 10800000}])
+        vm (detail-vm/vault-detail-vm state {:now-ms 3661000})
+        twap (first (:activity-twaps vm))]
+    (is (= 3660000 (:running-ms twap)))
+    (is (= 10800000 (:total-ms twap)))
+    (is (= "1h 1m / 3h 0m" (:running-label twap)))))
 
 (deftest vault-detail-vm-applies-direction-filter-to-supported-activity-tabs-test
   (let [state (assoc-in sample-state [:vaults-ui :detail-activity-direction-filter] :short)

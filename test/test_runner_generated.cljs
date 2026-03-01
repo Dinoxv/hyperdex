@@ -118,6 +118,12 @@
             [hyperopen.utils.hl-signing-test]
             [hyperopen.utils.interval-test]
             [hyperopen.vaults.actions-test]
+            [hyperopen.vaults.adapters.webdata-test]
+            [hyperopen.vaults.detail.activity-test]
+            [hyperopen.vaults.detail.benchmarks-test]
+            [hyperopen.vaults.detail.performance-test]
+            [hyperopen.vaults.detail.transfer-test]
+            [hyperopen.vaults.detail.types-test]
             [hyperopen.vaults.effects-test]
             [hyperopen.views.account-equity-view-test]
             [hyperopen.views.account-info-view-test]
@@ -181,6 +187,7 @@
             [hyperopen.views.vault-detail-view-test]
             [hyperopen.views.vaults-view-test]
             [hyperopen.views.vaults.detail-vm-test]
+            [hyperopen.views.vaults.detail.chart-test]
             [hyperopen.views.vaults.vm-test]
             [hyperopen.wallet.actions-test]
             [hyperopen.wallet.address-watcher-test]
@@ -339,6 +346,12 @@
              'hyperopen.utils.hl-signing-test
              'hyperopen.utils.interval-test
              'hyperopen.vaults.actions-test
+             'hyperopen.vaults.adapters.webdata-test
+             'hyperopen.vaults.detail.activity-test
+             'hyperopen.vaults.detail.benchmarks-test
+             'hyperopen.vaults.detail.performance-test
+             'hyperopen.vaults.detail.transfer-test
+             'hyperopen.vaults.detail.types-test
              'hyperopen.vaults.effects-test
              'hyperopen.views.account-equity-view-test
              'hyperopen.views.account-info-view-test
@@ -402,6 +415,7 @@
              'hyperopen.views.vault-detail-view-test
              'hyperopen.views.vaults-view-test
              'hyperopen.views.vaults.detail-vm-test
+             'hyperopen.views.vaults.detail.chart-test
              'hyperopen.views.vaults.vm-test
              'hyperopen.wallet.actions-test
              'hyperopen.wallet.address-watcher-test
