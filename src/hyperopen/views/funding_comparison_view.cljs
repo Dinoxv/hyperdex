@@ -24,6 +24,14 @@
     :positive ["text-[#36e1d3]"]
     ["text-trading-text-secondary"]))
 
+(defn- arb-tone-class
+  [raw-diff]
+  (cond
+    (not (number? raw-diff)) ["text-trading-text-secondary"]
+    (pos? raw-diff) ["text-[#36e1d3]"]
+    (neg? raw-diff) ["text-[#ff6b8a]"]
+    :else ["text-trading-text-secondary"]))
+
 (defn- sort-header
   [label column sort-state]
   (let [active? (= column (:column sort-state))
@@ -58,9 +66,9 @@
     [:span {:class ["text-sm" "leading-none" "text-base-300"]} "☆"]))
 
 (defn- arb-cell
-  [{:keys [value direction]}]
+  [{:keys [value direction raw-diff]}]
   (if (number? value)
-    [:span {:class ["num" "text-trading-text"]
+    [:span {:class (into ["num"] (arb-tone-class raw-diff))
             :title (or direction "")}
      (str (.toFixed (* value 100) 4) "%")]
     [:span {:class ["text-trading-text-secondary"]} "--"]))
@@ -132,14 +140,14 @@
      [:span {:class (into ["num"] (tone-class (:tone bybit)))}
       (format-rate (:rate bybit))]]
     [:div [:span {:class ["text-trading-text-secondary"]} "Bin-HL Arb "]
-     [:span {:class ["num" "text-trading-text"]
+     [:span {:class (into ["num"] (arb-tone-class (:raw-diff binance-hl-arb)))
              :title (or (:direction binance-hl-arb) "")}
       (if-let [value (:value binance-hl-arb)]
         (str (.toFixed (* value 100) 4) "%")
         "--")]]
     [:div {:class ["col-span-2"]}
      [:span {:class ["text-trading-text-secondary"]} "Bybit-HL Arb "]
-     [:span {:class ["num" "text-trading-text"]
+     [:span {:class (into ["num"] (arb-tone-class (:raw-diff bybit-hl-arb)))
              :title (or (:direction bybit-hl-arb) "")}
       (if-let [value (:value bybit-hl-arb)]
         (str (.toFixed (* value 100) 4) "%")

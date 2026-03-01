@@ -55,8 +55,12 @@
                                        :sort {:column :coin
                                               :direction :asc}}
                :funding-comparison {:predicted-fundings
-                                    [["AAA" [["HlPerp" {:fundingRate "0.00001"}]]]
-                                     ["ZZZ" [["HlPerp" {:fundingRate "0.00001"}]]]]}
+                                    [["AAA" [["HlPerp" {:fundingRate "0.00001"}]
+                                             ["BinPerp" {:fundingRate "0.00008"
+                                                         :fundingIntervalHours 8}]]]
+                                     ["ZZZ" [["HlPerp" {:fundingRate "0.00001"}]
+                                             ["BinPerp" {:fundingRate "0.00008"
+                                                         :fundingIntervalHours 8}]]]]}
                :asset-selector {:favorites #{"perp:ZZZ"}
                                 :market-by-key {"perp:AAA" {:coin "AAA" :openInterest 1}
                                                 "perp:ZZZ" {:coin "ZZZ" :openInterest 1}}}}
@@ -71,10 +75,14 @@
                :funding-comparison {:predicted-fundings
                                     [["ETH"
                                       [["HlPerp" {:fundingRate "0.0000125"
-                                                   :fundingIntervalHours 1}]]]
+                                                   :fundingIntervalHours 1}]
+                                       ["BinPerp" {:fundingRate "0.0001"
+                                                    :fundingIntervalHours 8}]]]
                                      ["BTC"
                                       [["HlPerp" {:fundingRate "0.0000125"
-                                                   :fundingIntervalHours 1}]]]]}
+                                                   :fundingIntervalHours 1}]
+                                       ["BinPerp" {:fundingRate "0.0001"
+                                                    :fundingIntervalHours 8}]]]]}
                :asset-selector {:favorites #{}
                                 :market-by-key {"perp:ETH" {:coin "ETH" :openInterest 10}
                                                 "perp:BTC" {:coin "BTC" :openInterest 20}}}}
@@ -84,3 +92,37 @@
     ;; Day multiplier is 24 for hourly-normalized rates.
     (is (= (* 24 0.0000125)
            (get-in (first rows) [:hyperliquid :rate])))))
+
+(deftest funding-comparison-vm-filters-rows-when-both-cex-rates-missing-test
+  (let [state {:funding-comparison-ui {:query ""
+                                       :timeframe :8hour
+                                       :sort {:column :coin
+                                              :direction :asc}}
+               :funding-comparison {:predicted-fundings
+                                    [["NOPE" [["HlPerp" {:fundingRate "0.00001"}]]]
+                                     ["YES" [["HlPerp" {:fundingRate "0.00001"}]
+                                             ["BybitPerp" {:fundingRate "0.00008"
+                                                           :fundingIntervalHours 8}]]]]}
+               :asset-selector {:favorites #{}
+                                :market-by-key {"perp:NOPE" {:coin "NOPE" :openInterest 1}
+                                                "perp:YES" {:coin "YES" :openInterest 1}}}}
+        rows (:rows (vm/funding-comparison-vm state))]
+    (is (= ["YES"] (mapv :coin rows)))))
+
+(deftest funding-comparison-vm-sorts-arb-by-signed-diff-not-absolute-test
+  (let [state {:funding-comparison-ui {:query ""
+                                       :timeframe :8hour
+                                       :sort {:column :binance-hl-arb
+                                              :direction :desc}}
+               :funding-comparison {:predicted-fundings
+                                    [["POS" [["HlPerp" {:fundingRate "0.0001" :fundingIntervalHours 1}]
+                                             ["BinPerp" {:fundingRate "0.0012" :fundingIntervalHours 8}]]]
+                                     ["NEG" [["HlPerp" {:fundingRate "0.0001" :fundingIntervalHours 1}]
+                                             ["BinPerp" {:fundingRate "0.00008" :fundingIntervalHours 8}]]]]}
+               :asset-selector {:favorites #{}
+                                :market-by-key {"perp:POS" {:coin "POS" :openInterest 1}
+                                                "perp:NEG" {:coin "NEG" :openInterest 1}}}}
+        rows (:rows (vm/funding-comparison-vm state))]
+    (is (= ["POS" "NEG"] (mapv :coin rows)))
+    (is (< 0 (get-in (first rows) [:binance-hl-arb :raw-diff])))
+    (is (> 0 (get-in (second rows) [:binance-hl-arb :raw-diff])))))

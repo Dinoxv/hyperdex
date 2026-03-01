@@ -90,6 +90,11 @@
                            venues)
                    {})}))))
 
+(defn- has-cex-funding-rate?
+  [{:keys [venues]}]
+  (or (number? (optional-number (:fundingRate (get venues "BinPerp"))))
+      (number? (optional-number (:fundingRate (get venues "BybitPerp"))))))
+
 (defn- venue-fallback-interval-hours
   [venue coin-token]
   (case venue
@@ -202,9 +207,9 @@
     :open-interest (optional-number (:open-interest row))
     :hyperliquid (optional-number (get-in row [:hyperliquid :rate]))
     :binance (optional-number (get-in row [:binance :rate]))
-    :binance-hl-arb (optional-number (get-in row [:binance-hl-arb :value]))
+    :binance-hl-arb (optional-number (get-in row [:binance-hl-arb :raw-diff]))
     :bybit (optional-number (get-in row [:bybit :rate]))
-    :bybit-hl-arb (optional-number (get-in row [:bybit-hl-arb :value]))
+    :bybit-hl-arb (optional-number (get-in row [:bybit-hl-arb :raw-diff]))
     nil))
 
 (defn- compare-rows
@@ -245,6 +250,7 @@
         market-by-key (or (get-in state [:asset-selector :market-by-key]) {})
         parsed-rows (->> (or (get-in state [:funding-comparison :predicted-fundings]) [])
                          (keep parse-predicted-row)
+                         (filter has-cex-funding-rate?)
                          (map #(build-row % market-by-key favorites timeframe))
                          (filter #(matches-query? (:coin %) query))
                          vec)

@@ -79,3 +79,20 @@
         text (set (collect-strings error-node))]
     (is (some? error-node))
     (is (contains? text "Network issue"))))
+
+(deftest funding-comparison-view-colors-arb-values-by-sign-test
+  (let [state (assoc-in sample-state
+                        [:funding-comparison :predicted-fundings]
+                        [["BTC"
+                          [["HlPerp" {:fundingRate "0.00002" :fundingIntervalHours 1}]
+                           ["BinPerp" {:fundingRate "0.00024" :fundingIntervalHours 8}]
+                           ["BybitPerp" {:fundingRate "0.00008" :fundingIntervalHours 8}]]]])
+        view-node (view/funding-comparison-view state)
+        positive-arb (find-first-node view-node
+                                      #(= "Long on Hyperliquid and short on Binance"
+                                          (get-in % [1 :title])))
+        negative-arb (find-first-node view-node
+                                      #(= "Short on Hyperliquid and long on Bybit"
+                                          (get-in % [1 :title])))]
+    (is (contains? (set (get-in positive-arb [1 :class])) "text-[#36e1d3]"))
+    (is (contains? (set (get-in negative-arb [1 :class])) "text-[#ff6b8a]"))))
