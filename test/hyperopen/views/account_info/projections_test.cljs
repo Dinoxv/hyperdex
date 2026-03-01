@@ -184,6 +184,55 @@
     (is (= "MYST" (:coin row)))
     (is (nil? (:usdc-value row)))))
 
+(deftest collect-positions-enriches-missing-mark-price-from-webdata2-asset-contexts-test
+  (let [rows (projections/collect-positions
+              {:meta {:universe [{:name "GOLD"}
+                                 {:name "AAPL"}]}
+               :assetCtxs [{:markPx "5391.25"}
+                           {:markPx "261.125"}]
+               :clearinghouseState {:assetPositions [{:position {:coin "GOLD"
+                                                                 :entryPx "5382.40"}}
+                                                     {:position {:coin "AAPL"
+                                                                 :entryPx "262.24"}}]}}
+              {})
+        gold-row (some #(when (= "GOLD" (get-in % [:position :coin])) %) rows)
+        aapl-row (some #(when (= "AAPL" (get-in % [:position :coin])) %) rows)]
+    (is (= 5391.25 (get-in gold-row [:position :markPx])))
+    (is (= 261.125 (get-in aapl-row [:position :markPx])))))
+
+(deftest collect-positions-resolves-dex-namespaced-mark-context-for-base-position-coin-test
+  (let [rows (projections/collect-positions
+              {:clearinghouseState {:assetPositions []}}
+              {"xyz" {:meta {:universe [{:name "xyz:GOLD"}]}
+                      :assetCtxs [{:markPx "5390.5"}]
+                      :assetPositions [{:position {:coin "GOLD"
+                                                   :entryPx "5382.40"}}]}})
+        row (first rows)]
+    (is (= "xyz" (:dex row)))
+    (is (= 5390.5 (get-in row [:position :markPx])))))
+
+(deftest collect-positions-keeps-existing-position-mark-price-when-present-test
+  (let [rows (projections/collect-positions
+              {:meta {:universe [{:name "GOLD"}]}
+               :assetCtxs [{:markPx "5390.5"}]
+               :clearinghouseState {:assetPositions [{:position {:coin "GOLD"
+                                                                 :entryPx "5382.40"
+                                                                 :markPx "5402.9"}}]}}
+              {})
+        row (first rows)]
+    (is (= "5402.9" (get-in row [:position :markPx])))))
+
+(deftest collect-positions-copies-top-level-mark-price-into-position-shape-for-table-consumers-test
+  (let [rows (projections/collect-positions
+              {:meta {:universe [{:name "GOLD"}]}
+               :assetCtxs [{:markPx "5390.5"}]
+               :clearinghouseState {:assetPositions [{:position {:coin "GOLD"
+                                                                 :entryPx "5382.40"}
+                                                      :markPx "5401.1"}]}}
+              {})
+        row (first rows)]
+    (is (= 5401.1 (get-in row [:position :markPx])))))
+
 (deftest normalize-order-history-row-returns-status-key-and-display-label-test
   (let [row {:order {:coin "SOL"
                      :oid 1

@@ -180,6 +180,29 @@
     (is (= "0.57831" (:position-tp-trigger-px row)))
     (is (nil? (:position-sl-trigger-px row)))))
 
+(deftest account-info-vm-attaches-market-mark-price-to-positions-when-row-mark-missing-test
+  (let [state {:account-info {:selected-tab :positions}
+               :asset-selector {:market-by-key {"perp:xyz:GOLD" {:key "perp:xyz:GOLD"
+                                                                  :coin "xyz:GOLD"
+                                                                  :mark 5354.2}}}
+               :webdata2 {:clearinghouseState {:assetPositions [{:position {:coin "xyz:GOLD"
+                                                                             :szi "0.0185"
+                                                                             :entryPx "5382.40"
+                                                                             :positionValue "99.06"
+                                                                             :unrealizedPnl "-0.51"
+                                                                             :returnOnEquity "-0.103"
+                                                                             :liquidationPx "4407.8"
+                                                                             :marginUsed "19.15"
+                                                                             :cumFunding {:allTime "-0.03"}}}]}}
+               :orders (base-orders)
+               :spot {:meta nil
+                      :clearinghouse-state nil}
+               :account {:mode :classic}
+               :perp-dex-clearinghouse {}}
+        view-model (vm/account-info-vm state)
+        row (first (:positions view-model))]
+    (is (= 5354.2 (get-in row [:position :markPx])))))
+
 (deftest account-info-vm-memoizes-selected-tab-derived-rows-by-input-identity-test
   (let [state {:account-info {:selected-tab :open-orders}
                :webdata2 {}

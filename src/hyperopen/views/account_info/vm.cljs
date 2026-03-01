@@ -1,5 +1,6 @@
 (ns hyperopen.views.account-info.vm
   (:require [clojure.string :as str]
+            [hyperopen.asset-selector.markets :as markets]
             [hyperopen.views.account-info.derived-cache :as derived-cache]
             [hyperopen.views.account-info.projections :as projections]
             [hyperopen.views.websocket-freshness :as ws-freshness]))
@@ -76,6 +77,52 @@
 (defn- normalize-dex-value
   [value]
   (some-> value projections/non-blank-text str/lower-case))
+
+(defn- existing-position-mark-price
+  [position-row]
+  (or (projections/parse-optional-num (get-in position-row [:position :markPx]))
+      (projections/parse-optional-num (get-in position-row [:position :markPrice]))
+      (projections/parse-optional-num (:markPx position-row))
+      (projections/parse-optional-num (:markPrice position-row))))
+
+(defn- position-coin-candidates
+  [position-row]
+  (let [coin (projections/non-blank-text (get-in position-row [:position :coin]))
+        dex (projections/non-blank-text (:dex position-row))
+        base-coin (some-> coin projections/parse-coin-namespace :base projections/non-blank-text)]
+    (->> [coin
+          (when (and (seq dex) (seq base-coin))
+            (str dex ":" base-coin))
+          base-coin]
+         (remove nil?)
+         distinct)))
+
+(defn- resolve-position-market-mark-price
+  [market-by-key position-row]
+  (some (fn [coin]
+          (let [market (markets/resolve-market-by-coin market-by-key coin)
+                mark (projections/parse-optional-num (:mark market))]
+            (when (and (number? mark) (pos? mark))
+              mark)))
+        (position-coin-candidates position-row)))
+
+(defn- attach-position-market-mark-prices
+  [positions market-by-key]
+  (if-not (map? market-by-key)
+    (vec (or positions []))
+    (->> (or positions [])
+         (mapv (fn [position-row]
+                 (if-not (map? position-row)
+                   position-row
+                   (let [existing-mark (existing-position-mark-price position-row)
+                         resolved-mark (or existing-mark
+                                           (resolve-position-market-mark-price market-by-key position-row))
+                         nested-mark (projections/parse-optional-num (get-in position-row [:position :markPx]))]
+                     (if (and (number? resolved-mark)
+                              (map? (:position position-row))
+                              (not (number? nested-mark)))
+                       (assoc-in position-row [:position :markPx] resolved-mark)
+                       position-row))))))))
 
 (defn- order-matches-position?
   [position order]
@@ -174,6 +221,7 @@
   (case selected-tab
     :balances {:balance-rows (derived-cache/memoized-balance-rows webdata2 spot-data account market-by-key)}
     :positions (let [positions (derived-cache/memoized-positions webdata2 perp-dex-states)
+                     positions (attach-position-market-mark-prices positions market-by-key)
                      normalized-open-orders (derived-cache/memoized-open-orders open-orders
                                                                                  open-orders-snapshot
                                                                                  open-orders-snapshot-by-dex

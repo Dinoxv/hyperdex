@@ -82,7 +82,9 @@
             [hyperopen.orderbook.settings-test]
             [hyperopen.platform-test]
             [hyperopen.portfolio.actions-test]
-            [hyperopen.portfolio.metrics-test]
+            [hyperopen.portfolio.metrics.builder-test]
+            [hyperopen.portfolio.metrics.history-test]
+            [hyperopen.portfolio.metrics.quantstats-parity-test]
             [hyperopen.runtime.action-adapters-test]
             [hyperopen.runtime.api-effects-test]
             [hyperopen.runtime.app-effects-test]
@@ -314,7 +316,9 @@
              'hyperopen.orderbook.settings-test
              'hyperopen.platform-test
              'hyperopen.portfolio.actions-test
-             'hyperopen.portfolio.metrics-test
+             'hyperopen.portfolio.metrics.builder-test
+             'hyperopen.portfolio.metrics.history-test
+             'hyperopen.portfolio.metrics.quantstats-parity-test
              'hyperopen.runtime.action-adapters-test
              'hyperopen.runtime.api-effects-test
              'hyperopen.runtime.app-effects-test
