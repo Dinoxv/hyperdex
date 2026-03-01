@@ -439,16 +439,19 @@
                    :target-liquidation-price 85
                    :anchor anchor}))
       (let [[event actions] (first @dispatch-calls)
-            open-action (first (first actions))]
+            select-action (first (first actions))
+            open-action (first (second actions))]
         (is (= :chart-liquidation-drag-margin-confirm (:replicant/trigger event)))
+        (is (= :actions/select-account-info-tab select-action))
+        (is (= :positions (second (first actions))))
         (is (= :actions/open-position-margin-modal open-action))
         (is (= :chart-liquidation-drag
-               (get-in actions [0 1 :prefill-source])))
+               (get-in actions [1 1 :prefill-source])))
         (is (= :add
-               (get-in actions [0 1 :prefill-margin-mode])))
+               (get-in actions [1 1 :prefill-margin-mode])))
         (is (= 2.5
-               (get-in actions [0 1 :prefill-margin-amount])))
+               (get-in actions [1 1 :prefill-margin-amount])))
         (is (= "xyz"
-               (get-in actions [0 1 :dex])))
+               (get-in actions [1 1 :dex])))
         (is (= anchor
-               (get-in actions [0 2])))))))
+               (get-in actions [1 2])))))))

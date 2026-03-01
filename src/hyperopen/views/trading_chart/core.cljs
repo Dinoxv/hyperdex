@@ -67,7 +67,8 @@
                (map? suggestion))
       (dispatch-fn
        {:replicant/trigger :chart-liquidation-drag-margin-confirm}
-       [[:actions/open-position-margin-modal
+       [[:actions/select-account-info-tab :positions]
+        [:actions/open-position-margin-modal
          (merge position-data
                 {:prefill-source :chart-liquidation-drag
                  :prefill-margin-mode (:mode suggestion)
