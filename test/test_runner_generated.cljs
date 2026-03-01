@@ -120,6 +120,8 @@
             [hyperopen.vaults.actions-test]
             [hyperopen.vaults.adapters.webdata-test]
             [hyperopen.vaults.detail.activity-test]
+            [hyperopen.vaults.detail.benchmarks-test]
+            [hyperopen.vaults.detail.performance-test]
             [hyperopen.vaults.detail.types-test]
             [hyperopen.vaults.effects-test]
             [hyperopen.views.account-equity-view-test]
@@ -344,6 +346,8 @@
              'hyperopen.vaults.actions-test
              'hyperopen.vaults.adapters.webdata-test
              'hyperopen.vaults.detail.activity-test
+             'hyperopen.vaults.detail.benchmarks-test
+             'hyperopen.vaults.detail.performance-test
              'hyperopen.vaults.detail.types-test
              'hyperopen.vaults.effects-test
              'hyperopen.views.account-equity-view-test

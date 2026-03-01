@@ -5,6 +5,8 @@
             [hyperopen.vaults.adapters.webdata :as webdata-adapter]
             [hyperopen.vaults.actions :as vault-actions]
             [hyperopen.vaults.detail.activity :as activity-model]
+            [hyperopen.vaults.detail.benchmarks :as benchmarks-model]
+            [hyperopen.vaults.detail.performance :as performance-model]
             [hyperopen.vaults.detail.types :as detail-types]
             [hyperopen.views.account-info.sort-kernel :as sort-kernel]))
 
@@ -2068,7 +2070,7 @@
                 0)
         apr (or (optional-number (:apr details))
                 (optional-number (:apr row)))
-        month-return (snapshot-value-by-range row :month tvl)
+        month-return (performance-model/snapshot-value-by-range row :month tvl)
         your-deposit (or (optional-number (:equity user-equity))
                          (optional-number (get-in details [:follower-state :vault-equity])))
         all-time-earned (optional-number (get-in details [:follower-state :all-time-pnl]))
@@ -2121,25 +2123,25 @@
                                       (if (= vault-transfer-mode :deposit)
                                         "Deposit"
                                         "Withdraw"))
-        summary (portfolio-summary details snapshot-range)
-        returns-benchmark-selector (returns-benchmark-selector-model state)
-        series-by-key (chart-series-data state summary)
+        summary (performance-model/portfolio-summary details snapshot-range)
+        returns-benchmark-selector (benchmarks-model/returns-benchmark-selector-model state)
+        series-by-key (performance-model/chart-series-data state summary)
         selected-series (resolve-chart-series series-by-key chart-series)
         strategy-raw-points (vec (or (get series-by-key selected-series) []))
         strategy-return-points (vec (or (get series-by-key :returns) []))
         selected-benchmark-coins (vec (or (:selected-coins returns-benchmark-selector) []))
         benchmark-label-by-coin (or (:label-by-coin returns-benchmark-selector) {})
-        benchmark-points-by-coin (benchmark-cumulative-return-points-by-coin state
-                                                                          snapshot-range
-                                                                          selected-benchmark-coins
-                                                                          strategy-return-points)
+        benchmark-points-by-coin (benchmarks-model/benchmark-cumulative-return-points-by-coin state
+                                                                                               snapshot-range
+                                                                                               selected-benchmark-coins
+                                                                                               strategy-return-points)
         benchmark-series (if (= selected-series :returns)
                            (mapv (fn [idx coin]
                                    {:id (keyword (str "benchmark-" idx))
                                     :coin coin
                                     :label (or (get benchmark-label-by-coin coin)
                                                coin)
-                                    :stroke (benchmark-series-stroke idx)
+                                    :stroke (benchmarks-model/benchmark-series-stroke idx)
                                     :raw-points (vec (or (get benchmark-points-by-coin coin) []))})
                                  (range)
                                  selected-benchmark-coins)
@@ -2201,14 +2203,14 @@
                                              (count chart-points))
         hovered-point (when (number? hovered-index)
                         (nth chart-points hovered-index nil))
-        strategy-cumulative-rows (cumulative-rows strategy-return-points)
+        strategy-cumulative-rows (performance-model/cumulative-rows strategy-return-points)
         benchmark-cumulative-rows-by-coin (into {}
                                                 (map (fn [coin]
-                                                       [coin (cumulative-rows (get benchmark-points-by-coin coin))]))
+                                                       [coin (performance-model/cumulative-rows (get benchmark-points-by-coin coin))]))
                                                 selected-benchmark-coins)
-        performance-metrics (performance-metrics-model returns-benchmark-selector
-                                                       strategy-cumulative-rows
-                                                       benchmark-cumulative-rows-by-coin)
+        performance-metrics (performance-model/performance-metrics-model returns-benchmark-selector
+                                                                          strategy-cumulative-rows
+                                                                          benchmark-cumulative-rows-by-coin)
         detail-error (get-in state [:vaults :errors :details-by-address vault-address])
         webdata-error (get-in state [:vaults :errors :webdata-by-vault vault-address])
         fills-error (first-address-error state :fills-by-vault history-addresses)
@@ -2317,10 +2319,10 @@
              :label "Your Performance"}]
      :selected-tab detail-tab
      :snapshot-range snapshot-range
-     :snapshot {:day (snapshot-value-by-range row :day tvl)
-                :week (snapshot-value-by-range row :week tvl)
-                :month (snapshot-value-by-range row :month tvl)
-                :all-time (snapshot-value-by-range row :all-time tvl)}
+     :snapshot {:day (performance-model/snapshot-value-by-range row :day tvl)
+                :week (performance-model/snapshot-value-by-range row :week tvl)
+                :month (performance-model/snapshot-value-by-range row :month tvl)
+                :all-time (performance-model/snapshot-value-by-range row :all-time tvl)}
      :performance-metrics (assoc performance-metrics
                                  :timeframe-options chart-timeframe-options
                                  :selected-timeframe snapshot-range)
