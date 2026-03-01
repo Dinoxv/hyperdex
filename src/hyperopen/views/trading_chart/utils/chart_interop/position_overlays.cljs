@@ -22,6 +22,7 @@
 (def ^:private pnl-badge-left-anchor-min-px 96)
 (def ^:private pnl-badge-left-anchor-max-px 180)
 (def ^:private min-liquidation-drag-margin-amount 0.000001)
+(def ^:private liquidation-drag-hit-height-px 14)
 
 (declare begin-liquidation-drag!)
 
@@ -360,6 +361,7 @@
 (defn- build-liquidation-row!
   [chart-obj document overlay y width]
   (let [row (.createElement document "div")
+        hit-area (.createElement document "div")
         line (.createElement document "div")
         badge (.createElement document "div")
         label (.createElement document "span")
@@ -379,7 +381,8 @@
                                       (+ chart-edge-padding-px
                                          (/ estimated-badge-width 2)
                                          10)
-                                      estimated-badge-width)]
+                                      estimated-badge-width)
+        hit-half-height (/ liquidation-drag-hit-height-px 2)]
     (apply-inline-style!
      row
      {"position" "absolute"
@@ -388,6 +391,18 @@
       "top" (str y "px")
       "height" "0px"
       "pointerEvents" "none"})
+    (apply-inline-style!
+     hit-area
+     {"position" "absolute"
+      "left" "0px"
+      "right" "0px"
+      "top" (str (- 0 hit-half-height) "px")
+      "height" (str liquidation-drag-hit-height-px "px")
+      "background" "transparent"
+      "cursor" "ns-resize"
+      "pointerEvents" "auto"})
+    (.setAttribute hit-area "data-position-liq-drag-hit" "true")
+    (.setAttribute hit-area "data-position-margin-trigger" "true")
     (apply-inline-style!
      line
      {"position" "absolute"
@@ -427,6 +442,7 @@
       "display" (if (seq drag-label) "inline" "none")})
     (.setAttribute badge "title" "Drag to adjust liquidation target")
     (.setAttribute badge "data-position-liq-drag-handle" "true")
+    (.setAttribute badge "data-position-margin-trigger" "true")
     (let [drag-started? (atom false)
           on-pointer-down
           (fn [event]
@@ -435,13 +451,20 @@
               (.stopPropagation event))
             (when-not @drag-started?
               (reset! drag-started? true)
-              (begin-liquidation-drag! chart-obj overlay badge event)))]
+              (begin-liquidation-drag! chart-obj
+                                       overlay
+                                       (or (some-> event .-currentTarget) badge)
+                                       event)))]
+      (.addEventListener hit-area "pointerdown" on-pointer-down)
+      (.addEventListener hit-area "mousedown" on-pointer-down)
+      (.addEventListener hit-area "touchstart" on-pointer-down)
       (.addEventListener badge "pointerdown" on-pointer-down)
       (.addEventListener badge "mousedown" on-pointer-down)
       (.addEventListener badge "touchstart" on-pointer-down))
     (.appendChild badge label)
     (.appendChild badge price)
     (.appendChild badge drag-note)
+    (.appendChild row hit-area)
     (.appendChild row line)
     (.appendChild row badge)
     row))

@@ -38,6 +38,12 @@
                           (fn [node]
                             (= "true" (aget node "data-position-liq-drag-handle")))))
 
+(defn- find-liquidation-drag-hit
+  [root]
+  (fake-dom/find-dom-node root
+                          (fn [node]
+                            (= "true" (aget node "data-position-liq-drag-hit")))))
+
 (defn- build-chart-fixture
   [{:keys [width price-to-y time-to-x y-to-price]
     :or {width 320
@@ -260,9 +266,11 @@
       :on-liquidation-drag-confirm (fn [payload]
                                      (swap! confirm-calls* conj payload))})
     (let [overlay-root (aget (.-children container) 0)
-          drag-handle (find-liquidation-drag-handle overlay-root)]
+          drag-handle (find-liquidation-drag-handle overlay-root)
+          drag-hit (find-liquidation-drag-hit overlay-root)]
       (is (some? drag-handle))
-      (fake-dom/dispatch-dom-event-with-payload! drag-handle
+      (is (some? drag-hit))
+      (fake-dom/dispatch-dom-event-with-payload! drag-hit
                                                  "pointerdown"
                                                  #js {:clientX 64
                                                       :clientY 120})
