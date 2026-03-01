@@ -91,7 +91,8 @@
            api-fetch-vault-ledger-updates
            api-submit-vault-transfer
            api-submit-funding-transfer
-           api-submit-funding-withdraw]}]
+           api-submit-funding-withdraw
+           api-submit-funding-deposit]}]
   {:fetch-asset-selector-markets fetch-asset-selector-markets
    :sync-active-asset-funding-predictability sync-active-asset-funding-predictability
    :api-fetch-user-funding-history api-fetch-user-funding-history
@@ -110,7 +111,8 @@
    :api-fetch-vault-ledger-updates api-fetch-vault-ledger-updates
    :api-submit-vault-transfer api-submit-vault-transfer
    :api-submit-funding-transfer api-submit-funding-transfer
-   :api-submit-funding-withdraw api-submit-funding-withdraw})
+   :api-submit-funding-withdraw api-submit-funding-withdraw
+   :api-submit-funding-deposit api-submit-funding-deposit})
 
 (defn runtime-effect-handlers
   [{:keys [storage
@@ -548,7 +550,8 @@
            set-funding-transfer-direction
            set-funding-amount-to-max
            submit-funding-transfer
-           submit-funding-withdraw]}]
+           submit-funding-withdraw
+           submit-funding-deposit]}]
   {:select-order-entry-mode select-order-entry-mode
    :select-pro-order-type select-pro-order-type
    :toggle-pro-order-type-dropdown toggle-pro-order-type-dropdown
@@ -594,7 +597,8 @@
    :set-funding-transfer-direction set-funding-transfer-direction
    :set-funding-amount-to-max set-funding-amount-to-max
    :submit-funding-transfer submit-funding-transfer
-   :submit-funding-withdraw submit-funding-withdraw})
+   :submit-funding-withdraw submit-funding-withdraw
+   :submit-funding-deposit submit-funding-deposit})
 
 (defn runtime-action-handlers
   [{:keys [core

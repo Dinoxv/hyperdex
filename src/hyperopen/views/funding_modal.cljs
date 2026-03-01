@@ -41,12 +41,52 @@
      "cursor-not-allowed"]
     (base-button-classes true)))
 
+(defn- deposit-asset-button
+  [asset selected?]
+  [:button {:type "button"
+            :class (into ["w-full"
+                          "rounded-lg"
+                          "border"
+                          "px-3"
+                          "py-2.5"
+                          "text-left"
+                          "transition-colors"
+                          "duration-150"]
+                         (if selected?
+                           ["border-[#3a5b6a]" "bg-[#1a2a37]"]
+                           ["border-transparent" "bg-transparent" "hover:bg-[#10222f]"]))
+            :on {:click [[:actions/set-funding-modal-field [:deposit-selected-asset-key] (:key asset)]
+                         [:actions/set-funding-modal-field [:deposit-step] :amount-entry]
+                         [:actions/set-funding-modal-field [:amount-input] ""]]}}
+   [:div {:class ["flex" "items-center" "gap-2.5"]}
+    [:div {:class ["h-8"
+                   "w-8"
+                   "rounded-full"
+                   "bg-[#1e5a93]"
+                   "text-xs"
+                   "font-semibold"
+                   "text-white"
+                   "flex"
+                   "items-center"
+                   "justify-center"]}
+     (:symbol asset)]
+    [:div {:class ["flex" "min-w-0" "flex-col"]}
+     [:span {:class ["text-sm" "font-semibold" "text-[#e6eef2]"]} (:symbol asset)]
+     [:span {:class ["text-xs" "text-[#7e95a0]"]} (:network asset)]]]])
+
 (defn funding-modal-view
   [state]
   (let [{:keys [open?
                 mode
                 legacy-kind
                 title
+                deposit-step
+                deposit-search-input
+                deposit-assets
+                deposit-selected-asset
+                deposit-submit-label
+                deposit-quick-amounts
+                deposit-min-usdc
                 amount-input
                 to-perp?
                 destination-input
@@ -58,9 +98,18 @@
                 submit-label
                 min-withdraw-usdc]} (funding-actions/funding-modal-view-model state)
         deposit? (= mode :deposit)
+        deposit-amount-entry? (= deposit-step :amount-entry)
         transfer? (= mode :transfer)
         withdraw? (= mode :withdraw)
-        legacy? (= mode :legacy)]
+        legacy? (= mode :legacy)
+        selected-deposit-asset* (or deposit-selected-asset
+                                    {:symbol "USDC"
+                                     :network "Arbitrum"})
+        modal-title (if (and deposit?
+                             deposit-amount-entry?
+                             (string? (:symbol selected-deposit-asset*)))
+                      (str "Deposit " (:symbol selected-deposit-asset*))
+                      title)]
     (when open?
       [:div {:class ["fixed" "inset-0" "z-[80]" "flex" "items-center" "justify-center" "p-4"]}
        [:div {:class ["absolute" "inset-0" "bg-black/65"]
@@ -78,34 +127,182 @@
                       "space-y-3"]
               :role "dialog"
               :aria-modal true
-              :aria-label title
+              :aria-label modal-title
               :tab-index 0
               :data-role "funding-modal"
               :on {:keydown [[:actions/handle-funding-modal-keydown [:event/key]]]}}
         [:div {:class ["flex" "items-center" "justify-between"]}
          [:h2 {:class ["text-lg" "font-semibold" "text-[#e5eef1]"]}
-          title]
+          modal-title]
          [:button {:type "button"
-                   :class ["text-sm" "text-[#8ea4ab]" "hover:text-[#e5eef1]"]
+                   :class ["h-8"
+                           "w-8"
+                           "rounded-md"
+                           "text-xl"
+                           "leading-none"
+                           "text-[#7f98a0]"
+                           "hover:bg-[#0f2834]"
+                           "hover:text-[#dce9ee]"]
                    :on {:click [[:actions/close-funding-modal]]}}
-          "Close"]]
+          "×"]]
 
-        (when deposit?
-          [:div {:class ["space-y-3"]}
-           [:p {:class ["text-sm" "text-[#b9cbd0]"]}
-            "Deposits are credited after one Arbitrum confirmation."]
+        (when (and deposit? (not deposit-amount-entry?))
+          [:div {:class ["space-y-3"] :data-role "funding-deposit-select-step"}
+           [:p {:class ["text-sm" "leading-6" "text-[#8fa7ae]"]}
+            "Deposit funds to start trading immediately. You can withdraw at any time."]
+           [:input {:type "text"
+                    :placeholder "Search a supported asset"
+                    :value deposit-search-input
+                    :class ["w-full"
+                            "rounded-lg"
+                            "border"
+                            "border-[#1f3f4f]"
+                            "bg-[#0c202a]"
+                            "px-3"
+                            "py-2.5"
+                            "text-sm"
+                            "text-[#dce9ee]"
+                            "outline-none"
+                            "focus:border-[#30607a]"]
+                    :on {:input [[:actions/set-funding-modal-field
+                                  [:deposit-search-input]
+                                  [:event.target/value]]]}}]
+           (if (seq deposit-assets)
+             (into
+              [:div {:class ["max-h-[264px]"
+                             "overflow-y-auto"
+                             "rounded-xl"
+                             "border"
+                             "border-[#1c3948]"
+                             "bg-[#0c1e29]"
+                             "p-2"]
+                     :data-role "funding-deposit-asset-list"}]
+              (for [asset deposit-assets]
+                ^{:key (name (:key asset))}
+                (deposit-asset-button asset
+                                      (= (:key asset)
+                                         (:key selected-deposit-asset*)))))
+             [:div {:class ["rounded-xl"
+                            "border"
+                            "border-[#1c3948]"
+                            "bg-[#0c1e29]"
+                            "px-3"
+                            "py-8"
+                            "text-center"
+                            "text-sm"
+                            "text-[#7b919b]"]}
+              "No assets match your search."])])
+
+        (when (and deposit? deposit-amount-entry?)
+          [:div {:class ["space-y-3"] :data-role "funding-deposit-amount-step"}
            [:p {:class ["text-sm" "text-[#8ea4ab]"]}
-            "Open the deposit bridge page to fund your account."]
-           [:div {:class ["flex" "justify-end" "gap-2"]}
+            (str "From the " (:network selected-deposit-asset*) " network")]
+           [:div {:class ["rounded-lg"
+                          "border"
+                          "border-[#1f3f4f]"
+                          "bg-[#1a2633]"
+                          "px-3"
+                          "py-3"]}
+            [:div {:class ["flex" "items-center" "gap-2.5"]}
+             [:div {:class ["h-8"
+                            "w-8"
+                            "rounded-full"
+                            "bg-[#1e5a93]"
+                            "text-xs"
+                            "font-semibold"
+                            "text-white"
+                            "flex"
+                            "items-center"
+                            "justify-center"]}
+              (:symbol selected-deposit-asset*)]
+             [:div {:class ["flex" "flex-col"]}
+              [:span {:class ["text-sm" "font-semibold" "text-[#e6eef2]"]} (:symbol selected-deposit-asset*)]
+              [:span {:class ["text-xs" "text-[#7e95a0]"]} (:network selected-deposit-asset*)]]]]
+           [:div {:class ["space-y-1.5"]}
+            [:label {:class ["block" "text-xs" "text-[#7e94a0]"]}
+             "Amount"]
+            [:div {:class ["flex"
+                           "items-center"
+                           "rounded-lg"
+                           "border"
+                           "border-[#2a4658]"
+                           "bg-[#0f2230]"
+                           "px-2"
+                           "py-1.5"
+                           "gap-2"]}
+             [:button {:type "button"
+                       :class ["rounded-md"
+                               "border"
+                               "border-[#445565]"
+                               "bg-[#26313d]"
+                               "px-2"
+                               "py-0.5"
+                               "text-xs"
+                               "font-semibold"
+                               "text-[#e6eef2]"
+                               "hover:border-[#607487]"]
+                       :on {:click [[:actions/set-funding-modal-field [:amount-input] (str deposit-min-usdc)]]}}
+              "MAX"]
+             [:input {:type "text"
+                      :input-mode "decimal"
+                      :placeholder (str deposit-min-usdc)
+                      :disabled submitting?
+                      :value amount-input
+                      :class ["flex-1"
+                              "bg-transparent"
+                              "text-sm"
+                              "text-[#e6eef2]"
+                              "outline-none"
+                              "disabled:opacity-70"]
+                      :on {:input [[:actions/set-funding-modal-field [:amount-input] [:event.target/value]]]}}]
+             [:span {:class ["text-sm" "text-[#7e95a0]"]} (:symbol selected-deposit-asset*)]]]
+           [:div {:class ["flex" "gap-2"]}
+            (for [quick-amount deposit-quick-amounts]
+              ^{:key (str "deposit-quick-" quick-amount)}
+              [:button {:type "button"
+                        :class ["rounded-md"
+                                "border"
+                                "border-[#3a4d5d]"
+                                "bg-[#111f29]"
+                                "px-3"
+                                "py-1.5"
+                                "text-xs"
+                                "text-[#e0ebef]"
+                                "hover:border-[#537089]"
+                                "hover:bg-[#162b37]"]
+                        :on {:click [[:actions/set-funding-modal-field [:amount-input] (str quick-amount)]]}}
+               (if (>= quick-amount 1000)
+                 (str (/ quick-amount 1000) "k")
+                 (str quick-amount))])]
+           [:div {:class ["space-y-1.5" "pt-2" "text-sm"]}
+            [:div {:class ["flex" "items-center" "justify-between"]}
+             [:span {:class ["text-[#7d94a0]"]} "Minimum deposit"]
+             [:span {:class ["text-[#dce9ee]"]} (str deposit-min-usdc " " (:symbol selected-deposit-asset*))]]
+            [:div {:class ["flex" "items-center" "justify-between"]}
+             [:span {:class ["text-[#7d94a0]"]} "Estimated time"]
+             [:span {:class ["text-[#dce9ee]"]} "~10 seconds"]]
+            [:div {:class ["flex" "items-center" "justify-between"]}
+             [:span {:class ["text-[#7d94a0]"]} "Network fee"]
+             [:span {:class ["text-[#dce9ee]"]} "None"]]]
+           [:div {:class ["grid" "grid-cols-[56px_1fr]" "gap-2" "pt-1"]}
             [:button {:type "button"
-                      :class (base-button-classes false)
-                      :on {:click [[:actions/close-funding-modal]]}}
-             "Cancel"]
+                      :class ["h-[38px]"
+                              "rounded-lg"
+                              "border"
+                              "border-[#355061]"
+                              "bg-[#152633]"
+                              "text-lg"
+                              "text-[#cfe0e7]"
+                              "hover:border-[#4b6c82]"
+                              "hover:bg-[#1b3242]"]
+                      :on {:click [[:actions/set-funding-modal-field [:deposit-step] :asset-select]
+                                   [:actions/set-funding-modal-field [:amount-input] ""]]}}
+             "←"]
             [:button {:type "button"
-                      :class (base-button-classes true)
-                      :on {:click [[:actions/close-funding-modal]
-                                   [:actions/navigate "/portfolio/deposit"]]}}
-             "Open Deposit Page"]]])
+                      :disabled submit-disabled?
+                      :class (submit-button-classes submit-disabled?)
+                      :on {:click [[:actions/submit-funding-deposit]]}}
+             deposit-submit-label]]])
 
         (when transfer?
           [:div {:class ["space-y-3"]}

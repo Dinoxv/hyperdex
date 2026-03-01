@@ -54,7 +54,8 @@
    [:effects/api-fetch-vault-ledger-updates :api-fetch-vault-ledger-updates]
    [:effects/api-submit-vault-transfer :api-submit-vault-transfer]
    [:effects/api-submit-funding-transfer :api-submit-funding-transfer]
-   [:effects/api-submit-funding-withdraw :api-submit-funding-withdraw]])
+   [:effects/api-submit-funding-withdraw :api-submit-funding-withdraw]
+   [:effects/api-submit-funding-deposit :api-submit-funding-deposit]])
 
 (defn registered-effect-ids
   []
@@ -218,6 +219,7 @@
      [:actions/set-funding-amount-to-max :set-funding-amount-to-max]
      [:actions/submit-funding-transfer :submit-funding-transfer]
      [:actions/submit-funding-withdraw :submit-funding-withdraw]
+     [:actions/submit-funding-deposit :submit-funding-deposit]
      [:actions/navigate :navigate]
      [:actions/load-funding-comparison-route :load-funding-comparison-route]
      [:actions/load-funding-comparison :load-funding-comparison]

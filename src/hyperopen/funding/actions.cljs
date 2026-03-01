@@ -8,6 +8,18 @@
 (def ^:private withdraw-min-usdc
   5)
 
+(def ^:private deposit-min-usdc
+  5)
+
+(def ^:private deposit-chain-id-mainnet
+  "0xa4b1")
+
+(def ^:private deposit-chain-id-testnet
+  "0x66eee")
+
+(def ^:private deposit-quick-amounts
+  [5 1000 10000 100000])
+
 (defn- non-blank-text
   [value]
   (let [text (some-> value str str/trim)]
@@ -67,11 +79,90 @@
       (= :legacy mode) :legacy
       :else nil)))
 
+(defn- normalize-deposit-step
+  [value]
+  (let [step (cond
+               (keyword? value) value
+               (string? value) (some-> value str/trim str/lower-case keyword)
+               :else nil)]
+    (if (= step :amount-entry)
+      :amount-entry
+      :asset-select)))
+
+(defn- normalize-chain-id
+  [value]
+  (let [raw (some-> value str str/trim)]
+    (when (seq raw)
+      (let [hex? (str/starts-with? raw "0x")
+            source (if hex? (subs raw 2) raw)
+            base (if hex? 16 10)
+            parsed (js/parseInt source base)]
+        (when (and (number? parsed)
+                   (not (js/isNaN parsed)))
+          (str "0x" (.toString (js/Math.floor parsed) 16)))))))
+
+(defn- normalize-deposit-asset-key
+  [value]
+  (let [asset-key (cond
+                    (keyword? value) value
+                    (string? value) (some-> value str/trim str/lower-case keyword)
+                    :else nil)]
+    (when (= :usdc asset-key)
+      asset-key)))
+
+(defn- resolve-deposit-network
+  [state]
+  (let [wallet-chain-id (normalize-chain-id (get-in state [:wallet :chain-id]))]
+    (if (= wallet-chain-id deposit-chain-id-testnet)
+      {:chain-id deposit-chain-id-testnet
+       :chain-label "Arbitrum Sepolia"}
+      {:chain-id deposit-chain-id-mainnet
+       :chain-label "Arbitrum"})))
+
+(defn- deposit-assets
+  [state]
+  (let [{:keys [chain-id chain-label]} (resolve-deposit-network state)]
+    [{:key :usdc
+      :symbol "USDC"
+      :name "USDC"
+      :network chain-label
+      :chain-id chain-id
+      :minimum deposit-min-usdc}]))
+
+(defn- deposit-asset
+  [state modal]
+  (let [selected-key (normalize-deposit-asset-key (:deposit-selected-asset-key modal))]
+    (some (fn [asset]
+            (when (= selected-key (:key asset))
+              asset))
+          (deposit-assets state))))
+
+(defn- deposit-assets-filtered
+  [state modal]
+  (let [search-term (-> (or (:deposit-search-input modal) "")
+                        str
+                        str/trim
+                        str/lower-case)
+        assets (deposit-assets state)]
+    (if-not (seq search-term)
+      assets
+      (filterv (fn [{:keys [symbol name network]}]
+                 (let [symbol* (str/lower-case (or symbol ""))
+                       name* (str/lower-case (or name ""))
+                       network* (str/lower-case (or network ""))]
+                   (or (str/includes? symbol* search-term)
+                       (str/includes? name* search-term)
+                       (str/includes? network* search-term))))
+               assets))))
+
 (defn default-funding-modal-state
   []
   {:open? false
    :mode nil
    :legacy-kind nil
+   :deposit-step :asset-select
+   :deposit-search-input ""
+   :deposit-selected-asset-key nil
    :amount-input ""
    :to-perp? true
    :destination-input ""
@@ -235,9 +326,44 @@
                           :amount (amount->text amount)
                           :destination destination}}})))
 
+(defn- deposit-preview
+  [state modal]
+  (let [deposit-step (normalize-deposit-step (:deposit-step modal))
+        selected-asset (deposit-asset state modal)
+        amount (parse-input-amount (:amount-input modal))
+        min-amount (or (:minimum selected-asset) deposit-min-usdc)]
+    (cond
+      (not= deposit-step :amount-entry)
+      {:ok? false}
+
+      (nil? selected-asset)
+      {:ok? false
+       :display-message "Select an asset to deposit."}
+
+      (not (finite-number? amount))
+      {:ok? false
+       :display-message "Enter a valid amount."}
+
+      (<= amount 0)
+      {:ok? false
+       :display-message "Enter an amount greater than 0."}
+
+      (< amount min-amount)
+      {:ok? false
+       :display-message (str "Minimum deposit is " min-amount " "
+                             (:symbol selected-asset) ".")}
+
+      :else
+      {:ok? true
+       :request {:action {:type "bridge2Deposit"
+                          :asset (name (:key selected-asset))
+                          :amount (amount->text amount)
+                          :chainId (:chain-id selected-asset)}}})))
+
 (defn- preview
   [state modal]
   (case (normalize-mode (:mode modal))
+    :deposit (deposit-preview state modal)
     :transfer (transfer-preview state modal)
     :withdraw (withdraw-preview state modal)
     {:ok? false
@@ -247,6 +373,9 @@
   [state]
   (let [modal (modal-state state)
         mode (normalize-mode (:mode modal))
+        deposit-step (normalize-deposit-step (:deposit-step modal))
+        deposit-assets* (deposit-assets-filtered state modal)
+        selected-deposit-asset (deposit-asset state modal)
         preview-result (preview state modal)
         preview-ok? (:ok? preview-result)
         transfer-max (transfer-max-amount state modal)
@@ -255,13 +384,19 @@
                      :transfer transfer-max
                      :withdraw withdraw-max
                      0)
+        deposit-step-amount-entry? (= deposit-step :amount-entry)
+        preview-message (:display-message preview-result)
         error (:error modal)
         status-message (or error
                            (when (and (not preview-ok?)
-                                      (seq (:display-message preview-result)))
-                             (:display-message preview-result)))
+                                      (seq preview-message)
+                                      (or (not= mode :deposit)
+                                          deposit-step-amount-entry?))
+                             preview-message))
         submitting? (true? (:submitting? modal))
         submit-disabled? (or submitting?
+                            (and (= mode :deposit)
+                                 (not deposit-step-amount-entry?))
                             (not preview-ok?))
         legacy-kind (or (:legacy-kind modal) :unknown)
         title (case mode
@@ -274,6 +409,10 @@
      :mode mode
      :legacy-kind legacy-kind
      :title title
+     :deposit-step deposit-step
+     :deposit-search-input (or (:deposit-search-input modal) "")
+     :deposit-assets deposit-assets*
+     :deposit-selected-asset selected-deposit-asset
      :amount-input (or (:amount-input modal) "")
      :to-perp? (true? (:to-perp? modal))
      :destination-input (or (:destination-input modal) "")
@@ -283,6 +422,13 @@
      :submit-disabled? submit-disabled?
      :preview-ok? preview-ok?
      :status-message status-message
+     :deposit-submit-label (if submitting?
+                            "Submitting..."
+                            (if preview-ok?
+                              "Deposit"
+                              (or preview-message "Enter a valid amount")))
+     :deposit-quick-amounts deposit-quick-amounts
+     :deposit-min-usdc deposit-min-usdc
      :submit-label (if submitting?
                      "Submitting..."
                      (case mode
@@ -299,6 +445,10 @@
           (assoc :open? true
                  :mode :deposit
                  :legacy-kind nil
+                 :deposit-step :asset-select
+                 :deposit-search-input ""
+                 :deposit-selected-asset-key nil
+                 :amount-input ""
                  :destination-input (or (wallet-address state)
                                         (:destination-input base "")
                                         "")))]]))
@@ -349,6 +499,9 @@
         value* (case path*
                  [:amount-input] (str (or value ""))
                  [:destination-input] (str (or value ""))
+                 [:deposit-search-input] (str (or value ""))
+                 [:deposit-step] (normalize-deposit-step value)
+                 [:deposit-selected-asset-key] (normalize-deposit-asset-key value)
                  value)
         next-modal (-> modal
                        (assoc-in path* value*)
@@ -405,6 +558,21 @@
       [[:effects/save-many [[(conj funding-modal-path :submitting?) true]
                             [(conj funding-modal-path :error) nil]]]
        [:effects/api-submit-funding-withdraw (:request result)]])))
+
+(defn submit-funding-deposit
+  [state]
+  (let [modal (modal-state state)
+        mode (normalize-mode (:mode modal))
+        result (if (= :deposit mode)
+                 (deposit-preview state modal)
+                 {:ok? false
+                  :display-message "Deposit modal unavailable."})]
+    (if-not (:ok? result)
+      [[:effects/save-many [[(conj funding-modal-path :submitting?) false]
+                            [(conj funding-modal-path :error) (:display-message result)]]]]
+      [[:effects/save-many [[(conj funding-modal-path :submitting?) true]
+                            [(conj funding-modal-path :error) nil]]]
+       [:effects/api-submit-funding-deposit (:request result)]])))
 
 (defn set-funding-modal-compat
   [state modal]

@@ -134,6 +134,7 @@
 (s/def ::api-submit-vault-transfer-args (s/tuple ::api-submit-request))
 (s/def ::api-submit-funding-transfer-args (s/tuple ::api-submit-request))
 (s/def ::api-submit-funding-withdraw-args (s/tuple ::api-submit-request))
+(s/def ::api-submit-funding-deposit-args (s/tuple ::api-submit-request))
 
 (defn- fetch-asset-selector-markets-args?
   [args]
@@ -433,6 +434,7 @@
    :actions/set-funding-amount-to-max ::no-args
    :actions/submit-funding-transfer ::no-args
    :actions/submit-funding-withdraw ::no-args
+   :actions/submit-funding-deposit ::no-args
    :actions/load-funding-comparison-route ::path-args
    :actions/load-funding-comparison ::no-args
    :actions/set-funding-comparison-query ::single-input-args
@@ -526,7 +528,8 @@
    :effects/api-fetch-vault-ledger-updates ::address-args
    :effects/api-submit-vault-transfer ::api-submit-vault-transfer-args
    :effects/api-submit-funding-transfer ::api-submit-funding-transfer-args
-   :effects/api-submit-funding-withdraw ::api-submit-funding-withdraw-args})
+   :effects/api-submit-funding-withdraw ::api-submit-funding-withdraw-args
+   :effects/api-submit-funding-deposit ::api-submit-funding-deposit-args})
 
 (defn contracted-action-ids
   []

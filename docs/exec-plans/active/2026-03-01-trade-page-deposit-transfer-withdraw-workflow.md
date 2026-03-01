@@ -6,9 +6,9 @@ This document is maintained in accordance with `/hyperopen/.agents/PLANS.md`.
 
 ## Purpose / Big Picture
 
-Today `/trade` shows account equity metrics but does not let the user fund or withdraw directly from that surface. After this change, the trade page right-rail account panel will expose `Deposit`, `Perps <-> Spot`, and `Withdraw` actions with the same interaction shape users expect from Hyperliquid: one-click entry from the main trading surface, clear modal flows, wallet-sign confirmation for transfer/withdraw, and deterministic success/error feedback.
+Today `/trade` shows account equity metrics but does not let the user fund or withdraw directly from that surface. After this change, the trade page right-rail account panel will expose `Deposit`, `Perps <-> Spot`, and `Withdraw` actions with the same interaction shape users expect from Hyperliquid: one-click entry from the main trading surface, Hyperliquid-style two-step deposit modal, wallet-sign confirmation for transfer/withdraw, and deterministic success/error feedback.
 
-A user verifies behavior by opening `/trade`, clicking each funding action, and confirming they can complete transfer/withdraw without leaving the page (except deposit bridge handoff), while seeing immediate UI state transitions before network submission.
+A user verifies behavior by opening `/trade`, clicking each funding action, and confirming they can complete deposit/transfer/withdraw without leaving the page while seeing immediate UI state transitions before network submission.
 
 ## Progress
 
@@ -21,6 +21,9 @@ A user verifies behavior by opening `/trade`, clicking each funding action, and 
 - [x] (2026-03-01 18:31Z) Added user-signed transfer/withdraw signing and API submit seams with contract tests and SDK parity coverage.
 - [x] (2026-03-01 18:31Z) Added funding action/effect runtime wiring, effect-order policies, schema contracts, and deterministic state transitions.
 - [x] (2026-03-01 18:31Z) Added/updated unit tests and passed required gates (`npm run check`, `npm test`, `npm run test:websocket`).
+- [x] (2026-03-01 19:17Z) Re-scoped deposit from bridge handoff to in-app two-step modal + on-chain submit path (USDC transfer to Bridge2 on Arbitrum/Arbitrum Sepolia with chain switching).
+- [x] (2026-03-01 19:17Z) Added `submit-funding-deposit` action/effect, runtime/schema/effect-order registration, and deposit-focused action/effect tests.
+- [x] (2026-03-01 19:17Z) Re-ran required gates (`npm run check`, `npm test`, `npm run test:websocket`) after deposit network integration changes.
 
 ## Surprises & Discoveries
 
@@ -45,8 +48,8 @@ A user verifies behavior by opening `/trade`, clicking each funding action, and 
   Rationale: This is the direct parity gap and gives users immediate funding controls where they place trades.
   Date/Author: 2026-03-01 / Codex
 
-- Decision: Treat transfer and withdraw as first-class user-signed modal flows; keep deposit as bridge handoff flow (open bridge/deposit route) instead of inventing a non-existent exchange deposit action.
-  Rationale: Matches protocol reality and avoids coupling trade-page UI to unsupported exchange action shapes.
+- Decision: Treat transfer and withdraw as user-signed exchange actions, and treat deposit as an on-chain Bridge2 transfer flow from wallet USDC to Bridge2 contract (not an exchange action and not a route handoff).
+  Rationale: Matches protocol reality from Hyperliquid Bridge2 docs while preserving in-trade-page UX parity with Hyperliquid’s deposit modal flow.
   Date/Author: 2026-03-01 / Codex
 
 - Decision: Preserve `:actions/set-funding-modal` as a compatibility alias while introducing typed funding actions/state for new workflows.
@@ -67,9 +70,10 @@ Implementation is complete for trade-page funding parity scope.
 
 Delivered behavior:
 - `/trade` account equity now exposes `Deposit`, `Perps <-> Spot`, and `Withdraw` actions.
-- Funding modal host in app shell now renders mode-specific funding flows (deposit handoff, transfer, withdraw) instead of placeholder copy.
+- Funding modal host in app shell now renders mode-specific funding flows (two-step deposit, transfer, withdraw) instead of placeholder copy.
 - Transfer and withdraw submit through user-signed action seams (`usdClassTransfer`, `withdraw3`) with wallet-context chain metadata and monotonic user nonce cursor updates.
 - Funding submit effects now handle wallet preconditions, success/error toasts, modal close/error projection, and post-submit `:actions/load-user-data` refresh.
+- Deposit now submits to network via wallet EIP-1193 transaction flow: optional chain switch, ERC20 `transfer` calldata to USDC contract, recipient set to Bridge2 contract, and confirmation receipt polling before success feedback.
 - Legacy `:actions/set-funding-modal` callers remain supported through compatibility mapping.
 
 Validation evidence (2026-03-01):
@@ -101,7 +105,7 @@ In this plan:
 
 - "Perps-Spot transfer" means Hyperliquid `usdClassTransfer` between spot USDC and perps account balance.
 - "Withdraw" means Hyperliquid `withdraw3` bridge withdrawal request.
-- "Deposit" means bridge handoff entry point (open deposit bridge path), not a new exchange action.
+- "Deposit" means bridge transaction entry point (wallet-signed on-chain USDC transfer to Bridge2), not a Hyperliquid exchange action.
 
 ## Plan of Work
 
@@ -180,7 +184,7 @@ Expected result: all commands exit `0`.
 Acceptance is satisfied when all of the following are true:
 
 1. `/trade` account equity panel shows `Deposit`, `Perps <-> Spot`, and `Withdraw` controls in deterministic layout on desktop and mobile breakpoints.
-2. Clicking `Deposit` performs the defined bridge handoff behavior (modal with bridge action or direct route open) and no longer shows placeholder copy.
+2. Clicking `Deposit` opens a two-step modal (asset selection then amount entry) and no longer shows placeholder copy.
 3. Clicking `Perps <-> Spot` opens a transfer modal that validates amount and direction, requests wallet signature, and submits `usdClassTransfer` payload on confirm.
 4. Clicking `Withdraw` opens a withdrawal modal that validates destination and amount, enforces documented minimum guardrails (at least 5 USDC unless protocol response changes), requests wallet signature, and submits `withdraw3` payload on confirm.
 5. Transfer/withdraw actions update user-visible submitting/error state before issuing heavy network effects.
@@ -210,7 +214,7 @@ Protocol notes embedded for implementation:
 UI parity notes embedded for implementation:
 
 - Trade-page account summary action cluster should expose funding controls directly, with `Deposit` emphasized and transfer/withdraw adjacent.
-- Hyperliquid deposit route includes `/portfolio/deposit`; using this as bridge handoff target is acceptable for parity-first delivery.
+- Hyperliquid Bridge2 docs confirm deposit is an on-chain bridge flow (USDC transfer to Bridge2), so this plan keeps deposit execution in-app via wallet transaction rather than navigation handoff.
 
 Reference URLs consulted during scoping:
 

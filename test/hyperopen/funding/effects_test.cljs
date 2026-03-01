@@ -182,3 +182,89 @@
           (.catch (fn [err]
                     (is false (str "Unexpected withdraw runtime failure-path rejection: " err))
                     (done)))))))
+
+(deftest api-submit-funding-deposit-no-wallet-sets-error-test
+  (let [store (atom {:wallet {}
+                     :funding-ui {:modal (seed-modal :deposit)}})
+        submit-calls (atom 0)
+        toasts (atom [])]
+    (is (nil?
+         (effects/api-submit-funding-deposit!
+          {:store store
+           :request {:action {:type "bridge2Deposit"
+                              :asset "usdc"
+                              :amount "5"
+                              :chainId "0xa4b1"}}
+           :submit-usdc-bridge2-deposit! (fn [_store _address _action]
+                                           (swap! submit-calls inc)
+                                           (js/Promise.resolve {:status "ok"}))
+           :show-toast! (fn [_store kind message]
+                          (swap! toasts conj [kind message])
+                          nil)})))
+    (is (= 0 @submit-calls))
+    (is (= false (get-in @store [:funding-ui :modal :submitting?])))
+    (is (= "Connect your wallet before depositing."
+           (get-in @store [:funding-ui :modal :error])))
+    (is (= [[:error "Connect your wallet before depositing."]]
+           @toasts))))
+
+(deftest api-submit-funding-deposit-success-closes-modal-and-refreshes-test
+  (async done
+    (let [default-modal {:open? false :mode nil :submitting? false :error nil}
+          store (atom {:wallet {:address "0xabc"}
+                       :funding-ui {:modal (seed-modal :deposit)}})
+          toasts (atom [])
+          dispatches (atom [])]
+      (-> (effects/api-submit-funding-deposit!
+           {:store store
+            :request {:action {:type "bridge2Deposit"
+                               :asset "usdc"
+                               :amount "5"
+                               :chainId "0xa4b1"}}
+            :submit-usdc-bridge2-deposit! (fn [_store _address _action]
+                                            (js/Promise.resolve {:status "ok"
+                                                                 :network "Arbitrum"}))
+            :show-toast! (fn [_store kind message]
+                           (swap! toasts conj [kind message]))
+            :dispatch! (fn [store* _ event]
+                         (swap! dispatches conj [store* event]))
+            :default-funding-modal-state (fn [] default-modal)})
+          (.then (fn [resp]
+                   (is (= "ok" (:status resp)))
+                   (is (= default-modal (get-in @store [:funding-ui :modal])))
+                   (is (= [[:success "Deposit submitted on Arbitrum."]]
+                          @toasts))
+                   (is (= [[[[:actions/load-user-data "0xabc"]]]]
+                          (mapv (fn [[_store event]] [event]) @dispatches)))
+                   (done)))
+          (.catch (fn [err]
+                    (is false (str "Unexpected deposit success-path error: " err))
+                    (done)))))))
+
+(deftest api-submit-funding-deposit-runtime-error-sets-error-state-test
+  (async done
+    (let [store (atom {:wallet {:address "0xabc"}
+                       :funding-ui {:modal (seed-modal :deposit)}})
+          toasts (atom [])]
+      (-> (effects/api-submit-funding-deposit!
+           {:store store
+            :request {:action {:type "bridge2Deposit"
+                               :asset "usdc"
+                               :amount "5"
+                               :chainId "0xa4b1"}}
+            :submit-usdc-bridge2-deposit! (fn [_store _address _action]
+                                            (js/Promise.reject (js/Error. "wallet unavailable")))
+            :show-toast! (fn [_store kind message]
+                           (swap! toasts conj [kind message])
+                           nil)})
+          (.then (fn [result]
+                   (is (nil? result))
+                   (is (= false (get-in @store [:funding-ui :modal :submitting?])))
+                   (is (= "Deposit failed: wallet unavailable"
+                          (get-in @store [:funding-ui :modal :error])))
+                   (is (= [[:error "Deposit failed: wallet unavailable"]]
+                          @toasts))
+                   (done)))
+          (.catch (fn [err]
+                    (is false (str "Unexpected deposit runtime failure-path rejection: " err))
+                    (done)))))))

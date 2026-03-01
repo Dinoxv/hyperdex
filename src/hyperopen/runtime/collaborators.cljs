@@ -199,7 +199,8 @@
    :set-funding-transfer-direction funding-actions/set-funding-transfer-direction
    :set-funding-amount-to-max funding-actions/set-funding-amount-to-max
    :submit-funding-transfer funding-actions/submit-funding-transfer
-   :submit-funding-withdraw funding-actions/submit-funding-withdraw})
+   :submit-funding-withdraw funding-actions/submit-funding-withdraw
+   :submit-funding-deposit funding-actions/submit-funding-deposit})
 
 (defn- vault-action-deps []
   {:load-vault-route vault-actions/load-vault-route
@@ -262,7 +263,8 @@
           :api-fetch-vault-ledger-updates vault-effects/api-fetch-vault-ledger-updates!
           :api-submit-vault-transfer vault-effects/api-submit-vault-transfer!
           :api-submit-funding-transfer funding-effects/api-submit-funding-transfer!
-          :api-submit-funding-withdraw funding-effects/api-submit-funding-withdraw!}}
+          :api-submit-funding-withdraw funding-effects/api-submit-funding-withdraw!
+          :api-submit-funding-deposit funding-effects/api-submit-funding-deposit!}}
    effect-overrides))
 
 (defn runtime-action-deps

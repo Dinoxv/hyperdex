@@ -53,7 +53,8 @@
          :api-fetch-vault-ledger-updates effect-adapters/api-fetch-vault-ledger-updates-effect
          :api-submit-vault-transfer effect-adapters/api-submit-vault-transfer-effect
          :api-submit-funding-transfer effect-adapters/api-submit-funding-transfer-effect
-         :api-submit-funding-withdraw effect-adapters/api-submit-funding-withdraw-effect}})
+         :api-submit-funding-withdraw effect-adapters/api-submit-funding-withdraw-effect
+         :api-submit-funding-deposit effect-adapters/api-submit-funding-deposit-effect}})
 
 (defn runtime-effect-deps
   ([] (runtime-effect-deps runtime-state/runtime))

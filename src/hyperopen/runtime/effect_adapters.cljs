@@ -786,3 +786,12 @@
     :exchange-response-error exchange-response-error
     :runtime-error-message runtime-error-message
     :show-toast! show-order-feedback-toast!}))
+
+(defn api-submit-funding-deposit-effect
+  [_ store request]
+  (funding-workflow-effects/api-submit-funding-deposit!
+   {:store store
+    :request request
+    :dispatch! nxr/dispatch
+    :runtime-error-message runtime-error-message
+    :show-toast! show-order-feedback-toast!}))

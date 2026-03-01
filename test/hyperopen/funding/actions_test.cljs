@@ -11,60 +11,39 @@
                                                    :totalMarginUsed "11.5"}}}
    :funding-ui {:modal (funding-actions/default-funding-modal-state)}})
 
+(defn- expected-open-modal
+  [mode & {:keys [legacy-kind] :or {legacy-kind nil}}]
+  {:open? true
+   :mode mode
+   :legacy-kind legacy-kind
+   :deposit-step :asset-select
+   :deposit-search-input ""
+   :deposit-selected-asset-key nil
+   :amount-input ""
+   :to-perp? true
+   :destination-input "0x1234567890abcdef1234567890abcdef12345678"
+   :submitting? false
+   :error nil})
+
 (deftest open-funding-modal-actions-set-mode-and-open-state-test
   (let [state (base-state)]
     (is (= [[:effects/save [:funding-ui :modal]
-             {:open? true
-              :mode :deposit
-              :legacy-kind nil
-              :amount-input ""
-              :to-perp? true
-              :destination-input "0x1234567890abcdef1234567890abcdef12345678"
-              :submitting? false
-              :error nil}]]
+             (expected-open-modal :deposit)]]
            (funding-actions/open-funding-deposit-modal state)))
     (is (= [[:effects/save [:funding-ui :modal]
-             {:open? true
-              :mode :transfer
-              :legacy-kind nil
-              :amount-input ""
-              :to-perp? true
-              :destination-input "0x1234567890abcdef1234567890abcdef12345678"
-              :submitting? false
-              :error nil}]]
+             (expected-open-modal :transfer)]]
            (funding-actions/open-funding-transfer-modal state)))
     (is (= [[:effects/save [:funding-ui :modal]
-             {:open? true
-              :mode :withdraw
-              :legacy-kind nil
-              :amount-input ""
-              :to-perp? true
-              :destination-input "0x1234567890abcdef1234567890abcdef12345678"
-              :submitting? false
-              :error nil}]]
+             (expected-open-modal :withdraw)]]
            (funding-actions/open-funding-withdraw-modal state)))))
 
 (deftest set-funding-modal-compat-preserves-legacy-fallback-test
   (let [state (base-state)]
     (is (= [[:effects/save [:funding-ui :modal]
-             {:open? true
-              :mode :transfer
-              :legacy-kind nil
-              :amount-input ""
-              :to-perp? true
-              :destination-input "0x1234567890abcdef1234567890abcdef12345678"
-              :submitting? false
-              :error nil}]]
+             (expected-open-modal :transfer)]]
            (funding-actions/set-funding-modal-compat state :send)))
     (is (= [[:effects/save [:funding-ui :modal]
-             {:open? true
-              :mode :legacy
-              :legacy-kind :history
-              :amount-input ""
-              :to-perp? true
-              :destination-input "0x1234567890abcdef1234567890abcdef12345678"
-              :submitting? false
-              :error nil}]]
+             (expected-open-modal :legacy :legacy-kind :history)]]
            (funding-actions/set-funding-modal-compat state :history)))))
 
 (deftest submit-funding-transfer-validates-and-emits-api-effect-test
@@ -123,6 +102,70 @@
                        :amount "6.5"
                        :destination "0x1234567890abcdef1234567890abcdef12345678"}}]]
            (funding-actions/submit-funding-withdraw valid)))))
+
+(deftest submit-funding-deposit-validates-step-asset-and-amount-test
+  (let [no-asset (assoc-in (base-state)
+                           [:funding-ui :modal]
+                           {:open? true
+                            :mode :deposit
+                            :deposit-step :amount-entry
+                            :deposit-selected-asset-key nil
+                            :amount-input "10"})
+        invalid-amount (assoc-in (base-state)
+                                 [:funding-ui :modal]
+                                 {:open? true
+                                  :mode :deposit
+                                  :deposit-step :amount-entry
+                                  :deposit-selected-asset-key :usdc
+                                  :amount-input ""})
+        below-minimum (assoc-in (base-state)
+                                [:funding-ui :modal]
+                                {:open? true
+                                 :mode :deposit
+                                 :deposit-step :amount-entry
+                                 :deposit-selected-asset-key :usdc
+                                 :amount-input "1"})
+        valid-mainnet (assoc-in (base-state)
+                                [:funding-ui :modal]
+                                {:open? true
+                                 :mode :deposit
+                                 :deposit-step :amount-entry
+                                 :deposit-selected-asset-key :usdc
+                                 :amount-input "5.25"})
+        valid-testnet (assoc-in (assoc (base-state)
+                                       :wallet {:address "0x1234567890abcdef1234567890abcdef12345678"
+                                                :chain-id "0x66eee"})
+                                [:funding-ui :modal]
+                                {:open? true
+                                 :mode :deposit
+                                 :deposit-step :amount-entry
+                                 :deposit-selected-asset-key :usdc
+                                 :amount-input "7"})]
+    (is (= [[:effects/save-many [[[:funding-ui :modal :submitting?] false]
+                                 [[:funding-ui :modal :error] "Select an asset to deposit."]]]]
+           (funding-actions/submit-funding-deposit no-asset)))
+    (is (= [[:effects/save-many [[[:funding-ui :modal :submitting?] false]
+                                 [[:funding-ui :modal :error] "Enter a valid amount."]]]]
+           (funding-actions/submit-funding-deposit invalid-amount)))
+    (is (= [[:effects/save-many [[[:funding-ui :modal :submitting?] false]
+                                 [[:funding-ui :modal :error] "Minimum deposit is 5 USDC."]]]]
+           (funding-actions/submit-funding-deposit below-minimum)))
+    (is (= [[:effects/save-many [[[:funding-ui :modal :submitting?] true]
+                                 [[:funding-ui :modal :error] nil]]]
+            [:effects/api-submit-funding-deposit
+             {:action {:type "bridge2Deposit"
+                       :asset "usdc"
+                       :amount "5.25"
+                       :chainId "0xa4b1"}}]]
+           (funding-actions/submit-funding-deposit valid-mainnet)))
+    (is (= [[:effects/save-many [[[:funding-ui :modal :submitting?] true]
+                                 [[:funding-ui :modal :error] nil]]]
+            [:effects/api-submit-funding-deposit
+             {:action {:type "bridge2Deposit"
+                       :asset "usdc"
+                       :amount "7"
+                       :chainId "0x66eee"}}]]
+           (funding-actions/submit-funding-deposit valid-testnet)))))
 
 (deftest set-funding-amount-to-max-respects-active-mode-test
   (let [transfer-state (assoc-in (base-state)

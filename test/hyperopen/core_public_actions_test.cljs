@@ -26,6 +26,9 @@
              {:open? true
               :mode :legacy
               :legacy-kind :history
+              :deposit-step :asset-select
+              :deposit-search-input ""
+              :deposit-selected-asset-key nil
               :amount-input ""
               :to-perp? true
               :destination-input ""
