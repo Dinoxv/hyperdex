@@ -32,10 +32,23 @@
                               (and (string? border-top)
                                    (str/includes? border-top "2px solid"))))))
 
+(defn- find-liquidation-drag-handle
+  [root]
+  (fake-dom/find-dom-node root
+                          (fn [node]
+                            (= "true" (aget node "data-position-liq-drag-handle")))))
+
+(defn- find-liquidation-drag-hit
+  [root]
+  (fake-dom/find-dom-node root
+                          (fn [node]
+                            (= "true" (aget node "data-position-liq-drag-hit")))))
+
 (defn- build-chart-fixture
-  [{:keys [width price-to-y time-to-x]
+  [{:keys [width price-to-y time-to-x y-to-price]
     :or {width 320
          price-to-y (fn [price] (- 220 price))
+         y-to-price (fn [y] (- 220 y))
          time-to-x (fn [time]
                      (case time
                        1700000000 48
@@ -53,6 +66,7 @@
                         :unsubscribeSizeChange unsubscribe-fn
                         :timeToCoordinate time-to-x}
         main-series #js {:priceToCoordinate price-to-y
+                         :coordinateToPrice y-to-price
                          :subscribeDataChanged subscribe-fn
                          :unsubscribeDataChanged unsubscribe-fn}
         chart #js {:timeScale (fn [] time-scale)
@@ -61,12 +75,14 @@
         chart-obj #js {:chart chart
                        :mainSeries main-series}
         document (fake-dom/make-fake-document)
-        container (fake-dom/make-fake-element "div")]
+        container (fake-dom/make-fake-element "div")
+        window-target (fake-dom/make-fake-element "window")]
     (set! (.-clientWidth container) width)
     (set! (.-clientHeight container) 240)
     {:chart-obj chart-obj
      :document document
      :container container
+     :window-target window-target
      :unsubscribe-calls* unsubscribe-calls*}))
 
 (deftest position-overlays-render-pnl-and-liquidation-rows-and-clear-test
@@ -227,4 +243,111 @@
       (is (number? pnl-left))
       (is (<= 90 pnl-left 145)
           "PNL badge should remain left-aligned even when entry/latest is near right edge"))
+    (position-overlays/clear-position-overlays! chart-obj)))
+
+(deftest position-overlays-renders-margin-delta-label-for-preview-liquidation-target-test
+  (let [{:keys [chart-obj document container]}
+        (build-chart-fixture {})
+        overlay {:side :long
+                 :entry-price 100
+                 :unrealized-pnl 2
+                 :abs-size 2
+                 :liquidation-price 95
+                 :current-liquidation-price 100
+                 :entry-time 1700000000
+                 :entry-time-ms 1700000000000
+                 :latest-time 1700003600}]
+    (position-overlays/sync-position-overlays!
+     chart-obj
+     container
+     overlay
+     {:document document})
+    (let [overlay-root (aget (.-children container) 0)
+          text (str/join " " (fake-dom/collect-text-content overlay-root))]
+      (is (str/includes? text "Liq. Price"))
+      (is (str/includes? text "Add $10.00 Margin")))
+    (position-overlays/clear-position-overlays! chart-obj)))
+
+(deftest position-overlays-liquidation-drag-emits-live-preview-suggestion-on-move-test
+  (let [preview-calls* (atom [])
+        {:keys [chart-obj document container window-target]}
+        (build-chart-fixture {})
+        overlay {:side :long
+                 :entry-price 100
+                 :unrealized-pnl 2.0
+                 :abs-size 2
+                 :liquidation-price 100
+                 :entry-time 1700000000
+                 :entry-time-ms 1700000000000
+                 :latest-time 1700003600}]
+    (position-overlays/sync-position-overlays!
+     chart-obj
+     container
+     overlay
+     {:document document
+      :window window-target
+      :on-liquidation-drag-preview (fn [payload]
+                                     (swap! preview-calls* conj payload))})
+    (let [overlay-root (aget (.-children container) 0)
+          drag-hit (find-liquidation-drag-hit overlay-root)]
+      (is (some? drag-hit))
+      (fake-dom/dispatch-dom-event-with-payload! drag-hit
+                                                 "pointerdown"
+                                                 #js {:clientX 64
+                                                      :clientY 120})
+      (fake-dom/dispatch-dom-event-with-payload! window-target
+                                                 "pointermove"
+                                                 #js {:clientX 64
+                                                      :clientY 125}))
+    (let [payload (first @preview-calls*)]
+      (is (= :add (:mode payload)))
+      (is (= 10 (:amount payload)))
+      (is (= 100 (:current-liquidation-price payload)))
+      (is (= 95 (:target-liquidation-price payload)))
+      (is (map? (:anchor payload))))
+    (position-overlays/clear-position-overlays! chart-obj)))
+
+(deftest position-overlays-liquidation-drag-emits-margin-confirmation-suggestion-test
+  (let [confirm-calls* (atom [])
+        {:keys [chart-obj document container window-target]}
+        (build-chart-fixture {})
+        overlay {:side :long
+                 :entry-price 100
+                 :unrealized-pnl 2.0
+                 :abs-size 2
+                 :liquidation-price 100
+                 :entry-time 1700000000
+                 :entry-time-ms 1700000000000
+                 :latest-time 1700003600}]
+    (position-overlays/sync-position-overlays!
+     chart-obj
+     container
+     overlay
+     {:document document
+      :window window-target
+      :on-liquidation-drag-confirm (fn [payload]
+                                     (swap! confirm-calls* conj payload))})
+    (let [overlay-root (aget (.-children container) 0)
+          drag-handle (find-liquidation-drag-handle overlay-root)
+          drag-hit (find-liquidation-drag-hit overlay-root)]
+      (is (some? drag-handle))
+      (is (some? drag-hit))
+      (fake-dom/dispatch-dom-event-with-payload! drag-hit
+                                                 "pointerdown"
+                                                 #js {:clientX 64
+                                                      :clientY 120})
+      (fake-dom/dispatch-dom-event-with-payload! window-target
+                                                 "pointermove"
+                                                 #js {:clientX 64
+                                                      :clientY 125})
+      (fake-dom/dispatch-dom-event-with-payload! window-target
+                                                 "pointerup"
+                                                 #js {:clientX 64
+                                                      :clientY 125}))
+    (let [payload (first @confirm-calls*)]
+      (is (= :add (:mode payload)))
+      (is (= 10 (:amount payload)))
+      (is (= 100 (:current-liquidation-price payload)))
+      (is (= 95 (:target-liquidation-price payload)))
+      (is (map? (:anchor payload))))
     (position-overlays/clear-position-overlays! chart-obj)))

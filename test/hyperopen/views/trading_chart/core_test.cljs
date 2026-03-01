@@ -1,6 +1,7 @@
 (ns hyperopen.views.trading-chart.core-test
   (:require [clojure.string :as str]
             [cljs.test :refer-macros [deftest is]]
+            [replicant.core :as replicant-core]
             [hyperopen.state.trading :as trading-state]
             [hyperopen.views.trading-chart.derived-cache :as derived-cache]
             [hyperopen.views.trading-chart.core :as chart-core]
@@ -394,7 +395,158 @@
       (is (= "BTC" (:asset persistence-deps)))
       (is (= transformed (:candles persistence-deps)))
       (is (= overlay-result (:position-overlay runtime-options)))
+      (is (fn? (:on-liquidation-drag-preview runtime-options)))
+      (is (fn? (:on-liquidation-drag-confirm runtime-options)))
       (is (= "BTC" (:active-asset @overlay-inputs*)))
       (is (= transformed (:candle-data @overlay-inputs*)))
       (is (= :1d (:selected-timeframe @overlay-inputs*)))
       (is (= [] (:fills @overlay-inputs*))))))
+
+(deftest trading-chart-view-keeps-chart-drag-liquidation-preview-while-margin-modal-open-test
+  (let [captured-args (atom nil)
+        overlay-result {:side :long
+                        :entry-price 100
+                        :liquidation-price 90
+                        :unrealized-pnl 4}
+        state {:active-asset "BTC"
+               :active-market {:dex "xyz"}
+               :candles {"BTC" {:1d []}}
+               :chart-options {:selected-timeframe :1d
+                               :selected-chart-type :candlestick
+                               :active-indicators {}}
+               :positions-ui {:margin-modal {:open? true
+                                             :position-key "BTC|xyz"
+                                             :prefill-source :chart-liquidation-drag
+                                             :prefill-liquidation-current-price "90"
+                                             :prefill-liquidation-target-price "85"}}}]
+    (with-redefs [trading-state/position-for-active-asset (fn [_]
+                                                             {:coin "BTC"
+                                                              :szi "1"
+                                                              :entryPx "100"
+                                                              :liquidationPx "90"})
+                  position-overlay-model/build-position-overlay (fn [_]
+                                                                  overlay-result)
+                  chart-core/chart-canvas (fn
+                                            ([a b c d e f]
+                                             (reset! captured-args [a b c d e f])
+                                             [:div])
+                                            ([a b c d e f g h]
+                                             (reset! captured-args [a b c d e f g h])
+                                             [:div]))]
+      (chart-core/trading-chart-view state))
+    (let [runtime-options (nth @captured-args 5)
+          overlay (:position-overlay runtime-options)]
+      (is (= 85 (:liquidation-price overlay)))
+      (is (= 90 (:current-liquidation-price overlay)))
+      (is (= 100 (:entry-price overlay)))
+      (is (= :long (:side overlay))))))
+
+(deftest trading-chart-liquidation-drag-callback-dispatches-margin-modal-prefill-test
+  (let [captured-args (atom nil)
+        dispatch-calls (atom [])
+        state {:active-asset "BTC"
+               :active-market {:dex "xyz"}
+               :candles {"BTC" {:1d []}}
+               :chart-options {:selected-timeframe :1d
+                               :selected-chart-type :candlestick
+                               :active-indicators {}}}]
+    (with-redefs [trading-state/position-for-active-asset (fn [_]
+                                                             {:coin "BTC"
+                                                              :szi "1"
+                                                              :entryPx "100"
+                                                              :liquidationPx "90"})
+                  position-overlay-model/build-position-overlay (fn [_]
+                                                                  {:side :long
+                                                                   :entry-price 100
+                                                                   :liquidation-price 90})
+                  chart-core/chart-canvas (fn
+                                            ([a b c d e f]
+                                             (reset! captured-args [a b c d e f])
+                                             [:div])
+                                            ([a b c d e f g h]
+                                             (reset! captured-args [a b c d e f g h])
+                                             [:div]))]
+      (chart-core/trading-chart-view state))
+    (let [runtime-options (nth @captured-args 5)
+          callback (:on-liquidation-drag-confirm runtime-options)
+          anchor {:left 10 :right 20 :top 30 :bottom 40 :width 10 :height 10
+                  :viewport-width 1200 :viewport-height 800}]
+      (binding [replicant-core/*dispatch* (fn [event actions]
+                                            (swap! dispatch-calls conj [event actions]))]
+        (callback {:mode :add
+                   :amount 2.5
+                   :current-liquidation-price 90
+                   :target-liquidation-price 85
+                   :anchor anchor}))
+      (let [[event actions] (first @dispatch-calls)
+            select-action (first (first actions))
+            open-action (first (second actions))]
+        (is (= :chart-liquidation-drag-margin-confirm (:replicant/trigger event)))
+        (is (= :actions/select-account-info-tab select-action))
+        (is (= :positions (second (first actions))))
+        (is (= :actions/open-position-margin-modal open-action))
+        (is (= :chart-liquidation-drag
+               (get-in actions [1 1 :prefill-source])))
+        (is (= :add
+               (get-in actions [1 1 :prefill-margin-mode])))
+        (is (= 2.5
+               (get-in actions [1 1 :prefill-margin-amount])))
+        (is (= "xyz"
+               (get-in actions [1 1 :dex])))
+        (is (= anchor
+               (get-in actions [1 2])))))))
+
+(deftest trading-chart-liquidation-drag-preview-callback-dispatches-margin-modal-prefill-test
+  (let [captured-args (atom nil)
+        dispatch-calls (atom [])
+        state {:active-asset "BTC"
+               :active-market {:dex "xyz"}
+               :candles {"BTC" {:1d []}}
+               :chart-options {:selected-timeframe :1d
+                               :selected-chart-type :candlestick
+                               :active-indicators {}}}]
+    (with-redefs [trading-state/position-for-active-asset (fn [_]
+                                                             {:coin "BTC"
+                                                              :szi "1"
+                                                              :entryPx "100"
+                                                              :liquidationPx "90"})
+                  position-overlay-model/build-position-overlay (fn [_]
+                                                                  {:side :long
+                                                                   :entry-price 100
+                                                                   :liquidation-price 90})
+                  chart-core/chart-canvas (fn
+                                            ([a b c d e f]
+                                             (reset! captured-args [a b c d e f])
+                                             [:div])
+                                            ([a b c d e f g h]
+                                             (reset! captured-args [a b c d e f g h])
+                                             [:div]))]
+      (chart-core/trading-chart-view state))
+    (let [runtime-options (nth @captured-args 5)
+          callback (:on-liquidation-drag-preview runtime-options)
+          anchor {:left 10 :right 20 :top 30 :bottom 40 :width 10 :height 10
+                  :viewport-width 1200 :viewport-height 800}]
+      (binding [replicant-core/*dispatch* (fn [event actions]
+                                            (swap! dispatch-calls conj [event actions]))]
+        (callback {:mode :add
+                   :amount 2.5
+                   :current-liquidation-price 90
+                   :target-liquidation-price 85
+                   :anchor anchor}))
+      (let [[event actions] (first @dispatch-calls)
+            select-action (first (first actions))
+            open-action (first (second actions))]
+        (is (= :chart-liquidation-drag-margin-preview (:replicant/trigger event)))
+        (is (= :actions/select-account-info-tab select-action))
+        (is (= :positions (second (first actions))))
+        (is (= :actions/open-position-margin-modal open-action))
+        (is (= :chart-liquidation-drag
+               (get-in actions [1 1 :prefill-source])))
+        (is (= :add
+               (get-in actions [1 1 :prefill-margin-mode])))
+        (is (= 2.5
+               (get-in actions [1 1 :prefill-margin-amount])))
+        (is (= "xyz"
+               (get-in actions [1 1 :dex])))
+        (is (= anchor
+               (get-in actions [1 2])))))))
