@@ -1,5 +1,6 @@
 (ns hyperopen.views.funding-modal
-  (:require [hyperopen.funding.actions :as funding-actions]))
+  (:require [hyperopen.funding.actions :as funding-actions]
+            [hyperopen.views.asset-icon :as asset-icon]))
 
 (defn- base-button-classes
   [primary?]
@@ -43,36 +44,43 @@
 
 (defn- deposit-asset-button
   [asset selected?]
-  [:button {:type "button"
-            :class (into ["w-full"
-                          "rounded-lg"
-                          "border"
-                          "px-3"
-                          "py-2.5"
-                          "text-left"
-                          "transition-colors"
-                          "duration-150"]
-                         (if selected?
-                           ["border-[#3a5b6a]" "bg-[#1a2a37]"]
-                           ["border-transparent" "bg-transparent" "hover:bg-[#10222f]"]))
-            :on {:click [[:actions/set-funding-modal-field
-                          [:deposit-selected-asset-key]
-                          (:key asset)]]}}
-   [:div {:class ["flex" "items-center" "gap-2.5"]}
-    [:div {:class ["h-8"
-                   "w-8"
-                   "rounded-full"
-                   "bg-[#1e5a93]"
-                   "text-xs"
-                   "font-semibold"
-                   "text-white"
-                   "flex"
-                   "items-center"
-                   "justify-center"]}
-     (:symbol asset)]
-    [:div {:class ["flex" "min-w-0" "flex-col"]}
-     [:span {:class ["text-sm" "font-semibold" "text-[#e6eef2]"]} (:symbol asset)]
-     [:span {:class ["text-xs" "text-[#7e95a0]"]} (:network asset)]]]])
+  (let [icon-src (asset-icon/market-icon-url {:coin (:symbol asset)
+                                               :symbol (:symbol asset)})]
+    [:button {:type "button"
+              :class (into ["w-full"
+                            "rounded-lg"
+                            "border"
+                            "px-3"
+                            "py-2.5"
+                            "text-left"
+                            "transition-colors"
+                            "duration-150"]
+                           (if selected?
+                             ["border-[#3a5b6a]" "bg-[#1a2a37]"]
+                             ["border-transparent" "bg-transparent" "hover:bg-[#10222f]"]))
+              :on {:click [[:actions/set-funding-modal-field
+                            [:deposit-selected-asset-key]
+                            (:key asset)]]}}
+     [:div {:class ["flex" "items-center" "gap-2.5"]}
+      [:div {:class ["h-8" "w-8" "shrink-0" "overflow-hidden" "rounded-full"]}
+       (if (seq icon-src)
+         [:img {:class ["block" "h-8" "w-8" "rounded-full" "object-cover"]
+                :src icon-src
+                :alt (str (:symbol asset) " icon")}]
+         [:div {:class ["h-8"
+                        "w-8"
+                        "rounded-full"
+                        "bg-[#1e5a93]"
+                        "text-xs"
+                        "font-semibold"
+                        "text-white"
+                        "flex"
+                        "items-center"
+                        "justify-center"]}
+          (:symbol asset)])]
+      [:div {:class ["flex" "min-w-0" "flex-col"]}
+       [:span {:class ["text-sm" "font-semibold" "text-[#e6eef2]"]} (:symbol asset)]
+       [:span {:class ["text-xs" "text-[#7e95a0]"]} (:network asset)]]]]))
 
 (defn funding-modal-view
   [state]
