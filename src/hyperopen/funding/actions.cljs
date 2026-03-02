@@ -91,7 +91,8 @@
     :symbol "SPX"
     :name "SPX"
     :network "Solana"
-    :flow-kind :hyperunit-address}
+    :flow-kind :hyperunit-address
+    :hyperunit-source-chain "solana"}
    {:key :xpl
     :symbol "XPL"
     :name "Plasma"
@@ -108,7 +109,7 @@
   (set (map :key deposit-assets-base)))
 
 (def ^:private deposit-implemented-asset-keys
-  #{:usdc :usdt :btc :eth :sol :2z :bonk :ena :fart :mon :pump})
+  #{:usdc :usdt :btc :eth :sol :2z :bonk :ena :fart :mon :pump :spxs})
 
 (defn- non-blank-text
   [value]

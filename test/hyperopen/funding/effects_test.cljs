@@ -711,6 +711,54 @@
                     (is false (str "Unexpected PUMP HyperUnit deposit-address success-path error: " err))
                     (done)))))))
 
+(deftest api-submit-funding-deposit-spxs-hyperunit-address-keeps-modal-open-test
+  (async done
+    (let [store (atom {:wallet {:address "0xabc"}
+                       :funding-ui {:modal (assoc (seed-modal :deposit)
+                                                  :deposit-step :amount-entry
+                                                  :deposit-selected-asset-key :spxs
+                                                  :deposit-generated-address nil
+                                                  :deposit-generated-signatures nil
+                                                  :deposit-generated-asset-key nil)}})
+          toasts (atom [])
+          submit-calls (atom [])]
+      (-> (effects/api-submit-funding-deposit!
+           {:store store
+            :request {:action {:type "hyperunitGenerateDepositAddress"
+                               :asset "spxs"
+                               :fromChain "solana"
+                               :network "Solana"}}
+            :submit-hyperunit-address-request! (fn [_store address action]
+                                                 (swap! submit-calls conj [address action])
+                                                 (js/Promise.resolve {:status "ok"
+                                                                      :keep-modal-open? true
+                                                                      :asset "spxs"
+                                                                      :deposit-address "spxAddressExample"
+                                                                      :deposit-signatures [{:r "0xa"}]}))
+            :show-toast! (fn [_store kind message]
+                           (swap! toasts conj [kind message]))})
+          (.then (fn [resp]
+                   (is (= "ok" (:status resp)))
+                   (is (= [["0xabc" {:type "hyperunitGenerateDepositAddress"
+                                     :asset "spxs"
+                                     :fromChain "solana"
+                                     :network "Solana"}]]
+                          @submit-calls))
+                   (is (= "spxAddressExample"
+                          (get-in @store [:funding-ui :modal :deposit-generated-address])))
+                   (is (= [{:r "0xa"}]
+                          (get-in @store [:funding-ui :modal :deposit-generated-signatures])))
+                   (is (= :spxs
+                          (get-in @store [:funding-ui :modal :deposit-generated-asset-key])))
+                   (is (= false
+                          (get-in @store [:funding-ui :modal :submitting?])))
+                   (is (= [[:success "Deposit address generated."]]
+                          @toasts))
+                   (done)))
+          (.catch (fn [err]
+                    (is false (str "Unexpected SPX HyperUnit deposit-address success-path error: " err))
+                    (done)))))))
+
 (deftest api-submit-funding-deposit-runtime-error-sets-error-state-test
   (async done
     (let [store (atom {:wallet {:address "0xabc"}
