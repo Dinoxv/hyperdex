@@ -25,9 +25,14 @@
     (is (= 30 (:daily-count summary)))
     (is (number? (:mean summary)))
     (is (number? (:stddev summary)))
+    (is (= 29 (count (:autocorrelation-series summary))))
+    (is (= 1 (get-in summary [:autocorrelation-series 0 :lag-days])))
+    (is (= 29 (get-in summary [:autocorrelation-series 28 :lag-days])))
     (is (approx= 1 (get-in summary [:autocorrelation :lag-1d :value]) 1e-4))
     (is (approx= 1 (get-in summary [:autocorrelation :lag-5d :value]) 1e-4))
     (is (approx= 1 (get-in summary [:autocorrelation :lag-15d :value]) 1e-3))
+    (is (= true (get-in summary [:autocorrelation-series 28 :undefined?])))
+    (is (= nil (get-in summary [:autocorrelation-series 28 :value])))
     (is (= false (get-in summary [:autocorrelation :lag-15d :insufficient?])))))
 
 (deftest compute-30d-summary-flags-insufficient-data-for-long-lags-test
@@ -45,6 +50,8 @@
     (is (= true (get-in summary [:autocorrelation :lag-5d :undefined?])))
     (is (= true (get-in summary [:autocorrelation :lag-15d :insufficient?])))
     (is (= nil (get-in summary [:autocorrelation :lag-15d :value])))
+    (is (= true (get-in summary [:autocorrelation-series 14 :insufficient?])))
+    (is (= true (get-in summary [:autocorrelation-series 28 :insufficient?])))
     (is (= 16 (get-in summary [:autocorrelation :lag-15d :minimum-daily-count])))))
 
 (deftest compute-30d-summary-ignores-invalid-and-outside-window-rows-test

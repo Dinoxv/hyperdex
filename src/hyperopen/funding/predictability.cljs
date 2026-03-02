@@ -10,6 +10,12 @@
 (def ^:private autocorrelation-lag-days
   [1 5 15])
 
+(def ^:private autocorrelation-max-lag-days
+  29)
+
+(def ^:private autocorrelation-series-lag-days
+  (vec (range 1 (inc autocorrelation-max-lag-days))))
+
 (defn- finite-number?
   [value]
   (and (number? value)
@@ -146,10 +152,17 @@
         rows* (normalize-rows-for-window rows now-ms*)
         rates (mapv :funding-rate-raw rows*)
         daily-points (daily-series rows* now-ms*)
+        lag-series (mapv (fn [lag-days]
+                           (lag-autocorrelation daily-points lag-days))
+                         autocorrelation-series-lag-days)
+        lag-series-by-day (into {}
+                                (map (fn [lag-stat]
+                                       [(:lag-days lag-stat) lag-stat]))
+                                lag-series)
         lag-stats (into {}
                         (map (fn [lag-days]
                                [(keyword (str "lag-" lag-days "d"))
-                                (lag-autocorrelation daily-points lag-days)])
+                                (get lag-series-by-day lag-days)])
                              autocorrelation-lag-days))]
     {:window-start-ms window-start-ms
      :window-end-ms now-ms*
@@ -157,4 +170,5 @@
      :daily-count (count (filter :mean-rate daily-points))
      :mean (math/mean rates)
      :stddev (math/sample-stddev rates)
+     :autocorrelation-series lag-series
      :autocorrelation lag-stats}))

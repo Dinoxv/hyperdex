@@ -414,7 +414,10 @@
                                                                         :stddev 0.0187
                                                                         :autocorrelation {:lag-1d {:value 0.714}
                                                                                           :lag-5d {:value 0.482}
-                                                                                          :lag-15d {:value 0.21}}}}
+                                                                                          :lag-15d {:value 0.21}}
+                                                                        :autocorrelation-series [{:lag-days 1 :value 0.714}
+                                                                                                 {:lag-days 2 :value 0.55}
+                                                                                                 {:lag-days 3 :value 0.44}]}}
                                                           :loading-by-coin {}
                                                           :error-by-coin {}}}}]
     (with-redefs [hyperopen.state.trading/position-for-active-asset
@@ -432,6 +435,7 @@
         (is (contains? strings "ACF Lag 1d"))
         (is (contains? strings "ACF Lag 5d"))
         (is (contains? strings "ACF Lag 15d"))
+        (is (contains? strings "Autocorrelation (30d Daily Lags)"))
         (is (contains? strings "+3679.2000%"))
         (is (contains? strings "175.0224%"))
         (is (contains? strings "+0.714"))
@@ -461,7 +465,10 @@
                                                                                           :lag-15d {:value nil
                                                                                                     :lag-days 15
                                                                                                     :minimum-daily-count 16
-                                                                                                    :insufficient? true}}}}
+                                                                                                    :insufficient? true}}
+                                                                        :autocorrelation-series [{:lag-days 1 :value 0.714}
+                                                                                                 {:lag-days 2 :value nil :undefined? true}
+                                                                                                 {:lag-days 3 :value -0.12}]}}
                                                           :loading-by-coin {"XYZ:GOLD" true}
                                                           :error-by-coin {}}}}]
     (with-redefs [hyperopen.state.trading/position-for-active-asset
@@ -479,4 +486,5 @@
             ready-view (view/active-asset-row ctx-data market {:visible-dropdown nil} ready-state)
             ready-strings (set (collect-strings ready-view))]
         (is (contains? loading-strings "Loading 30d stats..."))
+        (is (contains? ready-strings "Autocorrelation (30d Daily Lags)"))
         (is (contains? ready-strings "Lag 15d needs at least 16 daily points"))))))

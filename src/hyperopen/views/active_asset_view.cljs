@@ -3,6 +3,7 @@
             [hyperopen.state.trading :as trading-state]
             [hyperopen.websocket.active-asset-ctx :as active-ctx]
             [hyperopen.views.asset-icon :as asset-icon]
+            [hyperopen.views.autocorrelation-plot :as autocorrelation-plot]
             [hyperopen.views.asset-selector-view :as asset-selector]
             [hyperopen.utils.formatting :as fmt]
             [hyperopen.asset-selector.markets :as markets]))
@@ -299,6 +300,9 @@
      :predictability-error predictability-error
      :predictability-rows (when (map? predictability-summary)
                             (predictability-rows predictability-summary))
+     :predictability-autocorrelation-series (when (map? predictability-summary)
+                                              (vec (or (:autocorrelation-series predictability-summary)
+                                                       [])))
      :predictability-lag-note (when (map? predictability-summary)
                                 (predictability-lag-note predictability-summary))}))
 
@@ -321,6 +325,7 @@
            predictability-loading?
            predictability-error
            predictability-rows
+           predictability-autocorrelation-series
            predictability-lag-note]}]
   [:div {:class ["w-[18rem]"
                  "rounded-lg"
@@ -432,6 +437,10 @@
       :else
       [:div {:class ["num" "text-[0.86rem]" "leading-[1.2rem]" "text-gray-300/90"]}
        "—"])
+    (when (and (not predictability-loading?)
+               (not (seq predictability-error))
+               (seq predictability-autocorrelation-series))
+      (autocorrelation-plot/autocorrelation-plot predictability-autocorrelation-series))
     (when (seq predictability-lag-note)
       [:p {:class ["mt-1.5"
                    "text-[0.72rem]"
