@@ -721,16 +721,18 @@
   [])
 
 (defn open-position-reduce-popover
-  ([_state position-data]
+  ([state position-data]
    [[:effects/save-many [[[:positions-ui :reduce-popover]
-                          (position-reduce/from-position-row position-data)]
+                          (assoc (position-reduce/from-position-row position-data)
+                                 :locale (get-in state [:ui :locale]))]
                          [[:positions-ui :tpsl-modal]
                           (position-tpsl/default-modal-state)]
                          [[:positions-ui :margin-modal]
                           (position-margin/default-modal-state)]]]])
-  ([_state position-data trigger-bounds]
+  ([state position-data trigger-bounds]
    [[:effects/save-many [[[:positions-ui :reduce-popover]
-                          (position-reduce/from-position-row position-data trigger-bounds)]
+                          (assoc (position-reduce/from-position-row position-data trigger-bounds)
+                                 :locale (get-in state [:ui :locale]))]
                          [[:positions-ui :tpsl-modal]
                           (position-tpsl/default-modal-state)]
                          [[:positions-ui :margin-modal]
@@ -746,27 +748,31 @@
     []))
 
 (defn set-position-reduce-popover-field [state path value]
-  (let [popover (or (get-in state [:positions-ui :reduce-popover])
-                    (position-reduce/default-popover-state))
+  (let [popover (assoc (or (get-in state [:positions-ui :reduce-popover])
+                           (position-reduce/default-popover-state))
+                       :locale (get-in state [:ui :locale]))
         path* (if (vector? path) path [path])]
     [[:effects/save [:positions-ui :reduce-popover]
       (position-reduce/set-popover-field popover path* value)]]))
 
 (defn set-position-reduce-size-percent [state percent]
-  (let [popover (or (get-in state [:positions-ui :reduce-popover])
-                    (position-reduce/default-popover-state))]
+  (let [popover (assoc (or (get-in state [:positions-ui :reduce-popover])
+                           (position-reduce/default-popover-state))
+                       :locale (get-in state [:ui :locale]))]
     [[:effects/save [:positions-ui :reduce-popover]
       (position-reduce/set-size-percent popover percent)]]))
 
 (defn set-position-reduce-limit-price-to-mid [state]
-  (let [popover (or (get-in state [:positions-ui :reduce-popover])
-                    (position-reduce/default-popover-state))]
+  (let [popover (assoc (or (get-in state [:positions-ui :reduce-popover])
+                           (position-reduce/default-popover-state))
+                       :locale (get-in state [:ui :locale]))]
     [[:effects/save [:positions-ui :reduce-popover]
       (position-reduce/set-limit-price-to-mid popover)]]))
 
 (defn submit-position-reduce-close [state]
-  (let [popover (or (get-in state [:positions-ui :reduce-popover])
-                    (position-reduce/default-popover-state))
+  (let [popover (assoc (or (get-in state [:positions-ui :reduce-popover])
+                           (position-reduce/default-popover-state))
+                       :locale (get-in state [:ui :locale]))
         result (position-reduce/prepare-submit state popover)]
     (if-not (:ok? result)
       [[:effects/save [:positions-ui :reduce-popover]

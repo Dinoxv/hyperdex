@@ -3,7 +3,8 @@
             [hyperopen.account.history.position-identity :as position-identity]
             [hyperopen.api.gateway.orders.commands :as order-commands]
             [hyperopen.asset-selector.markets :as markets]
-            [hyperopen.domain.trading :as trading-domain]))
+            [hyperopen.domain.trading :as trading-domain]
+            [hyperopen.utils.parse :as parse-utils]))
 
 (def ^:private anchor-keys
   [:left :right :top :bottom :width :height :viewport-width :viewport-height])
@@ -11,6 +12,11 @@
 (defn- parse-num
   [value]
   (trading-domain/parse-num value))
+
+(defn- parse-popover-num
+  [popover value]
+  (or (parse-utils/parse-localized-decimal value (:locale popover))
+      (parse-num value)))
 
 (defn- parse-int-value
   [value]
@@ -97,6 +103,7 @@
    :dex nil
    :position-side nil
    :position-size 0
+   :locale nil
    :size-percent-input "100"
    :close-type :market
    :mid-price nil
@@ -118,7 +125,7 @@
 (defn configured-size-percent
   [popover]
   (let [raw (str/trim (str (or (:size-percent-input popover) "")))
-        parsed (parse-num raw)]
+        parsed (parse-popover-num popover raw)]
     (if (number? parsed)
       (clamp parsed 0 100)
       100)))
@@ -137,7 +144,7 @@
     (cond
       (= path* [:size-percent-input])
       (let [text (str/trim value*)
-            parsed (parse-num text)]
+            parsed (parse-popover-num popover text)]
         (if (str/blank? text)
           (assoc popover :size-percent-input "" :error nil)
           (if (number? parsed)
@@ -181,11 +188,20 @@
       0)))
 
 (defn- positive-price
-  [value]
-  (let [price (parse-num value)]
-    (when (and (number? price)
-               (pos? price))
-      price)))
+  ([value]
+   (let [price (parse-num value)]
+     (when (and (number? price)
+                (pos? price))
+       price)))
+  ([popover value]
+   (let [price (parse-popover-num popover value)]
+     (when (and (number? price)
+                (pos? price))
+       price))))
+
+(defn- popover-limit-price
+  [popover]
+  (positive-price popover (:limit-price popover)))
 
 (defn- position-open-side
   [position-side]
@@ -257,7 +273,7 @@
 (defn- submit-price
   [popover market]
   (if (limit-close? popover)
-    (positive-price (:limit-price popover))
+    (popover-limit-price popover)
     (resolve-market-price popover market)))
 
 (defn validate-popover
@@ -265,7 +281,7 @@
   (let [popover-open? (open? popover)
         close-size (active-close-size popover)
         close-side (reduce-order-side popover)
-        limit-price (positive-price (:limit-price popover))]
+        limit-price (popover-limit-price popover)]
     (cond
       (not popover-open?)
       {:is-ok false

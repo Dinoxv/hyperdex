@@ -323,10 +323,13 @@
         state {:ui {:locale "fr-FR"}}
         tpsl-effects (history-actions/open-position-tpsl-modal state row)
         margin-effects (history-actions/open-position-margin-modal state row)
+        reduce-effects (history-actions/open-position-reduce-popover state row)
         tpsl-modal (get-in (first tpsl-effects) [1 0 1])
-        margin-modal (get-in (first margin-effects) [1 0 1])]
+        margin-modal (get-in (first margin-effects) [1 0 1])
+        reduce-popover (get-in (first reduce-effects) [1 0 1])]
     (is (= "fr-FR" (:locale tpsl-modal)))
-    (is (= "fr-FR" (:locale margin-modal)))))
+    (is (= "fr-FR" (:locale margin-modal)))
+    (is (= "fr-FR" (:locale reduce-popover)))))
 
 (deftest position-reduce-popover-actions-open-update-close-test
   (let [row (fixtures/sample-position-row "xyz:NVDA" 10 "0.500")
@@ -373,6 +376,36 @@
                     :error "Place Order")]]
            submit-effects))
     (is (= [] close-all-effects))))
+
+(deftest position-reduce-popover-parses-localized-input-values-test
+  (let [row (fixtures/sample-position-row "xyz:NVDA" 10 "0.500")
+        state {:ui {:locale "fr-FR"}}
+        open-effects (history-actions/open-position-reduce-popover state row)
+        opened-popover (get-in (first open-effects) [1 0 1])
+        percent-effects (history-actions/set-position-reduce-popover-field
+                         {:ui {:locale "fr-FR"}
+                          :positions-ui {:reduce-popover opened-popover}}
+                         [:size-percent-input]
+                         "25,5")
+        percent-popover (get-in (first percent-effects) [2])
+        market-state {:asset-selector {:market-by-key {"perp:xyz:NVDA"
+                                                       {:coin "xyz:NVDA"
+                                                        :market-type :perp
+                                                        :asset-id 123
+                                                        :mark 10}}}}
+        submit-effects (history-actions/submit-position-reduce-close
+                        (assoc market-state
+                               :ui {:locale "fr-FR"}
+                               :positions-ui {:reduce-popover (assoc percent-popover
+                                                                     :close-type :limit
+                                                                     :limit-price "11,5")}))
+        submitted-order (get-in submit-effects [1 1 :action :orders 0])]
+    (is (= "fr-FR" (:locale opened-popover)))
+    (is (= "25.5" (:size-percent-input percent-popover)))
+    (is (= :effects/api-submit-order
+           (first (second submit-effects))))
+    (is (= "11.5" (:p submitted-order)))
+    (is (= "0.1275" (:s submitted-order)))))
 
 (deftest submit-position-tpsl-validates-and-emits-submit-effect-test
   (let [row (fixtures/sample-position-row "xyz:NVDA" 10 "0.500")
