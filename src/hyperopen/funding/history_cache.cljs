@@ -43,7 +43,17 @@
 
 (defn normalize-coin
   [coin]
-  (some-> coin str str/trim str/upper-case not-empty))
+  (some-> coin
+          str
+          str/trim
+          not-empty
+          (as-> coin*
+                (if (str/includes? coin* ":")
+                  (let [[dex base] (str/split coin* #":" 2)]
+                    (if (seq base)
+                      (str (str/lower-case dex) ":" base)
+                      coin*))
+                  (str/upper-case coin*)))))
 
 (defn cache-key
   [coin]
@@ -122,7 +132,8 @@
    :coin coin
    :rows []
    :last-row-time-ms nil
-   :last-sync-ms (or (parse-ms now-ms) 0)})
+   ;; Empty cache should not be treated as a fresh sync checkpoint.
+   :last-sync-ms 0})
 
 (defn normalize-market-funding-history-cache
   [coin raw-cache now-ms retention-window-ms]
@@ -252,11 +263,14 @@
                                                             retention-window-ms*)
              retention-start-ms (max 0 (- now-ms* retention-window-ms*))
              previous-last-time-ms (:last-row-time-ms cached)
+             has-cached-history? (or (number? previous-last-time-ms)
+                                     (seq (:rows cached)))
              start-time-ms (if (number? previous-last-time-ms)
                              (max retention-start-ms (inc previous-last-time-ms))
                              retention-start-ms)
              end-time-ms now-ms*
-             recent-sync? (and (not force?)
+             recent-sync? (and has-cached-history?
+                               (not force?)
                                (number? (:last-sync-ms cached))
                                (< (- now-ms* (:last-sync-ms cached))
                                   min-refresh-interval-ms*))

@@ -211,15 +211,32 @@
          :short 1
          0))))
 
+(def ^:private annualization-hours
+  (* 24 365))
+
+(defn- hourly-decimal->annualized-percent
+  [hourly-decimal]
+  (when (number? hourly-decimal)
+    (fmt/annualized-funding-rate (* hourly-decimal 100))))
+
+(defn- hourly-decimal-stddev->annualized-percent
+  [hourly-decimal-stddev]
+  (when (number? hourly-decimal-stddev)
+    (* hourly-decimal-stddev
+       100
+       (js/Math.sqrt annualization-hours))))
+
 (defn- predictability-rows
   [summary]
-  [{:id "mean"
-    :label "Mean"
-    :value (:mean summary)
+  (let [annualized-mean (hourly-decimal->annualized-percent (:mean summary))
+        annualized-volatility (hourly-decimal-stddev->annualized-percent (:stddev summary))]
+    [{:id "mean"
+    :label "Mean (APY)"
+    :value annualized-mean
     :kind :signed-percentage}
    {:id "volatility"
-    :label "Volatility (Std Dev)"
-    :value (:stddev summary)
+    :label "Volatility (Ann. Std Dev)"
+    :value annualized-volatility
     :kind :unsigned-percentage}
    {:id "acf-lag-1d"
     :label "ACF Lag 1d"
@@ -232,7 +249,7 @@
    {:id "acf-lag-15d"
     :label "ACF Lag 15d"
     :value (get-in summary [:autocorrelation :lag-15d :value])
-    :kind :signed-decimal}])
+    :kind :signed-decimal}]))
 
 (defn- predictability-lag-note
   [summary]

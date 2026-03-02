@@ -21,6 +21,12 @@
     (is (= [0.0001 0.0003]
            (mapv :fundingRate trimmed)))))
 
+(deftest normalize-coin-canonicalizes-case-for-default-and-dex-prefixed-markets-test
+  (is (= "BTC" (funding-cache/normalize-coin "btc")))
+  (is (= "ETH" (funding-cache/normalize-coin " Eth ")))
+  (is (= "xyz:GOLD" (funding-cache/normalize-coin "XYZ:GOLD")))
+  (is (= "xyz:GOLD" (funding-cache/normalize-coin "xyz:GOLD"))))
+
 (deftest sync-market-funding-history-cache-cold-then-warm-test
   (async done
     (let [now-ms (atom 1700007200000)
@@ -117,4 +123,37 @@
                                        (:start-time-ms (second @request-calls))))
                                 (done)))
                        (.catch (async-support/unexpected-error done)))))
+          (.catch (async-support/unexpected-error done))))))
+
+(deftest sync-market-funding-history-cache-empty-cache-does-not-skip-network-fetch-test
+  (async done
+    (let [now-ms 1700007200000
+          request-calls (atom [])
+          requested-coins (atom [])
+          request-market-funding-history!
+          (fn [coin opts]
+            (swap! requested-coins conj coin)
+            (swap! request-calls conj opts)
+            (js/Promise.resolve [{:coin "xyz:GOLD"
+                                  :time 1700007200000
+                                  :fundingRate "0.0003"
+                                  :premium "0.0004"}]))]
+      (-> (funding-cache/sync-market-funding-history-cache!
+           "XYZ:GOLD"
+           {:now-ms-fn (constantly now-ms)
+            :load-cache-fn (fn [_coin _opts]
+                             {:version 1
+                              :coin "XYZ:GOLD"
+                              :rows []
+                              :last-row-time-ms nil
+                              :last-sync-ms now-ms})
+            :persist-cache-fn (fn [_coin _snapshot] nil)
+            :request-market-funding-history! request-market-funding-history!
+            :min-refresh-interval-ms (* 5 60 1000)})
+          (.then (fn [result]
+                   (is (= :network (:source result)))
+                   (is (= 1 (:fetched-count result)))
+                   (is (= ["xyz:GOLD"] @requested-coins))
+                   (is (= 1 (count @request-calls)))
+                   (done)))
           (.catch (async-support/unexpected-error done))))))
