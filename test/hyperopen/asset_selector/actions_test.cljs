@@ -395,6 +395,15 @@
          (actions/set-funding-hypothetical-size {} "btc" 50000 "0.02")))
 
   (is (= [[:effects/save [:funding-ui :hypothetical-position-by-coin]
+           {"BTC" {:size-input "0,02"
+                   :value-input "1000.00"}}]]
+         (actions/set-funding-hypothetical-size
+          {:ui {:locale "fr-FR"}}
+          "btc"
+          50000
+          "0,02")))
+
+  (is (= [[:effects/save [:funding-ui :hypothetical-position-by-coin]
            {"BTC" {:size-input "oops"
                    :value-input "1000.00"}}]]
          (actions/set-funding-hypothetical-size {} "btc" 50000 "oops")))
@@ -418,6 +427,15 @@
            {"BTC" {:size-input "-0.0250"
                    :value-input "-1250"}}]]
          (actions/set-funding-hypothetical-value {} "BTC" 50000 "-1250")))
+
+  (is (= [[:effects/save [:funding-ui :hypothetical-position-by-coin]
+           {"BTC" {:size-input "-0.0250"
+                   :value-input "-1250,0"}}]]
+         (actions/set-funding-hypothetical-value
+          {:ui {:locale "fr-FR"}}
+          "BTC"
+          50000
+          "-1250,0")))
 
   (is (= [[:effects/save [:funding-ui :hypothetical-position-by-coin]
            {"BTC" {:size-input "0.0200"

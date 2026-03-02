@@ -2,6 +2,7 @@
   (:require [clojure.string :as str]
             [hyperopen.asset-selector.list-metrics :as list-metrics]
             [hyperopen.asset-selector.markets :as markets]
+            [hyperopen.utils.parse :as parse-utils]
             [hyperopen.state.trading :as trading]))
 
 (def ^:private asset-selector-sort-by-storage-key
@@ -86,13 +87,16 @@
 (defn- normalize-decimal-input
   [value]
   (-> (str (or value ""))
-      (str/replace #"," "")
       (str/replace #"\$" "")
       str/trim))
 
 (defn- parse-decimal-input
-  [value]
-  (parse-finite-number (normalize-decimal-input value)))
+  ([value]
+   (parse-decimal-input value nil))
+  ([value locale]
+   (let [text (normalize-decimal-input value)]
+     (or (parse-utils/parse-localized-decimal text locale)
+         (parse-finite-number text)))))
 
 (defn- normalize-coin-key
   [coin]
@@ -521,9 +525,10 @@
 (defn set-funding-hypothetical-size
   [state coin mark size-input]
   (if-let [coin* (normalize-coin-key coin)]
-    (let [size-input* (normalize-decimal-input size-input)
+    (let [locale (get-in state [:ui :locale])
+          size-input* (normalize-decimal-input size-input)
           mark* (parse-finite-number mark)
-          size* (parse-decimal-input size-input*)
+          size* (parse-decimal-input size-input* locale)
           next-value (when (and (number? mark*)
                                 (pos? mark*)
                                 (number? size*))
@@ -539,10 +544,12 @@
 (defn set-funding-hypothetical-value
   [state coin mark value-input]
   (if-let [coin* (normalize-coin-key coin)]
-    (let [value-input* (normalize-decimal-input value-input)
+    (let [locale (get-in state [:ui :locale])
+          value-input* (normalize-decimal-input value-input)
           mark* (parse-finite-number mark)
-          value* (parse-decimal-input value-input*)
-          sign (if (str/starts-with? value-input* "-")
+          value* (parse-decimal-input value-input* locale)
+          sign (if (or (str/starts-with? value-input* "-")
+                       (str/starts-with? value-input* "−"))
                  -1
                  1)
           value-magnitude* (when (number? value*)

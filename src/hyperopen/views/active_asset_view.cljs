@@ -1,13 +1,14 @@
 (ns hyperopen.views.active-asset-view
   (:require [clojure.string :as str]
+            [hyperopen.asset-selector.markets :as markets]
             [hyperopen.state.trading :as trading-state]
+            [hyperopen.utils.formatting :as fmt]
+            [hyperopen.utils.parse :as parse-utils]
             [hyperopen.websocket.active-asset-ctx :as active-ctx]
             [hyperopen.views.asset-icon :as asset-icon]
-            [hyperopen.views.autocorrelation-plot :as autocorrelation-plot]
-            [hyperopen.views.funding-rate-plot :as funding-rate-plot]
             [hyperopen.views.asset-selector-view :as asset-selector]
-            [hyperopen.utils.formatting :as fmt]
-            [hyperopen.asset-selector.markets :as markets]))
+            [hyperopen.views.autocorrelation-plot :as autocorrelation-plot]
+            [hyperopen.views.funding-rate-plot :as funding-rate-plot]))
 
 ;; Pure presentation components
 
@@ -132,13 +133,16 @@
 (defn- normalize-decimal-input
   [value]
   (-> (str (or value ""))
-      (str/replace #"," "")
       (str/replace #"\$" "")
       str/trim))
 
 (defn- parse-decimal-input
-  [value]
-  (parse-optional-number (normalize-decimal-input value)))
+  ([value]
+   (parse-decimal-input value nil))
+  ([value locale]
+   (let [text (normalize-decimal-input value)]
+     (or (parse-utils/parse-localized-decimal text locale)
+         (parse-optional-number text)))))
 
 (defn- coin-prefix [coin]
   (let [coin* (non-blank-text coin)]
@@ -216,7 +220,7 @@
       (/ default-hypothetical-position-value mark*))))
 
 (defn- hypothetical-position-model
-  [coin mark hypothetical-input]
+  [coin mark hypothetical-input locale]
   (let [mark* (parse-optional-number mark)
         stored (if (map? hypothetical-input)
                  hypothetical-input
@@ -232,8 +236,8 @@
         value-input (if (contains? stored :value-input)
                       (str (or (:value-input stored) ""))
                       (fmt/safe-to-fixed default-hypothetical-position-value 2))
-        size* (parse-decimal-input size-input)
-        value-raw* (parse-decimal-input value-input)
+        size* (parse-decimal-input size-input locale)
+        value-raw* (parse-decimal-input value-input locale)
         value-sign (cond
                      (and (number? value-raw*) (neg? value-raw*)) -1
                      (and (number? value-raw*) (pos? value-raw*)) 1
@@ -390,7 +394,7 @@
            " daily points"))))
 
 (defn- funding-tooltip-model
-  [position market coin mark funding-rate predictability-state hypothetical-input]
+  [position market coin mark funding-rate predictability-state hypothetical-input locale]
   (let [size-raw (:szi position)
         size (parse-optional-number size-raw)
         direction (direction-from-size size)
@@ -398,7 +402,7 @@
         has-live-position? (and (number? size)
                                 (not= direction :flat))
         hypothetical-model (when-not has-live-position?
-                             (hypothetical-position-model coin mark hypothetical-input))
+                             (hypothetical-position-model coin mark hypothetical-input locale))
         effective-direction (if has-live-position?
                               direction
                               (:direction hypothetical-model))
@@ -887,13 +891,15 @@
         funding-hypothetical-input (read-by-coin
                                     (get-in full-state [:funding-ui :hypothetical-position-by-coin] {})
                                     coin)
+        locale (get-in full-state [:ui :locale])
         funding-tooltip (funding-tooltip-model (or active-position {})
                                                market
                                                coin
                                                mark
                                                funding-rate
                                                funding-predictability-state
-                                               funding-hypothetical-input)
+                                               funding-hypothetical-input
+                                               locale)
         funding-tooltip-pin-id (str "funding-rate-tooltip-pin-"
                                     (-> (or coin "asset")
                                         str/lower-case
