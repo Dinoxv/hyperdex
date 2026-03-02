@@ -582,11 +582,14 @@
            request-hyperunit-withdrawal-queue!
            set-timeout-fn
            now-ms-fn
-           runtime-error-message]}]
+           runtime-error-message
+           on-terminal-lifecycle!]}]
   (let [request-ops! (when (fn? request-hyperunit-operations!)
                        request-hyperunit-operations!)
         request-queue! (when (fn? request-hyperunit-withdrawal-queue!)
                          request-hyperunit-withdrawal-queue!)
+        terminal-callback! (when (fn? on-terminal-lifecycle!)
+                             on-terminal-lifecycle!)
         timeout! (or set-timeout-fn
                      (fn [f delay-ms]
                        (js/setTimeout f delay-ms)))
@@ -621,7 +624,12 @@
                                           :transition-loading? false})))
             schedule-next! (fn [delay-ms poll-fn]
                              (when (should-continue?)
-                               (timeout! poll-fn delay-ms)))]
+                               (timeout! poll-fn delay-ms)))
+            notify-terminal! (fn [lifecycle]
+                               (when terminal-callback!
+                                 (try
+                                   (terminal-callback! lifecycle)
+                                   (catch :default _ nil))))]
         (install-lifecycle-poll-token! poll-key token)
         (letfn [(poll! []
                   (if-not (should-continue?)
@@ -646,7 +654,9 @@
                                      (update-lifecycle! lifecycle)
                                      (refresh-withdraw-queue!)
                                      (if (lifecycle-terminal? lifecycle)
-                                       (clear-lifecycle-poll-token! poll-key token)
+                                       (do
+                                         (clear-lifecycle-poll-token! poll-key token)
+                                         (notify-terminal! lifecycle))
                                        (schedule-next! (lifecycle-next-delay-ms now-ms lifecycle) poll!))))))
                         (.catch (fn [err]
                                   (when (should-continue?)
@@ -1463,7 +1473,11 @@
                            :request-hyperunit-withdrawal-queue! request-hyperunit-withdrawal-queue!
                            :set-timeout-fn set-timeout-fn
                            :now-ms-fn now-ms-fn
-                           :runtime-error-message runtime-error-message})
+                           :runtime-error-message runtime-error-message
+                           :on-terminal-lifecycle! (fn [_lifecycle]
+                                                    (refresh-after-funding-submit! store
+                                                                                   dispatch!
+                                                                                   address))})
                          (show-toast! store :success "Withdrawal submitted.")
                          resp)
                        (do
@@ -1547,7 +1561,11 @@
                            :base-url base-url
                            :request-hyperunit-operations! request-hyperunit-operations!
                            :set-timeout-fn set-timeout-fn
-                           :now-ms-fn now-ms-fn})
+                           :now-ms-fn now-ms-fn
+                           :on-terminal-lifecycle! (fn [_lifecycle]
+                                                    (refresh-after-funding-submit! store
+                                                                                   dispatch!
+                                                                                   address))})
                          (show-toast! store :success "Deposit address generated.")
                          resp)
                        (let [network (or (:network resp) "Arbitrum")]

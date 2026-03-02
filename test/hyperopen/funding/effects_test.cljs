@@ -203,7 +203,8 @@
           operation-calls (atom [])
           queue-calls (atom [])
           timeout-calls (atom 0)
-          toasts (atom [])]
+          toasts (atom [])
+          dispatches (atom [])]
       (-> (effects/api-submit-funding-withdraw!
            {:store store
             :request {:action {:type "hyperunitSendAssetWithdraw"
@@ -242,6 +243,8 @@
             :set-timeout-fn (fn [_f _delay-ms]
                               (swap! timeout-calls inc)
                               :timer-id)
+            :dispatch! (fn [store* _ event]
+                         (swap! dispatches conj [store* event]))
             :show-toast! (fn [_store kind message]
                            (swap! toasts conj [kind message]))})
           (.then (fn [_resp]
@@ -281,6 +284,8 @@
                       (is (= 7
                              (get-in @store [:funding-ui :modal :hyperunit-withdrawal-queue :by-chain "bitcoin" :withdrawal-queue-length])))
                       (is (= 0 @timeout-calls))
+                      (is (= [[[[:actions/load-user-data wallet-address]]]]
+                             (mapv (fn [[_store event]] [event]) @dispatches)))
                       (is (= [[:success "Withdrawal submitted."]]
                              @toasts))
                       (done))
@@ -597,6 +602,58 @@
                    (done)))
           (.catch (fn [err]
                     (is false (str "Unexpected HyperUnit deposit-address success-path error: " err))
+                    (done)))))))
+
+(deftest api-submit-funding-deposit-hyperunit-address-terminal-lifecycle-refreshes-user-data-test
+  (async done
+    (let [wallet-address "0xabc"
+          deposit-address "bc1qexamplexyz"
+          store (atom {:wallet {:address wallet-address}
+                       :funding-ui {:modal (assoc (seed-modal :deposit)
+                                                  :deposit-step :amount-entry
+                                                  :deposit-selected-asset-key :btc
+                                                  :deposit-generated-address nil
+                                                  :deposit-generated-signatures nil
+                                                  :deposit-generated-asset-key nil)}})
+          dispatches (atom [])
+          timeout-calls (atom 0)]
+      (-> (effects/api-submit-funding-deposit!
+           {:store store
+            :request {:action {:type "hyperunitGenerateDepositAddress"
+                               :asset "btc"
+                               :fromChain "bitcoin"
+                               :network "Bitcoin"}}
+            :submit-hyperunit-address-request! (fn [_store _address _action]
+                                                 (js/Promise.resolve {:status "ok"
+                                                                      :keep-modal-open? true
+                                                                      :asset "btc"
+                                                                      :deposit-address deposit-address
+                                                                      :deposit-signatures [{:r "0x1"}]}))
+            :request-hyperunit-operations! (fn [_opts]
+                                             (js/Promise.resolve
+                                              {:operations [{:operation-id "op_d1"
+                                                             :asset "btc"
+                                                             :protocol-address deposit-address
+                                                             :destination-address wallet-address
+                                                             :state-key :done
+                                                             :status "completed"}]}))
+            :set-timeout-fn (fn [_f _delay-ms]
+                              (swap! timeout-calls inc)
+                              :timer-id)
+            :dispatch! (fn [store* _ event]
+                         (swap! dispatches conj [store* event]))})
+          (.then (fn [_resp]
+                   (js/setTimeout
+                    (fn []
+                      (is (= [[[[:actions/load-user-data wallet-address]]]]
+                             (mapv (fn [[_store event]] [event]) @dispatches)))
+                      (is (= 0 @timeout-calls))
+                      (is (= :done
+                             (get-in @store [:funding-ui :modal :hyperunit-lifecycle :state])))
+                      (done))
+                    0)))
+          (.catch (fn [err]
+                    (is false (str "Unexpected HyperUnit deposit terminal refresh error: " err))
                     (done)))))))
 
 (deftest api-submit-funding-deposit-eth-hyperunit-address-keeps-modal-open-test
