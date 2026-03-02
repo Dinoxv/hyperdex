@@ -16,11 +16,16 @@ A contributor can verify success by opening `/trade`, initiating a Unit deposit 
 - [x] (2026-03-02 18:02Z) Confirmed current baseline integration points in funding actions/effects/view and runtime registration surfaces.
 - [x] (2026-03-02 18:44Z) Implemented HyperUnit API boundary (endpoints + gateway + instance wiring) with normalization for generate-address, operations, estimate-fees, and withdrawal-queue, plus milestone tests.
 - [x] (2026-03-02 19:10Z) Added canonical funding lifecycle state model, deterministic funding action transitions, runtime action wiring, and schema/test coverage for HyperUnit lifecycle state.
-- [ ] Implement Unit deposit lifecycle polling and UI stage rendering.
+- [x] (2026-03-02 20:19Z) Implemented Unit deposit lifecycle polling and stage-aware UI rendering using HyperUnit operations data (`stateNextAttemptAt` backoff, terminal-state stop conditions, and modal lifecycle panel updates).
 - [ ] Implement Unit withdrawal flow (asset-based) and lifecycle/queue tracking.
 - [ ] Integrate `estimate-fees` output into UI and validation messages.
 - [ ] Add regression + lifecycle tests across actions/effects/view/runtime contracts.
 - [ ] Run required validation gates and move this plan to completed.
+
+Validation evidence after Milestone 3 implementation:
+- [x] (2026-03-02 20:05Z) `npm run check` passed.
+- [x] (2026-03-02 20:14Z) `npm test` passed.
+- [x] (2026-03-02 20:15Z) `npm run test:websocket` passed.
 
 ## Surprises & Discoveries
 

@@ -115,6 +115,26 @@
           :else
           grouped-whole)))))
 
+(defn- titleize-token
+  [value fallback]
+  (if-let [token (some-> value name (str/replace #"-" " "))]
+    (let [words (->> (str/split token #"\s+")
+                     (remove str/blank?)
+                     (map str/capitalize))]
+      (if (seq words)
+        (str/join " " words)
+        fallback))
+    fallback))
+
+(defn- next-check-label
+  [next-at-ms now-ms]
+  (when (number? next-at-ms)
+    (let [remaining-ms (max 0 (- next-at-ms now-ms))
+          remaining-seconds (js/Math.ceil (/ remaining-ms 1000))]
+      (if (<= remaining-seconds 1)
+        "Now"
+        (str "In " remaining-seconds "s")))))
+
 (defn funding-modal-view
   [state]
   (let [{:keys [open?
@@ -135,6 +155,7 @@
                 amount-input
                 to-perp?
                 destination-input
+                hyperunit-lifecycle
                 max-display
                 max-input
                 submitting?
@@ -153,9 +174,19 @@
         selected-deposit-icon-src (asset-icon/market-icon-url {:coin (:symbol selected-deposit-asset*)
                                                                 :symbol (:symbol selected-deposit-asset*)})
         deposit-flow-kind* (or deposit-flow-kind :unknown)
+        selected-deposit-asset-key (:key selected-deposit-asset*)
         generated-signature-count (if (sequential? deposit-generated-signatures)
                                     (count deposit-generated-signatures)
                                     0)
+        lifecycle* (or hyperunit-lifecycle {})
+        show-hyperunit-lifecycle? (and (= :deposit (:direction lifecycle*))
+                                       (= selected-deposit-asset-key (:asset-key lifecycle*)))
+        lifecycle-state-label (titleize-token (:state lifecycle*)
+                                              "Awaiting Source Transfer")
+        lifecycle-status-label (titleize-token (:status lifecycle*)
+                                               "Pending")
+        lifecycle-next-check (next-check-label (:state-next-at lifecycle*)
+                                               (js/Date.now))
         amount-input-display (format-grouped-amount-input amount-input)
         modal-title (if (and deposit?
                              deposit-amount-entry?
@@ -305,6 +336,52 @@
                  [:div {:class ["flex" "items-center" "justify-between"]}
                   [:span {:class ["text-[#7d94a0]"]} "Network fee"]
                   [:span {:class ["text-[#dce9ee]"]} "Paid on source chain"]]]
+                (when show-hyperunit-lifecycle?
+                  [:div {:class ["rounded-lg"
+                                 "border"
+                                 "border-[#24485b]"
+                                 "bg-[#0c1f2c]"
+                                 "px-3"
+                                 "py-2.5"
+                                 "space-y-1.5"]
+                         :data-role "funding-deposit-lifecycle"}
+                   [:div {:class ["flex" "items-center" "justify-between"]}
+                    [:span {:class ["text-xs" "uppercase" "tracking-[0.08em]" "text-[#7d94a0]"]}
+                     "Lifecycle Stage"]
+                    [:span {:class ["text-xs" "font-medium" "text-[#dce9ee]"]}
+                     lifecycle-state-label]]
+                   [:div {:class ["flex" "items-center" "justify-between"]}
+                    [:span {:class ["text-[#7d94a0]"]} "Status"]
+                    [:span {:class ["text-[#dce9ee]"]} lifecycle-status-label]]
+                   (when (number? (:source-tx-confirmations lifecycle*))
+                     [:div {:class ["flex" "items-center" "justify-between"]}
+                      [:span {:class ["text-[#7d94a0]"]} "Source confirmations"]
+                      [:span {:class ["text-[#dce9ee]"]}
+                       (str (:source-tx-confirmations lifecycle*))]])
+                   (when (number? (:destination-tx-confirmations lifecycle*))
+                     [:div {:class ["flex" "items-center" "justify-between"]}
+                      [:span {:class ["text-[#7d94a0]"]} "Destination confirmations"]
+                      [:span {:class ["text-[#dce9ee]"]}
+                       (str (:destination-tx-confirmations lifecycle*))]])
+                   (when (seq (:destination-tx-hash lifecycle*))
+                     [:div {:class ["space-y-1"]}
+                      [:p {:class ["text-[#7d94a0]"]} "Destination tx hash"]
+                      [:p {:class ["font-mono" "text-xs" "text-[#dce9ee]" "break-all"]}
+                       (:destination-tx-hash lifecycle*)]])
+                   (when (seq lifecycle-next-check)
+                     [:div {:class ["flex" "items-center" "justify-between"]}
+                      [:span {:class ["text-[#7d94a0]"]} "Next check"]
+                      [:span {:class ["text-[#dce9ee]"]} lifecycle-next-check]])
+                   (when (seq (:error lifecycle*))
+                     [:div {:class ["rounded-md"
+                                    "border"
+                                    "border-[#7b3340]"
+                                    "bg-[#3a1b22]/55"
+                                    "px-2.5"
+                                    "py-1.5"
+                                    "text-xs"
+                                    "text-[#f2b8c5]"]}
+                      (:error lifecycle*)])])
                 [:div {:class ["grid" "grid-cols-[56px_1fr]" "gap-2" "pt-1"]}
                  [:button {:type "button"
                            :class ["h-[38px]"

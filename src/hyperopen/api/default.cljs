@@ -1,6 +1,7 @@
 (ns hyperopen.api.default
   (:require [hyperopen.api.compat :as api-compat]
             [hyperopen.api.gateway.account :as account-gateway]
+            [hyperopen.api.gateway.funding-hyperunit :as funding-hyperunit-gateway]
             [hyperopen.api.gateway.market :as market-gateway]
             [hyperopen.api.gateway.orders :as order-gateway]
             [hyperopen.api.gateway.vaults :as vault-gateway]
@@ -275,6 +276,26 @@
    (account-gateway/request-user-funding-history!
     {:request-user-funding-history-data! request-user-funding-history-data!}
     address
+    opts)))
+
+(defn request-hyperunit-operations!
+  [opts]
+  (funding-hyperunit-gateway/request-hyperunit-operations!
+   {:fetch-fn js/fetch}
+   opts))
+
+(defn request-hyperunit-estimate-fees!
+  ([] (request-hyperunit-estimate-fees! {}))
+  ([opts]
+   (funding-hyperunit-gateway/request-hyperunit-estimate-fees!
+    {:fetch-fn js/fetch}
+    opts)))
+
+(defn request-hyperunit-withdrawal-queue!
+  ([] (request-hyperunit-withdrawal-queue! {}))
+  ([opts]
+   (funding-hyperunit-gateway/request-hyperunit-withdrawal-queue!
+    {:fetch-fn js/fetch}
     opts)))
 
 (defn request-vault-index!
