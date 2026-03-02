@@ -61,7 +61,8 @@
     :symbol "BONK"
     :name "Bonk"
     :network "Solana"
-    :flow-kind :hyperunit-address}
+    :flow-kind :hyperunit-address
+    :hyperunit-source-chain "solana"}
    {:key :ena
     :symbol "ENA"
     :name "Ethena"
@@ -103,7 +104,7 @@
   (set (map :key deposit-assets-base)))
 
 (def ^:private deposit-implemented-asset-keys
-  #{:usdc :usdt :btc :eth :sol :2z})
+  #{:usdc :usdt :btc :eth :sol :2z :bonk})
 
 (defn- non-blank-text
   [value]

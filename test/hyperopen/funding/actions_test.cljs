@@ -310,6 +310,23 @@
                        :network "Solana"}}]]
            (funding-actions/submit-funding-deposit state)))))
 
+(deftest submit-funding-deposit-supports-bonk-hyperunit-address-flow-test
+  (let [state (assoc-in (base-state)
+                        [:funding-ui :modal]
+                        {:open? true
+                         :mode :deposit
+                         :deposit-step :amount-entry
+                         :deposit-selected-asset-key :bonk
+                         :amount-input ""})]
+    (is (= [[:effects/save-many [[[:funding-ui :modal :submitting?] true]
+                                 [[:funding-ui :modal :error] nil]]]
+            [:effects/api-submit-funding-deposit
+             {:action {:type "hyperunitGenerateDepositAddress"
+                       :asset "bonk"
+                       :fromChain "solana"
+                       :network "Solana"}}]]
+           (funding-actions/submit-funding-deposit state)))))
+
 (deftest submit-funding-deposit-rejects-unimplemented-asset-flows-test
   (let [state (assoc-in (base-state)
                         [:funding-ui :modal]
