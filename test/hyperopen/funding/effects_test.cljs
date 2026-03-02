@@ -9,7 +9,9 @@
    :submitting? true
    :error nil
    :amount-input "10"
-   :destination-input "0x1234567890abcdef1234567890abcdef12345678"})
+   :destination-input "0x1234567890abcdef1234567890abcdef12345678"
+   :withdraw-selected-asset-key :usdc
+   :withdraw-generated-address nil})
 
 (deftest api-submit-funding-transfer-no-wallet-sets-error-test
   (let [store (atom {:wallet {}
@@ -181,6 +183,93 @@
                    (done)))
           (.catch (fn [err]
                     (is false (str "Unexpected withdraw runtime failure-path rejection: " err))
+                    (done)))))))
+
+(deftest api-submit-funding-withdraw-hyperunit-send-asset-polls-and-updates-lifecycle-test
+  (async done
+    (let [wallet-address "0x1234567890abcdef1234567890abcdef12345678"
+          destination-address "bc1qexamplexyz0p4y0p4y0p4y0p4y0p4y0p4y0p"
+          protocol-address "bc1qprotocolrouteaddress"
+          store (atom {:wallet {:address wallet-address}
+                       :funding-ui {:modal (assoc (seed-modal :withdraw)
+                                                  :withdraw-selected-asset-key :btc
+                                                  :destination-input destination-address
+                                                  :withdraw-generated-address nil)}})
+          submit-calls (atom [])
+          operation-calls (atom [])
+          timeout-calls (atom 0)
+          toasts (atom [])]
+      (-> (effects/api-submit-funding-withdraw!
+           {:store store
+            :request {:action {:type "hyperunitSendAssetWithdraw"
+                               :asset "btc"
+                               :token "BTC"
+                               :amount "0.25"
+                               :destination destination-address
+                               :destinationChain "bitcoin"
+                               :network "Bitcoin"}}
+            :submit-hyperunit-send-asset-withdraw-request-fn (fn [_store address action submit-send-asset-fn]
+                                                                (swap! submit-calls conj [address action (fn? submit-send-asset-fn)])
+                                                                (js/Promise.resolve {:status "ok"
+                                                                                     :keep-modal-open? true
+                                                                                     :asset "btc"
+                                                                                     :destination destination-address
+                                                                                     :protocol-address protocol-address
+                                                                                     :network "Bitcoin"}))
+            :request-hyperunit-operations! (fn [opts]
+                                             (swap! operation-calls conj opts)
+                                             (js/Promise.resolve
+                                              {:operations [{:operation-id "op_w1"
+                                                             :asset "btc"
+                                                             :protocol-address protocol-address
+                                                             :source-address wallet-address
+                                                             :destination-address destination-address
+                                                             :state-key :done
+                                                             :status "completed"
+                                                             :position-in-withdraw-queue 2
+                                                             :destination-tx-hash "0xwithdraw"}]}))
+            :set-timeout-fn (fn [_f _delay-ms]
+                              (swap! timeout-calls inc)
+                              :timer-id)
+            :show-toast! (fn [_store kind message]
+                           (swap! toasts conj [kind message]))})
+          (.then (fn [_resp]
+                   (js/setTimeout
+                    (fn []
+                      (is (= [["0x1234567890abcdef1234567890abcdef12345678"
+                               {:type "hyperunitSendAssetWithdraw"
+                                :asset "btc"
+                                :token "BTC"
+                                :amount "0.25"
+                                :destination destination-address
+                                :destinationChain "bitcoin"
+                                :network "Bitcoin"}
+                               true]]
+                             @submit-calls))
+                      (is (= [{:base-url "https://api.hyperunit.xyz"
+                               :address wallet-address}]
+                             @operation-calls))
+                      (is (= protocol-address
+                             (get-in @store [:funding-ui :modal :withdraw-generated-address])))
+                      (is (= :withdraw
+                             (get-in @store [:funding-ui :modal :hyperunit-lifecycle :direction])))
+                      (is (= :btc
+                             (get-in @store [:funding-ui :modal :hyperunit-lifecycle :asset-key])))
+                      (is (= "op_w1"
+                             (get-in @store [:funding-ui :modal :hyperunit-lifecycle :operation-id])))
+                      (is (= :done
+                             (get-in @store [:funding-ui :modal :hyperunit-lifecycle :state])))
+                      (is (= :completed
+                             (get-in @store [:funding-ui :modal :hyperunit-lifecycle :status])))
+                      (is (= 2
+                             (get-in @store [:funding-ui :modal :hyperunit-lifecycle :position-in-withdraw-queue])))
+                      (is (= 0 @timeout-calls))
+                      (is (= [[:success "Withdrawal submitted."]]
+                             @toasts))
+                      (done))
+                    0)))
+          (.catch (fn [err]
+                    (is false (str "Unexpected HyperUnit withdrawal lifecycle polling error: " err))
                     (done)))))))
 
 (deftest api-submit-funding-deposit-no-wallet-sets-error-test

@@ -113,6 +113,17 @@
 (def ^:private deposit-implemented-asset-keys
   #{:usdc :usdt :btc :eth :sol :2z :bonk :ena :fart :mon :pump :spxs :xpl :usdh})
 
+(def ^:private withdraw-default-asset-key
+  :usdc)
+
+(def ^:private withdraw-supported-asset-keys
+  (->> deposit-assets-base
+       (filter (fn [{:keys [key flow-kind]}]
+                 (or (= key :usdc)
+                     (= flow-kind :hyperunit-address))))
+       (map :key)
+       set))
+
 (defn- non-blank-text
   [value]
   (let [text (some-> value str str/trim)]
@@ -155,16 +166,20 @@
     (when (finite-number? parsed)
       (max 0 parsed))))
 
-(defn- normalize-address
+(defn- normalize-evm-address
   [value]
   (let [text (some-> value str str/trim str/lower-case)]
     (when (and (string? text)
                (re-matches #"^0x[0-9a-f]{40}$" text))
       text)))
 
+(defn- normalize-withdraw-destination
+  [value]
+  (non-blank-text value))
+
 (defn- wallet-address
   [state]
-  (normalize-address (get-in state [:wallet :address])))
+  (normalize-evm-address (get-in state [:wallet :address])))
 
 (defn- normalize-mode
   [value]
@@ -208,6 +223,15 @@
                     (string? value) (some-> value str/trim str/lower-case keyword)
                     :else nil)]
     (when (contains? deposit-asset-keys asset-key)
+      asset-key)))
+
+(defn- normalize-withdraw-asset-key
+  [value]
+  (let [asset-key (cond
+                    (keyword? value) value
+                    (string? value) (some-> value str/trim str/lower-case keyword)
+                    :else nil)]
+    (when (contains? withdraw-supported-asset-keys asset-key)
       asset-key)))
 
 (defn- normalize-lifecycle-direction
@@ -322,6 +346,23 @@
                        (str/includes? network* search-term))))
                assets))))
 
+(defn- withdraw-assets
+  [state]
+  (->> (deposit-assets state)
+       (filterv (fn [asset]
+                  (contains? withdraw-supported-asset-keys (:key asset))))))
+
+(defn- withdraw-asset
+  [state modal]
+  (let [selected-key (or (normalize-withdraw-asset-key (:withdraw-selected-asset-key modal))
+                         withdraw-default-asset-key)
+        assets (withdraw-assets state)]
+    (or (some (fn [asset]
+                (when (= selected-key (:key asset))
+                  asset))
+              assets)
+        (first assets))))
+
 (defn default-funding-modal-state
   []
   {:open? false
@@ -336,6 +377,8 @@
    :amount-input ""
    :to-perp? true
    :destination-input ""
+   :withdraw-selected-asset-key withdraw-default-asset-key
+   :withdraw-generated-address nil
    :hyperunit-lifecycle (default-hyperunit-lifecycle-state)
    :submitting? false
    :error nil})
@@ -348,6 +391,9 @@
         modal (merge (default-funding-modal-state)
                      stored-modal)]
     (assoc modal
+           :withdraw-selected-asset-key (or (normalize-withdraw-asset-key
+                                             (:withdraw-selected-asset-key modal))
+                                            withdraw-default-asset-key)
            :hyperunit-lifecycle (normalize-hyperunit-lifecycle
                                  (:hyperunit-lifecycle modal)))))
 
@@ -359,6 +405,10 @@
   [coin]
   (and (string? coin)
        (str/starts-with? (str/upper-case (str/trim coin)) "USDC")))
+
+(defn- normalize-coin-token
+  [value]
+  (some-> value str str/trim str/upper-case))
 
 (defn- balance-row-available
   [row]
@@ -386,6 +436,15 @@
           (when (usdc-coin? (:coin row))
             (balance-row-available row)))
         (get-in state [:spot :clearinghouse-state :balances])))
+
+(defn- spot-asset-available
+  [state symbol]
+  (let [target (normalize-coin-token symbol)]
+    (some (fn [row]
+            (when (= target
+                     (normalize-coin-token (:coin row)))
+              (balance-row-available row)))
+          (get-in state [:spot :clearinghouse-state :balances]))))
 
 (defn- summary-derived-withdrawable
   [summary]
@@ -421,8 +480,17 @@
     (perps-withdrawable state)))
 
 (defn- withdraw-max-amount
-  [state]
-  (perps-withdrawable state))
+  [state selected-asset]
+  (cond
+    (nil? selected-asset)
+    0
+
+    (= :usdc (:key selected-asset))
+    (perps-withdrawable state)
+
+    :else
+    (or (spot-asset-available state (:symbol selected-asset))
+        0)))
 
 (defn- format-usdc-display
   [value]
@@ -471,13 +539,29 @@
 
 (defn- withdraw-preview
   [state modal]
-  (let [amount (parse-input-amount (:amount-input modal))
-        destination (normalize-address (:destination-input modal))
-        max-amount (withdraw-max-amount state)]
+  (let [selected-asset (withdraw-asset state modal)
+        flow-kind (:flow-kind selected-asset)
+        asset-key (:key selected-asset)
+        asset-symbol (or (:symbol selected-asset) "Asset")
+        destination-chain (non-blank-text (:hyperunit-source-chain selected-asset))
+        amount (parse-input-amount (:amount-input modal))
+        destination (if (= flow-kind :hyperunit-address)
+                      (normalize-withdraw-destination (:destination-input modal))
+                      (normalize-evm-address (:destination-input modal)))
+        max-amount (withdraw-max-amount state selected-asset)]
     (cond
+      (nil? selected-asset)
+      {:ok? false
+       :display-message "Select an asset to withdraw."}
+
       (nil? destination)
       {:ok? false
        :display-message "Enter a valid destination address."}
+
+      (and (= flow-kind :hyperunit-address)
+           (not (seq destination-chain)))
+      {:ok? false
+       :display-message (str "Withdrawal source chain is unavailable for " asset-symbol ".")}
 
       (<= max-amount 0)
       {:ok? false
@@ -487,7 +571,8 @@
       {:ok? false
        :display-message "Enter a valid amount."}
 
-      (< amount withdraw-min-usdc)
+      (and (= asset-key :usdc)
+           (< amount withdraw-min-usdc))
       {:ok? false
        :display-message (str "Minimum withdrawal is " withdraw-min-usdc " USDC.")}
 
@@ -496,10 +581,19 @@
        :display-message "Amount exceeds withdrawable balance."}
 
       :else
-      {:ok? true
-       :request {:action {:type "withdraw3"
-                          :amount (amount->text amount)
-                          :destination destination}}})))
+      (if (= flow-kind :hyperunit-address)
+        {:ok? true
+         :request {:action {:type "hyperunitSendAssetWithdraw"
+                            :asset (name asset-key)
+                            :token asset-symbol
+                            :amount (amount->text amount)
+                            :destination destination
+                            :destinationChain destination-chain
+                            :network (:network selected-asset)}}}
+        {:ok? true
+         :request {:action {:type "withdraw3"
+                            :amount (amount->text amount)
+                            :destination destination}}}))))
 
 (defn- deposit-preview
   [state modal]
@@ -613,6 +707,11 @@
         deposit-step (normalize-deposit-step (:deposit-step modal))
         deposit-assets* (deposit-assets-filtered state modal)
         selected-deposit-asset (deposit-asset state modal)
+        withdraw-assets* (withdraw-assets state)
+        selected-withdraw-asset (withdraw-asset state modal)
+        selected-withdraw-asset-key (:key selected-withdraw-asset)
+        selected-withdraw-symbol (or (:symbol selected-withdraw-asset) "USDC")
+        selected-withdraw-flow-kind (or (:flow-kind selected-withdraw-asset) :unknown)
         selected-deposit-asset-key (:key selected-deposit-asset)
         selected-deposit-flow-kind (or (:flow-kind selected-deposit-asset) :unknown)
         selected-deposit-implemented? (deposit-asset-implemented? selected-deposit-asset)
@@ -626,7 +725,7 @@
         preview-result (preview state modal)
         preview-ok? (:ok? preview-result)
         transfer-max (transfer-max-amount state modal)
-        withdraw-max (withdraw-max-amount state)
+        withdraw-max (withdraw-max-amount state selected-withdraw-asset)
         max-amount (case mode
                      :transfer transfer-max
                      :withdraw withdraw-max
@@ -664,12 +763,18 @@
      :deposit-flow-supported? selected-deposit-implemented?
      :deposit-generated-address generated-address
      :deposit-generated-signatures generated-signatures
+     :withdraw-assets withdraw-assets*
+     :withdraw-selected-asset selected-withdraw-asset
+     :withdraw-selected-asset-key selected-withdraw-asset-key
+     :withdraw-flow-kind selected-withdraw-flow-kind
+     :withdraw-generated-address (non-blank-text (:withdraw-generated-address modal))
      :amount-input (or (:amount-input modal) "")
      :to-perp? (true? (:to-perp? modal))
      :destination-input (or (:destination-input modal) "")
      :hyperunit-lifecycle hyperunit-lifecycle
      :max-display (format-usdc-display max-amount)
      :max-input (format-usdc-input max-amount)
+     :max-symbol (if (= mode :withdraw) selected-withdraw-symbol "USDC")
      :submitting? submitting?
      :submit-disabled? submit-disabled?
      :preview-ok? preview-ok?
@@ -698,7 +803,10 @@
                        :transfer "Transfer"
                        :withdraw "Withdraw"
                        "Confirm"))
-     :min-withdraw-usdc withdraw-min-usdc}))
+     :min-withdraw-usdc withdraw-min-usdc
+     :min-withdraw-amount (if (= selected-withdraw-asset-key :usdc)
+                            withdraw-min-usdc
+                            0)}))
 
 (defn open-funding-deposit-modal
   [state]
@@ -727,11 +835,16 @@
 
 (defn open-funding-withdraw-modal
   [state]
-  [[:effects/save funding-modal-path
-    (-> (default-funding-modal-state)
-        (assoc :open? true
-               :mode :withdraw
-               :destination-input (or (wallet-address state) "")))]])
+  (let [base (modal-state state)
+        selected-asset-key (or (normalize-withdraw-asset-key
+                                (:withdraw-selected-asset-key base))
+                               withdraw-default-asset-key)]
+    [[:effects/save funding-modal-path
+      (-> (default-funding-modal-state)
+          (assoc :open? true
+                 :mode :withdraw
+                 :withdraw-selected-asset-key selected-asset-key
+                 :destination-input (or (wallet-address state) "")))]]))
 
 (defn- open-legacy-funding-modal
   [state legacy-kind]
@@ -765,10 +878,13 @@
                  [:deposit-search-input] (str (or value ""))
                  [:deposit-step] (normalize-deposit-step value)
                  [:deposit-selected-asset-key] (normalize-deposit-asset-key value)
+                 [:withdraw-selected-asset-key] (or (normalize-withdraw-asset-key value)
+                                                    withdraw-default-asset-key)
                  value)
         clear-hyperunit-lifecycle? (or (= path* [:amount-input])
                                        (= path* [:destination-input])
                                        (= path* [:deposit-selected-asset-key])
+                                       (= path* [:withdraw-selected-asset-key])
                                        (and (= path* [:deposit-step])
                                             (= value* :asset-select)))
         next-modal (cond-> (-> modal
@@ -776,6 +892,9 @@
                                (assoc :error nil))
                      clear-hyperunit-lifecycle?
                      (assoc :hyperunit-lifecycle (default-hyperunit-lifecycle-state))
+
+                     clear-hyperunit-lifecycle?
+                     (assoc :withdraw-generated-address nil)
 
                      (= path* [:deposit-selected-asset-key])
                      (assoc :deposit-step :amount-entry
@@ -828,7 +947,7 @@
         mode (normalize-mode (:mode modal))
         max-amount (case mode
                      :transfer (transfer-max-amount state modal)
-                     :withdraw (withdraw-max-amount state)
+                     :withdraw (withdraw-max-amount state (withdraw-asset state modal))
                      0)]
     [[:effects/save funding-modal-path
       (-> modal

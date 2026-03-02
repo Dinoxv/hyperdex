@@ -116,6 +116,66 @@
              (set! signing/sign-usd-class-transfer-action! original-sign)
              (restore-fetch!)))))))
 
+(deftest submit-send-asset-signs-user-action-with-nonce-field-test
+  (async done
+    (let [store (atom {:wallet {:chain-id "0xa4b1"
+                                :user-signed-nonce-cursor 1700000005500}})
+          sign-calls (atom [])
+          fetch-calls (atom [])
+          original-now platform/now-ms
+          original-sign signing/sign-send-asset-action!
+          restore-fetch! (support/install-fetch-stub!
+                          (fn [url opts]
+                            (swap! fetch-calls conj [url opts])
+                            (js/Promise.resolve (support/json-response {:status "ok"}))))]
+      (set! platform/now-ms (fn [] 1700000001500))
+      (set! signing/sign-send-asset-action!
+            (fn [address action]
+              (swap! sign-calls conj [address action])
+              (js/Promise.resolve
+               (clj->js {:r "0x03"
+                         :s "0x04"
+                         :v 27}))))
+      (-> (trading/submit-send-asset! store
+                                      support/owner-address
+                                      {:type "sendAsset"
+                                       :destination "0x1234567890abcdef1234567890abcdef12345678"
+                                       :sourceDex "spot"
+                                       :destinationDex "spot"
+                                       :token "BTC"
+                                       :amount "0.25"
+                                       :fromSubAccount ""})
+          (.then (fn [resp]
+                   (is (= "ok" (:status resp)))
+                   (is (= 1 (count @sign-calls)))
+                   (is (= 1 (count @fetch-calls)))
+                   (let [[signed-address signed-action] (first @sign-calls)
+                         [_ fetch-opts] (first @fetch-calls)
+                         payload (support/fetch-body->map fetch-opts)]
+                     (is (= support/owner-address signed-address))
+                     (is (= "0xa4b1" (:signatureChainId signed-action)))
+                     (is (= "Mainnet" (:hyperliquidChain signed-action)))
+                     (is (= 1700000005501 (:nonce signed-action)))
+                     (is (= "BTC" (:token signed-action)))
+                     (is (= "spot" (:sourceDex signed-action)))
+                     (is (= "spot" (:destinationDex signed-action)))
+                     (is (= "0.25" (:amount signed-action)))
+                     (is (= 1700000005501 (:nonce payload)))
+                     (is (= signed-action (:action payload)))
+                     (is (= {:r "0x03" :s "0x04" :v 27}
+                            (:signature payload)))
+                     (is (= 1700000005501
+                            (get-in @store [:wallet :user-signed-nonce-cursor]))))
+                   (done)))
+          (.catch (fn [err]
+                    (is false (str "Unexpected error: " err))
+                    (done)))
+          (.finally
+           (fn []
+             (set! platform/now-ms original-now)
+             (set! signing/sign-send-asset-action! original-sign)
+             (restore-fetch!)))))))
+
 (deftest submit-withdraw3-signs-user-action-with-time-field-test
   (async done
     (let [store (atom {:wallet {:chain-id "0x66eee"

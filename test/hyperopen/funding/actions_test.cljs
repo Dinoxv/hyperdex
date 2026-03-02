@@ -25,6 +25,8 @@
    :amount-input ""
    :to-perp? true
    :destination-input "0x1234567890abcdef1234567890abcdef12345678"
+   :withdraw-selected-asset-key :usdc
+   :withdraw-generated-address nil
    :hyperunit-lifecycle (funding-actions/default-hyperunit-lifecycle-state)
    :submitting? false
    :error nil})
@@ -106,6 +108,29 @@
                        :amount "6.5"
                        :destination "0x1234567890abcdef1234567890abcdef12345678"}}]]
            (funding-actions/submit-funding-withdraw valid)))))
+
+(deftest submit-funding-withdraw-supports-btc-hyperunit-send-asset-flow-test
+  (let [state (-> (base-state)
+                  (assoc-in [:spot :clearinghouse-state :balances]
+                            [{:coin "USDC" :available "12.5" :total "12.5" :hold "0"}
+                             {:coin "BTC" :available "1.25" :total "1.25" :hold "0"}])
+                  (assoc-in [:funding-ui :modal]
+                            {:open? true
+                             :mode :withdraw
+                             :withdraw-selected-asset-key :btc
+                             :destination-input "bc1qexamplexyz0p4y0p4y0p4y0p4y0p4y0p4y0p"
+                             :amount-input "0.25"}))]
+    (is (= [[:effects/save-many [[[:funding-ui :modal :submitting?] true]
+                                 [[:funding-ui :modal :error] nil]]]
+            [:effects/api-submit-funding-withdraw
+             {:action {:type "hyperunitSendAssetWithdraw"
+                       :asset "btc"
+                       :token "BTC"
+                       :amount "0.25"
+                       :destination "bc1qexamplexyz0p4y0p4y0p4y0p4y0p4y0p4y0p"
+                       :destinationChain "bitcoin"
+                       :network "Bitcoin"}}]]
+           (funding-actions/submit-funding-withdraw state)))))
 
 (deftest submit-funding-deposit-validates-step-asset-and-amount-test
   (let [no-asset (assoc-in (base-state)
@@ -236,11 +261,17 @@
         [_ _ destination-modal] (first (funding-actions/set-funding-modal-field
                                         state
                                         [:destination-input]
-                                        "0x1234567890abcdef1234567890abcdef12345678"))]
+                                        "0x1234567890abcdef1234567890abcdef12345678"))
+        [_ _ withdraw-asset-modal] (first (funding-actions/set-funding-modal-field
+                                           state
+                                           [:withdraw-selected-asset-key]
+                                           :eth))]
     (is (= (funding-actions/default-hyperunit-lifecycle-state)
            (:hyperunit-lifecycle amount-modal)))
     (is (= (funding-actions/default-hyperunit-lifecycle-state)
-           (:hyperunit-lifecycle destination-modal)))))
+           (:hyperunit-lifecycle destination-modal)))
+    (is (= (funding-actions/default-hyperunit-lifecycle-state)
+           (:hyperunit-lifecycle withdraw-asset-modal)))))
 
 (deftest set-hyperunit-lifecycle-normalizes-snapshot-test
   (let [state (assoc-in (base-state)

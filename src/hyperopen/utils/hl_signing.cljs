@@ -33,6 +33,16 @@
    {:name "toPerp" :type "bool"}
    {:name "nonce" :type "uint64"}])
 
+(def ^:private send-asset-fields
+  [{:name "hyperliquidChain" :type "string"}
+   {:name "destination" :type "string"}
+   {:name "sourceDex" :type "string"}
+   {:name "destinationDex" :type "string"}
+   {:name "token" :type "string"}
+   {:name "amount" :type "string"}
+   {:name "fromSubAccount" :type "string"}
+   {:name "nonce" :type "uint64"}])
+
 (def ^:private withdraw-fields
   [{:name "hyperliquidChain" :type "string"}
    {:name "destination" :type "string"}
@@ -176,6 +186,24 @@
    :message {:hyperliquidChain hyperliquidChain
              :amount (str amount)
              :toPerp (boolean toPerp)
+             :nonce nonce}})
+
+(defn build-send-asset-typed-data
+  [{:keys [hyperliquidChain signatureChainId destination sourceDex destinationDex token amount fromSubAccount nonce]}]
+  {:types {"HyperliquidTransaction:SendAsset" send-asset-fields
+           "EIP712Domain" eip712-domain-fields}
+   :domain {:name "HyperliquidSignTransaction"
+            :version "1"
+            :chainId (parse-chain-id signatureChainId)
+            :verifyingContract zero-address}
+   :primaryType "HyperliquidTransaction:SendAsset"
+   :message {:hyperliquidChain hyperliquidChain
+             :destination destination
+             :sourceDex (or sourceDex "")
+             :destinationDex (or destinationDex "")
+             :token (str token)
+             :amount (str amount)
+             :fromSubAccount (or fromSubAccount "")
              :nonce nonce}})
 
 (defn build-withdraw3-typed-data
@@ -326,6 +354,10 @@
 (defn sign-usd-class-transfer-action!
   [address action]
   (sign-typed-data! address (build-usd-class-transfer-typed-data action)))
+
+(defn sign-send-asset-action!
+  [address action]
+  (sign-typed-data! address (build-send-asset-typed-data action)))
 
 (defn sign-withdraw3-action!
   [address action]

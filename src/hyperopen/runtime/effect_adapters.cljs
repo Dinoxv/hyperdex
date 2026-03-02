@@ -783,6 +783,9 @@
    {:store store
     :request request
     :dispatch! nxr/dispatch
+    :request-hyperunit-operations! api/request-hyperunit-operations!
+    :set-timeout-fn platform/set-timeout!
+    :now-ms-fn platform/now-ms
     :exchange-response-error exchange-response-error
     :runtime-error-message runtime-error-message
     :show-toast! show-order-feedback-toast!}))

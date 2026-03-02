@@ -32,6 +32,8 @@
               :deposit-generated-address nil
               :deposit-generated-signatures nil
               :deposit-generated-asset-key nil
+              :withdraw-selected-asset-key :usdc
+              :withdraw-generated-address nil
               :amount-input ""
               :to-perp? true
               :destination-input ""

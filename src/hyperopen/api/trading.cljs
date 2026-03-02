@@ -437,6 +437,14 @@
                               :nonce
                               signing/sign-usd-class-transfer-action!))
 
+(defn submit-send-asset!
+  [store address action]
+  (sign-and-post-user-action! store
+                              address
+                              action
+                              :nonce
+                              signing/sign-send-asset-action!))
+
 (defn submit-withdraw3!
   [store address action]
   (sign-and-post-user-action! store

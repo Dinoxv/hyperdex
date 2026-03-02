@@ -152,17 +152,23 @@
                 deposit-submit-label
                 deposit-quick-amounts
                 deposit-min-usdc
+                withdraw-assets
+                withdraw-selected-asset
+                withdraw-flow-kind
+                withdraw-generated-address
                 amount-input
                 to-perp?
                 destination-input
                 hyperunit-lifecycle
                 max-display
                 max-input
+                max-symbol
                 submitting?
                 submit-disabled?
                 status-message
                 submit-label
-                min-withdraw-usdc]} (funding-actions/funding-modal-view-model state)
+                min-withdraw-usdc
+                min-withdraw-amount]} (funding-actions/funding-modal-view-model state)
         deposit? (= mode :deposit)
         deposit-amount-entry? (= deposit-step :amount-entry)
         transfer? (= mode :transfer)
@@ -175,14 +181,27 @@
                                                                 :symbol (:symbol selected-deposit-asset*)})
         deposit-flow-kind* (or deposit-flow-kind :unknown)
         selected-deposit-asset-key (:key selected-deposit-asset*)
+        selected-withdraw-asset* (or withdraw-selected-asset
+                                     {:key :usdc
+                                      :symbol "USDC"
+                                      :network "Arbitrum"
+                                      :flow-kind :bridge2})
+        selected-withdraw-asset-key (:key selected-withdraw-asset*)
+        selected-withdraw-icon-src (asset-icon/market-icon-url {:coin (:symbol selected-withdraw-asset*)
+                                                                 :symbol (:symbol selected-withdraw-asset*)})
+        withdraw-flow-kind* (or withdraw-flow-kind :unknown)
         generated-signature-count (if (sequential? deposit-generated-signatures)
                                     (count deposit-generated-signatures)
                                     0)
         lifecycle* (or hyperunit-lifecycle {})
-        show-hyperunit-lifecycle? (and (= :deposit (:direction lifecycle*))
-                                       (= selected-deposit-asset-key (:asset-key lifecycle*)))
+        show-hyperunit-lifecycle? (or (and (= :deposit (:direction lifecycle*))
+                                           (= selected-deposit-asset-key (:asset-key lifecycle*)))
+                                      (and (= :withdraw (:direction lifecycle*))
+                                           (= selected-withdraw-asset-key (:asset-key lifecycle*))))
         lifecycle-state-label (titleize-token (:state lifecycle*)
-                                              "Awaiting Source Transfer")
+                                              (if (= :withdraw (:direction lifecycle*))
+                                                "Awaiting Hyperliquid Send"
+                                                "Awaiting Source Transfer"))
         lifecycle-status-label (titleize-token (:status lifecycle*)
                                                "Pending")
         lifecycle-next-check (next-check-label (:state-next-at lifecycle*)
@@ -588,9 +607,48 @@
           [:div {:class ["space-y-3"]}
            [:div {:class ["space-y-2"]}
             [:label {:class ["block" "text-xs" "uppercase" "tracking-[0.08em]" "text-[#8ea4ab]"]}
-             "Destination Address"]
+             "Asset"]
+            [:div {:class ["rounded-lg"
+                           "border"
+                           "border-[#1f3f4f]"
+                           "bg-[#152230]"
+                           "px-3"
+                           "py-2.5"]}
+             [:div {:class ["flex" "items-center" "justify-between" "gap-3"]}
+              [:div {:class ["flex" "items-center" "gap-2.5"]}
+               (deposit-asset-icon (:symbol selected-withdraw-asset*) selected-withdraw-icon-src)
+               [:div {:class ["flex" "flex-col"]}
+                [:span {:class ["text-sm" "font-semibold" "text-[#e6eef2]"]} (:symbol selected-withdraw-asset*)]
+                [:span {:class ["text-xs" "text-[#7e95a0]"]} (:network selected-withdraw-asset*)]]]
+              [:select {:value (or (some-> selected-withdraw-asset-key name) "usdc")
+                        :disabled submitting?
+                        :class ["rounded-md"
+                                "border"
+                                "border-[#355061]"
+                                "bg-[#0e1f2b]"
+                                "px-2.5"
+                                "py-1.5"
+                                "text-xs"
+                                "text-[#dce9ee]"
+                                "outline-none"
+                                "focus:border-[#4b6c82]"
+                                "disabled:opacity-70"]
+                        :on {:input [[:actions/set-funding-modal-field
+                                      [:withdraw-selected-asset-key]
+                                      [:event.target/value]]]}}
+               (for [asset withdraw-assets]
+                 ^{:key (str "withdraw-asset-" (name (:key asset)))}
+                 [:option {:value (name (:key asset))}
+                  (:symbol asset)])]]]]
+           [:div {:class ["space-y-2"]}
+            [:label {:class ["block" "text-xs" "uppercase" "tracking-[0.08em]" "text-[#8ea4ab]"]}
+             (if (= withdraw-flow-kind* :hyperunit-address)
+               (str "Destination Address (" (:network selected-withdraw-asset*) ")")
+               "Destination Address")]
             [:input {:type "text"
-                     :placeholder "0x..."
+                     :placeholder (if (= withdraw-flow-kind* :hyperunit-address)
+                                    (str "Enter " (:symbol selected-withdraw-asset*) " destination")
+                                    "0x...")
                      :disabled submitting?
                      :value destination-input
                      :class ["w-full"
@@ -612,14 +670,14 @@
            [:div {:class ["space-y-2"]}
             [:div {:class ["flex" "items-center" "justify-between" "gap-2"]}
              [:label {:class ["block" "text-xs" "uppercase" "tracking-[0.08em]" "text-[#8ea4ab]"]}
-              "Amount (USDC)"]
+              (str "Amount (" max-symbol ")")]
              [:button {:type "button"
                        :disabled submitting?
                        :class (if submitting?
                                 ["text-xs" "font-medium" "tracking-[0.03em]" "text-[#6f868c]" "cursor-not-allowed"]
                                 ["text-xs" "font-medium" "tracking-[0.03em]" "text-[#5de6da]" "hover:text-[#8bf3ea]"])
                        :on {:click [[:actions/set-funding-modal-field [:amount-input] max-input]]}}
-              (str "MAX: " max-display " USDC")]]
+              (str "MAX: " max-display " " max-symbol)]]
             [:input {:type "text"
                      :input-mode "decimal"
                      :placeholder "Enter amount"
@@ -639,8 +697,74 @@
                              "disabled:cursor-not-allowed"
                              "disabled:opacity-70"]
                      :on {:input [[:actions/set-funding-modal-field [:amount-input] [:event.target/value]]]}}]]
-           [:p {:class ["text-xs" "text-[#8ea4ab]"]}
-            (str "Minimum withdrawal: " min-withdraw-usdc " USDC.")]
+           (when (pos? min-withdraw-amount)
+             [:p {:class ["text-xs" "text-[#8ea4ab]"]}
+              (str "Minimum withdrawal: " min-withdraw-usdc " USDC.")])
+           (when (and (= withdraw-flow-kind* :hyperunit-address)
+                      (seq withdraw-generated-address))
+             [:div {:class ["rounded-lg"
+                            "border"
+                            "border-[#24485b]"
+                            "bg-[#0f2433]"
+                            "px-3"
+                            "py-2.5"
+                            "space-y-1.5"]}
+              [:p {:class ["text-xs" "uppercase" "tracking-[0.08em]" "text-[#7c93a0]"]}
+               "HyperUnit Protocol Address"]
+              [:p {:class ["font-mono" "text-xs" "break-all" "text-[#d6e8ee]"]}
+               withdraw-generated-address]])
+           (when (and show-hyperunit-lifecycle?
+                      (= :withdraw (:direction lifecycle*)))
+             [:div {:class ["rounded-lg"
+                            "border"
+                            "border-[#24485b]"
+                            "bg-[#0c1f2c]"
+                            "px-3"
+                            "py-2.5"
+                            "space-y-1.5"]
+                    :data-role "funding-withdraw-lifecycle"}
+              [:div {:class ["flex" "items-center" "justify-between"]}
+               [:span {:class ["text-xs" "uppercase" "tracking-[0.08em]" "text-[#7d94a0]"]}
+                "Lifecycle Stage"]
+               [:span {:class ["text-xs" "font-medium" "text-[#dce9ee]"]}
+                lifecycle-state-label]]
+              [:div {:class ["flex" "items-center" "justify-between"]}
+               [:span {:class ["text-[#7d94a0]"]} "Status"]
+               [:span {:class ["text-[#dce9ee]"]} lifecycle-status-label]]
+              (when (number? (:source-tx-confirmations lifecycle*))
+                [:div {:class ["flex" "items-center" "justify-between"]}
+                 [:span {:class ["text-[#7d94a0]"]} "Source confirmations"]
+                 [:span {:class ["text-[#dce9ee]"]}
+                  (str (:source-tx-confirmations lifecycle*))]])
+              (when (number? (:destination-tx-confirmations lifecycle*))
+                [:div {:class ["flex" "items-center" "justify-between"]}
+                 [:span {:class ["text-[#7d94a0]"]} "Destination confirmations"]
+                 [:span {:class ["text-[#dce9ee]"]}
+                  (str (:destination-tx-confirmations lifecycle*))]])
+              (when (number? (:position-in-withdraw-queue lifecycle*))
+                [:div {:class ["flex" "items-center" "justify-between"]}
+                 [:span {:class ["text-[#7d94a0]"]} "Queue position"]
+                 [:span {:class ["text-[#dce9ee]"]}
+                  (str (:position-in-withdraw-queue lifecycle*))]])
+              (when (seq (:destination-tx-hash lifecycle*))
+                [:div {:class ["space-y-1"]}
+                 [:p {:class ["text-[#7d94a0]"]} "Destination tx hash"]
+                 [:p {:class ["font-mono" "text-xs" "text-[#dce9ee]" "break-all"]}
+                  (:destination-tx-hash lifecycle*)]])
+              (when (seq lifecycle-next-check)
+                [:div {:class ["flex" "items-center" "justify-between"]}
+                 [:span {:class ["text-[#7d94a0]"]} "Next check"]
+                 [:span {:class ["text-[#dce9ee]"]} lifecycle-next-check]])
+              (when (seq (:error lifecycle*))
+                [:div {:class ["rounded-md"
+                               "border"
+                               "border-[#7b3340]"
+                               "bg-[#3a1b22]/55"
+                               "px-2.5"
+                               "py-1.5"
+                               "text-xs"
+                               "text-[#f2b8c5]"]}
+                 (:error lifecycle*)])])
            [:div {:class ["flex" "justify-end" "gap-2"]}
             [:button {:type "button"
                       :class (base-button-classes false)

@@ -286,6 +286,16 @@
     :fetch-fn js/fetch}
    {:address address}))
 
+(defn request-hyperunit-generate-address!
+  [{:keys [base-url source-chain destination-chain asset destination-address]}]
+  (funding-hyperunit-gateway/request-hyperunit-generate-address!
+   {:hyperunit-base-url base-url
+    :fetch-fn js/fetch}
+   {:source-chain source-chain
+    :destination-chain destination-chain
+    :asset asset
+    :destination-address destination-address}))
+
 (defn- lifecycle-poll-key
   [store direction asset-key]
   [store direction asset-key])
@@ -310,11 +320,20 @@
   [store direction asset-key protocol-address]
   (let [modal (get-in @store [:funding-ui :modal])
         lifecycle (:hyperunit-lifecycle modal)
-        generated-address (:deposit-generated-address modal)]
+        mode (:mode modal)
+        selected-asset-key (case direction
+                             :deposit (:deposit-selected-asset-key modal)
+                             :withdraw (:withdraw-selected-asset-key modal)
+                             nil)
+        generated-address (case direction
+                            :deposit (:deposit-generated-address modal)
+                            :withdraw (:withdraw-generated-address modal)
+                            nil)]
     (and (true? (:open? modal))
-         (= :deposit (:mode modal))
-         (= :amount-entry (:deposit-step modal))
-         (= asset-key (:deposit-selected-asset-key modal))
+         (= mode direction)
+         (or (not= direction :deposit)
+             (= :amount-entry (:deposit-step modal)))
+         (= asset-key selected-asset-key)
          (= direction (:direction lifecycle))
          (= asset-key (:asset-key lifecycle))
          (or (not (seq (canonical-token protocol-address)))
@@ -328,10 +347,11 @@
       (timestamp->ms (:op-created-at op))
       0))
 
-(defn- select-deposit-operation
-  [operations {:keys [asset-key protocol-address destination-address]}]
+(defn- select-operation
+  [operations {:keys [asset-key protocol-address source-address destination-address]}]
   (let [asset-token (some-> asset-key name canonical-token)
         protocol-token (canonical-token protocol-address)
+        source-token (canonical-token source-address)
         destination-token (canonical-token destination-address)
         for-asset (->> (or operations [])
                        (filter (fn [op]
@@ -343,13 +363,28 @@
                                         (canonical-token (:protocol-address %)))
                                     for-asset)
                            [])
+        source-matches (if (seq source-token)
+                         (filterv #(= source-token
+                                      (canonical-token (:source-address %)))
+                                  for-asset)
+                         [])
         destination-matches (if (seq destination-token)
                               (filterv #(= destination-token
                                            (canonical-token (:destination-address %)))
                                        for-asset)
                               [])
+        source-and-destination-matches (if (and (seq source-token)
+                                                (seq destination-token))
+                                         (filterv #(and (= source-token
+                                                         (canonical-token (:source-address %)))
+                                                        (= destination-token
+                                                           (canonical-token (:destination-address %))))
+                                                  for-asset)
+                                         [])
         candidates (cond
                      (seq protocol-matches) protocol-matches
+                     (seq source-and-destination-matches) source-and-destination-matches
+                     (seq source-matches) source-matches
                      (seq destination-matches) destination-matches
                      :else for-asset)]
     (last (sort-by op-sort-ms candidates))))
@@ -392,10 +427,10 @@
         (min hyperunit-operations-poll-max-delay-ms)
         js/Math.floor)))
 
-(defn- operation->deposit-lifecycle
-  [operation asset-key now-ms]
+(defn- operation->lifecycle
+  [operation direction asset-key now-ms]
   (funding-actions/normalize-hyperunit-lifecycle
-   {:direction :deposit
+   {:direction direction
     :asset-key asset-key
     :operation-id (:operation-id operation)
     :state (or (:state-key operation)
@@ -409,21 +444,33 @@
     :last-updated-ms now-ms
     :error (:error operation)}))
 
-(defn- awaiting-deposit-lifecycle
-  [asset-key now-ms]
+(defn- awaiting-lifecycle
+  [direction asset-key now-ms]
   (funding-actions/normalize-hyperunit-lifecycle
-   {:direction :deposit
+   {:direction direction
     :asset-key asset-key
     :status :pending
-    :state :awaiting-source-transfer
+    :state (if (= direction :withdraw)
+             :awaiting-hyperliquid-send
+             :awaiting-source-transfer)
     :last-updated-ms now-ms
     :error nil}))
 
-(defn- start-hyperunit-deposit-lifecycle-polling!
+(defn- awaiting-deposit-lifecycle
+  [asset-key now-ms]
+  (awaiting-lifecycle :deposit asset-key now-ms))
+
+(defn- awaiting-withdraw-lifecycle
+  [asset-key now-ms]
+  (awaiting-lifecycle :withdraw asset-key now-ms))
+
+(defn- start-hyperunit-lifecycle-polling!
   [{:keys [store
+           direction
            wallet-address
            asset-key
            protocol-address
+           destination-address
            base-url
            request-hyperunit-operations!
            set-timeout-fn
@@ -436,10 +483,10 @@
         now-ms!* (or now-ms-fn
                      (fn [] (js/Date.now)))]
     (when (and request-ops!
+               (contains? #{:deposit :withdraw} direction)
                (seq (non-blank-text wallet-address))
                (keyword? asset-key))
-      (let [direction :deposit
-            poll-key (lifecycle-poll-key store direction asset-key)
+      (let [poll-key (lifecycle-poll-key store direction asset-key)
             token (str (random-uuid))
             should-continue? (fn []
                                (and (lifecycle-poll-token-active? poll-key token)
@@ -462,14 +509,17 @@
                                  (when (should-continue?)
                                    (let [operations (:operations (or response {}))
                                          now-ms (now-ms!*)
-                                         operation (select-deposit-operation
-                                                    operations
-                                                    {:asset-key asset-key
-                                                     :protocol-address protocol-address
-                                                     :destination-address wallet-address})
+                                         operation (select-operation operations
+                                                                    {:asset-key asset-key
+                                                                     :protocol-address protocol-address
+                                                                     :source-address (when (= direction :withdraw)
+                                                                                       wallet-address)
+                                                                     :destination-address (if (= direction :withdraw)
+                                                                                            destination-address
+                                                                                            wallet-address)})
                                          lifecycle (if operation
-                                                     (operation->deposit-lifecycle operation asset-key now-ms)
-                                                     (awaiting-deposit-lifecycle asset-key now-ms))]
+                                                     (operation->lifecycle operation direction asset-key now-ms)
+                                                     (awaiting-lifecycle direction asset-key now-ms))]
                                      (update-lifecycle! lifecycle)
                                      (if (lifecycle-terminal? lifecycle)
                                        (clear-lifecycle-poll-token! poll-key token)
@@ -481,22 +531,34 @@
                                                       "Unable to refresh lifecycle status right now.")
                                           previous (get-in @store [:funding-ui :modal :hyperunit-lifecycle])]
                                       (update-lifecycle!
-                                       (assoc (merge (awaiting-deposit-lifecycle asset-key now-ms)
+                                       (assoc (merge (awaiting-lifecycle direction asset-key now-ms)
                                                      (if (map? previous) previous {}))
-                                              :direction :deposit
+                                              :direction direction
                                               :asset-key asset-key
                                               :last-updated-ms now-ms
                                               :error message))
                                       (schedule-next! hyperunit-operations-poll-default-delay-ms poll!))))))))]
           (poll!))))))
 
+(defn- start-hyperunit-deposit-lifecycle-polling!
+  [opts]
+  (start-hyperunit-lifecycle-polling!
+   (assoc opts :direction :deposit)))
+
+(defn- start-hyperunit-withdraw-lifecycle-polling!
+  [opts]
+  (start-hyperunit-lifecycle-polling!
+   (assoc opts :direction :withdraw)))
+
 (defn- hyperunit-gen-url
-  [base-url from-chain asset destination-address]
+  [base-url source-chain destination-chain asset destination-address]
   (let [encode js/encodeURIComponent]
     (str base-url
          "/gen/"
-         (encode from-chain)
-         "/hyperliquid/"
+         (encode source-chain)
+         "/"
+         (encode destination-chain)
+         "/"
          (encode asset)
          "/"
          (encode destination-address))))
@@ -701,9 +763,13 @@
       {:swap-tx swap-tx
        :approval-txs approval-txs})))
 
-(defn- fetch-hyperunit-deposit-address!
-  [base-url from-chain asset destination-address]
-  (let [url (hyperunit-gen-url base-url from-chain asset destination-address)]
+(defn- fetch-hyperunit-address!
+  [base-url source-chain destination-chain asset destination-address]
+  (let [url (hyperunit-gen-url base-url
+                               source-chain
+                               destination-chain
+                               asset
+                               destination-address)]
     (-> (js/fetch url #js {:method "GET"
                            :headers #js {"Content-Type" "application/json"}})
         (.then (fn [resp]
@@ -755,10 +821,11 @@
                            :error "Deposit asset is missing for this request."})
 
       :else
-      (-> (fetch-hyperunit-deposit-address! base-url
-                                            from-chain
-                                            asset
-                                            destination-address)
+      (-> (fetch-hyperunit-address! base-url
+                                    from-chain
+                                    "hyperliquid"
+                                    asset
+                                    destination-address)
           (.then (fn [{:keys [address signatures]}]
                    {:status "ok"
                     :keep-modal-open? true
@@ -767,6 +834,77 @@
                     :from-chain from-chain
                     :deposit-address address
                     :deposit-signatures signatures}))
+          (.catch (fn [err]
+                    {:status "err"
+                     :error (wallet-error-message err)}))))))
+
+(defn- submit-hyperunit-send-asset-withdraw-request!
+  [store owner-address action submit-send-asset!]
+  (let [source-address (normalize-address owner-address)
+        destination-address (non-blank-text (:destination action))
+        destination-chain (some-> (:destinationChain action) str str/trim str/lower-case)
+        asset (some-> (:asset action) str str/trim str/lower-case)
+        token (non-blank-text (:token action))
+        amount (some-> (:amount action) str str/trim)
+        network-label (or (non-blank-text (:network action))
+                          (some-> destination-chain str/capitalize))
+        base-url (resolve-hyperunit-base-url store)]
+    (cond
+      (nil? source-address)
+      (js/Promise.resolve {:status "err"
+                           :error "Connect your wallet before withdrawing."})
+
+      (not (seq destination-address))
+      (js/Promise.resolve {:status "err"
+                           :error "Enter a valid destination address."})
+
+      (not (seq destination-chain))
+      (js/Promise.resolve {:status "err"
+                           :error "Withdrawal destination chain is missing for this asset."})
+
+      (not (seq asset))
+      (js/Promise.resolve {:status "err"
+                           :error "Withdrawal asset is missing for this request."})
+
+      (not (seq token))
+      (js/Promise.resolve {:status "err"
+                           :error "Withdrawal token symbol is missing for this request."})
+
+      (not (seq amount))
+      (js/Promise.resolve {:status "err"
+                           :error "Enter a valid withdrawal amount."})
+
+      :else
+      (-> (fetch-hyperunit-address! base-url
+                                    "hyperliquid"
+                                    destination-chain
+                                    asset
+                                    destination-address)
+          (.then (fn [{:keys [address]}]
+                   (-> (submit-send-asset! store
+                                           source-address
+                                           {:type "sendAsset"
+                                            :destination address
+                                            :sourceDex "spot"
+                                            :destinationDex "spot"
+                                            :token token
+                                            :amount amount
+                                            :fromSubAccount ""})
+                       (.then (fn [exchange-resp]
+                                (if (= "ok" (:status exchange-resp))
+                                  {:status "ok"
+                                   :keep-modal-open? true
+                                   :network network-label
+                                   :asset asset
+                                   :token token
+                                   :destination destination-address
+                                   :destination-chain destination-chain
+                                   :protocol-address address}
+                                  (let [error-text (str/trim (str (fallback-exchange-response-error exchange-resp)))]
+                                    {:status "err"
+                                     :error (if (seq error-text)
+                                              error-text
+                                              "Unknown exchange error")})))))))
           (.catch (fn [err]
                     {:status "err"
                      :error (wallet-error-message err)}))))))
@@ -1060,30 +1198,78 @@
            request
            dispatch!
            submit-withdraw3!
+           submit-send-asset!
+           submit-hyperunit-send-asset-withdraw-request-fn
+           request-hyperunit-operations!
+           set-timeout-fn
+           now-ms-fn
            exchange-response-error
            runtime-error-message
            show-toast!
            default-funding-modal-state]
     :or {submit-withdraw3! trading-api/submit-withdraw3!
+         submit-send-asset! trading-api/submit-send-asset!
+         submit-hyperunit-send-asset-withdraw-request-fn submit-hyperunit-send-asset-withdraw-request!
+         request-hyperunit-operations! nil
+         set-timeout-fn nil
+         now-ms-fn nil
          exchange-response-error fallback-exchange-response-error
          runtime-error-message fallback-runtime-error-message
          show-toast! (fn [_store _kind _message] nil)
          default-funding-modal-state funding-actions/default-funding-modal-state}}]
   (let [address (get-in @store [:wallet :address])
-        action (:action request)]
+        action (:action request)
+        submit-withdraw! (case (:type action)
+                           "withdraw3" submit-withdraw3!
+                           "hyperunitSendAssetWithdraw"
+                           (fn [store* owner-address action*]
+                             (submit-hyperunit-send-asset-withdraw-request-fn
+                              store*
+                              owner-address
+                              action*
+                              submit-send-asset!))
+                           (fn [_store _address _action]
+                             (js/Promise.resolve {:status "err"
+                                                  :error "Withdrawal action type is not supported."})))]
     (if (nil? address)
       (set-funding-submit-error! store
                                  show-toast!
                                  "Connect your wallet before withdrawing.")
-      (-> (submit-withdraw3! store address action)
+      (-> (submit-withdraw! store address action)
           (.then (fn [resp]
                    (if (= "ok" (:status resp))
-                     (do
-                       (close-funding-modal! store default-funding-modal-state)
-                       (show-toast! store :success "Withdrawal submitted.")
-                       (refresh-after-funding-submit! store dispatch! address)
-                       resp)
-                     (let [error-text (str/trim (str (exchange-response-error resp)))
+                     (if (true? (:keep-modal-open? resp))
+                       (let [asset-key (some-> (:asset resp) str str/lower-case keyword)
+                             base-url (resolve-hyperunit-base-url store)
+                             now-ms (if (fn? now-ms-fn)
+                                      (now-ms-fn)
+                                      (js/Date.now))]
+                         (swap! store (fn [state]
+                                        (-> state
+                                            (assoc-in [:funding-ui :modal :submitting?] false)
+                                            (assoc-in [:funding-ui :modal :error] nil)
+                                            (assoc-in [:funding-ui :modal :withdraw-generated-address] (:protocol-address resp))
+                                            (assoc-in [:funding-ui :modal :hyperunit-lifecycle]
+                                                      (awaiting-withdraw-lifecycle asset-key now-ms)))))
+                         (start-hyperunit-withdraw-lifecycle-polling!
+                          {:store store
+                           :wallet-address address
+                           :asset-key asset-key
+                           :protocol-address (:protocol-address resp)
+                           :destination-address (:destination resp)
+                           :base-url base-url
+                           :request-hyperunit-operations! request-hyperunit-operations!
+                           :set-timeout-fn set-timeout-fn
+                           :now-ms-fn now-ms-fn})
+                         (show-toast! store :success "Withdrawal submitted.")
+                         resp)
+                       (do
+                         (close-funding-modal! store default-funding-modal-state)
+                         (show-toast! store :success "Withdrawal submitted.")
+                         (refresh-after-funding-submit! store dispatch! address)
+                         resp))
+                     (let [error-text (str/trim (str (or (:error resp)
+                                                        (exchange-response-error resp))))
                            message (str "Withdrawal failed: "
                                         (if (seq error-text) error-text "Unknown exchange error"))]
                        (set-funding-submit-error! store show-toast! message)

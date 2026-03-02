@@ -91,6 +91,30 @@
     (is (= true (get-in typed-data [:message :toPerp])))
     (is (= 1700000003000 (get-in typed-data [:message :nonce])))))
 
+(deftest build-send-asset-typed-data-test
+  (let [typed-data (signing/build-send-asset-typed-data
+                    {:hyperliquidChain "Mainnet"
+                     :signatureChainId "0xa4b1"
+                     :destination "0x1234567890abcdef1234567890abcdef12345678"
+                     :sourceDex "spot"
+                     :destinationDex "spot"
+                     :token "BTC"
+                     :amount "0.25"
+                     :fromSubAccount ""
+                     :nonce 1700000003500})]
+    (is (= "HyperliquidSignTransaction" (get-in typed-data [:domain :name])))
+    (is (= 42161 (get-in typed-data [:domain :chainId])))
+    (is (= "HyperliquidTransaction:SendAsset" (:primaryType typed-data)))
+    (is (= "Mainnet" (get-in typed-data [:message :hyperliquidChain])))
+    (is (= "0x1234567890abcdef1234567890abcdef12345678"
+           (get-in typed-data [:message :destination])))
+    (is (= "spot" (get-in typed-data [:message :sourceDex])))
+    (is (= "spot" (get-in typed-data [:message :destinationDex])))
+    (is (= "BTC" (get-in typed-data [:message :token])))
+    (is (= "0.25" (get-in typed-data [:message :amount])))
+    (is (= "" (get-in typed-data [:message :fromSubAccount])))
+    (is (= 1700000003500 (get-in typed-data [:message :nonce])))))
+
 (deftest build-withdraw3-typed-data-test
   (let [typed-data (signing/build-withdraw3-typed-data
                     {:hyperliquidChain "Testnet"
