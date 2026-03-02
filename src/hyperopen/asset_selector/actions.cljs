@@ -542,19 +542,8 @@
     (let [value-input* (normalize-decimal-input value-input)
           mark* (parse-finite-number mark)
           value* (parse-decimal-input value-input*)
-          current-size* (parse-decimal-input
-                         (:size-input (hypothetical-entry state coin* mark)))
-          sign (cond
-                 (and (number? value*) (neg? value*)) -1
-                 (and (number? value*) (pos? value*))
-                 (if (and (number? current-size*)
-                          (neg? current-size*))
-                   -1
-                   1)
-                 (and (number? current-size*)
-                      (neg? current-size*))
+          sign (if (str/starts-with? value-input* "-")
                  -1
-                 :else
                  1)
           value-magnitude* (when (number? value*)
                              (js/Math.abs value*))
