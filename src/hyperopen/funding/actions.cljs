@@ -73,7 +73,8 @@
     :symbol "FARTCOIN"
     :name "Fartcoin"
     :network "Solana"
-    :flow-kind :hyperunit-address}
+    :flow-kind :hyperunit-address
+    :hyperunit-source-chain "solana"}
    {:key :mon
     :symbol "MON"
     :name "Monad"
@@ -105,7 +106,7 @@
   (set (map :key deposit-assets-base)))
 
 (def ^:private deposit-implemented-asset-keys
-  #{:usdc :usdt :btc :eth :sol :2z :bonk :ena})
+  #{:usdc :usdt :btc :eth :sol :2z :bonk :ena :fart})
 
 (defn- non-blank-text
   [value]

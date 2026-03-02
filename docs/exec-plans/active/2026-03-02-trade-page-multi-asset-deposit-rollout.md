@@ -41,7 +41,10 @@ A user verifies behavior by opening `/trade`, selecting `Deposit`, seeing the co
 - [x] (2026-03-02 22:41Z) Completed Milestone 7 (`ENA`) HyperUnit address-flow enablement by adding `ena` Ethereum source-chain metadata to the shared address-generation path in `/hyperopen/src/hyperopen/funding/actions.cljs`.
 - [x] (2026-03-02 22:42Z) Added `ENA`-specific request/response coverage in `/hyperopen/test/hyperopen/funding/actions_test.cljs` and `/hyperopen/test/hyperopen/funding/effects_test.cljs`.
 - [x] (2026-03-02 22:44Z) Re-ran required validation gates after Milestone 7: `npm run check`, `npm test`, `npm run test:websocket` (all pass; existing unrelated test compile warnings remain).
-- [ ] Implement remaining per-coin milestones one by one with tests and manual verification (FARTCOIN, MON, PUMP, SPX, XPL, plus any additional assets discovered in Milestone 0 such as USDH).
+- [x] (2026-03-02 22:54Z) Completed Milestone 8 (`FARTCOIN`) HyperUnit address-flow enablement by adding `fart` Solana source-chain metadata to the shared address-generation path in `/hyperopen/src/hyperopen/funding/actions.cljs`.
+- [x] (2026-03-02 22:55Z) Added `FARTCOIN`-specific request/response coverage in `/hyperopen/test/hyperopen/funding/actions_test.cljs` and `/hyperopen/test/hyperopen/funding/effects_test.cljs`.
+- [x] (2026-03-02 22:57Z) Re-ran required validation gates after Milestone 8: `npm run check`, `npm test`, `npm run test:websocket` (all pass; existing unrelated test compile warnings remain).
+- [ ] Implement remaining per-coin milestones one by one with tests and manual verification (MON, PUMP, SPX, XPL, plus any additional assets discovered in Milestone 0 such as USDH).
 - [ ] Move this plan to completed after all per-coin acceptance criteria pass.
 
 ## Surprises & Discoveries
@@ -123,7 +126,7 @@ A user verifies behavior by opening `/trade`, selecting `Deposit`, seeing the co
 
 ## Outcomes & Retrospective
 
-Planning + discovery + Milestone 1 (`USDT`) + Milestone 2 (`BTC`) + Milestone 3 (`ETH`) + Milestone 4 (`SOL`) + Milestone 5 (`2Z`) + Milestone 6 (`BONK`) + Milestone 7 (`ENA`) completed.
+Planning + discovery + Milestone 1 (`USDT`) + Milestone 2 (`BTC`) + Milestone 3 (`ETH`) + Milestone 4 (`SOL`) + Milestone 5 (`2Z`) + Milestone 6 (`BONK`) + Milestone 7 (`ENA`) + Milestone 8 (`FARTCOIN`) completed.
 
 Achieved now:
 - Defined a discovery-first execution strategy that prevents stale asset assumptions.
@@ -138,10 +141,11 @@ Achieved now:
 - Implemented fourth HyperUnit address-flow coin (`2Z`) by enabling Solana source-chain metadata for the `2z` asset in the shared address-generation request handling.
 - Implemented fifth HyperUnit address-flow coin (`BONK`) by enabling Solana source-chain metadata for the `bonk` asset in the shared address-generation request handling.
 - Implemented sixth HyperUnit address-flow coin (`ENA`) by enabling Ethereum source-chain metadata for the `ena` asset in the shared address-generation request handling.
+- Implemented seventh HyperUnit address-flow coin (`FARTCOIN`) by enabling Solana source-chain metadata for the `fart` asset in the shared address-generation request handling.
 - Revalidated required repo gates after milestone implementation (`npm run check`, `npm test`, `npm run test:websocket`).
 
 Not yet achieved:
-- Remaining per-coin route/address flows (`FARTCOIN`, `MON`, `PUMP`, `SPX`, `XPL`, `USDH`) are not implemented yet.
+- Remaining per-coin route/address flows (`MON`, `PUMP`, `SPX`, `XPL`, `USDH`) are not implemented yet.
 - No manual per-coin end-to-end verification artifacts yet beyond code-level/test-level validation.
 
 ## Context and Orientation
@@ -309,3 +313,4 @@ Revision note (2026-03-02): Completed Milestone 4 (`SOL`) by enabling Solana Hyp
 Revision note (2026-03-02): Completed Milestone 5 (`2Z`) by enabling Solana HyperUnit address generation for the `2z` asset in the shared address-flow pipeline, adding `2Z` coverage tests, and re-running required validation gates.
 Revision note (2026-03-02): Completed Milestone 6 (`BONK`) by enabling Solana HyperUnit address generation for the `bonk` asset in the shared address-flow pipeline, adding `BONK` coverage tests, and re-running required validation gates.
 Revision note (2026-03-02): Completed Milestone 7 (`ENA`) by enabling Ethereum HyperUnit address generation for the `ena` asset in the shared address-flow pipeline, adding `ENA` coverage tests, and re-running required validation gates.
+Revision note (2026-03-02): Completed Milestone 8 (`FARTCOIN`) by enabling Solana HyperUnit address generation for the `fart` asset in the shared address-flow pipeline, adding `FARTCOIN` coverage tests, and re-running required validation gates.
