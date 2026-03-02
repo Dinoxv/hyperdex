@@ -153,8 +153,8 @@
     [:div {:class ["mt-2"
                    "rounded-md"
                    "border"
-                   "border-slate-700/70"
-                   "bg-slate-900/35"
+                   "border-base-300"
+                   "bg-base-100/80"
                    "px-2.5"
                    "py-2"]}
      [:h5 {:class ["mb-1"
