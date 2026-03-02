@@ -41,3 +41,19 @@
     (is (= :chart-liquidation-drag (:prefill-source modal)))
     (is (= 4.2 (:prefill-liquidation-current-price modal)))
     (is (= 6.7 (:prefill-liquidation-target-price modal)))))
+
+(deftest position-margin-parses-localized-amount-input-using-modal-locale-test
+  (let [row (fixtures/sample-position-row "xyz:NVDA" 10 "0.500")
+        state {:ui {:locale "fr-FR"}
+               :asset-selector {:market-by-key {"perp:xyz:NVDA"
+                                                {:coin "xyz:NVDA"
+                                                 :market-type :perp
+                                                 :asset-id 123}}}}
+        modal (-> (position-margin/from-position-row state row)
+                  (assoc :available-to-add 10))
+        updated (position-margin/set-modal-field modal [:amount-input] "2,5")
+        submit (position-margin/prepare-submit state updated)]
+    (is (= "fr-FR" (:locale updated)))
+    (is (= "2.5" (:amount-input updated)))
+    (is (true? (:ok? submit)))
+    (is (= 2500000 (get-in submit [:request :action :ntli])))))

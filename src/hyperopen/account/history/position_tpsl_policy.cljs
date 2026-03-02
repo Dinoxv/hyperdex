@@ -1,10 +1,16 @@
 (ns hyperopen.account.history.position-tpsl-policy
   (:require [clojure.string :as str]
             [hyperopen.account.history.position-tpsl-state :as position-tpsl-state]
-            [hyperopen.domain.trading :as trading-domain]))
+            [hyperopen.domain.trading :as trading-domain]
+            [hyperopen.utils.parse :as parse-utils]))
 
 (defn- parse-num [value]
   (trading-domain/parse-num value))
+
+(defn- parse-modal-input-num
+  [modal value]
+  (or (parse-utils/parse-localized-decimal value (:locale modal))
+      (parse-num value)))
 
 (defn position-side [szi]
   (let [size-num (parse-num szi)]
@@ -79,12 +85,12 @@
           100))))
 
 (defn parsed-inputs [modal]
-  (let [tp-trigger (parse-num (:tp-price modal))
-        sl-trigger (parse-num (:sl-price modal))
-        tp-limit (parse-num (:tp-limit modal))
-        sl-limit (parse-num (:sl-limit modal))
+  (let [tp-trigger (parse-modal-input-num modal (:tp-price modal))
+        sl-trigger (parse-modal-input-num modal (:sl-price modal))
+        tp-limit (parse-modal-input-num modal (:tp-limit modal))
+        sl-limit (parse-modal-input-num modal (:sl-limit modal))
         position-size (or (parse-num (:position-size modal)) 0)
-        configured-size (parse-num (:size-input modal))
+        configured-size (parse-modal-input-num modal (:size-input modal))
         configure-amount? (position-tpsl-state/bool (:configure-amount? modal))
         active-size (if configure-amount? configured-size position-size)
         tp-enabled? (positive-number? tp-trigger)
@@ -270,9 +276,9 @@
       0)))
 
 (defn configured-size-percent [modal]
-  (let [percent-input (parse-num (:size-percent-input modal))
+  (let [percent-input (parse-modal-input-num modal (:size-percent-input modal))
         position-size (or (parse-num (:position-size modal)) 0)
-        configured-size (parse-num (:size-input modal))]
+        configured-size (parse-modal-input-num modal (:size-input modal))]
     (cond
       (number? percent-input)
       (clamp percent-input 0 max-configure-size-percent)
@@ -378,7 +384,7 @@
 (defn pnl-input->price-text
   [modal raw-value mode]
   (let [raw-text (position-tpsl-state/normalize-input-text raw-value)
-        pnl-value (parse-num raw-text)]
+        pnl-value (parse-modal-input-num modal raw-text)]
     (if (and (not (str/blank? raw-text))
              (number? pnl-value))
       (if-let [price (pnl->price modal pnl-value mode)]
@@ -397,7 +403,7 @@
    (pnl-percent-input->price-text modal raw-value mode :roe-percent))
   ([modal raw-value mode percent-mode]
    (let [raw-text (position-tpsl-state/normalize-input-text raw-value)
-         percent-value (parse-num raw-text)]
+         percent-value (parse-modal-input-num modal raw-text)]
      (if (and (not (str/blank? raw-text))
               (number? percent-value))
        (if-let [pnl-usd (pnl-percent->usd modal percent-value percent-mode)]

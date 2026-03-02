@@ -2,6 +2,7 @@
   (:require [clojure.string :as str]
             [hyperopen.state.trading.order-form-key-policy :as order-form-key-policy]
             [hyperopen.state.trading :as trading]
+            [hyperopen.utils.parse :as parse-utils]
             [hyperopen.trading.order-form-tpsl-policy :as tpsl-policy]))
 
 (defn- normalize-order-entry-mode [mode]
@@ -58,6 +59,29 @@
 (defn- positive-size-percent? [form]
   (pos? (or (trading/parse-num (:size-percent form)) 0)))
 
+(def ^:private localized-numeric-order-form-paths
+  #{[:price]
+    [:trigger-px]
+    [:scale :start]
+    [:scale :end]
+    [:scale :count]
+    [:scale :skew]
+    [:twap :minutes]
+    [:tp :trigger]
+    [:tp :limit]
+    [:sl :trigger]
+    [:sl :limit]})
+
+(defn- normalize-localized-numeric-input
+  [state value]
+  (if (string? value)
+    (if (str/blank? value)
+      value
+      (or (parse-utils/normalize-localized-decimal-input value
+                                                         (get-in state [:ui :locale]))
+          value))
+    value))
+
 (defn- sync-size-percent-preserving-manual-display
   [state form]
   (let [raw-size-display (str (or (:size-display form) ""))]
@@ -68,10 +92,11 @@
 (defn- apply-size-display-input
   [state form raw-value]
   (let [raw* (str (or raw-value ""))
+        locale (get-in state [:ui :locale])
         normalized-form (trading/normalize-order-form state form)
         mode (size-input-mode normalized-form)
         reference-price (trading/reference-price state normalized-form)
-        parsed-display-size (trading/parse-num raw*)
+        parsed-display-size (parse-utils/parse-localized-decimal raw* locale)
         canonical-size (case mode
                          :quote
                          (when (and (number? parsed-display-size)
@@ -145,7 +170,8 @@
 
 (defn- resolve-tpsl-trigger-from-offset-input
   [state form leg raw-value]
-  (let [normalized-form (trading/normalize-order-form state form)
+  (let [canonical-raw-input (normalize-localized-numeric-input state raw-value)
+        normalized-form (trading/normalize-order-form state form)
         ui-state (trading/order-form-ui-state state)
         pricing-policy (trading/order-price-policy state normalized-form ui-state)
         limit-like? (trading/limit-like-type? (:type normalized-form))
@@ -154,7 +180,7 @@
         size (trading/parse-num (:size normalized-form))
         leverage (trading/parse-num (:ui-leverage normalized-form))
         inverse (tpsl-policy/inverse-for-leg (:side normalized-form) leg)]
-    (tpsl-policy/trigger-from-offset-input {:raw-input raw-value
+    (tpsl-policy/trigger-from-offset-input {:raw-input canonical-raw-input
                                             :baseline baseline
                                             :size size
                                             :leverage leverage
@@ -439,9 +465,13 @@
 
 (defn set-order-size-percent [state percent]
   (let [form (trading/order-form-draft state)
+        percent* (if (string? percent)
+                   (or (parse-utils/parse-localized-decimal percent (get-in state [:ui :locale]))
+                       percent)
+                   percent)
         next-form (-> (trading/apply-size-percent state
                                                   (assoc form :size-input-source :percent)
-                                                  percent)
+                                                  percent*)
                       (assoc :size-input-source :percent)
                       (#(backfill-tpsl-triggers-from-offset-inputs state %)))]
     (enforce-field-ownership
@@ -562,12 +592,15 @@
                            [:tp :offset-input] (resolve-tpsl-trigger-from-offset-input state form :tp value)
                            [:sl :offset-input] (resolve-tpsl-trigger-from-offset-input state form :sl value)
                            value)
+          canonical-value (if (contains? localized-numeric-order-form-paths resolved-path)
+                            (normalize-localized-numeric-input state resolved-value)
+                            resolved-value)
           normalized-value (cond
                              (= resolved-path [:type]) (:value (trading/order-type-value resolved-value))
                              (= resolved-path [:side]) (:value (trading/side-value resolved-value))
                              (= resolved-path [:tif]) (:value (trading/tif-value resolved-value))
                              (= resolved-path [:tpsl :unit]) (tpsl-policy/normalize-unit resolved-value)
-                             :else resolved-value)
+                             :else canonical-value)
           updated (cond-> (assoc-in form resolved-path normalized-value)
                     tp-offset-input? (assoc-in [:tp :offset-input] raw-input)
                     sl-offset-input? (assoc-in [:sl :offset-input] raw-input)

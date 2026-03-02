@@ -2,7 +2,8 @@
   (:require [clojure.string :as str]
             [hyperopen.account.history.position-tpsl-policy :as position-tpsl-policy]
             [hyperopen.account.history.position-tpsl-state :as position-tpsl-state]
-            [hyperopen.domain.trading :as trading-domain]))
+            [hyperopen.domain.trading :as trading-domain]
+            [hyperopen.utils.parse :as parse-utils]))
 
 (def ^:private updatable-paths
   #{[:tp-price]
@@ -13,6 +14,11 @@
 (defn- parse-num [value]
   (trading-domain/parse-num value))
 
+(defn- parse-modal-input-num
+  [modal value]
+  (or (parse-utils/parse-localized-decimal value (:locale modal))
+      (parse-num value)))
+
 (defn- percent->input-text
   [percent]
   (if (number? percent)
@@ -22,7 +28,7 @@
 (defn- sync-size-percent-input
   [modal]
   (let [size-text (position-tpsl-state/normalize-input-text (:size-input modal))
-        size-value (parse-num size-text)
+        size-value (parse-modal-input-num modal size-text)
         position-size (or (parse-num (:position-size modal)) 0)
         percent-text (if (str/blank? size-text)
                        ""
@@ -34,7 +40,7 @@
 (defn- apply-size-percent-input
   [modal raw-value]
   (let [raw-text (position-tpsl-state/normalize-input-text raw-value)
-        percent-value (parse-num raw-text)
+        percent-value (parse-modal-input-num modal raw-text)
         position-size (or (parse-num (:position-size modal)) 0)]
     (cond
       (str/blank? raw-text)
@@ -63,8 +69,8 @@
 (defn- capture-configured-size-pnl-targets
   [modal]
   (let [{:keys [active-size]} (position-tpsl-policy/parsed-inputs modal)
-        tp-price (parse-num (:tp-price modal))
-        sl-price (parse-num (:sl-price modal))
+        tp-price (parse-modal-input-num modal (:tp-price modal))
+        sl-price (parse-modal-input-num modal (:sl-price modal))
         gain-mode (position-tpsl-state/tp-gain-mode modal)
         loss-mode (position-tpsl-state/sl-loss-mode modal)]
     (if-not (position-tpsl-policy/positive-number? active-size)

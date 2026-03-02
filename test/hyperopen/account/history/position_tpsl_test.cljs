@@ -276,3 +276,18 @@
     (is (= first-submit second-submit))
     (is (= first-size-update second-size-update))
     (is (= first-limit-toggle second-limit-toggle))))
+
+(deftest position-tpsl-parses-localized-input-values-test
+  (let [modal (-> (position-tpsl/from-position-row
+                   (fixtures/sample-position-row "xyz:NVDA" 10 "0.500"))
+                  (assoc :locale "fr-FR"
+                         :configure-amount? true))
+        tp-from-gain (position-tpsl/set-modal-field modal [:tp-gain] "1,5")
+        sized (position-tpsl/set-modal-field modal [:size-percent-input] "40,5")
+        validated (position-tpsl/validate-modal (assoc modal :tp-price "11,5"))]
+    (is (= "13" (:tp-price tp-from-gain)))
+    (is (= "0.2025" (:size-input sized)))
+    (is (= "40.5" (:size-percent-input sized)))
+    (is (< (js/Math.abs (- 40.5 (position-tpsl/configured-size-percent sized))) 0.000001))
+    (is (= {:is-ok true :display-message "Place TP Order"}
+           validated))))

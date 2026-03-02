@@ -25,6 +25,7 @@
    :sl-limit ""
    :tp-gain-mode :usd
    :sl-loss-mode :usd
+   :locale nil
    :submitting? false
    :error nil})
 

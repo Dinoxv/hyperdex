@@ -668,16 +668,18 @@
   [[:effects/save [:account-info :hide-small-balances?] checked]])
 
 (defn open-position-tpsl-modal
-  ([_state position-data]
+  ([state position-data]
    [[:effects/save-many [[[:positions-ui :tpsl-modal]
-                          (position-tpsl/from-position-row position-data)]
+                          (assoc (position-tpsl/from-position-row position-data)
+                                 :locale (get-in state [:ui :locale]))]
                          [[:positions-ui :reduce-popover]
                           (position-reduce/default-popover-state)]
                          [[:positions-ui :margin-modal]
                           (position-margin/default-modal-state)]]]])
-  ([_state position-data trigger-bounds]
+  ([state position-data trigger-bounds]
    [[:effects/save-many [[[:positions-ui :tpsl-modal]
-                          (position-tpsl/from-position-row position-data trigger-bounds)]
+                          (assoc (position-tpsl/from-position-row position-data trigger-bounds)
+                                 :locale (get-in state [:ui :locale]))]
                          [[:positions-ui :reduce-popover]
                           (position-reduce/default-popover-state)]
                          [[:positions-ui :margin-modal]
@@ -693,21 +695,25 @@
     []))
 
 (defn set-position-tpsl-modal-field [state path value]
-  (let [modal (or (get-in state [:positions-ui :tpsl-modal])
-                  (position-tpsl/default-modal-state))
+  (let [locale (get-in state [:ui :locale])
+        modal (assoc (or (get-in state [:positions-ui :tpsl-modal])
+                         (position-tpsl/default-modal-state))
+                     :locale locale)
         path* (if (vector? path) path [path])]
     [[:effects/save [:positions-ui :tpsl-modal]
       (position-tpsl/set-modal-field modal path* value)]]))
 
 (defn set-position-tpsl-configure-amount [state checked]
-  (let [modal (or (get-in state [:positions-ui :tpsl-modal])
-                  (position-tpsl/default-modal-state))]
+  (let [modal (assoc (or (get-in state [:positions-ui :tpsl-modal])
+                         (position-tpsl/default-modal-state))
+                     :locale (get-in state [:ui :locale]))]
     [[:effects/save [:positions-ui :tpsl-modal]
       (position-tpsl/set-configure-amount modal checked)]]))
 
 (defn set-position-tpsl-limit-price [state checked]
-  (let [modal (or (get-in state [:positions-ui :tpsl-modal])
-                  (position-tpsl/default-modal-state))]
+  (let [modal (assoc (or (get-in state [:positions-ui :tpsl-modal])
+                         (position-tpsl/default-modal-state))
+                     :locale (get-in state [:ui :locale]))]
     [[:effects/save [:positions-ui :tpsl-modal]
       (position-tpsl/set-limit-price modal checked)]]))
 
@@ -795,21 +801,24 @@
     []))
 
 (defn set-position-margin-modal-field [state path value]
-  (let [modal (or (get-in state [:positions-ui :margin-modal])
-                  (position-margin/default-modal-state))
+  (let [modal (assoc (or (get-in state [:positions-ui :margin-modal])
+                         (position-margin/default-modal-state))
+                     :locale (get-in state [:ui :locale]))
         path* (if (vector? path) path [path])]
     [[:effects/save [:positions-ui :margin-modal]
       (position-margin/set-modal-field modal path* value)]]))
 
 (defn set-position-margin-amount-percent [state percent]
-  (let [modal (or (get-in state [:positions-ui :margin-modal])
-                  (position-margin/default-modal-state))]
+  (let [modal (assoc (or (get-in state [:positions-ui :margin-modal])
+                         (position-margin/default-modal-state))
+                     :locale (get-in state [:ui :locale]))]
     [[:effects/save [:positions-ui :margin-modal]
       (position-margin/set-amount-percent modal percent)]]))
 
 (defn set-position-margin-amount-to-max [state]
-  (let [modal (or (get-in state [:positions-ui :margin-modal])
-                  (position-margin/default-modal-state))]
+  (let [modal (assoc (or (get-in state [:positions-ui :margin-modal])
+                         (position-margin/default-modal-state))
+                     :locale (get-in state [:ui :locale]))]
     [[:effects/save [:positions-ui :margin-modal]
       (position-margin/set-amount-to-max modal)]]))
 

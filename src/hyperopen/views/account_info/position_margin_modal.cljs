@@ -1,5 +1,6 @@
 (ns hyperopen.views.account-info.position-margin-modal
   (:require [hyperopen.account.history.position-margin :as position-margin]
+            [hyperopen.utils.parse :as parse-utils]
             [hyperopen.views.account-info.shared :as shared]))
 
 (def ^:private panel-gap-px 8)
@@ -122,7 +123,9 @@
 
 (defn- parsed-percent
   [modal]
-  (let [parsed (js/parseFloat (str (or (:amount-percent-input modal) "0")))]
+  (let [parsed (or (parse-utils/parse-localized-decimal (:amount-percent-input modal)
+                                                        (:locale modal))
+                   0)]
     (if (js/isNaN parsed)
       0
       (clamp parsed 0 100))))

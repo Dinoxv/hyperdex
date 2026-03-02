@@ -2,7 +2,8 @@
   (:require [clojure.string :as str]
             [hyperopen.account.history.position-identity :as position-identity]
             [hyperopen.asset-selector.markets :as markets]
-            [hyperopen.domain.trading :as trading-domain]))
+            [hyperopen.domain.trading :as trading-domain]
+            [hyperopen.utils.parse :as parse-utils]))
 
 (def ^:private anchor-keys
   [:left :right :top :bottom :width :height :viewport-width :viewport-height])
@@ -83,14 +84,15 @@
     "0"))
 
 (defn- parse-input-number
-  [value]
+  [modal value]
   (let [text (str/trim (str (or value "")))]
     (when (seq text)
-      (parse-num text))))
+      (or (parse-utils/parse-localized-decimal text (:locale modal))
+          (parse-num text)))))
 
 (defn- normalize-non-negative-input
-  [value fallback]
-  (let [parsed (parse-input-number value)]
+  [modal value fallback]
+  (let [parsed (parse-input-number modal value)]
     (if (and (number? parsed)
              (not (js/isNaN parsed))
              (js/isFinite parsed)
@@ -251,10 +253,11 @@
    :max-removable 0
    :mode :add
    :amount-input "0"
-  :amount-percent-input "0"
+   :amount-percent-input "0"
    :prefill-source nil
    :prefill-liquidation-target-price nil
    :prefill-liquidation-current-price nil
+   :locale nil
    :error nil})
 
 (defn open?
@@ -277,7 +280,7 @@
 
 (defn- active-amount
   [modal]
-  (let [parsed (normalize-non-negative-input (:amount-input modal) 0)]
+  (let [parsed (normalize-non-negative-input modal (:amount-input modal) 0)]
     (if (and (number? parsed)
              (js/isFinite parsed))
       parsed
@@ -308,11 +311,11 @@
   (let [path* (if (vector? path) path [path])]
     (cond
       (= path* [:amount-input])
-      (let [amount (normalize-non-negative-input value (active-amount modal))]
+      (let [amount (normalize-non-negative-input modal value (active-amount modal))]
         (sync-percent-from-amount modal amount))
 
       (= path* [:amount-percent-input])
-      (let [percent (clamp (normalize-non-negative-input value 0) 0 100)]
+      (let [percent (clamp (normalize-non-negative-input modal value 0) 0 100)]
         (sync-amount-from-percent modal percent))
 
       (= path* [:mode])
@@ -324,7 +327,7 @@
 
 (defn set-amount-percent
   [modal percent]
-  (let [percent* (clamp (normalize-non-negative-input percent 0) 0 100)]
+  (let [percent* (clamp (normalize-non-negative-input modal percent 0) 0 100)]
     (sync-amount-from-percent modal percent*)))
 
 (defn set-amount-to-max
@@ -503,6 +506,7 @@
                 :margin-used margin-used
                 :available-to-add available
                 :max-removable removable
+                :locale (get-in state [:ui :locale])
                 :mode :add
                 :amount-input "0"
                 :amount-percent-input "0"

@@ -108,6 +108,23 @@
     (is (= "2" (:size base-form)))
     (is (= :manual (:size-input-source base-ui)))))
 
+(deftest localized-decimal-inputs-are-normalized-for-order-form-calculations-test
+  (let [state (assoc (base-state {:type :limit
+                                  :side :buy
+                                  :price "100"
+                                  :size "2"
+                                  :ui-leverage 20
+                                  :tpsl {:unit :usd}})
+                     :ui {:locale "fr-FR"})
+        price-transition (transitions/update-order-form state [:price] "101,5")
+        percent-transition (transitions/set-order-size-percent state "25,5")
+        size-display-transition (transitions/set-order-size-display state "203,0")
+        offset-transition (transitions/update-order-form state [:tp :offset-input] "20,5")]
+    (is (= "101.5" (get-in price-transition [:order-form :price])))
+    (is (< (js/Math.abs (- 25.5 (get-in percent-transition [:order-form :size-percent]))) 0.000001))
+    (is (= "203,0" (get-in size-display-transition [:order-form-ui :size-display])))
+    (is (= "110.25" (get-in offset-transition [:order-form :tp :trigger])))))
+
 (deftest submit-policy-disabled-reason-invariant-test
   (let [state (base-state)
         forms [(assoc (:order-form state) :type :limit :size "" :price "")

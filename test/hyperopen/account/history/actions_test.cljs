@@ -318,6 +318,16 @@
     (is (= []
            (history-actions/handle-position-tpsl-modal-keydown {} "Enter")))))
 
+(deftest position-modal-open-actions-propagate-ui-locale-test
+  (let [row (fixtures/sample-position-row "xyz:NVDA" 10 "0.500")
+        state {:ui {:locale "fr-FR"}}
+        tpsl-effects (history-actions/open-position-tpsl-modal state row)
+        margin-effects (history-actions/open-position-margin-modal state row)
+        tpsl-modal (get-in (first tpsl-effects) [1 0 1])
+        margin-modal (get-in (first margin-effects) [1 0 1])]
+    (is (= "fr-FR" (:locale tpsl-modal)))
+    (is (= "fr-FR" (:locale margin-modal)))))
+
 (deftest position-reduce-popover-actions-open-update-close-test
   (let [row (fixtures/sample-position-row "xyz:NVDA" 10 "0.500")
         open-effects (history-actions/open-position-reduce-popover {} row)
