@@ -44,7 +44,9 @@
    :show-all-asset-selector-markets asset-actions/show-all-asset-selector-markets
    :maybe-increase-asset-selector-render-limit asset-actions/maybe-increase-asset-selector-render-limit
    :mark-loaded-asset-icon asset-actions/mark-loaded-asset-icon
-   :mark-missing-asset-icon asset-actions/mark-missing-asset-icon})
+   :mark-missing-asset-icon asset-actions/mark-missing-asset-icon
+   :set-funding-hypothetical-size asset-actions/set-funding-hypothetical-size
+   :set-funding-hypothetical-value asset-actions/set-funding-hypothetical-value})
 
 (defn- chart-and-orderbook-action-deps []
   {:toggle-timeframes-dropdown chart-actions/toggle-timeframes-dropdown

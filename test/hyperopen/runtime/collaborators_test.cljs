@@ -43,6 +43,10 @@
                     (get-in deps [:wallet :connect-wallet-action])))
     (is (identical? asset-actions/select-asset
                     (get-in deps [:asset-selector :select-asset])))
+    (is (identical? asset-actions/set-funding-hypothetical-size
+                    (get-in deps [:asset-selector :set-funding-hypothetical-size])))
+    (is (identical? asset-actions/set-funding-hypothetical-value
+                    (get-in deps [:asset-selector :set-funding-hypothetical-value])))
     (is (identical? chart-actions/select-chart-type
                     (get-in deps [:chart :select-chart-type])))
     (is (identical? portfolio-actions/toggle-portfolio-summary-scope-dropdown

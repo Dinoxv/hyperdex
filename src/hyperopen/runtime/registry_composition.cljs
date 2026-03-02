@@ -269,7 +269,9 @@
            maybe-increase-asset-selector-render-limit
            refresh-asset-markets
            mark-loaded-asset-icon
-           mark-missing-asset-icon]}]
+           mark-missing-asset-icon
+           set-funding-hypothetical-size
+           set-funding-hypothetical-value]}]
   {:toggle-asset-dropdown toggle-asset-dropdown
    :close-asset-dropdown close-asset-dropdown
    :select-asset select-asset
@@ -286,7 +288,9 @@
    :maybe-increase-asset-selector-render-limit maybe-increase-asset-selector-render-limit
    :refresh-asset-markets refresh-asset-markets
    :mark-loaded-asset-icon mark-loaded-asset-icon
-   :mark-missing-asset-icon mark-missing-asset-icon})
+   :mark-missing-asset-icon mark-missing-asset-icon
+   :set-funding-hypothetical-size set-funding-hypothetical-size
+   :set-funding-hypothetical-value set-funding-hypothetical-value})
 
 (defn- chart-and-orderbook-action-handlers
   [{:keys [toggle-timeframes-dropdown

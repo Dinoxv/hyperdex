@@ -288,7 +288,8 @@
    :positions-ui {:tpsl-modal (position-tpsl/default-modal-state)
                   :reduce-popover (position-reduce/default-popover-state)
                   :margin-modal (position-margin/default-modal-state)}
-   :funding-ui {:modal nil}
+   :funding-ui {:modal nil
+                :hypothetical-position-by-coin {}}
    :funding-comparison-ui (default-funding-comparison-ui-state)
    :funding-comparison (default-funding-comparison-state)
    :asset-selector (default-asset-selector-state)

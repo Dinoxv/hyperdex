@@ -97,6 +97,7 @@
     (is (= #{} (get-in state [:asset-selector :favorites])))
     (is (= #{} (get-in state [:asset-selector :loaded-icons])))
     (is (= #{} (get-in state [:asset-selector :missing-icons])))
+    (is (= {} (get-in state [:funding-ui :hypothetical-position-by-coin])))
     (is (= {} (get-in state [:portfolio :summary-by-key])))
     (is (= [] (get-in state [:vaults :index-rows])))
     (is (= [] (get-in state [:vaults :recent-summaries])))

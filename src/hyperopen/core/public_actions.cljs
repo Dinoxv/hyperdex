@@ -65,6 +65,12 @@
 (def mark-missing-asset-icon
   asset-actions/mark-missing-asset-icon)
 
+(def set-funding-hypothetical-size
+  asset-actions/set-funding-hypothetical-size)
+
+(def set-funding-hypothetical-value
+  asset-actions/set-funding-hypothetical-value)
+
 (def restore-open-orders-sort-settings!
   account-history-actions/restore-open-orders-sort-settings!)
 

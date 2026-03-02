@@ -99,6 +99,8 @@
    [:actions/refresh-asset-markets :refresh-asset-markets]
    [:actions/mark-loaded-asset-icon :mark-loaded-asset-icon]
    [:actions/mark-missing-asset-icon :mark-missing-asset-icon]
+   [:actions/set-funding-hypothetical-size :set-funding-hypothetical-size]
+   [:actions/set-funding-hypothetical-value :set-funding-hypothetical-value]
    [:actions/toggle-timeframes-dropdown :toggle-timeframes-dropdown]
    [:actions/select-chart-timeframe :select-chart-timeframe]
    [:actions/toggle-chart-type-dropdown :toggle-chart-type-dropdown]

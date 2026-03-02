@@ -19,6 +19,9 @@
 (def ^:private asset-selector-active-tab-storage-key
   "asset-selector-active-tab")
 
+(def ^:private funding-hypothetical-default-value
+  1000)
+
 (def asset-selector-default-render-limit
   list-metrics/default-render-limit)
 
@@ -66,6 +69,61 @@
     (when (and (number? num)
                (not (js/isNaN num)))
       (js/Math.floor num))))
+
+(defn- parse-finite-number
+  [value]
+  (let [num (cond
+              (number? value) value
+              (string? value) (let [text (str/trim value)]
+                                (if (seq text)
+                                  (js/Number text)
+                                  js/NaN))
+              :else js/NaN)]
+    (when (and (number? num)
+               (js/isFinite num))
+      num)))
+
+(defn- normalize-decimal-input
+  [value]
+  (-> (str (or value ""))
+      (str/replace #"," "")
+      (str/replace #"\$" "")
+      str/trim))
+
+(defn- parse-decimal-input
+  [value]
+  (parse-finite-number (normalize-decimal-input value)))
+
+(defn- normalize-coin-key
+  [coin]
+  (let [text (some-> coin str str/trim)]
+    (when (seq text)
+      (str/upper-case text))))
+
+(defn- format-fixed
+  [value digits]
+  (if (and (number? value)
+           (js/isFinite value))
+    (.toFixed value digits)
+    ""))
+
+(defn- default-hypothetical-size-input
+  [mark]
+  (let [mark* (parse-finite-number mark)]
+    (when (and (number? mark*)
+               (pos? mark*))
+      (format-fixed (/ funding-hypothetical-default-value mark*) 4))))
+
+(defn- default-hypothetical-entry
+  [mark]
+  {:size-input (or (default-hypothetical-size-input mark) "")
+   :value-input (format-fixed funding-hypothetical-default-value 2)})
+
+(defn- hypothetical-entry
+  [state coin mark]
+  (let [stored (get-in state [:funding-ui :hypothetical-position-by-coin coin])]
+    (merge (default-hypothetical-entry mark)
+           (if (map? stored) stored {}))))
 
 (defn- parse-time-ms
   [value]
@@ -459,3 +517,46 @@
         [[:effects/queue-asset-icon-status {:market-key market-key
                                             :status :missing}]]
         []))))
+
+(defn set-funding-hypothetical-size
+  [state coin mark size-input]
+  (if-let [coin* (normalize-coin-key coin)]
+    (let [size-input* (normalize-decimal-input size-input)
+          mark* (parse-finite-number mark)
+          size* (parse-decimal-input size-input*)
+          next-value (when (and (number? mark*)
+                                (pos? mark*)
+                                (number? size*))
+                       (* (js/Math.abs size*) mark*))
+          by-coin (or (get-in state [:funding-ui :hypothetical-position-by-coin]) {})
+          next-entry (cond-> (hypothetical-entry state coin* mark)
+                       true (assoc :size-input size-input*)
+                       (number? next-value) (assoc :value-input (format-fixed next-value 2)))
+          next-by-coin (assoc by-coin coin* next-entry)]
+      [[:effects/save [:funding-ui :hypothetical-position-by-coin] next-by-coin]])
+    []))
+
+(defn set-funding-hypothetical-value
+  [state coin mark value-input]
+  (if-let [coin* (normalize-coin-key coin)]
+    (let [value-input* (normalize-decimal-input value-input)
+          mark* (parse-finite-number mark)
+          value* (parse-decimal-input value-input*)
+          current-size* (parse-decimal-input
+                         (:size-input (hypothetical-entry state coin* mark)))
+          sign (if (and (number? current-size*)
+                        (neg? current-size*))
+                 -1
+                 1)
+          next-size (when (and (number? mark*)
+                               (pos? mark*)
+                               (number? value*)
+                               (>= value* 0))
+                      (* sign (/ value* mark*)))
+          by-coin (or (get-in state [:funding-ui :hypothetical-position-by-coin]) {})
+          next-entry (cond-> (hypothetical-entry state coin* mark)
+                       true (assoc :value-input value-input*)
+                       (number? next-size) (assoc :size-input (format-fixed next-size 4)))
+          next-by-coin (assoc by-coin coin* next-entry)]
+      [[:effects/save [:funding-ui :hypothetical-position-by-coin] next-by-coin]])
+    []))

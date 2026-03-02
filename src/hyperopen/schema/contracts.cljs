@@ -171,6 +171,10 @@
 (s/def ::single-input-args (s/tuple any?))
 (s/def ::single-or-double-input-args (s/or :single (s/tuple any?)
                                            :double (s/tuple any? any?)))
+(s/def ::coin-number-input-args
+  (s/tuple ::non-empty-string
+           (s/nilable ::numberish)
+           any?))
 (s/def ::tab-args (s/tuple ::tab))
 (s/def ::asset-selector-shortcut-market-keys
   (s/and vector?
@@ -277,6 +281,8 @@
    :actions/refresh-asset-markets ::no-args
    :actions/mark-loaded-asset-icon ::market-key-args
    :actions/mark-missing-asset-icon ::market-key-args
+   :actions/set-funding-hypothetical-size ::coin-number-input-args
+   :actions/set-funding-hypothetical-value ::coin-number-input-args
    :actions/toggle-timeframes-dropdown ::no-args
    :actions/select-chart-timeframe ::keyword-args
    :actions/toggle-chart-type-dropdown ::no-args

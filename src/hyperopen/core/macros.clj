@@ -92,6 +92,8 @@
     apply-asset-icon-status-updates
     mark-loaded-asset-icon
     mark-missing-asset-icon
+    set-funding-hypothetical-size
+    set-funding-hypothetical-value
     restore-open-orders-sort-settings!
     restore-order-history-pagination-settings!
     restore-funding-history-pagination-settings!

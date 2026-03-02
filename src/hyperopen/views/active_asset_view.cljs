@@ -125,6 +125,20 @@
     (when (and (number? num) (not (js/isNaN num)))
       num)))
 
+(def ^:private default-hypothetical-position-value
+  1000)
+
+(defn- normalize-decimal-input
+  [value]
+  (-> (str (or value ""))
+      (str/replace #"," "")
+      (str/replace #"\$" "")
+      str/trim))
+
+(defn- parse-decimal-input
+  [value]
+  (parse-optional-number (normalize-decimal-input value)))
+
 (defn- coin-prefix [coin]
   (let [coin* (non-blank-text coin)]
     (when (and coin* (str/includes? coin* ":"))
@@ -193,6 +207,58 @@
 
       :else
       nil)))
+
+(defn- default-hypothetical-size [mark]
+  (let [mark* (parse-optional-number mark)]
+    (when (and (number? mark*)
+               (pos? mark*))
+      (/ default-hypothetical-position-value mark*))))
+
+(defn- hypothetical-position-model
+  [coin mark hypothetical-input]
+  (let [mark* (parse-optional-number mark)
+        stored (if (map? hypothetical-input)
+                 hypothetical-input
+                 {})
+        use-defaults? (and (not (contains? stored :size-input))
+                           (not (contains? stored :value-input)))
+        default-size (default-hypothetical-size mark*)
+        size-input (if (contains? stored :size-input)
+                     (str (or (:size-input stored) ""))
+                     (if (number? default-size)
+                       (fmt/safe-to-fixed default-size 4)
+                       ""))
+        value-input (if (contains? stored :value-input)
+                      (str (or (:value-input stored) ""))
+                      (fmt/safe-to-fixed default-hypothetical-position-value 2))
+        size* (parse-decimal-input size-input)
+        value* (parse-decimal-input value-input)
+        value* (when (and (number? value*)
+                          (>= value* 0))
+                 value*)
+        resolved-size (cond
+                        (number? size*) size*
+                        (and (number? value*)
+                             (number? mark*)
+                             (pos? mark*))
+                        (/ value* mark*)
+                        (and use-defaults?
+                             (number? default-size))
+                        default-size
+                        :else nil)
+        resolved-value (cond
+                         (number? value*) value*
+                         (and (number? resolved-size)
+                              (number? mark*)
+                              (pos? mark*))
+                         (* (js/Math.abs resolved-size) mark*)
+                         :else nil)]
+    {:coin coin
+     :size-input size-input
+     :value-input value-input
+     :size resolved-size
+     :position-value resolved-value
+     :direction (direction-from-size resolved-size)}))
 
 (defn- display-base-symbol [market coin]
   (or (non-blank-text (:base market))
@@ -318,11 +384,22 @@
            (:minimum-daily-count first-insufficient)
            " daily points"))))
 
-(defn- funding-tooltip-model [position market coin mark funding-rate predictability-state]
+(defn- funding-tooltip-model
+  [position market coin mark funding-rate predictability-state hypothetical-input]
   (let [size-raw (:szi position)
         size (parse-optional-number size-raw)
         direction (direction-from-size size)
         position-value (normalized-position-value position mark)
+        has-live-position? (and (number? size)
+                                (not= direction :flat))
+        hypothetical-model (when-not has-live-position?
+                             (hypothetical-position-model coin mark hypothetical-input))
+        effective-direction (if has-live-position?
+                              direction
+                              (:direction hypothetical-model))
+        effective-position-value (if has-live-position?
+                                   position-value
+                                   (:position-value hypothetical-model))
         base-symbol (display-base-symbol market coin)
         next-24h-rate (when (number? funding-rate)
                         (* funding-rate 24))
@@ -330,29 +407,38 @@
         predictability-summary (:summary predictability-state)
         predictability-loading? (true? (:loading? predictability-state))
         predictability-error (non-blank-text (:error predictability-state))]
-    {:position-size-label (if (and (not= direction :flat)
-                                   (number? size))
+    {:position-mode (if has-live-position? :live :hypothetical)
+     :position-size-label (if has-live-position?
                             (str (direction-label direction)
                                  " "
                                  (unsigned-size-text size-raw size)
                                  " "
                                  base-symbol)
                             "No open position")
-     :position-value position-value
+     :position-value effective-position-value
+     :position-base-symbol base-symbol
+     :hypothetical-size-input (:size-input hypothetical-model)
+     :hypothetical-value-input (:value-input hypothetical-model)
+     :hypothetical-coin (:coin hypothetical-model)
+     :hypothetical-mark mark
      :projection-rows [{:id "next-24h"
                         :label "Next 24h"
                         :rate next-24h-rate
-                        :payment (funding-payment-estimate direction position-value next-24h-rate)}
+                        :payment (funding-payment-estimate effective-direction
+                                                          effective-position-value
+                                                          next-24h-rate)}
                        {:id "apy"
                         :label "APY"
                         :rate annual-rate
-                        :payment (funding-payment-estimate direction position-value annual-rate)}]
+                        :payment (funding-payment-estimate effective-direction
+                                                          effective-position-value
+                                                          annual-rate)}]
      :predictability-loading? predictability-loading?
      :predictability-error predictability-error
      :predictability-rows (when (map? predictability-summary)
                             (predictability-rows predictability-summary
-                                                 direction
-                                                 position-value))
+                                                 effective-direction
+                                                 effective-position-value))
      :predictability-autocorrelation-series (when (map? predictability-summary)
                                               (vec (or (:autocorrelation-series predictability-summary)
                                                        [])))
@@ -402,8 +488,14 @@
      "whitespace-nowrap"]))
 
 (defn- funding-tooltip-panel
-  [{:keys [position-size-label
+  [{:keys [position-mode
+           position-size-label
            position-value
+           position-base-symbol
+           hypothetical-size-input
+           hypothetical-value-input
+           hypothetical-coin
+           hypothetical-mark
            projection-rows
            predictability-loading?
            predictability-error
@@ -428,21 +520,103 @@
                   "font-semibold"
                   "leading-5"
                   "text-gray-100"]}
-     "Position"]
-    [:div {:class ["grid"
-                   "grid-cols-[minmax(3.75rem,auto)_minmax(0,1fr)]"
-                   "gap-x-3.5"
-                   "gap-y-1"
-                   "text-[0.86rem]"
-                   "leading-[1.2rem]"]}
-     [:span {:class ["text-gray-300/95" "text-left"]} "Size"]
-     [:span {:class ["num" "text-left" "text-emerald-300" "whitespace-nowrap" "font-medium"]}
-      position-size-label]
-     [:span {:class ["text-gray-300/95" "text-left"]} "Value"]
-     [:span {:class ["num" "text-left" "font-medium" "text-gray-100"]}
-      (if (number? position-value)
-        (str "$" (fmt/format-fixed-number position-value 2))
-        "—")]]]
+     (if (= position-mode :hypothetical)
+       "Hypothetical Position"
+       "Position")]
+    (if (= position-mode :hypothetical)
+      [:div
+       [:div {:class ["grid"
+                      "grid-cols-[minmax(3.75rem,auto)_minmax(0,1fr)]"
+                      "gap-x-3.5"
+                      "gap-y-1"
+                      "text-[0.86rem]"
+                      "leading-[1.2rem]"]}
+        [:span {:class ["text-gray-300/95" "text-left"]} "Size"]
+        [:div {:class ["flex" "items-center" "gap-1.5" "min-w-0"]}
+         [:input {:type "text"
+                  :inputmode "decimal"
+                  :spellCheck false
+                  :aria-label "Hypothetical position size"
+                  :class ["w-full"
+                          "min-w-0"
+                          "rounded-md"
+                          "border"
+                          "border-slate-600/70"
+                          "bg-slate-900/45"
+                          "px-2"
+                          "py-1"
+                          "text-[0.82rem]"
+                          "leading-5"
+                          "text-gray-100"
+                          "placeholder:text-slate-400"
+                          "focus:border-emerald-400/60"
+                          "focus:outline-none"
+                          "focus:ring-0"
+                          "focus:ring-offset-0"
+                          "num"]
+                  :placeholder "0.0000"
+                  :value (or hypothetical-size-input "")
+                  :on {:input [[:actions/set-funding-hypothetical-size
+                                hypothetical-coin
+                                hypothetical-mark
+                                [:event.target/value]]]}}]
+         [:span {:class ["num"
+                         "shrink-0"
+                         "text-[0.72rem]"
+                         "font-medium"
+                         "uppercase"
+                         "tracking-wide"
+                         "text-gray-400"]}
+          position-base-symbol]]
+        [:span {:class ["text-gray-300/95" "text-left"]} "Value"]
+        [:div {:class ["flex" "items-center" "gap-1.5" "min-w-0"]}
+         [:span {:class ["num" "text-gray-300/95" "font-medium"]} "$"]
+         [:input {:type "text"
+                  :inputmode "decimal"
+                  :spellCheck false
+                  :aria-label "Hypothetical position value"
+                  :class ["w-full"
+                          "min-w-0"
+                          "rounded-md"
+                          "border"
+                          "border-slate-600/70"
+                          "bg-slate-900/45"
+                          "px-2"
+                          "py-1"
+                          "text-[0.82rem]"
+                          "leading-5"
+                          "text-gray-100"
+                          "placeholder:text-slate-400"
+                          "focus:border-emerald-400/60"
+                          "focus:outline-none"
+                          "focus:ring-0"
+                          "focus:ring-offset-0"
+                          "num"]
+                  :placeholder "1000.00"
+                  :value (or hypothetical-value-input "")
+                  :on {:input [[:actions/set-funding-hypothetical-value
+                                hypothetical-coin
+                                hypothetical-mark
+                                [:event.target/value]]]}}]]]
+       [:p {:class ["mt-1.5"
+                    "text-[0.72rem]"
+                    "leading-[1.05rem]"
+                    "text-gray-400"]}
+        "Edit size or value to estimate payments. Use negative size for short."]]
+      [:div {:class ["grid"
+                     "grid-cols-[minmax(3.75rem,auto)_minmax(0,1fr)]"
+                     "gap-x-3.5"
+                     "gap-y-1"
+                     "text-[0.86rem]"
+                     "leading-[1.2rem]"]}
+       [:span {:class ["text-gray-300/95" "text-left"]} "Size"]
+       [:span {:class ["num" "text-left" "text-emerald-300" "whitespace-nowrap" "font-medium"]}
+        position-size-label]
+       [:span {:class ["text-gray-300/95" "text-left"]} "Value"]
+       [:span {:class ["num" "text-left" "font-medium" "text-gray-100"]}
+        (if (number? position-value)
+          (str "$" (fmt/format-fixed-number position-value 2))
+          "—")]])]
    [:div {:class ["mb-2.5"
                   "h-px"
                   "w-full"
@@ -676,12 +850,16 @@
                                       :error (read-by-coin
                                               (get-in full-state [:active-assets :funding-predictability :error-by-coin] {})
                                               coin)}
+        funding-hypothetical-input (read-by-coin
+                                    (get-in full-state [:funding-ui :hypothetical-position-by-coin] {})
+                                    coin)
         funding-tooltip (funding-tooltip-model (or active-position {})
                                                market
                                                coin
                                                mark
                                                funding-rate
-                                               funding-predictability-state)
+                                               funding-predictability-state
+                                               funding-hypothetical-input)
         funding-tooltip-pin-id (str "funding-rate-tooltip-pin-"
                                     (-> (or coin "asset")
                                         str/lower-case

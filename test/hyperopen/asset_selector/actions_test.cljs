@@ -387,3 +387,34 @@
            "perp:BTC")))
   (is (= []
          (actions/mark-missing-asset-icon {} nil))))
+
+(deftest funding-hypothetical-actions-sync-size-and-value-test
+  (is (= [[:effects/save [:funding-ui :hypothetical-position-by-coin]
+           {"BTC" {:size-input "0.02"
+                   :value-input "1000.00"}}]]
+         (actions/set-funding-hypothetical-size {} "btc" 50000 "0.02")))
+
+  (is (= [[:effects/save [:funding-ui :hypothetical-position-by-coin]
+           {"BTC" {:size-input "oops"
+                   :value-input "1000.00"}}]]
+         (actions/set-funding-hypothetical-size {} "btc" 50000 "oops")))
+
+  (is (= [[:effects/save [:funding-ui :hypothetical-position-by-coin]
+           {"BTC" {:size-input "-0.0300"
+                   :value-input "1500"}}]]
+         (actions/set-funding-hypothetical-value
+          {:funding-ui {:hypothetical-position-by-coin {"BTC" {:size-input "-0.0200"
+                                                                :value-input "1000.00"}}}}
+          "btc"
+          50000
+          "1500")))
+
+  (is (= [[:effects/save [:funding-ui :hypothetical-position-by-coin]
+           {"BTC" {:size-input "0.0250"
+                   :value-input "1250"}}]]
+         (actions/set-funding-hypothetical-value {} "BTC" 50000 "1250")))
+
+  (is (= [[:effects/save [:funding-ui :hypothetical-position-by-coin]
+           {"BTC" {:size-input "0.0200"
+                   :value-input ""}}]]
+         (actions/set-funding-hypothetical-value {} "BTC" 50000 ""))))

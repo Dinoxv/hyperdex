@@ -394,6 +394,34 @@
         (is (contains? strings "+$3.60"))
         (is (contains? strings "+$1,314.00"))))))
 
+(deftest active-asset-row-funding-tooltip-uses-hypothetical-position-when-no-open-position-test
+  (let [ctx-data {:coin "xyz:GOLD"
+                  :mark 5000.0
+                  :oracle 4998.0
+                  :change24h 5.0
+                  :change24hPct 0.5
+                  :volume24h 2000000
+                  :openInterest 200
+                  :fundingRate 0.0056}
+        market {:coin "xyz:GOLD"
+                :symbol "GOLD-USDC"
+                :base "GOLD"
+                :market-type :perp}
+        full-state {:active-asset "xyz:GOLD"
+                    :asset-selector {:missing-icons #{}}}]
+    (with-redefs [hyperopen.state.trading/position-for-active-asset
+                  (fn [_]
+                    nil)
+                  hyperopen.utils.formatting/format-funding-countdown
+                  (fn [] "00:10:00")]
+      (let [view-node (view/active-asset-row ctx-data market {:visible-dropdown nil} full-state)
+            strings (set (collect-strings view-node))]
+        (is (contains? strings "Hypothetical Position"))
+        (is (contains? strings "Edit size or value to estimate payments. Use negative size for short."))
+        (is (contains? strings "-$1.34"))
+        (is (contains? strings "-$490.56"))
+        (is (not (contains? strings "No open position")))))))
+
 (deftest active-asset-row-funding-tooltip-renders-predictability-metrics-test
   (let [ctx-data {:coin "xyz:GOLD"
                   :mark 5000.0
