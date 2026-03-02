@@ -26,7 +26,10 @@ A user verifies behavior by opening `/trade`, selecting `Deposit`, seeing the co
 - [x] (2026-03-02 21:28Z) Completed Milestone 2 (`BTC`) HyperUnit address-flow implementation in `/hyperopen/src/hyperopen/funding/actions.cljs`, `/hyperopen/src/hyperopen/funding/effects.cljs`, and `/hyperopen/src/hyperopen/views/funding_modal.cljs` (generate/regenerate address flow, modal state persistence, and flow-aware CTA copy).
 - [x] (2026-03-02 21:30Z) Added/updated BTC flow tests in `/hyperopen/test/hyperopen/funding/actions_test.cljs` and `/hyperopen/test/hyperopen/funding/effects_test.cljs`; updated compatibility map assertion in `/hyperopen/test/hyperopen/core_public_actions_test.cljs` for expanded funding modal defaults.
 - [x] (2026-03-02 21:33Z) Re-ran required validation gates after Milestone 2: `npm run check`, `npm test`, `npm run test:websocket` (all pass; existing unrelated test compile warnings remain).
-- [ ] Implement remaining per-coin milestones one by one with tests and manual verification (ETH, SOL, 2Z, BONK, ENA, FARTCOIN, MON, PUMP, SPX, XPL, plus any additional assets discovered in Milestone 0 such as USDH).
+- [x] (2026-03-02 21:46Z) Completed Milestone 3 (`ETH`) HyperUnit address-flow enablement by extending the shared address-generation path and catalog metadata in `/hyperopen/src/hyperopen/funding/actions.cljs`.
+- [x] (2026-03-02 21:47Z) Added ETH-specific request/response coverage in `/hyperopen/test/hyperopen/funding/actions_test.cljs` and `/hyperopen/test/hyperopen/funding/effects_test.cljs`.
+- [x] (2026-03-02 21:50Z) Re-ran required validation gates after Milestone 3: `npm run check`, `npm test`, `npm run test:websocket` (all pass; existing unrelated test compile warnings remain).
+- [ ] Implement remaining per-coin milestones one by one with tests and manual verification (SOL, 2Z, BONK, ENA, FARTCOIN, MON, PUMP, SPX, XPL, plus any additional assets discovered in Milestone 0 such as USDH).
 - [ ] Move this plan to completed after all per-coin acceptance criteria pass.
 
 ## Surprises & Discoveries
@@ -108,7 +111,7 @@ A user verifies behavior by opening `/trade`, selecting `Deposit`, seeing the co
 
 ## Outcomes & Retrospective
 
-Planning + discovery + Milestone 1 (`USDT`) + Milestone 2 (`BTC`) completed.
+Planning + discovery + Milestone 1 (`USDT`) + Milestone 2 (`BTC`) + Milestone 3 (`ETH`) completed.
 
 Achieved now:
 - Defined a discovery-first execution strategy that prevents stale asset assumptions.
@@ -118,10 +121,11 @@ Achieved now:
 - Added shared multi-asset catalog plumbing and flow-kind gating in funding action/view layers with test coverage.
 - Implemented first route-flow coin (`USDT`) end-to-end through funding action + effect pipeline with wallet submit behavior and regression-safe tests.
 - Implemented first HyperUnit address-flow coin (`BTC`) with address-generation request path, modal in-place address rendering, and regenerate behavior.
+- Implemented second HyperUnit address-flow coin (`ETH`) by enabling Ethereum source-chain metadata and shared address-generation request handling.
 - Revalidated required repo gates after milestone implementation (`npm run check`, `npm test`, `npm run test:websocket`).
 
 Not yet achieved:
-- Remaining per-coin route/address flows (`ETH`, `SOL`, `2Z`, `BONK`, `ENA`, `FARTCOIN`, `MON`, `PUMP`, `SPX`, `XPL`, `USDH`) are not implemented yet.
+- Remaining per-coin route/address flows (`SOL`, `2Z`, `BONK`, `ENA`, `FARTCOIN`, `MON`, `PUMP`, `SPX`, `XPL`, `USDH`) are not implemented yet.
 - No manual per-coin end-to-end verification artifacts yet beyond code-level/test-level validation.
 
 ## Context and Orientation
@@ -284,3 +288,4 @@ Revision note (2026-03-02): Created new ExecPlan to expand trade-page deposit fr
 Revision note (2026-03-02): Completed Milestone 0 discovery by adding `tools/extract_hl_deposit_assets.mjs` and generating canonical snapshot artifact `2026-03-02-hl-deposit-assets-snapshot.json`; updated progress, discoveries, decisions, and inventory sections accordingly.
 Revision note (2026-03-02): Began shared implementation milestone by introducing multi-asset catalog visibility and safe unsupported-flow gating in funding actions/modal plus tests; kept per-coin route/address effects pending.
 Revision note (2026-03-02): Completed Milestone 1 (`USDT`) route flow and Milestone 2 (`BTC`) HyperUnit address flow with funding action/effect/view updates, expanded tests, and passing validation gates (`npm run check`, `npm test`, `npm run test:websocket`).
+Revision note (2026-03-02): Completed Milestone 3 (`ETH`) by enabling Ethereum HyperUnit address generation in the shared address-flow pipeline, adding ETH coverage tests, and re-running required validation gates.

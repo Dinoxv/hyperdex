@@ -43,7 +43,8 @@
     :symbol "ETH"
     :name "Ethereum"
     :network "Ethereum"
-    :flow-kind :hyperunit-address}
+    :flow-kind :hyperunit-address
+    :hyperunit-source-chain "ethereum"}
    {:key :sol
     :symbol "SOL"
     :name "Solana"
@@ -100,7 +101,7 @@
   (set (map :key deposit-assets-base)))
 
 (def ^:private deposit-implemented-asset-keys
-  #{:usdc :usdt :btc})
+  #{:usdc :usdt :btc :eth})
 
 (defn- non-blank-text
   [value]
@@ -444,11 +445,11 @@
                              " deposits are not implemented yet in Hyperopen.")}
 
       (= flow-kind :hyperunit-address)
-      (if (= (:key selected-asset) :btc)
+      (if-let [from-chain (non-blank-text (:hyperunit-source-chain selected-asset))]
         {:ok? true
          :request {:action {:type "hyperunitGenerateDepositAddress"
                             :asset (name (:key selected-asset))
-                            :fromChain (:hyperunit-source-chain selected-asset)
+                            :fromChain from-chain
                             :network (:network selected-asset)}}}
         {:ok? false
          :display-message (str (:symbol selected-asset)
