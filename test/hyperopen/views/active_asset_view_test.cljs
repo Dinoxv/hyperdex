@@ -439,7 +439,10 @@
                     :asset-selector {:missing-icons #{}}
                     :active-assets {:funding-predictability {:by-coin {"XYZ:GOLD"
                                                                        {:mean 0.0042
-                                                                        :stddev 0.0187
+                                                                       :stddev 0.0187
+                                                                       :daily-funding-series [{:day-index 1 :mean-rate 0.0012}
+                                                                                             {:day-index 2 :mean-rate -0.0004}
+                                                                                             {:day-index 3 :mean-rate 0.0008}]
                                                                         :autocorrelation {:lag-1d {:value 0.714}
                                                                                           :lag-5d {:value 0.482}
                                                                                           :lag-15d {:value 0.21}}
@@ -463,6 +466,7 @@
         (is (not (contains? strings "ACF Lag 1d")))
         (is (not (contains? strings "ACF Lag 5d")))
         (is (not (contains? strings "ACF Lag 15d")))
+        (is (contains? strings "Funding Rate"))
         (is (contains? strings "Autocorrelation"))
         (is (contains? strings "+3679.2000%"))
         (is (contains? strings "-$183,960.00"))
@@ -486,7 +490,10 @@
                     :asset-selector {:missing-icons #{}}
                     :active-assets {:funding-predictability {:by-coin {"XYZ:GOLD"
                                                                        {:mean 0.0042
-                                                                        :stddev 0.0187
+                                                                       :stddev 0.0187
+                                                                       :daily-funding-series [{:day-index 1 :mean-rate 0.0012}
+                                                                                             {:day-index 2 :mean-rate nil}
+                                                                                             {:day-index 3 :mean-rate -0.0006}]
                                                                         :autocorrelation {:lag-1d {:value 0.714}
                                                                                           :lag-5d {:value 0.482}
                                                                                           :lag-15d {:value nil
@@ -513,5 +520,6 @@
             ready-view (view/active-asset-row ctx-data market {:visible-dropdown nil} ready-state)
             ready-strings (set (collect-strings ready-view))]
         (is (contains? loading-strings "Loading 30d stats..."))
+        (is (contains? ready-strings "Funding Rate"))
         (is (contains? ready-strings "Autocorrelation"))
         (is (contains? ready-strings "Lag 15d needs at least 16 daily points"))))))

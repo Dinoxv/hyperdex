@@ -23,6 +23,10 @@
         summary (predictability/compute-30d-summary rows now-ms)]
     (is (= 60 (:sample-count summary)))
     (is (= 30 (:daily-count summary)))
+    (is (= 30 (count (:daily-funding-series summary))))
+    (is (= 1 (get-in summary [:daily-funding-series 0 :day-index])))
+    (is (= 30 (get-in summary [:daily-funding-series 29 :day-index])))
+    (is (approx= 0.000025 (get-in summary [:daily-funding-series 0 :mean-rate]) 1e-9))
     (is (number? (:mean summary)))
     (is (number? (:stddev summary)))
     (is (= 29 (count (:autocorrelation-series summary))))
@@ -72,5 +76,7 @@
               {:funding-rate-raw 0.01}]
         summary (predictability/compute-30d-summary rows now-ms)]
     (is (= 3 (:sample-count summary)))
+    (is (= 30 (count (:daily-funding-series summary))))
+    (is (approx= 0.001 (get-in summary [:daily-funding-series 2 :mean-rate]) 1e-9))
     (is (approx= 0.002 (:mean summary) 1e-9))
     (is (number? (:stddev summary)))))

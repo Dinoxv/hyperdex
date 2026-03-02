@@ -111,6 +111,13 @@
                                  :mean-rate mean-rate
                                  :sample-count (or count 0)}))))))))
 
+(defn- annotate-daily-series
+  [daily-points]
+  (mapv (fn [idx point]
+          (assoc point :day-index (inc idx)))
+        (range)
+        daily-points))
+
 (defn- lag-autocorrelation
   [daily-points lag-days]
   (let [minimum-daily-count (inc lag-days)
@@ -170,5 +177,6 @@
      :daily-count (count (filter :mean-rate daily-points))
      :mean (math/mean rates)
      :stddev (math/sample-stddev rates)
+     :daily-funding-series (annotate-daily-series daily-points)
      :autocorrelation-series lag-series
      :autocorrelation lag-stats}))

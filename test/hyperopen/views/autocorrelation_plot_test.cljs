@@ -1,6 +1,7 @@
 (ns hyperopen.views.autocorrelation-plot-test
   (:require [cljs.test :refer-macros [deftest is]]
-            [hyperopen.views.autocorrelation-plot :as autocorrelation-plot]))
+            [hyperopen.views.autocorrelation-plot :as autocorrelation-plot]
+            [hyperopen.views.funding-rate-plot :as funding-rate-plot]))
 
 (defn- collect-strings
   [node]
@@ -10,8 +11,13 @@
     (seq? node) (mapcat collect-strings node)
     :else []))
 
-(defn- collect-bar-attrs
-  [node]
+(defn- approx=
+  [left right epsilon]
+  (<= (js/Math.abs (- left right))
+      epsilon))
+
+(defn- collect-rect-attrs-by-key
+  [node data-key]
   (letfn [(walk [n]
             (cond
               (vector? n)
@@ -20,7 +26,7 @@
                     children (if attrs (drop 2 n) (drop 1 n))
                     child-results (mapcat walk children)]
                 (if (and (= :rect tag)
-                         (contains? attrs :data-lag))
+                         (contains? attrs data-key))
                   (cons attrs child-results)
                   child-results))
 
@@ -30,6 +36,10 @@
               :else
               []))]
     (vec (walk node))))
+
+(defn- collect-bar-attrs
+  [node]
+  (collect-rect-attrs-by-key node :data-lag))
 
 (deftest autocorrelation-plot-renders-title-axis-and-bars-test
   (let [series [{:lag-days 1 :value 0.62}
@@ -61,3 +71,38 @@
     (is (contains? values "-1"))
     (is (contains? values "0.5"))
     (is (contains? values "1"))))
+
+(deftest funding-rate-plot-renders-title-axis-and-bars-test
+  (let [series [{:day-index 1 :mean-rate 0.0004}
+                {:day-index 2 :mean-rate -0.0002}
+                {:day-index 3 :mean-rate nil}
+                {:day-index 4 :mean-rate 0.0001}
+                {:day-index 5 :mean-rate 0.0003}]
+        node (funding-rate-plot/funding-rate-plot series)
+        strings (set (collect-strings node))
+        bars (collect-rect-attrs-by-key node :data-day)]
+    (is (contains? strings "Funding Rate"))
+    (is (contains? strings "Day (oldest to newest)"))
+    (is (contains? strings "0%"))
+    (is (= 5 (count bars)))
+    (is (= [1 2 3 4 5]
+           (mapv :data-day bars)))))
+
+(deftest funding-rate-plot-sorts-and-annualizes-series-values-test
+  (let [series [{:day-index 3 :mean-rate 0.001}
+                {:day-index 1 :mean-rate -0.001}
+                {:day-index 2 :mean-rate "0.0005"}
+                {:day-index 4 :mean-rate "bad"}]
+        node (funding-rate-plot/funding-rate-plot series)
+        bars (collect-rect-attrs-by-key node :data-day)
+        value-by-day (into {}
+                           (map (fn [attrs]
+                                  [(:data-day attrs)
+                                   (js/parseFloat (or (:data-funding-rate-value attrs) ""))]))
+                           bars)]
+    (is (= [1 2 3 4]
+           (mapv :data-day bars)))
+    (is (approx= -876 (get value-by-day 1) 1e-9))
+    (is (approx= 438 (get value-by-day 2) 1e-9))
+    (is (approx= 876 (get value-by-day 3) 1e-9))
+    (is (js/isNaN (get value-by-day 4)))))

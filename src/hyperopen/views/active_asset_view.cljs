@@ -4,6 +4,7 @@
             [hyperopen.websocket.active-asset-ctx :as active-ctx]
             [hyperopen.views.asset-icon :as asset-icon]
             [hyperopen.views.autocorrelation-plot :as autocorrelation-plot]
+            [hyperopen.views.funding-rate-plot :as funding-rate-plot]
             [hyperopen.views.asset-selector-view :as asset-selector]
             [hyperopen.utils.formatting :as fmt]
             [hyperopen.asset-selector.markets :as markets]))
@@ -439,6 +440,9 @@
                             (predictability-rows predictability-summary
                                                  effective-direction
                                                  effective-position-value))
+     :predictability-daily-rate-series (when (map? predictability-summary)
+                                         (vec (or (:daily-funding-series predictability-summary)
+                                                  [])))
      :predictability-autocorrelation-series (when (map? predictability-summary)
                                               (vec (or (:autocorrelation-series predictability-summary)
                                                        [])))
@@ -500,6 +504,7 @@
            predictability-loading?
            predictability-error
            predictability-rows
+           predictability-daily-rate-series
            predictability-autocorrelation-series
            predictability-lag-note]}]
   [:div {:class ["w-[18rem]"
@@ -698,6 +703,10 @@
       :else
       [:div {:class ["num" "text-[0.86rem]" "leading-[1.2rem]" "text-gray-300/90"]}
        "—"])
+    (when (and (not predictability-loading?)
+               (not (seq predictability-error))
+               (seq predictability-daily-rate-series))
+      (funding-rate-plot/funding-rate-plot predictability-daily-rate-series))
     (when (and (not predictability-loading?)
                (not (seq predictability-error))
                (seq predictability-autocorrelation-series))
