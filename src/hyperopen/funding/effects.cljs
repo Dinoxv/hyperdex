@@ -19,6 +19,15 @@
 (def ^:private arbitrum-usdt-address
   "0xfd086bc7cd5c481dcc9c85ebe478a1c0b69fcbb9")
 
+(def ^:private hypercore-chain-id-decimal
+  "1337")
+
+(def ^:private hypercore-usdh-address
+  "0x2000000000000000000000000000000000000168")
+
+(def ^:private across-swap-approval-base-url
+  "https://app.across.to/api/swap/approval")
+
 (def ^:private hyperunit-mainnet-base-url
   "https://api.hyperunit.xyz")
 
@@ -112,6 +121,21 @@
             whole-units (* (js/BigInt whole*) (js/BigInt "1000000"))
             fract-units (js/BigInt fract*)]
         (+ whole-units fract-units)))))
+
+(defn- parse-usdh-units
+  [amount]
+  (let [text (some-> amount str str/trim)]
+    (when (and (seq text)
+               (re-matches #"^(?:0|[1-9]\d*)(?:\.\d{1,8})?$" text))
+      (let [[whole fract] (str/split text #"\\.")
+            whole* (or whole "0")
+            fract* (subs (str (or fract "") "00000000") 0 8)
+            whole-units (* (js/BigInt whole*) (js/BigInt "100000000"))
+            fract-units (js/BigInt fract*)]
+        (+ whole-units fract-units)))))
+
+(def ^:private usdh-route-max-units
+  (parse-usdh-units "1000000"))
 
 (defn- bigint-from-hex
   [value]
@@ -352,6 +376,85 @@
         (.then (fn [payload]
                  (js->clj payload :keywordize-keys true)))))))
 
+(defn- across-approval-url
+  [from-address amount-units usdc-address]
+  (let [encode js/encodeURIComponent]
+    (str across-swap-approval-base-url
+         "?tradeType=minOutput"
+         "&amount=" (encode (.toString amount-units))
+         "&inputToken=" (encode usdc-address)
+         "&originChainId=" (encode arbitrum-mainnet-chain-id-decimal)
+         "&outputToken=" (encode hypercore-usdh-address)
+         "&destinationChainId=" (encode hypercore-chain-id-decimal)
+         "&depositor=" (encode from-address))))
+
+(defn- fetch-across-approval!
+  [from-address amount-units usdc-address]
+  (let [url (across-approval-url from-address amount-units usdc-address)]
+    (-> (js/fetch url #js {:method "GET"
+                           :headers #js {"Content-Type" "application/json"}})
+        (.then (fn [resp]
+                 (if (.-ok resp)
+                   (.json resp)
+                   (.then (.text resp)
+                          (fn [text]
+                            (throw (js/Error.
+                                    (str "Across approval request failed ("
+                                         (.-status resp)
+                                         "): "
+                                         (or text "Unknown response"))))))))
+        (.then (fn [payload]
+                 (js->clj payload :keywordize-keys true)))))))
+
+(defn- normalize-hex-data
+  [value]
+  (let [text (some-> value str str/trim str/lower-case)]
+    (when (and (seq text)
+               (re-matches #"^0x[0-9a-f]+$" text))
+      text)))
+
+(defn- normalize-hex-quantity
+  [value]
+  (let [text (some-> value str str/trim str/lower-case)]
+    (cond
+      (not (seq text))
+      nil
+
+      (or (= text "0")
+          (= text "0x")
+          (= text "0x0"))
+      "0x0"
+
+      (re-matches #"^0x[0-9a-f]+$" text)
+      text
+
+      (re-matches #"^\d+$" text)
+      (str "0x" (.toString (js/BigInt text) 16))
+
+      :else
+      nil)))
+
+(defn- parse-across-transaction
+  [tx]
+  (let [to (normalize-address (:to tx))
+        data (normalize-hex-data (:data tx))
+        value (normalize-hex-quantity (:value tx))]
+    (when (and to data)
+      (cond-> {:to to
+               :data data}
+        (and (seq value)
+             (not= value "0x0")) (assoc :value value)))))
+
+(defn- across-approval->swap-config
+  [approval]
+  (let [swap-tx (parse-across-transaction (:swapTx approval))
+        approval-txs (->> (or (:approvalTxns approval) [])
+                          (keep parse-across-transaction)
+                          vec)]
+    (when swap-tx
+      {:swap-tx swap-tx
+       :approval-txs approval-txs})))
+
 (defn- fetch-hyperunit-deposit-address!
   [base-url from-chain asset destination-address]
   (let [url (hyperunit-gen-url base-url from-chain asset destination-address)]
@@ -544,6 +647,83 @@
                                owner-address
                                (- after-balance before-balance))))))))))
 
+(defn- send-and-confirm-evm-transaction!
+  [provider from-address {:keys [to data value]}]
+  (let [tx (cond-> {:from from-address
+                    :to to
+                    :data data}
+             (seq value) (assoc :value value))]
+    (-> (provider-request! provider
+                           "eth_sendTransaction"
+                           [tx])
+        (.then (fn [tx-hash]
+                 (-> (wait-for-transaction-receipt! provider tx-hash)
+                     (.then (fn [_]
+                              tx-hash))))))))
+
+(defn- send-across-approval-transactions!
+  [provider from-address approval-txs]
+  (reduce (fn [promise approval-tx]
+            (.then promise
+                   (fn [_]
+                     (send-and-confirm-evm-transaction! provider
+                                                        from-address
+                                                        approval-tx))))
+          (js/Promise.resolve nil)
+          approval-txs))
+
+(defn- submit-usdh-across-deposit-tx!
+  [_store owner-address action]
+  (let [provider (wallet/provider)
+        from-address (normalize-address owner-address)
+        amount-units (parse-usdh-units (:amount action))
+        chain-config (get chain-config-by-id arbitrum-mainnet-chain-id)
+        usdc-address (:usdc-address chain-config)]
+    (cond
+      (nil? provider)
+      (js/Promise.resolve {:status "err"
+                           :error "No wallet provider found. Connect your wallet first."})
+
+      (nil? from-address)
+      (js/Promise.resolve {:status "err"
+                           :error "Connect your wallet before depositing."})
+
+      (nil? amount-units)
+      (js/Promise.resolve {:status "err"
+                           :error "Enter a valid deposit amount."})
+
+      (<= amount-units (js/BigInt "0"))
+      (js/Promise.resolve {:status "err"
+                           :error "Enter an amount greater than 0."})
+
+      (> amount-units usdh-route-max-units)
+      (js/Promise.resolve {:status "err"
+                           :error "Maximum deposit is 1000000 USDH."})
+
+      :else
+      (-> (ensure-wallet-chain! provider chain-config)
+          (.then (fn [_]
+                   (fetch-across-approval! from-address amount-units usdc-address)))
+          (.then (fn [approval]
+                   (let [{:keys [swap-tx approval-txs]} (across-approval->swap-config approval)]
+                     (if (nil? swap-tx)
+                       (js/Promise.reject
+                        (js/Error. "Across approval response missing swap transaction fields."))
+                       (-> (send-across-approval-transactions! provider
+                                                               from-address
+                                                               approval-txs)
+                           (.then (fn [_]
+                                    (send-and-confirm-evm-transaction! provider
+                                                                       from-address
+                                                                       swap-tx))))))))
+          (.then (fn [tx-hash]
+                   {:status "ok"
+                    :txHash tx-hash
+                    :network (:network-label chain-config)}))
+          (.catch (fn [err]
+                    {:status "err"
+                     :error (wallet-error-message err)}))))))
+
 (defn- submit-usdt-lifi-bridge2-deposit-tx!
   [store owner-address action]
   (let [provider (wallet/provider)
@@ -674,12 +854,14 @@
            dispatch!
            submit-usdc-bridge2-deposit!
            submit-usdt-lifi-deposit!
+           submit-usdh-across-deposit!
            submit-hyperunit-address-request!
            runtime-error-message
            show-toast!
            default-funding-modal-state]
     :or {submit-usdc-bridge2-deposit! submit-usdc-bridge2-deposit-tx!
          submit-usdt-lifi-deposit! submit-usdt-lifi-bridge2-deposit-tx!
+         submit-usdh-across-deposit! submit-usdh-across-deposit-tx!
          submit-hyperunit-address-request! submit-hyperunit-address-deposit-request!
          runtime-error-message fallback-runtime-error-message
          show-toast! (fn [_store _kind _message] nil)
@@ -689,6 +871,7 @@
         submit-deposit! (case (:type action)
                           "bridge2Deposit" submit-usdc-bridge2-deposit!
                           "lifiUsdtToUsdcBridge2Deposit" submit-usdt-lifi-deposit!
+                          "acrossUsdcToUsdhDeposit" submit-usdh-across-deposit!
                           "hyperunitGenerateDepositAddress" submit-hyperunit-address-request!
                           (fn [_store _address _action]
                             (js/Promise.resolve {:status "err"

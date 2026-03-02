@@ -104,13 +104,14 @@
     :name "USDH"
     :network "Arbitrum"
     :flow-kind :route
-    :route-key "arbitrum_across"}])
+    :route-key "arbitrum_across"
+    :maximum 1000000}])
 
 (def ^:private deposit-asset-keys
   (set (map :key deposit-assets-base)))
 
 (def ^:private deposit-implemented-asset-keys
-  #{:usdc :usdt :btc :eth :sol :2z :bonk :ena :fart :mon :pump :spxs :xpl})
+  #{:usdc :usdt :btc :eth :sol :2z :bonk :ena :fart :mon :pump :spxs :xpl :usdh})
 
 (defn- non-blank-text
   [value]
@@ -479,9 +480,22 @@
          :display-message (str "Minimum deposit is " min-amount " "
                                (:symbol selected-asset) ".")}
 
+        (and (finite-number? (:maximum selected-asset))
+             (> amount (:maximum selected-asset)))
+        {:ok? false
+         :display-message (str "Maximum deposit is " (:maximum selected-asset) " "
+                               (:symbol selected-asset) ".")}
+
         (= (:key selected-asset) :usdt)
         {:ok? true
          :request {:action {:type "lifiUsdtToUsdcBridge2Deposit"
+                            :asset (name (:key selected-asset))
+                            :amount (amount->text amount)
+                            :chainId deposit-chain-id-mainnet}}}
+
+        (= (:key selected-asset) :usdh)
+        {:ok? true
+         :request {:action {:type "acrossUsdcToUsdhDeposit"
                             :asset (name (:key selected-asset))
                             :amount (amount->text amount)
                             :chainId deposit-chain-id-mainnet}}}

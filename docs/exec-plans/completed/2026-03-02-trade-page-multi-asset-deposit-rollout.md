@@ -56,8 +56,10 @@ A user verifies behavior by opening `/trade`, selecting `Deposit`, seeing the co
 - [x] (2026-03-02 23:52Z) Completed Milestone 12 (`XPL`) HyperUnit address-flow enablement by adding Plasma source-chain metadata to the shared address-generation path in `/hyperopen/src/hyperopen/funding/actions.cljs`.
 - [x] (2026-03-02 23:53Z) Added `XPL`-specific request/response coverage in `/hyperopen/test/hyperopen/funding/actions_test.cljs` and `/hyperopen/test/hyperopen/funding/effects_test.cljs`; updated unsupported-flow guard coverage to keep only non-implemented assets gated.
 - [x] (2026-03-02 23:55Z) Re-ran required validation gates after Milestone 12: `npm run check`, `npm test`, `npm run test:websocket` (all pass; existing unrelated test compile warnings remain).
-- [ ] Implement remaining per-coin milestones one by one with tests and manual verification (additional assets discovered in Milestone 0 such as USDH).
-- [ ] Move this plan to completed after all per-coin acceptance criteria pass.
+- [x] (2026-03-03 00:08Z) Completed Milestone 13 (`USDH`) route-flow enablement by adding `acrossUsdcToUsdhDeposit` action/effect handling in `/hyperopen/src/hyperopen/funding/actions.cljs` and `/hyperopen/src/hyperopen/funding/effects.cljs`, including Across approval quote fetch, optional ERC20 approvals, and swap submit wiring.
+- [x] (2026-03-03 00:09Z) Added `USDH` route-flow coverage in `/hyperopen/test/hyperopen/funding/actions_test.cljs` and `/hyperopen/test/hyperopen/funding/effects_test.cljs`.
+- [x] (2026-03-03 00:10Z) Re-ran required validation gates after Milestone 13: `npm run check`, `npm test`, `npm run test:websocket` (all pass; existing unrelated test compile warnings remain).
+- [x] Move this plan to completed after all per-coin acceptance criteria pass.
 
 ## Surprises & Discoveries
 
@@ -138,7 +140,7 @@ A user verifies behavior by opening `/trade`, selecting `Deposit`, seeing the co
 
 ## Outcomes & Retrospective
 
-Planning + discovery + Milestone 1 (`USDT`) + Milestone 2 (`BTC`) + Milestone 3 (`ETH`) + Milestone 4 (`SOL`) + Milestone 5 (`2Z`) + Milestone 6 (`BONK`) + Milestone 7 (`ENA`) + Milestone 8 (`FARTCOIN`) + Milestone 9 (`MON`) + Milestone 10 (`PUMP`) + Milestone 11 (`SPX`) + Milestone 12 (`XPL`) completed.
+Planning + discovery + Milestone 1 (`USDT`) + Milestone 2 (`BTC`) + Milestone 3 (`ETH`) + Milestone 4 (`SOL`) + Milestone 5 (`2Z`) + Milestone 6 (`BONK`) + Milestone 7 (`ENA`) + Milestone 8 (`FARTCOIN`) + Milestone 9 (`MON`) + Milestone 10 (`PUMP`) + Milestone 11 (`SPX`) + Milestone 12 (`XPL`) + Milestone 13 (`USDH`) completed.
 
 Achieved now:
 - Defined a discovery-first execution strategy that prevents stale asset assumptions.
@@ -158,10 +160,10 @@ Achieved now:
 - Implemented ninth HyperUnit address-flow coin (`PUMP`) by enabling Solana source-chain metadata for the `pump` asset in the shared address-generation request handling.
 - Implemented tenth HyperUnit address-flow coin (`SPX`) by enabling Solana source-chain metadata for the `spxs` asset in the shared address-generation request handling.
 - Implemented eleventh HyperUnit address-flow coin (`XPL`) by enabling Plasma source-chain metadata for the `xpl` asset in the shared address-generation request handling.
+- Implemented twelfth route-flow coin (`USDH`) by wiring the Arbitrum Across approval + swap transaction path for `usdh` deposits in the shared route submit pipeline.
 - Revalidated required repo gates after milestone implementation (`npm run check`, `npm test`, `npm run test:websocket`).
 
 Not yet achieved:
-- Remaining per-coin route/address flows (`USDH`) are not implemented yet.
 - No manual per-coin end-to-end verification artifacts yet beyond code-level/test-level validation.
 
 ## Context and Orientation
@@ -334,3 +336,4 @@ Revision note (2026-03-02): Completed Milestone 9 (`MON`) by enabling Monad Hype
 Revision note (2026-03-02): Completed Milestone 10 (`PUMP`) by enabling Solana HyperUnit address generation for the `pump` asset in the shared address-flow pipeline, adding `PUMP` coverage tests, and re-running required validation gates.
 Revision note (2026-03-02): Completed Milestone 11 (`SPX`) by enabling Solana HyperUnit address generation for the `spxs` asset in the shared address-flow pipeline, adding `SPX` coverage tests, and re-running required validation gates.
 Revision note (2026-03-02): Completed Milestone 12 (`XPL`) by enabling Plasma HyperUnit address generation for the `xpl` asset in the shared address-flow pipeline, adding `XPL` coverage tests, and re-running required validation gates.
+Revision note (2026-03-03): Completed Milestone 13 (`USDH`) by enabling Across-backed Arbitrum route flow (`acrossUsdcToUsdhDeposit`) with actions/effects/tests updates and re-running required validation gates.

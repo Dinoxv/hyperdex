@@ -242,6 +242,23 @@
                        :chainId "0xa4b1"}}]]
            (funding-actions/submit-funding-deposit state)))))
 
+(deftest submit-funding-deposit-supports-usdh-route-flow-test
+  (let [state (assoc-in (base-state)
+                        [:funding-ui :modal]
+                        {:open? true
+                         :mode :deposit
+                         :deposit-step :amount-entry
+                         :deposit-selected-asset-key :usdh
+                         :amount-input "10"})]
+    (is (= [[:effects/save-many [[[:funding-ui :modal :submitting?] true]
+                                 [[:funding-ui :modal :error] nil]]]
+            [:effects/api-submit-funding-deposit
+             {:action {:type "acrossUsdcToUsdhDeposit"
+                       :asset "usdh"
+                       :amount "10"
+                       :chainId "0xa4b1"}}]]
+           (funding-actions/submit-funding-deposit state)))))
+
 (deftest submit-funding-deposit-supports-btc-hyperunit-address-flow-test
   (let [state (assoc-in (base-state)
                         [:funding-ui :modal]
@@ -429,16 +446,16 @@
                        :network "Plasma"}}]]
            (funding-actions/submit-funding-deposit state)))))
 
-(deftest submit-funding-deposit-rejects-unimplemented-asset-flows-test
+(deftest submit-funding-deposit-rejects-unknown-asset-selection-test
   (let [state (assoc-in (base-state)
                         [:funding-ui :modal]
                         {:open? true
                          :mode :deposit
                          :deposit-step :amount-entry
-                         :deposit-selected-asset-key :usdh
+                         :deposit-selected-asset-key :does-not-exist
                          :amount-input "10"})]
     (is (= [[:effects/save-many [[[:funding-ui :modal :submitting?] false]
-                                 [[:funding-ui :modal :error] "USDH deposits are not implemented yet in Hyperopen."]]]]
+                                 [[:funding-ui :modal :error] "Select an asset to deposit."]]]]
            (funding-actions/submit-funding-deposit state)))))
 
 (deftest funding-modal-view-model-includes-multi-asset-deposit-catalog-test
