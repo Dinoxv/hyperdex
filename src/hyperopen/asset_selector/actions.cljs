@@ -133,7 +133,7 @@
   [value]
   (let [num (cond
               (number? value) value
-              (string? value) (js/parseFloat value)
+              (string? value) (parse-utils/parse-localized-currency-decimal value)
               :else js/NaN)]
     (when (and (number? num)
                (not (js/isNaN num))
