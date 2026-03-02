@@ -162,7 +162,7 @@
                    "font-semibold"
                    "text-gray-300"
                    "text-center"]}
-      "Funding Rate"]
+      "Rate History"]
      [:svg {:viewBox (str "0 0 " plot-width " " plot-height)
             :class ["h-[7rem]" "w-full"]
             :role "img"

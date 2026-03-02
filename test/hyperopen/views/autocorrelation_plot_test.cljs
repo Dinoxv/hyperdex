@@ -81,7 +81,7 @@
         node (funding-rate-plot/funding-rate-plot series)
         strings (set (collect-strings node))
         bars (collect-rect-attrs-by-key node :data-day)]
-    (is (contains? strings "Funding Rate"))
+    (is (contains? strings "Rate History"))
     (is (contains? strings "Day (oldest to newest)"))
     (is (contains? strings "0%"))
     (is (= 5 (count bars)))
