@@ -12,7 +12,10 @@
    :amount-input "10"
    :destination-input "0x1234567890abcdef1234567890abcdef12345678"
    :withdraw-selected-asset-key :usdc
-   :withdraw-generated-address nil})
+   :withdraw-generated-address nil
+   :hyperunit-lifecycle (funding-actions/default-hyperunit-lifecycle-state)
+   :hyperunit-fee-estimate (funding-actions/default-hyperunit-fee-estimate-state)
+   :hyperunit-withdrawal-queue (funding-actions/default-hyperunit-withdrawal-queue-state)})
 
 (deftest api-submit-funding-transfer-no-wallet-sets-error-test
   (let [store (atom {:wallet {}
@@ -198,6 +201,7 @@
                                                   :withdraw-generated-address nil)}})
           submit-calls (atom [])
           operation-calls (atom [])
+          queue-calls (atom [])
           timeout-calls (atom 0)
           toasts (atom [])]
       (-> (effects/api-submit-funding-withdraw!
@@ -229,6 +233,12 @@
                                                              :status "completed"
                                                              :position-in-withdraw-queue 2
                                                              :destination-tx-hash "0xwithdraw"}]}))
+            :request-hyperunit-withdrawal-queue! (fn [opts]
+                                                   (swap! queue-calls conj opts)
+                                                   (js/Promise.resolve
+                                                    {:by-chain {"bitcoin" {:chain "bitcoin"
+                                                                           :withdrawal-queue-length 7
+                                                                           :last-withdraw-queue-operation-tx-id "0xqueue-op"}}}))
             :set-timeout-fn (fn [_f _delay-ms]
                               (swap! timeout-calls inc)
                               :timer-id)
@@ -250,6 +260,8 @@
                       (is (= [{:base-url "https://api.hyperunit.xyz"
                                :address wallet-address}]
                              @operation-calls))
+                      (is (= [{:base-url "https://api.hyperunit.xyz"}]
+                             @queue-calls))
                       (is (= protocol-address
                              (get-in @store [:funding-ui :modal :withdraw-generated-address])))
                       (is (= :withdraw
@@ -264,6 +276,10 @@
                              (get-in @store [:funding-ui :modal :hyperunit-lifecycle :status])))
                       (is (= 2
                              (get-in @store [:funding-ui :modal :hyperunit-lifecycle :position-in-withdraw-queue])))
+                      (is (= :ready
+                             (get-in @store [:funding-ui :modal :hyperunit-withdrawal-queue :status])))
+                      (is (= 7
+                             (get-in @store [:funding-ui :modal :hyperunit-withdrawal-queue :by-chain "bitcoin" :withdrawal-queue-length])))
                       (is (= 0 @timeout-calls))
                       (is (= [[:success "Withdrawal submitted."]]
                              @toasts))
@@ -332,6 +348,70 @@
                    (done)))
           (.catch (fn [err]
                     (is false (str "Unexpected fee-estimate failure-path rejection: " err))
+                    (done)))))))
+
+(deftest api-fetch-hyperunit-withdrawal-queue-updates-modal-on-success-test
+  (async done
+    (let [store (atom {:wallet {:chain-id "0xa4b1"}
+                       :funding-ui {:modal {:open? true
+                                            :mode :withdraw
+                                            :withdraw-selected-asset-key :btc
+                                            :hyperunit-withdrawal-queue (funding-actions/default-hyperunit-withdrawal-queue-state)}}})
+          clock (atom [1700000000000 1700000001000])]
+      (-> (effects/api-fetch-hyperunit-withdrawal-queue!
+           {:store store
+            :request-hyperunit-withdrawal-queue! (fn [_opts]
+                                                   (js/Promise.resolve
+                                                    {:by-chain {"bitcoin" {:chain "bitcoin"
+                                                                           :withdrawal-queue-length 4
+                                                                           :last-withdraw-queue-operation-tx-id "0xqueue-next"}}}))
+            :now-ms-fn (fn []
+                         (let [value (first @clock)]
+                           (swap! clock rest)
+                           value))})
+          (.then (fn [_]
+                   (let [queue-state (get-in @store [:funding-ui :modal :hyperunit-withdrawal-queue])]
+                     (is (= :ready (:status queue-state)))
+                     (is (= 1700000000000 (:requested-at-ms queue-state)))
+                     (is (= 1700000001000 (:updated-at-ms queue-state)))
+                     (is (= 4 (get-in queue-state [:by-chain "bitcoin" :withdrawal-queue-length])))
+                     (is (= "0xqueue-next"
+                            (get-in queue-state [:by-chain "bitcoin" :last-withdraw-queue-operation-tx-id])))
+                     (is (nil? (:error queue-state)))
+                     (done))))
+          (.catch (fn [err]
+                    (is false (str "Unexpected withdrawal-queue success-path error: " err))
+                    (done)))))))
+
+(deftest api-fetch-hyperunit-withdrawal-queue-sets-error-state-on-failure-test
+  (async done
+    (let [store (atom {:wallet {:chain-id "0xa4b1"}
+                       :funding-ui {:modal {:open? true
+                                            :mode :withdraw
+                                            :withdraw-selected-asset-key :btc
+                                            :hyperunit-withdrawal-queue (funding-actions/default-hyperunit-withdrawal-queue-state)}}})
+          now-ms (atom [1700000000000 1700000001000])]
+      (-> (effects/api-fetch-hyperunit-withdrawal-queue!
+           {:store store
+            :request-hyperunit-withdrawal-queue! (fn [_opts]
+                                                   (js/Promise.reject (js/Error. "queue offline")))
+            :now-ms-fn (fn []
+                         (let [value (first @now-ms)]
+                           (swap! now-ms rest)
+                           value))
+            :runtime-error-message (fn [err]
+                                     (or (some-> err .-message)
+                                         "unknown"))})
+          (.then (fn [result]
+                   (is (map? result))
+                   (let [queue-state (get-in @store [:funding-ui :modal :hyperunit-withdrawal-queue])]
+                     (is (= :error (:status queue-state)))
+                     (is (= 1700000000000 (:requested-at-ms queue-state)))
+                     (is (= 1700000001000 (:updated-at-ms queue-state)))
+                     (is (= "queue offline" (:error queue-state))))
+                   (done)))
+          (.catch (fn [err]
+                    (is false (str "Unexpected withdrawal-queue failure-path rejection: " err))
                     (done)))))))
 
 (deftest api-submit-funding-deposit-no-wallet-sets-error-test

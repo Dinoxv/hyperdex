@@ -266,6 +266,7 @@
           :api-fetch-vault-ledger-updates vault-effects/api-fetch-vault-ledger-updates!
           :api-submit-vault-transfer vault-effects/api-submit-vault-transfer!
           :api-fetch-hyperunit-fee-estimate funding-effects/api-fetch-hyperunit-fee-estimate!
+          :api-fetch-hyperunit-withdrawal-queue funding-effects/api-fetch-hyperunit-withdrawal-queue!
           :api-submit-funding-transfer funding-effects/api-submit-funding-transfer!
           :api-submit-funding-withdraw funding-effects/api-submit-funding-withdraw!
           :api-submit-funding-deposit funding-effects/api-submit-funding-deposit!}}

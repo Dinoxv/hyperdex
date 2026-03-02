@@ -775,6 +775,14 @@
     :now-ms-fn platform/now-ms
     :runtime-error-message runtime-error-message}))
 
+(defn api-fetch-hyperunit-withdrawal-queue-effect
+  [_ store]
+  (funding-workflow-effects/api-fetch-hyperunit-withdrawal-queue!
+   {:store store
+    :request-hyperunit-withdrawal-queue! api/request-hyperunit-withdrawal-queue!
+    :now-ms-fn platform/now-ms
+    :runtime-error-message runtime-error-message}))
+
 (defn api-submit-funding-transfer-effect
   [_ store request]
   (funding-workflow-effects/api-submit-funding-transfer!
@@ -792,6 +800,7 @@
     :request request
     :dispatch! nxr/dispatch
     :request-hyperunit-operations! api/request-hyperunit-operations!
+    :request-hyperunit-withdrawal-queue! api/request-hyperunit-withdrawal-queue!
     :set-timeout-fn platform/set-timeout!
     :now-ms-fn platform/now-ms
     :exchange-response-error exchange-response-error

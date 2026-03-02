@@ -391,6 +391,66 @@
      :updated-at-ms (normalize-lifecycle-non-negative-int (:updated-at-ms estimate))
      :error (non-blank-text (:error estimate))}))
 
+(defn default-hyperunit-withdrawal-queue-state
+  []
+  {:status :idle
+   :by-chain {}
+   :requested-at-ms nil
+   :updated-at-ms nil
+   :error nil})
+
+(defn- normalize-withdraw-queue-status
+  [value]
+  (let [status (cond
+                 (keyword? value) value
+                 (string? value) (some-> value str/trim str/lower-case keyword)
+                 :else nil)]
+    (if (contains? #{:idle :loading :ready :error} status)
+      status
+      :idle)))
+
+(defn- normalize-withdraw-queue-entry
+  [value]
+  (let [entry (if (map? value) value {})
+        queue-length (normalize-lifecycle-non-negative-int
+                      (:withdrawal-queue-length entry))]
+    {:chain (some-> (:chain entry)
+                    non-blank-text
+                    str/lower-case)
+     :last-withdraw-queue-operation-tx-id
+     (non-blank-text (:last-withdraw-queue-operation-tx-id entry))
+     :withdrawal-queue-length (if (number? queue-length)
+                                queue-length
+                                0)}))
+
+(defn normalize-hyperunit-withdrawal-queue
+  [value]
+  (let [queue (if (map? value) value {})
+        by-chain (if (map? (:by-chain queue))
+                   (:by-chain queue)
+                   {})
+        normalized-by-chain (reduce-kv (fn [acc chain-key entry]
+                                         (if-let [chain (cond
+                                                          (keyword? chain-key)
+                                                          (some-> chain-key name non-blank-text str/lower-case)
+
+                                                          (string? chain-key)
+                                                          (some-> chain-key non-blank-text str/lower-case)
+
+                                                          :else
+                                                          (some-> chain-key str non-blank-text str/lower-case))]
+                                           (assoc acc chain (normalize-withdraw-queue-entry
+                                                             (assoc (if (map? entry) entry {})
+                                                                    :chain chain)))
+                                           acc))
+                                       {}
+                                       by-chain)]
+    {:status (normalize-withdraw-queue-status (:status queue))
+     :by-chain normalized-by-chain
+     :requested-at-ms (normalize-lifecycle-non-negative-int (:requested-at-ms queue))
+     :updated-at-ms (normalize-lifecycle-non-negative-int (:updated-at-ms queue))
+     :error (non-blank-text (:error queue))}))
+
 (defn- resolve-deposit-network
   [state]
   (let [wallet-chain-id (normalize-chain-id (get-in state [:wallet :chain-id]))]
@@ -476,6 +536,7 @@
    :withdraw-generated-address nil
    :hyperunit-lifecycle (default-hyperunit-lifecycle-state)
    :hyperunit-fee-estimate (default-hyperunit-fee-estimate-state)
+   :hyperunit-withdrawal-queue (default-hyperunit-withdrawal-queue-state)
    :submitting? false
    :error nil})
 
@@ -492,6 +553,8 @@
                                             withdraw-default-asset-key)
            :hyperunit-fee-estimate (normalize-hyperunit-fee-estimate
                                     (:hyperunit-fee-estimate modal))
+           :hyperunit-withdrawal-queue (normalize-hyperunit-withdrawal-queue
+                                        (:hyperunit-withdrawal-queue modal))
            :hyperunit-lifecycle (normalize-hyperunit-lifecycle
                                  (:hyperunit-lifecycle modal)))))
 
@@ -626,6 +689,14 @@
     (when (and (seq chain*)
                (map? (:by-chain estimate*)))
       (get (:by-chain estimate*) chain*))))
+
+(defn- hyperunit-withdrawal-queue-entry
+  [withdrawal-queue chain]
+  (let [queue* (normalize-hyperunit-withdrawal-queue withdrawal-queue)
+        chain* (some-> chain non-blank-text str/lower-case)]
+    (when (and (seq chain*)
+               (map? (:by-chain queue*)))
+      (get (:by-chain queue*) chain*))))
 
 (defn- estimate-fee-display
   [value]
@@ -869,10 +940,27 @@
                                            (:status hyperunit-fee-estimate))
         hyperunit-fee-estimate-error (non-blank-text
                                       (:error hyperunit-fee-estimate))
+        hyperunit-withdrawal-queue (normalize-hyperunit-withdrawal-queue
+                                    (:hyperunit-withdrawal-queue modal))
+        hyperunit-withdrawal-queue-loading? (= :loading
+                                               (:status hyperunit-withdrawal-queue))
+        hyperunit-withdrawal-queue-error (non-blank-text
+                                          (:error hyperunit-withdrawal-queue))
         deposit-chain (hyperunit-source-chain selected-deposit-asset)
         withdraw-chain (hyperunit-source-chain selected-withdraw-asset)
         deposit-chain-fee (hyperunit-fee-entry hyperunit-fee-estimate deposit-chain)
         withdraw-chain-fee (hyperunit-fee-entry hyperunit-fee-estimate withdraw-chain)
+        withdraw-chain-queue (hyperunit-withdrawal-queue-entry
+                              hyperunit-withdrawal-queue
+                              withdraw-chain)
+        withdraw-queue-length (when (and (= selected-withdraw-flow-kind :hyperunit-address)
+                                         (map? withdraw-chain-queue))
+                                (:withdrawal-queue-length withdraw-chain-queue))
+        withdraw-queue-last-operation-tx-id (when (and (= selected-withdraw-flow-kind :hyperunit-address)
+                                                       (map? withdraw-chain-queue))
+                                              (non-blank-text
+                                               (:last-withdraw-queue-operation-tx-id
+                                                withdraw-chain-queue)))
         deposit-estimated-time (if (= selected-deposit-flow-kind :hyperunit-address)
                                  (or (when hyperunit-fee-estimate-loading? "Loading...")
                                      (non-blank-text (:deposit-eta deposit-chain-fee))
@@ -942,6 +1030,7 @@
      :to-perp? (true? (:to-perp? modal))
      :destination-input (or (:destination-input modal) "")
      :hyperunit-lifecycle hyperunit-lifecycle
+     :hyperunit-withdrawal-queue hyperunit-withdrawal-queue
      :max-display (format-usdc-display max-amount)
      :max-input (format-usdc-input max-amount)
      :max-symbol (if (= mode :withdraw) selected-withdraw-symbol "USDC")
@@ -972,8 +1061,12 @@
      :deposit-network-fee deposit-network-fee
      :withdraw-estimated-time withdraw-estimated-time
      :withdraw-network-fee withdraw-network-fee
+     :withdraw-queue-length withdraw-queue-length
+     :withdraw-queue-last-operation-tx-id withdraw-queue-last-operation-tx-id
      :hyperunit-fee-estimate-loading? hyperunit-fee-estimate-loading?
      :hyperunit-fee-estimate-error hyperunit-fee-estimate-error
+     :hyperunit-withdrawal-queue-loading? hyperunit-withdrawal-queue-loading?
+     :hyperunit-withdrawal-queue-error hyperunit-withdrawal-queue-error
      :submit-label (if submitting?
                      "Submitting..."
                      (case mode
@@ -1022,6 +1115,7 @@
                  :mode :withdraw
                  :withdraw-selected-asset-key selected-asset-key
                  :destination-input (or (wallet-address state) "")))]
+     [:effects/api-fetch-hyperunit-withdrawal-queue]
      [:effects/api-fetch-hyperunit-fee-estimate]]))
 
 (defn- open-legacy-funding-modal
@@ -1074,6 +1168,10 @@
                      clear-hyperunit-lifecycle?
                      (assoc :withdraw-generated-address nil)
 
+                     (= path* [:withdraw-selected-asset-key])
+                     (assoc :hyperunit-withdrawal-queue
+                            (default-hyperunit-withdrawal-queue-state))
+
                      (= path* [:deposit-selected-asset-key])
                      (assoc :deposit-step :amount-entry
                             :amount-input ""
@@ -1090,10 +1188,15 @@
         next-mode (normalize-mode (:mode next-modal))
         refresh-estimate? (and (contains? #{:deposit :withdraw} next-mode)
                                (or (= path* [:deposit-selected-asset-key])
-                                   (= path* [:withdraw-selected-asset-key])))]
+                                   (= path* [:withdraw-selected-asset-key])))
+        refresh-withdraw-queue? (and (= next-mode :withdraw)
+                                     (= path* [:withdraw-selected-asset-key]))]
     (cond-> [[:effects/save funding-modal-path next-modal]]
       refresh-estimate?
-      (conj [:effects/api-fetch-hyperunit-fee-estimate]))))
+      (conj [:effects/api-fetch-hyperunit-fee-estimate])
+
+      refresh-withdraw-queue?
+      (conj [:effects/api-fetch-hyperunit-withdrawal-queue]))))
 
 (defn set-hyperunit-lifecycle
   [state lifecycle]

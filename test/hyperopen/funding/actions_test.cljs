@@ -29,6 +29,7 @@
    :withdraw-generated-address nil
    :hyperunit-lifecycle (funding-actions/default-hyperunit-lifecycle-state)
    :hyperunit-fee-estimate (funding-actions/default-hyperunit-fee-estimate-state)
+   :hyperunit-withdrawal-queue (funding-actions/default-hyperunit-withdrawal-queue-state)
    :submitting? false
    :error nil})
 
@@ -43,6 +44,7 @@
            (funding-actions/open-funding-transfer-modal state)))
     (is (= [[:effects/save [:funding-ui :modal]
              (expected-open-modal :withdraw)]
+            [:effects/api-fetch-hyperunit-withdrawal-queue]
             [:effects/api-fetch-hyperunit-fee-estimate]]
            (funding-actions/open-funding-withdraw-modal state)))))
 
@@ -291,7 +293,7 @@
     (is (= (funding-actions/default-hyperunit-lifecycle-state)
            (:hyperunit-lifecycle withdraw-asset-modal)))))
 
-(deftest set-funding-modal-field-refreshes-hyperunit-fee-estimate-on-asset-change-test
+(deftest set-funding-modal-field-refreshes-hyperunit-fee-estimate-and-queue-on-withdraw-asset-change-test
   (let [state (assoc-in (base-state)
                         [:funding-ui :modal]
                         {:open? true
@@ -303,7 +305,9 @@
                                                          :btc)]
     (is (= :effects/save (ffirst effects)))
     (is (= [:effects/api-fetch-hyperunit-fee-estimate]
-           (second effects)))))
+           (second effects)))
+    (is (= [:effects/api-fetch-hyperunit-withdrawal-queue]
+           (nth effects 2)))))
 
 (deftest set-hyperunit-lifecycle-normalizes-snapshot-test
   (let [state (assoc-in (base-state)
@@ -703,14 +707,25 @@
                                                                             :withdrawal-fee "0.00001"}}
                                                       :requested-at-ms 1
                                                       :updated-at-ms 2
-                                                      :error nil}}))
+                                                      :error nil}
+                             :hyperunit-withdrawal-queue {:status :ready
+                                                          :by-chain {"bitcoin" {:chain "bitcoin"
+                                                                                :withdrawal-queue-length 9
+                                                                                :last-withdraw-queue-operation-tx-id "0xqueue123"}}
+                                                          :requested-at-ms 3
+                                                          :updated-at-ms 4
+                                                          :error nil}}))
         view-model (funding-actions/funding-modal-view-model state)]
     (is (= "~20 mins" (:withdraw-estimated-time view-model)))
     (is (= "0.00001" (:withdraw-network-fee view-model)))
+    (is (= 9 (:withdraw-queue-length view-model)))
+    (is (= "0xqueue123" (:withdraw-queue-last-operation-tx-id view-model)))
     (is (= 0.0003 (:min-withdraw-amount view-model)))
     (is (= "BTC" (:min-withdraw-symbol view-model)))
     (is (= false (:hyperunit-fee-estimate-loading? view-model)))
-    (is (nil? (:hyperunit-fee-estimate-error view-model)))))
+    (is (nil? (:hyperunit-fee-estimate-error view-model)))
+    (is (= false (:hyperunit-withdrawal-queue-loading? view-model)))
+    (is (nil? (:hyperunit-withdrawal-queue-error view-model)))))
 
 (deftest set-funding-amount-to-max-respects-active-mode-test
   (let [transfer-state (assoc-in (base-state)

@@ -97,7 +97,13 @@
             :requested-at-ms nil
             :updated-at-ms nil
             :error nil}
-           (get-in state [:funding-ui :modal :hyperunit-fee-estimate])))))
+           (get-in state [:funding-ui :modal :hyperunit-fee-estimate])))
+    (is (= {:status :idle
+            :by-chain {}
+            :requested-at-ms nil
+            :updated-at-ms nil
+            :error nil}
+           (get-in state [:funding-ui :modal :hyperunit-withdrawal-queue])))))
 
 (deftest default-app-state-initializes-empty-runtime-collections-test
   (let [state (app-defaults/default-app-state

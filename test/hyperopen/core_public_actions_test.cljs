@@ -54,6 +54,11 @@
                                        :requested-at-ms nil
                                        :updated-at-ms nil
                                        :error nil}
+              :hyperunit-withdrawal-queue {:status :idle
+                                           :by-chain {}
+                                           :requested-at-ms nil
+                                           :updated-at-ms nil
+                                           :error nil}
               :submitting? false
               :error nil}]]
            (compat/set-funding-modal state :history)))))

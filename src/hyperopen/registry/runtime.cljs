@@ -54,6 +54,7 @@
    [:effects/api-fetch-vault-ledger-updates :api-fetch-vault-ledger-updates]
    [:effects/api-submit-vault-transfer :api-submit-vault-transfer]
    [:effects/api-fetch-hyperunit-fee-estimate :api-fetch-hyperunit-fee-estimate]
+   [:effects/api-fetch-hyperunit-withdrawal-queue :api-fetch-hyperunit-withdrawal-queue]
    [:effects/api-submit-funding-transfer :api-submit-funding-transfer]
    [:effects/api-submit-funding-withdraw :api-submit-funding-withdraw]
    [:effects/api-submit-funding-deposit :api-submit-funding-deposit]])

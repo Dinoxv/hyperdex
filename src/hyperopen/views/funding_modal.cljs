@@ -173,8 +173,12 @@
                 min-withdraw-symbol
                 withdraw-estimated-time
                 withdraw-network-fee
+                withdraw-queue-length
+                withdraw-queue-last-operation-tx-id
                 hyperunit-fee-estimate-loading?
-                hyperunit-fee-estimate-error]} (funding-actions/funding-modal-view-model state)
+                hyperunit-fee-estimate-error
+                hyperunit-withdrawal-queue-loading?
+                hyperunit-withdrawal-queue-error]} (funding-actions/funding-modal-view-model state)
         deposit? (= mode :deposit)
         deposit-amount-entry? (= deposit-step :amount-entry)
         transfer? (= mode :transfer)
@@ -720,6 +724,38 @@
             [:div {:class ["flex" "items-center" "justify-between"]}
              [:span {:class ["text-[#7d94a0]"]} "Network fee"]
              [:span {:class ["text-[#dce9ee]"]} withdraw-network-fee]]
+            (when (= withdraw-flow-kind* :hyperunit-address)
+              [:div {:class ["flex" "items-center" "justify-between"]}
+               [:span {:class ["text-[#7d94a0]"]} "Withdrawal queue"]
+               [:span {:class ["text-[#dce9ee]"]}
+                (cond
+                  hyperunit-withdrawal-queue-loading?
+                  "Loading..."
+
+                  (number? withdraw-queue-length)
+                  (str withdraw-queue-length)
+
+                  (seq hyperunit-withdrawal-queue-error)
+                  "Unavailable"
+
+                  :else
+                  "N/A")]])
+            (when (and (= withdraw-flow-kind* :hyperunit-address)
+                       (seq withdraw-queue-last-operation-tx-id))
+              [:div {:class ["flex" "items-center" "justify-between" "gap-2"]}
+               [:span {:class ["text-[#7d94a0]"]} "Last queue tx"]
+               [:span {:class ["max-w-[220px]"
+                               "truncate"
+                               "font-mono"
+                               "text-xs"
+                               "text-[#dce9ee]"]}
+                withdraw-queue-last-operation-tx-id]])
+            (when (and (= withdraw-flow-kind* :hyperunit-address)
+                       (not hyperunit-withdrawal-queue-loading?)
+                       (seq hyperunit-withdrawal-queue-error))
+              [:p {:class ["text-xs" "text-[#9db2ba]"]}
+               (str "Live queue status unavailable: "
+                    hyperunit-withdrawal-queue-error)])
             (when (and (= withdraw-flow-kind* :hyperunit-address)
                        (not hyperunit-fee-estimate-loading?)
                        (seq hyperunit-fee-estimate-error))

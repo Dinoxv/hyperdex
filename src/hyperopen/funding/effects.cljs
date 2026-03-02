@@ -293,6 +293,13 @@
     :fetch-fn js/fetch}
    {}))
 
+(defn request-hyperunit-withdrawal-queue!
+  [{:keys [base-url]}]
+  (funding-hyperunit-gateway/request-hyperunit-withdrawal-queue!
+   {:hyperunit-base-url base-url
+    :fetch-fn js/fetch}
+   {}))
+
 (defn request-hyperunit-generate-address!
   [{:keys [base-url source-chain destination-chain asset destination-address]}]
   (funding-hyperunit-gateway/request-hyperunit-generate-address!
@@ -352,6 +359,28 @@
   (let [modal (get-in @store [:funding-ui :modal])]
     (and (true? (:open? modal))
          (contains? #{:deposit :withdraw} (:mode modal)))))
+
+(defn- normalize-modal-asset-key
+  [value]
+  (cond
+    (keyword? value) value
+    (string? value) (some-> value str/trim str/lower-case keyword)
+    :else nil))
+
+(defn- modal-active-for-withdraw-queue?
+  ([store]
+   (modal-active-for-withdraw-queue? store nil))
+  ([store expected-asset-key]
+   (let [modal (get-in @store [:funding-ui :modal])
+         selected-asset-key (normalize-modal-asset-key
+                             (:withdraw-selected-asset-key modal))
+         expected-asset-key* (normalize-modal-asset-key expected-asset-key)]
+     (and (true? (:open? modal))
+          (= :withdraw (:mode modal))
+          (keyword? selected-asset-key)
+          (not= :usdc selected-asset-key)
+          (or (nil? expected-asset-key*)
+              (= expected-asset-key* selected-asset-key))))))
 
 (defn- op-sort-ms
   [op]
@@ -477,6 +506,70 @@
   [asset-key now-ms]
   (awaiting-lifecycle :withdraw asset-key now-ms))
 
+(defn- fetch-hyperunit-withdrawal-queue!
+  [{:keys [store
+           base-url
+           request-hyperunit-withdrawal-queue!
+           now-ms-fn
+           runtime-error-message
+           expected-asset-key
+           transition-loading?]
+    :or {transition-loading? true
+         runtime-error-message fallback-runtime-error-message}}]
+  (let [request-queue! (when (fn? request-hyperunit-withdrawal-queue!)
+                         request-hyperunit-withdrawal-queue!)
+        now-ms!* (or now-ms-fn
+                     (fn [] (js/Date.now)))
+        base-url* (or base-url
+                      (resolve-hyperunit-base-url store))]
+    (when (and request-queue!
+               (modal-active-for-withdraw-queue? store expected-asset-key))
+      (let [requested-at (now-ms!*)]
+        (when transition-loading?
+          (swap! store update-in
+                 [:funding-ui :modal :hyperunit-withdrawal-queue]
+                 (fn [current]
+                   (-> (funding-actions/normalize-hyperunit-withdrawal-queue current)
+                       (assoc :status :loading
+                              :requested-at-ms requested-at
+                              :error nil)))))
+        (-> (request-queue! {:base-url base-url*})
+            (.then (fn [resp]
+                     (when (modal-active-for-withdraw-queue? store expected-asset-key)
+                       (let [timestamp (now-ms!*)
+                             by-chain (if (map? (:by-chain resp))
+                                        (:by-chain resp)
+                                        {})
+                             error-text (non-blank-text (:error resp))]
+                         (swap! store update-in
+                                [:funding-ui :modal :hyperunit-withdrawal-queue]
+                                (fn [current]
+                                  (let [prev (funding-actions/normalize-hyperunit-withdrawal-queue current)]
+                                    (if (seq error-text)
+                                      (assoc prev
+                                             :status :error
+                                             :by-chain by-chain
+                                             :updated-at-ms timestamp
+                                             :error error-text)
+                                      (assoc prev
+                                             :status :ready
+                                             :by-chain by-chain
+                                             :updated-at-ms timestamp
+                                             :error nil)))))))
+                     resp))
+            (.catch (fn [err]
+                      (when (modal-active-for-withdraw-queue? store expected-asset-key)
+                        (let [timestamp (now-ms!*)
+                              message (or (non-blank-text (runtime-error-message err))
+                                          "Unable to load HyperUnit withdrawal queue.")]
+                          (swap! store update-in
+                                 [:funding-ui :modal :hyperunit-withdrawal-queue]
+                                 (fn [current]
+                                   (-> (funding-actions/normalize-hyperunit-withdrawal-queue current)
+                                       (assoc :status :error
+                                              :updated-at-ms timestamp
+                                              :error message)))))))))))))
+
 (defn- start-hyperunit-lifecycle-polling!
   [{:keys [store
            direction
@@ -486,10 +579,14 @@
            destination-address
            base-url
            request-hyperunit-operations!
+           request-hyperunit-withdrawal-queue!
            set-timeout-fn
-           now-ms-fn]}]
+           now-ms-fn
+           runtime-error-message]}]
   (let [request-ops! (when (fn? request-hyperunit-operations!)
                        request-hyperunit-operations!)
+        request-queue! (when (fn? request-hyperunit-withdrawal-queue!)
+                         request-hyperunit-withdrawal-queue!)
         timeout! (or set-timeout-fn
                      (fn [f delay-ms]
                        (js/setTimeout f delay-ms)))
@@ -509,6 +606,19 @@
                                   (swap! store assoc-in
                                          [:funding-ui :modal :hyperunit-lifecycle]
                                          (funding-actions/normalize-hyperunit-lifecycle lifecycle))))
+            refresh-withdraw-queue! (fn []
+                                      (when (and (= direction :withdraw)
+                                                 request-queue!
+                                                 (should-continue?))
+                                        (fetch-hyperunit-withdrawal-queue!
+                                         {:store store
+                                          :base-url base-url
+                                          :request-hyperunit-withdrawal-queue! request-queue!
+                                          :now-ms-fn now-ms!*
+                                          :runtime-error-message (or runtime-error-message
+                                                                     fallback-runtime-error-message)
+                                          :expected-asset-key asset-key
+                                          :transition-loading? false})))
             schedule-next! (fn [delay-ms poll-fn]
                              (when (should-continue?)
                                (timeout! poll-fn delay-ms)))]
@@ -527,13 +637,14 @@
                                                                      :protocol-address protocol-address
                                                                      :source-address (when (= direction :withdraw)
                                                                                        wallet-address)
-                                                                     :destination-address (if (= direction :withdraw)
-                                                                                            destination-address
-                                                                                            wallet-address)})
+                                         :destination-address (if (= direction :withdraw)
+                                                                    destination-address
+                                                                    wallet-address)})
                                          lifecycle (if operation
                                                      (operation->lifecycle operation direction asset-key now-ms)
                                                      (awaiting-lifecycle direction asset-key now-ms))]
                                      (update-lifecycle! lifecycle)
+                                     (refresh-withdraw-queue!)
                                      (if (lifecycle-terminal? lifecycle)
                                        (clear-lifecycle-poll-token! poll-key token)
                                        (schedule-next! (lifecycle-next-delay-ms now-ms lifecycle) poll!))))))
@@ -546,10 +657,11 @@
                                       (update-lifecycle!
                                        (assoc (merge (awaiting-lifecycle direction asset-key now-ms)
                                                      (if (map? previous) previous {}))
-                                              :direction direction
-                                              :asset-key asset-key
-                                              :last-updated-ms now-ms
-                                              :error message))
+                                               :direction direction
+                                               :asset-key asset-key
+                                               :last-updated-ms now-ms
+                                               :error message))
+                                      (refresh-withdraw-queue!)
                                       (schedule-next! hyperunit-operations-poll-default-delay-ms poll!))))))))]
           (poll!))))))
 
@@ -1225,6 +1337,22 @@
                                               :updated-at-ms timestamp
                                               :error message)))))))))))))
 
+(defn api-fetch-hyperunit-withdrawal-queue!
+  [{:keys [store
+           request-hyperunit-withdrawal-queue!
+           now-ms-fn
+           runtime-error-message]
+    :or {request-hyperunit-withdrawal-queue! request-hyperunit-withdrawal-queue!
+         now-ms-fn (fn [] (js/Date.now))
+         runtime-error-message fallback-runtime-error-message}}]
+  (fetch-hyperunit-withdrawal-queue!
+   {:store store
+    :base-url (resolve-hyperunit-base-url store)
+    :request-hyperunit-withdrawal-queue! request-hyperunit-withdrawal-queue!
+    :now-ms-fn now-ms-fn
+    :runtime-error-message runtime-error-message
+    :transition-loading? true}))
+
 (defn api-submit-funding-transfer!
   [{:keys [store
            request
@@ -1272,6 +1400,7 @@
            submit-send-asset!
            submit-hyperunit-send-asset-withdraw-request-fn
            request-hyperunit-operations!
+           request-hyperunit-withdrawal-queue!
            set-timeout-fn
            now-ms-fn
            exchange-response-error
@@ -1282,6 +1411,7 @@
          submit-send-asset! trading-api/submit-send-asset!
          submit-hyperunit-send-asset-withdraw-request-fn submit-hyperunit-send-asset-withdraw-request!
          request-hyperunit-operations! nil
+         request-hyperunit-withdrawal-queue! nil
          set-timeout-fn nil
          now-ms-fn nil
          exchange-response-error fallback-exchange-response-error
@@ -1330,8 +1460,10 @@
                            :destination-address (:destination resp)
                            :base-url base-url
                            :request-hyperunit-operations! request-hyperunit-operations!
+                           :request-hyperunit-withdrawal-queue! request-hyperunit-withdrawal-queue!
                            :set-timeout-fn set-timeout-fn
-                           :now-ms-fn now-ms-fn})
+                           :now-ms-fn now-ms-fn
+                           :runtime-error-message runtime-error-message})
                          (show-toast! store :success "Withdrawal submitted.")
                          resp)
                        (do
