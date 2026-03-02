@@ -94,9 +94,9 @@
   ([value]
    (parse-decimal-input value nil))
   ([value locale]
-   (let [text (normalize-decimal-input value)]
-     (or (parse-utils/parse-localized-decimal text locale)
-         (parse-finite-number text)))))
+   (parse-utils/parse-localized-currency-decimal
+    (normalize-decimal-input value)
+    locale)))
 
 (defn- normalize-coin-key
   [coin]

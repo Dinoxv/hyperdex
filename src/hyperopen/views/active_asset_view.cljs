@@ -130,19 +130,11 @@
 (def ^:private default-hypothetical-position-value
   1000)
 
-(defn- normalize-decimal-input
-  [value]
-  (-> (str (or value ""))
-      (str/replace #"\$" "")
-      str/trim))
-
 (defn- parse-decimal-input
   ([value]
    (parse-decimal-input value nil))
   ([value locale]
-   (let [text (normalize-decimal-input value)]
-     (or (parse-utils/parse-localized-decimal text locale)
-         (parse-optional-number text)))))
+   (parse-utils/parse-localized-currency-decimal value locale)))
 
 (defn- coin-prefix [coin]
   (let [coin* (non-blank-text coin)]

@@ -12,6 +12,19 @@
                (not (js/isNaN num)))
       (js/Math.floor num))))
 
+(defn- parse-finite-number
+  [value]
+  (let [num (cond
+              (number? value) value
+              (string? value) (let [text (str/trim value)]
+                                (if (seq text)
+                                  (js/Number text)
+                                  js/NaN))
+              :else js/NaN)]
+    (when (and (number? num)
+               (js/isFinite num))
+      num)))
+
 (defn- escape-regexp-literal
   [value]
   (str/replace (str value)
@@ -121,3 +134,19 @@
      (let [num (js/parseFloat normalized)]
        (when-not (js/isNaN num)
          num)))))
+
+(defn sanitize-currency-decimal-input
+  [value]
+  (-> (str (or value ""))
+      (str/replace #"\$" "")
+      str/trim))
+
+(defn parse-localized-currency-decimal
+  "Parse currency-like localized decimal input. Accepts locale decimal/grouping
+   rules and falls back to finite JS number parsing for compatibility."
+  ([value]
+   (parse-localized-currency-decimal value nil))
+  ([value locale]
+   (let [text (sanitize-currency-decimal-input value)]
+     (or (parse-localized-decimal text locale)
+         (parse-finite-number text)))))

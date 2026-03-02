@@ -25,3 +25,14 @@
   (is (= 0.5
          (parse/parse-localized-decimal ",5" "fr-FR")))
   (is (nil? (parse/parse-localized-decimal "abc" "fr-FR"))))
+
+(deftest parse-localized-currency-decimal-test
+  (is (= 1234.56
+         (parse/parse-localized-currency-decimal "$1,234.56" "en-US")))
+  (is (= 1234.56
+         (parse/parse-localized-currency-decimal (str "1\u202F234,56") "fr-FR")))
+  (is (= -12.5
+         (parse/parse-localized-currency-decimal "-12,5" "fr-FR")))
+  (is (= 1000
+         (parse/parse-localized-currency-decimal "1e3" "en-US")))
+  (is (nil? (parse/parse-localized-currency-decimal "$abc" "en-US"))))

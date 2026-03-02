@@ -18,8 +18,7 @@
   [modal value]
   (let [num-value (cond
                     (number? value) value
-                    :else (or (parse-utils/parse-localized-decimal value (:locale modal))
-                              (js/parseFloat (str (or value "")))))]
+                    :else (parse-utils/parse-localized-currency-decimal value (:locale modal)))]
     (if (or (js/isNaN num-value)
             (< (js/Math.abs num-value) 0.00000001))
       "0"
