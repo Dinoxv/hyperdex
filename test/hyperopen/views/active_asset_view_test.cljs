@@ -435,7 +435,7 @@
         (is (contains? strings "ACF Lag 1d"))
         (is (contains? strings "ACF Lag 5d"))
         (is (contains? strings "ACF Lag 15d"))
-        (is (contains? strings "Autocorrelation (30d Daily Lags)"))
+        (is (contains? strings "Autocorrelation"))
         (is (contains? strings "+3679.2000%"))
         (is (contains? strings "175.0224%"))
         (is (contains? strings "+0.714"))
@@ -486,5 +486,5 @@
             ready-view (view/active-asset-row ctx-data market {:visible-dropdown nil} ready-state)
             ready-strings (set (collect-strings ready-view))]
         (is (contains? loading-strings "Loading 30d stats..."))
-        (is (contains? ready-strings "Autocorrelation (30d Daily Lags)"))
+        (is (contains? ready-strings "Autocorrelation"))
         (is (contains? ready-strings "Lag 15d needs at least 16 daily points"))))))

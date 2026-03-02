@@ -95,6 +95,9 @@
         baseline-y (y-for-value 0 top chart-height)
         top-y (y-for-value 1 top chart-height)
         bottom-y (y-for-value -1 top chart-height)
+        tick-start-y (+ bottom-y 1)
+        tick-end-y (+ bottom-y 4)
+        tick-label-y (+ bottom-y 12)
         step (if (pos? point-count)
                (/ chart-width point-count)
                chart-width)
@@ -113,10 +116,9 @@
      [:h5 {:class ["mb-1"
                    "text-[0.74rem]"
                    "font-medium"
-                   "uppercase"
-                   "tracking-wide"
-                   "text-gray-400"]}
-      "Autocorrelation (30d Daily Lags)"]
+                   "text-gray-400"
+                   "text-center"]}
+      "Autocorrelation"]
      [:svg {:viewBox (str "0 0 " plot-width " " plot-height)
             :class ["h-[7rem]" "w-full"]
             :role "img"
@@ -161,19 +163,19 @@
                                                 "")}]))
       (for [tick ticks
             :let [idx (dec tick)]
-            :when (and (>= idx 0)
+           :when (and (>= idx 0)
                        (< idx point-count))]
         (let [x (+ left (* idx step) (/ step 2))]
           ^{:key (str "tick-" tick)}
           [:g
            [:line {:x1 x
-                   :y1 (+ baseline-y 1)
+                   :y1 tick-start-y
                    :x2 x
-                   :y2 (+ baseline-y 4)
+                   :y2 tick-end-y
                    :stroke axis-stroke
                    :stroke-width 1}]
            [:text {:x x
-                   :y (+ baseline-y 13)
+                   :y tick-label-y
                    :text-anchor "middle"
                    :font-size "7.8"
                    :fill "rgba(220,232,242,0.75)"}
@@ -199,4 +201,3 @@
               :font-size "8"
               :fill "rgba(220,232,242,0.72)"}
        "Lag (days)"]]]))
-

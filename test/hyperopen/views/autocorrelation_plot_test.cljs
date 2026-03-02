@@ -40,7 +40,7 @@
         node (autocorrelation-plot/autocorrelation-plot series)
         strings (set (collect-strings node))
         bars (collect-bar-attrs node)]
-    (is (contains? strings "Autocorrelation (30d Daily Lags)"))
+    (is (contains? strings "Autocorrelation"))
     (is (contains? strings "Lag (days)"))
     (is (contains? strings "+1"))
     (is (contains? strings "0"))
@@ -61,4 +61,3 @@
     (is (contains? values "-1"))
     (is (contains? values "0.5"))
     (is (contains? values "1"))))
-
