@@ -49,7 +49,8 @@
     :symbol "SOL"
     :name "Solana"
     :network "Solana"
-    :flow-kind :hyperunit-address}
+    :flow-kind :hyperunit-address
+    :hyperunit-source-chain "solana"}
    {:key :2z
     :symbol "2Z"
     :name "ZZ"
@@ -101,7 +102,7 @@
   (set (map :key deposit-assets-base)))
 
 (def ^:private deposit-implemented-asset-keys
-  #{:usdc :usdt :btc :eth})
+  #{:usdc :usdt :btc :eth :sol})
 
 (defn- non-blank-text
   [value]

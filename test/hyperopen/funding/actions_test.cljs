@@ -276,6 +276,23 @@
                        :network "Ethereum"}}]]
            (funding-actions/submit-funding-deposit state)))))
 
+(deftest submit-funding-deposit-supports-sol-hyperunit-address-flow-test
+  (let [state (assoc-in (base-state)
+                        [:funding-ui :modal]
+                        {:open? true
+                         :mode :deposit
+                         :deposit-step :amount-entry
+                         :deposit-selected-asset-key :sol
+                         :amount-input ""})]
+    (is (= [[:effects/save-many [[[:funding-ui :modal :submitting?] true]
+                                 [[:funding-ui :modal :error] nil]]]
+            [:effects/api-submit-funding-deposit
+             {:action {:type "hyperunitGenerateDepositAddress"
+                       :asset "sol"
+                       :fromChain "solana"
+                       :network "Solana"}}]]
+           (funding-actions/submit-funding-deposit state)))))
+
 (deftest submit-funding-deposit-rejects-unimplemented-asset-flows-test
   (let [state (assoc-in (base-state)
                         [:funding-ui :modal]
