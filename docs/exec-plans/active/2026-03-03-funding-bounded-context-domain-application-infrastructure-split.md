@@ -29,6 +29,8 @@ The change will make the funding surface safer to extend: domain rules become pu
 - [x] (2026-03-03 21:13Z) Milestone 5 validation completed for submit-orchestration slice: `npm run check`, `npm test`, and `npm run test:websocket` all passed after extraction.
 - [x] (2026-03-03 21:16Z) Milestone 4 follow-up: moved HyperUnit lifecycle polling orchestration into `/hyperopen/src/hyperopen/funding/application/lifecycle_polling.cljs`, while `/hyperopen/src/hyperopen/funding/effects.cljs` retains wrapper seams and existing helper ownership.
 - [x] (2026-03-03 21:16Z) Milestone 5 validation completed for lifecycle-polling slice: `npm run check`, `npm test`, and `npm run test:websocket` all passed after extraction.
+- [x] (2026-03-03 21:19Z) Milestone 3 follow-up: moved `funding-modal-view-model` implementation to `/hyperopen/src/hyperopen/funding/application/modal_vm.cljs`; `/hyperopen/src/hyperopen/funding/application/modal_actions.cljs` now exposes a compatibility wrapper that injects existing helper seams.
+- [x] (2026-03-03 21:19Z) Milestone 5 validation completed for modal-VM slice: `npm run check`, `npm test`, and `npm run test:websocket` all passed after extraction.
 - [ ] Milestone 3 remaining: split `funding-modal-view-model` and modal command orchestration into dedicated application modules to reduce `/hyperopen/src/hyperopen/funding/application/modal_actions.cljs` size.
 - [ ] Milestone 4 remaining: split submit/lifecycle polling orchestration from `/hyperopen/src/hyperopen/funding/effects.cljs` into explicit funding application modules while preserving current test seams.
 - [ ] Milestone 6: Land tracking and governance updates (`bd`, optional ADR) and complete handoff.
@@ -86,6 +88,7 @@ Implemented first execution slice with behavior-preserving boundary extraction:
 - `funding.effects` now delegates wallet RPC transport concerns (provider request, chain switching, receipt polling, and generic send-and-confirm helpers) to `funding.infrastructure.wallet-rpc`.
 - Funding submit entrypoints are now implemented in `funding.application.submit-effects`, while `funding.effects` preserves public runtime seams and default dependency wiring.
 - HyperUnit lifecycle polling orchestration now runs through `funding.application.lifecycle-polling`, with `funding.effects` preserving existing state helpers and compatibility wrapper behavior.
+- Funding modal view-model composition now lives in `funding.application.modal-vm`, reducing `modal_actions` boundary overlap while preserving the existing public facade contract.
 
 Current gates are green (`npm run check`, `npm test`, `npm run test:websocket`), and runtime contracts remained stable. Remaining work is decomposition depth: the large `modal_actions.cljs` and `effects.cljs` orchestration bodies still need additional internal splits to fully satisfy the bounded-context end state.
 
