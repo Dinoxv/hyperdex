@@ -41,7 +41,16 @@
      "font-medium"
      "text-[#6c8e93]"
      "cursor-not-allowed"]
-    (base-button-classes true)))
+    ["rounded-lg"
+     "border"
+     "border-primary/40"
+     "bg-primary"
+     "px-3.5"
+     "py-2"
+     "text-sm"
+     "font-medium"
+     "text-primary-content"
+     "hover:bg-primary/90"]))
 
 (defn- deposit-asset-icon
   [symbol icon-src]
