@@ -36,8 +36,16 @@ The change will make the funding surface safer to extend: domain rules become pu
 - [x] (2026-03-03 21:29Z) Milestone 5 validation completed for command+HyperUnit address slices: `npm run check`, `npm test`, and `npm run test:websocket` all passed after extraction.
 - [x] (2026-03-03 21:32Z) Milestone 4 follow-up: extracted ERC20 encoding/balance/allowance RPC helpers into `/hyperopen/src/hyperopen/funding/infrastructure/erc20_rpc.cljs` and rewired `/hyperopen/src/hyperopen/funding/effects.cljs` through compatibility aliases/wrappers.
 - [x] (2026-03-03 21:32Z) Milestone 5 validation completed for ERC20 RPC slice: `npm run check`, `npm test`, and `npm run test:websocket` all passed after extraction.
-- [ ] Milestone 3 remaining: extract remaining modal domain policy/assets helpers out of `/hyperopen/src/hyperopen/funding/application/modal_actions.cljs` (currently 1013 LOC) into dedicated domain modules to complete layering.
-- [ ] Milestone 4 remaining: extract remaining HyperUnit submit/address orchestration and route/deposit transaction composition helpers out of `/hyperopen/src/hyperopen/funding/effects.cljs` (currently 1407 LOC) into explicit application/infrastructure modules while preserving current test seams.
+- [x] (2026-03-03 23:46Z) Milestone 3 follow-up: extracted asset catalog/selection and withdrawal minimum policy from `/hyperopen/src/hyperopen/funding/application/modal_actions.cljs` into `/hyperopen/src/hyperopen/funding/domain/assets.cljs`, then rewired `modal_actions` through compatibility aliases.
+- [x] (2026-03-03 23:46Z) Milestone 3 follow-up: extracted modal default-state shape and normalization from `/hyperopen/src/hyperopen/funding/application/modal_actions.cljs` into `/hyperopen/src/hyperopen/funding/domain/modal_state.cljs`, preserving existing facade APIs.
+- [x] (2026-03-03 23:46Z) Milestone 4 follow-up: extracted HyperUnit submit request orchestration (`generate address` and `sendAsset withdraw`) from `/hyperopen/src/hyperopen/funding/effects.cljs` into `/hyperopen/src/hyperopen/funding/application/hyperunit_submit.cljs` with wrapper-based seam injection.
+- [x] (2026-03-03 23:46Z) Milestone 5 validation completed for assets/modal-state/hyperunit-submit slices: `npm run check`, `npm test`, and `npm run test:websocket` all passed after extraction.
+- [x] (2026-03-03 23:53Z) Milestone 3 follow-up: extracted remaining modal parsing/preview/fee-display/lifecycle policy from `/hyperopen/src/hyperopen/funding/application/modal_actions.cljs` into `/hyperopen/src/hyperopen/funding/domain/policy.cljs`; `modal_actions` now acts primarily as a compatibility/composition facade (reduced to ~230 LOC).
+- [x] (2026-03-03 23:53Z) Milestone 4 follow-up: extracted route-deposit transaction orchestration (`bridge2`, `LiFi`, `Across`) from `/hyperopen/src/hyperopen/funding/effects.cljs` into `/hyperopen/src/hyperopen/funding/application/deposit_submit.cljs` with dependency-injected wrappers from `effects` (reduced to ~1147 LOC).
+- [x] (2026-03-03 23:53Z) Milestone 5 validation completed for policy+deposit-submit slices: `npx shadow-cljs compile app`, `npx shadow-cljs compile test`, `npm run check`, `npm test`, and `npm run test:websocket` all passed after extraction.
+- [x] (2026-03-03 23:58Z) Milestone 4 follow-up: extracted HyperUnit existing-address selection/prefetch and fee/withdrawal-queue fetch orchestration from `/hyperopen/src/hyperopen/funding/effects.cljs` into `/hyperopen/src/hyperopen/funding/application/hyperunit_query.cljs`, preserving private-var compatibility wrappers in `effects` for tests.
+- [x] (2026-03-03 23:58Z) Milestone 5 validation completed for hyperunit-query slice: `npx shadow-cljs compile app`, `npx shadow-cljs compile test`, `npm run check`, `npm test`, and `npm run test:websocket` all passed after extraction.
+- [ ] Milestone 4 remaining: optional final cleanup split for residual lifecycle/operation utility helpers still in `/hyperopen/src/hyperopen/funding/effects.cljs` (`select-operation`, polling token utilities, and lifecycle conversion helpers) if we want a strictly facade-only file.
 - [ ] Milestone 6: Land tracking and governance updates (`bd`, optional ADR) and complete handoff.
 
 ## Surprises & Discoveries
@@ -97,8 +105,14 @@ Implemented first execution slice with behavior-preserving boundary extraction:
 - Funding modal command orchestration now lives in `funding.application.modal-commands`, with `modal_actions` preserving the facade API and delegating command logic through injected seams.
 - HyperUnit address transport/fallback and request error shaping now live in `funding.infrastructure.hyperunit-address-client`, reducing mixed transport logic inside `funding.effects`.
 - ERC20 calldata and eth_call read helpers now live in `funding.infrastructure.erc20-rpc`, reducing wallet transport implementation overlap inside `funding.effects`.
+- Asset catalog/selection and withdraw minimum policy now live in `funding.domain.assets`, reducing cross-layer policy logic inside `modal_actions`.
+- Modal state defaulting/normalization now lives in `funding.domain.modal-state`, leaving `modal_actions` focused on orchestration and compatibility.
+- HyperUnit deposit-address and withdraw send-asset submit orchestration now runs through `funding.application.hyperunit-submit`, reducing effect-layer orchestration overlap.
+- Remaining modal amount parsing, preview validation/request shaping, fee display formatting, and lifecycle status presentation policy now live in `funding.domain.policy`; `funding.application.modal-actions` is now mostly dependency wiring and compatibility wrappers.
+- Bridge2/LiFi/Across deposit transaction orchestration now lives in `funding.application.deposit-submit`, with `funding.effects` retaining wrapper seams and runtime-facing compatibility defaults.
+- HyperUnit existing-address selection/prefetch plus fee/withdrawal-queue fetch orchestration now lives in `funding.application.hyperunit-query`, with `funding.effects` keeping compatibility wrappers for tests that reference private vars.
 
-Current gates are green (`npm run check`, `npm test`, `npm run test:websocket`), and runtime contracts remained stable. Remaining work is decomposition depth: the large `modal_actions.cljs` and `effects.cljs` orchestration bodies still need additional internal splits to fully satisfy the bounded-context end state.
+Current gates are green (`npm run check`, `npm test`, `npm run test:websocket`), and runtime contracts remained stable. Remaining work is now mostly optional cleanup for residual lifecycle polling utility helpers in `funding.effects`.
 
 ## Context and Orientation
 

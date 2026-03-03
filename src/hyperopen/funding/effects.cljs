@@ -2,6 +2,9 @@
   (:require [clojure.string :as str]
             [hyperopen.api.trading :as trading-api]
             [hyperopen.funding.actions :as funding-actions]
+            [hyperopen.funding.application.deposit-submit :as deposit-submit]
+            [hyperopen.funding.application.hyperunit-submit :as hyperunit-submit]
+            [hyperopen.funding.application.hyperunit-query :as hyperunit-query]
             [hyperopen.funding.application.lifecycle-polling :as lifecycle-polling]
             [hyperopen.funding.application.submit-effects :as submit-effects]
             [hyperopen.funding.domain.lifecycle :as funding-lifecycle]
@@ -469,149 +472,41 @@
 
 (defn- select-existing-hyperunit-deposit-address
   [operations-response source-chain asset destination-address]
-  (let [source-token (canonical-chain-token source-chain)
-        asset-token (canonical-token asset)
-        destination-chain-token (canonical-chain-token "hyperliquid")
-        destination-address-token (canonical-token destination-address)
-        operations (if (sequential? (:operations operations-response))
-                     (:operations operations-response)
-                     [])
-        addresses (if (sequential? (:addresses operations-response))
-                    (:addresses operations-response)
-                    [])
-        matching-ops (->> operations
-                          (filter (fn [op]
-                                    (and (= asset-token
-                                            (canonical-token (:asset op)))
-                                         (same-chain-token? source-token
-                                                            (:source-chain op))
-                                         (same-chain-token? destination-chain-token
-                                                            (:destination-chain op))
-                                         (or (not (seq destination-address-token))
-                                             (= destination-address-token
-                                                (canonical-token (:destination-address op))))
-                                         (seq (canonical-token (:protocol-address op))))))
-                          vec)
-        op-address (some->> matching-ops
-                            (sort-by op-sort-ms)
-                            last
-                            :protocol-address
-                            non-blank-text)
-        address-entry-by-op (when (seq op-address)
-                              (some (fn [entry]
-                                      (when (= (canonical-token op-address)
-                                               (canonical-token (:address entry)))
-                                        entry))
-                                    addresses))
-        hyperliquid-address-entries (->> addresses
-                                         (filter (fn [entry]
-                                                   (and (same-chain-token? destination-chain-token
-                                                                           (:destination-chain entry))
-                                                        (seq (canonical-token (:address entry))))))
-                                         vec)
-        direct-address-entry (some (fn [entry]
-                                     (when (and (same-chain-token? source-token
-                                                                   (or (:source-coin-type entry)
-                                                                       (:source-chain entry)))
-                                                (same-chain-token? destination-chain-token
-                                                                   (:destination-chain entry))
-                                                (seq (canonical-token (:address entry))))
-                                       entry))
-                                   hyperliquid-address-entries)
-        source-format-address-entry (some (fn [entry]
-                                            (let [entry-source (or (:source-coin-type entry)
-                                                                   (:source-chain entry))
-                                                  entry-source-token (canonical-chain-token entry-source)
-                                                  entry-source-conflicts? (and (seq entry-source-token)
-                                                                               (contains? known-source-chain-tokens
-                                                                                          entry-source-token)
-                                                                               (not (same-chain-token? source-token
-                                                                                                       entry-source-token)))
-                                                  address* (:address entry)]
-                                              (when (and (same-chain-token? destination-chain-token
-                                                                            (:destination-chain entry))
-                                                         (not entry-source-conflicts?)
-                                                         (protocol-address-matches-source-chain?
-                                                          source-token
-                                                          address*))
-                                                entry)))
-                                          hyperliquid-address-entries)
-        chosen-entry (or address-entry-by-op
-                         direct-address-entry
-                         source-format-address-entry)
-        chosen-address (or op-address
-                          (some-> (:address chosen-entry) non-blank-text))]
-    (when (seq chosen-address)
-      {:address chosen-address
-       :signatures (:signatures chosen-entry)})))
+  (hyperunit-query/select-existing-hyperunit-deposit-address
+   {:canonical-chain-token canonical-chain-token
+    :canonical-token canonical-token
+    :same-chain-token? same-chain-token?
+    :op-sort-ms-fn op-sort-ms
+    :non-blank-text non-blank-text
+    :protocol-address-matches-source-chain? protocol-address-matches-source-chain?
+    :known-source-chain-tokens known-source-chain-tokens}
+   operations-response
+   source-chain
+   asset
+   destination-address))
 
 (defn- request-existing-hyperunit-deposit-address!
   [base-url base-urls destination-address source-chain asset]
-  (-> (request-hyperunit-operations! {:base-url base-url
-                                      :base-urls base-urls
-                                      :address destination-address})
-      (.then (fn [operations-response]
-               (select-existing-hyperunit-deposit-address operations-response
-                                                          source-chain
-                                                          asset
-                                                          destination-address)))
-      (.catch (fn [_err]
-                nil))))
+  (hyperunit-query/request-existing-hyperunit-deposit-address!
+   {:request-hyperunit-operations! request-hyperunit-operations!
+    :select-existing-hyperunit-deposit-address select-existing-hyperunit-deposit-address}
+   base-url
+   base-urls
+   destination-address
+   source-chain
+   asset))
 
 (defn- prefetch-selected-hyperunit-deposit-address!
   [store]
-  (let [state @store
-        modal (get-in state [:funding-ui :modal])
-        view-model (funding-actions/funding-modal-view-model state)
-        selected-asset (:deposit-selected-asset view-model)
-        selected-asset-key (normalize-asset-key (:key selected-asset))
-        selected-source-chain (some-> (:hyperunit-source-chain selected-asset)
-                                      non-blank-text
-                                      canonical-chain-token)
-        generated-address (non-blank-text (:deposit-generated-address modal))
-        generated-asset-key (normalize-asset-key (:deposit-generated-asset-key modal))
-        wallet-address (normalize-address (get-in state [:wallet :address]))
-        should-prefetch? (and (= :deposit (:mode modal))
-                              (= :amount-entry (:deposit-step modal))
-                              (= :hyperunit-address (:flow-kind selected-asset))
-                              (keyword? selected-asset-key)
-                              (seq selected-source-chain)
-                              (seq wallet-address)
-                              (not (and (= selected-asset-key generated-asset-key)
-                                        (seq generated-address))))]
-    (when should-prefetch?
-      (let [base-urls (resolve-hyperunit-base-urls store)
-            base-url (first base-urls)
-            asset-token (name selected-asset-key)]
-        (-> (request-existing-hyperunit-deposit-address! base-url
-                                                         base-urls
-                                                         wallet-address
-                                                         selected-source-chain
-                                                         asset-token)
-            (.then (fn [existing-address]
-                     (when (map? existing-address)
-                       (swap! store
-                              (fn [state*]
-                                (let [modal* (get-in state* [:funding-ui :modal])
-                                      active-asset-key (normalize-asset-key (:deposit-selected-asset-key modal*))
-                                      active-generated-key (normalize-asset-key (:deposit-generated-asset-key modal*))
-                                      active-generated-address (non-blank-text (:deposit-generated-address modal*))
-                                      still-active? (and (= :deposit (:mode modal*))
-                                                         (= :amount-entry (:deposit-step modal*))
-                                                         (= selected-asset-key active-asset-key))
-                                      already-populated? (and (= selected-asset-key active-generated-key)
-                                                              (seq active-generated-address))]
-                                  (if (and still-active?
-                                           (not already-populated?))
-                                    (-> state*
-                                        (assoc-in [:funding-ui :modal :error] nil)
-                                        (assoc-in [:funding-ui :modal :deposit-generated-address] (:address existing-address))
-                                        (assoc-in [:funding-ui :modal :deposit-generated-signatures] (:signatures existing-address))
-                                        (assoc-in [:funding-ui :modal :deposit-generated-asset-key] selected-asset-key))
-                                    state*)))))
-                     existing-address))
-            (.catch (fn [_err]
-                      nil)))))))
+  (hyperunit-query/prefetch-selected-hyperunit-deposit-address!
+   {:funding-modal-view-model-fn funding-actions/funding-modal-view-model
+    :normalize-asset-key normalize-asset-key
+    :non-blank-text non-blank-text
+    :canonical-chain-token canonical-chain-token
+    :normalize-address normalize-address
+    :resolve-hyperunit-base-urls resolve-hyperunit-base-urls
+    :request-existing-hyperunit-deposit-address! request-existing-hyperunit-deposit-address!}
+   store))
 
 (defn- lifecycle-next-delay-ms
   [now-ms lifecycle]
@@ -664,72 +559,14 @@
   (awaiting-lifecycle :withdraw asset-key now-ms))
 
 (defn- fetch-hyperunit-withdrawal-queue!
-  [{:keys [store
-           base-url
-           base-urls
-           request-hyperunit-withdrawal-queue!
-           now-ms-fn
-           runtime-error-message
-           expected-asset-key
-           transition-loading?]
-    :or {transition-loading? true
-         runtime-error-message fallback-runtime-error-message}}]
-  (let [request-queue! (when (fn? request-hyperunit-withdrawal-queue!)
-                         request-hyperunit-withdrawal-queue!)
-        now-ms!* (or now-ms-fn
-                     (fn [] (js/Date.now)))
-        resolved-base-urls (or (seq base-urls)
-                               (resolve-hyperunit-base-urls store))
-        base-url* (or (non-blank-text base-url)
-                      (first resolved-base-urls))]
-    (when (and request-queue!
-               (modal-active-for-withdraw-queue? store expected-asset-key))
-      (let [requested-at (now-ms!*)]
-        (when transition-loading?
-          (swap! store update-in
-                 [:funding-ui :modal :hyperunit-withdrawal-queue]
-                 (fn [current]
-                   (-> (funding-lifecycle/normalize-hyperunit-withdrawal-queue current)
-                       (assoc :status :loading
-                              :requested-at-ms requested-at
-                              :error nil)))))
-        (-> (request-queue! {:base-url base-url*
-                             :base-urls resolved-base-urls})
-            (.then (fn [resp]
-                     (when (modal-active-for-withdraw-queue? store expected-asset-key)
-                       (let [timestamp (now-ms!*)
-                             by-chain (if (map? (:by-chain resp))
-                                        (:by-chain resp)
-                                        {})
-                             error-text (non-blank-text (:error resp))]
-                        (swap! store update-in
-                                [:funding-ui :modal :hyperunit-withdrawal-queue]
-                                (fn [current]
-                                  (let [prev (funding-lifecycle/normalize-hyperunit-withdrawal-queue current)]
-                                    (if (seq error-text)
-                                      (assoc prev
-                                             :status :error
-                                             :by-chain by-chain
-                                             :updated-at-ms timestamp
-                                             :error error-text)
-                                      (assoc prev
-                                             :status :ready
-                                             :by-chain by-chain
-                                             :updated-at-ms timestamp
-                                             :error nil)))))))
-                     resp))
-            (.catch (fn [err]
-                      (when (modal-active-for-withdraw-queue? store expected-asset-key)
-                        (let [timestamp (now-ms!*)
-                              message (or (non-blank-text (runtime-error-message err))
-                                          "Unable to load HyperUnit withdrawal queue.")]
-                          (swap! store update-in
-                                 [:funding-ui :modal :hyperunit-withdrawal-queue]
-                                 (fn [current]
-                                   (-> (funding-lifecycle/normalize-hyperunit-withdrawal-queue current)
-                                       (assoc :status :error
-                                              :updated-at-ms timestamp
-                                              :error message)))))))))))))
+  [opts]
+  (hyperunit-query/fetch-hyperunit-withdrawal-queue!
+   {:modal-active-for-withdraw-queue? modal-active-for-withdraw-queue?
+    :normalize-hyperunit-withdrawal-queue funding-lifecycle/normalize-hyperunit-withdrawal-queue
+    :resolve-hyperunit-base-urls resolve-hyperunit-base-urls
+    :non-blank-text non-blank-text
+    :fallback-runtime-error-message fallback-runtime-error-message}
+   opts))
 
 (defn- start-hyperunit-lifecycle-polling!
   [opts]
@@ -861,352 +698,90 @@
 
 (defn- submit-hyperunit-address-deposit-request!
   [store owner-address action]
-  (let [destination-address (normalize-address owner-address)
-        from-chain (some-> (:fromChain action) str str/trim str/lower-case)
-        asset (some-> (:asset action) str str/trim str/lower-case)
-        network-label (or (non-blank-text (:network action))
-                          (some-> from-chain str/capitalize))
-        base-urls (resolve-hyperunit-base-urls store)
-        base-url (first base-urls)]
-    (cond
-      (nil? destination-address)
-      (js/Promise.resolve {:status "err"
-                           :error "Connect your wallet before generating a deposit address."})
-
-      (not (seq from-chain))
-      (js/Promise.resolve {:status "err"
-                           :error "Deposit source chain is missing for this asset."})
-
-      (not (seq asset))
-      (js/Promise.resolve {:status "err"
-                           :error "Deposit asset is missing for this request."})
-
-      :else
-      (let [to-success-response (fn [{:keys [address signatures]} reused-address?]
-                                  {:status "ok"
-                                   :keep-modal-open? true
-                                   :network network-label
-                                   :asset asset
-                                   :from-chain from-chain
-                                   :deposit-address address
-                                  :deposit-signatures signatures
-                                  :reused-address? (true? reused-address?)})
-            generate-address! (fn []
-                                (-> (fetch-hyperunit-address-with-source-fallbacks! base-url
-                                                                                    base-urls
-                                                                                    from-chain
-                                                                                    "hyperliquid"
-                                                                                    asset
-                                                                                    destination-address)
-                                    (.then (fn [{:keys [address signatures]}]
-                                             (to-success-response {:address address
-                                                                   :signatures signatures}
-                                                                  false)))))
-            lookup-existing-address! (fn []
-                                       (request-existing-hyperunit-deposit-address!
-                                        base-url
-                                        base-urls
-                                        destination-address
-                                        from-chain
-                                        asset))
-            fallback-after-generate-error!
-            (fn [generate-error]
-              (-> (lookup-existing-address!)
-                  (.then (fn [fallback-address]
-                           (if (map? fallback-address)
-                             (to-success-response fallback-address true)
-                             (js/Promise.reject generate-error))))))]
-        (-> (lookup-existing-address!)
-            (.then (fn [existing-address]
-                     (if (map? existing-address)
-                       (js/Promise.resolve (to-success-response existing-address true))
-                       (.catch (generate-address!) fallback-after-generate-error!))))
-            (.catch (fn [err]
-                      {:status "err"
-                       :error (hyperunit-request-error-message err
-                                                               {:asset asset
-                                                                :source-chain from-chain})})))))))
+  (hyperunit-submit/submit-hyperunit-address-deposit-request!
+   {:normalize-address normalize-address
+    :non-blank-text non-blank-text
+    :resolve-hyperunit-base-urls resolve-hyperunit-base-urls
+    :request-existing-hyperunit-deposit-address! request-existing-hyperunit-deposit-address!
+    :fetch-hyperunit-address-with-source-fallbacks! fetch-hyperunit-address-with-source-fallbacks!
+    :hyperunit-request-error-message hyperunit-request-error-message}
+   store
+   owner-address
+   action))
 
 (defn- submit-hyperunit-send-asset-withdraw-request!
   [store owner-address action submit-send-asset!]
-  (let [source-address (normalize-address owner-address)
-        destination-address (non-blank-text (:destination action))
-        destination-chain (some-> (:destinationChain action) str str/trim str/lower-case)
-        asset (some-> (:asset action) str str/trim str/lower-case)
-        token (non-blank-text (:token action))
-        amount (some-> (:amount action) str str/trim)
-        network-label (or (non-blank-text (:network action))
-                          (some-> destination-chain str/capitalize))
-        base-urls (resolve-hyperunit-base-urls store)
-        base-url (first base-urls)]
-    (cond
-      (nil? source-address)
-      (js/Promise.resolve {:status "err"
-                           :error "Connect your wallet before withdrawing."})
-
-      (not (seq destination-address))
-      (js/Promise.resolve {:status "err"
-                           :error "Enter a valid destination address."})
-
-      (not (seq destination-chain))
-      (js/Promise.resolve {:status "err"
-                           :error "Withdrawal destination chain is missing for this asset."})
-
-      (not (seq asset))
-      (js/Promise.resolve {:status "err"
-                           :error "Withdrawal asset is missing for this request."})
-
-      (not (seq token))
-      (js/Promise.resolve {:status "err"
-                           :error "Withdrawal token symbol is missing for this request."})
-
-      (not (seq amount))
-      (js/Promise.resolve {:status "err"
-                           :error "Enter a valid withdrawal amount."})
-
-      :else
-      (-> (fetch-hyperunit-address-with-source-fallbacks! base-url
-                                                          base-urls
-                                                          "hyperliquid"
-                                                          destination-chain
-                                                          asset
-                                                          destination-address)
-          (.then (fn [{:keys [address]}]
-                   (-> (submit-send-asset! store
-                                           source-address
-                                           {:type "sendAsset"
-                                            :destination address
-                                            :sourceDex "spot"
-                                            :destinationDex "spot"
-                                            :token token
-                                            :amount amount
-                                            :fromSubAccount ""})
-                       (.then (fn [exchange-resp]
-                                (if (= "ok" (:status exchange-resp))
-                                  {:status "ok"
-                                   :keep-modal-open? true
-                                   :network network-label
-                                   :asset asset
-                                   :token token
-                                   :destination destination-address
-                                   :destination-chain destination-chain
-                                   :protocol-address address}
-                                  (let [error-text (str/trim (str (fallback-exchange-response-error exchange-resp)))]
-                                    {:status "err"
-                                     :error (if (seq error-text)
-                                              error-text
-                                              "Unknown exchange error")})))))))
-          (.catch (fn [err]
-                    {:status "err"
-                     :error (hyperunit-request-error-message err
-                                                             {:asset asset
-                                                              :source-chain destination-chain})}))))))
+  (hyperunit-submit/submit-hyperunit-send-asset-withdraw-request!
+   {:normalize-address normalize-address
+    :non-blank-text non-blank-text
+    :resolve-hyperunit-base-urls resolve-hyperunit-base-urls
+    :fetch-hyperunit-address-with-source-fallbacks! fetch-hyperunit-address-with-source-fallbacks!
+    :fallback-exchange-response-error fallback-exchange-response-error
+    :hyperunit-request-error-message hyperunit-request-error-message}
+   store
+   owner-address
+   action
+   submit-send-asset!))
 
 (defn- submit-usdc-bridge2-deposit-tx!
   [store owner-address action]
-  (let [provider (wallet/provider)
-        from-address (normalize-address owner-address)
-        chain-config (resolve-deposit-chain-config store action)
-        amount-units (parse-usdc-units (:amount action))
-        usdc-address (:usdc-address chain-config)
-        bridge-address (:bridge-address chain-config)]
-    (cond
-      (nil? provider)
-      (js/Promise.resolve {:status "err"
-                           :error "No wallet provider found. Connect your wallet first."})
-
-      (nil? from-address)
-      (js/Promise.resolve {:status "err"
-                           :error "Connect your wallet before depositing."})
-
-      (nil? amount-units)
-      (js/Promise.resolve {:status "err"
-                           :error "Enter a valid deposit amount."})
-
-      (<= amount-units (js/BigInt "0"))
-      (js/Promise.resolve {:status "err"
-                           :error "Enter an amount greater than 0."})
-
-      :else
-      (-> (ensure-wallet-chain! provider chain-config)
-          (.then (fn [_]
-                   (provider-request! provider
-                                      "eth_sendTransaction"
-                                      [{:from from-address
-                                        :to usdc-address
-                                        :data (encode-erc20-transfer-call-data bridge-address amount-units)}])))
-          (.then (fn [tx-hash]
-                   (-> (wait-for-transaction-receipt! provider tx-hash)
-                       (.then (fn [_]
-                                {:status "ok"
-                                 :txHash tx-hash
-                                 :network (:network-label chain-config)})))))
-          (.catch (fn [err]
-                    {:status "err"
-                     :error (wallet-error-message err)}))))))
+  (deposit-submit/submit-usdc-bridge2-deposit-tx!
+   {:wallet-provider-fn wallet/provider
+    :normalize-address normalize-address
+    :resolve-deposit-chain-config resolve-deposit-chain-config
+    :parse-usdc-units parse-usdc-units
+    :ensure-wallet-chain! ensure-wallet-chain!
+    :provider-request! provider-request!
+    :wait-for-transaction-receipt! wait-for-transaction-receipt!
+    :encode-erc20-transfer-call-data encode-erc20-transfer-call-data
+    :wallet-error-message wallet-error-message}
+   store
+   owner-address
+   action))
 
 (def ^:private lifi-quote->swap-config route-clients/lifi-quote->swap-config)
 
-(defn- approve-lifi-swap-token-if-needed!
-  [provider from-address {:keys [swap-token-address approval-address from-amount-units]}]
-  (-> (read-erc20-allowance-units! provider
-                                   swap-token-address
-                                   from-address
-                                   approval-address)
-      (.then (fn [allowance-units]
-               (if (< allowance-units from-amount-units)
-                 (-> (provider-request! provider
-                                        "eth_sendTransaction"
-                                        [{:from from-address
-                                          :to swap-token-address
-                                          :data (encode-erc20-approve-call-data approval-address
-                                                                                from-amount-units)
-                                          :value "0x0"}])
-                     (.then (fn [approve-tx-hash]
-                              (wait-for-transaction-receipt! provider approve-tx-hash))))
-                 (js/Promise.resolve nil))))))
-
-(defn- submit-usdc-delta-bridge2-deposit!
-  [store owner-address delta-units]
-  (if (<= delta-units (js/BigInt "0"))
-    (js/Promise.reject
-     (js/Error. "Swap completed but no USDC was received for deposit."))
-    (submit-usdc-bridge2-deposit-tx! store
-                                     owner-address
-                                     {:amount (usdc-units->amount-text delta-units)
-                                      :chainId arbitrum-mainnet-chain-id})))
-
-(defn- execute-lifi-swap-and-bridge2-deposit!
-  [store owner-address provider from-address usdc-address {:keys [swap-to-address swap-data swap-value]}]
-  (let [swap-transaction (cond-> {:from from-address
-                                  :to swap-to-address
-                                  :data swap-data}
-                           (seq swap-value) (assoc :value swap-value))]
-    (-> (read-erc20-balance-units! provider usdc-address from-address)
-        (.then (fn [before-balance]
-                 (-> (provider-request! provider
-                                        "eth_sendTransaction"
-                                        [swap-transaction])
-                     (.then (fn [swap-tx-hash]
-                              (wait-for-transaction-receipt! provider swap-tx-hash)))
-                     (.then (fn [_]
-                              (read-erc20-balance-units! provider usdc-address from-address)))
-                     (.then (fn [after-balance]
-                              (submit-usdc-delta-bridge2-deposit!
-                               store
-                               owner-address
-                               (- after-balance before-balance))))))))))
-
 (def ^:private send-and-confirm-evm-transaction! wallet-rpc/send-and-confirm-evm-transaction!)
-
-(defn- send-across-approval-transactions!
-  [provider from-address approval-txs]
-  (reduce (fn [promise approval-tx]
-            (.then promise
-                   (fn [_]
-                     (send-and-confirm-evm-transaction! provider
-                                                        from-address
-                                                        approval-tx))))
-          (js/Promise.resolve nil)
-          approval-txs))
 
 (defn- submit-usdh-across-deposit-tx!
   [_store owner-address action]
-  (let [provider (wallet/provider)
-        from-address (normalize-address owner-address)
-        amount-units (parse-usdh-units (:amount action))
-        chain-config (get chain-config-by-id arbitrum-mainnet-chain-id)
-        usdc-address (:usdc-address chain-config)]
-    (cond
-      (nil? provider)
-      (js/Promise.resolve {:status "err"
-                           :error "No wallet provider found. Connect your wallet first."})
-
-      (nil? from-address)
-      (js/Promise.resolve {:status "err"
-                           :error "Connect your wallet before depositing."})
-
-      (nil? amount-units)
-      (js/Promise.resolve {:status "err"
-                           :error "Enter a valid deposit amount."})
-
-      (<= amount-units (js/BigInt "0"))
-      (js/Promise.resolve {:status "err"
-                           :error "Enter an amount greater than 0."})
-
-      (> amount-units usdh-route-max-units)
-      (js/Promise.resolve {:status "err"
-                           :error "Maximum deposit is 1000000 USDH."})
-
-      :else
-      (-> (ensure-wallet-chain! provider chain-config)
-          (.then (fn [_]
-                   (fetch-across-approval! from-address amount-units usdc-address)))
-          (.then (fn [approval]
-                   (let [{:keys [swap-tx approval-txs]} (across-approval->swap-config approval)]
-                     (if (nil? swap-tx)
-                       (js/Promise.reject
-                        (js/Error. "Across approval response missing swap transaction fields."))
-                       (-> (send-across-approval-transactions! provider
-                                                               from-address
-                                                               approval-txs)
-                           (.then (fn [_]
-                                    (send-and-confirm-evm-transaction! provider
-                                                                       from-address
-                                                                       swap-tx))))))))
-          (.then (fn [tx-hash]
-                   {:status "ok"
-                    :txHash tx-hash
-                    :network (:network-label chain-config)}))
-          (.catch (fn [err]
-                    {:status "err"
-                     :error (wallet-error-message err)}))))))
+  (deposit-submit/submit-usdh-across-deposit-tx!
+   {:wallet-provider-fn wallet/provider
+    :normalize-address normalize-address
+    :parse-usdh-units parse-usdh-units
+    :usdh-route-max-units usdh-route-max-units
+    :chain-config (get chain-config-by-id arbitrum-mainnet-chain-id)
+    :ensure-wallet-chain! ensure-wallet-chain!
+    :fetch-across-approval! fetch-across-approval!
+    :across-approval->swap-config across-approval->swap-config
+    :send-and-confirm-evm-transaction! send-and-confirm-evm-transaction!
+    :wallet-error-message wallet-error-message}
+   _store
+   owner-address
+   action))
 
 (defn- submit-usdt-lifi-bridge2-deposit-tx!
   [store owner-address action]
-  (let [provider (wallet/provider)
-        from-address (normalize-address owner-address)
-        amount-units (parse-usdc-units (:amount action))
-        chain-config (get chain-config-by-id arbitrum-mainnet-chain-id)
-        usdc-address (:usdc-address chain-config)]
-    (cond
-      (nil? provider)
-      (js/Promise.resolve {:status "err"
-                           :error "No wallet provider found. Connect your wallet first."})
-
-      (nil? from-address)
-      (js/Promise.resolve {:status "err"
-                           :error "Connect your wallet before depositing."})
-
-      (nil? amount-units)
-      (js/Promise.resolve {:status "err"
-                           :error "Enter a valid deposit amount."})
-
-      (<= amount-units (js/BigInt "0"))
-      (js/Promise.resolve {:status "err"
-                           :error "Enter an amount greater than 0."})
-
-      :else
-      (-> (ensure-wallet-chain! provider chain-config)
-          (.then (fn [_]
-                   (fetch-lifi-quote! from-address amount-units usdc-address)))
-          (.then (fn [quote]
-                   (let [swap-config (lifi-quote->swap-config quote)]
-                     (if (nil? swap-config)
-                       (js/Promise.reject
-                        (js/Error. "LiFi quote response missing required transaction fields."))
-                       (-> (approve-lifi-swap-token-if-needed! provider from-address swap-config)
-                           (.then (fn [_]
-                                    (execute-lifi-swap-and-bridge2-deposit!
-                                     store
-                                     owner-address
-                                     provider
-                                     from-address
-                                     usdc-address
-                                     swap-config))))))))
-          (.catch (fn [err]
-                    {:status "err"
-                     :error (wallet-error-message err)}))))))
+  (deposit-submit/submit-usdt-lifi-bridge2-deposit-tx!
+   {:wallet-provider-fn wallet/provider
+    :normalize-address normalize-address
+    :parse-usdc-units parse-usdc-units
+    :chain-config (get chain-config-by-id arbitrum-mainnet-chain-id)
+    :ensure-wallet-chain! ensure-wallet-chain!
+    :fetch-lifi-quote! fetch-lifi-quote!
+    :lifi-quote->swap-config lifi-quote->swap-config
+    :read-erc20-allowance-units! read-erc20-allowance-units!
+    :encode-erc20-approve-call-data encode-erc20-approve-call-data
+    :provider-request! provider-request!
+    :wait-for-transaction-receipt! wait-for-transaction-receipt!
+    :read-erc20-balance-units! read-erc20-balance-units!
+    :submit-usdc-bridge2-deposit! submit-usdc-bridge2-deposit-tx!
+    :usdc-units->amount-text usdc-units->amount-text
+    :bridge-chain-id arbitrum-mainnet-chain-id
+    :wallet-error-message wallet-error-message}
+   store
+   owner-address
+   action))
 
 (defn api-fetch-hyperunit-fee-estimate!
   [{:keys [store
@@ -1216,58 +791,17 @@
     :or {request-hyperunit-estimate-fees! request-hyperunit-estimate-fees!
          now-ms-fn (fn [] (js/Date.now))
          runtime-error-message fallback-runtime-error-message}}]
-  (let [request-estimate! (when (fn? request-hyperunit-estimate-fees!)
-                            request-hyperunit-estimate-fees!)]
-    (when (and request-estimate!
-               (modal-active-for-fee-estimate? store))
-      (let [base-urls (resolve-hyperunit-base-urls store)
-            base-url (first base-urls)
-            now-ms (now-ms-fn)]
-        (swap! store update-in
-               [:funding-ui :modal :hyperunit-fee-estimate]
-               (fn [current]
-                 (-> (funding-lifecycle/normalize-hyperunit-fee-estimate current)
-                     (assoc :status :loading
-                            :requested-at-ms now-ms
-                            :error nil))))
-        (prefetch-selected-hyperunit-deposit-address! store)
-        (-> (request-estimate! {:base-url base-url
-                                :base-urls base-urls})
-            (.then (fn [resp]
-                     (when (modal-active-for-fee-estimate? store)
-                       (let [timestamp (now-ms-fn)
-                             by-chain (if (map? (:by-chain resp))
-                                        (:by-chain resp)
-                                        {})
-                             error-text (non-blank-text (:error resp))]
-                         (swap! store update-in
-                                [:funding-ui :modal :hyperunit-fee-estimate]
-                                (fn [current]
-                                  (let [prev (funding-lifecycle/normalize-hyperunit-fee-estimate current)]
-                                    (if (seq error-text)
-                                      (assoc prev
-                                             :status :error
-                                             :by-chain by-chain
-                                             :updated-at-ms timestamp
-                                             :error error-text)
-                                      (assoc prev
-                                             :status :ready
-                                             :by-chain by-chain
-                                             :updated-at-ms timestamp
-                                             :error nil)))))))
-                     resp))
-            (.catch (fn [err]
-                      (when (modal-active-for-fee-estimate? store)
-                        (let [timestamp (now-ms-fn)
-                              message (or (non-blank-text (runtime-error-message err))
-                                          "Unable to load HyperUnit fee estimates.")]
-                          (swap! store update-in
-                                 [:funding-ui :modal :hyperunit-fee-estimate]
-                                 (fn [current]
-                                   (-> (funding-lifecycle/normalize-hyperunit-fee-estimate current)
-                                       (assoc :status :error
-                                              :updated-at-ms timestamp
-                                              :error message)))))))))))))
+  (hyperunit-query/api-fetch-hyperunit-fee-estimate!
+   {:modal-active-for-fee-estimate? modal-active-for-fee-estimate?
+    :normalize-hyperunit-fee-estimate funding-lifecycle/normalize-hyperunit-fee-estimate
+    :resolve-hyperunit-base-urls resolve-hyperunit-base-urls
+    :prefetch-selected-hyperunit-deposit-address! prefetch-selected-hyperunit-deposit-address!
+    :non-blank-text non-blank-text
+    :fallback-runtime-error-message fallback-runtime-error-message}
+   {:store store
+    :request-hyperunit-estimate-fees! request-hyperunit-estimate-fees!
+    :now-ms-fn now-ms-fn
+    :runtime-error-message runtime-error-message}))
 
 (defn api-fetch-hyperunit-withdrawal-queue!
   [{:keys [store
