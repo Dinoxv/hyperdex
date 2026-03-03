@@ -36,8 +36,8 @@ The change will make the funding surface safer to extend: domain rules become pu
 - [x] (2026-03-03 21:29Z) Milestone 5 validation completed for command+HyperUnit address slices: `npm run check`, `npm test`, and `npm run test:websocket` all passed after extraction.
 - [x] (2026-03-03 21:32Z) Milestone 4 follow-up: extracted ERC20 encoding/balance/allowance RPC helpers into `/hyperopen/src/hyperopen/funding/infrastructure/erc20_rpc.cljs` and rewired `/hyperopen/src/hyperopen/funding/effects.cljs` through compatibility aliases/wrappers.
 - [x] (2026-03-03 21:32Z) Milestone 5 validation completed for ERC20 RPC slice: `npm run check`, `npm test`, and `npm run test:websocket` all passed after extraction.
-- [ ] Milestone 3 remaining: split `funding-modal-view-model` and modal command orchestration into dedicated application modules to reduce `/hyperopen/src/hyperopen/funding/application/modal_actions.cljs` size.
-- [ ] Milestone 4 remaining: split submit/lifecycle polling orchestration from `/hyperopen/src/hyperopen/funding/effects.cljs` into explicit funding application modules while preserving current test seams.
+- [ ] Milestone 3 remaining: extract remaining modal domain policy/assets helpers out of `/hyperopen/src/hyperopen/funding/application/modal_actions.cljs` (currently 1013 LOC) into dedicated domain modules to complete layering.
+- [ ] Milestone 4 remaining: extract remaining HyperUnit submit/address orchestration and route/deposit transaction composition helpers out of `/hyperopen/src/hyperopen/funding/effects.cljs` (currently 1407 LOC) into explicit application/infrastructure modules while preserving current test seams.
 - [ ] Milestone 6: Land tracking and governance updates (`bd`, optional ADR) and complete handoff.
 
 ## Surprises & Discoveries
