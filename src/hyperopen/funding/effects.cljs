@@ -431,6 +431,69 @@
                      :else for-asset)]
     (last (sort-by op-sort-ms candidates))))
 
+(defn- select-existing-hyperunit-deposit-address
+  [operations-response source-chain asset destination-address]
+  (let [source-token (canonical-token source-chain)
+        asset-token (canonical-token asset)
+        destination-chain-token "hyperliquid"
+        destination-address-token (canonical-token destination-address)
+        operations (if (sequential? (:operations operations-response))
+                     (:operations operations-response)
+                     [])
+        addresses (if (sequential? (:addresses operations-response))
+                    (:addresses operations-response)
+                    [])
+        matching-ops (->> operations
+                          (filter (fn [op]
+                                    (and (= asset-token
+                                            (canonical-token (:asset op)))
+                                         (= source-token
+                                            (canonical-token (:source-chain op)))
+                                         (= destination-chain-token
+                                            (canonical-token (:destination-chain op)))
+                                         (or (not (seq destination-address-token))
+                                             (= destination-address-token
+                                                (canonical-token (:destination-address op))))
+                                         (seq (canonical-token (:protocol-address op))))))
+                          vec)
+        op-address (some->> matching-ops
+                            (sort-by op-sort-ms)
+                            last
+                            :protocol-address
+                            non-blank-text)
+        address-entry-by-op (when (seq op-address)
+                              (some (fn [entry]
+                                      (when (= (canonical-token op-address)
+                                               (canonical-token (:address entry)))
+                                        entry))
+                                    addresses))
+        direct-address-entry (some (fn [entry]
+                                     (when (and (= source-token
+                                                   (canonical-token (:source-coin-type entry)))
+                                                (= destination-chain-token
+                                                   (canonical-token (:destination-chain entry)))
+                                                (seq (canonical-token (:address entry))))
+                                       entry))
+                                   addresses)
+        chosen-entry (or address-entry-by-op direct-address-entry)
+        chosen-address (or op-address
+                          (some-> (:address chosen-entry) non-blank-text))]
+    (when (seq chosen-address)
+      {:address chosen-address
+       :signatures (:signatures chosen-entry)})))
+
+(defn- request-existing-hyperunit-deposit-address!
+  [base-url destination-address source-chain asset]
+  (-> (request-hyperunit-operations! {:base-url base-url
+                                      :address destination-address})
+      (.then (fn [operations-response]
+               (select-existing-hyperunit-deposit-address operations-response
+                                                          source-chain
+                                                          asset
+                                                          destination-address)))
+      (.catch (fn [_err]
+                nil))))
+
 (defn- lifecycle-next-delay-ms
   [now-ms lifecycle]
   (let [state-next-at (:state-next-at lifecycle)
@@ -931,19 +994,42 @@
                            :error "Deposit asset is missing for this request."})
 
       :else
-      (-> (fetch-hyperunit-address! base-url
-                                    from-chain
-                                    "hyperliquid"
-                                    asset
-                                    destination-address)
-          (.then (fn [{:keys [address signatures]}]
-                   {:status "ok"
-                    :keep-modal-open? true
-                    :network network-label
-                    :asset asset
-                    :from-chain from-chain
-                    :deposit-address address
-                    :deposit-signatures signatures}))
+      (let [to-success-response (fn [{:keys [address signatures]} reused-address?]
+                                  {:status "ok"
+                                   :keep-modal-open? true
+                                   :network network-label
+                                   :asset asset
+                                   :from-chain from-chain
+                                   :deposit-address address
+                                   :deposit-signatures signatures
+                                   :reused-address? (true? reused-address?)})
+            generate-address! (fn []
+                                (-> (fetch-hyperunit-address! base-url
+                                                              from-chain
+                                                              "hyperliquid"
+                                                              asset
+                                                              destination-address)
+                                    (.then (fn [{:keys [address signatures]}]
+                                             (to-success-response {:address address
+                                                                   :signatures signatures}
+                                                                  false)))))
+            lookup-existing-address! (fn []
+                                       (request-existing-hyperunit-deposit-address!
+                                        base-url
+                                        destination-address
+                                        from-chain
+                                        asset))]
+        (-> (lookup-existing-address!)
+            (.then (fn [existing-address]
+                     (if (map? existing-address)
+                       (to-success-response existing-address true)
+                       (-> (generate-address!)
+                           (.catch (fn [generate-error]
+                                     (-> (lookup-existing-address!)
+                                         (.then (fn [fallback-address]
+                                                  (if (map? fallback-address)
+                                                    (to-success-response fallback-address true)
+                                                    (js/Promise.reject generate-error))))))))))))
           (.catch (fn [err]
                     {:status "err"
                      :error (wallet-error-message err)}))))))
@@ -1541,7 +1627,11 @@
                                                     (refresh-after-funding-submit! store
                                                                                    dispatch!
                                                                                    address))})
-                         (show-toast! store :success "Deposit address generated.")
+                         (show-toast! store
+                                      :success
+                                      (if (true? (:reused-address? resp))
+                                        "Using existing deposit address."
+                                        "Deposit address generated."))
                          resp)
                        (let [network (or (:network resp) "Arbitrum")]
                          (close-funding-modal! store default-funding-modal-state)

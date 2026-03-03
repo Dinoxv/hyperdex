@@ -604,6 +604,41 @@
                     (is false (str "Unexpected HyperUnit deposit-address success-path error: " err))
                     (done)))))))
 
+(deftest api-submit-funding-deposit-hyperunit-address-reused-response-shows-existing-address-toast-test
+  (async done
+    (let [store (atom {:wallet {:address "0xabc"}
+                       :funding-ui {:modal (assoc (seed-modal :deposit)
+                                                  :deposit-step :amount-entry
+                                                  :deposit-selected-asset-key :btc
+                                                  :deposit-generated-address nil
+                                                  :deposit-generated-signatures nil
+                                                  :deposit-generated-asset-key nil)}})
+          toasts (atom [])]
+      (-> (effects/api-submit-funding-deposit!
+           {:store store
+            :request {:action {:type "hyperunitGenerateDepositAddress"
+                               :asset "btc"
+                               :fromChain "bitcoin"
+                               :network "Bitcoin"}}
+            :submit-hyperunit-address-request! (fn [_store _address _action]
+                                                 (js/Promise.resolve {:status "ok"
+                                                                      :keep-modal-open? true
+                                                                      :asset "btc"
+                                                                      :deposit-address "bc1qexisting"
+                                                                      :deposit-signatures {"guardian-a" "sig-a"}
+                                                                      :reused-address? true}))
+            :show-toast! (fn [_store kind message]
+                           (swap! toasts conj [kind message]))})
+          (.then (fn [resp]
+                   (is (= "ok" (:status resp)))
+                   (is (= true (:reused-address? resp)))
+                   (is (= [[:success "Using existing deposit address."]]
+                          @toasts))
+                   (done)))
+          (.catch (fn [err]
+                    (is false (str "Unexpected reused-address toast-path error: " err))
+                    (done)))))))
+
 (deftest api-submit-funding-deposit-hyperunit-address-terminal-lifecycle-refreshes-user-data-test
   (async done
     (let [wallet-address "0xabc"
