@@ -35,3 +35,11 @@
                :action-deps {:core {:navigate navigate-fn}}})]
     (is (= save-fn (get-in deps [:effect-handlers :save])))
     (is (= navigate-fn (get-in deps [:action-handlers :navigate])))))
+
+(deftest runtime-action-handlers-rejects-duplicate-leaf-keys-across-domains-test
+  (is (thrown-with-msg?
+       js/Error
+       #"Duplicate runtime handler key"
+       (registry-composition/runtime-action-handlers
+        {:first {:duplicate-handler (fn [& _] :first)}
+         :second {:duplicate-handler (fn [& _] :second)}}))))

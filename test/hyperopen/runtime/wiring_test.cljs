@@ -1,8 +1,19 @@
 (ns hyperopen.runtime.wiring-test
-  (:require [cljs.test :refer-macros [deftest is]]
+  (:require [clojure.set :as set]
+            [cljs.test :refer-macros [deftest is]]
             [hyperopen.runtime.action-adapters :as action-adapters]
             [hyperopen.runtime.effect-adapters :as effect-adapters]
+            [hyperopen.schema.runtime-registration-catalog :as runtime-registration-catalog]
             [hyperopen.runtime.wiring :as wiring]))
+
+(defn- flatten-leaf-keys
+  [node]
+  (reduce-kv (fn [acc k v]
+               (if (map? v)
+                 (into acc (flatten-leaf-keys v))
+                 (conj acc k)))
+             #{}
+             (or node {})))
 
 (deftest runtime-effect-deps-uses-extracted-effect-adapter-overrides-test
   (let [deps (wiring/runtime-effect-deps)]
@@ -48,3 +59,21 @@
                     (get-in deps [:action-handlers :navigate])))
     (is (identical? effect-adapters/save
                     (get-in deps [:effect-handlers :save])))))
+
+(deftest runtime-action-deps-cover-catalog-handler-keys-test
+  (let [action-deps (wiring/runtime-action-deps)
+        available-handler-keys (flatten-leaf-keys action-deps)
+        required-handler-keys (runtime-registration-catalog/action-handler-keys)
+        missing (set/difference required-handler-keys available-handler-keys)]
+    (is (empty? missing)
+        (str "Runtime action deps missing catalog handler keys: "
+             (pr-str missing)))))
+
+(deftest runtime-effect-deps-cover-catalog-handler-keys-test
+  (let [effect-deps (wiring/runtime-effect-deps)
+        available-handler-keys (flatten-leaf-keys effect-deps)
+        required-handler-keys (runtime-registration-catalog/effect-handler-keys)
+        missing (set/difference required-handler-keys available-handler-keys)]
+    (is (empty? missing)
+        (str "Runtime effect deps missing catalog handler keys: "
+             (pr-str missing)))))

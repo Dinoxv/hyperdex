@@ -2,6 +2,7 @@
   (:require [clojure.set :as set]
             [cljs.test :refer-macros [deftest is]]
             [hyperopen.registry.runtime :as runtime-registry]
+            [hyperopen.schema.runtime-registration-catalog :as runtime-registration-catalog]
             [hyperopen.schema.contracts :as contracts]))
 
 (def ^:private high-risk-action-ids
@@ -69,6 +70,16 @@
         (str "Action contract drift detected. "
              "missing=" (pr-str (set/difference registered contracted))
              " extra=" (pr-str (set/difference contracted registered))))))
+
+(deftest runtime-registration-catalog-has-unique-binding-ids-test
+  (let [action-rows (runtime-registration-catalog/action-binding-rows)
+        effect-rows (runtime-registration-catalog/effect-binding-rows)]
+    (is (= (count action-rows)
+           (count (set (map first action-rows))))
+        "Action binding rows must have unique action ids.")
+    (is (= (count effect-rows)
+           (count (set (map first effect-rows))))
+        "Effect binding rows must have unique effect ids.")))
 
 (deftest contracted-effect-ids-match-runtime-registered-effect-ids-test
   (let [registered (runtime-registry/registered-effect-ids)

@@ -1,6 +1,8 @@
 (ns hyperopen.schema.contracts
   (:require [cljs.spec.alpha :as s]
+            [clojure.set :as set]
             [clojure.string :as str]
+            [hyperopen.schema.runtime-registration-catalog :as runtime-registration-catalog]
             [hyperopen.state.trading.order-form-key-policy :as order-form-key-policy]))
 
 (defn validation-enabled?
@@ -321,7 +323,8 @@
                           #(= "effects" (namespace %))))
 
 (def ^:private action-args-spec-by-id
-  {:actions/init-websockets ::no-args
+  (let [args-spec-by-id
+        {:actions/init-websockets ::no-args
    :actions/subscribe-to-asset ::coin-args
    :actions/subscribe-to-webdata2 ::address-args
    :actions/connect-wallet ::no-args
@@ -548,12 +551,22 @@
    :actions/set-vault-transfer-withdraw-all ::boolean-args
    :actions/submit-vault-transfer ::no-args
    :actions/set-vault-detail-chart-hover ::vault-chart-hover-args
-   :actions/clear-vault-detail-chart-hover ::no-args
-   :actions/navigate (s/or :path (s/tuple ::non-empty-string)
-                           :path-and-opts (s/tuple ::non-empty-string map?))})
+         :actions/clear-vault-detail-chart-hover ::no-args
+         :actions/navigate (s/or :path (s/tuple ::non-empty-string)
+                                 :path-and-opts (s/tuple ::non-empty-string map?))}]
+    (when-not (= (set (keys args-spec-by-id))
+                 (runtime-registration-catalog/action-ids))
+      (throw (js/Error.
+              (str "Action contract metadata drift detected. "
+                   "missing=" (pr-str (set/difference (runtime-registration-catalog/action-ids)
+                                                      (set (keys args-spec-by-id))))
+                   " extra=" (pr-str (set/difference (set (keys args-spec-by-id))
+                                                     (runtime-registration-catalog/action-ids)))))))
+    args-spec-by-id))
 
 (def ^:private effect-args-spec-by-id
-  {:effects/save ::save-args
+  (let [args-spec-by-id
+        {:effects/save ::save-args
    :effects/save-many ::save-many-args
    :effects/local-storage-set ::storage-args
    :effects/local-storage-set-json ::storage-args
@@ -604,17 +617,26 @@
    :effects/api-submit-vault-transfer ::api-submit-vault-transfer-args
    :effects/api-fetch-hyperunit-fee-estimate ::no-args
    :effects/api-fetch-hyperunit-withdrawal-queue ::no-args
-   :effects/api-submit-funding-transfer ::api-submit-funding-transfer-args
-   :effects/api-submit-funding-withdraw ::api-submit-funding-withdraw-args
-   :effects/api-submit-funding-deposit ::api-submit-funding-deposit-args})
+         :effects/api-submit-funding-transfer ::api-submit-funding-transfer-args
+         :effects/api-submit-funding-withdraw ::api-submit-funding-withdraw-args
+         :effects/api-submit-funding-deposit ::api-submit-funding-deposit-args}]
+    (when-not (= (set (keys args-spec-by-id))
+                 (runtime-registration-catalog/effect-ids))
+      (throw (js/Error.
+              (str "Effect contract metadata drift detected. "
+                   "missing=" (pr-str (set/difference (runtime-registration-catalog/effect-ids)
+                                                      (set (keys args-spec-by-id))))
+                   " extra=" (pr-str (set/difference (set (keys args-spec-by-id))
+                                                     (runtime-registration-catalog/effect-ids)))))))
+    args-spec-by-id))
 
 (defn contracted-action-ids
   []
-  (set (keys action-args-spec-by-id)))
+  (runtime-registration-catalog/action-ids))
 
 (defn contracted-effect-ids
   []
-  (set (keys effect-args-spec-by-id)))
+  (runtime-registration-catalog/effect-ids))
 
 (defn action-ids-using-any-args
   []

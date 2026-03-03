@@ -77,6 +77,14 @@ source_of_truth: true
 - The order-form runtime gateway and runtime action registration MUST derive command-driven order-form mappings from that catalog.
 - DO NOT maintain duplicate command-id -> action-id tables in gateway and registry modules.
 
+## Runtime Registration Catalog Rules (MUST)
+- Runtime action/effect registration metadata authority MUST live in one canonical catalog:
+  `/hyperopen/src/hyperopen/schema/runtime_registration_catalog.cljs`.
+- Runtime registry installation (`/hyperopen/src/hyperopen/registry/runtime.cljs`) MUST derive action/effect binding rows and registered ID sets from that catalog.
+- Runtime registration composition (`/hyperopen/src/hyperopen/runtime/registry_composition.cljs`) MUST derive runtime action/effect handler key selection from that catalog.
+- Runtime contract ID coverage (`/hyperopen/src/hyperopen/schema/contracts.cljs`) MUST derive contracted action/effect ID sets from that same catalog and fail fast on ID drift.
+- DO NOT maintain duplicate action/effect ID binding tables across runtime registry, registry composition, and contract surfaces.
+
 ## Order-Form Legacy Key Policy Rules (MUST)
 - Canonical order-form key ownership policy MUST live in one shared module:
   `/hyperopen/src/hyperopen/state/trading/order_form_key_policy.cljs`.
