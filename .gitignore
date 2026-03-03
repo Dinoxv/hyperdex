@@ -44,3 +44,7 @@ yarn-error.log*
 /coverage/
 /tmp/
 PRDs/
+
+# Dolt database files (added by bd init)
+.dolt/
+*.db
