@@ -163,6 +163,15 @@
                       :dedupe-key :predicted-fundings}
                      opts)))
 
+(defn- build-market-index-by-key
+  [markets]
+  (reduce-kv (fn [acc idx market]
+               (if-let [market-key (:key market)]
+                 (assoc acc market-key idx)
+                 acc))
+             {}
+             (vec (or markets []))))
+
 (defn build-market-state
   [now-ms-fn active-asset phase dexs spot-meta spot-asset-ctxs perp-results]
   (let [dexs-with-default (if (= phase :bootstrap)
@@ -186,11 +195,13 @@
         market-by-key (into {}
                             (map (fn [m] [(:key m) m]))
                             all-markets)
+        market-index-by-key (build-market-index-by-key all-markets)
         active-market (when active-asset
                         (markets/resolve-market-by-coin
                          market-by-key
                          active-asset))]
     {:markets all-markets
      :market-by-key market-by-key
+     :market-index-by-key market-index-by-key
      :active-market active-market
      :loaded-at-ms (now-ms-fn)}))

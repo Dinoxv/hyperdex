@@ -79,6 +79,7 @@
    :sort-direction :desc
    :markets []
    :market-by-key {}
+   :market-index-by-key {}
    :scroll-top 0
    :render-limit 120
    :last-render-limit-increase-ms nil

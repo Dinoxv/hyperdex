@@ -33,7 +33,8 @@
                                                                     :mark 99
                                                                     :markRaw "99"
                                                                     :fundingRate 0.0
-                                                                    :openInterest 0}}}})
+                                                                    :openInterest 0}}
+                                       :market-index-by-key {"perp:BTC" 0}}})
           store-write-count (atom 0)
           schedule-count (atom 0)
           scheduled-callback (atom nil)
@@ -75,7 +76,8 @@
           (is (= 0.02 (get-in @store [:active-assets :contexts "BTC" :fundingRate])))
           (is (= 101.5 (get-in @store [:asset-selector :market-by-key "perp:BTC" :mark])))
           (is (= 0.0002 (get-in @store [:asset-selector :market-by-key "perp:BTC" :fundingRate])))
-          (is (= 45066 (get-in @store [:asset-selector :market-by-key "perp:BTC" :openInterest])))))
+          (is (= 45066 (get-in @store [:asset-selector :market-by-key "perp:BTC" :openInterest])))
+          (is (= {"perp:BTC" 0} (get-in @store [:asset-selector :market-index-by-key])))))
       (remove-watch store watch-key))
     (finally
       (reset-active-asset-ctx-state!)

@@ -141,6 +141,15 @@
                [(:key market) market]))
         markets))
 
+(defn- market-index-by-key-from-markets
+  [markets]
+  (reduce-kv (fn [acc idx market]
+               (if-let [market-key (:key market)]
+                 (assoc acc market-key idx)
+                 acc))
+             {}
+             (vec (or markets []))))
+
 (defn- parse-sort-number
   [value]
   (let [num (cond
@@ -236,6 +245,7 @@
   (if (seq (get-in state [:asset-selector :markets]))
     state
     (let [market-by-key (market-by-key-from-markets cached-markets)
+          market-index-by-key (market-index-by-key-from-markets cached-markets)
           active-asset (:active-asset state)
           resolved-active-market (when (and (string? active-asset)
                                             (nil? (:active-market state)))
@@ -243,6 +253,7 @@
       (cond-> (-> state
                   (assoc-in [:asset-selector :markets] cached-markets)
                   (assoc-in [:asset-selector :market-by-key] market-by-key)
+                  (assoc-in [:asset-selector :market-index-by-key] market-index-by-key)
                   (assoc-in [:asset-selector :phase] :bootstrap)
                   (assoc-in [:asset-selector :cache-hydrated?] true))
         (map? resolved-active-market)

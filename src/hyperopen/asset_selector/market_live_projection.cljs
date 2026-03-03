@@ -57,23 +57,95 @@
       (assoc :openInterest nil
              :fundingRate nil))))
 
+(defn- normalize-selector-markets
+  [selector-markets]
+  (if (sequential? selector-markets)
+    (vec selector-markets)
+    []))
+
+(defn- build-market-index-by-key
+  [selector-markets]
+  (reduce-kv (fn [acc idx market]
+               (if-let [market-key (:key market)]
+                 (assoc acc market-key idx)
+                 acc))
+             {}
+             selector-markets))
+
 (defn- patch-selector-market-by-key
   [market-by-key market-keys ctx]
-  (reduce (fn [acc market-key]
-            (if-let [market (get acc market-key)]
-              (assoc acc market-key (patch-market-from-active-asset-ctx market ctx))
-              acc))
-          market-by-key
+  (reduce (fn [{:keys [patched-market-by-key changed-markets]} market-key]
+            (if-let [market (get patched-market-by-key market-key)]
+              (let [patched-market (patch-market-from-active-asset-ctx market ctx)]
+                (if (= market patched-market)
+                  {:patched-market-by-key patched-market-by-key
+                   :changed-markets changed-markets}
+                  {:patched-market-by-key (assoc patched-market-by-key market-key patched-market)
+                   :changed-markets (assoc changed-markets market-key patched-market)}))
+              {:patched-market-by-key patched-market-by-key
+               :changed-markets changed-markets}))
+          {:patched-market-by-key market-by-key
+           :changed-markets {}}
           market-keys))
 
-(defn- patch-selector-markets
-  [selector-markets patched-market-by-key]
-  (mapv (fn [market]
-          (or (get patched-market-by-key (:key market))
-              market))
-        (if (sequential? selector-markets)
-          (vec selector-markets)
-          [])))
+(defn- valid-row-index?
+  [idx market-count]
+  (and (int? idx)
+       (<= 0 idx)
+       (< idx market-count)))
+
+(defn- apply-indexed-market-patches
+  [selector-markets market-index-by-key changed-markets]
+  (reduce-kv
+   (fn [{:keys [markets changed? stale?]} market-key patched-market]
+     (let [idx (get market-index-by-key market-key)
+           market-count (count markets)]
+       (if-not (valid-row-index? idx market-count)
+         {:markets markets
+          :changed? changed?
+          :stale? true}
+         (let [current-market (nth markets idx nil)]
+           (if (not= market-key (:key current-market))
+             {:markets markets
+              :changed? changed?
+              :stale? true}
+             (if (= current-market patched-market)
+               {:markets markets
+                :changed? changed?
+                :stale? stale?}
+               {:markets (assoc markets idx patched-market)
+                :changed? true
+                :stale? stale?}))))))
+   {:markets selector-markets
+    :changed? false
+    :stale? false}
+   changed-markets))
+
+(defn- patch-selector-markets-by-index
+  [selector-markets market-index-by-key changed-markets]
+  (if (empty? changed-markets)
+    {:patched-markets selector-markets
+     :patched-market-index-by-key (if (map? market-index-by-key)
+                                    market-index-by-key
+                                    {})
+     :changed? false}
+    (let [market-index-by-key* (if (map? market-index-by-key)
+                                 market-index-by-key
+                                 {})
+          first-pass (apply-indexed-market-patches selector-markets
+                                                   market-index-by-key*
+                                                   changed-markets)]
+      (if (:stale? first-pass)
+        (let [rebuilt-index (build-market-index-by-key selector-markets)
+              second-pass (apply-indexed-market-patches selector-markets
+                                                        rebuilt-index
+                                                        changed-markets)]
+          {:patched-markets (:markets second-pass)
+           :patched-market-index-by-key rebuilt-index
+           :changed? (:changed? second-pass)})
+        {:patched-markets (:markets first-pass)
+         :patched-market-index-by-key market-index-by-key*
+         :changed? (:changed? first-pass)}))))
 
 (defn apply-active-asset-ctx-update
   [state coin ctx]
@@ -82,15 +154,33 @@
                (map? ctx))
     state
     (let [market-by-key (get-in state [:asset-selector :market-by-key] {})
+          original-selector-markets (get-in state [:asset-selector :markets] [])
+          selector-markets (normalize-selector-markets original-selector-markets)
+          market-index-by-key (get-in state [:asset-selector :market-index-by-key] {})
+          original-market-index-by-key market-index-by-key
           candidate-keys (markets/candidate-market-keys coin)
           selector-market-keys (filterv #(contains? market-by-key %) candidate-keys)]
       (if (empty? selector-market-keys)
         state
-        (let [patched-market-by-key (patch-selector-market-by-key market-by-key
-                                                                  selector-market-keys
-                                                                  ctx)
-              patched-markets (patch-selector-markets (get-in state [:asset-selector :markets] [])
-                                                      patched-market-by-key)]
-          (-> state
+        (let [{:keys [patched-market-by-key changed-markets]} (patch-selector-market-by-key market-by-key
+                                                                                             selector-market-keys
+                                                                                             ctx)
+              {:keys [patched-markets patched-market-index-by-key]} (patch-selector-markets-by-index selector-markets
+                                                                                                      market-index-by-key
+                                                                                                      changed-markets)
+              market-by-key-changed? (not= patched-market-by-key market-by-key)
+              selector-markets-changed? (not= patched-markets original-selector-markets)
+              market-index-changed? (not= patched-market-index-by-key original-market-index-by-key)]
+          (if-not (or market-by-key-changed?
+                      selector-markets-changed?
+                      market-index-changed?)
+            state
+            (cond-> state
+              market-by-key-changed?
               (assoc-in [:asset-selector :market-by-key] patched-market-by-key)
-              (assoc-in [:asset-selector :markets] patched-markets)))))))
+
+              selector-markets-changed?
+              (assoc-in [:asset-selector :markets] patched-markets)
+
+              market-index-changed?
+              (assoc-in [:asset-selector :market-index-by-key] patched-market-index-by-key))))))))

@@ -22,14 +22,17 @@
                                 :cache-hydrated? false
                                 :loading? true
                                 :error "kept"
-                                :markets [{:key :existing}]}
+                                :markets [{:key :existing}]
+                                :market-index-by-key {:existing 0}}
                :active-market {:coin "BTC"}}
         market-state {:markets [{:key :new}]
                       :market-by-key {:new {:key :new}}
+                      :market-index-by-key {:new 0}
                       :active-market {:coin "ETH"}
                       :loaded-at-ms 999}
         next-state (projections/apply-asset-selector-success state :bootstrap market-state)]
     (is (= [{:key :existing}] (get-in next-state [:asset-selector :markets])))
+    (is (= {:existing 0} (get-in next-state [:asset-selector :market-index-by-key])))
     (is (= "kept" (get-in next-state [:asset-selector :error])))
     (is (= 999 (get-in next-state [:asset-selector :loaded-at-ms])))
     (is (= false (get-in next-state [:asset-selector :loading?])))))
@@ -50,6 +53,7 @@
     (is (= :full (get-in loading [:asset-selector :phase])))
     (is (= [{:key :btc}] (get-in success [:asset-selector :markets])))
     (is (= {:btc {:key :btc}} (get-in success [:asset-selector :market-by-key])))
+    (is (= {:btc 0} (get-in success [:asset-selector :market-index-by-key])))
     (is (= {:coin "BTC"} (:active-market success)))
     (is (= false (get-in success [:asset-selector :loading?])))
     (is (= nil (get-in success [:asset-selector :error])))

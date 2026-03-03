@@ -173,7 +173,9 @@
                        :openInterest 88}
           state {:asset-selector {:markets [perp-market spot-market]
                                   :market-by-key {"perp:7" perp-market
-                                                  "spot:@7" spot-market}}}
+                                                  "spot:@7" spot-market}
+                                  :market-index-by-key {"perp:7" 0
+                                                        "spot:@7" 1}}}
           next-state (market-live-projection/apply-active-asset-ctx-update
                       state
                       "7"
@@ -195,6 +197,31 @@
       (is (nil? (get-in next-state [:asset-selector :market-by-key "spot:@7" :openInterest])))
       (is (nil? (get-in next-state [:asset-selector :market-by-key "spot:@7" :fundingRate])))))
 
+  (testing "stale selector index maps are rebuilt before applying row patches"
+    (let [btc-market {:key "perp:BTC"
+                      :coin "BTC"
+                      :market-type :perp
+                      :mark 100}
+          eth-market {:key "perp:ETH"
+                      :coin "ETH"
+                      :market-type :perp
+                      :mark 200}
+          state {:asset-selector {:markets [btc-market eth-market]
+                                  :market-by-key {"perp:BTC" btc-market
+                                                  "perp:ETH" eth-market}
+                                  :market-index-by-key {"perp:BTC" 1
+                                                        "perp:ETH" 0}}}
+          next-state (market-live-projection/apply-active-asset-ctx-update
+                      state
+                      "BTC"
+                      {:markPx "120"
+                       :prevDayPx "100"})]
+      (is (= 120 (get-in next-state [:asset-selector :markets 0 :mark])))
+      (is (= 200 (get-in next-state [:asset-selector :markets 1 :mark])))
+      (is (= {"perp:BTC" 0
+              "perp:ETH" 1}
+             (get-in next-state [:asset-selector :market-index-by-key])))))
+
   (testing "invalid inputs and unknown markets are no-ops"
     (let [state {:asset-selector {:markets []
                                   :market-by-key {}}}]
@@ -208,7 +235,8 @@
                   :market-type :perp
                   :mark 100}
           state {:asset-selector {:markets {:unexpected true}
-                                  :market-by-key {"perp:BTC" market}}}
+                                  :market-by-key {"perp:BTC" market}
+                                  :market-index-by-key {"perp:BTC" 0}}}
           next-state (market-live-projection/apply-active-asset-ctx-update
                       state
                       "BTC"

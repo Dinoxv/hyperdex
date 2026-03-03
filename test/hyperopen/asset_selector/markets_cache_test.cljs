@@ -58,12 +58,16 @@
                :active-market nil
                :asset-selector {:markets []
                                 :market-by-key {}
+                                :market-index-by-key {}
                                 :phase :bootstrap}}
         result (markets-cache/restore-asset-selector-markets-cache-state
                 state
                 cached-markets
                 markets/resolve-market-by-coin)]
     (is (= cached-markets (get-in result [:asset-selector :markets])))
+    (is (= {"perp:ETH" 0
+            "spot:PURR/USDC" 1}
+           (get-in result [:asset-selector :market-index-by-key])))
     (is (= "ETH" (get-in result [:active-market :coin])))
     (is (= 7 (get-in result [:active-market :asset-id])))
     (is (= true (get-in result [:asset-selector :cache-hydrated?])))))

@@ -15,7 +15,8 @@
                 :fundingRate 0
                 :openInterest 0}
         state {:asset-selector {:markets [market]
-                                :market-by-key {"perp:BTC" market}}}
+                                :market-by-key {"perp:BTC" market}
+                                :market-index-by-key {"perp:BTC" 0}}}
         next-state (market-live-projection/apply-active-asset-ctx-update
                     state
                     "BTC"
@@ -31,7 +32,31 @@
            1.0e-12))
     (is (= 0.0002 (get-in next-state [:asset-selector :market-by-key "perp:BTC" :fundingRate])))
     (is (= 45066 (get-in next-state [:asset-selector :market-by-key "perp:BTC" :openInterest])))
-    (is (= 333 (get-in next-state [:asset-selector :markets 0 :volume24h])))))
+    (is (= 333 (get-in next-state [:asset-selector :markets 0 :volume24h])))
+    (is (= {"perp:BTC" 0} (get-in next-state [:asset-selector :market-index-by-key])))))
+
+(deftest apply-active-asset-ctx-update-patches-only-targeted-selector-index-test
+  (let [btc-market {:key "perp:BTC"
+                    :coin "BTC"
+                    :market-type :perp
+                    :mark 100}
+        eth-market {:key "perp:ETH"
+                    :coin "ETH"
+                    :market-type :perp
+                    :mark 200}
+        state {:asset-selector {:markets [btc-market eth-market]
+                                :market-by-key {"perp:BTC" btc-market
+                                                "perp:ETH" eth-market}
+                                :market-index-by-key {"perp:BTC" 0
+                                                      "perp:ETH" 1}}}
+        next-state (market-live-projection/apply-active-asset-ctx-update
+                    state
+                    "BTC"
+                    {:markPx "101"
+                     :prevDayPx "100"})]
+    (is (= 101 (get-in next-state [:asset-selector :markets 0 :mark])))
+    (is (identical? eth-market (get-in next-state [:asset-selector :markets 1])))
+    (is (not (identical? btc-market (get-in next-state [:asset-selector :markets 0]))))))
 
 (deftest apply-active-asset-ctx-update-keeps-spot-funding-and-open-interest-empty-test
   (let [spot-market {:key "spot:PURR/USDC"
@@ -43,7 +68,8 @@
                      :fundingRate nil
                      :openInterest nil}
         state {:asset-selector {:markets [spot-market]
-                                :market-by-key {"spot:PURR/USDC" spot-market}}}
+                                :market-by-key {"spot:PURR/USDC" spot-market}
+                                :market-index-by-key {"spot:PURR/USDC" 0}}}
         next-state (market-live-projection/apply-active-asset-ctx-update
                     state
                     "PURR/USDC"
@@ -59,7 +85,8 @@
 
   (testing "unknown coins are a no-op"
     (let [state {:asset-selector {:markets []
-                                  :market-by-key {}}}]
+                                  :market-by-key {}
+                                  :market-index-by-key {}}}]
       (is (= state
              (market-live-projection/apply-active-asset-ctx-update
               state

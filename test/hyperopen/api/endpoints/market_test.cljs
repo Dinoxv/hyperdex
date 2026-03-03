@@ -211,6 +211,9 @@
         (is (= nil (:active-market result)))
         (is (= 2 (count (:markets result))))
         (is (= 2 (count (:market-by-key result))))
+        (is (= {[:perp nil] 0
+                [:spot "HYPE"] 1}
+               (:market-index-by-key result)))
         (is (= 4242 (:loaded-at-ms result)))))))
 
 (deftest build-market-state-live-phase-prefixes-default-dex-and-resolves-active-market-test
@@ -241,4 +244,9 @@
         (is (= "BTC" (second (first @resolve-calls))))
         (is (= [:perp "vault"] (:key (:active-market result))))
         (is (= 4 (count (:markets result))))
+        (is (= {[:perp nil] 0
+                [:perp "vault"] 1
+                [:perp "partner"] 2
+                [:spot "SOL"] 3}
+               (:market-index-by-key result)))
         (is (= 999 (:loaded-at-ms result)))))))
