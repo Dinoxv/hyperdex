@@ -86,7 +86,7 @@
     value]])
 
 (defn- funding-action-button
-  [{:keys [label action primary?]}]
+  [{:keys [label action primary? data-role]}]
   [:button {:type "button"
             :class (into ["w-full"
                           "h-[34px]"
@@ -113,6 +113,7 @@
                             "hover:border-[#45d8ce]"
                             "hover:bg-[#0f2f36]"
                             "hover:text-[#76e9df]"]))
+            :data-role data-role
             :on {:click [action]}}
    label])
 
@@ -120,12 +121,15 @@
   [:div.space-y-2
    (funding-action-button {:label "Deposit"
                            :primary? true
-                           :action [:actions/open-funding-deposit-modal]})
+                           :data-role "funding-action-deposit"
+                           :action [:actions/open-funding-deposit-modal :event.currentTarget/bounds]})
    [:div.grid.grid-cols-2.gap-2.5
     (funding-action-button {:label "Perps <-> Spot"
-                            :action [:actions/open-funding-transfer-modal]})
+                            :data-role "funding-action-transfer"
+                            :action [:actions/open-funding-transfer-modal :event.currentTarget/bounds]})
     (funding-action-button {:label "Withdraw"
-                            :action [:actions/open-funding-withdraw-modal]})]])
+                            :data-role "funding-action-withdraw"
+                            :action [:actions/open-funding-withdraw-modal :event.currentTarget/bounds]})]])
 
 (defn- funding-actions-section []
   [:div {:class ["space-y-2"

@@ -309,6 +309,9 @@
   (s/or :position-only (s/tuple map?)
         :position-and-anchor (s/tuple map? any?)))
 (s/def ::position-margin-modal-field-args (s/tuple ::state-path any?))
+(s/def ::funding-modal-open-args
+  (s/or :none ::no-args
+        :anchor-only (s/tuple any?)))
 (s/def ::ws-reset-source-args (s/or :none ::no-args
                                     :source (s/tuple ::source)))
 
@@ -493,9 +496,9 @@
    :actions/cancel-order ::cancel-order-args
    :actions/load-user-data ::address-args
    :actions/set-funding-modal ::funding-modal-args
-   :actions/open-funding-transfer-modal ::no-args
-   :actions/open-funding-withdraw-modal ::no-args
-   :actions/open-funding-deposit-modal ::no-args
+   :actions/open-funding-transfer-modal ::funding-modal-open-args
+   :actions/open-funding-withdraw-modal ::funding-modal-open-args
+   :actions/open-funding-deposit-modal ::funding-modal-open-args
    :actions/close-funding-modal ::no-args
    :actions/handle-funding-modal-keydown ::key-args
    :actions/set-funding-modal-field ::funding-modal-field-args

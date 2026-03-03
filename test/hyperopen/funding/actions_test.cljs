@@ -16,6 +16,7 @@
   {:open? true
    :mode mode
    :legacy-kind legacy-kind
+   :anchor nil
    :deposit-step :asset-select
    :deposit-search-input ""
    :deposit-selected-asset-key nil
@@ -47,6 +48,29 @@
             [:effects/api-fetch-hyperunit-withdrawal-queue]
             [:effects/api-fetch-hyperunit-fee-estimate]]
            (funding-actions/open-funding-withdraw-modal state)))))
+
+(deftest open-funding-modal-actions-normalize-anchor-bounds-test
+  (let [state (base-state)
+        anchor {:left "940"
+                :right 1220
+                :top "502.5"
+                :bottom 536
+                :width 280
+                :height "34"
+                :viewport-width 1600
+                :viewport-height "900"}]
+    (is (= [[:effects/save [:funding-ui :modal]
+             (assoc (expected-open-modal :deposit)
+                    :anchor {:left 940
+                             :right 1220
+                             :top 502.5
+                             :bottom 536
+                             :width 280
+                             :height 34
+                             :viewport-width 1600
+                             :viewport-height 900})]
+            [:effects/api-fetch-hyperunit-fee-estimate]]
+           (funding-actions/open-funding-deposit-modal state anchor)))))
 
 (deftest set-funding-modal-compat-preserves-legacy-fallback-test
   (let [state (base-state)]

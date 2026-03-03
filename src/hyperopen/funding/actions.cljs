@@ -20,6 +20,9 @@
 (def ^:private deposit-quick-amounts
   [5 1000 10000 100000])
 
+(def ^:private anchor-keys
+  [:left :right :top :bottom :width :height :viewport-width :viewport-height])
+
 (def ^:private deposit-assets-base
   [{:key :usdc
     :symbol "USDC"
@@ -243,6 +246,18 @@
         (when (and (number? parsed)
                    (not (js/isNaN parsed)))
           (str "0x" (.toString (js/Math.floor parsed) 16)))))))
+
+(defn- normalize-anchor
+  [anchor]
+  (when (map? anchor)
+    (let [normalized (reduce (fn [acc k]
+                               (if-let [num (parse-num (get anchor k))]
+                                 (assoc acc k num)
+                                 acc))
+                             {}
+                             anchor-keys)]
+      (when (seq normalized)
+        normalized))))
 
 (defn- normalize-deposit-asset-key
   [value]
@@ -563,6 +578,7 @@
   {:open? false
    :mode nil
    :legacy-kind nil
+   :anchor nil
    :deposit-step :asset-select
    :deposit-search-input ""
    :deposit-selected-asset-key nil
@@ -588,6 +604,7 @@
         modal (merge (default-funding-modal-state)
                      stored-modal)]
     (assoc modal
+           :anchor (normalize-anchor (:anchor modal))
            :withdraw-selected-asset-key (or (normalize-withdraw-asset-key
                                              (:withdraw-selected-asset-key modal))
                                             withdraw-default-asset-key)
@@ -1121,6 +1138,7 @@
     {:open? (true? (:open? modal))
      :mode mode
      :legacy-kind legacy-kind
+     :anchor (:anchor modal)
      :title title
      :deposit-step deposit-step
      :deposit-search-input (or (:deposit-search-input modal) "")
@@ -1193,45 +1211,57 @@
      :min-withdraw-symbol selected-withdraw-symbol}))
 
 (defn open-funding-deposit-modal
-  [state]
-  (let [base (modal-state state)]
-    [[:effects/save funding-modal-path
-      (-> (default-funding-modal-state)
-          (assoc :open? true
-                 :mode :deposit
-                 :legacy-kind nil
-                 :deposit-step :asset-select
-                 :deposit-search-input ""
-                 :deposit-selected-asset-key nil
-                 :amount-input ""
-                 :destination-input (or (wallet-address state)
-                                        (:destination-input base "")
-                                        "")))]
-     [:effects/api-fetch-hyperunit-fee-estimate]]))
+  ([state]
+   (open-funding-deposit-modal state nil))
+  ([state anchor]
+   (let [base (modal-state state)
+         anchor* (normalize-anchor anchor)]
+     [[:effects/save funding-modal-path
+       (-> (default-funding-modal-state)
+           (assoc :open? true
+                  :mode :deposit
+                  :legacy-kind nil
+                  :anchor anchor*
+                  :deposit-step :asset-select
+                  :deposit-search-input ""
+                  :deposit-selected-asset-key nil
+                  :amount-input ""
+                  :destination-input (or (wallet-address state)
+                                         (:destination-input base "")
+                                         "")))]
+      [:effects/api-fetch-hyperunit-fee-estimate]])))
 
 (defn open-funding-transfer-modal
-  [state]
-  [[:effects/save funding-modal-path
-    (-> (default-funding-modal-state)
-        (assoc :open? true
-               :mode :transfer
-               :to-perp? true
-               :destination-input (or (wallet-address state) "")))]])
+  ([state]
+   (open-funding-transfer-modal state nil))
+  ([state anchor]
+   (let [anchor* (normalize-anchor anchor)]
+     [[:effects/save funding-modal-path
+       (-> (default-funding-modal-state)
+           (assoc :open? true
+                  :mode :transfer
+                  :anchor anchor*
+                  :to-perp? true
+                  :destination-input (or (wallet-address state) "")))]])))
 
 (defn open-funding-withdraw-modal
-  [state]
-  (let [base (modal-state state)
-        selected-asset-key (or (normalize-withdraw-asset-key
-                                (:withdraw-selected-asset-key base))
-                               withdraw-default-asset-key)]
-    [[:effects/save funding-modal-path
-      (-> (default-funding-modal-state)
-          (assoc :open? true
-                 :mode :withdraw
-                 :withdraw-selected-asset-key selected-asset-key
-                 :destination-input (or (wallet-address state) "")))]
-     [:effects/api-fetch-hyperunit-withdrawal-queue]
-     [:effects/api-fetch-hyperunit-fee-estimate]]))
+  ([state]
+   (open-funding-withdraw-modal state nil))
+  ([state anchor]
+   (let [base (modal-state state)
+         anchor* (normalize-anchor anchor)
+         selected-asset-key (or (normalize-withdraw-asset-key
+                                 (:withdraw-selected-asset-key base))
+                                withdraw-default-asset-key)]
+     [[:effects/save funding-modal-path
+       (-> (default-funding-modal-state)
+           (assoc :open? true
+                  :mode :withdraw
+                  :anchor anchor*
+                  :withdraw-selected-asset-key selected-asset-key
+                  :destination-input (or (wallet-address state) "")))]
+      [:effects/api-fetch-hyperunit-withdrawal-queue]
+      [:effects/api-fetch-hyperunit-fee-estimate]])))
 
 (defn- open-legacy-funding-modal
   [state legacy-kind]

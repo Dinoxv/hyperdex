@@ -3,6 +3,103 @@
             [hyperopen.funding.actions :as funding-actions]
             [hyperopen.views.asset-icon :as asset-icon]))
 
+(def ^:private panel-gap-px
+  10)
+
+(def ^:private panel-margin-px
+  12)
+
+(def ^:private preferred-panel-width-px
+  448)
+
+(def ^:private estimated-panel-height-px
+  560)
+
+(def ^:private fallback-viewport-width
+  1280)
+
+(def ^:private fallback-viewport-height
+  800)
+
+(defn- clamp
+  [value min-value max-value]
+  (-> value
+      (max min-value)
+      (min max-value)))
+
+(defn- anchor-number
+  [anchor k default]
+  (let [value (get anchor k)]
+    (if (number? value)
+      value
+      default)))
+
+(defn- anchored-popover-layout-style
+  [anchor]
+  (let [anchor* (if (map? anchor) anchor {})
+        viewport-width (max 320
+                            (anchor-number anchor* :viewport-width fallback-viewport-width)
+                            (+ (anchor-number anchor* :right 0) panel-margin-px))
+        viewport-height (max 320
+                             (anchor-number anchor* :viewport-height fallback-viewport-height))
+        anchor-left (anchor-number anchor* :left (- viewport-width panel-margin-px))
+        anchor-right (anchor-number anchor* :right anchor-left)
+        anchor-top (anchor-number anchor* :top (- viewport-height panel-margin-px))
+        panel-width (clamp (- viewport-width (* 2 panel-margin-px))
+                           320
+                           preferred-panel-width-px)
+        left-of-anchor (- anchor-left panel-gap-px panel-width)
+        right-of-anchor (+ anchor-right panel-gap-px)
+        fits-left? (>= left-of-anchor panel-margin-px)
+        fits-right? (<= (+ right-of-anchor panel-width panel-margin-px)
+                        viewport-width)
+        left (cond
+               fits-left? left-of-anchor
+               fits-right? right-of-anchor
+               :else (clamp left-of-anchor
+                            panel-margin-px
+                            (- viewport-width panel-width panel-margin-px)))
+        preferred-top (- anchor-top 20)
+        max-top (- viewport-height estimated-panel-height-px panel-margin-px)
+        top (if (> max-top panel-margin-px)
+              (clamp preferred-top panel-margin-px max-top)
+              panel-margin-px)]
+    {:left (str left "px")
+     :top (str top "px")
+     :width (str panel-width "px")}))
+
+(defn- complete-anchor?
+  [anchor]
+  (and (map? anchor)
+       (number? (:left anchor))
+       (number? (:right anchor))
+       (number? (:top anchor))
+       (number? (:bottom anchor))))
+
+(defn- mode->fallback-anchor-selector
+  [mode]
+  (case mode
+    :deposit "[data-role='funding-action-deposit']"
+    :transfer "[data-role='funding-action-transfer']"
+    :withdraw "[data-role='funding-action-withdraw']"
+    nil))
+
+(defn- element-anchor-bounds
+  [selector]
+  (when (seq selector)
+    (let [document* (some-> js/globalThis .-document)
+          target (some-> document* (.querySelector selector))]
+      (when (and target (fn? (.-getBoundingClientRect target)))
+        (let [rect (.getBoundingClientRect target)]
+          {:left (.-left rect)
+           :right (.-right rect)
+           :top (.-top rect)
+           :bottom (.-bottom rect)
+           :width (.-width rect)
+           :height (.-height rect)
+           :viewport-width (some-> js/globalThis .-innerWidth)
+           :viewport-height (some-> js/globalThis .-innerHeight)})))))
+
 (defn- base-button-classes
   [primary?]
   (if primary?
@@ -166,6 +263,7 @@
   (let [{:keys [open?
                 mode
                 legacy-kind
+                anchor
                 title
                 deposit-step
                 deposit-search-input
@@ -249,26 +347,44 @@
         lifecycle-next-check (next-check-label (:state-next-at lifecycle*)
                                                (js/Date.now))
         amount-input-display (format-grouped-amount-input amount-input)
+        stored-anchor* (if (map? anchor) anchor {})
+        fallback-anchor* (when-not (complete-anchor? stored-anchor*)
+                           (element-anchor-bounds (mode->fallback-anchor-selector mode)))
+        anchor* (or fallback-anchor* stored-anchor*)
+        anchored-popover? (complete-anchor? anchor*)
+        popover-style (when anchored-popover?
+                        (anchored-popover-layout-style anchor*))
         modal-title (if (and deposit?
                              deposit-amount-entry?
                              (string? (:symbol selected-deposit-asset*)))
                       (str "Deposit " (:symbol selected-deposit-asset*))
                       title)]
     (when open?
-      [:div {:class ["fixed" "inset-0" "z-[80]" "flex" "items-center" "justify-center" "p-4"]}
-       [:div {:class ["absolute" "inset-0" "bg-black/65"]
+      [:div {:class (into ["fixed" "inset-0" "z-[80]"]
+                          (if anchored-popover?
+                            ["pointer-events-none"]
+                            ["flex" "items-center" "justify-center" "p-4"]))}
+       [:button {:type "button"
+                 :class (into ["absolute" "inset-0" "pointer-events-auto"]
+                              (if anchored-popover?
+                                ["bg-transparent"]
+                                ["bg-black/65"]))
+                 :aria-label "Close funding dialog"
               :on {:click [[:actions/close-funding-modal]]}}]
-       [:div {:class ["relative"
+       [:div {:class (into ["relative"
                       "z-[81]"
-                      "w-full"
-                      "max-w-md"
                       "rounded-2xl"
                       "border"
                       "border-[#1f3b3c]"
                       "bg-[#081b24]"
                       "p-4"
                       "shadow-2xl"
-                      "space-y-3"]
+                            "space-y-3"
+                            "pointer-events-auto"]
+                           (if anchored-popover?
+                             []
+                             ["w-full" "max-w-md"]))
+              :style popover-style
               :role "dialog"
               :aria-modal true
               :aria-label modal-title
