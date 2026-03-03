@@ -1,5 +1,6 @@
 (ns hyperopen.funding.application.modal-actions
   (:require [clojure.string :as str]
+            [hyperopen.funding.application.modal-commands :as modal-commands]
             [hyperopen.funding.application.modal-vm :as modal-vm]
             [hyperopen.funding.domain.lifecycle :as lifecycle-domain]
             [hyperopen.domain.trading :as trading-domain]))
@@ -905,237 +906,108 @@
     :withdraw-min-usdc withdraw-min-usdc}
    state))
 
+(declare close-funding-modal
+         open-funding-deposit-modal
+         open-funding-withdraw-modal
+         open-funding-transfer-modal
+         open-legacy-funding-modal)
+
+(defn- command-deps
+  []
+  {:modal-state modal-state
+   :normalize-anchor normalize-anchor
+   :default-funding-modal-state default-funding-modal-state
+   :wallet-address wallet-address
+   :funding-modal-path funding-modal-path
+   :normalize-withdraw-asset-key normalize-withdraw-asset-key
+   :withdraw-default-asset-key withdraw-default-asset-key
+   :close-funding-modal-fn close-funding-modal
+   :open-funding-deposit-modal-fn open-funding-deposit-modal
+   :open-funding-withdraw-modal-fn open-funding-withdraw-modal
+   :open-funding-transfer-modal-fn open-funding-transfer-modal
+   :open-legacy-funding-modal-fn open-legacy-funding-modal
+   :normalize-amount-input normalize-amount-input
+   :normalize-deposit-step normalize-deposit-step
+   :normalize-deposit-asset-key normalize-deposit-asset-key
+   :default-hyperunit-lifecycle-state default-hyperunit-lifecycle-state
+   :default-hyperunit-withdrawal-queue-state default-hyperunit-withdrawal-queue-state
+   :normalize-mode normalize-mode
+   :normalize-hyperunit-lifecycle normalize-hyperunit-lifecycle
+   :non-blank-text non-blank-text
+   :transfer-max-amount transfer-max-amount
+   :withdraw-max-amount withdraw-max-amount
+   :withdraw-asset withdraw-asset
+   :format-usdc-input format-usdc-input
+   :transfer-preview transfer-preview
+   :withdraw-preview withdraw-preview
+   :deposit-preview deposit-preview})
+
 (defn open-funding-deposit-modal
   ([state]
    (open-funding-deposit-modal state nil))
   ([state anchor]
-   (let [base (modal-state state)
-         anchor* (normalize-anchor anchor)]
-     [[:effects/save funding-modal-path
-       (-> (default-funding-modal-state)
-           (assoc :open? true
-                  :mode :deposit
-                  :legacy-kind nil
-                  :anchor anchor*
-                  :deposit-step :asset-select
-                  :deposit-search-input ""
-                  :deposit-selected-asset-key nil
-                  :amount-input ""
-                  :destination-input (or (wallet-address state)
-                                         (:destination-input base "")
-                                         "")))]
-      [:effects/api-fetch-hyperunit-fee-estimate]])))
+   (modal-commands/open-funding-deposit-modal (command-deps) state anchor)))
 
 (defn open-funding-transfer-modal
   ([state]
    (open-funding-transfer-modal state nil))
   ([state anchor]
-   (let [anchor* (normalize-anchor anchor)]
-     [[:effects/save funding-modal-path
-       (-> (default-funding-modal-state)
-           (assoc :open? true
-                  :mode :transfer
-                  :anchor anchor*
-                  :to-perp? true
-                  :destination-input (or (wallet-address state) "")))]])))
+   (modal-commands/open-funding-transfer-modal (command-deps) state anchor)))
 
 (defn open-funding-withdraw-modal
   ([state]
    (open-funding-withdraw-modal state nil))
   ([state anchor]
-   (let [base (modal-state state)
-         anchor* (normalize-anchor anchor)
-         selected-asset-key (or (normalize-withdraw-asset-key
-                                 (:withdraw-selected-asset-key base))
-                                withdraw-default-asset-key)]
-     [[:effects/save funding-modal-path
-       (-> (default-funding-modal-state)
-           (assoc :open? true
-                  :mode :withdraw
-                  :anchor anchor*
-                  :withdraw-selected-asset-key selected-asset-key
-                  :destination-input (or (wallet-address state) "")))]
-      [:effects/api-fetch-hyperunit-withdrawal-queue]
-      [:effects/api-fetch-hyperunit-fee-estimate]])))
+   (modal-commands/open-funding-withdraw-modal (command-deps) state anchor)))
 
 (defn- open-legacy-funding-modal
   [state legacy-kind]
-  (let [legacy* (if (keyword? legacy-kind)
-                  legacy-kind
-                  (keyword (str/lower-case (str (or legacy-kind "unknown")))))]
-    [[:effects/save funding-modal-path
-      (-> (default-funding-modal-state)
-          (assoc :open? true
-                 :mode :legacy
-                 :legacy-kind legacy*
-                 :destination-input (or (wallet-address state) "")))]]))
+  (modal-commands/open-legacy-funding-modal (command-deps) state legacy-kind))
 
 (defn close-funding-modal
-  [_state]
-  [[:effects/save funding-modal-path (default-funding-modal-state)]])
+  [state]
+  (modal-commands/close-funding-modal (command-deps) state))
 
 (defn handle-funding-modal-keydown
   [state key]
-  (if (= key "Escape")
-    (close-funding-modal state)
-    []))
+  (modal-commands/handle-funding-modal-keydown (command-deps) state key))
 
 (defn set-funding-modal-field
   [state path value]
-  (let [modal (modal-state state)
-        path* (if (vector? path) path [path])
-        value* (case path*
-                 [:amount-input] (normalize-amount-input value)
-                 [:destination-input] (str (or value ""))
-                 [:deposit-search-input] (str (or value ""))
-                 [:deposit-step] (normalize-deposit-step value)
-                 [:deposit-selected-asset-key] (normalize-deposit-asset-key value)
-                 [:withdraw-selected-asset-key] (or (normalize-withdraw-asset-key value)
-                                                    withdraw-default-asset-key)
-                 value)
-        clear-hyperunit-lifecycle? (or (= path* [:amount-input])
-                                       (= path* [:destination-input])
-                                       (= path* [:deposit-selected-asset-key])
-                                       (= path* [:withdraw-selected-asset-key])
-                                       (and (= path* [:deposit-step])
-                                            (= value* :asset-select)))
-        next-modal (cond-> (-> modal
-                               (assoc-in path* value*)
-                               (assoc :error nil))
-                     clear-hyperunit-lifecycle?
-                     (assoc :hyperunit-lifecycle (default-hyperunit-lifecycle-state))
-
-                     clear-hyperunit-lifecycle?
-                     (assoc :withdraw-generated-address nil)
-
-                     (= path* [:withdraw-selected-asset-key])
-                     (assoc :hyperunit-withdrawal-queue
-                            (default-hyperunit-withdrawal-queue-state))
-
-                     (= path* [:deposit-selected-asset-key])
-                     (assoc :deposit-step :amount-entry
-                            :amount-input ""
-                            :deposit-generated-address nil
-                            :deposit-generated-signatures nil
-                            :deposit-generated-asset-key nil)
-
-                     (and (= path* [:deposit-step])
-                          (= value* :asset-select))
-                     (assoc :amount-input ""
-                            :deposit-generated-address nil
-                            :deposit-generated-signatures nil
-                            :deposit-generated-asset-key nil))
-        next-mode (normalize-mode (:mode next-modal))
-        refresh-estimate? (and (contains? #{:deposit :withdraw} next-mode)
-                               (or (= path* [:deposit-selected-asset-key])
-                                   (= path* [:withdraw-selected-asset-key])))
-        refresh-withdraw-queue? (and (= next-mode :withdraw)
-                                     (= path* [:withdraw-selected-asset-key]))]
-    (cond-> [[:effects/save funding-modal-path next-modal]]
-      refresh-estimate?
-      (conj [:effects/api-fetch-hyperunit-fee-estimate])
-
-      refresh-withdraw-queue?
-      (conj [:effects/api-fetch-hyperunit-withdrawal-queue]))))
+  (modal-commands/set-funding-modal-field (command-deps) state path value))
 
 (defn set-hyperunit-lifecycle
   [state lifecycle]
-  (let [modal (modal-state state)]
-    [[:effects/save funding-modal-path
-      (-> modal
-          (assoc :hyperunit-lifecycle (normalize-hyperunit-lifecycle lifecycle)
-                 :error nil))]]))
+  (modal-commands/set-hyperunit-lifecycle (command-deps) state lifecycle))
 
 (defn clear-hyperunit-lifecycle
   [state]
-  (let [modal (modal-state state)]
-    [[:effects/save funding-modal-path
-      (assoc modal :hyperunit-lifecycle (default-hyperunit-lifecycle-state))]]))
+  (modal-commands/clear-hyperunit-lifecycle (command-deps) state))
 
 (defn set-hyperunit-lifecycle-error
   [state error]
-  (let [modal (modal-state state)
-        lifecycle (normalize-hyperunit-lifecycle (:hyperunit-lifecycle modal))]
-    [[:effects/save funding-modal-path
-      (assoc modal :hyperunit-lifecycle (assoc lifecycle
-                                               :error (non-blank-text error)))]]))
+  (modal-commands/set-hyperunit-lifecycle-error (command-deps) state error))
 
 (defn set-funding-transfer-direction
   [state to-perp?]
-  (let [modal (modal-state state)]
-    [[:effects/save funding-modal-path
-      (-> modal
-          (assoc :to-perp? (true? to-perp?)
-                 :error nil))]]))
+  (modal-commands/set-funding-transfer-direction (command-deps) state to-perp?))
 
 (defn set-funding-amount-to-max
   [state]
-  (let [modal (modal-state state)
-        mode (normalize-mode (:mode modal))
-        max-amount (case mode
-                     :transfer (transfer-max-amount state modal)
-                     :withdraw (withdraw-max-amount state (withdraw-asset state modal))
-                     0)]
-    [[:effects/save funding-modal-path
-      (-> modal
-          (assoc :amount-input (format-usdc-input max-amount)
-                 :error nil))]]))
+  (modal-commands/set-funding-amount-to-max (command-deps) state))
 
 (defn submit-funding-transfer
   [state]
-  (let [modal (modal-state state)
-        mode (normalize-mode (:mode modal))
-        result (if (= :transfer mode)
-                 (transfer-preview state modal)
-                 {:ok? false
-                  :display-message "Transfer modal unavailable."})]
-    (if-not (:ok? result)
-      [[:effects/save-many [[(conj funding-modal-path :submitting?) false]
-                            [(conj funding-modal-path :error) (:display-message result)]]]]
-      [[:effects/save-many [[(conj funding-modal-path :submitting?) true]
-                            [(conj funding-modal-path :error) nil]]]
-       [:effects/api-submit-funding-transfer (:request result)]])))
+  (modal-commands/submit-funding-transfer (command-deps) state))
 
 (defn submit-funding-withdraw
   [state]
-  (let [modal (modal-state state)
-        mode (normalize-mode (:mode modal))
-        result (if (= :withdraw mode)
-                 (withdraw-preview state modal)
-                 {:ok? false
-                  :display-message "Withdraw modal unavailable."})]
-    (if-not (:ok? result)
-      [[:effects/save-many [[(conj funding-modal-path :submitting?) false]
-                            [(conj funding-modal-path :error) (:display-message result)]]]]
-      [[:effects/save-many [[(conj funding-modal-path :submitting?) true]
-                            [(conj funding-modal-path :error) nil]]]
-       [:effects/api-submit-funding-withdraw (:request result)]])))
+  (modal-commands/submit-funding-withdraw (command-deps) state))
 
 (defn submit-funding-deposit
   [state]
-  (let [modal (modal-state state)
-        mode (normalize-mode (:mode modal))
-        result (if (= :deposit mode)
-                 (deposit-preview state modal)
-                 {:ok? false
-                  :display-message "Deposit modal unavailable."})]
-    (if-not (:ok? result)
-      [[:effects/save-many [[(conj funding-modal-path :submitting?) false]
-                            [(conj funding-modal-path :error) (:display-message result)]]]]
-      [[:effects/save-many [[(conj funding-modal-path :submitting?) true]
-                            [(conj funding-modal-path :error) nil]]]
-       [:effects/api-submit-funding-deposit (:request result)]])))
+  (modal-commands/submit-funding-deposit (command-deps) state))
 
 (defn set-funding-modal-compat
   [state modal]
-  (let [mode (cond
-               (keyword? modal) modal
-               (string? modal) (keyword (str/lower-case (str/trim modal)))
-               :else nil)]
-    (case mode
-      nil (close-funding-modal state)
-      :deposit (open-funding-deposit-modal state)
-      :withdraw (open-funding-withdraw-modal state)
-      :send (open-funding-transfer-modal state)
-      :transfer (open-funding-transfer-modal state)
-      (open-legacy-funding-modal state mode))))
+  (modal-commands/set-funding-modal-compat (command-deps) state modal))
