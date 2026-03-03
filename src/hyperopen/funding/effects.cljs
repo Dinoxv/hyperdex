@@ -1,8 +1,9 @@
 (ns hyperopen.funding.effects
   (:require [clojure.string :as str]
-            [hyperopen.api.gateway.funding-hyperunit :as funding-hyperunit-gateway]
             [hyperopen.api.trading :as trading-api]
             [hyperopen.funding.actions :as funding-actions]
+            [hyperopen.funding.domain.lifecycle :as funding-lifecycle]
+            [hyperopen.funding.infrastructure.hyperunit-client :as hyperunit-client]
             [hyperopen.wallet.core :as wallet]))
 
 (def ^:private arbitrum-mainnet-chain-id
@@ -261,33 +262,11 @@
     (when (seq text)
       text)))
 
-(defn- with-hyperunit-base-url-fallbacks!
-  [{:keys [base-url
-           base-urls
-           request-fn
-           error-message]
-    :or {error-message "HyperUnit request failed."}}]
-  (let [candidates (vec (distinct
-                         (keep non-blank-text
-                               (concat [(non-blank-text base-url)]
-                                       (or base-urls [])))))]
-    (letfn [(attempt! [remaining last-error]
-              (if-let [candidate (first remaining)]
-                (let [request-result (try
-                                       (request-fn candidate)
-                                       (catch :default err
-                                         (js/Promise.reject err)))]
-                  (-> request-result
-                      (.catch (fn [err]
-                                (attempt! (rest remaining)
-                                          (or err last-error))))))
-                (js/Promise.reject
-                 (or last-error
-                     (js/Error. error-message)))))]
-      (attempt! candidates nil))))
-
 (defonce ^:private hyperunit-lifecycle-poll-tokens
   (atom {}))
+
+(def ^:private with-hyperunit-base-url-fallbacks!
+  hyperunit-client/with-hyperunit-base-url-fallbacks!)
 
 (defn- canonical-token
   [value]
@@ -398,61 +377,17 @@
                (not (js/isNaN parsed)))
       (js/Math.floor parsed))))
 
-(defn request-hyperunit-operations!
-  [{:keys [base-url base-urls address]}]
-  (with-hyperunit-base-url-fallbacks!
-   {:base-url base-url
-    :base-urls base-urls
-    :error-message "Unable to load HyperUnit operations."
-    :request-fn (fn [candidate-base-url]
-                  (funding-hyperunit-gateway/request-hyperunit-operations!
-                   {:hyperunit-base-url candidate-base-url
-                    :fetch-fn js/fetch}
-                   {:address address}))}))
+(def request-hyperunit-operations!
+  hyperunit-client/request-hyperunit-operations!)
 
-(defn request-hyperunit-estimate-fees!
-  [{:keys [base-url base-urls]}]
-  (with-hyperunit-base-url-fallbacks!
-   {:base-url base-url
-    :base-urls base-urls
-    :error-message "Unable to load HyperUnit fee estimates."
-    :request-fn (fn [candidate-base-url]
-                  (funding-hyperunit-gateway/request-hyperunit-estimate-fees!
-                   {:hyperunit-base-url candidate-base-url
-                    :fetch-fn js/fetch}
-                   {}))}))
+(def request-hyperunit-estimate-fees!
+  hyperunit-client/request-hyperunit-estimate-fees!)
 
-(defn request-hyperunit-withdrawal-queue!
-  [{:keys [base-url base-urls]}]
-  (with-hyperunit-base-url-fallbacks!
-   {:base-url base-url
-    :base-urls base-urls
-    :error-message "Unable to load HyperUnit withdrawal queue."
-    :request-fn (fn [candidate-base-url]
-                  (funding-hyperunit-gateway/request-hyperunit-withdrawal-queue!
-                   {:hyperunit-base-url candidate-base-url
-                    :fetch-fn js/fetch}
-                   {}))}))
+(def request-hyperunit-withdrawal-queue!
+  hyperunit-client/request-hyperunit-withdrawal-queue!)
 
-(defn request-hyperunit-generate-address!
-  [{:keys [base-url
-           base-urls
-           source-chain
-           destination-chain
-           asset
-           destination-address]}]
-  (with-hyperunit-base-url-fallbacks!
-   {:base-url base-url
-    :base-urls base-urls
-    :error-message "Unable to generate HyperUnit address."
-    :request-fn (fn [candidate-base-url]
-                  (funding-hyperunit-gateway/request-hyperunit-generate-address!
-                   {:hyperunit-base-url candidate-base-url
-                    :fetch-fn js/fetch}
-                   {:source-chain source-chain
-                    :destination-chain destination-chain
-                    :asset asset
-                    :destination-address destination-address}))}))
+(def request-hyperunit-generate-address!
+  hyperunit-client/request-hyperunit-generate-address!)
 
 (defn- lifecycle-poll-key
   [store direction asset-key]
@@ -736,7 +671,7 @@
 
 (defn- operation->lifecycle
   [operation direction asset-key now-ms]
-  (funding-actions/normalize-hyperunit-lifecycle
+  (funding-lifecycle/normalize-hyperunit-lifecycle
    {:direction direction
     :asset-key asset-key
     :operation-id (:operation-id operation)
@@ -753,7 +688,7 @@
 
 (defn- awaiting-lifecycle
   [direction asset-key now-ms]
-  (funding-actions/normalize-hyperunit-lifecycle
+  (funding-lifecycle/normalize-hyperunit-lifecycle
    {:direction direction
     :asset-key asset-key
     :status :pending
@@ -797,7 +732,7 @@
           (swap! store update-in
                  [:funding-ui :modal :hyperunit-withdrawal-queue]
                  (fn [current]
-                   (-> (funding-actions/normalize-hyperunit-withdrawal-queue current)
+                   (-> (funding-lifecycle/normalize-hyperunit-withdrawal-queue current)
                        (assoc :status :loading
                               :requested-at-ms requested-at
                               :error nil)))))
@@ -810,10 +745,10 @@
                                         (:by-chain resp)
                                         {})
                              error-text (non-blank-text (:error resp))]
-                         (swap! store update-in
+                        (swap! store update-in
                                 [:funding-ui :modal :hyperunit-withdrawal-queue]
                                 (fn [current]
-                                  (let [prev (funding-actions/normalize-hyperunit-withdrawal-queue current)]
+                                  (let [prev (funding-lifecycle/normalize-hyperunit-withdrawal-queue current)]
                                     (if (seq error-text)
                                       (assoc prev
                                              :status :error
@@ -834,7 +769,7 @@
                           (swap! store update-in
                                  [:funding-ui :modal :hyperunit-withdrawal-queue]
                                  (fn [current]
-                                   (-> (funding-actions/normalize-hyperunit-withdrawal-queue current)
+                                   (-> (funding-lifecycle/normalize-hyperunit-withdrawal-queue current)
                                        (assoc :status :error
                                               :updated-at-ms timestamp
                                               :error message)))))))))))))
@@ -878,7 +813,7 @@
                                 (when (should-continue?)
                                   (swap! store assoc-in
                                          [:funding-ui :modal :hyperunit-lifecycle]
-                                         (funding-actions/normalize-hyperunit-lifecycle lifecycle))))
+                                         (funding-lifecycle/normalize-hyperunit-lifecycle lifecycle))))
             refresh-withdraw-queue! (fn []
                                       (when (and (= direction :withdraw)
                                                  request-queue!
@@ -925,7 +860,7 @@
                                                      (awaiting-lifecycle direction asset-key now-ms))]
                                      (update-lifecycle! lifecycle)
                                      (refresh-withdraw-queue!)
-                                     (if (funding-actions/hyperunit-lifecycle-terminal? lifecycle)
+                                     (if (funding-lifecycle/hyperunit-lifecycle-terminal? lifecycle)
                                        (do
                                          (clear-lifecycle-poll-token! poll-key token)
                                          (notify-terminal! lifecycle))
@@ -1659,7 +1594,7 @@
         (swap! store update-in
                [:funding-ui :modal :hyperunit-fee-estimate]
                (fn [current]
-                 (-> (funding-actions/normalize-hyperunit-fee-estimate current)
+                 (-> (funding-lifecycle/normalize-hyperunit-fee-estimate current)
                      (assoc :status :loading
                             :requested-at-ms now-ms
                             :error nil))))
@@ -1676,7 +1611,7 @@
                          (swap! store update-in
                                 [:funding-ui :modal :hyperunit-fee-estimate]
                                 (fn [current]
-                                  (let [prev (funding-actions/normalize-hyperunit-fee-estimate current)]
+                                  (let [prev (funding-lifecycle/normalize-hyperunit-fee-estimate current)]
                                     (if (seq error-text)
                                       (assoc prev
                                              :status :error
@@ -1697,7 +1632,7 @@
                           (swap! store update-in
                                  [:funding-ui :modal :hyperunit-fee-estimate]
                                  (fn [current]
-                                   (-> (funding-actions/normalize-hyperunit-fee-estimate current)
+                                   (-> (funding-lifecycle/normalize-hyperunit-fee-estimate current)
                                        (assoc :status :error
                                               :updated-at-ms timestamp
                                               :error message)))))))))))))
