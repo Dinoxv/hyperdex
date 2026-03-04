@@ -52,7 +52,7 @@ Common commands:
 - `bd update <id> --claim --json`
 - `bd create "Issue title" --description="<details>" -t bug|feature|task|epic|chore -p 0-4 --json`
 - `bd close <id> --reason "Completed" --json`
-- `bd sync`
+- `bd backup status --json`
 
 For policy details, including markdown-vs-`bd` boundaries and session-completion workflow, follow `/hyperopen/docs/WORK_TRACKING.md`.
 

@@ -24,7 +24,7 @@ Define one source of truth for issue tracking and remove ambiguity between `bd` 
 ## Why `bd`
 - Dependency-aware tracking: model blocked/unblocked relationships directly.
 - Agent-friendly command surface: deterministic JSON output for automation.
-- Git-aligned history: `bd` state changes can be synchronized as part of normal delivery flow.
+- Local-first tracking: `bd` state stays in-repo without requiring remote sync.
 - Single tracker discipline: prevents split status across docs, notes, and external systems.
 
 ## Quick Start
@@ -78,10 +78,10 @@ Close completed items with a reason:
 4. Link discovered follow-up work using `discovered-from:<parent-id>`.
 5. Close completed issue: `bd close <id> --reason "Completed" --json`
 
-## Sync Behavior
-- Use `bd sync` as part of normal delivery before pushing code.
-- If your environment uses Dolt-backed sync commands directly, keep them consistent with team workflow.
-- Do not leave local-only tracker state at handoff time without explicitly documenting blockers.
+## Local-Only Behavior
+- `bd` is local-only in this repository.
+- Do not run `bd sync` (removed from current `bd` CLI).
+- Do not run `bd dolt push`/`bd dolt pull` unless explicitly requested for a migration.
 
 ## Important Rules
 - Use `bd` for all issue lifecycle tracking.
@@ -113,11 +113,10 @@ When finishing a coding session or handing work to another contributor:
    - `npm test`
    - `npm run test:websocket`
 3. Update `bd` issue status (close completed work, update remaining work).
-4. Sync and push if branch delivery is part of the session:
+4. Pull/rebase and push if branch delivery is part of the session:
    - `git pull --rebase`
-   - `bd sync`
    - `git push`
    - `git status` (confirm clean state and up-to-date branch)
 5. Provide handoff notes with relevant `bd` ids and any blockers.
 
-If push/sync cannot complete due environment or permissions, record the blocker explicitly in the handoff and in `bd`.
+If push cannot complete due environment or permissions, record the blocker explicitly in the handoff and in `bd`.

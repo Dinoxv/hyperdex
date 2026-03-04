@@ -58,7 +58,7 @@ When work touches `/hyperopen/src/hyperopen/views/**`, `/hyperopen/src/styles/**
 
 ## Work Tracking
 - Issue tracking source of truth is `/hyperopen/docs/WORK_TRACKING.md` (`bd`).
-- Use that doc for rationale, quick-start commands, issue types/priorities, and sync/handoff workflow.
+- Use that doc for rationale, quick-start commands, issue types/priorities, and local-only handoff workflow.
 - ExecPlan checklists in `/hyperopen/docs/exec-plans/**` remain required planning artifacts, not issue tracking.
 - Do not maintain duplicate markdown backlog or TODO trackers outside documented planning artifacts.
 
@@ -80,7 +80,7 @@ When work touches `/hyperopen/src/hyperopen/views/**`, `/hyperopen/src/styles/**
 ### Why bd?
 
 - Dependency-aware: Track blockers and relationships between issues
-- Git-friendly: Dolt-powered version control with native sync
+- Local-first: Issues stay in-repo without requiring remote tracker sync
 - Agent-optimized: JSON output, ready work detection, discovered-from links
 - Prevents duplicate tracking systems and confusion
 
@@ -137,13 +137,13 @@ bd close bd-42 --reason "Completed" --json
    - `bd create "Found bug" --description="Details about what was found" -p 1 --deps discovered-from:<parent-id>`
 5. **Complete**: `bd close <id> --reason "Done"`
 
-### Auto-Sync
+### Local-Only Mode
 
-bd automatically syncs via Dolt:
+This repository uses `bd` in local-only mode:
 
-- Each write auto-commits to Dolt history
-- Use `bd dolt push`/`bd dolt pull` for remote sync
-- No manual export/import needed!
+- Do not run `bd sync` (not available in current `bd`).
+- Do not run `bd dolt push` or `bd dolt pull`.
+- Keep git hooks for `bd` uninstalled unless explicitly requested.
 
 ### Important Rules
 
@@ -169,7 +169,6 @@ For more details, see README.md and docs/QUICKSTART.md.
 4. **PUSH TO REMOTE** - This is MANDATORY:
    ```bash
    git pull --rebase
-   bd sync
    git push
    git status  # MUST show "up to date with origin"
    ```
