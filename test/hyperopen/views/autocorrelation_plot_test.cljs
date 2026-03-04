@@ -82,10 +82,10 @@
         strings (set (collect-strings node))
         bars (collect-rect-attrs-by-key node :data-day)]
     (is (contains? strings "Rate History"))
-    (is (contains? strings "Day (oldest to newest)"))
+    (is (contains? strings "Day (newest to oldest)"))
     (is (contains? strings "0%"))
     (is (= 5 (count bars)))
-    (is (= [1 2 3 4 5]
+    (is (= [5 4 3 2 1]
            (mapv :data-day bars)))))
 
 (deftest funding-rate-plot-sorts-and-annualizes-series-values-test
@@ -100,7 +100,7 @@
                                   [(:data-day attrs)
                                    (js/parseFloat (or (:data-funding-rate-value attrs) ""))]))
                            bars)]
-    (is (= [1 2 3 4]
+    (is (= [4 3 2 1]
            (mapv :data-day bars)))
     (is (approx= -36.5 (get value-by-day 1) 1e-9))
     (is (approx= 18.25 (get value-by-day 2) 1e-9))

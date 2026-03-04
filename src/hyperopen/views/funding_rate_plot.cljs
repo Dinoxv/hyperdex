@@ -83,7 +83,7 @@
                      {:day-index day-index
                       :value annualized-rate
                       :undefined? (not (finite-number? annualized-rate))})))))
-       (sort-by :day-index)
+       (sort-by :day-index #(compare %2 %1))
        vec))
 
 (defn- domain-range
@@ -250,4 +250,4 @@
               :text-anchor "middle"
               :font-size "8.8"
               :fill "rgba(226,235,244,0.9)"}
-       "Day (oldest to newest)"]]]))
+       "Day (newest to oldest)"]]]))
