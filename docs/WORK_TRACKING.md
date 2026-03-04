@@ -1,7 +1,7 @@
 ---
 owner: platform
 status: canonical
-last_reviewed: 2026-03-03
+last_reviewed: 2026-03-04
 review_cycle_days: 90
 source_of_truth: true
 ---
@@ -120,3 +120,21 @@ When finishing a coding session or handing work to another contributor:
 5. Provide handoff notes with relevant `bd` ids and any blockers.
 
 If push cannot complete due environment or permissions, record the blocker explicitly in the handoff and in `bd`.
+
+## Shared Agent Command Phrases
+### `land the worktree`
+When a user says `land the worktree`, execute this exact local workflow:
+1. If the current worktree is detached `HEAD`, create an ephemeral branch from current `HEAD` (for example `codex/land-<timestamp>`).
+2. Commit staged changes on the current branch (`git commit ...`). Do not auto-stage files.
+3. Rebase the working branch onto local `main` (`git rebase main`).
+4. If rebase succeeds, merge into local `main` with fast-forward only:
+   - `git checkout main`
+   - `git merge --ff-only <working-branch>`
+5. Delete the feature worktree and branch:
+   - `git worktree remove <feature-worktree-path>` (run from a different worktree)
+   - `git branch -d <working-branch>`
+
+Guardrails:
+- If unstaged changes exist, stop and request stage/discard before rebase.
+- Stop immediately on rebase/merge conflicts; do not force-delete branch/worktree.
+- This phrase is local-integration cleanup; pushing is separate unless explicitly requested.

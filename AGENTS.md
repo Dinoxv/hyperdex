@@ -1,7 +1,7 @@
 ---
 owner: platform
 status: canonical
-last_reviewed: 2026-03-03
+last_reviewed: 2026-03-04
 review_cycle_days: 90
 source_of_truth: true
 ---
@@ -175,6 +175,9 @@ For more details, see README.md and docs/QUICKSTART.md.
 5. **Clean up** - Clear stashes, prune remote branches
 6. **Verify** - All changes committed AND pushed
 7. **Hand off** - Provide context for next session
+
+### Shared Phrase: `land the worktree`
+Interpret `land the worktree` using `/hyperopen/docs/WORK_TRACKING.md#shared-agent-command-phrases` (canonical definition).
 
 **CRITICAL RULES:**
 - Work is NOT complete until `git push` succeeds
