@@ -38,7 +38,7 @@
   [state]
   (let [active? (true? (get-in state [:account-context :ghost-mode :active?]))]
     (and active?
-         (seq (ghost-address state)))))
+         (some? (ghost-address state)))))
 
 (defn effective-account-address
   [state]

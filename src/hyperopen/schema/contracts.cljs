@@ -329,6 +329,14 @@
    :actions/subscribe-to-webdata2 ::address-args
    :actions/connect-wallet ::no-args
    :actions/disconnect-wallet ::no-args
+   :actions/open-ghost-mode-modal ::no-args
+   :actions/close-ghost-mode-modal ::no-args
+   :actions/set-ghost-mode-search ::single-input-args
+   :actions/start-ghost-mode ::optional-string-args
+   :actions/stop-ghost-mode ::no-args
+   :actions/add-ghost-mode-watchlist-address ::optional-string-args
+   :actions/remove-ghost-mode-watchlist-address ::address-args
+   :actions/spectate-ghost-mode-watchlist-address ::address-args
    :actions/enable-agent-trading ::no-args
    :actions/set-agent-storage-mode ::set-agent-storage-mode-args
    :actions/copy-wallet-address ::no-args

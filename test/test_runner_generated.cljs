@@ -3,6 +3,7 @@
 (ns test-runner-generated
   (:require [cljs.test :refer-macros [run-tests]]
             [hyperopen.account.context-test]
+            [hyperopen.account.ghost-mode-actions-test]
             [hyperopen.account.history.actions-test]
             [hyperopen.account.history.effects-test]
             [hyperopen.account.history.position-margin-test]
@@ -280,6 +281,7 @@
   "Run all generated test namespaces and return the results."
   []
   (run-tests 'hyperopen.account.context-test
+             'hyperopen.account.ghost-mode-actions-test
              'hyperopen.account.history.actions-test
              'hyperopen.account.history.effects-test
              'hyperopen.account.history.position-margin-test

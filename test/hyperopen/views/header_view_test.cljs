@@ -1,6 +1,7 @@
 (ns hyperopen.views.header-view-test
   (:require [clojure.string :as str]
             [cljs.test :refer-macros [deftest is]]
+            [hyperopen.account.context :as account-context]
             [hyperopen.views.header-view :as header-view]
             [hyperopen.wallet.core :as wallet]))
 
@@ -57,6 +58,14 @@
     (is (some? connect-btn))
     (is (= "Connect Wallet" (last connect-btn)))
     (is (nil? trigger))))
+
+(deftest header-renders-ghost-mode-trigger-button-test
+  (let [view (header-view/header-view {:wallet {:connected? false}})
+        ghost-mode-button (find-node-by-role view "ghost-mode-open-button")]
+    (is (some? ghost-mode-button))
+    (is (contains? (set (collect-strings ghost-mode-button)) "Ghost Mode"))
+    (is (= [[:actions/open-ghost-mode-modal]]
+           (get-in ghost-mode-button [1 :on :click])))))
 
 (deftest wallet-menu-renders-copy-and-disconnect-controls-test
   (let [view (header-view/header-view {:wallet {:connected? true
@@ -136,6 +145,33 @@
     (is (some? feedback-row))
     (is (some? success-icon))
     (is (contains? text "Address copied to clipboard"))))
+
+(deftest wallet-menu-shows-active-ghost-state-when-spectating-test
+  (let [ghost-address "0xabcdefabcdefabcdefabcdefabcdefabcdefabcd"
+        ghost-state {:ghost-mode {:active? true
+                                  :address ghost-address
+                                  :started-at-ms 1}
+                     :ghost-ui {:modal-open? false
+                                :search ghost-address
+                                :last-search ghost-address
+                                :search-error nil}
+                     :watchlist [ghost-address]
+                     :watchlist-loaded? true}
+        view (header-view/header-view {:wallet {:connected? true
+                                                :address connected-address
+                                                :agent {:status :ready}}
+                                       :account-context ghost-state})
+        ghost-mode-button (find-node-by-role view "ghost-mode-open-button")
+        menu-open-ghost (find-node-by-role view "wallet-menu-open-ghost-mode")
+        ghost-active-row (find-node-by-role view "wallet-menu-ghost-active-address")
+        ghost-button-text (set (collect-strings ghost-mode-button))
+        menu-text (set (collect-strings menu-open-ghost))
+        active-text (set (collect-strings ghost-active-row))]
+    (is (true? (account-context/ghost-mode-active?
+                {:account-context ghost-state})))
+    (is (contains? ghost-button-text "Spectating"))
+    (is (contains? menu-text "Manage Ghost Mode"))
+    (is (contains? active-text (wallet/short-addr ghost-address)))))
 
 (deftest wallet-menu-class-attributes-are-tokenized-collections-test
   (let [view (header-view/header-view {:wallet {:connected? true

@@ -1,5 +1,6 @@
 (ns hyperopen.views.header-view
   (:require [clojure.string :as str]
+            [hyperopen.account.context :as account-context]
             [hyperopen.wallet.core :as wallet]))
 
 (def header-nav-link-base-classes
@@ -169,7 +170,7 @@
                 :data-role "wallet-enable-trading"}
        (if disabled? "Awaiting signature..." "Enable Trading")])))
 
-(defn- wallet-menu [wallet-address copy-feedback agent-state]
+(defn- wallet-menu [wallet-address copy-feedback agent-state ghost-active? ghost-address]
   [:div {:class ["absolute"
                  "right-0"
                  "top-full"
@@ -211,6 +212,30 @@
    (agent-storage-mode-row agent-state)
    (trading-agent-status-row agent-state)
    (enable-trading-button agent-state)
+   [:div {:class ["h-px" "w-full" "bg-base-300"]}]
+   [:button {:type "button"
+             :class ["block"
+                     "w-full"
+                     "px-3"
+                     "py-3"
+                     "text-left"
+                     "text-sm"
+                     "font-medium"
+                     "text-[#96f8e0]"
+                     "transition-colors"
+                     "hover:bg-base-200"
+                     "focus:outline-none"]
+             :on {:click [[:actions/open-ghost-mode-modal]]}
+             :data-role "wallet-menu-open-ghost-mode"}
+    (if ghost-active? "Manage Ghost Mode" "Open Ghost Mode")]
+   (when ghost-active?
+     [:div {:class ["px-3"
+                    "pb-2"
+                    "text-xs"
+                    "text-[#9fb4b9]"]
+            :data-role "wallet-menu-ghost-active-address"}
+      [:span {:class ["num"]}
+       (or (wallet/short-addr ghost-address) ghost-address)]])
    [:div {:class ["h-px" "w-full" "bg-base-300"]}]
    [:button {:type "button"
              :class ["block"
@@ -265,7 +290,42 @@
             :data-role "wallet-connect-button"}
    (if is-connecting "Connecting…" "Connect Wallet")])
 
-(defn- wallet-control [wallet-state]
+(defn- ghost-mode-icon []
+  [:svg {:viewBox "0 0 20 20"
+         :fill "currentColor"
+         :class ["h-4" "w-4"]
+         :data-role "ghost-mode-trigger-icon"}
+   [:path {:fill-rule "evenodd"
+           :clip-rule "evenodd"
+           :d "M10 2a6 6 0 00-6 6v8a1 1 0 001.447.894L10 14.618l4.553 2.276A1 1 0 0016 16V8a6 6 0 00-6-6zm0 2a4 4 0 00-4 4v6.382l3.553-1.776a1 1 0 01.894 0L14 14.382V8a4 4 0 00-4-4z"}]])
+
+(defn- ghost-mode-trigger-button
+  [active?]
+  [:button {:type "button"
+            :class (into ["inline-flex"
+                          "h-10"
+                          "items-center"
+                          "gap-2"
+                          "rounded-xl"
+                          "border"
+                          "px-3"
+                          "text-sm"
+                          "transition-colors"]
+                         (if active?
+                           ["border-[#2c5d5a]"
+                            "bg-[#0d3a35]"
+                            "text-[#daf3ef]"
+                            "hover:bg-[#115046]"]
+                           ["border-base-300"
+                            "bg-base-100"
+                            "text-white"
+                            "hover:bg-base-200"]))
+            :on {:click [[:actions/open-ghost-mode-modal]]}
+            :data-role "ghost-mode-open-button"}
+   (ghost-mode-icon)
+   [:span (if active? "Spectating" "Ghost Mode")]])
+
+(defn- wallet-control [wallet-state ghost-mode]
   (let [is-connected (boolean (:connected? wallet-state))
         wallet-address (:address wallet-state)
         copy-feedback (:copy-feedback wallet-state)
@@ -274,12 +334,19 @@
     (if is-connected
       [:details {:class ["relative" "group"] :data-role "wallet-menu-details"}
        (wallet-trigger wallet-address)
-       (wallet-menu wallet-address copy-feedback agent-state)]
+       (wallet-menu wallet-address
+                    copy-feedback
+                    agent-state
+                    (true? (:active? ghost-mode))
+                    (:address ghost-mode))]
       (connect-wallet-button is-connecting))))
 
 (defn header-view [state]
   (let [wallet-state (get-in state [:wallet] {})
-        route (get-in state [:router :path] "/trade")]
+        route (get-in state [:router :path] "/trade")
+        ghost-active? (account-context/ghost-mode-active? state)
+        ghost-mode {:active? ghost-active?
+                    :address (account-context/ghost-address state)}]
     [:header.bg-base-200.border-b.border-base-300.w-full
      {:data-parity-id "header"}
      [:div {:class ["w-full" "app-shell-gutter" "py-3"]}
@@ -312,7 +379,8 @@
        ;; Right Section - Wallet Control and Icons
        [:div.flex.items-center.space-x-4
         {:data-parity-id "header-wallet-control"}
-        (wallet-control wallet-state)
+        (ghost-mode-trigger-button ghost-active?)
+        (wallet-control wallet-state ghost-mode)
 
         ;; Utility Icons
         [:button.w-10.h-10.bg-base-300.hover:bg-base-400.rounded-lg.flex.items-center.justify-center.transition-colors

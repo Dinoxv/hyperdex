@@ -36,7 +36,15 @@ A user will verify this by opening Ghost Mode from the header wallet area, enter
   - Updated portfolio metrics cache token ownership to effective address in `/hyperopen/src/hyperopen/views/portfolio/vm/utils.cljs`.
   - Added regression coverage for effective-address semantics under Ghost Mode in watcher/startup/websocket/projections/account-history/account-info tests.
 - [x] (2026-03-04 15:39Z) Re-ran validation gates after Milestone 2 changes: `npm test`, `npm run check`, and `npm run test:websocket` all passed.
-- [ ] Implement Milestone 3 (Ghost Mode UI, watchlist persistence, and stop controls).
+- [x] (2026-03-04 15:58Z) Implemented Milestone 3 Ghost Mode UI and command flow:
+  - Added Ghost Mode action module `/hyperopen/src/hyperopen/account/ghost_mode_actions.cljs` with modal open/close, search, spectate start/stop, and watchlist add/remove/spectate commands.
+  - Wired Ghost Mode action IDs through runtime adapters/collaborators/catalog/contracts in `/hyperopen/src/hyperopen/runtime/action_adapters.cljs`, `/hyperopen/src/hyperopen/runtime/collaborators.cljs`, `/hyperopen/src/hyperopen/schema/runtime_registration_catalog.cljs`, and `/hyperopen/src/hyperopen/schema/contracts.cljs`.
+  - Added Ghost Mode modal UI `/hyperopen/src/hyperopen/views/ghost_mode_modal.cljs` with address validation, watchlist controls, and explicit stop control.
+  - Extended header wallet controls in `/hyperopen/src/hyperopen/views/header_view.cljs` with Ghost Mode entry controls and active spectating state display.
+  - Added app-level spectating banner + global modal mount in `/hyperopen/src/hyperopen/views/app_view.cljs`.
+  - Added regression coverage in `/hyperopen/test/hyperopen/account/ghost_mode_actions_test.cljs`, `/hyperopen/test/hyperopen/views/header_view_test.cljs`, and `/hyperopen/test/hyperopen/views/app_shell_spacing_test.cljs`.
+- [x] (2026-03-04 15:59Z) Re-ran validation gates after Milestone 3 changes: `npm test`, `npm run check`, and `npm run test:websocket` all passed.
+- [x] Implement Milestone 3 (Ghost Mode UI, watchlist persistence, and stop controls).
 - [ ] Implement Milestone 4 (mutation guardrails, tests, docs, and validation gates).
 
 ## Surprises & Discoveries
@@ -84,7 +92,7 @@ A user will verify this by opening Ghost Mode from the header wallet area, enter
 
 ## Outcomes & Retrospective
 
-Milestones 1 and 2 are complete.
+Milestones 1, 2, and 3 are complete.
 
 Delivered in Milestone 1:
 
@@ -99,6 +107,13 @@ Delivered in Milestone 2:
 - read-side address routing now consistently follows `effective-account-address` across watcher, startup stale-guards, websocket account refreshes, account history fetch guards, and user-abstraction stale-write projection guards;
 - account-info websocket freshness cues and portfolio metrics cache tokening now key by effective address instead of wallet owner;
 - regression coverage now explicitly exercises Ghost Mode effective-address paths (without mutating signer ownership) across runtime and projection boundaries.
+
+Delivered in Milestone 3:
+
+- Ghost Mode command handlers now exist as a cohesive domain seam (modal open/close, start/stop spectating, and watchlist persistence commands) and are wired into runtime action dispatch contracts;
+- header wallet and app shell now expose explicit Ghost Mode entry/exit controls, including a persistent spectating banner with Stop Ghost Mode and modal-level Stop Ghost Mode affordance;
+- Ghost Mode UI supports public-address validation, watchlist management, and one-click spectate switching with local persistence parity;
+- regression coverage now spans Ghost command effects plus header/app-shell rendering and interaction wiring for active/inactive spectating states.
 
 Expected outcome of this plan is a stable, test-covered Ghost Mode that mirrors Trade.xyz behavior without violating Hyperopen signing/runtime invariants. The main risk area is migration completeness from direct `[:wallet :address]` reads to effective-address reads; this plan mitigates that with explicit file touchpoints and regression coverage requirements.
 

@@ -1,16 +1,87 @@
 (ns hyperopen.views.app-view
   (:require [clojure.string :as str]
+            [hyperopen.account.context :as account-context]
             [hyperopen.funding-comparison.actions :as funding-actions]
             [hyperopen.views.funding-modal :as funding-modal]
             [hyperopen.views.footer-view :as footer-view]
             [hyperopen.views.funding-comparison-view :as funding-comparison-view]
+            [hyperopen.views.ghost-mode-modal :as ghost-mode-modal]
             [hyperopen.views.header-view :as header-view]
             [hyperopen.views.notifications-view :as notifications-view]
             [hyperopen.views.vaults.detail-view :as vault-detail-view]
             [hyperopen.views.vaults.list-view :as vaults-view]
             [hyperopen.views.vaults.vm :as vault-vm]
             [hyperopen.views.portfolio-view :as portfolio-view]
-            [hyperopen.views.trade-view :as trade-view]))
+            [hyperopen.views.trade-view :as trade-view]
+            [hyperopen.wallet.core :as wallet]))
+
+(defn- ghost-mode-banner
+  [state]
+  (let [ghost-active? (account-context/ghost-mode-active? state)
+        ghost-address (account-context/ghost-address state)]
+    (when (and ghost-active?
+               (seq ghost-address))
+      [:div {:class ["border-b"
+                     "border-[#1f4746]"
+                     "bg-[#072426]"
+                     "text-[#d3f5ef]"]
+             :data-role "ghost-mode-active-banner"}
+       [:div {:class ["app-shell-gutter"
+                      "flex"
+                      "flex-wrap"
+                      "items-center"
+                      "justify-between"
+                      "gap-2"
+                      "py-2.5"]}
+        [:div {:class ["min-w-0" "flex" "items-center" "gap-2"]}
+         [:span {:class ["rounded-md"
+                         "border"
+                         "border-[#2a6863]"
+                         "bg-[#0c3a35]"
+                         "px-2"
+                         "py-0.5"
+                         "text-xs"
+                         "font-semibold"
+                         "uppercase"
+                         "tracking-[0.08em]"]}
+          "Ghost Mode"]
+         [:span {:class ["text-sm" "text-[#b4d9d4]"]}
+          "Currently spectating"]
+         [:span {:class ["text-sm" "font-semibold" "num"]
+                 :data-role "ghost-mode-active-banner-address"}
+          (or (wallet/short-addr ghost-address) ghost-address)]]
+        [:div {:class ["flex" "items-center" "gap-2"]}
+         [:button {:type "button"
+                   :class ["rounded-lg"
+                           "border"
+                           "border-[#2d585a]"
+                           "bg-transparent"
+                           "px-3"
+                           "py-1.5"
+                           "text-xs"
+                           "font-medium"
+                           "text-[#b7d3d0]"
+                           "transition-colors"
+                           "hover:border-[#3e7478]"
+                           "hover:text-[#e2f4f2]"]
+                   :on {:click [[:actions/open-ghost-mode-modal]]}
+                   :data-role "ghost-mode-banner-manage"}
+          "Manage"]
+         [:button {:type "button"
+                   :class ["rounded-lg"
+                           "border"
+                           "border-[#2f7067]"
+                           "bg-[#0f433d]"
+                           "px-3"
+                           "py-1.5"
+                           "text-xs"
+                           "font-semibold"
+                           "text-[#dbf7f2]"
+                           "transition-colors"
+                           "hover:bg-[#14544c]"]
+                   :on {:click [[:actions/stop-ghost-mode]]}
+                   :data-role "ghost-mode-banner-stop"}
+          "Stop Ghost Mode"]]]])))
 
 (defn app-view [state]
   (let [route (get-in state [:router :path] "/trade")
@@ -25,6 +96,7 @@
     [:div {:class root-classes
            :data-parity-id "app-root"}
      (header-view/header-view state)
+     (ghost-mode-banner state)
      [:div {:class ["flex-1" "min-h-0" "pb-12" "flex" "flex-col"]
             :data-parity-id "app-main"}
       (cond
@@ -35,5 +107,6 @@
         vault-route? (vaults-view/vaults-view state)
         :else (trade-view/trade-view state))]
      (funding-modal/funding-modal-view state)
+     (ghost-mode-modal/ghost-mode-modal-view state)
      (notifications-view/notifications-view state)
      (footer-view/footer-view state)]))

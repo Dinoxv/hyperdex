@@ -1,6 +1,7 @@
 (ns hyperopen.runtime.action-adapters
   (:require [clojure.string :as str]
             [nexus.registry :as nxr]
+            [hyperopen.account.ghost-mode-actions :as ghost-mode-actions]
             [hyperopen.funding.actions :as funding-actions]
             [hyperopen.platform :as platform]
             [hyperopen.portfolio.actions :as portfolio-actions]
@@ -36,6 +37,38 @@
 
 (defn set-funding-modal [state modal]
   (funding-actions/set-funding-modal-compat state modal))
+
+(defn open-ghost-mode-modal
+  [state]
+  (ghost-mode-actions/open-ghost-mode-modal state))
+
+(defn close-ghost-mode-modal
+  [state]
+  (ghost-mode-actions/close-ghost-mode-modal state))
+
+(defn set-ghost-mode-search
+  [state value]
+  (ghost-mode-actions/set-ghost-mode-search state value))
+
+(defn start-ghost-mode
+  [state & [address]]
+  (ghost-mode-actions/start-ghost-mode state address))
+
+(defn stop-ghost-mode
+  [state]
+  (ghost-mode-actions/stop-ghost-mode state))
+
+(defn add-ghost-mode-watchlist-address
+  [state & [address]]
+  (ghost-mode-actions/add-ghost-mode-watchlist-address state address))
+
+(defn remove-ghost-mode-watchlist-address
+  [state address]
+  (ghost-mode-actions/remove-ghost-mode-watchlist-address state address))
+
+(defn spectate-ghost-mode-watchlist-address
+  [state address]
+  (ghost-mode-actions/spectate-ghost-mode-watchlist-address state address))
 
 (def ^:private projection-effect-ids
   #{:effects/save

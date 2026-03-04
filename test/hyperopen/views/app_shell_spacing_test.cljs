@@ -299,3 +299,52 @@
     (is (some? toast-node))
     (is (contains? (set (collect-strings toast-node))
                    "Order submitted."))))
+
+(deftest app-view-renders-ghost-mode-banner-when-active-test
+  (let [address "0xabcdefabcdefabcdefabcdefabcdefabcdefabcd"
+        view-node (app-view/app-view (assoc trade-view-test-state
+                                            :router {:path "/trade"}
+                                            :wallet {}
+                                            :account-context {:ghost-mode {:active? true
+                                                                           :address address}
+                                                              :ghost-ui {:modal-open? false}
+                                                              :watchlist []}))
+        banner-node (find-first-node view-node
+                                     #(= "ghost-mode-active-banner"
+                                         (get-in % [1 :data-role])))
+        manage-button (find-first-node view-node
+                                       #(= "ghost-mode-banner-manage"
+                                           (get-in % [1 :data-role])))
+        stop-button (find-first-node view-node
+                                     #(= "ghost-mode-banner-stop"
+                                         (get-in % [1 :data-role])))]
+    (is (some? banner-node))
+    (is (contains? (set (collect-strings banner-node)) "Ghost Mode"))
+    (is (contains? (set (collect-strings banner-node)) "Currently spectating"))
+    (is (= [[:actions/open-ghost-mode-modal]]
+           (get-in manage-button [1 :on :click])))
+    (is (= [[:actions/stop-ghost-mode]]
+           (get-in stop-button [1 :on :click])))))
+
+(deftest app-view-renders-ghost-mode-modal-and-stop-control-when-open-and-active-test
+  (let [address "0xabcdefabcdefabcdefabcdefabcdefabcdefabcd"
+        view-node (app-view/app-view (assoc trade-view-test-state
+                                            :router {:path "/trade"}
+                                            :wallet {}
+                                            :account-context {:ghost-mode {:active? true
+                                                                           :address address}
+                                                              :ghost-ui {:modal-open? true
+                                                                         :search address
+                                                                         :search-error nil}
+                                                              :watchlist [address]}))
+        modal-root (find-first-node view-node
+                                    #(= "ghost-mode-modal-root"
+                                        (get-in % [1 :data-role])))
+        stop-button (find-first-node view-node
+                                     #(= "ghost-mode-stop"
+                                         (get-in % [1 :data-role])))]
+    (is (some? modal-root))
+    (is (contains? (set (collect-strings modal-root)) "Ghost Mode"))
+    (is (contains? (set (collect-strings modal-root)) "Currently spectating: "))
+    (is (= [[:actions/stop-ghost-mode]]
+           (get-in stop-button [1 :on :click])))))

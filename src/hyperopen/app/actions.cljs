@@ -24,6 +24,14 @@
    :asset-selector {:refresh-asset-markets action-adapters/refresh-asset-markets}
    :vaults {:load-vault-route action-adapters/load-vault-route-action}
    :funding-comparison {:load-funding-comparison-route action-adapters/load-funding-comparison-route-action}
+   :ghost-mode {:open-ghost-mode-modal action-adapters/open-ghost-mode-modal
+                :close-ghost-mode-modal action-adapters/close-ghost-mode-modal
+                :set-ghost-mode-search action-adapters/set-ghost-mode-search
+                :start-ghost-mode action-adapters/start-ghost-mode
+                :stop-ghost-mode action-adapters/stop-ghost-mode
+                :add-ghost-mode-watchlist-address action-adapters/add-ghost-mode-watchlist-address
+                :remove-ghost-mode-watchlist-address action-adapters/remove-ghost-mode-watchlist-address
+                :spectate-ghost-mode-watchlist-address action-adapters/spectate-ghost-mode-watchlist-address}
    :orders {:load-user-data action-adapters/load-user-data
             :set-funding-modal action-adapters/set-funding-modal}})
 

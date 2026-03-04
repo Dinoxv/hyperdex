@@ -1,5 +1,6 @@
 (ns hyperopen.runtime.collaborators
-  (:require [hyperopen.account.history.actions :as account-history-actions]
+  (:require [hyperopen.account.ghost-mode-actions :as ghost-mode-actions]
+            [hyperopen.account.history.actions :as account-history-actions]
             [hyperopen.account.history.effects :as account-history-effects]
             [hyperopen.asset-selector.actions :as asset-actions]
             [hyperopen.chart.actions :as chart-actions]
@@ -155,6 +156,16 @@
    :set-position-margin-amount-to-max account-history-actions/set-position-margin-amount-to-max
    :submit-position-margin-update account-history-actions/submit-position-margin-update})
 
+(defn- ghost-mode-action-deps []
+  {:open-ghost-mode-modal ghost-mode-actions/open-ghost-mode-modal
+   :close-ghost-mode-modal ghost-mode-actions/close-ghost-mode-modal
+   :set-ghost-mode-search ghost-mode-actions/set-ghost-mode-search
+   :start-ghost-mode ghost-mode-actions/start-ghost-mode
+   :stop-ghost-mode ghost-mode-actions/stop-ghost-mode
+   :add-ghost-mode-watchlist-address ghost-mode-actions/add-ghost-mode-watchlist-address
+   :remove-ghost-mode-watchlist-address ghost-mode-actions/remove-ghost-mode-watchlist-address
+   :spectate-ghost-mode-watchlist-address ghost-mode-actions/spectate-ghost-mode-watchlist-address})
+
 (defn- order-action-deps []
   {:select-order-entry-mode order-actions/select-order-entry-mode
    :select-pro-order-type order-actions/select-pro-order-type
@@ -278,9 +289,10 @@
    {:core {}
     :wallet (wallet-action-deps)
     :asset-selector (asset-selector-action-deps)
-   :chart (chart-and-orderbook-action-deps)
-   :account-history (account-history-action-deps)
-   :vaults (vault-action-deps)
+    :chart (chart-and-orderbook-action-deps)
+    :account-history (account-history-action-deps)
+    :ghost-mode (ghost-mode-action-deps)
+    :vaults (vault-action-deps)
     :funding-comparison (funding-comparison-action-deps)
-   :orders (order-action-deps)}
+    :orders (order-action-deps)}
    action-overrides))
