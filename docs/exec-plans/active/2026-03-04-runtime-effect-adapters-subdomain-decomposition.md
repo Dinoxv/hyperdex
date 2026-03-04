@@ -36,7 +36,7 @@ A contributor can verify success by confirming the monolith file is reduced to f
 - [x] (2026-03-04 03:13Z) Preserved disconnect cleanup behavior by injecting facade-owned order-toast clear collaborators into `wallet-adapters/disconnect-wallet`.
 - [x] (2026-03-04 03:13Z) Added wallet facade parity assertions in `/hyperopen/test/hyperopen/runtime/effect_adapters_test.cljs`.
 - [x] (2026-03-04 03:14Z) Re-ran required gates after wallet extraction: `npm run check`, `npm test`, `npm run test:websocket` (all green).
-- [ ] Milestone 3: Extract wallet + order adapters into dedicated namespaces (completed: wallet extraction in `hyperopen-63a.4`; remaining: order extraction in `hyperopen-63a.5`).
+- [x] Milestone 3: Extract wallet + order adapters into dedicated namespaces.
 - [x] (2026-03-04 03:35Z) Extracted order adapters into `/hyperopen/src/hyperopen/runtime/effect_adapters/order.cljs` (order-feedback toast lifecycle + order API submit/cancel/TPSL/margin wrappers + make-api factories).
 - [x] (2026-03-04 03:35Z) Delegated facade order APIs from `/hyperopen/src/hyperopen/runtime/effect_adapters.cljs` to `order` module, while preserving private order-toast collaborators used by wallet disconnect and funding/vault submit toasts.
 - [x] (2026-03-04 03:35Z) Added order facade parity assertions in `/hyperopen/test/hyperopen/runtime/effect_adapters_test.cljs`.
@@ -51,7 +51,10 @@ A contributor can verify success by confirming the monolith file is reduced to f
 - [x] (2026-03-04 02:39Z) Added vault facade parity + submit-wrapper seam regression coverage in `/hyperopen/test/hyperopen/runtime/effect_adapters_test.cljs`.
 - [x] (2026-03-04 02:39Z) Re-ran required gates after vault extraction: `npm run check`, `npm test`, `npm run test:websocket` (all green).
 - [x] Milestone 4: Extract funding + vault adapters into dedicated namespaces.
-- [ ] Milestone 5: Decompose tests by subdomain, add facade contract assertions, and run required gates.
+- [x] (2026-03-04 02:42Z) Split monolithic `/hyperopen/test/hyperopen/runtime/effect_adapters_test.cljs` into subdomain-oriented suites under `/hyperopen/test/hyperopen/runtime/effect_adapters/` (`common`, `websocket`, `asset_selector`, `wallet`, `order`, `funding`, `vaults`).
+- [x] (2026-03-04 02:42Z) Added explicit facade contract assertions in `/hyperopen/test/hyperopen/runtime/effect_adapters/facade_contract_test.cljs` and preserved existing seam behavior coverage in the new subdomain suites.
+- [x] (2026-03-04 02:42Z) Regenerated test runner (`/hyperopen/test/test_runner_generated.cljs`, 271 namespaces) and re-ran required gates: `npm run check`, `npm test`, `npm run test:websocket` (all green).
+- [x] Milestone 5: Decompose tests by subdomain, add facade contract assertions, and run required gates.
 
 ## Surprises & Discoveries
 
@@ -107,7 +110,7 @@ A contributor can verify success by confirming the monolith file is reduced to f
 
 ## Outcomes & Retrospective
 
-Seven extraction slices are complete: subdomain scaffold + shared helper seam (`common`), websocket/diagnostics seam (`websocket`), asset-selector seam (`asset_selector`), wallet seam (`wallet`), order seam (`order`), funding seam (`funding`), and vault seam (`vaults`). The facade now delegates websocket, asset-selector, wallet, order, funding, and vault behavior while preserving compatibility exports and override seams. Remaining work is concentrated in test decomposition and final validation milestones.
+All planned extraction slices and validation milestones are complete: subdomain scaffold + shared helper seam (`common`), websocket/diagnostics seam (`websocket`), asset-selector seam (`asset_selector`), wallet seam (`wallet`), order seam (`order`), funding seam (`funding`), vault seam (`vaults`), and test decomposition into subdomain suites with explicit facade contract assertions. The facade now delegates websocket, asset-selector, wallet, order, funding, and vault behavior while preserving compatibility exports and override seams.
 
 ## Context and Orientation
 

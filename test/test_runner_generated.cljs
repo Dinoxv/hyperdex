@@ -97,7 +97,14 @@
             [hyperopen.runtime.app-effects-test]
             [hyperopen.runtime.bootstrap-test]
             [hyperopen.runtime.collaborators-test]
-            [hyperopen.runtime.effect-adapters-test]
+            [hyperopen.runtime.effect-adapters.asset-selector-test]
+            [hyperopen.runtime.effect-adapters.common-test]
+            [hyperopen.runtime.effect-adapters.facade-contract-test]
+            [hyperopen.runtime.effect-adapters.funding-test]
+            [hyperopen.runtime.effect-adapters.order-test]
+            [hyperopen.runtime.effect-adapters.vaults-test]
+            [hyperopen.runtime.effect-adapters.wallet-test]
+            [hyperopen.runtime.effect-adapters.websocket-test]
             [hyperopen.runtime.registry-composition-test]
             [hyperopen.runtime.state-test]
             [hyperopen.runtime.validation-test]
@@ -365,7 +372,14 @@
              'hyperopen.runtime.app-effects-test
              'hyperopen.runtime.bootstrap-test
              'hyperopen.runtime.collaborators-test
-             'hyperopen.runtime.effect-adapters-test
+             'hyperopen.runtime.effect-adapters.asset-selector-test
+             'hyperopen.runtime.effect-adapters.common-test
+             'hyperopen.runtime.effect-adapters.facade-contract-test
+             'hyperopen.runtime.effect-adapters.funding-test
+             'hyperopen.runtime.effect-adapters.order-test
+             'hyperopen.runtime.effect-adapters.vaults-test
+             'hyperopen.runtime.effect-adapters.wallet-test
+             'hyperopen.runtime.effect-adapters.websocket-test
              'hyperopen.runtime.registry-composition-test
              'hyperopen.runtime.state-test
              'hyperopen.runtime.validation-test

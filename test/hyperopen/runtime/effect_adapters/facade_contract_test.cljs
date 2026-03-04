@@ -1,0 +1,28 @@
+(ns hyperopen.runtime.effect-adapters.facade-contract-test
+  (:require [cljs.test :refer-macros [deftest is]]
+            [hyperopen.runtime.effect-adapters :as effect-adapters]))
+
+(deftest facade-contract-exposes-runtime-effect-adapter-surface-test
+  (is (fn? effect-adapters/save))
+  (is (fn? effect-adapters/save-many))
+  (is (fn? effect-adapters/local-storage-set))
+  (is (fn? effect-adapters/local-storage-set-json))
+  (is (fn? effect-adapters/schedule-animation-frame!))
+  (is (fn? effect-adapters/queue-asset-icon-status))
+  (is (fn? effect-adapters/make-queue-asset-icon-status))
+  (is (fn? effect-adapters/subscribe-active-asset))
+  (is (fn? effect-adapters/sync-asset-selector-active-ctx-subscriptions))
+  (is (fn? effect-adapters/connect-wallet))
+  (is (fn? effect-adapters/disconnect-wallet))
+  (is (fn? effect-adapters/make-disconnect-wallet))
+  (is (fn? effect-adapters/copy-wallet-address))
+  (is (fn? effect-adapters/api-submit-order))
+  (is (fn? effect-adapters/api-cancel-order))
+  (is (fn? effect-adapters/api-submit-position-tpsl))
+  (is (fn? effect-adapters/api-submit-position-margin))
+  (is (fn? effect-adapters/sync-active-asset-funding-predictability))
+  (is (fn? effect-adapters/api-fetch-predicted-fundings-effect))
+  (is (fn? effect-adapters/api-fetch-vault-index-effect))
+  (is (fn? effect-adapters/api-submit-vault-transfer-effect))
+  (is (fn? effect-adapters/api-fetch-hyperunit-fee-estimate-effect))
+  (is (fn? effect-adapters/api-submit-funding-transfer-effect)))
