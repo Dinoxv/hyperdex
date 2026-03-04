@@ -113,13 +113,15 @@ When finishing a coding session or handing work to another contributor:
    - `npm test`
    - `npm run test:websocket`
 3. Update `bd` issue status (close completed work, update remaining work).
-4. Pull/rebase and push if branch delivery is part of the session:
+4. Pull/rebase and push only when the user explicitly requests remote sync in the current session:
    - `git pull --rebase`
    - `git push`
    - `git status` (confirm clean state and up-to-date branch)
 5. Provide handoff notes with relevant `bd` ids and any blockers.
 
-If push cannot complete due environment or permissions, record the blocker explicitly in the handoff and in `bd`.
+If remote sync is not explicitly requested, stop at local commit and provide handoff notes.
+
+If push is explicitly requested but cannot complete due environment or permissions, record the blocker explicitly in the handoff and in `bd`.
 
 ## Shared Agent Command Phrases
 - Machine-readable registry: `/hyperopen/command-phrases.edn`
