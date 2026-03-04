@@ -4,6 +4,7 @@
             [hyperopen.funding.history-cache :as funding-cache]
             [hyperopen.platform :as platform]
             [hyperopen.runtime.app-effects :as app-effects]
+            [hyperopen.runtime.effect-adapters.asset-selector :as asset-adapters]
             [hyperopen.runtime.effect-adapters :as effect-adapters]
             [hyperopen.runtime.effect-adapters.common :as common]
             [hyperopen.runtime.effect-adapters.websocket :as ws-adapters]
@@ -39,6 +40,28 @@
   (is (identical? ws-adapters/ws-reset-subscriptions effect-adapters/ws-reset-subscriptions))
   (is (identical? ws-adapters/confirm-ws-diagnostics-reveal effect-adapters/confirm-ws-diagnostics-reveal))
   (is (identical? ws-adapters/copy-websocket-diagnostics effect-adapters/copy-websocket-diagnostics)))
+
+(deftest facade-asset-selector-adapters-delegate-to-asset-selector-module-test
+  (is (identical? asset-adapters/persist-asset-selector-markets-cache!
+                  effect-adapters/persist-asset-selector-markets-cache!))
+  (is (identical? asset-adapters/persist-active-market-display!
+                  effect-adapters/persist-active-market-display!))
+  (is (identical? asset-adapters/load-active-market-display
+                  effect-adapters/load-active-market-display))
+  (is (identical? asset-adapters/sync-asset-selector-active-ctx-subscriptions
+                  effect-adapters/sync-asset-selector-active-ctx-subscriptions)))
+
+(deftest queue-asset-icon-status-wrapper-injects-facade-schedule-animation-frame-seam-test
+  (let [captured (atom nil)
+        store (atom {})]
+    (with-redefs [effect-adapters/schedule-animation-frame! (fn [_] :raf-id)
+                  asset-adapters/queue-asset-icon-status!
+                  (fn [opts]
+                    (reset! captured opts))]
+      (effect-adapters/queue-asset-icon-status nil store {:market-key "perp:BTC"
+                                                           :status :loaded})
+      (is (= :raf-id ((:schedule-animation-frame! @captured) (fn [] nil))))
+      (is (fn? (:flush-queued-asset-icon-statuses! @captured))))))
 
 (deftest subscribe-active-asset-persists-through-local-storage-effect-boundary-test
   (let [persist-calls (atom [])

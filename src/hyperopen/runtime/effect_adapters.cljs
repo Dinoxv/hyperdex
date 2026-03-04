@@ -1,20 +1,14 @@
 (ns hyperopen.runtime.effect-adapters
-  (:require [clojure.set :as set]
-            [nexus.registry :as nxr]
+  (:require [nexus.registry :as nxr]
             [hyperopen.platform :as platform]
             [hyperopen.api.default :as api]
             [hyperopen.api.projections :as api-projections]
             [hyperopen.account.history.effects :as account-history-effects]
             [hyperopen.order.effects :as order-effects]
             [hyperopen.order.feedback-runtime :as order-feedback-runtime]
-            [hyperopen.asset-selector.active-market-cache :as active-market-cache]
-            [hyperopen.asset-selector.actions :as asset-actions]
-            [hyperopen.asset-selector.icon-status-runtime :as icon-status-runtime]
-            [hyperopen.asset-selector.markets-cache :as markets-cache]
-            [hyperopen.asset-selector.markets :as markets]
-            [hyperopen.asset-selector.query :as asset-selector-query]
             [hyperopen.funding.history-cache :as funding-cache]
             [hyperopen.funding.predictability :as funding-predictability]
+            [hyperopen.runtime.effect-adapters.asset-selector :as asset-adapters]
             [hyperopen.runtime.effect-adapters.common :as common]
             [hyperopen.runtime.effect-adapters.websocket :as ws-adapters]
             [hyperopen.runtime.api-effects :as api-effects]
@@ -28,7 +22,6 @@
             [hyperopen.wallet.connection-runtime :as wallet-connection-runtime]
             [hyperopen.wallet.copy-feedback-runtime :as wallet-copy-runtime]
             [hyperopen.wallet.core :as wallet]
-            [hyperopen.websocket.active-asset-ctx :as active-ctx]
             [hyperopen.websocket.client :as ws-client]))
 
 (def append-diagnostics-event! ws-adapters/append-diagnostics-event!)
@@ -51,10 +44,9 @@
   ([store]
    (flush-queued-asset-icon-statuses! runtime-state/runtime store))
   ([runtime store]
-   (icon-status-runtime/flush-queued-asset-icon-statuses!
+   (asset-adapters/flush-queued-asset-icon-statuses!
     {:store store
      :runtime runtime
-     :apply-asset-icon-status-updates-fn asset-actions/apply-asset-icon-status-updates
      :save-many! (fn [runtime-store path-values]
                    (save-many nil runtime-store path-values))})))
 
@@ -62,7 +54,7 @@
   ([_ store payload]
    (queue-asset-icon-status runtime-state/runtime nil store payload))
   ([runtime _ store payload]
-   (icon-status-runtime/queue-asset-icon-status!
+   (asset-adapters/queue-asset-icon-status!
     {:store store
      :runtime runtime
      :payload payload
@@ -87,48 +79,14 @@
 
 (def init-websocket ws-adapters/init-websocket)
 
-(defn- normalize-market-type [value]
-  (markets-cache/normalize-market-type value))
-
-(defn- parse-max-leverage [value]
-  (markets-cache/parse-max-leverage value))
-
-(defn- parse-market-index [value]
-  (markets-cache/parse-market-index value))
-
-(defn- normalize-display-text [value]
-  (markets-cache/normalize-display-text value))
-
-(defn persist-asset-selector-markets-cache!
-  ([markets]
-   (persist-asset-selector-markets-cache! markets {}))
-  ([markets state]
-   (markets-cache/persist-asset-selector-markets-cache! markets state)))
-
-(defn- load-asset-selector-markets-cache []
-  (markets-cache/load-asset-selector-markets-cache))
+(def persist-asset-selector-markets-cache! asset-adapters/persist-asset-selector-markets-cache!)
 
 (defn restore-asset-selector-markets-cache! [store]
-  (markets-cache/restore-asset-selector-markets-cache!
-   store
-   {:load-cache-fn load-asset-selector-markets-cache
-    :resolve-market-by-coin-fn markets/resolve-market-by-coin}))
+  (asset-adapters/restore-asset-selector-markets-cache! {:store store}))
 
-(defn- active-market-display-normalize-deps []
-  {:normalize-display-text normalize-display-text
-   :normalize-market-type normalize-market-type
-   :parse-max-leverage parse-max-leverage
-   :parse-market-index parse-market-index})
+(def persist-active-market-display! asset-adapters/persist-active-market-display!)
 
-(defn persist-active-market-display! [market]
-  (active-market-cache/persist-active-market-display!
-   market
-   (active-market-display-normalize-deps)))
-
-(defn load-active-market-display [active-asset]
-  (active-market-cache/load-active-market-display
-   active-asset
-   (active-market-display-normalize-deps)))
+(def load-active-market-display asset-adapters/load-active-market-display)
 
 (defn subscribe-active-asset [_ store coin]
   (ws-adapters/subscribe-active-asset
@@ -159,19 +117,8 @@
 (defn unsubscribe-webdata2 [_ store address]
   (ws-adapters/unsubscribe-webdata2 address))
 
-(def ^:private asset-selector-active-ctx-owner
-  :asset-selector)
-
-(defn sync-asset-selector-active-ctx-subscriptions [_ store]
-  (let [state @store
-        desired-coins (asset-selector-query/selector-visible-market-coins state)
-        owned-coins (active-ctx/get-subscribed-coins-by-owner asset-selector-active-ctx-owner)
-        subscribe-coins (sort (set/difference desired-coins owned-coins))
-        unsubscribe-coins (sort (set/difference owned-coins desired-coins))]
-    (doseq [coin subscribe-coins]
-      (active-ctx/subscribe-active-asset-ctx! coin asset-selector-active-ctx-owner))
-    (doseq [coin unsubscribe-coins]
-      (active-ctx/unsubscribe-active-asset-ctx! coin asset-selector-active-ctx-owner))))
+(def sync-asset-selector-active-ctx-subscriptions
+  asset-adapters/sync-asset-selector-active-ctx-subscriptions)
 
 (defn connect-wallet [_ store]
   (wallet-connection-runtime/connect-wallet!

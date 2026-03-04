@@ -27,6 +27,11 @@ A contributor can verify success by confirming the monolith file is reduced to f
 - [x] (2026-03-04 02:26Z) Added websocket-facade parity assertions in `/hyperopen/test/hyperopen/runtime/effect_adapters_test.cljs`.
 - [x] (2026-03-04 02:27Z) Re-ran required gates after websocket extraction: `npm run check`, `npm test`, `npm run test:websocket` (all green).
 - [ ] Milestone 2: Extract websocket + diagnostics + asset-selector adapters into dedicated namespaces (completed: websocket + diagnostics extraction in `hyperopen-63a.2`; remaining: asset-selector extraction tracked in `hyperopen-63a.3`).
+- [x] (2026-03-04 02:49Z) Extracted asset-selector adapters into `/hyperopen/src/hyperopen/runtime/effect_adapters/asset_selector.cljs`: icon queue/flush, market cache persist/restore, active market display persist/load, and owner-scoped active-ctx subscription diffing.
+- [x] (2026-03-04 02:49Z) Rewired facade wrappers in `/hyperopen/src/hyperopen/runtime/effect_adapters.cljs` to delegate asset-selector behavior while preserving the `schedule-animation-frame!` override seam used by core bootstrap tests.
+- [x] (2026-03-04 02:49Z) Added asset-selector facade parity + seam regression checks in `/hyperopen/test/hyperopen/runtime/effect_adapters_test.cljs`.
+- [x] (2026-03-04 02:50Z) Re-ran required gates after asset-selector extraction: `npm run check`, `npm test`, `npm run test:websocket` (all green).
+- [x] Milestone 2: Extract websocket + diagnostics + asset-selector adapters into dedicated namespaces.
 - [ ] Milestone 3: Extract wallet + order adapters into dedicated namespaces.
 - [ ] Milestone 4: Extract funding + vault adapters into dedicated namespaces.
 - [ ] Milestone 5: Decompose tests by subdomain, add facade contract assertions, and run required gates.
@@ -64,9 +69,13 @@ A contributor can verify success by confirming the monolith file is reduced to f
   Rationale: Existing tests rely on `with-redefs` against facade var `fetch-candle-snapshot`; wrapper-level dependency injection preserves that override seam while moving websocket subscription logic into the websocket subdomain namespace.
   Date/Author: 2026-03-04 / Codex
 
+- Decision: Keep `queue-asset-icon-status` and `flush-queued-asset-icon-statuses!` as facade wrappers (not direct var aliases) while delegating to `asset_selector` module.
+  Rationale: Existing tests use `with-redefs` on `hyperopen.runtime.effect-adapters/schedule-animation-frame!`; facade-level injection is required so redefs continue to affect queue scheduling behavior.
+  Date/Author: 2026-03-04 / Codex
+
 ## Outcomes & Retrospective
 
-Two extraction slices are complete: subdomain scaffold + shared helper seam (`common`) and websocket/diagnostics seam (`websocket`). The facade now delegates significant runtime behavior while preserving compatibility exports and override seams. Remaining work is concentrated in asset-selector, wallet/order, and funding/vault extraction milestones.
+Three extraction slices are complete: subdomain scaffold + shared helper seam (`common`), websocket/diagnostics seam (`websocket`), and asset-selector seam (`asset_selector`). The facade now delegates most websocket and asset-selector behavior while preserving compatibility exports and override seams. Remaining work is concentrated in wallet/order and funding/vault extraction milestones.
 
 ## Context and Orientation
 
