@@ -7,11 +7,11 @@
             [hyperopen.runtime.effect-adapters.common :as common]
             [hyperopen.runtime.effect-adapters.funding :as funding-adapters]
             [hyperopen.runtime.effect-adapters.order :as order-adapters]
+            [hyperopen.runtime.effect-adapters.vaults :as vault-adapters]
             [hyperopen.runtime.effect-adapters.wallet :as wallet-adapters]
             [hyperopen.runtime.effect-adapters.websocket :as ws-adapters]
             [hyperopen.runtime.api-effects :as api-effects]
             [hyperopen.runtime.state :as runtime-state]
-            [hyperopen.vaults.effects :as vault-effects]
             [hyperopen.websocket.client :as ws-client]))
 
 (def append-diagnostics-event! ws-adapters/append-diagnostics-event!)
@@ -160,10 +160,6 @@
     :connected?-fn ws-client/connected?
     :load-active-market-display-fn load-active-market-display}))
 
-(def ^:private exchange-response-error common/exchange-response-error)
-
-(def ^:private runtime-error-message common/runtime-error-message)
-
 (def api-submit-order order-adapters/api-submit-order)
 
 (def api-cancel-order order-adapters/api-cancel-order)
@@ -211,104 +207,40 @@
 (def api-fetch-predicted-fundings-effect
   funding-adapters/api-fetch-predicted-fundings-effect)
 
-(defn api-fetch-vault-index-effect
-  [_ store]
-  (vault-effects/api-fetch-vault-index!
-   {:store store
-    :request-vault-index! api/request-vault-index!
-    :begin-vault-index-load api-projections/begin-vault-index-load
-    :apply-vault-index-success api-projections/apply-vault-index-success
-    :apply-vault-index-error api-projections/apply-vault-index-error}))
+(def api-fetch-vault-index-effect
+  vault-adapters/api-fetch-vault-index-effect)
 
-(defn api-fetch-vault-summaries-effect
-  [_ store]
-  (vault-effects/api-fetch-vault-summaries!
-   {:store store
-    :request-vault-summaries! api/request-vault-summaries!
-    :begin-vault-summaries-load api-projections/begin-vault-summaries-load
-    :apply-vault-summaries-success api-projections/apply-vault-summaries-success
-    :apply-vault-summaries-error api-projections/apply-vault-summaries-error}))
+(def api-fetch-vault-summaries-effect
+  vault-adapters/api-fetch-vault-summaries-effect)
 
-(defn api-fetch-user-vault-equities-effect
-  [_ store address]
-  (vault-effects/api-fetch-user-vault-equities!
-   {:store store
-    :address address
-    :request-user-vault-equities! api/request-user-vault-equities!
-    :begin-user-vault-equities-load api-projections/begin-user-vault-equities-load
-    :apply-user-vault-equities-success api-projections/apply-user-vault-equities-success
-    :apply-user-vault-equities-error api-projections/apply-user-vault-equities-error}))
+(def api-fetch-user-vault-equities-effect
+  vault-adapters/api-fetch-user-vault-equities-effect)
 
-(defn api-fetch-vault-details-effect
-  [_ store vault-address user-address]
-  (vault-effects/api-fetch-vault-details!
-   {:store store
-    :vault-address vault-address
-    :user-address user-address
-    :request-vault-details! api/request-vault-details!
-    :begin-vault-details-load api-projections/begin-vault-details-load
-    :apply-vault-details-success api-projections/apply-vault-details-success
-    :apply-vault-details-error api-projections/apply-vault-details-error}))
+(def api-fetch-vault-details-effect
+  vault-adapters/api-fetch-vault-details-effect)
 
-(defn api-fetch-vault-webdata2-effect
-  [_ store vault-address]
-  (vault-effects/api-fetch-vault-webdata2!
-   {:store store
-    :vault-address vault-address
-    :request-vault-webdata2! api/request-vault-webdata2!
-    :begin-vault-webdata2-load api-projections/begin-vault-webdata2-load
-    :apply-vault-webdata2-success api-projections/apply-vault-webdata2-success
-    :apply-vault-webdata2-error api-projections/apply-vault-webdata2-error}))
+(def api-fetch-vault-webdata2-effect
+  vault-adapters/api-fetch-vault-webdata2-effect)
 
-(defn api-fetch-vault-fills-effect
-  [_ store vault-address]
-  (vault-effects/api-fetch-vault-fills!
-   {:store store
-    :vault-address vault-address
-    :request-user-fills! api/request-user-fills!
-    :begin-vault-fills-load api-projections/begin-vault-fills-load
-    :apply-vault-fills-success api-projections/apply-vault-fills-success
-    :apply-vault-fills-error api-projections/apply-vault-fills-error}))
+(def api-fetch-vault-fills-effect
+  vault-adapters/api-fetch-vault-fills-effect)
 
-(defn api-fetch-vault-funding-history-effect
-  [_ store vault-address]
-  (vault-effects/api-fetch-vault-funding-history!
-   {:store store
-    :vault-address vault-address
-    :request-user-funding-history! api/request-user-funding-history!
-    :begin-vault-funding-history-load api-projections/begin-vault-funding-history-load
-    :apply-vault-funding-history-success api-projections/apply-vault-funding-history-success
-    :apply-vault-funding-history-error api-projections/apply-vault-funding-history-error}))
+(def api-fetch-vault-funding-history-effect
+  vault-adapters/api-fetch-vault-funding-history-effect)
 
-(defn api-fetch-vault-order-history-effect
-  [_ store vault-address]
-  (vault-effects/api-fetch-vault-order-history!
-   {:store store
-    :vault-address vault-address
-    :request-historical-orders! api/request-historical-orders!
-    :begin-vault-order-history-load api-projections/begin-vault-order-history-load
-    :apply-vault-order-history-success api-projections/apply-vault-order-history-success
-    :apply-vault-order-history-error api-projections/apply-vault-order-history-error}))
+(def api-fetch-vault-order-history-effect
+  vault-adapters/api-fetch-vault-order-history-effect)
 
-(defn api-fetch-vault-ledger-updates-effect
-  [_ store vault-address]
-  (vault-effects/api-fetch-vault-ledger-updates!
-   {:store store
-    :vault-address vault-address
-    :request-user-non-funding-ledger-updates! api/request-user-non-funding-ledger-updates!
-    :begin-vault-ledger-updates-load api-projections/begin-vault-ledger-updates-load
-    :apply-vault-ledger-updates-success api-projections/apply-vault-ledger-updates-success
-    :apply-vault-ledger-updates-error api-projections/apply-vault-ledger-updates-error}))
+(def api-fetch-vault-ledger-updates-effect
+  vault-adapters/api-fetch-vault-ledger-updates-effect)
 
 (defn api-submit-vault-transfer-effect
   [_ store request]
-  (vault-effects/api-submit-vault-transfer!
-   {:store store
-    :request request
-    :dispatch! nxr/dispatch
-    :exchange-response-error exchange-response-error
-    :runtime-error-message runtime-error-message
-    :show-toast! show-order-feedback-toast!}))
+  (apply vault-adapters/api-submit-vault-transfer-effect
+         [nil
+          store
+          request
+          {:show-toast! show-order-feedback-toast!}]))
 
 (def api-fetch-hyperunit-fee-estimate-effect
   funding-adapters/api-fetch-hyperunit-fee-estimate-effect)

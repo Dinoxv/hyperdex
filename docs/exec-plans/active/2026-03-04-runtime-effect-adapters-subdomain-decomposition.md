@@ -46,7 +46,11 @@ A contributor can verify success by confirming the monolith file is reduced to f
 - [x] (2026-03-04 02:21Z) Rewired funding exports in `/hyperopen/src/hyperopen/runtime/effect_adapters.cljs` to delegate to `funding` module while preserving facade-owned order toast seam injection for funding submit adapters.
 - [x] (2026-03-04 02:21Z) Added funding facade parity + submit-wrapper seam regression coverage in `/hyperopen/test/hyperopen/runtime/effect_adapters_test.cljs`.
 - [x] (2026-03-04 02:21Z) Re-ran required gates after funding extraction: `npm run check`, `npm test`, `npm run test:websocket` (all green).
-- [ ] Milestone 4: Extract funding + vault adapters into dedicated namespaces (completed: funding extraction in `hyperopen-63a.6`; remaining: vault extraction in `hyperopen-63a.7`).
+- [x] (2026-03-04 02:39Z) Extracted vault adapters into `/hyperopen/src/hyperopen/runtime/effect_adapters/vaults.cljs`: vault index/summaries/equities/details/webdata2/fills/funding-history/order-history/ledger-updates wrappers plus vault transfer submit wrapper.
+- [x] (2026-03-04 02:39Z) Delegated vault exports in `/hyperopen/src/hyperopen/runtime/effect_adapters.cljs` to `vaults` module while preserving facade-owned order toast seam injection for vault transfer submit adapter.
+- [x] (2026-03-04 02:39Z) Added vault facade parity + submit-wrapper seam regression coverage in `/hyperopen/test/hyperopen/runtime/effect_adapters_test.cljs`.
+- [x] (2026-03-04 02:39Z) Re-ran required gates after vault extraction: `npm run check`, `npm test`, `npm run test:websocket` (all green).
+- [x] Milestone 4: Extract funding + vault adapters into dedicated namespaces.
 - [ ] Milestone 5: Decompose tests by subdomain, add facade contract assertions, and run required gates.
 
 ## Surprises & Discoveries
@@ -103,7 +107,7 @@ A contributor can verify success by confirming the monolith file is reduced to f
 
 ## Outcomes & Retrospective
 
-Six extraction slices are complete: subdomain scaffold + shared helper seam (`common`), websocket/diagnostics seam (`websocket`), asset-selector seam (`asset_selector`), wallet seam (`wallet`), order seam (`order`), and funding seam (`funding`). The facade now delegates websocket, asset-selector, wallet, order, and funding behavior while preserving compatibility exports and override seams. Remaining work is concentrated in vault extraction and test decomposition milestones.
+Seven extraction slices are complete: subdomain scaffold + shared helper seam (`common`), websocket/diagnostics seam (`websocket`), asset-selector seam (`asset_selector`), wallet seam (`wallet`), order seam (`order`), funding seam (`funding`), and vault seam (`vaults`). The facade now delegates websocket, asset-selector, wallet, order, funding, and vault behavior while preserving compatibility exports and override seams. Remaining work is concentrated in test decomposition and final validation milestones.
 
 ## Context and Orientation
 
