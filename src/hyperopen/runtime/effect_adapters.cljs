@@ -17,6 +17,7 @@
             [hyperopen.funding.predictability :as funding-predictability]
             [hyperopen.orderbook.price-aggregation :as price-agg]
             [hyperopen.runtime.app-effects :as app-effects]
+            [hyperopen.runtime.effect-adapters.common :as common]
             [hyperopen.runtime.api-effects :as api-effects]
             [hyperopen.runtime.state :as runtime-state]
             [hyperopen.telemetry :as telemetry]
@@ -123,40 +124,15 @@
   [store status]
   (swap! store assoc-in [:websocket-ui :copy-status] status))
 
-(defn- effect-handler-store-1
-  [f]
-  (fn [_ store arg]
-    (f store arg)))
+(def save common/save)
 
-(defn- effect-handler-store-2
-  [f]
-  (fn [_ store arg1 arg2]
-    (f store arg1 arg2)))
+(def save-many common/save-many)
 
-(defn- effect-handler-1
-  [f]
-  (fn [_ _ arg]
-    (f arg)))
+(def local-storage-set common/local-storage-set)
 
-(defn- effect-handler-2
-  [f]
-  (fn [_ _ arg1 arg2]
-    (f arg1 arg2)))
+(def local-storage-set-json common/local-storage-set-json)
 
-(def save
-  (effect-handler-store-2 #'app-effects/save!))
-
-(def save-many
-  (effect-handler-store-1 #'app-effects/save-many!))
-
-(def local-storage-set
-  (effect-handler-2 #'app-effects/local-storage-set!))
-
-(def local-storage-set-json
-  (effect-handler-2 #'app-effects/local-storage-set-json!))
-
-(defn schedule-animation-frame! [f]
-  (platform/request-animation-frame! f))
+(def schedule-animation-frame! common/schedule-animation-frame!)
 
 (defn flush-queued-asset-icon-statuses!
   ([store]
@@ -186,11 +162,9 @@
   (fn [ctx store payload]
     (queue-asset-icon-status runtime ctx store payload)))
 
-(def push-state
-  (effect-handler-1 #'app-effects/push-state!))
+(def push-state common/push-state)
 
-(def replace-state
-  (effect-handler-1 #'app-effects/replace-state!))
+(def replace-state common/replace-state)
 
 (defn make-fetch-candle-snapshot
   [{:keys [log-fn
@@ -510,13 +484,9 @@
 (defn restore-active-asset! [store]
   (startup-restore/restore-active-asset! store (restore-active-asset-deps)))
 
-(defn- exchange-response-error
-  [resp]
-  (agent-runtime/exchange-response-error resp))
+(def ^:private exchange-response-error common/exchange-response-error)
 
-(defn- runtime-error-message
-  [err]
-  (agent-runtime/runtime-error-message err))
+(def ^:private runtime-error-message common/runtime-error-message)
 
 (defn- order-api-effect-deps
   ([]

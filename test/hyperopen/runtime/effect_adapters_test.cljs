@@ -5,6 +5,7 @@
             [hyperopen.platform :as platform]
             [hyperopen.runtime.app-effects :as app-effects]
             [hyperopen.runtime.effect-adapters :as effect-adapters]
+            [hyperopen.runtime.effect-adapters.common :as common]
             [hyperopen.test-support.async :as async-support]
             [hyperopen.telemetry :as telemetry]
             [hyperopen.websocket.active-asset-ctx :as active-ctx]
@@ -12,6 +13,15 @@
             [hyperopen.websocket.health-runtime :as health-runtime]
             [hyperopen.websocket.market-projection-runtime :as market-projection-runtime]
             [hyperopen.websocket.subscriptions-runtime :as subscriptions-runtime]))
+
+(deftest facade-shared-adapters-delegate-to-common-module-test
+  (is (identical? common/save effect-adapters/save))
+  (is (identical? common/save-many effect-adapters/save-many))
+  (is (identical? common/local-storage-set effect-adapters/local-storage-set))
+  (is (identical? common/local-storage-set-json effect-adapters/local-storage-set-json))
+  (is (identical? common/push-state effect-adapters/push-state))
+  (is (identical? common/replace-state effect-adapters/replace-state))
+  (is (identical? common/schedule-animation-frame! effect-adapters/schedule-animation-frame!)))
 
 (deftest subscribe-active-asset-persists-through-local-storage-effect-boundary-test
   (let [persist-calls (atom [])
