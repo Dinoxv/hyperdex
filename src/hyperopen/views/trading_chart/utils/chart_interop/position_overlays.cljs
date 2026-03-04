@@ -390,6 +390,37 @@
     (.appendChild row chip)
     row))
 
+(defn- render-liquidation-price-chip!
+  [document row overlay width]
+  (let [chip (.createElement document "div")
+        text-node (.createElement document "span")
+        safe-width (non-negative-number width 0)]
+    (apply-inline-style!
+     chip
+     {"position" "absolute"
+      "left" (str safe-width "px")
+      "top" "0px"
+      "transform" "translate(2px, -50%)"
+      "display" "inline-flex"
+      "alignItems" "center"
+      "padding" "1px 6px"
+      "fontSize" "11px"
+      "lineHeight" "16px"
+      "fontWeight" "600"
+      "borderRadius" "2px"
+      "border" (str "1px solid " liq-line-color)
+      "background" liq-line-color
+      "color" pnl-chip-text-color
+      "whiteSpace" "nowrap"
+      "pointerEvents" "none"})
+    (.setAttribute chip "data-position-liq-price-chip" "true")
+    (set! (.-textContent text-node)
+          (format-axis-price-text (:format-price overlay)
+                                  (:liquidation-price overlay)))
+    (.appendChild chip text-node)
+    (.appendChild row chip)
+    row))
+
 (defn- build-pnl-row!
   [document overlay start-x end-x y width]
   (let [row (.createElement document "div")
@@ -532,6 +563,7 @@
     (.appendChild row hit-area)
     (.appendChild row line)
     (.appendChild row badge)
+    (render-liquidation-price-chip! document row overlay width)
     row))
 
 (declare render-overlays!)

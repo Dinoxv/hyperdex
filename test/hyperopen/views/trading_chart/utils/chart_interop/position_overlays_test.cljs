@@ -38,6 +38,12 @@
                           (fn [node]
                             (= "true" (aget node "data-position-pnl-price-chip")))))
 
+(defn- find-liquidation-price-chip
+  [root]
+  (fake-dom/find-dom-node root
+                          (fn [node]
+                            (= "true" (aget node "data-position-liq-price-chip")))))
+
 (defn- find-liquidation-drag-handle
   [root]
   (fake-dom/find-dom-node root
@@ -121,6 +127,11 @@
                                  (str/join " ")
                                  str/trim)
           liq-badge (find-inline-badge overlay-root "Liq. Price")
+          liq-chip (find-liquidation-price-chip overlay-root)
+          liq-chip-text (some->> liq-chip
+                                 fake-dom/collect-text-content
+                                 (str/join " ")
+                                 str/trim)
           pnl-left (some-> pnl-badge .-style (aget "left") parse-px)
           liq-left (some-> liq-badge .-style (aget "left") parse-px)]
       (is (str/includes? text "PNL -$12.40 | 1.25"))
@@ -128,6 +139,8 @@
       (is (str/includes? text "$130"))
       (is (some? pnl-chip))
       (is (= "100" pnl-chip-text))
+      (is (some? liq-chip))
+      (is (= "130" liq-chip-text))
       (is (number? pnl-left))
       (is (number? liq-left))
       (is (<= 90 pnl-left 140) "PNL badge should stay inside readable zone, away from edges")
