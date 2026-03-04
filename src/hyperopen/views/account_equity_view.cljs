@@ -1,5 +1,6 @@
 (ns hyperopen.views.account-equity-view
   (:require [clojure.string :as str]
+            [hyperopen.account.context :as account-context]
             [hyperopen.views.account-info.projections :as account-projections]
             [hyperopen.utils.formatting :as fmt]))
 
@@ -131,13 +132,14 @@
                             :data-role "funding-action-withdraw"
                             :action [:actions/open-funding-withdraw-modal :event.currentTarget/bounds]})]])
 
-(defn- funding-actions-section []
-  [:div {:class ["space-y-2"
-                 "py-2.5"
-                 "border-y"
-                 "border-[#223b45]"]
-         :data-parity-id "funding-actions-section"}
-   (funding-actions-cluster)])
+(defn- funding-actions-section [ghost-mode-active?]
+  (when-not ghost-mode-active?
+    [:div {:class ["space-y-2"
+                   "py-2.5"
+                   "border-y"
+                   "border-[#223b45]"]
+           :data-parity-id "funding-actions-section"}
+     (funding-actions-cluster)]))
 
 (defn- unified-account? [state]
   (= :unified (get-in state [:account :mode])))
@@ -211,11 +213,13 @@
                                             maintenance-margin
                                             cross-margin-ratio
                                             cross-account-leverage
-                                            pnl-info]}]
+                                            pnl-info
+                                            ghost-mode-active?]}]
   [:div {:class ["bg-base-100" "rounded-none" "shadow-none" "p-3" "space-y-4" "w-full" "h-full"]
          :data-parity-id "account-equity"}
    [:div.text-sm.font-semibold.text-trading-text "Account Equity"]
-   (funding-actions-cluster)
+   (when-not ghost-mode-active?
+     (funding-actions-cluster))
 
    [:div.space-y-2
     (metric-row "Spot" (display-currency spot-equity))
@@ -239,10 +243,11 @@
                                              portfolio-value
                                              maintenance-margin
                                              unified-account-leverage
-                                             pnl-info]}]
+                                             pnl-info
+                                             ghost-mode-active?]}]
   [:div {:class ["bg-base-100" "rounded-none" "shadow-none" "p-3" "space-y-4" "w-full" "h-full"]
          :data-parity-id "account-equity"}
-   (funding-actions-section)
+   (funding-actions-section ghost-mode-active?)
    [:div.text-sm.font-semibold.text-trading-text "Unified Account Summary"]
    [:div.space-y-2
     (metric-row "Unified Account Ratio" (display-percent unified-account-ratio)
@@ -257,7 +262,8 @@
                 :tooltip "Total Perps Positions Value / Portfolio Value.")]])
 
 (defn account-equity-view [state]
-  (let [metrics (derive-account-equity-metrics state)]
+  (let [metrics (derive-account-equity-metrics state)
+        ghost-mode-active? (account-context/ghost-mode-active? state)]
     (if (unified-account? state)
-      (unified-account-summary-view metrics)
-      (classic-account-equity-view metrics))))
+      (unified-account-summary-view (assoc metrics :ghost-mode-active? ghost-mode-active?))
+      (classic-account-equity-view (assoc metrics :ghost-mode-active? ghost-mode-active?)))))

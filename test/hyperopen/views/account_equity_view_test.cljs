@@ -139,6 +139,53 @@
     (is (number? summary-index))
     (is (< funding-index summary-index))))
 
+(deftest unified-account-summary-hides-funding-actions-while-ghost-mode-active-test
+  (let [view-node (view/account-equity-view {:account {:mode :unified}
+                                             :account-context {:ghost-mode {:active? true
+                                                                           :address "0x1234567890abcdef1234567890abcdef12345678"}}
+                                             :webdata2 {:clearinghouseState {:marginSummary {:accountValue "204.45"
+                                                                                              :totalNtlPos "0.0"
+                                                                                              :totalRawUsd "204.45"
+                                                                                              :totalMarginUsed "0.0"}
+                                                                              :crossMarginSummary {:accountValue "204.45"
+                                                                                                   :totalNtlPos "0.0"
+                                                                                                   :totalRawUsd "204.45"
+                                                                                                   :totalMarginUsed "0.0"}
+                                                                              :crossMaintenanceMarginUsed "0.0"
+                                                                              :assetPositions []}}
+                                             :spot {}
+                                             :perp-dex-clearinghouse {}})
+        funding-section (find-first-node view-node #(= "funding-actions-section"
+                                                       (:data-parity-id (node-attrs %))))
+        deposit-button (find-first-node view-node #(= "funding-action-deposit"
+                                                      (:data-role (node-attrs %))))
+        transfer-button (find-first-node view-node #(= "funding-action-transfer"
+                                                       (:data-role (node-attrs %))))
+        withdraw-button (find-first-node view-node #(= "funding-action-withdraw"
+                                                       (:data-role (node-attrs %))))]
+    (is (nil? funding-section))
+    (is (nil? deposit-button))
+    (is (nil? transfer-button))
+    (is (nil? withdraw-button))
+    (is (some? (find-first-node view-node #(contains? (direct-texts %) "Unified Account Summary"))))))
+
+(deftest classic-account-equity-hides-funding-actions-while-ghost-mode-active-test
+  (let [view-node (view/account-equity-view {:account-context {:ghost-mode {:active? true
+                                                                            :address "0x1234567890abcdef1234567890abcdef12345678"}}
+                                             :webdata2 {}
+                                             :spot {}
+                                             :perp-dex-clearinghouse {}})
+        deposit-button (find-first-node view-node #(= "funding-action-deposit"
+                                                      (:data-role (node-attrs %))))
+        transfer-button (find-first-node view-node #(= "funding-action-transfer"
+                                                       (:data-role (node-attrs %))))
+        withdraw-button (find-first-node view-node #(= "funding-action-withdraw"
+                                                       (:data-role (node-attrs %))))]
+    (is (nil? deposit-button))
+    (is (nil? transfer-button))
+    (is (nil? withdraw-button))
+    (is (some? (find-first-node view-node #(contains? (direct-texts %) "Account Equity"))))))
+
 (deftest unified-account-summary-falls-back-to-placeholders-test
   (let [view-node (view/account-equity-view {:account {:mode :unified}
                                              :webdata2 {}

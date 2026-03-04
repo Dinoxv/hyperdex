@@ -1,6 +1,5 @@
 (ns hyperopen.views.trade.order-form-view.metrics-and-submit-test
   (:require [cljs.test :refer-macros [deftest is]]
-            [hyperopen.account.context :as account-context]
             [hyperopen.state.trading :as trading]
             [hyperopen.views.trade.order-form.test-support :refer [base-state
                                                                    button-node-by-click-action
@@ -191,6 +190,7 @@
                   (assoc :account-context {:ghost-mode {:active? true
                                                         :address "0x1234567890abcdef1234567890abcdef12345678"}}))
         view-node (view/order-form-view state)
+        submit-button (button-node-by-click-action view-node :actions/submit-order)
         stop-button (button-node-by-click-action view-node :actions/stop-ghost-mode)
         stop-container (find-first-node view-node
                                         (fn [node]
@@ -200,9 +200,9 @@
                                  (fn [node]
                                    (let [attrs (when (map? (second node)) (second node))
                                          classes (set (:class attrs))]
-                                     (contains? classes "order-submit-tooltip"))))
-        tooltip-strings (set (collect-strings tooltip))]
+                                     (contains? classes "order-submit-tooltip"))))]
+    (is (nil? submit-button))
     (is (some? stop-button))
     (is (some? stop-container))
     (is (contains? (set (collect-strings stop-container)) "Stop Ghost Mode"))
-    (is (contains? tooltip-strings account-context/ghost-mode-read-only-message))))
+    (is (nil? tooltip))))

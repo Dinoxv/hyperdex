@@ -882,9 +882,10 @@
       (when ghost-mode-read-only?
         (ghost-mode-stop-affordance))
 
-      (submit-row {:submitting? submitting?
-                   :submit-disabled? (:disabled? submit)
-                   :submit-tooltip (:tooltip submit)
-                   :on-submit (:on-submit submit-handlers)})
+      (when-not ghost-mode-read-only?
+        (submit-row {:submitting? submitting?
+                     :submit-disabled? (:disabled? submit)
+                     :submit-tooltip (:tooltip submit)
+                     :on-submit (:on-submit submit-handlers)}))
 
       (footer-metrics display show-liquidation-row? show-slippage-row? fee-copy)]]))
