@@ -37,6 +37,11 @@ A contributor can verify success by confirming the monolith file is reduced to f
 - [x] (2026-03-04 03:13Z) Added wallet facade parity assertions in `/hyperopen/test/hyperopen/runtime/effect_adapters_test.cljs`.
 - [x] (2026-03-04 03:14Z) Re-ran required gates after wallet extraction: `npm run check`, `npm test`, `npm run test:websocket` (all green).
 - [ ] Milestone 3: Extract wallet + order adapters into dedicated namespaces (completed: wallet extraction in `hyperopen-63a.4`; remaining: order extraction in `hyperopen-63a.5`).
+- [x] (2026-03-04 03:35Z) Extracted order adapters into `/hyperopen/src/hyperopen/runtime/effect_adapters/order.cljs` (order-feedback toast lifecycle + order API submit/cancel/TPSL/margin wrappers + make-api factories).
+- [x] (2026-03-04 03:35Z) Delegated facade order APIs from `/hyperopen/src/hyperopen/runtime/effect_adapters.cljs` to `order` module, while preserving private order-toast collaborators used by wallet disconnect and funding/vault submit toasts.
+- [x] (2026-03-04 03:35Z) Added order facade parity assertions in `/hyperopen/test/hyperopen/runtime/effect_adapters_test.cljs`.
+- [x] (2026-03-04 03:36Z) Re-ran required gates after order extraction: `npm run check`, `npm test`, `npm run test:websocket` (all green).
+- [x] Milestone 3: Extract wallet + order adapters into dedicated namespaces.
 - [ ] Milestone 4: Extract funding + vault adapters into dedicated namespaces.
 - [ ] Milestone 5: Decompose tests by subdomain, add facade contract assertions, and run required gates.
 
@@ -81,9 +86,13 @@ A contributor can verify success by confirming the monolith file is reduced to f
   Rationale: `disconnect-wallet` performs cross-domain cleanup (wallet copy timeout + order toast timeout/clear). Keeping a facade wrapper allows wallet module reuse while preserving explicit collaborator injection for order-toast cleanup without introducing wallet->order coupling.
   Date/Author: 2026-03-04 / Codex
 
+- Decision: Expose order-toast lifecycle helpers from `order` module and keep facade-private aliases for cross-domain callers.
+  Rationale: Funding/vault submit adapters and wallet disconnect currently rely on order toast collaborators; private facade aliases preserve existing call sites while removing order implementation logic from the monolith.
+  Date/Author: 2026-03-04 / Codex
+
 ## Outcomes & Retrospective
 
-Four extraction slices are complete: subdomain scaffold + shared helper seam (`common`), websocket/diagnostics seam (`websocket`), asset-selector seam (`asset_selector`), and wallet seam (`wallet`). The facade now delegates most websocket, asset-selector, and wallet behavior while preserving compatibility exports and override seams. Remaining work is concentrated in order and funding/vault extraction milestones.
+Five extraction slices are complete: subdomain scaffold + shared helper seam (`common`), websocket/diagnostics seam (`websocket`), asset-selector seam (`asset_selector`), wallet seam (`wallet`), and order seam (`order`). The facade now delegates most websocket, asset-selector, wallet, and order behavior while preserving compatibility exports and override seams. Remaining work is concentrated in funding/vault extraction and test decomposition milestones.
 
 ## Context and Orientation
 

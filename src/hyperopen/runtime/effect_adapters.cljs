@@ -4,12 +4,11 @@
             [hyperopen.api.default :as api]
             [hyperopen.api.projections :as api-projections]
             [hyperopen.account.history.effects :as account-history-effects]
-            [hyperopen.order.effects :as order-effects]
-            [hyperopen.order.feedback-runtime :as order-feedback-runtime]
             [hyperopen.funding.history-cache :as funding-cache]
             [hyperopen.funding.predictability :as funding-predictability]
             [hyperopen.runtime.effect-adapters.asset-selector :as asset-adapters]
             [hyperopen.runtime.effect-adapters.common :as common]
+            [hyperopen.runtime.effect-adapters.order :as order-adapters]
             [hyperopen.runtime.effect-adapters.wallet :as wallet-adapters]
             [hyperopen.runtime.effect-adapters.websocket :as ws-adapters]
             [hyperopen.runtime.api-effects :as api-effects]
@@ -118,36 +117,11 @@
 
 (def connect-wallet wallet-adapters/connect-wallet)
 
-(defn- set-order-feedback-toast! [store kind message]
-  (order-feedback-runtime/set-order-feedback-toast! store kind message))
+(def ^:private clear-order-feedback-toast! order-adapters/clear-order-feedback-toast!)
 
-(defn- clear-order-feedback-toast! [store]
-  (order-feedback-runtime/clear-order-feedback-toast! store))
+(def ^:private clear-order-feedback-toast-timeout! order-adapters/clear-order-feedback-toast-timeout!)
 
-(defn- clear-order-feedback-toast-timeout!
-  [runtime]
-  (order-feedback-runtime/clear-order-feedback-toast-timeout-in-runtime!
-   runtime
-   platform/clear-timeout!))
-
-(defn- schedule-order-feedback-toast-clear! [runtime store]
-  (order-feedback-runtime/schedule-order-feedback-toast-clear!
-   {:store store
-    :runtime runtime
-    :clear-order-feedback-toast! clear-order-feedback-toast!
-    :clear-order-feedback-toast-timeout! #(clear-order-feedback-toast-timeout! runtime)
-    :order-feedback-toast-duration-ms runtime-state/order-feedback-toast-duration-ms
-    :set-timeout-fn platform/set-timeout!}))
-
-(defn- show-order-feedback-toast!
-  ([store kind message]
-   (show-order-feedback-toast! runtime-state/runtime store kind message))
-  ([runtime store kind message]
-   (order-feedback-runtime/show-order-feedback-toast!
-    store
-    kind
-    message
-    #(schedule-order-feedback-toast-clear! runtime %))))
+(def ^:private show-order-feedback-toast! order-adapters/show-order-feedback-toast!)
 
 (defn disconnect-wallet
   ([_ store]
@@ -195,60 +169,21 @@
 
 (def ^:private runtime-error-message common/runtime-error-message)
 
-(defn- order-api-effect-deps
-  ([]
-   (order-api-effect-deps runtime-state/runtime))
-  ([runtime]
-   {:dispatch! nxr/dispatch
-    :exchange-response-error exchange-response-error
-    :prune-canceled-open-orders-fn order-effects/prune-canceled-open-orders
-    :runtime-error-message runtime-error-message
-    :show-toast! (fn [store kind message]
-                   (show-order-feedback-toast! runtime store kind message))}))
+(def api-submit-order order-adapters/api-submit-order)
 
-(defn api-submit-order
-  ([ctx store request]
-   (api-submit-order runtime-state/runtime ctx store request))
-  ([runtime ctx store request]
-   (order-effects/api-submit-order (order-api-effect-deps runtime) ctx store request)))
+(def api-cancel-order order-adapters/api-cancel-order)
 
-(defn api-cancel-order
-  ([ctx store request]
-   (api-cancel-order runtime-state/runtime ctx store request))
-  ([runtime ctx store request]
-   (order-effects/api-cancel-order (order-api-effect-deps runtime) ctx store request)))
+(def api-submit-position-tpsl order-adapters/api-submit-position-tpsl)
 
-(defn api-submit-position-tpsl
-  ([ctx store request]
-   (api-submit-position-tpsl runtime-state/runtime ctx store request))
-  ([runtime ctx store request]
-   (order-effects/api-submit-position-tpsl (order-api-effect-deps runtime) ctx store request)))
+(def api-submit-position-margin order-adapters/api-submit-position-margin)
 
-(defn api-submit-position-margin
-  ([ctx store request]
-   (api-submit-position-margin runtime-state/runtime ctx store request))
-  ([runtime ctx store request]
-   (order-effects/api-submit-position-margin (order-api-effect-deps runtime) ctx store request)))
+(def make-api-submit-order order-adapters/make-api-submit-order)
 
-(defn make-api-submit-order
-  [runtime]
-  (fn [ctx store request]
-    (api-submit-order runtime ctx store request)))
+(def make-api-cancel-order order-adapters/make-api-cancel-order)
 
-(defn make-api-cancel-order
-  [runtime]
-  (fn [ctx store request]
-    (api-cancel-order runtime ctx store request)))
+(def make-api-submit-position-tpsl order-adapters/make-api-submit-position-tpsl)
 
-(defn make-api-submit-position-tpsl
-  [runtime]
-  (fn [ctx store request]
-    (api-submit-position-tpsl runtime ctx store request)))
-
-(defn make-api-submit-position-margin
-  [runtime]
-  (fn [ctx store request]
-    (api-submit-position-margin runtime ctx store request)))
+(def make-api-submit-position-margin order-adapters/make-api-submit-position-margin)
 
 (defn- funding-predictability-path
   [bucket coin]

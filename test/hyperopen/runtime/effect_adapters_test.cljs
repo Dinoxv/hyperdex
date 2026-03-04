@@ -7,6 +7,7 @@
             [hyperopen.runtime.effect-adapters.asset-selector :as asset-adapters]
             [hyperopen.runtime.effect-adapters :as effect-adapters]
             [hyperopen.runtime.effect-adapters.common :as common]
+            [hyperopen.runtime.effect-adapters.order :as order-adapters]
             [hyperopen.runtime.effect-adapters.wallet :as wallet-adapters]
             [hyperopen.runtime.effect-adapters.websocket :as ws-adapters]
             [hyperopen.test-support.async :as async-support]
@@ -69,6 +70,16 @@
   (is (identical? wallet-adapters/set-agent-storage-mode effect-adapters/set-agent-storage-mode))
   (is (identical? wallet-adapters/copy-wallet-address effect-adapters/copy-wallet-address))
   (is (identical? wallet-adapters/make-copy-wallet-address effect-adapters/make-copy-wallet-address)))
+
+(deftest facade-order-adapters-delegate-to-order-module-test
+  (is (identical? order-adapters/api-submit-order effect-adapters/api-submit-order))
+  (is (identical? order-adapters/api-cancel-order effect-adapters/api-cancel-order))
+  (is (identical? order-adapters/api-submit-position-tpsl effect-adapters/api-submit-position-tpsl))
+  (is (identical? order-adapters/api-submit-position-margin effect-adapters/api-submit-position-margin))
+  (is (identical? order-adapters/make-api-submit-order effect-adapters/make-api-submit-order))
+  (is (identical? order-adapters/make-api-cancel-order effect-adapters/make-api-cancel-order))
+  (is (identical? order-adapters/make-api-submit-position-tpsl effect-adapters/make-api-submit-position-tpsl))
+  (is (identical? order-adapters/make-api-submit-position-margin effect-adapters/make-api-submit-position-margin)))
 
 (deftest subscribe-active-asset-persists-through-local-storage-effect-boundary-test
   (let [persist-calls (atom [])
