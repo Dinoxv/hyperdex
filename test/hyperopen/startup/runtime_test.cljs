@@ -224,7 +224,8 @@
         dispatch-calls (atom [])
         store (atom {:positions-ui {:tpsl-modal {:open? true}
                                     :reduce-popover {:open? true}
-                                    :margin-modal {:open? true}}})
+                                    :margin-modal {:open? true}}
+                     :account-context {:ghost-ui {:modal-open? true}}})
         dispatch! (fn [store-arg _ctx effects]
                     (swap! dispatch-calls conj {:store store-arg
                                                 :effects effects}))
@@ -246,6 +247,12 @@
         inside-margin-trigger-target #js {:closest (fn [selector]
                                                      (when (= selector "[data-position-margin-trigger='true']")
                                                        #js {}))}
+        inside-ghost-panel-target #js {:closest (fn [selector]
+                                                  (when (= selector "[data-ghost-mode-surface='true']")
+                                                    #js {}))}
+        inside-ghost-trigger-target #js {:closest (fn [selector]
+                                                    (when (= selector "[data-ghost-mode-trigger='true']")
+                                                      #js {}))}
         outside-target #js {:closest (fn [_selector] nil)}]
     (with-global-property
       "window"
@@ -265,16 +272,20 @@
           (mousedown-handler #js {:target inside-reduce-trigger-target})
           (mousedown-handler #js {:target inside-margin-panel-target})
           (mousedown-handler #js {:target inside-margin-trigger-target})
+          (mousedown-handler #js {:target inside-ghost-panel-target})
+          (mousedown-handler #js {:target inside-ghost-trigger-target})
           (is (empty? @dispatch-calls))
           (mousedown-handler #js {:target outside-target})
           (is (= [[:actions/close-position-tpsl-modal]
                   [:actions/close-position-reduce-popover]
-                  [:actions/close-position-margin-modal]]
+                  [:actions/close-position-margin-modal]
+                  [:actions/close-ghost-mode-modal]]
                  (-> @dispatch-calls first :effects)))
           (reset! dispatch-calls [])
           (swap! store assoc-in [:positions-ui :tpsl-modal :open?] false)
           (swap! store assoc-in [:positions-ui :reduce-popover :open?] false)
           (swap! store assoc-in [:positions-ui :margin-modal :open?] false)
+          (swap! store assoc-in [:account-context :ghost-ui :modal-open?] false)
           (mousedown-handler #js {:target outside-target})
           (is (empty? @dispatch-calls))
           (startup-runtime/install-position-tpsl-clickaway!

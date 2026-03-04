@@ -78,6 +78,7 @@
     (is (= false (get-in state [:account-context :ghost-mode :active?])))
     (is (nil? (get-in state [:account-context :ghost-mode :address])))
     (is (= false (get-in state [:account-context :ghost-ui :modal-open?])))
+    (is (nil? (get-in state [:account-context :ghost-ui :anchor])))
     (is (= "" (get-in state [:account-context :ghost-ui :search])))
     (is (= "" (get-in state [:account-context :ghost-ui :last-search])))
     (is (nil? (get-in state [:account-context :ghost-ui :search-error])))

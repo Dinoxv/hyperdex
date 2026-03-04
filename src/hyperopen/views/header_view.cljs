@@ -225,7 +225,8 @@
                      "transition-colors"
                      "hover:bg-base-200"
                      "focus:outline-none"]
-             :on {:click [[:actions/open-ghost-mode-modal]]}
+             :on {:click [[:actions/open-ghost-mode-modal :event.currentTarget/bounds]]}
+             :data-ghost-mode-trigger "true"
              :data-role "wallet-menu-open-ghost-mode"}
     (if ghost-active? "Manage Ghost Mode" "Open Ghost Mode")]
    (when ghost-active?
@@ -320,7 +321,8 @@
                             "bg-base-100"
                             "text-white"
                             "hover:bg-base-200"]))
-            :on {:click [[:actions/open-ghost-mode-modal]]}
+            :on {:click [[:actions/open-ghost-mode-modal :event.currentTarget/bounds]]}
+            :data-ghost-mode-trigger "true"
             :data-role "ghost-mode-open-button"}
    (ghost-mode-icon)
    [:span (if active? "Spectating" "Ghost Mode")]])

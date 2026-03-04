@@ -319,6 +319,16 @@
 (deftest assert-action-args-allows-ghost-mode-actions-with-or-without-address-test
   (is (= []
          (contracts/assert-action-args!
+          :actions/open-ghost-mode-modal
+          []
+          {:phase :test})))
+  (is (= [{:left 32 :right 96 :top 18 :bottom 52}]
+         (contracts/assert-action-args!
+          :actions/open-ghost-mode-modal
+          [{:left 32 :right 96 :top 18 :bottom 52}]
+          {:phase :test})))
+  (is (= []
+         (contracts/assert-action-args!
           :actions/start-ghost-mode
           []
           {:phase :test})))

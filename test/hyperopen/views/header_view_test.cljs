@@ -64,7 +64,7 @@
         ghost-mode-button (find-node-by-role view "ghost-mode-open-button")]
     (is (some? ghost-mode-button))
     (is (contains? (set (collect-strings ghost-mode-button)) "Ghost Mode"))
-    (is (= [[:actions/open-ghost-mode-modal]]
+    (is (= [[:actions/open-ghost-mode-modal :event.currentTarget/bounds]]
            (get-in ghost-mode-button [1 :on :click])))))
 
 (deftest wallet-menu-renders-copy-and-disconnect-controls-test

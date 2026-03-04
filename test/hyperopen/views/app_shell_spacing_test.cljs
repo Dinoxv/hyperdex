@@ -321,7 +321,7 @@
     (is (some? banner-node))
     (is (contains? (set (collect-strings banner-node)) "Ghost Mode"))
     (is (contains? (set (collect-strings banner-node)) "Currently spectating"))
-    (is (= [[:actions/open-ghost-mode-modal]]
+    (is (= [[:actions/open-ghost-mode-modal :event.currentTarget/bounds]]
            (get-in manage-button [1 :on :click])))
     (is (= [[:actions/stop-ghost-mode]]
            (get-in stop-button [1 :on :click])))))

@@ -6,6 +6,32 @@
 (def ^:private invalid-address-error
   "Enter a valid 0x-prefixed EVM address.")
 
+(def ^:private anchor-keys
+  [:left :right :top :bottom :width :height :viewport-width :viewport-height])
+
+(defn- parse-num
+  [value]
+  (cond
+    (number? value) value
+    (string? value) (let [text (str/trim value)
+                          parsed (js/parseFloat text)]
+                      (when (and (seq text)
+                                 (not (js/isNaN parsed)))
+                        parsed))
+    :else nil))
+
+(defn- normalize-anchor
+  [anchor]
+  (when (map? anchor)
+    (let [normalized (reduce (fn [acc key]
+                               (if-let [num (parse-num (get anchor key))]
+                                 (assoc acc key num)
+                                 acc))
+                             {}
+                             anchor-keys)]
+      (when (seq normalized)
+        normalized))))
+
 (defn- search-value
   [state]
   (or (get-in state [:account-context :ghost-ui :search]) ""))
@@ -31,18 +57,21 @@
     watchlist*]])
 
 (defn open-ghost-mode-modal
-  [state]
+  [state & [trigger-bounds]]
   (let [active-address (account-context/ghost-address state)
         search* (or active-address
                     (search-value state)
-                    "")]
+                    "")
+        anchor* (normalize-anchor trigger-bounds)]
     [[:effects/save-many [[[:account-context :ghost-ui :modal-open?] true]
+                          [[:account-context :ghost-ui :anchor] anchor*]
                           [[:account-context :ghost-ui :search] search*]
                           [[:account-context :ghost-ui :search-error] nil]]]]))
 
 (defn close-ghost-mode-modal
   [_state]
   [[:effects/save-many [[[:account-context :ghost-ui :modal-open?] false]
+                        [[:account-context :ghost-ui :anchor] nil]
                         [[:account-context :ghost-ui :search-error] nil]]]])
 
 (defn set-ghost-mode-search
@@ -61,6 +90,7 @@
                                   [[:account-context :ghost-mode :address] address*]
                                   [[:account-context :ghost-mode :started-at-ms] started-at-ms]
                                   [[:account-context :ghost-ui :modal-open?] false]
+                                  [[:account-context :ghost-ui :anchor] nil]
                                   [[:account-context :ghost-ui :search] address*]
                                   [[:account-context :ghost-ui :last-search] address*]
                                   [[:account-context :ghost-ui :search-error] nil]
@@ -77,6 +107,7 @@
                         [[:account-context :ghost-mode :address] nil]
                         [[:account-context :ghost-mode :started-at-ms] nil]
                         [[:account-context :ghost-ui :modal-open?] false]
+                        [[:account-context :ghost-ui :anchor] nil]
                         [[:account-context :ghost-ui :search-error] nil]]]])
 
 (defn add-ghost-mode-watchlist-address

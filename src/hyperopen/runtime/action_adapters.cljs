@@ -39,8 +39,8 @@
   (funding-actions/set-funding-modal-compat state modal))
 
 (defn open-ghost-mode-modal
-  [state]
-  (ghost-mode-actions/open-ghost-mode-modal state))
+  [state & [trigger-bounds]]
+  (ghost-mode-actions/open-ghost-mode-modal state trigger-bounds))
 
 (defn close-ghost-mode-modal
   [state]

@@ -315,6 +315,9 @@
 (s/def ::funding-modal-open-args
   (s/or :none ::no-args
         :anchor-only (s/tuple any?)))
+(s/def ::ghost-mode-open-args
+  (s/or :none ::no-args
+        :anchor-only (s/tuple any?)))
 (s/def ::ws-reset-source-args (s/or :none ::no-args
                                     :source (s/tuple ::source)))
 
@@ -330,7 +333,7 @@
    :actions/subscribe-to-webdata2 ::address-args
    :actions/connect-wallet ::no-args
    :actions/disconnect-wallet ::no-args
-   :actions/open-ghost-mode-modal ::no-args
+   :actions/open-ghost-mode-modal ::ghost-mode-open-args
    :actions/close-ghost-mode-modal ::no-args
    :actions/set-ghost-mode-search ::single-input-args
    :actions/start-ghost-mode ::optional-string-args

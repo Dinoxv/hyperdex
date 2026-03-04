@@ -224,7 +224,9 @@
        (some-> target (.closest "[data-position-reduce-surface='true']"))
        (some-> target (.closest "[data-position-reduce-trigger='true']"))
        (some-> target (.closest "[data-position-margin-surface='true']"))
-       (some-> target (.closest "[data-position-margin-trigger='true']")))))
+       (some-> target (.closest "[data-position-margin-trigger='true']"))
+       (some-> target (.closest "[data-ghost-mode-surface='true']"))
+       (some-> target (.closest "[data-ghost-mode-trigger='true']")))))
 
 (defn install-position-tpsl-clickaway!
   [{:keys [store dispatch!]}]
@@ -242,14 +244,16 @@
                       (let [tpsl-open? (true? (get-in @store [:positions-ui :tpsl-modal :open?]))
                             reduce-open? (true? (get-in @store [:positions-ui :reduce-popover :open?]))
                             margin-open? (true? (get-in @store [:positions-ui :margin-modal :open?]))
-                            any-open? (or tpsl-open? reduce-open? margin-open?)]
+                            ghost-mode-open? (true? (get-in @store [:account-context :ghost-ui :modal-open?]))
+                            any-open? (or tpsl-open? reduce-open? margin-open? ghost-mode-open?)]
                         (when any-open?
                           (let [target (event-target-with-closest event)]
                             (when-not (within-position-overlay-surface? target)
                               (let [close-actions (cond-> []
                                                     tpsl-open? (conj [:actions/close-position-tpsl-modal])
                                                     reduce-open? (conj [:actions/close-position-reduce-popover])
-                                                    margin-open? (conj [:actions/close-position-margin-modal]))]
+                                                    margin-open? (conj [:actions/close-position-margin-modal])
+                                                    ghost-mode-open? (conj [:actions/close-ghost-mode-modal]))]
                                 (when (seq close-actions)
                                   (dispatch! store nil close-actions))))))))]
         (.addEventListener window-object "mousedown" handler)

@@ -88,7 +88,7 @@
           ;; Install global keyboard shortcuts that should work regardless of focus target.
           (when (fn? install-asset-selector-shortcuts!)
             (install-asset-selector-shortcuts!))
-          ;; Install position overlay click-away behavior (TP/SL + Reduce) without blocking pointer interaction.
+          ;; Install click-away behavior for positioned overlays (TP/SL, Reduce, Margin, Ghost Mode).
           (when (fn? install-position-tpsl-clickaway!)
             (install-position-tpsl-clickaway!))
           ;; Register icon cache service worker for cross-reload symbol icon caching.

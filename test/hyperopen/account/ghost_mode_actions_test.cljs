@@ -12,15 +12,28 @@
 (def ^:private secondary-address
   "0x1111111111111111111111111111111111111111")
 
-(deftest open-ghost-mode-modal-prefills-active-address-test
+(deftest open-ghost-mode-modal-prefills-active-address-and-stores-anchor-test
   (let [state {:wallet {:address owner-address}
                :account-context {:ghost-mode {:active? true
                                               :address spectated-address}
                                  :ghost-ui {:search "0xdeadbeef"}}}]
     (is (= [[:effects/save-many [[[:account-context :ghost-ui :modal-open?] true]
+                                 [[:account-context :ghost-ui :anchor] {:left 100
+                                                                        :right 180
+                                                                        :top 18
+                                                                        :bottom 58
+                                                                        :viewport-width 1440
+                                                                        :viewport-height 900}]
                                  [[:account-context :ghost-ui :search] spectated-address]
                                  [[:account-context :ghost-ui :search-error] nil]]]]
-           (ghost-mode-actions/open-ghost-mode-modal state)))))
+           (ghost-mode-actions/open-ghost-mode-modal state
+                                                     {:left 100
+                                                      :right 180
+                                                      :top 18
+                                                      :bottom 58
+                                                      :viewport-width 1440
+                                                      :viewport-height 900
+                                                      :ignored "noop"})))))
 
 (deftest start-ghost-mode-persists-search-watchlist-and-active-state-test
   (with-redefs [platform/now-ms (fn [] 1710000000000)]
@@ -32,6 +45,7 @@
                                    [[:account-context :ghost-mode :address] spectated-address]
                                    [[:account-context :ghost-mode :started-at-ms] 1710000000000]
                                    [[:account-context :ghost-ui :modal-open?] false]
+                                   [[:account-context :ghost-ui :anchor] nil]
                                    [[:account-context :ghost-ui :search] spectated-address]
                                    [[:account-context :ghost-ui :last-search] spectated-address]
                                    [[:account-context :ghost-ui :search-error] nil]
@@ -70,6 +84,7 @@
                                [[:account-context :ghost-mode :address] nil]
                                [[:account-context :ghost-mode :started-at-ms] nil]
                                [[:account-context :ghost-ui :modal-open?] false]
+                               [[:account-context :ghost-ui :anchor] nil]
                                [[:account-context :ghost-ui :search-error] nil]]]]
          (ghost-mode-actions/stop-ghost-mode {})))
   (is (= []

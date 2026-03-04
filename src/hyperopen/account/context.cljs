@@ -64,6 +64,7 @@
                 :address nil
                 :started-at-ms nil}
    :ghost-ui {:modal-open? false
+              :anchor nil
               :search ""
               :last-search ""
               :search-error nil}

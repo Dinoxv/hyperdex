@@ -64,7 +64,8 @@
                            "transition-colors"
                            "hover:border-[#3e7478]"
                            "hover:text-[#e2f4f2]"]
-                   :on {:click [[:actions/open-ghost-mode-modal]]}
+                   :on {:click [[:actions/open-ghost-mode-modal :event.currentTarget/bounds]]}
+                   :data-ghost-mode-trigger "true"
                    :data-role "ghost-mode-banner-manage"}
           "Manage"]
          [:button {:type "button"
