@@ -3,11 +3,13 @@
             [hyperopen.api.trading :as trading-api]
             [hyperopen.funding.actions :as funding-actions]
             [hyperopen.funding.application.deposit-submit :as deposit-submit]
+            [hyperopen.funding.application.lifecycle-guards :as lifecycle-guards]
             [hyperopen.funding.application.hyperunit-submit :as hyperunit-submit]
             [hyperopen.funding.application.hyperunit-query :as hyperunit-query]
             [hyperopen.funding.application.lifecycle-polling :as lifecycle-polling]
             [hyperopen.funding.application.submit-effects :as submit-effects]
             [hyperopen.funding.domain.lifecycle :as funding-lifecycle]
+            [hyperopen.funding.domain.lifecycle-operations :as lifecycle-ops]
             [hyperopen.funding.infrastructure.erc20-rpc :as erc20-rpc]
             [hyperopen.funding.infrastructure.hyperunit-address-client :as hyperunit-address-client]
             [hyperopen.funding.infrastructure.hyperunit-client :as hyperunit-client]
@@ -319,24 +321,6 @@
     (string? value) (some-> value canonical-token keyword)
     :else nil))
 
-(defn- token->keyword
-  [value]
-  (let [text (some-> value
-                     canonical-token
-                     (str/replace #"([a-z0-9])([A-Z])" "$1-$2")
-                     (str/replace #"[^a-z0-9]+" "-")
-                     (str/replace #"(^-+)|(-+$)" ""))]
-    (when (seq text)
-      (keyword text))))
-
-(defn- timestamp->ms
-  [value]
-  (let [text (non-blank-text value)
-        parsed (if text (js/Date.parse text) js/NaN)]
-    (when (and (number? parsed)
-               (not (js/isNaN parsed)))
-      (js/Math.floor parsed))))
-
 (def request-hyperunit-operations!
   hyperunit-client/request-hyperunit-operations!)
 
@@ -349,126 +333,45 @@
 (def request-hyperunit-generate-address!
   hyperunit-client/request-hyperunit-generate-address!)
 
-(defn- lifecycle-poll-key
-  [store direction asset-key]
-  [store direction asset-key])
+(def ^:private lifecycle-poll-key
+  lifecycle-guards/lifecycle-poll-key)
 
 (defn- install-lifecycle-poll-token!
   [poll-key token]
-  (swap! hyperunit-lifecycle-poll-tokens assoc poll-key token))
+  (lifecycle-guards/install-lifecycle-poll-token!
+   hyperunit-lifecycle-poll-tokens
+   poll-key
+   token))
 
 (defn- clear-lifecycle-poll-token!
   [poll-key token]
-  (swap! hyperunit-lifecycle-poll-tokens
-         (fn [tokens]
-           (if (= token (get tokens poll-key))
-             (dissoc tokens poll-key)
-             tokens))))
+  (lifecycle-guards/clear-lifecycle-poll-token!
+   hyperunit-lifecycle-poll-tokens
+   poll-key
+   token))
 
 (defn- lifecycle-poll-token-active?
   [poll-key token]
-  (= token (get @hyperunit-lifecycle-poll-tokens poll-key)))
+  (lifecycle-guards/lifecycle-poll-token-active?
+   hyperunit-lifecycle-poll-tokens
+   poll-key
+   token))
 
-(defn- modal-active-for-lifecycle?
-  [store direction asset-key protocol-address]
-  (let [modal (get-in @store [:funding-ui :modal])
-        lifecycle (:hyperunit-lifecycle modal)
-        mode (:mode modal)
-        selected-asset-key (case direction
-                             :deposit (:deposit-selected-asset-key modal)
-                             :withdraw (:withdraw-selected-asset-key modal)
-                             nil)
-        generated-address (case direction
-                            :deposit (:deposit-generated-address modal)
-                            :withdraw (:withdraw-generated-address modal)
-                            nil)]
-    (and (true? (:open? modal))
-         (= mode direction)
-         (or (not= direction :deposit)
-             (= :amount-entry (:deposit-step modal)))
-         (= asset-key selected-asset-key)
-         (= direction (:direction lifecycle))
-         (= asset-key (:asset-key lifecycle))
-         (or (not (seq (canonical-token protocol-address)))
-             (= (canonical-token protocol-address)
-                (canonical-token generated-address))))))
+(def ^:private modal-active-for-lifecycle?
+  lifecycle-guards/modal-active-for-lifecycle?)
 
-(defn- modal-active-for-fee-estimate?
-  [store]
-  (let [modal (get-in @store [:funding-ui :modal])]
-    (and (true? (:open? modal))
-         (contains? #{:deposit :withdraw} (:mode modal)))))
-
-(defn- normalize-modal-asset-key
-  [value]
-  (cond
-    (keyword? value) value
-    (string? value) (some-> value str/trim str/lower-case keyword)
-    :else nil))
+(def ^:private modal-active-for-fee-estimate?
+  lifecycle-guards/modal-active-for-fee-estimate?)
 
 (defn- modal-active-for-withdraw-queue?
   ([store]
-   (modal-active-for-withdraw-queue? store nil))
+   (lifecycle-guards/modal-active-for-withdraw-queue? store))
   ([store expected-asset-key]
-   (let [modal (get-in @store [:funding-ui :modal])
-         selected-asset-key (normalize-modal-asset-key
-                             (:withdraw-selected-asset-key modal))
-         expected-asset-key* (normalize-modal-asset-key expected-asset-key)]
-     (and (true? (:open? modal))
-          (= :withdraw (:mode modal))
-          (keyword? selected-asset-key)
-          (not= :usdc selected-asset-key)
-          (or (nil? expected-asset-key*)
-              (= expected-asset-key* selected-asset-key))))))
+   (lifecycle-guards/modal-active-for-withdraw-queue? store expected-asset-key)))
 
-(defn- op-sort-ms
-  [op]
-  (or (timestamp->ms (:state-updated-at op))
-      (timestamp->ms (:state-started-at op))
-      (timestamp->ms (:op-created-at op))
-      0))
+(def ^:private op-sort-ms lifecycle-ops/op-sort-ms)
 
-(defn- select-operation
-  [operations {:keys [asset-key protocol-address source-address destination-address]}]
-  (let [asset-token (some-> asset-key name canonical-token)
-        protocol-token (canonical-token protocol-address)
-        source-token (canonical-token source-address)
-        destination-token (canonical-token destination-address)
-        for-asset (->> (or operations [])
-                       (filter (fn [op]
-                                 (= asset-token
-                                    (canonical-token (:asset op)))))
-                       vec)
-        protocol-matches (if (seq protocol-token)
-                           (filterv #(= protocol-token
-                                        (canonical-token (:protocol-address %)))
-                                    for-asset)
-                           [])
-        source-matches (if (seq source-token)
-                         (filterv #(= source-token
-                                      (canonical-token (:source-address %)))
-                                  for-asset)
-                         [])
-        destination-matches (if (seq destination-token)
-                              (filterv #(= destination-token
-                                           (canonical-token (:destination-address %)))
-                                       for-asset)
-                              [])
-        source-and-destination-matches (if (and (seq source-token)
-                                                (seq destination-token))
-                                         (filterv #(and (= source-token
-                                                         (canonical-token (:source-address %)))
-                                                        (= destination-token
-                                                           (canonical-token (:destination-address %))))
-                                                  for-asset)
-                                         [])
-        candidates (cond
-                     (seq protocol-matches) protocol-matches
-                     (seq source-and-destination-matches) source-and-destination-matches
-                     (seq source-matches) source-matches
-                     (seq destination-matches) destination-matches
-                     :else for-asset)]
-    (last (sort-by op-sort-ms candidates))))
+(def ^:private select-operation lifecycle-ops/select-operation)
 
 (defn- select-existing-hyperunit-deposit-address
   [operations-response source-chain asset destination-address]
@@ -510,53 +413,43 @@
 
 (defn- lifecycle-next-delay-ms
   [now-ms lifecycle]
-  (let [state-next-at (:state-next-at lifecycle)
-        next-delay (when (number? state-next-at)
-                     (max 0 (- state-next-at now-ms)))
-        base-delay (if (number? next-delay)
-                     next-delay
-                     hyperunit-operations-poll-default-delay-ms)]
-    (-> base-delay
-        (max hyperunit-operations-poll-min-delay-ms)
-        (min hyperunit-operations-poll-max-delay-ms)
-        js/Math.floor)))
+  (lifecycle-ops/lifecycle-next-delay-ms
+   {:default-delay-ms hyperunit-operations-poll-default-delay-ms
+    :min-delay-ms hyperunit-operations-poll-min-delay-ms
+    :max-delay-ms hyperunit-operations-poll-max-delay-ms}
+   now-ms
+   lifecycle))
 
 (defn- operation->lifecycle
   [operation direction asset-key now-ms]
-  (funding-lifecycle/normalize-hyperunit-lifecycle
-   {:direction direction
-    :asset-key asset-key
-    :operation-id (:operation-id operation)
-    :state (or (:state-key operation)
-               (token->keyword (:state operation)))
-    :status (token->keyword (:status operation))
-    :source-tx-confirmations (:source-tx-confirmations operation)
-    :destination-tx-confirmations (:destination-tx-confirmations operation)
-    :position-in-withdraw-queue (:position-in-withdraw-queue operation)
-    :destination-tx-hash (:destination-tx-hash operation)
-    :state-next-at (timestamp->ms (:state-next-attempt-at operation))
-    :last-updated-ms now-ms
-    :error (:error operation)}))
+  (lifecycle-ops/operation->lifecycle
+   funding-lifecycle/normalize-hyperunit-lifecycle
+   operation
+   direction
+   asset-key
+   now-ms))
 
 (defn- awaiting-lifecycle
   [direction asset-key now-ms]
-  (funding-lifecycle/normalize-hyperunit-lifecycle
-   {:direction direction
-    :asset-key asset-key
-    :status :pending
-    :state (if (= direction :withdraw)
-             :awaiting-hyperliquid-send
-             :awaiting-source-transfer)
-    :last-updated-ms now-ms
-    :error nil}))
+  (lifecycle-ops/awaiting-lifecycle
+   funding-lifecycle/normalize-hyperunit-lifecycle
+   direction
+   asset-key
+   now-ms))
 
 (defn- awaiting-deposit-lifecycle
   [asset-key now-ms]
-  (awaiting-lifecycle :deposit asset-key now-ms))
+  (lifecycle-ops/awaiting-deposit-lifecycle
+   funding-lifecycle/normalize-hyperunit-lifecycle
+   asset-key
+   now-ms))
 
 (defn- awaiting-withdraw-lifecycle
   [asset-key now-ms]
-  (awaiting-lifecycle :withdraw asset-key now-ms))
+  (lifecycle-ops/awaiting-withdraw-lifecycle
+   funding-lifecycle/normalize-hyperunit-lifecycle
+   asset-key
+   now-ms))
 
 (defn- fetch-hyperunit-withdrawal-queue!
   [opts]

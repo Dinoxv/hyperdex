@@ -46,8 +46,10 @@ The change will make the funding surface safer to extend: domain rules become pu
 - [x] (2026-03-03 23:58Z) Milestone 4 follow-up: extracted HyperUnit existing-address selection/prefetch and fee/withdrawal-queue fetch orchestration from `/hyperopen/src/hyperopen/funding/effects.cljs` into `/hyperopen/src/hyperopen/funding/application/hyperunit_query.cljs`, preserving private-var compatibility wrappers in `effects` for tests.
 - [x] (2026-03-03 23:58Z) Milestone 5 validation completed for hyperunit-query slice: `npx shadow-cljs compile app`, `npx shadow-cljs compile test`, `npm run check`, `npm test`, and `npm run test:websocket` all passed after extraction.
 - [x] (2026-03-03 23:59Z) Committed consolidated extraction slice as `1d7d18f` (`refactor(funding): split modal policy and hyperunit/deposit queries`).
+- [x] (2026-03-03) Milestone 4 follow-up: extracted residual lifecycle utility ownership from `/hyperopen/src/hyperopen/funding/effects.cljs` into `/hyperopen/src/hyperopen/funding/application/lifecycle_guards.cljs` (modal/poll-token guards) and `/hyperopen/src/hyperopen/funding/domain/lifecycle_operations.cljs` (operation selection, lifecycle conversion, delay policy), keeping private compatibility wrappers in `effects`.
+- [x] (2026-03-03) Milestone 5 validation completed for lifecycle-helper cleanup slice: `npm run check`, `npm test`, and `npm run test:websocket` all passed after extraction.
 - [ ] (2026-03-03 23:59Z) Milestone 6 remote sync blocked in this environment: `git pull --rebase`/`git push` failed with GitHub SSH auth (`Permission denied (publickey)`), and `bd dolt push` reported no configured Dolt remote (`origin` not found).
-- [ ] Milestone 4 remaining: optional final cleanup split for residual lifecycle/operation utility helpers still in `/hyperopen/src/hyperopen/funding/effects.cljs` (`select-operation`, polling token utilities, and lifecycle conversion helpers) if we want a strictly facade-only file.
+- [x] Milestone 4 optional cleanup completed: residual lifecycle/operation utility helpers (`select-operation`, polling token utilities, and lifecycle conversion helpers) were extracted and `funding/effects.cljs` now acts as a stricter facade (~834 LOC).
 - [ ] Milestone 6: Land tracking and governance updates (`bd`, optional ADR) and complete handoff.
 
 ## Surprises & Discoveries
@@ -113,8 +115,9 @@ Implemented first execution slice with behavior-preserving boundary extraction:
 - Remaining modal amount parsing, preview validation/request shaping, fee display formatting, and lifecycle status presentation policy now live in `funding.domain.policy`; `funding.application.modal-actions` is now mostly dependency wiring and compatibility wrappers.
 - Bridge2/LiFi/Across deposit transaction orchestration now lives in `funding.application.deposit-submit`, with `funding.effects` retaining wrapper seams and runtime-facing compatibility defaults.
 - HyperUnit existing-address selection/prefetch plus fee/withdrawal-queue fetch orchestration now lives in `funding.application.hyperunit-query`, with `funding.effects` keeping compatibility wrappers for tests that reference private vars.
+- Residual lifecycle polling guards/token registry and lifecycle operation selection/conversion utilities now live in `funding.application.lifecycle-guards` and `funding.domain.lifecycle-operations`; `funding.effects` delegates these through compatibility wrappers.
 
-Current gates are green (`npm run check`, `npm test`, `npm run test:websocket`), and runtime contracts remained stable. Remaining work is now mostly optional cleanup for residual lifecycle polling utility helpers in `funding.effects`.
+Current gates are green (`npm run check`, `npm test`, `npm run test:websocket`), and runtime contracts remained stable. Remaining work is now primarily Milestone 6 tracking/remote sync closure.
 
 ## Context and Orientation
 
