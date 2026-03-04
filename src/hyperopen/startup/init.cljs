@@ -22,6 +22,7 @@
            restore-portfolio-summary-time-range!
            restore-vaults-snapshot-range!
            restore-agent-storage-mode!
+           restore-ghost-mode-preferences!
            restore-active-asset!
            restore-asset-selector-markets-cache!
            restore-open-orders-sort-settings!
@@ -44,6 +45,8 @@
   (restore-vaults-snapshot-range! store)
   ;; Restore agent storage preference from localStorage.
   (restore-agent-storage-mode! store)
+  ;; Restore Ghost Mode watchlist and last-used modal search preference.
+  (restore-ghost-mode-preferences! store)
   ;; Restore selected asset from localStorage (default to BTC).
   (restore-active-asset! store)
   ;; Restore cached selector market symbols for immediate dropdown population.

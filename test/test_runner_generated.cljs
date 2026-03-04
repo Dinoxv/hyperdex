@@ -2,6 +2,7 @@
 ;; Do not edit by hand; run `node tools/generate-test-runner.mjs`.
 (ns test-runner-generated
   (:require [cljs.test :refer-macros [run-tests]]
+            [hyperopen.account.context-test]
             [hyperopen.account.history.actions-test]
             [hyperopen.account.history.effects-test]
             [hyperopen.account.history.position-margin-test]
@@ -116,6 +117,7 @@
             [hyperopen.schema.order-form-command-catalog-test]
             [hyperopen.startup.collaborators-test]
             [hyperopen.startup.init-test]
+            [hyperopen.startup.restore-test]
             [hyperopen.startup.runtime-test]
             [hyperopen.startup.watchers-test]
             [hyperopen.state.app-defaults-test]
@@ -277,7 +279,8 @@
 (defn run-generated-tests
   "Run all generated test namespaces and return the results."
   []
-  (run-tests 'hyperopen.account.history.actions-test
+  (run-tests 'hyperopen.account.context-test
+             'hyperopen.account.history.actions-test
              'hyperopen.account.history.effects-test
              'hyperopen.account.history.position-margin-test
              'hyperopen.account.history.position-tpsl-test
@@ -391,6 +394,7 @@
              'hyperopen.schema.order-form-command-catalog-test
              'hyperopen.startup.collaborators-test
              'hyperopen.startup.init-test
+             'hyperopen.startup.restore-test
              'hyperopen.startup.runtime-test
              'hyperopen.startup.watchers-test
              'hyperopen.state.app-defaults-test

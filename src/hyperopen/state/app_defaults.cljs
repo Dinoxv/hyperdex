@@ -2,6 +2,7 @@
   (:require [hyperopen.account.history.position-margin :as position-margin]
             [hyperopen.account.history.position-reduce :as position-reduce]
             [hyperopen.account.history.position-tpsl :as position-tpsl]
+            [hyperopen.account.context :as account-context]
             [hyperopen.funding.actions :as funding-actions]
             [hyperopen.i18n.locale :as i18n-locale]
             [hyperopen.platform :as platform]
@@ -286,6 +287,7 @@
           :error nil}
    :orders (default-orders-state)
    :wallet (default-wallet-state default-agent-state)
+   :account-context (account-context/default-account-context-state)
    :ui (default-ui-state)
    :account {:mode :classic
              :abstraction-raw nil}
