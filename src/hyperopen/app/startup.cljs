@@ -37,6 +37,7 @@
     :icon-service-worker-path runtime-state/icon-service-worker-path
     :per-dex-stagger-ms runtime-state/per-dex-stagger-ms
     :startup-stream-backfill-delay-ms runtime-state/startup-stream-backfill-delay-ms
+    :startup-funding-history-lookback-ms runtime-state/startup-funding-history-lookback-ms
     :schedule-idle-or-timeout! schedule-idle-or-timeout!
     :mark-performance! mark-performance!}))
 

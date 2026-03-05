@@ -18,6 +18,7 @@
                   :auto-fallback-on-health-degrade? true}
    :startup {:deferred-bootstrap-delay-ms 1200
              :stream-backfill-delay-ms 450
+             :funding-history-lookback-ms 604800000
              :per-dex-stagger-ms 120
              :startup-summary-delay-ms 5000}
    :diagnostics {:timeline-limit 50}

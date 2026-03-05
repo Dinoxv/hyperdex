@@ -7,6 +7,7 @@
 (deftest request-user-funding-history-paginates-forward-by-time-test
   (async done
     (let [calls (atom [])
+          delays (atom [])
           post-info! (api-stubs/post-info-body-stub
                       calls
                       (fn [body _opts]
@@ -31,16 +32,20 @@
                                                  "0xabc"
                                                  1000
                                                  5000
-                                                 {})
+                                                 {:wait-ms-fn (fn [delay-ms]
+                                                                (swap! delays conj delay-ms)
+                                                                (js/Promise.resolve nil))})
           (.then (fn [rows]
                    (is (= [3000 2000 1000] (mapv :time-ms rows)))
                    (is (= [1000 2001 3001] (mapv #(get % "startTime") @calls)))
+                   (is (= [1250 1250] @delays))
                    (done)))
           (.catch (async-support/unexpected-error done))))))
 
 (deftest request-user-funding-history-supports-wrapped-payloads-test
   (async done
-    (let [post-info! (api-stubs/post-info-stub
+    (let [delays (atom [])
+          post-info! (api-stubs/post-info-stub
                       (fn [body _opts]
                         (let [start-time (get body "startTime")]
                           (if (= start-time 0)
@@ -63,12 +68,44 @@
                                                  "0xabc"
                                                  0
                                                  5000
-                                                 {})
+                                                 {:wait-ms-fn (fn [delay-ms]
+                                                                (swap! delays conj delay-ms)
+                                                                (js/Promise.resolve nil))})
           (.then (fn [rows]
                    (is (= 1 (count rows)))
                    (is (= [{:time-ms 1000
                             :coin "HYPE"}]
                           rows))
+                   (is (= [1250] @delays))
+                   (done)))
+          (.catch (async-support/unexpected-error done))))))
+
+(deftest request-user-funding-history-adapts-page-delay-to-page-density-test
+  (async done
+    (let [delays (atom [])
+          post-info! (api-stubs/post-info-stub
+                      (fn [body _opts]
+                        (if (= 0 (get body "startTime"))
+                          [{:time-ms 0}
+                           {:time-ms 1}
+                           {:time-ms 2}
+                           {:time-ms 3}]
+                          [])))]
+      (-> (account/request-user-funding-history! post-info!
+                                                 identity
+                                                 identity
+                                                 "0xabc"
+                                                 0
+                                                 10
+                                                 {:user-funding-page-min-delay-ms 1000
+                                                  :user-funding-page-max-delay-ms 5000
+                                                  :user-funding-page-size 2
+                                                  :wait-ms-fn (fn [delay-ms]
+                                                                (swap! delays conj delay-ms)
+                                                                (js/Promise.resolve nil))})
+          (.then (fn [rows]
+                   (is (= 4 (count rows)))
+                   (is (= [2000] @delays))
                    (done)))
           (.catch (async-support/unexpected-error done))))))
 

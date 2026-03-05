@@ -47,6 +47,9 @@
 (def startup-stream-backfill-delay-ms
   (get-in config [:startup :stream-backfill-delay-ms]))
 
+(def startup-funding-history-lookback-ms
+  (get-in config [:startup :funding-history-lookback-ms]))
+
 (def startup-summary-delay-ms
   (get-in config [:startup :startup-summary-delay-ms]))
 

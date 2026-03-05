@@ -570,6 +570,14 @@
          (is (= 8 (count @stage-a-calls)))
          (is (= [:order-history 1 {:priority :low}]
                 (first @stage-a-calls)))
+         (let [fundings-call (first (filter #(= :fundings (first %)) @stage-a-calls))
+               fundings-opts (nth fundings-call 2)]
+           (is (map? fundings-opts))
+           (is (number? (:start-time-ms fundings-opts)))
+           (is (number? (:end-time-ms fundings-opts)))
+           (is (= :high (:priority fundings-opts)))
+           (is (<= (:start-time-ms fundings-opts)
+                   (:end-time-ms fundings-opts))))
          (is (= [["0xaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa" ["dex-a" "dex-b"]]] @stage-b-calls))
          (is (= "0xaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa" (:bootstrapped-address @startup-runtime-atom)))
          (is (= 1 (get-in @store [:account-info :order-history :request-id])))
@@ -753,12 +761,15 @@
           startup-runtime-atom (atom {:bootstrapped-address nil})]
       (with-redefs [platform/set-timeout! (fn [_f delay-ms]
                                             (swap! scheduled-delays conj delay-ms)
-                                            :timeout-id)]
+                                            :timeout-id)
+                    platform/now-ms (fn []
+                                      100000)]
         (startup-runtime/bootstrap-account-data!
          {:startup-runtime startup-runtime-atom
           :store store
           :address address
           :startup-stream-backfill-delay-ms 999
+          :startup-funding-history-lookback-ms 60000
           :fetch-frontend-open-orders! (fn [_store fetch-address opts]
                                          (swap! stage-a-calls conj [:open-orders fetch-address opts]))
           :fetch-user-fills! (fn [_store fetch-address opts]
@@ -784,6 +795,11 @@
          (is (some #(= :open-orders (first %)) @stage-a-calls))
          (is (some #(= :fills (first %)) @stage-a-calls))
          (is (some #(= :fundings (first %)) @stage-a-calls))
+         (is (some #(= [:fundings address {:priority :high
+                                           :start-time-ms 40000
+                                           :end-time-ms 100000}]
+                       %)
+                   @stage-a-calls))
          ;; Startup WS-first disabled means no delayed stream-backed fallback scheduling.
          (is (= [] @scheduled-delays))
          (done))
@@ -800,12 +816,15 @@
       (with-redefs [platform/set-timeout! (fn [f delay-ms]
                                             (swap! scheduled-delays conj delay-ms)
                                             (f)
-                                            :timeout-id)]
+                                            :timeout-id)
+                    platform/now-ms (fn []
+                                      100000)]
         (startup-runtime/bootstrap-account-data!
          {:startup-runtime startup-runtime-atom
           :store store
           :address address
           :startup-stream-backfill-delay-ms 123
+          :startup-funding-history-lookback-ms 60000
           :fetch-frontend-open-orders! (fn [_store fetch-address opts]
                                          (swap! stage-a-calls conj [:open-orders fetch-address opts]))
           :fetch-user-fills! (fn [_store fetch-address opts]
@@ -832,6 +851,11 @@
          (is (some #(= :open-orders (first %)) @stage-a-calls))
          (is (some #(= :fills (first %)) @stage-a-calls))
          (is (some #(= :fundings (first %)) @stage-a-calls))
+         (is (some #(= [:fundings address {:priority :high
+                                           :start-time-ms 40000
+                                           :end-time-ms 100000}]
+                       %)
+                   @stage-a-calls))
          (done))
        0))))
 

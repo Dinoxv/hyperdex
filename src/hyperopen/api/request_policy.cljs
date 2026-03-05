@@ -21,16 +21,43 @@
    :vault-details 8000
    :vault-webdata2 8000})
 
+(def ^:private default-user-funding-page-min-delay-ms
+  1250)
+
+(def ^:private default-user-funding-page-max-delay-ms
+  10000)
+
+(def ^:private default-user-funding-page-size
+  500)
+
+(defn- normalize-int-gte
+  [value floor]
+  (when (number? value)
+    (let [value* (js/Math.floor value)]
+      (when (>= value* floor)
+        value*))))
+
 (defn default-ttl-ms
   [request-kind]
   (get default-info-request-ttl-ms request-kind))
 
 (defn normalize-ttl-ms
   [value]
-  (when (number? value)
-    (let [value* (js/Math.floor value)]
-      (when (pos? value*)
-        value*))))
+  (normalize-int-gte value 1))
+
+(defn user-funding-pagination-policy
+  [opts]
+  (let [opts* (or opts {})
+        min-delay-ms (or (normalize-int-gte (:user-funding-page-min-delay-ms opts*) 1)
+                         default-user-funding-page-min-delay-ms)
+        max-delay-candidate (or (normalize-int-gte (:user-funding-page-max-delay-ms opts*) min-delay-ms)
+                                default-user-funding-page-max-delay-ms)
+        max-delay-ms (max min-delay-ms max-delay-candidate)
+        page-size (or (normalize-int-gte (:user-funding-page-size opts*) 1)
+                      default-user-funding-page-size)]
+    {:min-delay-ms min-delay-ms
+     :max-delay-ms max-delay-ms
+     :page-size page-size}))
 
 (defn apply-info-request-policy
   [request-kind opts]

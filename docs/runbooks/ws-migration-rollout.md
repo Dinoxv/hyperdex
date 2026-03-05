@@ -97,6 +97,8 @@ Operational notes:
 - Endpoint callers can override with `:cache-ttl-ms` per request.
 - Force bypass is available with `:force-refresh? true`.
 - Route/tab-inactive effects (funding comparison, vault detail/list, account order/funding history refresh) now skip fetch execution to reduce background churn.
+- `userFunding` pagination now applies conservative inter-page pacing (default floor `1250ms`) with adaptive scaling by page density (`:user-funding-page-min-delay-ms`, `:user-funding-page-max-delay-ms`, `:user-funding-page-size` opts in `/hyperopen/src/hyperopen/api/endpoints/account.cljs`).
+- Startup stage-A funding bootstrap now uses a bounded window (default `7d`) via `/hyperopen/src/hyperopen/config.cljs` `:startup :funding-history-lookback-ms` to avoid all-time cold-start backfill spikes.
 
 ## Monitoring and Signals
 

@@ -169,6 +169,24 @@
 (def ^:private default-startup-stream-backfill-delay-ms
   450)
 
+(def ^:private default-startup-funding-history-lookback-ms
+  (* 7 24 60 60 1000))
+
+(defn- normalize-startup-funding-history-lookback-ms
+  [value]
+  (if (number? value)
+    (max 0 (js/Math.floor value))
+    default-startup-funding-history-lookback-ms))
+
+(defn- startup-funding-history-request-opts
+  [startup-funding-history-lookback-ms]
+  (let [end-time-ms (platform/now-ms)
+        lookback-ms (normalize-startup-funding-history-lookback-ms
+                     startup-funding-history-lookback-ms)]
+    {:priority :high
+     :start-time-ms (max 0 (- end-time-ms lookback-ms))
+     :end-time-ms end-time-ms}))
+
 (defn- topic-usable-for-address?
   [store topic address]
   (when (and (some? store)
@@ -358,10 +376,14 @@
            ensure-perp-dexs!
            stage-b-account-bootstrap!
            startup-stream-backfill-delay-ms
+           startup-funding-history-lookback-ms
            log-fn]
     :as deps}]
   (when address
     (when-not (= address (:bootstrapped-address (startup-state deps)))
+      (let [funding-request-opts
+            (startup-funding-history-request-opts
+             startup-funding-history-lookback-ms)]
       (swap-startup-state! deps assoc :bootstrapped-address address)
       (swap! store assoc-in [:orders :open-orders-snapshot-by-dex] {})
       (swap! store assoc-in [:orders :fundings-raw] [])
@@ -412,16 +434,16 @@
           :address address
           :topic "userFundings"
           :fetch-fn fetch-and-merge-funding-history!
-          :opts {:priority :high}
+          :opts funding-request-opts
           :startup-stream-backfill-delay-ms startup-stream-backfill-delay-ms})
-        (fetch-and-merge-funding-history! store address {:priority :high}))
+        (fetch-and-merge-funding-history! store address funding-request-opts))
       ;; Stage B: low-priority, staggered per-dex data.
       (-> (ensure-perp-dexs! store {:priority :low})
           (.then (fn [dexs]
                    (stage-b-account-bootstrap! address
                                                (normalize-stage-b-dex-names dexs))))
           (.catch (fn [err]
-                    (log-fn "Error bootstrapping per-dex account data:" err)))))))
+                    (log-fn "Error bootstrapping per-dex account data:" err))))))))
 
 (defn install-address-handlers!
   [{:keys [store
