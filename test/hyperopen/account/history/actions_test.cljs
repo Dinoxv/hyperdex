@@ -187,13 +187,13 @@
 
 (deftest select-account-info-tab-order-history-uses-effective-address-for-freshness-test
   (with-redefs [platform/now-ms (constantly 100000)]
-    (let [shadow-address "0xdddddddddddddddddddddddddddddddddddddddd"
+    (let [spectate-address "0xdddddddddddddddddddddddddddddddddddddddd"
           state {:wallet {:address "0xaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"}
-                 :account-context {:shadow-mode {:active? true
-                                                :address shadow-address}}
+                 :account-context {:spectate-mode {:active? true
+                                                :address spectate-address}}
                  :account-info {:order-history {:loading? false
                                                 :loaded-at-ms 99000
-                                                :loaded-for-address shadow-address
+                                                :loaded-for-address spectate-address
                                                 :error nil}}}]
       (is (= [[:effects/save [:account-info :selected-tab] :order-history]]
              (history-actions/select-account-info-tab state :order-history))))))

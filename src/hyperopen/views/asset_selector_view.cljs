@@ -380,7 +380,7 @@
                                     highlighted-market-key)]
       [:div
        {:class ["absolute" "top-full" "left-0" "right-0" "mt-1" "bg-base-100"
-                "border" "border-base-300" "rounded-none" "shadow-none" "z-[220]" "isolate"]
+                "border" "border-base-300" "rounded-none" "spectate-none" "z-[220]" "isolate"]
         :on {:keydown [[:actions/handle-asset-selector-shortcut
                         [:event/key]
                         [:event/metaKey]

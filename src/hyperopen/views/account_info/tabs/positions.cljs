@@ -190,7 +190,7 @@
                      "leading-tight"
                      "text-gray-100"
                      "whitespace-normal"
-                     "shadow-lg"
+                     "spectate-lg"
                      "opacity-0"
                      "transition-opacity"
                      "duration-200"
@@ -445,7 +445,7 @@
       [:div {:class ["text-left" "relative"]}
        [:button {:class ["btn"
                          "btn-xs"
-                         "btn-shadow"
+                         "btn-spectate"
                          "w-full"
                          "justify-start"
                          "px-1"

@@ -297,7 +297,7 @@
                         "border"
                         "border-base-300"
                         "bg-base-100"
-                        "shadow-lg"
+                        "spectate-lg"
                         "z-30"]
                        (if open?
                          ["opacity-100" "scale-y-100" "translate-y-0"]
@@ -452,7 +452,7 @@
                       "border-base-300"
                       "bg-base-100"
                       "p-1"
-                      "shadow-lg"
+                      "spectate-lg"
                       "z-40"]}
         (if (seq candidates*)
           (for [option candidates*]
@@ -469,7 +469,7 @@
                      "border-base-300"
                      "bg-base-100/92"
                      "p-1.5"
-                     "shadow-md"]
+                     "spectate-md"]
              :data-role "portfolio-returns-benchmark-chip-rail"}
        [:div {:class ["flex" "flex-wrap" "items-center" "gap-1.5" "pr-1"]}
         (for [{:keys [value] :as option} chips]
@@ -686,7 +686,7 @@
                          "border"
                          "px-3"
                          "py-2"
-                         "shadow-lg"
+                         "spectate-lg"
                          "z-20"]
                  :data-role "portfolio-chart-hover-tooltip"
                  :style {:left (str hover-line-left-pct "%")
@@ -910,7 +910,7 @@
       "14 Day Volume"]
      [:div {:class ["num" "text-4xl" "font-medium" "text-trading-text"]}
       (format-compact-currency volume-14d-usd)]
-     [:button {:class ["btn" "btn-xs" "btn-shadow" "justify-start" "px-0" "text-trading-green" "hover:bg-transparent"]}
+     [:button {:class ["btn" "btn-xs" "btn-spectate" "justify-start" "px-0" "text-trading-green" "hover:bg-transparent"]}
       "View Volume"]])
    (section-card
     "portfolio-fees-card"
@@ -918,11 +918,11 @@
      [:div {:class ["flex" "items-center" "justify-between" "gap-2"]}
       [:span {:class ["text-sm" "text-trading-text-secondary"]}
        "Fees (Taker / Maker)"]
-      [:button {:class ["btn" "btn-shadow" "btn-xs" "text-trading-text"]}
+      [:button {:class ["btn" "btn-spectate" "btn-xs" "text-trading-text"]}
        "Perps"]]
      [:div {:class ["num" "text-4xl" "font-medium" "leading-tight" "text-trading-text"]}
       (str (format-fee-pct (:taker fees)) " / " (format-fee-pct (:maker fees)))]
-     [:button {:class ["btn" "btn-xs" "btn-shadow" "justify-start" "px-0" "text-trading-green" "hover:bg-transparent"]}
+     [:button {:class ["btn" "btn-xs" "btn-spectate" "justify-start" "px-0" "text-trading-green" "hover:bg-transparent"]}
       "View Fee Schedule"]])])
 
 (defn- header-actions []

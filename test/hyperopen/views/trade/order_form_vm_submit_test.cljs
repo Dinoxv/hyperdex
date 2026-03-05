@@ -7,9 +7,9 @@
          (vm-submit/submit-tooltip-message ["Size" "Price"] false nil nil)))
   (is (= "Load order book data before placing a market order."
          (vm-submit/submit-tooltip-message [] true nil nil)))
-  (is (= "Shadow Mode is read-only. Stop Shadow Mode to place trades or move funds."
-         (vm-submit/submit-tooltip-message [] false :shadow-mode-read-only
-                                           "Shadow Mode is read-only. Stop Shadow Mode to place trades or move funds.")))
+  (is (= "Spectate Mode is read-only. Stop Spectate Mode to place trades or move funds."
+         (vm-submit/submit-tooltip-message [] false :spectate-mode-read-only
+                                           "Spectate Mode is read-only. Stop Spectate Mode to place trades or move funds.")))
   (is (nil? (vm-submit/submit-tooltip-message [] false nil nil))))
 
 (deftest submit-tooltip-from-policy-delegates-to-message-rules-test
@@ -23,8 +23,8 @@
                                                 :market-price-missing? true
                                                 :reason :market-price-missing
                                                 :error-message nil})))
-  (is (= "Shadow Mode is read-only. Stop Shadow Mode to place trades or move funds."
+  (is (= "Spectate Mode is read-only. Stop Spectate Mode to place trades or move funds."
          (vm-submit/submit-tooltip-from-policy {:required-fields []
                                                 :market-price-missing? false
-                                                :reason :shadow-mode-read-only
-                                                :error-message "Shadow Mode is read-only. Stop Shadow Mode to place trades or move funds."}))))
+                                                :reason :spectate-mode-read-only
+                                                :error-message "Spectate Mode is read-only. Stop Spectate Mode to place trades or move funds."}))))

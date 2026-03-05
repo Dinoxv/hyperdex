@@ -24,7 +24,7 @@
        [:div
         {:class ["absolute" "left-0" "top-full" "mt-1" "w-[22rem]"
                  "bg-base-100" "opacity-100" "border" "border-base-300"
-                 "shadow-lg" "z-[120]" "isolate" "overflow-hidden"]}
+                 "spectate-lg" "z-[120]" "isolate" "overflow-hidden"]}
         [:div
          {:class ["flex" "items-center" "justify-between" "px-4" "py-3" "border-b" "border-base-300"]}
          [:h3 {:class ["text-white" "text-lg" "font-medium"]} "Indicators"]

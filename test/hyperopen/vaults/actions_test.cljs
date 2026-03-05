@@ -405,12 +405,12 @@
     (is (= "Deposits are disabled for this vault."
            (:display-message result)))))
 
-(deftest vault-transfer-submit-blocks-mutations-while-shadow-mode-active-test
+(deftest vault-transfer-submit-blocks-mutations-while-spectate-mode-active-test
   (let [vault-address "0x1234567890abcdef1234567890abcdef12345678"
         leader-address "0xabcdefabcdefabcdefabcdefabcdefabcdefabcd"
         state {:router {:path (str "/vaults/" vault-address)}
                :wallet {:address leader-address}
-               :account-context {:shadow-mode {:active? true
+               :account-context {:spectate-mode {:active? true
                                               :address "0x1234567890abcdef1234567890abcdef12345678"}}
                :vaults {:details-by-address {vault-address {:name "Vault Detail"
                                                             :leader leader-address
@@ -427,7 +427,7 @@
                                                   :error nil}}}]
     (is (= [[:effects/save-many [[[:vaults-ui :vault-transfer-modal :submitting?] false]
                                  [[:vaults-ui :vault-transfer-modal :error]
-                                  account-context/shadow-mode-read-only-message]]]]
+                                  account-context/spectate-mode-read-only-message]]]]
            (actions/submit-vault-transfer state)))))
 
 (deftest vault-transfer-preview-parses-localized-amount-input-test

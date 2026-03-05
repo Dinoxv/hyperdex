@@ -327,7 +327,7 @@
                       "border-[#1f3b3c]"
                       "bg-[#081f29]"
                       "p-1"
-                      "shadow-lg"
+                      "spectate-lg"
                       "z-40"]}
         (if (seq candidates*)
           (for [option candidates*]
@@ -344,7 +344,7 @@
                      "border-[#1f3b3c]"
                      "bg-[#081f29]"
                      "p-1.5"
-                     "shadow-md"]
+                     "spectate-md"]
              :data-role "vault-detail-returns-benchmark-chip-rail"}
        [:div {:class ["flex" "flex-wrap" "items-center" "gap-1.5" "pr-1"]}
         (for [{:keys [value] :as option} chips]
@@ -571,7 +571,7 @@
                          "border"
                          "px-3"
                          "py-2"
-                         "shadow-lg"
+                         "spectate-lg"
                          "z-20"]
                  :data-role "vault-detail-chart-hover-tooltip"
                  :style {:left (str hover-line-left-pct "%")

@@ -57,7 +57,7 @@
                            "left" ["right-full" "top-1/2" "-translate-y-1/2" "mr-2"]
                            "right" ["left-full" "top-1/2" "-translate-y-1/2" "ml-2"]))
             :style {:max-width "520px" :min-width "300px"}}
-      [:div.bg-gray-800.text-gray-100.text-xs.rounded-md.px-3.py-2.shadow-lg.leading-snug.whitespace-normal
+      [:div.bg-gray-800.text-gray-100.text-xs.rounded-md.px-3.py-2.spectate-lg.leading-snug.whitespace-normal
        text
        [:div {:class (into ["absolute" "w-0" "h-0" "border-4" "border-transparent"]
                            (case pos
@@ -104,13 +104,13 @@
                            ["border-[#58ded2]"
                             "bg-[#58ded2]"
                             "text-[#072b2f]"
-                            "shadow-[inset_0_1px_0_rgba(255,255,255,0.20)]"
+                            "spectate-[inset_0_1px_0_rgba(255,255,255,0.20)]"
                             "hover:border-[#69e5db]"
                             "hover:bg-[#69e5db]"]
                            ["border-[#32cdc2]"
                             "bg-[rgba(4,23,31,0.35)]"
                             "text-[#53ddd1]"
-                            "shadow-[inset_0_1px_0_rgba(255,255,255,0.08)]"
+                            "spectate-[inset_0_1px_0_rgba(255,255,255,0.08)]"
                             "hover:border-[#45d8ce]"
                             "hover:bg-[#0f2f36]"
                             "hover:text-[#76e9df]"]))
@@ -132,8 +132,8 @@
                             :data-role "funding-action-withdraw"
                             :action [:actions/open-funding-withdraw-modal :event.currentTarget/bounds]})]])
 
-(defn- funding-actions-section [shadow-mode-active?]
-  (when-not shadow-mode-active?
+(defn- funding-actions-section [spectate-mode-active?]
+  (when-not spectate-mode-active?
     [:div {:class ["space-y-2"
                    "py-2.5"
                    "border-y"
@@ -225,11 +225,11 @@
                                             cross-margin-ratio
                                             cross-account-leverage
                                             pnl-info
-                                            shadow-mode-active?]}]
-  [:div {:class ["bg-base-100" "rounded-none" "shadow-none" "p-3" "space-y-4" "w-full" "h-full"]
+                                            spectate-mode-active?]}]
+  [:div {:class ["bg-base-100" "rounded-none" "spectate-none" "p-3" "space-y-4" "w-full" "h-full"]
          :data-parity-id "account-equity"}
    [:div.text-sm.font-semibold.text-trading-text "Account Equity"]
-   (when-not shadow-mode-active?
+   (when-not spectate-mode-active?
      (funding-actions-cluster))
 
    [:div.space-y-2
@@ -257,10 +257,10 @@
                                              maintenance-margin
                                              unified-account-leverage
                                              pnl-info
-                                             shadow-mode-active?]}]
-  [:div {:class ["bg-base-100" "rounded-none" "shadow-none" "p-3" "space-y-4" "w-full" "h-full"]
+                                             spectate-mode-active?]}]
+  [:div {:class ["bg-base-100" "rounded-none" "spectate-none" "p-3" "space-y-4" "w-full" "h-full"]
          :data-parity-id "account-equity"}
-   (funding-actions-section shadow-mode-active?)
+   (funding-actions-section spectate-mode-active?)
    [:div.text-sm.font-semibold.text-trading-text "Unified Account Summary"]
    [:div.space-y-2
     (metric-row "Unified Account Value" (display-currency account-value-display)
@@ -276,7 +276,7 @@
 
 (defn account-equity-view [state]
   (let [metrics (derive-account-equity-metrics state)
-        shadow-mode-active? (account-context/shadow-mode-active? state)]
+        spectate-mode-active? (account-context/spectate-mode-active? state)]
     (if (unified-account? state)
-      (unified-account-summary-view (assoc metrics :shadow-mode-active? shadow-mode-active?))
-      (classic-account-equity-view (assoc metrics :shadow-mode-active? shadow-mode-active?)))))
+      (unified-account-summary-view (assoc metrics :spectate-mode-active? spectate-mode-active?))
+      (classic-account-equity-view (assoc metrics :spectate-mode-active? spectate-mode-active?)))))

@@ -7,7 +7,7 @@
             [hyperopen.account.history.effects-test]
             [hyperopen.account.history.position-margin-test]
             [hyperopen.account.history.position-tpsl-test]
-            [hyperopen.account.shadow-mode-actions-test]
+            [hyperopen.account.spectate-mode-actions-test]
             [hyperopen.api-test]
             [hyperopen.api.compat-test]
             [hyperopen.api.default-test]
@@ -289,7 +289,7 @@
              'hyperopen.account.history.effects-test
              'hyperopen.account.history.position-margin-test
              'hyperopen.account.history.position-tpsl-test
-             'hyperopen.account.shadow-mode-actions-test
+             'hyperopen.account.spectate-mode-actions-test
              'hyperopen.api-test
              'hyperopen.api.compat-test
              'hyperopen.api.default-test

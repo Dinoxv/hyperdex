@@ -1,8 +1,8 @@
-# Shadow Mode `/info` Sampling: userFunding + spotClearinghouseState (2026-03-05)
+# Spectate Mode `/info` Sampling: userFunding + spotClearinghouseState (2026-03-05)
 
 ## Scope
 
-Manual browser-inspection sampling on local branch `codex/ws-migration-manual-testing` for Shadow Mode address:
+Manual browser-inspection sampling on local branch `codex/ws-migration-manual-testing` for Spectate Mode address:
 
 - `0x162cc7c861ebd0c06b3d72319201150482518185`
 
@@ -22,7 +22,7 @@ Used browser-inspection live session against `http://localhost:8082/` and querie
 Runtime controls used during sampling:
 
 - reset counters via `reset_request_runtime_BANG_`
-- force Shadow Mode active with the target address
+- force Spectate Mode active with the target address
 - set Account Info selected tab to `:funding-history` for funding workflow coverage
 
 ## Results

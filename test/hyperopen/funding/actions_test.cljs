@@ -106,11 +106,11 @@
                        :toPerp false}}]]
            (funding-actions/submit-funding-transfer state-valid)))))
 
-(deftest submit-funding-actions-block-mutations-while-shadow-mode-active-test
+(deftest submit-funding-actions-block-mutations-while-spectate-mode-active-test
   (let [blocked-state (assoc (base-state)
-                             :account-context {:shadow-mode {:active? true
+                             :account-context {:spectate-mode {:active? true
                                                             :address "0x1234567890abcdef1234567890abcdef12345678"}})
-        blocked-message account-context/shadow-mode-read-only-message]
+        blocked-message account-context/spectate-mode-read-only-message]
     (is (= [[:effects/save-many [[[:funding-ui :modal :submitting?] false]
                                  [[:funding-ui :modal :error] blocked-message]]]]
            (funding-actions/submit-funding-transfer

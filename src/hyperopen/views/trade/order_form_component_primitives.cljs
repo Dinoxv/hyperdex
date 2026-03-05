@@ -26,7 +26,7 @@
    "focus-within:ring-1"
    "focus-within:ring-[#8a96a6]/40"
    "focus-within:ring-offset-0"
-   "focus-within:shadow-none"
+   "focus-within:spectate-none"
    "focus-within:border-[#8a96a6]"])
 
 (defn- dom-event-attr [event-id]

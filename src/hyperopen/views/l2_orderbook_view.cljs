@@ -221,7 +221,7 @@
                                                         :class (when dropdown-visible? "rotate-180")}
        [:path {:stroke-linecap "round" :stroke-linejoin "round" :stroke-width 2 :d "M19 9l-7 7-7-7"}]]]
      (when interactive?
-       [:div.absolute.top-full.left-0.mt-1.bg-base-100.border.border-base-300.rounded.shadow-lg.z-30.min-w-24.overflow-hidden
+       [:div.absolute.top-full.left-0.mt-1.bg-base-100.border.border-base-300.rounded.spectate-lg.z-30.min-w-24.overflow-hidden
         {:class (if dropdown-visible?
                   ["opacity-100" "scale-y-100" "translate-y-0"]
                   ["opacity-0" "scale-y-95" "-translate-y-2" "pointer-events-none"])
@@ -247,7 +247,7 @@
                                                         :viewBox "0 0 24 24"
                                                         :class (when dropdown-visible? "rotate-180")}
        [:path {:stroke-linecap "round" :stroke-linejoin "round" :stroke-width 2 :d "M19 9l-7 7-7-7"}]]]
-     [:div.absolute.top-full.right-0.mt-1.bg-base-100.border.border-base-300.rounded.shadow-lg.z-20.min-w-20.overflow-hidden
+     [:div.absolute.top-full.right-0.mt-1.bg-base-100.border.border-base-300.rounded.spectate-lg.z-20.min-w-20.overflow-hidden
       {:class (if dropdown-visible?
                 ["opacity-100" "scale-y-100" "translate-y-0"]
                 ["opacity-0" "scale-y-95" "-translate-y-2" "pointer-events-none"])

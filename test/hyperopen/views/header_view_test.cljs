@@ -59,13 +59,13 @@
     (is (= "Connect Wallet" (last connect-btn)))
     (is (nil? trigger))))
 
-(deftest header-renders-shadow-mode-trigger-button-test
+(deftest header-renders-spectate-mode-trigger-button-test
   (let [view (header-view/header-view {:wallet {:connected? false}})
-        shadow-mode-button (find-node-by-role view "shadow-mode-open-button")]
-    (is (some? shadow-mode-button))
-    (is (contains? (set (collect-strings shadow-mode-button)) "Shadow Mode"))
-    (is (= [[:actions/open-shadow-mode-modal :event.currentTarget/bounds]]
-           (get-in shadow-mode-button [1 :on :click])))))
+        spectate-mode-button (find-node-by-role view "spectate-mode-open-button")]
+    (is (some? spectate-mode-button))
+    (is (contains? (set (collect-strings spectate-mode-button)) "Spectate Mode"))
+    (is (= [[:actions/open-spectate-mode-modal :event.currentTarget/bounds]]
+           (get-in spectate-mode-button [1 :on :click])))))
 
 (deftest wallet-menu-renders-copy-and-disconnect-controls-test
   (let [view (header-view/header-view {:wallet {:connected? true
@@ -146,32 +146,32 @@
     (is (some? success-icon))
     (is (contains? text "Address copied to clipboard"))))
 
-(deftest wallet-menu-shows-active-shadow-state-when-spectating-test
-  (let [shadow-address "0xabcdefabcdefabcdefabcdefabcdefabcdefabcd"
-        shadow-state {:shadow-mode {:active? true
-                                  :address shadow-address
+(deftest wallet-menu-shows-active-spectate-state-when-spectating-test
+  (let [spectate-address "0xabcdefabcdefabcdefabcdefabcdefabcdefabcd"
+        spectate-state {:spectate-mode {:active? true
+                                  :address spectate-address
                                   :started-at-ms 1}
-                     :shadow-ui {:modal-open? false
-                                :search shadow-address
-                                :last-search shadow-address
+                     :spectate-ui {:modal-open? false
+                                :search spectate-address
+                                :last-search spectate-address
                                 :search-error nil}
-                     :watchlist [shadow-address]
+                     :watchlist [spectate-address]
                      :watchlist-loaded? true}
         view (header-view/header-view {:wallet {:connected? true
                                                 :address connected-address
                                                 :agent {:status :ready}}
-                                       :account-context shadow-state})
-        shadow-mode-button (find-node-by-role view "shadow-mode-open-button")
-        menu-open-shadow (find-node-by-role view "wallet-menu-open-shadow-mode")
-        shadow-active-row (find-node-by-role view "wallet-menu-shadow-active-address")
-        shadow-button-text (set (collect-strings shadow-mode-button))
-        menu-text (set (collect-strings menu-open-shadow))
-        active-text (set (collect-strings shadow-active-row))]
-    (is (true? (account-context/shadow-mode-active?
-                {:account-context shadow-state})))
-    (is (contains? shadow-button-text "Spectating"))
-    (is (contains? menu-text "Manage Shadow Mode"))
-    (is (contains? active-text (wallet/short-addr shadow-address)))))
+                                       :account-context spectate-state})
+        spectate-mode-button (find-node-by-role view "spectate-mode-open-button")
+        menu-open-spectate (find-node-by-role view "wallet-menu-open-spectate-mode")
+        spectate-active-row (find-node-by-role view "wallet-menu-spectate-active-address")
+        spectate-button-text (set (collect-strings spectate-mode-button))
+        menu-text (set (collect-strings menu-open-spectate))
+        active-text (set (collect-strings spectate-active-row))]
+    (is (true? (account-context/spectate-mode-active?
+                {:account-context spectate-state})))
+    (is (contains? spectate-button-text "Spectating"))
+    (is (contains? menu-text "Manage Spectate Mode"))
+    (is (contains? active-text (wallet/short-addr spectate-address)))))
 
 (deftest wallet-menu-class-attributes-are-tokenized-collections-test
   (let [view (header-view/header-view {:wallet {:connected? true

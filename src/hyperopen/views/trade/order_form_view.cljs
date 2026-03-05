@@ -139,7 +139,7 @@
                       "border-[#273035]"
                       "bg-[#1B2429]"
                       "p-1"
-                      "shadow-[0_10px_24px_rgba(0,0,0,0.35)]"]
+                      "spectate-[0_10px_24px_rgba(0,0,0,0.35)]"]
               :style {:z-index 1202}
               :role "listbox"
               :aria-label "Margin mode options"
@@ -211,7 +211,7 @@
                       "border-[#273035]"
                       "bg-[#1B2429]"
                       "p-1"
-                      "shadow-[0_10px_24px_rgba(0,0,0,0.35)]"]
+                      "spectate-[0_10px_24px_rgba(0,0,0,0.35)]"]
               :style {:z-index 1202}
               :role "listbox"
               :aria-label "Size unit options"
@@ -304,7 +304,7 @@
                       "border-base-300"
                       "bg-base-100"
                       "p-3"
-                      "shadow-[0_18px_36px_rgba(0,0,0,0.35)]"
+                      "spectate-[0_18px_36px_rgba(0,0,0,0.35)]"
                       "space-y-2.5"]
               :style {:z-index 1202}
               :role "dialog"
@@ -583,7 +583,7 @@
                     "py-2"
                     "text-xs"
                     "text-gray-200"
-                    "shadow-lg"
+                    "spectate-lg"
                     "opacity-0"
                     "translate-y-1"
                     "transition-all"
@@ -594,7 +594,7 @@
                     "group-focus:translate-y-0"]}
       submit-tooltip])])
 
-(defn- shadow-mode-icon
+(defn- spectate-mode-icon
   [size-classes]
   [:svg {:viewBox "0 0 24 24"
          :fill "none"
@@ -608,8 +608,8 @@
    [:path {:d "M15 10h.01"}]
    [:path {:d "M12 2a7 7 0 0 0-7 7v10l2-2 2 2 2-2 2 2 2-2 2 2V9a7 7 0 0 0-7-7z"}]])
 
-(defn- shadow-mode-stop-affordance []
-  [:div {:data-role "order-form-shadow-mode-stop"}
+(defn- spectate-mode-stop-affordance []
+  [:div {:data-role "order-form-spectate-mode-stop"}
    [:button {:type "button"
              :class ["flex"
                      "h-9"
@@ -631,11 +631,11 @@
                      "focus:ring-1"
                      "focus:ring-[#87c8c0]/40"
                      "focus:ring-offset-0"]
-             :on {:click [[:actions/stop-shadow-mode]]}
-             :data-role "order-form-shadow-mode-stop-button"}
+             :on {:click [[:actions/stop-spectate-mode]]}
+             :data-role "order-form-spectate-mode-stop-button"}
     [:span {:class ["inline-flex" "min-w-0" "items-center" "gap-2"]}
-     (shadow-mode-icon ["h-5" "w-5" "shrink-0"])
-     [:span {:class ["truncate"]} "Stop Shadow Mode"]]
+     (spectate-mode-icon ["h-5" "w-5" "shrink-0"])
+     [:span {:class ["truncate"]} "Stop Spectate Mode"]]
     [:span {:class ["shrink-0"
                     "rounded-[4px]"
                     "border"
@@ -808,13 +808,13 @@
                 show-liquidation-row?
                 show-slippage-row?]}
         controls
-        shadow-mode-read-only? (= :shadow-mode-read-only (:reason submit))
+        spectate-mode-read-only? (= :spectate-mode-read-only (:reason submit))
         tpsl-panel (tpsl-panel-model state form side ui-leverage controls)]
     [:div {:class ["bg-base-100"
                    "border"
                    "border-base-300"
                    "rounded-none"
-                   "shadow-none"
+                   "spectate-none"
                    "p-3"
                    "font-sans"
                    "min-h-[560px]"
@@ -905,10 +905,10 @@
       (when error
         [:div {:class ["text-xs" "text-red-400"]} error])
 
-      (when shadow-mode-read-only?
-        (shadow-mode-stop-affordance))
+      (when spectate-mode-read-only?
+        (spectate-mode-stop-affordance))
 
-      (when-not shadow-mode-read-only?
+      (when-not spectate-mode-read-only?
         (submit-row {:submitting? submitting?
                      :submit-disabled? (:disabled? submit)
                      :submit-tooltip (:tooltip submit)

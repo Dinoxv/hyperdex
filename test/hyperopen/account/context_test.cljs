@@ -43,29 +43,29 @@
             initial
             "0x2222222222222222222222222222222222222222")))))
 
-(deftest effective-account-address-prefers-shadow-when-active-test
+(deftest effective-account-address-prefers-spectate-when-active-test
   (let [owner "0x1111111111111111111111111111111111111111"
-        shadow "0x2222222222222222222222222222222222222222"]
-    (is (= shadow
+        spectate "0x2222222222222222222222222222222222222222"]
+    (is (= spectate
            (account-context/effective-account-address
             {:wallet {:address owner}
-             :account-context {:shadow-mode {:active? true
-                                            :address shadow}}})))
+             :account-context {:spectate-mode {:active? true
+                                            :address spectate}}})))
     (is (= owner
            (account-context/effective-account-address
             {:wallet {:address owner}
-             :account-context {:shadow-mode {:active? false
-                                            :address shadow}}})))
+             :account-context {:spectate-mode {:active? false
+                                            :address spectate}}})))
     (is (= owner
            (account-context/effective-account-address
             {:wallet {:address owner}
-             :account-context {:shadow-mode {:active? true
+             :account-context {:spectate-mode {:active? true
                                             :address "bad"}}})))))
 
-(deftest mutations-allowed-is-disabled-during-shadow-mode-test
+(deftest mutations-allowed-is-disabled-during-spectate-mode-test
   (is (false? (account-context/mutations-allowed?
-               {:account-context {:shadow-mode {:active? true
+               {:account-context {:spectate-mode {:active? true
                                                :address "0x1111111111111111111111111111111111111111"}}})))
   (is (true? (account-context/mutations-allowed?
-              {:account-context {:shadow-mode {:active? false
+              {:account-context {:spectate-mode {:active? false
                                               :address "0x1111111111111111111111111111111111111111"}}}))))

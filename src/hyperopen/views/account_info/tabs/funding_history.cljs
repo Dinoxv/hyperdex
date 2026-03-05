@@ -257,7 +257,7 @@
                   [:div {:class ["px-2" "py-1.5" "text-xs" "text-trading-text-secondary"]}
                    (or empty-message "No matching coins.")])])]]
           [:div {:class ["flex" "items-center" "justify-end" "gap-2" "md:col-span-2"]}
-           [:button {:class ["btn" "btn-xs" "btn-shadow" "h-8" "px-3" "text-xs" "font-medium" "min-w-[4.5rem]"]
+           [:button {:class ["btn" "btn-xs" "btn-spectate" "h-8" "px-3" "text-xs" "font-medium" "min-w-[4.5rem]"]
                      :on {:click [[:actions/reset-funding-history-filter-draft]]}}
            "Cancel"]
            [:button {:class ["btn" "btn-xs" "btn-primary" "h-8" "px-3" "text-xs" "font-medium" "min-w-[4.5rem]"]

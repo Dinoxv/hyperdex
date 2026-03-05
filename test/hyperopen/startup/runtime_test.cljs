@@ -181,7 +181,7 @@
         dispatch-calls (atom [])
         prevent-default-calls (atom 0)
         store (atom {:asset-selector {:visible-dropdown nil}
-                     :account-context {:shadow-mode {:active? false
+                     :account-context {:spectate-mode {:active? false
                                                     :address nil}}})
         dispatch! (fn [store-arg _ctx effects]
                     (swap! dispatch-calls conj {:store store-arg
@@ -206,7 +206,7 @@
           (is (= 1 @prevent-default-calls))
           (is (= [[:actions/handle-asset-selector-shortcut "k" true false nil]]
                  (-> @dispatch-calls first :effects)))
-          (swap! store assoc-in [:account-context :shadow-mode]
+          (swap! store assoc-in [:account-context :spectate-mode]
                  {:active? true
                   :address "0x1234567890abcdef1234567890abcdef12345678"})
           (keydown-handler #js {:key "x"
@@ -226,7 +226,7 @@
                                 :preventDefault (fn []
                                                   (swap! prevent-default-calls inc))})
           (is (= 2 @prevent-default-calls))
-          (is (= [[:actions/stop-shadow-mode]]
+          (is (= [[:actions/stop-spectate-mode]]
                  (-> @dispatch-calls second :effects)))
           (keydown-handler #js {:key "x"
                                 :metaKey true
@@ -256,7 +256,7 @@
         store (atom {:positions-ui {:tpsl-modal {:open? true}
                                     :reduce-popover {:open? true}
                                     :margin-modal {:open? true}}
-                     :account-context {:shadow-ui {:modal-open? true}}})
+                     :account-context {:spectate-ui {:modal-open? true}}})
         dispatch! (fn [store-arg _ctx effects]
                     (swap! dispatch-calls conj {:store store-arg
                                                 :effects effects}))
@@ -278,11 +278,11 @@
         inside-margin-trigger-target #js {:closest (fn [selector]
                                                      (when (= selector "[data-position-margin-trigger='true']")
                                                        #js {}))}
-        inside-shadow-panel-target #js {:closest (fn [selector]
-                                                  (when (= selector "[data-shadow-mode-surface='true']")
+        inside-spectate-panel-target #js {:closest (fn [selector]
+                                                  (when (= selector "[data-spectate-mode-surface='true']")
                                                     #js {}))}
-        inside-shadow-trigger-target #js {:closest (fn [selector]
-                                                    (when (= selector "[data-shadow-mode-trigger='true']")
+        inside-spectate-trigger-target #js {:closest (fn [selector]
+                                                    (when (= selector "[data-spectate-mode-trigger='true']")
                                                       #js {}))}
         outside-target #js {:closest (fn [_selector] nil)}]
     (with-global-property
@@ -303,20 +303,20 @@
           (mousedown-handler #js {:target inside-reduce-trigger-target})
           (mousedown-handler #js {:target inside-margin-panel-target})
           (mousedown-handler #js {:target inside-margin-trigger-target})
-          (mousedown-handler #js {:target inside-shadow-panel-target})
-          (mousedown-handler #js {:target inside-shadow-trigger-target})
+          (mousedown-handler #js {:target inside-spectate-panel-target})
+          (mousedown-handler #js {:target inside-spectate-trigger-target})
           (is (empty? @dispatch-calls))
           (mousedown-handler #js {:target outside-target})
           (is (= [[:actions/close-position-tpsl-modal]
                   [:actions/close-position-reduce-popover]
                   [:actions/close-position-margin-modal]
-                  [:actions/close-shadow-mode-modal]]
+                  [:actions/close-spectate-mode-modal]]
                  (-> @dispatch-calls first :effects)))
           (reset! dispatch-calls [])
           (swap! store assoc-in [:positions-ui :tpsl-modal :open?] false)
           (swap! store assoc-in [:positions-ui :reduce-popover :open?] false)
           (swap! store assoc-in [:positions-ui :margin-modal :open?] false)
-          (swap! store assoc-in [:account-context :shadow-ui :modal-open?] false)
+          (swap! store assoc-in [:account-context :spectate-ui :modal-open?] false)
           (mousedown-handler #js {:target outside-target})
           (is (empty? @dispatch-calls))
           (startup-runtime/install-position-tpsl-clickaway!
@@ -395,7 +395,7 @@
 (deftest stage-b-account-bootstrap-uses-effective-address-for-stale-guard-test
   (let [calls (atom [])
         store (atom {:wallet {:address "0xaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"}
-                     :account-context {:shadow-mode {:active? true
+                     :account-context {:spectate-mode {:active? true
                                                     :address "0xcccccccccccccccccccccccccccccccccccccccc"}}})]
     (with-redefs [platform/set-timeout! (fn [f _delay-ms]
                                           (f)

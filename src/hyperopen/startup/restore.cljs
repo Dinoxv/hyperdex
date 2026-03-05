@@ -37,64 +37,76 @@
           :else
           [])))))
 
-(def ^:private legacy-shadow-watchlist-storage-key
-  "ghost-mode-watchlist:v1")
+(def ^:private legacy-spectate-watchlist-storage-keys
+  ["shadow-mode-watchlist:v1"
+   "ghost-mode-watchlist:v1"])
 
-(def ^:private legacy-shadow-last-search-storage-key
-  "ghost-mode-last-search:v1")
+(def ^:private legacy-spectate-last-search-storage-keys
+  ["shadow-mode-last-search:v1"
+   "ghost-mode-last-search:v1"])
 
 (defn- read-renamed-storage
-  [new-key legacy-key]
+  [new-key legacy-keys]
   (let [new-value (platform/local-storage-get new-key)]
     (if (some? new-value)
       {:value new-value
-       :legacy? false}
-      (let [legacy-value (platform/local-storage-get legacy-key)]
-        {:value legacy-value
-         :legacy? (some? legacy-value)}))))
+       :legacy-key nil}
+      (or (some (fn [legacy-key]
+                  (let [legacy-value (platform/local-storage-get legacy-key)]
+                    (when (some? legacy-value)
+                      {:value legacy-value
+                       :legacy-key legacy-key})))
+                legacy-keys)
+          {:value nil
+           :legacy-key nil}))))
+
+(defn- remove-legacy-storage!
+  [legacy-keys]
+  (doseq [legacy-key legacy-keys]
+    (platform/local-storage-remove! legacy-key)))
 
 (defn- migrate-watchlist-storage!
   [watchlist]
   (platform/local-storage-set!
-   account-context/shadow-watchlist-storage-key
+   account-context/spectate-watchlist-storage-key
    (js/JSON.stringify (clj->js watchlist)))
-  (platform/local-storage-remove! legacy-shadow-watchlist-storage-key))
+  (remove-legacy-storage! legacy-spectate-watchlist-storage-keys))
 
 (defn- migrate-last-search-storage!
   [search-input]
   (platform/local-storage-set!
-   account-context/shadow-last-search-storage-key
+   account-context/spectate-last-search-storage-key
    (or search-input ""))
-  (platform/local-storage-remove! legacy-shadow-last-search-storage-key))
+  (remove-legacy-storage! legacy-spectate-last-search-storage-keys))
 
-(defn restore-shadow-mode-preferences!
+(defn restore-spectate-mode-preferences!
   [store]
   (let [{watchlist-raw :value
-         legacy-watchlist? :legacy?}
-        (read-renamed-storage account-context/shadow-watchlist-storage-key
-                              legacy-shadow-watchlist-storage-key)
+         legacy-watchlist-key :legacy-key}
+        (read-renamed-storage account-context/spectate-watchlist-storage-key
+                              legacy-spectate-watchlist-storage-keys)
         {search-raw :value
-         legacy-search? :legacy?}
-        (read-renamed-storage account-context/shadow-last-search-storage-key
-                              legacy-shadow-last-search-storage-key)
+         legacy-search-key :legacy-key}
+        (read-renamed-storage account-context/spectate-last-search-storage-key
+                              legacy-spectate-last-search-storage-keys)
         watchlist (parse-watchlist-storage watchlist-raw)
         search-input (some-> search-raw
                              str
                              str/trim)]
-    (when legacy-watchlist?
+    (when legacy-watchlist-key
       (migrate-watchlist-storage! watchlist))
-    (when legacy-search?
+    (when legacy-search-key
       (migrate-last-search-storage! search-input))
     (swap! store
            (fn [state]
              (-> state
                  (assoc-in [:account-context :watchlist] watchlist)
                  (assoc-in [:account-context :watchlist-loaded?] true)
-                 (assoc-in [:account-context :shadow-ui :last-search] (or search-input ""))
-                 (assoc-in [:account-context :shadow-ui :search] (or search-input ""))
-                 (assoc-in [:account-context :shadow-ui :label] "")
-                 (assoc-in [:account-context :shadow-ui :editing-watchlist-address] nil)
-                 (assoc-in [:account-context :shadow-ui :search-error] nil))))))
+                 (assoc-in [:account-context :spectate-ui :last-search] (or search-input ""))
+                 (assoc-in [:account-context :spectate-ui :search] (or search-input ""))
+                 (assoc-in [:account-context :spectate-ui :label] "")
+                 (assoc-in [:account-context :spectate-ui :editing-watchlist-address] nil)
+                 (assoc-in [:account-context :spectate-ui :search-error] nil))))))
 
 (defn restore-active-asset!
   [store {:keys [connected?-fn dispatch! load-active-market-display-fn]}]

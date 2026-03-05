@@ -611,7 +611,7 @@
                         "border"
                         "border-[#204046]"
                         "bg-[#081f29]"
-                        "shadow-lg"]}
+                        "spectate-lg"]}
           (for [{:keys [value label]} activity-filter-options]
             ^{:key (str "vault-detail-activity-filter-" (name value))}
             [:button {:type "button"

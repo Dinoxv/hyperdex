@@ -345,80 +345,80 @@
     (is (= [[:actions/dismiss-order-feedback-toast "toast-2"]]
            (get-in (second dismiss-nodes) [1 :on :click])))))
 
-(deftest app-view-renders-shadow-mode-banner-when-active-test
+(deftest app-view-renders-spectate-mode-banner-when-active-test
   (let [address "0xabcdefabcdefabcdefabcdefabcdefabcdefabcd"
         view-node (app-view/app-view (assoc trade-view-test-state
                                             :router {:path "/trade"}
                                             :wallet {}
-                                            :account-context {:shadow-mode {:active? true
+                                            :account-context {:spectate-mode {:active? true
                                                                            :address address}
-                                                              :shadow-ui {:modal-open? false}
+                                                              :spectate-ui {:modal-open? false}
                                                               :watchlist []}))
         banner-node (find-first-node view-node
-                                     #(= "shadow-mode-active-banner"
+                                     #(= "spectate-mode-active-banner"
                                          (get-in % [1 :data-role])))
         manage-button (find-first-node view-node
-                                       #(= "shadow-mode-banner-manage"
+                                       #(= "spectate-mode-banner-manage"
                                            (get-in % [1 :data-role])))
         stop-button (find-first-node view-node
-                                     #(= "shadow-mode-banner-stop"
+                                     #(= "spectate-mode-banner-stop"
                                          (get-in % [1 :data-role])))]
     (is (some? banner-node))
-    (is (contains? (set (collect-strings banner-node)) "Shadow Mode"))
+    (is (contains? (set (collect-strings banner-node)) "Spectate Mode"))
     (is (contains? (set (collect-strings banner-node)) "Currently spectating"))
-    (is (= [[:actions/open-shadow-mode-modal :event.currentTarget/bounds]]
+    (is (= [[:actions/open-spectate-mode-modal :event.currentTarget/bounds]]
            (get-in manage-button [1 :on :click])))
-    (is (= [[:actions/stop-shadow-mode]]
+    (is (= [[:actions/stop-spectate-mode]]
            (get-in stop-button [1 :on :click])))))
 
-(deftest app-view-renders-shadow-mode-modal-and-stop-control-when-open-and-active-test
+(deftest app-view-renders-spectate-mode-modal-and-stop-control-when-open-and-active-test
   (let [address "0xabcdefabcdefabcdefabcdefabcdefabcdefabcd"
         label "The Assistance Fund"
         view-node (app-view/app-view (assoc trade-view-test-state
                                             :router {:path "/trade"}
                                             :wallet {:copy-feedback {:kind :success
                                                                      :message "Address copied to clipboard"}}
-                                            :account-context {:shadow-mode {:active? true
+                                            :account-context {:spectate-mode {:active? true
                                                                            :address address}
-                                                              :shadow-ui {:modal-open? true
+                                                              :spectate-ui {:modal-open? true
                                                                          :search address
                                                                          :label ""
                                                                          :search-error nil}
                                                               :watchlist [{:address address
                                                                            :label label}]}))
         modal-root (find-first-node view-node
-                                    #(= "shadow-mode-modal-root"
+                                    #(= "spectate-mode-modal-root"
                                         (get-in % [1 :data-role])))
         watchlist-row (find-first-node view-node
-                                       #(= "shadow-mode-watchlist-row"
+                                       #(= "spectate-mode-watchlist-row"
                                            (get-in % [1 :data-role])))
         watchlist-label (find-first-node view-node
-                                         #(= "shadow-mode-watchlist-label"
+                                         #(= "spectate-mode-watchlist-label"
                                              (get-in % [1 :data-role])))
         close-button (find-first-node view-node
-                                      #(= "shadow-mode-close"
+                                      #(= "spectate-mode-close"
                                           (get-in % [1 :data-role])))
         stop-button (find-first-node view-node
-                                     #(= "shadow-mode-stop"
+                                     #(= "spectate-mode-stop"
                                          (get-in % [1 :data-role])))
         copy-button (find-first-node view-node
-                                     #(= "shadow-mode-watchlist-copy"
+                                     #(= "spectate-mode-watchlist-copy"
                                          (get-in % [1 :data-role])))
         edit-button (find-first-node view-node
-                                     #(= "shadow-mode-watchlist-edit"
+                                     #(= "spectate-mode-watchlist-edit"
                                          (get-in % [1 :data-role])))
         link-placeholder-button (find-first-node view-node
-                                                 #(= "shadow-mode-watchlist-link-placeholder"
+                                                 #(= "spectate-mode-watchlist-link-placeholder"
                                                      (get-in % [1 :data-role])))
         copy-feedback-row (find-first-node view-node
-                                           #(= "shadow-mode-copy-feedback"
+                                           #(= "spectate-mode-copy-feedback"
                                                (get-in % [1 :data-role])))
         rendered-strings (set (collect-strings modal-root))]
     (is (some? modal-root))
     (is (some? watchlist-row))
     (is (some? watchlist-label))
     (is (some? close-button))
-    (is (contains? (set (collect-strings modal-root)) "Shadow Mode"))
+    (is (contains? (set (collect-strings modal-root)) "Spectate Mode"))
     (is (contains? (set (collect-strings modal-root)) "Currently spectating: "))
     (is (contains? rendered-strings address))
     (is (contains? rendered-strings label))
@@ -426,12 +426,12 @@
     (is (some? copy-feedback-row))
     (is (not-any? #(str/starts-with? % "[[:li")
                   rendered-strings))
-    (is (= [[:actions/close-shadow-mode-modal]]
+    (is (= [[:actions/close-spectate-mode-modal]]
            (get-in close-button [1 :on :click])))
-    (is (= [[:actions/stop-shadow-mode]]
+    (is (= [[:actions/stop-spectate-mode]]
            (get-in stop-button [1 :on :click])))
-    (is (= [[:actions/copy-shadow-mode-watchlist-address address]]
+    (is (= [[:actions/copy-spectate-mode-watchlist-address address]]
            (get-in copy-button [1 :on :click])))
-    (is (= [[:actions/edit-shadow-mode-watchlist-address address]]
+    (is (= [[:actions/edit-spectate-mode-watchlist-address address]]
            (get-in edit-button [1 :on :click])))
     (is (true? (get-in link-placeholder-button [1 :disabled])))))

@@ -21,7 +21,7 @@
                  "min-w-0"
                  "px-3.5"
                  "py-3"
-                 "shadow-[inset_0_0_0_1px_rgba(8,38,45,0.35)]"]}
+                 "spectate-[inset_0_0_0_1px_rgba(8,38,45,0.35)]"]}
    [:div {:class ["text-xs"
                   "uppercase"
                   "tracking-[0.08em]"

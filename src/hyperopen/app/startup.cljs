@@ -128,7 +128,7 @@
        :restore-portfolio-summary-time-range! portfolio-actions/restore-portfolio-summary-time-range!
        :restore-vaults-snapshot-range! vault-actions/restore-vaults-snapshot-range!
        :restore-agent-storage-mode! startup-restore/restore-agent-storage-mode!
-       :restore-shadow-mode-preferences! startup-restore/restore-shadow-mode-preferences!
+       :restore-spectate-mode-preferences! startup-restore/restore-spectate-mode-preferences!
        :restore-active-asset! runtime-effect-adapters/restore-active-asset!
        :restore-asset-selector-markets-cache! runtime-effect-adapters/restore-asset-selector-markets-cache!
        :restore-open-orders-sort-settings! account-history-actions/restore-open-orders-sort-settings!

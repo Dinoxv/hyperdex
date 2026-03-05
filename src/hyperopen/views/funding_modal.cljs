@@ -640,7 +640,7 @@
                                    "bg-transparent"
                                    "border-0"
                                    "ring-0"
-                                   "shadow-none"
+                                   "spectate-none"
                                    "text-sm"
                                    "text-[#e6eef2]"
                                    "text-right"

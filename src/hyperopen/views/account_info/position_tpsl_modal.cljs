@@ -106,7 +106,7 @@
                    "text-xs"
                    "leading-4"
                    "text-gray-100"
-                   "shadow-lg"]}
+                   "spectate-lg"]}
      tooltip-text]]])
 
 (defn- pnl-mode-select
@@ -417,7 +417,7 @@
                        "bg-base-100"
                        "p-4"
                        "text-sm"
-                       "shadow-[0_24px_60px_rgba(0,0,0,0.45)]"
+                       "spectate-[0_24px_60px_rgba(0,0,0,0.45)]"
                        "space-y-3"
                        "overflow-y-auto"]
                :style layout-style

@@ -24,18 +24,18 @@
    :asset-selector {:refresh-asset-markets action-adapters/refresh-asset-markets}
    :vaults {:load-vault-route action-adapters/load-vault-route-action}
    :funding-comparison {:load-funding-comparison-route action-adapters/load-funding-comparison-route-action}
-   :shadow-mode {:open-shadow-mode-modal action-adapters/open-shadow-mode-modal
-                :close-shadow-mode-modal action-adapters/close-shadow-mode-modal
-                :set-shadow-mode-search action-adapters/set-shadow-mode-search
-                :set-shadow-mode-label action-adapters/set-shadow-mode-label
-                :start-shadow-mode action-adapters/start-shadow-mode
-                :stop-shadow-mode action-adapters/stop-shadow-mode
-                :add-shadow-mode-watchlist-address action-adapters/add-shadow-mode-watchlist-address
-                :remove-shadow-mode-watchlist-address action-adapters/remove-shadow-mode-watchlist-address
-                :edit-shadow-mode-watchlist-address action-adapters/edit-shadow-mode-watchlist-address
-                :clear-shadow-mode-watchlist-edit action-adapters/clear-shadow-mode-watchlist-edit
-                :copy-shadow-mode-watchlist-address action-adapters/copy-shadow-mode-watchlist-address
-                :spectate-shadow-mode-watchlist-address action-adapters/spectate-shadow-mode-watchlist-address}
+   :spectate-mode {:open-spectate-mode-modal action-adapters/open-spectate-mode-modal
+                :close-spectate-mode-modal action-adapters/close-spectate-mode-modal
+                :set-spectate-mode-search action-adapters/set-spectate-mode-search
+                :set-spectate-mode-label action-adapters/set-spectate-mode-label
+                :start-spectate-mode action-adapters/start-spectate-mode
+                :stop-spectate-mode action-adapters/stop-spectate-mode
+                :add-spectate-mode-watchlist-address action-adapters/add-spectate-mode-watchlist-address
+                :remove-spectate-mode-watchlist-address action-adapters/remove-spectate-mode-watchlist-address
+                :edit-spectate-mode-watchlist-address action-adapters/edit-spectate-mode-watchlist-address
+                :clear-spectate-mode-watchlist-edit action-adapters/clear-spectate-mode-watchlist-edit
+                :copy-spectate-mode-watchlist-address action-adapters/copy-spectate-mode-watchlist-address
+                :start-spectate-mode-watchlist-address action-adapters/start-spectate-mode-watchlist-address}
    :orders {:load-user-data action-adapters/load-user-data
             :set-funding-modal action-adapters/set-funding-modal}})
 

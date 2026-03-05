@@ -274,7 +274,7 @@
          show-toast! (fn [_store _kind _message] nil)
          default-vault-transfer-modal-state vault-actions/default-vault-transfer-modal-state}}]
   (let [state @store
-        shadow-mode-message (account-context/mutations-blocked-message state)
+        spectate-mode-message (account-context/mutations-blocked-message state)
         address (get-in state [:wallet :address])
         agent-status (get-in state [:wallet :agent :status])
         vault-address (or (vault-actions/normalize-vault-address (:vault-address request))
@@ -283,10 +283,10 @@
         is-deposit? (true? (:isDeposit action))
         mode-label (submit-mode-label is-deposit?)]
     (cond
-      (seq shadow-mode-message)
+      (seq spectate-mode-message)
       (set-vault-transfer-error! store
                                  show-toast!
-                                 shadow-mode-message)
+                                 spectate-mode-message)
 
       (nil? address)
       (set-vault-transfer-error! store

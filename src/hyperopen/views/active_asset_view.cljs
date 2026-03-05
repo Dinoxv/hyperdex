@@ -517,7 +517,7 @@
                  "text-xs"
                  "text-left"
                  "text-gray-100"
-                 "shadow-xl"
+                 "spectate-xl"
                  "backdrop-blur-sm"]}
    [:div {:class ["mb-3"]}
     [:h4 {:class ["mb-1.5"
@@ -1038,7 +1038,7 @@
         active-market (resolve-active-market full-state active-asset)
         selected-key (or (:key active-market)
                          (when active-asset (markets/coin->market-key active-asset)))]
-    [:div {:class ["relative" "bg-base-200" "border-b" "border-base-300" "rounded-none" "shadow-none"]
+    [:div {:class ["relative" "bg-base-200" "border-b" "border-base-300" "rounded-none" "spectate-none"]
            :data-parity-id "market-strip"}
      [:div
       (if (:active-asset full-state)

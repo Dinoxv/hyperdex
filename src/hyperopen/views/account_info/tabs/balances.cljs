@@ -71,7 +71,7 @@
                        "leading-tight"
                        "text-left"
                        "text-gray-100"
-                       "shadow-lg"
+                       "spectate-lg"
                        "whitespace-normal"]}
          (unified-available-balance-tooltip-text coin available-balance amount-decimals)
          [:div {:class (into ["absolute"
@@ -245,11 +245,11 @@
      [:div.text-right.font-semibold.num.num-right "$" (shared/format-currency usdc-value)]
      [:div.text-right.font-medium.num.num-right (shared/format-pnl pnl-value pnl-pct)]
      [:div.text-left
-      [:button {:class ["btn" "btn-xs" "btn-shadow" "text-trading-text"]} "Send"]]
+      [:button {:class ["btn" "btn-xs" "btn-spectate" "text-trading-text"]} "Send"]]
      [:div.text-left
       (if transfer-disabled?
         [:span {:class ["text-xs" "text-trading-text-secondary"]} "Unified"]
-        [:button {:class ["btn" "btn-xs" "btn-shadow" "text-trading-text"]} "Transfer"])]
+        [:button {:class ["btn" "btn-xs" "btn-spectate" "text-trading-text"]} "Transfer"])]
      [:div.text-left
       (balance-contract-node contract-id)]]))
 

@@ -66,7 +66,7 @@
                       "border"
                       "border-base-300"
                       "bg-base-100"
-                      "shadow-lg"
+                      "spectate-lg"
                       "z-[210]"]}
         (for [pro-order-type pro-dropdown-options]
           ^{:key (name pro-order-type)}
@@ -197,7 +197,7 @@
                               "transition-all"
                               "duration-300"
                               "ease-out"
-                              "shadow-[0_8px_16px_rgba(0,0,0,0.25)]"]
+                              "spectate-[0_8px_16px_rgba(0,0,0,0.25)]"]
                              (if menu-open?
                                ["visible"
                                 "opacity-100"
@@ -379,7 +379,7 @@
                           "transition-all"
                           "duration-300"
                           "ease-out"
-                          "shadow-[0_8px_16px_rgba(0,0,0,0.25)]"]
+                          "spectate-[0_8px_16px_rgba(0,0,0,0.25)]"]
                          (if open?
                            ["visible"
                             "opacity-100"

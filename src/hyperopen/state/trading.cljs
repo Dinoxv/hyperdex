@@ -550,7 +550,7 @@
          prepared-form (:form submit-prep)
          market-price-missing? (:market-price-missing? submit-prep)
          identity (market-identity state)
-         shadow-mode-message (account-context/mutations-blocked-message state)
+         spectate-mode-message (account-context/mutations-blocked-message state)
          spot? (:spot? identity)
          errors (validate-order-form state prepared-form)
          required-fields (submit-required-fields errors)
@@ -559,7 +559,7 @@
          reason (case mode
                  :submit
                  (cond
-                    (seq shadow-mode-message) :shadow-mode-read-only
+                    (seq spectate-mode-message) :spectate-mode-read-only
                     spot? :spot-read-only
                     market-price-missing? :market-price-missing
                     (seq errors) :validation-errors
@@ -570,7 +570,7 @@
                  :view
                  (cond
                     submitting? :submitting
-                    (seq shadow-mode-message) :shadow-mode-read-only
+                    (seq spectate-mode-message) :spectate-mode-read-only
                     spot? :spot-read-only
                     market-price-missing? :market-price-missing
                     (seq errors) :validation-errors
@@ -578,7 +578,7 @@
 
                   nil)
          error-message (case reason
-                         :shadow-mode-read-only shadow-mode-message
+                         :spectate-mode-read-only spectate-mode-message
                          :spot-read-only "Spot trading is not supported yet."
                          :market-price-missing "Market price unavailable. Load order book first."
                          :validation-errors (validation-error-message (first errors))

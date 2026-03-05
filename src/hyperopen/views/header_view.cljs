@@ -170,7 +170,7 @@
                 :data-role "wallet-enable-trading"}
        (if disabled? "Awaiting signature..." "Enable Trading")])))
 
-(defn- wallet-menu [wallet-address copy-feedback agent-state shadow-active? shadow-address]
+(defn- wallet-menu [wallet-address copy-feedback agent-state spectate-active? spectate-address]
   [:div {:class ["absolute"
                  "right-0"
                  "top-full"
@@ -225,18 +225,18 @@
                      "transition-colors"
                      "hover:bg-base-200"
                      "focus:outline-none"]
-             :on {:click [[:actions/open-shadow-mode-modal :event.currentTarget/bounds]]}
-             :data-shadow-mode-trigger "true"
-             :data-role "wallet-menu-open-shadow-mode"}
-    (if shadow-active? "Manage Shadow Mode" "Open Shadow Mode")]
-   (when shadow-active?
+             :on {:click [[:actions/open-spectate-mode-modal :event.currentTarget/bounds]]}
+             :data-spectate-mode-trigger "true"
+             :data-role "wallet-menu-open-spectate-mode"}
+    (if spectate-active? "Manage Spectate Mode" "Open Spectate Mode")]
+   (when spectate-active?
      [:div {:class ["px-3"
                     "pb-2"
                     "text-xs"
                     "text-[#9fb4b9]"]
-            :data-role "wallet-menu-shadow-active-address"}
+            :data-role "wallet-menu-spectate-active-address"}
       [:span {:class ["num"]}
-       (or (wallet/short-addr shadow-address) shadow-address)]])
+       (or (wallet/short-addr spectate-address) spectate-address)]])
    [:div {:class ["h-px" "w-full" "bg-base-300"]}]
    [:button {:type "button"
              :class ["block"
@@ -291,20 +291,14 @@
             :data-role "wallet-connect-button"}
    (if is-connecting "Connecting…" "Connect Wallet")])
 
-(defn- shadow-mode-icon []
-  [:svg {:viewBox "0 0 24 24"
-         :fill "none"
-         :stroke "currentColor"
-         :stroke-width "1.9"
-         :stroke-linecap "round"
-         :stroke-linejoin "round"
-         :class ["h-5" "w-5"]
-         :data-role "shadow-mode-trigger-icon"}
-   [:path {:d "M9 10h.01"}]
-   [:path {:d "M15 10h.01"}]
-   [:path {:d "M12 2a7 7 0 0 0-7 7v10l2-2 2 2 2-2 2 2 2-2 2 2V9a7 7 0 0 0-7-7z"}]])
+(defn- spectate-mode-icon []
+  [:svg {:viewBox "0 0 256 256"
+         :fill "currentColor"
+         :class ["h-5" "w-5" "shrink-0"]
+         :data-role "spectate-mode-trigger-icon"}
+   [:path {:d "M237.22,151.9l0-.1a1.42,1.42,0,0,0-.07-.22,48.46,48.46,0,0,0-2.31-5.3L193.27,51.8a8,8,0,0,0-1.67-2.44,32,32,0,0,0-45.26,0A8,8,0,0,0,144,55V80H112V55a8,8,0,0,0-2.34-5.66,32,32,0,0,0-45.26,0,8,8,0,0,0-1.67,2.44L21.2,146.28a48.46,48.46,0,0,0-2.31,5.3,1.72,1.72,0,0,0-.07.21s0,.08,0,.11a48,48,0,0,0,90.32,32.51,47.49,47.49,0,0,0,2.9-16.59V96h32v71.83a47.49,47.49,0,0,0,2.9,16.59,48,48,0,0,0,90.32-32.51Zm-143.15,27a32,32,0,0,1-60.2-21.71l1.81-4.13A32,32,0,0,1,96,167.88V168h0A32,32,0,0,1,94.07,178.94ZM203,198.07A32,32,0,0,1,160,168h0v-.11a32,32,0,0,1,60.32-14.78l1.81,4.13A32,32,0,0,1,203,198.07Z"}]])
 
-(defn- shadow-mode-trigger-button
+(defn- spectate-mode-trigger-button
   [active?]
   [:button {:type "button"
             :class (into ["inline-flex"
@@ -325,13 +319,13 @@
                             "bg-base-100"
                             "text-white"
                             "hover:bg-base-200"]))
-            :on {:click [[:actions/open-shadow-mode-modal :event.currentTarget/bounds]]}
-            :data-shadow-mode-trigger "true"
-            :data-role "shadow-mode-open-button"}
-   (shadow-mode-icon)
-   [:span (if active? "Spectating" "Shadow Mode")]])
+            :on {:click [[:actions/open-spectate-mode-modal :event.currentTarget/bounds]]}
+            :data-spectate-mode-trigger "true"
+            :data-role "spectate-mode-open-button"}
+   (spectate-mode-icon)
+   [:span (if active? "Spectating" "Spectate Mode")]])
 
-(defn- wallet-control [wallet-state shadow-mode]
+(defn- wallet-control [wallet-state spectate-mode]
   (let [is-connected (boolean (:connected? wallet-state))
         wallet-address (:address wallet-state)
         copy-feedback (:copy-feedback wallet-state)
@@ -343,16 +337,16 @@
        (wallet-menu wallet-address
                     copy-feedback
                     agent-state
-                    (true? (:active? shadow-mode))
-                    (:address shadow-mode))]
+                    (true? (:active? spectate-mode))
+                    (:address spectate-mode))]
       (connect-wallet-button is-connecting))))
 
 (defn header-view [state]
   (let [wallet-state (get-in state [:wallet] {})
         route (get-in state [:router :path] "/trade")
-        shadow-active? (account-context/shadow-mode-active? state)
-        shadow-mode {:active? shadow-active?
-                    :address (account-context/shadow-address state)}]
+        spectate-active? (account-context/spectate-mode-active? state)
+        spectate-mode {:active? spectate-active?
+                    :address (account-context/spectate-address state)}]
     [:header.bg-base-200.border-b.border-base-300.w-full
      {:data-parity-id "header"}
      [:div {:class ["w-full" "app-shell-gutter" "py-3"]}
@@ -385,8 +379,8 @@
        ;; Right Section - Wallet Control and Icons
        [:div.flex.items-center.space-x-4
         {:data-parity-id "header-wallet-control"}
-        (shadow-mode-trigger-button shadow-active?)
-        (wallet-control wallet-state shadow-mode)
+        (spectate-mode-trigger-button spectate-active?)
+        (wallet-control wallet-state spectate-mode)
 
         ;; Utility Icons
         [:button.w-10.h-10.bg-base-300.hover:bg-base-400.rounded-lg.flex.items-center.justify-center.transition-colors

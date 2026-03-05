@@ -175,7 +175,7 @@
       [:span.sr-only (:label selected-type)]]
      [:div
       {:class (into ["absolute" "top-full" "left-0" "mt-1"
-                     "bg-base-100" "border" "border-base-300" "rounded" "shadow-lg"
+                     "bg-base-100" "border" "border-base-300" "rounded" "spectate-lg"
                      "z-[120]" "isolate" "min-w-52" "overflow-hidden"]
                     (if chart-type-dropdown-visible
                       ["opacity-100" "scale-y-100" "translate-y-0"]

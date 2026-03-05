@@ -88,13 +88,13 @@
 
 (defn- funding-history-header-actions []
   [:div {:class ["ml-auto" "flex" "items-center" "justify-end" "gap-2" "px-4" "py-2"]}
-   [:button {:class ["btn" "btn-xs" "btn-shadow" "font-normal" "text-trading-text" "hover:bg-base-100" "hover:text-trading-text"]
+   [:button {:class ["btn" "btn-xs" "btn-spectate" "font-normal" "text-trading-text" "hover:bg-base-100" "hover:text-trading-text"]
              :on {:click [[:actions/toggle-funding-history-filter-open]]}}
     "Filter"]
-   [:button {:class ["btn" "btn-xs" "btn-shadow" "font-normal" "text-trading-text" "hover:bg-base-100" "hover:text-trading-text"]
+   [:button {:class ["btn" "btn-xs" "btn-spectate" "font-normal" "text-trading-text" "hover:bg-base-100" "hover:text-trading-text"]
              :on {:click [[:actions/view-all-funding-history]]}}
     "View All"]
-   [:button {:class ["btn" "btn-xs" "btn-shadow" "font-normal" "text-trading-green" "hover:bg-base-100" "hover:text-trading-green"]
+   [:button {:class ["btn" "btn-xs" "btn-spectate" "font-normal" "text-trading-green" "hover:bg-base-100" "hover:text-trading-green"]
              :on {:click [[:actions/export-funding-history-csv]]}}
     "Export as CSV"]])
 
@@ -124,7 +124,7 @@
 (def ^:private filter-trigger-button-classes
   ["btn"
    "btn-xs"
-   "btn-shadow"
+   "btn-spectate"
    "font-normal"
    "text-trading-text"
    "hover:bg-base-100"
@@ -136,7 +136,7 @@
    "focus-visible:outline-none"
    "focus-visible:ring-0"
    "focus-visible:ring-offset-0"
-   "focus-visible:shadow-none"])
+   "focus-visible:spectate-none"])
 
 (def ^:private coin-search-input-classes
   ["asset-selector-search-input"
@@ -189,7 +189,7 @@
       status-label
       (chevron-caret-icon filter-open?)]
      (when filter-open?
-       [:div {:class ["absolute" "right-4" "top-full" "z-20" "mt-1" "w-32" "overflow-hidden" "rounded-md" "border" "border-base-300" "bg-base-100" "shadow-lg"]}
+       [:div {:class ["absolute" "right-4" "top-full" "z-20" "mt-1" "w-32" "overflow-hidden" "rounded-md" "border" "border-base-300" "bg-base-100" "spectate-lg"]}
         (for [[option-key option-label] order-history-status-options]
           ^{:key (name option-key)}
           [:button {:class (into ["flex" "w-full" "items-center" "justify-between" "px-3" "py-2" "text-xs" "transition-colors"]
@@ -228,7 +228,7 @@
       direction-label
       (chevron-caret-icon filter-open?)]
      (when filter-open?
-       [:div {:class ["absolute" "right-4" "top-full" "z-20" "mt-1" "w-32" "overflow-hidden" "rounded-md" "border" "border-base-300" "bg-base-100" "shadow-lg"]}
+       [:div {:class ["absolute" "right-4" "top-full" "z-20" "mt-1" "w-32" "overflow-hidden" "rounded-md" "border" "border-base-300" "bg-base-100" "spectate-lg"]}
         (for [[option-key option-label] positions-direction-filter-options]
           ^{:key (name option-key)}
           [:button {:class (into ["flex" "w-full" "items-center" "justify-between" "px-3" "py-2" "text-xs" "transition-colors"]
@@ -267,7 +267,7 @@
       direction-label
       (chevron-caret-icon filter-open?)]
      (when filter-open?
-       [:div {:class ["absolute" "right-4" "top-full" "z-20" "mt-1" "w-32" "overflow-hidden" "rounded-md" "border" "border-base-300" "bg-base-100" "shadow-lg"]}
+       [:div {:class ["absolute" "right-4" "top-full" "z-20" "mt-1" "w-32" "overflow-hidden" "rounded-md" "border" "border-base-300" "bg-base-100" "spectate-lg"]}
         (for [[option-key option-label] open-orders-direction-filter-options]
           ^{:key (name option-key)}
           [:button {:class (into ["flex" "w-full" "items-center" "justify-between" "px-3" "py-2" "text-xs" "transition-colors"]
@@ -301,7 +301,7 @@
       direction-label
       (chevron-caret-icon filter-open?)]
      (when filter-open?
-       [:div {:class ["absolute" "right-4" "top-full" "z-20" "mt-1" "w-32" "overflow-hidden" "rounded-md" "border" "border-base-300" "bg-base-100" "shadow-lg"]}
+       [:div {:class ["absolute" "right-4" "top-full" "z-20" "mt-1" "w-32" "overflow-hidden" "rounded-md" "border" "border-base-300" "bg-base-100" "spectate-lg"]}
         (for [[option-key option-label] trade-history-direction-filter-options]
           ^{:key (name option-key)}
           [:button {:class (into ["flex" "w-full" "items-center" "justify-between" "px-3" "py-2" "text-xs" "transition-colors"]
@@ -637,7 +637,7 @@
                            fallback-selected-tab))
          extra-renderers (extra-tab-renderers extra-tabs)
          selected-extra-renderer (get extra-renderers selected-tab*)]
-     [:div {:class ["bg-base-100" "border-t" "border-base-300" "rounded-none" "shadow-none" "overflow-hidden" "w-full" "h-96" "flex" "flex-col" "min-h-0"]
+     [:div {:class ["bg-base-100" "border-t" "border-base-300" "rounded-none" "spectate-none" "overflow-hidden" "w-full" "h-96" "flex" "flex-col" "min-h-0"]
             :data-parity-id "account-tables"}
       (tab-navigation selected-tab*
                       tab-counts

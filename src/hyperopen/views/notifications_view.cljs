@@ -99,7 +99,7 @@
                            "border"
                            "px-4"
                            "py-3"
-                           "shadow-[0_14px_32px_rgba(7,12,22,0.42)]"
+                           "spectate-[0_14px_32px_rgba(7,12,22,0.42)]"
                            "backdrop-blur-sm"]
                           (:card tone))
              :role "status"

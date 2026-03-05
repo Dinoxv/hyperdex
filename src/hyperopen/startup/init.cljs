@@ -22,7 +22,7 @@
            restore-portfolio-summary-time-range!
            restore-vaults-snapshot-range!
            restore-agent-storage-mode!
-           restore-shadow-mode-preferences!
+           restore-spectate-mode-preferences!
            restore-active-asset!
            restore-asset-selector-markets-cache!
            restore-open-orders-sort-settings!
@@ -45,8 +45,8 @@
   (restore-vaults-snapshot-range! store)
   ;; Restore agent storage preference from localStorage.
   (restore-agent-storage-mode! store)
-  ;; Restore Shadow Mode watchlist and last-used modal search preference.
-  (restore-shadow-mode-preferences! store)
+  ;; Restore Spectate Mode watchlist and last-used modal search preference.
+  (restore-spectate-mode-preferences! store)
   ;; Restore selected asset from localStorage (default to BTC).
   (restore-active-asset! store)
   ;; Restore cached selector market symbols for immediate dropdown population.
@@ -88,7 +88,7 @@
           ;; Install global keyboard shortcuts that should work regardless of focus target.
           (when (fn? install-asset-selector-shortcuts!)
             (install-asset-selector-shortcuts!))
-          ;; Install click-away behavior for positioned overlays (TP/SL, Reduce, Margin, Shadow Mode).
+          ;; Install click-away behavior for positioned overlays (TP/SL, Reduce, Margin, Spectate Mode).
           (when (fn? install-position-tpsl-clickaway!)
             (install-position-tpsl-clickaway!))
           ;; Register icon cache service worker for cross-reload symbol icon caching.

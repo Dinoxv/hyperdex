@@ -36,7 +36,7 @@
                      "leading-tight"
                      "text-gray-100"
                      "whitespace-normal"
-                     "shadow-lg"
+                     "spectate-lg"
                      "opacity-0"
                      "transition-opacity"
                      "duration-200"

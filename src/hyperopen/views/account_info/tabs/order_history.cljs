@@ -245,7 +245,7 @@
                        "text-xs"
                        "leading-tight"
                        "text-gray-100"
-                       "shadow-lg"
+                       "spectate-lg"
                        "whitespace-normal"]}
          tooltip-text
          [:span {:class ["absolute"

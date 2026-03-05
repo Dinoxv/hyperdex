@@ -881,9 +881,9 @@
 
 (defn submit-vault-transfer
   [state]
-  (if-let [shadow-mode-message (account-context/mutations-blocked-message state)]
+  (if-let [spectate-mode-message (account-context/mutations-blocked-message state)]
     [[:effects/save-many [[(conj vault-transfer-modal-path :submitting?) false]
-                          [(conj vault-transfer-modal-path :error) shadow-mode-message]]]]
+                          [(conj vault-transfer-modal-path :error) spectate-mode-message]]]]
     (let [modal (vault-transfer-modal state)
           result (vault-transfer-preview state modal)]
       (if-not (:ok? result)

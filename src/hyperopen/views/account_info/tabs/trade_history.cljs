@@ -227,7 +227,7 @@
                         "text-xs"
                         "leading-tight"
                         "text-gray-100"
-                        "shadow-lg"
+                        "spectate-lg"
                         "whitespace-normal"]}
           trade-history-price-improved-tooltip-text
           [:div {:class ["absolute"

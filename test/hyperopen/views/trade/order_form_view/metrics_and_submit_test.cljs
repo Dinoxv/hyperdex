@@ -184,17 +184,17 @@
                                      (contains? classes "order-submit-tooltip"))))]
     (is (nil? tooltip))))
 
-(deftest shadow-mode-submit-block-renders-stop-control-and-tooltip-test
+(deftest spectate-mode-submit-block-renders-stop-control-and-tooltip-test
   (let [state (-> (base-state {:type :limit :size "1" :price "100"})
                   (assoc :asset-contexts {:BTC {:idx 0}})
-                  (assoc :account-context {:shadow-mode {:active? true
+                  (assoc :account-context {:spectate-mode {:active? true
                                                         :address "0x1234567890abcdef1234567890abcdef12345678"}}))
         view-node (view/order-form-view state)
         submit-button (button-node-by-click-action view-node :actions/submit-order)
-        stop-button (button-node-by-click-action view-node :actions/stop-shadow-mode)
+        stop-button (button-node-by-click-action view-node :actions/stop-spectate-mode)
         stop-container (find-first-node view-node
                                         (fn [node]
-                                          (= "order-form-shadow-mode-stop"
+                                          (= "order-form-spectate-mode-stop"
                                              (get-in node [1 :data-role]))))
         tooltip (find-first-node view-node
                                  (fn [node]
@@ -204,5 +204,5 @@
     (is (nil? submit-button))
     (is (some? stop-button))
     (is (some? stop-container))
-    (is (contains? (set (collect-strings stop-container)) "Stop Shadow Mode"))
+    (is (contains? (set (collect-strings stop-container)) "Stop Spectate Mode"))
     (is (nil? tooltip))))

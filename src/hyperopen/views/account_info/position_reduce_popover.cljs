@@ -130,7 +130,7 @@
                        "border-base-300"
                        "bg-base-100"
                        "p-3"
-                       "shadow-[0_24px_60px_rgba(0,0,0,0.45)]"
+                       "spectate-[0_24px_60px_rgba(0,0,0,0.45)]"
                        "space-y-3"]
                :style layout-style
                :role "dialog"

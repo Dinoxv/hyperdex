@@ -270,7 +270,7 @@
            [:div.text-left (format-trigger-conditions o)]
            [:div.text-left (format-tp-sl o)]
            [:div.text-left
-            [:button {:class ["btn" "btn-xs" "btn-shadow"]
+            [:button {:class ["btn" "btn-xs" "btn-spectate"]
                       :on {:click [[:actions/cancel-order o]]}}
              "Cancel"]]]))
        (empty-state "No open orders")))))

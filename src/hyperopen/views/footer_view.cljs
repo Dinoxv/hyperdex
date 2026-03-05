@@ -241,7 +241,7 @@
                   "text-xs"
                   "leading-4"
                   "text-base-content"
-                  "shadow-lg"]}
+                  "spectate-lg"]}
     store-id-text]])
 
 (defn- market-metric-label
@@ -270,7 +270,7 @@
                    "text-xs"
                    "leading-4"
                    "text-base-content"
-                   "shadow-lg"
+                   "spectate-lg"
                    "opacity-0"
                    "transition-opacity"
                    "duration-150"
@@ -501,7 +501,7 @@
                    "text-xs"
                    "leading-4"
                    "text-base-content"
-                   "shadow-lg"]}
+                   "spectate-lg"]}
      message]]])
 
 (defn- diagnostics-drawer [state health]
@@ -566,7 +566,7 @@
       [:div {:class ["flex" "items-center" "justify-between"]}
        [:h2 {:class ["text-sm" "font-semibold" "uppercase" "tracking-wide"]}
         "Connection diagnostics"]
-       [:button.btn.btn-xs.btn-shadow
+       [:button.btn.btn-xs.btn-spectate
         {:type "button"
          :on {:click [[:actions/close-ws-diagnostics]]}}
         "Close"]]
@@ -605,7 +605,7 @@
            reset-label)])
        (hover-tooltip
         "Run both market-data and Orders/OMS subscription resets in one pass, without a full reconnect."
-        [:button.btn.btn-sm.btn-shadow
+        [:button.btn.btn-sm.btn-spectate
          {:type "button"
           :title "Run both market-data and Orders/OMS subscription resets in one pass, without a full reconnect."
           :disabled reset-disabled?
@@ -616,7 +616,7 @@
 
       [:div {:class ["flex" "items-center" "justify-between" "text-xs" "text-base-content/70"]}
        [:span "Sensitive values are masked by default"]
-       [:button.btn.btn-xs.btn-shadow
+       [:button.btn.btn-xs.btn-spectate
         {:type "button"
          :on {:click [[:actions/toggle-ws-diagnostics-sensitive]]}}
         (if reveal-sensitive? "Hide sensitive" "Reveal sensitive")]]

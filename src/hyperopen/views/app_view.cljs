@@ -5,7 +5,7 @@
             [hyperopen.views.funding-modal :as funding-modal]
             [hyperopen.views.footer-view :as footer-view]
             [hyperopen.views.funding-comparison-view :as funding-comparison-view]
-            [hyperopen.views.shadow-mode-modal :as shadow-mode-modal]
+            [hyperopen.views.spectate-mode-modal :as spectate-mode-modal]
             [hyperopen.views.header-view :as header-view]
             [hyperopen.views.notifications-view :as notifications-view]
             [hyperopen.views.vaults.detail-view :as vault-detail-view]
@@ -15,17 +15,17 @@
             [hyperopen.views.trade-view :as trade-view]
             [hyperopen.wallet.core :as wallet]))
 
-(defn- shadow-mode-banner
+(defn- spectate-mode-banner
   [state]
-  (let [shadow-active? (account-context/shadow-mode-active? state)
-        shadow-address (account-context/shadow-address state)]
-    (when (and shadow-active?
-               (seq shadow-address))
+  (let [spectate-active? (account-context/spectate-mode-active? state)
+        spectate-address (account-context/spectate-address state)]
+    (when (and spectate-active?
+               (seq spectate-address))
       [:div {:class ["border-b"
                      "border-[#1f4746]"
                      "bg-[#072426]"
                      "text-[#d3f5ef]"]
-             :data-role "shadow-mode-active-banner"}
+             :data-role "spectate-mode-active-banner"}
        [:div {:class ["app-shell-gutter"
                       "flex"
                       "flex-wrap"
@@ -44,12 +44,12 @@
                          "font-semibold"
                          "uppercase"
                          "tracking-[0.08em]"]}
-          "Shadow Mode"]
+          "Spectate Mode"]
          [:span {:class ["text-sm" "text-[#b4d9d4]"]}
           "Currently spectating"]
          [:span {:class ["text-sm" "font-semibold" "num"]
-                 :data-role "shadow-mode-active-banner-address"}
-          (or (wallet/short-addr shadow-address) shadow-address)]]
+                 :data-role "spectate-mode-active-banner-address"}
+          (or (wallet/short-addr spectate-address) spectate-address)]]
         [:div {:class ["flex" "items-center" "gap-2"]}
          [:button {:type "button"
                    :class ["rounded-lg"
@@ -64,9 +64,9 @@
                            "transition-colors"
                            "hover:border-[#3e7478]"
                            "hover:text-[#e2f4f2]"]
-                   :on {:click [[:actions/open-shadow-mode-modal :event.currentTarget/bounds]]}
-                   :data-shadow-mode-trigger "true"
-                   :data-role "shadow-mode-banner-manage"}
+                   :on {:click [[:actions/open-spectate-mode-modal :event.currentTarget/bounds]]}
+                   :data-spectate-mode-trigger "true"
+                   :data-role "spectate-mode-banner-manage"}
           "Manage"]
          [:button {:type "button"
                    :class ["rounded-lg"
@@ -80,9 +80,9 @@
                            "text-[#dbf7f2]"
                            "transition-colors"
                            "hover:bg-[#14544c]"]
-                   :on {:click [[:actions/stop-shadow-mode]]}
-                   :data-role "shadow-mode-banner-stop"}
-          "Stop Shadow Mode"]]]])))
+                   :on {:click [[:actions/stop-spectate-mode]]}
+                   :data-role "spectate-mode-banner-stop"}
+          "Stop Spectate Mode"]]]])))
 
 (defn app-view [state]
   (let [route (get-in state [:router :path] "/trade")
@@ -97,7 +97,7 @@
     [:div {:class root-classes
            :data-parity-id "app-root"}
      (header-view/header-view state)
-     (shadow-mode-banner state)
+     (spectate-mode-banner state)
      [:div {:class ["flex-1" "min-h-0" "pb-12" "flex" "flex-col"]
             :data-parity-id "app-main"}
       (cond
@@ -108,6 +108,6 @@
         vault-route? (vaults-view/vaults-view state)
         :else (trade-view/trade-view state))]
      (funding-modal/funding-modal-view state)
-     (shadow-mode-modal/shadow-mode-modal-view state)
+     (spectate-mode-modal/spectate-mode-modal-view state)
      (notifications-view/notifications-view state)
      (footer-view/footer-view state)]))

@@ -1,14 +1,14 @@
 (ns hyperopen.account.context
   (:require [clojure.string :as str]))
 
-(def shadow-watchlist-storage-key
-  "shadow-mode-watchlist:v1")
+(def spectate-watchlist-storage-key
+  "spectate-mode-watchlist:v1")
 
-(def shadow-last-search-storage-key
-  "shadow-mode-last-search:v1")
+(def spectate-last-search-storage-key
+  "spectate-mode-last-search:v1")
 
-(def shadow-mode-read-only-message
-  "Shadow Mode is read-only. Stop Shadow Mode to place trades or move funds.")
+(def spectate-mode-read-only-message
+  "Spectate Mode is read-only. Stop Spectate Mode to place trades or move funds.")
 
 (def ^:private max-watchlist-size
   50)
@@ -125,37 +125,37 @@
   [state]
   (normalize-address (get-in state [:wallet :address])))
 
-(defn shadow-address
+(defn spectate-address
   [state]
-  (normalize-address (get-in state [:account-context :shadow-mode :address])))
+  (normalize-address (get-in state [:account-context :spectate-mode :address])))
 
-(defn shadow-mode-active?
+(defn spectate-mode-active?
   [state]
-  (let [active? (true? (get-in state [:account-context :shadow-mode :active?]))]
+  (let [active? (true? (get-in state [:account-context :spectate-mode :active?]))]
     (and active?
-         (some? (shadow-address state)))))
+         (some? (spectate-address state)))))
 
 (defn effective-account-address
   [state]
-  (if (shadow-mode-active? state)
-    (shadow-address state)
+  (if (spectate-mode-active? state)
+    (spectate-address state)
     (owner-address state)))
 
 (defn mutations-allowed?
   [state]
-  (not (shadow-mode-active? state)))
+  (not (spectate-mode-active? state)))
 
 (defn mutations-blocked-message
   [state]
   (when-not (mutations-allowed? state)
-    shadow-mode-read-only-message))
+    spectate-mode-read-only-message))
 
 (defn default-account-context-state
   []
-  {:shadow-mode {:active? false
+  {:spectate-mode {:active? false
                 :address nil
                 :started-at-ms nil}
-   :shadow-ui {:modal-open? false
+   :spectate-ui {:modal-open? false
               :anchor nil
               :search ""
               :label ""

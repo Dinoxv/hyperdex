@@ -11,7 +11,7 @@
    ;; Dropdown menu (toggled with state)
    [:div
     {:class (into ["absolute" "top-full" "left-0" "mt-1"
-                   "bg-base-100" "border" "border-base-300" "rounded" "shadow-lg"
+                   "bg-base-100" "border" "border-base-300" "rounded" "spectate-lg"
                    "z-[120]" "isolate" "min-w-32" "overflow-hidden"]
                   (if timeframes-dropdown-visible
                     ["opacity-100" "scale-y-100" "translate-y-0"]

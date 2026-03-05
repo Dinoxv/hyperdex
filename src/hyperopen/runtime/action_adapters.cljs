@@ -1,7 +1,7 @@
 (ns hyperopen.runtime.action-adapters
   (:require [clojure.string :as str]
             [nexus.registry :as nxr]
-            [hyperopen.account.shadow-mode-actions :as shadow-mode-actions]
+            [hyperopen.account.spectate-mode-actions :as spectate-mode-actions]
             [hyperopen.funding.actions :as funding-actions]
             [hyperopen.platform :as platform]
             [hyperopen.portfolio.actions :as portfolio-actions]
@@ -38,53 +38,53 @@
 (defn set-funding-modal [state modal]
   (funding-actions/set-funding-modal-compat state modal))
 
-(defn open-shadow-mode-modal
+(defn open-spectate-mode-modal
   [state & [trigger-bounds]]
-  (shadow-mode-actions/open-shadow-mode-modal state trigger-bounds))
+  (spectate-mode-actions/open-spectate-mode-modal state trigger-bounds))
 
-(defn close-shadow-mode-modal
+(defn close-spectate-mode-modal
   [state]
-  (shadow-mode-actions/close-shadow-mode-modal state))
+  (spectate-mode-actions/close-spectate-mode-modal state))
 
-(defn set-shadow-mode-search
+(defn set-spectate-mode-search
   [state value]
-  (shadow-mode-actions/set-shadow-mode-search state value))
+  (spectate-mode-actions/set-spectate-mode-search state value))
 
-(defn set-shadow-mode-label
+(defn set-spectate-mode-label
   [state value]
-  (shadow-mode-actions/set-shadow-mode-label state value))
+  (spectate-mode-actions/set-spectate-mode-label state value))
 
-(defn start-shadow-mode
+(defn start-spectate-mode
   [state & [address]]
-  (shadow-mode-actions/start-shadow-mode state address))
+  (spectate-mode-actions/start-spectate-mode state address))
 
-(defn stop-shadow-mode
+(defn stop-spectate-mode
   [state]
-  (shadow-mode-actions/stop-shadow-mode state))
+  (spectate-mode-actions/stop-spectate-mode state))
 
-(defn add-shadow-mode-watchlist-address
+(defn add-spectate-mode-watchlist-address
   [state & [address]]
-  (shadow-mode-actions/add-shadow-mode-watchlist-address state address))
+  (spectate-mode-actions/add-spectate-mode-watchlist-address state address))
 
-(defn remove-shadow-mode-watchlist-address
+(defn remove-spectate-mode-watchlist-address
   [state address]
-  (shadow-mode-actions/remove-shadow-mode-watchlist-address state address))
+  (spectate-mode-actions/remove-spectate-mode-watchlist-address state address))
 
-(defn edit-shadow-mode-watchlist-address
+(defn edit-spectate-mode-watchlist-address
   [state address]
-  (shadow-mode-actions/edit-shadow-mode-watchlist-address state address))
+  (spectate-mode-actions/edit-spectate-mode-watchlist-address state address))
 
-(defn clear-shadow-mode-watchlist-edit
+(defn clear-spectate-mode-watchlist-edit
   [state]
-  (shadow-mode-actions/clear-shadow-mode-watchlist-edit state))
+  (spectate-mode-actions/clear-spectate-mode-watchlist-edit state))
 
-(defn copy-shadow-mode-watchlist-address
+(defn copy-spectate-mode-watchlist-address
   [state address]
-  (shadow-mode-actions/copy-shadow-mode-watchlist-address state address))
+  (spectate-mode-actions/copy-spectate-mode-watchlist-address state address))
 
-(defn spectate-shadow-mode-watchlist-address
+(defn start-spectate-mode-watchlist-address
   [state address]
-  (shadow-mode-actions/spectate-shadow-mode-watchlist-address state address))
+  (spectate-mode-actions/start-spectate-mode-watchlist-address state address))
 
 (def ^:private projection-effect-ids
   #{:effects/save

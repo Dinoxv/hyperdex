@@ -100,7 +100,7 @@
                    styles-source))
       (is (re-find #"\.order-size-slider\.range::-moz-range-track\s*\{[^}]*var\(--order-size-slider-progress\)"
                    styles-source)))
-    (testing "order size slider thumb avoids daisy filler shadow trail"
+    (testing "order size slider thumb avoids daisy filler spectate trail"
       (is (not (re-find #"\.order-size-slider\.range::-webkit-slider-thumb\s*\{[^}]*calc\(var\(--filler-size\)"
                         styles-source)))
       (is (not (re-find #"\.order-size-slider\.range::-moz-range-thumb\s*\{[^}]*calc\(var\(--filler-size\)"

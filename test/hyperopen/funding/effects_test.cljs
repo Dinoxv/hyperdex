@@ -43,9 +43,9 @@
     (is (= [[:error "Connect your wallet before transferring funds."]]
            @toasts))))
 
-(deftest api-submit-funding-transfer-blocks-mutations-while-shadow-mode-active-test
+(deftest api-submit-funding-transfer-blocks-mutations-while-spectate-mode-active-test
   (let [store (atom {:wallet {:address "0xabc"}
-                     :account-context {:shadow-mode {:active? true
+                     :account-context {:spectate-mode {:active? true
                                                     :address "0x1234567890abcdef1234567890abcdef12345678"}}
                      :funding-ui {:modal (seed-modal :transfer)}})
         toasts (atom [])]
@@ -57,9 +57,9 @@
       :show-toast! (fn [_store kind message]
                      (swap! toasts conj [kind message]))})
     (is (= false (get-in @store [:funding-ui :modal :submitting?])))
-    (is (= account-context/shadow-mode-read-only-message
+    (is (= account-context/spectate-mode-read-only-message
            (get-in @store [:funding-ui :modal :error])))
-    (is (= [[:error account-context/shadow-mode-read-only-message]]
+    (is (= [[:error account-context/spectate-mode-read-only-message]]
            @toasts))))
 
 (deftest api-submit-funding-transfer-success-closes-modal-and-refreshes-test
@@ -152,9 +152,9 @@
     (is (= [[:error "Connect your wallet before withdrawing."]]
            @toasts))))
 
-(deftest api-submit-funding-withdraw-blocks-mutations-while-shadow-mode-active-test
+(deftest api-submit-funding-withdraw-blocks-mutations-while-spectate-mode-active-test
   (let [store (atom {:wallet {:address "0xabc"}
-                     :account-context {:shadow-mode {:active? true
+                     :account-context {:spectate-mode {:active? true
                                                     :address "0x1234567890abcdef1234567890abcdef12345678"}}
                      :funding-ui {:modal (seed-modal :withdraw)}})
         toasts (atom [])]
@@ -166,9 +166,9 @@
       :show-toast! (fn [_store kind message]
                      (swap! toasts conj [kind message]))})
     (is (= false (get-in @store [:funding-ui :modal :submitting?])))
-    (is (= account-context/shadow-mode-read-only-message
+    (is (= account-context/spectate-mode-read-only-message
            (get-in @store [:funding-ui :modal :error])))
-    (is (= [[:error account-context/shadow-mode-read-only-message]]
+    (is (= [[:error account-context/spectate-mode-read-only-message]]
            @toasts))))
 
 (deftest api-submit-funding-withdraw-success-closes-modal-and-refreshes-test
@@ -336,9 +336,9 @@
                     (is false (str "Unexpected HyperUnit withdrawal lifecycle polling error: " err))
                     (done)))))))
 
-(deftest api-submit-funding-deposit-blocks-mutations-while-shadow-mode-active-test
+(deftest api-submit-funding-deposit-blocks-mutations-while-spectate-mode-active-test
   (let [store (atom {:wallet {:address "0xabc"}
-                     :account-context {:shadow-mode {:active? true
+                     :account-context {:spectate-mode {:active? true
                                                     :address "0x1234567890abcdef1234567890abcdef12345678"}}
                      :funding-ui {:modal (seed-modal :deposit)}})
         toasts (atom [])]
@@ -351,9 +351,9 @@
       :show-toast! (fn [_store kind message]
                      (swap! toasts conj [kind message]))})
     (is (= false (get-in @store [:funding-ui :modal :submitting?])))
-    (is (= account-context/shadow-mode-read-only-message
+    (is (= account-context/spectate-mode-read-only-message
            (get-in @store [:funding-ui :modal :error])))
-    (is (= [[:error account-context/shadow-mode-read-only-message]]
+    (is (= [[:error account-context/spectate-mode-read-only-message]]
            @toasts))))
 
 (deftest api-fetch-hyperunit-fee-estimate-updates-modal-on-success-test
