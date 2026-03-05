@@ -325,6 +325,72 @@
                     (is false (str "Unexpected error: " err))
                     (done)))))))
 
+(deftest info-client-cache-reduces-rate-limit-retries-for-identical-requests-test
+  (async done
+    (let [cached-statuses (atom [429 200])
+          cached-fetch-calls (atom 0)
+          cached-client
+          (info-client/make-info-client
+           {:fetch-fn (fn [_ _]
+                        (swap! cached-fetch-calls inc)
+                        (let [status (or (first @cached-statuses) 200)]
+                          (swap! cached-statuses (fn [xs]
+                                                   (if (seq xs)
+                                                     (subvec xs 1)
+                                                     xs)))
+                          (js/Promise.resolve (fake-http-response status))))
+            :sleep-ms-fn (fn [_] (js/Promise.resolve nil))
+            :log-fn (fn [& _])})
+          uncached-statuses (atom [429 200 429 200])
+          uncached-fetch-calls (atom 0)
+          uncached-client
+          (info-client/make-info-client
+           {:fetch-fn (fn [_ _]
+                        (swap! uncached-fetch-calls inc)
+                        (let [status (or (first @uncached-statuses) 200)]
+                          (swap! uncached-statuses (fn [xs]
+                                                     (if (seq xs)
+                                                       (subvec xs 1)
+                                                       xs)))
+                          (js/Promise.resolve (fake-http-response status))))
+            :sleep-ms-fn (fn [_] (js/Promise.resolve nil))
+            :log-fn (fn [& _])})]
+      (-> ((:request-info! cached-client)
+           {"type" "portfolio"
+            "user" "0xabc"}
+           {:cache-key [:portfolio "0xabc"]
+            :cache-ttl-ms 1000})
+          (.then (fn [_]
+                   ((:request-info! cached-client)
+                    {"type" "portfolio"
+                     "user" "0xabc"}
+                    {:cache-key [:portfolio "0xabc"]
+                     :cache-ttl-ms 1000})))
+          (.then (fn [_]
+                   ((:request-info! uncached-client)
+                    {"type" "portfolio"
+                     "user" "0xabc"}
+                    {:cache-key [:portfolio "0xabc"]
+                     :cache-ttl-ms 1000})))
+          (.then (fn [_]
+                   ((:request-info! uncached-client)
+                    {"type" "portfolio"
+                     "user" "0xabc"}
+                    {:cache-key [:portfolio "0xabc"]
+                     :cache-ttl-ms 1000
+                     :force-refresh? true})))
+          (.then (fn [_]
+                   (let [cached-stats ((:get-request-stats cached-client))
+                         uncached-stats ((:get-request-stats uncached-client))]
+                     (is (= 2 @cached-fetch-calls))
+                     (is (= 4 @uncached-fetch-calls))
+                     (is (= 1 (:rate-limited cached-stats)))
+                     (is (= 2 (:rate-limited uncached-stats)))
+                     (done))))
+          (.catch (fn [err]
+                    (is false (str "Unexpected error: " err))
+                    (done)))))))
+
 (deftest normalize-info-funding-row-maps-delta-shape-test
   (let [row (funding-history/normalize-info-funding-row
              {:time 1700000000000

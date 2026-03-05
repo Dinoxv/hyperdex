@@ -103,6 +103,8 @@ Operational notes:
 - `/info` 429 rate-limit counts and attribution.
 - websocket health projection statuses and gap-detected counters.
 - chart blank-data reports during candle canary.
+- Deterministic before/after validation report:
+  - `/hyperopen/docs/qa/ws-migration-impact-validation-2026-03-05.md`
 
 ## Rollback
 
