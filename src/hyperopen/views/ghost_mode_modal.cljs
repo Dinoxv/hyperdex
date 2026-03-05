@@ -462,8 +462,13 @@
                             "leading-[19px]"
                             "text-gray-100"
                             "placeholder:text-gray-500"
-                            "outline-none"
-                            "focus:border-[#8a96a6]"]
+                            "focus:outline-none"
+                            "focus-visible:outline-none"
+                            "focus:border-base-300"
+                            "focus:ring-1"
+                            "focus:ring-[#8a96a6]/35"
+                            "focus:ring-offset-0"
+                            "focus:shadow-none"]
                     :on {:input [[:actions/set-ghost-mode-search [:event.target/value]]]}
                     :data-role "ghost-mode-search-input"}]
            [:button {:type "button"
@@ -492,8 +497,13 @@
                               "leading-[19px]"
                               "text-gray-100"
                               "placeholder:text-gray-500"
-                              "outline-none"
-                              "focus:border-[#8a96a6]"]
+                              "focus:outline-none"
+                              "focus-visible:outline-none"
+                              "focus:border-base-300"
+                              "focus:ring-1"
+                              "focus:ring-[#8a96a6]/35"
+                              "focus:ring-offset-0"
+                              "focus:shadow-none"]
                       :on {:input [[:actions/set-ghost-mode-label [:event.target/value]]]}
                       :data-role "ghost-mode-label-input"}]
              [:button {:type "button"
