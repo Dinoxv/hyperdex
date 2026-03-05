@@ -306,17 +306,17 @@
         owner-stale (projections/apply-user-abstraction-snapshot owner-state
                                                                  "0xdddddddddddddddddddddddddddddddddddddddd"
                                                                  snapshot)
-        ghost-state {:wallet {:address "0xaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"}
-                     :account-context {:ghost-mode {:active? true
+        shadow-state {:wallet {:address "0xaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"}
+                     :account-context {:shadow-mode {:active? true
                                                     :address "0xdddddddddddddddddddddddddddddddddddddddd"}}
                      :account {:mode :classic}}
-        ghost-match (projections/apply-user-abstraction-snapshot ghost-state
+        shadow-match (projections/apply-user-abstraction-snapshot shadow-state
                                                                  "0xdddddddddddddddddddddddddddddddddddddddd"
                                                                  snapshot)
-        ghost-stale (projections/apply-user-abstraction-snapshot ghost-state
+        shadow-stale (projections/apply-user-abstraction-snapshot shadow-state
                                                                  "0xaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
                                                                  snapshot)]
     (is (= snapshot (:account owner-match)))
     (is (= {:mode :classic} (:account owner-stale)))
-    (is (= snapshot (:account ghost-match)))
-    (is (= {:mode :classic} (:account ghost-stale)))))
+    (is (= snapshot (:account shadow-match)))
+    (is (= {:mode :classic} (:account shadow-stale)))))

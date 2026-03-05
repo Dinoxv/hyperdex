@@ -445,7 +445,7 @@
       [:div {:class ["text-left" "relative"]}
        [:button {:class ["btn"
                          "btn-xs"
-                         "btn-ghost"
+                         "btn-shadow"
                          "w-full"
                          "justify-start"
                          "px-1"

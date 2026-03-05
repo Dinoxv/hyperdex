@@ -132,8 +132,8 @@
                             :data-role "funding-action-withdraw"
                             :action [:actions/open-funding-withdraw-modal :event.currentTarget/bounds]})]])
 
-(defn- funding-actions-section [ghost-mode-active?]
-  (when-not ghost-mode-active?
+(defn- funding-actions-section [shadow-mode-active?]
+  (when-not shadow-mode-active?
     [:div {:class ["space-y-2"
                    "py-2.5"
                    "border-y"
@@ -225,11 +225,11 @@
                                             cross-margin-ratio
                                             cross-account-leverage
                                             pnl-info
-                                            ghost-mode-active?]}]
+                                            shadow-mode-active?]}]
   [:div {:class ["bg-base-100" "rounded-none" "shadow-none" "p-3" "space-y-4" "w-full" "h-full"]
          :data-parity-id "account-equity"}
    [:div.text-sm.font-semibold.text-trading-text "Account Equity"]
-   (when-not ghost-mode-active?
+   (when-not shadow-mode-active?
      (funding-actions-cluster))
 
    [:div.space-y-2
@@ -257,10 +257,10 @@
                                              maintenance-margin
                                              unified-account-leverage
                                              pnl-info
-                                             ghost-mode-active?]}]
+                                             shadow-mode-active?]}]
   [:div {:class ["bg-base-100" "rounded-none" "shadow-none" "p-3" "space-y-4" "w-full" "h-full"]
          :data-parity-id "account-equity"}
-   (funding-actions-section ghost-mode-active?)
+   (funding-actions-section shadow-mode-active?)
    [:div.text-sm.font-semibold.text-trading-text "Unified Account Summary"]
    [:div.space-y-2
     (metric-row "Unified Account Value" (display-currency account-value-display)
@@ -276,7 +276,7 @@
 
 (defn account-equity-view [state]
   (let [metrics (derive-account-equity-metrics state)
-        ghost-mode-active? (account-context/ghost-mode-active? state)]
+        shadow-mode-active? (account-context/shadow-mode-active? state)]
     (if (unified-account? state)
-      (unified-account-summary-view (assoc metrics :ghost-mode-active? ghost-mode-active?))
-      (classic-account-equity-view (assoc metrics :ghost-mode-active? ghost-mode-active?)))))
+      (unified-account-summary-view (assoc metrics :shadow-mode-active? shadow-mode-active?))
+      (classic-account-equity-view (assoc metrics :shadow-mode-active? shadow-mode-active?)))))

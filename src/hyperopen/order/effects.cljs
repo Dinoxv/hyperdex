@@ -244,7 +244,7 @@
        :error-text error-text
        :toast-message (margin-mode-sync-error-message error-text)})))
 
-(defn- ghost-mode-precondition-error
+(defn- shadow-mode-precondition-error
   [state]
   (account-context/mutations-blocked-message state))
 
@@ -272,13 +272,13 @@
 (defn api-submit-order
   [{:keys [dispatch! exchange-response-error runtime-error-message show-toast!]} _ store request]
   (let [state @store
-        ghost-mode-message (ghost-mode-precondition-error state)
+        shadow-mode-message (shadow-mode-precondition-error state)
         address (get-in state [:wallet :address])
         agent-status (get-in state [:wallet :agent :status])]
-    (if (seq ghost-mode-message)
+    (if (seq shadow-mode-message)
       (do
-        (swap! store assoc-in [:order-form-runtime :error] ghost-mode-message)
-        (show-toast! store :error ghost-mode-message))
+        (swap! store assoc-in [:order-form-runtime :error] shadow-mode-message)
+        (show-toast! store :error shadow-mode-message))
       (if (nil? address)
       (do
         (swap! store assoc-in [:order-form-runtime :error] "Connect your wallet before submitting.")
@@ -342,10 +342,10 @@
 
 (defn- position-tpsl-submit-precondition-error
   [state address agent-status]
-  (let [ghost-mode-message (ghost-mode-precondition-error state)]
+  (let [shadow-mode-message (shadow-mode-precondition-error state)]
     (cond
-      (seq ghost-mode-message)
-      ghost-mode-message
+      (seq shadow-mode-message)
+      shadow-mode-message
 
       (nil? address)
       "Connect your wallet before submitting."
@@ -414,10 +414,10 @@
 
 (defn- position-margin-submit-precondition-error
   [state address agent-status]
-  (let [ghost-mode-message (ghost-mode-precondition-error state)]
+  (let [shadow-mode-message (shadow-mode-precondition-error state)]
     (cond
-      (seq ghost-mode-message)
-      ghost-mode-message
+      (seq shadow-mode-message)
+      shadow-mode-message
 
       (nil? address)
       "Connect your wallet before updating margin."
@@ -478,16 +478,16 @@
            show-toast!]} _ store request]
   (let [state @store
         address (get-in state [:wallet :address])
-        ghost-mode-message (ghost-mode-precondition-error state)
+        shadow-mode-message (shadow-mode-precondition-error state)
         agent-status (get-in state [:wallet :agent :status])
         cancel-oids (cancel-request-oids request)
         prune-fn (or prune-canceled-open-orders-fn
                      prune-canceled-open-orders)]
     (cond
-      (seq ghost-mode-message)
+      (seq shadow-mode-message)
       (do
-        (swap! store assoc-in [:orders :cancel-error] ghost-mode-message)
-        (show-toast! store :error ghost-mode-message))
+        (swap! store assoc-in [:orders :cancel-error] shadow-mode-message)
+        (show-toast! store :error shadow-mode-message))
 
       (nil? address)
       (do

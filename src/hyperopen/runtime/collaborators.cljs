@@ -1,5 +1,5 @@
 (ns hyperopen.runtime.collaborators
-  (:require [hyperopen.account.ghost-mode-actions :as ghost-mode-actions]
+  (:require [hyperopen.account.shadow-mode-actions :as shadow-mode-actions]
             [hyperopen.account.history.actions :as account-history-actions]
             [hyperopen.account.history.effects :as account-history-effects]
             [hyperopen.asset-selector.actions :as asset-actions]
@@ -156,19 +156,19 @@
    :set-position-margin-amount-to-max account-history-actions/set-position-margin-amount-to-max
    :submit-position-margin-update account-history-actions/submit-position-margin-update})
 
-(defn- ghost-mode-action-deps []
-  {:open-ghost-mode-modal ghost-mode-actions/open-ghost-mode-modal
-   :close-ghost-mode-modal ghost-mode-actions/close-ghost-mode-modal
-   :set-ghost-mode-search ghost-mode-actions/set-ghost-mode-search
-   :set-ghost-mode-label ghost-mode-actions/set-ghost-mode-label
-   :start-ghost-mode ghost-mode-actions/start-ghost-mode
-   :stop-ghost-mode ghost-mode-actions/stop-ghost-mode
-   :add-ghost-mode-watchlist-address ghost-mode-actions/add-ghost-mode-watchlist-address
-   :remove-ghost-mode-watchlist-address ghost-mode-actions/remove-ghost-mode-watchlist-address
-   :edit-ghost-mode-watchlist-address ghost-mode-actions/edit-ghost-mode-watchlist-address
-   :clear-ghost-mode-watchlist-edit ghost-mode-actions/clear-ghost-mode-watchlist-edit
-   :copy-ghost-mode-watchlist-address ghost-mode-actions/copy-ghost-mode-watchlist-address
-   :spectate-ghost-mode-watchlist-address ghost-mode-actions/spectate-ghost-mode-watchlist-address})
+(defn- shadow-mode-action-deps []
+  {:open-shadow-mode-modal shadow-mode-actions/open-shadow-mode-modal
+   :close-shadow-mode-modal shadow-mode-actions/close-shadow-mode-modal
+   :set-shadow-mode-search shadow-mode-actions/set-shadow-mode-search
+   :set-shadow-mode-label shadow-mode-actions/set-shadow-mode-label
+   :start-shadow-mode shadow-mode-actions/start-shadow-mode
+   :stop-shadow-mode shadow-mode-actions/stop-shadow-mode
+   :add-shadow-mode-watchlist-address shadow-mode-actions/add-shadow-mode-watchlist-address
+   :remove-shadow-mode-watchlist-address shadow-mode-actions/remove-shadow-mode-watchlist-address
+   :edit-shadow-mode-watchlist-address shadow-mode-actions/edit-shadow-mode-watchlist-address
+   :clear-shadow-mode-watchlist-edit shadow-mode-actions/clear-shadow-mode-watchlist-edit
+   :copy-shadow-mode-watchlist-address shadow-mode-actions/copy-shadow-mode-watchlist-address
+   :spectate-shadow-mode-watchlist-address shadow-mode-actions/spectate-shadow-mode-watchlist-address})
 
 (defn- order-action-deps []
   {:select-order-entry-mode order-actions/select-order-entry-mode
@@ -296,7 +296,7 @@
     :asset-selector (asset-selector-action-deps)
     :chart (chart-and-orderbook-action-deps)
     :account-history (account-history-action-deps)
-    :ghost-mode (ghost-mode-action-deps)
+    :shadow-mode (shadow-mode-action-deps)
     :vaults (vault-action-deps)
     :funding-comparison (funding-comparison-action-deps)
     :orders (order-action-deps)}

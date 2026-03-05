@@ -62,7 +62,7 @@
   ["select" "select-sm" "select-bordered" "h-8" "min-h-8" "w-24" "pl-2" "pr-8" "text-sm" "leading-5"])
 
 (def ^:private pagination-nav-button-classes
-  ["btn" "btn-xs" "btn-ghost" "h-6" "min-h-6" "min-w-6"])
+  ["btn" "btn-xs" "btn-shadow" "h-6" "min-h-6" "min-w-6"])
 
 (def ^:private pagination-go-button-classes
   ["btn" "btn-xs" "btn-primary" "h-6" "min-h-6" "min-w-6"])

@@ -910,7 +910,7 @@
       "14 Day Volume"]
      [:div {:class ["num" "text-4xl" "font-medium" "text-trading-text"]}
       (format-compact-currency volume-14d-usd)]
-     [:button {:class ["btn" "btn-xs" "btn-ghost" "justify-start" "px-0" "text-trading-green" "hover:bg-transparent"]}
+     [:button {:class ["btn" "btn-xs" "btn-shadow" "justify-start" "px-0" "text-trading-green" "hover:bg-transparent"]}
       "View Volume"]])
    (section-card
     "portfolio-fees-card"
@@ -918,11 +918,11 @@
      [:div {:class ["flex" "items-center" "justify-between" "gap-2"]}
       [:span {:class ["text-sm" "text-trading-text-secondary"]}
        "Fees (Taker / Maker)"]
-      [:button {:class ["btn" "btn-ghost" "btn-xs" "text-trading-text"]}
+      [:button {:class ["btn" "btn-shadow" "btn-xs" "text-trading-text"]}
        "Perps"]]
      [:div {:class ["num" "text-4xl" "font-medium" "leading-tight" "text-trading-text"]}
       (str (format-fee-pct (:taker fees)) " / " (format-fee-pct (:maker fees)))]
-     [:button {:class ["btn" "btn-xs" "btn-ghost" "justify-start" "px-0" "text-trading-green" "hover:bg-transparent"]}
+     [:button {:class ["btn" "btn-xs" "btn-shadow" "justify-start" "px-0" "text-trading-green" "hover:bg-transparent"]}
       "View Fee Schedule"]])])
 
 (defn- header-actions []

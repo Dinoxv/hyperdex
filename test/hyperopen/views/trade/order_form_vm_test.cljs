@@ -66,15 +66,15 @@
     (is (= "Fill required fields: Size."
            (get-in view-model [:submit :tooltip])))))
 
-(deftest order-form-vm-shows-ghost-mode-submit-remediation-tooltip-test
+(deftest order-form-vm-shows-shadow-mode-submit-remediation-tooltip-test
   (let [state (assoc (base-state {:type :limit :size "1" :price "100"} {})
                      :asset-contexts {:BTC {:idx 0}}
-                     :account-context {:ghost-mode {:active? true
+                     :account-context {:shadow-mode {:active? true
                                                     :address "0x1234567890abcdef1234567890abcdef12345678"}})
         view-model (vm/order-form-vm state)]
     (is (true? (get-in view-model [:submit :disabled?])))
-    (is (= :ghost-mode-read-only (get-in view-model [:submit :reason])))
-    (is (= account-context/ghost-mode-read-only-message
+    (is (= :shadow-mode-read-only (get-in view-model [:submit :reason])))
+    (is (= account-context/shadow-mode-read-only-message
            (get-in view-model [:submit :tooltip])))))
 
 (deftest order-form-vm-uses-order-form-ui-flags-test

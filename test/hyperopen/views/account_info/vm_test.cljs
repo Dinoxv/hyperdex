@@ -239,7 +239,7 @@
                :perp-dex-clearinghouse {}
                :websocket-ui {:show-surface-freshness-cues? true}
                :wallet {:address "0xaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"}
-               :account-context {:ghost-mode {:active? true
+               :account-context {:shadow-mode {:active? true
                                               :address "0xdddddddddddddddddddddddddddddddddddddddd"}}
                :websocket {:health {:generated-at-ms 20000
                                     :streams {["openOrders" nil "0xdddddddddddddddddddddddddddddddddddddddd" nil nil]

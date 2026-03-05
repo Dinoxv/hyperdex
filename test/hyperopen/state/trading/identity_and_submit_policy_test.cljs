@@ -204,10 +204,10 @@
       (is (true? (:disabled? policy)))
       (is (nil? (:error-message policy)))))
 
-  (testing "ghost mode blocks submit policy with explicit stop guidance"
+  (testing "shadow mode blocks submit policy with explicit stop guidance"
     (let [state (assoc base-state
                        :asset-contexts {:BTC {:idx 0}}
-                       :account-context {:ghost-mode {:active? true
+                       :account-context {:shadow-mode {:active? true
                                                       :address "0x1234567890abcdef1234567890abcdef12345678"}})
           form (assoc (trading/default-order-form)
                       :type :limit
@@ -217,11 +217,11 @@
           view-policy (trading/submit-policy state form {:mode :view})
           submit-policy (trading/submit-policy state form {:mode :submit
                                                            :agent-ready? true})]
-      (is (= :ghost-mode-read-only (:reason view-policy)))
-      (is (= account-context/ghost-mode-read-only-message
+      (is (= :shadow-mode-read-only (:reason view-policy)))
+      (is (= account-context/shadow-mode-read-only-message
              (:error-message view-policy)))
-      (is (= :ghost-mode-read-only (:reason submit-policy)))
-      (is (= account-context/ghost-mode-read-only-message
+      (is (= :shadow-mode-read-only (:reason submit-policy)))
+      (is (= account-context/shadow-mode-read-only-message
              (:error-message submit-policy))))))
 
 (deftest prepare-order-form-for-submit-formats-market-price-per-hyperliquid-rules-test

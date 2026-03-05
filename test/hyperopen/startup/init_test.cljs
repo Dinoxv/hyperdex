@@ -32,7 +32,7 @@
       :restore-portfolio-summary-time-range! (record-store-call :restore-portfolio-summary-time-range)
       :restore-vaults-snapshot-range! (record-store-call :restore-vaults-snapshot-range)
       :restore-agent-storage-mode! (record-store-call :restore-agent-storage-mode)
-      :restore-ghost-mode-preferences! (record-store-call :restore-ghost-mode-preferences)
+      :restore-shadow-mode-preferences! (record-store-call :restore-shadow-mode-preferences)
       :restore-active-asset! (record-store-call :restore-active-asset)
       :restore-asset-selector-markets-cache! (record-store-call :restore-selector-markets-cache)
       :restore-open-orders-sort-settings! (record-store-call :restore-open-orders-sort)
@@ -66,7 +66,7 @@
             [:restore-portfolio-summary-time-range true]
             [:restore-vaults-snapshot-range true]
             [:restore-agent-storage-mode true]
-            [:restore-ghost-mode-preferences true]
+            [:restore-shadow-mode-preferences true]
             [:restore-active-asset true]
             [:restore-selector-markets-cache true]
             [:restore-open-orders-sort true]

@@ -1,7 +1,7 @@
 (ns hyperopen.runtime.action-adapters
   (:require [clojure.string :as str]
             [nexus.registry :as nxr]
-            [hyperopen.account.ghost-mode-actions :as ghost-mode-actions]
+            [hyperopen.account.shadow-mode-actions :as shadow-mode-actions]
             [hyperopen.funding.actions :as funding-actions]
             [hyperopen.platform :as platform]
             [hyperopen.portfolio.actions :as portfolio-actions]
@@ -38,53 +38,53 @@
 (defn set-funding-modal [state modal]
   (funding-actions/set-funding-modal-compat state modal))
 
-(defn open-ghost-mode-modal
+(defn open-shadow-mode-modal
   [state & [trigger-bounds]]
-  (ghost-mode-actions/open-ghost-mode-modal state trigger-bounds))
+  (shadow-mode-actions/open-shadow-mode-modal state trigger-bounds))
 
-(defn close-ghost-mode-modal
+(defn close-shadow-mode-modal
   [state]
-  (ghost-mode-actions/close-ghost-mode-modal state))
+  (shadow-mode-actions/close-shadow-mode-modal state))
 
-(defn set-ghost-mode-search
+(defn set-shadow-mode-search
   [state value]
-  (ghost-mode-actions/set-ghost-mode-search state value))
+  (shadow-mode-actions/set-shadow-mode-search state value))
 
-(defn set-ghost-mode-label
+(defn set-shadow-mode-label
   [state value]
-  (ghost-mode-actions/set-ghost-mode-label state value))
+  (shadow-mode-actions/set-shadow-mode-label state value))
 
-(defn start-ghost-mode
+(defn start-shadow-mode
   [state & [address]]
-  (ghost-mode-actions/start-ghost-mode state address))
+  (shadow-mode-actions/start-shadow-mode state address))
 
-(defn stop-ghost-mode
+(defn stop-shadow-mode
   [state]
-  (ghost-mode-actions/stop-ghost-mode state))
+  (shadow-mode-actions/stop-shadow-mode state))
 
-(defn add-ghost-mode-watchlist-address
+(defn add-shadow-mode-watchlist-address
   [state & [address]]
-  (ghost-mode-actions/add-ghost-mode-watchlist-address state address))
+  (shadow-mode-actions/add-shadow-mode-watchlist-address state address))
 
-(defn remove-ghost-mode-watchlist-address
+(defn remove-shadow-mode-watchlist-address
   [state address]
-  (ghost-mode-actions/remove-ghost-mode-watchlist-address state address))
+  (shadow-mode-actions/remove-shadow-mode-watchlist-address state address))
 
-(defn edit-ghost-mode-watchlist-address
+(defn edit-shadow-mode-watchlist-address
   [state address]
-  (ghost-mode-actions/edit-ghost-mode-watchlist-address state address))
+  (shadow-mode-actions/edit-shadow-mode-watchlist-address state address))
 
-(defn clear-ghost-mode-watchlist-edit
+(defn clear-shadow-mode-watchlist-edit
   [state]
-  (ghost-mode-actions/clear-ghost-mode-watchlist-edit state))
+  (shadow-mode-actions/clear-shadow-mode-watchlist-edit state))
 
-(defn copy-ghost-mode-watchlist-address
+(defn copy-shadow-mode-watchlist-address
   [state address]
-  (ghost-mode-actions/copy-ghost-mode-watchlist-address state address))
+  (shadow-mode-actions/copy-shadow-mode-watchlist-address state address))
 
-(defn spectate-ghost-mode-watchlist-address
+(defn spectate-shadow-mode-watchlist-address
   [state address]
-  (ghost-mode-actions/spectate-ghost-mode-watchlist-address state address))
+  (shadow-mode-actions/spectate-shadow-mode-watchlist-address state address))
 
 (def ^:private projection-effect-ids
   #{:effects/save

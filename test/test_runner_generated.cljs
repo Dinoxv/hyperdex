@@ -3,11 +3,11 @@
 (ns test-runner-generated
   (:require [cljs.test :refer-macros [run-tests]]
             [hyperopen.account.context-test]
-            [hyperopen.account.ghost-mode-actions-test]
             [hyperopen.account.history.actions-test]
             [hyperopen.account.history.effects-test]
             [hyperopen.account.history.position-margin-test]
             [hyperopen.account.history.position-tpsl-test]
+            [hyperopen.account.shadow-mode-actions-test]
             [hyperopen.api-test]
             [hyperopen.api.compat-test]
             [hyperopen.api.default-test]
@@ -285,11 +285,11 @@
   "Run all generated test namespaces and return the results."
   []
   (run-tests 'hyperopen.account.context-test
-             'hyperopen.account.ghost-mode-actions-test
              'hyperopen.account.history.actions-test
              'hyperopen.account.history.effects-test
              'hyperopen.account.history.position-margin-test
              'hyperopen.account.history.position-tpsl-test
+             'hyperopen.account.shadow-mode-actions-test
              'hyperopen.api-test
              'hyperopen.api.compat-test
              'hyperopen.api.default-test

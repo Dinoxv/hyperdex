@@ -37,25 +37,64 @@
           :else
           [])))))
 
-(defn restore-ghost-mode-preferences!
+(def ^:private legacy-shadow-watchlist-storage-key
+  "ghost-mode-watchlist:v1")
+
+(def ^:private legacy-shadow-last-search-storage-key
+  "ghost-mode-last-search:v1")
+
+(defn- read-renamed-storage
+  [new-key legacy-key]
+  (let [new-value (platform/local-storage-get new-key)]
+    (if (some? new-value)
+      {:value new-value
+       :legacy? false}
+      (let [legacy-value (platform/local-storage-get legacy-key)]
+        {:value legacy-value
+         :legacy? (some? legacy-value)}))))
+
+(defn- migrate-watchlist-storage!
+  [watchlist]
+  (platform/local-storage-set!
+   account-context/shadow-watchlist-storage-key
+   (js/JSON.stringify (clj->js watchlist)))
+  (platform/local-storage-remove! legacy-shadow-watchlist-storage-key))
+
+(defn- migrate-last-search-storage!
+  [search-input]
+  (platform/local-storage-set!
+   account-context/shadow-last-search-storage-key
+   (or search-input ""))
+  (platform/local-storage-remove! legacy-shadow-last-search-storage-key))
+
+(defn restore-shadow-mode-preferences!
   [store]
-  (let [watchlist (parse-watchlist-storage
-                   (platform/local-storage-get
-                    account-context/ghost-watchlist-storage-key))
-        search-input (some-> (platform/local-storage-get
-                              account-context/ghost-last-search-storage-key)
+  (let [{watchlist-raw :value
+         legacy-watchlist? :legacy?}
+        (read-renamed-storage account-context/shadow-watchlist-storage-key
+                              legacy-shadow-watchlist-storage-key)
+        {search-raw :value
+         legacy-search? :legacy?}
+        (read-renamed-storage account-context/shadow-last-search-storage-key
+                              legacy-shadow-last-search-storage-key)
+        watchlist (parse-watchlist-storage watchlist-raw)
+        search-input (some-> search-raw
                              str
                              str/trim)]
+    (when legacy-watchlist?
+      (migrate-watchlist-storage! watchlist))
+    (when legacy-search?
+      (migrate-last-search-storage! search-input))
     (swap! store
            (fn [state]
              (-> state
                  (assoc-in [:account-context :watchlist] watchlist)
                  (assoc-in [:account-context :watchlist-loaded?] true)
-                 (assoc-in [:account-context :ghost-ui :last-search] (or search-input ""))
-                 (assoc-in [:account-context :ghost-ui :search] (or search-input ""))
-                 (assoc-in [:account-context :ghost-ui :label] "")
-                 (assoc-in [:account-context :ghost-ui :editing-watchlist-address] nil)
-                 (assoc-in [:account-context :ghost-ui :search-error] nil))))))
+                 (assoc-in [:account-context :shadow-ui :last-search] (or search-input ""))
+                 (assoc-in [:account-context :shadow-ui :search] (or search-input ""))
+                 (assoc-in [:account-context :shadow-ui :label] "")
+                 (assoc-in [:account-context :shadow-ui :editing-watchlist-address] nil)
+                 (assoc-in [:account-context :shadow-ui :search-error] nil))))))
 
 (defn restore-active-asset!
   [store {:keys [connected?-fn dispatch! load-active-market-display-fn]}]

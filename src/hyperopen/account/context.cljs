@@ -1,14 +1,14 @@
 (ns hyperopen.account.context
   (:require [clojure.string :as str]))
 
-(def ghost-watchlist-storage-key
-  "ghost-mode-watchlist:v1")
+(def shadow-watchlist-storage-key
+  "shadow-mode-watchlist:v1")
 
-(def ghost-last-search-storage-key
-  "ghost-mode-last-search:v1")
+(def shadow-last-search-storage-key
+  "shadow-mode-last-search:v1")
 
-(def ghost-mode-read-only-message
-  "Ghost Mode is read-only. Stop Ghost Mode to place trades or move funds.")
+(def shadow-mode-read-only-message
+  "Shadow Mode is read-only. Stop Shadow Mode to place trades or move funds.")
 
 (def ^:private max-watchlist-size
   50)
@@ -125,37 +125,37 @@
   [state]
   (normalize-address (get-in state [:wallet :address])))
 
-(defn ghost-address
+(defn shadow-address
   [state]
-  (normalize-address (get-in state [:account-context :ghost-mode :address])))
+  (normalize-address (get-in state [:account-context :shadow-mode :address])))
 
-(defn ghost-mode-active?
+(defn shadow-mode-active?
   [state]
-  (let [active? (true? (get-in state [:account-context :ghost-mode :active?]))]
+  (let [active? (true? (get-in state [:account-context :shadow-mode :active?]))]
     (and active?
-         (some? (ghost-address state)))))
+         (some? (shadow-address state)))))
 
 (defn effective-account-address
   [state]
-  (if (ghost-mode-active? state)
-    (ghost-address state)
+  (if (shadow-mode-active? state)
+    (shadow-address state)
     (owner-address state)))
 
 (defn mutations-allowed?
   [state]
-  (not (ghost-mode-active? state)))
+  (not (shadow-mode-active? state)))
 
 (defn mutations-blocked-message
   [state]
   (when-not (mutations-allowed? state)
-    ghost-mode-read-only-message))
+    shadow-mode-read-only-message))
 
 (defn default-account-context-state
   []
-  {:ghost-mode {:active? false
+  {:shadow-mode {:active? false
                 :address nil
                 :started-at-ms nil}
-   :ghost-ui {:modal-open? false
+   :shadow-ui {:modal-open? false
               :anchor nil
               :search ""
               :label ""

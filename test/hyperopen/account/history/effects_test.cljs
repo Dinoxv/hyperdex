@@ -48,7 +48,7 @@
   ([address]
    (let [filters (history-filters)]
      {:wallet {:address address}
-      :account-context {:ghost-mode {:active? false
+      :account-context {:shadow-mode {:active? false
                                      :address nil}}
       :account-info {:selected-tab :balances
                      :funding-history {:filters filters
@@ -511,7 +511,7 @@
                                   (assoc-in [:account-info :funding-history :filters] filters)
                                   (assoc-in [:orders :fundings-raw] [existing-row])))
           stale-store (atom (-> (base-history-state "0xaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa")
-                                (assoc-in [:account-context :ghost-mode]
+                                (assoc-in [:account-context :shadow-mode]
                                           {:active? true
                                            :address "0xdddddddddddddddddddddddddddddddddddddddd"})
                                 (assoc-in [:account-info :funding-history :filters] filters)
@@ -550,7 +550,7 @@
   (async done
     (let [current-store (atom (base-history-state "0xaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"))
           stale-store (atom (-> (base-history-state "0xaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa")
-                                (assoc-in [:account-context :ghost-mode]
+                                (assoc-in [:account-context :shadow-mode]
                                           {:active? true
                                            :address "0xdddddddddddddddddddddddddddddddddddddddd"})))
           stale-before @stale-store]

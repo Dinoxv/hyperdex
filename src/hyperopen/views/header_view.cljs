@@ -170,7 +170,7 @@
                 :data-role "wallet-enable-trading"}
        (if disabled? "Awaiting signature..." "Enable Trading")])))
 
-(defn- wallet-menu [wallet-address copy-feedback agent-state ghost-active? ghost-address]
+(defn- wallet-menu [wallet-address copy-feedback agent-state shadow-active? shadow-address]
   [:div {:class ["absolute"
                  "right-0"
                  "top-full"
@@ -225,18 +225,18 @@
                      "transition-colors"
                      "hover:bg-base-200"
                      "focus:outline-none"]
-             :on {:click [[:actions/open-ghost-mode-modal :event.currentTarget/bounds]]}
-             :data-ghost-mode-trigger "true"
-             :data-role "wallet-menu-open-ghost-mode"}
-    (if ghost-active? "Manage Ghost Mode" "Open Ghost Mode")]
-   (when ghost-active?
+             :on {:click [[:actions/open-shadow-mode-modal :event.currentTarget/bounds]]}
+             :data-shadow-mode-trigger "true"
+             :data-role "wallet-menu-open-shadow-mode"}
+    (if shadow-active? "Manage Shadow Mode" "Open Shadow Mode")]
+   (when shadow-active?
      [:div {:class ["px-3"
                     "pb-2"
                     "text-xs"
                     "text-[#9fb4b9]"]
-            :data-role "wallet-menu-ghost-active-address"}
+            :data-role "wallet-menu-shadow-active-address"}
       [:span {:class ["num"]}
-       (or (wallet/short-addr ghost-address) ghost-address)]])
+       (or (wallet/short-addr shadow-address) shadow-address)]])
    [:div {:class ["h-px" "w-full" "bg-base-300"]}]
    [:button {:type "button"
              :class ["block"
@@ -291,7 +291,7 @@
             :data-role "wallet-connect-button"}
    (if is-connecting "Connecting…" "Connect Wallet")])
 
-(defn- ghost-mode-icon []
+(defn- shadow-mode-icon []
   [:svg {:viewBox "0 0 24 24"
          :fill "none"
          :stroke "currentColor"
@@ -299,12 +299,12 @@
          :stroke-linecap "round"
          :stroke-linejoin "round"
          :class ["h-5" "w-5"]
-         :data-role "ghost-mode-trigger-icon"}
+         :data-role "shadow-mode-trigger-icon"}
    [:path {:d "M9 10h.01"}]
    [:path {:d "M15 10h.01"}]
    [:path {:d "M12 2a7 7 0 0 0-7 7v10l2-2 2 2 2-2 2 2 2-2 2 2V9a7 7 0 0 0-7-7z"}]])
 
-(defn- ghost-mode-trigger-button
+(defn- shadow-mode-trigger-button
   [active?]
   [:button {:type "button"
             :class (into ["inline-flex"
@@ -325,13 +325,13 @@
                             "bg-base-100"
                             "text-white"
                             "hover:bg-base-200"]))
-            :on {:click [[:actions/open-ghost-mode-modal :event.currentTarget/bounds]]}
-            :data-ghost-mode-trigger "true"
-            :data-role "ghost-mode-open-button"}
-   (ghost-mode-icon)
-   [:span (if active? "Spectating" "Ghost Mode")]])
+            :on {:click [[:actions/open-shadow-mode-modal :event.currentTarget/bounds]]}
+            :data-shadow-mode-trigger "true"
+            :data-role "shadow-mode-open-button"}
+   (shadow-mode-icon)
+   [:span (if active? "Spectating" "Shadow Mode")]])
 
-(defn- wallet-control [wallet-state ghost-mode]
+(defn- wallet-control [wallet-state shadow-mode]
   (let [is-connected (boolean (:connected? wallet-state))
         wallet-address (:address wallet-state)
         copy-feedback (:copy-feedback wallet-state)
@@ -343,16 +343,16 @@
        (wallet-menu wallet-address
                     copy-feedback
                     agent-state
-                    (true? (:active? ghost-mode))
-                    (:address ghost-mode))]
+                    (true? (:active? shadow-mode))
+                    (:address shadow-mode))]
       (connect-wallet-button is-connecting))))
 
 (defn header-view [state]
   (let [wallet-state (get-in state [:wallet] {})
         route (get-in state [:router :path] "/trade")
-        ghost-active? (account-context/ghost-mode-active? state)
-        ghost-mode {:active? ghost-active?
-                    :address (account-context/ghost-address state)}]
+        shadow-active? (account-context/shadow-mode-active? state)
+        shadow-mode {:active? shadow-active?
+                    :address (account-context/shadow-address state)}]
     [:header.bg-base-200.border-b.border-base-300.w-full
      {:data-parity-id "header"}
      [:div {:class ["w-full" "app-shell-gutter" "py-3"]}
@@ -385,8 +385,8 @@
        ;; Right Section - Wallet Control and Icons
        [:div.flex.items-center.space-x-4
         {:data-parity-id "header-wallet-control"}
-        (ghost-mode-trigger-button ghost-active?)
-        (wallet-control wallet-state ghost-mode)
+        (shadow-mode-trigger-button shadow-active?)
+        (wallet-control wallet-state shadow-mode)
 
         ;; Utility Icons
         [:button.w-10.h-10.bg-base-300.hover:bg-base-400.rounded-lg.flex.items-center.justify-center.transition-colors

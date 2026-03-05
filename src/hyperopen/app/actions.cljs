@@ -24,18 +24,18 @@
    :asset-selector {:refresh-asset-markets action-adapters/refresh-asset-markets}
    :vaults {:load-vault-route action-adapters/load-vault-route-action}
    :funding-comparison {:load-funding-comparison-route action-adapters/load-funding-comparison-route-action}
-   :ghost-mode {:open-ghost-mode-modal action-adapters/open-ghost-mode-modal
-                :close-ghost-mode-modal action-adapters/close-ghost-mode-modal
-                :set-ghost-mode-search action-adapters/set-ghost-mode-search
-                :set-ghost-mode-label action-adapters/set-ghost-mode-label
-                :start-ghost-mode action-adapters/start-ghost-mode
-                :stop-ghost-mode action-adapters/stop-ghost-mode
-                :add-ghost-mode-watchlist-address action-adapters/add-ghost-mode-watchlist-address
-                :remove-ghost-mode-watchlist-address action-adapters/remove-ghost-mode-watchlist-address
-                :edit-ghost-mode-watchlist-address action-adapters/edit-ghost-mode-watchlist-address
-                :clear-ghost-mode-watchlist-edit action-adapters/clear-ghost-mode-watchlist-edit
-                :copy-ghost-mode-watchlist-address action-adapters/copy-ghost-mode-watchlist-address
-                :spectate-ghost-mode-watchlist-address action-adapters/spectate-ghost-mode-watchlist-address}
+   :shadow-mode {:open-shadow-mode-modal action-adapters/open-shadow-mode-modal
+                :close-shadow-mode-modal action-adapters/close-shadow-mode-modal
+                :set-shadow-mode-search action-adapters/set-shadow-mode-search
+                :set-shadow-mode-label action-adapters/set-shadow-mode-label
+                :start-shadow-mode action-adapters/start-shadow-mode
+                :stop-shadow-mode action-adapters/stop-shadow-mode
+                :add-shadow-mode-watchlist-address action-adapters/add-shadow-mode-watchlist-address
+                :remove-shadow-mode-watchlist-address action-adapters/remove-shadow-mode-watchlist-address
+                :edit-shadow-mode-watchlist-address action-adapters/edit-shadow-mode-watchlist-address
+                :clear-shadow-mode-watchlist-edit action-adapters/clear-shadow-mode-watchlist-edit
+                :copy-shadow-mode-watchlist-address action-adapters/copy-shadow-mode-watchlist-address
+                :spectate-shadow-mode-watchlist-address action-adapters/spectate-shadow-mode-watchlist-address}
    :orders {:load-user-data action-adapters/load-user-data
             :set-funding-modal action-adapters/set-funding-modal}})
 

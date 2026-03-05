@@ -323,70 +323,70 @@
           []
           {:phase :test}))))
 
-(deftest assert-action-args-allows-ghost-mode-actions-with-or-without-address-test
+(deftest assert-action-args-allows-shadow-mode-actions-with-or-without-address-test
   (is (= []
          (contracts/assert-action-args!
-          :actions/open-ghost-mode-modal
+          :actions/open-shadow-mode-modal
           []
           {:phase :test})))
   (is (= [{:left 32 :right 96 :top 18 :bottom 52}]
          (contracts/assert-action-args!
-          :actions/open-ghost-mode-modal
+          :actions/open-shadow-mode-modal
           [{:left 32 :right 96 :top 18 :bottom 52}]
           {:phase :test})))
   (is (= [""]
          (contracts/assert-action-args!
-          :actions/set-ghost-mode-search
+          :actions/set-shadow-mode-search
           [""]
           {:phase :test})))
   (is (= [""]
          (contracts/assert-action-args!
-          :actions/set-ghost-mode-label
+          :actions/set-shadow-mode-label
           [""]
           {:phase :test})))
   (is (= []
          (contracts/assert-action-args!
-          :actions/start-ghost-mode
+          :actions/start-shadow-mode
           []
           {:phase :test})))
   (is (= ["0x123"]
          (contracts/assert-action-args!
-          :actions/start-ghost-mode
+          :actions/start-shadow-mode
           ["0x123"]
           {:phase :test})))
   (is (= []
          (contracts/assert-action-args!
-          :actions/add-ghost-mode-watchlist-address
+          :actions/add-shadow-mode-watchlist-address
           []
           {:phase :test})))
   (is (= ["0x123"]
          (contracts/assert-action-args!
-          :actions/add-ghost-mode-watchlist-address
+          :actions/add-shadow-mode-watchlist-address
           ["0x123"]
           {:phase :test})))
   (is (= ["0x123"]
          (contracts/assert-action-args!
-          :actions/remove-ghost-mode-watchlist-address
+          :actions/remove-shadow-mode-watchlist-address
           ["0x123"]
           {:phase :test})))
   (is (= ["0x123"]
          (contracts/assert-action-args!
-          :actions/edit-ghost-mode-watchlist-address
+          :actions/edit-shadow-mode-watchlist-address
           ["0x123"]
           {:phase :test})))
   (is (= []
          (contracts/assert-action-args!
-          :actions/clear-ghost-mode-watchlist-edit
+          :actions/clear-shadow-mode-watchlist-edit
           []
           {:phase :test})))
   (is (= ["0x123"]
          (contracts/assert-action-args!
-          :actions/copy-ghost-mode-watchlist-address
+          :actions/copy-shadow-mode-watchlist-address
           ["0x123"]
           {:phase :test})))
   (is (= ["0x123"]
          (contracts/assert-action-args!
-          :actions/spectate-ghost-mode-watchlist-address
+          :actions/spectate-shadow-mode-watchlist-address
           ["0x123"]
           {:phase :test}))))
 

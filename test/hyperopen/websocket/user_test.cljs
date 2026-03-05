@@ -194,7 +194,7 @@
 (deftest user-ledger-incremental-triggers-account-surface-refresh-test
   (let [store (doto (make-store)
                 (swap! assoc :wallet {:address "0xaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"}
-                       :account-context {:ghost-mode {:active? true
+                       :account-context {:shadow-mode {:active? true
                                                       :address "0xdddddddddddddddddddddddddddddddddddddddd"}}))
         handlers (atom {})
         scheduled-refresh (atom nil)
@@ -253,7 +253,7 @@
   (let [effective-address "0xdddddddddddddddddddddddddddddddddddddddd"
         store (doto (make-store)
                 (swap! assoc :wallet {:address "0xaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"}
-                       :account-context {:ghost-mode {:active? true
+                       :account-context {:shadow-mode {:active? true
                                                       :address effective-address}}
                        :websocket {:health {:transport {:state :connected
                                                         :freshness :live}
@@ -326,7 +326,7 @@
         store (doto (make-store)
                 (swap! assoc :wallet {:address "0xaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"}
                        :router {:path "/trade"}
-                       :account-context {:ghost-mode {:active? true
+                       :account-context {:shadow-mode {:active? true
                                                       :address effective-address}}
                        :websocket {:health {:transport {:state :connected
                                                         :freshness :live}
@@ -399,7 +399,7 @@
           dex "vault"
           store (doto (make-store)
                   (swap! assoc :wallet {:address "0xaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"}
-                         :account-context {:ghost-mode {:active? true
+                         :account-context {:shadow-mode {:active? true
                                                         :address effective-address}}
                          :perp-dex-clearinghouse {dex {:account-value "1"}}
                          :websocket {:health {:transport {:state :connected
@@ -508,7 +508,7 @@
   (let [effective-address "0xdddddddddddddddddddddddddddddddddddddddd"
         store (doto (make-store)
                 (swap! assoc :wallet {:address "0xaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"}
-                       :account-context {:ghost-mode {:active? true
+                       :account-context {:shadow-mode {:active? true
                                                       :address effective-address}}
                        :websocket {:health {:transport {:state :connected
                                                         :freshness :live}
@@ -580,7 +580,7 @@
   (let [effective-address "0xdddddddddddddddddddddddddddddddddddddddd"
         store (doto (make-store)
                 (swap! assoc :wallet {:address "0xaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"}
-                       :account-context {:ghost-mode {:active? true
+                       :account-context {:shadow-mode {:active? true
                                                       :address effective-address}}
                        :websocket {:migration-flags {:order-fill-ws-first? false}
                                    :health {:transport {:state :connected

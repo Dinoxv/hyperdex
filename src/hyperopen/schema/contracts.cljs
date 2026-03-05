@@ -315,7 +315,7 @@
 (s/def ::funding-modal-open-args
   (s/or :none ::no-args
         :anchor-only (s/tuple any?)))
-(s/def ::ghost-mode-open-args
+(s/def ::shadow-mode-open-args
   (s/or :none ::no-args
         :anchor-only (s/tuple any?)))
 (s/def ::ws-reset-source-args (s/or :none ::no-args
@@ -333,18 +333,18 @@
    :actions/subscribe-to-webdata2 ::address-args
    :actions/connect-wallet ::no-args
    :actions/disconnect-wallet ::no-args
-   :actions/open-ghost-mode-modal ::ghost-mode-open-args
-   :actions/close-ghost-mode-modal ::no-args
-   :actions/set-ghost-mode-search ::single-input-args
-   :actions/set-ghost-mode-label ::single-input-args
-   :actions/start-ghost-mode ::optional-string-args
-   :actions/stop-ghost-mode ::no-args
-   :actions/add-ghost-mode-watchlist-address ::optional-string-args
-   :actions/remove-ghost-mode-watchlist-address ::address-args
-   :actions/edit-ghost-mode-watchlist-address ::address-args
-   :actions/clear-ghost-mode-watchlist-edit ::no-args
-   :actions/copy-ghost-mode-watchlist-address ::address-args
-   :actions/spectate-ghost-mode-watchlist-address ::address-args
+   :actions/open-shadow-mode-modal ::shadow-mode-open-args
+   :actions/close-shadow-mode-modal ::no-args
+   :actions/set-shadow-mode-search ::single-input-args
+   :actions/set-shadow-mode-label ::single-input-args
+   :actions/start-shadow-mode ::optional-string-args
+   :actions/stop-shadow-mode ::no-args
+   :actions/add-shadow-mode-watchlist-address ::optional-string-args
+   :actions/remove-shadow-mode-watchlist-address ::address-args
+   :actions/edit-shadow-mode-watchlist-address ::address-args
+   :actions/clear-shadow-mode-watchlist-edit ::no-args
+   :actions/copy-shadow-mode-watchlist-address ::address-args
+   :actions/spectate-shadow-mode-watchlist-address ::address-args
    :actions/enable-agent-trading ::no-args
    :actions/set-agent-storage-mode ::set-agent-storage-mode-args
    :actions/copy-wallet-address ::no-args

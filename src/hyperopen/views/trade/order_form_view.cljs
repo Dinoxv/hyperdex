@@ -594,7 +594,7 @@
                     "group-focus:translate-y-0"]}
       submit-tooltip])])
 
-(defn- ghost-mode-icon
+(defn- shadow-mode-icon
   [size-classes]
   [:svg {:viewBox "0 0 24 24"
          :fill "none"
@@ -608,8 +608,8 @@
    [:path {:d "M15 10h.01"}]
    [:path {:d "M12 2a7 7 0 0 0-7 7v10l2-2 2 2 2-2 2 2 2-2 2 2V9a7 7 0 0 0-7-7z"}]])
 
-(defn- ghost-mode-stop-affordance []
-  [:div {:data-role "order-form-ghost-mode-stop"}
+(defn- shadow-mode-stop-affordance []
+  [:div {:data-role "order-form-shadow-mode-stop"}
    [:button {:type "button"
              :class ["flex"
                      "h-9"
@@ -631,11 +631,11 @@
                      "focus:ring-1"
                      "focus:ring-[#87c8c0]/40"
                      "focus:ring-offset-0"]
-             :on {:click [[:actions/stop-ghost-mode]]}
-             :data-role "order-form-ghost-mode-stop-button"}
+             :on {:click [[:actions/stop-shadow-mode]]}
+             :data-role "order-form-shadow-mode-stop-button"}
     [:span {:class ["inline-flex" "min-w-0" "items-center" "gap-2"]}
-     (ghost-mode-icon ["h-5" "w-5" "shrink-0"])
-     [:span {:class ["truncate"]} "Stop Ghost Mode"]]
+     (shadow-mode-icon ["h-5" "w-5" "shrink-0"])
+     [:span {:class ["truncate"]} "Stop Shadow Mode"]]
     [:span {:class ["shrink-0"
                     "rounded-[4px]"
                     "border"
@@ -808,7 +808,7 @@
                 show-liquidation-row?
                 show-slippage-row?]}
         controls
-        ghost-mode-read-only? (= :ghost-mode-read-only (:reason submit))
+        shadow-mode-read-only? (= :shadow-mode-read-only (:reason submit))
         tpsl-panel (tpsl-panel-model state form side ui-leverage controls)]
     [:div {:class ["bg-base-100"
                    "border"
@@ -905,10 +905,10 @@
       (when error
         [:div {:class ["text-xs" "text-red-400"]} error])
 
-      (when ghost-mode-read-only?
-        (ghost-mode-stop-affordance))
+      (when shadow-mode-read-only?
+        (shadow-mode-stop-affordance))
 
-      (when-not ghost-mode-read-only?
+      (when-not shadow-mode-read-only?
         (submit-row {:submitting? submitting?
                      :submit-disabled? (:disabled? submit)
                      :submit-tooltip (:tooltip submit)

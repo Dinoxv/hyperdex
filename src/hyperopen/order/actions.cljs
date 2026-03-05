@@ -217,7 +217,7 @@
                           [[:ui :toast] latest-toast]]]]))
 
 (defn submit-order [state]
-  (let [ghost-mode-message (account-context/mutations-blocked-message state)
+  (let [shadow-mode-message (account-context/mutations-blocked-message state)
         raw-form (trading/order-form-draft state)
         agent-ready? (= :ready (get-in state [:wallet :agent :status]))
         submit-policy (trading/submit-policy state raw-form {:mode :submit
@@ -227,8 +227,8 @@
         reason (:reason submit-policy)
         error-message (:error-message submit-policy)]
     (cond
-      (seq ghost-mode-message)
-      [[:effects/save [:order-form-runtime :error] ghost-mode-message]]
+      (seq shadow-mode-message)
+      [[:effects/save [:order-form-runtime :error] shadow-mode-message]]
 
       reason
       [[:effects/save [:order-form-runtime :error] error-message]]
@@ -246,12 +246,12 @@
   (order-effects/prune-canceled-open-orders state request))
 
 (defn cancel-order [state order]
-  (let [ghost-mode-message (account-context/mutations-blocked-message state)
+  (let [shadow-mode-message (account-context/mutations-blocked-message state)
         agent-ready? (= :ready (get-in state [:wallet :agent :status]))
         request (trading-api/build-cancel-order-request state order)]
     (cond
-      (seq ghost-mode-message)
-      [[:effects/save [:orders :cancel-error] ghost-mode-message]]
+      (seq shadow-mode-message)
+      [[:effects/save [:orders :cancel-error] shadow-mode-message]]
 
       (not agent-ready?)
       [[:effects/save [:orders :cancel-error] "Enable trading before cancelling orders."]]

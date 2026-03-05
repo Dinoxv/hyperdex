@@ -254,22 +254,22 @@
                             stop-shortcut? (and (or meta-key? ctrl-key?)
                                                 shift-key?
                                                 (= key-token "x"))
-                            ghost-mode-active? (account-context/ghost-mode-active? @store)
+                            shadow-mode-active? (account-context/shadow-mode-active? @store)
                             editable-target? (editable-shortcut-target? event)
-                            stop-ghost-shortcut? (and stop-shortcut?
-                                                      ghost-mode-active?
+                            stop-shadow-shortcut? (and stop-shortcut?
+                                                      shadow-mode-active?
                                                       (not editable-target?))
                             selector-visible? (= :asset-selector
                                                  (get-in @store [:asset-selector :visible-dropdown]))]
                         (when (or open-shortcut?
-                                  stop-ghost-shortcut?
+                                  stop-shadow-shortcut?
                                   (and selector-visible?
                                        (= key "Escape")))
                           (when (or open-shortcut?
-                                    stop-ghost-shortcut?)
+                                    stop-shadow-shortcut?)
                             (.preventDefault event))
-                          (if stop-ghost-shortcut?
-                            (dispatch! store nil [[:actions/stop-ghost-mode]])
+                          (if stop-shadow-shortcut?
+                            (dispatch! store nil [[:actions/stop-shadow-mode]])
                             (dispatch! store nil [[:actions/handle-asset-selector-shortcut
                                                    key
                                                    meta-key?
@@ -297,8 +297,8 @@
        (some-> target (.closest "[data-position-reduce-trigger='true']"))
        (some-> target (.closest "[data-position-margin-surface='true']"))
        (some-> target (.closest "[data-position-margin-trigger='true']"))
-       (some-> target (.closest "[data-ghost-mode-surface='true']"))
-       (some-> target (.closest "[data-ghost-mode-trigger='true']")))))
+       (some-> target (.closest "[data-shadow-mode-surface='true']"))
+       (some-> target (.closest "[data-shadow-mode-trigger='true']")))))
 
 (defn install-position-tpsl-clickaway!
   [{:keys [store dispatch!]}]
@@ -316,8 +316,8 @@
                       (let [tpsl-open? (true? (get-in @store [:positions-ui :tpsl-modal :open?]))
                             reduce-open? (true? (get-in @store [:positions-ui :reduce-popover :open?]))
                             margin-open? (true? (get-in @store [:positions-ui :margin-modal :open?]))
-                            ghost-mode-open? (true? (get-in @store [:account-context :ghost-ui :modal-open?]))
-                            any-open? (or tpsl-open? reduce-open? margin-open? ghost-mode-open?)]
+                            shadow-mode-open? (true? (get-in @store [:account-context :shadow-ui :modal-open?]))
+                            any-open? (or tpsl-open? reduce-open? margin-open? shadow-mode-open?)]
                         (when any-open?
                           (let [target (event-target-with-closest event)]
                             (when-not (within-position-overlay-surface? target)
@@ -325,7 +325,7 @@
                                                     tpsl-open? (conj [:actions/close-position-tpsl-modal])
                                                     reduce-open? (conj [:actions/close-position-reduce-popover])
                                                     margin-open? (conj [:actions/close-position-margin-modal])
-                                                    ghost-mode-open? (conj [:actions/close-ghost-mode-modal]))]
+                                                    shadow-mode-open? (conj [:actions/close-shadow-mode-modal]))]
                                 (when (seq close-actions)
                                   (dispatch! store nil close-actions))))))))]
         (.addEventListener window-object "mousedown" handler)

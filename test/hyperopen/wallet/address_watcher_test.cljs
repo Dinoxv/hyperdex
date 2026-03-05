@@ -106,7 +106,7 @@
        {:wallet {:address "0xeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee"}})
       (is (= [["0xdddddddddddddddddddddddddddddddddddddddd" "0xeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee"]] @notify-calls)))))
 
-(deftest private-address-change-listener-tracks-effective-address-when-ghost-mode-toggles-test
+(deftest private-address-change-listener-tracks-effective-address-when-shadow-mode-toggles-test
   (let [notify-calls (atom [])]
     (with-redefs [hyperopen.wallet.address-watcher/notify-handlers!
                   (fn [old-address new-address]
@@ -116,10 +116,10 @@
       (@#'hyperopen.wallet.address-watcher/address-change-listener
        nil nil
        {:wallet {:address "0xaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"}
-        :account-context {:ghost-mode {:active? false
+        :account-context {:shadow-mode {:active? false
                                        :address "0xdddddddddddddddddddddddddddddddddddddddd"}}}
        {:wallet {:address "0xaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"}
-        :account-context {:ghost-mode {:active? true
+        :account-context {:shadow-mode {:active? true
                                        :address "0xdddddddddddddddddddddddddddddddddddddddd"}}})
       (is (= [["0xaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
                "0xdddddddddddddddddddddddddddddddddddddddd"]]

@@ -110,7 +110,7 @@ Operational notes:
 - Deterministic before/after validation report:
   - `/hyperopen/docs/qa/ws-migration-impact-validation-2026-03-05.md`
   - `/hyperopen/docs/qa/info-post-hotspot-baseline-2026-03-05.md`
-  - `/hyperopen/docs/qa/user-funding-spot-clearinghouse-ghost-mode-sampling-2026-03-05.md`
+  - `/hyperopen/docs/qa/user-funding-spot-clearinghouse-shadow-mode-sampling-2026-03-05.md`
 
 ## Rollback
 

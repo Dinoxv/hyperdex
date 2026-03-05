@@ -3,7 +3,7 @@
 
 (defn submit-tooltip-message [required-fields market-price-missing? reason error-message]
   (cond
-    (= reason :ghost-mode-read-only)
+    (= reason :shadow-mode-read-only)
     error-message
 
     (seq required-fields)

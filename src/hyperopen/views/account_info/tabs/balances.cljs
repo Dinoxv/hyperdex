@@ -245,11 +245,11 @@
      [:div.text-right.font-semibold.num.num-right "$" (shared/format-currency usdc-value)]
      [:div.text-right.font-medium.num.num-right (shared/format-pnl pnl-value pnl-pct)]
      [:div.text-left
-      [:button {:class ["btn" "btn-xs" "btn-ghost" "text-trading-text"]} "Send"]]
+      [:button {:class ["btn" "btn-xs" "btn-shadow" "text-trading-text"]} "Send"]]
      [:div.text-left
       (if transfer-disabled?
         [:span {:class ["text-xs" "text-trading-text-secondary"]} "Unified"]
-        [:button {:class ["btn" "btn-xs" "btn-ghost" "text-trading-text"]} "Transfer"])]
+        [:button {:class ["btn" "btn-xs" "btn-shadow" "text-trading-text"]} "Transfer"])]
      [:div.text-left
       (balance-contract-node contract-id)]]))
 

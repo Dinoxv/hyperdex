@@ -2,7 +2,7 @@
   (:require [clojure.string :as str]
             [hyperopen.account.context :as account-context]))
 
-(defn- ghost-mode-submit-error
+(defn- shadow-mode-submit-error
   [store]
   (account-context/mutations-blocked-message @store))
 
@@ -18,11 +18,11 @@
            set-funding-submit-error!
            close-funding-modal!
            refresh-after-funding-submit!]}]
-  (let [ghost-mode-message (ghost-mode-submit-error store)
+  (let [shadow-mode-message (shadow-mode-submit-error store)
         address (get-in @store [:wallet :address])
         action (:action request)]
-    (if (seq ghost-mode-message)
-      (set-funding-submit-error! store show-toast! ghost-mode-message)
+    (if (seq shadow-mode-message)
+      (set-funding-submit-error! store show-toast! shadow-mode-message)
       (if (nil? address)
       (set-funding-submit-error! store
                                  show-toast!
@@ -67,7 +67,7 @@
            resolve-hyperunit-base-urls
            awaiting-withdraw-lifecycle
            start-hyperunit-withdraw-lifecycle-polling!]}]
-  (let [ghost-mode-message (ghost-mode-submit-error store)
+  (let [shadow-mode-message (shadow-mode-submit-error store)
         address (get-in @store [:wallet :address])
         action (:action request)
         submit-withdraw! (case (:type action)
@@ -82,8 +82,8 @@
                            (fn [_store _address _action]
                              (js/Promise.resolve {:status "err"
                                                   :error "Withdrawal action type is not supported."})))]
-    (if (seq ghost-mode-message)
-      (set-funding-submit-error! store show-toast! ghost-mode-message)
+    (if (seq shadow-mode-message)
+      (set-funding-submit-error! store show-toast! shadow-mode-message)
       (if (nil? address)
       (set-funding-submit-error! store
                                  show-toast!
@@ -161,7 +161,7 @@
            resolve-hyperunit-base-urls
            awaiting-deposit-lifecycle
            start-hyperunit-deposit-lifecycle-polling!]}]
-  (let [ghost-mode-message (ghost-mode-submit-error store)
+  (let [shadow-mode-message (shadow-mode-submit-error store)
         address (get-in @store [:wallet :address])
         action (:action request)
         submit-deposit! (case (:type action)
@@ -172,8 +172,8 @@
                           (fn [_store _address _action]
                             (js/Promise.resolve {:status "err"
                                                  :error "Deposit action type is not supported."})))]
-    (if (seq ghost-mode-message)
-      (set-funding-submit-error! store show-toast! ghost-mode-message)
+    (if (seq shadow-mode-message)
+      (set-funding-submit-error! store show-toast! shadow-mode-message)
       (if (nil? address)
       (set-funding-submit-error! store
                                  show-toast!

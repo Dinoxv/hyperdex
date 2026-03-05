@@ -1,4 +1,4 @@
-(ns hyperopen.account.ghost-mode-actions
+(ns hyperopen.account.shadow-mode-actions
   (:require [clojure.string :as str]
             [hyperopen.account.context :as account-context]
             [hyperopen.platform :as platform]))
@@ -34,11 +34,11 @@
 
 (defn- search-value
   [state]
-  (or (get-in state [:account-context :ghost-ui :search]) ""))
+  (or (get-in state [:account-context :shadow-ui :search]) ""))
 
 (defn- label-value
   [state]
-  (or (get-in state [:account-context :ghost-ui :label]) ""))
+  (or (get-in state [:account-context :shadow-ui :label]) ""))
 
 (defn- normalized-search-address
   [state]
@@ -56,7 +56,7 @@
 (defn- editing-watchlist-address
   [state]
   (account-context/normalize-address
-   (get-in state [:account-context :ghost-ui :editing-watchlist-address])))
+   (get-in state [:account-context :shadow-ui :editing-watchlist-address])))
 
 (defn- watchlist
   [state]
@@ -66,13 +66,13 @@
 (defn- persist-watchlist-effects
   [watchlist*]
   [[:effects/local-storage-set-json
-    account-context/ghost-watchlist-storage-key
+    account-context/shadow-watchlist-storage-key
     watchlist*]])
 
-(defn open-ghost-mode-modal
+(defn open-shadow-mode-modal
   [state & [trigger-bounds]]
   (let [watchlist* (watchlist state)
-        active-address (account-context/ghost-address state)
+        active-address (account-context/shadow-address state)
         active-entry (account-context/watchlist-entry-by-address watchlist* active-address)
         search* (or active-address
                     (search-value state)
@@ -81,42 +81,42 @@
                    (label-value state)
                    "")
         anchor* (normalize-anchor trigger-bounds)]
-    [[:effects/save-many [[[:account-context :ghost-ui :modal-open?] true]
-                          [[:account-context :ghost-ui :anchor] anchor*]
-                          [[:account-context :ghost-ui :search] search*]
-                          [[:account-context :ghost-ui :label] label*]
-                          [[:account-context :ghost-ui :editing-watchlist-address] nil]
-                          [[:account-context :ghost-ui :search-error] nil]]]]))
+    [[:effects/save-many [[[:account-context :shadow-ui :modal-open?] true]
+                          [[:account-context :shadow-ui :anchor] anchor*]
+                          [[:account-context :shadow-ui :search] search*]
+                          [[:account-context :shadow-ui :label] label*]
+                          [[:account-context :shadow-ui :editing-watchlist-address] nil]
+                          [[:account-context :shadow-ui :search-error] nil]]]]))
 
-(defn close-ghost-mode-modal
+(defn close-shadow-mode-modal
   [_state]
-  [[:effects/save-many [[[:account-context :ghost-ui :modal-open?] false]
-                        [[:account-context :ghost-ui :anchor] nil]
-                        [[:account-context :ghost-ui :label] ""]
-                        [[:account-context :ghost-ui :editing-watchlist-address] nil]
-                        [[:account-context :ghost-ui :search-error] nil]]]])
+  [[:effects/save-many [[[:account-context :shadow-ui :modal-open?] false]
+                        [[:account-context :shadow-ui :anchor] nil]
+                        [[:account-context :shadow-ui :label] ""]
+                        [[:account-context :shadow-ui :editing-watchlist-address] nil]
+                        [[:account-context :shadow-ui :search-error] nil]]]])
 
-(defn set-ghost-mode-search
+(defn set-shadow-mode-search
   [state value]
   (let [text (if (string? value) value (str (or value "")))
         editing-address* (editing-watchlist-address state)
         next-address* (account-context/normalize-address text)
         editing-active? (and (some? editing-address*)
                              (= editing-address* next-address*))]
-    [[:effects/save-many [[[:account-context :ghost-ui :search] text]
-                          [[:account-context :ghost-ui :label] (if editing-active?
+    [[:effects/save-many [[[:account-context :shadow-ui :search] text]
+                          [[:account-context :shadow-ui :label] (if editing-active?
                                                                   (label-value state)
                                                                   "")]
-                          [[:account-context :ghost-ui :editing-watchlist-address] (when editing-active?
+                          [[:account-context :shadow-ui :editing-watchlist-address] (when editing-active?
                                                                                       editing-address*)]
-                          [[:account-context :ghost-ui :search-error] nil]]]]))
+                          [[:account-context :shadow-ui :search-error] nil]]]]))
 
-(defn set-ghost-mode-label
+(defn set-shadow-mode-label
   [_state value]
   (let [text (if (string? value) value (str (or value "")))]
-    [[:effects/save [:account-context :ghost-ui :label] text]]))
+    [[:effects/save [:account-context :shadow-ui :label] text]]))
 
-(defn start-ghost-mode
+(defn start-shadow-mode
   [state & [address]]
   (if-let [address* (resolved-address state address)]
     (let [started-at-ms (platform/now-ms)
@@ -125,35 +125,35 @@
                       address*
                       (normalized-search-label state)
                       true)]
-      (into [[:effects/save-many [[[:account-context :ghost-mode :active?] true]
-                                  [[:account-context :ghost-mode :address] address*]
-                                  [[:account-context :ghost-mode :started-at-ms] started-at-ms]
-                                  [[:account-context :ghost-ui :modal-open?] false]
-                                  [[:account-context :ghost-ui :anchor] nil]
-                                  [[:account-context :ghost-ui :search] address*]
-                                  [[:account-context :ghost-ui :last-search] address*]
-                                  [[:account-context :ghost-ui :label] ""]
-                                  [[:account-context :ghost-ui :editing-watchlist-address] nil]
-                                  [[:account-context :ghost-ui :search-error] nil]
+      (into [[:effects/save-many [[[:account-context :shadow-mode :active?] true]
+                                  [[:account-context :shadow-mode :address] address*]
+                                  [[:account-context :shadow-mode :started-at-ms] started-at-ms]
+                                  [[:account-context :shadow-ui :modal-open?] false]
+                                  [[:account-context :shadow-ui :anchor] nil]
+                                  [[:account-context :shadow-ui :search] address*]
+                                  [[:account-context :shadow-ui :last-search] address*]
+                                  [[:account-context :shadow-ui :label] ""]
+                                  [[:account-context :shadow-ui :editing-watchlist-address] nil]
+                                  [[:account-context :shadow-ui :search-error] nil]
                                   [[:account-context :watchlist] watchlist*]]]
              [:effects/local-storage-set
-              account-context/ghost-last-search-storage-key
+              account-context/shadow-last-search-storage-key
               address*]]
             (persist-watchlist-effects watchlist*)))
-    [[:effects/save [:account-context :ghost-ui :search-error] invalid-address-error]]))
+    [[:effects/save [:account-context :shadow-ui :search-error] invalid-address-error]]))
 
-(defn stop-ghost-mode
+(defn stop-shadow-mode
   [_state]
-  [[:effects/save-many [[[:account-context :ghost-mode :active?] false]
-                        [[:account-context :ghost-mode :address] nil]
-                        [[:account-context :ghost-mode :started-at-ms] nil]
-                        [[:account-context :ghost-ui :modal-open?] false]
-                        [[:account-context :ghost-ui :anchor] nil]
-                        [[:account-context :ghost-ui :label] ""]
-                        [[:account-context :ghost-ui :editing-watchlist-address] nil]
-                        [[:account-context :ghost-ui :search-error] nil]]]])
+  [[:effects/save-many [[[:account-context :shadow-mode :active?] false]
+                        [[:account-context :shadow-mode :address] nil]
+                        [[:account-context :shadow-mode :started-at-ms] nil]
+                        [[:account-context :shadow-ui :modal-open?] false]
+                        [[:account-context :shadow-ui :anchor] nil]
+                        [[:account-context :shadow-ui :label] ""]
+                        [[:account-context :shadow-ui :editing-watchlist-address] nil]
+                        [[:account-context :shadow-ui :search-error] nil]]]])
 
-(defn add-ghost-mode-watchlist-address
+(defn add-shadow-mode-watchlist-address
   [state & [address]]
   (if-let [address* (resolved-address state address)]
     (let [editing-address* (editing-watchlist-address state)
@@ -164,18 +164,18 @@
                       (normalized-search-label state)
                       preserve-existing-label?)]
       (into [[:effects/save-many [[[:account-context :watchlist] watchlist*]
-                                  [[:account-context :ghost-ui :search] address*]
-                                  [[:account-context :ghost-ui :last-search] address*]
-                                  [[:account-context :ghost-ui :label] ""]
-                                  [[:account-context :ghost-ui :editing-watchlist-address] nil]
-                                  [[:account-context :ghost-ui :search-error] nil]]]
+                                  [[:account-context :shadow-ui :search] address*]
+                                  [[:account-context :shadow-ui :last-search] address*]
+                                  [[:account-context :shadow-ui :label] ""]
+                                  [[:account-context :shadow-ui :editing-watchlist-address] nil]
+                                  [[:account-context :shadow-ui :search-error] nil]]]
              [:effects/local-storage-set
-              account-context/ghost-last-search-storage-key
+              account-context/shadow-last-search-storage-key
               address*]]
             (persist-watchlist-effects watchlist*)))
-    [[:effects/save [:account-context :ghost-ui :search-error] invalid-address-error]]))
+    [[:effects/save [:account-context :shadow-ui :search-error] invalid-address-error]]))
 
-(defn remove-ghost-mode-watchlist-address
+(defn remove-shadow-mode-watchlist-address
   [state address]
   (if-let [address* (account-context/normalize-address address)]
     (let [watchlist* (account-context/remove-watchlist-entry
@@ -185,43 +185,43 @@
           removed-editing? (= address* editing-address*)
           save-effects (cond-> [[[:account-context :watchlist] watchlist*]]
                          removed-editing?
-                         (into [[[:account-context :ghost-ui :label] ""]
-                                [[:account-context :ghost-ui :editing-watchlist-address] nil]]))]
+                         (into [[[:account-context :shadow-ui :label] ""]
+                                [[:account-context :shadow-ui :editing-watchlist-address] nil]]))]
       (into [[:effects/save-many save-effects]]
             (persist-watchlist-effects watchlist*)))
     []))
 
-(defn edit-ghost-mode-watchlist-address
+(defn edit-shadow-mode-watchlist-address
   [state address]
   (if-let [{:keys [address label]} (account-context/watchlist-entry-by-address
                                     (watchlist state)
                                     address)]
-    [[:effects/save-many [[[:account-context :ghost-ui :search] address]
-                          [[:account-context :ghost-ui :label] (or label "")]
-                          [[:account-context :ghost-ui :editing-watchlist-address] address]
-                          [[:account-context :ghost-ui :search-error] nil]]]]
+    [[:effects/save-many [[[:account-context :shadow-ui :search] address]
+                          [[:account-context :shadow-ui :label] (or label "")]
+                          [[:account-context :shadow-ui :editing-watchlist-address] address]
+                          [[:account-context :shadow-ui :search-error] nil]]]]
     []))
 
-(defn clear-ghost-mode-watchlist-edit
+(defn clear-shadow-mode-watchlist-edit
   [_state]
-  [[:effects/save-many [[[:account-context :ghost-ui :label] ""]
-                        [[:account-context :ghost-ui :editing-watchlist-address] nil]
-                        [[:account-context :ghost-ui :search-error] nil]]]])
+  [[:effects/save-many [[[:account-context :shadow-ui :label] ""]
+                        [[:account-context :shadow-ui :editing-watchlist-address] nil]
+                        [[:account-context :shadow-ui :search-error] nil]]]])
 
-(defn copy-ghost-mode-watchlist-address
+(defn copy-shadow-mode-watchlist-address
   [_state address]
   (if-let [address* (account-context/normalize-address address)]
     [[:effects/copy-wallet-address address*]]
     []))
 
-(defn spectate-ghost-mode-watchlist-address
+(defn spectate-shadow-mode-watchlist-address
   [state address]
   (if (str/blank? (str (or address "")))
     []
     (let [entry (account-context/watchlist-entry-by-address
                  (watchlist state)
                  address)]
-      (start-ghost-mode (-> state
-                            (assoc-in [:account-context :ghost-ui :search] address)
-                            (assoc-in [:account-context :ghost-ui :label] (or (:label entry) "")))
+      (start-shadow-mode (-> state
+                            (assoc-in [:account-context :shadow-ui :search] address)
+                            (assoc-in [:account-context :shadow-ui :label] (or (:label entry) "")))
                         address))))

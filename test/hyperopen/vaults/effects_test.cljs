@@ -172,10 +172,10 @@
     (is (= [[:error "Connect your wallet before submitting a deposit."]]
            @toast-calls))))
 
-(deftest api-submit-vault-transfer-blocks-mutations-while-ghost-mode-active-test
+(deftest api-submit-vault-transfer-blocks-mutations-while-shadow-mode-active-test
   (let [store (atom {:wallet {:address "0xabcdefabcdefabcdefabcdefabcdefabcdefabcd"
                               :agent {:status :ready}}
-                     :account-context {:ghost-mode {:active? true
+                     :account-context {:shadow-mode {:active? true
                                                     :address "0x1234567890abcdef1234567890abcdef12345678"}}
                      :vaults-ui {:vault-transfer-modal {:submitting? true}}})
         toast-calls (atom [])]
@@ -189,9 +189,9 @@
       :show-toast! (fn [_store kind message]
                      (swap! toast-calls conj [kind message]))})
     (is (= false (get-in @store [:vaults-ui :vault-transfer-modal :submitting?])))
-    (is (= account-context/ghost-mode-read-only-message
+    (is (= account-context/shadow-mode-read-only-message
            (get-in @store [:vaults-ui :vault-transfer-modal :error])))
-    (is (= [[:error account-context/ghost-mode-read-only-message]]
+    (is (= [[:error account-context/shadow-mode-read-only-message]]
            @toast-calls))))
 
 (deftest api-submit-vault-transfer-resets-modal-and-refreshes-vault-state-on-success-test

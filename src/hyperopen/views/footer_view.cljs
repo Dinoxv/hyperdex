@@ -566,7 +566,7 @@
       [:div {:class ["flex" "items-center" "justify-between"]}
        [:h2 {:class ["text-sm" "font-semibold" "uppercase" "tracking-wide"]}
         "Connection diagnostics"]
-       [:button.btn.btn-xs.btn-ghost
+       [:button.btn.btn-xs.btn-shadow
         {:type "button"
          :on {:click [[:actions/close-ws-diagnostics]]}}
         "Close"]]
@@ -605,7 +605,7 @@
            reset-label)])
        (hover-tooltip
         "Run both market-data and Orders/OMS subscription resets in one pass, without a full reconnect."
-        [:button.btn.btn-sm.btn-ghost
+        [:button.btn.btn-sm.btn-shadow
          {:type "button"
           :title "Run both market-data and Orders/OMS subscription resets in one pass, without a full reconnect."
           :disabled reset-disabled?
@@ -616,7 +616,7 @@
 
       [:div {:class ["flex" "items-center" "justify-between" "text-xs" "text-base-content/70"]}
        [:span "Sensitive values are masked by default"]
-       [:button.btn.btn-xs.btn-ghost
+       [:button.btn.btn-xs.btn-shadow
         {:type "button"
          :on {:click [[:actions/toggle-ws-diagnostics-sensitive]]}}
         (if reveal-sensitive? "Hide sensitive" "Reveal sensitive")]]

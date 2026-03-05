@@ -810,10 +810,10 @@
              (done))))
        0))))
 
-(deftest api-submit-order-effect-blocks-mutations-while-ghost-mode-active-test
+(deftest api-submit-order-effect-blocks-mutations-while-shadow-mode-active-test
   (let [store (atom {:wallet {:address "0xabc"
                               :agent {:status :ready}}
-                     :account-context {:ghost-mode {:active? true
+                     :account-context {:shadow-mode {:active? true
                                                     :address "0x1234567890abcdef1234567890abcdef12345678"}}
                      :order-form {}
                      :order-form-runtime {:submitting? false
@@ -822,33 +822,33 @@
     (core/api-submit-order nil store {:action {:type "order"
                                                :orders []
                                                :grouping "na"}})
-    (is (= account-context/ghost-mode-read-only-message
+    (is (= account-context/shadow-mode-read-only-message
            (get-in @store [:order-form-runtime :error])))
     (is (= {:kind :error
-            :message account-context/ghost-mode-read-only-message}
+            :message account-context/shadow-mode-read-only-message}
            (get-in @store [:ui :toast])))))
 
-(deftest api-cancel-order-effect-blocks-mutations-while-ghost-mode-active-test
+(deftest api-cancel-order-effect-blocks-mutations-while-shadow-mode-active-test
   (let [store (atom {:wallet {:address "0xabc"
                               :agent {:status :ready}}
-                     :account-context {:ghost-mode {:active? true
+                     :account-context {:shadow-mode {:active? true
                                                     :address "0x1234567890abcdef1234567890abcdef12345678"}}
                      :orders {:cancel-error nil}
                      :ui {:toast nil}})]
     (core/api-cancel-order nil store {:action {:type "cancel"
                                                :cancels [{:a 0 :o 101}]}})
-    (is (= account-context/ghost-mode-read-only-message
+    (is (= account-context/shadow-mode-read-only-message
            (get-in @store [:orders :cancel-error])))
     (is (= {:kind :error
-            :message account-context/ghost-mode-read-only-message}
+            :message account-context/shadow-mode-read-only-message}
            (get-in @store [:ui :toast])))))
 
 (deftest api-submit-position-tpsl-effect-validates-preconditions-test
   (let [dispatched (atom [])
         deps (position-submit-deps dispatched)
-        ghost-mode-store (atom {:wallet {:address "0xabc"
+        shadow-mode-store (atom {:wallet {:address "0xabc"
                                          :agent {:status :ready}}
-                                :account-context {:ghost-mode {:active? true
+                                :account-context {:shadow-mode {:active? true
                                                                :address "0x1234567890abcdef1234567890abcdef12345678"}}
                                 :positions-ui {:tpsl-modal {:submitting? true
                                                             :error nil}}
@@ -862,13 +862,13 @@
                                :positions-ui {:tpsl-modal {:submitting? true
                                                            :error nil}}
                                :ui {:toast nil}})]
-    (order-effects/api-submit-position-tpsl deps nil ghost-mode-store {:action {:type "order"}})
-    (is (= false (get-in @ghost-mode-store [:positions-ui :tpsl-modal :submitting?])))
-    (is (= account-context/ghost-mode-read-only-message
-           (get-in @ghost-mode-store [:positions-ui :tpsl-modal :error])))
+    (order-effects/api-submit-position-tpsl deps nil shadow-mode-store {:action {:type "order"}})
+    (is (= false (get-in @shadow-mode-store [:positions-ui :tpsl-modal :submitting?])))
+    (is (= account-context/shadow-mode-read-only-message
+           (get-in @shadow-mode-store [:positions-ui :tpsl-modal :error])))
     (is (= {:kind :error
-            :message account-context/ghost-mode-read-only-message}
-           (get-in @ghost-mode-store [:ui :toast])))
+            :message account-context/shadow-mode-read-only-message}
+           (get-in @shadow-mode-store [:ui :toast])))
 
     (order-effects/api-submit-position-tpsl deps nil missing-wallet-store {:action {:type "order"}})
     (is (= false (get-in @missing-wallet-store [:positions-ui :tpsl-modal :submitting?])))
@@ -951,9 +951,9 @@
 (deftest api-submit-position-margin-effect-validates-preconditions-test
   (let [dispatched (atom [])
         deps (position-submit-deps dispatched)
-        ghost-mode-store (atom {:wallet {:address "0xabc"
+        shadow-mode-store (atom {:wallet {:address "0xabc"
                                          :agent {:status :ready}}
-                                :account-context {:ghost-mode {:active? true
+                                :account-context {:shadow-mode {:active? true
                                                                :address "0x1234567890abcdef1234567890abcdef12345678"}}
                                 :positions-ui {:margin-modal {:submitting? true
                                                               :error nil}}
@@ -967,13 +967,13 @@
                                :positions-ui {:margin-modal {:submitting? true
                                                              :error nil}}
                                :ui {:toast nil}})]
-    (order-effects/api-submit-position-margin deps nil ghost-mode-store {:action {:type "updateIsolatedMargin"}})
-    (is (= false (get-in @ghost-mode-store [:positions-ui :margin-modal :submitting?])))
-    (is (= account-context/ghost-mode-read-only-message
-           (get-in @ghost-mode-store [:positions-ui :margin-modal :error])))
+    (order-effects/api-submit-position-margin deps nil shadow-mode-store {:action {:type "updateIsolatedMargin"}})
+    (is (= false (get-in @shadow-mode-store [:positions-ui :margin-modal :submitting?])))
+    (is (= account-context/shadow-mode-read-only-message
+           (get-in @shadow-mode-store [:positions-ui :margin-modal :error])))
     (is (= {:kind :error
-            :message account-context/ghost-mode-read-only-message}
-           (get-in @ghost-mode-store [:ui :toast])))
+            :message account-context/shadow-mode-read-only-message}
+           (get-in @shadow-mode-store [:ui :toast])))
 
     (order-effects/api-submit-position-margin deps nil missing-wallet-store {:action {:type "updateIsolatedMargin"}})
     (is (= false (get-in @missing-wallet-store [:positions-ui :margin-modal :submitting?])))

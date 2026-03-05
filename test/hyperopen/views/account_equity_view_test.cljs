@@ -147,9 +147,9 @@
     (is (number? summary-index))
     (is (< funding-index summary-index))))
 
-(deftest unified-account-summary-hides-funding-actions-while-ghost-mode-active-test
+(deftest unified-account-summary-hides-funding-actions-while-shadow-mode-active-test
   (let [view-node (view/account-equity-view {:account {:mode :unified}
-                                             :account-context {:ghost-mode {:active? true
+                                             :account-context {:shadow-mode {:active? true
                                                                            :address "0x1234567890abcdef1234567890abcdef12345678"}}
                                              :webdata2 {:clearinghouseState {:marginSummary {:accountValue "204.45"
                                                                                               :totalNtlPos "0.0"
@@ -177,8 +177,8 @@
     (is (nil? withdraw-button))
     (is (some? (find-first-node view-node #(contains? (direct-texts %) "Unified Account Summary"))))))
 
-(deftest classic-account-equity-hides-funding-actions-while-ghost-mode-active-test
-  (let [view-node (view/account-equity-view {:account-context {:ghost-mode {:active? true
+(deftest classic-account-equity-hides-funding-actions-while-shadow-mode-active-test
+  (let [view-node (view/account-equity-view {:account-context {:shadow-mode {:active? true
                                                                             :address "0x1234567890abcdef1234567890abcdef12345678"}}
                                              :webdata2 {}
                                              :spot {}

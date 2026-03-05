@@ -1,4 +1,4 @@
-(ns hyperopen.views.ghost-mode-modal
+(ns hyperopen.views.shadow-mode-modal
   (:require [hyperopen.account.context :as account-context]
             [hyperopen.wallet.core :as wallet]))
 
@@ -24,7 +24,7 @@
   84)
 
 (def ^:private fallback-anchor-selector
-  "[data-role='ghost-mode-open-button']")
+  "[data-role='shadow-mode-open-button']")
 
 (defn- clamp
   [value min-value max-value]
@@ -210,7 +210,7 @@
                          "text-xs"
                          "font-medium"]
                         tone-classes)
-           :data-role "ghost-mode-copy-feedback"}
+           :data-role "shadow-mode-copy-feedback"}
      [:svg {:viewBox "0 0 20 20"
             :class ["h-3.5" "w-3.5" "shrink-0"]
             :fill "none"
@@ -220,7 +220,7 @@
             :stroke-linejoin "round"
             :aria-hidden "true"}
       [:path {:d icon-path}]]
-     [:span {:data-role "ghost-mode-copy-feedback-message"}
+     [:span {:data-role "shadow-mode-copy-feedback-message"}
       message]]))
 
 (defn- spectate-icon
@@ -303,57 +303,57 @@
                     active? (into ["bg-base-200/80"])
                     (not active?) (into ["bg-base-100"])
                     editing? (into ["ring-1" "ring-[#4f8f87]/70"]))
-        :data-role "ghost-mode-watchlist-row"}
+        :data-role "shadow-mode-watchlist-row"}
      [:div {:class ["min-w-0"]
-            :data-role "ghost-mode-watchlist-label"}
+            :data-role "shadow-mode-watchlist-label"}
       [:span {:class ["text-m" "font-medium" "text-gray-100" "break-words"]}
        label]]
      [:div {:class ["min-w-0" "truncate"]
-            :data-role "ghost-mode-watchlist-address"}
+            :data-role "shadow-mode-watchlist-address"}
       [:span {:class ["num" "truncate" "text-sm" "text-gray-400"]}
        (watchlist-display-address address)]]
      [:div {:class ["flex" "items-center" "justify-end" "gap-1"]
-            :data-role "ghost-mode-watchlist-actions"}
+            :data-role "shadow-mode-watchlist-actions"}
       (watchlist-action-icon-button
        {:aria-label (if active? "Currently spectating this address" "Spectate this address")
         :title (if active? "Currently spectating" "Spectate this address")
-        :on-click [[:actions/spectate-ghost-mode-watchlist-address address]]
+        :on-click [[:actions/spectate-shadow-mode-watchlist-address address]]
         :class (when active? ["text-[#e8c25f]"
                               "border-[#7f6a39]"
                               "bg-[#2a2418]"
                               "hover:border-[#9f854c]"
                               "hover:bg-[#3a301f]"
                               "hover:text-[#f2d981]"])
-        :data-role "ghost-mode-watchlist-spectate"}
+        :data-role "shadow-mode-watchlist-spectate"}
        (spectate-icon))
       (watchlist-action-icon-button
        {:aria-label "Copy watchlist address"
         :title "Copy address"
-        :on-click [[:actions/copy-ghost-mode-watchlist-address address]]
-        :data-role "ghost-mode-watchlist-copy"}
+        :on-click [[:actions/copy-shadow-mode-watchlist-address address]]
+        :data-role "shadow-mode-watchlist-copy"}
        (copy-icon))
       (watchlist-action-icon-button
        {:aria-label "Link feature coming soon"
         :title "Link address (coming soon)"
-        :data-role "ghost-mode-watchlist-link-placeholder"
+        :data-role "shadow-mode-watchlist-link-placeholder"
         :disabled? true}
        (link-icon))
       (watchlist-action-icon-button
        {:aria-label "Edit watchlist label"
         :title "Edit label"
-        :on-click [[:actions/edit-ghost-mode-watchlist-address address]]
-        :data-role "ghost-mode-watchlist-edit"}
+        :on-click [[:actions/edit-shadow-mode-watchlist-address address]]
+        :data-role "shadow-mode-watchlist-edit"}
        (edit-icon))
       (watchlist-action-icon-button
        {:aria-label "Remove watchlist address"
         :title "Remove address"
-        :on-click [[:actions/remove-ghost-mode-watchlist-address address]]
-        :data-role "ghost-mode-watchlist-remove"}
+        :on-click [[:actions/remove-shadow-mode-watchlist-address address]]
+        :data-role "shadow-mode-watchlist-remove"}
        (remove-icon))]]))
 
-(defn ghost-mode-modal-view
+(defn shadow-mode-modal-view
   [state]
-  (let [ui-state (get-in state [:account-context :ghost-ui] {})
+  (let [ui-state (get-in state [:account-context :shadow-ui] {})
         open? (true? (:modal-open? ui-state))
         anchor (:anchor ui-state)
         search (or (:search ui-state) "")
@@ -366,8 +366,8 @@
                                  (seq (:message copy-feedback)))
         watchlist (account-context/normalize-watchlist
                    (get-in state [:account-context :watchlist]))
-        active? (account-context/ghost-mode-active? state)
-        active-address (account-context/ghost-address state)
+        active? (account-context/shadow-mode-active? state)
+        active-address (account-context/shadow-address state)
         valid-search? (some? (account-context/normalize-address search))
         start-disabled? (not valid-search?)
         add-disabled? (not valid-search?)
@@ -385,7 +385,7 @@
         panel-style (anchored-panel-layout-style anchor*)]
     (when open?
       [:div {:class ["fixed" "inset-0" "z-[290]" "pointer-events-none"]
-             :data-role "ghost-mode-modal-root"}
+             :data-role "shadow-mode-modal-root"}
        [:div {:class ["absolute"
                       "pointer-events-auto"
                       "flex"
@@ -401,22 +401,22 @@
               :style panel-style
               :role "dialog"
               :aria-modal false
-              :aria-label "Ghost Mode"
-              :data-role "ghost-mode-modal"
-              :data-ghost-mode-surface "true"}
+              :aria-label "Shadow Mode"
+              :data-role "shadow-mode-modal"
+              :data-shadow-mode-surface "true"}
         [:div {:class ["px-4"
                        "pt-3.5"
                        "pb-1.5"]}
          [:div {:class ["flex" "items-center" "justify-between" "gap-3"]}
           [:div {:class ["flex" "min-w-0" "items-center" "gap-2"]}
            [:h2 {:class ["text-[17px]" "font-semibold" "leading-[25px]" "text-[#e5eef1]"]}
-            "Ghost Mode"]]
+            "Shadow Mode"]]
           [:div {:class ["flex" "items-center" "gap-2"]}
            (when active?
              [:button {:type "button"
                        :class (modal-button-classes false false)
-                       :on {:click [[:actions/stop-ghost-mode]]}
-                       :data-role "ghost-mode-stop"}
+                       :on {:click [[:actions/stop-shadow-mode]]}
+                       :data-role "shadow-mode-stop"}
               "Stop"])
            [:button {:type "button"
                      :class ["inline-flex"
@@ -431,9 +431,9 @@
                              "focus:outline-none"
                              "focus:ring-0"
                              "focus:ring-offset-0"]
-                     :on {:click [[:actions/close-ghost-mode-modal]]}
-                     :aria-label "Close Ghost Mode"
-                     :data-role "ghost-mode-close"}
+                     :on {:click [[:actions/close-shadow-mode-modal]]}
+                     :aria-label "Close Shadow Mode"
+                     :data-role "shadow-mode-close"}
             [:svg {:viewBox "0 0 20 20"
                    :class ["h-4" "w-4"]
                    :fill "none"
@@ -469,14 +469,14 @@
                             "focus:ring-[#8a96a6]/35"
                             "focus:ring-offset-0"
                             "focus:shadow-none"]
-                    :on {:input [[:actions/set-ghost-mode-search [:event.target/value]]]}
-                    :data-role "ghost-mode-search-input"}]
+                    :on {:input [[:actions/set-shadow-mode-search [:event.target/value]]]}
+                    :data-role "shadow-mode-search-input"}]
            [:button {:type "button"
                      :class (into (modal-button-classes true start-disabled?)
                                   input-row-action-button-classes)
                      :disabled start-disabled?
-                     :on {:click [[:actions/start-ghost-mode]]}
-                     :data-role "ghost-mode-start"}
+                     :on {:click [[:actions/start-shadow-mode]]}
+                     :data-role "shadow-mode-start"}
             (if active? "Switch" "Spectate")]]
           (when show-label-row?
             [:div {:class input-row-layout-classes}
@@ -504,14 +504,14 @@
                               "focus:ring-[#8a96a6]/35"
                               "focus:ring-offset-0"
                               "focus:shadow-none"]
-                      :on {:input [[:actions/set-ghost-mode-label [:event.target/value]]]}
-                      :data-role "ghost-mode-label-input"}]
+                      :on {:input [[:actions/set-shadow-mode-label [:event.target/value]]]}
+                      :data-role "shadow-mode-label-input"}]
              [:button {:type "button"
                        :class (into (modal-button-classes false add-disabled?)
                                     input-row-action-button-classes)
                        :disabled add-disabled?
-                       :on {:click [[:actions/add-ghost-mode-watchlist-address]]}
-                       :data-role "ghost-mode-add-watchlist"}
+                       :on {:click [[:actions/add-shadow-mode-watchlist-address]]}
+                       :data-role "shadow-mode-add-watchlist"}
               add-watchlist-label]
              (when edit-mode?
                [:button {:type "button"
@@ -525,8 +525,8 @@
                                  "text-gray-200"
                                  "hover:bg-base-300"
                                  "hover:text-gray-100"]
-                         :on {:click [[:actions/clear-ghost-mode-watchlist-edit]]}
-                         :data-role "ghost-mode-clear-watchlist-edit"}
+                         :on {:click [[:actions/clear-shadow-mode-watchlist-edit]]}
+                         :data-role "shadow-mode-clear-watchlist-edit"}
                 "Cancel"])])
           (when active?
             [:div {:class ["rounded-lg"
@@ -537,7 +537,7 @@
                            "py-1.5"
                            "text-xs"
                            "text-[#bdeee8]"]
-                   :data-role "ghost-mode-active-summary"}
+                   :data-role "shadow-mode-active-summary"}
              [:span {:class ["font-medium"]}
               "Currently spectating: "]
              [:span {:class ["num"]} active-address]])
@@ -551,7 +551,7 @@
                            "text-m"
                            "leading-[19px]"
                            "text-[#f2b8c5]"]
-                   :data-role "ghost-mode-search-error"}
+                   :data-role "shadow-mode-search-error"}
              search-error])]]
         [:div {:class ["flex" "min-h-0" "flex-1" "flex-col"]}
          [:div {:class ["grid"
@@ -565,7 +565,7 @@
                         "text-xs"
                         "font-medium"
                         "text-gray-400"]
-                :data-role "ghost-mode-watchlist-header"}
+                :data-role "shadow-mode-watchlist-header"}
           [:span "Label"]
           [:span "Address"]
           [:span {:class ["text-right"]} "Actions"]]
@@ -578,7 +578,7 @@
                           "border-base-300"
                           "divide-y"
                           "divide-base-300"]
-                  :data-role "ghost-mode-watchlist"}]
+                  :data-role "shadow-mode-watchlist"}]
             (map (fn [entry]
                    (let [address (:address entry)]
                      ^{:key address}
@@ -599,7 +599,7 @@
                           "px-3"
                           "text-sm"
                           "text-[#90a6ad]"]
-                  :data-role "ghost-mode-watchlist-empty"}
+                  :data-role "shadow-mode-watchlist-empty"}
             "No spectated addresses saved yet."])]
         (when show-copy-feedback?
           [:div {:class ["border-t"
@@ -608,5 +608,5 @@
                          "px-4"
                          "pt-2"
                          "pb-2.5"]
-                 :data-role "ghost-mode-copy-feedback-slot"}
+                 :data-role "shadow-mode-copy-feedback-slot"}
            (copy-feedback-row copy-feedback)])]])))

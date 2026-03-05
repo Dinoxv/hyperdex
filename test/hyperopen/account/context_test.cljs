@@ -43,29 +43,29 @@
             initial
             "0x2222222222222222222222222222222222222222")))))
 
-(deftest effective-account-address-prefers-ghost-when-active-test
+(deftest effective-account-address-prefers-shadow-when-active-test
   (let [owner "0x1111111111111111111111111111111111111111"
-        ghost "0x2222222222222222222222222222222222222222"]
-    (is (= ghost
+        shadow "0x2222222222222222222222222222222222222222"]
+    (is (= shadow
            (account-context/effective-account-address
             {:wallet {:address owner}
-             :account-context {:ghost-mode {:active? true
-                                            :address ghost}}})))
+             :account-context {:shadow-mode {:active? true
+                                            :address shadow}}})))
     (is (= owner
            (account-context/effective-account-address
             {:wallet {:address owner}
-             :account-context {:ghost-mode {:active? false
-                                            :address ghost}}})))
+             :account-context {:shadow-mode {:active? false
+                                            :address shadow}}})))
     (is (= owner
            (account-context/effective-account-address
             {:wallet {:address owner}
-             :account-context {:ghost-mode {:active? true
+             :account-context {:shadow-mode {:active? true
                                             :address "bad"}}})))))
 
-(deftest mutations-allowed-is-disabled-during-ghost-mode-test
+(deftest mutations-allowed-is-disabled-during-shadow-mode-test
   (is (false? (account-context/mutations-allowed?
-               {:account-context {:ghost-mode {:active? true
+               {:account-context {:shadow-mode {:active? true
                                                :address "0x1111111111111111111111111111111111111111"}}})))
   (is (true? (account-context/mutations-allowed?
-              {:account-context {:ghost-mode {:active? false
+              {:account-context {:shadow-mode {:active? false
                                               :address "0x1111111111111111111111111111111111111111"}}}))))
