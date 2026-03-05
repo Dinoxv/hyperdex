@@ -6,6 +6,7 @@
             [hyperopen.account.history.effects :as history-effects]
             [hyperopen.api.default :as api]
             [hyperopen.domain.funding-history :as funding-history]
+            [hyperopen.platform :as platform]
             [hyperopen.views.account-info-view :as account-info-view]))
 
 (defn- apply-save-many-effect!
@@ -262,6 +263,125 @@
       (is (= 0 @calls))
       (is (false? (get-in @store [:account-info :funding-history :loading?]))))))
 
+(deftest api-fetch-user-funding-history-effect-prefers-hydrated-user-fundings-stream-test
+  (let [address "0xaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+        row (info-funding-row 1700003600000 "BTC" "-0.1250" "-10" "-0.0003")
+        calls (atom 0)
+        store (atom (-> (base-history-state address)
+                        (assoc-in [:account-info :selected-tab] :funding-history)
+                        (assoc-in [:account-info :funding-history :request-id] 51)
+                        (assoc-in [:account-info :funding-history :loading?] true)
+                        (assoc-in [:account-info :funding-history :error] "stale")
+                        (assoc-in [:orders :fundings-raw] [row])
+                        (assoc-in [:websocket :health]
+                                  {:transport {:state :connected
+                                               :freshness :live}
+                                   :streams {["userFundings" nil address nil nil]
+                                             {:topic "userFundings"
+                                              :status :n-a
+                                              :subscribed? true
+                                              :message-count 1
+                                              :descriptor {:type "userFundings"
+                                                           :user address}}}})))]
+    (with-redefs [api/request-user-funding-history! (fn
+                                                      ([_address]
+                                                       (swap! calls inc)
+                                                       (js/Promise.resolve []))
+                                                      ([_address _opts]
+                                                       (swap! calls inc)
+                                                       (js/Promise.resolve [])))]
+      (history-effects/api-fetch-user-funding-history-effect nil store 51)
+      (is (= 0 @calls))
+      (is (false? (get-in @store [:account-info :funding-history :loading?])))
+      (is (nil? (get-in @store [:account-info :funding-history :error])))
+      (is (= ["BTC"] (mapv :coin (get-in @store [:orders :fundings])))))))
+
+(deftest api-fetch-user-funding-history-effect-falls-back-to-rest-when-stream-not-hydrated-test
+  (async done
+    (let [address "0xaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+          row (info-funding-row 1700003600000 "BTC" "-0.1250" "-10" "-0.0003")
+          calls (atom 0)
+          store (atom (-> (base-history-state address)
+                          (assoc-in [:account-info :selected-tab] :funding-history)
+                          (assoc-in [:account-info :funding-history :request-id] 52)
+                          (assoc-in [:account-info :funding-history :loading?] true)
+                          (assoc-in [:websocket :health]
+                                    {:transport {:state :connected
+                                                 :freshness :live}
+                                     :streams {["userFundings" nil address nil nil]
+                                               {:topic "userFundings"
+                                                :status :n-a
+                                                :subscribed? true
+                                                :message-count 0
+                                                :descriptor {:type "userFundings"
+                                                             :user address}}}})))]
+      (with-redefs [platform/set-timeout! (fn [callback _ms]
+                                            (callback)
+                                            1234)
+                    api/request-user-funding-history! (fn
+                                                        ([_address]
+                                                         (swap! calls inc)
+                                                         (js/Promise.resolve [row]))
+                                                        ([_address _opts]
+                                                         (swap! calls inc)
+                                                         (js/Promise.resolve [row])))]
+        (-> (history-effects/api-fetch-user-funding-history-effect nil store 52)
+            (.then (fn [_]
+                     (is (= 1 @calls))
+                     (is (false? (get-in @store [:account-info :funding-history :loading?])))
+                     (is (= ["BTC"] (mapv :coin (get-in @store [:orders :fundings]))))
+                     (done)))
+            (.catch (fn [err]
+                      (is false (str "Unexpected error: " err))
+                      (done))))))))
+
+(deftest api-fetch-user-funding-history-effect-skips-rest-when-stream-hydrates-during-grace-window-test
+  (async done
+    (let [address "0xaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+          row (info-funding-row 1700003600000 "BTC" "-0.1250" "-10" "-0.0003")
+          calls (atom 0)
+          store (atom (-> (base-history-state address)
+                          (assoc-in [:account-info :selected-tab] :funding-history)
+                          (assoc-in [:account-info :funding-history :request-id] 53)
+                          (assoc-in [:account-info :funding-history :loading?] true)
+                          (assoc-in [:orders :fundings-raw] [row])
+                          (assoc-in [:websocket :health]
+                                    {:transport {:state :connected
+                                                 :freshness :live}
+                                     :streams {["userFundings" nil address nil nil]
+                                               {:topic "userFundings"
+                                                :status :n-a
+                                                :subscribed? true
+                                                :message-count 0
+                                                :descriptor {:type "userFundings"
+                                                             :user address}}}})))]
+      (with-redefs [platform/set-timeout! (fn [callback _ms]
+                                            ;; Simulate stream hydration racing in before fallback REST fires.
+                                            (swap! store assoc-in
+                                                   [:websocket :health :streams
+                                                    ["userFundings" nil address nil nil]
+                                                    :message-count]
+                                                   1)
+                                            (callback)
+                                            1234)
+                    api/request-user-funding-history! (fn
+                                                        ([_address]
+                                                         (swap! calls inc)
+                                                         (js/Promise.resolve [row]))
+                                                        ([_address _opts]
+                                                         (swap! calls inc)
+                                                         (js/Promise.resolve [row])))]
+        (-> (history-effects/api-fetch-user-funding-history-effect nil store 53)
+            (.then (fn [_]
+                     (is (= 0 @calls))
+                     (is (false? (get-in @store [:account-info :funding-history :loading?])))
+                     (is (nil? (get-in @store [:account-info :funding-history :error])))
+                     (is (= ["BTC"] (mapv :coin (get-in @store [:orders :fundings]))))
+                     (done)))
+            (.catch (fn [err]
+                      (is false (str "Unexpected error: " err))
+                      (done))))))))
+
 (deftest fetch-and-merge-funding-history-no-address-is-noop-test
   (let [store (atom (base-history-state nil))
         calls (atom 0)]
@@ -274,6 +394,110 @@
                                                        (js/Promise.resolve [])))]
       (is (nil? (history-effects/fetch-and-merge-funding-history! store nil nil)))
       (is (= 0 @calls)))))
+
+(deftest fetch-and-merge-funding-history-prefers-hydrated-stream-test
+  (let [address "0xaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+        row (info-funding-row 1700003600000 "BTC" "-0.1250" "-10" "-0.0003")
+        calls (atom 0)
+        store (atom (-> (base-history-state address)
+                        (assoc-in [:orders :fundings-raw] [row])
+                        (assoc-in [:websocket :health]
+                                  {:transport {:state :connected
+                                               :freshness :live}
+                                   :streams {["userFundings" nil address nil nil]
+                                             {:topic "userFundings"
+                                              :status :n-a
+                                              :subscribed? true
+                                              :message-count 1
+                                              :descriptor {:type "userFundings"
+                                                           :user address}}}})))]
+    (with-redefs [api/request-user-funding-history! (fn
+                                                      ([_address]
+                                                       (swap! calls inc)
+                                                       (js/Promise.resolve [row]))
+                                                      ([_address _opts]
+                                                       (swap! calls inc)
+                                                       (js/Promise.resolve [row])))]
+      (history-effects/fetch-and-merge-funding-history! store address {:priority :high})
+      (is (= 0 @calls))
+      (is (nil? (get-in @store [:account-info :funding-history :error])))
+      (is (= ["BTC"] (mapv :coin (get-in @store [:orders :fundings])))))))
+
+(deftest fetch-and-merge-funding-history-falls-back-to-rest-when-stream-not-hydrated-test
+  (async done
+    (let [address "0xaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+          row (info-funding-row 1700003600000 "BTC" "-0.1250" "-10" "-0.0003")
+          calls (atom 0)
+          store (atom (-> (base-history-state address)
+                          (assoc-in [:websocket :health]
+                                    {:transport {:state :connected
+                                                 :freshness :live}
+                                     :streams {["userFundings" nil address nil nil]
+                                               {:topic "userFundings"
+                                                :status :n-a
+                                                :subscribed? true
+                                                :message-count 0
+                                                :descriptor {:type "userFundings"
+                                                             :user address}}}})))]
+      (with-redefs [platform/set-timeout! (fn [callback _ms]
+                                            (callback)
+                                            1234)
+                    api/request-user-funding-history! (fn
+                                                        ([_address]
+                                                         (swap! calls inc)
+                                                         (js/Promise.resolve [row]))
+                                                        ([_address _opts]
+                                                         (swap! calls inc)
+                                                         (js/Promise.resolve [row])))]
+        (-> (history-effects/fetch-and-merge-funding-history! store address {:priority :high})
+            (.then (fn [_]
+                     (is (= 1 @calls))
+                     (is (= ["BTC"] (mapv :coin (get-in @store [:orders :fundings]))))
+                     (done)))
+            (.catch (fn [err]
+                      (is false (str "Unexpected error: " err))
+                      (done))))))))
+
+(deftest fetch-and-merge-funding-history-skips-rest-when-stream-hydrates-during-grace-window-test
+  (async done
+    (let [address "0xaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+          row (info-funding-row 1700003600000 "BTC" "-0.1250" "-10" "-0.0003")
+          calls (atom 0)
+          store (atom (-> (base-history-state address)
+                          (assoc-in [:orders :fundings-raw] [row])
+                          (assoc-in [:websocket :health]
+                                    {:transport {:state :connected
+                                                 :freshness :live}
+                                     :streams {["userFundings" nil address nil nil]
+                                               {:topic "userFundings"
+                                                :status :n-a
+                                                :subscribed? true
+                                                :message-count 0
+                                                :descriptor {:type "userFundings"
+                                                             :user address}}}})))]
+      (with-redefs [platform/set-timeout! (fn [callback _ms]
+                                            (swap! store assoc-in
+                                                   [:websocket :health :streams
+                                                    ["userFundings" nil address nil nil]
+                                                    :message-count]
+                                                   1)
+                                            (callback)
+                                            1234)
+                    api/request-user-funding-history! (fn
+                                                        ([_address]
+                                                         (swap! calls inc)
+                                                         (js/Promise.resolve [row]))
+                                                        ([_address _opts]
+                                                         (swap! calls inc)
+                                                         (js/Promise.resolve [row])))]
+        (-> (history-effects/fetch-and-merge-funding-history! store address {:priority :high})
+            (.then (fn [_]
+                     (is (= 0 @calls))
+                     (is (= ["BTC"] (mapv :coin (get-in @store [:orders :fundings]))))
+                     (done)))
+            (.catch (fn [err]
+                      (is false (str "Unexpected error: " err))
+                      (done))))))))
 
 (deftest fetch-and-merge-funding-history-success-merges-and-projects-current-address-only-test
   (async done

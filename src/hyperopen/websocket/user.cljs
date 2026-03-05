@@ -261,6 +261,23 @@
      {:user address
       :dex dex})))
 
+(defn- spot-clearinghouse-refresh-surface-active?
+  [state]
+  (let [route (some-> (get-in state [:router :path]) str str/trim)
+        selected-tab (get-in state [:account-info :selected-tab])
+        balances-tab-active? (or (nil? selected-tab)
+                                 (= selected-tab :balances))
+        trade-route-active? (or (str/blank? route)
+                                (str/starts-with? route "/trade"))
+        funding-modal-open? (true? (get-in state [:funding-ui :modal :open?]))
+        position-margin-modal-open? (true? (get-in state [:positions-ui :margin-modal :open?]))
+        vault-transfer-modal-open? (true? (get-in state [:vaults-ui :vault-transfer-modal :open?]))]
+    (or funding-modal-open?
+        position-margin-modal-open?
+        vault-transfer-modal-open?
+        (and trade-route-active?
+             balances-tab-active?))))
+
 (defn- refresh-account-surfaces-after-user-fill!
   [store address]
   (when address
@@ -269,10 +286,12 @@
           open-orders-live? (and ws-first-enabled?
                                  (topic-usable-for-address? store "openOrders" address))
           webdata2-live? (and ws-first-enabled?
-                              (topic-usable-for-address? store "webData2" address))]
+                              (topic-usable-for-address? store "webData2" address))
+          spot-refresh-surface-active? (spot-clearinghouse-refresh-surface-active? state)]
       (when-not open-orders-live?
         (refresh-open-orders-snapshot! store address nil {:priority :high}))
-      (refresh-spot-clearinghouse-snapshot! store address {:priority :high})
+      (when spot-refresh-surface-active?
+        (refresh-spot-clearinghouse-snapshot! store address {:priority :high}))
       (when-not webdata2-live?
         (refresh-default-clearinghouse-snapshot! store address {:priority :high}))
       (-> (market-metadata/ensure-and-apply-perp-dex-metadata!

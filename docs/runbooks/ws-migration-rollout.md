@@ -84,6 +84,7 @@ Current default TTL policy (ms) in `/hyperopen/src/hyperopen/api/request_policy.
 - `:public-webdata2`: `30000`
 - `:portfolio`: `8000`
 - `:user-fees`: `15000`
+- `:spot-clearinghouse-state`: `15000`
 - `:user-funding-history` / `:historical-orders` / `:user-non-funding-ledger`: `5000`
 - `:vault-summaries`: `15000`
 - `:user-vault-equities`: `5000`
@@ -107,6 +108,7 @@ Operational notes:
 - Deterministic before/after validation report:
   - `/hyperopen/docs/qa/ws-migration-impact-validation-2026-03-05.md`
   - `/hyperopen/docs/qa/info-post-hotspot-baseline-2026-03-05.md`
+  - `/hyperopen/docs/qa/user-funding-spot-clearinghouse-ghost-mode-sampling-2026-03-05.md`
 
 ## Rollback
 

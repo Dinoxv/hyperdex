@@ -254,7 +254,7 @@
            (ffirst @calls)))
     (is (= {:priority :low
             :dedupe-key [:spot-clearinghouse-state "0xabc"]
-            :cache-ttl-ms 5000}
+            :cache-ttl-ms 15000}
            (second (first @calls))))))
 
 (deftest request-spot-clearinghouse-state-allows-explicit-policy-overrides-test

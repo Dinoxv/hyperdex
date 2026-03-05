@@ -5,10 +5,14 @@
             [hyperopen.account.history.actions :as account-history-actions]
             [hyperopen.domain.funding-history :as funding-history]
             [hyperopen.platform :as platform]
-            [hyperopen.utils.formatting :as fmt]))
+            [hyperopen.utils.formatting :as fmt]
+            [hyperopen.websocket.health-projection :as health-projection]))
 
 (defn- format-funding-history-time [time-ms]
   (fmt/format-local-date-time (or time-ms 0)))
+
+(def ^:private funding-stream-fallback-delay-ms
+  1200)
 
 (defn- funding-position-side-label
   [position-side]
@@ -76,29 +80,119 @@
         (assoc-in [:orders :fundings-raw] merged)
         (assoc-in [:orders :fundings] projected))))
 
+(defn- funding-stream-hydrated?
+  [state address]
+  (when-let [address* (account-context/normalize-address address)]
+    (when-let [[_ stream]
+               (health-projection/find-usable-topic-stream
+                (get-in state [:websocket :health])
+                {:topic "userFundings"
+                 :selector {:user address*}})]
+      (pos? (or (:message-count stream) 0)))))
+
+(defn- funding-stream-usable?
+  [state address]
+  (when-let [address* (account-context/normalize-address address)]
+    (health-projection/topic-stream-usable?
+     (get-in state [:websocket :health])
+     "userFundings"
+     {:user address*})))
+
+(defn- apply-funding-history-stream-projection
+  [state]
+  (let [filters (account-history-actions/funding-history-filters state)
+        projected (funding-history/filter-funding-history-rows
+                   (get-in state [:orders :fundings-raw] [])
+                   filters)]
+    (-> state
+        (assoc-in [:account-info :funding-history :filters] filters)
+        (assoc-in [:orders :fundings] projected))))
+
+(defn- apply-funding-fetch-success!
+  [store request-id rows]
+  (swap! store
+         (fn [state]
+           (if (= request-id (account-history-actions/funding-history-request-id state))
+             (-> (merge-and-project-funding-history state rows)
+                 (assoc-in [:account-info :funding-history :loading?] false)
+                 (assoc-in [:account-info :funding-history :error] nil))
+             state))))
+
+(defn- apply-funding-fetch-error!
+  [store request-id err]
+  (swap! store
+         (fn [state]
+           (if (= request-id (account-history-actions/funding-history-request-id state))
+             (-> state
+                 (assoc-in [:account-info :funding-history :loading?] false)
+                 (assoc-in [:account-info :funding-history :error] (str err)))
+             state))))
+
+(defn- request-funding-history-with-fallback!
+  [store request-id address opts]
+  (-> (api/request-user-funding-history! address opts)
+      (.then (fn [rows]
+               (apply-funding-fetch-success! store request-id rows)))
+      (.catch (fn [err]
+                (apply-funding-fetch-error! store request-id err)))))
+
 (defn fetch-and-merge-funding-history!
   [store address opts]
   (when address
     (let [filters (account-history-actions/funding-history-filters @store)
+          opts* (or opts {})
+          force-refresh? (true? (:force-refresh? opts*))
           request-opts (merge {:priority :high}
                               filters
-                              (or opts {}))]
-      (-> (api/request-user-funding-history! address request-opts)
-          (.then
-           (fn [rows]
+                              opts*)
+          fetch-rest!
+          (fn []
+            (-> (api/request-user-funding-history! address request-opts)
+                (.then
+                 (fn [rows]
+                   (swap! store
+                          (fn [state]
+                            (if (= address (account-context/effective-account-address state))
+                              (-> (merge-and-project-funding-history state rows)
+                                  (assoc-in [:account-info :funding-history :error] nil))
+                              state)))))
+                (.catch
+                 (fn [err]
+                   (swap! store
+                          (fn [state]
+                            (if (= address (account-context/effective-account-address state))
+                              (assoc-in state [:account-info :funding-history :error] (str err))
+                              state)))))))
+          apply-stream!
+          (fn []
             (swap! store
                    (fn [state]
-                      (if (= address (account-context/effective-account-address state))
-                        (-> (merge-and-project-funding-history state rows)
-                            (assoc-in [:account-info :funding-history :error] nil))
-                        state)))))
-          (.catch
-           (fn [err]
-             (swap! store
-                    (fn [state]
-                      (if (= address (account-context/effective-account-address state))
-                        (assoc-in state [:account-info :funding-history :error] (str err))
-                        state)))))))))
+                     (if (= address (account-context/effective-account-address state))
+                       (-> (apply-funding-history-stream-projection state)
+                           (assoc-in [:account-info :funding-history :error] nil))
+                       state))))]
+      (cond
+        (and (not force-refresh?)
+             (funding-stream-hydrated? @store address))
+        (apply-stream!)
+
+        (and (not force-refresh?)
+             (funding-stream-usable? @store address))
+        (js/Promise.
+         (fn [resolve _reject]
+           (platform/set-timeout!
+            (fn []
+              (if (funding-stream-hydrated? @store address)
+                (do
+                  (apply-stream!)
+                  (resolve nil))
+                (-> (fetch-rest!)
+                    (.then (fn [result]
+                             (resolve result))))))
+            funding-stream-fallback-delay-ms)))
+
+        :else
+        (fetch-rest!)))))
 
 (defn api-fetch-user-funding-history-effect
   [_ store request-id]
@@ -126,23 +220,37 @@
                  state)))
 
       :else
-      (-> (api/request-user-funding-history! address opts)
-          (.then (fn [rows]
-                   (swap! store
-                          (fn [state]
-                            (if (= request-id (account-history-actions/funding-history-request-id state))
-                              (-> (merge-and-project-funding-history state rows)
-                                  (assoc-in [:account-info :funding-history :loading?] false)
-                                  (assoc-in [:account-info :funding-history :error] nil))
-                              state)))))
-          (.catch (fn [err]
-                    (swap! store
-                           (fn [state]
-                             (if (= request-id (account-history-actions/funding-history-request-id state))
-                               (-> state
-                                   (assoc-in [:account-info :funding-history :loading?] false)
-                                   (assoc-in [:account-info :funding-history :error] (str err)))
-                               state)))))))))
+      (if (funding-stream-hydrated? @store address)
+        (swap! store
+               (fn [state]
+                 (if (= request-id (account-history-actions/funding-history-request-id state))
+                   (-> (apply-funding-history-stream-projection state)
+                       (assoc-in [:account-info :funding-history :loading?] false)
+                       (assoc-in [:account-info :funding-history :error] nil))
+                   state)))
+        (if (funding-stream-usable? @store address)
+          (js/Promise.
+           (fn [resolve _reject]
+             (platform/set-timeout!
+              (fn []
+                (if (not= request-id
+                          (account-history-actions/funding-history-request-id @store))
+                  (resolve nil)
+                  (if (funding-stream-hydrated? @store address)
+                    (do
+                      (swap! store
+                             (fn [state]
+                               (if (= request-id (account-history-actions/funding-history-request-id state))
+                                 (-> (apply-funding-history-stream-projection state)
+                                     (assoc-in [:account-info :funding-history :loading?] false)
+                                     (assoc-in [:account-info :funding-history :error] nil))
+                                 state)))
+                      (resolve nil))
+                    (-> (request-funding-history-with-fallback! store request-id address opts)
+                        (.then (fn [result]
+                                 (resolve result)))))))
+              funding-stream-fallback-delay-ms)))
+          (request-funding-history-with-fallback! store request-id address opts))))))
 
 (defn fetch-historical-orders!
   [{:keys [store request-id request-historical-orders! opts]
