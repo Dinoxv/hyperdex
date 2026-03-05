@@ -44,6 +44,9 @@
 (def per-dex-stagger-ms
   (get-in config [:startup :per-dex-stagger-ms]))
 
+(def startup-stream-backfill-delay-ms
+  (get-in config [:startup :stream-backfill-delay-ms]))
+
 (def startup-summary-delay-ms
   (get-in config [:startup :startup-summary-delay-ms]))
 

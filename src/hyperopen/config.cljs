@@ -13,6 +13,7 @@
    :ui {:wallet-copy-feedback-ms 1500
         :order-toast-ms 3500}
    :startup {:deferred-bootstrap-delay-ms 1200
+             :stream-backfill-delay-ms 450
              :per-dex-stagger-ms 120
              :startup-summary-delay-ms 5000}
    :diagnostics {:timeline-limit 50}

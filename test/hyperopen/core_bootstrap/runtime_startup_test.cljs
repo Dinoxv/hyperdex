@@ -178,7 +178,8 @@
                                                                   :fee-config-by-name {"dex-1" {:deployer-fee-scale 0.1}
                                                                                        "dex-2" {:deployer-fee-scale 0.2}}}))
                         :stage-b-account-bootstrap! (fn [address dexs]
-                                                      (swap! stage-b-calls conj [address dexs]))}))]
+                                                      (swap! stage-b-calls conj [address dexs]))
+                        :startup-stream-backfill-delay-ms 0}))]
         (app-startup/bootstrap-account-data! system "0xabc")
         (js/setTimeout
          (fn []

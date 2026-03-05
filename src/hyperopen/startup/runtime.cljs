@@ -2,6 +2,7 @@
   (:require [clojure.string :as str]
             [hyperopen.account.context :as account-context]
             [hyperopen.platform :as platform]
+            [hyperopen.websocket.health-projection :as health-projection]
             [hyperopen.wallet.address-watcher :as address-watcher]))
 
 (defn default-startup-runtime-state
@@ -161,6 +162,41 @@
                    (assoc-in [:account-info :order-history :loaded-for-address] nil))))
       (fetch-historical-orders! store request-id {:priority :low}))))
 
+(def ^:private default-startup-stream-backfill-delay-ms
+  450)
+
+(defn- topic-live-for-address?
+  [store topic address]
+  (when (and (some? store)
+             (string? topic)
+             (seq address))
+    (health-projection/topic-stream-live?
+     (get-in @store [:websocket :health])
+     topic
+     {:user address})))
+
+(defn- schedule-stream-backed-startup-fallback!
+  [{:keys [store
+           address
+           topic
+           opts
+           fetch-fn
+           startup-stream-backfill-delay-ms]}]
+  (let [delay-ms (max 0 (or startup-stream-backfill-delay-ms
+                            default-startup-stream-backfill-delay-ms))]
+    (when (and (some? store)
+               (seq address)
+               (string? topic)
+               (fn? fetch-fn))
+      (when-not (topic-live-for-address? store topic address)
+        (platform/set-timeout!
+         (fn []
+           ;; Guard against stale async callbacks for an old address.
+           (when (= address (account-context/effective-account-address @store))
+             (when-not (topic-live-for-address? store topic address)
+               (fetch-fn store address (or opts {})))))
+         delay-ms)))))
+
 (defn install-asset-selector-shortcuts!
   [{:keys [store dispatch!]}]
   (let [window-object (when (exists? js/window) js/window)
@@ -275,8 +311,9 @@
      (fn []
        ;; Guard against stale async callbacks for an old address.
        (when (= address (account-context/effective-account-address @store))
-         (fetch-frontend-open-orders! store address {:dex dex
-                                                     :priority :low})
+         (when-not (topic-live-for-address? store "openOrders" address)
+           (fetch-frontend-open-orders! store address {:dex dex
+                                                       :priority :low}))
          (fetch-clearinghouse-state! store address dex {:priority :low})))
      (* per-dex-stagger-ms (inc idx)))))
 
@@ -293,6 +330,7 @@
            fetch-and-merge-funding-history!
            ensure-perp-dexs!
            stage-b-account-bootstrap!
+           startup-stream-backfill-delay-ms
            log-fn]
     :as deps}]
   (when address
@@ -318,13 +356,31 @@
       (prefetch-order-history! {:store store
                                 :fetch-historical-orders! fetch-historical-orders!})
       ;; Stage A: critical account data.
-      (fetch-frontend-open-orders! store address {:priority :high})
-      (fetch-user-fills! store address {:priority :high})
+      (schedule-stream-backed-startup-fallback!
+       {:store store
+        :address address
+        :topic "openOrders"
+        :fetch-fn fetch-frontend-open-orders!
+        :opts {:priority :high}
+        :startup-stream-backfill-delay-ms startup-stream-backfill-delay-ms})
+      (schedule-stream-backed-startup-fallback!
+       {:store store
+        :address address
+        :topic "userFills"
+        :fetch-fn fetch-user-fills!
+        :opts {:priority :high}
+        :startup-stream-backfill-delay-ms startup-stream-backfill-delay-ms})
       (fetch-spot-clearinghouse-state! store address {:priority :high})
       (fetch-user-abstraction! store address {:priority :high})
       (fetch-portfolio! store address {:priority :high})
       (fetch-user-fees! store address {:priority :high})
-      (fetch-and-merge-funding-history! store address {:priority :high})
+      (schedule-stream-backed-startup-fallback!
+       {:store store
+        :address address
+        :topic "userFundings"
+        :fetch-fn fetch-and-merge-funding-history!
+        :opts {:priority :high}
+        :startup-stream-backfill-delay-ms startup-stream-backfill-delay-ms})
       ;; Stage B: low-priority, staggered per-dex data.
       (-> (ensure-perp-dexs! store {:priority :low})
           (.then (fn [dexs]

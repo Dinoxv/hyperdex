@@ -36,6 +36,7 @@
     :api api
     :icon-service-worker-path runtime-state/icon-service-worker-path
     :per-dex-stagger-ms runtime-state/per-dex-stagger-ms
+    :startup-stream-backfill-delay-ms runtime-state/startup-stream-backfill-delay-ms
     :schedule-idle-or-timeout! schedule-idle-or-timeout!
     :mark-performance! mark-performance!}))
 
