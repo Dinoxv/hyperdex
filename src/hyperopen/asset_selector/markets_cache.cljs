@@ -1,11 +1,15 @@
 (ns hyperopen.asset-selector.markets-cache
   (:require [clojure.string :as str]
             [hyperopen.asset-selector.markets :as markets]
+            [hyperopen.platform.indexed-db :as indexed-db]
             [hyperopen.platform :as platform]
             [hyperopen.utils.parse :as parse-utils]))
 
 (def ^:private asset-selector-markets-cache-local-storage-key
   "asset-selector-markets-cache")
+
+(def ^:private asset-selector-markets-cache-version
+  1)
 
 (def ^:private supported-market-types
   #{:perp :spot})
@@ -215,30 +219,142 @@
          (keep identity)
          vec)))
 
-(defn persist-asset-selector-markets-cache!
-  ([markets]
-   (persist-asset-selector-markets-cache! markets {}))
-  ([markets state]
-   (let [normalized (build-asset-selector-markets-cache markets state)]
-     (when (seq normalized)
-       (try
-         (platform/local-storage-set! asset-selector-markets-cache-local-storage-key
-                                      (js/JSON.stringify (clj->js normalized)))
-         (catch :default e
-           (js/console.warn "Failed to persist asset selector market cache:" e)))))))
+(defn- parse-saved-at-ms
+  [value]
+  (or (parse-utils/parse-int-value value)
+      0))
 
-(defn load-asset-selector-markets-cache
+(defn- normalize-asset-selector-markets-cache-record
+  [raw]
+  (cond
+    (sequential? raw)
+    (when-let [rows (not-empty (normalize-asset-selector-markets-cache raw))]
+      {:id asset-selector-markets-cache-local-storage-key
+       :version 0
+       :saved-at-ms 0
+       :rows rows})
+
+    (map? raw)
+    (when-let [rows (not-empty (normalize-asset-selector-markets-cache (:rows raw)))]
+      {:id (or (:id raw) asset-selector-markets-cache-local-storage-key)
+       :version (or (parse-utils/parse-int-value (:version raw))
+                    asset-selector-markets-cache-version)
+       :saved-at-ms (parse-saved-at-ms (:saved-at-ms raw))
+       :rows rows})
+
+    :else
+    nil))
+
+(defn- build-asset-selector-markets-cache-record
+  [markets state now-ms-fn]
+  (when-let [rows (not-empty (build-asset-selector-markets-cache markets state))]
+    {:id asset-selector-markets-cache-local-storage-key
+     :version asset-selector-markets-cache-version
+     :saved-at-ms (now-ms-fn)
+     :rows rows}))
+
+(defn- persist-asset-selector-markets-cache-record-to-local-storage!
+  [record]
+  (when record
+    (try
+      (platform/local-storage-set! asset-selector-markets-cache-local-storage-key
+                                   (js/JSON.stringify (clj->js record)))
+      true
+      (catch :default e
+        (js/console.warn "Failed to persist asset selector market cache to localStorage:" e)
+        false))))
+
+(defn- load-asset-selector-markets-cache-record-from-local-storage
   []
   (try
     (let [raw (platform/local-storage-get asset-selector-markets-cache-local-storage-key)]
-      (if (seq raw)
-        (-> raw
-            js/JSON.parse
-            (js->clj :keywordize-keys true)
-            normalize-asset-selector-markets-cache)
-        []))
+      (when (seq raw)
+        (normalize-asset-selector-markets-cache-record
+         (js->clj (js/JSON.parse raw) :keywordize-keys true))))
     (catch :default _
-      [])))
+      nil)))
+
+(defn- persist-asset-selector-markets-cache-record-to-indexed-db!
+  [record]
+  (indexed-db/put-json! indexed-db/asset-selector-markets-store
+                        asset-selector-markets-cache-local-storage-key
+                        record))
+
+(defn- load-asset-selector-markets-cache-record-from-indexed-db!
+  []
+  (-> (indexed-db/get-json! indexed-db/asset-selector-markets-store
+                            asset-selector-markets-cache-local-storage-key)
+      (.then normalize-asset-selector-markets-cache-record)))
+
+(defn- newer-cache-record
+  [a b]
+  (cond
+    (and a b)
+    (if (>= (:saved-at-ms a 0)
+            (:saved-at-ms b 0))
+      a
+      b)
+
+    a
+    a
+
+    b
+    b
+
+    :else
+    nil))
+
+(defn- ->promise
+  [result]
+  (if (instance? js/Promise result)
+    result
+    (js/Promise.resolve result)))
+
+(defn persist-asset-selector-markets-cache!
+  ([markets]
+   (persist-asset-selector-markets-cache! markets {} {}))
+  ([markets state]
+   (persist-asset-selector-markets-cache! markets state {}))
+  ([markets state {:keys [now-ms-fn
+                          persist-indexed-db-fn
+                          persist-local-storage-fn]
+   :or {now-ms-fn platform/now-ms
+                        persist-indexed-db-fn persist-asset-selector-markets-cache-record-to-indexed-db!
+                        persist-local-storage-fn persist-asset-selector-markets-cache-record-to-local-storage!}}]
+   (if-let [record (build-asset-selector-markets-cache-record markets state now-ms-fn)]
+     (-> (->promise (persist-indexed-db-fn record))
+         (.then (fn [persisted?]
+                  (when-not persisted?
+                    (persist-local-storage-fn record))
+                  persisted?))
+         (.catch (fn [e]
+                   (js/console.warn "Failed to persist asset selector market cache to IndexedDB:" e)
+                   (persist-local-storage-fn record)
+                   false)))
+     (js/Promise.resolve false))))
+
+(defn load-asset-selector-markets-cache
+  ([]
+   (load-asset-selector-markets-cache {}))
+  ([{:keys [load-indexed-db-fn
+            load-local-storage-fn
+            persist-indexed-db-fn]
+     :or {load-indexed-db-fn load-asset-selector-markets-cache-record-from-indexed-db!
+          load-local-storage-fn load-asset-selector-markets-cache-record-from-local-storage
+          persist-indexed-db-fn persist-asset-selector-markets-cache-record-to-indexed-db!}}]
+   (let [local-record (load-local-storage-fn)]
+     (-> (->promise (load-indexed-db-fn))
+         (.catch (fn [error]
+                   (js/console.warn "Failed to load asset selector market cache from IndexedDB:" error)
+                   nil))
+         (.then (fn [indexed-db-record]
+                  (let [selected-record (newer-cache-record indexed-db-record local-record)]
+                    (when (and local-record
+                               (not= selected-record indexed-db-record))
+                      (-> (->promise (persist-indexed-db-fn local-record))
+                          (.catch (fn [_]
+                                    nil))))
+                    (vec (:rows selected-record [])))))))))
 
 (defn restore-asset-selector-markets-cache-state
   [state cached-markets resolve-market-by-coin-fn]
@@ -266,9 +382,14 @@
     {:load-cache-fn load-asset-selector-markets-cache
      :resolve-market-by-coin-fn markets/resolve-market-by-coin}))
   ([store {:keys [load-cache-fn resolve-market-by-coin-fn]}]
-   (let [cached-markets (load-cache-fn)]
-     (when (seq cached-markets)
-       (swap! store
-              restore-asset-selector-markets-cache-state
-              cached-markets
-              resolve-market-by-coin-fn)))))
+   (-> (->promise (load-cache-fn))
+       (.then (fn [cached-markets]
+                (when (seq cached-markets)
+                  (swap! store
+                         restore-asset-selector-markets-cache-state
+                         cached-markets
+                         resolve-market-by-coin-fn))
+                cached-markets))
+       (.catch (fn [error]
+                 (js/console.warn "Failed to restore asset selector market cache:" error)
+                 [])))))

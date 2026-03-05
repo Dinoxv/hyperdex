@@ -157,3 +157,34 @@
                    (is (= 1 (count @request-calls)))
                    (done)))
           (.catch (async-support/unexpected-error done))))))
+
+(deftest sync-market-funding-history-cache-supports-promise-based-cache-adapters-test
+  (async done
+    (let [now-ms 1700007200000
+          cache-state (atom nil)
+          persisted-snapshots (atom [])
+          request-market-funding-history!
+          (fn [_coin _opts]
+            (js/Promise.resolve [{:coin "BTC"
+                                  :time 1700000000000
+                                  :fundingRate "0.0001"
+                                  :premium "0.0002"}]))]
+      (-> (funding-cache/sync-market-funding-history-cache!
+           "BTC"
+           {:now-ms-fn (constantly now-ms)
+            :load-cache-fn (fn [_coin _opts]
+                             (js/Promise.resolve @cache-state))
+            :persist-cache-fn (fn [_coin snapshot]
+                                (reset! cache-state snapshot)
+                                (swap! persisted-snapshots conj snapshot)
+                                (js/Promise.resolve true))
+            :request-market-funding-history! request-market-funding-history!
+            :min-refresh-interval-ms 0})
+          (.then (fn [result]
+                   (is (= :network (:source result)))
+                   (is (= 1 (count (:rows result))))
+                   (is (= 1 (count @persisted-snapshots)))
+                   (is (= 1700000000000
+                          (get-in (first @persisted-snapshots) [:rows 0 :time-ms])))
+                   (done)))
+          (.catch (async-support/unexpected-error done))))))

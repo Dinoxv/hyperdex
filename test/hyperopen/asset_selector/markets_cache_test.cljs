@@ -1,7 +1,9 @@
 (ns hyperopen.asset-selector.markets-cache-test
-  (:require [cljs.test :refer-macros [deftest is]]
+  (:require [cljs.test :refer-macros [async deftest is]]
             [hyperopen.asset-selector.markets :as markets]
-            [hyperopen.asset-selector.markets-cache :as markets-cache]))
+            [hyperopen.asset-selector.markets-cache :as markets-cache]
+            [hyperopen.core-bootstrap.test-support.browser-mocks :as browser-mocks]
+            [hyperopen.test-support.async :as async-support]))
 
 (deftest build-asset-selector-markets-cache-sorts-and-normalizes-test
   (let [markets [{:key "perp:ETH"
@@ -86,3 +88,59 @@
                 [{:key "perp:ETH" :coin "ETH" :symbol "ETH-USDC" :base "ETH"}]
                 markets/resolve-market-by-coin)]
     (is (= state result))))
+
+(deftest persist-and-load-asset-selector-markets-cache-roundtrip-test
+  (async done
+    (browser-mocks/with-test-indexed-db
+      (fn []
+        (let [markets [{:key "perp:ETH"
+                        :coin "ETH"
+                        :symbol "ETH-USDC"
+                        :base "ETH"
+                        :quote "USDC"
+                        :market-type :perp
+                        :volume24h 1000}
+                       {:key "spot:PURR/USDC"
+                        :coin "PURR/USDC"
+                        :symbol "PURR/USDC"
+                        :base "PURR"
+                        :quote "USDC"
+                        :market-type :spot
+                        :volume24h 2000}]
+              state {:asset-selector {:sort-by :volume
+                                      :sort-direction :desc}}]
+          (-> (markets-cache/persist-asset-selector-markets-cache! markets state)
+              (.then (fn [persisted?]
+                       (is (true? persisted?))
+                       (-> (markets-cache/load-asset-selector-markets-cache)
+                           (.then (fn [cached]
+                                    (is (= ["PURR/USDC" "ETH-USDC"]
+                                           (mapv :symbol cached)))
+                                    (is (= [:spot :perp]
+                                           (mapv :market-type cached)))
+                                    (done)))
+                           (.catch (async-support/unexpected-error done)))))
+              (.catch (async-support/unexpected-error done))))))))
+
+(deftest load-asset-selector-markets-cache-falls-back-to-local-storage-test
+  (async done
+    (let [record {:saved-at-ms 50
+                  :rows [{:key "perp:ETH"
+                          :coin "ETH"
+                          :symbol "ETH-USDC"
+                          :base "ETH"
+                          :market-type :perp}]}]
+      (-> (markets-cache/load-asset-selector-markets-cache
+           {:load-indexed-db-fn (fn []
+                                  nil)
+            :load-local-storage-fn (fn []
+                                     record)})
+          (.then (fn [cached]
+                   (is (= [{:key "perp:ETH"
+                            :coin "ETH"
+                            :symbol "ETH-USDC"
+                            :base "ETH"
+                            :market-type :perp}]
+                          cached))
+                   (done)))
+          (.catch (async-support/unexpected-error done))))))

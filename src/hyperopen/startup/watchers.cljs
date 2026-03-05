@@ -12,8 +12,19 @@
 
 (defn install-store-cache-watchers!
   [store {:keys [persist-active-market-display!
-                 persist-asset-selector-markets-cache!]}]
+                 persist-asset-selector-markets-cache!
+                 request-animation-frame!]
+          :or {request-animation-frame! platform/request-animation-frame!}}]
+  (let [pending-selector-cache-write (atom nil)
+        selector-cache-write-scheduled? (atom false)
+        flush-selector-cache-write!
+        (fn []
+          (reset! selector-cache-write-scheduled? false)
+          (when-let [{:keys [markets state]} @pending-selector-cache-write]
+            (reset! pending-selector-cache-write nil)
+            (persist-asset-selector-markets-cache! markets state)))]
   ;; Keep startup display metadata fresh whenever active-market becomes available.
+  (remove-watch store active-market-display-watch-key)
   (add-watch store active-market-display-watch-key
     (fn [_ _ old-state new-state]
       (let [old-market (:active-market old-state)
@@ -22,12 +33,19 @@
           (persist-active-market-display! new-market)))))
 
   ;; Persist non-empty selector market lists so symbols are available on next reload.
+  (remove-watch store asset-selector-markets-watch-key)
   (add-watch store asset-selector-markets-watch-key
     (fn [_ _ old-state new-state]
       (let [old-markets (get-in old-state [:asset-selector :markets] [])
             new-markets (get-in new-state [:asset-selector :markets] [])]
         (when (not= old-markets new-markets)
-          (persist-asset-selector-markets-cache! new-markets new-state))))))
+          (reset! pending-selector-cache-write {:markets new-markets
+                                                :state new-state})
+          (when-not @selector-cache-write-scheduled?
+            (reset! selector-cache-write-scheduled? true)
+            (request-animation-frame!
+             (fn [_]
+               (flush-selector-cache-write!))))))))))
 
 (defn- status->diagnostics-event
   [status]

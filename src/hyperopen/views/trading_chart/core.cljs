@@ -257,6 +257,43 @@
                          (or (:venue legend-meta) "")
                          "-"
                          volume-visible?)
+         mark-visible-range-interaction!
+         (fn [node]
+           (chart-runtime/update-state! node
+                                        update
+                                        :visible-range-interaction-epoch
+                                        (fnil inc 0)))
+         start-visible-range-persistence!
+         (fn [node chart]
+           (ci/subscribe-visible-range-persistence!
+            chart
+            selected-timeframe
+            (assoc persistence-deps
+                   :on-visible-range-change! #(mark-visible-range-interaction! node))))
+         start-visible-range-restore!
+         (fn [node chart candles]
+           (let [runtime-state (chart-runtime/get-state node)
+                 restore-token (inc (or (:visible-range-restore-token runtime-state) 0))
+                 interaction-epoch (or (:visible-range-interaction-epoch runtime-state) 0)]
+             (ci/apply-default-visible-range! chart candles)
+             (chart-runtime/assoc-state! node
+                                         :visible-range-restore-tried? true
+                                         :visible-range-restore-token restore-token)
+             (-> (ci/apply-persisted-visible-range!
+                  chart
+                  selected-timeframe
+                  (assoc persistence-deps
+                         :candles candles
+                         :fallback-to-default? false
+                         :allow-apply-fn
+                         (fn []
+                           (let [runtime-state* (chart-runtime/get-state node)]
+                             (and (= restore-token
+                                     (:visible-range-restore-token runtime-state*))
+                                  (= interaction-epoch
+                                     (or (:visible-range-interaction-epoch runtime-state*) 0)))))))
+                 (.catch (fn [error]
+                           (js/console.warn "Failed to restore persisted visible range:" error))))))
          mount! (fn [{:keys [:replicant/life-cycle :replicant/node]}]
                   (case life-cycle
                     :replicant.life-cycle/mount
@@ -271,11 +308,7 @@
                                                                                   :volume-visible? volume-visible?}))
                             chart (.-chart chart-obj)
                             legend-control (ci/create-legend! node chart legend-meta legend-deps)
-                            data-ready? (boolean (seq candle-data))
-                            restored-now? (when (seq candle-data)
-                                            (ci/apply-persisted-visible-range! chart selected-timeframe persistence-deps))
-                            visible-range-cleanup (when data-ready?
-                                                   (ci/subscribe-visible-range-persistence! chart selected-timeframe persistence-deps))]
+                            data-ready? (boolean (seq candle-data))]
                         (ci/set-main-series-markers! chart-obj main-series-markers)
                         (ci/sync-baseline-base-value-subscription! chart-obj chart-type)
                         (ci/sync-position-overlays! chart-obj node position-overlay position-overlay-deps)
@@ -284,10 +317,17 @@
                         (chart-runtime/set-state! node {:chart-obj chart-obj
                                                         :legend-control legend-control
                                                         :chart-type chart-type
-                                                        :visible-range-restore-tried? (boolean (or restored-now?
-                                                                                                   (seq candle-data)))
-                                                        :visible-range-persistence-subscribed? (boolean data-ready?)
-                                                        :visible-range-cleanup visible-range-cleanup}))
+                                                        :visible-range-restore-tried? false
+                                                        :visible-range-restore-token 0
+                                                        :visible-range-interaction-epoch 0
+                                                        :visible-range-persistence-subscribed? false
+                                                        :visible-range-cleanup nil})
+                        (when data-ready?
+                          (start-visible-range-restore! node chart candle-data)
+                          (chart-runtime/assoc-state! node
+                                                     :visible-range-cleanup
+                                                     (start-visible-range-persistence! node chart)
+                                                     :visible-range-persistence-subscribed? true)))
                       (catch :default e
                         (js/console.error "Error in chart:" e)))
                     :replicant.life-cycle/update
@@ -324,12 +364,11 @@
                         (when volume-series
                           (ci/set-volume-data! volume-series candle-data))
                         (when (and chart-obj chart (seq candle-data) (not visible-range-restore-tried?))
-                          (ci/apply-persisted-visible-range! chart selected-timeframe persistence-deps)
-                          (chart-runtime/assoc-state! node :visible-range-restore-tried? true))
+                          (start-visible-range-restore! node chart candle-data))
                         (when (and chart-obj chart (seq candle-data) (not visible-range-persistence-subscribed?))
                           (chart-runtime/assoc-state! node
                                                      :visible-range-cleanup
-                                                     (ci/subscribe-visible-range-persistence! chart selected-timeframe persistence-deps)
+                                                     (start-visible-range-persistence! node chart)
                                                      :visible-range-persistence-subscribed? true))
                         (when chart-obj
                           (ci/set-main-series-markers! chart-obj main-series-markers)

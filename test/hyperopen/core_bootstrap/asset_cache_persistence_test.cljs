@@ -1,17 +1,21 @@
 (ns hyperopen.core-bootstrap.asset-cache-persistence-test
-  (:require [cljs.test :refer-macros [deftest is use-fixtures]]
+  (:require [cljs.test :refer-macros [async deftest is use-fixtures]]
+            [hyperopen.asset-selector.markets-cache :as markets-cache]
             [hyperopen.core :as app-core]
             [hyperopen.core.compat :as core]
             [hyperopen.runtime.effect-adapters :as effect-adapters]
+            [hyperopen.startup.watchers :as startup-watchers]
             [hyperopen.websocket.active-asset-ctx :as active-ctx]
             [hyperopen.websocket.client :as ws-client]
             [hyperopen.core-bootstrap.test-support.browser-mocks :as browser-mocks]
-            [hyperopen.core-bootstrap.test-support.fixtures :as fixtures]))
+            [hyperopen.core-bootstrap.test-support.fixtures :as fixtures]
+            [hyperopen.test-support.async :as async-support]))
 
 (use-fixtures :once fixtures/runtime-bootstrap-fixture)
 (use-fixtures :each fixtures/per-test-runtime-fixture)
 
 (def with-test-local-storage browser-mocks/with-test-local-storage)
+(def with-test-indexed-db browser-mocks/with-test-indexed-db)
 
 (deftest restore-active-asset-hydrates-cached-active-market-display-test
   (with-test-local-storage
@@ -105,103 +109,137 @@
             (reset! app-core/store original-state)))))))
 
 (deftest restore-asset-selector-markets-cache-hydrates-symbols-test
-  (with-test-local-storage
-    (fn []
-      (.setItem js/localStorage
-                "asset-selector-markets-cache"
-                (js/JSON.stringify
-                 (clj->js [{:key "perp:ETH"
-                            :coin "ETH"
-                            :symbol "ETH-USDC"
-                            :base "ETH"
-                            :quote "USDC"
-                            :market-type "perp"
-                            :category "crypto"
-                            :hip3? false
-                            :maxLeverage "25"}
-                           {:key "spot:PURR/USDC"
-                            :coin "PURR/USDC"
-                            :symbol "PURR/USDC"
-                            :base "PURR"
-                            :quote "USDC"
-                            :market-type "spot"
-                            :category "spot"
-                            :hip3? false}])))
-      (let [store (atom {:active-asset "ETH"
-                         :active-market nil
-                         :asset-selector {:markets []
-                                          :market-by-key {}
-                                          :phase :bootstrap}})]
-        (core/restore-asset-selector-markets-cache! store)
-        (is (= 2 (count (get-in @store [:asset-selector :markets]))))
-        (is (= :perp (get-in @store [:asset-selector :market-by-key "perp:ETH" :market-type])))
-        (is (= :spot (get-in @store [:asset-selector :market-by-key "spot:PURR/USDC" :market-type])))
-        (is (= "ETH-USDC" (get-in @store [:asset-selector :market-by-key "perp:ETH" :symbol])))
-        (is (= "ETH" (get-in @store [:active-market :coin])))
-        (is (= 25 (get-in @store [:active-market :maxLeverage])))
-        (is (= true (get-in @store [:asset-selector :cache-hydrated?])))))))
+  (async done
+    (with-test-indexed-db
+      (fn []
+        (let [store (atom {:active-asset "ETH"
+                           :active-market nil
+                           :asset-selector {:markets []
+                                            :market-by-key {}
+                                            :phase :bootstrap}})
+              cached-markets [{:key "perp:ETH"
+                               :coin "ETH"
+                               :symbol "ETH-USDC"
+                               :base "ETH"
+                               :quote "USDC"
+                               :market-type :perp
+                               :category :crypto
+                               :hip3? false
+                               :maxLeverage 25}
+                              {:key "spot:PURR/USDC"
+                               :coin "PURR/USDC"
+                               :symbol "PURR/USDC"
+                               :base "PURR"
+                               :quote "USDC"
+                               :market-type :spot
+                               :category :spot
+                               :hip3? false}]]
+          (-> (markets-cache/persist-asset-selector-markets-cache! cached-markets
+                                                                   {:asset-selector {:sort-by :volume
+                                                                                     :sort-direction :desc}})
+              (.then (fn [_]
+                       (-> (core/restore-asset-selector-markets-cache! store)
+                           (.then (fn [_]
+                                    (is (= 2 (count (get-in @store [:asset-selector :markets]))))
+                                    (is (= :perp (get-in @store [:asset-selector :market-by-key "perp:ETH" :market-type])))
+                                    (is (= :spot (get-in @store [:asset-selector :market-by-key "spot:PURR/USDC" :market-type])))
+                                    (is (= "ETH-USDC" (get-in @store [:asset-selector :market-by-key "perp:ETH" :symbol])))
+                                    (is (= "ETH" (get-in @store [:active-market :coin])))
+                                    (is (= 25 (get-in @store [:active-market :maxLeverage])))
+                                    (is (= true (get-in @store [:asset-selector :cache-hydrated?])))
+                                    (done)))
+                           (.catch (async-support/unexpected-error done)))))
+              (.catch (async-support/unexpected-error done))))))))
 
 (deftest restore-asset-selector-markets-cache-keeps-existing-markets-test
-  (with-test-local-storage
-    (fn []
-      (.setItem js/localStorage
-                "asset-selector-markets-cache"
-                (js/JSON.stringify
-                 (clj->js [{:key "perp:ETH"
-                            :coin "ETH"
-                            :symbol "ETH-USDC"
-                            :base "ETH"
-                            :market-type "perp"}])))
-      (let [existing-market {:key "perp:BTC"
-                             :coin "BTC"
-                             :symbol "BTC-USDC"
-                             :base "BTC"
-                             :market-type :perp}
-            store (atom {:asset-selector {:markets [existing-market]
-                                          :market-by-key {"perp:BTC" existing-market}
-                                          :phase :full}})]
-        (core/restore-asset-selector-markets-cache! store)
-        (is (= [existing-market]
-               (get-in @store [:asset-selector :markets])))
-        (is (= {"perp:BTC" existing-market}
-               (get-in @store [:asset-selector :market-by-key])))))))
+  (async done
+    (with-test-indexed-db
+      (fn []
+        (let [existing-market {:key "perp:BTC"
+                               :coin "BTC"
+                               :symbol "BTC-USDC"
+                               :base "BTC"
+                               :market-type :perp}
+              store (atom {:asset-selector {:markets [existing-market]
+                                            :market-by-key {"perp:BTC" existing-market}
+                                            :phase :full}})]
+          (-> (markets-cache/persist-asset-selector-markets-cache!
+               [{:key "perp:ETH"
+                 :coin "ETH"
+                 :symbol "ETH-USDC"
+                 :base "ETH"
+                 :market-type :perp}]
+               {:asset-selector {:sort-by :volume
+                                 :sort-direction :desc}})
+              (.then (fn [_]
+                       (-> (core/restore-asset-selector-markets-cache! store)
+                           (.then (fn [_]
+                                    (is (= [existing-market]
+                                           (get-in @store [:asset-selector :markets])))
+                                    (is (= {"perp:BTC" existing-market}
+                                           (get-in @store [:asset-selector :market-by-key])))
+                                    (done)))
+                           (.catch (async-support/unexpected-error done)))))
+              (.catch (async-support/unexpected-error done))))))))
 
 (deftest asset-selector-markets-store-projection-persists-cache-test
-  (with-test-local-storage
-    (fn []
-      (let [original-state @app-core/store
-            markets [{:key "perp:ETH"
-                      :coin "ETH"
-                      :symbol "ETH-USDC"
-                      :base "ETH"
-                      :quote "USDC"
-                      :market-type :perp
-                      :category :crypto
-                      :hip3? false
-                      :mark 1900.1
-                      :volume24h 1000}
-                     {:key "spot:PURR/USDC"
-                      :coin "PURR/USDC"
-                      :symbol "PURR/USDC"
-                      :base "PURR"
-                      :quote "USDC"
-                      :market-type :spot
-                      :category :spot
-                      :mark 0.21
-                      :volume24h 2000}]]
-        (try
-          (swap! app-core/store assoc-in [:asset-selector :sort-by] :volume)
-          (swap! app-core/store assoc-in [:asset-selector :sort-direction] :desc)
-          (swap! app-core/store assoc-in [:asset-selector :markets] [])
-          (swap! app-core/store assoc-in [:asset-selector :market-by-key] {})
-          (swap! app-core/store assoc-in [:asset-selector :markets] markets)
-          (let [cached (js->clj (js/JSON.parse (.getItem js/localStorage "asset-selector-markets-cache"))
-                                :keywordize-keys true)]
-            (is (= 2 (count cached)))
-            (is (= "PURR/USDC" (:symbol (first cached))))
-            (is (= "ETH-USDC" (:symbol (second cached))))
-            (is (= "spot" (:market-type (first cached))))
-            (is (= [0 1] (mapv :cache-order cached)))
-            (is (nil? (:mark (first cached)))))
-          (finally
-            (reset! app-core/store original-state)))))))
+  (async done
+    (with-test-indexed-db
+      (fn []
+        (js/Promise.
+         (fn [resolve reject]
+           (let [original-state @app-core/store
+                 markets [{:key "perp:ETH"
+                           :coin "ETH"
+                           :symbol "ETH-USDC"
+                           :base "ETH"
+                           :quote "USDC"
+                           :market-type :perp
+                           :category :crypto
+                           :hip3? false
+                           :mark 1900.1
+                           :volume24h 1000}
+                          {:key "spot:PURR/USDC"
+                           :coin "PURR/USDC"
+                           :symbol "PURR/USDC"
+                           :base "PURR"
+                           :quote "USDC"
+                           :market-type :spot
+                           :category :spot
+                           :mark 0.21
+                           :volume24h 2000}]
+                 fail! (fn [error]
+                         (reset! app-core/store original-state)
+                         ((async-support/unexpected-error done) error)
+                         (reject error))]
+             (try
+               (startup-watchers/install-store-cache-watchers!
+                app-core/store
+                {:persist-active-market-display! (fn [_] nil)
+                 :persist-asset-selector-markets-cache! effect-adapters/persist-asset-selector-markets-cache!
+                 :request-animation-frame! (fn [f]
+                                             (f 0)
+                                             :frame-id)})
+               (swap! app-core/store assoc-in [:asset-selector :sort-by] :volume)
+               (swap! app-core/store assoc-in [:asset-selector :sort-direction] :desc)
+               (swap! app-core/store assoc-in [:asset-selector :markets] [])
+               (swap! app-core/store assoc-in [:asset-selector :market-by-key] {})
+               (swap! app-core/store assoc-in [:asset-selector :markets] markets)
+               (js/setTimeout
+                (fn []
+                  (-> (markets-cache/load-asset-selector-markets-cache)
+                      (.then (fn [cached]
+                               (is (= 2 (count cached)))
+                               (is (= "PURR/USDC" (:symbol (first cached))))
+                               (is (= "ETH-USDC" (:symbol (second cached))))
+                               (is (= :spot (:market-type (first cached))))
+                               (is (= [0 1] (mapv :cache-order cached)))
+                               (is (nil? (:mark (first cached))))
+                               (reset! app-core/store original-state)
+                               (done)
+                               (resolve true)))
+                      (.catch fail!)))
+                20)
+               (catch :default e
+                 (reset! app-core/store original-state)
+                 (reject e))))))))))

@@ -309,6 +309,11 @@
   ([chart timeframe deps]
    (visible-range-persistence/apply-persisted-visible-range! chart timeframe deps)))
 
+(defn apply-default-visible-range!
+  "Apply the default recent visible range when no persisted range should win."
+  [chart candles]
+  (visible-range-persistence/apply-default-visible-range! chart candles))
+
 (defn subscribe-visible-range-persistence!
   "Subscribe to visible-range changes and persist them by asset + timeframe."
   ([chart timeframe]

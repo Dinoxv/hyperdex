@@ -22,6 +22,12 @@
   (let [next-state (apply assoc (get-state node) kvs)]
     (set-state! node next-state)))
 
+(defn update-state!
+  "Apply `f` to current runtime state and replace it."
+  [node f & args]
+  (let [next-state (apply f (get-state node) args)]
+    (set-state! node next-state)))
+
 (defn clear-state!
   "Clear runtime state for chart mount node."
   [node]

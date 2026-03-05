@@ -118,3 +118,53 @@
                  :at-ms 2000}]
                @diagnostics-events))
         (is (= 1 (get-in @store [:websocket-ui :reconnect-count])))))))
+
+(deftest asset-selector-cache-watch-coalesces-multiple-market-updates-per-frame-test
+  (let [store (atom (base-store))
+        queued-frame (atom nil)
+        persisted (atom [])]
+    (watchers/install-store-cache-watchers!
+     store
+     {:persist-active-market-display! (fn [_] nil)
+      :persist-asset-selector-markets-cache! (fn [markets state]
+                                               (swap! persisted conj {:markets markets
+                                                                      :sort-by (get-in state [:asset-selector :sort-by])}))
+      :request-animation-frame! (fn [f]
+                                  (reset! queued-frame f)
+                                  :frame-id)})
+    (swap! store assoc-in [:asset-selector :sort-by] :volume)
+    (swap! store assoc-in [:asset-selector :markets] [{:key "perp:BTC" :coin "BTC"}])
+    (swap! store assoc-in [:asset-selector :sort-by] :name)
+    (swap! store assoc-in [:asset-selector :markets] [{:key "perp:ETH" :coin "ETH"}])
+    (is (= 1 (count (keep some? [@queued-frame]))))
+    (is (empty? @persisted))
+    (@queued-frame 0)
+    (is (= [{:markets [{:key "perp:ETH" :coin "ETH"}]
+             :sort-by :name}]
+           @persisted))))
+
+(deftest install-store-cache-watchers-replaces-existing-selector-watchers-test
+  (let [store (atom (base-store))
+        frame-callbacks (atom [])
+        persisted (atom [])]
+    (watchers/install-store-cache-watchers!
+     store
+     {:persist-active-market-display! (fn [_] nil)
+      :persist-asset-selector-markets-cache! (fn [markets _state]
+                                               (swap! persisted conj markets))
+      :request-animation-frame! (fn [f]
+                                  (swap! frame-callbacks conj f)
+                                  :frame-id-1)})
+    (watchers/install-store-cache-watchers!
+     store
+     {:persist-active-market-display! (fn [_] nil)
+      :persist-asset-selector-markets-cache! (fn [markets _state]
+                                               (swap! persisted conj markets))
+      :request-animation-frame! (fn [f]
+                                  (swap! frame-callbacks conj f)
+                                  :frame-id-2)})
+    (swap! store assoc-in [:asset-selector :markets] [{:key "perp:BTC" :coin "BTC"}])
+    (doseq [callback @frame-callbacks]
+      (callback 0))
+    (is (= [[{:key "perp:BTC" :coin "BTC"}]]
+           @persisted))))

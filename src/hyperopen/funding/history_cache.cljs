@@ -1,6 +1,7 @@
 (ns hyperopen.funding.history-cache
   (:require [clojure.string :as str]
             [hyperopen.api.default :as api]
+            [hyperopen.platform.indexed-db :as indexed-db]
             [hyperopen.platform :as platform]))
 
 (def cache-retention-window-ms
@@ -14,6 +15,12 @@
 
 (def ^:private cache-key-prefix
   "market-funding-history-cache:")
+
+(defn- ->promise
+  [result]
+  (if (instance? js/Promise result)
+    result
+    (js/Promise.resolve result)))
 
 (defn- finite-number?
   [value]
@@ -150,53 +157,167 @@
      :last-row-time-ms (last-row-time-ms trimmed-rows)
      :last-sync-ms last-sync-ms}))
 
+(defn- normalize-market-funding-history-cache-record
+  [coin raw-record now-ms retention-window-ms]
+  (when (map? raw-record)
+    {:coin (normalize-coin coin)
+     :saved-at-ms (or (parse-ms (:saved-at-ms raw-record)) 0)
+     :snapshot (normalize-market-funding-history-cache coin
+                                                       (or (:snapshot raw-record)
+                                                           raw-record)
+                                                       now-ms
+                                                       retention-window-ms)}))
+
+(defn- build-market-funding-history-cache-record
+  [coin snapshot now-ms retention-window-ms]
+  {:coin coin
+   :saved-at-ms now-ms
+   :snapshot (normalize-market-funding-history-cache coin
+                                                     snapshot
+                                                     now-ms
+                                                     retention-window-ms)})
+
+(defn- newer-cache-record
+  [a b]
+  (cond
+    (and a b)
+    (if (>= (:saved-at-ms a 0)
+            (:saved-at-ms b 0))
+      a
+      b)
+
+    a
+    a
+
+    b
+    b
+
+    :else
+    nil))
+
+(defn- load-market-funding-history-cache-record-from-local-storage
+  [coin local-storage-get-fn now-ms retention-window-ms]
+  (when-let [key (cache-key coin)]
+    (try
+      (let [raw (local-storage-get-fn key)]
+        (when (seq raw)
+          (normalize-market-funding-history-cache-record
+           coin
+           (js->clj (js/JSON.parse raw) :keywordize-keys true)
+           now-ms
+           retention-window-ms)))
+      (catch :default _
+        nil))))
+
+(defn- persist-market-funding-history-cache-record-to-local-storage!
+  [coin record local-storage-set-fn]
+  (when-let [key (cache-key coin)]
+    (try
+      (local-storage-set-fn key (js/JSON.stringify (clj->js record)))
+      true
+      (catch :default e
+        (js/console.warn "Failed to persist market funding history cache to localStorage:" e)
+        false))))
+
+(defn- load-market-funding-history-cache-record-from-indexed-db!
+  [coin now-ms retention-window-ms]
+  (-> (indexed-db/get-json! indexed-db/funding-history-store coin)
+      (.then (fn [record]
+               (when record
+                 (normalize-market-funding-history-cache-record coin
+                                                                record
+                                                                now-ms
+                                                                retention-window-ms))))))
+
+(defn- persist-market-funding-history-cache-record-to-indexed-db!
+  [coin record]
+  (indexed-db/put-json! indexed-db/funding-history-store coin record))
+
 (defn load-market-funding-history-cache
   ([coin]
    (load-market-funding-history-cache coin {}))
-  ([coin {:keys [local-storage-get-fn now-ms-fn retention-window-ms]
+  ([coin {:keys [local-storage-get-fn
+                 load-indexed-db-fn
+                 persist-indexed-db-fn
+                 now-ms-fn
+                 retention-window-ms]
           :or {local-storage-get-fn platform/local-storage-get
+               load-indexed-db-fn load-market-funding-history-cache-record-from-indexed-db!
+               persist-indexed-db-fn persist-market-funding-history-cache-record-to-indexed-db!
                now-ms-fn platform/now-ms
                retention-window-ms cache-retention-window-ms}}]
    (let [coin* (normalize-coin coin)
          now-ms* (now-ms-fn)]
      (if-not coin*
-       nil
-       (let [key (cache-key coin*)]
-         (try
-           (let [raw (local-storage-get-fn key)]
-             (if (seq raw)
-               (normalize-market-funding-history-cache coin*
-                                                       (js->clj (js/JSON.parse raw)
-                                                                :keywordize-keys true)
-                                                       now-ms*
-                                                       retention-window-ms)
-               (empty-cache-snapshot coin* now-ms*)))
-           (catch :default _
-             (empty-cache-snapshot coin* now-ms*))))))))
+       (js/Promise.resolve nil)
+       (let [local-record (load-market-funding-history-cache-record-from-local-storage
+                           coin*
+                           local-storage-get-fn
+                           now-ms*
+                           retention-window-ms)]
+         (-> (->promise (load-indexed-db-fn coin* now-ms* retention-window-ms))
+             (.catch (fn [error]
+                       (js/console.warn "Failed to load market funding history cache from IndexedDB:" error)
+                       nil))
+             (.then (fn [indexed-db-record]
+                      (let [selected-record (newer-cache-record indexed-db-record local-record)
+                            snapshot (or (:snapshot selected-record)
+                                         (empty-cache-snapshot coin* now-ms*))]
+                        (when (and local-record
+                                   (not= selected-record indexed-db-record))
+                          (-> (->promise (persist-indexed-db-fn coin* local-record))
+                              (.catch (fn [_]
+                                        nil))))
+                        snapshot)))))))))
 
 (defn persist-market-funding-history-cache!
   ([coin snapshot]
    (persist-market-funding-history-cache! coin snapshot {}))
-  ([coin snapshot {:keys [local-storage-set-fn]
-                   :or {local-storage-set-fn platform/local-storage-set!}}]
+  ([coin snapshot {:keys [local-storage-set-fn
+                          persist-indexed-db-fn
+                          now-ms-fn]
+                   :or {local-storage-set-fn platform/local-storage-set!
+                        persist-indexed-db-fn persist-market-funding-history-cache-record-to-indexed-db!
+                        now-ms-fn platform/now-ms}}]
    (when-let [coin* (normalize-coin coin)]
-     (let [key (cache-key coin*)
-           normalized (normalize-market-funding-history-cache coin*
-                                                              snapshot
-                                                              (platform/now-ms)
-                                                              cache-retention-window-ms)]
-       (try
-         (local-storage-set-fn key (js/JSON.stringify (clj->js normalized)))
-         (catch :default e
-           (js/console.warn "Failed to persist market funding history cache:" e)))))))
+     (let [record (build-market-funding-history-cache-record coin*
+                                                             snapshot
+                                                             (now-ms-fn)
+                                                             cache-retention-window-ms)]
+       (-> (->promise (persist-indexed-db-fn coin* record))
+           (.then (fn [persisted?]
+                    (when-not persisted?
+                      (persist-market-funding-history-cache-record-to-local-storage!
+                       coin*
+                       record
+                       local-storage-set-fn))
+                    persisted?))
+           (.catch (fn [e]
+                     (js/console.warn "Failed to persist market funding history cache to IndexedDB:" e)
+                     (persist-market-funding-history-cache-record-to-local-storage!
+                      coin*
+                      record
+                      local-storage-set-fn)
+                     false)))))))
 
 (defn clear-market-funding-history-cache!
   ([coin]
    (clear-market-funding-history-cache! coin {}))
-  ([coin {:keys [local-storage-remove-fn]
-          :or {local-storage-remove-fn platform/local-storage-remove!}}]
+  ([coin {:keys [local-storage-remove-fn
+                 delete-indexed-db-fn]
+          :or {local-storage-remove-fn platform/local-storage-remove!
+               delete-indexed-db-fn indexed-db/delete-key!}}]
    (when-let [key (cache-key coin)]
-     (local-storage-remove-fn key))))
+     (-> (->promise (delete-indexed-db-fn indexed-db/funding-history-store
+                                          (normalize-coin coin)))
+         (.then (fn [deleted?]
+                  (when-not deleted?
+                    (local-storage-remove-fn key))
+                  deleted?))
+         (.catch (fn [error]
+                   (js/console.warn "Failed to clear market funding history cache from IndexedDB:" error)
+                   (local-storage-remove-fn key)
+                   false))))))
 
 (defn rows-for-window
   [rows now-ms window-ms]
@@ -255,72 +376,75 @@
                             :start-time-ms nil
                             :end-time-ms nil
                             :last-sync-ms now-ms*})
-       (let [cached (normalize-market-funding-history-cache coin*
-                                                            (or (load-cache-fn coin* {:now-ms-fn now-ms-fn
-                                                                                      :retention-window-ms retention-window-ms})
-                                                                {})
-                                                            now-ms*
-                                                            retention-window-ms*)
-             retention-start-ms (max 0 (- now-ms* retention-window-ms*))
-             previous-last-time-ms (:last-row-time-ms cached)
-             has-cached-history? (or (number? previous-last-time-ms)
-                                     (seq (:rows cached)))
-             start-time-ms (if (number? previous-last-time-ms)
-                             (max retention-start-ms (inc previous-last-time-ms))
-                             retention-start-ms)
-             end-time-ms now-ms*
-             recent-sync? (and has-cached-history?
-                               (not force?)
-                               (number? (:last-sync-ms cached))
-                               (< (- now-ms* (:last-sync-ms cached))
-                                  min-refresh-interval-ms*))
-             no-missing-delta? (> start-time-ms end-time-ms)]
-         (cond
-           recent-sync?
-           (js/Promise.resolve {:coin coin*
-                                :rows (:rows cached)
+       (.then (->promise (load-cache-fn coin* {:now-ms-fn now-ms-fn
+                                               :retention-window-ms retention-window-ms}))
+              (fn [loaded-cache]
+                (let [cached (normalize-market-funding-history-cache coin*
+                                                                     (or loaded-cache {})
+                                                                     now-ms*
+                                                                     retention-window-ms*)
+                      retention-start-ms (max 0 (- now-ms* retention-window-ms*))
+                      previous-last-time-ms (:last-row-time-ms cached)
+                      has-cached-history? (or (number? previous-last-time-ms)
+                                              (seq (:rows cached)))
+                      start-time-ms (if (number? previous-last-time-ms)
+                                      (max retention-start-ms (inc previous-last-time-ms))
+                                      retention-start-ms)
+                      end-time-ms now-ms*
+                      recent-sync? (and has-cached-history?
+                                        (not force?)
+                                        (number? (:last-sync-ms cached))
+                                        (< (- now-ms* (:last-sync-ms cached))
+                                           min-refresh-interval-ms*))
+                      no-missing-delta? (> start-time-ms end-time-ms)]
+                  (cond
+                    recent-sync?
+                    {:coin coin*
+                     :rows (:rows cached)
+                     :source :cache
+                     :reason :recent-sync
+                     :fetched-count 0
+                     :start-time-ms start-time-ms
+                     :end-time-ms end-time-ms
+                     :last-sync-ms (:last-sync-ms cached)}
+
+                    no-missing-delta?
+                    (let [snapshot* (assoc cached :last-sync-ms now-ms*)]
+                      (.then (->promise (persist-cache-fn coin* snapshot*))
+                             (fn [_]
+                               {:coin coin*
+                                :rows (:rows snapshot*)
                                 :source :cache
-                                :reason :recent-sync
+                                :reason :up-to-date
                                 :fetched-count 0
                                 :start-time-ms start-time-ms
                                 :end-time-ms end-time-ms
-                                :last-sync-ms (:last-sync-ms cached)})
+                                :last-sync-ms now-ms*})))
 
-           no-missing-delta?
-           (let [snapshot* (assoc cached :last-sync-ms now-ms*)]
-             (persist-cache-fn coin* snapshot*)
-             (js/Promise.resolve {:coin coin*
-                                  :rows (:rows snapshot*)
-                                  :source :cache
-                                  :reason :up-to-date
-                                  :fetched-count 0
-                                  :start-time-ms start-time-ms
-                                  :end-time-ms end-time-ms
-                                  :last-sync-ms now-ms*}))
-
-           :else
-           (-> (request-market-funding-history! coin*
-                                                {:start-time-ms start-time-ms
-                                                 :end-time-ms end-time-ms
-                                                 :priority priority})
-               (.then (fn [rows]
-                        (let [incoming (normalize-market-funding-history-rows coin* rows)
-                              merged (merge-market-funding-history-rows coin*
-                                                                        (:rows cached)
-                                                                        incoming)
-                              trimmed (trim-market-funding-history-rows merged
-                                                                       now-ms*
-                                                                       retention-window-ms*)
-                              snapshot* {:version cache-version
-                                         :coin coin*
+                    :else
+                    (.then (->promise (request-market-funding-history! coin*
+                                                                        {:start-time-ms start-time-ms
+                                                                         :end-time-ms end-time-ms
+                                                                         :priority priority}))
+                           (fn [rows]
+                             (let [incoming (normalize-market-funding-history-rows coin* rows)
+                                   merged (merge-market-funding-history-rows coin*
+                                                                             (:rows cached)
+                                                                             incoming)
+                                   trimmed (trim-market-funding-history-rows merged
+                                                                            now-ms*
+                                                                            retention-window-ms*)
+                                   snapshot* {:version cache-version
+                                              :coin coin*
+                                              :rows trimmed
+                                              :last-row-time-ms (last-row-time-ms trimmed)
+                                              :last-sync-ms now-ms*}]
+                               (.then (->promise (persist-cache-fn coin* snapshot*))
+                                      (fn [_]
+                                        {:coin coin*
                                          :rows trimmed
-                                         :last-row-time-ms (last-row-time-ms trimmed)
-                                         :last-sync-ms now-ms*}]
-                          (persist-cache-fn coin* snapshot*)
-                          {:coin coin*
-                           :rows trimmed
-                           :source :network
-                           :fetched-count (count incoming)
-                           :start-time-ms start-time-ms
-                           :end-time-ms end-time-ms
-                           :last-sync-ms now-ms*}))))))))))
+                                         :source :network
+                                         :fetched-count (count incoming)
+                                         :start-time-ms start-time-ms
+                                         :end-time-ms end-time-ms
+                                         :last-sync-ms now-ms*})))))))))))))
