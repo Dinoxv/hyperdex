@@ -1,7 +1,7 @@
 ---
 owner: platform
 status: canonical
-last_reviewed: 2026-03-04
+last_reviewed: 2026-03-05
 review_cycle_days: 90
 source_of_truth: true
 ---
@@ -17,15 +17,17 @@ This file is the agent entry point for this repository. It is a table of content
 
 ## Start Here
 1. [Architecture Map](/hyperopen/ARCHITECTURE.md)
-2. [Reliability Invariants](/hyperopen/docs/RELIABILITY.md)
-3. [Security and Signing Safety](/hyperopen/docs/SECURITY.md)
-4. [Quality Scorecard](/hyperopen/docs/QUALITY_SCORE.md)
-5. [Planning and Execution](/hyperopen/docs/PLANS.md)
-6. [Tooling and Agent Capabilities](/hyperopen/docs/tools.md)
-7. [Work Tracking and Session Handoff](/hyperopen/docs/WORK_TRACKING.md)
+2. [Browser Storage Policy](/hyperopen/docs/BROWSER_STORAGE.md)
+3. [Reliability Invariants](/hyperopen/docs/RELIABILITY.md)
+4. [Security and Signing Safety](/hyperopen/docs/SECURITY.md)
+5. [Quality Scorecard](/hyperopen/docs/QUALITY_SCORE.md)
+6. [Planning and Execution](/hyperopen/docs/PLANS.md)
+7. [Tooling and Agent Capabilities](/hyperopen/docs/tools.md)
+8. [Work Tracking and Session Handoff](/hyperopen/docs/WORK_TRACKING.md)
 
 ## Domain Guides
 - Architecture boundaries: [ARCHITECTURE.md](/hyperopen/ARCHITECTURE.md)
+- Browser persistence decisions: [BROWSER_STORAGE.md](/hyperopen/docs/BROWSER_STORAGE.md)
 - Design foundations and beliefs: [DESIGN.md](/hyperopen/docs/DESIGN.md) and [design docs index](/hyperopen/docs/design-docs/index.md)
 - Prior AGENTS section map: [AGENTS Section Reindex Map](/hyperopen/docs/design-docs/agents-section-index.md)
 - Frontend policy: [FRONTEND.md](/hyperopen/docs/FRONTEND.md)
@@ -41,6 +43,7 @@ This file is the agent entry point for this repository. It is a table of content
 - Keep changes scoped; preserve public Application Programming Interfaces unless explicitly requested.
 - Keep websocket runtime decisions pure and deterministic.
 - Keep side effects in interpreters/infrastructure boundaries only.
+- Follow `/hyperopen/docs/BROWSER_STORAGE.md` for any browser persistence change; default to `localStorage` only for tiny synchronous preferences and use IndexedDB for growing or high-churn caches.
 - Keep signing payload behavior consensus-safe and covered by parity tests when changed.
 - Keep interaction responsiveness deterministic: user-visible state updates must precede heavy subscription/fetch work.
 - Never run `git pull --rebase` or `git push` unless the user explicitly requests remote sync in the current session.

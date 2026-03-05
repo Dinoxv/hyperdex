@@ -1,7 +1,7 @@
 ---
 owner: architecture
 status: canonical
-last_reviewed: 2026-02-13
+last_reviewed: 2026-03-05
 review_cycle_days: 90
 source_of_truth: true
 ---
@@ -55,6 +55,15 @@ Dependency direction is intentional: domain -> application -> infrastructure. An
 - MUST keep complexity bounded: new namespaces under 500 LOC and new functions under 80 LOC unless justified by an Architecture Decision Record.
 - MUST include invariant ownership notes in PR documentation for changed invariants.
 
+## Browser Persistence Boundary Rules (MUST)
+- MUST keep browser storage reads and writes in infrastructure or platform boundaries, never in pure domain or application decision logic.
+- MUST use `/hyperopen/src/hyperopen/platform/indexed_db.cljs` as the shared IndexedDB seam instead of scattering raw `js/indexedDB` calls.
+- MUST use `localStorage` only for small, bounded preferences that benefit from synchronous startup restore.
+- MUST use IndexedDB for caches or persisted state that can grow by asset, timeframe, row count, or write frequency.
+- MUST use `sessionStorage` only when session-only lifetime is an explicit product behavior, not as a substitute for security design.
+- MUST treat browser storage choice as an architecture decision about access pattern and lifecycle, not as a security boundary.
+- MUST follow `/hyperopen/docs/BROWSER_STORAGE.md` for the detailed decision checklist and canonical examples.
+
 ## Domain-Driven Design Layer Boundaries (MUST)
 - Domain model/policy ownership:
   - `/hyperopen/src/hyperopen/websocket/domain/model.cljs`
@@ -90,6 +99,7 @@ Dependency direction is intentional: domain -> application -> infrastructure. An
 - [ ] Yes/No: Dependency Inversion Principle is preserved.
 
 ## Canonical Companion Docs
+- Browser storage selection policy: `/hyperopen/docs/BROWSER_STORAGE.md`
 - Reliability invariants and runtime rules: `/hyperopen/docs/RELIABILITY.md`
 - Security and signing invariants: `/hyperopen/docs/SECURITY.md`
 - Frontend interaction/runtime constraints: `/hyperopen/docs/FRONTEND.md`
