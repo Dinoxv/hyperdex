@@ -105,11 +105,19 @@
                                              :spot {}
                                              :perp-dex-clearinghouse {}})]
     (is (some? (find-first-node view-node #(contains? (direct-texts %) "Unified Account Summary"))))
+    (is (some? (find-first-node view-node #(contains? (direct-texts %) "Unified Account Value"))))
     (is (some? (find-first-node view-node #(contains? (direct-texts %) "Unified Account Ratio"))))
-    (is (some? (find-first-node view-node #(contains? (direct-texts %) "Portfolio Value"))))
     (is (some? (find-first-node view-node #(contains? (direct-texts %) "Perps Maintenance Margin"))))
     (is (some? (find-first-node view-node #(contains? (direct-texts %) "Unified Account Leverage"))))
     (is (nil? (find-first-node view-node #(contains? (direct-texts %) "Perps Overview"))))))
+
+(deftest classic-account-equity-renders-classic-account-value-label-test
+  (let [view-node (view/account-equity-view {:account {:mode :classic}
+                                             :webdata2 {}
+                                             :spot {}
+                                             :perp-dex-clearinghouse {}})]
+    (is (some? (find-first-node view-node #(contains? (direct-texts %) "Account Value"))))
+    (is (nil? (find-first-node view-node #(contains? (direct-texts %) "Unified Account Value"))))))
 
 (deftest unified-account-summary-renders-funding-section-above-summary-test
   (let [view-node (view/account-equity-view {:account {:mode :unified}
@@ -193,7 +201,7 @@
                                              :perp-dex-clearinghouse {}})
         placeholder-node (find-first-node view-node #(contains? (direct-texts %) "--"))]
     (is (some? (find-first-node view-node #(contains? (direct-texts %) "Unified Account Summary"))))
-    (is (some? (find-first-node view-node #(contains? (direct-texts %) "Portfolio Value"))))
+    (is (some? (find-first-node view-node #(contains? (direct-texts %) "Unified Account Value"))))
     (is (some? placeholder-node))
     (is (contains? (node-class-set placeholder-node) "text-trading-text-secondary"))))
 

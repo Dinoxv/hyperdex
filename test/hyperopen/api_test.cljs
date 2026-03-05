@@ -351,6 +351,34 @@
             (fn []
               (set! hyperopen.api.default/post-info! original-post-info)))))))
 
+(deftest fetch-user-abstraction-maps-dex-abstraction-to-classic-mode-test
+  (async done
+    (let [store (atom {:wallet {:address "0xaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"}
+                       :account {:mode :unified
+                                 :abstraction-raw "unifiedAccount"}})
+          original-post-info hyperopen.api.default/post-info!]
+      (set! hyperopen.api.default/post-info!
+            (fn post-info-mock
+              ([body]
+               (post-info-mock body {}))
+              ([_body _opts]
+               (js/Promise.resolve "dexAbstraction"))
+              ([body opts _attempt]
+               (post-info-mock body opts))))
+      (-> (api/fetch-user-abstraction! store "0xaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa")
+          (.then (fn [snapshot]
+                   (is (= {:mode :classic
+                           :abstraction-raw "dexAbstraction"}
+                          snapshot))
+                   (is (= snapshot (:account @store)))
+                   (done)))
+          (.catch (fn [err]
+                    (is false (str "Unexpected error: " err))
+                    (done)))
+          (.finally
+            (fn []
+              (set! hyperopen.api.default/post-info! original-post-info)))))))
+
 (deftest fetch-user-abstraction-skips-stale-address-write-test
   (async done
     (let [store (atom {:wallet {:address "0xdddddddddddddddddddddddddddddddddddddddd"}

@@ -505,7 +505,7 @@
 (defn fetch-user-abstraction!
   "Fetch account abstraction mode for a user and project normalized account mode.
    Supported normalized modes:
-   - :unified  => unifiedAccount / portfolioMargin / dexAbstraction
+   - :unified  => unifiedAccount / portfolioMargin
    - :classic  => default / disabled / nil / unknown"
   ([store address]
    (fetch-user-abstraction! store address {}))

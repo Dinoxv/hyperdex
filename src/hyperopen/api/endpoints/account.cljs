@@ -108,7 +108,8 @@
     (case abstraction*
       "unifiedAccount" :unified
       "portfolioMargin" :unified
-      "dexAbstraction" :unified
+      ;; `dexAbstraction` is a standard (non-unified) account shape.
+      "dexAbstraction" :classic
       "default" :classic
       "disabled" :classic
       :classic)))

@@ -97,6 +97,7 @@
                (is (= {} (nth results* 8)))
                (is (nil? (nth results* 9)))
                (is (= :unified (account-endpoints/normalize-user-abstraction-mode "portfolioMargin")))
+               (is (= :classic (account-endpoints/normalize-user-abstraction-mode "dexAbstraction")))
                (is (= :classic (account-endpoints/normalize-user-abstraction-mode "unknown")))
                (is (= 17 (count summary)))
                (is (some #(= "portfolio" (get-in % [0 "type"])) @calls))

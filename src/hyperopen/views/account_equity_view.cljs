@@ -144,6 +144,14 @@
 (defn- unified-account? [state]
   (= :unified (get-in state [:account :mode])))
 
+(defn- derive-account-value-display
+  [portfolio-value spot-equity perps-value]
+  (or portfolio-value
+      (when (or (number? spot-equity)
+                (number? perps-value))
+        (+ (or spot-equity 0)
+           (or perps-value 0)))))
+
 (defn- derive-account-equity-metrics [state]
   (let [webdata2 (:webdata2 state)
         clearinghouse-state (:clearinghouseState webdata2)
@@ -186,6 +194,7 @@
                           balance-rows)
         spot-equity (when (seq spot-values) (reduce + spot-values))
         portfolio-value (account-projections/portfolio-usdc-value balance-rows)
+        account-value-display (derive-account-value-display portfolio-value spot-equity perps-value)
         cross-margin-ratio (safe-div maintenance-margin cross-account-value)
         unified-account-ratio (safe-div maintenance-margin portfolio-value)
         cross-account-leverage (safe-div cross-total-ntl-pos cross-account-value)
@@ -202,6 +211,7 @@
      :unified-account-leverage unified-account-leverage
      :cross-account-value cross-account-value
      :portfolio-value portfolio-value
+     :account-value-display account-value-display
      :pnl-info pnl-info}))
 
 (defn account-equity-metrics [state]
@@ -209,6 +219,7 @@
 
 (defn- classic-account-equity-view [{:keys [spot-equity
                                             perps-value
+                                            account-value-display
                                             base-balance
                                             maintenance-margin
                                             cross-margin-ratio
@@ -222,6 +233,8 @@
      (funding-actions-cluster))
 
    [:div.space-y-2
+    (metric-row "Account Value" (display-currency account-value-display)
+                :tooltip "Total classic account value (Spot + Perps).")
     (metric-row "Spot" (display-currency spot-equity))
     (metric-row "Perps" (display-currency perps-value)
                 :tooltip "Balance + Unrealized PNL (approximate account value if all positions were closed)")]
@@ -240,7 +253,7 @@
                 :tooltip "Cross Account Leverage = Total Cross Positions Value / Cross Account Value.")]])
 
 (defn- unified-account-summary-view [{:keys [unified-account-ratio
-                                             portfolio-value
+                                             account-value-display
                                              maintenance-margin
                                              unified-account-leverage
                                              pnl-info
@@ -250,10 +263,10 @@
    (funding-actions-section ghost-mode-active?)
    [:div.text-sm.font-semibold.text-trading-text "Unified Account Summary"]
    [:div.space-y-2
+    (metric-row "Unified Account Value" (display-currency account-value-display)
+                :tooltip "Total portfolio value used for unified account risk and leverage calculations.")
     (metric-row "Unified Account Ratio" (display-percent unified-account-ratio)
                 :tooltip "Perps Maintenance Margin / Portfolio Value.")
-    (metric-row "Portfolio Value" (display-currency portfolio-value)
-                :tooltip "Total portfolio value used for unified account risk and leverage calculations.")
     (metric-row "Unrealized PNL" (:text pnl-info)
                 :value-class (:class pnl-info))
     (metric-row "Perps Maintenance Margin" (display-currency maintenance-margin)

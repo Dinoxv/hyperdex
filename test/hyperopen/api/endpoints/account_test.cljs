@@ -298,7 +298,7 @@
 (deftest normalize-user-abstraction-mode-maps-known-values-test
   (is (= :unified (account/normalize-user-abstraction-mode "unifiedAccount")))
   (is (= :unified (account/normalize-user-abstraction-mode "portfolioMargin")))
-  (is (= :unified (account/normalize-user-abstraction-mode " dexAbstraction ")))
+  (is (= :classic (account/normalize-user-abstraction-mode " dexAbstraction ")))
   (is (= :classic (account/normalize-user-abstraction-mode "default")))
   (is (= :classic (account/normalize-user-abstraction-mode "disabled")))
   (is (= :classic (account/normalize-user-abstraction-mode "  unknown  ")))
