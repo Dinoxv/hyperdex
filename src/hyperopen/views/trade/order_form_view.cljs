@@ -595,35 +595,53 @@
       submit-tooltip])])
 
 (defn- ghost-mode-stop-affordance []
-  [:div {:class ["rounded-lg"
-                 "border"
-                 "border-[#2f7067]"
-                 "bg-[#0f433d]/30"
-                 "px-3"
-                 "py-2.5"
-                 "text-xs"
-                 "text-[#d4ece8]"
-                 "flex"
-                 "items-center"
-                 "justify-between"
-                 "gap-2"]
-         :data-role "order-form-ghost-mode-stop"}
-   [:span "Ghost Mode is active and trading is disabled."]
+  [:div {:data-role "order-form-ghost-mode-stop"}
    [:button {:type "button"
-             :class ["rounded-md"
+             :class ["flex"
+                     "h-9"
+                     "w-full"
+                     "items-center"
+                     "justify-between"
+                     "gap-2"
+                     "rounded-lg"
                      "border"
                      "border-[#2f7067]"
-                     "bg-[#0f433d]"
-                     "px-2.5"
-                     "py-1"
-                     "text-xs"
-                     "font-semibold"
-                     "text-[#dbf7f2]"
+                     "bg-[#0f433d]/25"
+                     "px-3"
+                     "text-sm"
+                     "font-medium"
+                     "text-[#d6f1ed]"
                      "transition-colors"
-                     "hover:bg-[#14544c]"]
+                     "hover:bg-[#0f433d]/45"
+                     "focus:outline-none"
+                     "focus:ring-1"
+                     "focus:ring-[#87c8c0]/40"
+                     "focus:ring-offset-0"]
              :on {:click [[:actions/stop-ghost-mode]]}
              :data-role "order-form-ghost-mode-stop-button"}
-    "Stop Ghost Mode"]])
+    [:span {:class ["inline-flex" "min-w-0" "items-center" "gap-2"]}
+     [:svg {:viewBox "0 0 20 20"
+            :fill "currentColor"
+            :class ["h-3.5" "w-3.5" "shrink-0"]
+            :aria-hidden "true"}
+      [:path {:fill-rule "evenodd"
+              :clip-rule "evenodd"
+              :d "M10 2a6 6 0 00-6 6v8a1 1 0 001.447.894L10 14.618l4.553 2.276A1 1 0 0016 16V8a6 6 0 00-6-6zm0 2a4 4 0 00-4 4v6.382l3.553-1.776a1 1 0 01.894 0L14 14.382V8a4 4 0 00-4-4z"}]]
+     [:span {:class ["truncate"]} "Stop Ghost Mode"]]
+    [:span {:class ["shrink-0"
+                    "rounded-[4px]"
+                    "border"
+                    "border-[#2f7067]"
+                    "bg-[#0f433d]"
+                    "px-1.5"
+                    "py-0.5"
+                    "text-xs"
+                    "font-semibold"
+                    "uppercase"
+                    "leading-none"
+                    "tracking-[0.04em]"
+                    "text-[#c2e5e0]"]}
+     "⌘⇧X"]]])
 
 (def ^:private liquidation-price-tooltip
   "Position risk is low, so there is no liquidation price for the time being. Note that increasing the position or reducing the margin will increase the risk.")

@@ -192,6 +192,16 @@
           (keydown-handler #js {:key "x"
                                 :metaKey true
                                 :ctrlKey false
+                                :shiftKey false
+                                :target #js {:tagName "DIV"}
+                                :preventDefault (fn []
+                                                  (swap! prevent-default-calls inc))})
+          (is (= 1 @prevent-default-calls))
+          (is (= 1 (count @dispatch-calls)))
+          (keydown-handler #js {:key "x"
+                                :metaKey true
+                                :ctrlKey false
+                                :shiftKey true
                                 :target #js {:tagName "DIV"}
                                 :preventDefault (fn []
                                                   (swap! prevent-default-calls inc))})
@@ -201,6 +211,7 @@
           (keydown-handler #js {:key "x"
                                 :metaKey true
                                 :ctrlKey false
+                                :shiftKey true
                                 :target #js {:tagName "INPUT"}
                                 :preventDefault (fn []
                                                   (swap! prevent-default-calls inc))})

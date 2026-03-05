@@ -177,10 +177,12 @@
                       (let [key (some-> event .-key)
                             meta-key? (true? (some-> event .-metaKey))
                             ctrl-key? (true? (some-> event .-ctrlKey))
+                            shift-key? (true? (some-> event .-shiftKey))
                             key-token (some-> key str str/lower-case)
                             open-shortcut? (and (or meta-key? ctrl-key?)
                                                 (= key-token "k"))
                             stop-shortcut? (and (or meta-key? ctrl-key?)
+                                                shift-key?
                                                 (= key-token "x"))
                             ghost-mode-active? (account-context/ghost-mode-active? @store)
                             editable-target? (editable-shortcut-target? event)
