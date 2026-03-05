@@ -16,3 +16,10 @@
 {"created_at":"2026-03-04T18:38:06Z","created_by":"Geronimo","depends_on_id":"hyperopen-fq5","issue_id":"hyperopen-fq5.2","type":"parent-child"}
 {"created_at":"2026-03-04T18:38:06Z","created_by":"Geronimo","depends_on_id":"hyperopen-fq5","issue_id":"hyperopen-fq5.3","type":"parent-child"}
 {"created_at":"2026-03-04T18:38:07Z","created_by":"Geronimo","depends_on_id":"hyperopen-fq5","issue_id":"hyperopen-fq5.4","type":"parent-child"}
+{"created_at":"2026-03-04T21:43:32Z","created_by":"Geronimo","depends_on_id":"hyperopen-nhv","issue_id":"hyperopen-nhv.1","type":"parent-child"}
+{"created_at":"2026-03-04T21:43:35Z","created_by":"Geronimo","depends_on_id":"hyperopen-nhv","issue_id":"hyperopen-nhv.2","type":"parent-child"}
+{"created_at":"2026-03-04T21:43:38Z","created_by":"Geronimo","depends_on_id":"hyperopen-nhv","issue_id":"hyperopen-nhv.3","type":"parent-child"}
+{"created_at":"2026-03-04T21:43:41Z","created_by":"Geronimo","depends_on_id":"hyperopen-nhv","issue_id":"hyperopen-nhv.4","type":"parent-child"}
+{"created_at":"2026-03-04T21:43:44Z","created_by":"Geronimo","depends_on_id":"hyperopen-nhv","issue_id":"hyperopen-nhv.5","type":"parent-child"}
+{"created_at":"2026-03-04T21:43:49Z","created_by":"Geronimo","depends_on_id":"hyperopen-nhv","issue_id":"hyperopen-nhv.6","type":"parent-child"}
+{"created_at":"2026-03-04T21:43:52Z","created_by":"Geronimo","depends_on_id":"hyperopen-nhv","issue_id":"hyperopen-nhv.7","type":"parent-child"}
