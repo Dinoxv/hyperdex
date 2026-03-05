@@ -1,6 +1,7 @@
 (ns hyperopen.api.endpoints.vaults
   (:require [clojure.string :as str]
-            [hyperopen.api.endpoints.account :as account-endpoints]))
+            [hyperopen.api.endpoints.account :as account-endpoints]
+            [hyperopen.api.request-policy :as request-policy]))
 
 (def default-vault-index-url
   "https://stats-data.hyperliquid.xyz/Mainnet/vaults")
@@ -251,9 +252,11 @@
 (defn request-vault-summaries!
   [post-info! opts]
   (-> (post-info! {"type" "vaultSummaries"}
-                  (merge {:priority :high
-                          :dedupe-key :vault-summaries}
-                         opts))
+                  (request-policy/apply-info-request-policy
+                   :vault-summaries
+                   (merge {:priority :high
+                           :dedupe-key :vault-summaries}
+                          opts)))
       (.then normalize-vault-index-rows)))
 
 (defn normalize-user-vault-equity
@@ -278,9 +281,11 @@
   (if-let [requested-address (normalize-address address)]
     (-> (post-info! {"type" "userVaultEquities"
                      "user" requested-address}
-                    (merge {:priority :high
-                            :dedupe-key [:user-vault-equities requested-address]}
-                           opts))
+                    (request-policy/apply-info-request-policy
+                     :user-vault-equities
+                     (merge {:priority :high
+                             :dedupe-key [:user-vault-equities requested-address]}
+                            opts)))
         (.then normalize-user-vault-equities))
     (js/Promise.resolve [])))
 
@@ -349,9 +354,11 @@
   (if-let [vault-address* (normalize-address vault-address)]
     (let [opts* (or opts {})
           user-address (normalize-address (:user opts*))
-          request-opts (merge {:priority :high
-                               :dedupe-key [:vault-details vault-address* user-address]}
-                              (dissoc opts* :user))
+          request-opts (request-policy/apply-info-request-policy
+                        :vault-details
+                        (merge {:priority :high
+                                :dedupe-key [:vault-details vault-address* user-address]}
+                               (dissoc opts* :user)))
           request-body (cond-> {"type" "vaultDetails"
                                 "vaultAddress" vault-address*}
                          user-address (assoc "user" user-address))]
@@ -364,7 +371,9 @@
   (if-let [vault-address* (normalize-address vault-address)]
     (post-info! {"type" "webData2"
                  "user" vault-address*}
-                (merge {:priority :high
-                        :dedupe-key [:vault-webdata2 vault-address*]}
-                       opts))
+                (request-policy/apply-info-request-policy
+                 :vault-webdata2
+                 (merge {:priority :high
+                         :dedupe-key [:vault-webdata2 vault-address*]}
+                        opts)))
     (js/Promise.resolve nil)))

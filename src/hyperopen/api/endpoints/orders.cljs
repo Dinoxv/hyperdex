@@ -1,4 +1,6 @@
-(ns hyperopen.api.endpoints.orders)
+(ns hyperopen.api.endpoints.orders
+  (:require [clojure.string :as str]
+            [hyperopen.api.request-policy :as request-policy]))
 
 (defn request-frontend-open-orders!
   [post-info! address dex opts]
@@ -44,13 +46,18 @@
   [post-info! address opts]
   (if-not address
     (js/Promise.resolve [])
-    (-> (post-info! {"type" "historicalOrders"
-                     "user" address}
-                    (merge {:priority :high}
-                           opts))
+    (let [requested-address (some-> address str/trim str/lower-case)
+          opts* (request-policy/apply-info-request-policy
+                 :historical-orders
+                 (merge {:priority :high
+                         :dedupe-key [:historical-orders requested-address]}
+                        opts))]
+      (-> (post-info! {"type" "historicalOrders"
+                       "user" address}
+                      opts*)
         (.then (fn [payload]
                  (->> payload
                       historical-orders-seq
                       (map normalize-historical-order-row)
                       (remove nil?)
-                      vec))))))
+                      vec)))))))

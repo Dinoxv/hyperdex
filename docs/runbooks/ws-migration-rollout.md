@@ -74,6 +74,29 @@ Operator expectation:
 
 - temporary websocket degradation should shift affected paths back to bounded REST fallback without deploy rollback.
 
+## REST Hardening Policy (Non-Subscribable `/info`)
+
+When websocket parity is unavailable, `/info` calls now use shared TTL request policy plus single-flight coalescing in `info_client`.
+
+Current default TTL policy (ms) in `/hyperopen/src/hyperopen/api/request_policy.cljs`:
+
+- `:perp-dexs` / `:spot-meta`: `60000`
+- `:public-webdata2`: `30000`
+- `:portfolio`: `8000`
+- `:user-fees`: `15000`
+- `:user-funding-history` / `:historical-orders` / `:user-non-funding-ledger`: `5000`
+- `:vault-summaries`: `15000`
+- `:user-vault-equities`: `5000`
+- `:vault-details` / `:vault-webdata2`: `8000`
+- `:predicted-fundings`: `5000`
+- `:market-funding-history`: `15000`
+
+Operational notes:
+
+- Endpoint callers can override with `:cache-ttl-ms` per request.
+- Force bypass is available with `:force-refresh? true`.
+- Route/tab-inactive effects (funding comparison, vault detail/list, account order/funding history refresh) now skip fetch execution to reduce background churn.
+
 ## Monitoring and Signals
 
 - `/info` request volume by request type/source (from request telemetry).

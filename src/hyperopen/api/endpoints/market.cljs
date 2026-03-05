@@ -1,14 +1,20 @@
 (ns hyperopen.api.endpoints.market
   (:require [hyperopen.asset-selector.markets :as markets]
             [hyperopen.api.market-metadata.perp-dexs :as perp-dexs]
+            [hyperopen.api.request-policy :as request-policy]
             [hyperopen.utils.data-normalization :refer [normalize-asset-contexts]]
             [hyperopen.utils.interval :refer [interval-to-milliseconds]]))
 
 (defn request-asset-contexts!
   [post-info! opts]
-  (-> (post-info! {"type" "metaAndAssetCtxs"}
-                  (merge {:priority :high} opts))
-      (.then normalize-asset-contexts)))
+  (let [opts* (request-policy/apply-info-request-policy
+               :asset-contexts
+               (merge {:priority :high
+                       :dedupe-key :asset-contexts}
+                      opts))]
+    (-> (post-info! {"type" "metaAndAssetCtxs"}
+                    opts*)
+      (.then normalize-asset-contexts))))
 
 (defn request-meta-and-asset-ctxs!
   [post-info! dex opts]
@@ -17,17 +23,25 @@
         dedupe-key (or (:dedupe-key opts)
                        (if (seq dex)
                          [:meta-and-asset-ctxs dex]
-                         :meta-and-asset-ctxs-default))]
+                         :meta-and-asset-ctxs-default))
+        opts* (request-policy/apply-info-request-policy
+               :meta-and-asset-ctxs
+               (merge {:priority :high
+                       :dedupe-key dedupe-key}
+                      opts))]
     (post-info! body
-                (merge {:priority :high
-                        :dedupe-key dedupe-key}
-                       opts))))
+                opts*)))
 
 (defn request-perp-dexs!
   [post-info! opts]
-  (-> (post-info! {"type" "perpDexs"}
-                  (merge {:priority :high} opts))
-      (.then perp-dexs/normalize-perp-dex-payload)))
+  (let [opts* (request-policy/apply-info-request-policy
+               :perp-dexs
+               (merge {:priority :high
+                       :dedupe-key :perp-dexs}
+                      opts))]
+    (-> (post-info! {"type" "perpDexs"}
+                    opts*)
+      (.then perp-dexs/normalize-perp-dex-payload))))
 
 (defn request-candle-snapshot!
   [post-info! now-ms-fn coin {:keys [interval bars priority]
@@ -48,15 +62,21 @@
 (defn request-spot-meta!
   [post-info! opts]
   (post-info! {"type" "spotMeta"}
-              (merge {:priority :high}
-                     opts)))
+              (request-policy/apply-info-request-policy
+               :spot-meta
+               (merge {:priority :high
+                       :dedupe-key :spot-meta}
+                      opts))))
 
 (defn request-public-webdata2!
   [post-info! opts]
   (post-info! {"type" "webData2"
                "user" "0x0000000000000000000000000000000000000000"}
-              (merge {:priority :high}
-                     opts)))
+              (request-policy/apply-info-request-policy
+               :public-webdata2
+               (merge {:priority :high
+                       :dedupe-key :public-webdata2}
+                      opts))))
 
 (defn- finite-number?
   [value]
@@ -145,13 +165,15 @@
                           "coin" coin*}
                    (number? start-time-ms) (assoc "startTime" (js/Math.floor start-time-ms))
                    (number? end-time-ms) (assoc "endTime" (js/Math.floor end-time-ms)))
-            request-opts (merge {:priority :high
-                                 :dedupe-key [:market-funding-history coin* start-time-ms end-time-ms]}
-                                (dissoc (or opts {})
-                                        :start-time-ms
-                                        :end-time-ms
-                                        :startTime
-                                        :endTime))]
+            request-opts (request-policy/apply-info-request-policy
+                          :market-funding-history
+                          (merge {:priority :high
+                                  :dedupe-key [:market-funding-history coin* start-time-ms end-time-ms]}
+                                 (dissoc (or opts {})
+                                         :start-time-ms
+                                         :end-time-ms
+                                         :startTime
+                                         :endTime)))]
         (-> (post-info! body request-opts)
             (.then market-funding-history-seq)
             (.then normalize-market-funding-history-rows))))))
@@ -159,9 +181,11 @@
 (defn request-predicted-fundings!
   [post-info! opts]
   (post-info! {"type" "predictedFundings"}
-              (merge {:priority :high
-                      :dedupe-key :predicted-fundings}
-                     opts)))
+              (request-policy/apply-info-request-policy
+               :predicted-fundings
+               (merge {:priority :high
+                       :dedupe-key :predicted-fundings}
+                      opts))))
 
 (defn- build-market-index-by-key
   [markets]

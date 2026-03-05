@@ -1,5 +1,6 @@
 (ns hyperopen.api.endpoints.account
-  (:require [clojure.string :as str]))
+  (:require [clojure.string :as str]
+            [hyperopen.api.request-policy :as request-policy]))
 
 (defn- user-funding-request-body
   [address start-time-ms end-time-ms]
@@ -10,9 +11,18 @@
 
 (defn- fetch-user-funding-page!
   [post-info! address start-time-ms end-time-ms opts]
-  (post-info! (user-funding-request-body address start-time-ms end-time-ms)
-              (merge {:priority :high}
-                     opts)))
+  (let [requested-address (some-> address str str/lower-case)
+        start-time* (when (number? start-time-ms)
+                      (js/Math.floor start-time-ms))
+        end-time* (when (number? end-time-ms)
+                    (js/Math.floor end-time-ms))
+        opts* (request-policy/apply-info-request-policy
+               :user-funding-history
+               (merge {:priority :high
+                       :dedupe-key [:user-funding-history requested-address start-time* end-time*]}
+                      opts))]
+    (post-info! (user-funding-request-body address start-time-ms end-time-ms)
+                opts*)))
 
 (defn- funding-history-seq
   [payload]
@@ -119,9 +129,11 @@
   (if-not address
     (js/Promise.resolve nil)
     (let [requested-address (some-> address str str/lower-case)
-          opts* (merge {:priority :high
-                        :dedupe-key [:user-abstraction requested-address]}
-                       opts)]
+          opts* (request-policy/apply-info-request-policy
+                 :user-abstraction
+                 (merge {:priority :high
+                         :dedupe-key [:user-abstraction requested-address]}
+                        opts))]
       (post-info! {"type" "userAbstraction"
                    "user" address}
                   opts*))))
@@ -278,9 +290,11 @@
   (if-not address
     (js/Promise.resolve {})
     (let [requested-address (some-> address str str/lower-case)
-          opts* (merge {:priority :high
-                        :dedupe-key [:portfolio requested-address]}
-                       opts)]
+          opts* (request-policy/apply-info-request-policy
+                 :portfolio
+                 (merge {:priority :high
+                         :dedupe-key [:portfolio requested-address]}
+                        opts))]
       (-> (post-info! {"type" "portfolio"
                        "user" address}
                       opts*)
@@ -291,9 +305,11 @@
   (if-not address
     (js/Promise.resolve nil)
     (let [requested-address (some-> address str str/lower-case)
-          opts* (merge {:priority :high
-                        :dedupe-key [:user-fees requested-address]}
-                       opts)]
+          opts* (request-policy/apply-info-request-policy
+                 :user-fees
+                 (merge {:priority :high
+                         :dedupe-key [:user-fees requested-address]}
+                        opts))]
       (post-info! {"type" "userFees"
                    "user" address}
                   opts*))))
@@ -332,8 +348,10 @@
                         "user" address}
                  (number? start-time*) (assoc "startTime" start-time*)
                  (number? end-time*) (assoc "endTime" end-time*))
-          opts* (merge {:priority :high
-                        :dedupe-key [:user-non-funding-ledger requested-address start-time* end-time*]}
-                       opts)]
+          opts* (request-policy/apply-info-request-policy
+                 :user-non-funding-ledger
+                 (merge {:priority :high
+                         :dedupe-key [:user-non-funding-ledger requested-address start-time* end-time*]}
+                        opts))]
       (-> (post-info! body opts*)
           (.then non-funding-ledger-updates-seq)))))

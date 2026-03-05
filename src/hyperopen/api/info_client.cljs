@@ -1,5 +1,6 @@
 (ns hyperopen.api.info-client
   (:require [clojure.string :as str]
+            [hyperopen.api.request-policy :as request-policy]
             [hyperopen.platform :as platform]
             [hyperopen.telemetry :as telemetry]))
 
@@ -100,9 +101,60 @@
                 default-priority]} (merge default-config (or config {}))
         cooldown-until-ms (atom 0)
         single-flight-promises (atom {})
+        response-cache (atom {})
         request-runtime (atom (default-request-runtime))]
     (letfn [(normalize-priority [priority]
               (if (= priority :low) :low :high))
+            (cache-key-token [opts]
+              (let [opts* (or opts {})]
+                (or (:cache-key opts*)
+                    (:dedupe-key opts*))))
+            (request-flow-opts [opts]
+              (let [opts* (merge {:priority default-priority} (or opts {}))
+                    cache-key (cache-key-token opts*)
+                    dedupe-key (:dedupe-key opts*)
+                    flight-key (or dedupe-key cache-key)
+                    cache-ttl-ms (request-policy/normalize-ttl-ms (:cache-ttl-ms opts*))
+                    force-refresh? (true? (:force-refresh? opts*))
+                    request-source (or (:request-source opts*)
+                                       flight-key)
+                    request-opts (cond-> (dissoc opts*
+                                                :dedupe-key
+                                                :cache-key
+                                                :cache-ttl-ms
+                                                :force-refresh?)
+                                   (some? request-source)
+                                   (assoc :request-source request-source))]
+                {:request-opts request-opts
+                 :cache-key cache-key
+                 :cache-ttl-ms cache-ttl-ms
+                 :force-refresh? force-refresh?
+                 :flight-key flight-key}))
+            (read-cached-response [cache-key]
+              (when cache-key
+                (let [entry (get @response-cache cache-key)
+                      expires-at-ms (:expires-at-ms entry)]
+                  (cond
+                    (and (map? entry)
+                         (number? expires-at-ms)
+                         (> expires-at-ms (now-ms-fn)))
+                    (:value entry)
+
+                    (some? entry)
+                    (do
+                      (swap! response-cache dissoc cache-key)
+                      nil)
+
+                    :else
+                    nil))))
+            (write-cached-response! [cache-key cache-ttl-ms value]
+              (when (and cache-key
+                         (number? cache-ttl-ms)
+                         (pos? cache-ttl-ms))
+                (swap! response-cache assoc
+                       cache-key
+                       {:value value
+                        :expires-at-ms (+ (now-ms-fn) cache-ttl-ms)})))
             (retryable-status? [status]
               (contains? #{429 500 502 503 504} status))
             (retry-delay-ms [attempt]
@@ -333,29 +385,36 @@
               ([body]
                (request-info! body {}))
               ([body opts]
-               (let [opts* (merge {:priority default-priority} (or opts {}))
-                     dedupe-key (:dedupe-key opts*)
-                     request-opts (cond-> (dissoc opts* :dedupe-key)
-                                    (and dedupe-key
-                                         (nil? (:request-source opts*)))
-                                    (assoc :request-source dedupe-key))]
-                 (with-single-flight!
-                  dedupe-key
-                  (fn []
-                    (request-attempt! body request-opts 0)))))
+               (let [{:keys [request-opts
+                             cache-key
+                             cache-ttl-ms
+                             force-refresh?
+                             flight-key]} (request-flow-opts opts)]
+                 (if (and (not force-refresh?)
+                          cache-key
+                          cache-ttl-ms)
+                   (if-let [cached (read-cached-response cache-key)]
+                     (js/Promise.resolve cached)
+                     (with-single-flight!
+                      flight-key
+                      (fn []
+                        (-> (request-attempt! body request-opts 0)
+                            (.then (fn [value]
+                                     (write-cached-response! cache-key cache-ttl-ms value)
+                                     value))))))
+                   (with-single-flight!
+                    flight-key
+                    (fn []
+                      (request-attempt! body request-opts 0))))))
               ([body opts attempt]
-               (request-attempt! body
-                                 (let [opts* (merge {:priority default-priority} (or opts {}))]
-                                   (cond-> opts*
-                                     (and (:dedupe-key opts*)
-                                          (nil? (:request-source opts*)))
-                                     (assoc :request-source (:dedupe-key opts*))))
-                                 attempt)))
+               (let [{:keys [request-opts]} (request-flow-opts opts)]
+                 (request-attempt! body request-opts attempt))))
             (get-request-stats []
               (:stats @request-runtime))
             (reset-client! []
               (reset! cooldown-until-ms 0)
               (reset! single-flight-promises {})
+              (reset! response-cache {})
               (reset! request-runtime (default-request-runtime)))]
       {:request-info! request-info!
        :enqueue-request! enqueue-request!

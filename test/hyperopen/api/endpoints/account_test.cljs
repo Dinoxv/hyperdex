@@ -109,7 +109,9 @@
                      (is (= {"type" "userFunding"
                              "user" "0xabc"}
                             body))
-                     (is (= {:priority :high}
+                     (is (= {:priority :high
+                             :dedupe-key [:user-funding-history "0xabc" nil nil]
+                             :cache-ttl-ms 5000}
                             opts)))
                    (done)))
           (.catch (async-support/unexpected-error done))))))
@@ -292,7 +294,8 @@
             "user" "0xabc"}
            (ffirst @calls)))
     (is (= {:priority :low
-            :dedupe-key :explicit}
+            :dedupe-key :explicit
+            :cache-ttl-ms 60000}
            (second (first @calls))))))
 
 (deftest normalize-user-abstraction-mode-maps-known-values-test
@@ -440,7 +443,8 @@
                              "user" "0xAbC"}
                             body))
                      (is (= {:priority :low
-                             :dedupe-key [:portfolio "0xabc"]}
+                             :dedupe-key [:portfolio "0xabc"]
+                             :cache-ttl-ms 8000}
                             opts))
                      (is (= {:day {:equity "1"}
                              :perp-all-time {:equity "2"}}
@@ -458,7 +462,8 @@
                            "user" "0xAbC"}
                           (ffirst @calls)))
                    (is (= {:priority :high
-                           :dedupe-key [:portfolio "0xabc"]}
+                           :dedupe-key [:portfolio "0xabc"]
+                           :cache-ttl-ms 8000}
                           (second (first @calls))))
                    (is (= {:month {:equity "10"}}
                           summary))
@@ -478,7 +483,8 @@
                            "user" "0xAbC"}
                           (ffirst @calls)))
                    (is (= {:priority :low
-                           :dedupe-key :explicit}
+                           :dedupe-key :explicit
+                           :cache-ttl-ms 8000}
                           (second (first @calls))))
                    (done)))
           (.catch (async-support/unexpected-error done))))))
@@ -510,9 +516,11 @@
              "user" "0xAbC"}]
            (mapv first @calls)))
     (is (= [{:priority :low
-             :dedupe-key [:user-fees "0xabc"]}
+             :dedupe-key [:user-fees "0xabc"]
+             :cache-ttl-ms 15000}
             {:priority :low
-             :dedupe-key :explicit}]
+             :dedupe-key :explicit
+             :cache-ttl-ms 15000}]
            (mapv second @calls)))))
 
 (deftest request-user-fees-defaults-priority-and-dedupe-when-opts-are-nil-test
@@ -523,7 +531,8 @@
             "user" "0xAbC"}
            (ffirst @calls)))
     (is (= {:priority :high
-            :dedupe-key [:user-fees "0xabc"]}
+            :dedupe-key [:user-fees "0xabc"]
+            :cache-ttl-ms 15000}
            (second (first @calls))))))
 
 (deftest request-user-non-funding-ledger-updates-short-circuits-without-address-test
@@ -559,7 +568,8 @@
                              "endTime" 2000}
                             body))
                      (is (= {:priority :low
-                             :dedupe-key [:user-non-funding-ledger "0xabc" 1000 2000]}
+                             :dedupe-key [:user-non-funding-ledger "0xabc" 1000 2000]
+                             :cache-ttl-ms 5000}
                             opts))
                      (is (= [{:time 123
                               :delta {:type "deposit"

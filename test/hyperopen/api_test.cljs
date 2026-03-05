@@ -234,6 +234,97 @@
                     (is false (str "Unexpected error: " err))
                     (done)))))))
 
+(deftest info-client-serves-cached-response-within-ttl-test
+  (async done
+    (let [calls (atom 0)
+          now-ms (atom 1000)
+          client (info-client/make-info-client
+                  {:fetch-fn (fn [_ _]
+                               (let [n (swap! calls inc)]
+                                 (js/Promise.resolve (fake-http-response 200 {:call n}))))
+                   :now-ms-fn (fn [] @now-ms)
+                   :sleep-ms-fn (fn [_] (js/Promise.resolve nil))
+                   :log-fn (fn [& _])})]
+      (-> ((:request-info! client)
+           {"type" "portfolio"
+            "user" "0xabc"}
+           {:cache-key [:portfolio "0xabc"]
+            :cache-ttl-ms 200})
+          (.then (fn [first-response]
+                   (is (= {:call 1} first-response))
+                   (reset! now-ms 1100)
+                   ((:request-info! client)
+                    {"type" "portfolio"
+                     "user" "0xabc"}
+                    {:cache-key [:portfolio "0xabc"]
+                     :cache-ttl-ms 200})))
+          (.then (fn [second-response]
+                   (is (= {:call 1} second-response))
+                   (is (= 1 @calls))
+                   (done)))
+          (.catch (fn [err]
+                    (is false (str "Unexpected error: " err))
+                    (done)))))))
+
+(deftest info-client-force-refresh-bypasses-cache-test
+  (async done
+    (let [calls (atom 0)
+          now-ms (atom 2000)
+          client (info-client/make-info-client
+                  {:fetch-fn (fn [_ _]
+                               (let [n (swap! calls inc)]
+                                 (js/Promise.resolve (fake-http-response 200 {:call n}))))
+                   :now-ms-fn (fn [] @now-ms)
+                   :sleep-ms-fn (fn [_] (js/Promise.resolve nil))
+                   :log-fn (fn [& _])})]
+      (-> ((:request-info! client)
+           {"type" "userFees"
+            "user" "0xabc"}
+           {:cache-key [:user-fees "0xabc"]
+            :cache-ttl-ms 1000})
+          (.then (fn [_]
+                   (reset! now-ms 2100)
+                   ((:request-info! client)
+                    {"type" "userFees"
+                     "user" "0xabc"}
+                    {:cache-key [:user-fees "0xabc"]
+                     :cache-ttl-ms 1000
+                     :force-refresh? true})))
+          (.then (fn [response]
+                   (is (= {:call 2} response))
+                   (is (= 2 @calls))
+                   (done)))
+          (.catch (fn [err]
+                    (is false (str "Unexpected error: " err))
+                    (done)))))))
+
+(deftest info-client-coalesces-concurrent-requests-by-cache-key-test
+  (async done
+    (let [calls (atom 0)
+          client (info-client/make-info-client
+                  {:fetch-fn (fn [_ _]
+                               (swap! calls inc)
+                               (js/Promise.resolve (fake-http-response 200 {:ok true})))
+                   :sleep-ms-fn (fn [_] (js/Promise.resolve nil))
+                   :log-fn (fn [& _])})
+          p1 ((:request-info! client)
+              {"type" "spotMeta"}
+              {:cache-key :spot-meta
+               :cache-ttl-ms 500})
+          p2 ((:request-info! client)
+              {"type" "spotMeta"}
+              {:cache-key :spot-meta
+               :cache-ttl-ms 500})]
+      (-> (js/Promise.all #js [p1 p2])
+          (.then (fn [results]
+                   (is (= 1 @calls))
+                   (is (= [{:ok true} {:ok true}]
+                          (js->clj results :keywordize-keys true)))
+                   (done)))
+          (.catch (fn [err]
+                    (is false (str "Unexpected error: " err))
+                    (done)))))))
+
 (deftest normalize-info-funding-row-maps-delta-shape-test
   (let [row (funding-history/normalize-info-funding-row
              {:time 1700000000000

@@ -502,7 +502,7 @@
         (is (= 50
                (get-in @store [:account-info :order-history :page-size])))))))
 
-(deftest refresh-order-history-emits-request-then-fetch-with-tab-aware-loading-test
+(deftest refresh-order-history-fetches-only-when-order-history-tab-is-selected-test
   (let [selected-state {:account-info {:selected-tab :order-history
                                        :order-history {:request-id 5}}}
         background-state {:account-info {:selected-tab :balances
@@ -516,5 +516,4 @@
            (-> selected-effects first second (nth 1) second)))
     (is (= false
            (-> background-effects first second (nth 1) second)))
-    (is (= [:effects/api-fetch-historical-orders 6]
-           (second background-effects)))))
+    (is (= 1 (count background-effects)))))

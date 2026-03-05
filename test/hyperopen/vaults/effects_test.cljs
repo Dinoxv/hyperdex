@@ -6,7 +6,7 @@
 (deftest api-fetch-vault-index-applies-begin-and-success-projections-test
   (async done
     (let [request-calls (atom [])
-          store (atom {})]
+          store (atom {:router {:path "/vaults"}})]
       (-> (effects/api-fetch-vault-index!
            {:store store
             :request-vault-index! (fn [opts]
@@ -33,7 +33,7 @@
 (deftest api-fetch-vault-details-passes-vault-and-user-address-to-request-and-projections-test
   (async done
     (let [request-calls (atom [])
-          store (atom {})]
+          store (atom {:router {:path "/vaults/0x1234567890abcdef1234567890abcdef12345678"}})]
       (-> (effects/api-fetch-vault-details!
            {:store store
             :vault-address "0x1234567890abcdef1234567890abcdef12345678"
@@ -65,7 +65,7 @@
 (deftest api-fetch-vault-funding-history-uses-lookback-window-and-projections-test
   (async done
     (let [request-calls (atom [])
-          store (atom {})]
+          store (atom {:router {:path "/vaults/0x1234567890abcdef1234567890abcdef12345678"}})]
       (-> (effects/api-fetch-vault-funding-history!
            {:store store
             :vault-address "0x1234567890abcdef1234567890abcdef12345678"
@@ -100,7 +100,7 @@
 (deftest api-fetch-vault-ledger-updates-requests-non-funding-ledger-for-vault-test
   (async done
     (let [request-calls (atom [])
-          store (atom {})]
+          store (atom {:router {:path "/vaults/0x1234567890abcdef1234567890abcdef12345678"}})]
       (-> (effects/api-fetch-vault-ledger-updates!
            {:store store
             :vault-address "0x1234567890abcdef1234567890abcdef12345678"
@@ -125,6 +125,32 @@
           (.catch (fn [err]
                     (js/console.error err)
                     (is false "Unexpected vault ledger updates error")
+                    (done)))))))
+
+(deftest api-fetch-vault-details-skips-when-detail-route-is-inactive-test
+  (async done
+    (let [calls (atom 0)
+          store (atom {:router {:path "/trade"}})]
+      (-> (effects/api-fetch-vault-details!
+           {:store store
+            :vault-address "0x1234567890abcdef1234567890abcdef12345678"
+            :request-vault-details! (fn [_vault-address _opts]
+                                      (swap! calls inc)
+                                      (js/Promise.resolve {:name "ignored"}))
+            :begin-vault-details-load (fn [state _vault-address]
+                                        (assoc state :begin? true))
+            :apply-vault-details-success (fn [state _vault-address _payload]
+                                           (assoc state :loaded? true))
+            :apply-vault-details-error (fn [state _vault-address err]
+                                         (assoc state :error err))})
+          (.then (fn [result]
+                   (is (nil? result))
+                   (is (= 0 @calls))
+                   (is (nil? (:begin? @store)))
+                   (done)))
+          (.catch (fn [err]
+                    (js/console.error err)
+                    (is false "Unexpected inactive-route rejection")
                     (done)))))))
 
 (deftest api-submit-vault-transfer-rejects-when-wallet-is-disconnected-test

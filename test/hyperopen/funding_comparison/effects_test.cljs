@@ -5,7 +5,7 @@
 (deftest api-fetch-predicted-fundings-applies-begin-and-success-projections-test
   (async done
     (let [request-calls (atom [])
-          store (atom {})]
+          store (atom {:router {:path "/funding-comparison"}})]
       (-> (effects/api-fetch-predicted-fundings!
            {:store store
             :request-predicted-fundings! (fn [opts]
@@ -31,7 +31,7 @@
 
 (deftest api-fetch-predicted-fundings-applies-error-projection-test
   (async done
-    (let [store (atom {})]
+    (let [store (atom {:router {:path "/funding-comparison"}})]
       (-> (effects/api-fetch-predicted-fundings!
            {:store store
             :request-predicted-fundings! (fn [_opts]
@@ -49,4 +49,29 @@
                     (is (= "boom" (.-message err)))
                     (is (= true (:loading? @store)))
                     (is (= "boom" (:error @store)))
+                    (done)))))))
+
+(deftest api-fetch-predicted-fundings-skips-when-route-is-inactive-test
+  (async done
+    (let [request-calls (atom 0)
+          store (atom {:router {:path "/trade"}})]
+      (-> (effects/api-fetch-predicted-fundings!
+           {:store store
+            :request-predicted-fundings! (fn [_opts]
+                                           (swap! request-calls inc)
+                                           (js/Promise.resolve []))
+            :begin-funding-comparison-load (fn [state]
+                                             (assoc state :loading? true))
+            :apply-funding-comparison-success (fn [state rows]
+                                                (assoc state :rows rows))
+            :apply-funding-comparison-error (fn [state err]
+                                              (assoc state :error err))})
+          (.then (fn [result]
+                   (is (nil? result))
+                   (is (= 0 @request-calls))
+                   (is (nil? (:loading? @store)))
+                   (done)))
+          (.catch (fn [err]
+                    (js/console.error err)
+                    (is false "Unexpected inactive-route rejection")
                     (done)))))))

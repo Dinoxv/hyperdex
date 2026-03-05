@@ -102,11 +102,20 @@
 
 (defn api-fetch-user-funding-history-effect
   [_ store request-id]
-  (let [address (account-context/effective-account-address @store)
+  (let [selected? (= :funding-history (get-in @store [:account-info :selected-tab]))
+        address (account-context/effective-account-address @store)
         filters (account-history-actions/funding-history-filters @store)
         opts (merge {:priority :high}
                     filters)]
-    (if-not address
+    (cond
+      (not selected?)
+      (swap! store
+             (fn [state]
+               (if (= request-id (account-history-actions/funding-history-request-id state))
+                 (assoc-in state [:account-info :funding-history :loading?] false)
+                 state)))
+
+      (not address)
       (swap! store
              (fn [state]
                (if (= request-id (account-history-actions/funding-history-request-id state))
@@ -115,6 +124,8 @@
                      (assoc-in [:orders :fundings-raw] [])
                      (assoc-in [:orders :fundings] []))
                  state)))
+
+      :else
       (-> (api/request-user-funding-history! address opts)
           (.then (fn [rows]
                    (swap! store
@@ -177,8 +188,10 @@
 
 (defn api-fetch-historical-orders-effect
   [_ store request-id]
-  (fetch-historical-orders! {:store store
-                             :request-id request-id}))
+  (if (= :order-history (get-in @store [:account-info :selected-tab]))
+    (fetch-historical-orders! {:store store
+                               :request-id request-id})
+    (js/Promise.resolve nil)))
 
 (defn export-funding-history-csv-effect
   [_ _ rows]

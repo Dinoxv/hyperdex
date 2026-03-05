@@ -673,10 +673,11 @@
 (defn refresh-order-history [state]
   (let [request-id (inc (order-history-request-id state))
         selected? (= :order-history (get-in state [:account-info :selected-tab]))]
-    [[:effects/save-many [[[:account-info :order-history :request-id] request-id]
-                          [[:account-info :order-history :loading?] selected?]
-                          [[:account-info :order-history :error] nil]]]
-     [:effects/api-fetch-historical-orders request-id]]))
+    (cond-> [[:effects/save-many [[[:account-info :order-history :request-id] request-id]
+                                  [[:account-info :order-history :loading?] selected?]
+                                  [[:account-info :order-history :error] nil]]]]
+      selected?
+      (conj [:effects/api-fetch-historical-orders request-id]))))
 
 (defn set-hide-small-balances [_state checked]
   [[:effects/save [:account-info :hide-small-balances?] checked]])

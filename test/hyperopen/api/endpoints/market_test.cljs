@@ -15,7 +15,9 @@
            (mapv first @calls)))
     (is (= [:meta-and-asset-ctxs-default
             [:meta-and-asset-ctxs "vault"]]
-           (mapv (comp :dedupe-key second) @calls)))))
+           (mapv (comp :dedupe-key second) @calls)))
+    (is (= [4000 4000]
+           (mapv (comp :cache-ttl-ms second) @calls)))))
 
 (deftest request-meta-and-asset-ctxs-respects-explicit-dedupe-key-test
   (let [calls (atom [])
@@ -26,7 +28,8 @@
     (let [[body opts] (first @calls)]
       (is (= {"type" "metaAndAssetCtxs"} body))
       (is (= {:priority :low
-              :dedupe-key :explicit}
+              :dedupe-key :explicit
+              :cache-ttl-ms 4000}
              opts)))))
 
 (deftest request-perp-dexs-parses-named-dexes-test
@@ -118,7 +121,10 @@
           (.then (fn [_]
                    (let [[body opts] (first @calls)]
                      (is (= {"type" "metaAndAssetCtxs"} body))
-                     (is (= {:priority :high} opts)))
+                     (is (= {:priority :high
+                             :dedupe-key :asset-contexts
+                             :cache-ttl-ms 4000}
+                            opts)))
                    (done)))
           (.catch (async-support/unexpected-error done))))))
 
@@ -131,8 +137,12 @@
             {"type" "webData2"
              "user" "0x0000000000000000000000000000000000000000"}]
            (mapv first @calls)))
-    (is (= [{:priority :high}
-            {:priority :high}]
+    (is (= [{:priority :high
+             :dedupe-key :spot-meta
+             :cache-ttl-ms 60000}
+            {:priority :high
+             :dedupe-key :public-webdata2
+             :cache-ttl-ms 30000}]
            (mapv second @calls)))))
 
 (deftest request-predicted-fundings-uses-high-priority-and-dedupe-key-test
@@ -142,7 +152,8 @@
     (let [[body opts] (first @calls)]
       (is (= {"type" "predictedFundings"} body))
       (is (= {:priority :high
-              :dedupe-key :predicted-fundings}
+              :dedupe-key :predicted-fundings
+              :cache-ttl-ms 5000}
              opts)))))
 
 (deftest request-market-funding-history-builds-request-and-normalizes-rows-test
@@ -179,7 +190,8 @@
                             body))
                      (is (= :low (:priority opts)))
                      (is (= [:market-funding-history "BTC" 1699990000000 1700003600000]
-                            (:dedupe-key opts))))
+                            (:dedupe-key opts)))
+                     (is (= 15000 (:cache-ttl-ms opts))))
                    (done)))
           (.catch (async-support/unexpected-error done))))))
 

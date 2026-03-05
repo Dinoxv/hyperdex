@@ -152,10 +152,12 @@
 (deftest api-fetch-user-funding-history-effect-no-address-clears-only-current-request-test
   (let [row (info-funding-row 1700000000000 "BTC" "0.1000" "10" "0.0001")
         current-store (atom (-> (base-history-state nil)
+                                (assoc-in [:account-info :selected-tab] :funding-history)
                                 (assoc-in [:account-info :funding-history :request-id] 5)
                                 (assoc-in [:orders :fundings-raw] [row])
                                 (assoc-in [:orders :fundings] [row])))
         stale-store (atom (-> (base-history-state nil)
+                              (assoc-in [:account-info :selected-tab] :funding-history)
                               (assoc-in [:account-info :funding-history :request-id] 6)
                               (assoc-in [:orders :fundings-raw] [row])
                               (assoc-in [:orders :fundings] [row])))
@@ -176,10 +178,12 @@
                    :end-time-ms 2000000000000}
           calls (atom [])
           current-store (atom (-> (base-history-state "0xaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa")
+                                  (assoc-in [:account-info :selected-tab] :funding-history)
                                   (assoc-in [:account-info :funding-history :request-id] 9)
                                   (assoc-in [:account-info :funding-history :filters] filters)
                                   (assoc-in [:orders :fundings-raw] [existing-row])))
           stale-store (atom (-> (base-history-state "0xaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa")
+                                (assoc-in [:account-info :selected-tab] :funding-history)
                                 (assoc-in [:account-info :funding-history :request-id] 10)
                                 (assoc-in [:account-info :funding-history :filters] filters)
                                 (assoc-in [:orders :fundings-raw] [existing-row])))
@@ -216,8 +220,10 @@
 (deftest api-fetch-user-funding-history-effect-error-applies-only-current-request-test
   (async done
     (let [current-store (atom (-> (base-history-state "0xaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa")
+                                  (assoc-in [:account-info :selected-tab] :funding-history)
                                   (assoc-in [:account-info :funding-history :request-id] 11)))
           stale-store (atom (-> (base-history-state "0xaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa")
+                                (assoc-in [:account-info :selected-tab] :funding-history)
                                 (assoc-in [:account-info :funding-history :request-id] 12)))
           stale-before @stale-store]
       (with-redefs [api/request-user-funding-history! (fn
@@ -238,6 +244,23 @@
             (.catch (fn [err]
                       (is false (str "Unexpected error: " err))
                       (done))))))))
+
+(deftest api-fetch-user-funding-history-effect-skips-when-funding-tab-is-inactive-test
+  (let [calls (atom 0)
+        store (atom (-> (base-history-state "0xaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa")
+                        (assoc-in [:account-info :selected-tab] :balances)
+                        (assoc-in [:account-info :funding-history :request-id] 42)
+                        (assoc-in [:account-info :funding-history :loading?] true)))]
+    (with-redefs [api/request-user-funding-history! (fn
+                                                      ([_address]
+                                                       (swap! calls inc)
+                                                       (js/Promise.resolve []))
+                                                      ([_address _opts]
+                                                       (swap! calls inc)
+                                                       (js/Promise.resolve [])))]
+      (history-effects/api-fetch-user-funding-history-effect nil store 42)
+      (is (= 0 @calls))
+      (is (false? (get-in @store [:account-info :funding-history :loading?]))))))
 
 (deftest fetch-and-merge-funding-history-no-address-is-noop-test
   (let [store (atom (base-history-state nil))
@@ -327,9 +350,11 @@
 
 (deftest api-fetch-historical-orders-effect-no-address-clears-only-current-request-test
   (let [current-store (atom (-> (base-history-state nil)
+                                (assoc-in [:account-info :selected-tab] :order-history)
                                 (assoc-in [:account-info :order-history :request-id] 3)
                                 (assoc-in [:orders :order-history] [{:id "old"}])))
         stale-store (atom (-> (base-history-state nil)
+                              (assoc-in [:account-info :selected-tab] :order-history)
                               (assoc-in [:account-info :order-history :request-id] 4)
                               (assoc-in [:orders :order-history] [{:id "old"}])))
         stale-before @stale-store]
@@ -342,12 +367,38 @@
     (history-effects/api-fetch-historical-orders-effect nil stale-store 3)
     (is (= stale-before @stale-store))))
 
+(deftest api-fetch-historical-orders-effect-skips-when-order-history-tab-is-inactive-test
+  (async done
+    (let [calls (atom 0)
+          store (atom (-> (base-history-state "0xaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa")
+                          (assoc-in [:account-info :selected-tab] :balances)
+                          (assoc-in [:account-info :order-history :request-id] 8)
+                          (assoc-in [:account-info :order-history :loading?] true)))]
+      (with-redefs [api/request-historical-orders! (fn
+                                                     ([_address]
+                                                      (swap! calls inc)
+                                                      (js/Promise.resolve []))
+                                                     ([_address _opts]
+                                                      (swap! calls inc)
+                                                      (js/Promise.resolve [])))]
+        (-> (history-effects/api-fetch-historical-orders-effect nil store 8)
+            (.then (fn [result]
+                     (is (nil? result))
+                     (is (= 0 @calls))
+                     (is (true? (get-in @store [:account-info :order-history :loading?])))
+                     (done)))
+            (.catch (fn [err]
+                      (is false (str "Unexpected error: " err))
+                      (done))))))))
+
 (deftest api-fetch-historical-orders-effect-success-applies-only-current-request-test
   (async done
     (let [rows (list {:oid "a"} {:oid "b"})
           current-store (atom (-> (base-history-state "0xaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa")
+                                  (assoc-in [:account-info :selected-tab] :order-history)
                                   (assoc-in [:account-info :order-history :request-id] 20)))
           stale-store (atom (-> (base-history-state "0xaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa")
+                                (assoc-in [:account-info :selected-tab] :order-history)
                                 (assoc-in [:account-info :order-history :request-id] 21)))
           stale-before @stale-store]
       (with-redefs [api/request-historical-orders! (fn
@@ -374,8 +425,10 @@
 (deftest api-fetch-historical-orders-effect-error-applies-only-current-request-test
   (async done
     (let [current-store (atom (-> (base-history-state "0xaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa")
+                                  (assoc-in [:account-info :selected-tab] :order-history)
                                   (assoc-in [:account-info :order-history :request-id] 30)))
           stale-store (atom (-> (base-history-state "0xaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa")
+                                (assoc-in [:account-info :selected-tab] :order-history)
                                 (assoc-in [:account-info :order-history :request-id] 31)))
           stale-before @stale-store]
       (with-redefs [api/request-historical-orders! (fn

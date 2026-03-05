@@ -108,7 +108,8 @@
                    (is (= {"type" "vaultSummaries"}
                           (ffirst @calls)))
                    (is (= {:priority :low
-                           :dedupe-key :vault-summaries}
+                           :dedupe-key :vault-summaries
+                           :cache-ttl-ms 15000}
                           (second (first @calls))))
                    (is (= [{:name "Summary Vault"
                             :vault-address "0xa1"
@@ -155,7 +156,8 @@
                            "user" "0xabc"}
                           (ffirst @calls)))
                    (is (= {:priority :low
-                           :dedupe-key [:user-vault-equities "0xabc"]}
+                           :dedupe-key [:user-vault-equities "0xabc"]
+                           :cache-ttl-ms 5000}
                           (second (first @calls))))
                    (is (= [{:vault-address "0xa1"
                             :equity 120.5
@@ -200,7 +202,8 @@
                            "user" "0xuser"}
                           (ffirst @calls)))
                    (is (= {:priority :low
-                           :dedupe-key [:vault-details "0xvault" "0xuser"]}
+                           :dedupe-key [:vault-details "0xvault" "0xuser"]
+                           :cache-ttl-ms 8000}
                           (second (first @calls))))
                    (is (= "Vault Detail" (:name details)))
                    (is (= "0xvault" (:vault-address details)))
@@ -243,5 +246,6 @@
             "user" "0xvault"}
            (ffirst @calls)))
     (is (= {:priority :low
-            :dedupe-key [:vault-webdata2 "0xvault"]}
+            :dedupe-key [:vault-webdata2 "0xvault"]
+            :cache-ttl-ms 8000}
            (second (first @calls))))))

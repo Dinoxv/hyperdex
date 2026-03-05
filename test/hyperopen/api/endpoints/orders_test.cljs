@@ -46,6 +46,18 @@
                    (done)))
           (.catch (async-support/unexpected-error done))))))
 
+(deftest request-historical-orders-applies-dedupe-and-ttl-policy-test
+  (let [calls (atom [])
+        post-info! (api-stubs/post-info-stub calls {:orders []})]
+    (orders/request-historical-orders! post-info! "0xAbC" {:priority :low})
+    (is (= {"type" "historicalOrders"
+            "user" "0xAbC"}
+           (ffirst @calls)))
+    (is (= {:priority :low
+            :dedupe-key [:historical-orders "0xabc"]
+            :cache-ttl-ms 5000}
+           (second (first @calls))))))
+
 (deftest request-historical-orders-normalizes-sequential-payload-and-filters-invalid-rows-test
   (async done
     (let [post-info! (api-stubs/post-info-stub [nil

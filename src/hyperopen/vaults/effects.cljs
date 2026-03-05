@@ -8,6 +8,30 @@
 (def ^:private funding-history-lookback-ms
   (* 90 24 60 60 1000))
 
+(defn- vault-list-route-active?
+  [store]
+  (let [path (get-in @store [:router :path] "")
+        {:keys [kind]} (vault-actions/parse-vault-route path)]
+    (or (contains? #{:list :detail} kind)
+        (str/starts-with? (or path "") "/portfolio"))))
+
+(defn- vault-detail-route-active?
+  [store]
+  (= :detail
+     (:kind (vault-actions/parse-vault-route
+             (get-in @store [:router :path] "")))))
+
+(defn- allow-route?
+  [store opts detail-route?]
+  (or (true? (:skip-route-gate? (or opts {})))
+      (if detail-route?
+        (vault-detail-route-active? store)
+        (vault-list-route-active? store))))
+
+(defn- request-opts
+  [opts]
+  (dissoc (or opts {}) :skip-route-gate?))
+
 (defn api-fetch-vault-index!
   [{:keys [store
            request-vault-index!
@@ -15,14 +39,17 @@
            apply-vault-index-success
            apply-vault-index-error
            opts]}]
-  (swap! store begin-vault-index-load)
-  (-> (request-vault-index! (or opts {}))
-      (.then (promise-effects/apply-success-and-return
-              store
-              apply-vault-index-success))
-      (.catch (promise-effects/apply-error-and-reject
-               store
-               apply-vault-index-error))))
+  (if (allow-route? store opts false)
+    (let [request-opts* (request-opts opts)]
+      (swap! store begin-vault-index-load)
+      (-> (request-vault-index! request-opts*)
+          (.then (promise-effects/apply-success-and-return
+                  store
+                  apply-vault-index-success))
+          (.catch (promise-effects/apply-error-and-reject
+                   store
+                   apply-vault-index-error))))
+    (js/Promise.resolve nil)))
 
 (defn api-fetch-vault-summaries!
   [{:keys [store
@@ -31,14 +58,17 @@
            apply-vault-summaries-success
            apply-vault-summaries-error
            opts]}]
-  (swap! store begin-vault-summaries-load)
-  (-> (request-vault-summaries! (or opts {}))
-      (.then (promise-effects/apply-success-and-return
-              store
-              apply-vault-summaries-success))
-      (.catch (promise-effects/apply-error-and-reject
-               store
-               apply-vault-summaries-error))))
+  (if (allow-route? store opts false)
+    (let [request-opts* (request-opts opts)]
+      (swap! store begin-vault-summaries-load)
+      (-> (request-vault-summaries! request-opts*)
+          (.then (promise-effects/apply-success-and-return
+                  store
+                  apply-vault-summaries-success))
+          (.catch (promise-effects/apply-error-and-reject
+                   store
+                   apply-vault-summaries-error))))
+    (js/Promise.resolve nil)))
 
 (defn api-fetch-user-vault-equities!
   [{:keys [store
@@ -48,14 +78,17 @@
            apply-user-vault-equities-success
            apply-user-vault-equities-error
            opts]}]
-  (swap! store begin-user-vault-equities-load)
-  (-> (request-user-vault-equities! address (or opts {}))
-      (.then (promise-effects/apply-success-and-return
-              store
-              apply-user-vault-equities-success))
-      (.catch (promise-effects/apply-error-and-reject
-               store
-               apply-user-vault-equities-error))))
+  (if (allow-route? store opts false)
+    (let [request-opts* (request-opts opts)]
+      (swap! store begin-user-vault-equities-load)
+      (-> (request-user-vault-equities! address request-opts*)
+          (.then (promise-effects/apply-success-and-return
+                  store
+                  apply-user-vault-equities-success))
+          (.catch (promise-effects/apply-error-and-reject
+                   store
+                   apply-user-vault-equities-error))))
+    (js/Promise.resolve nil)))
 
 (defn api-fetch-vault-details!
   [{:keys [store
@@ -66,18 +99,20 @@
            apply-vault-details-success
            apply-vault-details-error
            opts]}]
-  (swap! store begin-vault-details-load vault-address)
-  (-> (request-vault-details! vault-address
-                              (cond-> (or opts {})
-                                user-address (assoc :user user-address)))
-      (.then (promise-effects/apply-success-and-return
-              store
-              apply-vault-details-success
-              vault-address))
-      (.catch (promise-effects/apply-error-and-reject
-               store
-               apply-vault-details-error
-               vault-address))))
+  (if (allow-route? store opts true)
+    (let [request-opts* (cond-> (request-opts opts)
+                          user-address (assoc :user user-address))]
+      (swap! store begin-vault-details-load vault-address)
+      (-> (request-vault-details! vault-address request-opts*)
+          (.then (promise-effects/apply-success-and-return
+                  store
+                  apply-vault-details-success
+                  vault-address))
+          (.catch (promise-effects/apply-error-and-reject
+                   store
+                   apply-vault-details-error
+                   vault-address))))
+    (js/Promise.resolve nil)))
 
 (defn api-fetch-vault-webdata2!
   [{:keys [store
@@ -87,16 +122,19 @@
            apply-vault-webdata2-success
            apply-vault-webdata2-error
            opts]}]
-  (swap! store begin-vault-webdata2-load vault-address)
-  (-> (request-vault-webdata2! vault-address (or opts {}))
-      (.then (promise-effects/apply-success-and-return
-              store
-              apply-vault-webdata2-success
-              vault-address))
-      (.catch (promise-effects/apply-error-and-reject
-               store
-               apply-vault-webdata2-error
-               vault-address))))
+  (if (allow-route? store opts true)
+    (let [request-opts* (request-opts opts)]
+      (swap! store begin-vault-webdata2-load vault-address)
+      (-> (request-vault-webdata2! vault-address request-opts*)
+          (.then (promise-effects/apply-success-and-return
+                  store
+                  apply-vault-webdata2-success
+                  vault-address))
+          (.catch (promise-effects/apply-error-and-reject
+                   store
+                   apply-vault-webdata2-error
+                   vault-address))))
+    (js/Promise.resolve nil)))
 
 (defn api-fetch-vault-fills!
   [{:keys [store
@@ -106,16 +144,19 @@
            apply-vault-fills-success
            apply-vault-fills-error
            opts]}]
-  (swap! store begin-vault-fills-load vault-address)
-  (-> (request-user-fills! vault-address (or opts {}))
-      (.then (promise-effects/apply-success-and-return
-              store
-              apply-vault-fills-success
-              vault-address))
-      (.catch (promise-effects/apply-error-and-reject
-               store
-               apply-vault-fills-error
-               vault-address))))
+  (if (allow-route? store opts true)
+    (let [request-opts* (request-opts opts)]
+      (swap! store begin-vault-fills-load vault-address)
+      (-> (request-user-fills! vault-address request-opts*)
+          (.then (promise-effects/apply-success-and-return
+                  store
+                  apply-vault-fills-success
+                  vault-address))
+          (.catch (promise-effects/apply-error-and-reject
+                   store
+                   apply-vault-fills-error
+                   vault-address))))
+    (js/Promise.resolve nil)))
 
 (defn api-fetch-vault-funding-history!
   [{:keys [store
@@ -126,22 +167,24 @@
            apply-vault-funding-history-error
            now-ms-fn
            opts]}]
-  (let [now-ms ((or now-ms-fn (fn []
-                                (.now js/Date))))
-        start-time-ms (max 0 (- now-ms funding-history-lookback-ms))
-        request-opts (merge {:start-time-ms start-time-ms
-                             :end-time-ms now-ms}
-                            (or opts {}))]
-    (swap! store begin-vault-funding-history-load vault-address)
-    (-> (request-user-funding-history! vault-address request-opts)
-        (.then (promise-effects/apply-success-and-return
-                store
-                apply-vault-funding-history-success
-                vault-address))
-        (.catch (promise-effects/apply-error-and-reject
-                 store
-                 apply-vault-funding-history-error
-                 vault-address)))))
+  (if (allow-route? store opts true)
+    (let [now-ms ((or now-ms-fn (fn []
+                                  (.now js/Date))))
+          start-time-ms (max 0 (- now-ms funding-history-lookback-ms))
+          request-opts* (merge {:start-time-ms start-time-ms
+                                :end-time-ms now-ms}
+                               (request-opts opts))]
+      (swap! store begin-vault-funding-history-load vault-address)
+      (-> (request-user-funding-history! vault-address request-opts*)
+          (.then (promise-effects/apply-success-and-return
+                  store
+                  apply-vault-funding-history-success
+                  vault-address))
+          (.catch (promise-effects/apply-error-and-reject
+                   store
+                   apply-vault-funding-history-error
+                   vault-address))))
+    (js/Promise.resolve nil)))
 
 (defn api-fetch-vault-order-history!
   [{:keys [store
@@ -151,16 +194,19 @@
            apply-vault-order-history-success
            apply-vault-order-history-error
            opts]}]
-  (swap! store begin-vault-order-history-load vault-address)
-  (-> (request-historical-orders! vault-address (or opts {}))
-      (.then (promise-effects/apply-success-and-return
-              store
-              apply-vault-order-history-success
-              vault-address))
-      (.catch (promise-effects/apply-error-and-reject
-               store
-               apply-vault-order-history-error
-               vault-address))))
+  (if (allow-route? store opts true)
+    (let [request-opts* (request-opts opts)]
+      (swap! store begin-vault-order-history-load vault-address)
+      (-> (request-historical-orders! vault-address request-opts*)
+          (.then (promise-effects/apply-success-and-return
+                  store
+                  apply-vault-order-history-success
+                  vault-address))
+          (.catch (promise-effects/apply-error-and-reject
+                   store
+                   apply-vault-order-history-error
+                   vault-address))))
+    (js/Promise.resolve nil)))
 
 (defn api-fetch-vault-ledger-updates!
   [{:keys [store
@@ -170,16 +216,19 @@
            apply-vault-ledger-updates-success
            apply-vault-ledger-updates-error
            opts]}]
-  (swap! store begin-vault-ledger-updates-load vault-address)
-  (-> (request-user-non-funding-ledger-updates! vault-address nil nil (or opts {}))
-      (.then (promise-effects/apply-success-and-return
-              store
-              apply-vault-ledger-updates-success
-              vault-address))
-      (.catch (promise-effects/apply-error-and-reject
-               store
-               apply-vault-ledger-updates-error
-               vault-address))))
+  (if (allow-route? store opts true)
+    (let [request-opts* (request-opts opts)]
+      (swap! store begin-vault-ledger-updates-load vault-address)
+      (-> (request-user-non-funding-ledger-updates! vault-address nil nil request-opts*)
+          (.then (promise-effects/apply-success-and-return
+                  store
+                  apply-vault-ledger-updates-success
+                  vault-address))
+          (.catch (promise-effects/apply-error-and-reject
+                   store
+                   apply-vault-ledger-updates-error
+                   vault-address))))
+    (js/Promise.resolve nil)))
 
 (defn- fallback-exchange-response-error
   [resp]
