@@ -107,10 +107,15 @@
   [post-info! address opts]
   (if-not address
     (js/Promise.resolve nil)
-    (post-info! {"type" "spotClearinghouseState"
-                 "user" address}
-                (merge {:priority :high}
-                       opts))))
+    (let [requested-address (some-> address str str/lower-case)
+          opts* (request-policy/apply-info-request-policy
+                 :spot-clearinghouse-state
+                 (merge {:priority :high
+                         :dedupe-key [:spot-clearinghouse-state requested-address]}
+                        opts))]
+      (post-info! {"type" "spotClearinghouseState"
+                   "user" address}
+                  opts*))))
 
 (defn normalize-user-abstraction-mode
   [abstraction]

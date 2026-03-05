@@ -248,11 +248,29 @@
 (deftest request-spot-clearinghouse-state-builds-request-body-test
   (let [calls (atom [])
         post-info! (api-stubs/post-info-stub calls {})]
-    (account/request-spot-clearinghouse-state! post-info! "0xabc" {:priority :low})
+    (account/request-spot-clearinghouse-state! post-info! "0xAbC" {:priority :low})
     (is (= {"type" "spotClearinghouseState"
-            "user" "0xabc"}
+            "user" "0xAbC"}
            (ffirst @calls)))
-    (is (= {:priority :low}
+    (is (= {:priority :low
+            :dedupe-key [:spot-clearinghouse-state "0xabc"]
+            :cache-ttl-ms 5000}
+           (second (first @calls))))))
+
+(deftest request-spot-clearinghouse-state-allows-explicit-policy-overrides-test
+  (let [calls (atom [])
+        post-info! (api-stubs/post-info-stub calls {})]
+    (account/request-spot-clearinghouse-state! post-info!
+                                               "0xAbC"
+                                               {:priority :low
+                                                :dedupe-key :explicit
+                                                :cache-ttl-ms 777})
+    (is (= {"type" "spotClearinghouseState"
+            "user" "0xAbC"}
+           (ffirst @calls)))
+    (is (= {:priority :low
+            :dedupe-key :explicit
+            :cache-ttl-ms 777}
            (second (first @calls))))))
 
 (deftest request-user-abstraction-builds-dedupe-key-per-address-test

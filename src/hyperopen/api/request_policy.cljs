@@ -8,6 +8,7 @@
    :public-webdata2 30000
    :user-funding-history 5000
    :historical-orders 5000
+   :spot-clearinghouse-state 5000
    :user-abstraction 60000
    :portfolio 8000
    :user-fees 15000
