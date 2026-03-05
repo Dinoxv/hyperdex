@@ -138,28 +138,49 @@
      "hover:border-[#3d666b]"
      "hover:text-[#e5eef1]"]))
 
+(def ^:private input-row-action-button-classes
+  ["h-8"
+   "w-full"
+   "justify-center"
+   "px-2"
+   "py-1"
+   "text-xs"
+   "font-medium"
+   "leading-none"
+   "whitespace-nowrap"])
+
+(def ^:private input-row-layout-classes
+  ["grid"
+   "grid-cols-[minmax(0,1fr)_7.75rem]"
+   "items-center"
+   "gap-2"])
+
 (defn- watchlist-action-icon-button
-  [{:keys [aria-label title on-click data-role disabled?]} icon]
+  [{:keys [aria-label title on-click data-role disabled? class]} icon]
   [:button {:type "button"
-            :class (cond-> ["inline-flex"
-                            "h-7"
-                            "w-7"
-                            "items-center"
-                            "justify-center"
-                            "rounded-md"
-                            "border"
-                            "border-[#254248]"
-                            "bg-[#0a1f28]"
-                            "text-[#9db2b8]"
-                            "focus:outline-none"
-                            "focus:ring-0"
-                            "focus:ring-offset-0"
-                            "hover:border-[#40686d]"
-                            "hover:text-[#e5eef1]"]
+            :class (cond-> (into ["inline-flex"
+                                  "h-7"
+                                  "w-7"
+                                  "items-center"
+                                  "justify-center"
+                                  "rounded-md"
+                                  "border"
+                                  "border-[#223a42]"
+                                  "bg-transparent"
+                                  "text-[#8ea2a9]"
+                                  "transition-colors"
+                                  "focus:outline-none"
+                                  "focus:ring-0"
+                                  "focus:ring-offset-0"
+                                  "hover:border-[#3a616a]"
+                                  "hover:bg-[#0f2a34]"
+                                  "hover:text-[#e5eef1]"]
+                                 (or class []))
                      disabled? (into ["cursor-not-allowed"
                                       "opacity-45"
-                                      "hover:border-[#254248]"
-                                      "hover:text-[#9db2b8]"]))
+                                      "hover:border-[#223a42]"
+                                      "hover:bg-transparent"
+                                      "hover:text-[#8ea2a9]"]))
             :on (when-not disabled? {:click on-click})
             :aria-label aria-label
             :title title
@@ -277,9 +298,9 @@
   (let [address (:address entry)
         label (watchlist-display-label entry)]
     [:li {:class (cond-> ["grid"
-                          "grid-cols-[minmax(0,1fr)_minmax(0,1.3fr)_auto]"
+                          "grid-cols-[minmax(0,1.15fr)_minmax(0,0.95fr)_auto]"
                           "items-center"
-                          "gap-2"
+                          "gap-1.5"
                           "rounded-md"
                           "border"
                           "px-2.5"
@@ -292,18 +313,24 @@
         :data-role "ghost-mode-watchlist-row"}
      [:div {:class ["min-w-0"]
             :data-role "ghost-mode-watchlist-label"}
-      [:span {:class ["text-sm" "font-medium" "text-[#e5eef1]"]}
+      [:span {:class ["text-m" "font-medium" "text-[#e5eef1]" "break-words"]}
        label]]
      [:div {:class ["min-w-0" "truncate"]
             :data-role "ghost-mode-watchlist-address"}
-      [:span {:class ["num" "truncate" "text-xs" "text-[#95aab0]"]}
+      [:span {:class ["num" "truncate" "text-sm" "text-[#95aab0]"]}
        (watchlist-display-address address)]]
-     [:div {:class ["flex" "items-center" "justify-end" "gap-1.5"]
+     [:div {:class ["flex" "items-center" "justify-end" "gap-1"]
             :data-role "ghost-mode-watchlist-actions"}
       (watchlist-action-icon-button
        {:aria-label (if active? "Currently spectating this address" "Spectate this address")
         :title (if active? "Currently spectating" "Spectate this address")
         :on-click [[:actions/spectate-ghost-mode-watchlist-address address]]
+        :class (when active? ["text-[#e8c25f]"
+                              "border-[#7f6a39]"
+                              "bg-[#2a2418]"
+                              "hover:border-[#9f854c]"
+                              "hover:bg-[#3a301f]"
+                              "hover:text-[#f2d981]"])
         :data-role "ghost-mode-watchlist-spectate"}
        (spectate-icon))
       (watchlist-action-icon-button
@@ -342,6 +369,8 @@
                          (:editing-watchlist-address ui-state))
         search-error (:search-error ui-state)
         copy-feedback (get-in state [:wallet :copy-feedback])
+        show-copy-feedback? (and (map? copy-feedback)
+                                 (seq (:message copy-feedback)))
         watchlist (account-context/normalize-watchlist
                    (get-in state [:account-context :watchlist]))
         active? (account-context/ghost-mode-active? state)
@@ -350,6 +379,9 @@
         start-disabled? (not valid-search?)
         add-disabled? (not valid-search?)
         edit-mode? (some? editing-address)
+        show-label-row? (or edit-mode?
+                            valid-search?
+                            (seq label))
         add-watchlist-label (if edit-mode?
                              "Save Label"
                              "Add To Watchlist")
@@ -363,57 +395,68 @@
              :data-role "ghost-mode-modal-root"}
        [:div {:class ["absolute"
                       "pointer-events-auto"
-                      "rounded-2xl"
+                      "flex"
+                      "max-h-full"
+                      "min-h-0"
+                      "flex-col"
+                      "overflow-hidden"
+                      "rounded-xl"
                       "border"
                       "border-[#1f3b3c]"
                       "bg-[#081b24]"
-                      "p-4"
-                      "shadow-2xl"
-                      "space-y-4"
-                      "overflow-y-auto"]
+                      "shadow-2xl"]
               :style panel-style
               :role "dialog"
               :aria-modal false
               :aria-label "Ghost Mode"
               :data-role "ghost-mode-modal"
               :data-ghost-mode-surface "true"}
-        [:div {:class ["flex" "items-center" "justify-between" "gap-3"]}
-         [:div {:class ["flex" "min-w-0" "flex-col"]}
-          [:h2 {:class ["text-lg" "font-semibold" "text-[#e5eef1]"]}
-           "Ghost Mode"]
-          [:p {:class ["text-sm" "text-[#97adb3]"]}
-           "Spectate any public address in read-only mode."]]
-         [:button {:type "button"
-                   :class ["text-sm" "text-[#8ea4ab]" "hover:text-[#e5eef1]"]
-                   :on {:click [[:actions/close-ghost-mode-modal]]}
-                   :data-role "ghost-mode-close"}
-          "Close"]]
-        (when active?
-          [:div {:class ["rounded-lg"
-                         "border"
-                         "border-[#1f4f4f]"
-                         "bg-[#0a2f33]/60"
-                         "px-3"
-                         "py-2"
-                         "text-sm"
-                         "text-[#bdeee8]"]
-                 :data-role "ghost-mode-active-summary"}
-           [:span {:class ["font-medium"]}
-            "Currently spectating: "]
-           [:span {:class ["num"]} active-address]])
-        [:div {:class ["space-y-2"]}
-         [:div {:class ["grid" "gap-2" "sm:grid-cols-2"]}
-          [:div {:class ["space-y-1.5"]}
-           [:label {:class ["block"
-                            "text-xs"
-                            "font-medium"
-                            "uppercase"
-                            "tracking-[0.08em]"
-                            "text-[#8ea4ab]"]}
-            "Public Address"]
+        [:div {:class ["border-b"
+                       "border-[#1e353f]"
+                       "px-4"
+                       "pt-3.5"
+                       "pb-3"]}
+         [:div {:class ["flex" "items-center" "justify-between" "gap-3"]}
+          [:div {:class ["flex" "min-w-0" "items-center" "gap-2"]}
+           [:h2 {:class ["text-[17px]" "font-semibold" "leading-[25px]" "text-[#e5eef1]"]}
+            "Ghost Mode"]]
+          [:div {:class ["flex" "items-center" "gap-2"]}
+           (when active?
+             [:button {:type "button"
+                       :class (modal-button-classes false false)
+                       :on {:click [[:actions/stop-ghost-mode]]}
+                       :data-role "ghost-mode-stop"}
+              "Stop"])
+           [:button {:type "button"
+                     :class ["inline-flex"
+                             "h-8"
+                             "w-8"
+                             "items-center"
+                             "justify-center"
+                             "rounded-md"
+                             "text-[#8ea4ab]"
+                             "hover:bg-[#0f2a34]"
+                             "hover:text-[#e5eef1]"
+                             "focus:outline-none"
+                             "focus:ring-0"
+                             "focus:ring-offset-0"]
+                     :on {:click [[:actions/close-ghost-mode-modal]]}
+                     :aria-label "Close Ghost Mode"
+                     :data-role "ghost-mode-close"}
+            [:svg {:viewBox "0 0 20 20"
+                   :class ["h-4" "w-4"]
+                   :fill "none"
+                   :stroke "currentColor"
+                   :stroke-width "1.8"
+                   :stroke-linecap "round"
+                   :aria-hidden "true"}
+             [:path {:d "M5 5 15 15"}]
+             [:path {:d "M15 5 5 15"}]]]]]
+         [:div {:class ["mt-2.5" "space-y-2"]}
+          [:div {:class input-row-layout-classes}
            [:input {:type "text"
                     :value search
-                    :placeholder "0x..."
+                    :placeholder "Search or enter address to spectate..."
                     :spell-check false
                     :auto-capitalize "off"
                     :auto-complete "off"
@@ -424,126 +467,142 @@
                             "bg-[#0c2028]"
                             "px-3"
                             "py-2.5"
-                            "text-sm"
+                            "text-m"
+                            "leading-[19px]"
                             "text-[#e6eff2]"
+                            "placeholder:text-[#6f8790]"
                             "outline-none"
                             "focus:border-[#4f8f87]"]
                     :on {:input [[:actions/set-ghost-mode-search [:event.target/value]]]}
-                    :data-role "ghost-mode-search-input"}]]
-          [:div {:class ["space-y-1.5"]}
-           [:label {:class ["block"
-                            "text-xs"
-                            "font-medium"
-                            "uppercase"
-                            "tracking-[0.08em]"
-                            "text-[#8ea4ab]"]}
-            "Label"]
-           [:input {:type "text"
-                    :value label
-                    :placeholder "Label (optional)"
-                    :spell-check false
-                    :auto-capitalize "off"
-                    :auto-complete "off"
-                    :class ["w-full"
-                            "rounded-lg"
-                            "border"
-                            "border-[#28474b]"
-                            "bg-[#0c2028]"
-                            "px-3"
-                            "py-2.5"
-                            "text-sm"
-                            "text-[#e6eff2]"
-                            "outline-none"
-                            "focus:border-[#4f8f87]"]
-                    :on {:input [[:actions/set-ghost-mode-label [:event.target/value]]]}
-                    :data-role "ghost-mode-label-input"}]]]
-         (when (seq search-error)
-           [:div {:class ["rounded-md"
-                          "border"
-                          "border-[#7b3340]"
-                          "bg-[#3a1b22]/55"
-                          "px-3"
-                          "py-2"
-                          "text-sm"
-                          "text-[#f2b8c5]"]
-                  :data-role "ghost-mode-search-error"}
-            search-error])]
-        [:div {:class ["flex" "flex-wrap" "justify-end" "gap-2"]}
-         [:button {:type "button"
-                   :class (modal-button-classes false false)
-                   :on {:click [[:actions/close-ghost-mode-modal]]}
-                   :data-role "ghost-mode-cancel"}
-          "Cancel"]
-         (when active?
+                    :data-role "ghost-mode-search-input"}]
            [:button {:type "button"
-                     :class (modal-button-classes false false)
-                     :on {:click [[:actions/stop-ghost-mode]]}
-                     :data-role "ghost-mode-stop"}
-            "Stop Ghost Mode"])
-         [:button {:type "button"
-                   :class (modal-button-classes false add-disabled?)
-                   :disabled add-disabled?
-                   :on {:click [[:actions/add-ghost-mode-watchlist-address]]}
-                   :data-role "ghost-mode-add-watchlist"}
-          add-watchlist-label]
-         (when edit-mode?
-           [:button {:type "button"
-                     :class (modal-button-classes false false)
-                     :on {:click [[:actions/clear-ghost-mode-watchlist-edit]]}
-                     :data-role "ghost-mode-clear-watchlist-edit"}
-            "Cancel Edit"])
-         [:button {:type "button"
-                   :class (modal-button-classes true start-disabled?)
-                   :disabled start-disabled?
-                   :on {:click [[:actions/start-ghost-mode]]}
-                   :data-role "ghost-mode-start"}
-          (if active? "Switch Spectating" "Start Spectating")]]
-        [:div {:class ["space-y-2"]}
-         [:div {:class ["flex" "items-center" "justify-between"]}
-          [:h3 {:class ["text-sm" "font-semibold" "text-[#e5eef1]"]}
-           "Watchlist"]]
-         (if (seq watchlist)
-           [:div {:class ["space-y-1"]}
-            [:div {:class ["grid"
-                           "grid-cols-[minmax(0,1fr)_minmax(0,1.3fr)_auto]"
-                           "items-center"
-                           "gap-2"
-                           "rounded-md"
+                     :class (into (modal-button-classes true start-disabled?)
+                                  input-row-action-button-classes)
+                     :disabled start-disabled?
+                     :on {:click [[:actions/start-ghost-mode]]}
+                     :data-role "ghost-mode-start"}
+            (if active? "Switch" "Spectate")]]
+          (when show-label-row?
+            [:div {:class input-row-layout-classes}
+             [:input {:type "text"
+                      :value label
+                      :placeholder "Enter label for this address..."
+                      :spell-check false
+                      :auto-capitalize "off"
+                      :auto-complete "off"
+                      :class ["w-full"
+                              "rounded-lg"
+                              "border"
+                              "border-[#28474b]"
+                              "bg-[#0c2028]"
+                              "px-3"
+                              "py-2"
+                              "text-m"
+                              "leading-[19px]"
+                              "text-[#e6eff2]"
+                              "placeholder:text-[#6f8790]"
+                              "outline-none"
+                              "focus:border-[#4f8f87]"]
+                      :on {:input [[:actions/set-ghost-mode-label [:event.target/value]]]}
+                      :data-role "ghost-mode-label-input"}]
+             [:button {:type "button"
+                       :class (into (modal-button-classes false add-disabled?)
+                                    input-row-action-button-classes)
+                       :disabled add-disabled?
+                       :on {:click [[:actions/add-ghost-mode-watchlist-address]]}
+                       :data-role "ghost-mode-add-watchlist"}
+              add-watchlist-label]
+             (when edit-mode?
+               [:button {:type "button"
+                         :class ["rounded-lg"
+                                 "border"
+                                 "border-[#2c4b50]"
+                                 "bg-transparent"
+                                 "px-2.5"
+                                 "py-1.5"
+                                 "text-xs"
+                                 "text-[#b7c8cc]"
+                                 "hover:border-[#3d666b]"
+                                 "hover:text-[#e5eef1]"]
+                         :on {:click [[:actions/clear-ghost-mode-watchlist-edit]]}
+                         :data-role "ghost-mode-clear-watchlist-edit"}
+                "Cancel"])])
+          (when active?
+            [:div {:class ["rounded-lg"
                            "border"
-                           "border-[#1f3b46]"
-                           "bg-[#0a1e28]"
+                           "border-[#1f4f4f]"
+                           "bg-[#0a2f33]/60"
                            "px-2.5"
                            "py-1.5"
                            "text-xs"
-                           "font-medium"
-                           "uppercase"
-                           "tracking-[0.08em]"
-                           "text-[#7f97a0]"]
-                   :data-role "ghost-mode-watchlist-header"}
-             [:span "Label"]
-             [:span "Address"]
-             [:span {:class ["text-right"]} "Actions"]]
-            (into
-             [:ul {:class ["max-h-56" "space-y-1" "overflow-y-auto"]
-                   :data-role "ghost-mode-watchlist"}]
-             (map (fn [entry]
-                    (let [address (:address entry)]
-                      ^{:key address}
-                      (watchlist-row entry
-                                     (= address active-address)
-                                     (= address editing-address))))
-                  watchlist))]
-           [:div {:class ["rounded-lg"
+                           "text-[#bdeee8]"]
+                   :data-role "ghost-mode-active-summary"}
+             [:span {:class ["font-medium"]}
+              "Currently spectating: "]
+             [:span {:class ["num"]} active-address]])
+          (when (seq search-error)
+            [:div {:class ["rounded-md"
+                           "border"
+                           "border-[#7b3340]"
+                           "bg-[#3a1b22]/55"
+                           "px-2.5"
+                           "py-2"
+                           "text-m"
+                           "leading-[19px]"
+                           "text-[#f2b8c5]"]
+                   :data-role "ghost-mode-search-error"}
+             search-error])]]
+        [:div {:class ["flex" "min-h-0" "flex-1" "flex-col" "px-4" "py-3"]}
+         [:div {:class ["mb-2"
+                        "grid"
+                        "grid-cols-[minmax(0,1fr)_minmax(0,1.3fr)_auto]"
+                        "items-center"
+                        "gap-2"
+                        "rounded-md"
+                        "border"
+                        "border-[#1f3b46]"
+                        "bg-[#0a1e28]"
+                        "px-2.5"
+                        "py-1.5"
+                        "text-xs"
+                        "font-medium"
+                        "text-[#7f97a0]"]
+                :data-role "ghost-mode-watchlist-header"}
+          [:span "Label"]
+          [:span "Address"]
+          [:span {:class ["text-right"]} "Actions"]]
+         (if (seq watchlist)
+           (into
+            [:ul {:class ["min-h-0" "flex-1" "space-y-1.5" "overflow-y-auto"]
+                  :data-role "ghost-mode-watchlist"}]
+            (map (fn [entry]
+                   (let [address (:address entry)]
+                     ^{:key address}
+                     (watchlist-row entry
+                                    (= address active-address)
+                                    (= address editing-address))))
+                 watchlist))
+           [:div {:class ["flex"
+                          "min-h-[160px]"
+                          "flex-1"
+                          "items-center"
+                          "justify-center"
+                          "rounded-lg"
                           "border"
                           "border-dashed"
                           "border-[#2a4b4f]"
                           "bg-[#081f28]"
                           "px-3"
-                          "py-3"
                           "text-sm"
                           "text-[#90a6ad]"]
                   :data-role "ghost-mode-watchlist-empty"}
-            "No spectated addresses saved yet."])
-         (when (and (map? copy-feedback)
-                    (seq (:message copy-feedback)))
-           (copy-feedback-row copy-feedback))]]])))
+            "No spectated addresses saved yet."])]
+        (when show-copy-feedback?
+          [:div {:class ["border-t"
+                         "border-[#1e353f]"
+                         "bg-[#0a2029]"
+                         "px-4"
+                         "pt-2"
+                         "pb-2.5"]
+                 :data-role "ghost-mode-copy-feedback-slot"}
+           (copy-feedback-row copy-feedback)])]])))
