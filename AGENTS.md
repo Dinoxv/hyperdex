@@ -177,10 +177,13 @@ For more details, see README.md and docs/QUICKSTART.md.
 6. **Verify** - All local changes committed; include remote-sync blocker details when push is not requested or not possible
 7. **Hand off** - Provide context for next session
 
-### Shared Phrase: `land the worktree`
-Resolve shared phrases with `/hyperopen/tools/phrase get "<phrase>"`.
+### Shared Agent Command Phrases
+Resolve any shared agent command phrase with `/hyperopen/tools/phrase get "<phrase>"`.
 Machine-readable registry: `/hyperopen/command-phrases.edn`.
 Canonical long-form policy: `/hyperopen/docs/WORK_TRACKING.md#shared-agent-command-phrases`.
+Invocation rule: when user input is a short phrase of 2-5 words after normalization, always run phrase lookup before interpreting intent.
+Normalization rule: ignore punctuation and hyphenation differences when counting words for this trigger.
+If lookup returns a defined phrase command, execute its instructions; if not, continue with normal intent handling.
 
 **CRITICAL RULES:**
 - Do not run `git pull --rebase` or `git push` unless the user explicitly instructs remote sync.
