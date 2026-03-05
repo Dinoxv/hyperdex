@@ -12,6 +12,7 @@
             [hyperopen.telemetry :as telemetry]
             [hyperopen.utils.formatting :as fmt]
             [hyperopen.websocket.client :as ws-client]
+            [hyperopen.websocket.health-projection :as health-projection]
             [hyperopen.wallet.address-watcher :as address-watcher]))
 
 (defonce user-state (atom {:subscriptions #{}}))
@@ -153,12 +154,25 @@
                address
                api-projections/apply-perp-dex-clearinghouse-error))))
 
+(defn- topic-live-for-address?
+  [store topic address]
+  (when (and (string? topic)
+             (seq address))
+    (health-projection/topic-stream-live?
+     (get-in @store [:websocket :health])
+     topic
+     {:user address})))
+
 (defn- refresh-account-surfaces-after-user-fill!
   [store address]
   (when address
-    (refresh-open-orders-snapshot! store address nil {:priority :high})
+    (let [open-orders-live? (topic-live-for-address? store "openOrders" address)
+          webdata2-live? (topic-live-for-address? store "webData2" address)]
+      (when-not open-orders-live?
+        (refresh-open-orders-snapshot! store address nil {:priority :high}))
     (refresh-spot-clearinghouse-snapshot! store address {:priority :high})
-    (refresh-default-clearinghouse-snapshot! store address {:priority :high})
+    (when-not webdata2-live?
+      (refresh-default-clearinghouse-snapshot! store address {:priority :high}))
     (-> (market-metadata/ensure-and-apply-perp-dex-metadata!
          {:store store
           :ensure-perp-dexs-data! api/ensure-perp-dexs-data!
@@ -167,10 +181,11 @@
          {:priority :low})
         (.then (fn [dex-names]
                  (doseq [dex dex-names]
-                   (refresh-open-orders-snapshot! store address dex {:priority :low})
+                   (when-not open-orders-live?
+                     (refresh-open-orders-snapshot! store address dex {:priority :low}))
                    (refresh-perp-dex-clearinghouse-snapshot! store address dex {:priority :low}))))
         (.catch (fn [err]
-                  (telemetry/log! "Error refreshing per-dex account surfaces after user fill:" err))))))
+                  (telemetry/log! "Error refreshing per-dex account surfaces after user fill:" err)))))))
 
 (defn- clear-account-surface-refresh-timeout!
   []

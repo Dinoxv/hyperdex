@@ -60,3 +60,62 @@
                  health
                  {:enabled? true
                   :severe-threshold-ms 30000})))))
+
+(deftest topic-stream-live-matches-user-selectors-case-insensitively-test
+  (let [health {:transport {:state :connected
+                            :freshness :live}
+                :streams {["openOrders" nil "0xabc" nil nil]
+                          {:topic "openOrders"
+                           :status :live
+                           :subscribed? true
+                           :descriptor {:type "openOrders"
+                                        :user "0xabc"}}
+                          ["webData2" nil "0xabc" nil nil]
+                          {:topic "webData2"
+                           :status :live
+                           :subscribed? true
+                           :descriptor {:type "webData2"
+                                        :user "0xabc"}}}}]
+    (is (true? (health-projection/topic-stream-live? health
+                                                     "openOrders"
+                                                     {:user "0xAbC"})))
+    (is (true? (health-projection/topic-stream-live? health
+                                                     "webData2"
+                                                     {:user "0xABC"})))))
+
+(deftest topic-stream-live-requires-live-transport-and-unique-live-match-test
+  (let [base-streams {["openOrders" nil "0xabc" nil nil]
+                      {:topic "openOrders"
+                       :status :live
+                       :subscribed? true
+                       :descriptor {:type "openOrders"
+                                    :user "0xabc"}}
+                      ["openOrders" nil "0xdef" nil nil]
+                      {:topic "openOrders"
+                       :status :live
+                       :subscribed? true
+                       :descriptor {:type "openOrders"
+                                    :user "0xdef"}}}
+        disconnected {:transport {:state :disconnected
+                                  :freshness :offline}
+                      :streams base-streams}
+        ambiguous {:transport {:state :connected
+                               :freshness :live}
+                   :streams base-streams}
+        delayed {:transport {:state :connected
+                             :freshness :live}
+                 :streams {["openOrders" nil "0xabc" nil nil]
+                           {:topic "openOrders"
+                            :status :delayed
+                            :subscribed? true
+                            :descriptor {:type "openOrders"
+                                         :user "0xabc"}}}}]
+    (is (false? (health-projection/topic-stream-live? disconnected
+                                                      "openOrders"
+                                                      {:user "0xabc"})))
+    (is (false? (health-projection/topic-stream-live? ambiguous
+                                                      "openOrders"
+                                                      nil)))
+    (is (false? (health-projection/topic-stream-live? delayed
+                                                      "openOrders"
+                                                      {:user "0xabc"})))))

@@ -8,7 +8,8 @@
             [hyperopen.telemetry :as telemetry]
             [hyperopen.account.history.position-margin :as position-margin]
             [hyperopen.account.history.position-tpsl :as position-tpsl]
-            [hyperopen.api.trading :as trading-api]))
+            [hyperopen.api.trading :as trading-api]
+            [hyperopen.websocket.health-projection :as health-projection]))
 
 (defn- cancel-request-oids
   [request]
@@ -129,11 +130,24 @@
                store
                api-projections/apply-perp-dex-clearinghouse-error))))
 
+(defn- topic-live-for-address?
+  [store topic address]
+  (when (and (string? topic)
+             (seq address))
+    (health-projection/topic-stream-live?
+     (get-in @store [:websocket :health])
+     topic
+     {:user address})))
+
 (defn- refresh-account-surfaces-after-order-mutation!
   [store address]
   (when address
-    (refresh-open-orders-snapshot! store address nil {:priority :high})
-    (refresh-default-clearinghouse-snapshot! store address {:priority :high})
+    (let [open-orders-live? (topic-live-for-address? store "openOrders" address)
+          webdata2-live? (topic-live-for-address? store "webData2" address)]
+      (when-not open-orders-live?
+        (refresh-open-orders-snapshot! store address nil {:priority :high}))
+      (when-not webdata2-live?
+        (refresh-default-clearinghouse-snapshot! store address {:priority :high}))
     (-> (market-metadata/ensure-and-apply-perp-dex-metadata!
          {:store store
           :ensure-perp-dexs-data! api/ensure-perp-dexs-data!
@@ -142,10 +156,11 @@
          {:priority :low})
         (.then (fn [dex-names]
                  (doseq [dex dex-names]
-                   (refresh-open-orders-snapshot! store address dex {:priority :low})
+                   (when-not open-orders-live?
+                     (refresh-open-orders-snapshot! store address dex {:priority :low}))
                    (refresh-perp-dex-clearinghouse-snapshot! store address dex {:priority :low}))))
         (.catch (fn [err]
-                  (telemetry/log! "Error refreshing per-dex account surfaces after order mutation:" err))))))
+                  (telemetry/log! "Error refreshing per-dex account surfaces after order mutation:" err)))))))
 
 (defn- submit-order-error-message
   [exchange-response-error resp]

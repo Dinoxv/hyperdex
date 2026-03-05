@@ -1,4 +1,6 @@
-(ns hyperopen.websocket.health-projection)
+(ns hyperopen.websocket.health-projection
+  (:require [clojure.string :as str]
+            [hyperopen.websocket.domain.model :as model]))
 
 (def ^:private fingerprint-time-bucket-ms
   1000)
@@ -55,6 +57,106 @@
                     (number? age-ms)
                     (> age-ms severe-threshold-ms))))
            (get health :streams {})))))
+
+(defn- address-like?
+  [value]
+  (and (string? value)
+       (re-matches #"0x[0-9a-fA-F]+" value)))
+
+(defn- selector-value=
+  [a b]
+  (cond
+    (and (address-like? a) (address-like? b))
+    (= (str/lower-case a) (str/lower-case b))
+
+    :else
+    (= a b)))
+
+(defn- descriptor-matches-selector?
+  [descriptor selector]
+  (every? (fn [[k v]]
+            (if (nil? v)
+              true
+              (selector-value= v (get descriptor k))))
+          (or selector {})))
+
+(defn- stream-topic
+  [stream]
+  (or (:topic stream)
+      (get-in stream [:descriptor :type])))
+
+(defn- stream-live?
+  [stream]
+  (and (:subscribed? stream)
+       (= :live (:status stream))))
+
+(defn- transport-live?
+  [health]
+  (and (= :connected (get-in health [:transport :state]))
+       (= :live (get-in health [:transport :freshness]))))
+
+(defn- exact-stream-entry
+  [streams topic selector]
+  (let [sub-key (model/subscription-key (merge {:type topic}
+                                               (or selector {})))
+        stream (get streams sub-key)]
+    (when (and (map? stream)
+               (= topic (stream-topic stream)))
+      [sub-key stream])))
+
+(defn- active-topic-entries
+  [streams topic]
+  (->> (or streams {})
+       (filter (fn [[_ stream]]
+                 (and (map? stream)
+                      (:subscribed? stream)
+                      (= topic (stream-topic stream)))))
+       vec))
+
+(defn- selector-matching-entries
+  [streams topic selector]
+  (let [selector* (or selector {})]
+    (->> (active-topic-entries streams topic)
+         (filter (fn [[_ stream]]
+                   (descriptor-matches-selector?
+                    (or (:descriptor stream) {})
+                    selector*)))
+         vec)))
+
+(defn find-live-topic-stream
+  [health {:keys [topic selector]}]
+  (let [streams (or (:streams health) {})
+        selector* (or selector {})]
+    (when (and (string? topic)
+               (transport-live? health))
+      (let [exact (exact-stream-entry streams topic selector*)
+            selected (cond
+                       (and exact (stream-live? (second exact)))
+                       exact
+
+                       (seq selector*)
+                       (let [matches (->> (selector-matching-entries streams topic selector*)
+                                          (filter (fn [[_ stream]]
+                                                    (stream-live? stream)))
+                                          vec)]
+                         (when (= 1 (count matches))
+                           (first matches)))
+
+                       :else
+                       (let [active (->> (active-topic-entries streams topic)
+                                         (filter (fn [[_ stream]]
+                                                   (stream-live? stream)))
+                                         vec)]
+                         (when (= 1 (count active))
+                           (first active))))]
+        selected))))
+
+(defn topic-stream-live?
+  [health topic selector]
+  (boolean
+   (find-live-topic-stream health
+                           {:topic topic
+                            :selector selector})))
 
 (defn auto-recover-eligible?
   [state health {:keys [enabled? severe-threshold-ms]}]
