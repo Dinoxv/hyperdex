@@ -179,6 +179,18 @@
      topic
      {:user address})))
 
+(defn- topic-usable-for-address-and-dex?
+  [store topic address dex]
+  (when (and (some? store)
+             (string? topic)
+             (seq address)
+             (seq dex))
+    (health-projection/topic-stream-usable?
+     (get-in @store [:websocket :health])
+     topic
+     {:user address
+      :dex dex})))
+
 (defn- schedule-stream-backed-startup-fallback!
   [{:keys [store
            address
@@ -308,9 +320,13 @@
            address
            dexs
            per-dex-stagger-ms
+           sync-perp-dex-clearinghouse-subscriptions!
            fetch-frontend-open-orders!
            fetch-clearinghouse-state!]}]
-  (doseq [[idx dex] (map-indexed vector (normalize-stage-b-dex-names dexs))]
+  (let [dex-names (normalize-stage-b-dex-names dexs)]
+    (when (fn? sync-perp-dex-clearinghouse-subscriptions!)
+      (sync-perp-dex-clearinghouse-subscriptions! address dex-names))
+    (doseq [[idx dex] (map-indexed vector dex-names)]
     (platform/set-timeout!
      (fn []
        ;; Guard against stale async callbacks for an old address.
@@ -319,8 +335,14 @@
                    (not (topic-usable-for-address? store "openOrders" address)))
            (fetch-frontend-open-orders! store address {:dex dex
                                                        :priority :low}))
-         (fetch-clearinghouse-state! store address dex {:priority :low})))
-     (* per-dex-stagger-ms (inc idx)))))
+         (when (or (not (migration-flags/startup-bootstrap-ws-first-enabled? @store))
+                   (not (topic-usable-for-address-and-dex?
+                         store
+                         "clearinghouseState"
+                         address
+                         dex)))
+           (fetch-clearinghouse-state! store address dex {:priority :low}))))
+     (* per-dex-stagger-ms (inc idx))))))
 
 (defn bootstrap-account-data!
   [{:keys [store

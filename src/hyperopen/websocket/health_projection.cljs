@@ -95,6 +95,10 @@
   (and (:subscribed? stream)
        (contains? #{:live :n-a} (:status stream))))
 
+(defn- stream-subscribed?
+  [stream]
+  (true? (:subscribed? stream)))
+
 (defn- transport-live?
   [health]
   (and (= :connected (get-in health [:transport :state]))
@@ -171,6 +175,13 @@
                       :selector selector
                       :stream-ready? stream-usable?}))
 
+(defn find-subscribed-topic-stream
+  [health {:keys [topic selector]}]
+  (find-topic-stream health
+                     {:topic topic
+                      :selector selector
+                      :stream-ready? stream-subscribed?}))
+
 (defn topic-stream-live?
   [health topic selector]
   (boolean
@@ -184,6 +195,13 @@
    (find-usable-topic-stream health
                              {:topic topic
                               :selector selector})))
+
+(defn topic-stream-subscribed?
+  [health topic selector]
+  (boolean
+   (find-subscribed-topic-stream health
+                                 {:topic topic
+                                  :selector selector})))
 
 (defn auto-recover-eligible?
   [state health {:keys [enabled? severe-threshold-ms]}]

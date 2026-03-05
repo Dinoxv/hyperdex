@@ -147,12 +147,20 @@
   [post-info! address dex opts]
   (if-not address
     (js/Promise.resolve nil)
-    (let [body (cond-> {"type" "clearinghouseState"
+    (let [requested-address (some-> address str str/lower-case)
+          requested-dex* (some-> dex str str/trim)
+          requested-dex (when (seq requested-dex*)
+                          requested-dex*)
+          dedupe-dex (some-> requested-dex str/lower-case)
+          body (cond-> {"type" "clearinghouseState"
                         "user" address}
-                 (and dex (not= dex "")) (assoc "dex" dex))]
-      (post-info! body
-                  (merge {:priority :high}
-                         opts)))))
+                 requested-dex (assoc "dex" requested-dex))
+          opts* (request-policy/apply-info-request-policy
+                 :clearinghouse-state
+                 (merge {:priority :high
+                         :dedupe-key [:clearinghouse-state requested-address dedupe-dex]}
+                        opts))]
+      (post-info! body opts*))))
 
 (defn- normalize-portfolio-summary-key
   [value]

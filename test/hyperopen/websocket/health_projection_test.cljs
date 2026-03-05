@@ -141,3 +141,38 @@
     (is (false? (health-projection/topic-stream-usable? disconnected
                                                         "openOrders"
                                                         {:user "0xabc"})))))
+
+(deftest topic-stream-subscribed-matches-subscribed-streams-even-when-idle-test
+  (let [idle-stream {:topic "clearinghouseState"
+                     :status :idle
+                     :subscribed? true
+                     :descriptor {:type "clearinghouseState"
+                                  :user "0xabc"
+                                  :dex "vault"}}
+        unsubscribed-stream {:topic "clearinghouseState"
+                             :status :idle
+                             :subscribed? false
+                             :descriptor {:type "clearinghouseState"
+                                          :user "0xabc"
+                                          :dex "vault"}}
+        connected {:transport {:state :connected
+                               :freshness :live}
+                   :streams {["clearinghouseState" nil "0xabc" "vault" nil] idle-stream}}
+        disconnected {:transport {:state :disconnected
+                                  :freshness :offline}
+                      :streams {["clearinghouseState" nil "0xabc" "vault" nil] idle-stream}}
+        inactive {:transport {:state :connected
+                              :freshness :live}
+                  :streams {["clearinghouseState" nil "0xabc" "vault" nil] unsubscribed-stream}}]
+    (is (true? (health-projection/topic-stream-subscribed? connected
+                                                           "clearinghouseState"
+                                                           {:user "0xAbC"
+                                                            :dex "vault"})))
+    (is (false? (health-projection/topic-stream-subscribed? disconnected
+                                                            "clearinghouseState"
+                                                            {:user "0xabc"
+                                                             :dex "vault"})))
+    (is (false? (health-projection/topic-stream-subscribed? inactive
+                                                            "clearinghouseState"
+                                                            {:user "0xabc"
+                                                             :dex "vault"})))))

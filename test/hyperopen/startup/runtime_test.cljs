@@ -474,6 +474,50 @@
             [address "dex-b" {:priority :low}]]
            @clearinghouse-calls))))
 
+(deftest stage-b-account-bootstrap-skips-per-dex-clearinghouse-when-stream-usable-test
+  (let [open-orders-calls (atom [])
+        clearinghouse-calls (atom [])
+        sync-calls (atom [])
+        address "0xaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+        store (atom {:wallet {:address address}
+                     :websocket {:health {:transport {:state :connected
+                                                      :freshness :live}
+                                          :streams {"open-orders-stream" {:subscribed? true
+                                                                          :status :live
+                                                                          :topic "openOrders"
+                                                                          :descriptor {:type "openOrders"
+                                                                                       :user address}}
+                                                    "dex-a-clearinghouse-stream" {:subscribed? true
+                                                                                  :status :live
+                                                                                  :topic "clearinghouseState"
+                                                                                  :descriptor {:type "clearinghouseState"
+                                                                                               :user address
+                                                                                               :dex "dex-a"}}
+                                                    "dex-b-clearinghouse-stream" {:subscribed? true
+                                                                                  :status :n-a
+                                                                                  :topic "clearinghouseState"
+                                                                                  :descriptor {:type "clearinghouseState"
+                                                                                               :user address
+                                                                                               :dex "dex-b"}}}}}})]
+    (with-redefs [platform/set-timeout! (fn [f _delay-ms]
+                                          (f)
+                                          :timeout-id)]
+      (startup-runtime/stage-b-account-bootstrap!
+       {:store store
+        :address address
+        :dexs ["dex-a" "dex-b"]
+        :per-dex-stagger-ms 25
+        :sync-perp-dex-clearinghouse-subscriptions! (fn [sync-address dex-names]
+                                                      (swap! sync-calls conj [sync-address dex-names]))
+        :fetch-frontend-open-orders! (fn [_store fetch-address opts]
+                                       (swap! open-orders-calls conj [fetch-address opts]))
+        :fetch-clearinghouse-state! (fn [_store fetch-address dex opts]
+                                      (swap! clearinghouse-calls conj [fetch-address dex opts]))}))
+    (is (empty? @open-orders-calls))
+    (is (empty? @clearinghouse-calls))
+    (is (= [[address ["dex-a" "dex-b"]]]
+           @sync-calls))))
+
 (deftest bootstrap-account-data-covers-nil-repeat-success-and-error-branches-test
   (async done
     (let [store (atom {:wallet {:address "0xaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"}

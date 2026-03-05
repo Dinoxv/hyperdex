@@ -339,10 +339,34 @@
              "user" "0xabc"
              "dex" "vault"}]
            (mapv first @calls)))
-    (is (= [{:priority :high}
-            {:priority :high}
-            {:priority :low}]
+    (is (= [{:priority :high
+             :dedupe-key [:clearinghouse-state "0xabc" nil]
+             :cache-ttl-ms 5000}
+            {:priority :high
+             :dedupe-key [:clearinghouse-state "0xabc" nil]
+             :cache-ttl-ms 5000}
+            {:priority :low
+             :dedupe-key [:clearinghouse-state "0xabc" "vault"]
+             :cache-ttl-ms 5000}]
            (mapv second @calls)))))
+
+(deftest request-clearinghouse-state-allows-explicit-policy-overrides-test
+  (let [calls (atom [])
+        post-info! (api-stubs/post-info-stub calls {})]
+    (account/request-clearinghouse-state! post-info!
+                                          "0xAbC"
+                                          "Vault"
+                                          {:priority :low
+                                           :dedupe-key :explicit
+                                           :cache-ttl-ms 777})
+    (is (= {"type" "clearinghouseState"
+            "user" "0xAbC"
+            "dex" "Vault"}
+           (ffirst @calls)))
+    (is (= {:priority :low
+            :dedupe-key :explicit
+            :cache-ttl-ms 777}
+           (second (first @calls))))))
 
 (deftest request-clearinghouse-state-short-circuits-without-address-test
   (async done

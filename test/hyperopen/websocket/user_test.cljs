@@ -1,5 +1,5 @@
 (ns hyperopen.websocket.user-test
-  (:require [cljs.test :refer-macros [deftest is testing]]
+  (:require [cljs.test :refer-macros [async deftest is testing]]
             [hyperopen.api.default :as api]
             [hyperopen.api.market-metadata.facade :as market-metadata]
             [hyperopen.platform :as platform]
@@ -17,6 +17,11 @@
          :account-info {:funding-history {:filters {:coin-set #{}
                                                    :start-time-ms 0
                                                    :end-time-ms 9999999999999}}}}))
+
+(defn- reset-user-subscription-state!
+  []
+  (reset! user-ws/user-state {:subscriptions #{}
+                              :clearinghouse-subscriptions #{}}))
 
 (deftest init-handlers-parse-nested-user-channel-payloads-test
   (let [store (make-store)
@@ -52,7 +57,14 @@
           :data {:isSnapshot true
                  :nonFundingLedgerUpdates [{:time 1000 :coin "USDC" :delta "5.0"}]}})
         (is (= [{:time 1000 :coin "USDC" :delta "5.0"}]
-               (get-in @store [:orders :ledger])))))))
+               (get-in @store [:orders :ledger]))))
+      (testing "clearinghouseState snapshot stores per-dex payload from nested data shape"
+        ((get @handlers "clearinghouseState")
+         {:channel "clearinghouseState"
+          :data {:dex "vault"
+                 :clearinghouseState {:withdrawable "12.34"}}})
+        (is (= {:withdrawable "12.34"}
+               (get-in @store [:perp-dex-clearinghouse "vault"])))))))
 
 (deftest user-channel-incrementals-append-and-dedupe-test
   (let [store (make-store)
@@ -308,6 +320,117 @@
       (is (= [] @perp-clearinghouse-addresses))
       (is (= [effective-address]
              @spot-clearinghouse-addresses)))))
+
+(deftest user-ledger-refresh-skips-per-dex-clearinghouse-when-stream-subscribed-and-snapshot-ready-test
+  (async done
+    (let [effective-address "0xdddddddddddddddddddddddddddddddddddddddd"
+          dex "vault"
+          store (doto (make-store)
+                  (swap! assoc :wallet {:address "0xaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"}
+                         :account-context {:ghost-mode {:active? true
+                                                        :address effective-address}}
+                         :perp-dex-clearinghouse {dex {:account-value "1"}}
+                         :websocket {:health {:transport {:state :connected
+                                                          :freshness :live}
+                                              :streams {["openOrders" nil effective-address nil nil]
+                                                        {:topic "openOrders"
+                                                         :status :live
+                                                         :subscribed? true
+                                                         :descriptor {:type "openOrders"
+                                                                      :user effective-address}}
+                                                        ["webData2" nil effective-address nil nil]
+                                                        {:topic "webData2"
+                                                         :status :live
+                                                         :subscribed? true
+                                                         :descriptor {:type "webData2"
+                                                                      :user effective-address}}
+                                                        ["clearinghouseState" nil effective-address dex nil]
+                                                        {:topic "clearinghouseState"
+                                                         :status :idle
+                                                         :subscribed? true
+                                                         :descriptor {:type "clearinghouseState"
+                                                                      :user effective-address
+                                                                      :dex dex}}}}}))
+          handlers (atom {})
+          scheduled-refresh (atom nil)
+          open-orders-addresses (atom [])
+          perp-clearinghouse-calls (atom [])
+          spot-clearinghouse-addresses (atom [])]
+      (reset-user-subscription-state!)
+      (with-redefs [ws-client/register-handler!
+                    (fn [message-type handler-fn]
+                      (swap! handlers assoc message-type handler-fn)
+                      true)
+                    platform/set-timeout! (fn [callback _ms]
+                                            (reset! scheduled-refresh callback)
+                                            1234)
+                    platform/clear-timeout! (fn [_] nil)
+                    api/request-frontend-open-orders! (fn
+                                                        ([_address]
+                                                         (swap! open-orders-addresses conj _address)
+                                                         (js/Promise.resolve []))
+                                                        ([_address _opts]
+                                                         (swap! open-orders-addresses conj _address)
+                                                         (js/Promise.resolve []))
+                                                        ([_address _dex _opts]
+                                                         (swap! open-orders-addresses conj _address)
+                                                         (js/Promise.resolve [])))
+                    api/request-clearinghouse-state! (fn
+                                                       ([_address _dex]
+                                                        (swap! perp-clearinghouse-calls conj [_address _dex])
+                                                        (js/Promise.resolve {}))
+                                                       ([_address _dex _opts]
+                                                        (swap! perp-clearinghouse-calls conj [_address _dex])
+                                                        (js/Promise.resolve {})))
+                    api/request-spot-clearinghouse-state! (fn
+                                                            ([_address]
+                                                             (swap! spot-clearinghouse-addresses conj _address)
+                                                             (js/Promise.resolve {}))
+                                                            ([_address _opts]
+                                                             (swap! spot-clearinghouse-addresses conj _address)
+                                                             (js/Promise.resolve {})))
+                    market-metadata/ensure-and-apply-perp-dex-metadata! (fn [_deps _opts]
+                                                                          (js/Promise.resolve [dex]))]
+        (user-ws/init! store)
+        ((get @handlers "userNonFundingLedgerUpdates")
+         {:channel "userNonFundingLedgerUpdates"
+          :data {:isSnapshot false
+                 :nonFundingLedgerUpdates [{:time 2000 :coin "USDC" :delta "2.0"}]}})
+        (is (fn? @scheduled-refresh))
+        (@scheduled-refresh)
+        (js/setTimeout
+         (fn []
+           (is (= [] @open-orders-addresses))
+           ;; Per-dex REST snapshot is suppressed when stream is subscribed and snapshot is already present.
+           (is (= [] @perp-clearinghouse-calls))
+           (is (= [effective-address]
+                  @spot-clearinghouse-addresses))
+           (reset-user-subscription-state!)
+           (done))
+         0)))))
+
+(deftest sync-perp-dex-clearinghouse-subscriptions-diffs-by-dex-test
+  (let [address "0xaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+        outbound-messages (atom [])]
+    (reset-user-subscription-state!)
+    (with-redefs [ws-client/send-message! (fn [payload]
+                                            (swap! outbound-messages conj payload)
+                                            true)]
+      (user-ws/sync-perp-dex-clearinghouse-subscriptions! address ["dex-a" "dex-b"])
+      ;; No-op sync should not emit duplicate subscribe messages.
+      (user-ws/sync-perp-dex-clearinghouse-subscriptions! address ["dex-a" "dex-b"])
+      ;; Removing one dex should emit unsubscribe for the stale dex only.
+      (user-ws/sync-perp-dex-clearinghouse-subscriptions! address ["dex-b"])
+      (let [subscribe-msgs (filter #(= "subscribe" (get % :method)) @outbound-messages)
+            unsubscribe-msgs (filter #(= "unsubscribe" (get % :method)) @outbound-messages)
+            subscribe-subs (set (map :subscription subscribe-msgs))
+            unsubscribe-subs (set (map :subscription unsubscribe-msgs))]
+        (is (= #{{:type "clearinghouseState" :user address :dex "dex-a"}
+                 {:type "clearinghouseState" :user address :dex "dex-b"}}
+               subscribe-subs))
+        (is (= #{{:type "clearinghouseState" :user address :dex "dex-a"}}
+               unsubscribe-subs))))
+    (reset-user-subscription-state!)))
 
 (deftest user-ledger-refresh-skips-open-orders-and-default-clearinghouse-when-ws-event-driven-test
   (let [effective-address "0xdddddddddddddddddddddddddddddddddddddddd"

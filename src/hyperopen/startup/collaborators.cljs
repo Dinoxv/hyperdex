@@ -405,6 +405,7 @@
       :create-user-handler user-ws/create-user-handler
       :subscribe-user! user-ws/subscribe-user!
       :unsubscribe-user! user-ws/unsubscribe-user!
+      :sync-perp-dex-clearinghouse-subscriptions! user-ws/sync-perp-dex-clearinghouse-subscriptions!
       :subscribe-webdata2! webdata2/subscribe-webdata2!
       :unsubscribe-webdata2! webdata2/unsubscribe-webdata2!}
      (dissoc overrides :api))))
