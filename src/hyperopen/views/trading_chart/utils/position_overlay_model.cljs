@@ -86,37 +86,54 @@
       (and dir* (str/includes? dir* "open short")) :short
       :else nil)))
 
-(defn- entry-transition-fill?
-  [fill direction]
+(defn- entry-transition-direction
+  [fill]
   (let [start-position (parse-num (:startPosition fill))
         fill-size (parse-num (:sz fill))
         side-sign (fill-side-sign fill)
         open-direction (open-direction-from-dir-text fill)]
     (cond
-      (and (#{:long :short} open-direction)
-           (= open-direction direction))
-      true
+      (#{:long :short} open-direction)
+      open-direction
 
       (and (finite-number? start-position)
            (finite-number? fill-size)
            (finite-number? side-sign))
       (let [end-position (+ start-position (* side-sign fill-size))]
-        (case direction
-          :long (and (<= start-position 0)
-                     (> end-position 0))
-          :short (and (>= start-position 0)
-                      (< end-position 0))
-          false))
+        (cond
+          (and (<= start-position 0)
+               (> end-position 0))
+          :long
+          (and (>= start-position 0)
+               (< end-position 0))
+          :short
+          :else nil))
 
-      :else false)))
+      :else nil)))
 
-(defn- latest-entry-fill
-  [fills direction]
-  (->> (or fills [])
-       (filter map?)
-       (sort-by fill-time)
-       (filter #(entry-transition-fill? % direction))
-       last))
+(defn- prefer-later-fill
+  [current fill]
+  (let [current-time (fill-time current)
+        fill-time* (fill-time fill)]
+    (if (and (finite-number? fill-time*)
+             (or (not (finite-number? current-time))
+                 (>= fill-time* current-time)))
+      fill
+      current)))
+
+(defn- latest-entry-fills-for-asset
+  [active-asset fills market-by-key]
+  (reduce (fn [latest-by-side fill]
+            (if-not (and (map? fill)
+                         (asset-fill-match? active-asset fill market-by-key))
+              latest-by-side
+              (let [direction (entry-transition-direction fill)]
+                (if (#{:long :short} direction)
+                  (update latest-by-side direction prefer-later-fill fill)
+                  latest-by-side))))
+          {:long nil
+           :short nil}
+          (or fills [])))
 
 (defn- timeframe-bucket-seconds
   [timeframe]
@@ -172,9 +189,8 @@
       (let [entry-price (parse-num (:entryPx position*))
             unrealized-pnl (or (parse-num (:unrealizedPnl position*)) 0)
             liquidation-price (parse-num (:liquidationPx position*))
-            matching-fills (->> (or fills [])
-                                (filter #(asset-fill-match? active-asset % market-by-key)))
-            entry-fill (latest-entry-fill matching-fills side)
+            latest-entry-fills (latest-entry-fills-for-asset active-asset fills market-by-key)
+            entry-fill (get latest-entry-fills side)
             entry-time-ms (fill-time entry-fill)
             entry-time (align-time-to-timeframe entry-time-ms selected-timeframe)
             latest-time (when (seq candle-data)

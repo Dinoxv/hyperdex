@@ -33,7 +33,7 @@
             :text "L"}
            (:entry-marker overlay)))))
 
-(deftest build-position-overlay-short-prefers-latest-transition-fill-test
+(deftest build-position-overlay-short-prefers-latest-transition-fill-from-unsorted-input-test
   (let [overlay (position-overlay-model/build-position-overlay
                  {:active-asset "SOL"
                   :position {:coin "SOL"
@@ -41,8 +41,9 @@
                              :entryPx "99.5"
                              :unrealizedPnl "-5.0"
                              :liquidationPx "130.75"}
-                  :fills [{:coin "SOL" :startPosition "0" :side "A" :sz "1" :time 1700500000000}
-                          {:coin "SOL" :dir "Open Short Market" :side "A" :sz "1.5" :time 1700600000000}]
+                  :fills [{:coin "SOL" :dir "Open Short Market" :side "A" :sz "1.5" :time 1700600000000}
+                          {:coin "SOL" :startPosition "-2" :side "A" :sz "0.4" :time 1700700000000}
+                          {:coin "SOL" :startPosition "0" :side "A" :sz "1" :time 1700500000000}]
                   :selected-timeframe :1d
                   :candle-data [{:time 1700438400}
                                 {:time 1700697600}]})]
