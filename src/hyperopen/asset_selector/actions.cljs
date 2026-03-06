@@ -522,6 +522,30 @@
                                             :status :missing}]]
         []))))
 
+(defn set-funding-tooltip-visible
+  [state tooltip-id visible?]
+  (let [tooltip-id* (some-> tooltip-id str str/trim)
+        current-visible-id (get-in state [:funding-ui :tooltip :visible-id])
+        next-visible-id (cond
+                          (and (true? visible?) (seq tooltip-id*)) tooltip-id*
+                          (= current-visible-id tooltip-id*) nil
+                          :else current-visible-id)]
+    (if (= current-visible-id next-visible-id)
+      []
+      [[:effects/save [:funding-ui :tooltip :visible-id] next-visible-id]])))
+
+(defn set-funding-tooltip-pinned
+  [state tooltip-id pinned?]
+  (let [tooltip-id* (some-> tooltip-id str str/trim)
+        current-pinned-id (get-in state [:funding-ui :tooltip :pinned-id])
+        next-pinned-id (cond
+                         (and (true? pinned?) (seq tooltip-id*)) tooltip-id*
+                         (= current-pinned-id tooltip-id*) nil
+                         :else current-pinned-id)]
+    (if (= current-pinned-id next-pinned-id)
+      []
+      [[:effects/save [:funding-ui :tooltip :pinned-id] next-pinned-id]])))
+
 (defn set-funding-hypothetical-size
   [state coin mark size-input]
   (if-let [coin* (normalize-coin-key coin)]

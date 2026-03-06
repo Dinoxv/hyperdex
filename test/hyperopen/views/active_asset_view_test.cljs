@@ -89,6 +89,20 @@
               []))]
     (vec (walk node))))
 
+(defn- funding-tooltip-pin-id
+  [coin]
+  (str "funding-rate-tooltip-pin-"
+       (-> (or coin "asset")
+           str
+           str/lower-case
+           (str/replace #"[^a-z0-9_-]" "-"))))
+
+(defn- with-visible-funding-tooltip
+  [state coin]
+  (assoc-in state
+            [:funding-ui :tooltip :visible-id]
+            (funding-tooltip-pin-id coin)))
+
 (deftest active-asset-row-symbol-fallback-test
   (let [ctx-data {:coin "SOL"
                   :mark 87.0
@@ -321,6 +335,110 @@
       (view/active-asset-panel {} false dropdown-state full-state))
     (is (= 144 (:scroll-top @captured-props)))))
 
+(deftest active-asset-row-skips-funding-tooltip-derivation-when-closed-test
+  (let [ctx-data {:coin "xyz:GOLD"
+                  :mark 5000.0
+                  :oracle 4998.0
+                  :change24h 5.0
+                  :change24hPct 0.5
+                  :volume24h 2000000
+                  :openInterest 200
+                  :fundingRate 0.01}
+        market {:coin "xyz:GOLD"
+                :symbol "GOLD-USDC"
+                :base "GOLD"
+                :market-type :perp}
+        full-state {:active-asset "xyz:GOLD"
+                    :asset-selector {:missing-icons #{}}}
+        cache* @#'hyperopen.views.active-asset-view/funding-tooltip-model-cache]
+    (reset! cache* nil)
+    (with-redefs [hyperopen.utils.formatting/format-funding-countdown
+                  (fn [] "00:10:00")]
+      (view/active-asset-row ctx-data market {:visible-dropdown nil} full-state))
+    (is (nil? @cache*))))
+
+(deftest active-asset-row-funding-tooltip-memoizes-by-summary-signature-test
+  (let [memoized-tooltip @#'hyperopen.views.active-asset-view/memoized-funding-tooltip-model
+        cache* @#'hyperopen.views.active-asset-view/funding-tooltip-model-cache
+        position {:coin "xyz:GOLD"
+                  :szi "1"
+                  :positionValue "5000"}
+        market {:coin "xyz:GOLD"
+                :symbol "GOLD-USDC"
+                :base "GOLD"
+                :market-type :perp}
+        summary-1 {:mean 0.1008
+                   :stddev 0.0916108152
+                   :daily-funding-series [{:day-index 1 :daily-rate 0.0288}
+                                          {:day-index 2 :daily-rate -0.0096}]
+                   :autocorrelation {:lag-1d {:value 0.714}
+                                     :lag-5d {:value 0.482}
+                                     :lag-15d {:value 0.21}}
+                   :autocorrelation-series [{:lag-days 1 :value 0.714}
+                                            {:lag-days 2 :value 0.55}]}
+        summary-2 {:mean 0.1008
+                   :stddev 0.0916108152
+                   :daily-funding-series [{:day-index 1 :daily-rate 0.0288}
+                                          {:day-index 2 :daily-rate -0.0096}]
+                   :autocorrelation {:lag-1d {:value 0.714}
+                                     :lag-5d {:value 0.482}
+                                     :lag-15d {:value 0.21}}
+                   :autocorrelation-series [{:lag-days 1 :value 0.714}
+                                            {:lag-days 2 :value 0.55}]}
+        summary-3 {:mean 0.0900
+                   :stddev 0.0916108152
+                   :daily-funding-series [{:day-index 1 :daily-rate 0.0288}
+                                          {:day-index 2 :daily-rate -0.0096}]
+                   :autocorrelation {:lag-1d {:value 0.714}
+                                     :lag-5d {:value 0.482}
+                                     :lag-15d {:value 0.21}}
+                   :autocorrelation-series [{:lag-days 1 :value 0.714}
+                                            {:lag-days 2 :value 0.55}]}
+        tooltip-1 (do
+                    (reset! cache* nil)
+                    (memoized-tooltip position
+                                      market
+                                      "xyz:GOLD"
+                                      5000.0
+                                      0.01
+                                      {:summary summary-1
+                                       :loading? false
+                                       :error nil}
+                                      nil
+                                      nil))
+        tooltip-2 (memoized-tooltip {:coin "xyz:GOLD"
+                                     :szi "1"
+                                     :positionValue "5000"}
+                                    {:coin "xyz:GOLD"
+                                     :symbol "GOLD-USDC"
+                                     :base "GOLD"
+                                     :market-type :perp}
+                                    "xyz:GOLD"
+                                    5000.0
+                                    0.01
+                                    {:summary summary-2
+                                     :loading? false
+                                     :error nil}
+                                    nil
+                                    nil)
+        tooltip-3 (memoized-tooltip {:coin "xyz:GOLD"
+                                     :szi "1"
+                                     :positionValue "5000"}
+                                    {:coin "xyz:GOLD"
+                                     :symbol "GOLD-USDC"
+                                     :base "GOLD"
+                                     :market-type :perp}
+                                    "xyz:GOLD"
+                                    5000.0
+                                    0.01
+                                    {:summary summary-3
+                                     :loading? false
+                                     :error nil}
+                                    nil
+                                    nil)]
+    (is (identical? tooltip-1 tooltip-2))
+    (is (not (identical? tooltip-2 tooltip-3)))))
+
 (deftest active-asset-row-funding-tooltip-shows-position-projections-test
   (let [ctx-data {:coin "xyz:GOLD"
                   :mark 5372.43
@@ -334,8 +452,10 @@
                 :symbol "GOLD-USDC"
                 :base "GOLD"
                 :market-type :perp}
-        full-state {:active-asset "xyz:GOLD"
-                    :asset-selector {:missing-icons #{}}}]
+        full-state (with-visible-funding-tooltip
+                     {:active-asset "xyz:GOLD"
+                      :asset-selector {:missing-icons #{}}}
+                     "xyz:GOLD")]
     (with-redefs [hyperopen.state.trading/position-for-active-asset
                   (fn [_]
                     {:coin "xyz:GOLD"
@@ -378,8 +498,10 @@
                 :symbol "GOLD-USDC"
                 :base "GOLD"
                 :market-type :perp}
-        full-state {:active-asset "xyz:GOLD"
-                    :asset-selector {:missing-icons #{}}}]
+        full-state (with-visible-funding-tooltip
+                     {:active-asset "xyz:GOLD"
+                      :asset-selector {:missing-icons #{}}}
+                     "xyz:GOLD")]
     (with-redefs [hyperopen.state.trading/position-for-active-asset
                   (fn [_]
                     {:coin "xyz:GOLD"
@@ -407,8 +529,10 @@
                 :symbol "GOLD-USDC"
                 :base "GOLD"
                 :market-type :perp}
-        full-state {:active-asset "xyz:GOLD"
-                    :asset-selector {:missing-icons #{}}}]
+        full-state (with-visible-funding-tooltip
+                     {:active-asset "xyz:GOLD"
+                      :asset-selector {:missing-icons #{}}}
+                     "xyz:GOLD")]
     (with-redefs [hyperopen.state.trading/position-for-active-asset
                   (fn [_]
                     nil)
@@ -435,11 +559,13 @@
                 :symbol "GOLD-USDC"
                 :base "GOLD"
                 :market-type :perp}
-        full-state {:active-asset "xyz:GOLD"
-                    :asset-selector {:missing-icons #{}}
-                    :funding-ui {:hypothetical-position-by-coin {"XYZ:GOLD"
-                                                                 {:size-input "oops"
-                                                                  :value-input "-1000.00"}}}}]
+        full-state (with-visible-funding-tooltip
+                     {:active-asset "xyz:GOLD"
+                      :asset-selector {:missing-icons #{}}
+                      :funding-ui {:hypothetical-position-by-coin {"XYZ:GOLD"
+                                                                   {:size-input "oops"
+                                                                    :value-input "-1000.00"}}}}
+                     "xyz:GOLD")]
     (with-redefs [hyperopen.state.trading/position-for-active-asset
                   (fn [_]
                     nil)
@@ -465,12 +591,14 @@
                 :symbol "GOLD-USDC"
                 :base "GOLD"
                 :market-type :perp}
-        full-state {:active-asset "xyz:GOLD"
-                    :ui {:locale "fr-FR"}
-                    :asset-selector {:missing-icons #{}}
-                    :funding-ui {:hypothetical-position-by-coin {"XYZ:GOLD"
-                                                                 {:size-input "oops"
-                                                                  :value-input "-1000,00"}}}}]
+        full-state (with-visible-funding-tooltip
+                     {:active-asset "xyz:GOLD"
+                      :ui {:locale "fr-FR"}
+                      :asset-selector {:missing-icons #{}}
+                      :funding-ui {:hypothetical-position-by-coin {"XYZ:GOLD"
+                                                                   {:size-input "oops"
+                                                                    :value-input "-1000,00"}}}}
+                     "xyz:GOLD")]
     (with-redefs [hyperopen.state.trading/position-for-active-asset
                   (fn [_]
                     nil)
@@ -496,22 +624,24 @@
                 :symbol "GOLD-USDC"
                 :base "GOLD"
                 :market-type :perp}
-        full-state {:active-asset "xyz:GOLD"
-                    :asset-selector {:missing-icons #{}}
-                    :active-assets {:funding-predictability {:by-coin {"XYZ:GOLD"
-                                                                       {:mean 0.1008
-                                                                       :stddev 0.0916108152
-                                                                       :daily-funding-series [{:day-index 1 :daily-rate 0.0288}
-                                                                                             {:day-index 2 :daily-rate -0.0096}
-                                                                                             {:day-index 3 :daily-rate 0.0192}]
-                                                                        :autocorrelation {:lag-1d {:value 0.714}
-                                                                                          :lag-5d {:value 0.482}
-                                                                                          :lag-15d {:value 0.21}}
-                                                                        :autocorrelation-series [{:lag-days 1 :value 0.714}
-                                                                                                 {:lag-days 2 :value 0.55}
-                                                                                                 {:lag-days 3 :value 0.44}]}}
-                                                          :loading-by-coin {}
-                                                          :error-by-coin {}}}}]
+        full-state (with-visible-funding-tooltip
+                     {:active-asset "xyz:GOLD"
+                      :asset-selector {:missing-icons #{}}
+                      :active-assets {:funding-predictability {:by-coin {"XYZ:GOLD"
+                                                                         {:mean 0.1008
+                                                                          :stddev 0.0916108152
+                                                                          :daily-funding-series [{:day-index 1 :daily-rate 0.0288}
+                                                                                                {:day-index 2 :daily-rate -0.0096}
+                                                                                                {:day-index 3 :daily-rate 0.0192}]
+                                                                          :autocorrelation {:lag-1d {:value 0.714}
+                                                                                            :lag-5d {:value 0.482}
+                                                                                            :lag-15d {:value 0.21}}
+                                                                          :autocorrelation-series [{:lag-days 1 :value 0.714}
+                                                                                                   {:lag-days 2 :value 0.55}
+                                                                                                   {:lag-days 3 :value 0.44}]}}
+                                                            :loading-by-coin {}
+                                                            :error-by-coin {}}}} 
+                     "xyz:GOLD")]
     (with-redefs [hyperopen.state.trading/position-for-active-asset
                   (fn [_]
                     {:coin "xyz:GOLD"
@@ -547,25 +677,27 @@
                 :symbol "GOLD-USDC"
                 :base "GOLD"
                 :market-type :perp}
-        full-state {:active-asset "xyz:GOLD"
-                    :asset-selector {:missing-icons #{}}
-                    :active-assets {:funding-predictability {:by-coin {"XYZ:GOLD"
-                                                                       {:mean 0.1008
-                                                                       :stddev 0.0916108152
-                                                                       :daily-funding-series [{:day-index 1 :daily-rate 0.0288}
-                                                                                             {:day-index 2 :daily-rate nil}
-                                                                                             {:day-index 3 :daily-rate -0.0144}]
-                                                                        :autocorrelation {:lag-1d {:value 0.714}
-                                                                                          :lag-5d {:value 0.482}
-                                                                                          :lag-15d {:value nil
-                                                                                                    :lag-days 15
-                                                                                                    :minimum-daily-count 16
-                                                                                                    :insufficient? true}}
-                                                                        :autocorrelation-series [{:lag-days 1 :value 0.714}
-                                                                                                 {:lag-days 2 :value nil :undefined? true}
-                                                                                                 {:lag-days 3 :value -0.12}]}}
-                                                          :loading-by-coin {"XYZ:GOLD" true}
-                                                          :error-by-coin {}}}}]
+        full-state (with-visible-funding-tooltip
+                     {:active-asset "xyz:GOLD"
+                      :asset-selector {:missing-icons #{}}
+                      :active-assets {:funding-predictability {:by-coin {"XYZ:GOLD"
+                                                                         {:mean 0.1008
+                                                                          :stddev 0.0916108152
+                                                                          :daily-funding-series [{:day-index 1 :daily-rate 0.0288}
+                                                                                                {:day-index 2 :daily-rate nil}
+                                                                                                {:day-index 3 :daily-rate -0.0144}]
+                                                                          :autocorrelation {:lag-1d {:value 0.714}
+                                                                                            :lag-5d {:value 0.482}
+                                                                                            :lag-15d {:value nil
+                                                                                                      :lag-days 15
+                                                                                                      :minimum-daily-count 16
+                                                                                                      :insufficient? true}}
+                                                                          :autocorrelation-series [{:lag-days 1 :value 0.714}
+                                                                                                   {:lag-days 2 :value nil :undefined? true}
+                                                                                                   {:lag-days 3 :value -0.12}]}}
+                                                            :loading-by-coin {"XYZ:GOLD" true}
+                                                            :error-by-coin {}}}}
+                     "xyz:GOLD")]
     (with-redefs [hyperopen.state.trading/position-for-active-asset
                   (fn [_]
                     {:coin "xyz:GOLD"

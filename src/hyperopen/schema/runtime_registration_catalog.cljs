@@ -111,6 +111,8 @@
      [:actions/refresh-asset-markets :refresh-asset-markets]
      [:actions/mark-loaded-asset-icon :mark-loaded-asset-icon]
      [:actions/mark-missing-asset-icon :mark-missing-asset-icon]
+     [:actions/set-funding-tooltip-visible :set-funding-tooltip-visible]
+     [:actions/set-funding-tooltip-pinned :set-funding-tooltip-pinned]
      [:actions/set-funding-hypothetical-size :set-funding-hypothetical-size]
      [:actions/set-funding-hypothetical-value :set-funding-hypothetical-value]
      [:actions/toggle-timeframes-dropdown :toggle-timeframes-dropdown]

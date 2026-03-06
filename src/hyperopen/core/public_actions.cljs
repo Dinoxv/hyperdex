@@ -65,6 +65,12 @@
 (def mark-missing-asset-icon
   asset-actions/mark-missing-asset-icon)
 
+(def set-funding-tooltip-visible
+  asset-actions/set-funding-tooltip-visible)
+
+(def set-funding-tooltip-pinned
+  asset-actions/set-funding-tooltip-pinned)
+
 (def set-funding-hypothetical-size
   asset-actions/set-funding-hypothetical-size)
 

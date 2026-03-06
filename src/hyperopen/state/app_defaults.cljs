@@ -300,6 +300,8 @@
                   :reduce-popover (position-reduce/default-popover-state)
                   :margin-modal (position-margin/default-modal-state)}
    :funding-ui {:modal (funding-actions/default-funding-modal-state)
+                :tooltip {:visible-id nil
+                          :pinned-id nil}
                 :hypothetical-position-by-coin {}}
    :funding-comparison-ui (default-funding-comparison-ui-state)
    :funding-comparison (default-funding-comparison-state)

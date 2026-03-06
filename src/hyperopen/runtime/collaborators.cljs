@@ -48,6 +48,8 @@
    :maybe-increase-asset-selector-render-limit asset-actions/maybe-increase-asset-selector-render-limit
    :mark-loaded-asset-icon asset-actions/mark-loaded-asset-icon
    :mark-missing-asset-icon asset-actions/mark-missing-asset-icon
+   :set-funding-tooltip-visible asset-actions/set-funding-tooltip-visible
+   :set-funding-tooltip-pinned asset-actions/set-funding-tooltip-pinned
    :set-funding-hypothetical-size asset-actions/set-funding-hypothetical-size
    :set-funding-hypothetical-value asset-actions/set-funding-hypothetical-value})
 

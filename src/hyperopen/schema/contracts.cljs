@@ -187,6 +187,8 @@
   (s/tuple ::non-empty-string
            (s/nilable ::numberish)
            any?))
+(s/def ::tooltip-toggle-args
+  (s/tuple ::non-empty-string ::booleanish))
 (s/def ::tab-args (s/tuple ::tab))
 (s/def ::asset-selector-shortcut-market-keys
   (s/and vector?
@@ -378,6 +380,8 @@
    :actions/refresh-asset-markets ::no-args
    :actions/mark-loaded-asset-icon ::market-key-args
    :actions/mark-missing-asset-icon ::market-key-args
+   :actions/set-funding-tooltip-visible ::tooltip-toggle-args
+   :actions/set-funding-tooltip-pinned ::tooltip-toggle-args
    :actions/set-funding-hypothetical-size ::coin-number-input-args
    :actions/set-funding-hypothetical-value ::coin-number-input-args
    :actions/toggle-timeframes-dropdown ::no-args

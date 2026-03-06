@@ -23,7 +23,7 @@
    (tooltip content "top" {}))
   ([content position]
    (tooltip content position {}))
-  ([content position {:keys [click-pinnable? pin-id]}]
+  ([content position {:keys [click-pinnable? pin-id pinned?]}]
    (let [pos (or position "top")
          tooltip-body (second content)
          body-node (if (string? tooltip-body)
@@ -47,10 +47,16 @@
                      text
                      "funding-rate-tooltip-pin"))]
      (if click-pinnable?
-       [:div {:class ["relative" "group" "inline-flex"]}
+       [:div {:class ["relative" "group" "inline-flex"]
+              :on {:mouseenter [[:actions/set-funding-tooltip-visible pin-id* true]]
+                   :mouseleave [[:actions/set-funding-tooltip-visible pin-id* false]]}}
         [:input {:id pin-id*
                  :type "checkbox"
-                 :class ["peer" "sr-only"]}]
+                 :checked (boolean pinned?)
+                 :class ["peer" "sr-only"]
+                 :on {:change [[:actions/set-funding-tooltip-pinned pin-id* :event.target/checked]]
+                      :focus [[:actions/set-funding-tooltip-visible pin-id* true]]
+                      :blur [[:actions/set-funding-tooltip-visible pin-id* false]]}}]
         ;; Click outside target that only exists while pinned open.
         [:label {:for pin-id*
                  :class ["fixed"
@@ -118,6 +124,20 @@
     (or (and (seq normalized-coin)
              (get by-coin normalized-coin))
         (get by-coin coin))))
+
+(defn- funding-tooltip-pin-id
+  [coin]
+  (str "funding-rate-tooltip-pin-"
+       (-> (or coin "asset")
+           str
+           str/lower-case
+           (str/replace #"[^a-z0-9_-]" "-"))))
+
+(defn- value-signature
+  [value]
+  {:hash (hash value)
+   :count (when (counted? value)
+            (count value))})
 
 (defn- parse-optional-number [value]
   (let [num (cond
@@ -448,6 +468,50 @@
                                                        [])))
      :predictability-lag-note (when (map? predictability-summary)
                                 (predictability-lag-note predictability-summary))}))
+
+(defonce ^:private funding-tooltip-model-cache
+  (atom nil))
+
+(defn- funding-tooltip-cache-key
+  [position market coin mark funding-rate predictability-state hypothetical-input locale]
+  {:position {:szi (:szi position)
+              :position-value (:positionValue position)}
+   :market-base (non-blank-text (:base market))
+   :market-symbol (non-blank-text (:symbol market))
+   :coin (non-blank-text coin)
+   :mark mark
+   :funding-rate funding-rate
+   :predictability-loading? (true? (:loading? predictability-state))
+   :predictability-error (non-blank-text (:error predictability-state))
+   :predictability-summary-signature (value-signature (:summary predictability-state))
+   :hypothetical-input hypothetical-input
+   :locale locale})
+
+(defn- memoized-funding-tooltip-model
+  [position market coin mark funding-rate predictability-state hypothetical-input locale]
+  (let [cache-key (funding-tooltip-cache-key position
+                                             market
+                                             coin
+                                             mark
+                                             funding-rate
+                                             predictability-state
+                                             hypothetical-input
+                                             locale)
+        cached @funding-tooltip-model-cache]
+    (if (and (map? cached)
+             (= cache-key (:key cached)))
+      (:result cached)
+      (let [result (funding-tooltip-model position
+                                          market
+                                          coin
+                                          mark
+                                          funding-rate
+                                          predictability-state
+                                          hypothetical-input
+                                          locale)]
+        (reset! funding-tooltip-model-cache {:key cache-key
+                                             :result result})
+        result))))
 
 (defn- predictability-rate-text [{:keys [rate-kind rate]}]
   (case rate-kind
@@ -884,18 +948,23 @@
                                     (get-in full-state [:funding-ui :hypothetical-position-by-coin] {})
                                     coin)
         locale (get-in full-state [:ui :locale])
-        funding-tooltip (funding-tooltip-model (or active-position {})
-                                               market
-                                               coin
-                                               mark
-                                               funding-rate
-                                               funding-predictability-state
-                                               funding-hypothetical-input
-                                               locale)
-        funding-tooltip-pin-id (str "funding-rate-tooltip-pin-"
-                                    (-> (or coin "asset")
-                                        str/lower-case
-                                        (str/replace #"[^a-z0-9_-]" "-")))
+        funding-tooltip-ui (get-in full-state [:funding-ui :tooltip] {})
+        funding-tooltip-id (funding-tooltip-pin-id coin)
+        funding-tooltip-open? (or (= funding-tooltip-id
+                                     (:visible-id funding-tooltip-ui))
+                                  (= funding-tooltip-id
+                                     (:pinned-id funding-tooltip-ui)))
+        funding-tooltip-pinned? (= funding-tooltip-id
+                                   (:pinned-id funding-tooltip-ui))
+        funding-tooltip (when funding-tooltip-open?
+                          (memoized-funding-tooltip-model (or active-position {})
+                                                          market
+                                                          coin
+                                                          mark
+                                                          funding-rate
+                                                          funding-predictability-state
+                                                          funding-hypothetical-input
+                                                          locale))
         dropdown-visible? (= (:visible-dropdown dropdown-state) :asset-selector)
         is-spot (= :spot (:market-type market))
         ;; Handle missing data gracefully
@@ -970,10 +1039,12 @@
            (tooltip 
              [[:span {:class ["cursor-help" "num" (signed-tone-class funding-rate)]}
                (signed-percentage-text funding-rate 4)]
-              (funding-tooltip-panel funding-tooltip)]
+              (when funding-tooltip-open?
+                (funding-tooltip-panel funding-tooltip))]
              "bottom"
              {:click-pinnable? true
-              :pin-id funding-tooltip-pin-id})
+              :pin-id funding-tooltip-id
+              :pinned? funding-tooltip-pinned?})
            [:span (if is-spot "—" "Loading...")])
          [:span.mx-1 "/"]
          [:span.num (if is-spot "—" countdown-text)]]]]]))
