@@ -338,7 +338,6 @@
                                "text-white"
                                "hover:bg-base-200"]))
                :on {:click [[:actions/open-spectate-mode-modal :event.currentTarget/bounds]]}
-               :title button-label
                :aria-label button-label
                :aria-describedby spectate-mode-trigger-tooltip-id
                :data-spectate-mode-trigger "true"
