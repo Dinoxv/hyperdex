@@ -1,35 +1,110 @@
 (ns hyperopen.views.trading-chart.test-support.fake-dom)
 
+(declare make-fake-text-node)
+
+(defn- node-text-content
+  [node]
+  (cond
+    (= 3 (.-nodeType node))
+    (or (.-data node)
+        (.-nodeValue node)
+        "")
+
+    :else
+    (apply str
+           (map node-text-content
+                (or (some-> node .-childNodes array-seq)
+                    (some-> node .-children array-seq)
+                    [])))))
+
+(defn make-fake-text-node
+  [text]
+  (let [node #js {:nodeType 3
+                  :parentNode nil
+                  :childNodes #js []
+                  :children #js []}]
+    (js/Object.defineProperty
+     node
+     "textContent"
+     #js {:configurable true
+          :enumerable true
+          :get (fn []
+                 (or (.-data node)
+                     (.-nodeValue node)
+                     ""))
+          :set (fn [value]
+                 (let [next-text (or (some-> value str) "")]
+                   (aset node "data" next-text)
+                   (aset node "nodeValue" next-text)))})
+    (set! (.-textContent node) text)
+    node))
+
 (defn make-fake-element [tag]
   (let [children (array)
+        child-nodes (array)
         listeners (js-obj)
         element #js {:tagName tag
+                     :nodeType 1
                      :style #js {}
                      :children children
+                     :childNodes child-nodes
                      :listeners listeners
                      :parentNode nil
                      :firstChild nil
                      :className ""
-                     :innerHTML ""
-                     :textContent ""}]
+                     :innerHTML ""}]
     (letfn [(refresh-first-child! []
               (set! (.-firstChild element)
-                    (when (pos? (alength children))
-                      (aget children 0))))]
+                    (when (pos? (alength child-nodes))
+                      (aget child-nodes 0))))
+            (append-child-node! [child]
+              (when child
+                (when-let [current-parent (.-parentNode child)]
+                  (.removeChild current-parent child))
+                (.push child-nodes child)
+                (when (= 1 (.-nodeType child))
+                  (.push children child))
+                (set! (.-parentNode child) element)
+                (refresh-first-child!))
+              child)
+            (remove-child-node! [child]
+              (let [child-node-index (.indexOf child-nodes child)]
+                (when (>= child-node-index 0)
+                  (.splice child-nodes child-node-index 1)
+                  (when (= 1 (.-nodeType child))
+                    (let [child-index (.indexOf children child)]
+                      (when (>= child-index 0)
+                        (.splice children child-index 1))))
+                  (set! (.-parentNode child) nil)
+                  (refresh-first-child!)))
+              child)
+            (clear-child-nodes! []
+              (doseq [child (array-seq child-nodes)]
+                (set! (.-parentNode child) nil))
+              (.splice child-nodes 0 (alength child-nodes))
+              (.splice children 0 (alength children))
+              (refresh-first-child!))
+            (set-text-content! [value]
+              (let [next-text (or (some-> value str) "")]
+                (clear-child-nodes!)
+                (when (seq next-text)
+                  (append-child-node! (make-fake-text-node next-text)))
+                next-text))]
+      (js/Object.defineProperty
+       element
+       "textContent"
+       #js {:configurable true
+            :enumerable true
+            :get (fn []
+                   (node-text-content element))
+            :set (fn [value]
+                   (set-text-content! value))})
       (set! (.-appendChild element)
             (fn [child]
-              (.push children child)
-              (set! (.-parentNode child) element)
-              (refresh-first-child!)
-              child))
+              (append-child-node! child)))
       (set! (.-removeChild element)
             (fn [child]
-              (let [idx (.indexOf children child)]
-                (when (>= idx 0)
-                  (.splice children idx 1)))
-              (set! (.-parentNode child) nil)
-              (refresh-first-child!)
-              child))
+              (remove-child-node! child)))
       (set! (.-setAttribute element)
             (fn [attr value]
               (aset element attr value)))
@@ -49,19 +124,35 @@
   #js {:createElement (fn [tag]
                         (make-fake-element tag))
        :createElementNS (fn [_ns tag]
-                          (make-fake-element tag))})
+                          (make-fake-element tag))
+       :createTextNode (fn [text]
+                         (make-fake-text-node text))})
+
+(defn collect-text-nodes [node]
+  (cond
+    (nil? node) []
+    (= 3 (.-nodeType node)) [node]
+    :else
+    (mapcat collect-text-nodes
+            (or (some-> node .-childNodes array-seq)
+                (some-> node .-children array-seq)
+                []))))
 
 (defn collect-text-content [node]
-  (let [own (when-let [text (.-textContent node)]
-              (when (and (string? text) (seq text))
-                [text]))
-        children (or (some-> node .-children array-seq) [])]
-    (into (vec own)
-          (mapcat collect-text-content children))))
+  (->> (collect-text-nodes node)
+       (keep (fn [text-node]
+               (let [text (or (.-data text-node)
+                              (.-nodeValue text-node)
+                              "")]
+                 (when (seq text)
+                   text))))
+       vec))
 
 (defn find-dom-node [node pred]
   (when node
-    (let [children (or (some-> node .-children array-seq) [])]
+    (let [children (or (some-> node .-childNodes array-seq)
+                       (some-> node .-children array-seq)
+                       [])]
       (or (when (pred node) node)
           (some #(find-dom-node % pred) children)))))
 

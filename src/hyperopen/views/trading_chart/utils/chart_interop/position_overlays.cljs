@@ -104,12 +104,20 @@
         (aset style k v))))
   el)
 
-(defn- set-text-content!
-  [el text]
-  (let [next-text (or (some-> text str) "")]
-    (when (not= next-text (.-textContent el))
-      (set! (.-textContent el) next-text)))
-  el)
+(defn- create-text-node!
+  [document text]
+  (.createTextNode document (or (some-> text str) "")))
+
+(defn- set-text-node-value!
+  [text-node text]
+  (let [next-text (or (some-> text str) "")
+        current-text (or (some-> text-node .-data)
+                         (some-> text-node .-nodeValue)
+                         "")]
+    (when (not= next-text current-text)
+      (aset text-node "data" next-text)
+      (aset text-node "nodeValue" next-text)))
+  text-node)
 
 (defn- invoke-method
   [target method-name & args]
@@ -357,10 +365,14 @@
         line (.createElement document "div")
         badge (.createElement document "div")
         badge-text (.createElement document "span")
+        badge-text-node (create-text-node! document "")
         chip (.createElement document "div")
-        chip-text (.createElement document "span")]
+        chip-text (.createElement document "span")
+        chip-text-node (create-text-node! document "")]
     (.setAttribute row "data-position-pnl-row" "true")
     (.setAttribute chip "data-position-pnl-price-chip" "true")
+    (.appendChild badge-text badge-text-node)
+    (.appendChild chip-text chip-text-node)
     (.appendChild badge badge-text)
     (.appendChild chip chip-text)
     (.appendChild row line)
@@ -370,17 +382,19 @@
      :line line
      :badge badge
      :badge-text badge-text
+     :badge-text-node badge-text-node
      :chip chip
-     :chip-text chip-text}))
+     :chip-text chip-text
+     :chip-text-node chip-text-node}))
 
 (defn- hide-pnl-row!
-  [{:keys [row badge-text chip-text]}]
+  [{:keys [row badge-text-node chip-text-node]}]
   (apply-inline-style! row {"display" "none"})
-  (set-text-content! badge-text "")
-  (set-text-content! chip-text ""))
+  (set-text-node-value! badge-text-node "")
+  (set-text-node-value! chip-text-node ""))
 
 (defn- patch-pnl-row!
-  [{:keys [row line badge badge-text chip chip-text]} overlay y width]
+  [{:keys [row line badge badge-text badge-text-node chip chip-text chip-text-node]} overlay y width]
   (let [pnl-text (format-pnl-text (:unrealized-pnl overlay))
         size-text (format-size-text (:format-size overlay) (:abs-size overlay))
         pnl-label-text (str "PNL " pnl-text " | " size-text)
@@ -430,7 +444,7 @@
      badge-text
      {"whiteSpace" "nowrap"
       "userSelect" "none"})
-    (set-text-content! badge-text pnl-label-text)
+    (set-text-node-value! badge-text-node pnl-label-text)
     (apply-inline-style!
      chip
      {"position" "absolute"
@@ -449,8 +463,11 @@
       "color" pnl-chip-text-color
       "whiteSpace" "nowrap"
       "pointerEvents" "none"})
-    (set-text-content!
+    (apply-inline-style!
      chip-text
+     {"whiteSpace" "nowrap"})
+    (set-text-node-value!
+     chip-text-node
      (format-axis-price-text (:format-price overlay)
                              (:entry-price overlay)))))
 
@@ -475,10 +492,14 @@
         line (.createElement document "div")
         badge (.createElement document "div")
         label (.createElement document "span")
+        label-text-node (create-text-node! document "")
         price (.createElement document "span")
+        price-text-node (create-text-node! document "")
         drag-note (.createElement document "span")
+        drag-note-text-node (create-text-node! document "")
         chip (.createElement document "div")
         chip-text (.createElement document "span")
+        chip-text-node (create-text-node! document "")
         on-hit-pointer-down (fn [event]
                               (begin-current-liquidation-drag! chart-obj hit-area event))
         on-badge-pointer-down (fn [event]
@@ -496,6 +517,10 @@
     (.addEventListener badge "pointerdown" on-badge-pointer-down)
     (.addEventListener badge "mousedown" on-badge-pointer-down)
     (.addEventListener badge "touchstart" on-badge-pointer-down)
+    (.appendChild label label-text-node)
+    (.appendChild price price-text-node)
+    (.appendChild drag-note drag-note-text-node)
+    (.appendChild chip-text chip-text-node)
     (.appendChild badge label)
     (.appendChild badge price)
     (.appendChild badge drag-note)
@@ -509,21 +534,25 @@
      :line line
      :badge badge
      :label label
+     :label-text-node label-text-node
      :price price
+     :price-text-node price-text-node
      :drag-note drag-note
+     :drag-note-text-node drag-note-text-node
      :chip chip
-     :chip-text chip-text}))
+     :chip-text chip-text
+     :chip-text-node chip-text-node}))
 
 (defn- hide-liquidation-row!
-  [{:keys [row label price drag-note chip-text]}]
+  [{:keys [row label-text-node price-text-node drag-note-text-node chip-text-node]}]
   (apply-inline-style! row {"display" "none"})
-  (set-text-content! label "")
-  (set-text-content! price "")
-  (set-text-content! drag-note "")
-  (set-text-content! chip-text ""))
+  (set-text-node-value! label-text-node "")
+  (set-text-node-value! price-text-node "")
+  (set-text-node-value! drag-note-text-node "")
+  (set-text-node-value! chip-text-node ""))
 
 (defn- patch-liquidation-row!
-  [{:keys [row hit-area line badge label price drag-note chip chip-text]} overlay y width]
+  [{:keys [row hit-area line badge label label-text-node price price-text-node drag-note drag-note-text-node chip chip-text chip-text-node]} overlay y width]
   (let [liq-price-text (format-price-text (:format-price overlay)
                                           (:liquidation-price overlay))
         drag-label (liquidation-drag-label overlay
@@ -589,9 +618,15 @@
       "color" liq-text-color
       "cursor" "ns-resize"
       "pointerEvents" "auto"})
-    (set-text-content! label "Liq. Price")
-    (set-text-content! price liq-price-text)
-    (set-text-content! drag-note drag-label)
+    (apply-inline-style!
+     label
+     {"whiteSpace" "nowrap"})
+    (set-text-node-value! label-text-node "Liq. Price")
+    (apply-inline-style!
+     price
+     {"whiteSpace" "nowrap"})
+    (set-text-node-value! price-text-node liq-price-text)
+    (set-text-node-value! drag-note-text-node drag-label)
     (apply-inline-style!
      drag-note
      {"color" liq-drag-text-color
@@ -615,8 +650,11 @@
       "color" pnl-chip-text-color
       "whiteSpace" "nowrap"
       "pointerEvents" "none"})
-    (set-text-content!
+    (apply-inline-style!
      chip-text
+     {"whiteSpace" "nowrap"})
+    (set-text-node-value!
+     chip-text-node
      (format-axis-price-text (:format-price overlay)
                              (:liquidation-price overlay)))))
 

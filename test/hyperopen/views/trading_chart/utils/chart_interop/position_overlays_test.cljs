@@ -56,6 +56,16 @@
                           (fn [node]
                             (= "true" (aget node "data-position-liq-drag-hit")))))
 
+(defn- first-text-node
+  [node]
+  (first (fake-dom/collect-text-nodes node)))
+
+(defn- text-node-text
+  [text-node]
+  (or (some-> text-node .-data)
+      (some-> text-node .-nodeValue)
+      ""))
+
 (defn- emit-overlay-repaint!
   [{:keys [subscription-callbacks*]}]
   (when-let [callback (or (get @subscription-callbacks* :size-change)
@@ -317,6 +327,78 @@
         (is (= "105" pnl-chip-text))
         (is (= "125" liq-chip-text))
         (is (str/includes? border-top "34, 201, 151"))))
+    (position-overlays/clear-position-overlays! chart-obj)))
+
+(deftest position-overlays-sync-retains-text-nodes-while-patching-text-test
+  (let [{:keys [chart-obj document container]}
+        (build-chart-fixture {})
+        overlay {:side :short
+                 :entry-price 100
+                 :unrealized-pnl -2.5
+                 :abs-size 1.5
+                 :current-liquidation-price 100
+                 :liquidation-price 95
+                 :entry-time 1700000000
+                 :entry-time-ms 1700000000000
+                 :latest-time 1700003600}
+        next-overlay {:side :short
+                      :entry-price 105
+                      :unrealized-pnl 8.0
+                      :abs-size 3.0
+                      :current-liquidation-price 100
+                      :liquidation-price 97.5
+                      :entry-time 1700000000
+                      :entry-time-ms 1700000000000
+                      :latest-time 1700003600}
+        format-price (fn [price _raw] (str price))
+        format-size (fn [size] (str size))]
+    (position-overlays/sync-position-overlays!
+     chart-obj
+     container
+     overlay
+     {:document document
+      :format-price format-price
+      :format-size format-size})
+    (let [overlay-root (aget (.-children container) 0)
+          pnl-badge-before (find-inline-badge overlay-root "PNL -$2.50 | 1.5")
+          pnl-chip-before (find-pnl-price-chip overlay-root)
+          liq-badge-before (find-inline-badge overlay-root "Liq. Price")
+          liq-chip-before (find-liquidation-price-chip overlay-root)
+          pnl-badge-text-node-before (first-text-node pnl-badge-before)
+          pnl-chip-text-node-before (first-text-node pnl-chip-before)
+          [liq-label-text-node-before
+           liq-price-text-node-before
+           liq-drag-note-text-node-before] (vec (fake-dom/collect-text-nodes liq-badge-before))
+          liq-chip-text-node-before (first-text-node liq-chip-before)]
+      (position-overlays/sync-position-overlays!
+       chart-obj
+       container
+       next-overlay
+       {:document document
+        :format-price format-price
+        :format-size format-size})
+      (let [pnl-badge-after (find-inline-badge overlay-root "PNL +$8.00 | 3")
+            pnl-chip-after (find-pnl-price-chip overlay-root)
+            liq-badge-after (find-inline-badge overlay-root "Liq. Price")
+            liq-chip-after (find-liquidation-price-chip overlay-root)
+            pnl-badge-text-node-after (first-text-node pnl-badge-after)
+            pnl-chip-text-node-after (first-text-node pnl-chip-after)
+            [liq-label-text-node-after
+             liq-price-text-node-after
+             liq-drag-note-text-node-after] (vec (fake-dom/collect-text-nodes liq-badge-after))
+            liq-chip-text-node-after (first-text-node liq-chip-after)]
+        (is (identical? pnl-badge-text-node-before pnl-badge-text-node-after))
+        (is (identical? pnl-chip-text-node-before pnl-chip-text-node-after))
+        (is (identical? liq-label-text-node-before liq-label-text-node-after))
+        (is (identical? liq-price-text-node-before liq-price-text-node-after))
+        (is (identical? liq-drag-note-text-node-before liq-drag-note-text-node-after))
+        (is (identical? liq-chip-text-node-before liq-chip-text-node-after))
+        (is (= "PNL +$8.00 | 3" (text-node-text pnl-badge-text-node-after)))
+        (is (= "105" (text-node-text pnl-chip-text-node-after)))
+        (is (= "Liq. Price" (text-node-text liq-label-text-node-after)))
+        (is (= "$97.5" (text-node-text liq-price-text-node-after)))
+        (is (= "Remove $7.50 Margin" (text-node-text liq-drag-note-text-node-after)))
+        (is (= "97.5" (text-node-text liq-chip-text-node-after)))))
     (position-overlays/clear-position-overlays! chart-obj)))
 
 (deftest position-overlays-do-not-render-secondary-side-glyphs-test
