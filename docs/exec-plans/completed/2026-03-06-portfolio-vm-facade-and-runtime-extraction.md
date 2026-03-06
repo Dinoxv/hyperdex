@@ -36,11 +36,16 @@ After this refactor, `/hyperopen/src/hyperopen/views/portfolio/vm.cljs` will rem
 - [x] (2026-03-06 18:11Z) Reduced `/hyperopen/src/hyperopen/views/portfolio/vm.cljs` from the old summary/chart duplicate implementations to delegation wrappers, leaving only the still-unextracted performance-table assembly and final `portfolio-vm` composition in the root facade.
 - [x] (2026-03-06 18:11Z) Added direct module coverage in `/hyperopen/test/hyperopen/views/portfolio/vm/summary_helpers_test.cljs` and `/hyperopen/test/hyperopen/views/portfolio/vm/chart_helpers_test.cljs` to lock the extracted modules to the canonical root-VM contract.
 - [x] Milestone 3: Align `/hyperopen/src/hyperopen/views/portfolio/vm/history.cljs`, `/hyperopen/src/hyperopen/views/portfolio/vm/chart.cljs`, `/hyperopen/src/hyperopen/views/portfolio/vm/chart_math.cljs`, `/hyperopen/src/hyperopen/views/portfolio/vm/equity.cljs`, `/hyperopen/src/hyperopen/views/portfolio/vm/volume.cljs`, and `/hyperopen/src/hyperopen/views/portfolio/vm/summary.cljs` with the behavior currently embedded in the root VM.
-- [ ] Milestone 4: Reduce `/hyperopen/src/hyperopen/views/portfolio/vm.cljs` to a thin facade/composer, remove duplicate private implementations, and update tests toward module ownership.
+- [x] (2026-03-06 18:37Z) Added `/hyperopen/src/hyperopen/views/portfolio/vm/performance.cljs` as the canonical owner of performance-table request assembly, metric-column enrichment, hidden-row filtering, and worker/signature-gated performance model construction.
+- [x] (2026-03-06 18:37Z) Reduced `/hyperopen/src/hyperopen/views/portfolio/vm.cljs` to a 222-line facade that keeps only final `portfolio-vm` composition plus the minimal compatibility seams still exercised by existing tests (`chart-line-path`, metrics worker/signature wrappers, and benchmark selector binding).
+- [x] (2026-03-06 18:37Z) Added direct module coverage in `/hyperopen/test/hyperopen/views/portfolio/vm/performance_helpers_test.cljs` so the extracted performance module is tested without routing through the root facade.
+- [x] Milestone 4: Reduce `/hyperopen/src/hyperopen/views/portfolio/vm.cljs` to a thin facade/composer, remove duplicate private implementations, and update tests toward module ownership.
 - [x] (2026-03-06 17:09Z) Validation for the first slice: `npx shadow-cljs compile test` passed after the benchmark extraction.
 - [x] (2026-03-06 17:47Z) Ran required validation gates after the benchmark and metrics-runtime extractions: `npm test`, `npm run check`, and `npm run test:websocket` all exited `0`.
 - [x] (2026-03-06 18:00Z) Re-ran the required validation gates after the `chart_math`/`volume`/`equity` extraction slice: `npm test`, `npm run check`, and `npm run test:websocket` all exited `0`.
 - [x] (2026-03-06 18:15Z) Re-ran the required validation gates after the summary/chart alignment slice: `npm test`, `npm run check`, and `npm run test:websocket` all exited `0`.
+- [x] (2026-03-06 18:48Z) Re-ran the required validation gates after the performance-module extraction and final facade reduction: `npm test`, `npm run check`, and `npm run test:websocket` all exited `0`.
+- [x] Milestone 5: Final validation and handoff.
 
 ## Surprises & Discoveries
 
@@ -68,6 +73,9 @@ After this refactor, `/hyperopen/src/hyperopen/views/portfolio/vm.cljs` will rem
 - Observation: `/hyperopen/src/hyperopen/views/portfolio/vm/history.cljs` already had downstream consumers that depend on map-shaped normalized rows, so porting the old root VM's vector-internal helpers into `history.cljs` would have created new churn instead of reducing it.
   Evidence: The rewritten `summary.cljs` and `chart.cljs` now compose directly against `vm-history/normalized-history-rows`, `vm-history/history-window-rows`, `vm-history/rebase-history-rows`, `vm-history/history-point-value`, and `vm-history/history-point-time-ms` using the current map-shaped helper contract, and the full validation gates passed.
 
+- Observation: The last structurally significant duplication left in the root VM was the performance-table request/signature assembly, not the final `portfolio-vm` map construction itself.
+  Evidence: After extracting `summary`, `chart`, `benchmarks`, `metrics_bridge`, `chart_math`, `equity`, and `volume`, `/hyperopen/src/hyperopen/views/portfolio/vm.cljs` still contained only the performance-model builder plus a few compatibility seams; moving that logic into `/hyperopen/src/hyperopen/views/portfolio/vm/performance.cljs` dropped the root facade to 222 LOC.
+
 ## Decision Log
 
 - Decision: Keep `/hyperopen/src/hyperopen/views/portfolio/vm.cljs` as the stable facade namespace for `portfolio-vm` while moving logic behind focused module seams.
@@ -90,9 +98,13 @@ After this refactor, `/hyperopen/src/hyperopen/views/portfolio/vm.cljs` will rem
   Rationale: `metrics_bridge.cljs` and the new benchmark/chart/summary modules already align cleanly around the map-shaped history contract, so forcing `history.cljs` back to the root's old internals would have increased duplication and widened the migration surface without improving the facade boundary.
   Date/Author: 2026-03-06 / Codex
 
+- Decision: Introduce `/hyperopen/src/hyperopen/views/portfolio/vm/performance.cljs` instead of leaving the performance-table assembly as the last large private block inside `vm.cljs`.
+  Rationale: The final request/signature/metric-column logic is cohesive, already depends on `metrics_bridge.cljs`, and was the last non-trivial algorithmic section keeping the root namespace above “thin facade” status. Extracting it completed the ownership split without changing the public `portfolio-vm` contract.
+  Date/Author: 2026-03-06 / Codex
+
 ## Outcomes & Retrospective
 
-Milestones 1 through 3 are complete. The benchmark selector/cache/context slice now lives in `/hyperopen/src/hyperopen/views/portfolio/vm/benchmarks.cljs`, the metrics worker/runtime slice now lives in `/hyperopen/src/hyperopen/views/portfolio/vm/metrics_bridge.cljs`, the `chart_math`/`volume`/`equity` helpers live canonically in their dedicated modules, and `summary.cljs` plus `chart.cljs` now own the real portfolio summary/chart behavior that had still been duplicated in the root VM. The root facade is down to 476 LOC and no longer owns worker state, cache atoms, summary fallback logic, chart shaping, or account-equity math; the remaining extraction target is the performance-table assembly still embedded in `/hyperopen/src/hyperopen/views/portfolio/vm.cljs`.
+This refactor is complete. Benchmark selector/cache/context ownership lives in `/hyperopen/src/hyperopen/views/portfolio/vm/benchmarks.cljs`, metrics worker/runtime ownership lives in `/hyperopen/src/hyperopen/views/portfolio/vm/metrics_bridge.cljs`, summary/chart/history-facing behavior lives in `/hyperopen/src/hyperopen/views/portfolio/vm/summary.cljs`, `/hyperopen/src/hyperopen/views/portfolio/vm/chart.cljs`, and `/hyperopen/src/hyperopen/views/portfolio/vm/history.cljs`, account-equity and volume ownership lives in `/hyperopen/src/hyperopen/views/portfolio/vm/equity.cljs` plus `/hyperopen/src/hyperopen/views/portfolio/vm/volume.cljs`, and the last performance-table assembly moved into `/hyperopen/src/hyperopen/views/portfolio/vm/performance.cljs`. The root facade now measures 222 LOC, keeps only final `portfolio-vm` composition plus a handful of compatibility seams, and all required validation gates (`npm test`, `npm run check`, `npm run test:websocket`) pass after the full extraction.
 
 ## Context and Orientation
 

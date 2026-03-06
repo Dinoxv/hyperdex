@@ -187,6 +187,7 @@
             [hyperopen.views.portfolio.vm.history-test]
             [hyperopen.views.portfolio.vm.metrics-bridge-helpers-test]
             [hyperopen.views.portfolio.vm.metrics-bridge-test]
+            [hyperopen.views.portfolio.vm.performance-helpers-test]
             [hyperopen.views.portfolio.vm.summary-helpers-test]
             [hyperopen.views.portfolio.vm.summary-test]
             [hyperopen.views.portfolio.vm.volume-helpers-test]
@@ -474,6 +475,7 @@
              'hyperopen.views.portfolio.vm.history-test
              'hyperopen.views.portfolio.vm.metrics-bridge-helpers-test
              'hyperopen.views.portfolio.vm.metrics-bridge-test
+             'hyperopen.views.portfolio.vm.performance-helpers-test
              'hyperopen.views.portfolio.vm.summary-helpers-test
              'hyperopen.views.portfolio.vm.summary-test
              'hyperopen.views.portfolio.vm.volume-helpers-test
