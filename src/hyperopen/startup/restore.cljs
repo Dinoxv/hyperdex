@@ -2,6 +2,7 @@
   (:require [clojure.string :as str]
             [hyperopen.i18n.locale :as i18n-locale]
             [hyperopen.account.context :as account-context]
+            [hyperopen.account.spectate-mode-links :as spectate-mode-links]
             [hyperopen.platform :as platform]
             [hyperopen.wallet.agent-session :as agent-session]))
 
@@ -107,6 +108,25 @@
                  (assoc-in [:account-context :spectate-ui :label] "")
                  (assoc-in [:account-context :spectate-ui :editing-watchlist-address] nil)
                  (assoc-in [:account-context :spectate-ui :search-error] nil))))))
+
+(defn restore-spectate-mode-url!
+  ([store]
+   (restore-spectate-mode-url! store
+                               (some-> js/globalThis .-location .-search)
+                               (platform/now-ms)))
+  ([store search now-ms]
+   (when-let [address (spectate-mode-links/spectate-address-from-search search)]
+     (swap! store
+            (fn [state]
+              (-> state
+                  (assoc-in [:account-context :spectate-mode :active?] true)
+                  (assoc-in [:account-context :spectate-mode :address] address)
+                  (assoc-in [:account-context :spectate-mode :started-at-ms] now-ms)
+                  (assoc-in [:account-context :spectate-ui :search] address)
+                  (assoc-in [:account-context :spectate-ui :last-search] address)
+                  (assoc-in [:account-context :spectate-ui :label] "")
+                  (assoc-in [:account-context :spectate-ui :editing-watchlist-address] nil)
+                  (assoc-in [:account-context :spectate-ui :search-error] nil)))))))
 
 (defn restore-active-asset!
   [store {:keys [connected?-fn dispatch! load-active-market-display-fn]}]

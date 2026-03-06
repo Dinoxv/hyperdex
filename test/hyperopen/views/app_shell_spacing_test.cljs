@@ -377,7 +377,7 @@
         view-node (app-view/app-view (assoc trade-view-test-state
                                             :router {:path "/trade"}
                                             :wallet {:copy-feedback {:kind :success
-                                                                     :message "Address copied to clipboard"}}
+                                                                     :message "Spectate link copied to clipboard"}}
                                             :account-context {:spectate-mode {:active? true
                                                                            :address address}
                                                               :spectate-ui {:modal-open? true
@@ -407,9 +407,9 @@
         edit-button (find-first-node view-node
                                      #(= "spectate-mode-watchlist-edit"
                                          (get-in % [1 :data-role])))
-        link-placeholder-button (find-first-node view-node
-                                                 #(= "spectate-mode-watchlist-link-placeholder"
-                                                     (get-in % [1 :data-role])))
+        link-button (find-first-node view-node
+                                     #(= "spectate-mode-watchlist-link"
+                                         (get-in % [1 :data-role])))
         copy-feedback-row (find-first-node view-node
                                            #(= "spectate-mode-copy-feedback"
                                                (get-in % [1 :data-role])))
@@ -422,7 +422,7 @@
     (is (contains? (set (collect-strings modal-root)) "Currently spectating: "))
     (is (contains? rendered-strings address))
     (is (contains? rendered-strings label))
-    (is (contains? rendered-strings "Address copied to clipboard"))
+    (is (contains? rendered-strings "Spectate link copied to clipboard"))
     (is (some? copy-feedback-row))
     (is (not-any? #(str/starts-with? % "[[:li")
                   rendered-strings))
@@ -434,4 +434,5 @@
            (get-in copy-button [1 :on :click])))
     (is (= [[:actions/edit-spectate-mode-watchlist-address address]]
            (get-in edit-button [1 :on :click])))
-    (is (true? (get-in link-placeholder-button [1 :disabled])))))
+    (is (= [[:actions/copy-spectate-mode-watchlist-link address]]
+           (get-in link-button [1 :on :click])))))

@@ -143,6 +143,10 @@
 
 (def make-copy-wallet-address wallet-adapters/make-copy-wallet-address)
 
+(def copy-spectate-link wallet-adapters/copy-spectate-link)
+
+(def make-copy-spectate-link wallet-adapters/make-copy-spectate-link)
+
 (def make-reconnect-websocket ws-adapters/make-reconnect-websocket)
 
 (def reconnect-websocket ws-adapters/reconnect-websocket)

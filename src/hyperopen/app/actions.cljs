@@ -35,6 +35,7 @@
                 :edit-spectate-mode-watchlist-address action-adapters/edit-spectate-mode-watchlist-address
                 :clear-spectate-mode-watchlist-edit action-adapters/clear-spectate-mode-watchlist-edit
                 :copy-spectate-mode-watchlist-address action-adapters/copy-spectate-mode-watchlist-address
+                :copy-spectate-mode-watchlist-link action-adapters/copy-spectate-mode-watchlist-link
                 :start-spectate-mode-watchlist-address action-adapters/start-spectate-mode-watchlist-address}
    :orders {:load-user-data action-adapters/load-user-data
             :set-funding-modal action-adapters/set-funding-modal}})

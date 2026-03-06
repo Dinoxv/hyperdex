@@ -386,6 +386,11 @@
           {:phase :test})))
   (is (= ["0x123"]
          (contracts/assert-action-args!
+          :actions/copy-spectate-mode-watchlist-link
+          ["0x123"]
+          {:phase :test})))
+  (is (= ["0x123"]
+         (contracts/assert-action-args!
           :actions/start-spectate-mode-watchlist-address
           ["0x123"]
           {:phase :test}))))

@@ -33,6 +33,7 @@
       :restore-vaults-snapshot-range! (record-store-call :restore-vaults-snapshot-range)
       :restore-agent-storage-mode! (record-store-call :restore-agent-storage-mode)
       :restore-spectate-mode-preferences! (record-store-call :restore-spectate-mode-preferences)
+      :restore-spectate-mode-url! (record-store-call :restore-spectate-mode-url)
       :restore-active-asset! (record-store-call :restore-active-asset)
       :restore-asset-selector-markets-cache! (record-store-call :restore-selector-markets-cache)
       :restore-open-orders-sort-settings! (record-store-call :restore-open-orders-sort)
@@ -67,6 +68,7 @@
             [:restore-vaults-snapshot-range true]
             [:restore-agent-storage-mode true]
             [:restore-spectate-mode-preferences true]
+            [:restore-spectate-mode-url true]
             [:restore-active-asset true]
             [:restore-selector-markets-cache true]
             [:restore-open-orders-sort true]

@@ -168,6 +168,7 @@
    :edit-spectate-mode-watchlist-address spectate-mode-actions/edit-spectate-mode-watchlist-address
    :clear-spectate-mode-watchlist-edit spectate-mode-actions/clear-spectate-mode-watchlist-edit
    :copy-spectate-mode-watchlist-address spectate-mode-actions/copy-spectate-mode-watchlist-address
+   :copy-spectate-mode-watchlist-link spectate-mode-actions/copy-spectate-mode-watchlist-link
    :start-spectate-mode-watchlist-address spectate-mode-actions/start-spectate-mode-watchlist-address})
 
 (defn- order-action-deps []

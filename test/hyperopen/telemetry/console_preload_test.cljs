@@ -15,8 +15,8 @@
         ids ((aget api "registeredActionIds"))
         ids* (js->clj ids)]
     (is (array? ids))
-    (is (some #{":actions/start-ghost-mode"} ids*))
-    (is (some #{":actions/stop-ghost-mode"} ids*))
+    (is (some #{":actions/start-spectate-mode"} ids*))
+    (is (some #{":actions/stop-spectate-mode"} ids*))
     (is (= ids* (sort ids*)))))
 
 (deftest dispatch-api-normalizes-supported-action-id-strings-and-delegates-test
@@ -27,17 +27,17 @@
                                  (swap! dispatched conj [runtime-store event actions]))]
       (let [api (@#'console-preload/debug-api)
             dispatch! (aget api "dispatch")
-            start-result (dispatch! #js [":actions/start-ghost-mode" "0xabc"])
-            stop-result (dispatch! #js ["actions/stop-ghost-mode"])]
-        (is (= [[store nil [[:actions/start-ghost-mode "0xabc"]]]
-                [store nil [[:actions/stop-ghost-mode]]]]
+            start-result (dispatch! #js [":actions/start-spectate-mode" "0xabc"])
+            stop-result (dispatch! #js ["actions/stop-spectate-mode"])]
+        (is (= [[store nil [[:actions/start-spectate-mode "0xabc"]]]
+                [store nil [[:actions/stop-spectate-mode]]]]
                @dispatched))
         (is (= {:dispatched true
-                :actionId ":actions/start-ghost-mode"
+                :actionId ":actions/start-spectate-mode"
                 :argCount 1}
                (js->clj start-result :keywordize-keys true)))
         (is (= {:dispatched true
-                :actionId ":actions/stop-ghost-mode"
+                :actionId ":actions/stop-spectate-mode"
                 :argCount 0}
                (js->clj stop-result :keywordize-keys true)))))))
 

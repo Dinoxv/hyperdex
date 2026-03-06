@@ -216,3 +216,37 @@
            (get-in @store [:wallet :copy-feedback :message])))
     (is (= 1 @schedule-calls))
     (is (= 1 (count @logs)))))
+
+(deftest copy-spectate-link-sets-success-feedback-when-clipboard-write-succeeds-test
+  (async done
+    (let [written (atom nil)
+          schedule-calls (atom 0)
+          clear-timeout-calls (atom 0)
+          store (atom {:wallet {:copy-feedback nil}})
+          clipboard #js {:writeText (fn [payload]
+                                      (reset! written payload)
+                                      (js/Promise.resolve true))}]
+      (copy-runtime/copy-spectate-link!
+       {:store store
+        :url "https://app.hyperopen.test/trade?spectate=0xabcdefabcdefabcdefabcdefabcdefabcdefabcd"
+        :set-wallet-copy-feedback! set-feedback!
+        :clear-wallet-copy-feedback! clear-feedback!
+        :clear-wallet-copy-feedback-timeout! (fn []
+                                               (swap! clear-timeout-calls inc))
+        :schedule-wallet-copy-feedback-clear! (fn [_]
+                                                (swap! schedule-calls inc))
+        :log-fn (fn [& _] nil)
+        :clipboard clipboard})
+      (js/setTimeout
+       (fn []
+         (try
+           (is (= "https://app.hyperopen.test/trade?spectate=0xabcdefabcdefabcdefabcdefabcdefabcdefabcd"
+                  @written))
+           (is (= :success (get-in @store [:wallet :copy-feedback :kind])))
+           (is (= "Spectate link copied to clipboard"
+                  (get-in @store [:wallet :copy-feedback :message])))
+           (is (= 1 @clear-timeout-calls))
+           (is (= 1 @schedule-calls))
+           (finally
+             (done))))
+       0))))

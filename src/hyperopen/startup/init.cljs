@@ -23,6 +23,7 @@
            restore-vaults-snapshot-range!
            restore-agent-storage-mode!
            restore-spectate-mode-preferences!
+           restore-spectate-mode-url!
            restore-active-asset!
            restore-asset-selector-markets-cache!
            restore-open-orders-sort-settings!
@@ -47,6 +48,8 @@
   (restore-agent-storage-mode! store)
   ;; Restore Spectate Mode watchlist and last-used modal search preference.
   (restore-spectate-mode-preferences! store)
+  ;; Restore Spectate Mode directly from the current URL query when present.
+  (restore-spectate-mode-url! store)
   ;; Restore selected asset from localStorage (default to BTC).
   (restore-active-asset! store)
   ;; Restore cached selector market symbols for immediate dropdown population.

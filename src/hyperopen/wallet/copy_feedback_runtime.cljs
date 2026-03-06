@@ -46,9 +46,13 @@
   (or clipboard
       (some-> js/globalThis .-navigator .-clipboard)))
 
-(defn copy-wallet-address!
+(defn- copy-text!
   [{:keys [store
-           address
+           text
+           missing-message
+           success-message
+           failure-message
+           log-label
            set-wallet-copy-feedback!
            clear-wallet-copy-feedback!
            clear-wallet-copy-feedback-timeout!
@@ -60,9 +64,9 @@
     (clear-wallet-copy-feedback! store)
     (clear-wallet-copy-feedback-timeout!)
     (cond
-      (not (seq address))
+      (not (seq text))
       (do
-        (set-wallet-copy-feedback! store :error "No address to copy")
+        (set-wallet-copy-feedback! store :error missing-message)
         (schedule-wallet-copy-feedback-clear! store))
 
       (not (and clipboard* write-text-fn))
@@ -72,15 +76,33 @@
 
       :else
       (try
-        (-> (.writeText clipboard* address)
+        (-> (.writeText clipboard* text)
             (.then (fn []
-                     (set-wallet-copy-feedback! store :success "Address copied to clipboard")
+                     (set-wallet-copy-feedback! store :success success-message)
                      (schedule-wallet-copy-feedback-clear! store)))
             (.catch (fn [err]
-                      (log-fn "Copy wallet address failed:" err)
-                      (set-wallet-copy-feedback! store :error "Couldn't copy address")
+                      (log-fn log-label err)
+                      (set-wallet-copy-feedback! store :error failure-message)
                       (schedule-wallet-copy-feedback-clear! store))))
         (catch :default err
-          (log-fn "Copy wallet address failed:" err)
-          (set-wallet-copy-feedback! store :error "Couldn't copy address")
+          (log-fn log-label err)
+          (set-wallet-copy-feedback! store :error failure-message)
           (schedule-wallet-copy-feedback-clear! store))))))
+
+(defn copy-wallet-address!
+  [{:keys [address] :as opts}]
+  (copy-text! (assoc opts
+                     :text address
+                     :missing-message "No address to copy"
+                     :success-message "Address copied to clipboard"
+                     :failure-message "Couldn't copy address"
+                     :log-label "Copy wallet address failed:")))
+
+(defn copy-spectate-link!
+  [{:keys [url] :as opts}]
+  (copy-text! (assoc opts
+                     :text url
+                     :missing-message "No spectate link to copy"
+                     :success-message "Spectate link copied to clipboard"
+                     :failure-message "Couldn't copy spectate link"
+                     :log-label "Copy spectate link failed:")))

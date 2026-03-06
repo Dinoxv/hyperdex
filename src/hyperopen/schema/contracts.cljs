@@ -126,6 +126,7 @@
 (s/def ::storage-args (s/tuple ::non-empty-string any?))
 (s/def ::queue-asset-icon-status-args (s/tuple ::asset-icon-status))
 (s/def ::path-args (s/tuple ::non-empty-string))
+(s/def ::path-and-address-args (s/tuple ::non-empty-string ::non-empty-string))
 (s/def ::coin-args (s/tuple ::non-empty-string))
 (s/def ::address-args (s/tuple ::non-empty-string))
 (s/def ::optional-address-args (s/tuple (s/nilable ::non-empty-string)))
@@ -344,6 +345,7 @@
    :actions/edit-spectate-mode-watchlist-address ::address-args
    :actions/clear-spectate-mode-watchlist-edit ::no-args
    :actions/copy-spectate-mode-watchlist-address ::address-args
+   :actions/copy-spectate-mode-watchlist-link ::address-args
    :actions/start-spectate-mode-watchlist-address ::address-args
    :actions/enable-agent-trading ::no-args
    :actions/set-agent-storage-mode ::set-agent-storage-mode-args
@@ -607,6 +609,7 @@
    :effects/enable-agent-trading ::enable-agent-trading-args
    :effects/set-agent-storage-mode ::set-agent-storage-mode-args
    :effects/copy-wallet-address ::optional-address-args
+   :effects/copy-spectate-link ::path-and-address-args
    :effects/reconnect-websocket ::no-args
    :effects/refresh-websocket-health ::no-args
    :effects/confirm-ws-diagnostics-reveal ::no-args

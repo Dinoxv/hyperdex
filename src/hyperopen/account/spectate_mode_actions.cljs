@@ -1,6 +1,7 @@
 (ns hyperopen.account.spectate-mode-actions
   (:require [clojure.string :as str]
             [hyperopen.account.context :as account-context]
+            [hyperopen.account.spectate-mode-links :as spectate-mode-links]
             [hyperopen.platform :as platform]))
 
 (def ^:private invalid-address-error
@@ -62,6 +63,11 @@
   [state]
   (account-context/normalize-watchlist
    (get-in state [:account-context :watchlist])))
+
+(defn- current-route-path
+  [state]
+  (or (get-in state [:router :path])
+      "/trade"))
 
 (defn- persist-watchlist-effects
   [watchlist*]
@@ -136,6 +142,10 @@
                                   [[:account-context :spectate-ui :editing-watchlist-address] nil]
                                   [[:account-context :spectate-ui :search-error] nil]
                                   [[:account-context :watchlist] watchlist*]]]
+             [:effects/replace-state
+              (spectate-mode-links/spectate-url-path
+               (current-route-path state)
+               address*)]
              [:effects/local-storage-set
               account-context/spectate-last-search-storage-key
               address*]]
@@ -143,7 +153,7 @@
     [[:effects/save [:account-context :spectate-ui :search-error] invalid-address-error]]))
 
 (defn stop-spectate-mode
-  [_state]
+  [state]
   [[:effects/save-many [[[:account-context :spectate-mode :active?] false]
                         [[:account-context :spectate-mode :address] nil]
                         [[:account-context :spectate-mode :started-at-ms] nil]
@@ -151,7 +161,11 @@
                         [[:account-context :spectate-ui :anchor] nil]
                         [[:account-context :spectate-ui :label] ""]
                         [[:account-context :spectate-ui :editing-watchlist-address] nil]
-                        [[:account-context :spectate-ui :search-error] nil]]]])
+                        [[:account-context :spectate-ui :search-error] nil]]]
+   [:effects/replace-state
+    (spectate-mode-links/spectate-url-path
+     (current-route-path state)
+     nil)]])
 
 (defn add-spectate-mode-watchlist-address
   [state & [address]]
@@ -212,6 +226,14 @@
   [_state address]
   (if-let [address* (account-context/normalize-address address)]
     [[:effects/copy-wallet-address address*]]
+    []))
+
+(defn copy-spectate-mode-watchlist-link
+  [state address]
+  (if-let [address* (account-context/normalize-address address)]
+    [[:effects/copy-spectate-link
+      (current-route-path state)
+      address*]]
     []))
 
 (defn start-spectate-mode-watchlist-address

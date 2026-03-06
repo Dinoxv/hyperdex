@@ -333,10 +333,10 @@
         :data-role "spectate-mode-watchlist-copy"}
        (copy-icon))
       (watchlist-action-icon-button
-       {:aria-label "Link feature coming soon"
-        :title "Link address (coming soon)"
-        :data-role "spectate-mode-watchlist-link-placeholder"
-        :disabled? true}
+       {:aria-label "Copy spectate link"
+        :title "Link address"
+        :on-click [[:actions/copy-spectate-mode-watchlist-link address]]
+        :data-role "spectate-mode-watchlist-link"}
        (link-icon))
       (watchlist-action-icon-button
        {:aria-label "Edit watchlist label"

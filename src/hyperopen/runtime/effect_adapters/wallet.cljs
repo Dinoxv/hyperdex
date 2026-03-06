@@ -1,5 +1,6 @@
 (ns hyperopen.runtime.effect-adapters.wallet
-  (:require [hyperopen.platform :as platform]
+  (:require [hyperopen.account.spectate-mode-links :as spectate-mode-links]
+            [hyperopen.platform :as platform]
             [hyperopen.runtime.state :as runtime-state]
             [hyperopen.telemetry :as telemetry]
             [hyperopen.wallet.agent-runtime :as agent-runtime]
@@ -67,6 +68,24 @@
   [runtime]
   (fn [ctx store address]
     (copy-wallet-address runtime ctx store address)))
+
+(defn copy-spectate-link
+  ([_ store path address]
+   (copy-spectate-link runtime-state/runtime nil store path address))
+  ([runtime _ store path address]
+   (wallet-copy-runtime/copy-spectate-link!
+    {:store store
+     :url (spectate-mode-links/spectate-url path address)
+     :set-wallet-copy-feedback! set-wallet-copy-feedback!
+     :clear-wallet-copy-feedback! clear-wallet-copy-feedback!
+     :clear-wallet-copy-feedback-timeout! #(clear-wallet-copy-feedback-timeout! runtime)
+     :schedule-wallet-copy-feedback-clear! #(schedule-wallet-copy-feedback-clear! runtime %)
+     :log-fn telemetry/log!})))
+
+(defn make-copy-spectate-link
+  [runtime]
+  (fn [ctx store path address]
+    (copy-spectate-link runtime ctx store path address)))
 
 (defn disconnect-wallet
   [runtime store {:keys [clear-order-feedback-toast-timeout!

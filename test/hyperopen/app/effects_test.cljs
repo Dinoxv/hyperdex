@@ -9,6 +9,7 @@
         refresh-handler (fn [& _] nil)
         disconnect-handler (fn [& _] nil)
         copy-handler (fn [& _] nil)
+        copy-link-handler (fn [& _] nil)
         submit-handler (fn [& _] nil)
         cancel-handler (fn [& _] nil)
         margin-handler (fn [& _] nil)]
@@ -28,6 +29,10 @@
                   (fn [runtime*]
                     (is (identical? runtime runtime*))
                     copy-handler)
+                  effect-adapters/make-copy-spectate-link
+                  (fn [runtime*]
+                    (is (identical? runtime runtime*))
+                    copy-link-handler)
                   effect-adapters/make-api-submit-order
                   (fn [runtime*]
                     (is (identical? runtime runtime*))
@@ -51,6 +56,8 @@
                         (get-in deps [:wallet :disconnect-wallet])))
         (is (identical? copy-handler
                         (get-in deps [:wallet :copy-wallet-address])))
+        (is (identical? copy-link-handler
+                        (get-in deps [:wallet :copy-spectate-link])))
         (is (identical? effect-adapters/api-fetch-predicted-fundings-effect
                         (get-in deps [:api :api-fetch-predicted-fundings])))
         (is (identical? submit-handler

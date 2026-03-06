@@ -62,6 +62,8 @@
                                                                     :label nil}
                                                                    {:address spectated-address
                                                                     :label "Assistance"}]]]]
+              [:effects/replace-state
+               "/trade?spectate=0xabcdefabcdefabcdefabcdefabcdefabcdefabcd"]
               [:effects/local-storage-set "spectate-mode-last-search:v1" spectated-address]
               [:effects/local-storage-set-json "spectate-mode-watchlist:v1" [{:address secondary-address
                                                                             :label nil}
@@ -143,6 +145,12 @@
             {}
             spectated-address)))))
 
+(deftest copy-spectate-mode-watchlist-link-emits-current-route-and_address-test
+  (is (= [[:effects/copy-spectate-link "/portfolio" spectated-address]]
+         (spectate-mode-actions/copy-spectate-mode-watchlist-link
+          {:router {:path "/portfolio"}}
+          spectated-address))))
+
 (deftest stop-and-spectate-actions-clear-or-ignore-as-expected-test
   (is (= [[:effects/save-many [[[:account-context :spectate-mode :active?] false]
                                [[:account-context :spectate-mode :address] nil]
@@ -151,7 +159,8 @@
                                [[:account-context :spectate-ui :anchor] nil]
                                [[:account-context :spectate-ui :label] ""]
                                [[:account-context :spectate-ui :editing-watchlist-address] nil]
-                               [[:account-context :spectate-ui :search-error] nil]]]]
+                               [[:account-context :spectate-ui :search-error] nil]]]
+            [:effects/replace-state "/trade"]]
          (spectate-mode-actions/stop-spectate-mode {})))
   (is (= []
          (spectate-mode-actions/start-spectate-mode-watchlist-address {} " "))))

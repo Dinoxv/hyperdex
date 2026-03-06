@@ -97,6 +97,17 @@
                                        "/portfolio")))
       (is (= 0 @chart-bootstrap-calls)))))
 
+(deftest navigate-preserves-spectate-query-when-spectate-mode-is-active-test
+  (with-redefs [portfolio-actions/select-portfolio-chart-tab (fn [_state _tab] [])
+                vault-actions/load-vault-route (fn [_state _path] [])
+                funding-comparison-actions/load-funding-comparison-route (fn [_state _path] [])]
+    (is (= [[:effects/save [:router :path] "/portfolio"]
+            [:effects/push-state "/portfolio?spectate=0xabcdefabcdefabcdefabcdefabcdefabcdefabcd"]]
+           (action-adapters/navigate {:router {:path "/trade"}
+                                      :account-context {:spectate-mode {:active? true
+                                                                        :address "0xabcdefabcdefabcdefabcdefabcdefabcdefabcd"}}}
+                                     "/portfolio")))))
+
 (deftest handle-wallet-connected-refreshes-vault-route-when-active-test
   (let [dispatch-calls (atom [])]
     (with-redefs [wallet-connection-runtime/handle-wallet-connected!

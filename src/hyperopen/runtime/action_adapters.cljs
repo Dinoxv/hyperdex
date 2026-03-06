@@ -1,6 +1,8 @@
 (ns hyperopen.runtime.action-adapters
   (:require [clojure.string :as str]
             [nexus.registry :as nxr]
+            [hyperopen.account.context :as account-context]
+            [hyperopen.account.spectate-mode-links :as spectate-mode-links]
             [hyperopen.account.spectate-mode-actions :as spectate-mode-actions]
             [hyperopen.funding.actions :as funding-actions]
             [hyperopen.platform :as platform]
@@ -82,6 +84,10 @@
   [state address]
   (spectate-mode-actions/copy-spectate-mode-watchlist-address state address))
 
+(defn copy-spectate-mode-watchlist-link
+  [state address]
+  (spectate-mode-actions/copy-spectate-mode-watchlist-link state address))
+
 (defn start-spectate-mode-watchlist-address
   [state address]
   (spectate-mode-actions/start-spectate-mode-watchlist-address state address))
@@ -115,13 +121,21 @@
      (get-in state [:portfolio-ui :chart-tab]))
     []))
 
+(defn- navigation-browser-path
+  [state normalized-path]
+  (spectate-mode-links/spectate-url-path
+   normalized-path
+   (when (account-context/spectate-mode-active? state)
+     (account-context/spectate-address state))))
+
 (defn navigate
   [state path & [opts]]
   (let [p (router/normalize-path path)
         replace? (boolean (:replace? opts))
+        browser-path (navigation-browser-path state p)
         base-effects (cond-> [[:effects/save [:router :path] p]]
-                       replace? (conj [:effects/replace-state p])
-                       (not replace?) (conj [:effects/push-state p]))
+                       replace? (conj [:effects/replace-state browser-path])
+                       (not replace?) (conj [:effects/push-state browser-path]))
         route-effects (into []
                             (concat (vault-actions/load-vault-route state p)
                                     (funding-comparison-actions/load-funding-comparison-route state p)))

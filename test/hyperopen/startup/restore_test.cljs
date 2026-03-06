@@ -153,3 +153,38 @@
              (get-in @store [:account-context :spectate-ui :search])))
       (is (empty? @set-calls))
       (is (empty? @remove-calls)))))
+
+(deftest restore-spectate-mode-url-activates-spectate-without-mutating-watchlist-test
+  (let [store (atom {:account-context {:spectate-mode {:active? false
+                                                       :address nil
+                                                       :started-at-ms nil}
+                                       :spectate-ui {:search "0x1111111111111111111111111111111111111111"
+                                                     :last-search "0x1111111111111111111111111111111111111111"
+                                                     :label "Existing"
+                                                     :editing-watchlist-address "0x1111111111111111111111111111111111111111"
+                                                     :search-error "old"}
+                                       :watchlist [{:address "0xaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+                                                    :label "Core"}]
+                                       :watchlist-loaded? true}})]
+    (startup-restore/restore-spectate-mode-url!
+     store
+     "?spectate=0xABCDEFABCDEFABCDEFABCDEFABCDEFABCDEFABCD"
+     1710000000000)
+    (is (= true (get-in @store [:account-context :spectate-mode :active?])))
+    (is (= "0xabcdefabcdefabcdefabcdefabcdefabcdefabcd"
+           (get-in @store [:account-context :spectate-mode :address])))
+    (is (= 1710000000000
+           (get-in @store [:account-context :spectate-mode :started-at-ms])))
+    (is (= "0xabcdefabcdefabcdefabcdefabcdefabcdefabcd"
+           (get-in @store [:account-context :spectate-ui :search])))
+    (is (= "0xabcdefabcdefabcdefabcdefabcdefabcdefabcd"
+           (get-in @store [:account-context :spectate-ui :last-search])))
+    (is (= [{:address "0xaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+             :label "Core"}]
+           (get-in @store [:account-context :watchlist])))))
+
+(deftest restore-spectate-mode-url-ignores-invalid-query-values-test
+  (let [store (atom {:account-context (account-context/default-account-context-state)})]
+    (startup-restore/restore-spectate-mode-url! store "?spectate=not-an-address" 1710000000000)
+    (is (= false (get-in @store [:account-context :spectate-mode :active?])))
+    (is (nil? (get-in @store [:account-context :spectate-mode :address])))))

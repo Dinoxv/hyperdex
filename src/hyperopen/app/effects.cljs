@@ -31,7 +31,8 @@
             :disconnect-wallet (effect-adapters/make-disconnect-wallet runtime)
             :enable-agent-trading action-adapters/enable-agent-trading
             :set-agent-storage-mode effect-adapters/set-agent-storage-mode
-            :copy-wallet-address (effect-adapters/make-copy-wallet-address runtime)}
+            :copy-wallet-address (effect-adapters/make-copy-wallet-address runtime)
+            :copy-spectate-link (effect-adapters/make-copy-spectate-link runtime)}
    :diagnostics {:confirm-ws-diagnostics-reveal effect-adapters/confirm-ws-diagnostics-reveal
                  :copy-websocket-diagnostics effect-adapters/copy-websocket-diagnostics
                  :ws-reset-subscriptions effect-adapters/ws-reset-subscriptions}
