@@ -64,7 +64,8 @@
                          "z-40"
                          "hidden"
                          "cursor-default"
-                         "peer-checked:block"]}]
+                         "peer-checked:block"]
+                 :on {:click [[:actions/set-funding-tooltip-visible pin-id* false]]}}]
         [:label {:for pin-id*
                  :class ["relative" "z-50" "inline-flex" "cursor-pointer"]}
          trigger-node]

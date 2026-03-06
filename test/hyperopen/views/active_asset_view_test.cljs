@@ -335,6 +335,17 @@
       (view/active-asset-panel {} false dropdown-state full-state))
     (is (= 144 (:scroll-top @captured-props)))))
 
+(deftest tooltip-click-pinnable-dismiss-target-clears-visible-state-test
+  (let [pin-id (funding-tooltip-pin-id "BTC")
+        tooltip-node (view/tooltip [[:span "Funding"] [:div "Body"]]
+                                   "top"
+                                   {:click-pinnable? true
+                                    :pin-id pin-id
+                                    :pinned? true})
+        dismiss-label (nth tooltip-node 3)]
+    (is (= [[:actions/set-funding-tooltip-visible pin-id false]]
+           (get-in dismiss-label [1 :on :click])))))
+
 (deftest active-asset-row-skips-funding-tooltip-derivation-when-closed-test
   (let [ctx-data {:coin "xyz:GOLD"
                   :mark 5000.0
