@@ -1,6 +1,7 @@
 (ns hyperopen.views.active-asset-view-test
   (:require [clojure.string :as str]
             [cljs.test :refer-macros [deftest is]]
+            [hyperopen.system :as app-system]
             [hyperopen.views.active-asset-view :as view]))
 
 (defn- collect-strings [node]
@@ -89,6 +90,22 @@
               []))]
     (vec (walk node))))
 
+(defn- fake-image-node
+  [{:keys [complete? natural-width]}]
+  (let [listeners (atom {})
+        removed-listeners (atom [])]
+    {:node (doto (js-obj)
+             (aset "complete" (boolean complete?))
+             (aset "naturalWidth" (or natural-width 0))
+             (aset "addEventListener"
+                   (fn [event handler]
+                     (swap! listeners assoc event handler)))
+             (aset "removeEventListener"
+                   (fn [event handler]
+                     (swap! removed-listeners conj [event handler]))))
+     :listeners listeners
+     :removed-listeners removed-listeners}))
+
 (defn- funding-tooltip-pin-id
   [coin]
   (str "funding-rate-tooltip-pin-"
@@ -155,14 +172,19 @@
         img-classes (->> img-attrs
                          (mapcat #(class-values (:class %)))
                          set)
+        icon-layer (first (find-nodes-with-style-key icon-node :background-image))
+        background-image (get-in icon-layer [1 :style :background-image])
         strings (set (collect-strings icon-node))
         path-ds (set (collect-path-ds icon-node))]
     (is (not (contains? strings "HYPE")))
     (is (contains? img-srcs "https://app.hyperliquid.xyz/coins/HYPE_spot.svg"))
     (is (not (contains? img-classes "bg-white")))
+    (is (contains? img-classes "opacity-0"))
+    (is (= "url('https://app.hyperliquid.xyz/coins/HYPE_spot.svg')"
+           background-image))
     (is (contains? path-ds "M19 9l-7 7-7-7"))))
 
-(deftest asset-icon-renders-visible-image-immediately-and-wires-load-events-test
+(deftest asset-icon-renders-neutral-surface-while-probing-and-registers-render-hook-test
   (let [market {:key "perp:BTC"
                 :coin "BTC"
                 :symbol "BTC-USDC"
@@ -172,13 +194,62 @@
         img-node (first (find-img-nodes icon-node))
         attrs (second img-node)
         classes (set (class-values (:class attrs)))
+        icon-layer (first (find-nodes-with-style-key icon-node :background-image))
+        background-image (get-in icon-layer [1 :style :background-image])
         strings (set (collect-strings icon-node))]
     (is (some? img-node))
     (is (not (contains? strings "BTC")))
     (is (not (contains? classes "bg-white")))
-    (is (not (contains? classes "opacity-0")))
-    (is (= [[:actions/mark-loaded-asset-icon "perp:BTC"]]
-           (get-in attrs [:on :load])))))
+    (is (contains? classes "opacity-0"))
+    (is (= "url('https://app.hyperliquid.xyz/coins/BTC.svg')"
+           background-image))
+    (is (fn? (:replicant/on-render attrs)))))
+
+(deftest asset-icon-probe-hook-dispatches-loaded-for-complete-images-test
+  (let [market {:key "perp:BTC"
+                :coin "BTC"
+                :symbol "BTC-USDC"
+                :base "BTC"
+                :market-type :perp}
+        icon-node (view/asset-icon market false #{} #{})
+        probe-attrs (-> icon-node find-img-nodes first second)
+        on-render (:replicant/on-render probe-attrs)
+        remembered (atom nil)
+        store (atom {:asset-selector {:loaded-icons #{}
+                                      :missing-icons #{}}})
+        {node :node listeners :listeners} (fake-image-node {:complete? true
+                                                            :natural-width 48})]
+    (with-redefs [app-system/store store]
+      (on-render {:replicant/life-cycle :replicant.life-cycle/mount
+                  :replicant/node node
+                  :replicant/remember (fn [memory]
+                                        (reset! remembered memory))}))
+    (is (contains? @listeners "load"))
+    (is (contains? @listeners "error"))
+    (is (= #{"perp:BTC"} (get-in @store [:asset-selector :loaded-icons])))
+    (is (= #{} (get-in @store [:asset-selector :missing-icons])))
+    (is (= "https://app.hyperliquid.xyz/coins/BTC.svg"
+           (:src @remembered)))))
+
+(deftest asset-icon-probe-hook-dispatches-missing-for-complete-broken-images-test
+  (let [market {:key "perp:BTC"
+                :coin "BTC"
+                :symbol "BTC-USDC"
+                :base "BTC"
+                :market-type :perp}
+        icon-node (view/asset-icon market false #{} #{})
+        probe-attrs (-> icon-node find-img-nodes first second)
+        on-render (:replicant/on-render probe-attrs)
+        store (atom {:asset-selector {:loaded-icons #{}
+                                      :missing-icons #{}}})
+        {node :node} (fake-image-node {:complete? true
+                                       :natural-width 0})]
+    (with-redefs [app-system/store store]
+      (on-render {:replicant/life-cycle :replicant.life-cycle/mount
+                  :replicant/node node
+                  :replicant/remember (fn [_] nil)}))
+    (is (= #{} (get-in @store [:asset-selector :loaded-icons])))
+    (is (= #{"perp:BTC"} (get-in @store [:asset-selector :missing-icons])))))
 
 (deftest asset-icon-renders-visible-image-when-icon-is-marked-loaded-test
   (let [market {:key "perp:BTC"
@@ -197,6 +268,7 @@
            (:src attrs)))
     (is (contains? classes "object-contain"))
     (is (not (contains? classes "bg-white")))
+    (is (not (contains? classes "opacity-0")))
     (is (not (contains? strings "BTC")))
     (is (empty? (find-nodes-with-style-key icon-node :background-image)))))
 

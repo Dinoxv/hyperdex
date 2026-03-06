@@ -1,7 +1,9 @@
 (ns hyperopen.views.active-asset-view
   (:require [clojure.string :as str]
+            [hyperopen.asset-selector.actions :as asset-actions]
             [hyperopen.asset-selector.markets :as markets]
             [hyperopen.state.trading :as trading-state]
+            [hyperopen.system :as app-system]
             [hyperopen.utils.formatting :as fmt]
             [hyperopen.utils.parse :as parse-utils]
             [hyperopen.websocket.active-asset-ctx :as active-ctx]
@@ -826,6 +828,78 @@
       :else
       nil)))
 
+(defn- apply-asset-icon-status! [market-key status status*]
+  (when (and (seq market-key)
+             (not= status @status*))
+    (let [{:keys [loaded-icons missing-icons changed?]}
+          (asset-actions/apply-asset-icon-status-updates
+           @app-system/store
+           {market-key status})]
+      (reset! status* status)
+      (when changed?
+        (swap! app-system/store
+               (fn [state]
+                 (-> state
+                     (assoc-in [:asset-selector :loaded-icons] loaded-icons)
+                     (assoc-in [:asset-selector :missing-icons] missing-icons))))))))
+
+(defn- mounted-image-status [node]
+  (let [natural-width (some-> node .-naturalWidth)
+        complete? (boolean (some-> node .-complete))]
+    (cond
+      (and (number? natural-width)
+           (pos? natural-width))
+      :loaded
+
+      (and complete?
+           (number? natural-width)
+           (zero? natural-width))
+      :missing
+
+      :else
+      nil)))
+
+(defn- attach-asset-icon-probe [market-key icon-src]
+  (fn [{:keys [:replicant/life-cycle :replicant/node :replicant/memory :replicant/remember]}]
+    (cond
+      (= life-cycle :replicant.life-cycle/unmount)
+      (when-let [dispose (:dispose memory)]
+        (dispose))
+
+      (contains? #{:replicant.life-cycle/mount
+                   :replicant.life-cycle/update}
+                 life-cycle)
+      (when (seq icon-src)
+        (let [{previous-src :src
+               previous-dispose :dispose
+               status* :status*} (or memory {})
+              status* (or status* (atom nil))
+              listeners-current? (and (some? previous-dispose)
+                                      (= previous-src icon-src))
+              remember! (fn [dispose]
+                          (remember {:src icon-src
+                                     :dispose dispose
+                                     :status* status*}))]
+          (when (and previous-dispose
+                     (not= previous-src icon-src))
+            (previous-dispose))
+          (when-not listeners-current?
+            (let [on-load (fn [_]
+                            (apply-asset-icon-status! market-key :loaded status*))
+                  on-error (fn [_]
+                             (apply-asset-icon-status! market-key :missing status*))
+                  dispose (fn []
+                            (.removeEventListener node "load" on-load)
+                            (.removeEventListener node "error" on-error))]
+              (.addEventListener node "load" on-load)
+              (.addEventListener node "error" on-error)
+              (remember! dispose)))
+          (when-let [status (mounted-image-status node)]
+            (apply-asset-icon-status! market-key status status*))))
+
+      :else
+      nil)))
+
 (defn asset-icon [market dropdown-visible? missing-icons loaded-icons]
   (let [coin (:coin market)
         symbol (or (:symbol market) coin)
@@ -833,17 +907,19 @@
         leverage-label (leverage-chip-label market)
         market-type (:market-type market)
         market-key (or (:key market) (markets/coin->market-key coin))
+        loaded-icon? (contains? loaded-icons market-key)
         missing-icon? (contains? missing-icons market-key)
         icon-src (when-not missing-icon?
                    (asset-icon/market-icon-url market))
-        show-icon? (seq icon-src)
-        show-monogram? (not show-icon?)
+        show-loaded-icon? (and loaded-icon? (seq icon-src))
+        probe-icon? (and (seq icon-src) (not loaded-icon?))
+        show-monogram? missing-icon?
         monogram (symbol-monogram market symbol coin)]
     [:div {:class ["flex" "items-center" "gap-2" "cursor-pointer" "hover:bg-base-300"
                    "rounded" "pr-2" "py-1" "transition-colors" "min-w-0"]
            :on {:click [[:actions/toggle-asset-dropdown :asset-selector]]}}
-     [:div {:class ["w-5" "h-5" "shrink-0" "overflow-hidden" "rounded-full"]}
-      (if show-icon?
+     [:div {:class ["relative" "w-5" "h-5" "shrink-0" "overflow-hidden" "rounded-full"]}
+      (if show-loaded-icon?
         [:img {:class ["block" "w-5" "h-5" "object-contain" "pointer-events-none"]
                :src icon-src
                :alt ""
@@ -855,7 +931,20 @@
                        "font-semibold" "tracking-tight" "uppercase" "leading-none"
                        "flex" "items-center" "justify-center" "px-0.5"]
                :aria-hidden true}
-         monogram])]
+         (when show-monogram?
+           monogram)])
+      (when probe-icon?
+        [:div {:class ["absolute" "inset-0" "rounded-full" "bg-center" "bg-contain"
+                       "bg-no-repeat" "pointer-events-none"]
+               :aria-hidden true
+               :style {:background-image (str "url('" icon-src "')")}}])
+      (when probe-icon?
+        [:img {:class ["absolute" "inset-0" "block" "w-5" "h-5"
+                       "object-contain" "opacity-0" "pointer-events-none"]
+               :src icon-src
+               :alt ""
+               :aria-hidden true
+               :replicant/on-render (attach-asset-icon-probe market-key icon-src)}])]
      [:div.flex.items-center.space-x-2.min-w-0
       [:span.font-medium.truncate symbol]
       (when (= market-type :spot)
