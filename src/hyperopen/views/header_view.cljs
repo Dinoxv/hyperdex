@@ -298,32 +298,92 @@
          :data-role "spectate-mode-trigger-icon"}
    [:path {:d "M237.22,151.9l0-.1a1.42,1.42,0,0,0-.07-.22,48.46,48.46,0,0,0-2.31-5.3L193.27,51.8a8,8,0,0,0-1.67-2.44,32,32,0,0,0-45.26,0A8,8,0,0,0,144,55V80H112V55a8,8,0,0,0-2.34-5.66,32,32,0,0,0-45.26,0,8,8,0,0,0-1.67,2.44L21.2,146.28a48.46,48.46,0,0,0-2.31,5.3,1.72,1.72,0,0,0-.07.21s0,.08,0,.11a48,48,0,0,0,90.32,32.51,47.49,47.49,0,0,0,2.9-16.59V96h32v71.83a47.49,47.49,0,0,0,2.9,16.59,48,48,0,0,0,90.32-32.51Zm-143.15,27a32,32,0,0,1-60.2-21.71l1.81-4.13A32,32,0,0,1,96,167.88V168h0A32,32,0,0,1,94.07,178.94ZM203,198.07A32,32,0,0,1,160,168h0v-.11a32,32,0,0,1,60.32-14.78l1.81,4.13A32,32,0,0,1,203,198.07Z"}]])
 
+(def ^:private spectate-mode-trigger-tooltip-id
+  "spectate-mode-open-tooltip")
+
+(defn- spectate-mode-trigger-tooltip-copy
+  [active?]
+  (if active?
+    "Spectate Mode is active. Click to manage the address you are viewing or stop spectating."
+    "Inspect another wallet in read-only mode. Click to open Spectate Mode and choose an address."))
+
 (defn- spectate-mode-trigger-button
   [active?]
-  [:button {:type "button"
-            :class (into ["inline-flex"
-                          "h-10"
-                          "items-center"
-                          "gap-2"
-                          "rounded-xl"
-                          "border"
-                          "px-3"
-                          "text-sm"
-                          "transition-colors"]
-                         (if active?
-                           ["border-[#2c5d5a]"
-                            "bg-[#0d3a35]"
-                            "text-[#daf3ef]"
-                            "hover:bg-[#115046]"]
-                           ["border-base-300"
-                            "bg-base-100"
-                            "text-white"
-                            "hover:bg-base-200"]))
-            :on {:click [[:actions/open-spectate-mode-modal :event.currentTarget/bounds]]}
-            :data-spectate-mode-trigger "true"
-            :data-role "spectate-mode-open-button"}
-   (spectate-mode-icon)
-   [:span (if active? "Spectating" "Spectate Mode")]])
+  (let [button-label (if active?
+                       "Manage Spectate Mode"
+                       "Open Spectate Mode")
+        tooltip-copy (spectate-mode-trigger-tooltip-copy active?)]
+    [:div {:class ["relative" "inline-flex" "group"]
+           :data-role "spectate-mode-trigger"}
+     [:button {:type "button"
+               :class (into ["inline-flex"
+                             "h-10"
+                             "w-10"
+                             "items-center"
+                             "justify-center"
+                             "rounded-xl"
+                             "border"
+                             "transition-colors"
+                             "focus:outline-none"
+                             "focus:ring-2"
+                             "focus:ring-[#66e3c5]/50"
+                             "focus:ring-offset-0"]
+                            (if active?
+                              ["border-[#2c5d5a]"
+                               "bg-[#0d3a35]"
+                               "text-[#daf3ef]"
+                               "hover:bg-[#115046]"]
+                              ["border-base-300"
+                               "bg-base-100"
+                               "text-white"
+                               "hover:bg-base-200"]))
+               :on {:click [[:actions/open-spectate-mode-modal :event.currentTarget/bounds]]}
+               :title button-label
+               :aria-label button-label
+               :aria-describedby spectate-mode-trigger-tooltip-id
+               :data-spectate-mode-trigger "true"
+               :data-role "spectate-mode-open-button"}
+      (spectate-mode-icon)]
+     [:div {:id spectate-mode-trigger-tooltip-id
+            :role "tooltip"
+            :class ["pointer-events-none"
+                    "absolute"
+                    "right-0"
+                    "top-full"
+                    "z-[260]"
+                    "mt-2"
+                    "w-64"
+                    "translate-y-1"
+                    "rounded-lg"
+                    "border"
+                    "border-[#264b4f]"
+                    "bg-[#0b1619]"
+                    "px-3"
+                    "py-2.5"
+                    "text-left"
+                    "text-xs"
+                    "leading-5"
+                    "text-[#d2e8eb]"
+                    "opacity-0"
+                    "shadow-2xl"
+                    "transition-all"
+                    "duration-150"
+                    "group-hover:translate-y-0"
+                    "group-hover:opacity-100"
+                    "group-focus-within:translate-y-0"
+                    "group-focus-within:opacity-100"]
+            :data-role "spectate-mode-open-tooltip"}
+      [:div {:class ["absolute"
+                     "-top-1.5"
+                     "right-3"
+                     "h-3"
+                     "w-3"
+                     "rotate-45"
+                     "border-l"
+                     "border-t"
+                     "border-[#264b4f]"
+                     "bg-[#0b1619]"]}]
+      tooltip-copy]]))
 
 (defn- wallet-control [wallet-state spectate-mode]
   (let [is-connected (boolean (:connected? wallet-state))

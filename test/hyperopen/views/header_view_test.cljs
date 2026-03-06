@@ -61,9 +61,14 @@
 
 (deftest header-renders-spectate-mode-trigger-button-test
   (let [view (header-view/header-view {:wallet {:connected? false}})
-        spectate-mode-button (find-node-by-role view "spectate-mode-open-button")]
+        spectate-mode-button (find-node-by-role view "spectate-mode-open-button")
+        spectate-mode-tooltip (find-node-by-role view "spectate-mode-open-tooltip")]
     (is (some? spectate-mode-button))
-    (is (contains? (set (collect-strings spectate-mode-button)) "Spectate Mode"))
+    (is (= [] (collect-strings spectate-mode-button)))
+    (is (= "Open Spectate Mode" (get-in spectate-mode-button [1 :aria-label])))
+    (is (= "spectate-mode-open-tooltip" (get-in spectate-mode-button [1 :aria-describedby])))
+    (is (contains? (set (collect-strings spectate-mode-tooltip))
+                   "Inspect another wallet in read-only mode. Click to open Spectate Mode and choose an address."))
     (is (= [[:actions/open-spectate-mode-modal :event.currentTarget/bounds]]
            (get-in spectate-mode-button [1 :on :click])))))
 
@@ -162,14 +167,16 @@
                                                 :agent {:status :ready}}
                                        :account-context spectate-state})
         spectate-mode-button (find-node-by-role view "spectate-mode-open-button")
+        spectate-mode-tooltip (find-node-by-role view "spectate-mode-open-tooltip")
         menu-open-spectate (find-node-by-role view "wallet-menu-open-spectate-mode")
         spectate-active-row (find-node-by-role view "wallet-menu-spectate-active-address")
-        spectate-button-text (set (collect-strings spectate-mode-button))
         menu-text (set (collect-strings menu-open-spectate))
         active-text (set (collect-strings spectate-active-row))]
     (is (true? (account-context/spectate-mode-active?
                 {:account-context spectate-state})))
-    (is (contains? spectate-button-text "Spectating"))
+    (is (= "Manage Spectate Mode" (get-in spectate-mode-button [1 :aria-label])))
+    (is (contains? (set (collect-strings spectate-mode-tooltip))
+                   "Spectate Mode is active. Click to manage the address you are viewing or stop spectating."))
     (is (contains? menu-text "Manage Spectate Mode"))
     (is (contains? active-text (wallet/short-addr spectate-address)))))
 
