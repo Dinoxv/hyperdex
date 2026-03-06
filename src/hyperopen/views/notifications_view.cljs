@@ -4,20 +4,20 @@
 (defn- toast-tone
   [kind]
   (case kind
-    :success {:card ["border-[#3e5368]"
-                     "bg-[#283648]/95"]
+    :success {:card ["border-[#1f4f4f]"
+                     "bg-[#081b24]/95"]
               :icon ["text-[#52f2c8]"
                      "border-[#52f2c8]/70"]
               :headline ["text-[#f6fefd]"]
               :subline ["text-[#9aa9bb]"]}
-    :error {:card ["border-error/40"
-                   "bg-[#3a2126]/95"]
+    :error {:card ["border-[#7b3340]"
+                   "bg-[#081b24]/95"]
             :icon ["text-error"
                    "border-error/70"]
             :headline ["text-[#ffe3e8]"]
             :subline ["text-[#f2b8c3]"]}
-    {:card ["border-[#4b5a6d]"
-            "bg-[#273244]/95"]
+    {:card ["border-[#1f3b3c]"
+            "bg-[#081b24]/95"]
      :icon ["text-info"
             "border-info/70"]
      :headline ["text-[#f6fefd]"]

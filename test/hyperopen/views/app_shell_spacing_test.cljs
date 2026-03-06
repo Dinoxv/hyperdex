@@ -333,9 +333,12 @@
                                                            :message "Sold 1.25 SOL"}]}))
         toast-nodes (find-nodes view-node #(= "global-toast" (get-in % [1 :data-role])))
         dismiss-nodes (find-nodes view-node #(= "global-toast-dismiss" (get-in % [1 :data-role])))
+        toast-class-sets (mapv #(set (get-in % [1 :class])) toast-nodes)
         rendered-strings (set (collect-strings view-node))]
     (is (= 2 (count toast-nodes)))
     (is (= 2 (count dismiss-nodes)))
+    (is (every? #(contains? % "bg-[#081b24]/95") toast-class-sets))
+    (is (every? #(contains? % "border-[#1f4f4f]") toast-class-sets))
     (is (contains? rendered-strings "Bought 6 HYPE"))
     (is (contains? rendered-strings "Sold 1.25 SOL"))
     (is (contains? rendered-strings "At average price of $31.66667"))
