@@ -179,6 +179,7 @@
             [hyperopen.views.portfolio.vm-test]
             [hyperopen.views.portfolio.vm.benchmarks-helpers-test]
             [hyperopen.views.portfolio.vm.benchmarks-test]
+            [hyperopen.views.portfolio.vm.chart-helpers-test]
             [hyperopen.views.portfolio.vm.chart-math-additional-test]
             [hyperopen.views.portfolio.vm.chart-math-test]
             [hyperopen.views.portfolio.vm.equity-helpers-test]
@@ -186,6 +187,7 @@
             [hyperopen.views.portfolio.vm.history-test]
             [hyperopen.views.portfolio.vm.metrics-bridge-helpers-test]
             [hyperopen.views.portfolio.vm.metrics-bridge-test]
+            [hyperopen.views.portfolio.vm.summary-helpers-test]
             [hyperopen.views.portfolio.vm.summary-test]
             [hyperopen.views.portfolio.vm.volume-helpers-test]
             [hyperopen.views.portfolio.vm.volume-test]
@@ -464,6 +466,7 @@
              'hyperopen.views.portfolio.vm-test
              'hyperopen.views.portfolio.vm.benchmarks-helpers-test
              'hyperopen.views.portfolio.vm.benchmarks-test
+             'hyperopen.views.portfolio.vm.chart-helpers-test
              'hyperopen.views.portfolio.vm.chart-math-additional-test
              'hyperopen.views.portfolio.vm.chart-math-test
              'hyperopen.views.portfolio.vm.equity-helpers-test
@@ -471,6 +474,7 @@
              'hyperopen.views.portfolio.vm.history-test
              'hyperopen.views.portfolio.vm.metrics-bridge-helpers-test
              'hyperopen.views.portfolio.vm.metrics-bridge-test
+             'hyperopen.views.portfolio.vm.summary-helpers-test
              'hyperopen.views.portfolio.vm.summary-test
              'hyperopen.views.portfolio.vm.volume-helpers-test
              'hyperopen.views.portfolio.vm.volume-test
