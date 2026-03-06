@@ -1,5 +1,7 @@
 (ns hyperopen.app.startup
-  (:require [hyperopen.account.history.actions :as account-history-actions]
+  (:require [hyperopen.account.history.funding-actions :as funding-actions]
+            [hyperopen.account.history.order-actions :as order-actions]
+            [hyperopen.account.history.surface-actions :as surface-actions]
             [hyperopen.asset-selector.settings :as asset-selector-settings]
             [hyperopen.chart.settings :as chart-settings]
             [hyperopen.orderbook.settings :as orderbook-settings]
@@ -132,10 +134,10 @@
        :restore-spectate-mode-url! startup-restore/restore-spectate-mode-url!
        :restore-active-asset! runtime-effect-adapters/restore-active-asset!
        :restore-asset-selector-markets-cache! runtime-effect-adapters/restore-asset-selector-markets-cache!
-       :restore-open-orders-sort-settings! account-history-actions/restore-open-orders-sort-settings!
-       :restore-funding-history-pagination-settings! account-history-actions/restore-funding-history-pagination-settings!
-       :restore-trade-history-pagination-settings! account-history-actions/restore-trade-history-pagination-settings!
-       :restore-order-history-pagination-settings! account-history-actions/restore-order-history-pagination-settings!
+       :restore-open-orders-sort-settings! surface-actions/restore-open-orders-sort-settings!
+       :restore-funding-history-pagination-settings! funding-actions/restore-funding-history-pagination-settings!
+       :restore-trade-history-pagination-settings! order-actions/restore-trade-history-pagination-settings!
+       :restore-order-history-pagination-settings! order-actions/restore-order-history-pagination-settings!
        :set-on-connected-handler! wallet/set-on-connected-handler!
        :handle-wallet-connected runtime-action-adapters/handle-wallet-connected
        :init-wallet! wallet/init-wallet!

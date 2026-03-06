@@ -1,8 +1,9 @@
 (ns hyperopen.account.history.effects
   (:require [clojure.string :as str]
             [hyperopen.account.context :as account-context]
+            [hyperopen.account.history.funding-actions :as funding-actions]
+            [hyperopen.account.history.order-actions :as order-actions]
             [hyperopen.api.default :as api]
-            [hyperopen.account.history.actions :as account-history-actions]
             [hyperopen.domain.funding-history :as funding-history]
             [hyperopen.platform :as platform]
             [hyperopen.utils.formatting :as fmt]
@@ -71,7 +72,7 @@
 
 (defn- merge-and-project-funding-history
   [state rows]
-  (let [filters (account-history-actions/funding-history-filters state)
+  (let [filters (funding-actions/funding-history-filters state)
         merged (funding-history/merge-funding-history-rows (get-in state [:orders :fundings-raw] [])
                                                            rows)
         projected (funding-history/filter-funding-history-rows merged filters)]
@@ -100,7 +101,7 @@
 
 (defn- apply-funding-history-stream-projection
   [state]
-  (let [filters (account-history-actions/funding-history-filters state)
+  (let [filters (funding-actions/funding-history-filters state)
         projected (funding-history/filter-funding-history-rows
                    (get-in state [:orders :fundings-raw] [])
                    filters)]
@@ -112,7 +113,7 @@
   [store request-id rows]
   (swap! store
          (fn [state]
-           (if (= request-id (account-history-actions/funding-history-request-id state))
+           (if (= request-id (funding-actions/funding-history-request-id state))
              (-> (merge-and-project-funding-history state rows)
                  (assoc-in [:account-info :funding-history :loading?] false)
                  (assoc-in [:account-info :funding-history :error] nil))
@@ -122,7 +123,7 @@
   [store request-id err]
   (swap! store
          (fn [state]
-           (if (= request-id (account-history-actions/funding-history-request-id state))
+           (if (= request-id (funding-actions/funding-history-request-id state))
              (-> state
                  (assoc-in [:account-info :funding-history :loading?] false)
                  (assoc-in [:account-info :funding-history :error] (str err)))
@@ -139,7 +140,7 @@
 (defn fetch-and-merge-funding-history!
   [store address opts]
   (when address
-    (let [filters (account-history-actions/funding-history-filters @store)
+    (let [filters (funding-actions/funding-history-filters @store)
           opts* (or opts {})
           force-refresh? (true? (:force-refresh? opts*))
           request-opts (merge {:priority :high}
@@ -198,21 +199,21 @@
   [_ store request-id]
   (let [selected? (= :funding-history (get-in @store [:account-info :selected-tab]))
         address (account-context/effective-account-address @store)
-        filters (account-history-actions/funding-history-filters @store)
+        filters (funding-actions/funding-history-filters @store)
         opts (merge {:priority :high}
                     filters)]
     (cond
       (not selected?)
       (swap! store
              (fn [state]
-               (if (= request-id (account-history-actions/funding-history-request-id state))
+               (if (= request-id (funding-actions/funding-history-request-id state))
                  (assoc-in state [:account-info :funding-history :loading?] false)
                  state)))
 
       (not address)
       (swap! store
              (fn [state]
-               (if (= request-id (account-history-actions/funding-history-request-id state))
+               (if (= request-id (funding-actions/funding-history-request-id state))
                  (-> state
                      (assoc-in [:account-info :funding-history :loading?] false)
                      (assoc-in [:orders :fundings-raw] [])
@@ -223,7 +224,7 @@
       (if (funding-stream-hydrated? @store address)
         (swap! store
                (fn [state]
-                 (if (= request-id (account-history-actions/funding-history-request-id state))
+                 (if (= request-id (funding-actions/funding-history-request-id state))
                    (-> (apply-funding-history-stream-projection state)
                        (assoc-in [:account-info :funding-history :loading?] false)
                        (assoc-in [:account-info :funding-history :error] nil))
@@ -234,13 +235,13 @@
              (platform/set-timeout!
               (fn []
                 (if (not= request-id
-                          (account-history-actions/funding-history-request-id @store))
+                          (funding-actions/funding-history-request-id @store))
                   (resolve nil)
                   (if (funding-stream-hydrated? @store address)
                     (do
                       (swap! store
                              (fn [state]
-                               (if (= request-id (account-history-actions/funding-history-request-id state))
+                               (if (= request-id (funding-actions/funding-history-request-id state))
                                  (-> (apply-funding-history-stream-projection state)
                                      (assoc-in [:account-info :funding-history :loading?] false)
                                      (assoc-in [:account-info :funding-history :error] nil))
@@ -263,7 +264,7 @@
       (do
         (swap! store
                (fn [state]
-                 (if (= request-id (account-history-actions/order-history-request-id state))
+                 (if (= request-id (order-actions/order-history-request-id state))
                    (-> state
                        (assoc-in [:account-info :order-history :loading?] false)
                        (assoc-in [:account-info :order-history :error] nil)
@@ -273,25 +274,25 @@
                    state)))
         (js/Promise.resolve nil))
       (-> (request-historical-orders! address opts*)
-          (.then (fn [rows]
-                   (swap! store
-                          (fn [state]
-                            (if (= request-id (account-history-actions/order-history-request-id state))
-                              (-> state
-                                  (assoc-in [:account-info :order-history :loading?] false)
-                                  (assoc-in [:account-info :order-history :error] nil)
+      (.then (fn [rows]
+               (swap! store
+                      (fn [state]
+                        (if (= request-id (order-actions/order-history-request-id state))
+                          (-> state
+                              (assoc-in [:account-info :order-history :loading?] false)
+                              (assoc-in [:account-info :order-history :error] nil)
                                   (assoc-in [:account-info :order-history :loaded-at-ms] (platform/now-ms))
                                   (assoc-in [:account-info :order-history :loaded-for-address]
                                             requested-address)
                                   (assoc-in [:orders :order-history] (vec (or rows []))))
                               state)))))
-          (.catch (fn [err]
-                    (swap! store
-                           (fn [state]
-                             (if (= request-id (account-history-actions/order-history-request-id state))
-                               (-> state
-                                   (assoc-in [:account-info :order-history :loading?] false)
-                                   (assoc-in [:account-info :order-history :error] (str err)))
+      (.catch (fn [err]
+                (swap! store
+                       (fn [state]
+                         (if (= request-id (order-actions/order-history-request-id state))
+                           (-> state
+                               (assoc-in [:account-info :order-history :loading?] false)
+                               (assoc-in [:account-info :order-history :error] (str err)))
                                state)))))))))
 
 (defn api-fetch-historical-orders-effect

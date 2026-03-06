@@ -1,5 +1,6 @@
 (ns hyperopen.system
-  (:require [hyperopen.account.history.actions :as account-history-actions]
+  (:require [hyperopen.account.history.funding-actions :as funding-actions]
+            [hyperopen.account.history.order-actions :as order-actions]
             [hyperopen.runtime.state :as runtime-state]
             [hyperopen.state.app-defaults :as app-defaults]
             [hyperopen.state.trading :as trading]
@@ -7,13 +8,13 @@
             [hyperopen.websocket.client :as ws-client]))
 
 (def ^:private default-funding-history-state
-  account-history-actions/default-funding-history-state)
+  funding-actions/default-funding-history-state)
 
 (def ^:private default-order-history-state
-  account-history-actions/default-order-history-state)
+  order-actions/default-order-history-state)
 
 (def ^:private default-trade-history-state
-  account-history-actions/default-trade-history-state)
+  order-actions/default-trade-history-state)
 
 (defn default-store-state
   []
