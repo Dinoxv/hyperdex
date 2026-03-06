@@ -146,15 +146,20 @@
                      :base "HYPE"
                      :market-type :spot}
         icon-node (view/asset-icon spot-market false #{} #{})
-        img-srcs (->> (find-img-nodes icon-node)
-                      (map second)
+        img-attrs (->> (find-img-nodes icon-node)
+                       (map second))
+        img-srcs (->> img-attrs
                       (map :src)
                       (remove nil?)
                       set)
+        img-classes (->> img-attrs
+                         (mapcat #(class-values (:class %)))
+                         set)
         strings (set (collect-strings icon-node))
         path-ds (set (collect-path-ds icon-node))]
     (is (not (contains? strings "HYPE")))
     (is (contains? img-srcs "https://app.hyperliquid.xyz/coins/HYPE_spot.svg"))
+    (is (not (contains? img-classes "bg-white")))
     (is (contains? path-ds "M19 9l-7 7-7-7"))))
 
 (deftest asset-icon-renders-visible-image-immediately-and-wires-load-events-test
@@ -170,7 +175,7 @@
         strings (set (collect-strings icon-node))]
     (is (some? img-node))
     (is (not (contains? strings "BTC")))
-    (is (contains? classes "bg-white"))
+    (is (not (contains? classes "bg-white")))
     (is (not (contains? classes "opacity-0")))
     (is (= [[:actions/mark-loaded-asset-icon "perp:BTC"]]
            (get-in attrs [:on :load])))))
@@ -191,7 +196,7 @@
     (is (= "https://app.hyperliquid.xyz/coins/BTC.svg"
            (:src attrs)))
     (is (contains? classes "object-contain"))
-    (is (contains? classes "bg-white"))
+    (is (not (contains? classes "bg-white")))
     (is (not (contains? strings "BTC")))
     (is (empty? (find-nodes-with-style-key icon-node :background-image)))))
 

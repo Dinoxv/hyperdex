@@ -844,7 +844,7 @@
            :on {:click [[:actions/toggle-asset-dropdown :asset-selector]]}}
      [:div {:class ["w-5" "h-5" "shrink-0" "overflow-hidden" "rounded-full"]}
       (if show-icon?
-        [:img {:class ["block" "w-5" "h-5" "object-contain" "bg-white" "pointer-events-none"]
+        [:img {:class ["block" "w-5" "h-5" "object-contain" "pointer-events-none"]
                :src icon-src
                :alt ""
                :aria-hidden true
