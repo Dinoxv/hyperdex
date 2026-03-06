@@ -1,8 +1,11 @@
 (ns hyperopen.views.portfolio.vm.benchmarks-helpers-test
-  (:require [clojure.string :as str]
-            [cljs.test :refer-macros [deftest is use-fixtures]]
-            [hyperopen.views.portfolio.vm.benchmarks :as vm-benchmarks]
-            [hyperopen.views.portfolio.vm.constants :as constants]))
+  (:require [cljs.test :refer-macros [deftest is use-fixtures]]
+            [hyperopen.portfolio.metrics :as portfolio-metrics]
+            [hyperopen.views.portfolio.vm.benchmarks :as vm-benchmarks]))
+
+(defn- approx=
+  [a b]
+  (< (js/Math.abs (- a b)) 1e-9))
 
 (use-fixtures :each
   (fn [f]
@@ -10,147 +13,187 @@
     (f)
     (vm-benchmarks/reset-portfolio-vm-cache!)))
 
-(deftest vault-benchmark-helpers-cover-normalization-and-selection-test
+(deftest vault-benchmark-helpers-cover-normalization-selection-and-cap-test
   (is (= "vault:0xabc"
          (vm-benchmarks/vault-benchmark-value "0xabc")))
   (is (= "0xabc"
-         (vm-benchmarks/vault-benchmark-address "vault:0xabc")))
+         (vm-benchmarks/vault-benchmark-address "vault:0xAbC")))
   (is (nil? (vm-benchmarks/vault-benchmark-address "BTC")))
-  (is (nil? (vm-benchmarks/vault-benchmark-address 42)))
-  (is (true? (vm-benchmarks/benchmark-vault-row? {:isVault true :tvl 10})))
-  (is (false? (vm-benchmarks/benchmark-vault-row? {:isVault true :tvl 0})))
-  (is (false? (vm-benchmarks/benchmark-vault-row? {:isVault false :tvl 10})))
-  (is (= "Unknown Vault"
-         (vm-benchmarks/benchmark-vault-name {})))
-  (is (= -10
-         (vm-benchmarks/benchmark-vault-option-rank {:tvl 10}))))
-
-(deftest vault-benchmark-option-builders-filter-order-and-cap-test
+  (is (true? (vm-benchmarks/benchmark-vault-row? {:vault-address "0xabc"
+                                                  :relationship {:type :normal}})))
+  (is (false? (vm-benchmarks/benchmark-vault-row? {:vault-address "0xabc"
+                                                   :relationship {:type :child}})))
+  (is (= 12
+         (vm-benchmarks/benchmark-vault-tvl {:tvl "12"})))
+  (is (= "Alpha"
+         (vm-benchmarks/benchmark-vault-name {:name " Alpha "})))
+  (is (= [ -12 "alpha" "0xabc"]
+         (vm-benchmarks/benchmark-vault-option-rank {:tvl "12"
+                                                     :name "Alpha"
+                                                     :vault-address "0xabc"})))
   (let [rows (vec (concat
-                   [{:isVault true :vaultAddress "0xdrop" :name "No TVL"}
-                    {:isVault false :vaultAddress "0xskip" :name "Not Vault" :tvl 999}]
-                   (for [idx (range 1 15)]
-                     {:isVault true
-                      :vaultAddress (str "0x" idx)
-                      :name (str "Vault " idx)
+                   [{:name "Drop Child"
+                     :vault-address "0xchild"
+                     :relationship {:type :child}
+                     :tvl 999}]
+                   (for [idx (range 1 106)]
+                     {:name (str "Vault " idx)
+                      :vault-address (str "0x" idx)
+                      :relationship {:type :normal}
                       :tvl idx})))
         eligible (vm-benchmarks/eligible-vault-benchmark-rows rows)
-        built (vm-benchmarks/build-vault-benchmark-selector-options eligible)]
-    (is (= constants/max-vault-benchmark-options
-           (count eligible)))
-    (is (= "0x14" (:vaultAddress (first eligible))))
-    (is (= "0x5" (:vaultAddress (last eligible))))
-    (is (= "vault:0x14" (get-in built [0 :value])))
-    (is (= "Vault 14" (get-in built [0 :label])))
-    (is (= "Vaults" (get-in built [0 :group])))
-    (is (= 14
-           (js/Number (get-in built [0 :tvl]))))
-    (is (= {:isVault true
-            :vaultAddress "0x7"
-            :name "Vault 7"
-            :tvl 7}
-           (vm-benchmarks/vault-benchmark-row-by-address rows "0x7")))))
+        built (vm-benchmarks/build-vault-benchmark-selector-options rows)]
+    (is (= 100 (count eligible)))
+    (is (= "0x105" (:vault-address (first eligible))))
+    (is (= "0x6" (:vault-address (last eligible))))
+    (is (= "vault:0x105" (get-in built [0 :value])))
+    (is (= "Vault 105 (VAULT)" (get-in built [0 :label])))
+    (is (= 105 (get-in built [0 :tvl])))))
 
-(deftest market-benchmark-helpers-cover-type-label-rank-signature-and-search-test
-  (let [markets [{:coin "BTC" :type "PERP" :openInterest "300"}
-                 {:coin "ETH" :type "PERP" :openInterest "200"}
-                 {:coin "BTC" :type "SPOT" :openInterest "150"}
-                 {:coin "ETH" :type "SPOT" :openInterest "120"}
-                 {:coin "SOL" :type "PERP" :openInterest "500"}]
-        selector-options (vm-benchmarks/build-benchmark-selector-options markets [])]
-    (is (= "Spot" (vm-benchmarks/market-type-token "SPOT")))
-    (is (= "Perp" (vm-benchmarks/market-type-token "PERP")))
-    (is (= "FUT" (vm-benchmarks/market-type-token "FUT")))
-    (is (nil? (vm-benchmarks/market-type-token :spot)))
-    (is (= 500
-           (js/Number (vm-benchmarks/benchmark-open-interest {:openInterest "500"}))))
-    (is (= 0
-           (vm-benchmarks/benchmark-open-interest {:openInterest 500})))
-    (is (= "SOL Perp"
-           (vm-benchmarks/benchmark-option-label {:coin "SOL" :type "PERP"})))
-    (is (= "SOL"
-           (vm-benchmarks/benchmark-option-label {:coin "SOL" :type :perp})))
-    (is (= -1000000000000
-           (vm-benchmarks/benchmark-option-rank {:coin "BTC" :type "PERP" :openInterest "1"})))
-    (is (= -100000000000
-           (vm-benchmarks/benchmark-option-rank {:coin "ETH" :type "PERP" :openInterest "1"})))
-    (is (= -10000000000
-           (vm-benchmarks/benchmark-option-rank {:coin "BTC" :type "SPOT" :openInterest "1"})))
-    (is (= -1000000000
-           (vm-benchmarks/benchmark-option-rank {:coin "ETH" :type "SPOT" :openInterest "1"})))
-    (is (= -500
-           (vm-benchmarks/benchmark-option-rank {:coin "SOL" :type "PERP" :openInterest "500"})))
-    (is (= ["BTC" "ETH" "BTC" "ETH" "SOL"]
-           (mapv :value selector-options)))
-    (is (= "SOL-500"
-           (vm-benchmarks/benchmark-market-signature {:coin "SOL" :openInterest "500"})))
-    (is (= constants/empty-benchmark-markets-signature
+(deftest market-benchmark-helpers-cover_rank_signature_and_search_paths-test
+  (let [market {:coin "BTC"
+                :symbol "BTC-USD"
+                :dex "hl"
+                :market-type :perp
+                :openInterest "300"
+                :cache-order "2"
+                :key "btc-perp"}]
+    (is (= :spot (vm-benchmarks/market-type-token "SPOT")))
+    (is (= :perp (vm-benchmarks/market-type-token " perp ")))
+    (is (nil? (vm-benchmarks/market-type-token 7)))
+    (is (= 300 (vm-benchmarks/benchmark-open-interest market)))
+    (is (= 0 (vm-benchmarks/benchmark-open-interest {:openInterest "bad"})))
+    (is (= "BTC-USD (HL PERP)"
+           (vm-benchmarks/benchmark-option-label market)))
+    (is (= [ -300 2 "btc-usd" "btc" "btc-perp"]
+           (vm-benchmarks/benchmark-option-rank market)))
+    (is (number? (vm-benchmarks/benchmark-market-signature market)))
+    (is (= (vm-benchmarks/mix-benchmark-markets-hash 7 market)
+           (vm-benchmarks/mix-benchmark-markets-hash 7 market)))
+    (is (= {:count 0 :rolling-hash 1 :xor-hash 0}
            (vm-benchmarks/benchmark-markets-signature [])))
-    (let [many-markets (for [idx (range 12)]
-                         {:coin (str "C" idx)
-                          :type "PERP"
-                          :openInterest (str idx)})
-          signature (vm-benchmarks/benchmark-markets-signature many-markets)]
-      (is (= 10 (count (str/split signature #"\|")))))
-    (is (number? (vm-benchmarks/mix-benchmark-markets-hash 7 {:coin "SOL" :openInterest "500"})))
-    (is (= (vm-benchmarks/mix-benchmark-markets-hash 7 {:coin "SOL" :openInterest "500"})
-           (vm-benchmarks/mix-benchmark-markets-hash 7 {:coin "SOL" :openInterest "500"})))
-    (is (true? (vm-benchmarks/benchmark-option-matches-search? {:label "SPY Spot"} "spy")))
-    (is (false? (vm-benchmarks/benchmark-option-matches-search? {:label "SPY Spot"} "eth")))
-    (is (true? (vm-benchmarks/benchmark-option-matches-search? {:label "SPY Spot"} nil)))
+    (is (= 2 (:count (vm-benchmarks/benchmark-markets-signature [market (assoc market :coin "ETH")]))))
     (is (= "btc"
            (vm-benchmarks/normalize-benchmark-search-query "  BTC  ")))
-    (is (nil? (vm-benchmarks/normalize-benchmark-search-query nil)))))
+    (is (true? (vm-benchmarks/benchmark-option-matches-search? {:label "BTC-USD (HL PERP)"} "btc")))
+    (is (true? (vm-benchmarks/benchmark-option-matches-search? {:label "SPY" :value "SPY"} "spy")))
+    (is (false? (vm-benchmarks/benchmark-option-matches-search? {:label "BTC"} "eth")))))
 
 (deftest benchmark-selector-model-and-memoization-cover-cache-branches-test
-  (let [state {:market-data {:active-markets [{:coin "BTC" :type "PERP" :openInterest "300"}
-                                              {:coin "ETH" :type "PERP" :openInterest "200"}
-                                              {:coin "SOL" :type "PERP" :openInterest "100"}]}
-               :portfolio {:summaries {:all {:vaults [{:isVault true
-                                                       :vaultAddress "0xabc"
-                                                       :name "Alpha"
-                                                       :tvl 10}]}}}
-               :ui {:preferences {:portfolio-returns-benchmarks ["BTC" "ETH" "SOL" "DOGE" "EXTRA"]}
-                    :local-state {:portfolio-returns-benchmark-search "eth"}}}
-        short-state (assoc-in state
-                              [:ui :preferences :portfolio-returns-benchmarks]
-                              ["BTC"])
-        options [{:value "BTC" :label "BTC Perp"}
-                 {:value "ETH" :label "ETH Perp"}
-                 {:value "SOL" :label "SOL Perp"}]]
-    (is (= ["BTC" "ETH" "SOL" "DOGE"]
+  (let [state {:asset-selector {:markets [{:coin "BTC"
+                                           :symbol "BTC-USD"
+                                           :dex "hl"
+                                           :market-type :perp
+                                           :openInterest "300"
+                                           :cache-order 1}
+                                          {:coin "ETH"
+                                           :symbol "ETH-USD"
+                                           :dex "hl"
+                                           :market-type :perp
+                                           :openInterest "200"
+                                           :cache-order 2}]}
+               :vaults {:merged-index-rows [{:name "Alpha"
+                                             :vault-address "0xabc"
+                                             :relationship {:type :normal}
+                                             :tvl 10}]}
+               :portfolio-ui {:returns-benchmark-coins ["BTC" "vault:0xabc"]
+                              :returns-benchmark-search "eth"
+                              :returns-benchmark-suggestions-open? true}}
+        short-state (assoc state :portfolio-ui {:returns-benchmark-coins ["BTC"]
+                                                :returns-benchmark-search "eth"
+                                                :returns-benchmark-suggestions-open? false})]
+    (is (= ["BTC" "vault:0xabc"]
            (vm-benchmarks/selected-returns-benchmark-coins state)))
-    (is (= ["BTC" "ETH"]
-           (vm-benchmarks/selected-returns-benchmark-coins {})))
-    (is (= [{:value "ETH" :label "ETH Perp"}
-            {:value "SOL" :label "SOL Perp"}]
-           (vm-benchmarks/selected-benchmark-options options ["ETH" "MISSING" "SOL"])))
-    (let [model-max (vm-benchmarks/returns-benchmark-selector-model state)
-          model-search (vm-benchmarks/returns-benchmark-selector-model short-state)]
-      (is (true? (:max-reached? model-max)))
-      (is (= [] (:available-options model-max)))
-      (is (= "eth" (:search-query model-search)))
-      (is (= ["ETH"]
-             (mapv :value (:available-options model-search)))))
-    (let [build-calls (atom 0)
-          markets [{:coin "BTC" :type "PERP" :openInterest "300"}]
-          vaults [{:isVault true :vaultAddress "0xabc" :name "Alpha" :tvl 10}]]
+    (is (= [{:value "BTC"
+             :label "BTC-USD (HL PERP)"
+             :open-interest 300}
+            {:value "vault:0xabc"
+             :label "Alpha (VAULT)"
+             :tvl 10}]
+           (vm-benchmarks/selected-benchmark-options
+            (vm-benchmarks/benchmark-selector-options state)
+            ["BTC" "vault:0xabc"])))
+    (let [model (vm-benchmarks/returns-benchmark-selector-model state)
+          search-model (vm-benchmarks/returns-benchmark-selector-model short-state)]
+      (is (= ["BTC" "vault:0xabc"] (:selected-coins model)))
+      (is (= "ETH" (:top-coin model)))
+      (is (= "eth" (:coin-search search-model)))
+      (is (= ["ETH"] (mapv :value (:candidates search-model))))
+      (is (true? (:suggestions-open? model))))
+    (vm-benchmarks/reset-portfolio-vm-cache!)
+    (let [build-count (atom 0)
+          original-builder vm-benchmarks/*build-benchmark-selector-options*
+          markets-a [{:coin "BTC"
+                      :symbol "BTC-USD"
+                      :dex "hl"
+                      :market-type :perp
+                      :openInterest "300"
+                      :cache-order 1}
+                     {:coin "ETH"
+                      :symbol "ETH-USD"
+                      :dex "hl"
+                      :market-type :perp
+                      :openInterest "200"
+                      :cache-order 2}]
+          markets-b (mapv identity markets-a)
+          markets-c (assoc-in markets-b [1 :openInterest] "1200")]
       (with-redefs [vm-benchmarks/*build-benchmark-selector-options*
-                    (fn [active-markets eligible-vaults]
-                      (swap! build-calls inc)
-                      [{:value (str (count active-markets) "-" (count eligible-vaults))}])]
-        (vm-benchmarks/memoized-eligible-vault-benchmark-rows vaults)
-        (let [first-rows (vm-benchmarks/memoized-eligible-vault-benchmark-rows vaults)
-              second-rows (vm-benchmarks/memoized-eligible-vault-benchmark-rows vaults)]
-          (is (identical? first-rows second-rows)))
-        (vm-benchmarks/memoized-benchmark-selector-options markets vaults)
-        (vm-benchmarks/memoized-benchmark-selector-options markets vaults)
-        (let [build-count-before @build-calls]
-          (is (= [{:value "1-1"}]
-                 (vm-benchmarks/memoized-benchmark-selector-options markets vaults)))
-          (is (= build-count-before @build-calls)))
-        (vm-benchmarks/memoized-benchmark-selector-options
-         (conj markets {:coin "ETH" :type "PERP" :openInterest "200"})
-         vaults)
-        (is (> @build-calls 0))
-        (is (vector? (vm-benchmarks/benchmark-selector-options state)))))))
+                    (fn [markets]
+                      (swap! build-count inc)
+                      (original-builder markets))]
+        (let [first-options (vm-benchmarks/memoized-benchmark-selector-options markets-a)
+              second-options (vm-benchmarks/memoized-benchmark-selector-options markets-a)
+              signature-hit (vm-benchmarks/memoized-benchmark-selector-options markets-b)
+              changed-options (vm-benchmarks/memoized-benchmark-selector-options markets-c)]
+          (is (= 2 @build-count))
+          (is (= ["BTC" "ETH"] (mapv :value first-options)))
+          (is (= ["BTC" "ETH"] (mapv :value second-options)))
+          (is (= ["BTC" "ETH"] (mapv :value signature-hit)))
+          (is (= ["ETH" "BTC"] (mapv :value changed-options)))))
+      (let [vaults [{:name "Alpha"
+                     :vault-address "0xabc"
+                     :relationship {:type :normal}
+                     :tvl 10}]
+            first-rows (vm-benchmarks/memoized-eligible-vault-benchmark-rows vaults)
+            second-rows (vm-benchmarks/memoized-eligible-vault-benchmark-rows vaults)]
+        (is (identical? first-rows second-rows))))))
+
+(deftest benchmark-computation-context-builds_strategy_and_benchmark_rows-test
+  (let [t0 1704067200000
+        t1 (+ t0 (* 24 60 60 1000))
+        t2 (+ t1 (* 24 60 60 1000))
+        vault-address "0xaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+        vault-ref (str "vault:" vault-address)
+        state {:candles {"SPY" {:1h [{:t t0 :c 50}
+                                     {:t t1 :c 55}
+                                     {:t t2 :c 60}]}}
+               :vaults {:merged-index-rows [{:name "Peer Vault"
+                                             :vault-address vault-address
+                                             :relationship {:type :normal}
+                                             :tvl 120
+                                             :snapshot-by-key {:month [0.05 0.15]}}]}}
+        selector {:selected-coins ["SPY" vault-ref]
+                  :label-by-coin {"SPY" "SPY (HL SPOT)"
+                                  vault-ref "Peer Vault (VAULT)"}}]
+    (with-redefs [portfolio-metrics/returns-history-rows (fn [_state _summary _scope]
+                                                           [[t0 0]
+                                                            [t1 10]
+                                                            [t2 20]])]
+      (let [context (vm-benchmarks/benchmark-computation-context state
+                                                                 {:dummy true}
+                                                                 :all
+                                                                 :month
+                                                                 selector)]
+        (is (= [[t0 0] [t1 10] [t2 20]]
+               (:strategy-cumulative-rows context)))
+        (is (every? true?
+                    (map approx=
+                         [0 10 20]
+                         (mapv second (get (:benchmark-cumulative-rows-by-coin context) "SPY")))))
+        (is (every? true?
+                    (map approx=
+                         [5 15 15]
+                         (mapv second (get (:benchmark-cumulative-rows-by-coin context) vault-ref)))))
+        (is (number? (:strategy-source-version context)))
+        (is (number? (get (:benchmark-source-version-map context) "SPY")))
+        (is (number? (get (:benchmark-source-version-map context) vault-ref)))))))

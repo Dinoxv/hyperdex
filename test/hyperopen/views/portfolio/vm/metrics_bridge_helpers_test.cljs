@@ -1,85 +1,130 @@
 (ns hyperopen.views.portfolio.vm.metrics-bridge-helpers-test
-  (:require [cljs.test :refer-macros [deftest is]]
+  (:require [cljs.test :refer-macros [deftest is use-fixtures]]
             [hyperopen.portfolio.metrics :as portfolio-metrics]
+            [hyperopen.system :as system]
             [hyperopen.views.portfolio.vm.metrics-bridge :as vm-metrics-bridge]))
 
 (defn- approx=
   [a b]
   (< (js/Math.abs (- a b)) 1e-9))
 
-(deftest worker-result-normalization-covers-nil-and-map-paths-test
+(use-fixtures :each
+  (fn [f]
+    (reset! vm-metrics-bridge/last-metrics-request nil)
+    (f)
+    (reset! vm-metrics-bridge/last-metrics-request nil)))
+
+(deftest worker-result-normalization-covers-nil-js-and-nested-status-maps-test
   (is (nil? (vm-metrics-bridge/normalize-worker-metric-values nil)))
-  (is (= {:cagr 1 :sharpe 2}
+  (is (= {:cagr 1
+          :sharpe 2
+          :metric-status {}
+          :metric-reason {}}
          (vm-metrics-bridge/normalize-worker-metric-values #js {:cagr 1 :sharpe 2})))
-  (is (nil? (vm-metrics-bridge/normalize-worker-metrics-result nil)))
-  (is (= {:values {:alpha 3}
-          :rows [{:name "x"}]}
+  (is (= {:metric-status {:cagr :suppressed}
+          :metric-reason {:cagr :core-gate-failed}}
+         (vm-metrics-bridge/normalize-worker-metric-values
+          #js {:metric-status #js {:cagr "suppressed"}
+               :metric-reason #js {:cagr "core-gate-failed"}})))
+  (is (= {:portfolio-values {:metric-status {:time-in-market :ok}
+                             :metric-reason {}}
+          :benchmark-values-by-coin {"SPY" {:metric-status {}
+                                            :metric-reason {:r2 :benchmark-coverage-gate-failed}}}}
          (vm-metrics-bridge/normalize-worker-metrics-result
-          #js {:values #js {:alpha 3}
-               :rows #js [#js {:name "x"}]}))))
+          #js {:portfolio-values #js {:metric-status #js {:time-in-market "ok"}}
+               :benchmark-values-by-coin #js {"SPY" #js {:metric-reason #js {:r2 "benchmark-coverage-gate-failed"}}}}))))
 
-(deftest request-metrics-computation-fallback-uses-sync-builder-test
-  (let [result* (atom nil)]
-    (with-redefs [vm-metrics-bridge/metrics-worker nil
-                  portfolio-metrics/compute-performance-metrics (fn [{:keys [seed]}]
-                                                                  {:value (* seed 2)})
-                  portfolio-metrics/metric-rows (fn [values]
-                                                  [{:key :value :value (:value values)}])]
-      (vm-metrics-bridge/request-metrics-computation! {:seed 7}
-                                                      #(reset! result* %))
-      (is (= {:values {:value 14}
-              :rows [{:key :value :value 14}]}
-             @result*)))))
-
-(deftest request-metrics-computation-worker-path-posts-and-handles-message-test
+(deftest request-metrics-computation-dedupes-and-posts-through-worker-test
   (let [posted-message (atom nil)
-        result* (atom nil)
-        fake-worker (js-obj)]
-    (with-redefs [vm-metrics-bridge/metrics-worker fake-worker]
-      (set! (.-postMessage fake-worker)
-            (fn [message]
-              (reset! posted-message (js->clj message :keywordize-keys true))))
-      (vm-metrics-bridge/request-metrics-computation! {:seed 5}
-                                                      #(reset! result* %))
+        store (atom {:portfolio-ui {}})
+        signature-a {:summary-time-range :month
+                     :selected-benchmark-coins ["SPY"]
+                     :strategy-source-version 101
+                     :benchmark-source-versions [["SPY" 201]]}
+        signature-b (assoc signature-a :strategy-source-version 102)
+        fake-worker #js {}]
+    (set! (.-postMessage fake-worker)
+          (fn [message]
+            (reset! posted-message (js->clj message :keywordize-keys true))))
+    (with-redefs [system/store store
+                  vm-metrics-bridge/metrics-worker fake-worker]
+      (vm-metrics-bridge/request-metrics-computation! {:seed 1} signature-a)
       (is (= {:type "compute-metrics"
-              :payload {:seed 5}}
+              :payload {:seed 1}}
              @posted-message))
-      ((.-onmessage fake-worker)
-       (js-obj "data" (js-obj "type" "ignored"
-                              "payload" (js-obj "values" (js-obj "x" 1)))))
-      (is (nil? @result*))
-      ((.-onmessage fake-worker)
-       (js-obj "data" (js-obj "type" "metrics-result"
-                              "payload" (js-obj "values" (js-obj "x" 2)
-                                                "rows" #js []))))
-      (is (= 2 (get-in @result* [:values :x]))))))
+      (is (= signature-a (:signature @vm-metrics-bridge/last-metrics-request)))
+      (is (true? (get-in @store [:portfolio-ui :metrics-loading?])))
+      (reset! posted-message nil)
+      (vm-metrics-bridge/request-metrics-computation! {:seed 2} signature-a)
+      (is (nil? @posted-message))
+      (vm-metrics-bridge/request-metrics-computation! {:seed 3} signature-b)
+      (is (= {:type "compute-metrics"
+              :payload {:seed 3}}
+             @posted-message))
+      (is (= signature-b (:signature @vm-metrics-bridge/last-metrics-request))))))
+
+(deftest request-metrics-computation-keeps-existing-metrics-visible-test
+  (let [store (atom {:portfolio-ui {:metrics-loading? false
+                                    :metrics-result {:portfolio-values {:metric-status {}
+                                                                        :metric-reason {}}}}})]
+    (with-redefs [system/store store
+                  vm-metrics-bridge/metrics-worker nil]
+      (vm-metrics-bridge/request-metrics-computation! {:seed 7}
+                                                      {:summary-time-range :month
+                                                       :selected-benchmark-coins []
+                                                       :strategy-source-version 1
+                                                       :benchmark-source-versions []})
+      (is (false? (get-in @store [:portfolio-ui :metrics-loading?]))))))
 
 (deftest metrics-request-and-sync-helpers-cover-signature-and-row-defaults-test
-  (let [strategy [{:time-ms 101} {:time-ms 102}]
-        benchmark [{:time-ms 201}]
-        signature-a (vm-metrics-bridge/metrics-request-signature strategy benchmark 0)
-        signature-b (vm-metrics-bridge/metrics-request-signature strategy benchmark 0.01)]
-    (is (string? signature-a))
+  (let [signature-a (vm-metrics-bridge/metrics-request-signature :month
+                                                                 ["SPY" "QQQ"]
+                                                                 101
+                                                                 {"SPY" 201
+                                                                  "QQQ" 301})
+        signature-b (vm-metrics-bridge/metrics-request-signature :week
+                                                                 ["SPY" "QQQ"]
+                                                                 101
+                                                                 {"SPY" 201
+                                                                  "QQQ" 301})]
+    (is (= :month (:summary-time-range signature-a)))
+    (is (= ["SPY" "QQQ"] (:selected-benchmark-coins signature-a)))
+    (is (= [["SPY" 201] ["QQQ" 301]]
+           (:benchmark-source-versions signature-a)))
     (is (not= signature-a signature-b)))
   (is (= [{:time-ms 1}]
-         (vm-metrics-bridge/request-benchmark-daily-rows {:performance-daily-rows [{:time-ms 1}]})))
-  (is (= [] (vm-metrics-bridge/request-benchmark-daily-rows {})))
-  (is (= [{:time-ms 1}] (vm-metrics-bridge/request-strategy-daily-rows [{:time-ms 1}])))
-  (is (= [] (vm-metrics-bridge/request-strategy-daily-rows nil)))
-  (with-redefs [portfolio-metrics/compute-performance-metrics (fn [{:keys [seed]}]
-                                                                {:metric seed})
-                portfolio-metrics/metric-rows (fn [values]
-                                                [{:id :metric :value (:metric values)}])]
-    (is (= {:values {:metric 9}
-            :rows [{:id :metric :value 9}]}
-           (vm-metrics-bridge/compute-metrics-sync {:seed 9})))))
+         (vm-metrics-bridge/request-benchmark-daily-rows {:benchmark-daily-rows [{:time-ms 1}]})))
+  (is (= [[1 5]]
+         (vm-metrics-bridge/request-strategy-daily-rows {:strategy-daily-rows [[1 5]]})))
+  (with-redefs [portfolio-metrics/daily-compounded-returns (fn [rows]
+                                                             (mapv (fn [[time-ms value]]
+                                                                     {:time-ms time-ms :value value})
+                                                                   rows))
+                portfolio-metrics/compute-performance-metrics (fn [{:keys [strategy-daily-rows benchmark-daily-rows]}]
+                                                                {:strategy-count (count strategy-daily-rows)
+                                                                 :benchmark-count (count benchmark-daily-rows)
+                                                                 :metric-status {}
+                                                                 :metric-reason {}})]
+    (is (= {:portfolio-values {:strategy-count 2
+                               :benchmark-count 2
+                               :metric-status {}
+                               :metric-reason {}}
+            :benchmark-values-by-coin {"SPY" {:strategy-count 2
+                                              :benchmark-count 0
+                                              :metric-status {}
+                                              :metric-reason {}}}}
+           (vm-metrics-bridge/compute-metrics-sync
+            {:portfolio-request {:strategy-cumulative-rows [[1 0] [2 5]]
+                                 :strategy-daily-rows [{:time-ms 1 :value 0} {:time-ms 2 :value 5}]
+                                 :benchmark-cumulative-rows [[1 0] [2 3]]}
+             :benchmark-requests [{:coin "SPY"
+                                   :request {:strategy-cumulative-rows [[1 0] [2 3]]}}]})))))
 
 (deftest vault-snapshot-and-alignment-helpers-cover-branches-test
   (is (= ["1d" "7d" "30d"]
          (vm-metrics-bridge/vault-snapshot-range-keys)))
   (is (= 2 (vm-metrics-bridge/vault-snapshot-point-value [1 "2"])))
-  (is (thrown? js/Error
-               (vm-metrics-bridge/vault-snapshot-point-value {:value "3"})))
+  (is (= 3 (vm-metrics-bridge/vault-snapshot-point-value {:value "3"})))
   (is (nil? (vm-metrics-bridge/vault-snapshot-point-value nil)))
   (is (= 4
          (vm-metrics-bridge/normalize-vault-snapshot-return "1d" {:returns {"1d" 4}})))

@@ -1,69 +1,150 @@
 (ns hyperopen.views.portfolio.vm.metrics-bridge
-  (:require [goog.object :as gobj]
-            [hyperopen.views.portfolio.vm.history :as vm-history]
-            [hyperopen.views.portfolio.vm.benchmarks :as vm-benchmarks]
+  (:require [clojure.string :as str]
+            [hyperopen.portfolio.actions :as portfolio-actions]
             [hyperopen.portfolio.metrics :as portfolio-metrics]
             [hyperopen.portfolio.metrics.parsing :as parsing]
-            [hyperopen.views.portfolio.vm.constants :as constants]))
+            [hyperopen.system :as system]
+            [hyperopen.views.portfolio.vm.history :as vm-history]))
 
-(defonce metrics-worker
-  (when (and (exists? js/window) (exists? js/Worker))
-    (let [worker (js/Worker. "/js/portfolio_worker.js")]
-      worker)))
+(def ^:private empty-source-version-counter
+  0)
+
+(defn- metric-token
+  [value]
+  (cond
+    (keyword? value) value
+    (string? value) (let [trimmed (some-> value str/trim)]
+                      (when (seq trimmed)
+                        (keyword trimmed)))
+    :else nil))
+
+(defn- normalize-metric-token-map
+  [token-map]
+  (into {}
+        (map (fn [[metric-key metric-token-value]]
+               [metric-key
+                (or (metric-token metric-token-value)
+                    metric-token-value)]))
+        (or token-map {})))
+
+(defn normalize-worker-metric-values
+  [metric-values]
+  (let [metric-values* (cond
+                         (map? metric-values) metric-values
+                         (some? metric-values) (js->clj metric-values :keywordize-keys true)
+                         :else nil)]
+    (if (map? metric-values*)
+      (-> metric-values*
+          (update :metric-status normalize-metric-token-map)
+          (update :metric-reason normalize-metric-token-map))
+      metric-values*)))
+
+(defn normalize-worker-metrics-result
+  [payload]
+  (let [payload* (cond
+                   (map? payload) payload
+                   (some? payload) (js->clj payload :keywordize-keys true)
+                   :else {})
+        benchmark-values-by-coin (or (:benchmark-values-by-coin payload*)
+                                     {})]
+    (assoc payload*
+           :portfolio-values (normalize-worker-metric-values (:portfolio-values payload*))
+           :benchmark-values-by-coin (into {}
+                                           (map (fn [[coin metric-values]]
+                                                  [(if (keyword? coin)
+                                                     (name coin)
+                                                     coin)
+                                                   (normalize-worker-metric-values metric-values)]))
+                                           benchmark-values-by-coin))))
+
+(defonce ^:dynamic metrics-worker
+  (delay
+   (when (exists? js/Worker)
+     (let [worker (js/Worker. "/js/portfolio_worker.js")]
+       (.addEventListener worker "message"
+                          (fn [^js e]
+                            (let [data (.-data e)
+                                  type (.-type data)
+                                  payload-js (.-payload data)]
+                              (when (= type "metrics-result")
+                                (let [payload (normalize-worker-metrics-result payload-js)]
+                                  (swap! system/store (fn [s]
+                                                        (-> s
+                                                            (assoc-in [:portfolio-ui :metrics-result] payload)
+                                                            (assoc-in [:portfolio-ui :metrics-loading?] false)))))))))
+       worker))))
 
 (defonce last-metrics-request (atom nil))
 
-(defn normalize-worker-metric-values
-  [values]
-  (if values
-    (js->clj values :keywordize-keys true)
-    nil))
-
-(defn normalize-worker-metrics-result
-  [result]
-  (when result
-    (let [clj-result (js->clj result :keywordize-keys true)]
-      (-> clj-result
-          (update :values normalize-worker-metric-values)))))
+(defn- current-worker
+  [worker-ref]
+  (cond
+    (nil? worker-ref) nil
+    (satisfies? IDeref worker-ref) @worker-ref
+    :else worker-ref))
 
 (defn request-metrics-computation!
-  [request-data on-complete]
-  (if metrics-worker
-    (do
-      (set! (.-onmessage metrics-worker)
-            (fn [event]
-              (let [data (.-data event)]
-                (when (= (gobj/get data "type") "metrics-result")
-                  (on-complete (normalize-worker-metrics-result (gobj/get data "payload")))))))
-      (.postMessage metrics-worker (clj->js {:type "compute-metrics"
-                                             :payload request-data})))
-    (let [result (portfolio-metrics/compute-performance-metrics request-data)]
-      (on-complete {:values result
-                    :rows (portfolio-metrics/metric-rows result)}))))
+  [request-data request-signature]
+  (when (not= request-signature (:signature @last-metrics-request))
+    (reset! last-metrics-request {:signature request-signature})
+    ;; Keep existing metrics visible during background recomputes to avoid
+    ;; flashing the overlay spinner on live data refreshes.
+    (when (nil? (get-in @system/store [:portfolio-ui :metrics-result]))
+      (swap! system/store assoc-in [:portfolio-ui :metrics-loading?] true))
+    (when-let [worker (current-worker metrics-worker)]
+      (.postMessage worker #js {:type "compute-metrics"
+                                :payload (clj->js request-data)}))))
 
 (defn metrics-request-signature
-  [strategy-rows benchmark-daily-rows rf-rate]
-  (let [strategy-count (count strategy-rows)
-        strategy-last (when (seq strategy-rows)
-                        (vm-history/history-point-time-ms (last strategy-rows)))
-        benchmark-count (count benchmark-daily-rows)
-        benchmark-last (when (seq benchmark-daily-rows)
-                         (:time-ms (last benchmark-daily-rows)))]
-    (str strategy-count "-" strategy-last "-" benchmark-count "-" benchmark-last "-" rf-rate)))
+  [summary-time-range selected-benchmark-coins strategy-source-version benchmark-source-version-map]
+  (let [selected-coins (vec (or selected-benchmark-coins []))]
+    {:summary-time-range (portfolio-actions/normalize-summary-time-range summary-time-range)
+     :selected-benchmark-coins selected-coins
+     :strategy-source-version strategy-source-version
+     :benchmark-source-versions (mapv (fn [coin]
+                                        [coin
+                                         (get benchmark-source-version-map coin
+                                              empty-source-version-counter)])
+                                      selected-coins)}))
 
 (defn request-benchmark-daily-rows
-  [benchmark]
-  (or (:performance-daily-rows benchmark) []))
+  [portfolio-request]
+  (if (contains? portfolio-request :benchmark-daily-rows)
+    (or (:benchmark-daily-rows portfolio-request) [])
+    (portfolio-metrics/daily-compounded-returns (or (:benchmark-cumulative-rows portfolio-request)
+                                                    []))))
 
 (defn request-strategy-daily-rows
-  [strategy-rows]
-  (or strategy-rows []))
+  [request]
+  (if (contains? request :strategy-daily-rows)
+    (or (:strategy-daily-rows request) [])
+    (portfolio-metrics/daily-compounded-returns (or (:strategy-cumulative-rows request)
+                                                    []))))
 
 (defn compute-metrics-sync
   [request-data]
-  (let [result (portfolio-metrics/compute-performance-metrics request-data)]
-    {:values result
-     :rows (portfolio-metrics/metric-rows result)}))
+  (let [portfolio-request (:portfolio-request request-data)
+        benchmark-requests (:benchmark-requests request-data)
+        benchmark-daily-rows (request-benchmark-daily-rows portfolio-request)
+        portfolio-result (portfolio-metrics/compute-performance-metrics
+                          {:strategy-cumulative-rows (:strategy-cumulative-rows portfolio-request)
+                           :strategy-daily-rows (:strategy-daily-rows portfolio-request)
+                           :benchmark-daily-rows benchmark-daily-rows
+                           :rf (or (:rf portfolio-request) 0)
+                           :mar (or (:mar portfolio-request) 0)
+                           :periods-per-year (or (:periods-per-year portfolio-request) 365)
+                           :quality-gates (:quality-gates portfolio-request)})
+        benchmark-results (into {}
+                                (map (fn [{:keys [coin request]}]
+                                       (let [strategy-daily-rows (request-strategy-daily-rows request)]
+                                         [coin (portfolio-metrics/compute-performance-metrics
+                                                {:strategy-cumulative-rows (:strategy-cumulative-rows request)
+                                                 :strategy-daily-rows strategy-daily-rows
+                                                 :rf 0
+                                                 :periods-per-year 365})]))
+                                benchmark-requests))]
+    {:portfolio-values portfolio-result
+     :benchmark-values-by-coin benchmark-results}))
 
 (defn vault-snapshot-range-keys
   []
@@ -71,9 +152,22 @@
 
 (defn vault-snapshot-point-value
   [point]
-  (when point
-    (or (parsing/optional-number (nth point 1 nil))
-        (parsing/optional-number (:value point)))))
+  (cond
+    (number? point)
+    point
+
+    (and (sequential? point)
+         (>= (count point) 2))
+    (parsing/optional-number (second point))
+
+    (map? point)
+    (or (parsing/optional-number (:value point))
+        (parsing/optional-number (:pnl point))
+        (parsing/optional-number (:account-value point))
+        (parsing/optional-number (:accountValue point)))
+
+    :else
+    nil))
 
 (defn normalize-vault-snapshot-return
   [span-key row]
