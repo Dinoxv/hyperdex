@@ -212,6 +212,37 @@
                                  {:full-width? true
                                   :extra-classes (table/header-alignment-classes align)})))
 
+(def ^:private balance-row-action-button-classes
+  ["inline-flex"
+   "min-h-6"
+   "w-full"
+   "justify-start"
+   "appearance-none"
+   "border-0"
+   "bg-transparent"
+   "p-0"
+   "font-medium"
+   "text-trading-text"
+   "transition-colors"
+   "hover:bg-transparent"
+   "hover:text-[#7fffe4]"
+   "focus:outline-none"
+   "focus:ring-0"
+   "focus:ring-offset-0"
+   "focus:shadow-none"
+   "focus-visible:outline-none"
+   "focus-visible:ring-0"
+   "focus-visible:ring-offset-0"
+   "focus-visible:text-[#7fffe4]"
+   "focus-visible:underline"
+   "underline-offset-2"
+   "whitespace-nowrap"])
+
+(defn- balance-row-action-button [label]
+  [:button {:class balance-row-action-button-classes
+            :type "button"}
+   label])
+
 (defn balance-row [{:keys [coin
                            selection-coin
                            total-balance
@@ -245,11 +276,11 @@
      [:div.text-right.font-semibold.num.num-right "$" (shared/format-currency usdc-value)]
      [:div.text-right.font-medium.num.num-right (shared/format-pnl pnl-value pnl-pct)]
      [:div.text-left
-      [:button {:class ["btn" "btn-xs" "btn-spectate" "text-trading-text"]} "Send"]]
+      (balance-row-action-button "Send")]
      [:div.text-left
       (if transfer-disabled?
         [:span {:class ["text-xs" "text-trading-text-secondary"]} "Unified"]
-        [:button {:class ["btn" "btn-xs" "btn-spectate" "text-trading-text"]} "Transfer"])]
+        (balance-row-action-button "Transfer"))]
      [:div.text-left
       (balance-contract-node contract-id)]]))
 
