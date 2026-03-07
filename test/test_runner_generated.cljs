@@ -84,6 +84,7 @@
             [hyperopen.funding-comparison.actions-test]
             [hyperopen.funding-comparison.effects-test]
             [hyperopen.funding.actions-test]
+            [hyperopen.funding.application.modal-vm-test]
             [hyperopen.funding.effects-test]
             [hyperopen.funding.history-cache-test]
             [hyperopen.funding.predictability-test]
@@ -385,6 +386,7 @@
              'hyperopen.funding-comparison.actions-test
              'hyperopen.funding-comparison.effects-test
              'hyperopen.funding.actions-test
+             'hyperopen.funding.application.modal-vm-test
              'hyperopen.funding.effects-test
              'hyperopen.funding.history-cache-test
              'hyperopen.funding.predictability-test
