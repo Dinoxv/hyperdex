@@ -113,6 +113,84 @@
           (view/open-orders-tab-content changed-rows sort-state-asc)
           (is (= 3 @sort-calls)))))))
 
+(deftest open-orders-tab-content-re-sorts-and-re-indexes-when-coin-market-labels-change-test
+  (let [rows [{:oid 1001
+               :coin "@107"
+               :side "B"
+               :sz "1.0"
+               :orig-sz "1.0"
+               :px "100.0"
+               :type "Limit"
+               :time 1700000000000
+               :reduce-only false
+               :is-trigger false
+               :trigger-condition nil
+               :is-position-tpsl false}
+              {:oid 1002
+               :coin "@108"
+               :side "A"
+               :sz "1.0"
+               :orig-sz "1.0"
+               :px "101.0"
+               :type "Limit"
+               :time 1699999999000
+               :reduce-only false
+               :is-trigger false
+               :trigger-condition nil
+               :is-position-tpsl false}]
+        sort-state {:column "Coin" :direction :asc}
+        market-by-key {"spot:@107" {:coin "@107"
+                                    :symbol "ZZZ/USDC"
+                                    :base "ZZZ"
+                                    :market-type :spot}
+                       "spot:@108" {:coin "@108"
+                                    :symbol "AAA/USDC"
+                                    :base "AAA"
+                                    :market-type :spot}}
+        equivalent-market (into {} market-by-key)
+        changed-market {"spot:@107" {:coin "@107"
+                                     :symbol "AAA/USDC"
+                                     :base "AAA"
+                                     :market-type :spot}
+                        "spot:@108" {:coin "@108"
+                                     :symbol "ZZZ/USDC"
+                                     :base "ZZZ"
+                                     :market-type :spot}}
+        sort-calls (atom 0)
+        index-calls (atom 0)
+        original-sort open-orders-tab/sort-open-orders-by-column
+        original-index-builder @#'open-orders-tab/*build-open-orders-coin-search-index*]
+    (open-orders-tab/reset-open-orders-sort-cache!)
+    (with-redefs [open-orders-tab/sort-open-orders-by-column
+                  (fn
+                    ([orders column direction]
+                     (swap! sort-calls inc)
+                     (original-sort orders column direction))
+                    ([orders column direction market-by-key*]
+                     (swap! sort-calls inc)
+                     (original-sort orders column direction market-by-key*)))
+                  open-orders-tab/*build-open-orders-coin-search-index*
+                  (fn [sorted-rows market-by-key*]
+                    (swap! index-calls inc)
+                    (original-index-builder sorted-rows market-by-key*))]
+      (view/open-orders-tab-content rows sort-state {:market-by-key market-by-key})
+      (view/open-orders-tab-content rows sort-state {:market-by-key market-by-key})
+      (is (= 1 @sort-calls))
+      (is (= 1 @index-calls))
+
+      (view/open-orders-tab-content rows sort-state {:market-by-key equivalent-market})
+      (is (= 1 @sort-calls))
+      (is (= 1 @index-calls))
+
+      (let [changed-content (view/open-orders-tab-content rows sort-state {:market-by-key changed-market})
+            changed-row (hiccup/first-viewport-row changed-content)
+            changed-coin-cell (nth (vec (hiccup/node-children changed-row)) 2)
+            changed-strings (set (hiccup/collect-strings changed-coin-cell))]
+        (is (= 2 @sort-calls))
+        (is (= 2 @index-calls))
+        (is (contains? changed-strings "AAA"))
+        (is (not (contains? changed-strings "ZZZ")))))))
+
 (deftest open-orders-tab-content-filters-rows-by-direction-filter-test
   (let [rows [{:oid 1001
                :coin "LONGCOIN"
@@ -370,6 +448,30 @@
     (is (some? coin-button))
     (is (= [[:actions/select-asset "@107"]]
            (get-in coin-button [1 :on :click])))))
+
+(deftest open-orders-row-cancel-action-renders-text-button-without-btn-chrome-test
+  (let [open-orders [{:oid 101
+                      :coin "HYPE"
+                      :side "B"
+                      :sz "1.0"
+                      :orig-sz "1.0"
+                      :px "100.0"
+                      :type "Limit"
+                      :time 1700000001000
+                      :reduce-only false
+                      :is-trigger false
+                      :trigger-condition nil
+                      :is-position-tpsl false}]
+        content (view/open-orders-tab-content open-orders {:column "Time" :direction :desc})
+        row-node (hiccup/first-viewport-row content)
+        cancel-cell (nth (vec (hiccup/node-children row-node)) 11)
+        action-button (hiccup/find-first-node cancel-cell #(= :button (first %)))
+        button-classes (hiccup/node-class-set action-button)]
+    (is (some? action-button))
+    (is (contains? (set (hiccup/collect-strings cancel-cell)) "Cancel"))
+    (is (contains? button-classes "inline-flex"))
+    (is (not (contains? button-classes "btn")))
+    (is (not (contains? button-classes "btn-spectate")))))
 
 (deftest open-orders-coin-cell-dispatches-select-asset-action-test
   (let [open-orders [{:oid 101

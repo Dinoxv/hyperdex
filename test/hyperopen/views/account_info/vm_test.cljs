@@ -233,6 +233,35 @@
       (vm/account-info-vm (assoc state :orders (assoc (:orders state) :open-orders [{:coin "ETH" :oid 12}])))
       (is (= 2 @normalize-calls)))))
 
+(deftest account-info-vm-carries-market-metadata-for-selected-open-orders-tab-test
+  (let [state {:account-info {:selected-tab :open-orders}
+               :asset-selector {:market-by-key {"spot:@107" {:coin "@107"
+                                                             :market-type :spot
+                                                             :symbol "AAPL/USDC"
+                                                             :base "AAPL"
+                                                             :quote "USDC"}}}
+               :webdata2 {}
+               :orders {:open-orders [{:coin "@107"
+                                       :oid 42
+                                       :side "B"
+                                       :sz "1.0"
+                                       :limitPx "10.0"
+                                       :timestamp 1700000000000}]
+                        :open-orders-snapshot []
+                        :open-orders-snapshot-by-dex {}}
+               :spot {:meta nil
+                      :clearinghouse-state nil}
+               :account {:mode :classic}
+               :perp-dex-clearinghouse {}}
+        view-model (vm/account-info-vm state)
+        order-row (first (:open-orders view-model))]
+    (is (= :open-orders (:selected-tab view-model)))
+    (is (= 1 (count (:open-orders view-model))))
+    (is (= "@107" (:coin order-row)))
+    (is (= "42" (:oid order-row)))
+    (is (= "AAPL"
+           (get-in view-model [:open-orders-state :market-by-key "spot:@107" :base])))))
+
 (deftest account-info-vm-derives-freshness-cues-from-websocket-health-test
   (let [state {:account-info {:selected-tab :open-orders}
                :webdata2 {}

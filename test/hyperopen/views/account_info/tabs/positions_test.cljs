@@ -409,6 +409,19 @@
            (nth (first click-actions) 2)))
     (is (= "true" (get-in action-button [1 :data-position-reduce-trigger])))))
 
+(deftest position-row-reduce-cell-renders-text-button-without-btn-chrome-test
+  (let [row-data (fixtures/sample-position-row "xyz:NVDA" 10 "0.500")
+        row-node (view/position-row row-data)
+        row-cells (vec (hiccup/node-children row-node))
+        reduce-cell (nth row-cells 9)
+        action-button (hiccup/find-first-node reduce-cell #(= :button (first %)))
+        button-classes (hiccup/node-class-set action-button)]
+    (is (some? action-button))
+    (is (contains? (set (hiccup/collect-strings reduce-cell)) "Reduce"))
+    (is (contains? button-classes "inline-flex"))
+    (is (not (contains? button-classes "btn")))
+    (is (not (contains? button-classes "btn-spectate")))))
+
 (deftest position-row-margin-cell-dispatches-open-modal-action-test
   (let [row-data (fixtures/sample-position-row "xyz:NVDA" 10 "0.500")
         row-node (view/position-row row-data)

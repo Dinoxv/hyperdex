@@ -140,6 +140,9 @@
               [row candidates]))
           rows*)))
 
+(def ^:dynamic *build-open-orders-coin-search-index*
+  build-open-orders-coin-search-index)
+
 (defn- filter-open-orders-by-coin-search
   [rows indexed-rows coin-search]
   (let [query (shared/compile-coin-search-query coin-search)]
@@ -231,7 +234,7 @@
                                 market-by-key)))
             indexed-rows (if same-index?
                            (:indexed-rows cache)
-                           (build-open-orders-coin-search-index base-sorted market-by-key))
+                           (*build-open-orders-coin-search-index* base-sorted market-by-key))
             result (filter-open-orders-by-coin-search base-sorted indexed-rows coin-search)]
         (reset! sorted-open-orders-cache {:orders orders
                                           :orders-signature (:signature row-match)
