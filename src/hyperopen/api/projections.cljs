@@ -2,7 +2,8 @@
   (:require [clojure.string :as str]
             [hyperopen.account.context :as account-context]
             [hyperopen.api.errors :as api-errors]
-            [hyperopen.api.market-metadata.perp-dexs :as perp-dexs]))
+            [hyperopen.api.market-metadata.perp-dexs :as perp-dexs]
+            [hyperopen.wallet.agent-session :as agent-session]))
 
 (defn- normalized-error
   [err]
@@ -205,6 +206,19 @@
 (def ^:private default-api-wallet-name
   "app.hyperopen.xyz")
 
+(defn- default-agent-name-from-snapshot
+  [snapshot]
+  (some-> (or (:agentName snapshot)
+              (:agent-name snapshot)
+              (:walletName snapshot)
+              (:wallet-name snapshot)
+              (:agentLabel snapshot)
+              (:agent-label snapshot)
+              (:label snapshot))
+          str
+          str/trim
+          not-empty))
+
 (defn- parse-ms
   [value]
   (let [parsed (cond
@@ -225,17 +239,22 @@
                         str/trim
                         str/lower-case
                         not-empty)
-        valid-until-ms (some parse-ms
-                             [(:agentValidUntil snapshot)
-                              (:agent-valid-until snapshot)
-                              (:validUntil snapshot)
-                              (:valid-until snapshot)])]
+        approval-name (default-agent-name-from-snapshot snapshot)
+        parsed-name (agent-session/parse-agent-name-valid-until approval-name)
+        name (:name parsed-name)
+        encoded-valid-until-ms (:valid-until-ms parsed-name)
+        explicit-valid-until-ms (some parse-ms
+                                      [(:agentValidUntil snapshot)
+                                       (:agent-valid-until snapshot)
+                                       (:validUntil snapshot)
+                                       (:valid-until snapshot)])]
     (when address
       {:row-kind :default
-       :name default-api-wallet-name
+       :name (or name approval-name default-api-wallet-name)
        :approval-name nil
        :address address
-       :valid-until-ms valid-until-ms})))
+       :valid-until-ms (or explicit-valid-until-ms
+                           encoded-valid-until-ms)})))
 
 (defn clear-api-wallets-errors
   [state]
