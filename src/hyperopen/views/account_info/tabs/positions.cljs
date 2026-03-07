@@ -443,17 +443,14 @@
         funding-tooltip
         {:underlined? false})]
       [:div {:class ["text-left" "relative"]}
-       [:button {:class ["btn"
-                         "btn-xs"
-                         "btn-spectate"
+       [:button {:class ["inline-flex"
                          "w-full"
                          "justify-start"
-                         "px-1"
+                         "bg-transparent"
+                         "p-0"
                          "font-semibold"
                          "text-trading-green"
-                         "hover:bg-transparent"
-                         "active:bg-transparent"
-                         "focus:bg-transparent"
+                         "transition-colors"
                          "focus:outline-none"
                          "focus:ring-0"
                          "focus:ring-offset-0"
@@ -463,7 +460,6 @@
                          "focus-visible:ring-offset-0"
                          "hover:text-[#7fffe4]"
                          "focus-visible:text-[#7fffe4]"
-                         "flex-nowrap"
                          "whitespace-nowrap"]
                  :type "button"
                  :data-position-reduce-trigger "true"

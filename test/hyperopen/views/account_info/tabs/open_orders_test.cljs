@@ -88,9 +88,13 @@
         sort-calls (atom 0)]
     (open-orders-tab/reset-open-orders-sort-cache!)
     (with-redefs [open-orders-tab/sort-open-orders-by-column
-                  (fn [orders _column _direction]
-                    (swap! sort-calls inc)
-                    orders)]
+                  (fn
+                    ([orders _column _direction]
+                     (swap! sort-calls inc)
+                     orders)
+                    ([orders _column _direction _market-by-key]
+                     (swap! sort-calls inc)
+                     orders))]
       (view/open-orders-tab-content rows sort-state)
       (view/open-orders-tab-content rows sort-state)
       (is (= 1 @sort-calls))
@@ -236,9 +240,13 @@
         sort-calls (atom 0)]
     (open-orders-tab/reset-open-orders-sort-cache!)
     (with-redefs [open-orders-tab/sort-open-orders-by-column
-                  (fn [orders _column _direction]
-                    (swap! sort-calls inc)
-                    orders)]
+                  (fn
+                    ([orders _column _direction]
+                     (swap! sort-calls inc)
+                     orders)
+                    ([orders _column _direction _market-by-key]
+                     (swap! sort-calls inc)
+                     orders))]
       (view/open-orders-tab-content rows sort-state {:direction-filter :all})
       (view/open-orders-tab-content rows sort-state {:direction-filter :all})
       (is (= 1 @sort-calls))
@@ -330,6 +338,38 @@
            (get-in long-coin-base [1 :style :color])))
     (is (= "rgb(234, 175, 184)"
            (get-in short-coin-base [1 :style :color])))))
+
+(deftest open-orders-tab-content-resolves-raw-market-ids-through-market-by-key-test
+  (let [open-orders [{:oid 101
+                      :coin "@107"
+                      :side "B"
+                      :sz "1.0"
+                      :orig-sz "1.0"
+                      :px "100.0"
+                      :type "Limit"
+                      :time 1700000001000
+                      :reduce-only false
+                      :is-trigger false
+                      :trigger-condition nil
+                      :is-position-tpsl false}]
+        market-by-key {"spot:@107" {:coin "@107"
+                                    :market-type :spot
+                                    :symbol "AAPL/USDC"
+                                    :base "AAPL"
+                                    :quote "USDC"}}
+        content (view/open-orders-tab-content open-orders
+                                              {:column "Time" :direction :desc}
+                                              {:coin-search "aa"
+                                               :market-by-key market-by-key})
+        text-content (set (hiccup/collect-strings content))
+        row-node (hiccup/first-viewport-row content)
+        coin-cell (nth (vec (hiccup/node-children row-node)) 2)
+        coin-button (hiccup/find-first-node coin-cell #(= :button (first %)))]
+    (is (contains? text-content "AAPL"))
+    (is (not (contains? text-content "@107")))
+    (is (some? coin-button))
+    (is (= [[:actions/select-asset "@107"]]
+           (get-in coin-button [1 :on :click])))))
 
 (deftest open-orders-coin-cell-dispatches-select-asset-action-test
   (let [open-orders [{:oid 101

@@ -288,10 +288,11 @@
                                 :coin-search ""
                                 :filter-open? false}
                                (get-in state [:account-info :positions] {}))
-        open-orders-state (merge {:direction-filter :all
-                                  :coin-search ""
-                                  :filter-open? false}
-                                 (get-in state [:account-info :open-orders] {}))
+        open-orders-state (-> (merge {:direction-filter :all
+                                      :coin-search ""
+                                      :filter-open? false}
+                                     (get-in state [:account-info :open-orders] {}))
+                              (assoc :market-by-key market-by-key))
         websocket-health (get-in state [:websocket :health])
         effective-address (account-context/effective-account-address state)
         show-surface-freshness-cues?

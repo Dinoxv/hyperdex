@@ -52,6 +52,9 @@
     (is (= :all (get-in view-model [:open-orders-state :direction-filter])))
     (is (= "nv" (get-in view-model [:open-orders-state :coin-search])))
     (is (false? (get-in view-model [:open-orders-state :filter-open?])))
+    (is (= {"xyz:NVDA" {:coin "xyz:NVDA"
+                        :symbol "NVDA/USDC"}}
+           (get-in view-model [:open-orders-state :market-by-key])))
     (is (= "liq" (get-in view-model [:trade-history-state :coin-search])))
     (is (= {"xyz:NVDA" {:coin "xyz:NVDA"
                         :symbol "NVDA/USDC"}}

@@ -118,15 +118,21 @@
       :short (filterv #(contains? short-order-side-values (:side %)) orders*)
       (vec orders*))))
 
+(defn- open-order-coin-base-label
+  [coin market-by-key]
+  (or (some-> (shared/resolve-coin-display coin market-by-key)
+              :base-label)
+      ""))
+
 (defn- build-open-orders-coin-search-index
-  [rows]
+  [rows market-by-key]
   (let [rows* (or rows [])
         candidates-by-coin (volatile! {})]
     (mapv (fn [row]
             (let [coin (:coin row)
                   cached (get @candidates-by-coin coin)
                   candidates (or cached
-                                 (let [{:keys [base-label prefix-label]} (shared/resolve-coin-display coin {})
+                                 (let [{:keys [base-label prefix-label]} (shared/resolve-coin-display coin market-by-key)
                                        normalized (shared/normalized-coin-search-candidates
                                                    [coin base-label prefix-label])]
                                    (vswap! candidates-by-coin assoc coin normalized)
@@ -152,8 +158,8 @@
     "S" {:color sell-coin-color}
     nil))
 
-(defn- open-orders-coin-node [coin side]
-  (let [{:keys [base-label prefix-label]} (shared/resolve-coin-display coin {})
+(defn- open-orders-coin-node [coin market-by-key side]
+  (let [{:keys [base-label prefix-label]} (shared/resolve-coin-display coin market-by-key)
         node-style (coin-style side)]
     (shared/coin-select-control
      coin
@@ -168,39 +174,51 @@
         [:span {:class shared/position-chip-classes} prefix-label])]
      {:extra-classes ["w-full" "justify-start" "text-left"]})))
 
-(defn sort-open-orders-by-column [orders column direction]
-  (sort-kernel/sort-rows-by-column
-   orders
-   {:column column
-    :direction direction
-    :accessor-by-column
-    {"Time" (fn [o] (shared/parse-num (:time o)))
-     "Type" (fn [o] (or (:type o) ""))
-     "Coin" (fn [o] (or (:coin o) ""))
-     "Direction" (fn [o] (direction-label (:side o)))
-     "Size" (fn [o] (shared/parse-num (:sz o)))
-     "Original Size" (fn [o] (shared/parse-num (or (:orig-sz o) (:sz o))))
-     "Order Value" (fn [o] (or (order-value o) 0))
-     "Price" (fn [o] (shared/parse-num (:px o)))}}))
+(defn sort-open-orders-by-column
+  ([orders column direction]
+   (sort-open-orders-by-column orders column direction {}))
+  ([orders column direction market-by-key]
+   (sort-kernel/sort-rows-by-column
+    orders
+    {:column column
+     :direction direction
+     :accessor-by-column
+     {"Time" (fn [o] (shared/parse-num (:time o)))
+      "Type" (fn [o] (or (:type o) ""))
+      "Coin" (fn [o] (some-> (open-order-coin-base-label (:coin o) market-by-key)
+                             str/lower-case))
+      "Direction" (fn [o] (direction-label (:side o)))
+      "Size" (fn [o] (shared/parse-num (:sz o)))
+      "Original Size" (fn [o] (shared/parse-num (or (:orig-sz o) (:sz o))))
+      "Order Value" (fn [o] (or (order-value o) 0))
+      "Price" (fn [o] (shared/parse-num (:px o)))}})))
 
 (defonce ^:private sorted-open-orders-cache (atom nil))
 
 (defn reset-open-orders-sort-cache! []
   (reset! sorted-open-orders-cache nil))
 
-(defn- memoized-sorted-open-orders [orders direction-filter sort-state coin-search]
+(defn- memoized-sorted-open-orders [orders direction-filter sort-state market-by-key coin-search]
   (let [column (:column sort-state)
         direction (:direction sort-state)
         cache @sorted-open-orders-cache
         row-match (cache-keys/rows-match-state orders
                                                (:orders cache)
                                                (:orders-signature cache))
+        market-match (cache-keys/value-match-state market-by-key
+                                                   (:market-by-key cache)
+                                                   (:market-signature cache))
+        market-affects-base-sort? (= column "Coin")
         same-base? (and (map? cache)
                         (:same-input? row-match)
                         (= direction-filter (:direction-filter cache))
                         (= column (:column cache))
-                        (= direction (:direction cache)))
-        cache-hit? (and same-base?
+                        (= direction (:direction cache))
+                        (or (not market-affects-base-sort?)
+                            (:same-input? market-match)))
+        same-index? (and same-base?
+                         (:same-input? market-match))
+        cache-hit? (and same-index?
                         (= coin-search (:coin-search cache)))]
     (if cache-hit?
       (:result cache)
@@ -209,10 +227,11 @@
                           (vec (sort-open-orders-by-column
                                 (filter-open-orders-by-direction orders direction-filter)
                                 column
-                                direction)))
-            indexed-rows (if same-base?
+                                direction
+                                market-by-key)))
+            indexed-rows (if same-index?
                            (:indexed-rows cache)
-                           (build-open-orders-coin-search-index base-sorted))
+                           (build-open-orders-coin-search-index base-sorted market-by-key))
             result (filter-open-orders-by-coin-search base-sorted indexed-rows coin-search)]
         (reset! sorted-open-orders-cache {:orders orders
                                           :orders-signature (:signature row-match)
@@ -220,6 +239,8 @@
                                           :coin-search coin-search
                                           :column column
                                           :direction direction
+                                          :market-by-key market-by-key
+                                          :market-signature (:signature market-match)
                                           :base-sorted base-sorted
                                           :indexed-rows indexed-rows
                                           :result result})
@@ -236,8 +257,9 @@
    (open-orders-tab-content normalized sort-state {}))
   ([normalized sort-state open-orders-state]
    (let [direction-filter (open-orders-direction-filter-key open-orders-state)
+         market-by-key (or (:market-by-key open-orders-state) {})
          coin-search (:coin-search open-orders-state "")
-         sorted (memoized-sorted-open-orders normalized direction-filter sort-state coin-search)]
+         sorted (memoized-sorted-open-orders normalized direction-filter sort-state market-by-key coin-search)]
      (if (seq sorted)
        (table/tab-table-content
         [:div {:class ["grid" "gap-2" "py-1" "px-3" "bg-base-200" "text-xs" "font-medium" open-orders-grid-template-class]}
@@ -258,7 +280,7 @@
           [:div {:class ["grid" "gap-2" "py-px" "px-3" "hover:bg-base-300" "text-xs" open-orders-grid-template-class]}
            [:div.pr-2.text-left.whitespace-nowrap (shared/format-open-orders-time (:time o))]
            [:div.pl-1.text-left (or (:type o) "Order")]
-           [:div.text-left (open-orders-coin-node (:coin o) (:side o))]
+           [:div.text-left (open-orders-coin-node (:coin o) market-by-key (:side o))]
            [:div {:class ["text-left" (direction-class (:side o))]} (direction-label (:side o))]
            [:div.text-left.num (shared/format-currency (:sz o))]
            [:div.text-left.num (shared/format-currency (or (:orig-sz o) (:sz o)))]
@@ -270,7 +292,23 @@
            [:div.text-left (format-trigger-conditions o)]
            [:div.text-left (format-tp-sl o)]
            [:div.text-left
-            [:button {:class ["btn" "btn-xs" "btn-spectate"]
+            [:button {:class ["inline-flex"
+                              "w-full"
+                              "justify-start"
+                              "bg-transparent"
+                              "p-0"
+                              "font-medium"
+                              "text-trading-text"
+                              "transition-colors"
+                              "focus:outline-none"
+                              "focus:ring-0"
+                              "focus:ring-offset-0"
+                              "focus:shadow-none"
+                              "focus-visible:outline-none"
+                              "focus-visible:ring-0"
+                              "focus-visible:ring-offset-0"
+                              "hover:text-trading-text"
+                              "whitespace-nowrap"]
                       :on {:click [[:actions/cancel-order o]]}}
              "Cancel"]]]))
        (empty-state "No open orders")))))
