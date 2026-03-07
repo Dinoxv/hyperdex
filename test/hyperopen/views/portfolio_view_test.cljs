@@ -203,6 +203,21 @@
     (is (some? y-axis-label-node))
     (is (some #(re-find #"[0-9],[0-9]" %) all-text))))
 
+(deftest portfolio-view-funding-actions-pass-explicit-anchor-bounds-test
+  (let [view-node (portfolio-view/portfolio-view sample-state)
+        deposit-button (find-first-node view-node
+                                        #(= [[:actions/open-funding-deposit-modal :event.currentTarget/bounds]]
+                                            (get-in % [1 :on :click])))
+        transfer-button (find-first-node view-node
+                                         #(= [[:actions/open-funding-transfer-modal :event.currentTarget/bounds]]
+                                             (get-in % [1 :on :click])))
+        withdraw-button (find-first-node view-node
+                                         #(= [[:actions/open-funding-withdraw-modal :event.currentTarget/bounds]]
+                                             (get-in % [1 :on :click])))]
+    (is (some? deposit-button))
+    (is (some? transfer-button))
+    (is (some? withdraw-button))))
+
 (deftest portfolio-view-returns-tab-renders-percent-axis-labels-test
   (let [state (-> sample-state
                   (assoc-in [:portfolio-ui :chart-tab] :returns)

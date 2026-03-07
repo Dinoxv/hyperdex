@@ -174,6 +174,48 @@
       refresh-withdraw-queue?
       (conj [:effects/api-fetch-hyperunit-withdrawal-queue]))))
 
+(defn search-funding-deposit-assets
+  [deps state value]
+  (set-funding-modal-field deps state [:deposit-search-input] value))
+
+(defn select-funding-deposit-asset
+  [deps state asset-key]
+  (set-funding-modal-field deps state [:deposit-selected-asset-key] asset-key))
+
+(defn return-to-funding-deposit-asset-select
+  [deps state]
+  (set-funding-modal-field deps state [:deposit-step] :asset-select))
+
+(defn enter-funding-deposit-amount
+  [deps state value]
+  (set-funding-modal-field deps state [:amount-input] value))
+
+(defn set-funding-deposit-amount-to-minimum
+  [{:keys [modal-state
+           deposit-asset
+           deposit-min-usdc] :as deps}
+   state]
+  (let [modal (modal-state state)
+        minimum (or (:minimum (deposit-asset state modal))
+                    deposit-min-usdc)]
+    (set-funding-modal-field deps state [:amount-input] minimum)))
+
+(defn enter-funding-transfer-amount
+  [deps state value]
+  (set-funding-modal-field deps state [:amount-input] value))
+
+(defn select-funding-withdraw-asset
+  [deps state asset-key]
+  (set-funding-modal-field deps state [:withdraw-selected-asset-key] asset-key))
+
+(defn enter-funding-withdraw-destination
+  [deps state value]
+  (set-funding-modal-field deps state [:destination-input] value))
+
+(defn enter-funding-withdraw-amount
+  [deps state value]
+  (set-funding-modal-field deps state [:amount-input] value))
+
 (defn set-hyperunit-lifecycle
   [{:keys [modal-state
            normalize-hyperunit-lifecycle

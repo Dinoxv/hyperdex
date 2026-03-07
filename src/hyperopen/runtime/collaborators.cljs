@@ -215,6 +215,15 @@
    :close-funding-modal funding-actions/close-funding-modal
    :handle-funding-modal-keydown funding-actions/handle-funding-modal-keydown
    :set-funding-modal-field funding-actions/set-funding-modal-field
+   :search-funding-deposit-assets funding-actions/search-funding-deposit-assets
+   :select-funding-deposit-asset funding-actions/select-funding-deposit-asset
+   :return-to-funding-deposit-asset-select funding-actions/return-to-funding-deposit-asset-select
+   :enter-funding-deposit-amount funding-actions/enter-funding-deposit-amount
+   :set-funding-deposit-amount-to-minimum funding-actions/set-funding-deposit-amount-to-minimum
+   :enter-funding-transfer-amount funding-actions/enter-funding-transfer-amount
+   :select-funding-withdraw-asset funding-actions/select-funding-withdraw-asset
+   :enter-funding-withdraw-destination funding-actions/enter-funding-withdraw-destination
+   :enter-funding-withdraw-amount funding-actions/enter-funding-withdraw-amount
    :set-hyperunit-lifecycle funding-actions/set-hyperunit-lifecycle
    :clear-hyperunit-lifecycle funding-actions/clear-hyperunit-lifecycle
    :set-hyperunit-lifecycle-error funding-actions/set-hyperunit-lifecycle-error

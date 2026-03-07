@@ -902,3 +902,150 @@
       (is (= [:funding-ui :modal] path))
       (is (= "8.5" (:amount-input next-modal)))
       (is (nil? (:error next-modal))))))
+
+(deftest named-funding-modal-actions-update-intended-fields-test
+  (let [deposit-state (assoc-in (base-state)
+                                [:funding-ui :modal]
+                                {:open? true
+                                 :mode :deposit
+                                 :deposit-step :asset-select
+                                 :deposit-search-input ""
+                                 :deposit-selected-asset-key nil
+                                 :amount-input ""})
+        withdraw-state (assoc-in (base-state)
+                                 [:funding-ui :modal]
+                                 {:open? true
+                                  :mode :withdraw
+                                  :withdraw-selected-asset-key :usdc
+                                  :destination-input ""
+                                  :amount-input ""})
+        transfer-state (assoc-in (base-state)
+                                 [:funding-ui :modal]
+                                 {:open? true
+                                 :mode :transfer
+                                 :amount-input ""})]
+    (let [[effect-id path next-modal] (first (funding-actions/search-funding-deposit-assets
+                                              deposit-state
+                                              "btc"))]
+      (is (= :effects/save effect-id))
+      (is (= [:funding-ui :modal] path))
+      (is (= "btc" (:deposit-search-input next-modal))))
+    (let [effects (funding-actions/select-funding-deposit-asset
+                   deposit-state
+                   :btc)
+          [effect-id path next-modal] (first effects)]
+      (is (= :effects/save effect-id))
+      (is (= [:funding-ui :modal] path))
+      (is (= :amount-entry (:deposit-step next-modal)))
+      (is (= :btc (:deposit-selected-asset-key next-modal)))
+      (is (= [[:effects/api-fetch-hyperunit-fee-estimate]]
+             (rest effects))))
+    (let [[effect-id path next-modal] (first (funding-actions/enter-funding-deposit-amount
+                                              (assoc-in deposit-state
+                                                        [:funding-ui :modal]
+                                                        {:open? true
+                                                         :mode :deposit
+                                                         :deposit-step :amount-entry
+                                                         :deposit-selected-asset-key :usdc
+                                                         :amount-input ""})
+                                              "25"))]
+      (is (= :effects/save effect-id))
+      (is (= [:funding-ui :modal] path))
+      (is (= :amount-entry (:deposit-step next-modal)))
+      (is (= :usdc (:deposit-selected-asset-key next-modal)))
+      (is (= "25" (:amount-input next-modal))))
+    (let [[effect-id path next-modal] (first (funding-actions/enter-funding-transfer-amount
+                                              transfer-state
+                                              "4.5"))]
+      (is (= :effects/save effect-id))
+      (is (= [:funding-ui :modal] path))
+      (is (= "4.5" (:amount-input next-modal))))
+    (let [effects (funding-actions/select-funding-withdraw-asset
+                   withdraw-state
+                   :btc)
+          [effect-id path next-modal] (first effects)]
+      (is (= :effects/save effect-id))
+      (is (= [:funding-ui :modal] path))
+      (is (= :btc (:withdraw-selected-asset-key next-modal)))
+      (is (= (funding-actions/default-hyperunit-withdrawal-queue-state)
+             (:hyperunit-withdrawal-queue next-modal)))
+      (is (= [[:effects/api-fetch-hyperunit-fee-estimate]
+              [:effects/api-fetch-hyperunit-withdrawal-queue]]
+             (rest effects))))
+    (let [[effect-id path next-modal] (first (funding-actions/enter-funding-withdraw-destination
+                                              withdraw-state
+                                              "bc1qexample"))]
+      (is (= :effects/save effect-id))
+      (is (= [:funding-ui :modal] path))
+      (is (= "bc1qexample" (:destination-input next-modal))))
+    (let [[effect-id path next-modal] (first (funding-actions/enter-funding-withdraw-amount
+                                              withdraw-state
+                                              "6.5"))]
+      (is (= :effects/save effect-id))
+      (is (= [:funding-ui :modal] path))
+      (is (= "6.5" (:amount-input next-modal))))))
+
+(deftest funding-deposit-minimum-action-uses-selected-asset-minimum-test
+  (let [state (assoc-in (base-state)
+                        [:funding-ui :modal]
+                        {:open? true
+                         :mode :deposit
+                         :deposit-step :amount-entry
+                         :deposit-selected-asset-key :usdc
+                         :amount-input ""})
+        [effect-id path next-modal] (first (funding-actions/set-funding-deposit-amount-to-minimum state))]
+    (is (= :effects/save effect-id))
+    (is (= [:funding-ui :modal] path))
+    (is (= "5" (:amount-input next-modal)))
+    (is (nil? (:error next-modal)))))
+
+(deftest funding-modal-view-model-scopes-lifecycle-to-the-active-direction-test
+  (let [state (assoc-in (base-state)
+                        [:funding-ui :modal]
+                        {:open? true
+                         :mode :deposit
+                         :deposit-step :amount-entry
+                         :deposit-selected-asset-key :btc
+                         :hyperunit-lifecycle {:direction :withdraw
+                                               :asset-key :btc
+                                               :operation-id "op_btc_3"
+                                               :state :queued
+                                               :status :pending
+                                               :source-tx-confirmations 1
+                                               :destination-tx-confirmations nil
+                                               :position-in-withdraw-queue 2
+                                               :destination-tx-hash nil
+                                               :state-next-at 1700000000000
+                                               :last-updated-ms 1700000000000
+                                               :error nil}})
+        view-model (funding-actions/funding-modal-view-model state)]
+    (is (= :deposit/address (get-in view-model [:content :kind])))
+    (is (nil? (get-in view-model [:deposit :lifecycle])))
+    (is (nil? (get-in view-model [:withdraw :lifecycle])))))
+
+(deftest funding-modal-view-model-uses-stable-next-check-copy-in-lifecycle-panels-test
+  (let [state (-> (base-state)
+                  (assoc-in [:spot :clearinghouse-state :balances]
+                            [{:coin "USDC" :available "12.5" :total "12.5" :hold "0"}
+                             {:coin "BTC" :available "1.25" :total "1.25" :hold "0"}])
+                  (assoc-in [:funding-ui :modal]
+                            {:open? true
+                             :mode :withdraw
+                             :withdraw-selected-asset-key :btc
+                             :destination-input "bc1qexamplexyz0p4y0p4y0p4y0p4y0p4y0p4y0p"
+                             :amount-input "0.25"
+                             :hyperunit-lifecycle {:direction :withdraw
+                                                   :asset-key :btc
+                                                   :operation-id "op_btc_4"
+                                                   :state :queued
+                                                   :status :pending
+                                                   :source-tx-confirmations 1
+                                                   :destination-tx-confirmations nil
+                                                   :position-in-withdraw-queue 2
+                                                   :destination-tx-hash nil
+                                                   :state-next-at 1700000000000
+                                                   :last-updated-ms 1700000000000
+                                                   :error nil}}))
+        view-model (funding-actions/funding-modal-view-model state)]
+    (is (= "Scheduled"
+           (get-in view-model [:withdraw :lifecycle :next-check-label])))))

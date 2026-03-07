@@ -181,6 +181,7 @@
             [hyperopen.views.footer-view-test]
             [hyperopen.views.funding-comparison-view-test]
             [hyperopen.views.funding-comparison.vm-test]
+            [hyperopen.views.funding-modal-test]
             [hyperopen.views.header-view-test]
             [hyperopen.views.l2-orderbook-view-test]
             [hyperopen.views.portfolio-view-test]
@@ -235,6 +236,7 @@
             [hyperopen.views.trading-chart.utils.indicators-test]
             [hyperopen.views.trading-chart.utils.position-overlay-model-test]
             [hyperopen.views.typography-scale-test]
+            [hyperopen.views.ui.anchored-popover-test]
             [hyperopen.views.vaults.detail-view-test]
             [hyperopen.views.vaults.detail-vm-test]
             [hyperopen.views.vaults.detail.activity-test]
@@ -480,6 +482,7 @@
              'hyperopen.views.footer-view-test
              'hyperopen.views.funding-comparison-view-test
              'hyperopen.views.funding-comparison.vm-test
+             'hyperopen.views.funding-modal-test
              'hyperopen.views.header-view-test
              'hyperopen.views.l2-orderbook-view-test
              'hyperopen.views.portfolio-view-test
@@ -534,6 +537,7 @@
              'hyperopen.views.trading-chart.utils.indicators-test
              'hyperopen.views.trading-chart.utils.position-overlay-model-test
              'hyperopen.views.typography-scale-test
+             'hyperopen.views.ui.anchored-popover-test
              'hyperopen.views.vaults.detail-view-test
              'hyperopen.views.vaults.detail-vm-test
              'hyperopen.views.vaults.detail.activity-test

@@ -146,6 +146,8 @@
    :normalize-amount-input normalize-amount-input
    :normalize-deposit-step normalize-deposit-step
    :normalize-deposit-asset-key normalize-deposit-asset-key
+   :deposit-asset deposit-asset
+   :deposit-min-usdc deposit-min-usdc
    :default-hyperunit-lifecycle-state default-hyperunit-lifecycle-state
    :default-hyperunit-withdrawal-queue-state default-hyperunit-withdrawal-queue-state
    :normalize-mode normalize-mode
@@ -192,6 +194,42 @@
 (defn set-funding-modal-field
   [state path value]
   (modal-commands/set-funding-modal-field (command-deps) state path value))
+
+(defn search-funding-deposit-assets
+  [state value]
+  (modal-commands/search-funding-deposit-assets (command-deps) state value))
+
+(defn select-funding-deposit-asset
+  [state asset-key]
+  (modal-commands/select-funding-deposit-asset (command-deps) state asset-key))
+
+(defn return-to-funding-deposit-asset-select
+  [state]
+  (modal-commands/return-to-funding-deposit-asset-select (command-deps) state))
+
+(defn enter-funding-deposit-amount
+  [state value]
+  (modal-commands/enter-funding-deposit-amount (command-deps) state value))
+
+(defn set-funding-deposit-amount-to-minimum
+  [state]
+  (modal-commands/set-funding-deposit-amount-to-minimum (command-deps) state))
+
+(defn enter-funding-transfer-amount
+  [state value]
+  (modal-commands/enter-funding-transfer-amount (command-deps) state value))
+
+(defn select-funding-withdraw-asset
+  [state asset-key]
+  (modal-commands/select-funding-withdraw-asset (command-deps) state asset-key))
+
+(defn enter-funding-withdraw-destination
+  [state value]
+  (modal-commands/enter-funding-withdraw-destination (command-deps) state value))
+
+(defn enter-funding-withdraw-amount
+  [state value]
+  (modal-commands/enter-funding-withdraw-amount (command-deps) state value))
 
 (defn set-hyperunit-lifecycle
   [state lifecycle]

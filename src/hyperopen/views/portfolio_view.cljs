@@ -38,12 +38,12 @@
    {:label "Portfolio Margin"
     :action [:actions/navigate "/portfolio"]}
    {:label "Send"
-    :action [:actions/set-funding-modal :send]}
+    :action [:actions/open-funding-transfer-modal :event.currentTarget/bounds]}
    {:label "Withdraw"
-    :action [:actions/set-funding-modal :withdraw]}
+    :action [:actions/open-funding-withdraw-modal :event.currentTarget/bounds]}
    {:label "Deposit"
     :primary? true
-    :action [:actions/set-funding-modal :deposit]}])
+    :action [:actions/open-funding-deposit-modal :event.currentTarget/bounds]}])
 
 (defn- format-currency [value]
   (or (fmt/format-currency value)

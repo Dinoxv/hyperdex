@@ -528,6 +528,15 @@
    :actions/close-funding-modal ::no-args
    :actions/handle-funding-modal-keydown ::key-args
    :actions/set-funding-modal-field ::funding-modal-field-args
+   :actions/search-funding-deposit-assets ::single-input-args
+   :actions/select-funding-deposit-asset ::keyword-or-string-args
+   :actions/return-to-funding-deposit-asset-select ::no-args
+   :actions/enter-funding-deposit-amount ::single-input-args
+   :actions/set-funding-deposit-amount-to-minimum ::no-args
+   :actions/enter-funding-transfer-amount ::single-input-args
+   :actions/select-funding-withdraw-asset ::keyword-or-string-args
+   :actions/enter-funding-withdraw-destination ::single-input-args
+   :actions/enter-funding-withdraw-amount ::single-input-args
    :actions/set-hyperunit-lifecycle ::set-hyperunit-lifecycle-args
    :actions/clear-hyperunit-lifecycle ::no-args
    :actions/set-hyperunit-lifecycle-error ::set-hyperunit-lifecycle-error-args
