@@ -82,3 +82,44 @@
                                                          (get-in % [1 :data-role])))]
     (is (some? deposit-step))
     (is (nil? deposit-lifecycle))))
+
+(deftest funding-modal-falls-back-to-selector-anchor-when-stored-anchor-missing-test
+  (let [state (assoc-in (base-state)
+                        [:funding-ui :modal]
+                        {:open? true
+                         :mode :deposit
+                         :deposit-step :asset-select
+                         :deposit-search-input ""
+                         :deposit-selected-asset-key nil
+                         :amount-input ""})
+        original-document (.-document js/globalThis)
+        original-inner-width (.-innerWidth js/globalThis)
+        original-inner-height (.-innerHeight js/globalThis)]
+    (set! (.-document js/globalThis)
+          #js {:querySelector (fn [selector]
+                                (when (= "[data-role='funding-action-deposit']" selector)
+                                  #js {:getBoundingClientRect
+                                       (fn []
+                                         #js {:left 1040
+                                              :right 1180
+                                              :top 620
+                                              :bottom 660
+                                              :width 140
+                                              :height 40})}))})
+    (set! (.-innerWidth js/globalThis) 1440)
+    (set! (.-innerHeight js/globalThis) 900)
+    (try
+      (let [view-node (view/funding-modal-view state)
+            modal-node (find-first-node view-node #(= "funding-modal"
+                                                      (get-in % [1 :data-role])))
+            overlay-node (find-first-node view-node #(= "Close funding dialog"
+                                                        (get-in % [1 :aria-label])))]
+        (is (= "448px" (get-in modal-node [1 :style :width])))
+        (is (contains? (set (get-in modal-node [1 :class])) "pointer-events-auto"))
+        (is (not (contains? (set (get-in modal-node [1 :class])) "w-full")))
+        (is (contains? (set (get-in overlay-node [1 :class])) "bg-transparent"))
+        (is (not (contains? (set (get-in overlay-node [1 :class])) "bg-black/65"))))
+      (finally
+        (set! (.-document js/globalThis) original-document)
+        (set! (.-innerWidth js/globalThis) original-inner-width)
+        (set! (.-innerHeight js/globalThis) original-inner-height)))))

@@ -111,6 +111,30 @@
           :else
           grouped-whole)))))
 
+(defn- mode->fallback-anchor-selector
+  [mode]
+  (case mode
+    :deposit "[data-role='funding-action-deposit']"
+    :transfer "[data-role='funding-action-transfer']"
+    :withdraw "[data-role='funding-action-withdraw']"
+    nil))
+
+(defn- element-anchor-bounds
+  [selector]
+  (when (seq selector)
+    (let [document* (some-> js/globalThis .-document)
+          target (some-> document* (.querySelector selector))]
+      (when (and target (fn? (.-getBoundingClientRect target)))
+        (let [rect (.getBoundingClientRect target)]
+          {:left (.-left rect)
+           :right (.-right rect)
+           :top (.-top rect)
+           :bottom (.-bottom rect)
+           :width (.-width rect)
+           :height (.-height rect)
+           :viewport-width (some-> js/globalThis .-innerWidth)
+           :viewport-height (some-> js/globalThis .-innerHeight)})))))
+
 (defn- lifecycle-tx-hash-content
   [{:keys [hash explorer-url]}]
   (if (seq explorer-url)
@@ -756,7 +780,11 @@
   [state]
   (let [{:keys [modal feedback] :as view-model} (funding-actions/funding-modal-view-model state)
         open? (:open? modal)
-        anchor (:anchor modal)
+        stored-anchor* (if (map? (:anchor modal)) (:anchor modal) {})
+        fallback-anchor* (when-not (anchored-popover/complete-anchor? stored-anchor*)
+                           (element-anchor-bounds
+                            (mode->fallback-anchor-selector (:mode modal))))
+        anchor (or fallback-anchor* stored-anchor*)
         anchored-popover? (anchored-popover/complete-anchor? anchor)
         popover-style (when anchored-popover?
                         (anchored-popover/anchored-popover-layout-style
