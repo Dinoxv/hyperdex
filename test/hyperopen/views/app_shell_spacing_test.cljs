@@ -166,8 +166,32 @@
     (is (contains-class? view-node "xl:grid-cols-[minmax(0,1fr)_280px_320px]"))
     (is (contains-class? view-node "xl:grid-rows-[minmax(580px,1fr)_auto]"))
     (is (not (contains-class? view-node "xl:grid-rows-[minmax(580px,auto)_auto]")))
-    (is (contains-class? view-node "xl:row-span-2"))
-    (is (not (contains-class? view-node "xl:row-start-2")))))
+    (is (contains-class? view-node "xl:row-span-2"))))
+
+(deftest trade-view-xl-panel-span-contract-test
+  (let [view-node (trade-view/trade-view trade-view-test-state)
+        orderbook-panel (find-first-node view-node
+                                         #(= "trade-orderbook-panel"
+                                             (get-in % [1 :data-parity-id])))
+        order-entry-panel (find-first-node view-node
+                                           #(= "trade-order-entry-panel"
+                                               (get-in % [1 :data-parity-id])))
+        account-panel (find-first-node view-node
+                                       #(= "trade-account-tables-panel"
+                                           (get-in % [1 :data-parity-id])))
+        orderbook-classes (node-class-set orderbook-panel)
+        order-entry-classes (node-class-set order-entry-panel)
+        account-panel-classes (node-class-set account-panel)]
+    (is (some? orderbook-panel))
+    (is (some? order-entry-panel))
+    (is (some? account-panel))
+    (is (contains? orderbook-classes "xl:col-start-2"))
+    (is (contains? orderbook-classes "xl:row-start-1"))
+    (is (not (contains? orderbook-classes "xl:row-span-2")))
+    (is (contains? order-entry-classes "xl:col-start-3"))
+    (is (contains? order-entry-classes "xl:row-span-2"))
+    (is (contains? account-panel-classes "xl:col-start-1"))
+    (is (contains? account-panel-classes "xl:col-span-2"))))
 
 (deftest trade-view-account-info-cell-bounds-overflow-test
   (let [view-node (trade-view/trade-view trade-view-test-state)

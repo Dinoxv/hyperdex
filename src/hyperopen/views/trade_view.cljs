@@ -95,7 +95,7 @@
                              "lg:border-t"
                              "lg:border-base-300"
                              "xl:col-start-2"
-                             "xl:row-span-2"
+                             "xl:row-start-1"
                              "xl:border-t-0"])
                :data-parity-id "trade-orderbook-panel"}
          (l2-orderbook-view/l2-orderbook-view
@@ -137,6 +137,7 @@
                             ["lg:flex"
                              "lg:col-start-1"
                              "lg:row-start-2"
-                             "xl:col-start-1"])
+                             "xl:col-start-1"
+                             "xl:col-span-2"])
                :data-parity-id "trade-account-tables-panel"}
          (account-info-view/account-info-view state*)]]]]]))
