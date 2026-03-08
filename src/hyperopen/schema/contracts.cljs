@@ -141,6 +141,7 @@
 (s/def ::api-submit-position-margin-args (s/tuple ::api-submit-request))
 (s/def ::api-submit-vault-transfer-args (s/tuple ::api-submit-request))
 (s/def ::api-submit-funding-transfer-args (s/tuple ::api-submit-request))
+(s/def ::api-submit-funding-send-args (s/tuple ::api-submit-request))
 (s/def ::api-submit-funding-withdraw-args (s/tuple ::api-submit-request))
 (s/def ::api-submit-funding-deposit-args (s/tuple ::api-submit-request))
 
@@ -318,6 +319,10 @@
   (s/or :position-only (s/tuple map?)
         :position-and-anchor (s/tuple map? any?)))
 (s/def ::position-margin-modal-field-args (s/tuple ::state-path any?))
+(s/def ::funding-send-open-args
+  (s/or :none ::no-args
+        :context-only (s/tuple map?)
+        :context-and-anchor (s/tuple map? any?)))
 (s/def ::funding-modal-open-args
   (s/or :none ::no-args
         :anchor-only (s/tuple any?)))
@@ -532,6 +537,7 @@
    :actions/cancel-order ::cancel-order-args
    :actions/load-user-data ::address-args
    :actions/set-funding-modal ::funding-modal-args
+   :actions/open-funding-send-modal ::funding-send-open-args
    :actions/open-funding-transfer-modal ::funding-modal-open-args
    :actions/open-funding-withdraw-modal ::funding-modal-open-args
    :actions/open-funding-deposit-modal ::funding-modal-open-args
@@ -554,6 +560,7 @@
    :actions/set-hyperunit-lifecycle-error ::set-hyperunit-lifecycle-error-args
    :actions/set-funding-transfer-direction ::boolean-args
    :actions/set-funding-amount-to-max ::no-args
+   :actions/submit-funding-send ::no-args
    :actions/submit-funding-transfer ::no-args
    :actions/submit-funding-withdraw ::no-args
    :actions/submit-funding-deposit ::no-args
@@ -675,6 +682,7 @@
    :effects/api-submit-vault-transfer ::api-submit-vault-transfer-args
    :effects/api-fetch-hyperunit-fee-estimate ::no-args
    :effects/api-fetch-hyperunit-withdrawal-queue ::no-args
+         :effects/api-submit-funding-send ::api-submit-funding-send-args
          :effects/api-submit-funding-transfer ::api-submit-funding-transfer-args
          :effects/api-submit-funding-withdraw ::api-submit-funding-withdraw-args
          :effects/api-submit-funding-deposit ::api-submit-funding-deposit-args}]

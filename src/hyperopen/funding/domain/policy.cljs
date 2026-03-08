@@ -74,6 +74,7 @@
                (string? value) (some-> value str/trim str/lower-case keyword)
                :else nil)]
     (cond
+      (= :send mode) :send
       (= :deposit mode) :deposit
       (= :transfer mode) :transfer
       (= :withdraw mode) :withdraw
@@ -472,6 +473,59 @@
                           :amount (amount->text amount)
                           :toPerp to-perp?}}})))
 
+(defn send-preview
+  [_state modal]
+  (let [token (non-blank-text (:send-token modal))
+        symbol (or (non-blank-text (:send-symbol modal))
+                   token
+                   "Asset")
+        amount-input (normalize-amount-input (:amount-input modal))
+        amount (parse-input-amount amount-input)
+        destination (normalize-evm-address (:destination-input modal))
+        max-amount (parse-num (:send-max-amount modal))]
+    (cond
+      (not (seq token))
+      {:ok? false
+       :display-message "Select an asset to send."}
+
+      (not (finite-number? max-amount))
+      {:ok? false
+       :display-message "Unable to determine sendable balance."}
+
+      (<= max-amount 0)
+      {:ok? false
+       :display-message (str "No sendable " symbol " balance available.")}
+
+      (and (str/blank? amount-input)
+           (str/blank? (or (:destination-input modal) "")))
+      {:ok? false}
+
+      (nil? destination)
+      {:ok? false
+       :display-message "Enter a valid destination address."}
+
+      (not (finite-number? amount))
+      {:ok? false
+       :display-message "Enter a valid amount."}
+
+      (<= amount 0)
+      {:ok? false
+       :display-message "Enter an amount greater than 0."}
+
+      (> amount max-amount)
+      {:ok? false
+       :display-message "Amount exceeds available balance."}
+
+      :else
+      {:ok? true
+       :request {:action {:type "sendAsset"
+                          :destination destination
+                          :sourceDex "spot"
+                          :destinationDex "spot"
+                          :token token
+                          :amount (amount->text amount)
+                          :fromSubAccount ""}}})))
+
 (defn withdraw-preview
   [state modal]
   (let [selected-asset (withdraw-asset state modal)
@@ -636,6 +690,7 @@
   [state modal]
   (case (normalize-mode (:mode modal))
     :deposit (deposit-preview state modal)
+    :send (send-preview state modal)
     :transfer (transfer-preview state modal)
     :withdraw (withdraw-preview state modal)
     {:ok? false

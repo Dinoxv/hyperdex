@@ -740,6 +740,33 @@
     :close-funding-modal! close-funding-modal!
     :refresh-after-funding-submit! refresh-after-funding-submit!}))
 
+(defn api-submit-funding-send!
+  [{:keys [store
+           request
+           dispatch!
+           submit-send-asset!
+           exchange-response-error
+           runtime-error-message
+           show-toast!
+           default-funding-modal-state]
+    :or {submit-send-asset! trading-api/submit-send-asset!
+         exchange-response-error fallback-exchange-response-error
+         runtime-error-message fallback-runtime-error-message
+         show-toast! (fn [_store _kind _message] nil)
+         default-funding-modal-state funding-actions/default-funding-modal-state}}]
+  (submit-effects/api-submit-funding-send!
+   {:store store
+    :request request
+    :dispatch! dispatch!
+    :submit-send-asset! submit-send-asset!
+    :exchange-response-error exchange-response-error
+    :runtime-error-message runtime-error-message
+    :show-toast! show-toast!
+    :default-funding-modal-state default-funding-modal-state
+    :set-funding-submit-error! set-funding-submit-error!
+    :close-funding-modal! close-funding-modal!
+    :refresh-after-funding-submit! refresh-after-funding-submit!}))
+
 (defn api-submit-funding-withdraw!
   [{:keys [store
            request

@@ -11,6 +11,12 @@
    :mode mode
    :submitting? true
    :error nil
+   :send-token nil
+   :send-symbol nil
+   :send-prefix-label nil
+   :send-max-amount nil
+   :send-max-display nil
+   :send-max-input ""
    :amount-input "10"
    :destination-input "0x1234567890abcdef1234567890abcdef12345678"
    :withdraw-selected-asset-key :usdc
@@ -18,6 +24,87 @@
    :hyperunit-lifecycle (funding-actions/default-hyperunit-lifecycle-state)
    :hyperunit-fee-estimate (funding-actions/default-hyperunit-fee-estimate-state)
    :hyperunit-withdrawal-queue (funding-actions/default-hyperunit-withdrawal-queue-state)})
+
+(deftest api-submit-funding-send-no-wallet-sets-error-test
+  (let [store (atom {:wallet {}
+                     :funding-ui {:modal (assoc (seed-modal :send)
+                                                :send-token "USDC"
+                                                :send-symbol "USDC"
+                                                :send-max-amount 12.5)}})
+        submit-calls (atom 0)
+        toasts (atom [])]
+    (is (nil?
+         (effects/api-submit-funding-send!
+          {:store store
+           :request {:action {:type "sendAsset"
+                              :destination "0x1234567890abcdef1234567890abcdef12345678"
+                              :sourceDex "spot"
+                              :destinationDex "spot"
+                              :token "USDC"
+                              :amount "10"
+                              :fromSubAccount ""}}
+           :submit-send-asset! (fn [_store _address _action]
+                                 (swap! submit-calls inc)
+                                 (js/Promise.resolve {:status "ok"}))
+           :show-toast! (fn [_store kind message]
+                          (swap! toasts conj [kind message])
+                          nil)})))
+    (is (= 0 @submit-calls))
+    (is (= false (get-in @store [:funding-ui :modal :submitting?])))
+    (is (= "Connect your wallet before sending tokens."
+           (get-in @store [:funding-ui :modal :error])))
+    (is (= [[:error "Connect your wallet before sending tokens."]]
+           @toasts))))
+
+(deftest api-submit-funding-send-success-closes-modal-and-refreshes-test
+  (async done
+    (let [default-modal {:open? false :mode nil :submitting? false :error nil}
+          store (atom {:wallet {:address "0xabc"}
+                       :funding-ui {:modal (assoc (seed-modal :send)
+                                                  :send-token "USDC"
+                                                  :send-symbol "USDC"
+                                                  :send-max-amount 12.5)}})
+          submit-calls (atom [])
+          toasts (atom [])
+          dispatches (atom [])]
+      (-> (effects/api-submit-funding-send!
+           {:store store
+            :request {:action {:type "sendAsset"
+                               :destination "0x1234567890abcdef1234567890abcdef12345678"
+                               :sourceDex "spot"
+                               :destinationDex "spot"
+                               :token "USDC"
+                               :amount "10"
+                               :fromSubAccount ""}}
+            :submit-send-asset! (fn [store* address action]
+                                  (swap! submit-calls conj [store* address action])
+                                  (js/Promise.resolve {:status "ok"}))
+            :show-toast! (fn [_store kind message]
+                           (swap! toasts conj [kind message]))
+            :dispatch! (fn [store* _ event]
+                         (swap! dispatches conj [store* event]))
+            :default-funding-modal-state (fn [] default-modal)})
+          (.then (fn [resp]
+                   (is (= {:status "ok"} resp))
+                   (is (= [["0xabc" {:type "sendAsset"
+                                     :destination "0x1234567890abcdef1234567890abcdef12345678"
+                                     :sourceDex "spot"
+                                     :destinationDex "spot"
+                                     :token "USDC"
+                                     :amount "10"
+                                     :fromSubAccount ""}]]
+                          (mapv (fn [[_store address action]]
+                                  [address action])
+                                @submit-calls)))
+                   (is (= default-modal (get-in @store [:funding-ui :modal])))
+                   (is (= [[:success "Send submitted."]]
+                          @toasts))
+                   (is (= [[[[:actions/load-user-data "0xabc"]]]]
+                          (mapv (fn [[_store event]] [event]) @dispatches)))
+                   (done)))
+          (.catch (fn [err]
+                    (is false (str "Unexpected send success-path error: " err))
+                    (done)))))))
 
 (deftest api-submit-funding-transfer-no-wallet-sets-error-test
   (let [store (atom {:wallet {}

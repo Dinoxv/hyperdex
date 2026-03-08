@@ -333,3 +333,48 @@
     (is (contains? all-text "Destination tx hash"))
     (is (contains? all-text "tx-raw"))
     (is (contains? all-text "Scheduled"))))
+
+(deftest funding-send-modal-renders-mobile-sheet-layout-test
+  (let [state (assoc-in (base-state)
+                        [:funding-ui :modal]
+                        {:open? true
+                         :mode :send
+                         :send-token "xyz:GOLD"
+                         :send-symbol "GOLD"
+                         :send-prefix-label "xyz"
+                         :send-max-amount 4.25
+                         :send-max-display "4.250000"
+                         :send-max-input "4.250000"
+                         :amount-input ""
+                         :destination-input ""
+                         :anchor {:viewport-width 430
+                                  :viewport-height 932}})
+        original-inner-width (.-innerWidth js/globalThis)
+        original-inner-height (.-innerHeight js/globalThis)]
+    (set! (.-innerWidth js/globalThis) 430)
+    (set! (.-innerHeight js/globalThis) 932)
+    (try
+      (let [view-node (view/funding-modal-view state)
+            modal-node (find-first-node view-node #(= "funding-modal"
+                                                      (get-in % [1 :data-role])))
+            send-step (find-first-node view-node #(= "funding-send-step"
+                                                     (get-in % [1 :data-role])))
+            destination-input (find-first-node view-node #(= "funding-send-destination-input"
+                                                             (get-in % [1 :data-role])))
+            amount-input (find-first-node view-node #(= "funding-send-amount-input"
+                                                        (get-in % [1 :data-role])))
+            all-text (set (collect-strings view-node))]
+        (is (contains? (set (get-in modal-node [1 :class])) "absolute"))
+        (is (contains? (set (get-in modal-node [1 :class])) "bottom-0"))
+        (is (contains? (set (get-in modal-node [1 :class])) "rounded-t-[22px]"))
+        (is (some? send-step))
+        (is (some? destination-input))
+        (is (some? amount-input))
+        (is (contains? all-text "Send Tokens"))
+        (is (contains? all-text "Trading Account"))
+        (is (contains? all-text "GOLD"))
+        (is (contains? all-text "xyz"))
+        (is (contains? all-text "MAX: 4.250000 GOLD")))
+      (finally
+        (set! (.-innerWidth js/globalThis) original-inner-width)
+        (set! (.-innerHeight js/globalThis) original-inner-height)))))

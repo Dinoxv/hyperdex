@@ -128,10 +128,12 @@
    state))
 
 (declare close-funding-modal
+         open-funding-send-modal
          open-funding-deposit-modal
          open-funding-withdraw-modal
          open-funding-transfer-modal
-         open-legacy-funding-modal)
+         open-legacy-funding-modal
+         submit-funding-send)
 
 (defn- command-deps
   []
@@ -140,9 +142,11 @@
    :default-funding-modal-state default-funding-modal-state
    :wallet-address wallet-address
    :funding-modal-path funding-modal-path
+   :parse-num parse-num
    :normalize-withdraw-asset-key normalize-withdraw-asset-key
    :withdraw-default-asset-key withdraw-default-asset-key
    :close-funding-modal-fn close-funding-modal
+   :open-funding-send-modal-fn open-funding-send-modal
    :open-funding-deposit-modal-fn open-funding-deposit-modal
    :open-funding-withdraw-modal-fn open-funding-withdraw-modal
    :open-funding-transfer-modal-fn open-funding-transfer-modal
@@ -162,9 +166,18 @@
    :withdraw-max-amount withdraw-max-amount
    :withdraw-asset withdraw-asset
    :format-usdc-input format-usdc-input
+   :send-preview policy-domain/send-preview
    :transfer-preview transfer-preview
    :withdraw-preview withdraw-preview
    :deposit-preview deposit-preview})
+
+(defn open-funding-send-modal
+  ([state]
+   (open-funding-send-modal state nil nil))
+  ([state send-context]
+   (open-funding-send-modal state send-context nil))
+  ([state send-context anchor]
+   (modal-commands/open-funding-send-modal (command-deps) state send-context anchor)))
 
 (defn open-funding-deposit-modal
   ([state]
@@ -263,6 +276,10 @@
 (defn set-funding-amount-to-max
   [state]
   (modal-commands/set-funding-amount-to-max (command-deps) state))
+
+(defn submit-funding-send
+  [state]
+  (modal-commands/submit-funding-send (command-deps) state))
 
 (defn submit-funding-transfer
   [state]

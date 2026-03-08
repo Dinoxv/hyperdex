@@ -29,4 +29,5 @@
   (is (fn? effect-adapters/api-fetch-vault-index-effect))
   (is (fn? effect-adapters/api-submit-vault-transfer-effect))
   (is (fn? effect-adapters/api-fetch-hyperunit-fee-estimate-effect))
+  (is (fn? effect-adapters/api-submit-funding-send-effect))
   (is (fn? effect-adapters/api-submit-funding-transfer-effect)))

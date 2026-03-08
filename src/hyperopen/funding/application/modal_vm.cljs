@@ -133,6 +133,12 @@
      :amount-input (string-value (:amount-input modal))
      :to-perp? (true? (:to-perp? modal))
      :destination-input (string-value (:destination-input modal))
+     :send-token (non-blank-text (:send-token modal))
+     :send-symbol (non-blank-text (:send-symbol modal))
+     :send-prefix-label (non-blank-text (:send-prefix-label modal))
+     :send-max-amount (:send-max-amount modal)
+     :send-max-display (string-value (:send-max-display modal))
+     :send-max-input (string-value (:send-max-input modal))
      :withdraw-generated-address (non-blank-text (:withdraw-generated-address modal))
      :anchor (:anchor modal)
      :error (:error modal)
@@ -342,22 +348,26 @@
                                                        :include-queue-position? true}))))
 
 (defn- mode-max-amount
-  [mode transfer-max withdraw-max]
+  [mode send-max transfer-max withdraw-max]
   (case mode
+    :send send-max
     :transfer transfer-max
     :withdraw withdraw-max
     0))
 
 (defn- max-symbol
-  [mode selected-withdraw-symbol]
-  (if (= mode :withdraw)
-    selected-withdraw-symbol
+  [mode send-symbol selected-withdraw-symbol]
+  (case mode
+    :send send-symbol
+    :withdraw selected-withdraw-symbol
     "USDC"))
 
 (defn- with-amount-context
   [{:keys [state
            modal
            mode
+           send-max-amount
+           send-symbol
            selected-deposit-asset
            selected-withdraw-asset
            selected-withdraw-symbol
@@ -371,7 +381,7 @@
         withdraw-max (withdraw-max-amount state selected-withdraw-asset)
         withdraw-min-amount (withdraw-minimum-amount selected-withdraw-asset)
         deposit-min-amount (asset-minimum selected-deposit-asset deposit-min-usdc)
-        max-amount (mode-max-amount mode transfer-max withdraw-max)]
+        max-amount (mode-max-amount mode send-max-amount transfer-max withdraw-max)]
     (assoc ctx
            :transfer-max transfer-max
            :withdraw-max withdraw-max
@@ -379,9 +389,13 @@
            :deposit-min-amount deposit-min-amount
            :deposit-min-input (format-usdc-input deposit-min-amount)
            :max-amount max-amount
-           :max-display (format-usdc-display max-amount)
-           :max-input (format-usdc-input max-amount)
-           :max-symbol (max-symbol mode selected-withdraw-symbol)
+           :max-display (if (= mode :send)
+                          (:send-max-display ctx)
+                          (format-usdc-display max-amount))
+           :max-input (if (= mode :send)
+                        (:send-max-input ctx)
+                        (format-usdc-input max-amount))
+           :max-symbol (max-symbol mode send-symbol selected-withdraw-symbol)
            :transfer-max-display (format-usdc-display transfer-max)
            :transfer-max-input (format-usdc-input transfer-max)
            :withdraw-max-display (format-usdc-display withdraw-max)
@@ -497,6 +511,7 @@
     :else
     (case mode
       :deposit "Deposit"
+      :send "Send Tokens"
       :transfer "Perps <-> Spot"
       :withdraw "Withdraw"
       :legacy (str/capitalize (name legacy-kind))
@@ -532,6 +547,7 @@
   (if submitting?
     "Submitting..."
     (case mode
+      :send "Send"
       :transfer "Transfer"
       :withdraw "Withdraw"
       "Confirm")))
@@ -584,6 +600,7 @@
                                    selected-deposit-asset
                                    selected-deposit-flow-kind
                                    selected-deposit-implemented?)
+    :send :send/form
     :transfer :transfer/form
     :withdraw (if (and (= withdraw-step :amount-entry)
                        selected-withdraw-asset)
@@ -699,6 +716,26 @@
              :submit-disabled? submit-disabled?
              :submitting? submitting?}})
 
+(defn- send-model
+  [{:keys [send-token
+           send-symbol
+           send-prefix-label
+           destination-input
+           amount-input
+           send-max-display
+           submit-disabled?
+           submitting?]}]
+  {:asset {:token send-token
+           :symbol send-symbol
+           :prefix-label send-prefix-label}
+   :destination {:value destination-input}
+   :amount {:value amount-input
+            :max-display send-max-display
+            :symbol send-symbol}
+   :actions {:submit-label (if submitting? "Submitting..." "Send")
+             :submit-disabled? submit-disabled?
+             :submitting? submitting?}})
+
 (defn- withdraw-model
   [{:keys [withdraw-assets
            withdraw-step
@@ -804,6 +841,10 @@
            deposit-min-amount
            deposit-estimated-time
            deposit-network-fee
+           send-token
+           send-symbol
+           send-prefix-label
+           send-max-display
            withdraw-estimated-time
            withdraw-network-fee
            withdraw-queue-length
@@ -880,6 +921,7 @@
    :content {:kind content-kind}
    :feedback (feedback-model ctx)
    :deposit (deposit-model ctx)
+   :send (send-model ctx)
    :transfer (transfer-model ctx)
    :withdraw (withdraw-model ctx)
    :legacy (legacy-model ctx)})

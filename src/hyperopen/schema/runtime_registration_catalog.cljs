@@ -59,6 +59,7 @@
    [:effects/api-submit-vault-transfer :api-submit-vault-transfer]
    [:effects/api-fetch-hyperunit-fee-estimate :api-fetch-hyperunit-fee-estimate]
    [:effects/api-fetch-hyperunit-withdrawal-queue :api-fetch-hyperunit-withdrawal-queue]
+   [:effects/api-submit-funding-send :api-submit-funding-send]
    [:effects/api-submit-funding-transfer :api-submit-funding-transfer]
    [:effects/api-submit-funding-withdraw :api-submit-funding-withdraw]
    [:effects/api-submit-funding-deposit :api-submit-funding-deposit]])
@@ -232,6 +233,7 @@
      [:actions/cancel-order :cancel-order]
      [:actions/load-user-data :load-user-data]
      [:actions/set-funding-modal :set-funding-modal]
+     [:actions/open-funding-send-modal :open-funding-send-modal]
      [:actions/open-funding-transfer-modal :open-funding-transfer-modal]
      [:actions/open-funding-withdraw-modal :open-funding-withdraw-modal]
      [:actions/open-funding-deposit-modal :open-funding-deposit-modal]
@@ -254,6 +256,7 @@
      [:actions/set-hyperunit-lifecycle-error :set-hyperunit-lifecycle-error]
      [:actions/set-funding-transfer-direction :set-funding-transfer-direction]
      [:actions/set-funding-amount-to-max :set-funding-amount-to-max]
+     [:actions/submit-funding-send :submit-funding-send]
      [:actions/submit-funding-transfer :submit-funding-transfer]
      [:actions/submit-funding-withdraw :submit-funding-withdraw]
      [:actions/submit-funding-deposit :submit-funding-deposit]

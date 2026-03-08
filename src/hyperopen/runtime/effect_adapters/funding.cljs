@@ -108,6 +108,19 @@
      :runtime-error-message common/runtime-error-message
      :show-toast! show-toast!})))
 
+(defn api-submit-funding-send-effect
+  ([_ store request]
+   (api-submit-funding-send-effect nil store request {}))
+  ([_ store request {:keys [show-toast!]
+                     :or {show-toast! (fn [_store _kind _message] nil)}}]
+   (funding-workflow-effects/api-submit-funding-send!
+    {:store store
+     :request request
+     :dispatch! nxr/dispatch
+     :exchange-response-error common/exchange-response-error
+     :runtime-error-message common/runtime-error-message
+     :show-toast! show-toast!})))
+
 (defn api-submit-funding-withdraw-effect
   ([_ store request]
    (api-submit-funding-withdraw-effect nil store request {}))

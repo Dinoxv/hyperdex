@@ -18,6 +18,12 @@
    :mode mode
    :legacy-kind legacy-kind
    :anchor nil
+   :send-token nil
+   :send-symbol nil
+   :send-prefix-label nil
+   :send-max-amount nil
+   :send-max-display nil
+   :send-max-input ""
    :deposit-step :asset-select
    :deposit-search-input ""
    :withdraw-step :asset-select
@@ -39,6 +45,22 @@
 
 (deftest open-funding-modal-actions-set-mode-and-open-state-test
   (let [state (base-state)]
+    (is (= [[:effects/save [:funding-ui :modal]
+             (assoc (expected-open-modal :send)
+                    :destination-input ""
+                    :send-token "xyz:GOLD"
+                    :send-symbol "GOLD"
+                    :send-prefix-label "xyz"
+                    :send-max-amount 4.25
+                    :send-max-display "4.250000"
+                    :send-max-input "4.250000")]]
+           (funding-actions/open-funding-send-modal state
+                                                   {:token "xyz:GOLD"
+                                                    :symbol "GOLD"
+                                                    :prefix-label "xyz"
+                                                    :max-amount "4.25"
+                                                    :max-display "4.250000"
+                                                    :max-input "4.250000"})))
     (is (= [[:effects/save [:funding-ui :modal]
              (expected-open-modal :deposit)]
             [:effects/api-fetch-hyperunit-fee-estimate]]
@@ -78,11 +100,64 @@
 (deftest set-funding-modal-compat-preserves-legacy-fallback-test
   (let [state (base-state)]
     (is (= [[:effects/save [:funding-ui :modal]
-             (expected-open-modal :transfer)]]
+             (assoc (expected-open-modal :send)
+                    :destination-input "")]]
            (funding-actions/set-funding-modal-compat state :send)))
     (is (= [[:effects/save [:funding-ui :modal]
              (expected-open-modal :legacy :legacy-kind :history)]]
            (funding-actions/set-funding-modal-compat state :history)))))
+
+(deftest submit-funding-send-validates-and-emits-api-effect-test
+  (let [state-idle (assoc-in (base-state)
+                             [:funding-ui :modal]
+                             {:open? true
+                              :mode :send
+                              :send-token "USDC"
+                              :send-symbol "USDC"
+                              :send-max-amount 12.5
+                              :send-max-display "12.500000"
+                              :send-max-input "12.500000"
+                              :destination-input ""
+                              :amount-input ""})
+        state-invalid (assoc-in (base-state)
+                                [:funding-ui :modal]
+                                {:open? true
+                                 :mode :send
+                                 :send-token "USDC"
+                                 :send-symbol "USDC"
+                                 :send-max-amount 12.5
+                                 :send-max-display "12.500000"
+                                 :send-max-input "12.500000"
+                                 :destination-input "abc"
+                                 :amount-input "2.25"})
+        state-valid (assoc-in (base-state)
+                              [:funding-ui :modal]
+                              {:open? true
+                               :mode :send
+                               :send-token "USDC"
+                               :send-symbol "USDC"
+                               :send-max-amount 12.5
+                               :send-max-display "12.500000"
+                               :send-max-input "12.500000"
+                               :destination-input "0x1234567890abcdef1234567890abcdef12345678"
+                               :amount-input "2.25"})]
+    (is (= [[:effects/save-many [[[:funding-ui :modal :submitting?] false]
+                                 [[:funding-ui :modal :error] nil]]]]
+           (funding-actions/submit-funding-send state-idle)))
+    (is (= [[:effects/save-many [[[:funding-ui :modal :submitting?] false]
+                                 [[:funding-ui :modal :error] "Enter a valid destination address."]]]]
+           (funding-actions/submit-funding-send state-invalid)))
+    (is (= [[:effects/save-many [[[:funding-ui :modal :submitting?] true]
+                                 [[:funding-ui :modal :error] nil]]]
+            [:effects/api-submit-funding-send
+             {:action {:type "sendAsset"
+                       :destination "0x1234567890abcdef1234567890abcdef12345678"
+                       :sourceDex "spot"
+                       :destinationDex "spot"
+                       :token "USDC"
+                       :amount "2.25"
+                       :fromSubAccount ""}}]]
+           (funding-actions/submit-funding-send state-valid)))))
 
 (deftest submit-funding-transfer-validates-and-emits-api-effect-test
   (let [state-invalid (assoc-in (base-state)
@@ -113,6 +188,18 @@
                              :account-context {:spectate-mode {:active? true
                                                             :address "0x1234567890abcdef1234567890abcdef12345678"}})
         blocked-message account-context/spectate-mode-read-only-message]
+    (is (= [[:effects/save-many [[[:funding-ui :modal :submitting?] false]
+                                 [[:funding-ui :modal :error] blocked-message]]]]
+           (funding-actions/submit-funding-send
+            (assoc-in blocked-state
+                      [:funding-ui :modal]
+                      {:open? true
+                       :mode :send
+                       :send-token "USDC"
+                       :send-symbol "USDC"
+                       :send-max-amount 12.5
+                       :destination-input "0x1234567890abcdef1234567890abcdef12345678"
+                       :amount-input "2.25"}))))
     (is (= [[:effects/save-many [[[:funding-ui :modal :submitting?] false]
                                  [[:funding-ui :modal :error] blocked-message]]]]
            (funding-actions/submit-funding-transfer

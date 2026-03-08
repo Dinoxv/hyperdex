@@ -61,6 +61,7 @@
          :api-fetch-hyperunit-fee-estimate effect-adapters/api-fetch-hyperunit-fee-estimate-effect
          :api-fetch-hyperunit-withdrawal-queue effect-adapters/api-fetch-hyperunit-withdrawal-queue-effect
          :api-submit-funding-transfer effect-adapters/api-submit-funding-transfer-effect
+         :api-submit-funding-send effect-adapters/api-submit-funding-send-effect
          :api-submit-funding-withdraw effect-adapters/api-submit-funding-withdraw-effect
          :api-submit-funding-deposit effect-adapters/api-submit-funding-deposit-effect}})
 

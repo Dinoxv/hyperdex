@@ -19,10 +19,17 @@
 (deftest funding-submit-wrappers-inject-order-toast-seam-test
   (let [runtime-store (atom {})
         request {:coin "BTC"}
+        send-call (atom nil)
         transfer-call (atom nil)
         withdraw-call (atom nil)
         deposit-call (atom nil)]
-    (letfn [(capture-transfer-call!
+    (letfn [(capture-send-call!
+              [ctx store* request* opts]
+              (reset! send-call {:ctx ctx
+                                 :store store*
+                                 :request request*
+                                 :opts opts}))
+            (capture-transfer-call!
               [ctx store* request* opts]
               (reset! transfer-call {:ctx ctx
                                      :store store*
@@ -40,20 +47,23 @@
                                     :store store*
                                     :request request*
                                     :opts opts}))]
-      (with-redefs [funding-adapters/api-submit-funding-transfer-effect capture-transfer-call!
+      (with-redefs [funding-adapters/api-submit-funding-send-effect capture-send-call!
+                    funding-adapters/api-submit-funding-transfer-effect capture-transfer-call!
                     funding-adapters/api-submit-funding-withdraw-effect capture-withdraw-call!
                     funding-adapters/api-submit-funding-deposit-effect capture-deposit-call!]
+        (effect-adapters/api-submit-funding-send-effect nil runtime-store request)
         (effect-adapters/api-submit-funding-transfer-effect nil runtime-store request)
         (effect-adapters/api-submit-funding-withdraw-effect nil runtime-store request)
         (effect-adapters/api-submit-funding-deposit-effect nil runtime-store request)))
-    (doseq [{:keys [ctx store request opts]} [@transfer-call
+    (doseq [{:keys [ctx store request opts]} [@send-call
+                                              @transfer-call
                                               @withdraw-call
                                               @deposit-call]]
       (is (nil? ctx))
       (is (identical? runtime-store store))
       (is (= {:coin "BTC"} request))
       (is (fn? (:show-toast! opts))))
-    ((:show-toast! (:opts @transfer-call)) runtime-store :success "Funding submitted")
+    ((:show-toast! (:opts @send-call)) runtime-store :success "Funding submitted")
     (is (= {:kind :success
             :message "Funding submitted"}
            (get-in @runtime-store [:ui :toast])))))

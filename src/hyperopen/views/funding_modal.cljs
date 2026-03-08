@@ -19,6 +19,18 @@
 (def ^:private trade-order-entry-panel-selector
   "[data-parity-id='trade-order-entry-panel']")
 
+(def ^:private fallback-viewport-width
+  1280)
+
+(def ^:private fallback-viewport-height
+  800)
+
+(def ^:private mobile-sheet-breakpoint-px
+  640)
+
+(def ^:private mobile-sheet-top-offset-px
+  20)
+
 (defn- base-button-classes
   [primary?]
   (if primary?
@@ -127,6 +139,40 @@
     :transfer "[data-role='funding-action-transfer']"
     :withdraw "[data-role='funding-action-withdraw']"
     nil))
+
+(defn- anchor-number
+  [anchor k default]
+  (let [value (get anchor k)]
+    (if (number? value)
+      value
+      default)))
+
+(defn- modal-viewport-width
+  [anchor]
+  (max 320
+       (anchor-number anchor :viewport-width fallback-viewport-width)
+       (or (some-> js/globalThis .-innerWidth) fallback-viewport-width)
+       (+ (anchor-number anchor :right 0) 16)))
+
+(defn- modal-viewport-height
+  [anchor]
+  (max 320
+       (anchor-number anchor :viewport-height fallback-viewport-height)
+       (or (some-> js/globalThis .-innerHeight) fallback-viewport-height)))
+
+(defn- mobile-sheet?
+  [modal]
+  (and (= :send (:mode modal))
+       (<= (modal-viewport-width (or (:anchor modal) {}))
+           mobile-sheet-breakpoint-px)))
+
+(defn- mobile-sheet-style
+  [modal]
+  (let [max-height (max 320
+                        (- (modal-viewport-height (or (:anchor modal) {}))
+                           mobile-sheet-top-offset-px))]
+    {:max-height (str max-height "px")
+     :padding-bottom "max(env(safe-area-inset-bottom), 1rem)"}))
 
 (defn- element-anchor-bounds
   [selector]
@@ -335,6 +381,7 @@
            placeholder
            disabled?
            input-action
+           input-args
            max-action
            max-label
            suffix
@@ -377,7 +424,9 @@
                      "disabled:cursor-not-allowed"
                      "disabled:opacity-70"]
              :data-role data-role
-             :on {:input [[input-action [:event.target/value]]]}}]
+             :on {:input [(vec (concat [input-action]
+                                       (or input-args [])
+                                       [[:event.target/value]]))]}}]
     (when (seq suffix)
       [:span {:class ["text-sm" "text-[#7e95a0]"]} suffix])]])
 
@@ -758,6 +807,100 @@
                 :submit-label (get-in actions [:submit-label])
                 :submit-disabled? (get-in actions [:submit-disabled?])})])
 
+(defn- send-asset-field
+  [{:keys [symbol prefix-label]}]
+  [:div {:class ["flex"
+                 "items-center"
+                 "rounded-lg"
+                 "border"
+                 "border-[#28474b]"
+                 "bg-[#0c2028]"
+                 "px-3"
+                 "py-3"
+                 "gap-2"
+                 "min-w-0"]}
+   [:span {:class ["truncate" "text-sm" "font-semibold" "text-[#e6eff2]"]}
+    (or symbol "Asset")]
+   [:div {:class ["flex" "items-center" "gap-2" "min-w-0"]}
+    (when (seq prefix-label)
+      [:span {:class ["inline-flex"
+                      "items-center"
+                      "rounded-lg"
+                      "bg-[#242924]"
+                      "px-3"
+                      "py-[1px]"
+                      "text-xs"
+                      "font-medium"
+                      "leading-none"
+                      "text-emerald-300"]}
+       prefix-label])]])
+
+(defn- send-content
+  [{:keys [asset destination amount actions]}]
+  [:div {:class ["space-y-4"] :data-role "funding-send-step"}
+   [:p {:class ["text-sm" "leading-6" "text-[#8fa7ae]"]}
+    "Send tokens to another account on the Hyperliquid L1."]
+   [:div {:class ["space-y-2"]}
+    [:label {:class ["block" "text-xs" "uppercase" "tracking-[0.08em]" "text-[#8ea4ab]"]}
+     "Destination"]
+    [:input {:type "text"
+             :placeholder "0x..."
+             :disabled (get-in actions [:submitting?])
+             :value (:value destination)
+             :class ["w-full"
+                     "rounded-lg"
+                     "border"
+                     "border-[#28474b]"
+                     "bg-[#0c2028]"
+                     "px-3"
+                     "py-2.5"
+                     "text-sm"
+                     "text-[#e6eff2]"
+                     "outline-none"
+                     "focus:border-[#4f8f87]"
+                     "disabled:cursor-not-allowed"
+                     "disabled:opacity-70"]
+             :data-role "funding-send-destination-input"
+             :on {:input [[:actions/set-funding-modal-field
+                           [:destination-input]
+                           [:event.target/value]]]}}]]
+   [:div {:class ["grid" "grid-cols-2" "gap-3"]}
+    [:div {:class ["space-y-2"]}
+     [:label {:class ["block" "text-xs" "uppercase" "tracking-[0.08em]" "text-[#8ea4ab]"]}
+      "Account"]
+     [:div {:class ["flex"
+                    "items-center"
+                    "justify-between"
+                    "rounded-lg"
+                    "border"
+                    "border-[#28474b]"
+                    "bg-[#0c2028]"
+                    "px-3"
+                    "py-3"]}
+      [:span {:class ["text-sm" "font-semibold" "text-[#e6eff2]"]} "Trading Account"]]]
+    [:div {:class ["space-y-2"]}
+     [:label {:class ["block" "text-xs" "uppercase" "tracking-[0.08em]" "text-[#8ea4ab]"]}
+      "Asset"]
+     (send-asset-field asset)]]
+   (amount-input-field {:label "Amount"
+                        :value (:value amount)
+                        :placeholder "Enter amount"
+                        :disabled? (get-in actions [:submitting?])
+                        :input-action :actions/set-funding-modal-field
+                        :input-args [[:amount-input]]
+                        :max-action :actions/set-funding-amount-to-max
+                        :max-label (when (seq (:max-display amount))
+                                     (str "MAX: " (:max-display amount)
+                                          (when (seq (:symbol amount))
+                                            (str " " (:symbol amount)))))
+                        :suffix (:symbol amount)
+                        :data-role "funding-send-amount-input"})
+   [:button {:type "button"
+             :disabled (get-in actions [:submit-disabled?])
+             :class (into ["w-full"] (submit-button-classes (get-in actions [:submit-disabled?])))
+             :on {:click [[:actions/submit-funding-send]]}}
+    (get-in actions [:submit-label])]])
+
 (defn- withdraw-select-content
   [{:keys [search assets selected-asset]}]
   [:div {:class ["space-y-3"] :data-role "funding-withdraw-select-step"}
@@ -986,13 +1129,14 @@
      "Close"]]])
 
 (defn- render-content
-  [{:keys [content deposit transfer withdraw legacy]}]
+  [{:keys [content deposit send transfer withdraw legacy]}]
   (case (:kind content)
     :deposit/select (deposit-select-content deposit)
     :deposit/address (deposit-address-content deposit)
     :deposit/amount (deposit-amount-content deposit)
     :deposit/unavailable (deposit-unavailable-content deposit)
     :deposit/missing-asset (deposit-missing-asset-content deposit)
+    :send/form (send-content send)
     :transfer/form (transfer-content transfer)
     :withdraw/select (withdraw-select-content withdraw)
     :withdraw/detail (withdraw-detail-content withdraw)
@@ -1004,43 +1148,55 @@
   (let [{:keys [modal feedback] :as view-model} (funding-actions/funding-modal-view-model state)
         open? (:open? modal)
         stored-anchor* (if (map? (:anchor modal)) (:anchor modal) {})
+        mobile-sheet? (mobile-sheet? modal)
         fallback-anchor* (when-not (anchored-popover/complete-anchor? stored-anchor*)
                            (element-anchor-bounds
                             (mode->fallback-anchor-selector (:mode modal))))
         anchor (-> (or fallback-anchor* stored-anchor*)
                    align-anchor-to-trade-order-entry-divider)
-        anchored-popover? (anchored-popover/complete-anchor? anchor)
+        anchored-popover? (and (not mobile-sheet?)
+                               (anchored-popover/complete-anchor? anchor))
         popover-style (when anchored-popover?
                         (anchored-popover/anchored-popover-layout-style
                          {:anchor anchor
                           :preferred-width-px preferred-panel-width-px
-                          :estimated-height-px estimated-panel-height-px}))]
+                          :estimated-height-px estimated-panel-height-px}))
+        sheet-style (when mobile-sheet?
+                      (mobile-sheet-style (assoc modal :anchor anchor)))]
     (when open?
       [:div {:class (into ["fixed" "inset-0" "z-[80]"]
-                          (if anchored-popover?
+                          (if (or anchored-popover? mobile-sheet?)
                             ["pointer-events-none"]
                             ["flex" "items-center" "justify-center" "p-4"]))}
        [:button {:type "button"
                  :class (into ["absolute" "inset-0" "pointer-events-auto"]
-                              (if anchored-popover?
-                                ["bg-transparent"]
-                                ["bg-black/65"]))
+                              (cond
+                                mobile-sheet? ["bg-black/55" "backdrop-blur-[1px]"]
+                                anchored-popover? ["bg-transparent"]
+                                :else ["bg-black/65"]))
                  :aria-label "Close funding dialog"
                  :on {:click [[:actions/close-funding-modal]]}}]
        [:div {:class (into ["relative"
                             "z-[81]"
                             "space-y-3"
-                            "rounded-2xl"
                             "border"
                             "border-[#1f3b3c]"
                             "bg-[#081b24]"
-                            "p-4"
                             "shadow-2xl"
                             "pointer-events-auto"]
-                           (if anchored-popover?
-                             []
-                             ["w-full" "max-w-md"]))
-              :style popover-style
+                           (if mobile-sheet?
+                             ["absolute"
+                              "inset-x-0"
+                              "bottom-0"
+                              "w-full"
+                              "overflow-y-auto"
+                              "rounded-t-[22px]"
+                              "px-4"
+                              "pt-4"]
+                             (cond-> ["rounded-2xl" "p-4"]
+                               (not anchored-popover?)
+                               (conj "w-full" "max-w-md"))))
+              :style (or sheet-style popover-style)
               :role "dialog"
               :aria-modal true
               :aria-label (:title modal)

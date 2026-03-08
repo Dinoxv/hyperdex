@@ -9,6 +9,12 @@
    :mode nil
    :legacy-kind nil
    :anchor nil
+   :send-token nil
+   :send-symbol nil
+   :send-prefix-label nil
+   :send-max-amount nil
+   :send-max-display nil
+   :send-max-input ""
    :deposit-step :asset-select
    :deposit-search-input ""
    :withdraw-step :asset-select

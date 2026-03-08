@@ -35,6 +35,12 @@
               :deposit-generated-address nil
               :deposit-generated-signatures nil
               :deposit-generated-asset-key nil
+              :send-token nil
+              :send-symbol nil
+              :send-prefix-label nil
+              :send-max-amount nil
+              :send-max-display nil
+              :send-max-input ""
               :withdraw-selected-asset-key :usdc
               :withdraw-generated-address nil
               :amount-input ""

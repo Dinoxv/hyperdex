@@ -239,9 +239,41 @@
    "underline-offset-2"
    "whitespace-nowrap"])
 
-(defn- balance-row-action-button [label]
-  [:button {:class balance-row-action-button-classes
-            :type "button"}
+(defn- send-enabled?
+  [{:keys [key selection-coin coin available-balance]}]
+  (let [row-key (some-> key str str/trim)]
+    (and (seq (shared/non-blank-text (or selection-coin coin)))
+         (number? (shared/parse-num available-balance))
+         (pos? (shared/parse-num available-balance))
+         (not (#{"perps-usdc" "unified-usdc-fallback"} row-key)))))
+
+(defn- send-action-context
+  [{:keys [coin selection-coin available-balance amount-decimals]}]
+  (let [{:keys [base-label prefix-label]}
+        (shared/resolve-coin-display (or selection-coin coin) {})
+        max-display (shared/format-balance-amount available-balance amount-decimals)]
+    {:token (or selection-coin coin)
+     :symbol (or base-label coin "Asset")
+     :prefix-label prefix-label
+     :max-amount available-balance
+     :max-display max-display
+     :max-input max-display}))
+
+(defn- balance-row-action-button
+  ([label]
+   (balance-row-action-button label nil))
+  ([label action]
+   [:button {:class balance-row-action-button-classes
+             :type "button"
+             :on (when action {:click [action]})}
+    label]))
+
+(defn- balance-row-disabled-action [label]
+  [:span {:class ["inline-flex"
+                  "min-h-6"
+                  "items-center"
+                  "text-xs"
+                  "text-trading-text-secondary"]}
    label])
 
 (defn balance-row [{:keys [coin
@@ -253,11 +285,23 @@
                            pnl-pct
                            amount-decimals
                            contract-id
+                           key
                            transfer-disabled?
                            available-balance-tooltip-position]}]
   (let [coin-style (when-not (usdc-balance-row? {:coin coin})
                      {:color "rgb(151, 252, 228)"})
-        selectable-coin (or selection-coin coin)]
+        selectable-coin (or selection-coin coin)
+        send-enabled?* (send-enabled? {:key key
+                                       :selection-coin selection-coin
+                                       :coin coin
+                                       :available-balance available-balance})
+        send-action (when send-enabled?*
+                      [:actions/open-funding-send-modal
+                       (send-action-context {:coin coin
+                                             :selection-coin selection-coin
+                                             :available-balance available-balance
+                                             :amount-decimals amount-decimals})
+                       :event.currentTarget/bounds])]
     [:div.grid.grid-cols-8.gap-2.py-px.px-3.hover:bg-base-300.items-center.text-sm.text-trading-text
      (shared/coin-select-control selectable-coin
                                  (or coin "")
@@ -277,7 +321,9 @@
      [:div.text-right.font-semibold.num.num-right "$" (shared/format-currency usdc-value)]
      [:div.text-right.font-medium.num.num-right (shared/format-pnl pnl-value pnl-pct)]
      [:div.text-left
-      (balance-row-action-button "Send")]
+      (if send-enabled?*
+        (balance-row-action-button "Send" send-action)
+        (balance-row-disabled-action "Send"))]
      [:div.text-left
       (if transfer-disabled?
         [:span {:class ["text-xs" "text-trading-text-secondary"]} "Unified"]
@@ -327,18 +373,26 @@
                        "whitespace-nowrap"]}
         prefix-label])]))
 
-(defn- mobile-balance-footer-action [label enabled?]
-  [:span {:class (into ["inline-flex"
-                        "items-center"
-                        "bg-transparent"
-                        "p-0"
-                        "text-xs"
-                        "font-medium"
-                        "leading-none"]
-                       (if enabled?
-                         ["text-trading-green"]
-                         ["cursor-default" "text-trading-text-secondary"]))}
-   label])
+(defn- mobile-balance-footer-action
+  ([label enabled?]
+   (mobile-balance-footer-action label enabled? nil))
+  ([label enabled? action]
+   (let [attrs {:class (into ["inline-flex"
+                              "items-center"
+                              "bg-transparent"
+                              "p-0"
+                              "text-xs"
+                              "font-medium"
+                              "leading-none"]
+                             (if enabled?
+                               ["text-trading-green"]
+                               ["cursor-default" "text-trading-text-secondary"]))}]
+     (if (and enabled? action)
+       [:button (assoc attrs
+                       :type "button"
+                       :on {:click [action]})
+        label]
+       [:span attrs label]))))
 
 (defn- mobile-balance-card [expanded-row-id row]
   (let [{:keys [coin
@@ -356,7 +410,18 @@
         row-id (some-> key str str/trim)
         {:keys [base-label]} (shared/resolve-coin-display (or selection-coin coin) {})
         expanded? (= expanded-row-id row-id)
-        transfer-enabled? (not transfer-disabled?)]
+        transfer-enabled? (not transfer-disabled?)
+        send-enabled?* (send-enabled? {:key key
+                                       :selection-coin selection-coin
+                                       :coin coin
+                                       :available-balance available-balance})
+        send-action (when send-enabled?*
+                      [:actions/open-funding-send-modal
+                       (send-action-context {:coin coin
+                                             :selection-coin selection-coin
+                                             :available-balance available-balance
+                                             :amount-decimals amount-decimals})
+                       :event.currentTarget/bounds])]
     (mobile-cards/expandable-card
      {:data-role (str "mobile-balance-card-" row-id)
       :expanded? expanded?
@@ -413,7 +478,7 @@
                                                      {:full-width? true}))])
                        [:div {:class ["border-t" "border-[#273035]" "pt-3"]}
                         [:div {:class ["flex" "items-center" "gap-4"]}
-                         (mobile-balance-footer-action "Send" true)
+                         (mobile-balance-footer-action "Send" send-enabled?* send-action)
                          (mobile-balance-footer-action "Transfer to Perps" transfer-enabled?)]]]})))
 
 (defn balances-tab-content

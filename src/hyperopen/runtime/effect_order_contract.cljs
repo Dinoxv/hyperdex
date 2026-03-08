@@ -101,6 +101,12 @@
     :allow-duplicate-heavy-effects? false
     :heavy-effect-ids #{:effects/api-submit-funding-transfer}}
 
+   :actions/submit-funding-send
+   {:required-phase-order [:projection :persistence :heavy-io]
+    :require-projection-before-heavy? true
+    :allow-duplicate-heavy-effects? false
+    :heavy-effect-ids #{:effects/api-submit-funding-send}}
+
    :actions/submit-funding-withdraw
    {:required-phase-order [:projection :persistence :heavy-io]
     :require-projection-before-heavy? true

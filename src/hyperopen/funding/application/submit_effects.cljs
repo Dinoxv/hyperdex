@@ -6,6 +6,46 @@
   [store]
   (account-context/mutations-blocked-message @store))
 
+(defn api-submit-funding-send!
+  [{:keys [store
+           request
+           dispatch!
+           submit-send-asset!
+           exchange-response-error
+           runtime-error-message
+           show-toast!
+           default-funding-modal-state
+           set-funding-submit-error!
+           close-funding-modal!
+           refresh-after-funding-submit!]}]
+  (let [spectate-mode-message (spectate-mode-submit-error store)
+        address (get-in @store [:wallet :address])
+        action (:action request)]
+    (if (seq spectate-mode-message)
+      (set-funding-submit-error! store show-toast! spectate-mode-message)
+      (if (nil? address)
+        (set-funding-submit-error! store
+                                   show-toast!
+                                   "Connect your wallet before sending tokens.")
+        (-> (submit-send-asset! store address action)
+            (.then (fn [resp]
+                     (if (= "ok" (:status resp))
+                       (do
+                         (close-funding-modal! store default-funding-modal-state)
+                         (show-toast! store :success "Send submitted.")
+                         (refresh-after-funding-submit! store dispatch! address)
+                         resp)
+                       (let [error-text (str/trim (str (exchange-response-error resp)))
+                             message (str "Send failed: "
+                                          (if (seq error-text) error-text "Unknown exchange error"))]
+                         (set-funding-submit-error! store show-toast! message)
+                         resp))))
+            (.catch (fn [err]
+                      (let [error-text (str/trim (str (runtime-error-message err)))
+                            message (str "Send failed: "
+                                         (if (seq error-text) error-text "Unknown runtime error"))]
+                        (set-funding-submit-error! store show-toast! message)))))))))
+
 (defn api-submit-funding-transfer!
   [{:keys [store
            request

@@ -612,6 +612,7 @@
                      :key "usdc"
                      :coin "USDC"
                      :total-balance 388.555675
+                     :available-balance 388.555675
                      :usdc-value 388.55
                      :amount-decimals 8
                      :contract-id "0x1234567890abcdef1234567890abcdef12345678")
@@ -640,6 +641,15 @@
                                                                    (contains? (hiccup/node-class-set %) "border-t")
                                                                    (contains? (hiccup/node-class-set %) "pt-3")
                                                                    (contains? (set (hiccup/collect-strings %)) "Send")))
+        send-button (hiccup/find-first-node expanded-card #(= [[:actions/open-funding-send-modal
+                                                                {:token "USDC"
+                                                                 :symbol "USDC"
+                                                                 :prefix-label nil
+                                                                 :max-amount 388.555675
+                                                                 :max-display "388.55567500"
+                                                                 :max-input "388.55567500"}
+                                                                :event.currentTarget/bounds]]
+                                                              (get-in % [1 :on :click])))
         total-balance-value (hiccup/find-first-node expanded-card #(and (= :div (first %))
                                                                         (contains? (hiccup/direct-texts %) "388.55567500 USDC")
                                                                         (contains? (hiccup/node-class-set %) "whitespace-nowrap")))
@@ -656,6 +666,7 @@
     (is (contains? (hiccup/node-class-set expanded-card) "bg-[#1b2429]"))
     (is (contains? (hiccup/node-class-set expanded-card) "border-[#273035]"))
     (is (some? total-balance-value))
+    (is (some? send-button))
     (is (some? namespace-chip))
     (is (some? footer-divider))
     (is (contains? (hiccup/node-class-set namespace-chip) "bg-[#0d5a51]"))

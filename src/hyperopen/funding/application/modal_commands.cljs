@@ -8,6 +8,23 @@
     [[:effects/save-many [[(conj funding-modal-path :submitting?) false]
                           [(conj funding-modal-path :error) message]]]]))
 
+(defn- normalize-send-context
+  [{:keys [non-blank-text parse-num]} send-context]
+  (let [context (if (map? send-context) send-context {})
+        max-amount (parse-num (:max-amount context))
+        max-display (or (non-blank-text (:max-display context))
+                        (when (number? max-amount)
+                          (str max-amount)))
+        max-input (or (non-blank-text (:max-input context))
+                      (when (number? max-amount)
+                        (str max-amount)))]
+    {:send-token (non-blank-text (:token context))
+     :send-symbol (non-blank-text (:symbol context))
+     :send-prefix-label (non-blank-text (:prefix-label context))
+     :send-max-amount (when (number? max-amount) max-amount)
+     :send-max-display max-display
+     :send-max-input (or max-input "")}))
+
 (defn open-funding-deposit-modal
   [{:keys [modal-state
            normalize-anchor
@@ -34,6 +51,27 @@
                                         (:destination-input base "")
                                         "")))]
      [:effects/api-fetch-hyperunit-fee-estimate]]))
+
+(defn open-funding-send-modal
+  [{:keys [normalize-anchor
+           default-funding-modal-state
+           funding-modal-path
+           non-blank-text
+           parse-num]}
+   _state
+   send-context
+   anchor]
+  (let [anchor* (normalize-anchor anchor)
+        send-modal-state (normalize-send-context {:non-blank-text non-blank-text
+                                                  :parse-num parse-num}
+                                                 send-context)]
+    [[:effects/save funding-modal-path
+      (-> (default-funding-modal-state)
+          (assoc :open? true
+                 :mode :send
+                 :anchor anchor*
+                 :destination-input "")
+          (merge send-modal-state))]]))
 
 (defn open-funding-transfer-modal
   [{:keys [normalize-anchor
@@ -304,13 +342,40 @@
   (let [modal (modal-state state)
         mode (normalize-mode (:mode modal))
         max-amount (case mode
+                     :send (:send-max-amount modal)
                      :transfer (transfer-max-amount state modal)
                      :withdraw (withdraw-max-amount state (withdraw-asset state modal))
                      0)]
     [[:effects/save funding-modal-path
       (-> modal
-          (assoc :amount-input (format-usdc-input max-amount)
+          (assoc :amount-input (if (= mode :send)
+                                 (or (:send-max-input modal)
+                                     (when (number? max-amount)
+                                       (str max-amount))
+                                     "")
+                                 (format-usdc-input max-amount))
                  :error nil))]]))
+
+(defn submit-funding-send
+  [{:keys [modal-state
+           normalize-mode
+           send-preview
+           funding-modal-path]}
+   state]
+  (if-let [guard-effects (mutation-guard-effects state funding-modal-path)]
+    guard-effects
+    (let [modal (modal-state state)
+          mode (normalize-mode (:mode modal))
+          result (if (= :send mode)
+                   (send-preview state modal)
+                   {:ok? false
+                    :display-message "Send modal unavailable."})]
+      (if-not (:ok? result)
+        [[:effects/save-many [[(conj funding-modal-path :submitting?) false]
+                              [(conj funding-modal-path :error) (:display-message result)]]]]
+        [[:effects/save-many [[(conj funding-modal-path :submitting?) true]
+                              [(conj funding-modal-path :error) nil]]]
+         [:effects/api-submit-funding-send (:request result)]]))))
 
 (defn submit-funding-transfer
   [{:keys [modal-state
@@ -377,6 +442,7 @@
 
 (defn set-funding-modal-compat
   [{:keys [close-funding-modal-fn
+           open-funding-send-modal-fn
            open-funding-deposit-modal-fn
            open-funding-withdraw-modal-fn
            open-funding-transfer-modal-fn
@@ -391,6 +457,6 @@
       nil (close-funding-modal-fn state)
       :deposit (open-funding-deposit-modal-fn state nil)
       :withdraw (open-funding-withdraw-modal-fn state nil)
-      :send (open-funding-transfer-modal-fn state nil)
+      :send (open-funding-send-modal-fn state nil nil)
       :transfer (open-funding-transfer-modal-fn state nil)
       (open-legacy-funding-modal-fn state mode))))
