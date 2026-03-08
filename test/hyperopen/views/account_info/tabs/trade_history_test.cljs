@@ -338,6 +338,44 @@
     (is (contains? (set (hiccup/collect-strings hype-direction-cell))
                    "Market Order Liquidation: Close Long"))))
 
+(deftest trade-history-desktop-grid-and-value-cells-use-available-width-test
+  (let [fills [{:tid 1
+                :coin "xyz:SILVER"
+                :side "A"
+                :dir "Close Long"
+                :sz "0.52"
+                :px "95.242"
+                :tradeValue "49.53"
+                :fee "0.00"
+                :closedPnl "0.19"
+                :time 1700000000000}]
+        content (view/trade-history-tab-content fills)
+        header-node (hiccup/tab-header-node content)
+        row-node (hiccup/first-viewport-row content)
+        cells (vec (hiccup/node-children row-node))
+        coin-cell (nth cells 1)
+        size-cell (nth cells 4)
+        value-cell (nth cells 5)
+        fee-cell (nth cells 6)
+        pnl-cell (nth cells 7)
+        coin-base (hiccup/find-first-node coin-cell #(and (= :span (first %))
+                                                          (contains? (hiccup/direct-texts %) "SILVER")))
+        header-classes (hiccup/node-class-set header-node)
+        row-classes (hiccup/node-class-set row-node)
+        flexible-grid-class "grid-cols-[minmax(180px,1.45fr)_minmax(90px,1.05fr)_minmax(160px,1.2fr)_minmax(90px,0.8fr)_minmax(130px,1.1fr)_minmax(130px,1.05fr)_minmax(110px,0.9fr)_minmax(120px,1fr)]"
+        old-grid-class "grid-cols-[180px_90px_160px_90px_130px_130px_110px_120px]"]
+    (is (contains? header-classes flexible-grid-class))
+    (is (contains? row-classes flexible-grid-class))
+    (is (not (contains? header-classes old-grid-class)))
+    (is (not (contains? row-classes old-grid-class)))
+    (is (some? coin-base))
+    (is (contains? (hiccup/node-class-set coin-base) "whitespace-nowrap"))
+    (is (not (contains? (hiccup/node-class-set coin-base) "truncate")))
+    (is (contains? (hiccup/node-class-set size-cell) "whitespace-nowrap"))
+    (is (contains? (hiccup/node-class-set value-cell) "whitespace-nowrap"))
+    (is (contains? (hiccup/node-class-set fee-cell) "whitespace-nowrap"))
+    (is (contains? (hiccup/node-class-set pnl-cell) "whitespace-nowrap"))))
+
 (deftest trade-history-coin-cell-dispatches-select-asset-action-test
   (let [fills [{:tid 1
                 :coin "xyz:NVDA"

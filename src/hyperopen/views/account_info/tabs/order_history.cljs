@@ -94,7 +94,7 @@
      (shared/coin-select-control
       coin
       [:span {:class ["flex" "items-center" "gap-1.5" "min-w-0"]}
-       [:span (cond-> {:class (cond-> ["truncate"]
+       [:span (cond-> {:class (cond-> ["whitespace-nowrap"]
                                 side
                                 (conj "font-semibold"))}
                 coin-style
@@ -391,7 +391,7 @@
    (table/sortable-header-button column-name sort-state :actions/sort-order-history options)))
 
 (def ^:private order-history-grid-template-class
-  "grid-cols-[minmax(130px,1.45fr)_minmax(110px,1.25fr)_minmax(84px,0.9fr)_minmax(64px,0.7fr)_minmax(82px,0.9fr)_minmax(72px,0.75fr)_minmax(100px,1.05fr)_minmax(72px,0.8fr)_minmax(74px,0.72fr)_minmax(140px,1.55fr)_minmax(60px,0.65fr)_minmax(120px,1.25fr)_minmax(106px,1.2fr)]")
+  "grid-cols-[minmax(130px,1.45fr)_minmax(110px,1.15fr)_minmax(84px,1.35fr)_minmax(64px,1.25fr)_minmax(82px,0.9fr)_minmax(72px,0.8fr)_minmax(100px,1.05fr)_minmax(72px,0.8fr)_minmax(74px,0.8fr)_minmax(140px,1.35fr)_minmax(60px,0.7fr)_minmax(120px,1.15fr)_minmax(106px,1.05fr)]")
 
 (defn order-history-table [order-history order-history-state]
   (let [sort-state (order-history-sort-state order-history-state)

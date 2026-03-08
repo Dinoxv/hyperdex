@@ -250,13 +250,16 @@
     (shared/coin-select-control
      (trade-history-coin row)
      [:span {:class ["flex" "items-center" "gap-1.5" "min-w-0"]}
-      [:span {:class (cond-> ["truncate"]
+      [:span {:class (cond-> ["whitespace-nowrap"]
                        direction-class
                        (conj direction-class))}
        base-label]
       (when prefix-label
         [:span {:class shared/position-chip-classes} prefix-label])]
      {:extra-classes ["w-full" "justify-start" "text-left"]})))
+
+(def ^:private trade-history-grid-template-class
+  "grid-cols-[minmax(180px,1.45fr)_minmax(90px,1.05fr)_minmax(160px,1.2fr)_minmax(90px,0.8fr)_minmax(130px,1.1fr)_minmax(130px,1.05fr)_minmax(110px,0.9fr)_minmax(120px,1fr)]")
 
 (defn- format-trade-history-price [row]
   (let [price (or (:px row) (:price row) (:p row))]
@@ -447,7 +450,7 @@
                         "text-sm"
                         "font-medium"
                         "text-trading-text-secondary"
-                        "grid-cols-[180px_90px_160px_90px_130px_130px_110px_120px]"]
+                        trade-history-grid-template-class]
                        extra-classes)}
     [:div {:class ["text-left"]} (sortable-trade-history-header "Time" sort-state)]
     [:div {:class ["text-left"]} (sortable-trade-history-header "Coin" sort-state)]
@@ -465,21 +468,21 @@
                  "px-3"
                  "hover:bg-base-300"
                  "text-sm"
-                 "grid-cols-[180px_90px_160px_90px_130px_130px_110px_120px]"]}
+                 trade-history-grid-template-class]}
    [:div {:class ["text-left" "text-xs" "whitespace-nowrap"]}
     (trade-history-time-node row)]
    [:div {:class ["text-left"]}
     (trade-history-coin-node row market-by-key)]
    (trade-history-direction-node row)
-   [:div {:class ["text-left" "num"]}
+   [:div {:class ["text-left" "num" "whitespace-nowrap"]}
     (format-trade-history-price row)]
-   [:div {:class ["text-left" "num"]}
+   [:div {:class ["text-left" "num" "whitespace-nowrap"]}
     (format-trade-history-size row market-by-key)]
-   [:div {:class ["text-left" "num"]}
+   [:div {:class ["text-left" "num" "whitespace-nowrap"]}
     (format-trade-history-value row)]
-   [:div {:class ["text-left" "num"]}
+   [:div {:class ["text-left" "num" "whitespace-nowrap"]}
     (format-trade-history-fee row)]
-   [:div {:class ["text-left" "num" (trade-history-closed-pnl-class row)]}
+   [:div {:class ["text-left" "num" "whitespace-nowrap" (trade-history-closed-pnl-class row)]}
     (format-trade-history-closed-pnl row)]])
 
 (defn- mobile-trade-history-coin-node [row market-by-key]

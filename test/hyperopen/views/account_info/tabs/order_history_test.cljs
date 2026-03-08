@@ -272,10 +272,10 @@
                                                       :status-filter :all
                                                       :loading? false})
         long-coin-base (hiccup/find-first-node content #(and (= :span (first %))
-                                                      (contains? (hiccup/node-class-set %) "truncate")
+                                                      (contains? (hiccup/node-class-set %) "whitespace-nowrap")
                                                       (contains? (hiccup/direct-texts %) "NVDA")))
         sell-coin-base (hiccup/find-first-node content #(and (= :span (first %))
-                                                      (contains? (hiccup/node-class-set %) "truncate")
+                                                      (contains? (hiccup/node-class-set %) "whitespace-nowrap")
                                                       (contains? (hiccup/direct-texts %) "PUMP")))]
     (is (some? long-coin-base))
     (is (some? sell-coin-base))
@@ -285,6 +285,39 @@
            (get-in long-coin-base [1 :style :color])))
     (is (= "rgb(234, 175, 184)"
            (get-in sell-coin-base [1 :style :color])))))
+
+(deftest order-history-desktop-grid-and-coin-label-avoid-unnecessary-truncation-test
+  (let [rows [{:order {:coin "xyz:SILVER"
+                       :oid 307891000622
+                       :side "B"
+                       :origSz "0.500"
+                       :remainingSz "0.000"
+                       :limitPx "95.242"
+                       :orderType "Limit"
+                       :reduceOnly false
+                       :isTrigger false
+                       :timestamp 1700000000000}
+               :status "filled"
+               :statusTimestamp 1700000000500}]
+        content (@#'view/order-history-table rows {:sort {:column "Time" :direction :desc}
+                                                   :status-filter :all
+                                                   :loading? false})
+        header-node (hiccup/tab-header-node content)
+        row-node (hiccup/first-viewport-row content)
+        coin-cell (nth (vec (hiccup/node-children row-node)) 2)
+        coin-base (hiccup/find-first-node coin-cell #(and (= :span (first %))
+                                                          (contains? (hiccup/direct-texts %) "SILVER")))
+        header-classes (hiccup/node-class-set header-node)
+        row-classes (hiccup/node-class-set row-node)
+        flexible-grid-class "grid-cols-[minmax(130px,1.45fr)_minmax(110px,1.15fr)_minmax(84px,1.35fr)_minmax(64px,1.25fr)_minmax(82px,0.9fr)_minmax(72px,0.8fr)_minmax(100px,1.05fr)_minmax(72px,0.8fr)_minmax(74px,0.8fr)_minmax(140px,1.35fr)_minmax(60px,0.7fr)_minmax(120px,1.15fr)_minmax(106px,1.05fr)]"
+        old-grid-class "grid-cols-[minmax(130px,1.45fr)_minmax(110px,1.25fr)_minmax(84px,0.9fr)_minmax(64px,0.7fr)_minmax(82px,0.9fr)_minmax(72px,0.75fr)_minmax(100px,1.05fr)_minmax(72px,0.8fr)_minmax(74px,0.72fr)_minmax(140px,1.55fr)_minmax(60px,0.65fr)_minmax(120px,1.25fr)_minmax(106px,1.2fr)]"]
+    (is (contains? header-classes flexible-grid-class))
+    (is (contains? row-classes flexible-grid-class))
+    (is (not (contains? header-classes old-grid-class)))
+    (is (not (contains? row-classes old-grid-class)))
+    (is (some? coin-base))
+    (is (contains? (hiccup/node-class-set coin-base) "whitespace-nowrap"))
+    (is (not (contains? (hiccup/node-class-set coin-base) "truncate")))))
 
 (deftest order-history-coin-cell-dispatches-select-asset-action-test
   (let [rows [{:order {:coin "xyz:NVDA"
