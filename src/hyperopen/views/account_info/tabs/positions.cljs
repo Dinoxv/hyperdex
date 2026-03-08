@@ -364,6 +364,110 @@
             :on {:click action}}
    label])
 
+(defn- mobile-position-detail-edit-button [aria-label action data-attr]
+  [:button {:type "button"
+            :class ["inline-flex"
+                    "-ml-0.5"
+                    "h-6"
+                    "w-6"
+                    "items-center"
+                    "justify-center"
+                    "shrink-0"
+                    "bg-transparent"
+                    "p-0"
+                    "text-trading-green"
+                    "transition-colors"
+                    "hover:text-[#7fffe4]"
+                    "focus:outline-none"
+                    "focus:ring-0"
+                    "focus:ring-offset-0"
+                    "focus-visible:text-[#7fffe4]"]
+            :aria-label aria-label
+            :on {:click action}
+            data-attr "true"}
+   (edit-icon)])
+
+(defn- editable-mobile-detail-value
+  [content edit-button]
+  [:div {:class ["inline-flex" "max-w-full" "items-start" "gap-0.5" "align-top"]}
+   [:div {:class ["min-w-0" "leading-5"]}
+    content]
+   edit-button])
+
+(def ^:private mobile-position-overlay-breakpoint-px 640)
+(def ^:private mobile-position-overlay-trigger-size-px 24)
+(def ^:private mobile-position-overlay-horizontal-padding-px 16)
+(def ^:private mobile-position-overlay-bottom-padding-px 24)
+(def ^:private mobile-position-overlay-fallback-width-px 430)
+(def ^:private mobile-position-overlay-fallback-height-px 932)
+
+(defn- current-viewport-number
+  [value fallback]
+  (if (and (number? value)
+           (pos? value))
+    value
+    fallback))
+
+(defn- current-viewport-width []
+  (current-viewport-number (some-> js/globalThis .-innerWidth)
+                           mobile-position-overlay-fallback-width-px))
+
+(defn- current-viewport-height []
+  (current-viewport-number (some-> js/globalThis .-innerHeight)
+                           mobile-position-overlay-fallback-height-px))
+
+(defn- phone-overlay-trigger?
+  []
+  (<= (current-viewport-width)
+      mobile-position-overlay-breakpoint-px))
+
+(defn- mobile-position-overlay-anchor
+  []
+  (let [viewport-width (current-viewport-width)
+        viewport-height (current-viewport-height)
+        trigger-size mobile-position-overlay-trigger-size-px
+        right (max trigger-size
+                   (- viewport-width mobile-position-overlay-horizontal-padding-px))
+        left (max 0 (- right trigger-size))
+        bottom (max trigger-size
+                    (- viewport-height mobile-position-overlay-bottom-padding-px))
+        top (max 0 (- bottom trigger-size))]
+    {:left left
+     :right right
+     :top top
+     :bottom bottom
+     :width trigger-size
+     :height trigger-size
+     :viewport-width viewport-width
+     :viewport-height viewport-height}))
+
+(defn- position-overlay-trigger
+  [action-id position-data]
+  [[action-id
+    position-data
+    (if (phone-overlay-trigger?)
+      (mobile-position-overlay-anchor)
+      :event.currentTarget/bounds)]])
+
+(defn- mobile-position-margin-value-node
+  [margin margin-mode-label]
+  [:span {:class ["inline-flex"
+                  "max-w-full"
+                  "flex-wrap"
+                  "items-center"
+                  "gap-x-1"
+                  "gap-y-0.5"
+                  "leading-5"]}
+   [:span {:class ["num" "font-medium" "text-trading-text" "whitespace-nowrap"]}
+    (str "$" (shared/format-currency margin))]
+   (when margin-mode-label
+     [:span {:class ["text-xs"
+                     "font-medium"
+                     "leading-4"
+                     "text-trading-text-secondary"
+                     "whitespace-nowrap"]}
+      (str "(" margin-mode-label ")")])])
+
 (def ^:private mobile-position-card-shell-classes
   ["overflow-hidden"
    "rounded-lg"
@@ -643,11 +747,28 @@
                                    (position-value-copy position-value-num)
                                    {:value-classes ["num" "font-medium" "whitespace-nowrap"]})
          (mobile-cards/detail-item "Margin"
-                                   (position-margin-copy (:marginUsed pos) margin-mode-label)
-                                   {:value-classes ["num" "font-medium" "whitespace-nowrap"]})
+                                   (editable-mobile-detail-value
+                                    (mobile-position-margin-value-node
+                                     (:marginUsed pos)
+                                     margin-mode-label)
+                                    (mobile-position-detail-edit-button
+                                     "Edit Margin"
+                                     (position-overlay-trigger
+                                      :actions/open-position-margin-modal
+                                      position-data)
+                                     :data-position-margin-trigger))
+                                   {:value-classes ["font-medium"]})
          (mobile-cards/detail-item "TP/SL"
-                                   (tpsl-cell-copy position-data)
-                                   {:value-classes ["font-medium" "whitespace-nowrap"]})
+                                   (editable-mobile-detail-value
+                                    [:span {:class ["font-medium" "text-trading-text" "whitespace-nowrap"]}
+                                     (tpsl-cell-copy position-data)]
+                                    (mobile-position-detail-edit-button
+                                     "Edit TP/SL"
+                                     (position-overlay-trigger
+                                      :actions/open-position-tpsl-modal
+                                      position-data)
+                                     :data-position-tpsl-trigger))
+                                   {:value-classes ["font-medium"]})
          (mobile-cards/detail-item "Funding"
                                    (funding-value-node display-funding)
                                    {:value-classes ["font-medium" "whitespace-nowrap"]})])
@@ -655,13 +776,19 @@
         [:div {:class ["relative" "flex" "flex-wrap" "items-center" "gap-x-5" "gap-y-2"]}
          (mobile-position-action-button
           "Close"
-          [[:actions/open-position-reduce-popover position-data :event.currentTarget/bounds]])
+          (position-overlay-trigger
+           :actions/open-position-reduce-popover
+           position-data))
          (mobile-position-action-button
           "Margin"
-          [[:actions/open-position-margin-modal position-data :event.currentTarget/bounds]])
+          (position-overlay-trigger
+           :actions/open-position-margin-modal
+           position-data))
          (mobile-position-action-button
           "TP/SL"
-          [[:actions/open-position-tpsl-modal position-data :event.currentTarget/bounds]])
+          (position-overlay-trigger
+           :actions/open-position-tpsl-modal
+           position-data))
          (when active-reduce-popover?
            (position-reduce-popover/position-reduce-popover-view reduce-popover))
          (when active-margin-modal?

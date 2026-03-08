@@ -68,15 +68,19 @@
 
 (defn- normalize-anchor
   [anchor]
-  (when (map? anchor)
-    (let [normalized (reduce (fn [acc k]
-                               (if-let [n (parse-num (get anchor k))]
-                                 (assoc acc k n)
-                                 acc))
-                             {}
-                             anchor-keys)]
-      (when (seq normalized)
-        normalized))))
+  (let [anchor* (cond
+                  (map? anchor) anchor
+                  (some? anchor) (js->clj anchor :keywordize-keys true)
+                  :else nil)]
+    (when (map? anchor*)
+      (let [normalized (reduce (fn [acc k]
+                                 (if-let [n (parse-num (get anchor* k))]
+                                   (assoc acc k n)
+                                   acc))
+                               {}
+                               anchor-keys)]
+        (when (seq normalized)
+          normalized)))))
 
 (defn- normalize-close-type
   [value]

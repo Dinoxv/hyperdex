@@ -359,6 +359,34 @@
     (is (= "fr-FR" (:locale margin-modal)))
     (is (= "fr-FR" (:locale reduce-popover)))))
 
+(deftest position-overlay-open-actions-normalize-js-anchor-objects-test
+  (let [row (fixtures/sample-position-row "xyz:NVDA" 10 "0.500")
+        js-anchor #js {:left 390
+                       :right 414
+                       :top 884
+                       :bottom 908
+                       :width 24
+                       :height 24
+                       "viewport-width" 430
+                       "viewport-height" 932}
+        tpsl-effects (history-actions/open-position-tpsl-modal {} row js-anchor)
+        margin-effects (history-actions/open-position-margin-modal {} row js-anchor)
+        reduce-effects (history-actions/open-position-reduce-popover {} row js-anchor)
+        tpsl-anchor (get-in (first tpsl-effects) [1 0 1 :anchor])
+        margin-anchor (get-in (first margin-effects) [1 0 1 :anchor])
+        reduce-anchor (get-in (first reduce-effects) [1 0 1 :anchor])]
+    (is (= {:left 390
+            :right 414
+            :top 884
+            :bottom 908
+            :width 24
+            :height 24
+            :viewport-width 430
+            :viewport-height 932}
+           tpsl-anchor))
+    (is (= tpsl-anchor margin-anchor))
+    (is (= tpsl-anchor reduce-anchor))))
+
 (deftest position-reduce-popover-actions-open-update-close-test
   (let [row (fixtures/sample-position-row "xyz:NVDA" 10 "0.500")
         open-effects (history-actions/open-position-reduce-popover {} row)
