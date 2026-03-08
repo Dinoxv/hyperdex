@@ -183,8 +183,15 @@
     (is (contains? account-info-cell-classes "min-h-0"))
     (is (contains? account-info-cell-classes "overflow-hidden"))))
 
-(deftest trade-view-renders-mobile-account-shortcuts-test
-  (let [view-node (trade-view/trade-view trade-view-test-state)
+(deftest trade-view-renders-mobile-account-shortcuts-only-on-account-surface-test
+  (let [chart-view (trade-view/trade-view trade-view-test-state)
+        chart-balances-shortcut (find-first-node chart-view
+                                                 #(= [[:actions/select-trade-mobile-surface :account]
+                                                      [:actions/select-account-info-tab :balances]]
+                                                     (get-in % [1 :on :click])))
+        view-node (trade-view/trade-view (assoc-in trade-view-test-state
+                                                   [:trade-ui :mobile-surface]
+                                                   :account))
         balances-shortcut (find-first-node view-node
                                            #(= [[:actions/select-trade-mobile-surface :account]
                                                 [:actions/select-account-info-tab :balances]]
@@ -195,15 +202,24 @@
                                                   (get-in % [1 :on :click])))
         trade-history-shortcut (find-first-node view-node
                                                 #(= [[:actions/select-trade-mobile-surface :account]
-                                                     [:actions/select-account-info-tab :trade-history]]
+                                                    [:actions/select-account-info-tab :trade-history]]
                                                     (get-in % [1 :on :click])))
         all-text (set (collect-strings view-node))]
+    (is (nil? chart-balances-shortcut))
     (is (some? balances-shortcut))
     (is (some? open-orders-shortcut))
     (is (some? trade-history-shortcut))
     (is (contains? all-text "Balances"))
     (is (contains? all-text "Open Orders"))
     (is (contains? all-text "Trade History"))))
+
+(deftest trade-view-primary-mobile-tabs-exclude-account-tab-test
+  (let [view-node (trade-view/trade-view trade-view-test-state)
+        all-text (set (collect-strings view-node))]
+    (is (contains? all-text "Chart"))
+    (is (contains? all-text "Order Book"))
+    (is (contains? all-text "Trade"))
+    (is (not (contains? all-text "Account")))))
 
 (deftest trade-view-reads-runtime-health-snapshot-for-surface-freshness-cues-test
   (let [state (-> trade-view-test-state

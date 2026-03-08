@@ -10,8 +10,7 @@
 (def ^:private trade-mobile-surfaces
   [[:chart "Chart"]
    [:orderbook "Order Book"]
-   [:ticket "Trade"]
-   [:account "Account"]])
+   [:ticket "Trade"]])
 
 (def ^:private trade-mobile-account-shortcuts
   [[:balances "Balances"]
@@ -24,18 +23,18 @@
   [selected-surface [surface-id label]]
   [:button {:type "button"
             :class (into ["flex-1"
-                          "rounded-md"
-                          "px-2.5"
-                          "py-1.5"
-                          "text-xs"
+                          "border-b-2"
+                          "px-2"
+                          "py-2"
+                          "text-sm"
                           "font-medium"
                           "transition-colors"
                           "focus:outline-none"
                           "focus:ring-0"
                           "focus:ring-offset-0"]
                          (if (= selected-surface surface-id)
-                           ["bg-base-100" "text-trading-text" "shadow-sm"]
-                           ["text-trading-text-secondary" "hover:bg-base-200" "hover:text-trading-text"]))
+                           ["border-primary" "text-trading-text"]
+                           ["border-transparent" "text-trading-text-secondary" "hover:text-trading-text"]))
             :on {:click [[:actions/select-trade-mobile-surface surface-id]]}}
    label])
 
@@ -77,15 +76,11 @@
      [:div {:class ["w-full" "h-full" "px-0" "py-0" "space-y-0" "flex" "flex-col" "min-h-0"]}
       [:div {:class ["lg:hidden" "border-b" "border-base-300" "bg-base-200"]}
        (active-asset-view/active-asset-view state*)]
-      [:div {:class ["lg:hidden" "border-b" "border-base-300" "bg-base-200/70" "px-3" "py-1.5" "space-y-1.5"]}
-       [:div {:class ["flex" "items-center" "gap-1.5" "rounded-xl" "bg-base-200" "p-1"]}
+      [:div {:class ["lg:hidden" "border-b" "border-base-300" "bg-base-200/70" "px-3"]}
+       [:div {:class ["flex" "items-center" "gap-0"]}
         (for [[surface-id _label :as surface] trade-mobile-surfaces]
           ^{:key (str "trade-mobile-surface-" (name surface-id))}
-          (mobile-surface-button mobile-surface surface))]
-       [:div {:class ["flex" "gap-1.5" "overflow-x-auto" "scrollbar-hide" "pb-0.5"]}
-        (for [[tab-id _label :as shortcut] trade-mobile-account-shortcuts]
-          ^{:key (str "trade-mobile-account-shortcut-" (name tab-id))}
-          (mobile-account-shortcut-button mobile-surface selected-account-tab shortcut))]]
+          (mobile-surface-button mobile-surface surface))]]
       [:div {:class ["relative" "flex-1" "min-h-0"]}
        [:div {:class ["hidden" "xl:block" "absolute" "top-0" "bottom-0" "right-[320px]" "w-px" "bg-base-300" "pointer-events-none" "z-10"]}]
         [:div {:class ["grid"
@@ -168,4 +163,10 @@
                              "lg:row-start-2"
                              "xl:col-start-1"])
                :data-parity-id "trade-account-tables-panel"}
+         (when (= mobile-surface :account)
+           [:div {:class ["lg:hidden" "border-b" "border-base-300" "bg-base-200/60" "px-3" "py-1.5"]}
+            [:div {:class ["flex" "gap-1.5" "overflow-x-auto" "scrollbar-hide" "pb-0.5"]}
+             (for [[tab-id _label :as shortcut] trade-mobile-account-shortcuts]
+               ^{:key (str "trade-mobile-account-shortcut-" (name tab-id))}
+               (mobile-account-shortcut-button mobile-surface selected-account-tab shortcut))]])
          (account-info-view/account-info-view state*)]]]]]))

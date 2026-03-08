@@ -414,6 +414,7 @@
    :actions/select-orderbook-price-aggregation ::keyword-or-string-args
    :actions/select-orderbook-tab ::tab-args
    :actions/select-trade-mobile-surface ::tab-args
+   :actions/toggle-trade-mobile-asset-details ::no-args
    :actions/add-indicator ::add-indicator-args
    :actions/remove-indicator ::keyword-args
    :actions/update-indicator-period ::update-indicator-period-args

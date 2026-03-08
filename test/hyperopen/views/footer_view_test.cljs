@@ -160,6 +160,31 @@
     (is (false? (boolean (get-in off-toggle [1 :checked]))))
     (is (true? (boolean (get-in on-toggle [1 :checked]))))))
 
+(deftest footer-renders-mobile-bottom-nav-actions-test
+  (let [view (footer-view/footer-view (assoc (base-state)
+                                             :router {:path "/trade"}))
+        mobile-nav (find-node #(= "mobile-bottom-nav" (get-in % [1 :data-role])) view)
+        markets-button (find-node #(= "mobile-bottom-nav-markets" (get-in % [1 :data-role])) view)
+        trade-button (find-node #(= "mobile-bottom-nav-trade" (get-in % [1 :data-role])) view)
+        account-button (find-node #(= "mobile-bottom-nav-account" (get-in % [1 :data-role])) view)]
+    (is (some? mobile-nav))
+    (is (= [[:actions/select-trade-mobile-surface :chart]
+            [:actions/toggle-asset-dropdown :asset-selector]]
+           (get-in markets-button [1 :on :click])))
+    (is (= [[:actions/select-trade-mobile-surface :chart]]
+           (get-in trade-button [1 :on :click])))
+    (is (= [[:actions/select-trade-mobile-surface :account]]
+           (get-in account-button [1 :on :click])))))
+
+(deftest footer-mobile-bottom-nav-highlights-account-surface-test
+  (let [view (footer-view/footer-view (assoc (base-state)
+                                             :router {:path "/trade"}
+                                             :trade-ui {:mobile-surface :account}))
+        account-button (find-node #(= "mobile-bottom-nav-account" (get-in % [1 :data-role])) view)
+        classes (set (class-values (get-in account-button [1 :class])))]
+    (is (contains? classes "bg-[#0d2a31]"))
+    (is (contains? classes "text-[#61e6cf]"))))
+
 (deftest diagnostics-drawer-renders-only-when-open-test
   (let [closed-view (footer-view/footer-view (base-state))
         open-view (footer-view/footer-view (assoc-in (base-state) [:websocket-ui :diagnostics-open?] true))]

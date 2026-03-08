@@ -2,6 +2,7 @@
   (:require [clojure.string :as str]
             [hyperopen.config :as app-config]
             [hyperopen.platform :as platform]
+            [hyperopen.trade.layout-actions :as trade-layout-actions]
             [hyperopen.websocket.diagnostics-sanitize :as diagnostics-sanitize]))
 
 (def footer-link-classes
@@ -761,6 +762,104 @@
 
       (market-projection-recent-flushes-section health now-ms reveal-sensitive?)]]))
 
+(defn- mobile-nav-icon
+  [kind active?]
+  (let [icon-classes (into ["h-[18px]" "w-[18px]"]
+                           (if active?
+                             ["text-[#61e6cf]"]
+                             ["text-trading-text-secondary"]))]
+    (case kind
+      :markets
+      [:svg {:viewBox "0 0 20 20" :fill "currentColor" :class icon-classes}
+       [:path {:d "M3 11a1 1 0 011-1h1a1 1 0 011 1v5H3v-5z"}]
+       [:path {:d "M8 7a1 1 0 011-1h1a1 1 0 011 1v9H8V7z"}]
+       [:path {:d "M13 4a1 1 0 011-1h1a1 1 0 011 1v12h-3V4z"}]]
+
+      :trade
+      [:svg {:viewBox "0 0 20 20" :fill "currentColor" :class icon-classes}
+       [:path {:fill-rule "evenodd"
+               :clip-rule "evenodd"
+               :d "M10 3a7 7 0 100 14 7 7 0 000-14zm1 3a1 1 0 10-2 0v4c0 .265.105.52.293.707l2.5 2.5a1 1 0 001.414-1.414L11 9.586V6z"}]]
+
+      :account
+      [:svg {:viewBox "0 0 20 20" :fill "currentColor" :class icon-classes}
+       [:path {:fill-rule "evenodd"
+               :clip-rule "evenodd"
+               :d "M10 9a3 3 0 100-6 3 3 0 000 6zm-6 8a6 6 0 1112 0H4z"}]]
+
+      nil)))
+
+(defn- mobile-nav-button
+  [{:keys [label active? click icon-kind data-role]}]
+  [:button {:type "button"
+            :class (into ["inline-flex"
+                          "flex-col"
+                          "items-center"
+                          "justify-center"
+                          "gap-1"
+                          "rounded-xl"
+                          "px-2"
+                          "py-1.5"
+                          "text-xs"
+                          "font-medium"
+                          "transition-colors"]
+                         (if active?
+                           ["bg-[#0d2a31]" "text-[#61e6cf]"]
+                           ["text-trading-text-secondary" "hover:bg-base-100" "hover:text-trading-text"]))
+            :on {:click click}
+            :data-role data-role}
+   (mobile-nav-icon icon-kind active?)
+   [:span label]])
+
+(defn- mobile-bottom-nav
+  [state]
+  (let [route (get-in state [:router :path] "/trade")
+        trade-route? (str/starts-with? route "/trade")
+        portfolio-route? (str/starts-with? route "/portfolio")
+        mobile-surface (trade-layout-actions/normalize-trade-mobile-surface
+                        (get-in state [:trade-ui :mobile-surface]))
+        asset-selector-open? (= :asset-selector (get-in state [:asset-selector :visible-dropdown]))
+        markets-active? (and trade-route? asset-selector-open?)
+        account-active? (or portfolio-route?
+                            (and trade-route? (= mobile-surface :account)))
+        trade-active? (and trade-route?
+                           (not account-active?)
+                           (not markets-active?))]
+    [:div {:class ["lg:hidden"
+                   "w-full"
+                   "bg-[#07161b]/95"
+                   "backdrop-blur"
+                   "app-shell-gutter"
+                   "pt-2"
+                   "pb-[calc(0.5rem+env(safe-area-inset-bottom))]"]
+           :data-role "mobile-bottom-nav"}
+     [:div {:class ["grid" "grid-cols-3" "gap-2"]}
+      (mobile-nav-button
+       {:label "Markets"
+        :active? markets-active?
+        :click (if trade-route?
+                 [[:actions/select-trade-mobile-surface :chart]
+                  [:actions/toggle-asset-dropdown :asset-selector]]
+                 [[:actions/navigate "/trade"]])
+        :icon-kind :markets
+        :data-role "mobile-bottom-nav-markets"})
+      (mobile-nav-button
+       {:label "Trade"
+        :active? trade-active?
+        :click (if trade-route?
+                 [[:actions/select-trade-mobile-surface :chart]]
+                 [[:actions/navigate "/trade"]])
+        :icon-kind :trade
+        :data-role "mobile-bottom-nav-trade"})
+      (mobile-nav-button
+       {:label "Account"
+        :active? account-active?
+        :click (if trade-route?
+                 [[:actions/select-trade-mobile-surface :account]]
+                 [[:actions/navigate "/portfolio"]])
+        :icon-kind :account
+        :data-role "mobile-bottom-nav-account"})]]))
+
 (defn footer-view [state]
   (let [health (get-in state [:websocket :health] {})
         {:keys [status]} (dominant-pill-state health)
@@ -773,7 +872,8 @@
         banner (banner-model state health)]
     [:footer {:class ["fixed" "inset-x-0" "bottom-0" footer-z-class "isolate" "w-full" "shrink-0" "bg-base-200" "border-t" "border-base-300"]
               :data-parity-id "footer"}
-     [:div {:class ["w-full" "app-shell-gutter" "py-2" "relative"]}
+     (mobile-bottom-nav state)
+     [:div {:class ["hidden" "lg:block" "w-full" "app-shell-gutter" "py-2" "relative"]}
       (when banner
         [:div {:class (into ["mb-2"
                              "rounded"

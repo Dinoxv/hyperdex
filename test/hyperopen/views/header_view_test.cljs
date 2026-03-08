@@ -79,6 +79,31 @@
     (is (= [[:actions/open-spectate-mode-modal :event.currentTarget/bounds]]
            (get-in spectate-mode-button [1 :on :click])))))
 
+(deftest header-renders-mobile-menu-and-utility-buttons-test
+  (let [view (header-view/header-view {:wallet {:connected? false}
+                                       :router {:path "/trade"}})
+        menu-trigger (find-node-by-role view "mobile-header-menu-trigger")
+        menu-panel (find-node-by-role view "mobile-header-menu-panel")
+        mobile-brand (find-node-by-role view "mobile-brand")
+        trade-link (find-node-by-role view "mobile-header-menu-link-trade")
+        portfolio-link (find-node-by-role view "mobile-header-menu-link-portfolio")
+        spectate-link (find-node-by-role view "mobile-header-menu-spectate")
+        language-button (find-node-by-role view "header-language-button")
+        settings-button (find-node-by-role view "header-settings-button")]
+    (is (some? menu-trigger))
+    (is (some? menu-panel))
+    (is (some? mobile-brand))
+    (is (= [[:actions/navigate "/trade"]]
+           (get-in mobile-brand [1 :on :click])))
+    (is (= [[:actions/navigate "/trade"]]
+           (get-in trade-link [1 :on :click])))
+    (is (= [[:actions/navigate "/portfolio"]]
+           (get-in portfolio-link [1 :on :click])))
+    (is (= [[:actions/open-spectate-mode-modal :event.currentTarget/bounds]]
+           (get-in spectate-link [1 :on :click])))
+    (is (some? language-button))
+    (is (some? settings-button))))
+
 (deftest wallet-menu-renders-copy-and-disconnect-controls-test
   (let [view (header-view/header-view {:wallet {:connected? true
                                                  :address connected-address

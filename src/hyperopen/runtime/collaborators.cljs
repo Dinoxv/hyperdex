@@ -82,6 +82,7 @@
    :select-orderbook-price-aggregation orderbook-actions/select-orderbook-price-aggregation
    :select-orderbook-tab orderbook-actions/select-orderbook-tab
    :select-trade-mobile-surface trade-layout-actions/select-trade-mobile-surface
+   :toggle-trade-mobile-asset-details trade-layout-actions/toggle-trade-mobile-asset-details
    :add-indicator chart-settings/add-indicator
    :remove-indicator chart-settings/remove-indicator
    :update-indicator-period chart-settings/update-indicator-period

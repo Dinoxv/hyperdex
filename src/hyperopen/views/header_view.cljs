@@ -448,6 +448,136 @@
                      "bg-[#0b1619]"]}]
       tooltip-copy]]))
 
+(defn- mobile-menu-icon []
+  [:svg {:viewBox "0 0 20 20"
+         :fill "currentColor"
+         :class ["h-5" "w-5" "text-white"]}
+   [:path {:fill-rule "evenodd"
+           :clip-rule "evenodd"
+           :d "M3 5a1 1 0 011-1h12a1 1 0 110 2H4a1 1 0 01-1-1zM3 10a1 1 0 011-1h12a1 1 0 110 2H4a1 1 0 01-1-1zM3 15a1 1 0 011-1h12a1 1 0 110 2H4a1 1 0 01-1-1z"}]])
+
+(defn- globe-icon []
+  [:svg {:viewBox "0 0 20 20"
+         :fill "currentColor"
+         :class ["h-[18px]" "w-[18px]" "text-white"]}
+   [:path {:fill-rule "evenodd"
+           :clip-rule "evenodd"
+           :d "M10 18a8 8 0 100-16 8 8 0 000 16zM4.332 8.027a6.012 6.012 0 011.912-2.706C6.512 5.73 6.974 6 7.5 6A1.5 1.5 0 019 7.5V8a2 2 0 004 0 2 2 0 011.523-1.943A5.977 5.977 0 0116 10c0 .34-.028.675-.083 1H15a2 2 0 00-2 2v2.197A5.973 5.973 0 0110 16v-2a2 2 0 00-2-2 2 2 0 01-2-2 2 2 0 00-1.668-1.973z"}]])
+
+(defn- settings-icon []
+  [:svg {:viewBox "0 0 20 20"
+         :fill "currentColor"
+         :class ["h-[18px]" "w-[18px]" "text-white"]}
+   [:path {:fill-rule "evenodd"
+           :clip-rule "evenodd"
+           :d "M11.49 3.17c-.38-1.56-2.6-1.56-2.98 0a1.532 1.532 0 01-2.286.948c-1.372-.836-2.942.734-2.106 2.106.54.886.061 2.042-.947 2.287-1.561.379-1.561 2.6 0 2.978a1.532 1.532 0 01.947 2.287c-.836 1.372.734 2.942 2.106 2.106a1.532 1.532 0 012.287.947c.379 1.561 2.6 1.561 2.978 0a1.533 1.533 0 012.287-.947c1.372.836 2.942-.734 2.106-2.106a1.533 1.533 0 01.947-2.287c1.561-.379 1.561-2.6 0-2.978a1.532 1.532 0 01-.947-2.287c.836-1.372-.734-2.942-2.106-2.106a1.532 1.532 0 01-2.287-.947zM10 13a3 3 0 100-6 3 3 0 000 6z"}]])
+
+(defn- utility-icon-button
+  [title body data-role]
+  [:button {:type "button"
+            :class ["inline-flex"
+                    "h-9"
+                    "w-9"
+                    "items-center"
+                    "justify-center"
+                    "rounded-xl"
+                    "border"
+                    "border-base-300"
+                    "bg-base-100"
+                    "transition-colors"
+                    "hover:bg-base-200"]
+            :title title
+            :aria-label title
+            :data-role data-role}
+   body])
+
+(defn- mobile-menu-link
+  [label route active?]
+  [:button {:type "button"
+            :class (into ["flex"
+                          "w-full"
+                          "items-center"
+                          "justify-between"
+                          "rounded-lg"
+                          "px-3"
+                          "py-2.5"
+                          "text-left"
+                          "text-sm"
+                          "font-medium"
+                          "transition-colors"]
+                         (if active?
+                           ["bg-base-100" "text-white"]
+                           ["text-trading-text-secondary" "hover:bg-base-100" "hover:text-white"]))
+            :on {:click [[:actions/navigate route]]}
+            :data-role (str "mobile-header-menu-link-" (name (keyword (subs route 1))))}
+   [:span label]
+   [:svg {:viewBox "0 0 20 20"
+          :fill "currentColor"
+          :class ["h-4" "w-4" "text-trading-text-secondary"]}
+    [:path {:fill-rule "evenodd"
+            :clip-rule "evenodd"
+            :d "M7.293 14.707a1 1 0 010-1.414L10.586 10 7.293 6.707a1 1 0 111.414-1.414l4 4a1 1 0 010 1.414l-4 4a1 1 0 01-1.414 0z"}]]])
+
+(defn- mobile-header-menu
+  [route]
+  [:details {:class ["relative" "md:hidden" "group"]
+             :data-role "mobile-header-menu"}
+   [:summary {:class ["flex"
+                      "h-9"
+                      "w-9"
+                      "list-none"
+                      "items-center"
+                      "justify-center"
+                      "rounded-xl"
+                      "border"
+                      "border-base-300"
+                      "bg-base-100"
+                      "transition-colors"
+                      "hover:bg-base-200"
+                      "cursor-pointer"]
+              :aria-label "Open mobile menu"
+              :data-role "mobile-header-menu-trigger"}
+    (mobile-menu-icon)]
+   [:div {:class ["absolute"
+                  "left-0"
+                  "top-full"
+                  "z-[260]"
+                  "mt-2"
+                  "w-64"
+                  "overflow-hidden"
+                  "rounded-2xl"
+                  "border"
+                  "border-base-300"
+                  "bg-trading-bg"
+                  "p-2"
+                  "shadow-2xl"]
+          :data-role "mobile-header-menu-panel"}
+    [:div {:class ["px-3" "pb-2" "pt-1" "text-xs" "font-semibold" "uppercase" "tracking-[0.14em]" "text-trading-text-secondary"]}
+     "Navigate"]
+    (mobile-menu-link "Trade" "/trade" (route-active? route "/trade"))
+    (mobile-menu-link "Portfolio" "/portfolio" (route-active? route "/portfolio"))
+    (mobile-menu-link "Funding" "/funding-comparison" (funding-route-active? route))
+    (mobile-menu-link "Vaults" "/vaults" (route-active? route "/vaults"))
+    [:div {:class ["mx-1" "my-2" "h-px" "bg-base-300"]}]
+    [:button {:type "button"
+              :class ["flex"
+                      "w-full"
+                      "items-center"
+                      "justify-between"
+                      "rounded-lg"
+                      "px-3"
+                      "py-2.5"
+                      "text-left"
+                      "text-sm"
+                      "font-medium"
+                      "text-[#96f8e0]"
+                      "transition-colors"
+                      "hover:bg-base-100"]
+              :on {:click [[:actions/open-spectate-mode-modal :event.currentTarget/bounds]]}
+              :data-role "mobile-header-menu-spectate"}
+     [:span "Spectate Mode"]
+     (spectate-mode-icon)]]])
+
 (defn- wallet-control [wallet-state spectate-mode]
   (let [is-connected (boolean (:connected? wallet-state))
         wallet-address (:address wallet-state)
@@ -470,15 +600,22 @@
         api-wallet-route? (api-wallets-actions/api-wallet-route? route)
         spectate-active? (account-context/spectate-mode-active? state)
         spectate-mode {:active? spectate-active?
-                    :address (account-context/spectate-address state)}]
+                       :address (account-context/spectate-address state)}]
     [:header.bg-base-200.border-b.border-base-300.w-full
      {:data-parity-id "header"}
-     [:div {:class ["w-full" "app-shell-gutter" "py-1.5" "md:py-3"]}
-      [:div.flex.items-center
-       ;; Logo and Brand
-       [:div.flex.items-center.space-x-2.sm:space-x-3
-        [:span {:class ["text-primary" "text-xl" "leading-none" "sm:text-3xl" "font-bold" "font-splash"]}
-         "HyperOpen"]]
+     [:div {:class ["w-full" "app-shell-gutter" "py-2" "md:py-3"]}
+      [:div {:class ["flex" "items-center" "gap-2" "md:gap-4"]}
+       [:div {:class ["flex" "items-center" "gap-2.5" "md:gap-3" "min-w-0"]}
+        (mobile-header-menu route)
+        [:button {:type "button"
+                  :class ["md:hidden" "inline-flex" "items-center" "rounded-lg" "px-1" "py-0.5"]
+                  :on {:click [[:actions/navigate "/trade"]]}
+                  :data-role "mobile-brand"}
+         [:span {:class ["font-splash" "text-lg" "leading-none" "text-primary"]}
+          "HO"]]
+        [:div {:class ["hidden" "md:flex" "items-center" "space-x-2" "sm:space-x-3"]}
+         [:span {:class ["text-primary" "text-xl" "leading-none" "sm:text-3xl" "font-bold" "font-splash"]}
+          "HyperOpen"]]]
 
        ;; Navigation Links
        [:nav.hidden.md:flex.flex-1.items-center.justify-start.space-x-8.ml-8
@@ -517,27 +654,11 @@
           (more-menu-link "API" api-wallets-actions/canonical-route api-wallet-route?)]]]
 
        ;; Right Section - Wallet Control and Icons
-       [:div {:class ["ml-auto" "flex" "items-center" "gap-1.5" "sm:gap-3" "lg:gap-4"]
+       [:div {:class ["ml-auto" "flex" "items-center" "gap-1.5" "sm:gap-2.5" "lg:gap-4"]
               :data-parity-id "header-wallet-control"}
-        [:div {:class (if spectate-active?
-                        ["inline-flex"]
-                        ["hidden" "sm:inline-flex"])}
+        [:div {:class ["inline-flex" "md:hidden" "lg:inline-flex"]}
          (spectate-mode-trigger-button spectate-active?)]
         (wallet-control wallet-state spectate-mode)
-
-        ;; Utility Icons
-        [:button.hidden.lg:flex.w-10.h-10.bg-base-300.hover:bg-base-400.rounded-lg.items-center.justify-center.transition-colors
-         {:title "Language/Region"}
-         [:svg.w-5.h-5.text-white {:viewBox "0 0 20 20" :fill "currentColor"}
-          [:path {:fill-rule "evenodd" :d "M10 18a8 8 0 100-16 8 8 0 000 16zM4.332 8.027a6.012 6.012 0 011.912-2.706C6.512 5.73 6.974 6 7.5 6A1.5 1.5 0 019 7.5V8a2 2 0 004 0 2 2 0 011.523-1.943A5.977 5.977 0 0116 10c0 .34-.028.675-.083 1H15a2 2 0 00-2 2v2.197A5.973 5.973 0 0110 16v-2a2 2 0 00-2-2 2 2 0 01-2-2 2 2 0 00-1.668-1.973z" :clip-rule "evenodd"}]]]
-
-        [:button.hidden.lg:flex.w-10.h-10.bg-base-300.hover:bg-base-400.rounded-lg.items-center.justify-center.transition-colors
-         {:title "Settings"}
-         [:svg.w-5.h-5.text-white {:viewBox "0 0 20 20" :fill "currentColor"}
-          [:path {:fill-rule "evenodd" :d "M11.49 3.17c-.38-1.56-2.6-1.56-2.98 0a1.532 1.532 0 01-2.286.948c-1.372-.836-2.942.734-2.106 2.106.54.886.061 2.042-.947 2.287-1.561.379-1.561 2.6 0 2.978a1.532 1.532 0 01.947 2.287c-.836 1.372.734 2.942 2.106 2.106a1.532 1.532 0 012.287.947c.379 1.561 2.6 1.561 2.978 0a1.533 1.533 0 012.287-.947c1.372.836 2.942-.734 2.106-2.106a1.533 1.533 0 01.947-2.287c1.561-.379 1.561-2.6 0-2.978a1.532 1.532 0 01-.947-2.287c.836-1.372-.734-2.942-2.106-2.106a1.532 1.532 0 01-2.287-.947zM10 13a3 3 0 100-6 3 3 0 000 6z" :clip-rule "evenodd"}]]]
-
-        ;; Mobile menu button
-        [:button.md:hidden.w-9.h-9.bg-base-300.hover:bg-base-400.rounded-lg.flex.items-center.justify-center.transition-colors
-         {:title "Menu"}
-         [:svg.w-5.h-5.text-white {:viewBox "0 0 20 20" :fill "currentColor"}
-          [:path {:fill-rule "evenodd" :d "M3 5a1 1 0 011-1h12a1 1 0 110 2H4a1 1 0 01-1-1zM3 10a1 1 0 011-1h12a1 1 0 110 2H4a1 1 0 01-1-1zM3 15a1 1 0 011-1h12a1 1 0 110 2H4a1 1 0 01-1-1z" :clip-rule "evenodd"}]]]]]]]))
+        [:div {:class ["flex" "items-center" "gap-1.5" "md:hidden" "lg:flex"]}
+         (utility-icon-button "Language/Region" (globe-icon) "header-language-button")
+         (utility-icon-button "Settings" (settings-icon) "header-settings-button")]]]]]))

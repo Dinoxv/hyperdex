@@ -21,3 +21,8 @@
   [_state surface]
   [[:effects/save [:trade-ui :mobile-surface]
     (normalize-trade-mobile-surface surface)]])
+
+(defn toggle-trade-mobile-asset-details
+  [state]
+  [[:effects/save [:trade-ui :mobile-asset-details-open?]
+    (not (true? (get-in state [:trade-ui :mobile-asset-details-open?])))]])

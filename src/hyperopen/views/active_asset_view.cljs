@@ -1057,6 +1057,19 @@
     [:span {:class ["text-trading-text-secondary"]} "/"]
     [:span {:class ["num" "text-trading-text-secondary"]} (if is-spot "--" countdown-text)]]])
 
+(defn- mobile-detail-card
+  [label value-node]
+  [:div {:class ["rounded-xl"
+                 "border"
+                 "border-base-300/70"
+                 "bg-base-100/75"
+                 "px-3"
+                 "py-2"
+                 "space-y-1.5"]}
+   [:div {:class ["text-xs" "font-medium" "uppercase" "tracking-[0.12em]" "text-trading-text-secondary"]}
+    label]
+   value-node])
+
 (defn- mobile-active-asset-row
   [{:keys [icon-market
            dropdown-visible?
@@ -1076,55 +1089,107 @@
            funding-tooltip-id
            funding-tooltip-pinned?
            is-spot]}]
-  [:div {:class ["lg:hidden" "space-y-1.5" "px-3" "py-2"]}
-   [:div {:class ["flex" "items-center" "justify-between" "gap-3"]}
-    [:div {:class ["min-w-0" "flex-1"]}
-     (asset-icon icon-market
-                 dropdown-visible?
-                 (get-in full-state [:asset-selector :missing-icons] #{})
-                 (get-in full-state [:asset-selector :loaded-icons] #{}))]
-    [:div {:class ["text-right" "space-y-1"]}
-     [:div {:class ["num" "text-lg" "font-semibold" "leading-none" "text-trading-text"]}
-      (if mark
-        (fmt/format-trade-price mark mark-raw)
-        "Loading...")]
-     [:div {:class ["text-xs"]}
-      (if change-24h
-        (change-indicator change-24h change-24h-pct)
-        [:span {:class ["text-trading-text-secondary"]} "--"])]]]
-   [:div {:class ["flex" "gap-1.5" "overflow-x-auto" "scrollbar-hide" "pb-0.5"]}
-    (mobile-stat-chip "Vol" (if volume-24h
-                              (fmt/format-large-currency volume-24h)
-                              "Loading..."))
-    (mobile-stat-chip "Oracle" (if (and (not is-spot) oracle)
-                                 (fmt/format-trade-price oracle oracle-raw)
-                                 (if is-spot "—" "Loading...")))
-    (mobile-stat-chip "OI" (cond
-                             is-spot "—"
-                             open-interest-usd (fmt/format-large-currency open-interest-usd)
-                             :else "Loading..."))
-    (mobile-funding-chip funding-rate
-                         countdown-text
-                         funding-tooltip-open?
-                         funding-tooltip
-                         funding-tooltip-id
-                         funding-tooltip-pinned?
-                         is-spot)]])
+  (let [details-open? (true? (get-in full-state [:trade-ui :mobile-asset-details-open?]))]
+    [:div {:class ["lg:hidden" "space-y-2" "px-3" "py-2.5"]
+           :data-role "trade-mobile-asset-summary"}
+     [:div {:class ["flex" "items-start" "justify-between" "gap-3"]}
+      [:div {:class ["min-w-0" "flex-1"]}
+       (asset-icon icon-market
+                   dropdown-visible?
+                   (get-in full-state [:asset-selector :missing-icons] #{})
+                   (get-in full-state [:asset-selector :loaded-icons] #{}))]
+      [:div {:class ["flex" "items-start" "gap-2.5"]}
+       [:div {:class ["text-right" "space-y-1"]}
+        [:div {:class ["num" "text-[1.625rem]" "font-semibold" "leading-none" "text-trading-text"]}
+         (if mark
+           (fmt/format-trade-price mark mark-raw)
+           "Loading...")]
+        [:div {:class ["text-xs"]}
+         (if change-24h
+           (change-indicator change-24h change-24h-pct)
+           [:span {:class ["text-trading-text-secondary"]} "--"])]]
+       [:button {:type "button"
+                 :class ["inline-flex"
+                         "h-10"
+                         "w-10"
+                         "items-center"
+                         "justify-center"
+                         "rounded-xl"
+                         "border"
+                         "border-base-300"
+                         "bg-base-100"
+                         "transition-colors"
+                         "hover:bg-base-200"]
+                 :on {:click [[:actions/toggle-trade-mobile-asset-details]]}
+                 :aria-label (if details-open?
+                               "Hide market details"
+                               "Show market details")
+                 :data-role "trade-mobile-asset-details-toggle"}
+        [:svg {:viewBox "0 0 20 20"
+               :fill "currentColor"
+               :class (into ["h-5" "w-5" "text-trading-text-secondary" "transition-transform"]
+                            (when details-open? ["rotate-180"]))}
+          [:path {:fill-rule "evenodd"
+                  :clip-rule "evenodd"
+                  :d "M5.293 7.293a1 1 0 011.414 0L10 10.586l3.293-3.293a1 1 0 111.414 1.414l-4 4a1 1 0 01-1.414 0l-4-4a1 1 0 010-1.414z"}]]]]]
+     (when details-open?
+       [:div {:class ["grid" "grid-cols-2" "gap-2"]
+              :data-role "trade-mobile-asset-details-panel"}
+        (mobile-detail-card
+         "Mark / Oracle"
+         [:div {:class ["space-y-1" "text-sm" "font-semibold" "text-trading-text"]}
+          [:div {:class ["num"]}
+           (if mark
+             (fmt/format-trade-price mark mark-raw)
+             "Loading...")]
+          [:div {:class ["num" "text-xs" "text-trading-text-secondary"]}
+           (if (and (not is-spot) oracle)
+             (fmt/format-trade-price oracle oracle-raw)
+             (if is-spot "—" "Loading..."))]])
+        (mobile-detail-card
+         "24h Volume"
+         [:div {:class ["text-sm" "font-semibold" "num" "text-trading-text"]}
+          (if volume-24h
+            (fmt/format-large-currency volume-24h)
+            "Loading...")])
+        (mobile-detail-card
+         "Open Interest"
+         [:div {:class ["text-sm" "font-semibold" "num" "text-trading-text"]}
+          (cond
+            is-spot "—"
+            open-interest-usd (fmt/format-large-currency open-interest-usd)
+            :else "Loading...")])
+        (mobile-detail-card
+         "Funding / Countdown"
+         [:div {:class ["flex" "items-center" "gap-1.5" "text-sm" "text-trading-text"]}
+          (if is-spot
+            [:span {:class ["num" "text-trading-text-secondary"]} "--"]
+            (if (number? funding-rate)
+              (tooltip
+               [[:span {:class ["cursor-help" "num" (signed-tone-class funding-rate)]}
+                 (signed-percentage-text funding-rate 4)]
+                (when funding-tooltip-open?
+                  (funding-tooltip-panel funding-tooltip))]
+               "bottom"
+               {:click-pinnable? true
+                :pin-id funding-tooltip-id
+                :pinned? funding-tooltip-pinned?})
+              [:span {:class ["num" "text-trading-text-secondary"]} "Loading..."]))
+          [:span {:class ["text-trading-text-secondary"]} "/"]
+          [:span {:class ["num" "text-trading-text-secondary"]}
+           (if is-spot "--" countdown-text)]])])]))
 
 (defn- mobile-select-asset-row
   [dropdown-visible?]
-  [:div {:class ["lg:hidden" "space-y-1.5" "px-3" "py-2"]}
+  [:div {:class ["lg:hidden" "space-y-2" "px-3" "py-2.5"]}
    [:div {:class ["flex" "items-center" "justify-between" "gap-3"]}
     [:div {:class ["min-w-0" "flex-1"]}
      (asset-selector-trigger dropdown-visible?)]
     [:div {:class ["text-right" "space-y-1"]}
-     [:div {:class ["num" "text-lg" "font-semibold" "leading-none" "text-trading-text-secondary"]} "—"]
+     [:div {:class ["num" "text-[1.625rem]" "font-semibold" "leading-none" "text-trading-text-secondary"]} "—"]
      [:div {:class ["text-xs" "text-trading-text-secondary"]} "--"]]]
-   [:div {:class ["flex" "gap-1.5" "overflow-x-auto" "scrollbar-hide" "pb-0.5"]}
-    (mobile-stat-chip "Vol" "—")
-    (mobile-stat-chip "Oracle" "—")
-    (mobile-stat-chip "OI" "—")
-    (mobile-stat-chip "Funding" "— / —")]])
+   [:div {:class ["rounded-xl" "border" "border-dashed" "border-base-300/70" "bg-base-100/40" "px-3" "py-2" "text-xs" "text-trading-text-secondary"]}
+    "Select a market to view price, liquidity, and funding details."]])
 
 (defn active-asset-row [ctx-data market dropdown-state full-state]
   (let [coin (or (:coin market) (:coin ctx-data))

@@ -28,6 +28,22 @@
     :else
     []))
 
+(defn- find-node [pred node]
+  (cond
+    (vector? node)
+    (or (when (pred node) node)
+        (some #(find-node pred %) (rest node)))
+
+    (seq? node)
+    (some #(find-node pred %) node)
+
+    :else nil))
+
+(defn- find-node-by-role [node role]
+  (find-node #(and (vector? %)
+                   (= role (get-in % [1 :data-role])))
+             node))
+
 (defn- class-values [class-attr]
   (cond
     (nil? class-attr) []
@@ -416,6 +432,57 @@
         view-node (view/active-asset-row ctx-data market {:visible-dropdown nil} {:asset-selector {:missing-icons #{}}})
         strings (set (collect-strings view-node))]
     (is (contains? strings "xyz"))))
+
+(deftest mobile-active-asset-row-collapses-details-by-default-test
+  (let [ctx-data {:coin "SOL"
+                  :mark 87.0
+                  :markRaw "87.0"
+                  :oracle 86.9
+                  :oracleRaw "86.9"
+                  :change24h 1.2
+                  :change24hPct 1.4
+                  :volume24h 1000
+                  :openInterest 100
+                  :fundingRate 0.001}
+        market {:coin "SOL"
+                :symbol "SOL"
+                :base "SOL"
+                :market-type :perp}
+        view-node (view/active-asset-row ctx-data market {:visible-dropdown nil} {:asset-selector {:missing-icons #{}}})
+        toggle-button (find-node-by-role view-node "trade-mobile-asset-details-toggle")
+        details-panel (find-node-by-role view-node "trade-mobile-asset-details-panel")]
+    (is (some? toggle-button))
+    (is (= [[:actions/toggle-trade-mobile-asset-details]]
+           (get-in toggle-button [1 :on :click])))
+    (is (nil? details-panel))))
+
+(deftest mobile-active-asset-row-renders-disclosure-panel-when-open-test
+  (let [ctx-data {:coin "SOL"
+                  :mark 87.0
+                  :markRaw "87.0"
+                  :oracle 86.9
+                  :oracleRaw "86.9"
+                  :change24h 1.2
+                  :change24hPct 1.4
+                  :volume24h 1000
+                  :openInterest 100
+                  :fundingRate 0.001}
+        market {:coin "SOL"
+                :symbol "SOL"
+                :base "SOL"
+                :market-type :perp}
+        view-node (view/active-asset-row ctx-data
+                                         market
+                                         {:visible-dropdown nil}
+                                         {:asset-selector {:missing-icons #{}}
+                                          :trade-ui {:mobile-asset-details-open? true}})
+        details-panel (find-node-by-role view-node "trade-mobile-asset-details-panel")
+        strings (set (collect-strings details-panel))]
+    (is (some? details-panel))
+    (is (contains? strings "Mark / Oracle"))
+    (is (contains? strings "24h Volume"))
+    (is (contains? strings "Open Interest"))
+    (is (contains? strings "Funding / Countdown"))))
 
 (deftest active-asset-panel-passes-scroll-top-to-selector-wrapper-test
   (let [captured-props (atom nil)

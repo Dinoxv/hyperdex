@@ -146,6 +146,7 @@
      [:actions/select-orderbook-price-aggregation :select-orderbook-price-aggregation]
      [:actions/select-orderbook-tab :select-orderbook-tab]
      [:actions/select-trade-mobile-surface :select-trade-mobile-surface]
+     [:actions/toggle-trade-mobile-asset-details :toggle-trade-mobile-asset-details]
      [:actions/add-indicator :add-indicator]
      [:actions/remove-indicator :remove-indicator]
      [:actions/update-indicator-period :update-indicator-period]

@@ -101,7 +101,7 @@
            :data-parity-id "app-root"}
      (header-view/header-view state)
      (spectate-mode-banner state)
-     [:div {:class ["flex-1" "min-h-0" "pb-12" "flex" "flex-col"]
+     [:div {:class ["flex-1" "min-h-0" "pb-[5rem]" "lg:pb-12" "flex" "flex-col"]
             :data-parity-id "app-main"}
       (cond
         trade-route? (trade-view/trade-view state)
