@@ -18,7 +18,9 @@
   #{:orderbook :trades})
 
 (def ^:private max-render-levels-per-side 80)
+(def ^:private mobile-split-max-levels-per-side 10)
 (def ^:private orderbook-columns-class "grid-cols-[1fr_2fr_2fr]")
+(def ^:private mobile-split-columns-class "grid-cols-[minmax(0,1.2fr)_minmax(0,0.8fr)_minmax(0,0.8fr)_minmax(0,1.2fr)]")
 (def ^:private header-neutral-text-class "text-[rgb(148,158,156)]")
 (def ^:private body-neutral-text-class "text-[rgb(210,218,215)]")
 (def ^:private ask-depth-bar-class "bg-[rgba(237,112,136,0.15)]")
@@ -407,6 +409,66 @@
           :data-role "orderbook-total-header-cell"}
     [:span {:class [header-neutral-text-class "text-xs" "num"]} (str "Total (" size-symbol ")")]]])
 
+(defn- mobile-split-level-pairs [bids-with-totals asks-with-totals]
+  (let [visible-bids (vec (take mobile-split-max-levels-per-side bids-with-totals))
+        visible-asks (vec (take mobile-split-max-levels-per-side asks-with-totals))
+        row-count (max (count visible-bids)
+                       (count visible-asks))]
+    (mapv (fn [idx]
+            {:bid (get visible-bids idx)
+             :ask (get visible-asks idx)})
+          (range row-count))))
+
+(defn- mobile-split-column-headers [size-symbol]
+  [:div {:class ["grid" mobile-split-columns-class "items-center" "gap-x-2" "px-2" "py-2" "bg-base-100" "border-b" "border-base-300"]
+         :data-role "orderbook-mobile-split-headers"}
+   [:div {:class ["text-left"]
+          :data-role "orderbook-mobile-bid-total-header-cell"}
+    [:span {:class [header-neutral-text-class "text-xs" "num"]} (str "Total (" size-symbol ")")]]
+   [:div {:class ["text-right" "num-right"]
+          :data-role "orderbook-mobile-bid-price-header-cell"}
+    [:span {:class [header-neutral-text-class "text-xs" "num"]} "Bid"]]
+   [:div {:class ["text-left"]
+          :data-role "orderbook-mobile-ask-price-header-cell"}
+    [:span {:class [header-neutral-text-class "text-xs" "num"]} "Ask"]]
+   [:div {:class ["text-right" "num-right"]
+          :data-role "orderbook-mobile-ask-total-header-cell"}
+    [:span {:class [header-neutral-text-class "text-xs" "num"]} (str "Total (" size-symbol ")")]]])
+
+(defn- mobile-split-order-row [{:keys [bid ask]} max-cum-size size-unit]
+  (let [bid-total (when bid (format-order-total bid size-unit))
+        ask-total (when ask (format-order-total ask size-unit))
+        bid-price (when bid (or (format-price (:px bid) (:px bid)) "0.00"))
+        ask-price (when ask (or (format-price (:px ask) (:px ask)) "0.00"))
+        bid-bar-width (some-> bid
+                              (order-total-for-unit size-unit)
+                              (cumulative-bar-width max-cum-size))
+        ask-bar-width (some-> ask
+                              (order-total-for-unit size-unit)
+                              (cumulative-bar-width max-cum-size))]
+    [:div {:class ["relative" "grid" mobile-split-columns-class "items-center" "gap-x-2" "px-2" "h-5" "bg-base-100" "text-xs" "border-b" "border-base-300/60"]
+           :data-role "orderbook-mobile-split-row"}
+     [:div {:class ["pointer-events-none" "absolute" "inset-y-0" "left-0" "flex" "w-1/2" "items-center" "justify-end" "pr-1"]}
+      (when bid
+        [:div {:class ["h-full" bid-depth-bar-class "transition-all" "duration-300" "ease-[cubic-bezier(0.68,-0.6,0.32,1.6)]"]
+               :style {:width (str (or bid-bar-width 0) "%")}}])]
+     [:div {:class ["pointer-events-none" "absolute" "inset-y-0" "right-0" "flex" "w-1/2" "items-center" "justify-start" "pl-1"]}
+      (when ask
+        [:div {:class ["h-full" ask-depth-bar-class "transition-all" "duration-300" "ease-[cubic-bezier(0.68,-0.6,0.32,1.6)]"]
+               :style {:width (str (or ask-bar-width 0) "%")}}])]
+     [:div {:class ["relative" "z-10" "text-left"]
+            :data-role "orderbook-mobile-bid-total-cell"}
+      [:span {:class [body-neutral-text-class "num"]} bid-total]]
+     [:div {:class ["relative" "z-10" "text-right" "num-right"]
+            :data-role "orderbook-mobile-bid-price-cell"}
+      [:span {:class [bid-price-text-class "num"]} bid-price]]
+     [:div {:class ["relative" "z-10" "text-left"]
+            :data-role "orderbook-mobile-ask-price-cell"}
+      [:span {:class [ask-price-text-class "num"]} ask-price]]
+     [:div {:class ["relative" "z-10" "text-right" "num-right"]
+            :data-role "orderbook-mobile-ask-total-cell"}
+      [:span {:class [body-neutral-text-class "num"]} ask-total]]]))
+
 (defn- fallback-render-snapshot [orderbook-data]
   (let [raw-bids (:bids orderbook-data)
         raw-asks (:asks orderbook-data)
@@ -485,30 +547,42 @@
                        show-freshness-cue?
                        freshness-cue)
 
-     ;; Column headers
-     (column-headers selected-size-symbol)
-
-     ;; Order rows
-     [:div {:class (cond-> ["flex-1" "min-h-0" "flex" "flex-col"]
+     [:div {:class (cond-> ["flex" "flex-1" "min-h-0" "flex-col" "lg:hidden"]
                      depth-dimmed? (conj "opacity-90"))
-            :data-role "orderbook-depth-body"}
-      ;; Asks (sell orders) - top section, rendered worst->best (reversed for display)
-      [:div {:class ["flex-1" "min-h-0" "overflow-hidden" "flex" "flex-col" "gap-0.5" "justify-end"]
-             :data-role "orderbook-asks-pane"}
-       (for [ask (reverse asks-with-totals)]
-         ^{:key (str "ask-" (:px ask))}
-         (order-row ask max-cum-size true size-unit))]
+            :data-role "orderbook-mobile-split-panel"}
+      (mobile-split-column-headers selected-size-symbol)
+      [:div {:class ["flex-1" "min-h-0" "overflow-hidden" "bg-base-100"]
+             :data-role "orderbook-mobile-split-body"}
+       (for [{:keys [bid ask] :as split-row} (mobile-split-level-pairs bids-with-totals asks-with-totals)]
+         ^{:key (str "mobile-split-row-" (:px bid "bid-empty") "-" (:px ask "ask-empty"))}
+         (mobile-split-order-row split-row max-cum-size size-unit))]]
 
-      ;; Spread - middle section
-      (when spread
-        (spread-row spread))
+     [:div {:class ["hidden" "flex-1" "min-h-0" "flex-col" "lg:flex"]
+            :data-role "orderbook-desktop-panel"}
+      ;; Column headers
+      (column-headers selected-size-symbol)
 
-      ;; Bids (buy orders) - bottom section, rendered best->worst
-      [:div {:class ["flex-1" "min-h-0" "overflow-hidden" "flex" "flex-col" "gap-0.5"]
-             :data-role "orderbook-bids-pane"}
-       (for [bid bids-with-totals]
-         ^{:key (str "bid-" (:px bid))}
-         (order-row bid max-cum-size false size-unit))]]])))
+      ;; Order rows
+      [:div {:class (cond-> ["flex-1" "min-h-0" "flex" "flex-col"]
+                      depth-dimmed? (conj "opacity-90"))
+             :data-role "orderbook-depth-body"}
+       ;; Asks (sell orders) - top section, rendered worst->best (reversed for display)
+       [:div {:class ["flex-1" "min-h-0" "overflow-hidden" "flex" "flex-col" "gap-0.5" "justify-end"]
+              :data-role "orderbook-asks-pane"}
+        (for [ask (reverse asks-with-totals)]
+          ^{:key (str "ask-" (:px ask))}
+          (order-row ask max-cum-size true size-unit))]
+
+       ;; Spread - middle section
+       (when spread
+         (spread-row spread))
+
+       ;; Bids (buy orders) - bottom section, rendered best->worst
+       [:div {:class ["flex-1" "min-h-0" "overflow-hidden" "flex" "flex-col" "gap-0.5"]
+              :data-role "orderbook-bids-pane"}
+        (for [bid bids-with-totals]
+          ^{:key (str "bid-" (:px bid))}
+          (order-row bid max-cum-size false size-unit))]]]])))
 
 ;; Empty state
 (defn empty-orderbook []

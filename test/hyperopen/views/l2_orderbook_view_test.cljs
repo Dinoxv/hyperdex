@@ -423,6 +423,64 @@
         level-row-count (count-nodes panel (data-role= "orderbook-level-row"))]
     (is (= 24 level-row-count))))
 
+(deftest orderbook-panel-renders-mobile-split-book-with-top-ten-levels-per-side-test
+  (let [asks (mapv (fn [idx]
+                     {:px (str (+ 101 idx))
+                      :sz (str (+ 1 idx))})
+                   (range 12))
+        bids (mapv (fn [idx]
+                     {:px (str (- 99 idx))
+                      :sz (str (+ 1 idx))})
+                   (range 12))
+        panel (view/l2-orderbook-panel "BTC"
+                                       {:market-type :perp
+                                        :base "BTC"
+                                        :quote "USDC"
+                                        :szDecimals 4}
+                                       {:bids bids
+                                        :asks asks}
+                                       {:size-unit :quote
+                                        :size-unit-dropdown-visible? false
+                                        :price-aggregation-dropdown-visible? false
+                                        :price-aggregation-by-coin {"BTC" :full}})
+        mobile-panel (find-first-node panel (data-role= "orderbook-mobile-split-panel"))
+        mobile-header-row (find-first-node panel (data-role= "orderbook-mobile-split-headers"))
+        mobile-panel-classes (node-class-set mobile-panel)
+        header-text (set (collect-strings mobile-header-row))
+        mobile-row-count (count-nodes panel (data-role= "orderbook-mobile-split-row"))
+        bid-price-cell-count (count-nodes panel (data-role= "orderbook-mobile-bid-price-cell"))
+        ask-price-cell-count (count-nodes panel (data-role= "orderbook-mobile-ask-price-cell"))]
+    (is (some? mobile-panel))
+    (is (contains? mobile-panel-classes "lg:hidden"))
+    (is (= 10 mobile-row-count))
+    (is (= 10 bid-price-cell-count))
+    (is (= 10 ask-price-cell-count))
+    (is (contains? header-text "Bid"))
+    (is (contains? header-text "Ask"))
+    (is (contains? header-text "Total (USDC)"))))
+
+(deftest orderbook-panel-keeps-desktop-ladder-behind-lg-breakpoint-contract-test
+  (let [panel (view/l2-orderbook-panel "BTC"
+                                       {:market-type :perp
+                                        :base "BTC"
+                                        :quote "USDC"
+                                        :szDecimals 4}
+                                       {:bids [{:px "99" :sz "2"}]
+                                        :asks [{:px "101" :sz "1"}]}
+                                       {:size-unit :base
+                                        :size-unit-dropdown-visible? false
+                                        :price-aggregation-dropdown-visible? false
+                                        :price-aggregation-by-coin {"BTC" :full}})
+        mobile-panel (find-first-node panel (data-role= "orderbook-mobile-split-panel"))
+        desktop-panel (find-first-node panel (data-role= "orderbook-desktop-panel"))
+        mobile-classes (node-class-set mobile-panel)
+        desktop-classes (node-class-set desktop-panel)]
+    (is (some? mobile-panel))
+    (is (some? desktop-panel))
+    (is (contains? mobile-classes "lg:hidden"))
+    (is (contains? desktop-classes "hidden"))
+    (is (contains? desktop-classes "lg:flex"))))
+
 (deftest orderbook-panel-can-render-from-precomputed-slices-without-raw-levels-test
   (let [panel (view/l2-orderbook-panel "BTC"
                                        {:market-type :perp

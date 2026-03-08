@@ -207,6 +207,20 @@
     (is (contains? account-info-cell-classes "min-h-0"))
     (is (contains? account-info-cell-classes "overflow-hidden"))))
 
+(deftest trade-view-orderbook-panel-uses-compact-mobile-height-with-desktop-override-test
+  (let [view-node (trade-view/trade-view trade-view-test-state)
+        orderbook-panel (find-first-node view-node
+                                         #(= "trade-orderbook-panel"
+                                             (get-in % [1 :data-parity-id])))
+        orderbook-classes (node-class-set orderbook-panel)]
+    (is (some? orderbook-panel))
+    (is (contains? orderbook-classes "h-[320px]"))
+    (is (contains? orderbook-classes "min-h-[320px]"))
+    (is (contains? orderbook-classes "sm:h-[360px]"))
+    (is (contains? orderbook-classes "sm:min-h-[360px]"))
+    (is (contains? orderbook-classes "lg:h-full"))
+    (is (contains? orderbook-classes "lg:min-h-0"))))
+
 (deftest trade-view-renders-account-panel-on-mobile-market-surfaces-test
   (let [chart-view (trade-view/trade-view trade-view-test-state)
         chart-account-panel (find-first-node chart-view

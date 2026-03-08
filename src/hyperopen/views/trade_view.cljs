@@ -83,10 +83,12 @@
         [:div {:class (into [(if (= mobile-surface :orderbook) "block" "hidden")
                              "bg-base-100"
                              "w-full"
-                             "h-auto"
-                             "min-h-[360px]"
+                             "h-[320px]"
+                             "min-h-[320px]"
                              "overflow-hidden"]
-                            ["lg:block"
+                            ["sm:h-[360px]"
+                             "sm:min-h-[360px]"
+                             "lg:block"
                              "lg:h-full"
                              "lg:min-h-0"
                              "lg:col-start-2"
