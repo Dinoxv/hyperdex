@@ -260,6 +260,254 @@
    (shortcut-item "⌘S" "Favorite")
    (shortcut-item "Esc" "Close")])
 
+(declare processed-assets
+         asset-list)
+
+(def ^:private selector-tabs
+  [["All" :all]
+   ["Perps" :perps]
+   ["Spot" :spot]
+   ["Crypto" :crypto]
+   ["Tradfi" :tradfi]
+   ["HIP-3" :hip3]])
+
+(defn- mobile-tab-button [label active? tab-key]
+  [:button {:class (into ["shrink-0"
+                          "border-b-2"
+                          "pb-2"
+                          "text-sm"
+                          "font-medium"
+                          "transition-colors"]
+                         (if active?
+                           ["border-primary" "text-gray-100"]
+                           ["border-transparent" "text-gray-400" "hover:text-gray-200"]))
+            :on {:click [[:actions/set-asset-selector-tab tab-key]]}}
+   label])
+
+(defn- mobile-tab-row [active-tab]
+  [:div {:class ["-mx-4"
+                 "overflow-x-auto"
+                 "border-b"
+                 "border-base-300/80"
+                 "px-4"
+                 "scrollbar-hide"]}
+   [:div {:class ["flex" "items-center" "gap-5" "whitespace-nowrap"]}
+    (for [[label tab-key] selector-tabs]
+      ^{:key (name tab-key)}
+      (mobile-tab-button label (= active-tab tab-key) tab-key))]])
+
+(defn- sort-chevron [direction]
+  [:svg {:class ["h-3" "w-3"]
+         :fill "none"
+         :stroke "currentColor"
+         :viewBox "0 0 24 24"}
+   (if (= direction :asc)
+     [:path {:stroke-linecap "round" :stroke-linejoin "round" :stroke-width 2 :d "M5 15l7-7 7 7"}]
+     [:path {:stroke-linecap "round" :stroke-linejoin "round" :stroke-width 2 :d "M19 9l-7 7-7-7"}])])
+
+(defn- mobile-sort-header-cell
+  [title subtitle active? direction on-click align]
+  [:button {:class (into ["flex" "flex-col" "gap-0.5" "transition-colors"]
+                         (concat
+                           (if (= align :right)
+                             ["items-end" "text-right"]
+                             ["items-start" "text-left"])
+                           (if active?
+                             ["text-gray-100"]
+                             ["text-gray-400" "hover:text-gray-200"])))
+            :on {:click on-click}}
+   [:div {:class ["flex" "items-center" "gap-1" "whitespace-nowrap" "text-xs" "font-medium"]}
+    [:span title]
+    (when active?
+      (sort-chevron direction))]
+   [:div {:class ["text-xs" "leading-tight" "text-gray-500"]}
+    subtitle]])
+
+(defn- mobile-sort-header [sort-by sort-direction]
+  [:div {:class ["grid"
+                 "grid-cols-[minmax(0,1.35fr)_minmax(0,1fr)_minmax(0,0.95fr)]"
+                 "gap-3"
+                 "border-b"
+                 "border-base-300/80"
+                 "px-4"
+                 "py-3"]}
+   (mobile-sort-header-cell "Symbol" nil (= sort-by :name) sort-direction [[:actions/update-asset-selector-sort :name]] :left)
+   (mobile-sort-header-cell "Volume" "Open Interest" (= sort-by :volume) sort-direction [[:actions/update-asset-selector-sort :volume]] :left)
+   (mobile-sort-header-cell "Last Price" "24h Change" (= sort-by :price) sort-direction [[:actions/update-asset-selector-sort :price]] :right)])
+
+(defn- mobile-favorite-button [favorite? market-key]
+  [:button {:class ["mt-0.5" "shrink-0" "text-gray-400" "hover:text-yellow-400" "transition-colors"]
+            :on {:click [[:actions/toggle-asset-favorite market-key]]}}
+   [:svg {:class ["h-4" "w-4"]
+          :viewBox "0 0 24 24"
+          :fill (if favorite? "currentColor" "none")
+          :stroke "currentColor"
+          :stroke-width 1.5}
+    [:path {:stroke-linecap "round" :stroke-linejoin "round"
+            :d "M11.48 3.499a.75.75 0 011.04 0l2.162 2.162 3.03.44a.75.75 0 01.416 1.279l-2.192 2.136.517 3.018a.75.75 0 01-1.088.79L12 13.347l-2.715 1.425a.75.75 0 01-1.088-.79l.517-3.018-2.192-2.136a.75.75 0 01.416-1.279l3.03-.44 2.162-2.162z"}]]])
+
+(defn- mobile-asset-list-item [asset selected? highlighted? favorites]
+  (let [{:keys [key symbol mark markRaw volume24h change24h change24hPct openInterest market-type dex maxLeverage]} asset
+        safe-change (when (some? change24h) (fmt/safe-number change24h))
+        safe-change-pct (when (some? change24hPct) (fmt/safe-number change24hPct))
+        change-available? (and (number? safe-change)
+                               (number? safe-change-pct)
+                               (not (js/isNaN safe-change))
+                               (not (js/isNaN safe-change-pct)))
+        positive-change? (and change-available? (>= safe-change 0))
+        change-color (if positive-change? "text-success" "text-error")
+        is-spot (= market-type :spot)
+        favorite? (contains? favorites key)
+        row-highlight-classes (cond-> []
+                                highlighted? (into ["bg-base-200/60"])
+                                selected? (into ["bg-base-200"]))]
+    [:div {:class (into ["grid"
+                         "grid-cols-[minmax(0,1.35fr)_minmax(0,1fr)_minmax(0,0.95fr)]"
+                         "gap-3"
+                         "items-center"
+                         "border-b"
+                         "border-base-300/70"
+                         "px-4"
+                         "py-3"
+                         "transition-colors"
+                         "cursor-pointer"]
+                        row-highlight-classes)
+           :on {:click [[:actions/select-asset asset]]}
+           :data-role "mobile-asset-selector-row"}
+     [:div {:class ["flex" "items-start" "gap-2.5" "min-w-0"]}
+      (mobile-favorite-button favorite? key)
+      [:div {:class ["min-w-0" "space-y-1"]}
+       [:div {:class ["truncate" "text-base" "font-medium" "leading-none" "text-trading-text"]}
+        symbol]
+       [:div {:class ["flex" "items-center" "gap-1.5" "overflow-hidden"]}
+        (when is-spot
+          (chip "SPOT" ["bg-gray-500/20" "text-gray-200" "border-gray-500/30" "shrink-0"]))
+        (when dex
+          (chip dex ["bg-emerald-500/20" "text-emerald-300" "border-emerald-500/30" "shrink-0"]))
+        (when (and maxLeverage (> maxLeverage 0))
+          (chip (str maxLeverage "x") ["bg-primary/20" "text-primary" "border-primary/30" "shrink-0"]))]]]
+     [:div {:class ["min-w-0" "space-y-1" "text-left"]}
+      [:div {:class ["num" "text-base" "font-semibold" "leading-none" "text-trading-text"]}
+       (format-or-dash volume24h fmt/format-large-currency)]
+      [:div {:class ["num" "text-xs" "text-trading-text-secondary"]}
+       (if is-spot
+         "--"
+         (format-or-dash openInterest fmt/format-large-currency))]]
+     [:div {:class ["min-w-0" "space-y-1" "text-right"]}
+      [:div {:class ["num" "text-base" "font-semibold" "leading-none" "text-trading-text"]}
+       (or (fmt/format-trade-price mark markRaw) "—")]
+      [:div
+       (if change-available?
+         {:class [change-color "num" "text-xs"]}
+         {:class ["num" "text-xs" "text-trading-text-secondary"]})
+       (if change-available?
+         (fmt/format-percentage safe-change-pct)
+         "—")]]]))
+
+(defn- mobile-asset-list [assets selected-market-key highlighted-market-key favorites]
+  (if (empty? assets)
+    [:div {:class ["flex-1" "px-4" "py-10" "text-center" "text-gray-400"]}
+     [:div "No assets found"]
+     [:div {:class ["mt-1" "text-xs"]} "Try adjusting your search"]]
+    [:div {:class ["flex-1" "overflow-y-auto" "scrollbar-hide"]}
+     (for [asset assets]
+       ^{:key (:key asset)}
+       (mobile-asset-list-item asset
+                               (= selected-market-key (:key asset))
+                               (= highlighted-market-key (:key asset))
+                               favorites))]))
+
+(defn- desktop-asset-selector-dropdown
+  [{:keys [loading? phase search-term strict? favorites-only? active-tab sort-by sort-direction
+           markets selected-market-key favorites missing-icons loaded-icons highlighted-market-key
+           render-limit scroll-top]}]
+  (let [processed-assets-list (processed-assets markets search-term sort-by sort-direction
+                                                favorites favorites-only? strict? active-tab)
+        ordered-market-keys (mapv :key processed-assets-list)
+        highlighted-market-key* (effective-highlighted-market-key
+                                  processed-assets-list
+                                  selected-market-key
+                                  highlighted-market-key)]
+    [:div
+     {:class ["absolute" "top-full" "left-0" "right-0" "mt-1" "hidden" "bg-base-100"
+              "border" "border-base-300" "rounded-none" "spectate-none" "z-[220]" "isolate" "lg:block"]
+      :data-role "asset-selector-desktop-dropdown"
+      :on {:keydown [[:actions/handle-asset-selector-shortcut
+                      [:event/key]
+                      [:event/metaKey]
+                      [:event/ctrlKey]
+                      ordered-market-keys]]}
+      :style {:transition "opacity 0.2s ease-in-out, transform 0.2s ease-in-out"
+              :opacity 1
+              :transform "translateY(0)"
+              :background-color "var(--color-base-100)"}
+      :replicant/mounting {:style {:opacity 0 :transform "translateY(-8px)"}}
+      :replicant/unmounting {:style {:opacity 0 :transform "translateY(-8px)"}}}
+     [:div {:class ["absolute" "inset-0" "pointer-events-none"]
+            :style {:background-color "var(--color-base-100)"}}
+      nil]
+     [:div.relative.p-4.bg-base-100
+      (when loading?
+        [:div.mb-2.text-xs.text-gray-400
+         (if (= phase :full)
+           "Loading markets..."
+           "Loading markets (bootstrap)...")])
+      (search-controls search-term strict? favorites-only?)
+      (tab-row active-tab)
+      (sort-controls sort-by sort-direction)
+      (asset-list processed-assets-list selected-market-key highlighted-market-key* favorites missing-icons loaded-icons render-limit scroll-top)
+      (selector-shortcut-footer)]]))
+
+(defn- mobile-asset-selector-dropdown
+  [{:keys [loading? phase search-term strict? favorites-only? active-tab sort-by sort-direction
+           markets selected-market-key favorites highlighted-market-key]}]
+  (let [processed-assets-list (processed-assets markets search-term sort-by sort-direction
+                                                favorites favorites-only? strict? active-tab)
+        ordered-market-keys (mapv :key processed-assets-list)
+        highlighted-market-key* (effective-highlighted-market-key
+                                  processed-assets-list
+                                  selected-market-key
+                                  highlighted-market-key)]
+    [:div {:class ["fixed" "inset-0" "z-[260]" "bg-base-100" "flex" "flex-col" "lg:hidden"]
+           :data-role "asset-selector-mobile-overlay"
+           :on {:keydown [[:actions/handle-asset-selector-shortcut
+                           [:event/key]
+                           [:event/metaKey]
+                           [:event/ctrlKey]
+                           ordered-market-keys]]}
+           :style {:padding-top "max(1rem, env(safe-area-inset-top))"
+                   :padding-bottom "max(1rem, env(safe-area-inset-bottom))"}}
+     [:div {:class ["app-shell-gutter" "flex" "items-center" "justify-end" "pb-3"]}
+      [:button {:type "button"
+                :class ["inline-flex"
+                        "h-9"
+                        "w-9"
+                        "items-center"
+                        "justify-center"
+                        "rounded-lg"
+                        "text-gray-400"
+                        "transition-colors"
+                        "hover:bg-base-200"
+                        "hover:text-gray-200"]
+                :on {:click [[:actions/close-asset-dropdown]]}
+                :aria-label "Close asset selector"
+                :data-role "asset-selector-mobile-close"}
+       [:svg {:class ["h-5" "w-5"]
+              :fill "none"
+              :stroke "currentColor"
+              :viewBox "0 0 24 24"}
+        [:path {:stroke-linecap "round" :stroke-linejoin "round" :stroke-width 2 :d "M6 18L18 6M6 6l12 12"}]]]]
+     [:div {:class ["app-shell-gutter" "flex" "min-h-0" "flex-1" "flex-col" "gap-4"]}
+      (when loading?
+        [:div {:class ["text-xs" "text-gray-400"]}
+         (if (= phase :full)
+           "Loading markets..."
+           "Loading markets (bootstrap)...")])
+      (search-controls search-term strict? favorites-only?)
+      (mobile-tab-row active-tab)
+      (mobile-sort-header sort-by sort-direction)
+      (mobile-asset-list processed-assets-list selected-market-key highlighted-market-key* favorites)]]))
+
 (defn asset-list [assets selected-market-key highlighted-market-key favorites missing-icons loaded-icons render-limit scroll-top]
   (let [assets* (if (vector? assets) assets (vec assets))
         total (count assets*)]
@@ -371,41 +619,35 @@
            favorites favorites-only? strict? active-tab missing-icons loaded-icons
            highlighted-market-key render-limit scroll-top loading? phase]}]
   (when visible?
-    (let [processed-assets-list (processed-assets markets search-term sort-by sort-direction
-                                                  favorites favorites-only? strict? active-tab)
-          ordered-market-keys (mapv :key processed-assets-list)
-          highlighted-market-key* (effective-highlighted-market-key
-                                    processed-assets-list
-                                    selected-market-key
-                                    highlighted-market-key)]
-      [:div
-       {:class ["absolute" "top-full" "left-0" "right-0" "mt-1" "bg-base-100"
-                "border" "border-base-300" "rounded-none" "spectate-none" "z-[220]" "isolate"]
-        :on {:keydown [[:actions/handle-asset-selector-shortcut
-                        [:event/key]
-                        [:event/metaKey]
-                        [:event/ctrlKey]
-                        ordered-market-keys]]}
-        :style {:transition "opacity 0.2s ease-in-out, transform 0.2s ease-in-out"
-                :opacity 1
-                :transform "translateY(0)"
-                :background-color "var(--color-base-100)"}
-        :replicant/mounting {:style {:opacity 0 :transform "translateY(-8px)"}}
-        :replicant/unmounting {:style {:opacity 0 :transform "translateY(-8px)"}}}
-       [:div {:class ["absolute" "inset-0" "pointer-events-none"]
-              :style {:background-color "var(--color-base-100)"}}
-        nil]
-       [:div.relative.p-4.bg-base-100
-        (when loading?
-          [:div.mb-2.text-xs.text-gray-400
-           (if (= phase :full)
-             "Loading markets..."
-             "Loading markets (bootstrap)...")])
-        (search-controls search-term strict? favorites-only?)
-        (tab-row active-tab)
-        (sort-controls sort-by sort-direction)
-        (asset-list processed-assets-list selected-market-key highlighted-market-key* favorites missing-icons loaded-icons render-limit scroll-top)
-        (selector-shortcut-footer)]])))
+    [:div
+     (mobile-asset-selector-dropdown {:loading? loading?
+                                      :phase phase
+                                      :search-term search-term
+                                      :strict? strict?
+                                      :favorites-only? favorites-only?
+                                      :active-tab active-tab
+                                      :sort-by sort-by
+                                      :sort-direction sort-direction
+                                      :markets markets
+                                      :selected-market-key selected-market-key
+                                      :favorites favorites
+                                      :highlighted-market-key highlighted-market-key})
+     (desktop-asset-selector-dropdown {:loading? loading?
+                                       :phase phase
+                                       :search-term search-term
+                                       :strict? strict?
+                                       :favorites-only? favorites-only?
+                                       :active-tab active-tab
+                                       :sort-by sort-by
+                                       :sort-direction sort-direction
+                                       :markets markets
+                                       :selected-market-key selected-market-key
+                                       :favorites favorites
+                                       :missing-icons missing-icons
+                                       :loaded-icons loaded-icons
+                                       :highlighted-market-key highlighted-market-key
+                                       :render-limit render-limit
+                                       :scroll-top scroll-top})]))
 
 ;; Wrapper component that can be used in active-asset-view
 (defn asset-selector-wrapper [props]
@@ -413,5 +655,5 @@
    (asset-selector-dropdown props)
    ;; Invisible overlay to handle click-outside-to-close
    (when (:visible? props)
-     [:div {:class ["fixed" "inset-0" "z-[210]" "transition" "duration-700" "ease-in-out"]
+     [:div {:class ["fixed" "inset-0" "z-[210]" "hidden" "transition" "duration-700" "ease-in-out" "lg:block"]
             :on {:click [[:actions/close-asset-dropdown]]}}])])

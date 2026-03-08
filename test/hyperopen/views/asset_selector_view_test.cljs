@@ -174,6 +174,14 @@
 
     :else nil))
 
+(defn- find-node-by-role [node role]
+  (find-first-node node
+                   (fn [candidate]
+                     (let [attrs (when (and (vector? candidate)
+                                            (map? (second candidate)))
+                                   (second candidate))]
+                       (= role (:data-role attrs))))))
+
 (defn- node-children [node]
   (let [attrs (when (and (vector? node) (map? (second node))) (second node))]
     (if attrs
@@ -342,21 +350,30 @@
                     :highlighted-market-key nil
                     :render-limit 120
                     :scroll-top 0})
-        attrs (second dropdown)
+        desktop-dropdown (find-node-by-role dropdown "asset-selector-desktop-dropdown")
+        mobile-overlay (find-node-by-role dropdown "asset-selector-mobile-overlay")
+        mobile-close-button (find-node-by-role dropdown "asset-selector-mobile-close")
+        attrs (second desktop-dropdown)
         strings (set (collect-strings dropdown))
+        mobile-strings (set (collect-strings mobile-overlay))
         navigate-icon (find-first-node
-                        dropdown
+                        desktop-dropdown
                         (fn [candidate]
                           (and (vector? candidate)
                                (= :svg (first candidate))
                                (= "0 0 22 13"
                                   (get-in candidate [1 :viewBox])))))]
+    (is (some? desktop-dropdown))
+    (is (some? mobile-overlay))
+    (is (some? mobile-close-button))
     (is (= [[:actions/handle-asset-selector-shortcut
              [:event/key]
              [:event/metaKey]
              [:event/ctrlKey]
              ["perp:BTC" "perp:xyz:GOLD" "spot:PURR/USDC"]]]
            (get-in attrs [:on :keydown])))
+    (is (= [[:actions/close-asset-dropdown]]
+           (get-in mobile-close-button [1 :on :click])))
     (is (contains? strings "⌘K"))
     (is (contains? strings "Navigate"))
     (is (contains? strings "Enter"))
@@ -369,7 +386,37 @@
     (is (not (contains? strings "Cmd/Ctrl+K")))
     (is (not (contains? strings "Cmd/Ctrl+S")))
     (is (not (contains? strings "Up/Down")))
-    (is (some? navigate-icon))))
+    (is (some? navigate-icon))
+    (is (contains? mobile-strings "Symbol"))
+    (is (contains? mobile-strings "Volume"))
+    (is (contains? mobile-strings "Open Interest"))
+    (is (contains? mobile-strings "Last Price"))
+    (is (contains? mobile-strings "24h Change"))
+    (is (not (contains? mobile-strings "⌘K")))))
+
+(deftest asset-selector-dropdown-mobile-overlay-uses-fullscreen-shell-test
+  (let [dropdown (view/asset-selector-dropdown
+                   {:visible? true
+                    :markets sample-markets
+                    :selected-market-key "perp:BTC"
+                    :search-term ""
+                    :sort-by :name
+                    :sort-direction :asc
+                    :favorites #{}
+                    :favorites-only? false
+                    :strict? false
+                    :active-tab :all
+                    :missing-icons #{}
+                    :loaded-icons #{}
+                    :highlighted-market-key nil
+                    :render-limit 120
+                    :scroll-top 0})
+        mobile-overlay (find-node-by-role dropdown "asset-selector-mobile-overlay")
+        classes (set (collect-all-classes mobile-overlay))]
+    (is (contains? classes "fixed"))
+    (is (contains? classes "inset-0"))
+    (is (contains? classes "flex-col"))
+    (is (contains? classes "lg:hidden"))))
 
 (deftest asset-list-item-applies-left-aligned-numeric-utilities-test
   (let [asset {:key "perp:SOL"
