@@ -905,34 +905,6 @@
              (withdraw-queue-error-message flow)
              (withdraw-fee-estimate-error-message flow)]))))
 
-(defn- withdraw-quick-amount-buttons
-  [{:keys [quick-amounts max-input]} submitting?]
-  (let [max-amount (js/Number. (or max-input "0"))]
-    (when (seq quick-amounts)
-      [:div {:class ["flex" "flex-wrap" "gap-2"]}
-       (for [quick-amount quick-amounts]
-         ^{:key (str "withdraw-quick-" quick-amount)}
-         [:button {:type "button"
-                   :disabled (or submitting?
-                                 (> quick-amount max-amount))
-                   :class ["rounded-md"
-                           "border"
-                           "border-[#3a4d5d]"
-                           "bg-[#111f29]"
-                           "px-3"
-                           "py-1.5"
-                           "text-xs"
-                           "text-[#e0ebef]"
-                           "hover:border-[#537089]"
-                           "hover:bg-[#162b37]"
-                           "disabled:cursor-not-allowed"
-                           "disabled:opacity-45"]
-                   :on {:click [[:actions/enter-funding-withdraw-amount
-                                 (str quick-amount)]]}}
-          (if (>= quick-amount 1000)
-            (str (/ quick-amount 1000) "k")
-            (str quick-amount))])])))
-
 (defn- withdraw-protocol-address-panel
   [flow]
   (when (and (hyperunit-address-flow? flow)
@@ -964,8 +936,7 @@
                                    :max-action :actions/set-funding-amount-to-max
                                    :suffix (:symbol amount)
                                    :data-role "funding-withdraw-amount-input"})
-     [:div {:class ["flex" "items-center" "justify-between" "gap-3"]}
-      (withdraw-quick-amount-buttons amount submitting?)
+     [:div {:class ["flex" "justify-end"]}
       [:p {:class ["text-xs" "text-[#7f97a0]"]}
        (:available-label amount)]]
      (withdraw-summary-section summary flow)

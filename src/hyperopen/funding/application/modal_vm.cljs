@@ -571,12 +571,6 @@
     (conj (summary-row "Estimated time" withdraw-estimated-time)
           (summary-row "Network fee" withdraw-network-fee))))
 
-(defn- withdraw-quick-amounts
-  [selected-withdraw-asset-key deposit-quick-amounts]
-  (if (= selected-withdraw-asset-key :usdc)
-    deposit-quick-amounts
-    []))
-
 (defn- content-kind
   [{:keys [mode
            deposit-step
@@ -614,9 +608,7 @@
         withdraw-summary-rows (withdraw-summary-rows (:withdraw-min-amount ctx)
                                                      (:selected-withdraw-symbol ctx)
                                                      withdraw-estimated-time
-                                                     withdraw-network-fee)
-        withdraw-quick-amounts (withdraw-quick-amounts (:selected-withdraw-asset-key ctx)
-                                                       (:deposit-quick-amounts ctx))]
+                                                     withdraw-network-fee)]
     (assoc ctx
            :status-message status-message
            :show-status-message? (show-status-message? ctx status-message)
@@ -632,8 +624,7 @@
            :deposit-unsupported-detail (deposit-unsupported-detail
                                         (:selected-deposit-flow-kind ctx))
            :deposit-summary-rows deposit-summary-rows
-           :withdraw-summary-rows withdraw-summary-rows
-           :withdraw-quick-amounts withdraw-quick-amounts)))
+           :withdraw-summary-rows withdraw-summary-rows)))
 
 (defn- feedback-model
   [{:keys [status-message show-status-message?]}]
@@ -717,7 +708,6 @@
            amount-input
            withdraw-max-display
            withdraw-max-input
-           withdraw-quick-amounts
            selected-withdraw-symbol
            selected-withdraw-flow-kind
            withdraw-generated-address
@@ -745,7 +735,6 @@
                                   " "
                                   selected-withdraw-symbol
                                   " available")
-            :quick-amounts withdraw-quick-amounts
             :symbol selected-withdraw-symbol}
    :flow {:kind selected-withdraw-flow-kind
           :protocol-address withdraw-generated-address
@@ -811,7 +800,6 @@
            status-message
            deposit-submit-label
            deposit-quick-amounts
-           withdraw-quick-amounts
            deposit-min-usdc
            deposit-min-amount
            deposit-estimated-time
@@ -871,7 +859,6 @@
    :status-message status-message
    :deposit-submit-label deposit-submit-label
    :deposit-quick-amounts deposit-quick-amounts
-   :withdraw-quick-amounts withdraw-quick-amounts
    :deposit-min-usdc deposit-min-usdc
    :deposit-min-amount deposit-min-amount
    :deposit-estimated-time deposit-estimated-time

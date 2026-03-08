@@ -264,6 +264,8 @@
                                                    (get-in % [1 :data-role])))
         max-node (find-first-node view-node #(= [[:actions/set-funding-amount-to-max]]
                                                 (get-in % [1 :on :click])))
+        quick-amount-node (find-first-node view-node #(= [[:actions/enter-funding-withdraw-amount "5"]]
+                                                         (get-in % [1 :on :click])))
         lifecycle-node (find-first-node view-node #(= "funding-withdraw-lifecycle"
                                                       (get-in % [1 :data-role])))
         all-text (set (collect-strings view-node))]
@@ -274,6 +276,7 @@
     (is (= "0x1234567890abcdef1234567890abcdef12345678"
            (get-in destination-node [1 :value])))
     (is (contains? (set (get-in amount-node [1 :class])) "text-right"))
+    (is (nil? quick-amount-node))
     (is (contains? all-text "8.5 USDC available"))
     (is (not (contains? all-text "Withdrawal queue")))
     (is (not (contains? all-text "HyperUnit Protocol Address")))
