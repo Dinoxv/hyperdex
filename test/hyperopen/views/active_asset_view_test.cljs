@@ -482,7 +482,11 @@
     (is (contains? strings "Mark / Oracle"))
     (is (contains? strings "24h Volume"))
     (is (contains? strings "Open Interest"))
-    (is (contains? strings "Funding / Countdown"))))
+    (is (contains? strings "Funding / Countdown"))
+    (is (contains-class? details-panel "border-t"))
+    (is (not (contains-class? details-panel "rounded-xl")))
+    (is (contains-class? details-panel "cursor-help"))
+    (is (contains-class? details-panel "decoration-dashed"))))
 
 (deftest active-asset-panel-passes-scroll-top-to-selector-wrapper-test
   (let [captured-props (atom nil)

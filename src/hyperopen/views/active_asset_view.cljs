@@ -1009,64 +1009,10 @@
                          (when (:numeric? options) ["num"]))}
       value-component]]))
 
-(defn- mobile-stat-chip [label value & [value-classes]]
-  [:div {:class ["inline-flex"
-                 "min-w-fit"
-                 "items-center"
-                 "gap-1.5"
-                 "shrink-0"
-                 "rounded-md"
-                 "border"
-                 "border-base-300/70"
-                 "bg-base-100/70"
-                 "px-2"
-                 "py-1"]}
-   [:div {:class ["text-xs" "font-medium" "uppercase" "tracking-[0.08em]" "text-trading-text-secondary"]}
-    label]
-   [:div {:class (into ["text-xs" "font-semibold" "num" "text-trading-text"] (or value-classes []))} value]])
-
-(defn- mobile-funding-chip
-  [funding-rate countdown-text funding-tooltip-open? funding-tooltip funding-tooltip-id funding-tooltip-pinned? is-spot]
-  [:div {:class ["inline-flex"
-                 "min-w-fit"
-                 "items-center"
-                 "gap-1.5"
-                 "shrink-0"
-                 "rounded-md"
-                 "border"
-                 "border-base-300/70"
-                 "bg-base-100/70"
-                 "px-2"
-                 "py-1"]}
-   [:div {:class ["text-xs" "font-medium" "uppercase" "tracking-[0.08em]" "text-trading-text-secondary"]}
-    "Funding"]
-   [:div {:class ["flex" "items-center" "gap-1.5" "text-xs" "text-trading-text"]}
-    (if is-spot
-      [:span {:class ["num" "text-trading-text-secondary"]} "--"]
-      (if (number? funding-rate)
-        (tooltip
-         [[:span {:class ["cursor-help" "num" (signed-tone-class funding-rate)]}
-           (signed-percentage-text funding-rate 4)]
-          (when funding-tooltip-open?
-            (funding-tooltip-panel funding-tooltip))]
-         "bottom"
-         {:click-pinnable? true
-          :pin-id funding-tooltip-id
-          :pinned? funding-tooltip-pinned?})
-        [:span {:class ["num" "text-trading-text-secondary"]} "Loading..."]))
-    [:span {:class ["text-trading-text-secondary"]} "/"]
-    [:span {:class ["num" "text-trading-text-secondary"]} (if is-spot "--" countdown-text)]]])
-
-(defn- mobile-detail-card
+(defn- mobile-detail-item
   [label value-node]
-  [:div {:class ["rounded-xl"
-                 "border"
-                 "border-base-300/70"
-                 "bg-base-100/75"
-                 "px-3"
-                 "py-2"
-                 "space-y-1.5"]}
-   [:div {:class ["text-xs" "font-medium" "uppercase" "tracking-[0.12em]" "text-trading-text-secondary"]}
+  [:div {:class ["min-w-0" "space-y-1"]}
+   [:div {:class ["text-xs" "font-medium" "text-trading-text-secondary" "whitespace-nowrap"]}
     label]
    value-node])
 
@@ -1133,40 +1079,64 @@
                   :clip-rule "evenodd"
                   :d "M5.293 7.293a1 1 0 011.414 0L10 10.586l3.293-3.293a1 1 0 111.414 1.414l-4 4a1 1 0 01-1.414 0l-4-4a1 1 0 010-1.414z"}]]]]]
      (when details-open?
-       [:div {:class ["grid" "grid-cols-2" "gap-2"]
+       [:div {:class ["grid"
+                      "grid-cols-2"
+                      "gap-x-4"
+                      "gap-y-3"
+                      "border-t"
+                      "border-base-300/80"
+                      "pt-2.5"]
               :data-role "trade-mobile-asset-details-panel"}
-        (mobile-detail-card
+        (mobile-detail-item
          "Mark / Oracle"
-         [:div {:class ["space-y-1" "text-sm" "font-semibold" "text-trading-text"]}
-          [:div {:class ["num"]}
+         [:div {:class ["flex"
+                        "items-center"
+                        "gap-1"
+                        "text-xs"
+                        "font-semibold"
+                        "text-trading-text"
+                        "whitespace-nowrap"]}
+          [:span {:class ["num"]}
            (if mark
              (fmt/format-trade-price mark mark-raw)
              "Loading...")]
-          [:div {:class ["num" "text-xs" "text-trading-text-secondary"]}
+          [:span {:class ["text-trading-text-secondary"]} "/"]
+          [:span {:class ["num" "text-trading-text-secondary"]}
            (if (and (not is-spot) oracle)
              (fmt/format-trade-price oracle oracle-raw)
              (if is-spot "—" "Loading..."))]])
-        (mobile-detail-card
+        (mobile-detail-item
          "24h Volume"
          [:div {:class ["text-sm" "font-semibold" "num" "text-trading-text"]}
           (if volume-24h
             (fmt/format-large-currency volume-24h)
             "Loading...")])
-        (mobile-detail-card
+        (mobile-detail-item
          "Open Interest"
          [:div {:class ["text-sm" "font-semibold" "num" "text-trading-text"]}
           (cond
             is-spot "—"
             open-interest-usd (fmt/format-large-currency open-interest-usd)
             :else "Loading...")])
-        (mobile-detail-card
+        (mobile-detail-item
          "Funding / Countdown"
-         [:div {:class ["flex" "items-center" "gap-1.5" "text-sm" "text-trading-text"]}
+         [:div {:class ["flex"
+                        "items-center"
+                        "gap-1"
+                        "text-xs"
+                        "font-semibold"
+                        "text-trading-text"
+                        "whitespace-nowrap"]}
           (if is-spot
             [:span {:class ["num" "text-trading-text-secondary"]} "--"]
             (if (number? funding-rate)
               (tooltip
-               [[:span {:class ["cursor-help" "num" (signed-tone-class funding-rate)]}
+               [[:span {:class ["cursor-help"
+                                "num"
+                                "underline"
+                                "decoration-dashed"
+                                "underline-offset-2"
+                                (signed-tone-class funding-rate)]}
                  (signed-percentage-text funding-rate 4)]
                 (when funding-tooltip-open?
                   (funding-tooltip-panel funding-tooltip))]
