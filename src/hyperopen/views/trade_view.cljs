@@ -10,11 +10,12 @@
 (def ^:private trade-mobile-surfaces
   [[:chart "Chart"]
    [:orderbook "Order Book"]
-   [:ticket "Trade"]])
+   [:trades "Trades"]])
 
 (defn- mobile-surface-button
   [selected-surface [surface-id label]]
   [:button {:type "button"
+            :data-role (str "trade-mobile-surface-button-" (name surface-id))
             :class (into ["flex-1"
                           "border-b-2"
                           "px-2"
@@ -31,16 +32,33 @@
             :on {:click [[:actions/select-trade-mobile-surface surface-id]]}}
    label])
 
+(defn- mobile-orderbook-view-state
+  [orderbook-view-state mobile-surface]
+  (assoc orderbook-view-state
+         :show-tabs? false
+         :active-tab-override (if (= mobile-surface :trades)
+                                :trades
+                                :orderbook)))
+
 (defn trade-view [state]
   (let [active-asset (:active-asset state)
         orderbook-data (when active-asset (get-in state [:orderbooks active-asset]))
         mobile-surface (trade-layout-actions/normalize-trade-mobile-surface
                          (get-in state [:trade-ui :mobile-surface]))
-        mobile-market-surface? (contains? #{:chart :orderbook} mobile-surface)
+        mobile-market-surface? (contains? trade-layout-actions/market-mobile-surfaces
+                                          mobile-surface)
+        mobile-orderbook-surface? (contains? #{:orderbook :trades} mobile-surface)
         show-surface-freshness-cues?
         (boolean (get-in state [:websocket-ui :show-surface-freshness-cues?] false))
         websocket-health (get-in state [:websocket :health])
-        state* (assoc state :websocket-health websocket-health)]
+        state* (assoc state :websocket-health websocket-health)
+        orderbook-view-state {:coin (or active-asset "No Asset Selected")
+                              :market (:active-market state)
+                              :orderbook orderbook-data
+                              :orderbook-ui (:orderbook-ui state)
+                              :show-surface-freshness-cues? show-surface-freshness-cues?
+                              :websocket-health websocket-health
+                              :loading (and active-asset (nil? orderbook-data))}]
     [:div {:class ["flex-1" "flex" "flex-col" "min-h-0"]
            :data-parity-id "trade-root"}
      [:div {:class ["w-full" "h-full" "px-0" "py-0" "space-y-0" "flex" "flex-col" "min-h-0"]}
@@ -80,7 +98,7 @@
          [:div {:class ["overflow-hidden" "flex-1" "min-h-0"]}
           (trading-chart/trading-chart-view state*)]]
 
-        [:div {:class (into [(if (= mobile-surface :orderbook) "block" "hidden")
+        [:div {:class (into [(if mobile-orderbook-surface? "block" "hidden")
                              "bg-base-100"
                              "w-full"
                              "h-[320px]"
@@ -100,14 +118,11 @@
                              "xl:row-start-1"
                              "xl:border-t-0"])
                :data-parity-id "trade-orderbook-panel"}
-         (l2-orderbook-view/l2-orderbook-view
-           {:coin (or active-asset "No Asset Selected")
-            :market (:active-market state)
-            :orderbook orderbook-data
-            :orderbook-ui (:orderbook-ui state)
-            :show-surface-freshness-cues? show-surface-freshness-cues?
-            :websocket-health websocket-health
-            :loading (and active-asset (nil? orderbook-data))})]
+         [:div {:class ["h-full" "min-h-0" "lg:hidden"]}
+          (l2-orderbook-view/l2-orderbook-view
+           (mobile-orderbook-view-state orderbook-view-state mobile-surface))]
+         [:div {:class ["hidden" "h-full" "min-h-0" "lg:block"]}
+          (l2-orderbook-view/l2-orderbook-view orderbook-view-state)]]
 
         [:div {:class (into [(if (= mobile-surface :ticket) "flex" "hidden")
                              "bg-base-100"

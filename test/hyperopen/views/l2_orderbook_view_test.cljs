@@ -372,6 +372,22 @@
       (is (contains? classes "overflow-y-auto"))
       (is (contains? classes "scrollbar-hide")))))
 
+(deftest l2-orderbook-view-can-hide-tabs-and-force-trades-panel-test
+  (with-redefs [ws-trades/get-recent-trades
+                (fn []
+                  [{:coin "BTC" :px "61500.1" :sz "0.03" :side "A" :time 1700000003}])]
+    (let [view-node (view/l2-orderbook-view {:coin "BTC"
+                                             :market {:base "BTC" :quote "USDC"}
+                                             :orderbook-ui {:active-tab :orderbook}
+                                             :active-tab-override :trades
+                                             :show-tabs? false})
+          tabs-row (find-first-node view-node (data-role= "orderbook-tabs-row"))
+          trades-header-row (find-first-node view-node (data-role= "trades-column-headers-row"))
+          orderbook-header-row (find-first-node view-node (data-role= "orderbook-column-headers-row"))]
+      (is (nil? tabs-row))
+      (is (some? trades-header-row))
+      (is (nil? orderbook-header-row)))))
+
 (deftest orderbook-and-trades-share-constrained-tab-viewport-sizing-test
   (let [required-classes #{"flex-1" "h-full" "min-h-0" "overflow-hidden" "bg-base-100"}
         orderbook-view (view/l2-orderbook-view {:coin "BTC"

@@ -4,8 +4,12 @@
 (def default-mobile-surface
   :chart)
 
+(def market-mobile-surfaces
+  #{:chart :orderbook :trades})
+
 (def ^:private mobile-surface-options
-  #{:chart :orderbook :ticket :account})
+  (into market-mobile-surfaces
+        #{:ticket :account}))
 
 (defn normalize-trade-mobile-surface
   [value]

@@ -196,6 +196,17 @@
     (is (contains? classes "text-[#61e6cf]"))
     (is (not (contains? classes "bg-[#0d2a31]")))))
 
+(deftest footer-mobile-bottom-nav-keeps-markets-active-for-trades-surface-test
+  (let [view (footer-view/footer-view (assoc (base-state)
+                                             :router {:path "/trade"}
+                                             :trade-ui {:mobile-surface :trades}))
+        markets-button (find-node #(= "mobile-bottom-nav-markets" (get-in % [1 :data-role])) view)
+        trade-button (find-node #(= "mobile-bottom-nav-trade" (get-in % [1 :data-role])) view)
+        markets-classes (set (class-values (get-in markets-button [1 :class])))
+        trade-classes (set (class-values (get-in trade-button [1 :class])))]
+    (is (contains? markets-classes "text-[#61e6cf]"))
+    (is (not (contains? trade-classes "text-[#61e6cf]")))))
+
 (deftest diagnostics-drawer-renders-only-when-open-test
   (let [closed-view (footer-view/footer-view (base-state))
         open-view (footer-view/footer-view (assoc-in (base-state) [:websocket-ui :diagnostics-open?] true))]

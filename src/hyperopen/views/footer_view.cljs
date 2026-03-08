@@ -819,7 +819,8 @@
         mobile-surface (trade-layout-actions/normalize-trade-mobile-surface
                         (get-in state [:trade-ui :mobile-surface]))
         markets-active? (and trade-route?
-                             (contains? #{:chart :orderbook} mobile-surface))
+                             (contains? trade-layout-actions/market-mobile-surfaces
+                                        mobile-surface))
         account-active? (or portfolio-route?
                             (and trade-route? (= mobile-surface :account)))
         trade-active? (and trade-route? (= mobile-surface :ticket))]

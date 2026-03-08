@@ -66,6 +66,9 @@
     (seq? node) (mapcat collect-strings node)
     :else []))
 
+(defn- node-text [node]
+  (str/join " " (collect-strings node)))
+
 (defn- root-class-set [node]
   (let [attrs (when (and (vector? node) (map? (second node)))
                 (second node))]
@@ -228,6 +231,21 @@
                                                  (get-in % [1 :data-parity-id])))
         chart-classes (node-class-set chart-account-panel)
         chart-text (set (collect-strings chart-view))
+        trades-view (trade-view/trade-view (assoc-in trade-view-test-state
+                                                     [:trade-ui :mobile-surface]
+                                                     :trades))
+        trades-account-panel (find-first-node trades-view
+                                              #(= "trade-account-tables-panel"
+                                                  (get-in % [1 :data-parity-id])))
+        trades-orderbook-panel (find-first-node trades-view
+                                                #(= "trade-orderbook-panel"
+                                                    (get-in % [1 :data-parity-id])))
+        trades-order-entry-panel (find-first-node trades-view
+                                                  #(= "trade-order-entry-panel"
+                                                      (get-in % [1 :data-parity-id])))
+        trades-account-classes (node-class-set trades-account-panel)
+        trades-orderbook-classes (node-class-set trades-orderbook-panel)
+        trades-order-entry-classes (node-class-set trades-order-entry-panel)
         ticket-view (trade-view/trade-view (assoc-in trade-view-test-state
                                                      [:trade-ui :mobile-surface]
                                                      :ticket))
@@ -240,19 +258,41 @@
     (is (some #(str/starts-with? % "Balances") chart-text))
     (is (some #(str/starts-with? % "Open Orders") chart-text))
     (is (contains? chart-text "Trade History"))
+    (is (contains? trades-account-classes "flex"))
+    (is (not (contains? trades-account-classes "hidden")))
+    (is (contains? trades-orderbook-classes "block"))
+    (is (not (contains? trades-orderbook-classes "hidden")))
+    (is (contains? trades-order-entry-classes "hidden"))
     (is (contains? ticket-classes "hidden"))
     (is (nil? (find-first-node chart-view
                                #(= [[:actions/select-trade-mobile-surface :account]
                                     [:actions/select-account-info-tab :balances]]
                                    (get-in % [1 :on :click])))))))
 
-(deftest trade-view-primary-mobile-tabs-exclude-account-tab-test
+(deftest trade-view-primary-mobile-tabs-route-to-market-surfaces-test
   (let [view-node (trade-view/trade-view trade-view-test-state)
-        all-text (set (collect-strings view-node))]
-    (is (contains? all-text "Chart"))
-    (is (contains? all-text "Order Book"))
-    (is (contains? all-text "Trade"))
-    (is (not (contains? all-text "Account")))))
+        top-buttons (find-nodes view-node #(str/starts-with? (get-in % [1 :data-role] "")
+                                                             "trade-mobile-surface-button-"))
+        chart-button (find-first-node view-node #(= "trade-mobile-surface-button-chart"
+                                                    (get-in % [1 :data-role])))
+        orderbook-button (find-first-node view-node #(= "trade-mobile-surface-button-orderbook"
+                                                        (get-in % [1 :data-role])))
+        trades-button (find-first-node view-node #(= "trade-mobile-surface-button-trades"
+                                                     (get-in % [1 :data-role])))]
+    (is (= 3 (count top-buttons)))
+    (is (= "Chart" (node-text chart-button)))
+    (is (= "Order Book" (node-text orderbook-button)))
+    (is (= "Trades" (node-text trades-button)))
+    (is (= [[:actions/select-trade-mobile-surface :chart]]
+           (get-in chart-button [1 :on :click])))
+    (is (= [[:actions/select-trade-mobile-surface :orderbook]]
+           (get-in orderbook-button [1 :on :click])))
+    (is (= [[:actions/select-trade-mobile-surface :trades]]
+           (get-in trades-button [1 :on :click])))
+    (is (nil? (find-first-node view-node #(= "trade-mobile-surface-button-ticket"
+                                             (get-in % [1 :data-role])))))
+    (is (nil? (find-first-node view-node #(= "trade-mobile-surface-button-account"
+                                             (get-in % [1 :data-role])))))))
 
 (deftest trade-view-reads-runtime-health-snapshot-for-surface-freshness-cues-test
   (let [state (-> trade-view-test-state

@@ -297,6 +297,7 @@
 (defn orderbook-tab-button [active-tab tab-id label]
   [:button.flex-1.px-3.py-2.text-sm.font-medium.border-b-2.transition-colors
    {:type "button"
+    :data-role (str "orderbook-tab-button-" (name tab-id))
     :class (if (= active-tab tab-id)
              ["text-white" "border-cyan-400"]
              ["text-gray-400" "border-transparent" "hover:text-gray-200"])
@@ -304,7 +305,8 @@
    label])
 
 (defn orderbook-tabs-row [active-tab]
-  [:div.flex.items-center.bg-base-100.border-b.border-base-300
+  [:div {:class ["flex" "items-center" "bg-base-100" "border-b" "border-base-300"]
+         :data-role "orderbook-tabs-row"}
    (orderbook-tab-button active-tab :orderbook "Order Book")
    (orderbook-tab-button active-tab :trades "Trades")])
 
@@ -607,6 +609,8 @@
         (boolean (:show-surface-freshness-cues? state))
         websocket-health (or (:websocket-health state)
                              (get-in state [:websocket :health]))
+        active-tab-override (:active-tab-override state)
+        show-tabs? (not= false (:show-tabs? state))
         orderbook-ui (merge {:size-unit :base
                              :size-unit-dropdown-visible? false
                              :price-aggregation-dropdown-visible? false
@@ -614,11 +618,13 @@
                              :active-tab :orderbook}
                             (:orderbook-ui state))
         loading? (:loading state)
-        active-tab (normalize-orderbook-tab (:active-tab orderbook-ui))
+        active-tab (normalize-orderbook-tab (or active-tab-override
+                                               (:active-tab orderbook-ui)))
         base-symbol (resolve-base-symbol coin market)]
     [:div {:class ["w-full" "h-full" "min-h-0" "overflow-hidden" "flex" "flex-col"]
            :data-parity-id "orderbook-panel"}
-     (orderbook-tabs-row active-tab)
+     (when show-tabs?
+       (orderbook-tabs-row active-tab))
      [:div {:class ["flex-1" "h-full" "min-h-0" "overflow-hidden" "bg-base-100"]}
       (if (= active-tab :trades)
         (tab-content-viewport
