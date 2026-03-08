@@ -610,6 +610,10 @@
 (deftest balances-tab-content-renders-mobile-summary-cards-with-inline-expansion-test
   (let [rows [(assoc fixtures/sample-balance-row
                      :key "usdc"
+                     :coin "USDC"
+                     :total-balance 388.555675
+                     :usdc-value 388.55
+                     :amount-decimals 8
                      :contract-id "0x1234567890abcdef1234567890abcdef12345678")
               {:key "meow"
                :coin "MEOW"
@@ -631,6 +635,12 @@
         collapsed-card (hiccup/find-by-data-role content "mobile-balance-card-meow")
         expanded-button (first (vec (hiccup/node-children expanded-card)))
         collapsed-button (first (vec (hiccup/node-children collapsed-card)))
+        summary-grid (hiccup/find-first-node expanded-button #(contains? (hiccup/node-class-set %) "grid-cols-[minmax(0,0.82fr)_minmax(0,0.8fr)_minmax(0,1.25fr)_auto]"))
+        total-balance-value (hiccup/find-first-node expanded-card #(and (= :div (first %))
+                                                                        (contains? (hiccup/direct-texts %) "388.55567500 USDC")
+                                                                        (contains? (hiccup/node-class-set %) "whitespace-nowrap")))
+        namespace-chip (hiccup/find-first-node collapsed-card #(and (= :span (first %))
+                                                                    (contains? (hiccup/direct-texts %) "xyz")))
         expanded-strings (set (hiccup/collect-strings expanded-card))
         collapsed-strings (set (hiccup/collect-strings collapsed-card))]
     (is (some? mobile-viewport))
@@ -638,6 +648,11 @@
     (is (= true (get-in expanded-button [1 :aria-expanded])))
     (is (= [[:actions/toggle-account-info-mobile-card :balances "usdc"]]
            (get-in expanded-button [1 :on :click])))
+    (is (some? summary-grid))
+    (is (some? total-balance-value))
+    (is (some? namespace-chip))
+    (is (contains? (hiccup/node-class-set namespace-chip) "bg-[#0d5a51]"))
+    (is (not (contains? (hiccup/node-class-set namespace-chip) "border")))
     (is (contains? expanded-strings "Coin"))
     (is (contains? expanded-strings "USDC Value"))
     (is (contains? expanded-strings "Total Balance"))

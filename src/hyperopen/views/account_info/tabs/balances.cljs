@@ -314,7 +314,18 @@
     [:span {:class ["flex" "min-w-0" "items-center" "gap-1.5"]}
      [:span {:class ["truncate" "text-trading-text"]} (or base-label coin "Asset")]
      (when prefix-label
-       [:span {:class shared/position-chip-classes} prefix-label])]))
+       [:span {:class ["inline-flex"
+                       "items-center"
+                       "rounded-md"
+                       "bg-[#0d5a51]"
+                       "px-2"
+                       "py-0.5"
+                       "text-xs"
+                       "font-medium"
+                       "leading-none"
+                       "text-emerald-300"
+                       "whitespace-nowrap"]}
+        prefix-label])]))
 
 (defn- mobile-balance-action-chip [label]
   [:span {:class ["inline-flex"
@@ -352,17 +363,23 @@
      {:data-role (str "mobile-balance-card-" row-id)
       :expanded? expanded?
       :toggle-actions [[:actions/toggle-account-info-mobile-card :balances row-id]]
+      :summary-grid-classes ["grid"
+                             "grid-cols-[minmax(0,0.82fr)_minmax(0,0.8fr)_minmax(0,1.25fr)_auto]"
+                             "items-start"
+                             "gap-x-3"
+                             "gap-y-2"]
       :summary-items [(mobile-cards/summary-item "Coin"
                                                  (mobile-balance-coin-node row)
                                                  {:value-classes ["text-trading-text"]})
                       (mobile-cards/summary-item "USDC Value"
                                                  (str "$" (shared/format-currency usdc-value))
-                                                 {:value-classes ["num"]})
+                                                 {:value-classes ["num" "whitespace-nowrap"]})
                       (mobile-cards/summary-item "Total Balance"
                                                  (str (shared/format-balance-amount total-balance amount-decimals)
                                                       " "
                                                       (or base-label coin ""))
-                                                 {:value-classes ["num"]})]
+                                                 {:value-classes ["num"
+                                                                  "whitespace-nowrap"]})]
       :detail-content (mobile-cards/detail-grid
                        "grid-cols-2"
                        [(mobile-cards/detail-item
