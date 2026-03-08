@@ -10,6 +10,15 @@
 (def ^:private estimated-panel-height-px
   560)
 
+(def ^:private popover-divider-gap-px
+  10)
+
+(def ^:private trade-order-entry-panel-max-width-px
+  320)
+
+(def ^:private trade-order-entry-panel-selector
+  "[data-parity-id='trade-order-entry-panel']")
+
 (defn- base-button-classes
   [primary?]
   (if primary?
@@ -134,6 +143,24 @@
            :height (.-height rect)
            :viewport-width (some-> js/globalThis .-innerWidth)
            :viewport-height (some-> js/globalThis .-innerHeight)})))))
+
+(defn- trade-order-entry-divider-left
+  []
+  (let [panel-bounds (element-anchor-bounds trade-order-entry-panel-selector)]
+    (when (and (number? (:left panel-bounds))
+               (number? (:width panel-bounds))
+               (<= (:width panel-bounds) trade-order-entry-panel-max-width-px))
+      (:left panel-bounds))))
+
+(defn- align-anchor-to-trade-order-entry-divider
+  [anchor]
+  (if-let [divider-left (and (anchored-popover/complete-anchor? anchor)
+                             (trade-order-entry-divider-left))]
+    (let [divider-anchor (+ divider-left popover-divider-gap-px)]
+      (assoc anchor
+             :left divider-anchor
+             :right divider-anchor))
+    anchor))
 
 (defn- lifecycle-tx-hash-content
   [{:keys [hash explorer-url]}]
@@ -980,7 +1007,8 @@
         fallback-anchor* (when-not (anchored-popover/complete-anchor? stored-anchor*)
                            (element-anchor-bounds
                             (mode->fallback-anchor-selector (:mode modal))))
-        anchor (or fallback-anchor* stored-anchor*)
+        anchor (-> (or fallback-anchor* stored-anchor*)
+                   align-anchor-to-trade-order-entry-divider)
         anchored-popover? (anchored-popover/complete-anchor? anchor)
         popover-style (when anchored-popover?
                         (anchored-popover/anchored-popover-layout-style

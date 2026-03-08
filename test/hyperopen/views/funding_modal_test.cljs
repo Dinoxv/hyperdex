@@ -124,6 +124,40 @@
         (set! (.-innerWidth js/globalThis) original-inner-width)
         (set! (.-innerHeight js/globalThis) original-inner-height)))))
 
+(deftest funding-modal-aligns-popover-right-edge-to-trade-order-entry-divider-test
+  (let [state (assoc-in (base-state)
+                        [:funding-ui :modal]
+                        {:open? true
+                         :mode :withdraw
+                         :withdraw-step :asset-select
+                         :withdraw-search-input ""
+                         :anchor {:left 1040
+                                  :right 1180
+                                  :top 620
+                                  :bottom 660
+                                  :viewport-width 1440
+                                  :viewport-height 900}})
+        original-document (.-document js/globalThis)]
+    (set! (.-document js/globalThis)
+          #js {:querySelector (fn [selector]
+                                (when (= "[data-parity-id='trade-order-entry-panel']" selector)
+                                  #js {:getBoundingClientRect
+                                       (fn []
+                                         #js {:left 1120
+                                              :right 1400
+                                              :top 0
+                                              :bottom 900
+                                              :width 280
+                                              :height 900})}))})
+    (try
+      (let [view-node (view/funding-modal-view state)
+            modal-node (find-first-node view-node #(= "funding-modal"
+                                                      (get-in % [1 :data-role])))]
+        (is (= "448px" (get-in modal-node [1 :style :width])))
+        (is (= "672px" (get-in modal-node [1 :style :left]))))
+      (finally
+        (set! (.-document js/globalThis) original-document)))))
+
 (deftest withdraw-flow-renders-hyperunit-protocol-and-lifecycle-details-test
   (let [state (-> (base-state)
                   (assoc-in [:spot :clearinghouse-state :balances]
