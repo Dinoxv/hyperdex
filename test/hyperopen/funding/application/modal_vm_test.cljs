@@ -21,8 +21,10 @@
                                                     :status nil}
                                                    value))
            :normalize-deposit-step #(or % :asset-select)
+           :normalize-withdraw-step #(or % :asset-select)
            :deposit-assets-filtered (fn [state _modal] (:deposit-assets state))
            :deposit-asset (fn [state _modal] (:deposit-asset state))
+           :withdraw-assets-filtered (fn [state _modal] (:withdraw-assets state))
            :withdraw-assets (fn [state] (:withdraw-assets state))
            :withdraw-asset (fn [state _modal] (:withdraw-asset state))
            :deposit-asset-implemented? (fn [asset] (true? (:implemented? asset)))
@@ -143,6 +145,7 @@
 
 (deftest funding-modal-view-model-builds-withdraw-lifecycle-and-queue-models-test
   (let [state (base-state {:modal {:mode :withdraw
+                                   :withdraw-step :amount-entry
                                    :amount-input "0.25"
                                    :destination-input "bc1qexample"
                                    :hyperunit-lifecycle {:direction :withdraw
@@ -172,7 +175,7 @@
                                                            :min 0.0003
                                                            :max 1.25)})
         view-model (modal-vm/funding-modal-view-model (base-deps) state)]
-    (is (= :withdraw/form (get-in view-model [:content :kind])))
+    (is (= :withdraw/detail (get-in view-model [:content :kind])))
     (is (= :failure (:hyperunit-lifecycle-outcome view-model)))
     (is (= "Needs Attention" (:hyperunit-lifecycle-outcome-label view-model)))
     (is (= "Retry from the activity panel."
@@ -186,10 +189,41 @@
     (is (= "https://explorer/withdraw/bitcoin/queue-123"
            (:withdraw-queue-last-operation-explorer-url view-model)))
     (is (= "~20 mins" (:withdraw-estimated-time view-model)))
-    (is (= "0.00001@bitcoin" (:withdraw-network-fee view-model)))))
+    (is (= "0.00001@bitcoin" (:withdraw-network-fee view-model)))
+    (is (= "1.25 BTC available"
+           (get-in view-model [:withdraw :amount :available-label])))))
+
+(deftest funding-modal-view-model-builds-withdraw-select-model-with-asset-amounts-test
+  (let [btc-asset (withdraw-asset :key :btc
+                                  :symbol "BTC"
+                                  :flow-kind :hyperunit-address
+                                  :source-chain "bitcoin"
+                                  :min 0.0003
+                                  :max 1.25)
+        state (base-state {:modal {:mode :withdraw
+                                   :withdraw-step :asset-select
+                                   :withdraw-search-input "bt"}
+                           :withdraw-assets [(assoc (withdraw-asset :key :usdc
+                                                                    :symbol "USDC"
+                                                                    :flow-kind :evm-address
+                                                                    :max 360.793551)
+                                                   :available-display "360.793551"
+                                                   :available-detail-display "360.793551")
+                                            (assoc btc-asset
+                                                   :available-display "1.25"
+                                                   :available-detail-display "1.25")]
+                           :withdraw-asset btc-asset
+                           :preview-result {:ok? false
+                                            :display-message "Enter a valid destination address."}})
+        view-model (modal-vm/funding-modal-view-model (base-deps) state)]
+    (is (= :withdraw/select (get-in view-model [:content :kind])))
+    (is (= "bt" (get-in view-model [:withdraw :search :value])))
+    (is (= "1.25" (get-in view-model [:withdraw :assets 1 :available-display])))
+    (is (false? (get-in view-model [:feedback :visible?])))))
 
 (deftest funding-modal-view-model-direct-feedback-uses-preview-errors-for-withdrawals-test
   (let [state (base-state {:modal {:mode :withdraw
+                                   :withdraw-step :amount-entry
                                    :amount-input ""
                                    :destination-input ""}
                            :preview-result {:ok? false

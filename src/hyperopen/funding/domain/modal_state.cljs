@@ -1,5 +1,6 @@
 (ns hyperopen.funding.domain.modal-state
   (:require [hyperopen.funding.domain.assets :as assets-domain]
+            [hyperopen.funding.domain.policy :as policy-domain]
             [hyperopen.funding.domain.lifecycle :as lifecycle-domain]))
 
 (defn default-funding-modal-state
@@ -10,6 +11,8 @@
    :anchor nil
    :deposit-step :asset-select
    :deposit-search-input ""
+   :withdraw-step :asset-select
+   :withdraw-search-input ""
    :deposit-selected-asset-key nil
    :deposit-generated-address nil
    :deposit-generated-signatures nil
@@ -32,6 +35,8 @@
     (assoc modal
            :anchor (when (fn? normalize-anchor-fn)
                      (normalize-anchor-fn (:anchor modal)))
+           :withdraw-step (policy-domain/normalize-withdraw-step
+                           (:withdraw-step modal))
            :withdraw-selected-asset-key (or (assets-domain/normalize-withdraw-asset-key
                                              (:withdraw-selected-asset-key modal))
                                             assets-domain/withdraw-default-asset-key)

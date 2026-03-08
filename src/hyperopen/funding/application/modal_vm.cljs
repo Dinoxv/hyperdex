@@ -107,23 +107,29 @@
            normalize-mode
            normalize-hyperunit-lifecycle
            normalize-deposit-step
+           normalize-withdraw-step
            non-blank-text
            deposit-quick-amounts
            deposit-min-usdc
            withdraw-min-usdc]}
-   state]
+  state]
   (let [modal (modal-state state)
         mode (normalize-mode (:mode modal))
-        deposit-step (normalize-deposit-step (:deposit-step modal))]
+        deposit-step (normalize-deposit-step (:deposit-step modal))
+        withdraw-step (normalize-withdraw-step (:withdraw-step modal))]
     {:state state
      :modal modal
      :open? (true? (:open? modal))
      :mode mode
      :deposit? (= mode :deposit)
+     :withdraw? (= mode :withdraw)
      :legacy? (= mode :legacy)
      :deposit-step deposit-step
      :deposit-step-amount-entry? (= deposit-step :amount-entry)
+     :withdraw-step withdraw-step
+     :withdraw-step-amount-entry? (= withdraw-step :amount-entry)
      :deposit-search-input (string-value (:deposit-search-input modal))
+     :withdraw-search-input (string-value (:withdraw-search-input modal))
      :amount-input (string-value (:amount-input modal))
      :to-perp? (true? (:to-perp? modal))
      :destination-input (string-value (:destination-input modal))
@@ -141,6 +147,7 @@
   [{:keys [state modal] :as ctx}
    {:keys [deposit-assets-filtered
            deposit-asset
+           withdraw-assets-filtered
            withdraw-assets
            withdraw-asset
            deposit-asset-implemented?]}]
@@ -153,7 +160,8 @@
            :selected-deposit-symbol (asset-symbol selected-deposit-asset "")
            :selected-deposit-flow-kind (flow-kind selected-deposit-asset)
            :selected-deposit-implemented? (deposit-asset-implemented? selected-deposit-asset)
-           :withdraw-assets (withdraw-assets state)
+           :withdraw-assets (withdraw-assets-filtered state modal)
+           :withdraw-all-assets (withdraw-assets state)
            :selected-withdraw-asset selected-withdraw-asset
            :selected-withdraw-asset-key (:key selected-withdraw-asset)
            :selected-withdraw-symbol (asset-symbol selected-withdraw-asset "USDC")
@@ -432,38 +440,59 @@
            preview-ok?
            preview-message
            mode
-           deposit-step-amount-entry?]}]
+           deposit-step-amount-entry?
+           withdraw-step-amount-entry?]}]
   (or error
       (when (and (not preview-ok?)
                  (seq preview-message)
                  (or (not= mode :deposit)
-                     deposit-step-amount-entry?))
+                     deposit-step-amount-entry?)
+                 (or (not= mode :withdraw)
+                     withdraw-step-amount-entry?))
         preview-message)))
 
 (defn- show-status-message?
-  [{:keys [legacy? deposit?]} status-message]
-  (and (seq status-message)
-       (not legacy?)
-       (not deposit?)))
+  [{:keys [legacy? deposit? withdraw? withdraw-step-amount-entry?]} status-message]
+  (boolean
+   (and (seq status-message)
+        (not legacy?)
+        (not deposit?)
+        (or (not withdraw?)
+            withdraw-step-amount-entry?))))
 
 (defn- submit-disabled?
-  [{:keys [submitting? deposit? deposit-step-amount-entry? preview-ok?]}]
+  [{:keys [submitting?
+           deposit?
+           withdraw?
+           deposit-step-amount-entry?
+           withdraw-step-amount-entry?
+           preview-ok?]}]
   (or submitting?
       (and deposit?
            (not deposit-step-amount-entry?))
+      (and withdraw?
+           (not withdraw-step-amount-entry?))
       (not preview-ok?)))
 
 (defn- title
   [{:keys [mode
            deposit?
+           withdraw?
            deposit-step-amount-entry?
+           withdraw-step-amount-entry?
            selected-deposit-symbol
+           selected-withdraw-symbol
            legacy-kind]}]
   (cond
     (and deposit?
          deposit-step-amount-entry?
          (seq selected-deposit-symbol))
     (str "Deposit " selected-deposit-symbol)
+
+    (and withdraw?
+         withdraw-step-amount-entry?
+         (seq selected-withdraw-symbol))
+    (str "Withdraw " selected-withdraw-symbol)
 
     :else
     (case mode
@@ -542,19 +571,30 @@
     (conj (summary-row "Estimated time" withdraw-estimated-time)
           (summary-row "Network fee" withdraw-network-fee))))
 
+(defn- withdraw-quick-amounts
+  [selected-withdraw-asset-key deposit-quick-amounts]
+  (if (= selected-withdraw-asset-key :usdc)
+    deposit-quick-amounts
+    []))
+
 (defn- content-kind
   [{:keys [mode
            deposit-step
+           withdraw-step
            selected-deposit-asset
            selected-deposit-flow-kind
-           selected-deposit-implemented?]}]
+           selected-deposit-implemented?
+           selected-withdraw-asset]}]
   (case mode
     :deposit (deposit-content-kind deposit-step
                                    selected-deposit-asset
                                    selected-deposit-flow-kind
                                    selected-deposit-implemented?)
     :transfer :transfer/form
-    :withdraw :withdraw/form
+    :withdraw (if (and (= withdraw-step :amount-entry)
+                       selected-withdraw-asset)
+                :withdraw/detail
+                :withdraw/select)
     :legacy :unsupported/workflow
     :unknown))
 
@@ -574,7 +614,9 @@
         withdraw-summary-rows (withdraw-summary-rows (:withdraw-min-amount ctx)
                                                      (:selected-withdraw-symbol ctx)
                                                      withdraw-estimated-time
-                                                     withdraw-network-fee)]
+                                                     withdraw-network-fee)
+        withdraw-quick-amounts (withdraw-quick-amounts (:selected-withdraw-asset-key ctx)
+                                                       (:deposit-quick-amounts ctx))]
     (assoc ctx
            :status-message status-message
            :show-status-message? (show-status-message? ctx status-message)
@@ -590,7 +632,8 @@
            :deposit-unsupported-detail (deposit-unsupported-detail
                                         (:selected-deposit-flow-kind ctx))
            :deposit-summary-rows deposit-summary-rows
-           :withdraw-summary-rows withdraw-summary-rows)))
+           :withdraw-summary-rows withdraw-summary-rows
+           :withdraw-quick-amounts withdraw-quick-amounts)))
 
 (defn- feedback-model
   [{:keys [status-message show-status-message?]}]
@@ -667,11 +710,14 @@
 
 (defn- withdraw-model
   [{:keys [withdraw-assets
+           withdraw-step
+           withdraw-search-input
            selected-withdraw-asset
            destination-input
            amount-input
            withdraw-max-display
            withdraw-max-input
+           withdraw-quick-amounts
            selected-withdraw-symbol
            selected-withdraw-flow-kind
            withdraw-generated-address
@@ -686,12 +732,20 @@
            withdraw-lifecycle
            submit-disabled?
            submitting?]}]
-  {:assets withdraw-assets
+  {:step withdraw-step
+   :search {:value withdraw-search-input
+            :placeholder "Search a supported asset"}
+   :assets withdraw-assets
    :selected-asset selected-withdraw-asset
    :destination {:value destination-input}
    :amount {:value amount-input
             :max-display withdraw-max-display
             :max-input withdraw-max-input
+            :available-label (str withdraw-max-input
+                                  " "
+                                  selected-withdraw-symbol
+                                  " available")
+            :quick-amounts withdraw-quick-amounts
             :symbol selected-withdraw-symbol}
    :flow {:kind selected-withdraw-flow-kind
           :protocol-address withdraw-generated-address
@@ -724,6 +778,8 @@
            title
            deposit-step
            deposit-search-input
+           withdraw-step
+           withdraw-search-input
            deposit-assets
            selected-deposit-asset
            selected-deposit-flow-kind
@@ -731,6 +787,7 @@
            generated-address
            generated-signatures
            withdraw-assets
+           withdraw-all-assets
            selected-withdraw-asset
            selected-withdraw-asset-key
            selected-withdraw-flow-kind
@@ -754,6 +811,7 @@
            status-message
            deposit-submit-label
            deposit-quick-amounts
+           withdraw-quick-amounts
            deposit-min-usdc
            deposit-min-amount
            deposit-estimated-time
@@ -779,6 +837,8 @@
    :title title
    :deposit-step deposit-step
    :deposit-search-input deposit-search-input
+   :withdraw-step withdraw-step
+   :withdraw-search-input withdraw-search-input
    :deposit-assets deposit-assets
    :deposit-selected-asset selected-deposit-asset
    :deposit-flow-kind selected-deposit-flow-kind
@@ -786,6 +846,7 @@
    :deposit-generated-address generated-address
    :deposit-generated-signatures generated-signatures
    :withdraw-assets withdraw-assets
+   :withdraw-all-assets withdraw-all-assets
    :withdraw-selected-asset selected-withdraw-asset
    :withdraw-selected-asset-key selected-withdraw-asset-key
    :withdraw-flow-kind selected-withdraw-flow-kind
@@ -810,6 +871,7 @@
    :status-message status-message
    :deposit-submit-label deposit-submit-label
    :deposit-quick-amounts deposit-quick-amounts
+   :withdraw-quick-amounts withdraw-quick-amounts
    :deposit-min-usdc deposit-min-usdc
    :deposit-min-amount deposit-min-amount
    :deposit-estimated-time deposit-estimated-time

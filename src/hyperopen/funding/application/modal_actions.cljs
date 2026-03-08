@@ -25,6 +25,7 @@
 (def normalize-evm-address policy-domain/normalize-evm-address)
 (def normalize-mode policy-domain/normalize-mode)
 (def normalize-deposit-step policy-domain/normalize-deposit-step)
+(def normalize-withdraw-step policy-domain/normalize-withdraw-step)
 
 (defn- normalize-anchor
   [anchor]
@@ -58,8 +59,9 @@
 (def deposit-asset assets-domain/deposit-asset)
 (def deposit-asset-implemented? assets-domain/deposit-asset-implemented?)
 (def deposit-assets-filtered assets-domain/deposit-assets-filtered)
-(def withdraw-assets assets-domain/withdraw-assets)
-(def withdraw-asset assets-domain/withdraw-asset)
+(def withdraw-assets policy-domain/withdraw-assets)
+(def withdraw-assets-filtered policy-domain/withdraw-assets-filtered)
+(def withdraw-asset policy-domain/withdraw-asset)
 (def withdraw-minimum-amount assets-domain/withdraw-minimum-amount)
 (def hyperunit-source-chain assets-domain/hyperunit-source-chain)
 
@@ -92,11 +94,13 @@
   [state]
   (modal-vm/funding-modal-view-model
    {:modal-state modal-state
-    :normalize-mode normalize-mode
-    :normalize-hyperunit-lifecycle normalize-hyperunit-lifecycle
-    :normalize-deposit-step normalize-deposit-step
+   :normalize-mode normalize-mode
+   :normalize-hyperunit-lifecycle normalize-hyperunit-lifecycle
+   :normalize-deposit-step normalize-deposit-step
+    :normalize-withdraw-step normalize-withdraw-step
     :deposit-assets-filtered deposit-assets-filtered
     :deposit-asset deposit-asset
+    :withdraw-assets-filtered withdraw-assets-filtered
     :withdraw-assets withdraw-assets
     :withdraw-asset withdraw-asset
     :deposit-asset-implemented? deposit-asset-implemented?
@@ -145,6 +149,7 @@
    :open-legacy-funding-modal-fn open-legacy-funding-modal
    :normalize-amount-input normalize-amount-input
    :normalize-deposit-step normalize-deposit-step
+   :normalize-withdraw-step normalize-withdraw-step
    :normalize-deposit-asset-key normalize-deposit-asset-key
    :deposit-asset deposit-asset
    :deposit-min-usdc deposit-min-usdc
@@ -199,6 +204,10 @@
   [state value]
   (modal-commands/search-funding-deposit-assets (command-deps) state value))
 
+(defn search-funding-withdraw-assets
+  [state value]
+  (modal-commands/search-funding-withdraw-assets (command-deps) state value))
+
 (defn select-funding-deposit-asset
   [state asset-key]
   (modal-commands/select-funding-deposit-asset (command-deps) state asset-key))
@@ -206,6 +215,10 @@
 (defn return-to-funding-deposit-asset-select
   [state]
   (modal-commands/return-to-funding-deposit-asset-select (command-deps) state))
+
+(defn return-to-funding-withdraw-asset-select
+  [state]
+  (modal-commands/return-to-funding-withdraw-asset-select (command-deps) state))
 
 (defn enter-funding-deposit-amount
   [state value]

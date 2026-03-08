@@ -29,6 +29,8 @@
               :anchor nil
               :deposit-step :asset-select
               :deposit-search-input ""
+              :withdraw-step :asset-select
+              :withdraw-search-input ""
               :deposit-selected-asset-key nil
               :deposit-generated-address nil
               :deposit-generated-signatures nil

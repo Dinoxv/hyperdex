@@ -132,6 +132,7 @@
                   (assoc-in [:funding-ui :modal]
                             {:open? true
                              :mode :withdraw
+                             :withdraw-step :amount-entry
                              :withdraw-selected-asset-key :btc
                              :amount-input "0.25"
                              :destination-input "bc1qexamplexyz0p4y0p4y0p4y0p4y0p4y0p4y0p"
@@ -177,33 +178,35 @@
     (is (contains? all-text "HyperUnit Protocol Address"))
     (is (contains? all-text "bridge-protocol-address"))
     (is (contains? all-text "Needs Attention"))
-    (is (contains? all-text "Bridge broadcast failed"))))
+    (is (contains? all-text "Bridge broadcast failed"))
+    (is (contains? all-text "1.25 BTC available"))))
 
-(deftest withdraw-content-renders-unavailable-queue-and-error-copy-from-flow-model-test
+(deftest withdraw-detail-content-renders-unavailable-queue-and-error-copy-from-flow-model-test
   (let [selected-asset {:key :btc
                         :symbol "BTC"
                         :network "Bitcoin"}
-        content (@#'view/withdraw-content {:assets [selected-asset]
-                                          :selected-asset selected-asset
-                                          :destination {:value "bc1qexamplexyz0p4y0p4y0p4y0p4y0p4y0p4y0p"}
-                                          :amount {:value "0.25"
-                                                   :max-display "1.25"
-                                                   :symbol "BTC"}
-                                          :flow {:kind :hyperunit-address
-                                                 :protocol-address "bridge-protocol-address"
-                                                 :fee-estimate {:state :error
-                                                                :message "Estimator offline"}
-                                                 :withdrawal-queue {:state :error
-                                                                    :length nil
-                                                                    :last-operation {:tx-id "0xqueue123"
-                                                                                     :explorer-url "https://mempool.space/tx/0xqueue123"}
-                                                                    :message "Queue service offline"}}
-                                          :summary {:rows [{:label "Estimated time"
-                                                            :value "Depends on destination chain"}]}
-                                          :lifecycle nil
-                                          :actions {:submit-label "Withdraw"
-                                                    :submit-disabled? false
-                                                    :submitting? false}})
+        content (@#'view/withdraw-detail-content {:selected-asset selected-asset
+                                                  :destination {:value "bc1qexamplexyz0p4y0p4y0p4y0p4y0p4y0p4y0p"}
+                                                  :amount {:value "0.25"
+                                                           :max-display "1.25"
+                                                           :max-input "1.25"
+                                                           :available-label "1.25 BTC available"
+                                                           :symbol "BTC"}
+                                                  :flow {:kind :hyperunit-address
+                                                         :protocol-address "bridge-protocol-address"
+                                                         :fee-estimate {:state :error
+                                                                        :message "Estimator offline"}
+                                                         :withdrawal-queue {:state :error
+                                                                            :length nil
+                                                                            :last-operation {:tx-id "0xqueue123"
+                                                                                             :explorer-url "https://mempool.space/tx/0xqueue123"}
+                                                                            :message "Queue service offline"}}
+                                                  :summary {:rows [{:label "Estimated time"
+                                                                    :value "Depends on destination chain"}]}
+                                                  :lifecycle nil
+                                                  :actions {:submit-label "Withdraw"
+                                                            :submit-disabled? false
+                                                            :submitting? false}})
         queue-link (find-first-node content #(= "https://mempool.space/tx/0xqueue123"
                                                 (get-in % [1 :href])))
         all-text (set (collect-strings content))]
@@ -214,13 +217,43 @@
     (is (contains? all-text "Live queue status unavailable: Queue service offline"))
     (is (contains? all-text "Live HyperUnit estimates unavailable: Estimator offline"))
     (is (contains? all-text "HyperUnit Protocol Address"))
-    (is (contains? all-text "bridge-protocol-address"))))
+    (is (contains? all-text "bridge-protocol-address"))
+    (is (contains? all-text "1.25 BTC available"))))
 
-(deftest standard-withdraw-flow-uses-generic-destination-copy-without-hyperunit-sections-test
+(deftest withdraw-select-step-renders-asset-list-with-withdrawable-amounts-test
+  (let [state (-> (base-state)
+                  (assoc :account {:mode :unified})
+                  (assoc-in [:spot :clearinghouse-state :balances]
+                            [{:coin "USDC" :available "360.793551" :total "360.793551" :hold "0"}
+                             {:coin "BTC" :available "1.25" :total "1.25" :hold "0"}])
+                  (assoc-in [:webdata2 :clearinghouseState]
+                            {:availableToWithdraw "0"
+                             :marginSummary {:accountValue "0"
+                                             :totalMarginUsed "0"}})
+                  (assoc-in [:funding-ui :modal]
+                            {:open? true
+                             :mode :withdraw
+                             :withdraw-step :asset-select
+                             :withdraw-search-input ""}))
+        view-node (view/funding-modal-view state)
+        select-step (find-first-node view-node #(= "funding-withdraw-select-step"
+                                                   (get-in % [1 :data-role])))
+        asset-list (find-first-node view-node #(= "funding-withdraw-asset-list"
+                                                  (get-in % [1 :data-role])))
+        all-text (set (collect-strings view-node))]
+    (is (some? select-step))
+    (is (some? asset-list))
+    (is (contains? all-text "Withdraw funds from your Hyperliquid account. You can deposit at any time."))
+    (is (contains? all-text "360.793551"))
+    (is (contains? all-text "1.25"))
+    (is (not (contains? all-text "Destination Address")))))
+
+(deftest standard-withdraw-detail-uses-generic-destination-copy-without-hyperunit-sections-test
   (let [state (assoc-in (base-state)
                         [:funding-ui :modal]
                         {:open? true
                          :mode :withdraw
+                         :withdraw-step :amount-entry
                          :withdraw-selected-asset-key :usdc
                          :amount-input ""
                          :destination-input ""})
@@ -235,6 +268,7 @@
     (is (some? destination-node))
     (is (some? amount-node))
     (is (contains? all-text "Destination Address"))
+    (is (contains? all-text "8.5 USDC available"))
     (is (not (contains? all-text "Withdrawal queue")))
     (is (not (contains? all-text "HyperUnit Protocol Address")))
     (is (nil? lifecycle-node))))

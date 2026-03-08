@@ -374,7 +374,32 @@
     (funding-asset-icon (:symbol asset) (asset-icon-src asset))
     [:div {:class ["flex" "min-w-0" "flex-col"]}
      [:span {:class ["text-sm" "font-semibold" "text-[#e6eef2]"]} (:symbol asset)]
-     [:span {:class ["text-xs" "text-[#7e95a0]"]} (:network asset)]]]])
+       [:span {:class ["text-xs" "text-[#7e95a0]"]} (:network asset)]]]])
+
+(defn- withdraw-asset-button
+  [asset selected?]
+  [:button {:type "button"
+            :class (into ["w-full"
+                          "rounded-lg"
+                          "border"
+                          "px-3"
+                          "py-2.5"
+                          "text-left"
+                          "transition-colors"
+                          "duration-150"]
+                         (if selected?
+                           ["border-[#3a5b6a]" "bg-[#1a2a37]"]
+                           ["border-transparent" "bg-transparent" "hover:bg-[#10222f]"]))
+            :on {:click [[:actions/select-funding-withdraw-asset
+                          (:key asset)]]}}
+   [:div {:class ["flex" "items-center" "justify-between" "gap-3"]}
+    [:div {:class ["flex" "items-center" "gap-2.5"]}
+     (funding-asset-icon (:symbol asset) (asset-icon-src asset))
+     [:div {:class ["flex" "min-w-0" "flex-col"]}
+      [:span {:class ["text-sm" "font-semibold" "text-[#e6eef2]"]} (:symbol asset)]
+      [:span {:class ["text-xs" "text-[#7e95a0]"]} (:network asset)]]]
+    [:span {:class ["shrink-0" "text-sm" "font-medium" "text-[#dce9ee]"]}
+     (:available-display asset)]]])
 
 (defn- deposit-asset-card
   [asset]
@@ -640,6 +665,53 @@
                 :submit-label (get-in actions [:submit-label])
                 :submit-disabled? (get-in actions [:submit-disabled?])})])
 
+(defn- withdraw-select-content
+  [{:keys [search assets selected-asset]}]
+  [:div {:class ["space-y-3"] :data-role "funding-withdraw-select-step"}
+   [:p {:class ["text-sm" "leading-6" "text-[#8fa7ae]"]}
+    "Withdraw funds from your Hyperliquid account. You can deposit at any time."]
+   [:input {:type "text"
+            :placeholder (:placeholder search)
+            :value (:value search)
+            :class ["w-full"
+                    "rounded-lg"
+                    "border"
+                    "border-[#1f3f4f]"
+                    "bg-[#0c202a]"
+                    "px-3"
+                    "py-2.5"
+                    "text-sm"
+                    "text-[#dce9ee]"
+                    "outline-none"
+                    "focus:border-[#30607a]"]
+            :on {:input [[:actions/search-funding-withdraw-assets
+                          [:event.target/value]]]}}]
+   (if (seq assets)
+     (into
+      [:div {:class ["max-h-[264px]"
+                     "overflow-y-auto"
+                     "rounded-xl"
+                     "border"
+                     "border-[#1c3948]"
+                     "bg-[#0c1e29]"
+                     "p-2"]
+             :data-role "funding-withdraw-asset-list"}]
+      (for [asset assets]
+        ^{:key (name (:key asset))}
+        (withdraw-asset-button asset
+                               (= (:key asset)
+                                  (:key selected-asset)))))
+     [:div {:class ["rounded-xl"
+                    "border"
+                    "border-[#1c3948]"
+                    "bg-[#0c1e29]"
+                    "px-3"
+                    "py-8"
+                    "text-center"
+                    "text-sm"
+                    "text-[#7b919b]"]}
+      "No assets match your search."])])
+
 (defn- withdrawal-queue-copy
   [{:keys [state length]}]
   (case state
@@ -653,41 +725,11 @@
   (= (:kind flow) :hyperunit-address))
 
 (defn- withdraw-asset-selector
-  [assets selected-asset submitting?]
+  [selected-asset]
   [:div {:class ["space-y-2"]}
    [:label {:class ["block" "text-xs" "uppercase" "tracking-[0.08em]" "text-[#8ea4ab]"]}
     "Asset"]
-   [:div {:class ["rounded-lg"
-                  "border"
-                  "border-[#1f3f4f]"
-                  "bg-[#152230]"
-                  "px-3"
-                  "py-2.5"]}
-    [:div {:class ["flex" "items-center" "justify-between" "gap-3"]}
-     [:div {:class ["flex" "items-center" "gap-2.5"]}
-      (funding-asset-icon (:symbol selected-asset) (asset-icon-src selected-asset))
-      [:div {:class ["flex" "flex-col"]}
-       [:span {:class ["text-sm" "font-semibold" "text-[#e6eef2]"]} (:symbol selected-asset)]
-       [:span {:class ["text-xs" "text-[#7e95a0]"]} (:network selected-asset)]]]
-     [:select {:value (or (some-> (:key selected-asset) name) "usdc")
-               :disabled submitting?
-               :class ["rounded-md"
-                       "border"
-                       "border-[#355061]"
-                       "bg-[#0e1f2b]"
-                       "px-2.5"
-                       "py-1.5"
-                       "text-xs"
-                       "text-[#dce9ee]"
-                       "outline-none"
-                       "focus:border-[#4b6c82]"
-                       "disabled:opacity-70"]
-               :on {:input [[:actions/select-funding-withdraw-asset
-                             [:event.target/value]]]}}
-      (for [asset assets]
-        ^{:key (str "withdraw-asset-" (name (:key asset)))}
-        [:option {:value (name (:key asset))}
-         (:symbol asset)])]]]])
+   (deposit-asset-card selected-asset)])
 
 (defn- withdraw-destination-label
   [selected-asset flow]
@@ -797,6 +839,34 @@
              (withdraw-queue-error-message flow)
              (withdraw-fee-estimate-error-message flow)]))))
 
+(defn- withdraw-quick-amount-buttons
+  [{:keys [quick-amounts max-input]} submitting?]
+  (let [max-amount (js/Number. (or max-input "0"))]
+    (when (seq quick-amounts)
+      [:div {:class ["flex" "flex-wrap" "gap-2"]}
+       (for [quick-amount quick-amounts]
+         ^{:key (str "withdraw-quick-" quick-amount)}
+         [:button {:type "button"
+                   :disabled (or submitting?
+                                 (> quick-amount max-amount))
+                   :class ["rounded-md"
+                           "border"
+                           "border-[#3a4d5d]"
+                           "bg-[#111f29]"
+                           "px-3"
+                           "py-1.5"
+                           "text-xs"
+                           "text-[#e0ebef]"
+                           "hover:border-[#537089]"
+                           "hover:bg-[#162b37]"
+                           "disabled:cursor-not-allowed"
+                           "disabled:opacity-45"]
+                   :on {:click [[:actions/enter-funding-withdraw-amount
+                                 (str quick-amount)]]}}
+          (if (>= quick-amount 1000)
+            (str (/ quick-amount 1000) "k")
+            (str quick-amount))])])))
+
 (defn- withdraw-protocol-address-panel
   [flow]
   (when (and (hyperunit-address-flow? flow)
@@ -813,25 +883,31 @@
      [:p {:class ["break-all" "font-mono" "text-xs" "text-[#d6e8ee]"]}
       (:protocol-address flow)]]))
 
-(defn- withdraw-content
-  [{:keys [assets selected-asset destination amount flow summary lifecycle actions]}]
+(defn- withdraw-detail-content
+  [{:keys [selected-asset destination amount flow summary lifecycle actions]}]
   (let [submitting? (get-in actions [:submitting?])]
-    [:div {:class ["space-y-3"]}
-     (withdraw-asset-selector assets selected-asset submitting?)
+    [:div {:class ["space-y-3"] :data-role "funding-withdraw-detail-step"}
+     [:p {:class ["text-sm" "text-[#8ea4ab]"]}
+      (str "To the " (:network selected-asset) " network")]
+     (withdraw-asset-selector selected-asset)
      (withdraw-destination-field selected-asset flow destination submitting?)
-   (amount-input-field {:label (str "Amount (" (:symbol amount) ")")
+     (amount-input-field {:label "Amount"
                         :value (:value amount)
                         :placeholder "Enter amount"
                         :disabled? submitting?
                         :input-action :actions/enter-funding-withdraw-amount
                         :max-action :actions/set-funding-amount-to-max
-                        :max-label (str "MAX: " (:max-display amount) " " (:symbol amount))
+                        :max-label "MAX"
+                        :suffix (:symbol amount)
                         :data-role "funding-withdraw-amount-input"})
+     [:div {:class ["flex" "items-center" "justify-between" "gap-3"]}
+      (withdraw-quick-amount-buttons amount submitting?)
+      [:p {:class ["text-xs" "text-[#7f97a0]"]}
+       (:available-label amount)]]
      (withdraw-summary-section summary flow)
      (withdraw-protocol-address-panel flow)
      (lifecycle-panel lifecycle "funding-withdraw-lifecycle")
-     (action-row {:cancel-action :actions/close-funding-modal
-                  :cancel-label "Cancel"
+     (action-row {:back-action :actions/return-to-funding-withdraw-asset-select
                   :submit-action :actions/submit-funding-withdraw
                   :submit-label (get-in actions [:submit-label])
                   :submit-disabled? (get-in actions [:submit-disabled?])})]))
@@ -856,7 +932,8 @@
     :deposit/unavailable (deposit-unavailable-content deposit)
     :deposit/missing-asset (deposit-missing-asset-content deposit)
     :transfer/form (transfer-content transfer)
-    :withdraw/form (withdraw-content withdraw)
+    :withdraw/select (withdraw-select-content withdraw)
+    :withdraw/detail (withdraw-detail-content withdraw)
     :unsupported/workflow (legacy-content legacy)
     nil))
 

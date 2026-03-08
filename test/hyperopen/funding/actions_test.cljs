@@ -20,6 +20,8 @@
    :anchor nil
    :deposit-step :asset-select
    :deposit-search-input ""
+   :withdraw-step :asset-select
+   :withdraw-search-input ""
    :deposit-selected-asset-key nil
    :deposit-generated-address nil
    :deposit-generated-signatures nil
@@ -903,6 +905,28 @@
       (is (= "8.5" (:amount-input next-modal)))
       (is (nil? (:error next-modal))))))
 
+(deftest set-funding-amount-to-max-prefers-unified-usdc-availability-for-withdrawals-test
+  (let [state (-> (base-state)
+                  (assoc :account {:mode :unified})
+                  (assoc-in [:spot :clearinghouse-state :balances]
+                            [{:coin "USDC" :available "360.793551" :total "360.793551" :hold "0"}])
+                  (assoc-in [:webdata2 :clearinghouseState]
+                            {:availableToWithdraw "0"
+                             :marginSummary {:accountValue "0"
+                                             :totalMarginUsed "0"}})
+                  (assoc-in [:funding-ui :modal]
+                            {:open? true
+                             :mode :withdraw
+                             :withdraw-step :amount-entry
+                             :withdraw-selected-asset-key :usdc
+                             :destination-input "0x1234567890abcdef1234567890abcdef12345678"
+                             :amount-input ""}))]
+    (let [[effect-id path next-modal] (first (funding-actions/set-funding-amount-to-max state))]
+      (is (= :effects/save effect-id))
+      (is (= [:funding-ui :modal] path))
+      (is (= "360.793551" (:amount-input next-modal)))
+      (is (nil? (:error next-modal))))))
+
 (deftest named-funding-modal-actions-update-intended-fields-test
   (let [deposit-state (assoc-in (base-state)
                                 [:funding-ui :modal]
@@ -916,6 +940,8 @@
                                  [:funding-ui :modal]
                                  {:open? true
                                   :mode :withdraw
+                                  :withdraw-step :asset-select
+                                  :withdraw-search-input ""
                                   :withdraw-selected-asset-key :usdc
                                   :destination-input ""
                                   :amount-input ""})
@@ -930,6 +956,12 @@
       (is (= :effects/save effect-id))
       (is (= [:funding-ui :modal] path))
       (is (= "btc" (:deposit-search-input next-modal))))
+    (let [[effect-id path next-modal] (first (funding-actions/search-funding-withdraw-assets
+                                              withdraw-state
+                                              "btc"))]
+      (is (= :effects/save effect-id))
+      (is (= [:funding-ui :modal] path))
+      (is (= "btc" (:withdraw-search-input next-modal))))
     (let [effects (funding-actions/select-funding-deposit-asset
                    deposit-state
                    :btc)
@@ -967,11 +999,27 @@
       (is (= :effects/save effect-id))
       (is (= [:funding-ui :modal] path))
       (is (= :btc (:withdraw-selected-asset-key next-modal)))
+      (is (= :amount-entry (:withdraw-step next-modal)))
+      (is (= "" (:amount-input next-modal)))
+      (is (= "" (:destination-input next-modal)))
       (is (= (funding-actions/default-hyperunit-withdrawal-queue-state)
              (:hyperunit-withdrawal-queue next-modal)))
       (is (= [[:effects/api-fetch-hyperunit-fee-estimate]
               [:effects/api-fetch-hyperunit-withdrawal-queue]]
              (rest effects))))
+    (let [[effect-id path next-modal] (first (funding-actions/return-to-funding-withdraw-asset-select
+                                              (assoc-in withdraw-state
+                                                        [:funding-ui :modal]
+                                                        {:open? true
+                                                         :mode :withdraw
+                                                         :withdraw-step :amount-entry
+                                                         :withdraw-selected-asset-key :usdc
+                                                         :amount-input "6.5"
+                                                         :destination-input "0x1234567890abcdef1234567890abcdef12345678"})))]
+      (is (= :effects/save effect-id))
+      (is (= [:funding-ui :modal] path))
+      (is (= :asset-select (:withdraw-step next-modal)))
+      (is (= "" (:amount-input next-modal))))
     (let [[effect-id path next-modal] (first (funding-actions/enter-funding-withdraw-destination
                                               withdraw-state
                                               "bc1qexample"))]

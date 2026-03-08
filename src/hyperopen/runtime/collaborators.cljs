@@ -216,8 +216,10 @@
    :handle-funding-modal-keydown funding-actions/handle-funding-modal-keydown
    :set-funding-modal-field funding-actions/set-funding-modal-field
    :search-funding-deposit-assets funding-actions/search-funding-deposit-assets
+   :search-funding-withdraw-assets funding-actions/search-funding-withdraw-assets
    :select-funding-deposit-asset funding-actions/select-funding-deposit-asset
    :return-to-funding-deposit-asset-select funding-actions/return-to-funding-deposit-asset-select
+   :return-to-funding-withdraw-asset-select funding-actions/return-to-funding-withdraw-asset-select
    :enter-funding-deposit-amount funding-actions/enter-funding-deposit-amount
    :set-funding-deposit-amount-to-minimum funding-actions/set-funding-deposit-amount-to-minimum
    :enter-funding-transfer-amount funding-actions/enter-funding-transfer-amount

@@ -529,8 +529,10 @@
    :actions/handle-funding-modal-keydown ::key-args
    :actions/set-funding-modal-field ::funding-modal-field-args
    :actions/search-funding-deposit-assets ::single-input-args
+   :actions/search-funding-withdraw-assets ::single-input-args
    :actions/select-funding-deposit-asset ::keyword-or-string-args
    :actions/return-to-funding-deposit-asset-select ::no-args
+   :actions/return-to-funding-withdraw-asset-select ::no-args
    :actions/enter-funding-deposit-amount ::single-input-args
    :actions/set-funding-deposit-amount-to-minimum ::no-args
    :actions/enter-funding-transfer-amount ::single-input-args

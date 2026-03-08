@@ -26,6 +26,8 @@
                  :anchor anchor*
                  :deposit-step :asset-select
                  :deposit-search-input ""
+                 :withdraw-step :asset-select
+                 :withdraw-search-input ""
                  :deposit-selected-asset-key nil
                  :amount-input ""
                  :destination-input (or (wallet-address state)
@@ -46,6 +48,8 @@
           (assoc :open? true
                  :mode :transfer
                  :anchor anchor*
+                 :withdraw-step :asset-select
+                 :withdraw-search-input ""
                  :to-perp? true
                  :destination-input (or (wallet-address state) "")))]]))
 
@@ -53,6 +57,7 @@
   [{:keys [modal-state
            normalize-anchor
            normalize-withdraw-asset-key
+           normalize-withdraw-step
            withdraw-default-asset-key
            default-funding-modal-state
            wallet-address
@@ -69,6 +74,8 @@
           (assoc :open? true
                  :mode :withdraw
                  :anchor anchor*
+                 :withdraw-step (normalize-withdraw-step :asset-select)
+                 :withdraw-search-input ""
                  :withdraw-selected-asset-key selected-asset-key
                  :destination-input (or (wallet-address state) "")))]
      [:effects/api-fetch-hyperunit-withdrawal-queue]
@@ -88,6 +95,8 @@
           (assoc :open? true
                  :mode :legacy
                  :legacy-kind legacy*
+                 :withdraw-step :asset-select
+                 :withdraw-search-input ""
                  :destination-input (or (wallet-address state) "")))]]))
 
 (defn close-funding-modal
@@ -108,6 +117,7 @@
   [{:keys [modal-state
            normalize-amount-input
            normalize-deposit-step
+           normalize-withdraw-step
            normalize-deposit-asset-key
            normalize-withdraw-asset-key
            withdraw-default-asset-key
@@ -124,7 +134,9 @@
                  [:amount-input] (normalize-amount-input value)
                  [:destination-input] (str (or value ""))
                  [:deposit-search-input] (str (or value ""))
+                 [:withdraw-search-input] (str (or value ""))
                  [:deposit-step] (normalize-deposit-step value)
+                 [:withdraw-step] (normalize-withdraw-step value)
                  [:deposit-selected-asset-key] (normalize-deposit-asset-key value)
                  [:withdraw-selected-asset-key] (or (normalize-withdraw-asset-key value)
                                                     withdraw-default-asset-key)
@@ -148,6 +160,11 @@
                      (assoc :hyperunit-withdrawal-queue
                             (default-hyperunit-withdrawal-queue-state))
 
+                     (= path* [:withdraw-selected-asset-key])
+                     (assoc :withdraw-step :amount-entry
+                            :amount-input ""
+                            :destination-input "")
+
                      (= path* [:deposit-selected-asset-key])
                      (assoc :deposit-step :amount-entry
                             :amount-input ""
@@ -160,7 +177,12 @@
                      (assoc :amount-input ""
                             :deposit-generated-address nil
                             :deposit-generated-signatures nil
-                            :deposit-generated-asset-key nil))
+                            :deposit-generated-asset-key nil)
+
+                     (and (= path* [:withdraw-step])
+                          (= value* :asset-select))
+                     (assoc :amount-input ""
+                            :error nil))
         next-mode (normalize-mode (:mode next-modal))
         refresh-estimate? (and (contains? #{:deposit :withdraw} next-mode)
                                (or (= path* [:deposit-selected-asset-key])
@@ -178,6 +200,10 @@
   [deps state value]
   (set-funding-modal-field deps state [:deposit-search-input] value))
 
+(defn search-funding-withdraw-assets
+  [deps state value]
+  (set-funding-modal-field deps state [:withdraw-search-input] value))
+
 (defn select-funding-deposit-asset
   [deps state asset-key]
   (set-funding-modal-field deps state [:deposit-selected-asset-key] asset-key))
@@ -185,6 +211,10 @@
 (defn return-to-funding-deposit-asset-select
   [deps state]
   (set-funding-modal-field deps state [:deposit-step] :asset-select))
+
+(defn return-to-funding-withdraw-asset-select
+  [deps state]
+  (set-funding-modal-field deps state [:withdraw-step] :asset-select))
 
 (defn enter-funding-deposit-amount
   [deps state value]
