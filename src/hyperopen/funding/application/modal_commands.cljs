@@ -121,6 +121,7 @@
            normalize-deposit-asset-key
            normalize-withdraw-asset-key
            withdraw-default-asset-key
+           wallet-address
            default-hyperunit-lifecycle-state
            default-hyperunit-withdrawal-queue-state
            normalize-mode
@@ -163,7 +164,7 @@
                      (= path* [:withdraw-selected-asset-key])
                      (assoc :withdraw-step :amount-entry
                             :amount-input ""
-                            :destination-input "")
+                            :destination-input (or (wallet-address state) ""))
 
                      (= path* [:deposit-selected-asset-key])
                      (assoc :deposit-step :amount-entry

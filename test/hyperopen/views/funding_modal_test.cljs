@@ -256,18 +256,24 @@
                          :withdraw-step :amount-entry
                          :withdraw-selected-asset-key :usdc
                          :amount-input ""
-                         :destination-input ""})
+                         :destination-input "0x1234567890abcdef1234567890abcdef12345678"})
         view-node (view/funding-modal-view state)
         destination-node (find-first-node view-node #(= "0x..."
                                                         (get-in % [1 :placeholder])))
         amount-node (find-first-node view-node #(= "funding-withdraw-amount-input"
                                                    (get-in % [1 :data-role])))
+        max-node (find-first-node view-node #(= [[:actions/set-funding-amount-to-max]]
+                                                (get-in % [1 :on :click])))
         lifecycle-node (find-first-node view-node #(= "funding-withdraw-lifecycle"
                                                       (get-in % [1 :data-role])))
         all-text (set (collect-strings view-node))]
     (is (some? destination-node))
     (is (some? amount-node))
+    (is (some? max-node))
     (is (contains? all-text "Destination Address"))
+    (is (= "0x1234567890abcdef1234567890abcdef12345678"
+           (get-in destination-node [1 :value])))
+    (is (contains? (set (get-in amount-node [1 :class])) "text-right"))
     (is (contains? all-text "8.5 USDC available"))
     (is (not (contains? all-text "Withdrawal queue")))
     (is (not (contains? all-text "HyperUnit Protocol Address")))

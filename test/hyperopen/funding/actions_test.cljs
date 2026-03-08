@@ -1001,7 +1001,8 @@
       (is (= :btc (:withdraw-selected-asset-key next-modal)))
       (is (= :amount-entry (:withdraw-step next-modal)))
       (is (= "" (:amount-input next-modal)))
-      (is (= "" (:destination-input next-modal)))
+      (is (= "0x1234567890abcdef1234567890abcdef12345678"
+             (:destination-input next-modal)))
       (is (= (funding-actions/default-hyperunit-withdrawal-queue-state)
              (:hyperunit-withdrawal-queue next-modal)))
       (is (= [[:effects/api-fetch-hyperunit-fee-estimate]

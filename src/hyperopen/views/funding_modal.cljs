@@ -354,6 +354,72 @@
     (when (seq suffix)
       [:span {:class ["text-sm" "text-[#7e95a0]"]} suffix])]])
 
+(defn- withdraw-amount-input-field
+  [{:keys [value
+           placeholder
+           disabled?
+           input-action
+           max-action
+           suffix
+           data-role]}]
+  [:div {:class ["space-y-2"]}
+   [:label {:class ["block" "text-xs" "uppercase" "tracking-[0.08em]" "text-[#8ea4ab]"]}
+    "Amount"]
+   [:div {:class ["flex"
+                  "items-center"
+                  "rounded-lg"
+                  "border"
+                  "border-[#28474b]"
+                  "bg-[#0c2028]"
+                  "px-2.5"
+                  "py-1.5"
+                  "gap-2"]}
+    [:button {:type "button"
+              :disabled disabled?
+              :class (if disabled?
+                       ["rounded-md"
+                        "border"
+                        "border-[#445565]"
+                        "bg-[#1d2933]"
+                        "px-2"
+                        "py-0.5"
+                        "text-xs"
+                        "font-semibold"
+                        "text-[#6f868c]"
+                        "cursor-not-allowed"]
+                       ["rounded-md"
+                        "border"
+                        "border-[#445565]"
+                        "bg-[#26313d]"
+                        "px-2"
+                        "py-0.5"
+                        "text-xs"
+                        "font-semibold"
+                        "text-[#e6eef2]"
+                        "hover:border-[#607487]"])
+              :on {:click [[max-action]]}}
+     "MAX"]
+    [:input {:type "text"
+             :input-mode "decimal"
+             :placeholder placeholder
+             :disabled disabled?
+             :value (format-grouped-amount-input value)
+             :class ["flex-1"
+                     "bg-transparent"
+                     "border-0"
+                     "ring-0"
+                     "text-right"
+                     "text-sm"
+                     "text-[#e6eff2]"
+                     "outline-none"
+                     "focus:border-0"
+                     "focus:ring-0"
+                     "disabled:cursor-not-allowed"
+                     "disabled:opacity-70"]
+             :data-role data-role
+             :on {:input [[input-action [:event.target/value]]]}}]
+    [:span {:class ["text-sm" "text-[#7e95a0]"]} suffix]]])
+
 (defn- deposit-asset-button
   [asset selected?]
   [:button {:type "button"
@@ -891,15 +957,13 @@
       (str "To the " (:network selected-asset) " network")]
      (withdraw-asset-selector selected-asset)
      (withdraw-destination-field selected-asset flow destination submitting?)
-     (amount-input-field {:label "Amount"
-                        :value (:value amount)
-                        :placeholder "Enter amount"
-                        :disabled? submitting?
-                        :input-action :actions/enter-funding-withdraw-amount
-                        :max-action :actions/set-funding-amount-to-max
-                        :max-label "MAX"
-                        :suffix (:symbol amount)
-                        :data-role "funding-withdraw-amount-input"})
+     (withdraw-amount-input-field {:value (:value amount)
+                                   :placeholder "Enter amount"
+                                   :disabled? submitting?
+                                   :input-action :actions/enter-funding-withdraw-amount
+                                   :max-action :actions/set-funding-amount-to-max
+                                   :suffix (:symbol amount)
+                                   :data-role "funding-withdraw-amount-input"})
      [:div {:class ["flex" "items-center" "justify-between" "gap-3"]}
       (withdraw-quick-amount-buttons amount submitting?)
       [:p {:class ["text-xs" "text-[#7f97a0]"]}
