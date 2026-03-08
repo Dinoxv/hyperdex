@@ -327,19 +327,17 @@
                        "whitespace-nowrap"]}
         prefix-label])]))
 
-(defn- mobile-balance-action-chip [label]
-  [:span {:class ["inline-flex"
-                  "items-center"
-                  "rounded-full"
-                  "border"
-                  "border-base-300"
-                  "bg-base-100/70"
-                  "px-2.5"
-                  "py-1"
-                  "text-xs"
-                  "font-medium"
-                  "leading-none"
-                  "text-trading-text"]}
+(defn- mobile-balance-footer-action [label enabled?]
+  [:span {:class (into ["inline-flex"
+                        "items-center"
+                        "bg-transparent"
+                        "p-0"
+                        "text-xs"
+                        "font-medium"
+                        "leading-none"]
+                       (if enabled?
+                         ["text-trading-green"]
+                         ["cursor-default" "text-trading-text-secondary"]))}
    label])
 
 (defn- mobile-balance-card [expanded-row-id row]
@@ -358,16 +356,31 @@
         row-id (some-> key str str/trim)
         {:keys [base-label]} (shared/resolve-coin-display (or selection-coin coin) {})
         expanded? (= expanded-row-id row-id)
-        transfer-label (if transfer-disabled? "Unified" "Transfer")]
+        transfer-enabled? (not transfer-disabled?)]
     (mobile-cards/expandable-card
      {:data-role (str "mobile-balance-card-" row-id)
       :expanded? expanded?
       :toggle-actions [[:actions/toggle-account-info-mobile-card :balances row-id]]
+      :card-classes ["overflow-hidden"
+                     "rounded-lg"
+                     "border"
+                     "border-[#273035]"
+                     "bg-[#1b2429]"]
+      :button-classes ["w-full"
+                       "px-3"
+                       "py-3"
+                       "text-left"
+                       "transition-colors"
+                       "hover:bg-[#223038]"
+                       "focus:outline-none"
+                       "focus:ring-0"
+                       "focus:ring-offset-0"]
       :summary-grid-classes ["grid"
                              "grid-cols-[minmax(0,0.82fr)_minmax(0,0.8fr)_minmax(0,1.25fr)_auto]"
                              "items-start"
                              "gap-x-3"
                              "gap-y-2"]
+      :expanded-container-classes ["border-t" "border-[#273035]" "px-3" "py-3"]
       :summary-items [(mobile-cards/summary-item "Coin"
                                                  (mobile-balance-coin-node row)
                                                  {:value-classes ["text-trading-text"]})
@@ -380,29 +393,28 @@
                                                       (or base-label coin ""))
                                                  {:value-classes ["num"
                                                                   "whitespace-nowrap"]})]
-      :detail-content (mobile-cards/detail-grid
-                       "grid-cols-2"
-                       [(mobile-cards/detail-item
-                         "Available Balance"
-                         (available-balance-value-node {:coin coin
-                                                        :available-balance available-balance
-                                                        :amount-decimals amount-decimals
-                                                        :transfer-disabled? transfer-disabled?
-                                                        :tooltip-position available-balance-tooltip-position})
-                         {:value-classes ["num"]})
-                        (mobile-cards/detail-item
-                         "PNL (ROE %)"
-                         (shared/format-pnl pnl-value pnl-pct))
-                        (mobile-cards/detail-item
-                         "Actions"
-                         [:div {:class ["flex" "flex-wrap" "gap-2"]}
-                          (mobile-balance-action-chip "Send")
-                          (mobile-balance-action-chip transfer-label)]
-                         {:full-width? true})
-                        (when-let [contract-node (balance-contract-node contract-id)]
-                          (mobile-cards/detail-item "Contract"
-                                                    contract-node
-                                                    {:full-width? true}))])})))
+      :detail-content [:div {:class ["space-y-3"]}
+                       (mobile-cards/detail-grid
+                        "grid-cols-2"
+                        [(mobile-cards/detail-item
+                          "Available Balance"
+                          (available-balance-value-node {:coin coin
+                                                         :available-balance available-balance
+                                                         :amount-decimals amount-decimals
+                                                         :transfer-disabled? transfer-disabled?
+                                                         :tooltip-position available-balance-tooltip-position})
+                          {:value-classes ["num" "whitespace-nowrap"]})
+                         (mobile-cards/detail-item
+                          "PNL (ROE %)"
+                          (shared/format-pnl pnl-value pnl-pct))
+                         (when-let [contract-node (balance-contract-node contract-id)]
+                           (mobile-cards/detail-item "Contract"
+                                                     contract-node
+                                                     {:full-width? true}))])
+                       [:div {:class ["border-t" "border-[#273035]" "pt-3"]}
+                        [:div {:class ["flex" "items-center" "gap-4"]}
+                         (mobile-balance-footer-action "Send" true)
+                         (mobile-balance-footer-action "Transfer to Perps" transfer-enabled?)]]]})))
 
 (defn balances-tab-content
   ([balance-rows hide-small? sort-state]
