@@ -63,6 +63,7 @@ Each milestone must be independently verifiable and incrementally implement the 
 * When you discover optimizer behavior, performance tradeoffs, unexpected bugs, or inverse/unapply semantics that shaped your approach, capture those observations in the `Surprises & Discoveries` section with short evidence snippets (test output is ideal).
 * If you change course mid-implementation, document why in the `Decision Log` and reflect the implications in `Progress`. Plans are guides for the next contributor as much as checklists for you.
 * At completion of a major task or the full plan, write an `Outcomes & Retrospective` entry summarizing what was achieved, what remains, and lessons learned.
+* For non-trivial changes, the `Outcomes & Retrospective` entry must state whether the change reduced or increased overall complexity and why.
 
 # Prototyping milestones and parallel implementations
 
@@ -110,6 +111,7 @@ Prefer additive code changes followed by subtractions that keep tests passing. P
     ## Outcomes & Retrospective
 
     Summarize outcomes, gaps, and lessons learned at major milestones or at completion. Compare the result against the original purpose.
+    For non-trivial changes, state whether the implementation reduced or increased overall complexity and why.
 
     ## Context and Orientation
 
