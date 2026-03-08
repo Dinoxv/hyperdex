@@ -183,6 +183,28 @@
     (is (contains? account-info-cell-classes "min-h-0"))
     (is (contains? account-info-cell-classes "overflow-hidden"))))
 
+(deftest trade-view-renders-mobile-account-shortcuts-test
+  (let [view-node (trade-view/trade-view trade-view-test-state)
+        balances-shortcut (find-first-node view-node
+                                           #(= [[:actions/select-trade-mobile-surface :account]
+                                                [:actions/select-account-info-tab :balances]]
+                                               (get-in % [1 :on :click])))
+        open-orders-shortcut (find-first-node view-node
+                                              #(= [[:actions/select-trade-mobile-surface :account]
+                                                   [:actions/select-account-info-tab :open-orders]]
+                                                  (get-in % [1 :on :click])))
+        trade-history-shortcut (find-first-node view-node
+                                                #(= [[:actions/select-trade-mobile-surface :account]
+                                                     [:actions/select-account-info-tab :trade-history]]
+                                                    (get-in % [1 :on :click])))
+        all-text (set (collect-strings view-node))]
+    (is (some? balances-shortcut))
+    (is (some? open-orders-shortcut))
+    (is (some? trade-history-shortcut))
+    (is (contains? all-text "Balances"))
+    (is (contains? all-text "Open Orders"))
+    (is (contains? all-text "Trade History"))))
+
 (deftest trade-view-reads-runtime-health-snapshot-for-surface-freshness-cues-test
   (let [state (-> trade-view-test-state
                   (assoc :active-asset "BTC")

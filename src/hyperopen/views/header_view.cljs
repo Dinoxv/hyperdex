@@ -330,19 +330,28 @@
    (wallet-chevron-icon)])
 
 (defn- connect-wallet-button [is-connecting]
-  [:button {:class ["bg-teal-600"
-                    "hover:bg-teal-700"
-                    "text-teal-100"
-                    "px-3"
-                    "py-2"
-                    "rounded-lg"
-                    "text-sm"
-                    "font-medium"
-                    "transition-colors"]
-            :disabled (boolean is-connecting)
-            :on {:click [[:actions/connect-wallet]]}
-            :data-role "wallet-connect-button"}
-   (if is-connecting "Connecting…" "Connect Wallet")])
+  (into
+   [:button {:class ["bg-teal-600"
+                     "hover:bg-teal-700"
+                     "text-teal-100"
+                     "inline-flex"
+                     "h-9"
+                     "items-center"
+                     "justify-center"
+                     "px-3"
+                     "rounded-lg"
+                     "text-xs"
+                     "sm:text-sm"
+                     "font-medium"
+                     "transition-colors"]
+             :disabled (boolean is-connecting)
+             :on {:click [[:actions/connect-wallet]]}
+             :data-role "wallet-connect-button"}]
+   (if is-connecting
+     [[:span {:class ["sm:hidden"]} "Connecting…"]
+      [:span {:class ["hidden" "sm:inline"]} "Connecting…"]]
+     [[:span {:class ["sm:hidden"]} "Connect"]
+      [:span {:class ["hidden" "sm:inline"]} "Connect Wallet"]])))
 
 (defn- spectate-mode-icon []
   [:svg {:viewBox "0 0 256 256"
@@ -464,11 +473,11 @@
                     :address (account-context/spectate-address state)}]
     [:header.bg-base-200.border-b.border-base-300.w-full
      {:data-parity-id "header"}
-     [:div {:class ["w-full" "app-shell-gutter" "py-2" "md:py-3"]}
+     [:div {:class ["w-full" "app-shell-gutter" "py-1.5" "md:py-3"]}
       [:div.flex.items-center
        ;; Logo and Brand
-       [:div.flex.items-center.space-x-3
-        [:span {:class ["text-primary" "text-2xl" "sm:text-3xl" "font-bold" "font-splash"]}
+       [:div.flex.items-center.space-x-2.sm:space-x-3
+        [:span {:class ["text-primary" "text-xl" "leading-none" "sm:text-3xl" "font-bold" "font-splash"]}
          "HyperOpen"]]
 
        ;; Navigation Links
@@ -508,8 +517,8 @@
           (more-menu-link "API" api-wallets-actions/canonical-route api-wallet-route?)]]]
 
        ;; Right Section - Wallet Control and Icons
-       [:div {:class ["ml-auto" "flex" "items-center" "gap-2" "sm:gap-3" "lg:gap-4"]}
-        {:data-parity-id "header-wallet-control"}
+       [:div {:class ["ml-auto" "flex" "items-center" "gap-1.5" "sm:gap-3" "lg:gap-4"]
+              :data-parity-id "header-wallet-control"}
         [:div {:class (if spectate-active?
                         ["inline-flex"]
                         ["hidden" "sm:inline-flex"])}
@@ -528,7 +537,7 @@
           [:path {:fill-rule "evenodd" :d "M11.49 3.17c-.38-1.56-2.6-1.56-2.98 0a1.532 1.532 0 01-2.286.948c-1.372-.836-2.942.734-2.106 2.106.54.886.061 2.042-.947 2.287-1.561.379-1.561 2.6 0 2.978a1.532 1.532 0 01.947 2.287c-.836 1.372.734 2.942 2.106 2.106a1.532 1.532 0 012.287.947c.379 1.561 2.6 1.561 2.978 0a1.533 1.533 0 012.287-.947c1.372.836 2.942-.734 2.106-2.106a1.533 1.533 0 01.947-2.287c1.561-.379 1.561-2.6 0-2.978a1.532 1.532 0 01-.947-2.287c.836-1.372-.734-2.942-2.106-2.106a1.532 1.532 0 01-2.287-.947zM10 13a3 3 0 100-6 3 3 0 000 6z" :clip-rule "evenodd"}]]]
 
         ;; Mobile menu button
-        [:button.md:hidden.w-10.h-10.bg-base-300.hover:bg-base-400.rounded-lg.flex.items-center.justify-center.transition-colors
+        [:button.md:hidden.w-9.h-9.bg-base-300.hover:bg-base-400.rounded-lg.flex.items-center.justify-center.transition-colors
          {:title "Menu"}
          [:svg.w-5.h-5.text-white {:viewBox "0 0 20 20" :fill "currentColor"}
           [:path {:fill-rule "evenodd" :d "M3 5a1 1 0 011-1h12a1 1 0 110 2H4a1 1 0 01-1-1zM3 10a1 1 0 011-1h12a1 1 0 110 2H4a1 1 0 01-1-1zM3 15a1 1 0 011-1h12a1 1 0 110 2H4a1 1 0 01-1-1z" :clip-rule "evenodd"}]]]]]]]))

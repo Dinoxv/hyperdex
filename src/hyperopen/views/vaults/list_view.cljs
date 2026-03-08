@@ -250,30 +250,47 @@
     (snapshot-sparkline snapshot-series)]])
 
 (defn- mobile-vault-card
-  [{:keys [name vault-address leader apr tvl your-deposit age-days]}]
+  [{:keys [name vault-address leader apr tvl your-deposit age-days snapshot-series]}]
   [:a {:href (vault-detail-route vault-address)
        :class ["block"
                "w-full"
                "rounded-lg"
                "border"
                "border-base-300/70"
-               "bg-base-100/85"
-               "p-2.5"
+               "bg-base-100/68"
+               "px-3"
+               "py-2.5"
                "text-left"
                "transition-colors"
                "hover:bg-base-200"]}
-   [:div {:class ["flex" "items-center" "justify-between" "gap-2"]}
-    [:div {:class ["min-w-0"]}
-     [:div {:class ["truncate" "font-semibold" "text-trading-text"]} name]
-     [:div {:class ["num" "text-xs" "text-trading-text-secondary"]}
-      (wallet/short-addr vault-address)]]
-    [:div {:class ["num" "text-xs" "text-trading-text-secondary"]}
-     (wallet/short-addr leader)]]
-   [:div {:class ["mt-2.5" "grid" "grid-cols-2" "gap-2" "text-xs"]}
-    [:div [:span {:class ["text-trading-text-secondary"]} "APR "] [:span {:class (into ["num"] (percent-text-class apr))} (format-percent apr)]]
-    [:div [:span {:class ["text-trading-text-secondary"]} "TVL "] [:span {:class ["num" "text-trading-text"]} (format-currency tvl)]]
-    [:div [:span {:class ["text-trading-text-secondary"]} "Your Deposit "] [:span {:class ["num" "text-trading-text"]} (format-currency your-deposit)]]
-    [:div [:span {:class ["text-trading-text-secondary"]} "Age "] [:span {:class ["num" "text-trading-text"]} (format-age age-days)]]]])
+   [:div {:class ["min-w-0" "space-y-0.5"]}
+    [:div {:class ["flex" "items-start" "justify-between" "gap-3"]}
+     [:div {:class ["min-w-0" "flex-1"]}
+      [:div {:class ["truncate" "font-semibold" "text-trading-text"]} name]
+      [:div {:class ["num" "text-xs" "text-trading-text-secondary"]}
+       (wallet/short-addr vault-address)]]
+     [:div {:class ["text-right" "text-xs" "uppercase" "tracking-[0.08em]" "text-trading-text-secondary"]}
+      "Vault"]]]
+   [:div {:class ["mt-2.5" "space-y-2" "text-xs"]}
+    [:div {:class ["grid" "grid-cols-[auto_1fr]" "items-center" "gap-2"]}
+     [:span {:class ["text-trading-text-secondary"]} "Leader"]
+     [:span {:class ["justify-self-end" "num" "text-trading-text"]} (wallet/short-addr leader)]]
+    [:div {:class ["grid" "grid-cols-[auto_1fr]" "items-center" "gap-2"]}
+     [:span {:class ["text-trading-text-secondary"]} "APR"]
+     [:span {:class (into ["justify-self-end" "num"] (percent-text-class apr))} (format-percent apr)]]
+    [:div {:class ["grid" "grid-cols-[auto_1fr]" "items-center" "gap-2"]}
+     [:span {:class ["text-trading-text-secondary"]} "TVL"]
+     [:span {:class ["justify-self-end" "num" "text-trading-text"]} (format-currency tvl)]]
+    [:div {:class ["grid" "grid-cols-[auto_1fr]" "items-center" "gap-2"]}
+     [:span {:class ["text-trading-text-secondary"]} "Your Deposit"]
+     [:span {:class ["justify-self-end" "num" "text-trading-text"]} (format-currency your-deposit)]]
+    [:div {:class ["grid" "grid-cols-[auto_1fr]" "items-center" "gap-2"]}
+     [:span {:class ["text-trading-text-secondary"]} "Age (days)"]
+     [:span {:class ["justify-self-end" "num" "text-trading-text"]} (format-age age-days)]]
+    [:div {:class ["grid" "grid-cols-[auto_1fr]" "items-center" "gap-2"]}
+     [:span {:class ["text-trading-text-secondary"]} "Snapshot"]
+     [:div {:class ["justify-self-end"]}
+      (snapshot-sparkline snapshot-series)]]]])
 
 (def ^:private loading-skeleton-row-count
   5)
@@ -533,37 +550,46 @@
                 user-rows
                 visible-user-rows
                 user-pagination
-                total-visible-tvl]} (vault-vm/vault-list-vm state)]
+                total-visible-tvl]} (vault-vm/vault-list-vm state)
+        wallet-connected? (boolean (get-in state [:wallet :connected?]))
+        wallet-connecting? (boolean (get-in state [:wallet :connecting?]))]
     [:div {:class ["relative" "w-full" "app-shell-gutter" "py-4" "md:py-6"]
            :data-parity-id "vaults-root"}
      [:div {:class ["pointer-events-none"
                     "absolute"
                     "inset-x-0"
                     "top-0"
-                    "h-[240px]"
-                    "md:h-[360px]"
+                    "h-[180px]"
+                    "md:h-[300px]"
                     "rounded-b-[24px]"
-                    "opacity-95"]
+                    "opacity-90"]
             :style {:background-image "radial-gradient(120% 120% at 15% -10%, rgba(0, 148, 111, 0.35), rgba(6, 30, 34, 0.05) 60%), radial-gradient(130% 140% at 85% 20%, rgba(0, 138, 96, 0.22), rgba(6, 30, 34, 0) 68%), linear-gradient(180deg, rgba(4, 43, 36, 0.72) 0%, rgba(6, 27, 32, 0.15) 100%)"}}]
 
      [:div {:class ["relative" "mx-auto" "w-full" "max-w-[1280px]" "space-y-4"]}
       [:div {:class ["flex" "flex-wrap" "items-center" "justify-between" "gap-3"]}
        [:h1 {:class ["text-2xl" "font-normal" "text-trading-text" "sm:text-[48px]" "sm:leading-[52px]"]}
-        "Vaults"]
-       [:button {:type "button"
-                 :disabled true
-                 :class ["hidden"
-                         "xl:inline-flex"
-                         "rounded-xl"
-                         "bg-[#55e6ce]"
-                         "px-5"
-                         "py-2.5"
-                         "text-sm"
-                         "font-medium"
-                         "text-[#043a33]"
-                         "opacity-70"
-                         "cursor-not-allowed"]}
-        "Establish Connection"]]
+        "Vaults"]]
+
+      (when-not wallet-connected?
+        [:button {:type "button"
+                  :class ["inline-flex"
+                          "w-full"
+                          "items-center"
+                          "justify-center"
+                          "rounded-xl"
+                          "bg-[#55e6ce]"
+                          "px-5"
+                          "py-2.5"
+                          "text-sm"
+                          "font-medium"
+                          "text-[#043a33]"
+                          "transition-colors"
+                          "hover:bg-[#6ef0da]"
+                          "sm:w-auto"]
+                  :disabled wallet-connecting?
+                  :on {:click [[:actions/connect-wallet]]}
+                  :data-role "vaults-route-connect"}
+         (if wallet-connecting? "Connecting…" "Connect")])
 
       [:div {:class ["w-full" "max-w-[320px]" "rounded-xl" "bg-[#0f1a1f]" "px-3" "py-3" "md:max-w-[360px]" "md:rounded-2xl"]}
        [:div {:class ["text-sm" "font-normal" "text-trading-text-secondary"]}
@@ -574,7 +600,7 @@
          [:div {:class ["mt-1" "num" "text-[44px]" "leading-[46px]" "font-normal" "text-trading-text"]}
           (format-total-currency total-visible-tvl)])]
 
-      [:div {:class ["rounded-xl" "border" "border-base-300/80" "bg-base-100/90" "p-2.5" "md:rounded-2xl" "md:p-3"]}
+      [:div {:class ["rounded-lg" "border" "border-base-300/80" "bg-base-100/90" "p-2.5" "md:rounded-2xl" "md:p-3"]}
        [:div {:class ["flex" "flex-wrap" "items-center" "gap-2"]}
         [:input {:id "vaults-search-input"
                  :type "search"

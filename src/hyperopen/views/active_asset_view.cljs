@@ -1010,31 +1010,37 @@
       value-component]]))
 
 (defn- mobile-stat-chip [label value & [value-classes]]
-  [:div {:class ["min-w-[104px]"
+  [:div {:class ["inline-flex"
+                 "min-w-fit"
+                 "items-center"
+                 "gap-1.5"
                  "shrink-0"
-                 "rounded-lg"
+                 "rounded-md"
                  "border"
-                 "border-base-300"
-                 "bg-base-100/80"
-                 "px-2.5"
-                 "py-2"]}
+                 "border-base-300/70"
+                 "bg-base-100/70"
+                 "px-2"
+                 "py-1"]}
    [:div {:class ["text-xs" "font-medium" "uppercase" "tracking-[0.08em]" "text-trading-text-secondary"]}
     label]
-   [:div {:class (into ["mt-1" "text-sm" "font-semibold" "num" "text-trading-text"] (or value-classes []))} value]])
+   [:div {:class (into ["text-xs" "font-semibold" "num" "text-trading-text"] (or value-classes []))} value]])
 
 (defn- mobile-funding-chip
   [funding-rate countdown-text funding-tooltip-open? funding-tooltip funding-tooltip-id funding-tooltip-pinned? is-spot]
-  [:div {:class ["min-w-[140px]"
+  [:div {:class ["inline-flex"
+                 "min-w-fit"
+                 "items-center"
+                 "gap-1.5"
                  "shrink-0"
-                 "rounded-lg"
+                 "rounded-md"
                  "border"
-                 "border-base-300"
-                 "bg-base-100/80"
-                 "px-2.5"
-                 "py-2"]}
+                 "border-base-300/70"
+                 "bg-base-100/70"
+                 "px-2"
+                 "py-1"]}
    [:div {:class ["text-xs" "font-medium" "uppercase" "tracking-[0.08em]" "text-trading-text-secondary"]}
     "Funding"]
-   [:div {:class ["mt-1" "flex" "items-center" "gap-1.5" "text-sm" "text-trading-text"]}
+   [:div {:class ["flex" "items-center" "gap-1.5" "text-xs" "text-trading-text"]}
     (if is-spot
       [:span {:class ["num" "text-trading-text-secondary"]} "--"]
       (if (number? funding-rate)
@@ -1070,15 +1076,15 @@
            funding-tooltip-id
            funding-tooltip-pinned?
            is-spot]}]
-  [:div {:class ["lg:hidden" "space-y-2.5" "px-3" "py-2.5"]}
-   [:div {:class ["flex" "items-start" "justify-between" "gap-3"]}
+  [:div {:class ["lg:hidden" "space-y-1.5" "px-3" "py-2"]}
+   [:div {:class ["flex" "items-center" "justify-between" "gap-3"]}
     [:div {:class ["min-w-0" "flex-1"]}
      (asset-icon icon-market
                  dropdown-visible?
                  (get-in full-state [:asset-selector :missing-icons] #{})
                  (get-in full-state [:asset-selector :loaded-icons] #{}))]
     [:div {:class ["text-right" "space-y-1"]}
-     [:div {:class ["num" "text-xl" "font-semibold" "leading-none" "text-trading-text"]}
+     [:div {:class ["num" "text-lg" "font-semibold" "leading-none" "text-trading-text"]}
       (if mark
         (fmt/format-trade-price mark mark-raw)
         "Loading...")]
@@ -1086,17 +1092,17 @@
       (if change-24h
         (change-indicator change-24h change-24h-pct)
         [:span {:class ["text-trading-text-secondary"]} "--"])]]]
-   [:div {:class ["flex" "gap-2" "overflow-x-auto" "scrollbar-hide" "pb-0.5"]}
-    (mobile-stat-chip "Volume" (if volume-24h
-                                 (fmt/format-large-currency volume-24h)
-                                 "Loading..."))
+   [:div {:class ["flex" "gap-1.5" "overflow-x-auto" "scrollbar-hide" "pb-0.5"]}
+    (mobile-stat-chip "Vol" (if volume-24h
+                              (fmt/format-large-currency volume-24h)
+                              "Loading..."))
     (mobile-stat-chip "Oracle" (if (and (not is-spot) oracle)
                                  (fmt/format-trade-price oracle oracle-raw)
                                  (if is-spot "—" "Loading...")))
-    (mobile-stat-chip "Open Interest" (cond
-                                        is-spot "—"
-                                        open-interest-usd (fmt/format-large-currency open-interest-usd)
-                                        :else "Loading..."))
+    (mobile-stat-chip "OI" (cond
+                             is-spot "—"
+                             open-interest-usd (fmt/format-large-currency open-interest-usd)
+                             :else "Loading..."))
     (mobile-funding-chip funding-rate
                          countdown-text
                          funding-tooltip-open?
@@ -1107,17 +1113,17 @@
 
 (defn- mobile-select-asset-row
   [dropdown-visible?]
-  [:div {:class ["lg:hidden" "space-y-2.5" "px-3" "py-2.5"]}
-   [:div {:class ["flex" "items-start" "justify-between" "gap-3"]}
+  [:div {:class ["lg:hidden" "space-y-1.5" "px-3" "py-2"]}
+   [:div {:class ["flex" "items-center" "justify-between" "gap-3"]}
     [:div {:class ["min-w-0" "flex-1"]}
      (asset-selector-trigger dropdown-visible?)]
     [:div {:class ["text-right" "space-y-1"]}
-     [:div {:class ["num" "text-xl" "font-semibold" "leading-none" "text-trading-text-secondary"]} "—"]
+     [:div {:class ["num" "text-lg" "font-semibold" "leading-none" "text-trading-text-secondary"]} "—"]
      [:div {:class ["text-xs" "text-trading-text-secondary"]} "--"]]]
-   [:div {:class ["flex" "gap-2" "overflow-x-auto" "scrollbar-hide" "pb-0.5"]}
-    (mobile-stat-chip "Volume" "—")
+   [:div {:class ["flex" "gap-1.5" "overflow-x-auto" "scrollbar-hide" "pb-0.5"]}
+    (mobile-stat-chip "Vol" "—")
     (mobile-stat-chip "Oracle" "—")
-    (mobile-stat-chip "Open Interest" "—")
+    (mobile-stat-chip "OI" "—")
     (mobile-stat-chip "Funding" "— / —")]])
 
 (defn active-asset-row [ctx-data market dropdown-state full-state]

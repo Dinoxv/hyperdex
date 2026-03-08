@@ -54,10 +54,17 @@
   (let [view (header-view/header-view {:wallet {:connected? false
                                                  :connecting? false}})
         connect-btn (find-node-by-role view "wallet-connect-button")
+        connect-text (set (collect-strings connect-btn))
         trigger (find-node-by-role view "wallet-menu-trigger")]
     (is (some? connect-btn))
-    (is (= "Connect Wallet" (last connect-btn)))
+    (is (contains? connect-text "Connect"))
+    (is (contains? connect-text "Connect Wallet"))
     (is (nil? trigger))))
+
+(deftest header-does-not-render-parity-attr-maps-as-visible-text-test
+  (let [view (header-view/header-view {:wallet {:connected? false}})
+        all-text (collect-strings view)]
+    (is (not-any? #(str/includes? % ":data-parity-id") all-text))))
 
 (deftest header-renders-spectate-mode-trigger-button-test
   (let [view (header-view/header-view {:wallet {:connected? false}})

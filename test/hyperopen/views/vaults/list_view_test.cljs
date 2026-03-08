@@ -64,17 +64,27 @@
   (let [view (vaults-view/vaults-view sample-state)
         root (find-first-node view #(= "vaults-root" (get-in % [1 :data-parity-id])))
         search-input (find-first-node view #(= "vaults-search-input" (get-in % [1 :id])))
+        route-connect (find-first-node view #(= "vaults-route-connect" (get-in % [1 :data-role])))
         text (set (collect-strings view))]
     (is (some? root))
     (is (some? search-input))
+    (is (some? route-connect))
     (is (contains? text "Vaults"))
     (is (contains? text "Total Value Locked"))
     (is (contains? text "Protocol Vaults"))
     (is (contains? text "User Vaults"))
+    (is (contains? text "Connect"))
     (is (contains? text "3M"))
     (is (contains? text "6M"))
     (is (contains? text "1Y"))
     (is (contains? text "2Y"))))
+
+(deftest vaults-view-route-connect-button-dispatches-wallet-connect-test
+  (let [view (vaults-view/vaults-view sample-state)
+        route-connect (find-first-node view #(= "vaults-route-connect" (get-in % [1 :data-role])))]
+    (is (some? route-connect))
+    (is (= [[:actions/connect-wallet]]
+           (get-in route-connect [1 :on :click])))))
 
 (deftest vaults-view-rows-navigate-to-detail-route-test
   (let [view (vaults-view/vaults-view sample-state)
