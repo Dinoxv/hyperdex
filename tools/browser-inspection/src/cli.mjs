@@ -47,6 +47,7 @@ function usage() {
   process.stdout.write(`Usage:
   inspect --url <url> [--target <label>] [--viewports desktop,mobile] [--session-id <id>] [--headed] [--manage-local-app] [--attach-port <port>] [--attach-host <host>] [--target-id <cdp-target-id>]
   compare [--left-url <url>] [--right-url <url>] [--left-label <label>] [--right-label <label>] [--viewports desktop,mobile] [--session-id <id>] [--headed] [--manage-local-app] [--attach-port <port>] [--attach-host <host>] [--target-id <cdp-target-id>]
+  preflight [--attach-port <port>] [--attach-host <host>] [--local-url <url>] [--strict]
   navigate --session-id <id> --url <url> [--viewport desktop]
   eval --session-id <id> --expression <js>
   session start [--headed] [--manage-local-app] [--attach-port <port>] [--attach-host <host>] [--target-id <cdp-target-id>]
@@ -136,6 +137,19 @@ async function run() {
       allowUnsafeEval: Boolean(args["allow-unsafe-eval"])
     });
     asJson(result);
+    return;
+  }
+
+  if (command === "preflight") {
+    const result = await service.preflight({
+      attachPort: args["attach-port"] || null,
+      attachHost: args["attach-host"] || null,
+      localUrl: args["local-url"] || null
+    });
+    asJson(result);
+    if (Boolean(args.strict) && !result.ok) {
+      process.exitCode = 2;
+    }
     return;
   }
 

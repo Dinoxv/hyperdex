@@ -115,6 +115,7 @@ All browser-inspection tooling lives under `/hyperopen/tools/browser-inspection/
 | --- | --- | --- |
 | `node tools/browser-inspection/src/cli.mjs navigate` | `... navigate --session-id abc --url https://app.hyperliquid.xyz/trade --viewport desktop` | Moving a session tab to a URL |
 | `node tools/browser-inspection/src/cli.mjs eval` | `... eval --session-id abc --expression "({url: location.href})"` | Lightweight read-only DOM/runtime checks |
+| `node tools/browser-inspection/src/cli.mjs preflight` | `... preflight --strict` | Validate local/attach prerequisites before expensive capture workflows |
 | `node tools/browser-inspection/src/cli.mjs inspect` | `... inspect --url https://app.hyperliquid.xyz/trade --target hyperliquid` | One-off snapshot capture |
 | `node tools/browser-inspection/src/cli.mjs compare` | `... compare --left-url ... --right-url ... --left-label ... --right-label ...` | Diff local vs reference across viewports |
 
@@ -122,6 +123,7 @@ All browser-inspection tooling lives under `/hyperopen/tools/browser-inspection/
 
 - Session commands are read-only by design.
 - Snapshot output is written to `/hyperopen/tmp/browser-inspection/`.
+- Nightly QA wrapper command is `npm run qa:nightly-ui`; each run writes a timestamped bundle under `/hyperopen/tmp/browser-inspection/nightly-ui-qa-*/` including `preflight.json`, `attempt-summary.tsv`, and `failure-classification.json`.
 - Use explicit `--target-id` when attaching to avoid wrong tab capture.
 - For tab-selection stability, follow `/hyperopen/docs/runbooks/browser-live-inspection.md` and use marker verification steps.
 

@@ -3,7 +3,9 @@ import { assertSessionState } from "./contracts.mjs";
 import { ArtifactStore } from "./artifact_store.mjs";
 import { CDPClient, getBrowserWsUrl } from "./cdp_client.mjs";
 import { killProcess, launchChrome, processIsAlive } from "./chrome_launcher.mjs";
+import { classifyErrorMessage, remediationForClassification } from "./failure_classification.mjs";
 import { maybeStartLocalApp, maybeStopLocalApp } from "./local_app_manager.mjs";
+import { runPreflightChecks } from "./preflight.mjs";
 import { safeNowIso } from "./util.mjs";
 
 function validateUrlForReadOnly(config, url) {
@@ -61,6 +63,18 @@ function normalizeTargetInfo(targetInfo) {
     openerId: targetInfo.openerId || null,
     browserContextId: targetInfo.browserContextId || null
   };
+}
+
+function withActionableStartupError(error, phaseLabel) {
+  const classification = classifyErrorMessage(error?.message || error);
+  if (!classification) {
+    return error;
+  }
+  const remediation = remediationForClassification(classification);
+  const detail = remediation ? ` Remediation: ${remediation}` : "";
+  const wrapped = new Error(`${phaseLabel} failed: ${classification.summary}${detail}`, { cause: error });
+  wrapped.classification = classification;
+  return wrapped;
 }
 
 export class SessionManager {
@@ -174,14 +188,32 @@ export class SessionManager {
       throw new Error("targetId can only be provided when attaching to an existing Chrome endpoint");
     }
 
-    const localApp = await maybeStartLocalApp(this.config.localApp, {
-      manageLocalApp: Boolean(options.manageLocalApp),
-      command: options.localAppCommand,
-      cwd: options.localAppCwd,
-      url: options.localAppUrl || this.config.localApp.url,
-      startupTimeoutMs: options.localAppStartupTimeoutMs || this.config.localApp.startupTimeoutMs,
-      pollIntervalMs: options.localAppPollIntervalMs || this.config.localApp.pollIntervalMs
-    });
+    if (!attach) {
+      const preflight = await runPreflightChecks(this.config, {
+        localUrl: options.localAppUrl || this.config.localApp.url
+      });
+      if (!preflight.ok) {
+        const primary = preflight.classification;
+        const remediation = preflight.remediation ? ` Remediation: ${preflight.remediation}` : "";
+        const reason = primary ? `${primary.summary}` : "Preflight checks failed.";
+        const failed = preflight.summary?.failedRequiredCheckIds?.join(", ") || "unknown";
+        throw new Error(`${reason} Required checks failed: ${failed}.${remediation}`);
+      }
+    }
+
+    let localApp;
+    try {
+      localApp = await maybeStartLocalApp(this.config.localApp, {
+        manageLocalApp: Boolean(options.manageLocalApp),
+        command: options.localAppCommand,
+        cwd: options.localAppCwd,
+        url: options.localAppUrl || this.config.localApp.url,
+        startupTimeoutMs: options.localAppStartupTimeoutMs || this.config.localApp.startupTimeoutMs,
+        pollIntervalMs: options.localAppPollIntervalMs || this.config.localApp.pollIntervalMs
+      });
+    } catch (error) {
+      throw withActionableStartupError(error, "Local app startup");
+    }
 
     let chromeRuntime;
     if (attach) {
@@ -200,14 +232,19 @@ export class SessionManager {
         controlMode: "attached"
       };
     } else {
-      const launched = await launchChrome({
-        chromePath: options.chromePath || this.config.chrome.path,
-        headless: options.headless ?? this.config.chrome.headless,
-        extraArgs: [...(this.config.chrome.extraArgs || []), ...(options.extraArgs || [])],
-        ephemeralProfile: options.ephemeralProfile ?? this.config.chrome.ephemeralProfile,
-        userDataDir: options.userDataDir,
-        detached: true
-      });
+      let launched;
+      try {
+        launched = await launchChrome({
+          chromePath: options.chromePath || this.config.chrome.path,
+          headless: options.headless ?? this.config.chrome.headless,
+          extraArgs: [...(this.config.chrome.extraArgs || []), ...(options.extraArgs || [])],
+          ephemeralProfile: options.ephemeralProfile ?? this.config.chrome.ephemeralProfile,
+          userDataDir: options.userDataDir,
+          detached: true
+        });
+      } catch (error) {
+        throw withActionableStartupError(error, "Chrome startup");
+      }
       chromeRuntime = {
         pid: launched.pid,
         port: launched.port,

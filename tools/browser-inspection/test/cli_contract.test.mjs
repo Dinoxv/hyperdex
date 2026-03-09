@@ -48,3 +48,11 @@ test("cli session targets without selector exits non-zero", async () => {
     }
   );
 });
+
+test("cli preflight returns structured JSON", async () => {
+  const { stdout } = await execFileAsync(process.execPath, [cliPath, "preflight"]);
+  const parsed = JSON.parse(stdout);
+  assert.ok(typeof parsed.ok === "boolean");
+  assert.ok(Array.isArray(parsed.checks));
+  assert.ok(typeof parsed.mode === "string");
+});

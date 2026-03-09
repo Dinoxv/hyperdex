@@ -1,5 +1,6 @@
 import { spawn } from "node:child_process";
 import { killProcess, processIsAlive } from "./chrome_launcher.mjs";
+import { classifyErrorMessage, remediationForClassification } from "./failure_classification.mjs";
 import { sleep } from "./util.mjs";
 
 export async function waitForUrl(url, timeoutMs = 120000, pollIntervalMs = 1000) {
@@ -53,11 +54,37 @@ export async function maybeStartLocalApp(config, options = {}) {
   const child = spawn("sh", ["-lc", command], {
     cwd,
     detached: true,
-    stdio: "ignore"
+    stdio: ["ignore", "ignore", "pipe"]
   });
-  child.unref();
+  let stderrBuffer = "";
+  if (child.stderr) {
+    child.stderr.setEncoding("utf8");
+    child.stderr.on("data", (chunk) => {
+      stderrBuffer = `${stderrBuffer}${chunk}`.slice(-4000);
+    });
+  }
 
-  await waitForUrl(url, startupTimeoutMs, pollIntervalMs);
+  const exitPromise = new Promise((resolve) => {
+    child.once("exit", (code, signal) => {
+      resolve({ code, signal });
+    });
+  });
+
+  const winner = await Promise.race([
+    waitForUrl(url, startupTimeoutMs, pollIntervalMs).then(() => ({ kind: "ready" })),
+    exitPromise.then((details) => ({ kind: "exit", details }))
+  ]);
+
+  if (winner.kind === "exit") {
+    const status = winner.details?.code !== null ? `code ${winner.details?.code}` : `signal ${winner.details?.signal || "unknown"}`;
+    const classified = classifyErrorMessage(stderrBuffer || `Local app exited early (${status}).`);
+    const remediation = classified ? remediationForClassification(classified) : null;
+    const remediationSuffix = remediation ? ` Remediation: ${remediation}` : "";
+    const stderrSuffix = stderrBuffer ? ` Stderr tail: ${stderrBuffer.replace(/\\s+/g, " ").trim()}` : "";
+    throw new Error(`Local app command exited early (${status}).${stderrSuffix}${remediationSuffix}`);
+  }
+
+  child.unref();
   return {
     managed: true,
     startedByTool: true,

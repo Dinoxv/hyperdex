@@ -3,6 +3,7 @@ import path from "node:path";
 import { loadConfig } from "./config.mjs";
 import { captureSnapshot } from "./capture_pipeline.mjs";
 import { compareSnapshots, renderCompareMarkdown } from "./parity_compare.mjs";
+import { runPreflightChecks } from "./preflight.mjs";
 import { SessionManager } from "./session_manager.mjs";
 import { ensureDir, writeJsonFile } from "./util.mjs";
 
@@ -87,6 +88,10 @@ export class BrowserInspectionService {
       allowUnsafeEval: options.allowUnsafeEval,
       timeoutMs: options.timeoutMs
     });
+  }
+
+  async preflight(options = {}) {
+    return runPreflightChecks(this.config, options);
   }
 
   async capture(options = {}) {

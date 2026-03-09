@@ -24,6 +24,10 @@ Run from `/hyperopen`:
   - `npm run browser:inspect -- --url https://app.hyperliquid.xyz/trade --target hyperliquid`
 - One-off parity compare:
   - `npm run browser:compare`
+- Preflight checks before local or attach workflows:
+  - `npm run browser:preflight`
+- Standard nightly UI QA wrapper:
+  - `npm run qa:nightly-ui`
 - List active sessions:
   - `node tools/browser-inspection/src/cli.mjs session list`
 - Start a persistent session:
@@ -58,6 +62,14 @@ Each run creates `/hyperopen/tmp/browser-inspection/<run-id>/` with:
 - `<viewport>-report.md` (compare runs)
 - `<viewport>-visual-diff.png` (compare runs)
 
+Nightly wrapper runs additionally create `/hyperopen/tmp/browser-inspection/nightly-ui-qa-<timestamp>/` with:
+
+- `run-meta.json`
+- `preflight.json`
+- `attempt-summary.tsv`
+- `failure-classification.json`
+- per-attempt `*.json` and `*.log`
+
 ## Safety and Redaction
 
 Redaction is enabled by default for:
@@ -77,8 +89,20 @@ Read-only guardrails block:
 2. Run:
    - `npm run browser:compare -- --manage-local-app`
 3. Open the generated report:
-   - `/hyperopen/tmp/browser-inspection/<run-id>/desktop-report.md`
-   - `/hyperopen/tmp/browser-inspection/<run-id>/mobile-report.md`
+  - `/hyperopen/tmp/browser-inspection/<run-id>/desktop-report.md`
+  - `/hyperopen/tmp/browser-inspection/<run-id>/mobile-report.md`
+
+## Nightly UI QA Workflow
+
+1. Run deterministic preflight:
+   - `npm run browser:preflight`
+2. Run nightly matrix:
+   - `npm run qa:nightly-ui`
+3. Read outputs:
+   - `/hyperopen/tmp/browser-inspection/nightly-ui-qa-<timestamp>/failure-classification.json`
+   - `/hyperopen/docs/qa/nightly-ui-report-<YYYY-MM-DD>.md`
+4. If local bind is blocked, rerun with attach fallback:
+   - `npm run qa:nightly-ui -- --attach-port 9222 --target-id <target-id>`
 
 ## Optional Smoke Test
 
