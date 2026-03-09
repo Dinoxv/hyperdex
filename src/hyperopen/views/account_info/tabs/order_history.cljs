@@ -391,7 +391,7 @@
    (table/sortable-header-button column-name sort-state :actions/sort-order-history options)))
 
 (def ^:private order-history-grid-template-class
-  "grid-cols-[minmax(130px,1.45fr)_minmax(110px,1.15fr)_minmax(84px,1.35fr)_minmax(64px,1.25fr)_minmax(82px,0.9fr)_minmax(72px,0.8fr)_minmax(100px,1.05fr)_minmax(72px,0.8fr)_minmax(74px,0.8fr)_minmax(140px,1.35fr)_minmax(60px,0.7fr)_minmax(120px,1.15fr)_minmax(106px,1.05fr)]")
+  "grid-cols-[minmax(124px,1.4fr)_minmax(72px,0.72fr)_minmax(84px,1.2fr)_minmax(72px,1fr)_minmax(76px,0.82fr)_minmax(76px,0.82fr)_minmax(96px,1fr)_minmax(72px,0.78fr)_minmax(74px,0.74fr)_minmax(112px,1.08fr)_minmax(52px,0.58fr)_minmax(84px,0.82fr)_minmax(96px,0.92fr)]")
 
 (defn order-history-table [order-history order-history-state]
   (let [sort-state (order-history-sort-state order-history-state)
@@ -409,8 +409,8 @@
        [:div {:class ["grid" "gap-2" "py-1" "px-3" "bg-base-200" "text-xs" "font-medium" order-history-grid-template-class]}
         [:div.pr-2.whitespace-nowrap (sortable-order-history-header "Time" sort-state)]
         [:div.pl-1.text-left (sortable-order-history-header "Type" sort-state)]
-       [:div.pr-4.text-left (sortable-order-history-header "Coin" sort-state)]
-       [:div.pl-2.text-left (sortable-order-history-header "Direction" sort-state)]
+        [:div.pr-4.text-left (sortable-order-history-header "Coin" sort-state)]
+        [:div.pl-2.text-left (sortable-order-history-header "Direction" sort-state)]
         [:div.text-left (sortable-order-history-header "Size" sort-state)]
         [:div.text-left (sortable-order-history-header "Filled Size" sort-state)]
         [:div.text-left (sortable-order-history-header "Order Value" sort-state)]
