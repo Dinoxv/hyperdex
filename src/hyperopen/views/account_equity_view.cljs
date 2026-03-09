@@ -233,9 +233,12 @@
                                             cross-margin-ratio
                                             cross-account-leverage
                                             pnl-info
+                                            fill-height?
                                             show-funding-actions?
                                             state]}]
-  [:div {:class ["bg-base-100" "rounded-none" "spectate-none" "p-3" "space-y-4" "w-full" "h-full"]
+  [:div {:class (into ["bg-base-100" "rounded-none" "spectate-none" "p-3" "space-y-4" "w-full"]
+                      (when fill-height?
+                        ["h-full"]))
          :data-parity-id "account-equity"}
    [:div.text-sm.font-semibold.text-trading-text "Account Equity"]
    (when show-funding-actions?
@@ -266,9 +269,12 @@
                                              maintenance-margin
                                              unified-account-leverage
                                              pnl-info
+                                             fill-height?
                                              show-funding-actions?
                                              state]}]
-  [:div {:class ["bg-base-100" "rounded-none" "spectate-none" "p-3" "space-y-4" "w-full" "h-full"]
+  [:div {:class (into ["bg-base-100" "rounded-none" "spectate-none" "p-3" "space-y-4" "w-full"]
+                      (when fill-height?
+                        ["h-full"]))
          :data-parity-id "account-equity"}
    (when show-funding-actions?
      (funding-actions-section state))
@@ -288,13 +294,16 @@
 (defn account-equity-view
   ([state]
    (account-equity-view state {}))
-  ([state {:keys [show-funding-actions?]
-           :or {show-funding-actions? true}}]
+  ([state {:keys [fill-height? show-funding-actions?]
+           :or {fill-height? true
+                show-funding-actions? true}}]
    (let [metrics (derive-account-equity-metrics state)]
     (if (unified-account? state)
       (unified-account-summary-view (assoc metrics
+                                           :fill-height? fill-height?
                                            :show-funding-actions? show-funding-actions?
                                            :state state))
       (classic-account-equity-view (assoc metrics
+                                          :fill-height? fill-height?
                                           :show-funding-actions? show-funding-actions?
                                           :state state))))))

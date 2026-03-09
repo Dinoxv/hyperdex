@@ -136,6 +136,16 @@
     (is (nil? transfer-button))
     (is (nil? withdraw-button))))
 
+(deftest account-equity-view-can-disable-fill-height-test
+  (let [view-node (view/account-equity-view {:account {:mode :classic}
+                                             :webdata2 {}
+                                             :spot {}
+                                             :perp-dex-clearinghouse {}}
+                                            {:fill-height? false})
+        root-classes (node-class-set view-node)]
+    (is (contains? root-classes "w-full"))
+    (is (not (contains? root-classes "h-full")))))
+
 (deftest funding-actions-view-exposes-anchor-aware-funding-actions-test
   (let [actions-node (view/funding-actions-view {})
         deposit-button (find-first-node actions-node #(= "funding-action-deposit"

@@ -284,6 +284,10 @@
                                                #(= "trade-mobile-account-summary-panel"
                                                    (get-in % [1 :data-parity-id])))
         account-summary-classes (node-class-set account-summary-panel)
+        account-actions-panel (find-first-node account-view
+                                               #(= "trade-mobile-account-actions"
+                                                   (get-in % [1 :data-parity-id])))
+        account-actions-classes (node-class-set account-actions-panel)
         account-mobile-panel (find-first-node account-view
                                               #(= "trade-mobile-account-surface"
                                                   (get-in % [1 :data-parity-id])))
@@ -307,6 +311,9 @@
     (is (contains? account-panel-classes "hidden"))
     (is (contains? account-summary-classes "flex"))
     (is (not (contains? account-summary-classes "hidden")))
+    (is (contains? account-summary-classes "absolute"))
+    (is (contains? account-summary-classes "inset-0"))
+    (is (contains? account-actions-classes "mt-auto"))
     (is (contains? account-mobile-text "Account Equity"))
     (is (contains? account-mobile-text "Deposit"))
     (is (contains? account-mobile-text "Withdraw"))

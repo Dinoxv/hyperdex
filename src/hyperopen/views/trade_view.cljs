@@ -41,12 +41,14 @@
                                 :orderbook)))
 
 (defn- mobile-account-surface [state]
-  [:div {:class ["flex" "flex-col" "bg-base-100"]
+  [:div {:class ["flex" "h-full" "min-h-0" "flex-col" "bg-base-100"]
          :data-parity-id "trade-mobile-account-surface"}
-   (account-equity-view/account-equity-view state {:show-funding-actions? false})
+   (account-equity-view/account-equity-view state {:fill-height? false
+                                                   :show-funding-actions? false})
    (account-equity-view/funding-actions-view
     state
-    {:container-classes ["border-t"
+    {:container-classes ["mt-auto"
+                         "border-t"
                          "border-base-300"
                          "bg-base-100"
                          "px-3"
@@ -163,19 +165,6 @@
                 :data-parity-id "trade-desktop-account-equity-panel"}
           (account-equity-view/account-equity-view state*)]]
 
-        [:div {:class (into [(if mobile-account-surface?
-                               "flex"
-                               "hidden")
-                             "bg-base-100"
-                             "border-t"
-                             "border-base-300"
-                             "flex-col"
-                             "min-h-0"
-                             "lg:hidden"]
-                            [])
-               :data-parity-id "trade-mobile-account-summary-panel"}
-         (mobile-account-surface state*)]
-
         [:div {:class (into [(if (= mobile-surface :account)
                                "hidden"
                                (if mobile-market-surface? "flex" "hidden"))
@@ -194,6 +183,23 @@
          [:div {:class ["w-full" "lg:hidden"]
                 :data-parity-id "trade-mobile-account-panel"}
           (account-info-view/account-info-view state*)]
-         [:div {:class ["hidden" "w-full" "min-h-0" "lg:flex"]
+        [:div {:class ["hidden" "w-full" "min-h-0" "lg:flex"]
                 :data-parity-id "trade-desktop-account-panel"}
-          (account-info-view/account-info-view state*)]]]]]]))
+          (account-info-view/account-info-view state*)]]
+        ]
+
+       [:div {:class (into [(if mobile-account-surface?
+                               "flex"
+                               "hidden")
+                             "absolute"
+                             "inset-0"
+                             "z-20"
+                             "bg-base-100"
+                             "border-t"
+                             "border-base-300"
+                             "flex-col"
+                             "min-h-0"
+                             "lg:hidden"]
+                            [])
+               :data-parity-id "trade-mobile-account-summary-panel"}
+        (mobile-account-surface state*)]]]]))
