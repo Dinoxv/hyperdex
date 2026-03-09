@@ -266,6 +266,7 @@
             [hyperopen.wallet.connection-runtime-test]
             [hyperopen.wallet.copy-feedback-runtime-test]
             [hyperopen.wallet.core-test]
+            [hyperopen.websocket.account-surface-service-coverage-test]
             [hyperopen.websocket.acl.hyperliquid-test]
             [hyperopen.websocket.active-asset-ctx-test]
             [hyperopen.websocket.api-coverage-bridge-test]
@@ -579,6 +580,7 @@
              'hyperopen.wallet.connection-runtime-test
              'hyperopen.wallet.copy-feedback-runtime-test
              'hyperopen.wallet.core-test
+             'hyperopen.websocket.account-surface-service-coverage-test
              'hyperopen.websocket.acl.hyperliquid-test
              'hyperopen.websocket.active-asset-ctx-test
              'hyperopen.websocket.api-coverage-bridge-test
