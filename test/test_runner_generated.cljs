@@ -108,6 +108,7 @@
             [hyperopen.portfolio.metrics.builder-test]
             [hyperopen.portfolio.metrics.history-test]
             [hyperopen.portfolio.metrics.quantstats-parity-test]
+            [hyperopen.registry.runtime-test]
             [hyperopen.runtime.action-adapters-test]
             [hyperopen.runtime.api-effects-test]
             [hyperopen.runtime.app-effects-test]
@@ -422,6 +423,7 @@
              'hyperopen.portfolio.metrics.builder-test
              'hyperopen.portfolio.metrics.history-test
              'hyperopen.portfolio.metrics.quantstats-parity-test
+             'hyperopen.registry.runtime-test
              'hyperopen.runtime.action-adapters-test
              'hyperopen.runtime.api-effects-test
              'hyperopen.runtime.app-effects-test
