@@ -90,6 +90,11 @@
             [hyperopen.funding.application.modal-vm-test]
             [hyperopen.funding.effects-test]
             [hyperopen.funding.history-cache-test]
+            [hyperopen.funding.infrastructure.erc20-rpc-test]
+            [hyperopen.funding.infrastructure.hyperunit-address-client-test]
+            [hyperopen.funding.infrastructure.hyperunit-client-test]
+            [hyperopen.funding.infrastructure.route-clients-test]
+            [hyperopen.funding.infrastructure.wallet-rpc-test]
             [hyperopen.funding.predictability-test]
             [hyperopen.header.actions-test]
             [hyperopen.i18n.locale-test]
@@ -398,6 +403,11 @@
              'hyperopen.funding.application.modal-vm-test
              'hyperopen.funding.effects-test
              'hyperopen.funding.history-cache-test
+             'hyperopen.funding.infrastructure.erc20-rpc-test
+             'hyperopen.funding.infrastructure.hyperunit-address-client-test
+             'hyperopen.funding.infrastructure.hyperunit-client-test
+             'hyperopen.funding.infrastructure.route-clients-test
+             'hyperopen.funding.infrastructure.wallet-rpc-test
              'hyperopen.funding.predictability-test
              'hyperopen.header.actions-test
              'hyperopen.i18n.locale-test
