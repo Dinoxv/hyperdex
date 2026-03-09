@@ -13,6 +13,7 @@ After this change, a user placing a market long or short from Hyperopen will get
 - [x] (2026-02-24 14:20Z) Audited Hyperliquid docs and canonical SDK references listed in `/hyperopen/docs/references/hyperliquid-sdks.md`.
 - [x] (2026-02-24 14:21Z) Compared audited sources against current Hyperopen market-order and submit-response handling paths.
 - [x] (2026-02-24 14:22Z) Authored this ExecPlan with implementation milestones, file-level scope, and validation gates.
+- [x] (2026-03-09 18:31Z) Moved this plan to `/hyperopen/docs/exec-plans/deferred/` during ExecPlan lifecycle cleanup and created `bd` issue `hyperopen-gvp` as the backlog source of truth.
 - [ ] Implement exchange-compliant price formatting for market-order submission paths.
 - [ ] Implement nested `response.data.statuses` outcome parsing and truthful submit toasts/errors.
 - [ ] Align default market slippage policy with source-backed behavior and add explicit no-fill guidance.
@@ -55,7 +56,7 @@ After this change, a user placing a market long or short from Hyperopen will get
 
 ## Outcomes & Retrospective
 
-This plan is not implemented yet. The expected outcome is elimination of false-positive “Order submitted” messages for rejected market orders and materially higher first-attempt market-order acceptance via exchange-compliant price formatting. Remaining work after implementation should evaluate extending identical price formatting guarantees to manually-entered limit and trigger order prices.
+This plan was authored but never executed. It was moved out of `/hyperopen/docs/exec-plans/active/` during the 2026-03-09 lifecycle cleanup so that active ExecPlans only describe live tracked implementation. If this work is resumed, use `bd` issue `hyperopen-gvp` as the backlog source of truth and this deferred plan as the starting implementation context. The intended user outcome remains elimination of false-positive success feedback for rejected market orders and protocol-compliant market submit formatting.
 
 ## Context and Orientation
 
@@ -178,3 +179,4 @@ No new external dependency is required. The implementation should introduce smal
 Existing runtime/effect boundaries remain unchanged; new behavior should be injected through `order/effects.cljs` and trading-domain helpers only.
 
 Plan revision note: 2026-02-24 14:22Z - Initial plan created after external docs/SDK audit and local discrepancy analysis.
+Plan revision note: 2026-03-09 18:31Z - Moved this authored-only plan to `/hyperopen/docs/exec-plans/deferred/` and recorded `bd` issue `hyperopen-gvp` as the backlog source of truth during ExecPlan lifecycle cleanup.

@@ -16,6 +16,7 @@ A user can verify this by loading a long row and a short row and confirming the 
 - [x] (2026-02-24 15:18Z) Collected Hyperliquid live evidence via browser inspection artifacts and frontend bundle code (`/hyperopen/tmp/browser-inspection/inspect-2026-02-24T15-15-36-731Z-bd34d304/*`, `/hyperopen/tmp/hyperliquid-main-split.js`).
 - [x] (2026-02-24 15:18Z) Identified concrete aesthetic deltas and mapped them to exact Hyperopen files to edit.
 - [x] (2026-02-24 15:18Z) Authored this ExecPlan.
+- [x] (2026-03-09 18:31Z) Moved this plan to `/hyperopen/docs/exec-plans/deferred/` during ExecPlan lifecycle cleanup and created `bd` issue `hyperopen-1ug` as the backlog source of truth.
 - [ ] Implement parity UI changes in positions rendering, header tooltips, and shared style tokens.
 - [ ] Add/adjust tests for short-row styling, size sign behavior, single-line PNL, and tooltip affordances.
 - [ ] Run required validation gates: `npm run check`, `npm test`, `npm run test:websocket`.
@@ -53,7 +54,7 @@ A user can verify this by loading a long row and a short row and confirming the 
 
 ## Outcomes & Retrospective
 
-This plan is currently in authored state. No code has been changed yet under this plan. Retrospective updates will be recorded after implementation and validation gates.
+This plan was never executed beyond authoring and discovery. It was moved out of `/hyperopen/docs/exec-plans/active/` during the 2026-03-09 lifecycle cleanup so that `active` only contains live execution work. If this parity work is resumed, use `bd` issue `hyperopen-1ug` as the backlog source of truth and this deferred plan as historical implementation context.
 
 ## Context and Orientation
 

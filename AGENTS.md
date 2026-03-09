@@ -58,6 +58,8 @@ When work touches `/hyperopen/src/hyperopen/views/**`, `/hyperopen/src/styles/**
 - Complex work must use an ExecPlan shaped by `/hyperopen/.agents/PLANS.md`.
 - Store active plans in `/hyperopen/docs/exec-plans/active/`.
 - Move completed plans to `/hyperopen/docs/exec-plans/completed/`.
+- Move non-active or superseded planning notes to `/hyperopen/docs/exec-plans/deferred/`.
+- Active ExecPlans must reference live `bd` work and retain unchecked progress items; `npm run check` enforces this.
 - Track known debt in `/hyperopen/docs/exec-plans/tech-debt-tracker.md`.
 
 ## Work Tracking

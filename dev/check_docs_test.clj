@@ -10,13 +10,17 @@
   (java.time.LocalDate/of 2026 2 13))
 
 (defn test-config
-  []
-  {:required-files ["AGENTS.md" "docs/product-specs/index.md"]
-   :governed-explicit ["AGENTS.md"]
-   :governed-dirs ["docs/product-specs"]
-   :index-rules [{:index "docs/product-specs/index.md" :dir "docs/product-specs"}]
-   :agents-required-links ["docs/product-specs/index.md"]
-   :today test-today})
+  ([] (test-config {}))
+  ([overrides]
+   (merge {:required-files ["AGENTS.md" "docs/product-specs/index.md"]
+           :governed-explicit ["AGENTS.md"]
+           :governed-dirs ["docs/product-specs"]
+           :index-rules [{:index "docs/product-specs/index.md" :dir "docs/product-specs"}]
+           :agents-required-links ["docs/product-specs/index.md"]
+           :active-exec-plan-dir "docs/exec-plans/active"
+           :bd-show-fn (fn [_issue-ids] {})
+           :today test-today}
+          overrides)))
 
 (defn delete-recursive!
   [file]
@@ -75,6 +79,15 @@
                "docs/product-specs/spec-a.md"
                (with-front-matter spec-meta
                                   "# Spec A\n\ncontent\n")))
+
+(defn active-plan
+  [{:keys [issue-id unchecked-count checked-count]}]
+  (str "# Active Plan\n\n"
+       "## Progress\n\n"
+       (when issue-id
+         (str "Tracking issue: `" issue-id "`\n\n"))
+       (apply str (repeat checked-count "- [x] Finished step.\n"))
+       (apply str (repeat unchecked-count "- [ ] Remaining step.\n"))))
 
 (deftest passing-repo-has-no-errors
   (with-temp-repo
@@ -142,6 +155,58 @@
   (let [required (set docs/default-required-files)]
     (is (not (contains? required "PRDs/README.md")))
     (is (not (contains? required "PPDs/README.md")))))
+
+(deftest active-exec-plan-with-open-issue-and-unchecked-progress-passes
+  (with-temp-repo
+    (fn [root]
+      (baseline-files! root)
+      (write-file! root
+                   "docs/exec-plans/active/2026-03-09-sample.md"
+                   (active-plan {:issue-id "hyperopen-123"
+                                 :checked-count 1
+                                 :unchecked-count 1}))
+      (is (empty? (docs/check-repo root
+                                   (test-config {:bd-show-fn (fn [issue-ids]
+                                                               (zipmap issue-ids (repeat "in_progress")))})))))))
+
+(deftest active-exec-plan-without-bd-link-is-reported
+  (with-temp-repo
+    (fn [root]
+      (baseline-files! root)
+      (write-file! root
+                   "docs/exec-plans/active/2026-03-09-sample.md"
+                   (active-plan {:checked-count 0
+                                 :unchecked-count 1}))
+      (let [codes (set (map :code (docs/check-repo root (test-config))))]
+        (is (contains? codes :active-exec-plan-missing-bd-link))))))
+
+(deftest active-exec-plan-with-only-closed-issues-is-reported
+  (with-temp-repo
+    (fn [root]
+      (baseline-files! root)
+      (write-file! root
+                   "docs/exec-plans/active/2026-03-09-sample.md"
+                   (active-plan {:issue-id "hyperopen-123"
+                                 :checked-count 1
+                                 :unchecked-count 1}))
+      (let [codes (set (map :code (docs/check-repo root
+                                                   (test-config {:bd-show-fn (fn [_issue-ids]
+                                                                               {"hyperopen-123" "closed"})}))))]
+        (is (contains? codes :active-exec-plan-no-open-bd-issue))))))
+
+(deftest active-exec-plan-without-unchecked-progress-is-reported
+  (with-temp-repo
+    (fn [root]
+      (baseline-files! root)
+      (write-file! root
+                   "docs/exec-plans/active/2026-03-09-sample.md"
+                   (active-plan {:issue-id "hyperopen-123"
+                                 :checked-count 2
+                                 :unchecked-count 0}))
+      (let [codes (set (map :code (docs/check-repo root
+                                                   (test-config {:bd-show-fn (fn [_issue-ids]
+                                                                               {"hyperopen-123" "open"})}))))]
+        (is (contains? codes :active-exec-plan-no-unchecked-progress))))))
 
 (defn -main
   [& _args]

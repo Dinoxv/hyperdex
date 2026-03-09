@@ -2,7 +2,9 @@
 
 (ns dev.check-docs
   (:require [clojure.java.io :as io]
-            [clojure.string :as str]))
+            [clojure.java.shell :as shell]
+            [clojure.string :as str]
+            [cheshire.core :as json]))
 
 (def default-required-files
   ["AGENTS.md"
@@ -19,6 +21,7 @@
    "docs/design-docs/core-beliefs.md"
    "docs/exec-plans/active/README.md"
    "docs/exec-plans/completed/README.md"
+   "docs/exec-plans/deferred/README.md"
    "docs/exec-plans/tech-debt-tracker.md"
    "docs/generated/index.md"
    "docs/product-specs/index.md"
@@ -48,6 +51,9 @@
    {:index "docs/references/index.md"
     :dir "docs/references"}])
 
+(def default-active-exec-plan-dir
+  "docs/exec-plans/active")
+
 (def default-agents-required-links
   ["ARCHITECTURE.md"
    "docs/DESIGN.md"
@@ -73,6 +79,8 @@
    :governed-dirs default-governed-dirs
    :index-rules default-index-rules
    :agents-required-links default-agents-required-links
+   :active-exec-plan-dir default-active-exec-plan-dir
+   :bd-show-fn nil
    :today (utc-today)})
 
 (defn normalize-path
@@ -89,6 +97,20 @@
     (if-not (.exists dir)
       []
       (->> (file-seq dir)
+           (filter #(.isFile %))
+           (map #(.getCanonicalPath %))
+           (filter #(str/ends-with? % ".md"))
+           (map #(normalize-path (.toString (.relativize (.toPath (io/file root))
+                                                        (.toPath (io/file %))))))
+           sort
+           vec))))
+
+(defn markdown-files-in-dir
+  [root rel-dir]
+  (let [dir (io/file root rel-dir)]
+    (if-not (.exists dir)
+      []
+      (->> (.listFiles dir)
            (filter #(.isFile %))
            (map #(.getCanonicalPath %))
            (filter #(str/ends-with? % ".md"))
@@ -258,6 +280,85 @@
   [root rel-path]
   (slurp (io/file root rel-path)))
 
+(def active-exec-plan-issue-pattern
+  #"\bhyperopen-[a-z0-9]+(?:\.[0-9]+)?\b")
+
+(defn extract-active-exec-plan-issue-ids
+  [text]
+  (->> (re-seq active-exec-plan-issue-pattern text)
+       distinct
+       sort
+       vec))
+
+(defn active-exec-plan-unchecked-count
+  [text]
+  (count (re-seq #"(?m)^- \[ \]" text)))
+
+(defn default-bd-show-fn
+  [issue-ids]
+  (reduce (fn [acc issue-id]
+            (let [{:keys [exit out err]} (shell/sh "bd" "show" issue-id "--json")]
+              (cond
+                (zero? exit)
+                (let [rows (json/parse-string out true)
+                      status (-> rows first :status)]
+                  (if status
+                    (assoc acc issue-id status)
+                    acc))
+
+                (re-find #"not found|no issue|unknown issue|does not exist" (str/lower-case err))
+                acc
+
+                :else
+                (throw (ex-info (str "bd show failed for " issue-id)
+                                {:issue-id issue-id
+                                 :stderr err
+                                 :exit exit})))))
+          {}
+          issue-ids))
+
+(defn active-exec-plan-errors
+  [root {:keys [active-exec-plan-dir bd-show-fn]}]
+  (let [plan-dir (or active-exec-plan-dir default-active-exec-plan-dir)
+        plan-files (->> (markdown-files-in-dir root plan-dir)
+                        (remove #(= % (str plan-dir "/README.md")))
+                        vec)]
+    (if (empty? plan-files)
+      []
+      (let [plans (mapv (fn [rel-path]
+                          (let [text (file-text root rel-path)]
+                            {:path rel-path
+                             :text text
+                             :issue-ids (extract-active-exec-plan-issue-ids text)
+                             :unchecked-count (active-exec-plan-unchecked-count text)}))
+                        plan-files)
+            all-ids (->> plans (mapcat :issue-ids) distinct sort vec)
+            lookup (or bd-show-fn default-bd-show-fn)]
+        (try
+          (let [status-by-id (lookup all-ids)]
+            (mapcat (fn [{:keys [path issue-ids unchecked-count]}]
+                      (let [valid-ids (filter #(contains? status-by-id %) issue-ids)
+                            open-ids (filter #(not= "closed" (get status-by-id %)) valid-ids)]
+                        (cond-> []
+                          (empty? valid-ids)
+                          (conj (err :active-exec-plan-missing-bd-link
+                                     path
+                                     "active ExecPlan must reference at least one valid bd issue id"))
+
+                          (and (seq valid-ids) (empty? open-ids))
+                          (conj (err :active-exec-plan-no-open-bd-issue
+                                     path
+                                     (str "active ExecPlan only references closed bd issues: "
+                                          (str/join ", " valid-ids))))
+
+                          (zero? unchecked-count)
+                          (conj (err :active-exec-plan-no-unchecked-progress
+                                     path
+                                     "active ExecPlan has no remaining unchecked progress items; move it out of active")))))
+                    plans))
+          (catch Exception ex
+            [(err :bd-query-failed plan-dir (or (.getMessage ex) "failed to query bd issue status"))]))))))
+
 (defn validate-governed-doc
   [root rel-path today]
   (let [text (file-text root rel-path)
@@ -305,15 +406,17 @@
   ([root]
    (check-repo root (default-config)))
   ([root config]
-   (let [today (:today config)
-         required (:required-files config)
-         governed (governed-doc-paths root config)
-         governed-errors (mapcat #(validate-governed-doc root % today) governed)
-         index-errors (mapcat #(index-coverage-errors root %) (:index-rules config))]
+  (let [today (:today config)
+        required (:required-files config)
+        governed (governed-doc-paths root config)
+        governed-errors (mapcat #(validate-governed-doc root % today) governed)
+        index-errors (mapcat #(index-coverage-errors root %) (:index-rules config))
+        active-plan-errors (active-exec-plan-errors root config)]
      (-> []
          (into (required-file-errors root required))
          (into governed-errors)
          (into index-errors)
+         (into active-plan-errors)
          (into (agents-link-errors root (:agents-required-links config)))))))
 
 (defn print-errors!

@@ -10,6 +10,7 @@ The `src/hyperopen/views/portfolio/vm.cljs` namespace is currently 1,639 lines o
 
 ## Progress
 
+- [x] (2026-03-09 18:31Z) Moved this stale note to `/hyperopen/docs/exec-plans/deferred/` during ExecPlan lifecycle cleanup because `/hyperopen/docs/exec-plans/completed/2026-03-06-portfolio-vm-facade-and-runtime-extraction.md` supersedes it.
 - [ ] (Pending) Create execution plan.
 - [ ] (Pending) Read and analyze `src/hyperopen/views/portfolio/vm.cljs` to map out its logical sections.
 - [ ] (Pending) Create `src/hyperopen/views/portfolio/vm/constants.cljs` (Options, labels, and shared constants).
@@ -34,7 +35,7 @@ The `src/hyperopen/views/portfolio/vm.cljs` namespace is currently 1,639 lines o
 
 ## Outcomes & Retrospective
 
-(Pending completion)
+This note was never executed as written and is now superseded by `/hyperopen/docs/exec-plans/completed/2026-03-06-portfolio-vm-facade-and-runtime-extraction.md`. It was moved out of `/hyperopen/docs/exec-plans/active/` during the 2026-03-09 lifecycle cleanup so that active ExecPlans only represent live work.
 
 ## Context and Orientation
 

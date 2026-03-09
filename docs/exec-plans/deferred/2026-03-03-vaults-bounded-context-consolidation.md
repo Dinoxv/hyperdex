@@ -14,6 +14,7 @@ A developer can verify the result by confirming that the directory `/hyperopen/s
 
 ## Progress
 
+- [x] (2026-03-09 18:31Z) Moved this plan to `/hyperopen/docs/exec-plans/deferred/` during ExecPlan lifecycle cleanup and created `bd` issue `hyperopen-0o0` as the backlog source of truth.
 - [ ] Read all files to be moved and their consumers to confirm namespace references.
 - [ ] Milestone 1: Move vault detail components from `views/vault_detail/` into `views/vaults/detail/`.
 - [ ] Milestone 2: Move top-level vault entry-point views into `views/vaults/`.
@@ -44,7 +45,7 @@ A developer can verify the result by confirming that the directory `/hyperopen/s
 
 ## Outcomes & Retrospective
 
-(To be filled after completion.)
+This plan was authored but never executed. It was moved out of `/hyperopen/docs/exec-plans/active/` during the 2026-03-09 lifecycle cleanup so that active ExecPlans only represent live execution work. If this refactor is resumed, use `bd` issue `hyperopen-0o0` as the backlog source of truth and this deferred plan as the implementation context.
 
 ## Context and Orientation
 
