@@ -132,14 +132,22 @@
                             :data-role "funding-action-withdraw"
                             :action [:actions/open-funding-withdraw-modal :event.currentTarget/bounds]})]])
 
-(defn- funding-actions-section [spectate-mode-active?]
-  (when-not spectate-mode-active?
-    [:div {:class ["space-y-2"
-                   "py-2.5"
-                   "border-y"
-                   "border-[#223b45]"]
-           :data-parity-id "funding-actions-section"}
-     (funding-actions-cluster)]))
+(defn funding-actions-view
+  ([state]
+   (funding-actions-view state {}))
+  ([state {:keys [container-classes data-parity-id]
+           :or {container-classes ["space-y-2"]}}]
+   (when-not (account-context/spectate-mode-active? state)
+     [:div (cond-> {:class (into [] container-classes)}
+             data-parity-id (assoc :data-parity-id data-parity-id))
+      (funding-actions-cluster)])))
+
+(defn- funding-actions-section [state]
+  (funding-actions-view state {:container-classes ["space-y-2"
+                                                   "py-2.5"
+                                                   "border-y"
+                                                   "border-[#223b45]"]
+                               :data-parity-id "funding-actions-section"}))
 
 (defn- unified-account? [state]
   (= :unified (get-in state [:account :mode])))
@@ -225,12 +233,13 @@
                                             cross-margin-ratio
                                             cross-account-leverage
                                             pnl-info
-                                            spectate-mode-active?]}]
+                                            show-funding-actions?
+                                            state]}]
   [:div {:class ["bg-base-100" "rounded-none" "spectate-none" "p-3" "space-y-4" "w-full" "h-full"]
          :data-parity-id "account-equity"}
    [:div.text-sm.font-semibold.text-trading-text "Account Equity"]
-   (when-not spectate-mode-active?
-     (funding-actions-cluster))
+   (when show-funding-actions?
+     (funding-actions-view state))
 
    [:div.space-y-2
     (metric-row "Account Value" (display-currency account-value-display)
@@ -257,10 +266,12 @@
                                              maintenance-margin
                                              unified-account-leverage
                                              pnl-info
-                                             spectate-mode-active?]}]
+                                             show-funding-actions?
+                                             state]}]
   [:div {:class ["bg-base-100" "rounded-none" "spectate-none" "p-3" "space-y-4" "w-full" "h-full"]
          :data-parity-id "account-equity"}
-   (funding-actions-section spectate-mode-active?)
+   (when show-funding-actions?
+     (funding-actions-section state))
    [:div.text-sm.font-semibold.text-trading-text "Unified Account Summary"]
    [:div.space-y-2
     (metric-row "Unified Account Value" (display-currency account-value-display)
@@ -274,9 +285,16 @@
     (metric-row "Unified Account Leverage" (display-leverage unified-account-leverage)
                 :tooltip "Total Perps Positions Value / Portfolio Value.")]])
 
-(defn account-equity-view [state]
-  (let [metrics (derive-account-equity-metrics state)
-        spectate-mode-active? (account-context/spectate-mode-active? state)]
+(defn account-equity-view
+  ([state]
+   (account-equity-view state {}))
+  ([state {:keys [show-funding-actions?]
+           :or {show-funding-actions? true}}]
+   (let [metrics (derive-account-equity-metrics state)]
     (if (unified-account? state)
-      (unified-account-summary-view (assoc metrics :spectate-mode-active? spectate-mode-active?))
-      (classic-account-equity-view (assoc metrics :spectate-mode-active? spectate-mode-active?)))))
+      (unified-account-summary-view (assoc metrics
+                                           :show-funding-actions? show-funding-actions?
+                                           :state state))
+      (classic-account-equity-view (assoc metrics
+                                          :show-funding-actions? show-funding-actions?
+                                          :state state))))))

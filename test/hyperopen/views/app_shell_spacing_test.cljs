@@ -224,13 +224,17 @@
     (is (contains? orderbook-classes "lg:h-full"))
     (is (contains? orderbook-classes "lg:min-h-0"))))
 
-(deftest trade-view-renders-account-panel-on-mobile-market-surfaces-test
+(deftest trade-view-restores-market-tables-and-keeps-account-surface-summary-only-test
   (let [chart-view (trade-view/trade-view trade-view-test-state)
         chart-account-panel (find-first-node chart-view
                                              #(= "trade-account-tables-panel"
                                                  (get-in % [1 :data-parity-id])))
         chart-classes (node-class-set chart-account-panel)
-        chart-text (set (collect-strings chart-view))
+        chart-account-text (set (collect-strings chart-account-panel))
+        chart-summary-panel (find-first-node chart-view
+                                             #(= "trade-mobile-account-summary-panel"
+                                                 (get-in % [1 :data-parity-id])))
+        chart-summary-classes (node-class-set chart-summary-panel)
         trades-view (trade-view/trade-view (assoc-in trade-view-test-state
                                                      [:trade-ui :mobile-surface]
                                                      :trades))
@@ -252,22 +256,63 @@
         ticket-account-panel (find-first-node ticket-view
                                               #(= "trade-account-tables-panel"
                                                   (get-in % [1 :data-parity-id])))
-        ticket-classes (node-class-set ticket-account-panel)]
+        ticket-classes (node-class-set ticket-account-panel)
+        ticket-desktop-equity-panel (find-first-node ticket-view
+                                                     #(= "trade-desktop-account-equity-panel"
+                                                         (get-in % [1 :data-parity-id])))
+        ticket-desktop-equity-classes (node-class-set ticket-desktop-equity-panel)
+        ticket-summary-panel (find-first-node ticket-view
+                                              #(= "trade-mobile-account-summary-panel"
+                                                  (get-in % [1 :data-parity-id])))
+        ticket-summary-classes (node-class-set ticket-summary-panel)
+        account-view (trade-view/trade-view (assoc-in trade-view-test-state
+                                                      [:trade-ui :mobile-surface]
+                                                      :account))
+        account-active-asset-strip (find-first-node account-view
+                                                    #(= "trade-mobile-active-asset-strip"
+                                                        (get-in % [1 :data-parity-id])))
+        account-active-asset-strip-classes (node-class-set account-active-asset-strip)
+        account-surface-tabs (find-first-node account-view
+                                              #(= "trade-mobile-surface-tabs"
+                                                  (get-in % [1 :data-parity-id])))
+        account-surface-tabs-classes (node-class-set account-surface-tabs)
+        account-panel (find-first-node account-view
+                                       #(= "trade-account-tables-panel"
+                                           (get-in % [1 :data-parity-id])))
+        account-panel-classes (node-class-set account-panel)
+        account-summary-panel (find-first-node account-view
+                                               #(= "trade-mobile-account-summary-panel"
+                                                   (get-in % [1 :data-parity-id])))
+        account-summary-classes (node-class-set account-summary-panel)
+        account-mobile-panel (find-first-node account-view
+                                              #(= "trade-mobile-account-surface"
+                                                  (get-in % [1 :data-parity-id])))
+        account-mobile-text (set (collect-strings account-mobile-panel))]
     (is (contains? chart-classes "flex"))
     (is (not (contains? chart-classes "hidden")))
-    (is (some #(str/starts-with? % "Balances") chart-text))
-    (is (some #(str/starts-with? % "Open Orders") chart-text))
-    (is (contains? chart-text "Trade History"))
+    (is (contains? chart-summary-classes "hidden"))
+    (is (some #(str/starts-with? % "Balances") chart-account-text))
+    (is (some #(str/starts-with? % "Open Orders") chart-account-text))
+    (is (contains? chart-account-text "Trade History"))
     (is (contains? trades-account-classes "flex"))
     (is (not (contains? trades-account-classes "hidden")))
     (is (contains? trades-orderbook-classes "block"))
     (is (not (contains? trades-orderbook-classes "hidden")))
     (is (contains? trades-order-entry-classes "hidden"))
     (is (contains? ticket-classes "hidden"))
-    (is (nil? (find-first-node chart-view
-                               #(= [[:actions/select-trade-mobile-surface :account]
-                                    [:actions/select-account-info-tab :balances]]
-                                   (get-in % [1 :on :click])))))))
+    (is (contains? ticket-summary-classes "hidden"))
+    (is (contains? ticket-desktop-equity-classes "hidden"))
+    (is (contains? account-active-asset-strip-classes "hidden"))
+    (is (contains? account-surface-tabs-classes "hidden"))
+    (is (contains? account-panel-classes "hidden"))
+    (is (contains? account-summary-classes "flex"))
+    (is (not (contains? account-summary-classes "hidden")))
+    (is (contains? account-mobile-text "Account Equity"))
+    (is (contains? account-mobile-text "Deposit"))
+    (is (contains? account-mobile-text "Withdraw"))
+    (is (not (some #(str/starts-with? % "Balances") account-mobile-text)))
+    (is (not (some #(str/starts-with? % "Open Orders") account-mobile-text)))
+    (is (not (contains? account-mobile-text "Trade History")))))
 
 (deftest trade-view-primary-mobile-tabs-route-to-market-surfaces-test
   (let [view-node (trade-view/trade-view trade-view-test-state)

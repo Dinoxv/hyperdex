@@ -119,6 +119,38 @@
     (is (some? (find-first-node view-node #(contains? (direct-texts %) "Account Value"))))
     (is (nil? (find-first-node view-node #(contains? (direct-texts %) "Unified Account Value"))))))
 
+(deftest account-equity-view-can-hide-inline-funding-actions-test
+  (let [view-node (view/account-equity-view {:account {:mode :classic}
+                                             :webdata2 {}
+                                             :spot {}
+                                             :perp-dex-clearinghouse {}}
+                                            {:show-funding-actions? false})
+        deposit-button (find-first-node view-node #(= "funding-action-deposit"
+                                                      (:data-role (node-attrs %))))
+        transfer-button (find-first-node view-node #(= "funding-action-transfer"
+                                                       (:data-role (node-attrs %))))
+        withdraw-button (find-first-node view-node #(= "funding-action-withdraw"
+                                                       (:data-role (node-attrs %))))]
+    (is (some? (find-first-node view-node #(contains? (direct-texts %) "Account Equity"))))
+    (is (nil? deposit-button))
+    (is (nil? transfer-button))
+    (is (nil? withdraw-button))))
+
+(deftest funding-actions-view-exposes-anchor-aware-funding-actions-test
+  (let [actions-node (view/funding-actions-view {})
+        deposit-button (find-first-node actions-node #(= "funding-action-deposit"
+                                                         (:data-role (node-attrs %))))
+        transfer-button (find-first-node actions-node #(= "funding-action-transfer"
+                                                          (:data-role (node-attrs %))))
+        withdraw-button (find-first-node actions-node #(= "funding-action-withdraw"
+                                                          (:data-role (node-attrs %))))]
+    (is (= [[:actions/open-funding-deposit-modal :event.currentTarget/bounds]]
+           (get-in deposit-button [1 :on :click])))
+    (is (= [[:actions/open-funding-transfer-modal :event.currentTarget/bounds]]
+           (get-in transfer-button [1 :on :click])))
+    (is (= [[:actions/open-funding-withdraw-modal :event.currentTarget/bounds]]
+           (get-in withdraw-button [1 :on :click])))))
+
 (deftest unified-account-summary-renders-funding-section-above-summary-test
   (let [view-node (view/account-equity-view {:account {:mode :unified}
                                              :webdata2 {:clearinghouseState {:marginSummary {:accountValue "204.45"

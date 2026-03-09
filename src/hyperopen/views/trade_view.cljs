@@ -40,6 +40,20 @@
                                 :trades
                                 :orderbook)))
 
+(defn- mobile-account-surface [state]
+  [:div {:class ["flex" "flex-col" "bg-base-100"]
+         :data-parity-id "trade-mobile-account-surface"}
+   (account-equity-view/account-equity-view state {:show-funding-actions? false})
+   (account-equity-view/funding-actions-view
+    state
+    {:container-classes ["border-t"
+                         "border-base-300"
+                         "bg-base-100"
+                         "px-3"
+                         "py-3"
+                         "space-y-2"]
+     :data-parity-id "trade-mobile-account-actions"})])
+
 (defn trade-view [state]
   (let [active-asset (:active-asset state)
         orderbook-data (when active-asset (get-in state [:orderbooks active-asset]))
@@ -47,6 +61,7 @@
                          (get-in state [:trade-ui :mobile-surface]))
         mobile-market-surface? (contains? trade-layout-actions/market-mobile-surfaces
                                           mobile-surface)
+        mobile-account-surface? (= mobile-surface :account)
         mobile-orderbook-surface? (contains? #{:orderbook :trades} mobile-surface)
         show-surface-freshness-cues?
         (boolean (get-in state [:websocket-ui :show-surface-freshness-cues?] false))
@@ -62,9 +77,15 @@
     [:div {:class ["flex-1" "flex" "flex-col" "min-h-0"]
            :data-parity-id "trade-root"}
      [:div {:class ["w-full" "h-full" "px-0" "py-0" "space-y-0" "flex" "flex-col" "min-h-0"]}
-      [:div {:class ["lg:hidden" "border-b" "border-base-300" "bg-base-200"]}
+      [:div {:class (into ["lg:hidden" "border-b" "border-base-300" "bg-base-200"]
+                          (when mobile-account-surface?
+                            ["hidden"]))
+             :data-parity-id "trade-mobile-active-asset-strip"}
        (active-asset-view/active-asset-view state*)]
-      [:div {:class ["lg:hidden" "border-b" "border-base-300" "bg-base-200/70" "px-3"]}
+      [:div {:class (into ["lg:hidden" "border-b" "border-base-300" "bg-base-200/70" "px-3"]
+                          (when mobile-account-surface?
+                            ["hidden"]))
+             :data-parity-id "trade-mobile-surface-tabs"}
        [:div {:class ["flex" "items-center" "gap-0"]}
         (for [[surface-id _label :as surface] trade-mobile-surfaces]
           ^{:key (str "trade-mobile-surface-" (name surface-id))}
@@ -138,13 +159,26 @@
                              "xl:row-span-2"])
                :data-parity-id "trade-order-entry-panel"}
          (order-form-view/order-form-view state*)
-         [:div {:class ["border-t" "border-base-300"]}
+         [:div {:class ["hidden" "border-t" "border-base-300" "lg:block"]
+                :data-parity-id "trade-desktop-account-equity-panel"}
           (account-equity-view/account-equity-view state*)]]
 
-        [:div {:class (into [(if (or (= mobile-surface :account)
-                                     mobile-market-surface?)
+        [:div {:class (into [(if mobile-account-surface?
                                "flex"
                                "hidden")
+                             "bg-base-100"
+                             "border-t"
+                             "border-base-300"
+                             "flex-col"
+                             "min-h-0"
+                             "lg:hidden"]
+                            [])
+               :data-parity-id "trade-mobile-account-summary-panel"}
+         (mobile-account-surface state*)]
+
+        [:div {:class (into [(if (= mobile-surface :account)
+                               "hidden"
+                               (if mobile-market-surface? "flex" "hidden"))
                              "bg-base-100"
                              "border-t"
                              "border-base-300"
@@ -157,4 +191,9 @@
                              "xl:col-start-1"
                              "xl:col-span-2"])
                :data-parity-id "trade-account-tables-panel"}
-         (account-info-view/account-info-view state*)]]]]]))
+         [:div {:class ["w-full" "lg:hidden"]
+                :data-parity-id "trade-mobile-account-panel"}
+          (account-info-view/account-info-view state*)]
+         [:div {:class ["hidden" "w-full" "min-h-0" "lg:flex"]
+                :data-parity-id "trade-desktop-account-panel"}
+          (account-info-view/account-info-view state*)]]]]]]))
