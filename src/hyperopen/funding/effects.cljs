@@ -129,7 +129,7 @@
   (let [text (some-> amount str str/trim)]
     (when (and (seq text)
                (re-matches #"^(?:0|[1-9]\d*)(?:\.\d{1,6})?$" text))
-      (let [[whole fract] (str/split text #"\\.")
+      (let [[whole fract] (str/split text #"\.")
             whole* (or whole "0")
             fract* (subs (str (or fract "") "000000") 0 6)
             whole-units (* (js/BigInt whole*) (js/BigInt "1000000"))
@@ -141,7 +141,7 @@
   (let [text (some-> amount str str/trim)]
     (when (and (seq text)
                (re-matches #"^(?:0|[1-9]\d*)(?:\.\d{1,8})?$" text))
-      (let [[whole fract] (str/split text #"\\.")
+      (let [[whole fract] (str/split text #"\.")
             whole* (or whole "0")
             fract* (subs (str (or fract "") "00000000") 0 8)
             whole-units (* (js/BigInt whole*) (js/BigInt "100000000"))
