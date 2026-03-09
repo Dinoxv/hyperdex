@@ -149,15 +149,15 @@
     (is (= [[:actions/toggle-ws-diagnostics]]
            (get-in pill [1 :on :click])))))
 
-(deftest footer-renders-surface-freshness-toggle-test
+(deftest diagnostics-drawer-renders-surface-freshness-toggle-test
   (let [off-view (footer-view/footer-view (base-state))
         off-toggle (find-surface-freshness-toggle off-view)
-        on-view (footer-view/footer-view (assoc-in (base-state)
-                                                   [:websocket-ui :show-surface-freshness-cues?]
-                                                   true))
+        on-view (footer-view/footer-view (-> (base-state)
+                                             (assoc-in [:websocket-ui :diagnostics-open?] true)
+                                             (assoc-in [:websocket-ui :show-surface-freshness-cues?] true)))
         on-toggle (find-surface-freshness-toggle on-view)]
-    (is (some? off-toggle))
-    (is (false? (boolean (get-in off-toggle [1 :checked]))))
+    (is (nil? off-toggle))
+    (is (some? on-toggle))
     (is (true? (boolean (get-in on-toggle [1 :checked]))))))
 
 (deftest footer-renders-mobile-bottom-nav-actions-test

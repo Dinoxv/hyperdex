@@ -421,6 +421,39 @@
     value
     (diagnostics-sanitize/sanitize-value :mask value)))
 
+(defn- surface-freshness-toggle [checked?]
+  [:label {:class ["flex"
+                   "items-center"
+                   "justify-between"
+                   "gap-3"
+                   "rounded"
+                   "border"
+                   "border-base-300"
+                   "bg-base-200/50"
+                   "px-3"
+                   "py-2.5"
+                   "text-xs"
+                   "text-base-content"
+                   "cursor-pointer"
+                   "select-none"]
+           :data-role "surface-freshness-toggle"}
+   [:span "Show freshness cues"]
+   [:input {:type "checkbox"
+            :class ["h-5"
+                    "w-5"
+                    "rounded-[3px]"
+                    "border"
+                    "border-base-300"
+                    "bg-transparent"
+                    "trade-toggle-checkbox"
+                    "transition-colors"
+                    "focus:outline-none"
+                    "focus:ring-0"
+                    "focus:ring-offset-0"
+                    "focus:shadow-none"]
+            :checked checked?
+            :on {:click [[:actions/toggle-show-surface-freshness-cues]]}}]])
+
 (defn- group-title [group]
   (case group
     :orders_oms "Orders/OMS"
@@ -518,6 +551,8 @@
         reveal-sensitive? (boolean (get-in state [:websocket-ui :reveal-sensitive?] false))
         copy-status (get-in state [:websocket-ui :copy-status])
         copy-success? (= :success (:kind copy-status))
+        show-surface-freshness-cues?
+        (boolean (get-in state [:websocket-ui :show-surface-freshness-cues?] false))
         transport-state (get-in health [:transport :state])
         reset-in-progress? (boolean (get-in state [:websocket-ui :reset-in-progress?] false))
         reset-cooldown-until-ms (get-in state [:websocket-ui :reset-cooldown-until-ms])
@@ -644,6 +679,7 @@
       [:section {:class ["space-y-2"]}
        [:h3 {:class ["text-xs" "font-semibold" "uppercase" "tracking-wide" "text-base-content/70"]}
         "Diagnostics"]
+       (surface-freshness-toggle show-surface-freshness-cues?)
        [:div {:class ["rounded" "border" "border-base-300" "bg-base-200/50" "p-3" "space-y-1.5" "text-xs"]}
         [:div {:class ["flex" "justify-between"]}
          [:span "App version"]
@@ -863,8 +899,6 @@
         {:keys [status]} (dominant-pill-state health)
         {:keys [border bg text]} (status-tone status)
         pill-label (if (= status :live) "Connected" (status-label status))
-        show-surface-freshness-cues?
-        (boolean (get-in state [:websocket-ui :show-surface-freshness-cues?] false))
         diagnostics-open? (boolean (get-in state [:websocket-ui :diagnostics-open?] false))
         footer-z-class (if diagnostics-open? "z-[260]" "z-40")
         banner (banner-model state health)]
@@ -901,25 +935,7 @@
                           bg
                           text]
                   :on {:click [[:actions/toggle-ws-diagnostics]]}}
-         [:span pill-label]]
-        [:label {:class ["flex" "items-center" "gap-2" "text-xs" "text-base-content/70" "cursor-pointer" "select-none"]
-                 :data-role "surface-freshness-toggle"}
-         [:input {:type "checkbox"
-                  :class ["h-4"
-                          "w-4"
-                          "rounded-[3px]"
-                          "border"
-                          "border-base-300"
-                          "bg-transparent"
-                          "trade-toggle-checkbox"
-                          "transition-colors"
-                          "focus:outline-none"
-                          "focus:ring-0"
-                          "focus:ring-offset-0"
-                          "focus:shadow-none"]
-                  :checked show-surface-freshness-cues?
-                  :on {:click [[:actions/toggle-show-surface-freshness-cues]]}}]
-         [:span "Show freshness cues"]]]
+         [:span pill-label]]]
 
        [:div {:class ["flex" "space-x-6"]}
         [:a {:class footer-link-classes
