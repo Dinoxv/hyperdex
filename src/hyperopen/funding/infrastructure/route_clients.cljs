@@ -34,20 +34,24 @@
 
 (defn fetch-lifi-quote!
   [request]
-  (let [url (lifi-quote-url request)]
-    (-> (js/fetch url #js {:method "GET"})
-        (.then (fn [resp]
-                 (if (.-ok resp)
-                   (.json resp)
-                   (.then (.text resp)
-                          (fn [text]
-                            (throw (js/Error.
-                                    (str "LiFi quote request failed ("
-                                         (.-status resp)
-                                         "): "
-                                         (or text "Unknown response"))))))))
-        (.then (fn [payload]
-                 (js->clj payload :keywordize-keys true)))))))
+  (let [url (lifi-quote-url request)
+        request-promise (js/fetch url #js {:method "GET"})
+        response-promise (let [handle-response
+                               (fn [resp]
+                                 (if (.-ok resp)
+                                   (.json resp)
+                                   (let [text-promise (.text resp)]
+                                     (.then text-promise
+                                            (fn [text]
+                                              (throw (js/Error.
+                                                      (str "LiFi quote request failed ("
+                                                           (.-status resp)
+                                                           "): "
+                                                           (or text "Unknown response")))))))))]
+                           (.then request-promise handle-response))]
+    (.then response-promise
+           (fn [payload]
+             (js->clj payload :keywordize-keys true)))))
 
 (defn- across-approval-url
   [{:keys [base-url from-address amount-units input-token-address origin-chain-id output-token-address destination-chain-id]}]
@@ -63,20 +67,24 @@
 
 (defn fetch-across-approval!
   [request]
-  (let [url (across-approval-url request)]
-    (-> (js/fetch url #js {:method "GET"})
-        (.then (fn [resp]
-                 (if (.-ok resp)
-                   (.json resp)
-                   (.then (.text resp)
-                          (fn [text]
-                            (throw (js/Error.
-                                    (str "Across approval request failed ("
-                                         (.-status resp)
-                                         "): "
-                                         (or text "Unknown response"))))))))
-        (.then (fn [payload]
-                 (js->clj payload :keywordize-keys true)))))))
+  (let [url (across-approval-url request)
+        request-promise (js/fetch url #js {:method "GET"})
+        response-promise (let [handle-response
+                               (fn [resp]
+                                 (if (.-ok resp)
+                                   (.json resp)
+                                   (let [text-promise (.text resp)]
+                                     (.then text-promise
+                                            (fn [text]
+                                              (throw (js/Error.
+                                                      (str "Across approval request failed ("
+                                                           (.-status resp)
+                                                           "): "
+                                                           (or text "Unknown response")))))))))]
+                           (.then request-promise handle-response))]
+    (.then response-promise
+           (fn [payload]
+             (js->clj payload :keywordize-keys true)))))
 
 (defn- normalize-hex-data
   [value]
