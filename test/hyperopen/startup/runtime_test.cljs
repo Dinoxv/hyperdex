@@ -580,6 +580,7 @@
                    (:end-time-ms fundings-opts))))
          (is (= [["0xaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa" ["dex-a" "dex-b"]]] @stage-b-calls))
          (is (= "0xaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa" (:bootstrapped-address @startup-runtime-atom)))
+         (is (= false (get-in @store [:orders :open-orders-hydrated?])))
          (is (= 1 (get-in @store [:account-info :order-history :request-id])))
          (is (= {} (get-in @store [:orders :open-orders-snapshot-by-dex])))
          (is (= [] (get-in @store [:orders :fundings-raw])))
@@ -614,6 +615,7 @@
           stage-a-calls (atom [])
           store (atom {:wallet {:address address}
                        :account-info {:order-history {:request-id 0}}
+                       :orders {:open-orders-hydrated? true}
                        :websocket {:health {:transport {:state :connected
                                                         :freshness :live}
                                             :streams {"open-orders-stream" {:subscribed? true
@@ -664,7 +666,7 @@
          (is (some #(= :abstraction (first %)) @stage-a-calls))
          (is (some #(= :portfolio (first %)) @stage-a-calls))
          (is (some #(= :user-fees (first %)) @stage-a-calls))
-         (is (not (some #(= :open-orders (first %)) @stage-a-calls)))
+         (is (some #(= :open-orders (first %)) @stage-a-calls))
          (is (not (some #(= :fills (first %)) @stage-a-calls)))
          (is (not (some #(= :fundings (first %)) @stage-a-calls)))
          (done))
@@ -676,6 +678,7 @@
           stage-a-calls (atom [])
           store (atom {:wallet {:address address}
                        :account-info {:order-history {:request-id 0}}
+                       :orders {:open-orders-hydrated? true}
                        :websocket {:health {:transport {:state :connected
                                                         :freshness :live}
                                             :streams {"open-orders-stream" {:subscribed? true
@@ -726,7 +729,7 @@
          (is (some #(= :abstraction (first %)) @stage-a-calls))
          (is (some #(= :portfolio (first %)) @stage-a-calls))
          (is (some #(= :user-fees (first %)) @stage-a-calls))
-         (is (not (some #(= :open-orders (first %)) @stage-a-calls)))
+         (is (some #(= :open-orders (first %)) @stage-a-calls))
          (is (not (some #(= :fills (first %)) @stage-a-calls)))
          (is (not (some #(= :fundings (first %)) @stage-a-calls)))
          (done))
@@ -917,6 +920,7 @@
       (is (= ["0xaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"] @bootstrap-calls))
       ((:on-change address-handler) nil)
       (is (nil? (:bootstrapped-address @startup-runtime-atom)))
+      (is (= false (get-in @store [:orders :open-orders-hydrated?])))
       (is (= {} (get-in @store [:orders :open-orders-snapshot-by-dex])))
       (is (= [] (get-in @store [:orders :fundings-raw])))
       (is (= [] (get-in @store [:orders :fundings])))

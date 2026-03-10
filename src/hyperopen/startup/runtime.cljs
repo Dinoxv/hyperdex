@@ -291,6 +291,7 @@
             (startup-funding-history-request-opts
              startup-funding-history-lookback-ms)]
       (swap-startup-state! deps assoc :bootstrapped-address address)
+      (swap! store assoc-in [:orders :open-orders-hydrated?] false)
       (swap! store assoc-in [:orders :open-orders-snapshot-by-dex] {})
       (swap! store assoc-in [:orders :fundings-raw] [])
       (swap! store assoc-in [:orders :fundings] [])
@@ -354,6 +355,7 @@
         (bootstrap-account-data! new-address)
         (do
           (swap-startup-state! deps assoc :bootstrapped-address nil)
+          (swap! store assoc-in [:orders :open-orders-hydrated?] false)
           (swap! store assoc-in [:orders :open-orders-snapshot-by-dex] {})
           (swap! store assoc-in [:orders :fundings-raw] [])
           (swap! store assoc-in [:orders :fundings] [])

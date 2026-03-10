@@ -111,3 +111,51 @@
                 @sync-calls))
          (done))
        0))))
+
+(deftest schedule-stream-backed-fallback-fetches-when-open-orders-stream-is-live-but-surface-not-hydrated-test
+  (let [scheduled-callback (atom nil)
+        fetch-calls (atom [])
+        store (atom {:wallet {:address address}
+                     :orders {:open-orders []
+                              :open-orders-hydrated? false}
+                     :websocket {:health {:transport {:state :connected
+                                                      :freshness :live}
+                                          :streams {["openOrders" nil address nil nil]
+                                                    {:topic "openOrders"
+                                                     :status :live
+                                                     :subscribed? true
+                                                     :descriptor {:type "openOrders"
+                                                                  :user address}}}}}})]
+    (surface-service/schedule-stream-backed-fallback!
+     {:store store
+      :address address
+      :topic "openOrders"
+      :fetch-fn (fn [_store fetch-address opts]
+                  (swap! fetch-calls conj [fetch-address opts]))
+      :opts {:priority :high}
+      :surface-hydrated? #(true? (get-in % [:orders :open-orders-hydrated?]))
+      :startup-stream-backfill-delay-ms 12
+      :set-timeout-fn (fn [callback _delay-ms]
+                        (reset! scheduled-callback callback)
+                        :timeout-id)})
+    (is (fn? @scheduled-callback))
+    (@scheduled-callback)
+    (is (= [[address {:priority :high}]]
+           @fetch-calls))
+    (reset! scheduled-callback nil)
+    (reset! fetch-calls [])
+    (swap! store assoc-in [:orders :open-orders-hydrated?] true)
+    (surface-service/schedule-stream-backed-fallback!
+     {:store store
+      :address address
+      :topic "openOrders"
+      :fetch-fn (fn [_store fetch-address opts]
+                  (swap! fetch-calls conj [fetch-address opts]))
+      :opts {:priority :high}
+      :surface-hydrated? #(true? (get-in % [:orders :open-orders-hydrated?]))
+      :startup-stream-backfill-delay-ms 12
+      :set-timeout-fn (fn [callback _delay-ms]
+                        (reset! scheduled-callback callback)
+                        :timeout-id)})
+    (is (nil? @scheduled-callback))
+    (is (= [] @fetch-calls))))

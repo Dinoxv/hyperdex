@@ -48,7 +48,7 @@
       (is (contains? label-classes "min-h-6"))
       (is (contains? label-classes "w-full")))))
 
-(deftest open-orders-grid-template-keeps-right-columns-readable-test
+(deftest open-orders-grid-template-expands-the-coin-track-without-collapsing-tail-columns-test
   (let [open-orders [{:oid 101
                       :coin "HYPE"
                       :side "B"
@@ -69,7 +69,9 @@
     (is (some? header-grid-class))
     (is (= header-grid-class row-grid-class))
     (is (str/includes? header-grid-class
-                       "minmax(80px,0.95fr)_minmax(120px,1.35fr)_minmax(70px,0.8fr)_minmax(80px,0.9fr)"))))
+                       "minmax(90px,1.15fr)"))
+    (is (str/includes? header-grid-class
+                       "minmax(76px,0.82fr)_minmax(112px,1.15fr)_minmax(64px,0.72fr)_minmax(72px,0.74fr)"))))
 
 (deftest open-orders-tab-content-memoizes-sorting-by-input-signature-and-sort-state-test
   (let [rows [{:oid 1001
@@ -403,13 +405,15 @@
                       :is-position-tpsl false}]
         content (view/open-orders-tab-content open-orders {:column "Time" :direction :desc})
         long-coin-base (hiccup/find-first-node content #(and (= :span (first %))
-                                                      (contains? (hiccup/node-class-set %) "truncate")
+                                                      (contains? (hiccup/node-class-set %) "whitespace-nowrap")
                                                       (contains? (hiccup/direct-texts %) "NVDA")))
         short-coin-base (hiccup/find-first-node content #(and (= :span (first %))
-                                                       (contains? (hiccup/node-class-set %) "truncate")
+                                                       (contains? (hiccup/node-class-set %) "whitespace-nowrap")
                                                        (contains? (hiccup/direct-texts %) "PUMP")))]
     (is (some? long-coin-base))
     (is (some? short-coin-base))
+    (is (not (contains? (hiccup/node-class-set long-coin-base) "truncate")))
+    (is (not (contains? (hiccup/node-class-set short-coin-base) "truncate")))
     (is (contains? (hiccup/node-class-set long-coin-base) "font-semibold"))
     (is (contains? (hiccup/node-class-set short-coin-base) "font-semibold"))
     (is (= "rgb(151, 252, 228)"

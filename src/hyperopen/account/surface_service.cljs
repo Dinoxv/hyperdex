@@ -23,12 +23,20 @@
   (when (fn? f)
     (apply f args)))
 
+(defn- open-orders-surface-hydrated?
+  [state]
+  (or (true? (get-in state [:orders :open-orders-hydrated?]))
+      (seq (get-in state [:orders :open-orders]))
+      (seq (get-in state [:orders :open-orders-snapshot]))
+      (some seq (vals (get-in state [:orders :open-orders-snapshot-by-dex] {})))))
+
 (defn schedule-stream-backed-fallback!
   [{:keys [store
            address
            topic
            opts
            fetch-fn
+           surface-hydrated?
            startup-stream-backfill-delay-ms
            set-timeout-fn
            resolve-current-address]
@@ -39,11 +47,17 @@
                (seq address)
                (string? topic)
                (fn? fetch-fn))
-      (when-not (surface-policy/topic-usable-for-address? @store topic address)
+      (when-not (and (surface-policy/topic-usable-for-address? @store topic address)
+                     (if (fn? surface-hydrated?)
+                       (surface-hydrated? @store)
+                       true))
         (set-timeout-fn
          (fn []
            (when (active-address? store address resolve-current-address)
-             (when-not (surface-policy/topic-usable-for-address? @store topic address)
+             (when-not (and (surface-policy/topic-usable-for-address? @store topic address)
+                            (if (fn? surface-hydrated?)
+                              (surface-hydrated? @store)
+                              true))
                (fetch-fn store address (or opts {})))))
          delay-ms)))))
 
@@ -118,6 +132,7 @@
             :topic "openOrders"
             :fetch-fn fetch-frontend-open-orders!
             :opts {:priority :high}
+            :surface-hydrated? open-orders-surface-hydrated?
             :startup-stream-backfill-delay-ms startup-stream-backfill-delay-ms
             :resolve-current-address resolve-current-address})
           (schedule-stream-backed-fallback!

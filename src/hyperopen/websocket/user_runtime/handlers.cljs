@@ -33,7 +33,11 @@
   (fn [msg]
     (when (and (= "openOrders" (:channel msg))
                (common/message-for-active-address? store msg))
-      (swap! store assoc-in [:orders :open-orders] (:data msg)))))
+      (swap! store
+             (fn [state]
+               (-> state
+                   (assoc-in [:orders :open-orders] (:data msg))
+                   (assoc-in [:orders :open-orders-hydrated?] true)))))))
 
 (defn user-fills-handler
   [store]

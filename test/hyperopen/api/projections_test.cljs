@@ -185,6 +185,8 @@
            (:perp-dex-fee-config-by-name perp-dexs-with-config)))
     (is (= "Error: perp-dexs" (:perp-dexs-error perp-dexs-error)))
     (is (= :unexpected (:perp-dexs-error-category perp-dexs-error)))
+    (is (= true (get-in open-orders [:orders :open-orders-hydrated?])))
+    (is (= true (get-in open-orders-by-dex [:orders :open-orders-hydrated?])))
     (is (= [{:oid 1}] (get-in open-orders [:orders :open-orders-snapshot])))
     (is (= [{:oid 2}] (get-in open-orders-by-dex [:orders :open-orders-snapshot-by-dex "vault"])))
     (is (= "Error: open-orders" (get-in open-orders-error [:orders :open-error])))

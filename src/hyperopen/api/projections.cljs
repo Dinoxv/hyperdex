@@ -67,9 +67,10 @@
 
 (defn apply-open-orders-success
   [state dex rows]
-  (if (and dex (not= dex ""))
-    (assoc-in state [:orders :open-orders-snapshot-by-dex dex] rows)
-    (assoc-in state [:orders :open-orders-snapshot] rows)))
+  (let [state* (assoc-in state [:orders :open-orders-hydrated?] true)]
+    (if (and dex (not= dex ""))
+      (assoc-in state* [:orders :open-orders-snapshot-by-dex dex] rows)
+      (assoc-in state* [:orders :open-orders-snapshot] rows))))
 
 (defn apply-open-orders-error
   [state err]

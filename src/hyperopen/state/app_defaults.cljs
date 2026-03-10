@@ -55,6 +55,7 @@
 (defn default-orders-state
   []
   {:open-orders []
+   :open-orders-hydrated? false
    :open-orders-snapshot []
    :open-orders-snapshot-by-dex {}
    :fills []

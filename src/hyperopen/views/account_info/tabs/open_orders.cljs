@@ -167,7 +167,7 @@
     (shared/coin-select-control
      coin
      [:span {:class ["flex" "items-center" "gap-1.5" "min-w-0"]}
-      [:span (cond-> {:class (cond-> ["truncate"]
+      [:span (cond-> {:class (cond-> ["whitespace-nowrap"]
                                 side
                                 (conj "font-semibold"))}
                node-style
@@ -253,7 +253,7 @@
   (table/sortable-header-button column-name sort-state :actions/sort-open-orders))
 
 (def ^:private open-orders-grid-template-class
-  "grid-cols-[minmax(130px,1.45fr)_minmax(70px,0.75fr)_minmax(60px,0.7fr)_minmax(70px,0.8fr)_minmax(60px,0.7fr)_minmax(80px,0.85fr)_minmax(100px,1fr)_minmax(70px,0.8fr)_minmax(80px,0.95fr)_minmax(120px,1.35fr)_minmax(70px,0.8fr)_minmax(80px,0.9fr)]")
+  "grid-cols-[minmax(130px,1.4fr)_minmax(64px,0.64fr)_minmax(90px,1.15fr)_minmax(64px,0.68fr)_minmax(56px,0.58fr)_minmax(80px,0.8fr)_minmax(96px,1fr)_minmax(68px,0.72fr)_minmax(76px,0.82fr)_minmax(112px,1.15fr)_minmax(64px,0.72fr)_minmax(72px,0.74fr)]")
 
 (defn open-orders-tab-content
   ([normalized sort-state]
