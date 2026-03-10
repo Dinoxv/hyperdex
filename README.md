@@ -38,6 +38,94 @@ If you are evaluating the project on GitHub, start with:
 - [Reliability Invariants](docs/RELIABILITY.md)
 - [Product specs and roadmap](docs/product-specs/index.md)
 
+## Architecture
+
+Hyperopen is built around plain ClojureScript data, explicit state transitions, and narrow interop boundaries. The UI is rendered with Replicant and action/effect handlers are registered through Nexus, but the practical design choice is simpler than any framework label: most product logic works on maps, vectors, and keywords, then hands off side effects to named boundary namespaces.
+
+That wiring is visible in:
+
+- [src/hyperopen/app/bootstrap.cljs](src/hyperopen/app/bootstrap.cljs), which connects Replicant rendering to Nexus dispatch
+- [src/hyperopen/runtime/wiring.cljs](src/hyperopen/runtime/wiring.cljs) and [src/hyperopen/runtime/bootstrap.cljs](src/hyperopen/runtime/bootstrap.cljs), which register actions, effects, system state, and runtime watchers
+- feature namespaces such as [src/hyperopen/chart/actions.cljs](src/hyperopen/chart/actions.cljs), [src/hyperopen/runtime/action_adapters.cljs](src/hyperopen/runtime/action_adapters.cljs), and [src/hyperopen/runtime/app_effects.cljs](src/hyperopen/runtime/app_effects.cljs)
+
+### Data-oriented state and actions
+
+Feature actions usually return effect descriptors instead of mutating UI objects directly. That keeps the "what should happen next?" part of the code visible and testable.
+
+```clj
+(defn select-chart-type
+  [state chart-type]
+  [(chart-dropdown-projection-effect nil [[[:chart-options :selected-chart-type] chart-type]])
+   [:effects/local-storage-set "chart-type" (name chart-type)]])
+```
+
+That example comes from [src/hyperopen/chart/actions.cljs](src/hyperopen/chart/actions.cljs). The action computes the next projection and the persistence effect as plain data. The effect is interpreted later by runtime adapters such as [src/hyperopen/runtime/app_effects.cljs](src/hyperopen/runtime/app_effects.cljs), which is where `swap!`, `localStorage`, history updates, and other side effects actually happen.
+
+### Explicit state flow
+
+The websocket runtime makes this pattern especially explicit. [src/hyperopen/websocket/application/runtime_reducer.cljs](src/hyperopen/websocket/application/runtime_reducer.cljs) reduces runtime messages such as `:cmd/send-message`, `:evt/socket-open`, and `:evt/socket-close` into a new state plus a vector of runtime effects. Those effects are plain data values created by [src/hyperopen/websocket/domain/model.cljs](src/hyperopen/websocket/domain/model.cljs), for example `:fx/socket-send`, `:fx/timer-set-interval`, and `:fx/project-runtime-view`.
+
+This makes cause and effect easier to follow than in a mutable event-handler style architecture:
+
+- the reducer owns the state transition
+- the effect interpreter owns timers, sockets, and dispatching
+- tests can drive the reducer and interpreter separately
+
+The reducer is even written so it can be called directly in tests and replay-like tooling, which is why runtime config normalization and message typing live inside the reducer layer instead of being spread across UI callbacks.
+
+### Boundaries stay at the edge
+
+Browser, network, and persistence code are intentionally pushed to the edges:
+
+- [src/hyperopen/websocket/acl/hyperliquid.cljs](src/hyperopen/websocket/acl/hyperliquid.cljs) parses raw provider JSON into domain envelopes before the rest of the websocket runtime consumes it.
+- [src/hyperopen/websocket/infrastructure/runtime_effects.cljs](src/hyperopen/websocket/infrastructure/runtime_effects.cljs) owns socket lifecycle, timers, routing, projection publication, and telemetry.
+- [src/hyperopen/runtime/app_effects.cljs](src/hyperopen/runtime/app_effects.cljs) owns app-level `save!`, `localStorage`, history, and async fetch effects.
+- [src/hyperopen/platform/indexed_db.cljs](src/hyperopen/platform/indexed_db.cljs) centralizes IndexedDB access instead of scattering raw `js/indexedDB` calls.
+
+One practical benefit is that mutable foreign objects stay out of core reducer state:
+
+```clj
+(defn- connection-projection [state]
+  {:status (:status state)
+   :attempt (:attempt state)
+   :ws nil})
+
+(defn- attach-active-socket [io-state runtime-view]
+  (assoc-in runtime-view [:connection :ws]
+            (get-in @io-state [:sockets (:active-socket-id runtime-view)])))
+```
+
+The reducer publishes plain data first, and the effect interpreter attaches the actual websocket object later when updating the runtime view. That keeps browser objects out of the part of the system that needs to stay deterministic.
+
+### Projections and view models
+
+Rendering code generally consumes derived data instead of re-parsing raw exchange payloads inline:
+
+- [src/hyperopen/views/account_info/projections](src/hyperopen/views/account_info/projections) normalizes, filters, dedupes, and labels balances, positions, orders, and trades for tables.
+- [src/hyperopen/views/portfolio/vm.cljs](src/hyperopen/views/portfolio/vm.cljs) builds a portfolio view model from account metrics, summary state, benchmark context, and chart helpers.
+- the websocket reducer emits a public runtime projection via `:fx/project-runtime-view` instead of exposing raw internal runtime state directly.
+
+This is useful at the product level because a UI change often becomes "update the projection contract" instead of "thread parsing logic through several components."
+
+## Why these choices reduce complexity
+
+- State transitions are explicit return values, not hidden mutations buried in callbacks.
+- Data normalization happens once at boundaries and projection helpers, which reduces duplicate parsing logic across views.
+- Core state stays plain and serializable, which makes debugging and reducer tests much simpler.
+- Side effects are concentrated in a few namespaces, so bugs involving sockets, timers, storage, or fetches are easier to isolate.
+- The same seams are tested directly. Good examples are [test/hyperopen/websocket/acl/hyperliquid_test.cljs](test/hyperopen/websocket/acl/hyperliquid_test.cljs), [test/hyperopen/websocket/infrastructure/runtime_effects_test.cljs](test/hyperopen/websocket/infrastructure/runtime_effects_test.cljs), [test/hyperopen/views/account_info/projections_test.cljs](test/hyperopen/views/account_info/projections_test.cljs), and [test/hyperopen/websocket/market_projection_runtime_test.cljs](test/hyperopen/websocket/market_projection_runtime_test.cljs).
+
+## Why this codebase is easier for humans and agents to work on
+
+The architecture is not "AI magic." It is useful for humans and agents for the same reason: the code gives you stable places to look.
+
+- User actions usually start in feature action namespaces such as [src/hyperopen/chart/actions.cljs](src/hyperopen/chart/actions.cljs) or in [src/hyperopen/runtime/action_adapters.cljs](src/hyperopen/runtime/action_adapters.cljs).
+- Boundary work usually lives in [src/hyperopen/runtime/effect_adapters](src/hyperopen/runtime/effect_adapters), [src/hyperopen/websocket/infrastructure](src/hyperopen/websocket/infrastructure), or [src/hyperopen/platform](src/hyperopen/platform).
+- Derived UI state usually lives in [src/hyperopen/views](src/hyperopen/views) under `projections` or `vm`.
+- Tests are named after those same seams, which makes targeted verification straightforward.
+
+That locality matters in practice. A contributor or agent can usually implement a feature by changing one action or reducer, one boundary adapter if I/O is involved, one projection or view-model if the UI shape changes, and one nearby test. That is safer than hunting through large mutable controller objects with hidden side effects.
+
 ## Quick start
 
 ### Prerequisites
@@ -100,6 +188,7 @@ Future work may extend that philosophy further into user-controlled analytics co
 
 Contributions are welcome. The best starting points are:
 
+- [Architecture Map](ARCHITECTURE.md)
 - [Planning and execution](docs/PLANS.md)
 - [Work tracking](docs/WORK_TRACKING.md)
 - [Quality scorecard](docs/QUALITY_SCORE.md)
@@ -110,3 +199,11 @@ The repository uses beads (`bd`) for local issue tracking. If you are working in
 ## License
 
 GNU AGPL v3. See [LICENSE](LICENSE).
+
+## When changing code here
+
+- Keep pure decision logic in action, reducer, domain, projection, or view-model namespaces. Keep browser APIs, sockets, timers, storage, and fetches in effect or infrastructure namespaces.
+- Normalize external payloads once at the boundary or projection helper. Do not let multiple views invent their own parsing rules.
+- Prefer explicit effects and derived values over ad hoc mutation of shared state.
+- Do not put live websocket, DOM, or timer objects into core app state when a sidecar or interpreter boundary already exists.
+- Add or update the focused test nearest the seam you touched before reaching for broader fixes.
