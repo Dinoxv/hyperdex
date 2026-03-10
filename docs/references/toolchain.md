@@ -1,7 +1,7 @@
 ---
 owner: platform
 status: canonical
-last_reviewed: 2026-03-07
+last_reviewed: 2026-03-10
 review_cycle_days: 90
 source_of_truth: true
 ---
@@ -23,10 +23,12 @@ Local discovery and semantic analysis commands:
 - `clojure-lsp diagnostics --project-root .`
 - `clojure-lsp references --project-root . --from <fqns> --raw`
 - `clojure-lsp rename --project-root . --from <old-fqns> --to <new-fqns> --dry`
+- `tools/shadow-nrepl-port` or `npm run nrepl:port`
 
 Usage guidance:
 - Prefer `rg` for fast first-pass discovery, broad audits, and cases where the exact fully qualified symbol is not known yet.
 - Prefer `clojure-lsp` for symbol-accurate references, rename planning, and editor-backed definition jumps once a persistent LSP session is available.
+- Prefer `tools/shadow-nrepl-port` over global process scans when you need the live Shadow nREPL for the current worktree; it reads `target/shadow-cljs/nrepl.port` from the worktree root and verifies the listener is still alive.
 - Standalone `clj-kondo` is optional in local environments; use `clojure-lsp diagnostics` as the repo-safe semantic analysis default unless `clj-kondo` is explicitly installed and required.
 
 Browser inspection and parity commands:

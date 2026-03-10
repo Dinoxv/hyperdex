@@ -11,6 +11,7 @@
     "dev:proxy": "concurrently -k -n TAILWIND,CLJS,PROXY \"npm run css:watch\" \"npm run cljs:watch\" \"npm run proxy:dev\"",
     "build": "npm run css:build && npx shadow-cljs release app portfolio-worker",
     "repl": "npx shadow-cljs cljs-repl app",
+    "nrepl:port": "./tools/shadow-nrepl-port",
     "test:runner:generate": "node tools/generate-test-runner.mjs",
     "test": "npm run test:runner:generate && shadow-cljs compile test && node out/test.js",
     "test:ci": "npm run check && npm test",

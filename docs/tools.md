@@ -1,7 +1,7 @@
 ---
 owner: platform
 status: canonical
-last_reviewed: 2026-03-07
+last_reviewed: 2026-03-10
 review_cycle_days: 90
 source_of_truth: true
 ---
@@ -13,7 +13,7 @@ Use this file as the single starting point for what actions this repo provides t
 ## Quick map
 
 1. For a quick list of build/test commands, start with this section in `/hyperopen/docs/references/toolchain.md`.
-2. For local Clojure discovery, semantic references, renames, and diagnostics, use the Local Clojure Navigation and Analysis section below.
+2. For local Clojure discovery, semantic references, renames, diagnostics, and current-worktree Shadow nREPL lookup, use the Local Clojure Navigation and Analysis section below.
 3. For shared command phrase lookup, use `/hyperopen/tools/phrase get "<phrase>"` and `/hyperopen/command-phrases.edn`.
 4. For browser parity/debug workflows, use the Browser Inspection section below.
 5. For CRAP hotspot analysis after generating coverage, use `bb tools/crap_report.clj --scope src` or `bb tools/crap_report.clj --module <path> --format json`.
@@ -51,11 +51,13 @@ Use this file as the single starting point for what actions this repo provides t
 | `clojure-lsp diagnostics --project-root .` | Semantic diagnostics using project analysis | After edits or before handoff when you want unresolved-symbol, namespace, and lint feedback |
 | `clojure-lsp references --project-root . --from <fqns> --raw` | Symbol-accurate reference lookup | You know the fully qualified symbol and need real references instead of text matches |
 | `clojure-lsp rename --project-root . --from <old-fqns> --to <new-fqns> --dry` | Preview semantic rename patch without editing files | Rename planning, API moves, and safe scope checks before applying a rename |
+| `tools/shadow-nrepl-port` or `npm run nrepl:port` | Resolve the active Shadow nREPL port for the current git worktree as JSON | Codex or local tooling needs the dev REPL that belongs to this worktree, not another worktree on the same machine |
 | `clojure-lsp` via a persistent editor/LSP session | Warm semantic navigation for definition, references, and rename | Repeated symbol work where one-time analysis startup can be amortized across many lookups |
 
 Recommended split:
 - Start with `rg` when speed matters most or when you do not yet know the exact symbol you are chasing.
 - Switch to `clojure-lsp` once you know the fully qualified symbol and correctness matters more than raw command latency.
+- Use `tools/shadow-nrepl-port` instead of global `ps`/`lsof` scans when you need the live Shadow nREPL for this worktree. The helper resolves the current git top-level, reads `target/shadow-cljs/nrepl.port`, and verifies the port is still listening before returning JSON.
 - Prefer a persistent `clojure-lsp` session for repeated navigation. One-shot CLI calls pay analysis startup cost each time.
 - Treat standalone `clj-kondo` as optional. `clojure-lsp` uses `clj-kondo` analysis internally, but the separate `clj-kondo` binary is not guaranteed to be installed on `PATH` in every local environment.
 
@@ -158,6 +160,7 @@ Register once in Codex once and then call MCP tools directly:
 ## 8) Where definitions live
 
 - Scripted command surface: `/hyperopen/package.json`
+- Worktree-scoped Shadow nREPL helper: `/hyperopen/tools/shadow-nrepl-port`
 - UI workbench source: `/hyperopen/portfolio/hyperopen/workbench/`
 - UI workbench scenes: `/hyperopen/portfolio/hyperopen/workbench/scenes/**`
 - UI workbench shared helpers/builders: `/hyperopen/portfolio/hyperopen/workbench/support/**`
