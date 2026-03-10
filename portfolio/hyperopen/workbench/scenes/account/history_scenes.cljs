@@ -1,6 +1,7 @@
 (ns hyperopen.workbench.scenes.account.history-scenes
   (:require [portfolio.replicant :as portfolio]
             [hyperopen.workbench.support.layout :as layout]
+            [hyperopen.views.account-info.projections.trades :as trade-projections]
             [hyperopen.views.account-info.tabs.funding-history :as funding-history]
             [hyperopen.views.account-info.tabs.order-history :as order-history]
             [hyperopen.views.account-info.tabs.trade-history :as trade-history]))
@@ -72,6 +73,19 @@
     :status "canceled"
     :statusTimestamp 1700003600500}])
 
+(def trade-market-by-key
+  {"xyz:NVDA" {:coin "xyz:NVDA" :symbol "NVDA-USD"}
+   "BTC" {:coin "BTC" :symbol "BTC-USDC"}})
+
+(defn- trade-history-state
+  ([] (trade-history-state {}))
+  ([overrides]
+   (merge {:sort {:column "Time" :direction :desc}
+           :direction-filter :all
+           :coin-search ""
+           :market-by-key trade-market-by-key}
+          overrides)))
+
 (defn- history-panel
   [content]
   (layout/page-shell
@@ -79,21 +93,39 @@
     (layout/panel-shell {:class ["h-[660px]"]}
      content))))
 
+(defn- mobile-history-panel
+  [content]
+  (layout/page-shell
+   (layout/mobile-shell
+    (layout/panel-shell {:class ["h-[680px]" "p-0"]}
+     content))))
+
 (portfolio/defscene trade-history-default
   []
   (history-panel
    (trade-history/trade-history-tab-content
     trade-fills
-    {:sort {:column "Time" :direction :desc}
-     :direction-filter :all
-     :coin-search ""
-     :market-by-key {"xyz:NVDA" {:coin "xyz:NVDA" :symbol "NVDA-USD"}
-                     "BTC" {:coin "BTC" :symbol "BTC-USDC"}}})))
+    (trade-history-state))))
+
+(portfolio/defscene trade-history-mobile-closed
+  []
+  (mobile-history-panel
+   (trade-history/trade-history-tab-content
+    trade-fills
+    (trade-history-state))))
+
+(portfolio/defscene trade-history-mobile-open
+  []
+  (mobile-history-panel
+   (trade-history/trade-history-tab-content
+    trade-fills
+    (trade-history-state
+     {:mobile-expanded-card {:trade-history (trade-projections/trade-history-row-id (second trade-fills))}}))))
 
 (portfolio/defscene trade-history-empty
   []
   (history-panel
-   (trade-history/trade-history-tab-content [] {:sort {:column "Time" :direction :desc}})))
+   (trade-history/trade-history-tab-content [] (trade-history-state))))
 
 (portfolio/defscene funding-history-default
   []
