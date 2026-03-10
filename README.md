@@ -73,6 +73,27 @@ This makes cause and effect easier to follow than in a mutable event-handler sty
 
 The reducer is even written so it can be called directly in tests and replay-like tooling, which is why runtime config normalization and message typing live inside the reducer layer instead of being spread across UI callbacks.
 
+### WebSocket runtime, not callback soup
+
+The websocket stack is one of the clearest examples of this repo's architecture. Hyperopen does not treat the socket as a single `onmessage` callback that mutates app state directly. It treats realtime handling as a small runtime with explicit stages:
+
+- [src/hyperopen/websocket/client.cljs](src/hyperopen/websocket/client.cljs) assembles the transport, scheduler, clock, router, and runtime configuration.
+- [src/hyperopen/websocket/application/runtime.cljs](src/hyperopen/websocket/application/runtime.cljs) uses `core.async` channels and topic routing to move commands and envelopes through the system.
+- [src/hyperopen/websocket/application/runtime_engine.cljs](src/hyperopen/websocket/application/runtime_engine.cljs) runs the mailbox/effects loop.
+- [src/hyperopen/websocket/application/runtime_reducer.cljs](src/hyperopen/websocket/application/runtime_reducer.cljs) decides state transitions and emitted effects.
+- [src/hyperopen/websocket/infrastructure/runtime_effects.cljs](src/hyperopen/websocket/infrastructure/runtime_effects.cljs) executes transport, timer, router, and projection side effects.
+
+The runtime also applies explicit policy by channel type. [src/hyperopen/websocket/domain/policy.cljs](src/hyperopen/websocket/domain/policy.cljs) separates high-volume `:market` topics such as `l2Book`, `trades`, `candle`, and `activeAssetCtx` from `:lossless` topics such as `webData2`, `openOrders`, and `userFills`. In [src/hyperopen/websocket/application/runtime.cljs](src/hyperopen/websocket/application/runtime.cljs), market handlers get sliding buffers while lossless handlers get regular buffers, so high-frequency market traffic can be smoothed without treating account and order streams as disposable.
+
+That policy carries through to UI projection. [src/hyperopen/websocket/market_projection_runtime.cljs](src/hyperopen/websocket/market_projection_runtime.cljs) coalesces market updates per animation frame and keeps the latest update per coalesce key, so heavy market traffic does not force one store write per websocket message. The tests in [test/hyperopen/websocket/market_projection_runtime_test.cljs](test/hyperopen/websocket/market_projection_runtime_test.cljs) cover those coalescing guarantees directly.
+
+This structure gives the websocket layer a few practical benefits:
+
+- account and order data can keep stricter handling than market tick traffic
+- reconnect, backoff, freshness, and gap detection live in named runtime modules instead of scattered callbacks
+- raw provider payloads are normalized once at the edge in [src/hyperopen/websocket/acl/hyperliquid.cljs](src/hyperopen/websocket/acl/hyperliquid.cljs)
+- diagnostics are first-class, with health projections in [src/hyperopen/websocket/health_projection.cljs](src/hyperopen/websocket/health_projection.cljs) and message/effect capture in [src/hyperopen/websocket/flight_recorder.cljs](src/hyperopen/websocket/flight_recorder.cljs)
+
 ### Boundaries stay at the edge
 
 Browser, network, and persistence code are intentionally pushed to the edges:
