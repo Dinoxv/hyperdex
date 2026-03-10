@@ -147,17 +147,15 @@
   (async done
     (let [original-state @app-system/store
           wait-for-idle @#'console-preload/wait-for-idle
-          interval-id (atom nil)]
+          interval-id (atom nil)
+          tick-id (atom 0)]
       (try
-        (swap! app-system/store assoc :router {:path "/idle-one"})
+        (swap! app-system/store assoc :router {:path "/idle-0"})
         (reset! interval-id
                 (js/setInterval
                  (fn []
-                   (swap! app-system/store update-in [:router :path]
-                          (fn [path]
-                            (if (= path "/idle-one")
-                              "/idle-two"
-                              "/idle-one"))))
+                   (let [step (swap! tick-id inc)]
+                     (swap! app-system/store assoc-in [:router :path] (str "/idle-" step))))
                  1))
         (-> (wait-for-idle {:quiet-ms 20
                             :timeout-ms 5

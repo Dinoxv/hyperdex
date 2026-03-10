@@ -261,6 +261,7 @@
             [hyperopen.views.vaults.detail.transfer-modal-test]
             [hyperopen.views.vaults.list-view-test]
             [hyperopen.views.vaults.vm-test]
+            [hyperopen.views.workbench-render-seams-test]
             [hyperopen.wallet.actions-test]
             [hyperopen.wallet.address-watcher-test]
             [hyperopen.wallet.agent-runtime-test]
@@ -314,7 +315,8 @@
             [hyperopen.websocket.user-runtime.refresh-test]
             [hyperopen.websocket.user-runtime.subscriptions-test]
             [hyperopen.websocket.user-test]
-            [hyperopen.websocket.webdata2-test]))
+            [hyperopen.websocket.webdata2-test]
+            [hyperopen.workbench.support.dispatch-test]))
 
 (defn run-generated-tests
   "Run all generated test namespaces and return the results."
@@ -578,6 +580,7 @@
              'hyperopen.views.vaults.detail.transfer-modal-test
              'hyperopen.views.vaults.list-view-test
              'hyperopen.views.vaults.vm-test
+             'hyperopen.views.workbench-render-seams-test
              'hyperopen.wallet.actions-test
              'hyperopen.wallet.address-watcher-test
              'hyperopen.wallet.agent-runtime-test
@@ -631,4 +634,5 @@
              'hyperopen.websocket.user-runtime.refresh-test
              'hyperopen.websocket.user-runtime.subscriptions-test
              'hyperopen.websocket.user-test
-             'hyperopen.websocket.webdata2-test))
+             'hyperopen.websocket.webdata2-test
+             'hyperopen.workbench.support.dispatch-test))

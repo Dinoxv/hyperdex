@@ -13,6 +13,8 @@ Repository build and test entry points:
 - `npm test`
 - `npm run test:crap`
 - `npm run test:websocket`
+- `npm run dev`
+- `npm run portfolio`
 - `bb tools/crap_report.clj --scope src`
 - `npm run test:browser-inspection`
 
@@ -37,6 +39,14 @@ Browser inspection and parity commands:
 
 Comprehensive tool surface and use guidance:
 - `/hyperopen/docs/tools.md`
+
+UI workbench reference:
+- URL: `http://localhost:8080/ui-workbench.html`
+- Shadow build: `:portfolio`
+- Watch commands: `npm run dev` or `npm run portfolio`
+- Scene tree: `/hyperopen/portfolio/hyperopen/workbench/scenes/**`
+- Shared workbench helpers: `/hyperopen/portfolio/hyperopen/workbench/support/**`
+- Naming convention: file names end with `_scenes.cljs`, namespaces end with `-scenes`
 
 Deterministic target selection workflow:
 - `/hyperopen/docs/runbooks/browser-live-inspection.md` (Attach to Your Own Browser and Deterministic Tab Identification)

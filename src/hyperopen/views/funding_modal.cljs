@@ -1151,10 +1151,9 @@
     :unsupported/workflow (legacy-content legacy)
     nil))
 
-(defn funding-modal-view
-  [state]
-  (let [{:keys [modal feedback] :as view-model} (funding-actions/funding-modal-view-model state)
-        open? (:open? modal)
+(defn render-funding-modal
+  [{:keys [modal feedback] :as view-model}]
+  (let [open? (:open? modal)
         stored-anchor* (if (map? (:anchor modal)) (:anchor modal) {})
         mobile-sheet? (mobile-sheet? modal)
         fallback-anchor* (when-not (anchored-popover/complete-anchor? stored-anchor*)
@@ -1289,3 +1288,7 @@
                         :on {:keydown [[:actions/handle-funding-modal-keydown
                                         [:event/key]]]}}]
                (keep identity panel-children))]))))
+
+(defn funding-modal-view
+  [state]
+  (render-funding-modal (funding-actions/funding-modal-view-model state)))

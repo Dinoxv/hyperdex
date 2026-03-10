@@ -1,10 +1,12 @@
-{:source-paths ["src" "test"]
+{:source-paths ["src" "test" "portfolio"]
  
- :dependencies [[no.cjohansen/replicant "2025.06.21"]
+ :dependencies [[no.cjohansen/portfolio "2026.03.1"]
+                [coderafting/memsearch "0.1.1"]
+                [no.cjohansen/replicant "2025.06.21"]
                 [no.cjohansen/nexus "2025.07.1"]
                 [org.clojure/test.check "1.1.1"]]
  
- :dev-http {8080 "resources/public"}
+ :dev-http {8080 ["resources/public" "classpath:public"]}
  
   :builds
  {:app {:target :browser
@@ -15,6 +17,31 @@
                    :http-root "resources/public"
                    :http-port 8080
                    :after-load hyperopen.core/reload}}
+
+  :portfolio {:target :portfolio
+              :runner-ns hyperopen.workbench.runner
+              :ns-regexp "-scenes$"
+              :output-dir "resources/public/js"
+              :asset-path "/js"
+              :html-file {:path "resources/public/ui-workbench.html"
+                          :title "Hyperopen UI Workbench"}
+              :portfolio.ui/config {:css-paths ["/css/main.css"]
+                                    :canvas-path "/ui-workbench-canvas.html"
+                                    :viewport/defaults {:viewport/width "100%"
+                                                        :viewport/height "100%"
+                                                        :viewport/padding 20}
+                                    :viewport/options [{:title "Auto"
+                                                        :value {:viewport/width "100%"
+                                                                :viewport/height "100%"}}
+                                                       {:title "iPhone 14 Pro Max"
+                                                        :value {:viewport/width 430
+                                                                :viewport/height 932}}
+                                                       {:title "Tablet"
+                                                        :value {:viewport/width 820
+                                                                :viewport/height 1180}}
+                                                       {:title "Desktop"
+                                                        :value {:viewport/width 1440
+                                                                :viewport/height 900}}]}}
 
   :portfolio-worker {:target :browser
                      :output-dir "resources/public/js"

@@ -30,6 +30,9 @@ Use this file as the single starting point for what actions this repo provides t
 | `npm test` | Full test suite | Regular validation and regression confidence |
 | `npm run test:crap` | Fast Babashka tests for CRAP-tool parsing and report math | Before changing the CRAP analyzer/reporter |
 | `npm run test:websocket` | Websocket-only suite | Websocket runtime/API changes |
+| `npm run dev` | Watch app, Portfolio workbench, and portfolio worker builds alongside Tailwind | Normal frontend development |
+| `npm run portfolio` | Watch only the Portfolio workbench plus Tailwind | Isolated component workbench iteration |
+| `npm run portfolio:watch` | Watch the dedicated Shadow `:portfolio` target | Workbench-only CLJS compile loop |
 | `npm run test:runner:generate` | Regenerate test runner list | Usually after adding/removing test namespaces |
 | `bb tools/crap_report.clj --scope src` | Print CRAP hotspots from existing `coverage/lcov.info` | After `npm run coverage` when triaging risky functions/modules |
 | `npm run browser:inspect -- --url <url> --target <label>` | One-off parity capture | Visual/runtime parity evidence and smoke checks |
@@ -155,9 +158,18 @@ Register once in Codex once and then call MCP tools directly:
 ## 8) Where definitions live
 
 - Scripted command surface: `/hyperopen/package.json`
+- UI workbench source: `/hyperopen/portfolio/hyperopen/workbench/`
+- UI workbench scenes: `/hyperopen/portfolio/hyperopen/workbench/scenes/**`
+- UI workbench shared helpers/builders: `/hyperopen/portfolio/hyperopen/workbench/support/**`
 - Phrase registry: `/hyperopen/command-phrases.edn`
 - Phrase lookup CLI: `/hyperopen/tools/phrase`
 - MCP definitions: `/hyperopen/tools/browser-inspection/src/mcp_server.mjs`
 - CLI definitions: `/hyperopen/tools/browser-inspection/src/cli.mjs`
 - Runtime and config: `/hyperopen/tools/browser-inspection/src/service.mjs` and `/hyperopen/tools/browser-inspection/config/defaults.json`
 - Operational runbook: `/hyperopen/docs/runbooks/browser-live-inspection.md`
+
+UI workbench scene conventions:
+- File names end with `_scenes.cljs`
+- Namespaces end with `-scenes`
+- Keep reusable scene-only data/layout helpers in `/hyperopen/portfolio/hyperopen/workbench/support/**`
+- Keep workbench namespaces out of the normal production require path

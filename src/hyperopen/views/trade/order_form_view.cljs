@@ -756,7 +756,8 @@
                             "text-primary"))
    (fees-row (:fees display) fee-copy)]))
 
-(defn order-form-view [state]
+(defn render-order-form
+  [{:keys [state vm handlers ui]}]
   (let [{:keys [form
                 side
                 type
@@ -780,26 +781,32 @@
                 scale-preview-lines
                 error
                 submitting?
-                submit]}
-        (order-form-vm/order-form-vm state)
-        handler-map (handlers/build-handlers)
-        margin-mode-dropdown-open? (boolean (get-in state [:order-form-ui :margin-mode-dropdown-open?]))
-        leverage-popover-open? (boolean (get-in state [:order-form-ui :leverage-popover-open?]))
-        leverage-draft (get-in state [:order-form-ui :leverage-draft])
-        size-unit-dropdown-open? (boolean (get-in state [:order-form-ui :size-unit-dropdown-open?]))
-        tif-dropdown-open? (boolean (get-in state [:order-form-ui :tif-dropdown-open?]))
-        max-leverage (trading/market-max-leverage state)
-        cross-margin-allowed? (trading/cross-margin-allowed? state)
-        entry-mode-handlers (:entry-mode handler-map)
-        leverage-handlers (:leverage handler-map)
-        side-handlers (:side handler-map)
-        price-handlers (:price handler-map)
-        size-handlers (:size handler-map)
-        section-handlers (:order-type-sections handler-map)
-        toggle-handlers (:toggles handler-map)
-        tif-handlers (:tif handler-map)
-        tp-sl-handlers (:tp-sl handler-map)
-        submit-handlers (:submit handler-map)
+                submit]} vm
+        margin-mode-dropdown-open? (boolean (or (:margin-mode-dropdown-open? ui)
+                                                (get-in state [:order-form-ui :margin-mode-dropdown-open?])))
+        leverage-popover-open? (boolean (or (:leverage-popover-open? ui)
+                                            (get-in state [:order-form-ui :leverage-popover-open?])))
+        leverage-draft (or (:leverage-draft ui)
+                           (get-in state [:order-form-ui :leverage-draft]))
+        size-unit-dropdown-open? (boolean (or (:size-unit-dropdown-open? ui)
+                                              (get-in state [:order-form-ui :size-unit-dropdown-open?])))
+        tif-dropdown-open? (boolean (or (:tif-dropdown-open? ui)
+                                        (get-in state [:order-form-ui :tif-dropdown-open?])))
+        max-leverage (or (:max-leverage ui)
+                         (trading/market-max-leverage state))
+        cross-margin-allowed? (if (contains? ui :cross-margin-allowed?)
+                                (:cross-margin-allowed? ui)
+                                (trading/cross-margin-allowed? state))
+        entry-mode-handlers (:entry-mode handlers)
+        leverage-handlers (:leverage handlers)
+        side-handlers (:side handlers)
+        price-handlers (:price handlers)
+        size-handlers (:size handlers)
+        section-handlers (:order-type-sections handlers)
+        toggle-handlers (:toggles handlers)
+        tif-handlers (:tif handlers)
+        tp-sl-handlers (:tp-sl handlers)
+        submit-handlers (:submit handlers)
         fee-copy (fee-row-copy (:fees display))
         {:keys [show-limit-like-controls?
                 show-tpsl-toggle?
@@ -919,3 +926,16 @@
                      :on-submit (:on-submit submit-handlers)}))
 
       (footer-metrics display show-liquidation-row? show-slippage-row? fee-copy)]]))
+
+(defn order-form-view [state]
+  (render-order-form
+   {:state state
+    :vm (order-form-vm/order-form-vm state)
+    :handlers (handlers/build-handlers)
+    :ui {:margin-mode-dropdown-open? (boolean (get-in state [:order-form-ui :margin-mode-dropdown-open?]))
+         :leverage-popover-open? (boolean (get-in state [:order-form-ui :leverage-popover-open?]))
+         :leverage-draft (get-in state [:order-form-ui :leverage-draft])
+         :size-unit-dropdown-open? (boolean (get-in state [:order-form-ui :size-unit-dropdown-open?]))
+         :tif-dropdown-open? (boolean (get-in state [:order-form-ui :tif-dropdown-open?]))
+         :max-leverage (trading/market-max-leverage state)
+         :cross-margin-allowed? (trading/cross-margin-allowed? state)}}))
