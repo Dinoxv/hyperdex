@@ -64,6 +64,13 @@ Recommended split:
 Benchmark note:
 - Local measurements on 2026-03-07 in this repository showed `rg` discovery runs around `0.03s` to `0.07s`, one-shot `clojure-lsp` CLI reference and rename dry-run commands around `15s` to `17s`, and warm in-session `textDocument/definition` requests around `0.024s` after an initial `16.6s` server startup. Treat these as order-of-magnitude guidance, not a performance contract.
 
+Live local bug workflow selection:
+- Start with browser inspection when the task is about a specific running tab or interaction: reproducing UI bugs, checking console errors, inspecting DOM/network state, or understanding what the user saw in the browser. Use the attach and tab-selection workflow from `/hyperopen/docs/runbooks/browser-live-inspection.md`.
+- Browser attach requires a reachable CDP endpoint from a Chromium-family browser such as Chrome or Brave, typically started with `--remote-debugging-port=<port>`. The toolchain cannot retroactively attach to a normal browser session that was launched without remote debugging enabled.
+- Use the worktree-scoped Shadow nREPL when the task requires evaluating ClojureScript, inspecting app runtime state, or calling functions inside the current local build.
+- For bugs in a running local dev session, prefer browser attach first when a CDP endpoint is available and escalate to `tools/shadow-nrepl-port` or `npm run nrepl:port` only when browser evidence is insufficient.
+- Never choose a Shadow nREPL by global process scan when multiple worktrees may be active; always resolve it from the current worktree.
+
 ## 3) Skills available to agents
 
 | Skill | Purpose | Trigger |
@@ -111,7 +118,7 @@ All browser-inspection tooling lives under `/hyperopen/tools/browser-inspection/
 | CLI command | Example | Use this when |
 | --- | --- | --- |
 | `node tools/browser-inspection/src/cli.mjs session start` | `... session start --headed --manage-local-app` | You need a long-lived tool session |
-| `node tools/browser-inspection/src/cli.mjs session attach --attach-port <port>` | `... session attach --attach-port 9222` | You already have a Chrome with remote debugging |
+| `node tools/browser-inspection/src/cli.mjs session attach --attach-port <port>` | `... session attach --attach-port 9222` | You already have a Chromium-family browser with remote debugging |
 | `node tools/browser-inspection/src/cli.mjs session list` | `... session list` | You need active Codex/browser sessions |
 | `node tools/browser-inspection/src/cli.mjs session targets --attach-port <port>` | `... session targets --attach-port 9222` | You need to pick a target tab |
 | `node tools/browser-inspection/src/cli.mjs session stop --session-id <id>` | `... session stop --session-id abc` | You want to cleanly close a session |
@@ -137,6 +144,8 @@ All browser-inspection tooling lives under `/hyperopen/tools/browser-inspection/
 - Nightly QA wrapper command is `npm run qa:nightly-ui`; each run writes a timestamped bundle under `/hyperopen/tmp/browser-inspection/nightly-ui-qa-*/` including `preflight.json`, `attempt-summary.tsv`, and `failure-classification.json`.
 - Use explicit `--target-id` when attaching to avoid wrong tab capture.
 - For tab-selection stability, follow `/hyperopen/docs/runbooks/browser-live-inspection.md` and use marker verification steps.
+- Browser attach only works when the user or tool launched a compatible Chromium browser with a reachable CDP endpoint. Without that, use the worktree-scoped Shadow nREPL for runtime-state inspection instead of assuming tab-level browser access exists.
+- For live local bug triage, prefer browser attach first when available. Reach for the worktree-scoped Shadow nREPL only after browser inspection stops being enough to explain the behavior.
 
 ## 7) Browser Inspection tools (Codex MCP)
 

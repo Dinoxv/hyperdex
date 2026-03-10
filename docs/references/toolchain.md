@@ -29,6 +29,9 @@ Usage guidance:
 - Prefer `rg` for fast first-pass discovery, broad audits, and cases where the exact fully qualified symbol is not known yet.
 - Prefer `clojure-lsp` for symbol-accurate references, rename planning, and editor-backed definition jumps once a persistent LSP session is available.
 - Prefer `tools/shadow-nrepl-port` over global process scans when you need the live Shadow nREPL for the current worktree; it reads `target/shadow-cljs/nrepl.port` from the worktree root and verifies the listener is still alive.
+- For live local bug investigation, start with the browser attach/inspection commands when the question is about a running tab, console output, DOM state, or user interaction.
+- Browser attach requires a compatible Chromium/CDP endpoint, such as Chrome or Brave launched with `--remote-debugging-port=<port>`. It cannot retroactively attach to a normal browser session that was started without remote debugging.
+- Escalate to `tools/shadow-nrepl-port` only when you need to inspect runtime state or evaluate ClojureScript inside the current local build.
 - Standalone `clj-kondo` is optional in local environments; use `clojure-lsp diagnostics` as the repo-safe semantic analysis default unless `clj-kondo` is explicitly installed and required.
 
 Browser inspection and parity commands:

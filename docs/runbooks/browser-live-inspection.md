@@ -3,13 +3,13 @@
 ## Purpose
 
 This runbook documents the browser inspection subsystem under `/hyperopen/tools/browser-inspection/`.
-It enables live Chrome control for debugging and one-command parity comparison between Hyperliquid and local Hyperopen.
+It enables live Chromium-browser control through Chrome DevTools Protocol (CDP) for debugging and one-command parity comparison between Hyperliquid and local Hyperopen.
 
 ## Defaults
 
 - Local target: `http://localhost:8080/trade`
 - Remote target: `https://app.hyperliquid.xyz/trade`
-- Browser: macOS Chrome path `/Applications/Google Chrome.app/Contents/MacOS/Google Chrome`
+- Default launched browser: macOS Chrome path `/Applications/Google Chrome.app/Contents/MacOS/Google Chrome`
 - Mode: headless, read-only, ephemeral profile
 - Viewports: desktop and mobile
 - Artifact root: `/hyperopen/tmp/browser-inspection/`
@@ -38,9 +38,9 @@ Run from `/hyperopen`:
   - `node tools/browser-inspection/src/cli.mjs session list`
 - Start a persistent session:
   - `node tools/browser-inspection/src/cli.mjs session start`
-- List page targets for a Chrome endpoint:
+- List page targets for a Chromium CDP endpoint:
   - `node tools/browser-inspection/src/cli.mjs session targets --attach-port 9222`
-- Attach to an existing Chrome DevTools endpoint:
+- Attach to an existing Chromium CDP endpoint:
   - `node tools/browser-inspection/src/cli.mjs session attach --attach-port 9222`
 - Attach to a specific existing tab:
   - `node tools/browser-inspection/src/cli.mjs session attach --attach-port 9222 --target-id <target-id>`
@@ -131,26 +131,35 @@ If the nightly or PR bundle reports `manual-exception`, follow `/hyperopen/docs/
 
 This is opt-in and uses real Chrome.
 
+## Attach Requirements
+
+- Attach mode works with browsers that expose Chrome DevTools Protocol, including Chromium-family browsers such as Google Chrome and Brave.
+- The target browser must be started with a reachable remote debugging endpoint, typically `--remote-debugging-port=<port>`.
+- A normal browser session that was launched without remote debugging cannot be attached retroactively by this toolchain. Relaunch it with remote debugging enabled first.
+- Prefer a dedicated `--user-data-dir` for attach workflows to avoid profile lock conflicts and to keep the debug session isolated.
+
 ## Attach to Your Own Browser
 
-1. Start a visible Chrome window with remote debugging enabled:
+1. Start a visible Chromium-family browser window with remote debugging enabled. Example with Chrome:
    - `open -na "Google Chrome" --args --remote-debugging-port=9222 --user-data-dir=/tmp/hyperopen-cdp-visible --new-window http://localhost:8080/trade`
-2. Confirm the endpoint is not headless:
+2. Example with Brave:
+   - `open -na "Brave Browser" --args --remote-debugging-port=9222 --user-data-dir=/tmp/hyperopen-cdp-brave --new-window http://localhost:8080/trade`
+3. Confirm the endpoint is not headless:
    - `curl -s http://127.0.0.1:9222/json/version`
    - Ensure `User-Agent` does not contain `HeadlessChrome`.
-3. In the exact tab you want to inspect, set a temporary marker in DevTools Console:
+4. In the exact tab you want to inspect, set a temporary marker in DevTools Console:
    - `window.__codex_marker = "my-live-tab"; document.title = document.title + " [my-live-tab]";`
-4. List available tabs and choose the one with the marker in `title`:
+5. List available tabs and choose the one with the marker in `title`:
    - `node tools/browser-inspection/src/cli.mjs session targets --attach-port 9222`
-5. Start an attached session pinned to that tab:
+6. Start an attached session pinned to that tab:
    - `node tools/browser-inspection/src/cli.mjs session attach --attach-port 9222 --target-id <target-id>`
-6. Verify target identity before capture:
+7. Verify target identity before capture:
    - `node tools/browser-inspection/src/cli.mjs eval --session-id <id> --expression "({href: location.href, title: document.title, marker: window.__codex_marker})"`
-7. Reuse the returned `sessionId` for `navigate`, `eval`, `inspect`, or `compare`.
-8. Stop only the tool session when done:
+8. Reuse the returned `sessionId` for `navigate`, `eval`, `inspect`, or `compare`.
+9. Stop only the tool session when done:
    - `node tools/browser-inspection/src/cli.mjs session stop --session-id <id>`
 
-Attached mode does not terminate your Chrome process.
+Attached mode does not terminate your browser process.
 
 ## Deterministic Tab Identification
 
@@ -172,8 +181,8 @@ When multiple targets are returned, use this checklist:
   - Run `curl -s http://127.0.0.1:9222/json/version`.
   - If `User-Agent` contains `HeadlessChrome`, you are connected to a non-visible Chrome process.
   - Restart with the visible launch command above and reselect target by marker.
-- Chrome not found:
-  - Export custom path via env variable configured in defaults (`BROWSER_INSPECTION_CHROME_PATH`).
+- Browser not found for locally launched mode:
+  - Export custom path via env variable configured in defaults (`BROWSER_INSPECTION_CHROME_PATH`), or use attach mode with a manually launched Chromium browser such as Brave.
 - Local app not reachable:
   - Start app manually with `npm run dev` or pass `--manage-local-app`.
 - Session not found:
