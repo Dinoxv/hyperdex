@@ -280,7 +280,7 @@
          [:div.text-left (table/non-sortable-header "Cancel All")]]
         (for [o sorted]
           ^{:key (str (:oid o) "-" (:coin o))}
-          [:div {:class ["grid" "gap-2" "py-px" "px-3" "hover:bg-base-300" "text-xs" open-orders-grid-template-class]}
+          [:div {:class ["grid" "items-center" "gap-2" "py-px" "px-3" "hover:bg-base-300" "text-xs" open-orders-grid-template-class]}
            [:div.pr-2.text-left.whitespace-nowrap (shared/format-open-orders-time (:time o))]
            [:div.pl-1.text-left (or (:type o) "Order")]
            [:div.text-left (open-orders-coin-node (:coin o) market-by-key (:side o))]

@@ -73,6 +73,25 @@
     (is (str/includes? header-grid-class
                        "minmax(76px,0.82fr)_minmax(112px,1.15fr)_minmax(64px,0.72fr)_minmax(72px,0.74fr)"))))
 
+(deftest open-orders-rows-center-grid-items-vertically-test
+  (let [open-orders [{:oid 101
+                      :coin "HYPE"
+                      :side "B"
+                      :sz "2.0"
+                      :orig-sz "2.0"
+                      :px "100.0"
+                      :type "Limit"
+                      :time 1700000000000
+                      :reduce-only true
+                      :is-trigger false
+                      :trigger-condition nil
+                      :is-position-tpsl false}]
+        content (view/open-orders-tab-content open-orders {:column "Time" :direction :desc})
+        row-node (hiccup/first-viewport-row content)
+        row-classes (hiccup/node-class-set row-node)]
+    (is (contains? row-classes "grid"))
+    (is (contains? row-classes "items-center"))))
+
 (deftest open-orders-tab-content-memoizes-sorting-by-input-signature-and-sort-state-test
   (let [rows [{:oid 1001
                :coin "ETH"
