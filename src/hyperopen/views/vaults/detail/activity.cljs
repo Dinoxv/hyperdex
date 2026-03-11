@@ -141,6 +141,7 @@
                                          benchmark-label
                                          benchmark-columns
                                          benchmark-coin
+                                         loading?
                                          groups
                                          timeframe-options
                                          selected-timeframe]}]
@@ -154,10 +155,23 @@
                                     (let [rows* (->> (or rows [])
                                                      (filter #(performance-metric-row-visible? % benchmark-columns*))
                                                      vec)]
-                                      (when (seq rows*)
+                                     (when (seq rows*)
                                         (assoc group :rows rows*)))))
                             vec)]
-    [:div {:class ["flex" "h-full" "min-h-0" "flex-col"]}
+    [:div {:class ["relative" "flex" "h-full" "min-h-0" "flex-col"]
+           :data-role "vault-detail-performance-metrics-card"}
+     (when loading?
+       [:div {:class ["absolute" "inset-0" "z-10" "flex" "items-center" "justify-center" "bg-[#071820]/70" "backdrop-blur-sm"]
+              :data-role "vault-detail-performance-metrics-loading-overlay"
+              :role "status"
+              :aria-live "polite"}
+        [:div {:class ["flex" "max-w-[250px]" "flex-col" "items-center" "gap-2.5" "px-4" "text-center"]}
+         [:span {:class ["loading" "loading-spinner" "loading-lg" "text-[#66e3c5]"]
+                 :aria-hidden true}]
+         [:span {:class ["text-sm" "font-medium" "text-trading-text"]}
+          "Loading benchmark history"]
+         [:span {:class ["text-xs" "leading-5" "text-[#9fb4bb]"]}
+          "Vault metrics stay visible while benchmark comparisons finish in the background."]]])
      [:div {:class ["grid"
                     "items-center"
                     "justify-items-start"

@@ -293,6 +293,21 @@
     (is (nil? sharpe-row))
     (is (nil? max-drawdown-row))))
 
+(deftest vault-detail-view-renders-background-benchmark-sync-banner-when-history-is-pending-test
+  (let [state (-> sample-state
+                  (assoc-in [:vaults-ui :detail-chart-series] :returns)
+                  (assoc-in [:candles "BTC" :1h] []))
+        view (vault-detail-view/vault-detail-view state)
+        banner-node (find-first-node view #(= "vault-detail-background-status" (get-in % [1 :data-role])))
+        benchmark-item (find-first-node view #(= "vault-detail-background-status-item-benchmark-history"
+                                                 (get-in % [1 :data-role])))
+        banner-strings (set (collect-strings banner-node))]
+    (is (some? banner-node))
+    (is (= "status" (get-in banner-node [1 :role])))
+    (is (contains? banner-strings "Vault analytics are still syncing"))
+    (is (contains? banner-strings "The chart is ready. The remaining analytics will fill in automatically."))
+    (is (= "Benchmark history" (first (collect-strings benchmark-item))))))
+
 (deftest vault-detail-view-selects-active-snapshot-timeframe-option-test
   (let [state (assoc-in sample-state [:vaults-ui :snapshot-range] :six-month)
         view (vault-detail-view/vault-detail-view state)

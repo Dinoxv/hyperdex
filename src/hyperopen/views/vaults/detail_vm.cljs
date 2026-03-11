@@ -4,6 +4,7 @@
             [hyperopen.vaults.detail.activity :as activity-model]
             [hyperopen.vaults.detail.benchmarks :as benchmarks-model]
             [hyperopen.vaults.detail.performance :as performance-model]
+            [hyperopen.vaults.detail.types :as detail-types]
             [hyperopen.vaults.detail.transfer :as transfer-model]
             [hyperopen.vaults.domain.identity :as vault-identity]
             [hyperopen.vaults.domain.ui-state :as vault-ui-state]
@@ -141,6 +142,30 @@
         (count (:followers details)))
       0))
 
+(defn- benchmark-history-pending?
+  [selected-series activity-tab strategy-return-points selected-benchmark-coins benchmark-points-by-coin]
+  (and (or (= selected-series :returns)
+           (= activity-tab :performance-metrics))
+       (seq strategy-return-points)
+       (seq selected-benchmark-coins)
+       (boolean
+        (some (fn [coin]
+                (and (seq coin)
+                     (nil? (detail-types/vault-benchmark-address coin))
+                     (empty? (get benchmark-points-by-coin coin))))
+              selected-benchmark-coins))))
+
+(defn- background-status-model
+  [benchmark-history-pending?]
+  (let [items (cond-> []
+                benchmark-history-pending?
+                (conj {:id :benchmark-history
+                       :label "Benchmark history"}))]
+    {:visible? (boolean (seq items))
+     :title "Vault analytics are still syncing"
+     :detail "The chart is ready. The remaining analytics will fill in automatically."
+     :items items}))
+
 (defn vault-detail-vm
   ([state]
    (vault-detail-vm state {:now-ms (.now js/Date)}))
@@ -226,6 +251,11 @@
                                                                                                snapshot-range
                                                                                                selected-benchmark-coins
                                                                                                strategy-return-points)
+        benchmark-history-loading? (benchmark-history-pending? selected-series
+                                                               activity-tab
+                                                               strategy-return-points
+                                                               selected-benchmark-coins
+                                                               benchmark-points-by-coin)
         benchmark-series (if (= selected-series :returns)
                            (mapv (fn [idx coin]
                                    {:id (keyword (str "benchmark-" idx))
@@ -259,9 +289,10 @@
                                                 (map (fn [coin]
                                                        [coin (performance-model/cumulative-rows (get benchmark-points-by-coin coin))]))
                                                 selected-benchmark-coins)
-        performance-metrics (performance-model/performance-metrics-model returns-benchmark-selector
-                                                                          strategy-cumulative-rows
-                                                                          benchmark-cumulative-rows-by-coin)
+        performance-metrics (assoc (performance-model/performance-metrics-model returns-benchmark-selector
+                                                                                strategy-cumulative-rows
+                                                                                benchmark-cumulative-rows-by-coin)
+                                   :loading? benchmark-history-loading?)
         detail-error (get-in state [:vaults :errors :details-by-address vault-address])
         webdata-error (get-in state [:vaults :errors :webdata-by-vault vault-address])
         fills-error (first-address-error state :fills-by-vault history-addresses)
@@ -346,6 +377,7 @@
                :your-deposit your-deposit
                :all-time-earned all-time-earned
                :apr (normalize-percent-value apr)}
+     :background-status (background-status-model benchmark-history-loading?)
      :vault-transfer vault-transfer
      :tabs [{:value :about
              :label "About"}

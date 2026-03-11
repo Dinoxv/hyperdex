@@ -6,11 +6,50 @@
             [hyperopen.views.vaults.detail.transfer-modal :as transfer-modal]
             [hyperopen.views.vaults.detail-vm :as detail-vm]))
 
+(defn- background-status-banner [{:keys [visible? title detail items]}]
+  (when visible?
+    [:div {:class ["rounded-xl"
+                   "border"
+                   "px-4"
+                   "py-3"
+                   "backdrop-blur-sm"]
+           :style {:border-color "rgba(39, 82, 86, 0.92)"
+                   :background "linear-gradient(135deg, rgba(7, 24, 32, 0.97) 0%, rgba(8, 31, 37, 0.97) 54%, rgba(12, 41, 39, 0.93) 100%)"}
+           :data-role "vault-detail-background-status"
+           :role "status"
+           :aria-live "polite"}
+     [:div {:class ["flex" "flex-col" "gap-3" "xl:flex-row" "xl:items-center" "xl:justify-between"]}
+      [:div {:class ["flex" "items-start" "gap-3"]}
+       [:span {:class ["mt-0.5" "loading" "loading-spinner" "loading-sm" "text-[#66e3c5]"]
+               :aria-hidden true}]
+       [:div {:class ["space-y-1"]}
+        [:div {:class ["text-sm" "font-medium" "text-trading-text"]}
+         title]
+        [:div {:class ["text-sm" "leading-5" "text-[#9fb4bb]"]}
+         detail]]]
+      [:div {:class ["flex" "flex-wrap" "gap-2"]}
+       (for [{:keys [id label]} items]
+         ^{:key (str "vault-detail-background-status-item-" (name id))}
+         [:span {:class ["rounded-full"
+                         "border"
+                         "px-2.5"
+                         "py-1"
+                         "text-xs"
+                         "font-medium"
+                         "uppercase"
+                         "tracking-[0.18em]"]
+                 :style {:border-color "rgba(72, 113, 119, 0.88)"
+                         :background-color "rgba(12, 29, 35, 0.92)"
+                         :color "#9fb6bc"}
+                 :data-role (str "vault-detail-background-status-item-" (name id))}
+          label])]]]))
+
 (defn vault-detail-view
   [state]
   (let [{:keys [kind
                 invalid-address?
                 loading?
+                background-status
                 error
                 tabs
                 selected-tab
@@ -32,6 +71,7 @@
        :else
        [:div {:class ["space-y-4"]}
         (hero/hero-section vm vault-transfer*)
+        (background-status-banner background-status)
 
         (when loading?
           [:div {:class ["rounded-xl" "border" "border-[#1f3d3d]" "bg-[#081820]" "px-4" "py-2.5" "text-sm" "text-[#8fa6ad]"]}

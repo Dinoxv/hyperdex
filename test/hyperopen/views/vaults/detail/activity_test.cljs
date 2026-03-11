@@ -177,6 +177,34 @@
     (is (true? (get-in disabled-filter-toggle [1 :disabled])))
     (is (contains? fallback-text "This activity stream is not available yet for vaults."))))
 
+(deftest activity-panel-renders-performance-metrics-loading-overlay-copy-test
+  (let [view (activity/activity-panel
+              (assoc base-activity-panel-props
+                     :selected-activity-tab :performance-metrics
+                     :performance-metrics {:loading? true
+                                           :benchmark-selected? true
+                                           :benchmark-label "Bitcoin"
+                                           :benchmark-columns [{:coin "BTC"
+                                                                :label "Bitcoin"}]
+                                           :benchmark-coin "BTC"
+                                           :timeframe-options [{:value :month :label "30D"}]
+                                           :selected-timeframe :month
+                                           :groups [{:id :risk
+                                                     :rows [{:key :sharpe
+                                                             :label "Sharpe"
+                                                             :kind :ratio
+                                                             :value 1.23
+                                                             :benchmark-values {"BTC" 0.98}}]}]}))
+        overlay-node (hiccup/find-first-node view
+                                             #(= "vault-detail-performance-metrics-loading-overlay"
+                                                 (get-in % [1 :data-role])))
+        overlay-strings (set (hiccup/collect-strings overlay-node))]
+    (is (some? overlay-node))
+    (is (= "status" (get-in overlay-node [1 :role])))
+    (is (contains? overlay-strings "Loading benchmark history"))
+    (is (contains? overlay-strings
+                   "Vault metrics stay visible while benchmark comparisons finish in the background."))))
+
 (deftest activity-table-helpers-cover-error-loading-empty-and-row-branches-test
   (let [fills-table @#'activity/fills-table
         funding-history-table @#'activity/funding-history-table

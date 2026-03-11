@@ -271,6 +271,21 @@
     (is (= "BTC (HL PERP)" (get-in vm [:performance-metrics :benchmark-label])))
     (is (seq (get-in vm [:performance-metrics :groups])))))
 
+(deftest vault-detail-vm-reports-background-benchmark-sync-while-market-history-is-missing-test
+  (let [state (-> sample-state
+                  (assoc-in [:vaults-ui :detail-chart-series] :returns)
+                  (assoc-in [:candles "BTC" :1h] []))
+        vm (detail-vm/vault-detail-vm state)
+        background-status (:background-status vm)]
+    (is (true? (:visible? background-status)))
+    (is (= "Vault analytics are still syncing" (:title background-status)))
+    (is (= "The chart is ready. The remaining analytics will fill in automatically."
+           (:detail background-status)))
+    (is (= [{:id :benchmark-history
+             :label "Benchmark history"}]
+           (:items background-status)))
+    (is (true? (get-in vm [:performance-metrics :loading?])))))
+
 (deftest vault-detail-vm-limits-vault-benchmark-candidates-to-top-100-by-tvl-test
   (let [address-for (fn [idx]
                       (let [suffix (str idx)
