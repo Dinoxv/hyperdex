@@ -139,7 +139,7 @@
              (done))))
        0))))
 
-(deftest api-submit-order-effect-skips-open-orders-and-default-clearinghouse-when-ws-streams-live-test
+(deftest api-submit-order-effect-refreshes-dex-open-orders-but-skips-default-open-orders-when-ws-streams-live-test
   (async done
     (let [address "0xabc"
           store (atom {:wallet {:address address
@@ -185,8 +185,10 @@
          (try
            (is (= [[[:actions/refresh-order-history]]]
                   @dispatched))
-           ;; openOrders stream is live, so fallback open-order snapshots are skipped.
-           (is (= [] @refresh-calls))
+           ;; Generic openOrders coverage suppresses the default refresh, but named DEX
+           ;; rows still require explicit snapshot hydration after order mutation.
+           (is (= [[address "dex-a" {:priority :low}]]
+                  @refresh-calls))
            ;; webData2 stream is live, so default clearinghouse refresh is skipped;
            ;; per-dex backstop refresh remains.
            (is (= [[address "dex-a" {:priority :low}]]
@@ -199,7 +201,7 @@
              (done))))
        0))))
 
-(deftest api-submit-order-effect-skips-open-orders-and-default-clearinghouse-when-ws-streams-event-driven-test
+(deftest api-submit-order-effect-refreshes-dex-open-orders-for-event-driven-ws-streams-test
   (async done
     (let [address "0xabc"
           store (atom {:wallet {:address address
@@ -245,8 +247,10 @@
          (try
            (is (= [[[:actions/refresh-order-history]]]
                   @dispatched))
-           ;; Event-driven (:n-a) streams are still WS-covered and should suppress high-priority fallbacks.
-           (is (= [] @refresh-calls))
+           ;; Event-driven (:n-a) generic coverage should still allow the named DEX
+           ;; open-order snapshots to refresh.
+           (is (= [[address "dex-a" {:priority :low}]]
+                  @refresh-calls))
            (is (= [[address "dex-a" {:priority :low}]]
                   @clearinghouse-calls))
            (finally

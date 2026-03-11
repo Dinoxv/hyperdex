@@ -23,6 +23,11 @@
   (when (fn? f)
     (apply f args)))
 
+(defn- refresh-dex-open-orders?
+  [open-orders-live? refresh-dex-open-orders-when-stream-live?]
+  (or (not open-orders-live?)
+      (true? refresh-dex-open-orders-when-stream-live?)))
+
 (defn- open-orders-surface-hydrated?
   [state]
   (or (true? (get-in state [:orders :open-orders-hydrated?]))
@@ -180,6 +185,7 @@
            refresh-perp-dex-clearinghouse!
            resolve-current-address
            refresh-spot?
+           refresh-dex-open-orders-when-stream-live?
            gate-perp-dex-by-stream?
            skip-perp-dex-when-subscribed-and-ready?
            perp-dex-snapshot-ready?
@@ -238,7 +244,13 @@
                                      (and skip-perp-dex-when-subscribed-and-ready?
                                           perp-dex-stream-subscribed?
                                           perp-dex-snapshot-ready?))]
-                             (when-not open-orders-live?
+                             ;; Generic openOrders websocket coverage does not hydrate the
+                             ;; named-DEX snapshot map that backs dex-scoped rows in the
+                             ;; Open Orders tab, so order mutations may need an explicit
+                             ;; per-dex refresh even when the generic stream is live.
+                             (when (refresh-dex-open-orders?
+                                    open-orders-live?
+                                    refresh-dex-open-orders-when-stream-live?)
                                (call-when-fn! refresh-open-orders!
                                               store
                                               address
@@ -270,6 +282,7 @@
   (run-post-event-refresh!
    (assoc deps
           :refresh-spot? false
+          :refresh-dex-open-orders-when-stream-live? true
           :gate-perp-dex-by-stream? false
           :skip-perp-dex-when-subscribed-and-ready? false
           :error-prefix "Error refreshing per-dex account surfaces after order mutation:")))

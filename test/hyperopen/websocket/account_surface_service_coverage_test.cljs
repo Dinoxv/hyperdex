@@ -253,6 +253,46 @@
          (done))
        0))))
 
+(deftest ws-account-surface-service-order-mutation-refreshes-dex-open-orders-when-generic-stream-live-test
+  (async done
+    (let [address (indexed-address 43)
+          open-orders-calls (atom [])
+          default-clearinghouse-calls (atom [])
+          perp-dex-calls (atom [])
+          store (atom
+                 {:wallet {:address address}
+                  :websocket {:health {:transport {:state :connected
+                                                   :freshness :live}
+                                       :streams {["openOrders" nil address nil nil]
+                                                 {:topic "openOrders"
+                                                  :status :live
+                                                  :subscribed? true
+                                                  :descriptor {:type "openOrders"
+                                                               :user address}}}}}})]
+      (surface-service/refresh-after-order-mutation!
+       {:store store
+        :address address
+        :ensure-perp-dexs! (fn [_store _opts]
+                             (resolved-thenable ["dex-a" "" nil "dex-b"]))
+        :refresh-open-orders! (fn [_store refresh-address refresh-dex opts]
+                                (swap! open-orders-calls conj [refresh-address refresh-dex opts]))
+        :refresh-default-clearinghouse! (fn [_store refresh-address opts]
+                                          (swap! default-clearinghouse-calls conj [refresh-address opts]))
+        :refresh-perp-dex-clearinghouse! (fn [_store refresh-address refresh-dex opts]
+                                           (swap! perp-dex-calls conj [refresh-address refresh-dex opts]))})
+      (js/setTimeout
+       (fn []
+         (is (= [[address "dex-a" {:priority :low}]
+                 [address "dex-b" {:priority :low}]]
+                @open-orders-calls))
+         (is (= [[address {:priority :high}]]
+                @default-clearinghouse-calls))
+         (is (= [[address "dex-a" {:priority :low}]
+                 [address "dex-b" {:priority :low}]]
+                @perp-dex-calls))
+         (done))
+       0))))
+
 (deftest ws-account-surface-service-user-fill-refresh-coverage-test
   (let [address (indexed-address 45)
         dex "vault"
