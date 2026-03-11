@@ -7,7 +7,10 @@
    "activeAssetCtx" :market
    "webData2" :lossless
    "openOrders" :lossless
+   "twapStates" :lossless
    "userFills" :lossless
+   "userTwapHistory" :lossless
+   "userTwapSliceFills" :lossless
    "userFundings" :lossless
    "userNonFundingLedgerUpdates" :lossless})
 

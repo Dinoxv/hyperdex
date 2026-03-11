@@ -105,6 +105,8 @@
   (testing "topic->group handles both arities and fallback groups"
     (is (= :market_data (model/topic->group "trades")))
     (is (= :market_data (model/topic->group "candle")))
+    (is (= :orders_oms (model/topic->group "twapStates")))
+    (is (= :orders_oms (model/topic->group "userTwapHistory")))
     (is (= :account (model/topic->group "unknown-topic")))
     (is (= :custom (apply model/topic->group [{"foo" :custom} "foo"])))
     (is (= :custom (model/topic->group {"foo" :custom} "foo")))

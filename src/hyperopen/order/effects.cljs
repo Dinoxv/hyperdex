@@ -277,6 +277,62 @@
   (when-let [message (cancel-status-error-value status-entry)]
     (str "Order " (inc idx) ": " message)))
 
+(defn- twap-cancel-request?
+  [request]
+  (= "twapCancel" (get-in request [:action :type])))
+
+(defn- twap-cancel-error-message
+  [exchange-response-error resp]
+  (str "TWAP termination failed: " (exchange-response-error resp)))
+
+(defn- twap-cancel-status-error-value
+  [status-entry]
+  (let [error-value (cond
+                      (and (map? status-entry)
+                           (contains? status-entry :error))
+                      (:error status-entry)
+
+                      (string? status-entry)
+                      (let [status-text (some-> status-entry str/trim)]
+                        (when (and (seq status-text)
+                                   (not= "success" (str/lower-case status-text)))
+                          status-text))
+
+                      :else nil)
+        message (cond
+                  (string? error-value) error-value
+                  (map? error-value) (or (:message error-value)
+                                         (pr-str error-value))
+                  :else (some-> error-value str))
+        trimmed (str/trim (or message ""))]
+    (when (seq trimmed)
+      trimmed)))
+
+(defn- twap-cancel-outcome
+  [exchange-response-error resp]
+  (let [top-level-ok? (= "ok" (:status resp))
+        statuses (let [values (get-in resp [:response :data :statuses])
+                       value (get-in resp [:response :data :status])]
+                   (cond
+                     (sequential? values) (vec values)
+                     (some? value) [value]
+                     :else []))
+        first-error (some twap-cancel-status-error-value statuses)]
+    (cond
+      (not top-level-ok?)
+      {:ok? false
+       :error-text (str (exchange-response-error resp))
+       :toast-message (twap-cancel-error-message exchange-response-error resp)}
+
+      (seq first-error)
+      {:ok? false
+       :error-text first-error
+       :toast-message (str "TWAP termination failed: " first-error)}
+
+      :else
+      {:ok? true
+       :toast-message "TWAP terminated."})))
+
 (defn- successful-cancel-entries
   [request status-entries]
   (->> (map vector
@@ -587,6 +643,7 @@
         address (get-in state [:wallet :address])
         spectate-mode-message (spectate-mode-precondition-error state)
         agent-status (get-in state [:wallet :agent :status])
+        twap-cancel? (twap-cancel-request? request)
         cancel-oids (cancel-request-oids request)
         prune-fn (or prune-canceled-open-orders-fn
                      prune-canceled-open-orders)]
@@ -609,29 +666,45 @@
       :else
       (do
         ;; Hide targeted orders immediately; rollback by clearing pending ids on failure.
-        (swap! store add-pending-cancel-oids cancel-oids)
+        (when (seq cancel-oids)
+          (swap! store add-pending-cancel-oids cancel-oids))
         (-> (trading-api/cancel-order! store address (:action request))
             (.then (fn [resp]
-                     (let [{:keys [ok? success-cancels error-text toast-message]}
-                           (cancel-outcome exchange-response-error request resp)
-                           success-request (successful-cancel-request request success-cancels)
-                           success-count (count success-cancels)]
-                       (swap! store
-                              (fn [state]
-                                (cond-> (-> state
-                                            (assoc-in [:orders :cancel-error]
-                                                      (when-not ok?
-                                                        error-text))
-                                            (remove-pending-cancel-oids cancel-oids))
-                                  (= "ok" (:status resp))
-                                  (assoc-in [:orders :cancel-response] resp)
+                     (if twap-cancel?
+                       (let [{:keys [ok? error-text toast-message]}
+                             (twap-cancel-outcome exchange-response-error resp)]
+                         (swap! store
+                                (fn [state]
+                                  (cond-> (assoc-in state
+                                                    [:orders :cancel-error]
+                                                    (when-not ok?
+                                                      error-text))
+                                    (= "ok" (:status resp))
+                                    (assoc-in [:orders :cancel-response] resp))))
+                         (show-toast! store (if ok? :success :error) toast-message)
+                         (when ok?
+                           (refresh-account-surfaces-after-order-mutation! store address)
+                           (dispatch! store nil [[:actions/refresh-order-history]])))
+                       (let [{:keys [ok? success-cancels error-text toast-message]}
+                             (cancel-outcome exchange-response-error request resp)
+                             success-request (successful-cancel-request request success-cancels)
+                             success-count (count success-cancels)]
+                         (swap! store
+                                (fn [state]
+                                  (cond-> (-> state
+                                              (assoc-in [:orders :cancel-error]
+                                                        (when-not ok?
+                                                          error-text))
+                                              (remove-pending-cancel-oids cancel-oids))
+                                    (= "ok" (:status resp))
+                                    (assoc-in [:orders :cancel-response] resp)
 
-                                  (map? success-request)
-                                  (prune-fn success-request))))
-                       (show-toast! store (if ok? :success :error) toast-message)
-                       (when (pos? success-count)
-                         (refresh-account-surfaces-after-order-mutation! store address)
-                         (dispatch! store nil [[:actions/refresh-order-history]])))))
+                                    (map? success-request)
+                                    (prune-fn success-request))))
+                         (show-toast! store (if ok? :success :error) toast-message)
+                         (when (pos? success-count)
+                           (refresh-account-surfaces-after-order-mutation! store address)
+                           (dispatch! store nil [[:actions/refresh-order-history]]))))))
             (.catch (fn [err]
                       (let [error-text (runtime-error-message err)]
                         (swap! store
@@ -639,4 +712,9 @@
                                  (-> state
                                      (assoc-in [:orders :cancel-error] error-text)
                                      (remove-pending-cancel-oids cancel-oids))))
-                        (show-toast! store :error (str "Order cancellation failed: " error-text))))))))))
+                        (show-toast! store
+                                     :error
+                                     (str (if twap-cancel?
+                                            "TWAP termination failed: "
+                                            "Order cancellation failed: ")
+                                          error-text))))))))))

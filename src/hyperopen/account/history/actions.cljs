@@ -3,7 +3,8 @@
             [hyperopen.account.history.order-actions :as order-actions]
             [hyperopen.account.history.position-overlay-actions :as position-overlay-actions]
             [hyperopen.account.history.shared :as history-shared]
-            [hyperopen.account.history.surface-actions :as surface-actions]))
+            [hyperopen.account.history.surface-actions :as surface-actions]
+            [hyperopen.account.history.twap-actions :as twap-actions]))
 
 (def default-funding-history-state
   funding-actions/default-funding-history-state)
@@ -13,6 +14,9 @@
 
 (def default-trade-history-state
   order-actions/default-trade-history-state)
+
+(def default-twap-state
+  twap-actions/default-twap-state)
 
 (def normalize-order-history-page-size
   history-shared/normalize-order-history-page-size)
@@ -192,6 +196,9 @@
 
 (def refresh-order-history
   order-actions/refresh-order-history)
+
+(def select-account-info-twap-subtab
+  twap-actions/select-account-info-twap-subtab)
 
 (def set-hide-small-balances
   surface-actions/set-hide-small-balances)

@@ -8,10 +8,14 @@
             [hyperopen.websocket.user :as user-ws]))
 
 (defn- make-store []
-  (atom {:orders {:fills []
+  (atom {:orders {:twap-states []
+                  :twap-history []
+                  :twap-slice-fills []
+                  :fills []
                   :fundings []
                   :fundings-raw []
                   :ledger []}
+         :wallet {:address "0xaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"}
          :ui {:toast nil
               :toasts []}
          :account-info {:funding-history {:filters {:coin-set #{}
@@ -54,6 +58,41 @@
         (is (= [{:tid 1 :coin "BTC" :time 1000}]
                (get-in @store [:orders :fills])))
         (is (nil? (get-in @store [:ui :toast]))))
+      (testing "twapStates snapshot uses nested :data :states"
+        ((get @handlers "twapStates")
+         {:channel "twapStates"
+          :data {:user "0xaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+                 :states [[17 {:coin "BTC"
+                               :sz "1.0"
+                               :timestamp 1700000000000}]]}})
+        (is (= [[17 {:coin "BTC"
+                     :sz "1.0"
+                     :timestamp 1700000000000}]]
+               (get-in @store [:orders :twap-states]))))
+      (testing "userTwapHistory snapshot uses nested :data :history"
+        ((get @handlers "userTwapHistory")
+         {:channel "userTwapHistory"
+          :data {:user "0xaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+                 :isSnapshot true
+                 :history [{:time 1700000000
+                            :status {:status "finished"}
+                            :state {:coin "BTC"
+                                    :sz "1.0"
+                                    :executedSz "1.0"
+                                    :executedNtl "100.0"
+                                    :minutes 30
+                                    :timestamp 1700000000000}}]}})
+        (is (= 1 (count (get-in @store [:orders :twap-history])))))
+      (testing "userTwapSliceFills snapshot unwraps fill rows"
+        ((get @handlers "userTwapSliceFills")
+         {:channel "userTwapSliceFills"
+          :data {:user "0xaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+                 :isSnapshot true
+                 :twapSliceFills [{:fill {:tid 9
+                                          :coin "BTC"
+                                          :time 1000}}]}})
+        (is (= [{:tid 9 :coin "BTC" :time 1000}]
+               (get-in @store [:orders :twap-slice-fills]))))
       (testing "userFundings snapshot normalizes nested :data :fundings"
         ((get @handlers "userFundings")
          {:channel "userFundings"

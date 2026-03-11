@@ -436,6 +436,7 @@
    :actions/show-volume-indicator ::no-args
    :actions/hide-volume-indicator ::no-args
    :actions/select-account-info-tab ::tab-args
+   :actions/select-account-info-twap-subtab ::keyword-or-string-args
    :actions/set-funding-history-filters ::funding-history-filter-args
    :actions/toggle-funding-history-filter-open ::no-args
    :actions/toggle-funding-history-filter-coin ::coin-args
@@ -546,6 +547,7 @@
    :actions/submit-cancel-visible-open-orders-confirmation ::no-args
    :actions/cancel-visible-open-orders ::cancel-visible-open-orders-args
    :actions/cancel-order ::cancel-order-args
+   :actions/cancel-twap ::cancel-order-args
    :actions/load-user-data ::address-args
    :actions/set-funding-modal ::funding-modal-args
    :actions/open-funding-send-modal ::funding-send-open-args

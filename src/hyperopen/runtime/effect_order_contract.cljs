@@ -146,6 +146,12 @@
     :allow-duplicate-heavy-effects? false
     :heavy-effect-ids #{:effects/api-cancel-order}}
 
+   :actions/cancel-twap
+   {:required-phase-order [:projection :persistence :heavy-io]
+    :require-projection-before-heavy? true
+    :allow-duplicate-heavy-effects? false
+    :heavy-effect-ids #{:effects/api-cancel-order}}
+
    :actions/cancel-visible-open-orders
    {:required-phase-order [:projection :persistence :heavy-io]
     :require-projection-before-heavy? true

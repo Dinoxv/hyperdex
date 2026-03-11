@@ -273,6 +273,23 @@
           {:action {:type "cancel"
                     :cancels cancels}})))))
 
+(defn build-cancel-twap-request
+  "Normalize a TWAP row payload into exchange twapCancel action shape.
+   Returns nil when the required twap id or asset index is missing."
+  [state twap]
+  (let [coin (normalize-cancel-order-coin twap)
+        twap-id (some parse-int-value
+                      [(:twap-id twap)
+                       (:twapId twap)
+                       (:t twap)
+                       (get-in twap [:state :twapId])])
+        asset-idx (resolve-cancel-order-asset-idx state twap coin)]
+    (when (and (some? twap-id)
+               (some? asset-idx))
+      {:action {:type "twapCancel"
+                :a asset-idx
+                :t twap-id}})))
+
 (defn- safe-private-key->agent-address
   [private-key]
   (try

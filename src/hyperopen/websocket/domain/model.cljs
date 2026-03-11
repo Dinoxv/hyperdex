@@ -162,7 +162,10 @@
    "candle" :market_data
    "activeAssetCtx" :market_data
    "openOrders" :orders_oms
+   "twapStates" :orders_oms
    "userFills" :orders_oms
+   "userTwapHistory" :orders_oms
+   "userTwapSliceFills" :orders_oms
    "userFundings" :orders_oms
    "userNonFundingLedgerUpdates" :orders_oms
    "webData2" :account})

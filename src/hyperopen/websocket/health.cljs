@@ -286,7 +286,10 @@
    "activeAssetCtx" single-coin-descriptor-candidates
    "webData2" user-descriptor-candidates
    "openOrders" user-descriptor-candidates
+   "twapStates" user-descriptor-candidates
    "userFills" user-descriptor-candidates
+   "userTwapHistory" user-descriptor-candidates
+   "userTwapSliceFills" user-descriptor-candidates
    "userFundings" user-descriptor-candidates
    "userNonFundingLedgerUpdates" user-descriptor-candidates})
 

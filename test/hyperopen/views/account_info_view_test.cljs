@@ -17,3 +17,23 @@
     (is (contains? content-classes "flex-1"))
     (is (contains? content-classes "min-h-0"))
     (is (contains? content-classes "overflow-hidden"))))
+
+(deftest account-info-panel-renders-twap-tab-content-instead-of-placeholder-test
+  (let [state {:account-info {:selected-tab :twap}
+               :orders {:twap-states [[17 {:coin "BTC"
+                                           :side "B"
+                                           :sz "1.0"
+                                           :executedSz "0.4"
+                                           :executedNtl "40.0"
+                                           :minutes 30
+                                           :timestamp 1700000000000
+                                           :reduceOnly false}]]}
+               :spot {:meta nil
+                      :clearinghouse-state nil}
+               :account {:mode :classic}
+               :perp-dex-clearinghouse {}}
+        panel (view/account-info-panel state)
+        strings (set (hiccup/collect-strings panel))]
+    (is (contains? strings "Terminate"))
+    (is (contains? strings "Active (1)"))
+    (is (not (contains? strings "TWAP coming soon")))))

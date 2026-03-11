@@ -8,6 +8,7 @@
     (is (= :market (policy/topic->tier "candle")))
     (is (= :market (apply policy/topic->tier ["trades"])))
     (is (= :market (policy/topic->tier policy/default-channel-tier-policy "trades")))
+    (is (= :lossless (policy/topic->tier "twapStates")))
     (is (= :lossless (policy/topic->tier policy/default-channel-tier-policy "userFills"))))
   (testing "Unknown topics default to :lossless"
     (is (= :lossless (policy/topic->tier "newTopic")))

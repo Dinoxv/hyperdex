@@ -11,6 +11,44 @@
   (let [combined (concat incoming current)]
     (vec (take 200 combined))))
 
+(defn- unique-by
+  [id-fn rows]
+  (reduce (fn [acc row]
+            (let [id (id-fn row)]
+              (if (or (nil? id)
+                      (contains? (:seen acc) id))
+                acc
+                {:seen (conj (:seen acc) id)
+                 :rows (conj (:rows acc) row)})))
+          {:seen #{} :rows []}
+          (or rows [])))
+
+(defn- twap-history-row-id
+  [row]
+  (some-> [(get-in row [:status :status])
+           (:time row)
+           (get-in row [:state :timestamp])
+           (get-in row [:state :coin])]
+          pr-str))
+
+(defn- merge-twap-history-rows
+  [current incoming]
+  (->> (concat incoming current)
+       (unique-by twap-history-row-id)
+       :rows
+       (take 200)
+       vec))
+
+(defn- twap-slice-fill-rows
+  [rows]
+  (->> (or rows [])
+       (keep (fn [row]
+               (cond
+                 (map? (:fill row)) (:fill row)
+                 (map? row) row
+                 :else nil)))
+       vec))
+
 (defn- extract-channel-rows
   [msg collection-key]
   (let [payload (:data msg)]
@@ -38,6 +76,14 @@
                (-> state
                    (assoc-in [:orders :open-orders] (:data msg))
                    (assoc-in [:orders :open-orders-hydrated?] true)))))))
+
+(defn twap-states-handler
+  [store]
+  (fn [msg]
+    (when (and (= "twapStates" (:channel msg))
+               (common/message-for-active-address? store msg))
+      (let [{:keys [rows]} (extract-channel-rows msg :states)]
+        (swap! store assoc-in [:orders :twap-states] rows)))))
 
 (defn user-fills-handler
   [store]
@@ -88,6 +134,34 @@
             (do
               (swap! store update-in [:orders :ledger] #(upsert-seq (or % []) rows))
               (refresh-runtime/schedule-account-surface-refresh-after-fill! store))))))))
+
+(defn user-twap-history-handler
+  [store]
+  (fn [msg]
+    (when (and (= "userTwapHistory" (:channel msg))
+               (common/message-for-active-address? store msg))
+      (let [{:keys [rows snapshot?]} (extract-channel-rows msg :history)]
+        (swap! store update :orders
+               (fn [orders]
+                 (assoc (or orders {})
+                        :twap-history
+                        (if snapshot?
+                          rows
+                          (merge-twap-history-rows (:twap-history orders) rows)))))))))
+
+(defn user-twap-slice-fills-handler
+  [store]
+  (fn [msg]
+    (when (and (= "userTwapSliceFills" (:channel msg))
+               (common/message-for-active-address? store msg))
+      (let [{:keys [rows snapshot?]} (extract-channel-rows msg :twapSliceFills)
+            fills (twap-slice-fill-rows rows)]
+        (if snapshot?
+          (swap! store assoc-in [:orders :twap-slice-fills] fills)
+          (let [existing (get-in @store [:orders :twap-slice-fills] [])
+                new-rows (vec (fill-runtime/novel-fills existing fills))]
+            (when (seq new-rows)
+              (swap! store update-in [:orders :twap-slice-fills] #(upsert-seq (or % []) new-rows)))))))))
 
 (defn- clear-dex-from-clearinghouse-message
   [msg]

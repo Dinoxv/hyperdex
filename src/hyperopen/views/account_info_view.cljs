@@ -7,6 +7,7 @@
             [hyperopen.views.account-info.tabs.open-orders :as open-orders-tab]
             [hyperopen.views.account-info.tabs.order-history :as order-history-tab]
             [hyperopen.views.account-info.tabs.positions :as positions-tab]
+            [hyperopen.views.account-info.tabs.twap :as twap-tab]
             [hyperopen.views.account-info.tabs.trade-history :as trade-history-tab]))
 
 (def ^:private base-tab-definitions
@@ -585,8 +586,8 @@
                                                 :mobile-expanded-card mobile-expanded-card))))
    :open-orders (fn [{:keys [open-orders open-orders-sort open-orders-state]}]
                   (open-orders-tab-content open-orders open-orders-sort open-orders-state))
-   :twap (fn [_]
-           (placeholder-tab-content :twap))
+   :twap (fn [view-model]
+           (twap-tab/twap-tab-content view-model))
    :trade-history (fn [{:keys [trade-history-rows trade-history-state mobile-expanded-card]}]
                     (trade-history-tab-content trade-history-rows
                                                (assoc trade-history-state

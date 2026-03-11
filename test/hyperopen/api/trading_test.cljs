@@ -27,6 +27,17 @@
            {:order {:assetIdx "13"
                     :oid "307891000623"}}]))))
 
+(deftest build-cancel-twap-request-public-seam-produces-twap-cancel-action-test
+  (is (= {:action {:type "twapCancel"
+                   :a 12
+                   :t 77}}
+         (trading/build-cancel-twap-request
+          {:asset-contexts {}
+           :asset-selector {:market-by-key {}}}
+          {:coin "SOL"
+           :asset-idx "12"
+           :twap-id "77"}))))
+
 (deftest submit-order-public-seam-rejects-when-session-is-missing-test
   (async done
     (let [store (atom {:wallet {:agent {:status :ready

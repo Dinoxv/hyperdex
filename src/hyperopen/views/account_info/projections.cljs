@@ -3,6 +3,7 @@
             [hyperopen.views.account-info.projections.coins :as coins]
             [hyperopen.views.account-info.projections.orders :as orders]
             [hyperopen.views.account-info.projections.parse :as parse]
+            [hyperopen.views.account-info.projections.twaps :as twaps]
             [hyperopen.views.account-info.projections.trades :as trades]))
 
 ;; Parsing helpers
@@ -51,3 +52,11 @@
 (def trade-history-fee-number trades/trade-history-fee-number)
 (def trade-history-closed-pnl-number trades/trade-history-closed-pnl-number)
 (def trade-history-row-id trades/trade-history-row-id)
+
+;; TWAP
+(def normalize-active-twap-row twaps/normalize-active-twap-row)
+(def normalized-active-twaps twaps/normalized-active-twaps)
+(def normalize-twap-history-row twaps/normalize-twap-history-row)
+(def normalized-twap-history twaps/normalized-twap-history)
+(def normalize-twap-slice-fill twaps/normalize-twap-slice-fill)
+(def normalized-twap-slice-fills twaps/normalized-twap-slice-fills)

@@ -10,7 +10,10 @@
   ["openOrders"
    "userFills"
    "userFundings"
-   "userNonFundingLedgerUpdates"])
+   "userNonFundingLedgerUpdates"
+   "twapStates"
+   "userTwapHistory"
+   "userTwapSliceFills"])
 
 (defn- runtime-streams
   []
@@ -29,8 +32,10 @@
 
 (defn- user-subscription
   [address topic]
-  {:type topic
-   :user address})
+  (cond-> {:type topic
+           :user address}
+    (= "twapStates" topic)
+    (assoc :dex "ALL_DEXS")))
 
 (defn- user-subscriptions
   [address]

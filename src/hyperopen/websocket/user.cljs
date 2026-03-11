@@ -23,8 +23,11 @@
 (defn init!
   [store]
   (ws-client/register-handler! "openOrders" (handlers/open-orders-handler store))
+  (ws-client/register-handler! "twapStates" (handlers/twap-states-handler store))
   (ws-client/register-handler! "userFills" (handlers/user-fills-handler store))
   (ws-client/register-handler! "userFundings" (handlers/user-fundings-handler store))
+  (ws-client/register-handler! "userTwapHistory" (handlers/user-twap-history-handler store))
+  (ws-client/register-handler! "userTwapSliceFills" (handlers/user-twap-slice-fills-handler store))
   (ws-client/register-handler! "userNonFundingLedgerUpdates" (handlers/user-ledger-handler store))
   (ws-client/register-handler! "clearinghouseState" (handlers/clearinghouse-state-handler store))
   (telemetry/log! "User websocket handlers initialized"))

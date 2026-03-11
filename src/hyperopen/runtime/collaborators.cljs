@@ -93,6 +93,7 @@
 
 (defn- account-history-action-deps []
   {:select-account-info-tab account-history-actions/select-account-info-tab
+   :select-account-info-twap-subtab account-history-actions/select-account-info-twap-subtab
    :set-funding-history-filters account-history-actions/set-funding-history-filters
    :toggle-funding-history-filter-open account-history-actions/toggle-funding-history-filter-open
    :toggle-funding-history-filter-coin account-history-actions/toggle-funding-history-filter-coin
@@ -224,6 +225,7 @@
    :submit-cancel-visible-open-orders-confirmation order-actions/submit-cancel-visible-open-orders-confirmation
    :cancel-visible-open-orders order-actions/cancel-visible-open-orders
    :cancel-order order-actions/cancel-order
+   :cancel-twap order-actions/cancel-twap
    :open-funding-send-modal funding-actions/open-funding-send-modal
    :open-funding-transfer-modal funding-actions/open-funding-transfer-modal
    :open-funding-withdraw-modal funding-actions/open-funding-withdraw-modal

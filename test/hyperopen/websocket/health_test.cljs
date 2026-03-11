@@ -217,6 +217,19 @@
                                       :payload {:channel "openOrders"
                                                 :data {:openOrders []}}})))))
 
+(deftest twap-states-single-active-stream-falls-back-when-payload-lacks-dex-test
+  (let [sub {:type "twapStates" :user "0xalice" :dex "ALL_DEXS"}
+        sub-key (model/subscription-key sub)
+        streams {sub-key (mk-stream {:subscribed? true
+                                     :topic "twapStates"
+                                     :descriptor sub})}]
+    (is (= [sub-key]
+           (health/match-stream-keys streams
+                                     {:topic "twapStates"
+                                      :payload {:channel "twapStates"
+                                                :data {:user "0xalice"
+                                                       :states [[17 {:coin "BTC"}]]}}})))))
+
 (deftest health-snapshot-includes-seq-gap-fields-and-group-rollup-test
   (let [sub-key ["trades" "BTC" nil nil nil]
         snapshot (health/derive-health-snapshot

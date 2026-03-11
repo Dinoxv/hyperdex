@@ -3,6 +3,7 @@
             [hyperopen.account.context :as account-context]
             [hyperopen.asset-selector.markets :as markets]
             [hyperopen.order.cancel-visible-confirmation :as cancel-visible-confirmation]
+            [hyperopen.platform :as platform]
             [hyperopen.views.account-info.derived-cache :as derived-cache]
             [hyperopen.views.account-info.projections :as projections]
             [hyperopen.views.websocket-freshness :as ws-freshness]))
@@ -219,22 +220,29 @@
                                  open-orders-snapshot
                                  open-orders-snapshot-by-dex
                                  pending-cancel-oids
+                                 twap-states
+                                 twap-history
+                                 twap-slice-fills
                                  market-by-key]
-  (case selected-tab
-    :balances {:balance-rows (derived-cache/memoized-balance-rows webdata2 spot-data account market-by-key)}
-    :positions (let [positions (derived-cache/memoized-positions webdata2 perp-dex-states)
-                     positions (attach-position-market-mark-prices positions market-by-key)
-                     normalized-open-orders (derived-cache/memoized-open-orders open-orders
-                                                                                 open-orders-snapshot
-                                                                                 open-orders-snapshot-by-dex
-                                                                                 pending-cancel-oids)]
-                 {:positions (attach-position-tpsl-trigger-prices positions
-                                                                  normalized-open-orders)})
-    :open-orders {:open-orders (derived-cache/memoized-open-orders open-orders
-                                                                   open-orders-snapshot
-                                                                   open-orders-snapshot-by-dex
-                                                                   pending-cancel-oids)}
-    {}))
+  (let [now-ms (platform/now-ms)]
+    (case selected-tab
+      :balances {:balance-rows (derived-cache/memoized-balance-rows webdata2 spot-data account market-by-key)}
+      :positions (let [positions (derived-cache/memoized-positions webdata2 perp-dex-states)
+                       positions (attach-position-market-mark-prices positions market-by-key)
+                       normalized-open-orders (derived-cache/memoized-open-orders open-orders
+                                                                                   open-orders-snapshot
+                                                                                   open-orders-snapshot-by-dex
+                                                                                   pending-cancel-oids)]
+                   {:positions (attach-position-tpsl-trigger-prices positions
+                                                                    normalized-open-orders)})
+      :open-orders {:open-orders (derived-cache/memoized-open-orders open-orders
+                                                                     open-orders-snapshot
+                                                                     open-orders-snapshot-by-dex
+                                                                     pending-cancel-oids)}
+      :twap {:twap-active-rows (projections/normalized-active-twaps twap-states now-ms)
+             :twap-history-rows (projections/normalized-twap-history twap-history)
+             :twap-fill-rows (projections/normalized-twap-slice-fills twap-slice-fills)}
+      {})))
 
 (defn reset-account-info-vm-cache! []
   (derived-cache/reset-derived-cache!))
@@ -257,22 +265,43 @@
         open-orders-source (prefer-orders-value orders webdata2 :open-orders)
         open-orders-snapshot-source (prefer-orders-value orders webdata2 :open-orders-snapshot)
         open-orders-snapshot-by-dex-source (prefer-orders-value orders webdata2 :open-orders-snapshot-by-dex)
+        twap-states-source (:twap-states orders)
+        twap-history-source (:twap-history orders)
+        twap-slice-fills-source (:twap-slice-fills orders)
         pending-cancel-oids (:pending-cancel-oids orders)
-        {:keys [balance-rows positions open-orders]} (selected-tab-derivations selected-tab
-                                                                                webdata2
-                                                                                spot-data
-                                                                                account
-                                                                                perp-dex-states
-                                                                                open-orders-source
-                                                                                open-orders-snapshot-source
-                                                                                open-orders-snapshot-by-dex-source
-                                                                                pending-cancel-oids
-                                                                                market-by-key)
+        {:keys [balance-rows positions open-orders twap-active-rows twap-history-rows twap-fill-rows]}
+        (selected-tab-derivations selected-tab
+                                  webdata2
+                                  spot-data
+                                  account
+                                  perp-dex-states
+                                  open-orders-source
+                                  open-orders-snapshot-source
+                                  open-orders-snapshot-by-dex-source
+                                  pending-cancel-oids
+                                  twap-states-source
+                                  twap-history-source
+                                  twap-slice-fills-source
+                                  market-by-key)
         trade-history-state (-> (merge {:direction-filter :all
                                         :coin-search ""
                                         :filter-open? false}
                                        (get-in state [:account-info :trade-history] {}))
                                 (assoc :market-by-key market-by-key))
+        twap-state (merge {:selected-subtab :active}
+                          (get-in state [:account-info :twap] {}))
+        twap-fill-state (-> (merge {:sort {:column "Time" :direction :desc}
+                                    :direction-filter :all
+                                    :coin-search ""
+                                    :filter-open? false
+                                    :page-size 50
+                                    :page 1
+                                    :page-input "1"}
+                                   (get-in state [:account-info :trade-history] {}))
+                            (assoc :direction-filter :all
+                                   :coin-search ""
+                                   :filter-open? false
+                                   :market-by-key market-by-key))
         funding-history-state (get-in state [:account-info :funding-history] {})
         order-history-state (-> (merge {:status-filter :all
                                         :filter-open? false
@@ -284,7 +313,8 @@
                                                         open-orders-snapshot-by-dex-source
                                                         pending-cancel-oids)
                     :positions (positions-tab-count webdata2 perp-dex-states)
-                    :balances (balance-tab-count webdata2 spot-data account)}
+                    :balances (balance-tab-count webdata2 spot-data account)
+                    :twap (count (or twap-states-source []))}
         open-orders-sort (get-in state [:account-info :open-orders-sort] {:column "Time" :direction :desc})
         positions-state (merge {:direction-filter :all
                                 :coin-search ""
@@ -334,6 +364,11 @@
      :open-orders (or open-orders [])
      :trade-history-rows (prefer-orders-value orders webdata2 :fills)
      :trade-history-state trade-history-state
+     :twap-state twap-state
+     :twap-fill-state twap-fill-state
+     :twap-active-rows (or twap-active-rows [])
+     :twap-history-rows (or twap-history-rows [])
+     :twap-fill-rows (or twap-fill-rows [])
      :funding-history-rows (prefer-orders-value orders webdata2 :fundings)
      :funding-history-raw (prefer-orders-value orders webdata2 :fundings-raw)
      :funding-history-state funding-history-state

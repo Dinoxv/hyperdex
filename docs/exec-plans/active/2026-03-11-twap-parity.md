@@ -16,9 +16,9 @@ The visible proof is straightforward. In the trade ticket, choosing the `TWAP` o
 - [x] (2026-03-11 19:13Z) Audited the current repository and confirmed that TWAP submit plumbing exists in `/hyperopen/src/hyperopen/api/gateway/orders/commands.cljs`, `/hyperopen/src/hyperopen/state/trading.cljs`, and `/hyperopen/src/hyperopen/views/trade/order_form_type_extensions.cljs`, but account-level TWAP rendering is still a placeholder in `/hyperopen/src/hyperopen/views/account_info_view.cljs`.
 - [x] (2026-03-11 19:13Z) Researched current Hyperliquid behavior from official documentation and the production frontend bundle, then embedded the results in this plan.
 - [x] (2026-03-11 19:27Z) Implemented the first trade-ticket parity slice: TWAP now normalizes legacy drafts into an hours-plus-minutes runtime model, defaults to `0h 30m` with randomization off, enforces the 5-minute to 24-hour runtime range, enforces the per-suborder 10 USDC minimum notional rule, and shows inline TWAP preview details in the trade form.
-- [ ] Implement account-side TWAP data surfaces for active states, history, and slice fills.
-- [ ] Replace the placeholder account TWAP tab with working sub-tabs, tables, and terminate interactions.
-- [x] (2026-03-11 19:27Z) Ran the required validation gates successfully: `npm run check`, `npm test`, and `npm run test:websocket`.
+- [x] (2026-03-11 20:49Z) Implemented account-side TWAP lifecycle surfaces: user websocket subscriptions now cover `twapStates`, `userTwapHistory`, and `userTwapSliceFills`; store projections normalize active TWAPs, TWAP history, and TWAP slice fills; and the account view model exposes those rows only when the TWAP tab is selected.
+- [x] (2026-03-11 20:49Z) Replaced the placeholder account TWAP tab with working `active`, `history`, and `fill history` views plus terminate interactions that emit `twapCancel`.
+- [x] (2026-03-11 20:49Z) Re-ran the required validation gates successfully on the TWAP account-side slice: `npm run check`, `npm test`, and `npm run test:websocket`.
 
 ## Surprises & Discoveries
 
@@ -37,6 +37,9 @@ The visible proof is straightforward. In the trade ticket, choosing the `TWAP` o
 - Observation: The local environment did not have repository dependencies installed at the start of implementation, so the first `npm test` attempt failed before the test runner even loaded application code.
   Evidence: `npm test` initially failed with `sh: shadow-cljs: command not found`; after `npm ci`, the named test gates ran successfully.
 
+- Observation: Hyperliquid's TWAP history and slice-fill websocket subscriptions are sufficient to populate the account tab without introducing a second REST hydration path in this slice.
+  Evidence: the production bundle subscribes to `userTwapHistory` and `userTwapSliceFills`, and the local implementation passed the full test suite using websocket-backed snapshots for both surfaces.
+
 ## Decision Log
 
 - Decision: Start implementation with trade-ticket parity before account-tab rendering.
@@ -53,7 +56,9 @@ The visible proof is straightforward. In the trade ticket, choosing the `TWAP` o
 
 ## Outcomes & Retrospective
 
-The first milestone is complete. The codebase now has one shared interpretation of TWAP runtime, slice count, and minimum slice notional across form defaults, UI preview, validation, and request building. This reduced local complexity because the old state depended on an ambiguous `:twap {:minutes ...}` field that meant "total minutes" in some places and "form input" in others. The remaining work is still substantial because account-side TWAP lifecycle support does not exist yet, but the trade path is now aligned with the current Hyperliquid behavior described in this plan.
+The planned TWAP parity work is now implemented in two cohesive slices. The trade ticket has one shared interpretation of TWAP runtime, slice count, and minimum slice notional across form defaults, UI preview, validation, and request building. The account area now models TWAP as its own lifecycle instead of pretending it is a standard open order: websocket subscriptions hydrate active TWAPs, TWAP history, and TWAP slice fills, the TWAP tab renders the official three-subtab structure, and terminate actions send `twapCancel` using the resolved asset index and `twapId`.
+
+The most useful simplification was keeping TWAP lifecycle separate from ordinary order history while still reusing stable table primitives and fill-history rendering where that behavior truly matched. That preserved clarity around identifiers and statuses and avoided hidden coupling with standard order cancel logic. The end state passed `npm run check`, `npm test`, and `npm run test:websocket`, which gives us good confidence that the TWAP path is now covered end to end.
 
 ## Context and Orientation
 
@@ -144,12 +149,12 @@ Key implementation facts captured from research:
 - Active TWAP state comes from a `twapStates` websocket subscription.
 - TWAP history and fill history come from separate info surfaces, not from ordinary order history.
 
-Key local gaps captured during audit:
+Key local gaps captured during audit and resolved during implementation:
 
-- `/hyperopen/src/hyperopen/views/account_info_view.cljs` still renders the TWAP tab as placeholder content.
-- `/hyperopen/src/hyperopen/views/account-info/vm.cljs` does not yet derive TWAP rows or counts.
-- `/hyperopen/src/hyperopen/domain/trading/validation.cljs` only checks that TWAP minutes are greater than zero.
-- `/hyperopen/src/hyperopen/trading/order_form_state.cljs` still defaults TWAP to 5 minutes and randomize true.
+- `/hyperopen/src/hyperopen/views/account_info_view.cljs` had rendered the TWAP tab as placeholder content.
+- `/hyperopen/src/hyperopen/views/account-info/vm.cljs` did not derive TWAP rows or counts.
+- `/hyperopen/src/hyperopen/domain/trading/validation.cljs` only checked that TWAP minutes were greater than zero.
+- `/hyperopen/src/hyperopen/trading/order_form_state.cljs` defaulted TWAP to 5 minutes and randomize true.
 
 ## Interfaces and Dependencies
 
@@ -174,3 +179,5 @@ In `/hyperopen/src/hyperopen/api/gateway/orders/commands.cljs`, `build-twap-acti
 Revision note: Created this plan after auditing the repository, claiming `hyperopen-35i`, and researching Hyperliquid's current TWAP behavior so the implementation can proceed from a self-contained specification.
 
 Revision note: Updated the plan after completing the first trade-ticket TWAP parity slice and running `npm run check`, `npm test`, and `npm run test:websocket` successfully.
+
+Revision note: Updated the plan after wiring TWAP websocket lifecycle surfaces, the account TWAP tab, and `twapCancel`, then re-running `npm run check`, `npm test`, and `npm run test:websocket` successfully.

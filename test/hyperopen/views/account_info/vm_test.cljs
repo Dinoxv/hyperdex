@@ -206,6 +206,47 @@
         row (first (:positions view-model))]
     (is (= 5354.2 (get-in row [:position :markPx])))))
 
+(deftest account-info-vm-derives-twap-tab-rows-and-state-test
+  (let [state {:account-info {:selected-tab :twap
+                              :twap {:selected-subtab :history}
+                              :trade-history {:coin-search "eth"}}
+               :orders {:twap-states [[17 {:coin "BTC"
+                                           :side "B"
+                                           :sz "1.0"
+                                           :executedSz "0.4"
+                                           :executedNtl "40.0"
+                                           :minutes 30
+                                           :timestamp 1700000000000
+                                           :reduceOnly false}]]
+                        :twap-history [{:time 1700001000
+                                        :status {:status "finished"}
+                                        :state {:coin "BTC"
+                                                :side "B"
+                                                :sz "1.0"
+                                                :executedSz "1.0"
+                                                :executedNtl "100.0"
+                                                :minutes 30
+                                                :timestamp 1700000000000
+                                                :reduceOnly false
+                                                :randomize true}}]
+                        :twap-slice-fills [{:tid 9
+                                            :coin "BTC"
+                                            :time 1700002000000
+                                            :px "100.0"
+                                            :sz "0.1"}]}
+               :spot {:meta nil
+                      :clearinghouse-state nil}
+               :account {:mode :classic}
+               :perp-dex-clearinghouse {}}
+        view-model (vm/account-info-vm state)]
+    (is (= :history (get-in view-model [:twap-state :selected-subtab])))
+    (is (= 1 (count (:twap-active-rows view-model))))
+    (is (= 1 (count (:twap-history-rows view-model))))
+    (is (= 1 (count (:twap-fill-rows view-model))))
+    (is (= :all (get-in view-model [:twap-fill-state :direction-filter])))
+    (is (= "" (get-in view-model [:twap-fill-state :coin-search])))
+    (is (= 1 (get-in view-model [:tab-counts :twap])))))
+
 (deftest account-info-vm-memoizes-selected-tab-derived-rows-by-input-identity-test
   (let [state {:account-info {:selected-tab :open-orders}
                :webdata2 {}

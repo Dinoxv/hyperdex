@@ -67,10 +67,23 @@
                                          :subscribed? true
                                          :descriptor {:type "userFills"
                                                       :user address}}
+      ["twapStates" nil address "ALL_DEXS" nil] {:topic "twapStates"
+                                                 :subscribed? true
+                                                 :descriptor {:type "twapStates"
+                                                              :user address
+                                                              :dex "ALL_DEXS"}}
       ["userFundings" nil address nil nil] {:topic "userFundings"
                                             :subscribed? false
                                             :descriptor {:type "userFundings"
                                                          :user address}}
+      ["userTwapHistory" nil address nil nil] {:topic "userTwapHistory"
+                                               :subscribed? false
+                                               :descriptor {:type "userTwapHistory"
+                                                            :user address}}
+      ["userTwapSliceFills" nil address nil nil] {:topic "userTwapSliceFills"
+                                                  :subscribed? false
+                                                  :descriptor {:type "userTwapSliceFills"
+                                                               :user address}}
       ["userNonFundingLedgerUpdates" nil address nil nil] {:topic "userNonFundingLedgerUpdates"
                                                            :subscribed? true
                                                            :descriptor {:type "userNonFundingLedgerUpdates"
@@ -85,9 +98,12 @@
                                             true)]
       (subscriptions-runtime/subscribe-user! address)
       (subscriptions-runtime/unsubscribe-user! address)
-      (is (= #{{:type "userFundings" :user address}}
+      (is (= #{{:type "userFundings" :user address}
+               {:type "userTwapHistory" :user address}
+               {:type "userTwapSliceFills" :user address}}
              (set (map :subscription (filter #(= "subscribe" (:method %)) @outbound)))))
       (is (= #{{:type "openOrders" :user address}
+               {:type "twapStates" :user address :dex "ALL_DEXS"}
                {:type "userFills" :user address}
                {:type "userNonFundingLedgerUpdates" :user address}
                {:type "clearinghouseState" :user address :dex "vault"}}
@@ -128,7 +144,10 @@
     (is (= [{:type "openOrders" :user address}
             {:type "userFills" :user address}
             {:type "userFundings" :user address}
-            {:type "userNonFundingLedgerUpdates" :user address}]
+            {:type "userNonFundingLedgerUpdates" :user address}
+            {:type "twapStates" :user address :dex "ALL_DEXS"}
+            {:type "userTwapHistory" :user address}
+            {:type "userTwapSliceFills" :user address}]
            (user-subscriptions address)))
     (is (= #{[address "vault"]}
            (clearinghouse-keys address)))
@@ -155,9 +174,12 @@
       (subscriptions-runtime/subscribe-user! address)
       (subscriptions-runtime/unsubscribe-user! address)
       (is (= #{{:type "openOrders" :user normalized-address}
+               {:type "twapStates" :user normalized-address :dex "ALL_DEXS"}
                {:type "userFills" :user normalized-address}
                {:type "userFundings" :user normalized-address}
-               {:type "userNonFundingLedgerUpdates" :user normalized-address}}
+               {:type "userNonFundingLedgerUpdates" :user normalized-address}
+               {:type "userTwapHistory" :user normalized-address}
+               {:type "userTwapSliceFills" :user normalized-address}}
              (set (map :subscription (filter #(= "subscribe" (:method %)) @outbound)))))
       (is (empty? (filter #(= "unsubscribe" (:method %)) @outbound)))
       (is (= [["Subscribed to user streams for:" normalized-address]

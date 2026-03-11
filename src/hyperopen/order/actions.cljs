@@ -350,3 +350,8 @@
   (emit-cancel-effects state
                        (trading-api/build-cancel-order-request state order)
                        "Missing asset or order id."))
+
+(defn cancel-twap [state twap]
+  (emit-cancel-effects state
+                       (trading-api/build-cancel-twap-request state twap)
+                       "Missing TWAP asset or TWAP id."))
