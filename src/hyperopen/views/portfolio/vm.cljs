@@ -70,6 +70,66 @@
       (some-> options first :label)
       ""))
 
+(defn- missing-initial-portfolio-summary?
+  [state]
+  (and (boolean (get-in state [:portfolio :loading?]))
+       (nil? (get-in state [:portfolio :loaded-at-ms]))))
+
+(defn- missing-initial-user-fees?
+  [state]
+  (and (boolean (get-in state [:portfolio :user-fees-loading?]))
+       (nil? (get-in state [:portfolio :user-fees-loaded-at-ms]))))
+
+(defn- benchmark-history-pending?
+  [chart returns-benchmark-selector benchmark-context]
+  (let [selected-benchmark-coins (vec (or (:selected-coins returns-benchmark-selector)
+                                          []))
+        strategy-cumulative-rows (or (:strategy-cumulative-rows benchmark-context)
+                                     [])
+        benchmark-cumulative-rows-by-coin (or (:benchmark-cumulative-rows-by-coin benchmark-context)
+                                              {})]
+    (and (= :returns (:selected-tab chart))
+         (seq strategy-cumulative-rows)
+         (seq selected-benchmark-coins)
+         (boolean
+          (some (fn [coin]
+                  (empty? (get benchmark-cumulative-rows-by-coin coin)))
+                selected-benchmark-coins)))))
+
+(defn- background-status-detail
+  [item-ids]
+  (if (or (contains? item-ids :benchmark-history)
+          (contains? item-ids :performance-metrics))
+    "The chart is ready. The remaining analytics will fill in automatically."
+    "You can keep using the page while the remaining data finishes loading."))
+
+(defn- background-status-model
+  [state chart returns-benchmark-selector benchmark-context performance-metrics]
+  (let [items (cond-> []
+                (missing-initial-portfolio-summary? state)
+                (conj {:id :portfolio-returns
+                       :label "Portfolio returns"})
+
+                (missing-initial-user-fees? state)
+                (conj {:id :fees-volume
+                       :label "Fees & volume"})
+
+                (benchmark-history-pending? chart returns-benchmark-selector benchmark-context)
+                (conj {:id :benchmark-history
+                       :label "Benchmark history"})
+
+                (:loading? performance-metrics)
+                (conj {:id :performance-metrics
+                       :label "Performance metrics"}))
+        item-ids (set (map :id items))]
+    {:visible? (boolean (seq items))
+     :title (if (or (contains? item-ids :benchmark-history)
+                    (contains? item-ids :performance-metrics))
+              "Portfolio analytics are still syncing"
+              "Portfolio data is still syncing")
+     :detail (background-status-detail item-ids)
+     :items items}))
+
 (def ^:dynamic *build-benchmark-selector-options*
   vm-benchmarks/build-benchmark-selector-options)
 
@@ -189,6 +249,11 @@
                                           benchmark-context)]
     {:volume-14d-usd volume-14d
      :fees fees
+     :background-status (background-status-model state
+                                                chart
+                                                returns-benchmark-selector
+                                                benchmark-context
+                                                performance-metrics)
      :performance-metrics performance-metrics
      :chart chart
      :selectors {:summary-scope {:value summary-scope

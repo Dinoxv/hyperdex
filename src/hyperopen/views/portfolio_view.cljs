@@ -767,8 +767,17 @@
     [:div {:class ["flex" "h-full" "min-h-0" "flex-col" "relative"]
            :data-role "portfolio-performance-metrics-card"}
      (when loading?
-       [:div {:class ["absolute" "inset-0" "z-10" "flex" "items-center" "justify-center" "bg-base-100/50" "backdrop-blur-sm"]}
-        [:span {:class ["loading" "loading-spinner" "loading-lg"]}]])
+       [:div {:class ["absolute" "inset-0" "z-10" "flex" "items-center" "justify-center" "bg-base-100/65" "backdrop-blur-sm"]
+              :data-role "portfolio-performance-metrics-loading-overlay"
+              :role "status"
+              :aria-live "polite"}
+        [:div {:class ["flex" "max-w-[240px]" "flex-col" "items-center" "gap-2.5" "px-4" "text-center"]}
+         [:span {:class ["loading" "loading-spinner" "loading-lg"]
+                 :aria-hidden true}]
+         [:span {:class ["text-sm" "font-medium" "text-trading-text"]}
+          "Calculating performance metrics"]
+         [:span {:class ["text-xs" "leading-5" "text-trading-text-secondary"]}
+          "Returns stay visible while the remaining analytics finish in the background."]]])
      [:div {:class ["grid"
                     "items-center"
                     "justify-items-start"
@@ -894,6 +903,44 @@
       ^{:key label}
       (action-button item))]])
 
+(defn- background-status-banner [{:keys [visible? title detail items]}]
+  (when visible?
+    [:div {:class ["rounded-xl"
+                   "border"
+                   "px-4"
+                   "py-3"
+                   "backdrop-blur-sm"]
+           :style {:border-color "rgba(46, 91, 98, 0.9)"
+                   :background "linear-gradient(135deg, rgba(8, 24, 30, 0.96) 0%, rgba(9, 35, 42, 0.96) 54%, rgba(14, 44, 37, 0.92) 100%)"}
+           :data-role "portfolio-background-status"
+           :role "status"
+           :aria-live "polite"}
+     [:div {:class ["flex" "flex-col" "gap-3" "xl:flex-row" "xl:items-center" "xl:justify-between"]}
+      [:div {:class ["flex" "items-start" "gap-3"]}
+       [:span {:class ["mt-0.5" "loading" "loading-spinner" "loading-sm" "text-trading-green"]
+               :aria-hidden true}]
+       [:div {:class ["space-y-1"]}
+        [:div {:class ["text-sm" "font-medium" "text-trading-text"]}
+         title]
+        [:div {:class ["text-sm" "leading-5" "text-trading-text-secondary"]}
+         detail]]]
+      [:div {:class ["flex" "flex-wrap" "gap-2"]}
+       (for [{:keys [id label]} items]
+         ^{:key (str "portfolio-background-status-item-" (name id))}
+         [:span {:class ["rounded-full"
+                         "border"
+                         "px-2.5"
+                         "py-1"
+                         "text-xs"
+                         "font-medium"
+                         "uppercase"
+                         "tracking-[0.18em]"]
+                 :style {:border-color "rgba(72, 113, 119, 0.88)"
+                         :background-color "rgba(12, 29, 35, 0.92)"
+                         :color "#9fb6bc"}
+                 :data-role (str "portfolio-background-status-item-" (name id))}
+          label])]]]))
+
 (defn portfolio-view [state]
   (let [view-model (portfolio-vm/portfolio-vm state)]
     [:div {:class ["flex-1"
@@ -906,6 +953,7 @@
            :style {:background-image "radial-gradient(circle at 15% 0%, rgba(0, 212, 170, 0.10), transparent 35%), radial-gradient(circle at 85% 100%, rgba(0, 212, 170, 0.08), transparent 40%)"}
            :data-parity-id "portfolio-root"}
      (header-actions)
+     (background-status-banner (:background-status view-model))
      [:div {:class ["grid"
                     "grid-cols-1"
                     "gap-3"

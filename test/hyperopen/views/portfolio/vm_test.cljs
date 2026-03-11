@@ -176,6 +176,74 @@
                 {:value 0 :y-ratio 1}]
                (get-in view-model [:chart :y-ticks])))))))
 
+(deftest portfolio-vm-background-status-reports-initial-data-loads-test
+  (with-redefs [account-equity-view/account-equity-metrics (fn [_]
+                                                              {:spot-equity 0
+                                                               :perps-value 0
+                                                               :cross-account-value 0
+                                                               :unrealized-pnl 0})]
+    (let [state {:account {:mode :classic}
+                 :portfolio-ui {:summary-scope :all
+                                :summary-time-range :month
+                                :chart-tab :returns}
+                 :portfolio {:summary-by-key {}
+                             :loading? true
+                             :loaded-at-ms nil
+                             :user-fees-loading? true
+                             :user-fees-loaded-at-ms nil}
+                 :webdata2 {:clearinghouseState {:marginSummary {:accountValue 0}}
+                           :totalVaultEquity 0}
+                 :borrow-lend {:total-supplied-usd 0}}
+          background-status (:background-status (vm/portfolio-vm state))]
+      (is (true? (:visible? background-status)))
+      (is (= "Portfolio data is still syncing" (:title background-status)))
+      (is (= "You can keep using the page while the remaining data finishes loading."
+             (:detail background-status)))
+      (is (= [{:id :portfolio-returns
+               :label "Portfolio returns"}
+              {:id :fees-volume
+               :label "Fees & volume"}]
+             (:items background-status))))))
+
+(deftest portfolio-vm-background-status-reports-benchmark-and-metrics-after-chart-ready-test
+  (let [store (atom {:portfolio-ui {}})]
+    (with-redefs [account-equity-view/account-equity-metrics (fn [_]
+                                                                {:spot-equity 10
+                                                                 :perps-value 10
+                                                                 :cross-account-value 10
+                                                                 :unrealized-pnl 0})
+                  system/store store
+                  vm/metrics-worker (delay #js {:postMessage (fn [_payload] nil)})]
+      (let [state {:account {:mode :classic}
+                   :portfolio-ui {:summary-scope :all
+                                  :summary-time-range :month
+                                  :chart-tab :returns
+                                  :returns-benchmark-coins ["SPY"]
+                                  :returns-benchmark-coin "SPY"
+                                  :metrics-loading? true}
+                   :asset-selector {:markets [{:coin "SPY"
+                                               :symbol "SPY"
+                                               :market-type :spot
+                                               :cache-order 1}]}
+                   :portfolio {:summary-by-key {:month {:pnlHistory [[1 0] [2 0] [3 0]]
+                                                        :accountValueHistory [[1 100] [2 105] [3 110]]
+                                                        :vlm 10}}
+                               :loaded-at-ms 1
+                               :user-fees-loaded-at-ms 1}
+                   :webdata2 {:clearinghouseState {:marginSummary {:accountValue 10}}
+                             :totalVaultEquity 0}
+                   :borrow-lend {:total-supplied-usd 0}}
+            background-status (:background-status (vm/portfolio-vm state))]
+        (is (true? (:visible? background-status)))
+        (is (= "Portfolio analytics are still syncing" (:title background-status)))
+        (is (= "The chart is ready. The remaining analytics will fill in automatically."
+               (:detail background-status)))
+        (is (= [{:id :benchmark-history
+                 :label "Benchmark history"}
+                {:id :performance-metrics
+                 :label "Performance metrics"}]
+               (:items background-status)))))))
+
 (deftest portfolio-vm-builds-performance-metrics-groups-with-benchmark-fallbacks-test
   (with-redefs [account-equity-view/account-equity-metrics (fn [_]
                                                              {:spot-equity 0
@@ -331,4 +399,3 @@
       (is (= [0 0 -0.49 0]
              (mapv :value (get-in view-model [:chart :points]))))
       (is (seq (get-in view-model [:chart :path]))))))
-
