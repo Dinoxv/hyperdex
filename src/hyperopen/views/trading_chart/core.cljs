@@ -294,6 +294,8 @@
                          "-"
                          (or (:venue legend-meta) "")
                          "-"
+                         (or (:market-open? legend-meta) true)
+                         "-"
                          volume-visible?)
          mark-visible-range-interaction!
          (fn [node]
@@ -517,6 +519,7 @@
         legend-meta {:symbol symbol
                      :timeframe-label timeframe-label
                      :venue "Hyperopen"
+                     :market-open? true
                      :candle-data candle-data}]
     [:div {:class ["w-full" "h-full"]
            :data-parity-id "chart-panel"}

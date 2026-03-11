@@ -89,6 +89,7 @@
     (is (= "relative" (.-position (.-style container))))
     (@crosshair-handler* #js {:time 1700000100})
     (let [legend-node (aget (.-children container) 0)
+          market-status-node (fake-dom/find-dom-node legend-node #(= "chart-market-status" (aget % "data-role")))
           values-row (aget (.-children legend-node) 1)
           delta-node (aget (.-children values-row) (dec (.-length (.-children values-row))))
           text (str/join " " (fake-dom/collect-text-content legend-node))]
@@ -96,15 +97,22 @@
       (is (str/includes? text "$95"))
       (is (str/includes? text "d-5"))
       (is (str/includes? text "p-5.0"))
+      (is (= "#00c278" (.-backgroundColor (.-style market-status-node))))
+      (is (= "Market open" (aget market-status-node "aria-label")))
       (is (= "#ef4444" (.-color (.-style delta-node)))))
     (@crosshair-handler* #js {:time :no-match})
     (let [text (str/join " " (fake-dom/collect-text-content (aget (.-children container) 0)))]
       (is (str/includes? text "$95")))
     (.update ^js legend-control {:symbol "SOL"
                                  :timeframe-label "1H"
-                                 :venue "Alt"})
-    (let [text (str/join " " (fake-dom/collect-text-content (aget (.-children container) 0)))]
+                                 :venue "Alt"
+                                 :market-open? false})
+    (let [legend-node (aget (.-children container) 0)
+          market-status-node (fake-dom/find-dom-node legend-node #(= "chart-market-status" (aget % "data-role")))
+          text (str/join " " (fake-dom/collect-text-content legend-node))]
       (is (str/includes? text "SOL · 1H · Alt"))
+      (is (= "#6b7280" (.-backgroundColor (.-style market-status-node))))
+      (is (= "Market closed" (aget market-status-node "aria-label")))
       (is (str/includes? text "-- (--)")))
     (.destroy ^js legend-control)
     (is (identical? @crosshair-handler* @unsubscribed-handler*))
@@ -129,4 +137,3 @@
         (.destroy ^js legend-control))
       (finally
         (aset js/globalThis "document" original-document)))))
-

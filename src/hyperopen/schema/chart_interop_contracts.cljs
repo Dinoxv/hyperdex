@@ -97,11 +97,12 @@
 (s/def ::symbol non-empty-string?)
 (s/def ::timeframe-label non-empty-string?)
 (s/def ::venue non-empty-string?)
+(s/def ::market-open? boolean?)
 (s/def ::candle-data sequential?)
 (s/def ::legend-meta
   (s/and
    (s/keys :req-un [::candle-data]
-           :opt-un [::symbol ::timeframe-label ::venue])
+           :opt-un [::symbol ::timeframe-label ::venue ::market-open?])
    (fn [{:keys [candle-data]}]
      (every? #(s/valid? ::candle %) candle-data))))
 

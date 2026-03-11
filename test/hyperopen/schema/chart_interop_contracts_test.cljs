@@ -13,3 +13,12 @@
     (is (some? indicator))
     (is (= indicators-data
            (chart-contracts/assert-indicators! indicators-data {:boundary :test/contracts})))))
+
+(deftest assert-legend-meta-accepts-market-open-flag-test
+  (let [legend-meta {:symbol "BTC"
+                     :timeframe-label "1D"
+                     :venue "Hyperopen"
+                     :market-open? false
+                     :candle-data [{:time 1 :open 100 :high 101 :low 99 :close 100}]}]
+    (is (= legend-meta
+           (chart-contracts/assert-legend-meta! legend-meta {:boundary :test/contracts})))))
