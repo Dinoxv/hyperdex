@@ -133,6 +133,22 @@
     (chart-interop/set-series-data! series mutated-prefix :candlestick)
     (is (= [:set :set] @calls*))))
 
+(deftest set-series-data-config-change-forces-full-reset-even-with-identical-candles-test
+  (let [set-calls* (atom 0)
+        update-calls* (atom 0)
+        candles [{:time 1 :open 10 :high 11 :low 9 :close 10.5}
+                 {:time 2 :open 10.5 :high 12 :low 10 :close 11.5}]
+        series (series-support/make-series
+                :apply-options (fn [_] nil)
+                :set-data (fn [_]
+                            (swap! set-calls* inc))
+                :update (fn [_]
+                          (swap! update-calls* inc)))]
+    (chart-interop/set-series-data! series candles :candlestick {:price-decimals 2})
+    (chart-interop/set-series-data! series candles :candlestick {:price-decimals 5})
+    (is (= 2 @set-calls*))
+    (is (zero? @update-calls*))))
+
 (deftest set-volume-data-identity-gates-and-incrementally-updates-tail-test
   (let [calls* (atom [])
         candles [{:time 1 :open 10 :high 11 :low 9 :close 10.5 :volume 100}
@@ -155,6 +171,21 @@
            (second @calls*)))
     (is (= [:update {:value 90 :time 3 :color "rgba(34, 171, 148, 0.5)"}]
            (nth @calls* 2)))))
+
+(deftest set-volume-data-non-tail-mutation-falls-back-to-full-reset-test
+  (let [calls* (atom [])
+        candles [{:time 1 :open 10 :high 11 :low 9 :close 10.5 :volume 100}
+                 {:time 2 :open 10.5 :high 12 :low 10 :close 11.5 :volume 120}]
+        mutated-prefix [{:time 1 :open 10 :high 13 :low 9 :close 12.5 :volume 130}
+                        {:time 2 :open 10.5 :high 12 :low 10 :close 11.5 :volume 120}]
+        volume-series (series-support/make-series
+                       :set-data (fn [_]
+                                   (swap! calls* conj :set))
+                       :update (fn [_]
+                                 (swap! calls* conj :update)))]
+    (chart-interop/set-volume-data! volume-series candles)
+    (chart-interop/set-volume-data! volume-series mutated-prefix)
+    (is (= [:set :set] @calls*))))
 
 (deftest set-volume-data-applies-transformed-volume-points-test
   (let [applied-data (atom nil)
