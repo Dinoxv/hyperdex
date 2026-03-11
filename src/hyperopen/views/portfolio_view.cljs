@@ -11,22 +11,6 @@
    :notation "compact"
    :maximumFractionDigits 1})
 
-(def ^:private tooltip-currency-format-options
-  {:style "currency"
-   :currency "USD"
-   :maximumFractionDigits 0
-   :minimumFractionDigits 0})
-
-(def ^:private tooltip-time-format-options
-  {:hour "2-digit"
-   :minute "2-digit"
-   :hour12 false})
-
-(def ^:private tooltip-date-format-options
-  {:year "numeric"
-   :month "short"
-   :day "2-digit"})
-
 (def ^:private action-items
   [{:label "Link Staking"
     :mobile-label "Staking"
@@ -123,81 +107,6 @@
     (< value min-value) min-value
     (> value max-value) max-value
     :else value))
-
-(defn- format-tooltip-date [time-ms]
-  (or (fmt/format-intl-date-time time-ms tooltip-date-format-options)
-      "--"))
-
-(defn- format-tooltip-time [time-ms]
-  (or (fmt/format-intl-date-time time-ms tooltip-time-format-options)
-      "--:--"))
-
-(defn- format-tooltip-value [selected-tab value]
-  (if (= selected-tab :returns)
-    (format-axis-percent value)
-    (let [n (if (number? value) value 0)
-          n* (if (== n -0) 0 n)]
-      (or (fmt/format-intl-number n* tooltip-currency-format-options)
-          "$0"))))
-
-(defn- tooltip-metric-label [selected-tab]
-  (case selected-tab
-    :account-value "Account Value"
-    :pnl "PNL"
-    :returns "Returns"
-    "Value"))
-
-(defn- tooltip-value-classes [selected-tab value]
-  (let [n (if (number? value) value 0)
-        positive-classes ["text-[#16d6a1]"]
-        negative-classes ["text-[#ff7b72]"]
-        neutral-classes ["text-[#e6edf2]"]]
-    (case selected-tab
-      :account-value ["text-[#ff9f1a]"]
-      :pnl (cond
-             (pos? n) positive-classes
-             (neg? n) negative-classes
-             :else neutral-classes)
-      :returns (cond
-                 (pos? n) positive-classes
-                 (neg? n) negative-classes
-                 :else neutral-classes)
-      neutral-classes)))
-
-(defn- chart-tooltip-model [summary-time-range selected-tab {:keys [time-ms value]}]
-  {:timestamp (if (= summary-time-range :day)
-                (format-tooltip-time time-ms)
-                (format-tooltip-date time-ms))
-   :metric-label (tooltip-metric-label selected-tab)
-   :metric-value (format-tooltip-value selected-tab value)
-   :value-classes (tooltip-value-classes selected-tab value)})
-
-(defn- chart-tooltip-benchmark-values
-  [selected-tab hovered-index series]
-  (if (and (= selected-tab :returns)
-           (number? hovered-index))
-    (->> (or series [])
-         (keep (fn [{:keys [id coin label stroke points]}]
-                 (when (and (keyword? id)
-                            (not= id :strategy))
-                   (let [point (get (or points []) hovered-index)
-                         value (:value point)
-                         coin* (or (some-> coin str string/trim)
-                                   (name id))
-                         label* (or (some-> label str string/trim)
-                                    coin*
-                                    "Benchmark")
-                         stroke* (if (and (string? stroke)
-                                          (seq stroke))
-                                   stroke
-                                   "#e6edf2")]
-                     (when (fmt/finite-number? value)
-                       {:coin coin*
-                        :label label*
-                        :value (format-tooltip-value :returns value)
-                        :stroke stroke*})))))
-         vec)
-    []))
 
 (def ^:private axis-label-fallback-char-width-px
   7.5)
@@ -585,15 +494,13 @@
         (summary-row "Staking Account" (format-hype (:staking-account-hype summary))))])))
 
 (defn- chart-card [{:keys [chart selectors]}]
-  (let [{:keys [tabs selected-tab axis-kind y-ticks series points hover]} chart
+  (let [{:keys [tabs selected-tab axis-kind y-ticks series points hover hover-tooltip]} chart
         returns-benchmark (:returns-benchmark selectors)
         returns-benchmark* (add-benchmark-chip-colors returns-benchmark series)
-        summary-time-range (get-in selectors [:summary-time-range :value])
         y-axis-width (y-axis-gutter-width axis-kind y-ticks)
         plot-left (+ y-axis-width 10)
         point-count (count points)
         hovered-point (:point hover)
-        hovered-index (:index hover)
         hover-active? (boolean (:active? hover))
         hover-line-left-pct (when hover-active?
                              (* 100 (:x-ratio hovered-point)))
@@ -602,15 +509,7 @@
                                              8
                                              92))
         hover-tooltip-right? (when hover-active?
-                               (> hover-line-left-pct 74))
-        hover-benchmark-values (when hover-active?
-                                 (chart-tooltip-benchmark-values selected-tab
-                                                                 hovered-index
-                                                                 series))
-        hover-tooltip (when hover-active?
-                        (chart-tooltip-model summary-time-range
-                                             selected-tab
-                                             hovered-point))]
+                               (> hover-line-left-pct 74))]
     (section-card
      "portfolio-chart-card"
      [:div {:class ["flex" "items-center" "gap-2" "border-b" "border-base-300" "px-3" "py-2"]}
@@ -741,9 +640,9 @@
                                   "tracking-tight"]
                                  (:value-classes hover-tooltip))}
              (:metric-value hover-tooltip)]]
-           (when (seq hover-benchmark-values)
+           (when (seq (:benchmark-values hover-tooltip))
              [:div {:class ["mt-1.5" "space-y-1"]}
-              (for [{:keys [coin label value stroke]} hover-benchmark-values]
+              (for [{:keys [coin label value stroke]} (:benchmark-values hover-tooltip)]
                 ^{:key (str "portfolio-chart-hover-tooltip-benchmark-row-" coin)}
                 [:div {:class ["grid"
                                "grid-cols-[1fr_auto]"

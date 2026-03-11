@@ -1,53 +1,7 @@
 (ns hyperopen.views.vaults.detail.chart-view-test
-  (:require [clojure.string :as str]
-            [cljs.test :refer-macros [deftest is]]
+  (:require [cljs.test :refer-macros [deftest is]]
             [hyperopen.views.account-info.test-support.hiccup :as hiccup]
             [hyperopen.views.vaults.detail.chart-view :as chart]))
-
-(deftest chart-private-formatters-handle-signs-and-fallbacks-test
-  (let [format-axis @#'chart/format-chart-axis-value
-        format-tooltip @#'chart/format-chart-tooltip-value]
-    (is (= "+1.50%" (format-axis :returns 1.5)))
-    (is (= "-3.40%" (format-axis :returns -3.4)))
-    (is (= "0.00%" (format-axis :returns -0.000001)))
-    (is (= "$0" (format-axis :pnl js/NaN)))
-    (is (= "$0.00" (format-tooltip :pnl js/NaN)))
-    (is (= "$0.00" (format-tooltip :account-value nil)))))
-
-(deftest chart-tooltip-models-and-benchmark-values-test
-  (let [tooltip-model @#'chart/chart-tooltip-model
-        tooltip-benchmark-values @#'chart/chart-tooltip-benchmark-values
-        day-model (tooltip-model :day :returns {:time-ms 1700000000000
-                                                :value 0.25})
-        month-model (tooltip-model :month :returns {:time-ms 1700000000000
-                                                    :value -0.5})
-        benchmark-values (tooltip-benchmark-values :returns
-                                                   1
-                                                   [{:id :strategy
-                                                     :points [{:value 0.1}
-                                                              {:value 0.2}]}
-                                                    {:id :btc
-                                                     :coin "BTC"
-                                                     :label "Bitcoin"
-                                                     :stroke ""
-                                                     :points [{:value 0.1}
-                                                              {:value -0.2}]}
-                                                    {:id :eth
-                                                     :coin "ETH"
-                                                     :label ""
-                                                     :stroke "#33d1b7"
-                                                     :points [{:value 0.3}
-                                                              {:value 0.4}]}])]
-    (is (re-find #":" (:timestamp day-model)))
-    (is (= "Returns" (:metric-label day-model)))
-    (is (= "+0.25%" (:metric-value day-model)))
-    (is (not (str/includes? (:timestamp month-model) ":")))
-    (is (= "-0.50%" (:metric-value month-model)))
-    (is (= 2 (count benchmark-values)))
-    (is (= "Bitcoin" (get-in benchmark-values [0 :label])))
-    (is (= "#e6edf2" (get-in benchmark-values [0 :stroke])))
-    (is (= "#33d1b7" (get-in benchmark-values [1 :stroke])))
-    (is (= [] (tooltip-benchmark-values :pnl 1 [])))))
 
 (deftest chart-timeframe-menu-resolves-token-and-actions-test
   (let [menu (chart/chart-timeframe-menu {:timeframe-options [{:value :week
@@ -103,6 +57,14 @@
                                                    :value -0.1
                                                    :x-ratio 0.8
                                                    :y-ratio 0.2}}
+                                   :hover-tooltip {:timestamp "12:00"
+                                                   :metric-label "Returns"
+                                                   :metric-value "-0.10%"
+                                                   :value-classes ["text-[#ff7b72]"]
+                                                   :benchmark-values [{:coin "BTC"
+                                                                       :label "Bitcoin"
+                                                                       :value "+0.30%"
+                                                                       :stroke "#f7931a"}]}
                                    :returns-benchmark {:coin-search "BT"
                                                        :suggestions-open? true
                                                        :candidates [{:value "BTC" :label "Bitcoin"}]

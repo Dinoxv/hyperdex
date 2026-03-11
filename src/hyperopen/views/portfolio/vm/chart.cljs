@@ -2,6 +2,7 @@
   (:require [hyperopen.portfolio.actions :as portfolio-actions]
             [hyperopen.portfolio.metrics :as portfolio-metrics]
             [hyperopen.views.portfolio.vm.chart-math :as vm-chart-math]
+            [hyperopen.views.portfolio.vm.chart-tooltip :as chart-tooltip]
             [hyperopen.views.portfolio.vm.constants :as constants]
             [hyperopen.views.portfolio.vm.history :as vm-history]
             [hyperopen.views.portfolio.vm.utils :as utils]))
@@ -73,7 +74,7 @@
       strategy-series-stroke)))
 
 (defn build-chart-model
-  [state summary-entry summary-scope returns-benchmark-selector benchmark-context]
+  [state summary-entry summary-scope summary-time-range returns-benchmark-selector benchmark-context]
   (let [selected-tab (portfolio-actions/normalize-portfolio-chart-tab
                       (get-in state [:portfolio-ui :chart-tab]
                               portfolio-actions/default-chart-tab))
@@ -135,16 +136,22 @@
         hovered-index (vm-chart-math/normalize-hover-index (get-in state [:portfolio-ui :chart-hover-index])
                                                            (count strategy-points))
         hovered-point (when (number? hovered-index)
-                        (nth strategy-points hovered-index nil))]
+                        (nth strategy-points hovered-index nil))
+        hover {:index hovered-index
+               :point hovered-point
+               :active? (some? hovered-point)}
+        hover-tooltip (chart-tooltip/build-chart-hover-tooltip summary-time-range
+                                                               selected-tab
+                                                               hover
+                                                               series)]
     {:selected-tab selected-tab
      :axis-kind axis-kind
      :tabs constants/chart-tab-options
      :points strategy-points
      :path (:path strategy-series)
      :series series
-     :hover {:index hovered-index
-             :point hovered-point
-             :active? (some? hovered-point)}
+     :hover hover
+     :hover-tooltip hover-tooltip
      :benchmark-selected? (and (= selected-tab :returns)
                                (seq selected-benchmark-coins))
      :y-ticks (if domain

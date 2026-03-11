@@ -8,7 +8,8 @@
             [hyperopen.vaults.domain.identity :as vault-identity]
             [hyperopen.vaults.domain.ui-state :as vault-ui-state]
             [hyperopen.vaults.infrastructure.routes :as vault-routes]
-            [hyperopen.views.vaults.detail.chart :as chart-model]))
+            [hyperopen.views.vaults.detail.chart :as chart-model]
+            [hyperopen.views.vaults.detail.chart-tooltip :as chart-tooltip]))
 
 (def ^:private chart-timeframe-options
   [{:value :day
@@ -248,6 +249,11 @@
         series (:series chart-model*)
         strategy-series (:strategy-series chart-model*)
         chart-points (:points chart-model*)
+        hover (:hover chart-model*)
+        hover-tooltip (chart-tooltip/build-chart-hover-tooltip snapshot-range
+                                                              selected-series
+                                                              hover
+                                                              series)
         strategy-cumulative-rows (performance-model/cumulative-rows strategy-return-points)
         benchmark-cumulative-rows-by-coin (into {}
                                                 (map (fn [coin]
@@ -371,7 +377,8 @@
              :selected-timeframe snapshot-range
              :selected-series selected-series
              :returns-benchmark returns-benchmark-selector
-             :hover (:hover chart-model*)
+             :hover hover
+             :hover-tooltip hover-tooltip
              :y-ticks (:y-ticks chart-model*)
              :points chart-points
              :path (:path strategy-series)

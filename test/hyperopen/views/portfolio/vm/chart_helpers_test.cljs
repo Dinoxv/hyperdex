@@ -34,6 +34,7 @@
         chart (vm-chart/build-chart-model state
                                           {}
                                           :all
+                                          :day
                                           {:selected-coins []
                                            :label-by-coin {}}
                                           benchmark-context)]
@@ -43,5 +44,7 @@
            (mapv :value (:points chart))))
     (is (= 1 (get-in chart [:hover :index])))
     (is (= 5.56 (get-in chart [:hover :point :value])))
+    (is (= "Returns" (get-in chart [:hover-tooltip :metric-label])))
+    (is (= "+5.56%" (get-in chart [:hover-tooltip :metric-value])))
     (is (seq (:path chart)))
     (is (= 4 (count (:y-ticks chart))))))

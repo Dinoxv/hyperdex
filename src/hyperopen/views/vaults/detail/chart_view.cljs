@@ -1,17 +1,6 @@
 (ns hyperopen.views.vaults.detail.chart-view
   (:require [clojure.string :as str]
-            [hyperopen.utils.formatting :as fmt]
-            [hyperopen.views.vaults.detail.format :as vf]))
-
-(def ^:private tooltip-time-format-options
-  {:hour "2-digit"
-   :minute "2-digit"
-   :hour12 false})
-
-(def ^:private tooltip-date-format-options
-  {:year "numeric"
-   :month "short"
-   :day "2-digit"})
+            [hyperopen.utils.formatting :as fmt]))
 
 (defn- format-chart-axis-value
   [axis-kind value]
@@ -23,87 +12,6 @@
       :pnl (or (fmt/format-large-currency n) "$0")
       :account-value (or (fmt/format-large-currency n) "$0")
       (or (fmt/format-large-currency n) "$0"))))
-
-(defn- format-chart-tooltip-value
-  [axis-kind value]
-  (let [n (if (fmt/finite-number? value) value 0)]
-    (case axis-kind
-      :returns (format-chart-axis-value :returns n)
-      :pnl (vf/format-currency n {:missing "$0.00"})
-      :account-value (vf/format-currency n {:missing "$0.00"})
-      (vf/format-currency n {:missing "$0.00"}))))
-
-(defn- format-tooltip-date
-  [time-ms]
-  (or (fmt/format-intl-date-time time-ms tooltip-date-format-options)
-      "—"))
-
-(defn- format-tooltip-time
-  [time-ms]
-  (or (fmt/format-intl-date-time time-ms tooltip-time-format-options)
-      "--:--"))
-
-(defn- tooltip-metric-label
-  [axis-kind]
-  (case axis-kind
-    :account-value "Account Value"
-    :pnl "PNL"
-    :returns "Returns"
-    "Value"))
-
-(defn- tooltip-value-classes
-  [axis-kind value]
-  (let [n (if (fmt/finite-number? value) value 0)
-        positive-classes ["text-[#16d6a1]"]
-        negative-classes ["text-[#ff7b72]"]
-        neutral-classes ["text-[#e6edf2]"]]
-    (case axis-kind
-      :account-value ["text-[#ff9f1a]"]
-      :pnl (cond
-             (pos? n) positive-classes
-             (neg? n) negative-classes
-             :else neutral-classes)
-      :returns (cond
-                 (pos? n) positive-classes
-                 (neg? n) negative-classes
-                 :else neutral-classes)
-      neutral-classes)))
-
-(defn- chart-tooltip-model
-  [summary-time-range axis-kind {:keys [time-ms value]}]
-  {:timestamp (if (= summary-time-range :day)
-                (format-tooltip-time time-ms)
-                (format-tooltip-date time-ms))
-   :metric-label (tooltip-metric-label axis-kind)
-   :metric-value (format-chart-tooltip-value axis-kind value)
-   :value-classes (tooltip-value-classes axis-kind value)})
-
-(defn- chart-tooltip-benchmark-values
-  [axis-kind hovered-index series]
-  (if (and (= axis-kind :returns)
-           (number? hovered-index))
-    (->> (or series [])
-         (keep (fn [{:keys [id coin label stroke points]}]
-                 (when (and (keyword? id)
-                            (not= id :strategy))
-                     (let [point (get (or points []) hovered-index)
-                         value (:value point)
-                         label* (or (some-> label str str/trim)
-                                    (some-> coin str str/trim)
-                                    (when (keyword? id)
-                                      (name id))
-                                    "Benchmark")
-                         stroke* (if (and (string? stroke)
-                                          (seq stroke))
-                                   stroke
-                                   "#e6edf2")]
-                     (when (fmt/finite-number? value)
-                       {:coin (or coin label* "benchmark")
-                        :label label*
-                        :value (format-chart-tooltip-value :returns value)
-                        :stroke stroke*})))))
-         vec)
-    []))
 
 (defn- clamp-number
   [value min-value max-value]
@@ -459,11 +367,11 @@
         y-ticks (:y-ticks chart)
         selected-series (:selected-series chart)
         series (:series chart)
+        hover-tooltip (:hover-tooltip chart)
         returns-benchmark* (add-benchmark-chip-colors (:returns-benchmark chart) series)
         y-axis-width (y-axis-gutter-width axis-kind y-ticks)
         plot-left (+ y-axis-width 10)
         point-count (count (:points chart))
-        hovered-index (get-in chart [:hover :index])
         hovered-point (get-in chart [:hover :point])
         hover-active? (boolean (get-in chart [:hover :active?]))
         hover-line-left-pct (when hover-active?
@@ -473,15 +381,7 @@
                                               8
                                               92))
         hover-tooltip-right? (when hover-active?
-                               (> hover-line-left-pct 74))
-        hover-benchmark-values (when hover-active?
-                                 (chart-tooltip-benchmark-values axis-kind
-                                                                 hovered-index
-                                                                 series))
-        hover-tooltip (when hover-active?
-                        (chart-tooltip-model (:selected-timeframe chart)
-                                             axis-kind
-                                             hovered-point))]
+                               (> hover-line-left-pct 74))]
     [:section {:class ["rounded-2xl"
                        "border"
                        "border-[#1b393a]"
@@ -605,9 +505,9 @@
                                   "tracking-tight"]
                                  (:value-classes hover-tooltip))}
              (:metric-value hover-tooltip)]]
-           (when (seq hover-benchmark-values)
+           (when (seq (:benchmark-values hover-tooltip))
              [:div {:class ["mt-1.5" "space-y-1"]}
-              (for [{:keys [coin label value stroke]} hover-benchmark-values]
+              (for [{:keys [coin label value stroke]} (:benchmark-values hover-tooltip)]
                 ^{:key (str "vault-detail-chart-hover-tooltip-benchmark-row-" coin)}
                 [:div {:class ["grid"
                                "grid-cols-[1fr_auto]"

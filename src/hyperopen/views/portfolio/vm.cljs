@@ -184,6 +184,7 @@
         chart (vm-chart/build-chart-model state
                                           summary-entry
                                           summary-scope
+                                          summary-time-range
                                           returns-benchmark-selector
                                           benchmark-context)]
     {:volume-14d-usd volume-14d

@@ -193,6 +193,7 @@
             [hyperopen.views.asset-icon-test]
             [hyperopen.views.asset-selector-view-test]
             [hyperopen.views.autocorrelation-plot-test]
+            [hyperopen.views.chart.tooltip-core-test]
             [hyperopen.views.footer-view-test]
             [hyperopen.views.funding-comparison-view-test]
             [hyperopen.views.funding-comparison.vm-test]
@@ -206,6 +207,7 @@
             [hyperopen.views.portfolio.vm.chart-helpers-test]
             [hyperopen.views.portfolio.vm.chart-math-additional-test]
             [hyperopen.views.portfolio.vm.chart-math-test]
+            [hyperopen.views.portfolio.vm.chart-tooltip-test]
             [hyperopen.views.portfolio.vm.equity-helpers-test]
             [hyperopen.views.portfolio.vm.history-helpers-test]
             [hyperopen.views.portfolio.vm.history-test]
@@ -256,6 +258,7 @@
             [hyperopen.views.vaults.detail-vm-test]
             [hyperopen.views.vaults.detail.activity-test]
             [hyperopen.views.vaults.detail.chart-test]
+            [hyperopen.views.vaults.detail.chart-tooltip-test]
             [hyperopen.views.vaults.detail.chart-view-test]
             [hyperopen.views.vaults.detail.format-test]
             [hyperopen.views.vaults.detail.panels-test]
@@ -514,6 +517,7 @@
              'hyperopen.views.asset-icon-test
              'hyperopen.views.asset-selector-view-test
              'hyperopen.views.autocorrelation-plot-test
+             'hyperopen.views.chart.tooltip-core-test
              'hyperopen.views.footer-view-test
              'hyperopen.views.funding-comparison-view-test
              'hyperopen.views.funding-comparison.vm-test
@@ -527,6 +531,7 @@
              'hyperopen.views.portfolio.vm.chart-helpers-test
              'hyperopen.views.portfolio.vm.chart-math-additional-test
              'hyperopen.views.portfolio.vm.chart-math-test
+             'hyperopen.views.portfolio.vm.chart-tooltip-test
              'hyperopen.views.portfolio.vm.equity-helpers-test
              'hyperopen.views.portfolio.vm.history-helpers-test
              'hyperopen.views.portfolio.vm.history-test
@@ -577,6 +582,7 @@
              'hyperopen.views.vaults.detail-vm-test
              'hyperopen.views.vaults.detail.activity-test
              'hyperopen.views.vaults.detail.chart-test
+             'hyperopen.views.vaults.detail.chart-tooltip-test
              'hyperopen.views.vaults.detail.chart-view-test
              'hyperopen.views.vaults.detail.format-test
              'hyperopen.views.vaults.detail.panels-test
