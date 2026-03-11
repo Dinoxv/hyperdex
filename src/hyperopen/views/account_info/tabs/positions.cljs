@@ -294,14 +294,51 @@
     (str tp-text " / " sl-text)))
 
 (defn- edit-icon []
-  [:svg {:class ["h-3" "w-3" "shrink-0"]
+  [:svg {:class ["h-5" "w-5" "shrink-0"]
          :viewBox "0 0 20 20"
          :fill "none"
          :stroke "currentColor"
-         :stroke-width "1.8"
+         :stroke-width "1.6"
+         :stroke-linecap "round"
+         :stroke-linejoin "round"
          :aria-hidden true}
    [:path {:d "M4 13.5V16h2.5L14 8.5 11.5 6 4 13.5Z"}]
    [:path {:d "M10.5 7 13 9.5"}]])
+
+(def ^:private position-detail-edit-button-classes
+  ["inline-flex"
+   "-ml-0.5"
+   "h-6"
+   "w-6"
+   "items-center"
+   "justify-center"
+   "shrink-0"
+   "bg-transparent"
+   "p-0"
+   "text-trading-green"
+   "transition-colors"
+   "hover:text-[#7fffe4]"
+   "focus:outline-none"
+   "focus:ring-0"
+   "focus:ring-offset-0"
+   "focus-visible:outline-none"
+   "focus-visible:ring-0"
+   "focus-visible:ring-offset-0"
+   "focus-visible:text-[#7fffe4]"])
+
+(defn- position-detail-edit-button
+  [aria-label action data-attr]
+  [:button {:class position-detail-edit-button-classes
+            :type "button"
+            :aria-label aria-label
+            data-attr "true"
+            :on {:click action}}
+   (edit-icon)])
+
+(defn- position-margin-editable?
+  [position-data]
+  (not= :cross
+        (position-margin-mode position-data)))
 
 (defn position-unique-key [position-data]
   (projections/position-unique-key position-data))
@@ -515,6 +552,7 @@
                            :else "text-trading-text")
          liq-price (:liquidationPx pos)
          margin (:marginUsed pos)
+         margin-editable? (position-margin-editable? position-data)
          margin-mode-label (some-> (position-margin-mode position-data)
                                    margin-mode-display-label)
          funding-num (shared/parse-optional-num (get-in pos [:cumFunding :allTime]))
@@ -583,28 +621,11 @@
          (when margin-mode-label
            [:span {:class ["text-xs" "font-medium" "text-trading-text-secondary"]}
             (str "(" margin-mode-label ")")])]
-        [:button {:class ["inline-flex"
-                          "h-4"
-                          "w-4"
-                          "items-center"
-                          "justify-center"
-                          "shrink-0"
-                          "bg-transparent"
-                          "p-0"
-                          "text-trading-green"
-                          "hover:text-[#7fffe4]"
-                          "focus:outline-none"
-                          "focus:ring-0"
-                          "focus:ring-offset-0"
-                          "focus-visible:outline-none"
-                          "focus-visible:ring-0"
-                          "focus-visible:ring-offset-0"
-                          "focus-visible:text-[#7fffe4]"]
-                  :type "button"
-                  :aria-label "Edit Margin"
-                  :data-position-margin-trigger "true"
-                  :on {:click [[:actions/open-position-margin-modal position-data :event.currentTarget/bounds]]}}
-         (edit-icon)]]
+        (when margin-editable?
+          (position-detail-edit-button
+           "Edit Margin"
+           [[:actions/open-position-margin-modal position-data :event.currentTarget/bounds]]
+           :data-position-margin-trigger))]
        (when active-margin-modal?
          (position-margin-modal/position-margin-modal-view margin-modal))]
       [:div.text-left.font-semibold.num
@@ -647,28 +668,10 @@
       [:div {:class ["text-left" "relative"]}
        [:div {:class ["inline-flex" "items-center" "gap-0.5" "whitespace-nowrap"]}
         [:span {:class ["font-normal" "text-trading-text" "whitespace-nowrap" "select-text"]} tpsl-copy]
-        [:button {:class ["inline-flex"
-                          "h-4"
-                          "w-4"
-                          "items-center"
-                          "justify-center"
-                          "shrink-0"
-                          "bg-transparent"
-                          "p-0"
-                          "text-trading-green"
-                          "hover:text-[#7fffe4]"
-                          "focus:outline-none"
-                          "focus:ring-0"
-                          "focus:ring-offset-0"
-                          "focus-visible:outline-none"
-                          "focus-visible:ring-0"
-                          "focus-visible:ring-offset-0"
-                          "focus-visible:text-[#7fffe4]"]
-                  :type "button"
-                  :aria-label "Edit TP/SL"
-                  :data-position-tpsl-trigger "true"
-                  :on {:click [[:actions/open-position-tpsl-modal position-data :event.currentTarget/bounds]]}}
-         (edit-icon)]]
+        (position-detail-edit-button
+         "Edit TP/SL"
+         [[:actions/open-position-tpsl-modal position-data :event.currentTarget/bounds]]
+         :data-position-tpsl-trigger)]
        (when active-modal?
          (position-tpsl-modal/position-tpsl-modal-view tpsl-modal))]])))
 
@@ -684,6 +687,7 @@
                           (and (number? pnl-num) (pos? pnl-num)) "text-success"
                           (and (number? pnl-num) (neg? pnl-num)) "text-error"
                           :else "text-trading-text")
+        margin-editable? (position-margin-editable? position-data)
         margin-mode-label (some-> (position-margin-mode position-data)
                                   margin-mode-display-label)
         funding-num (shared/parse-optional-num (get-in pos [:cumFunding :allTime]))
@@ -730,15 +734,19 @@
                                    (position-value-copy position-value-num)
                                    {:value-classes ["num" "font-medium" "whitespace-nowrap"]})
          (mobile-cards/detail-item "Margin"
-                                   (editable-mobile-margin-value
-                                    (:marginUsed pos)
-                                    margin-mode-label
-                                    (mobile-position-detail-edit-button
-                                     "Edit Margin"
-                                     (position-overlay-trigger
-                                      :actions/open-position-margin-modal
-                                      position-data)
-                                     :data-position-margin-trigger))
+                                   (if margin-editable?
+                                     (editable-mobile-margin-value
+                                      (:marginUsed pos)
+                                      margin-mode-label
+                                      (mobile-position-detail-edit-button
+                                       "Edit Margin"
+                                       (position-overlay-trigger
+                                        :actions/open-position-margin-modal
+                                        position-data)
+                                       :data-position-margin-trigger))
+                                     (mobile-position-margin-value-node
+                                      (:marginUsed pos)
+                                      margin-mode-label))
                                    {:value-classes ["font-medium"]})
          (mobile-cards/detail-item "TP/SL"
                                    (editable-mobile-detail-value
@@ -761,11 +769,12 @@
           (position-overlay-trigger
            :actions/open-position-reduce-popover
            position-data))
-         (mobile-position-action-button
-          "Margin"
-          (position-overlay-trigger
-           :actions/open-position-margin-modal
-           position-data))
+         (when margin-editable?
+           (mobile-position-action-button
+            "Margin"
+            (position-overlay-trigger
+             :actions/open-position-margin-modal
+             position-data)))
          (mobile-position-action-button
           "TP/SL"
           (position-overlay-trigger

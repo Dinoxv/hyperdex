@@ -489,6 +489,11 @@
     (is (contains? tpsl-strings "-- / --"))
     (is (some? edit-icon-node))
     (is (some? value-node))
+    (is (contains? (hiccup/node-class-set action-button) "h-6"))
+    (is (contains? (hiccup/node-class-set action-button) "w-6"))
+    (is (contains? (hiccup/node-class-set edit-icon-node) "h-5"))
+    (is (contains? (hiccup/node-class-set edit-icon-node) "w-5"))
+    (is (= "1.6" (get-in edit-icon-node [1 :stroke-width])))
     (is (= "Edit TP/SL" (get-in action-button [1 :aria-label])))))
 
 (deftest position-row-tpsl-cell-renders-derived-trigger-prices-when-present-test
@@ -557,12 +562,17 @@
         row-cells (vec (hiccup/node-children row-node))
         margin-cell (nth row-cells 7)
         action-button (hiccup/find-first-node margin-cell #(= :button (first %)))
+        edit-icon-node (hiccup/find-first-node margin-cell #(= :svg (first %)))
         value-node (hiccup/find-first-node margin-cell #(and (= :span (first %))
                                                               (contains? (hiccup/node-class-set %) "select-text")))
         click-actions (get-in action-button [1 :on :click])
         margin-strings (set (hiccup/collect-strings margin-cell))]
     (is (contains? margin-strings "$12.00"))
     (is (some? value-node))
+    (is (contains? (hiccup/node-class-set action-button) "h-6"))
+    (is (contains? (hiccup/node-class-set action-button) "w-6"))
+    (is (contains? (hiccup/node-class-set edit-icon-node) "h-5"))
+    (is (contains? (hiccup/node-class-set edit-icon-node) "w-5"))
     (is (vector? click-actions))
     (is (= :actions/open-position-margin-modal
            (first (first click-actions))))
@@ -586,6 +596,42 @@
         cross-strings (set (hiccup/collect-strings cross-cell))]
     (is (contains? isolated-strings "(Isolated)"))
     (is (contains? cross-strings "(Cross)"))))
+
+(deftest position-row-cross-margin-cell-omits-edit-affordance-test
+  (let [row-data (assoc-in (fixtures/sample-position-row "xyz:NVDA" 10 "0.500")
+                           [:position :leverage :type]
+                           "cross")
+        row-node (view/position-row row-data)
+        margin-cell (nth (vec (hiccup/node-children row-node)) 7)
+        action-button (hiccup/find-first-node margin-cell #(= :button (first %)))
+        margin-strings (set (hiccup/collect-strings margin-cell))]
+    (is (contains? margin-strings "$12.00"))
+    (is (contains? margin-strings "(Cross)"))
+    (is (nil? action-button))))
+
+(deftest positions-tab-content-mobile-cross-margin-card-omits-margin-actions-test
+  (with-phone-viewport
+    (fn []
+      (let [cross-row (assoc-in (fixtures/sample-position-row "xyz:NVDA" 10 "0.500")
+                                [:position :leverage :type]
+                                "cross")
+            row-id (view/position-unique-key cross-row)
+            content (view/positions-tab-content [cross-row]
+                                                fixtures/default-sort-state
+                                                nil
+                                                nil
+                                                nil
+                                                {:direction-filter :all
+                                                 :mobile-expanded-card {:positions row-id}})
+            expanded-card (hiccup/find-by-data-role content (str "mobile-position-card-" row-id))
+            margin-edit-button (hiccup/find-first-node expanded-card #(= "Edit Margin" (get-in % [1 :aria-label])))
+            margin-footer-button (hiccup/find-first-node expanded-card #(and (= :button (first %))
+                                                                             (contains? (hiccup/direct-texts %) "Margin")))
+            expanded-strings (set (hiccup/collect-strings expanded-card))]
+        (is (contains? expanded-strings "Margin"))
+        (is (contains? expanded-strings "(Cross)"))
+        (is (nil? margin-edit-button))
+        (is (nil? margin-footer-button))))))
 
 (deftest position-row-renders-inline-margin-modal-for-active-row-key-test
   (let [row-data (fixtures/sample-position-row "xyz:NVDA" 10 "0.500")
