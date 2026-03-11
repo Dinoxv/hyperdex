@@ -6,7 +6,7 @@
                 [no.cjohansen/nexus "2025.07.1"]
                 [org.clojure/test.check "1.1.1"]]
  
- :dev-http {8080 ["resources/public" "classpath:public"]}
+ :dev-http {8080 ["resources/public"]}
  
   :builds
  {:app {:target :browser

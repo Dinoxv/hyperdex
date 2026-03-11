@@ -322,6 +322,7 @@
             [hyperopen.websocket.user-runtime.subscriptions-test]
             [hyperopen.websocket.user-test]
             [hyperopen.websocket.webdata2-test]
+            [hyperopen.workbench.portfolio-client-test]
             [hyperopen.workbench.support.dispatch-test]))
 
 (defn run-generated-tests
@@ -647,4 +648,5 @@
              'hyperopen.websocket.user-runtime.subscriptions-test
              'hyperopen.websocket.user-test
              'hyperopen.websocket.webdata2-test
+             'hyperopen.workbench.portfolio-client-test
              'hyperopen.workbench.support.dispatch-test))
