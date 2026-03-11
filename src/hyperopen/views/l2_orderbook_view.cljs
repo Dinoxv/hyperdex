@@ -27,6 +27,7 @@
 (def ^:private bid-depth-bar-class "bg-[rgba(31,166,125,0.15)]")
 (def ^:private ask-price-text-class "text-[rgb(237,112,136)]")
 (def ^:private bid-price-text-class "text-[rgb(31,166,125)]")
+(def ^:private orderbook-tab-indicator-class "bg-[rgb(80,210,193)]")
 
 (defn normalize-orderbook-tab [tab]
   (let [tab* (cond
@@ -295,20 +296,29 @@
     (size-unit-dropdown base-symbol quote-symbol size-unit size-dropdown-visible?)]])
 
 (defn orderbook-tab-button [active-tab tab-id label]
-  [:button.flex-1.px-3.py-2.text-sm.font-medium.border-b-2.transition-colors
+  [:button.flex-1.px-3.py-2.text-sm.font-medium.transition-colors
    {:type "button"
     :data-role (str "orderbook-tab-button-" (name tab-id))
     :class (if (= active-tab tab-id)
-             ["text-white" "border-cyan-400"]
-             ["text-gray-400" "border-transparent" "hover:text-gray-200"])
+             ["text-white"]
+             ["text-gray-400" "hover:text-gray-200"])
     :on {:click [[:actions/select-orderbook-tab tab-id]]}}
    label])
 
 (defn orderbook-tabs-row [active-tab]
-  [:div {:class ["flex" "items-center" "bg-base-100" "border-b" "border-base-300"]
+  [:div {:class ["relative" "flex" "items-center" "bg-base-100" "border-b" "border-base-300"]
          :data-role "orderbook-tabs-row"}
    (orderbook-tab-button active-tab :orderbook "Order Book")
-   (orderbook-tab-button active-tab :trades "Trades")])
+   (orderbook-tab-button active-tab :trades "Trades")
+   [:div {:class ["pointer-events-none"
+                  "absolute"
+                  "bottom-0"
+                  "left-0"
+                  "h-px"
+                  "w-1/2"
+                  orderbook-tab-indicator-class]
+          :style {:left (if (= active-tab :trades) "50%" "0%")
+                  :transition "left 0.3s"}}]])
 
 (defn tab-content-viewport [content]
   [:div {:class ["flex-1" "h-full" "min-h-0" "overflow-hidden" "bg-base-100"]}
