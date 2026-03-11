@@ -184,8 +184,15 @@
                                                                     :side :sell
                                                                     :size "3"
                                                                     :reduce-only true
-                                                                    :twap {:minutes "15"
-                                                                           :randomize false}})]
+                                                                    :twap {:hours 1
+                                                                           :minutes 30
+                                                                           :randomize false}})
+        legacy-twap-request (commands/build-order-request command-context {:type :twap
+                                                                           :side :buy
+                                                                           :size "2"
+                                                                           :reduce-only false
+                                                                           :twap {:minutes "15"
+                                                                                  :randomize true}})]
     (is (= "order" (get-in scale-request [:action :type])))
     (is (= "na" (get-in scale-request [:action :grouping])))
     (is (= 3 (count (:orders scale-request))))
@@ -198,8 +205,13 @@
     (is (= false (get-in twap-request [:action :twap :b])))
     (is (= "3" (get-in twap-request [:action :twap :s])))
     (is (= true (get-in twap-request [:action :twap :r])))
-    (is (= 15 (get-in twap-request [:action :twap :m])))
-    (is (= false (get-in twap-request [:action :twap :t])))))
+    (is (= 90 (get-in twap-request [:action :twap :m])))
+    (is (= false (get-in twap-request [:action :twap :t])))
+
+    (is (= true (get-in legacy-twap-request [:action :twap :b])))
+    (is (= "2" (get-in legacy-twap-request [:action :twap :s])))
+    (is (= 15 (get-in legacy-twap-request [:action :twap :m])))
+    (is (= true (get-in legacy-twap-request [:action :twap :t])))))
 
 (deftest build-order-request-includes-update-leverage-pre-action-test
   (let [cross-request (commands/build-order-request command-context {:type :limit
@@ -281,10 +293,12 @@
   (is (nil? (commands/build-order-request command-context {:type :twap
                                                             :side :buy
                                                             :size "1"
-                                                            :twap {:minutes 0
+                                                            :twap {:hours 0
+                                                                   :minutes 4
                                                                    :randomize true}})))
   (is (nil? (commands/build-twap-action (assoc command-context :active-asset nil)
                                         {:side :buy
                                          :size "1"
-                                         :twap {:minutes 15
+                                         :twap {:hours 0
+                                                :minutes 15
                                                 :randomize true}}))))

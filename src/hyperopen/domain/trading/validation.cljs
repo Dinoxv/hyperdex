@@ -1,5 +1,6 @@
 (ns hyperopen.domain.trading.validation
-  (:require [hyperopen.domain.trading.core :as core]))
+  (:require [hyperopen.domain.trading.core :as core]
+            [hyperopen.domain.trading.market :as market]))
 
 (def ^:private validation-error-specs
   {:order/size-invalid {:message "Size must be greater than 0."
@@ -14,8 +15,10 @@
                         :fields []}
    :scale/endpoint-notional-too-small {:message "Scale start/end orders must each be at least 10 in order value."
                                        :fields []}
-   :twap/minutes-invalid {:message "TWAP minutes must be greater than 0."
-                          :fields [:twap-minutes]}
+   :twap/runtime-invalid {:message "TWAP runtime must be between 5 minutes and 24 hours."
+                          :fields [:twap-runtime]}
+   :twap/suborder-notional-too-small {:message "Each TWAP suborder must be at least 10 USDC in order value."
+                                      :fields []}
    :tpsl/tp-trigger-required {:message "TP trigger price is required when TP is enabled."
                               :fields [:tp-trigger]}
    :tpsl/sl-trigger-required {:message "SL trigger price is required when SL is enabled."
@@ -100,10 +103,17 @@
         (< end-notional core/scale-min-endpoint-notional))
     (conj (validation-error :scale/endpoint-notional-too-small))))
 
-(defn- validate-twap [{:keys [twap-min] :as parsed}]
-  (cond-> (require-size-error parsed)
-    (invalid-positive? twap-min)
-    (conj (validation-error :twap/minutes-invalid))))
+(defn- validate-twap [{:keys [twap-minutes
+                              twap-suborder-notional] :as parsed}]
+  (let [runtime-valid? (boolean (core/valid-twap-runtime? twap-minutes))]
+    (cond-> (require-size-error parsed)
+      (not runtime-valid?)
+      (conj (validation-error :twap/runtime-invalid))
+
+      (and runtime-valid?
+           (number? twap-suborder-notional)
+           (< twap-suborder-notional core/twap-min-suborder-notional))
+      (conj (validation-error :twap/suborder-notional-too-small)))))
 
 (def ^:private type-validator-dispatch
   {:validate/market validate-market
@@ -147,7 +157,10 @@
                                  (number? (:price end-leg))
                                  (number? (:size end-leg)))
                         (* (:price end-leg) (:size end-leg)))
-         twap-min (core/parse-num (get-in form [:twap :minutes]))
+         twap-minutes (core/twap-total-minutes (get-in form [:twap]))
+         twap-suborder-notional (core/twap-suborder-notional size
+                                                             twap-minutes
+                                                             (market/reference-price context form))
          tp-enabled? (get-in form [:tp :enabled?])
          sl-enabled? (get-in form [:sl :enabled?])
          tp-trigger (core/parse-num (get-in form [:tp :trigger]))
@@ -162,7 +175,8 @@
                  :scale-skew scale-skew
                  :start-notional start-notional
                  :end-notional end-notional
-                 :twap-min twap-min}
+                 :twap-minutes twap-minutes
+                 :twap-suborder-notional twap-suborder-notional}
          validator-id (core/order-type-validator-id order-type)
          validator-fn (get type-validator-dispatch validator-id validate-limit)
          type-errors (validator-fn parsed)
@@ -181,7 +195,7 @@
    :scale-start 3
    :scale-end 4
    :scale-count 5
-   :twap-minutes 6
+   :twap-runtime 6
    :tp-trigger 7
    :sl-trigger 8})
 
@@ -192,7 +206,7 @@
    :scale-start "Start Price"
    :scale-end "End Price"
    :scale-count "Total Orders"
-   :twap-minutes "Minutes"
+   :twap-runtime "Runtime"
    :tp-trigger "TP Trigger"
    :sl-trigger "SL Trigger"})
 

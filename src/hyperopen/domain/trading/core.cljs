@@ -82,6 +82,10 @@
 (def scale-min-order-count 2)
 (def scale-max-order-count 100)
 (def scale-min-endpoint-notional 10)
+(def twap-min-runtime-minutes 5)
+(def twap-max-runtime-minutes 1440)
+(def twap-frequency-seconds 30)
+(def twap-min-suborder-notional 10)
 
 (defn parse-num [v]
   (cond
@@ -92,6 +96,12 @@
                              (not (js/isNaN n)))
                     n))
     :else nil))
+
+(defn- normalize-nonnegative-int [value]
+  (when-let [parsed (parse-num value)]
+    (let [normalized (-> parsed js/Math.floor int)]
+      (when (>= normalized 0)
+        normalized))))
 
 (defn- clamp-num [n min-v max-v]
   (-> n
@@ -142,6 +152,44 @@
   (when-let [parsed (parse-num count)]
     (and (>= parsed scale-min-order-count)
          (<= parsed scale-max-order-count))))
+
+(defn split-twap-total-minutes [value]
+  (let [total-minutes (or (normalize-nonnegative-int value) 0)]
+    {:hours (quot total-minutes 60)
+     :minutes (mod total-minutes 60)}))
+
+(defn twap-total-minutes [twap-form]
+  (let [twap* (or twap-form {})]
+    (if (contains? twap* :hours)
+      (+ (* 60 (or (normalize-nonnegative-int (:hours twap*)) 0))
+         (or (normalize-nonnegative-int (:minutes twap*)) 0))
+      (normalize-nonnegative-int (:minutes twap*)))))
+
+(defn valid-twap-runtime? [minutes]
+  (when-let [total-minutes (normalize-nonnegative-int minutes)]
+    (<= twap-min-runtime-minutes total-minutes twap-max-runtime-minutes)))
+
+(defn twap-suborder-count [minutes]
+  (when-let [total-minutes (normalize-nonnegative-int minutes)]
+    (+ 1 (/ (* 60 total-minutes) twap-frequency-seconds))))
+
+(defn twap-suborder-size [total-size minutes]
+  (let [size* (parse-num total-size)
+        order-count (twap-suborder-count minutes)]
+    (when (and (number? size*)
+               (pos? size*)
+               (number? order-count)
+               (pos? order-count))
+      (/ size* order-count))))
+
+(defn twap-suborder-notional [total-size minutes reference-price]
+  (let [suborder-size (twap-suborder-size total-size minutes)
+        reference-price* (parse-num reference-price)]
+    (when (and (number? suborder-size)
+               (pos? suborder-size)
+               (number? reference-price*)
+               (pos? reference-price*))
+      (* suborder-size reference-price*))))
 
 (defn normalize-scale-sz-decimals [sz-decimals]
   (let [parsed (parse-num sz-decimals)]

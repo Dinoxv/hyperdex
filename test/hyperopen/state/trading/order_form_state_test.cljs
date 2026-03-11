@@ -39,6 +39,9 @@
   (is (nil? (:size-input-source (trading/default-order-form))))
   (is (nil? (:size-display (trading/default-order-form))))
   (is (= :usd (get-in (trading/default-order-form) [:tpsl :unit])))
+  (is (= 0 (get-in (trading/default-order-form) [:twap :hours])))
+  (is (= 30 (get-in (trading/default-order-form) [:twap :minutes])))
+  (is (false? (get-in (trading/default-order-form) [:twap :randomize])))
   (is (= trading/default-market-slippage-pct
          (:slippage (trading/default-order-form))))
   (is (= :limit (:entry-mode (trading/default-order-form-ui))))
@@ -133,6 +136,17 @@
     (is (= :take-limit (:type normalized)))
     (is (= normalized
            (trading/normalize-order-form base-state form-without-entry-mode)))))
+
+(deftest normalize-order-form-migrates-legacy-twap-total-minutes-test
+  (let [legacy-form (-> (trading/default-order-form)
+                        (assoc :type :twap)
+                        (assoc :twap {:minutes 95
+                                      :randomize true}))
+        normalized (trading/normalize-order-form base-state legacy-form)]
+    (is (= :twap (:type normalized)))
+    (is (= 1 (get-in normalized [:twap :hours])))
+    (is (= 35 (get-in normalized [:twap :minutes])))
+    (is (true? (get-in normalized [:twap :randomize])))))
 
 (deftest normalize-order-form-strips-policy-legacy-compatibility-keys-test
   (let [legacy-form (merge (trading/default-order-form)

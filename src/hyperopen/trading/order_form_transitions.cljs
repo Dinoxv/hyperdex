@@ -66,6 +66,7 @@
     [:scale :end]
     [:scale :count]
     [:scale :skew]
+    [:twap :hours]
     [:twap :minutes]
     [:tp :trigger]
     [:tp :limit]

@@ -151,6 +151,9 @@
 (defn set-scale-skew-input []
   (update-order-field [:scale :skew] event-target-value))
 
+(defn set-twap-hours-input []
+  (update-order-field [:twap :hours] event-target-value))
+
 (defn set-twap-minutes-input []
   (update-order-field [:twap :minutes] event-target-value))
 

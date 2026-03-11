@@ -223,12 +223,12 @@
         asset-idx (:asset-idx command-context)
         side (:side form)
         size (trading-domain/parse-num (:size form))
-        minutes (trading-domain/parse-num (get-in form [:twap :minutes]))
+        minutes (trading-domain/twap-total-minutes (get-in form [:twap]))
         randomize (boolean (get-in form [:twap :randomize]))]
     (when (and (string? active-asset)
                (number? asset-idx)
                (positive-number? size)
-               (positive-number? minutes))
+               (trading-domain/valid-twap-runtime? minutes))
       {:action (array-map :type "twapOrder"
                           :twap (array-map :a asset-idx
                                            :b (trading-domain/order-side->is-buy side)

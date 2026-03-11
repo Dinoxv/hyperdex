@@ -6,7 +6,9 @@
 (def default-scale-skew "1.00")
 (def default-ui-leverage 20)
 (def default-slippage trading-domain/default-market-slippage-pct)
-(def default-twap-minutes 5)
+(def default-twap-hours 0)
+(def default-twap-minutes 30)
+(def default-twap-randomize false)
 (def default-margin-mode :cross)
 (def default-size-input-mode :quote)
 (def default-size-input-source :manual)
@@ -80,8 +82,9 @@
            :end ""
            :count default-scale-order-count
            :skew default-scale-skew}
-   :twap {:minutes default-twap-minutes
-          :randomize true}
+   :twap {:hours default-twap-hours
+          :minutes default-twap-minutes
+          :randomize default-twap-randomize}
    :tpsl {:unit default-tpsl-unit}
    :tp {:enabled? false
         :trigger ""
@@ -126,10 +129,31 @@
      :count (or (:count raw-scale) default-scale-order-count)
      :skew normalized-skew}))
 
+(defn- normalize-twap-runtime-field [value default-value]
+  (cond
+    (string? value) value
+    (number? value) (-> value js/Math.floor int (max 0))
+    :else default-value))
+
+(defn- normalize-twap-form [twap]
+  (let [raw-twap (or twap {})
+        runtime-fields (if (contains? raw-twap :hours)
+                         {:hours (normalize-twap-runtime-field (:hours raw-twap) 0)
+                          :minutes (normalize-twap-runtime-field (:minutes raw-twap) 0)}
+                         (trading-domain/split-twap-total-minutes
+                          (or (:minutes raw-twap)
+                              (+ (* 60 default-twap-hours)
+                                 default-twap-minutes))))]
+    (assoc runtime-fields
+           :randomize (if (contains? raw-twap :randomize)
+                        (boolean (:randomize raw-twap))
+                        default-twap-randomize))))
+
 (defn normalize-order-form [form]
   (let [raw-tpsl (:tpsl form)]
     (-> form
         (assoc :scale (normalize-scale-form (:scale form)))
+        (assoc :twap (normalize-twap-form (:twap form)))
         (assoc :tpsl {:unit (normalize-tpsl-unit (:unit raw-tpsl))}))))
 
 (defn default-order-form-runtime []

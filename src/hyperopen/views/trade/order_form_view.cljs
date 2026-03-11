@@ -10,6 +10,29 @@
   [:div {:class ["px-3" "py-2" "bg-base-200" "border" "border-base-300" "rounded-lg" "text-xs" "text-gray-300"]}
    message])
 
+(defn- twap-runtime-label [total-minutes]
+  (if (number? total-minutes)
+    (let [hours (quot total-minutes 60)
+          minutes (mod total-minutes 60)]
+      (cond
+        (and (pos? hours) (pos? minutes)) (str hours "h " minutes "m")
+        (pos? hours) (str hours "h")
+        :else (str minutes "m")))
+    "--"))
+
+(defn- twap-preview [state form base-symbol]
+  (let [total-minutes (trading/twap-total-minutes (get-in form [:twap]))
+        order-count (trading/twap-suborder-count total-minutes)
+        suborder-size (trading/twap-suborder-size (:size form) total-minutes)]
+    {:runtime (twap-runtime-label total-minutes)
+     :frequency (str trading/twap-frequency-seconds "s")
+     :order-count (if (number? order-count) (str order-count) "--")
+     :size-per-suborder (if (number? suborder-size)
+                          (str (trading/base-size-string state suborder-size)
+                               " "
+                               base-symbol)
+                          "--")}))
+
 (defn- price-context-accessory [{:keys [label mid-available?]} on-set-to-mid]
   [:button {:type "button"
             :disabled (not mid-available?)
@@ -808,7 +831,8 @@
         side-handlers (:side handlers)
         price-handlers (:price handlers)
         size-handlers (:size handlers)
-        section-handlers (:order-type-sections handlers)
+        section-handlers (assoc (:order-type-sections handlers)
+                                :twap-preview (twap-preview state form base-symbol))
         toggle-handlers (:toggles handlers)
         tif-handlers (:tif handlers)
         tp-sl-handlers (:tp-sl handlers)

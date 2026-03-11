@@ -234,6 +234,45 @@
     (is (contains? (set (get-in chevron [1 :class])) "rotate-180"))
     (is (false? (get-in menu [1 :aria-hidden])))))
 
+(deftest twap-section-renders-runtime-inputs-randomize-and-preview-test
+  (let [node (first (type-extensions/render-order-type-sections
+                     :twap
+                     {:twap {:hours 0
+                             :minutes 30
+                             :randomize false}}
+                     {:on-set-twap-hours [[:actions/twap-hours [:event.target/value]]]
+                      :on-set-twap-minutes [[:actions/twap-minutes [:event.target/value]]]
+                      :on-toggle-twap-randomize [[:actions/twap-randomize [:event.target/checked]]]
+                      :twap-preview {:runtime "30m"
+                                     :frequency "30s"
+                                     :order-count "61"
+                                     :size-per-suborder "0.0491 BTC"}}))
+        hours-input (input-node-by-aria-label node "Hours")
+        minutes-input (input-node-by-aria-label node "Minutes")
+        checkbox (first (filter #(= "checkbox" (get-in % [1 :type]))
+                                (collect-nodes-by-tag node :input)))
+        labels (set (collect-strings node))]
+    (is (some? hours-input))
+    (is (some? minutes-input))
+    (is (= [[:actions/twap-hours [:event.target/value]]]
+           (get-in hours-input [1 :on :input])))
+    (is (= [[:actions/twap-minutes [:event.target/value]]]
+           (get-in minutes-input [1 :on :input])))
+    (is (= [[:actions/twap-randomize [:event.target/checked]]]
+           (get-in checkbox [1 :on :change])))
+    (is (contains? labels "Hours"))
+    (is (contains? labels "Minutes"))
+    (is (contains? labels "Randomize"))
+    (is (contains? labels "Hyperliquid slices TWAP orders every 30 seconds."))
+    (is (contains? labels "Runtime"))
+    (is (contains? labels "30m"))
+    (is (contains? labels "Frequency"))
+    (is (contains? labels "30s"))
+    (is (contains? labels "Orders"))
+    (is (contains? labels "61"))
+    (is (contains? labels "Per Slice"))
+    (is (contains? labels "0.0491 BTC"))))
+
 (deftest section-module-delegates-to-type-extensions-test
   (with-redefs [type-extensions/render-order-type-sections
                 (fn [order-type form callbacks]

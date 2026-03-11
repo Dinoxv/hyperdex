@@ -2,6 +2,11 @@
   (:require [hyperopen.trading.order-type-registry :as order-types]
             [hyperopen.views.trade.order-form-component-primitives :as primitives]))
 
+(defn- twap-preview-row [label value]
+  [:div {:class ["flex" "items-center" "justify-between" "gap-3" "text-xs"]}
+   [:span {:class ["text-gray-400"]} label]
+   [:span {:class ["font-semibold" "text-gray-100" "num"]} (or value "--")]])
+
 (def ^:private section-renderers
   {:trigger
    (fn [form {:keys [on-set-trigger-price]}]
@@ -33,17 +38,36 @@
                                               on-set-scale-skew)]])
 
    :twap
-   (fn [form {:keys [on-set-twap-minutes
-                     on-toggle-twap-randomize]}]
+   (fn [form {:keys [on-set-twap-hours
+                     on-set-twap-minutes
+                     on-toggle-twap-randomize
+                     twap-preview]}]
      [:div {:class ["space-y-2"]}
       (primitives/section-label "TWAP")
-      (primitives/input (get-in form [:twap :minutes])
-                        on-set-twap-minutes
-                        :placeholder "Minutes")
+      [:div {:class ["grid" "grid-cols-2" "gap-2"]}
+       (primitives/inline-labeled-scale-input "Hours"
+                                              (get-in form [:twap :hours])
+                                              on-set-twap-hours)
+       (primitives/inline-labeled-scale-input "Minutes"
+                                              (get-in form [:twap :minutes])
+                                              on-set-twap-minutes)]
       (primitives/row-toggle "Randomize"
                              (get-in form [:twap :randomize])
                              on-toggle-twap-randomize
-                             "trade-toggle-twap-randomize")])})
+                             "trade-toggle-twap-randomize")
+      [:div {:class ["rounded-lg"
+                     "border"
+                     "border-base-300"
+                     "bg-base-200/50"
+                     "px-3"
+                     "py-2"
+                     "space-y-1.5"]}
+       [:div {:class ["text-xs" "text-gray-400"]}
+        "Hyperliquid slices TWAP orders every 30 seconds."]
+       (twap-preview-row "Runtime" (:runtime twap-preview))
+       (twap-preview-row "Frequency" (:frequency twap-preview))
+       (twap-preview-row "Orders" (:order-count twap-preview))
+       (twap-preview-row "Per Slice" (:size-per-suborder twap-preview))]])})
 
 (declare ensure-valid-extension-registry!)
 

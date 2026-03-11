@@ -49,6 +49,7 @@
    (commands/set-scale-end-input)
    (commands/set-scale-count-input)
    (commands/set-scale-skew-input)
+   (commands/set-twap-hours-input)
    (commands/set-twap-minutes-input)
    (commands/toggle-twap-randomize)
    (commands/toggle-tp-enabled)
@@ -84,6 +85,9 @@
   (is (= {:command-id :order-form/toggle-tpsl-unit-dropdown
           :args []}
          (commands/toggle-tpsl-unit-dropdown)))
+  (is (= {:command-id :order-form/update-order-form
+          :args [[:twap :hours] commands/event-target-value]}
+         (commands/set-twap-hours-input)))
   (is (= {:command-id :order-form/update-order-form
           :args [[:side] :sell]}
          (commands/set-order-side :sell))))

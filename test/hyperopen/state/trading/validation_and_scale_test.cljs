@@ -32,14 +32,30 @@
                       :price "")]
       (is (empty? (trading/validate-order-form form)))))
 
-  (testing "twap requires minutes"
-    (let [form (assoc (trading/default-order-form)
-                      :size "1"
-                      :type :twap
-                      :twap {:minutes 0 :randomize true})
-          errors (trading/validate-order-form form)]
-      (is (= #{:twap/minutes-invalid}
-             (validation-codes errors))))))
+  (testing "twap runtime must be between 5 minutes and 24 hours"
+    (let [too-short (assoc (trading/default-order-form)
+                           :size "1"
+                           :type :twap
+                           :twap {:hours 0 :minutes 4 :randomize false})
+          too-long (assoc (trading/default-order-form)
+                          :size "1"
+                          :type :twap
+                          :twap {:hours 24 :minutes 1 :randomize false})]
+      (is (= #{:twap/runtime-invalid}
+             (validation-codes (trading/validate-order-form too-short))))
+      (is (= #{:twap/runtime-invalid}
+             (validation-codes (trading/validate-order-form too-long))))))
+
+  (testing "twap suborders must satisfy the venue minimum order value"
+    (let [too-small (assoc (trading/default-order-form)
+                           :side :buy
+                           :size "1"
+                           :type :twap
+                           :twap {:hours 0 :minutes 30 :randomize false})
+          valid (assoc too-small :size "10")]
+      (is (= #{:twap/suborder-notional-too-small}
+             (validation-codes (trading/validate-order-form support/base-state too-small))))
+      (is (empty? (trading/validate-order-form support/base-state valid))))))
 
 (deftest scale-skew-validation-range-test
   (let [base-scale-form (assoc (trading/default-order-form)
