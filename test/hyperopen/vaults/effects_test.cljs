@@ -49,8 +49,8 @@
                                       (js/Promise.resolve {:name "Detail"}))
             :begin-vault-details-load (fn [state vault-address]
                                         (assoc state :begin-vault-address vault-address))
-            :apply-vault-details-success (fn [state vault-address payload]
-                                           (assoc state :detail [vault-address payload]))
+            :apply-vault-details-success (fn [state vault-address user-address payload]
+                                           (assoc state :detail [vault-address user-address payload]))
             :apply-vault-details-error (fn [state vault-address err]
                                          (assoc state :detail-error [vault-address err]))})
           (.then (fn [_payload]
@@ -60,6 +60,7 @@
                    (is (= "0x1234567890abcdef1234567890abcdef12345678"
                           (:begin-vault-address @store)))
                    (is (= ["0x1234567890abcdef1234567890abcdef12345678"
+                           "0xabcdefabcdefabcdefabcdefabcdefabcdefabcd"
                            {:name "Detail"}]
                           (:detail @store)))
                    (done)))
@@ -145,7 +146,7 @@
                                       (js/Promise.resolve {:name "ignored"}))
             :begin-vault-details-load (fn [state _vault-address]
                                         (assoc state :begin? true))
-            :apply-vault-details-success (fn [state _vault-address _payload]
+            :apply-vault-details-success (fn [state _vault-address _user-address _payload]
                                            (assoc state :loaded? true))
             :apply-vault-details-error (fn [state _vault-address err]
                                          (assoc state :error err))})
@@ -279,8 +280,8 @@
                                       (js/Promise.resolve {:name "Override Detail"}))
             :begin-vault-details-load (fn [state requested-vault-address]
                                         (assoc state :override-detail-begin requested-vault-address))
-            :apply-vault-details-success (fn [state requested-vault-address payload]
-                                           (assoc state :override-detail [requested-vault-address payload]))
+            :apply-vault-details-success (fn [state requested-vault-address requested-user-address payload]
+                                           (assoc state :override-detail [requested-vault-address requested-user-address payload]))
             :apply-vault-details-error (fn [state requested-vault-address err]
                                          (assoc state :override-detail-error [requested-vault-address err]))
             :opts {:skip-route-gate? true
@@ -291,7 +292,7 @@
                           @request-calls))
                    (is (= vault-address
                           (:override-detail-begin @store)))
-                   (is (= [vault-address {:name "Override Detail"}]
+                   (is (= [vault-address nil {:name "Override Detail"}]
                           (:override-detail @store)))
                    (done)))
           (.catch (fn [err]

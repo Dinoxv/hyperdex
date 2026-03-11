@@ -197,6 +197,7 @@
    :user-equities []
    :user-equity-by-address {}
    :details-by-address {}
+   :viewer-details-by-address {}
    :webdata-by-vault {}
    :fills-by-vault {}
    :funding-history-by-vault {}

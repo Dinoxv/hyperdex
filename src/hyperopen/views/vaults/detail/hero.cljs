@@ -117,7 +117,7 @@
                     :value (vf/format-currency (:tvl metrics) {:missing "$0.00"})})
       (metric-card {:label "Past Month Return"
                     :value (vf/format-percent month-return {:signed? false
-                                                            :decimals 0})
+                                                            :decimals 2})
                     :accent month-return-accent})
       (metric-card {:label "Your Deposits"
                     :value (vf/format-currency (:your-deposit metrics))})

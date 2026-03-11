@@ -252,6 +252,7 @@
   (let [state {:vaults {:user-equities []
                         :user-equity-by-address {}
                         :details-by-address {}
+                        :viewer-details-by-address {}
                         :webdata-by-vault {}
                         :loading {:user-equities? false
                                   :details-by-address {}
@@ -270,8 +271,13 @@
                            {:vault-address "0xB"
                             :equity 20}])
         equities-error (projections/apply-user-vault-equities-error equities-loading (js/Error. "equity-fail"))
-        details-loading (projections/begin-vault-details-load state "0xA")
-        details-success (projections/apply-vault-details-success details-loading "0xA" {:name "Vault A"})
+        details-loading (projections/begin-vault-details-load state "0xA" "0xViewer")
+        details-success (projections/apply-vault-details-success details-loading
+                                                                 "0xA"
+                                                                 "0xViewer"
+                                                                 {:name "Vault A"
+                                                                  :follower-state {:vault-equity 10}
+                                                                  :max-withdrawable 5})
         details-error (projections/apply-vault-details-error details-loading "0xA" "details-fail")
         webdata-loading (projections/begin-vault-webdata2-load state "0xA")
         webdata-success (projections/apply-vault-webdata2-success webdata-loading "0xA" {:fills [1]})
@@ -287,7 +293,12 @@
     (is (= "Error: equity-fail" (get-in equities-error [:vaults :errors :user-equities])))
     (is (= true (get-in details-loading [:vaults :loading :details-by-address "0xa"])))
     (is (= true (get-in details-loading [:vaults-ui :detail-loading?])))
-    (is (= {:name "Vault A"} (get-in details-success [:vaults :details-by-address "0xa"])))
+    (is (= {:name "Vault A"}
+           (get-in details-success [:vaults :details-by-address "0xa"])))
+    (is (= {:name "Vault A"
+            :follower-state {:vault-equity 10}
+            :max-withdrawable 5}
+           (get-in details-success [:vaults :viewer-details-by-address "0xa" "0xviewer"])))
     (is (= false (get-in details-success [:vaults :loading :details-by-address "0xa"])))
     (is (= false (get-in details-success [:vaults-ui :detail-loading?])))
     (is (number? (get-in details-success [:vaults :loaded-at-ms :details-by-address "0xa"])))

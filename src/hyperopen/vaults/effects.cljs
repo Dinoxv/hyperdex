@@ -109,7 +109,8 @@
           (.then (promise-effects/apply-success-and-return
                   store
                   apply-vault-details-success
-                  vault-address))
+                  vault-address
+                  user-address))
           (.catch (promise-effects/apply-error-and-reject
                    store
                    apply-vault-details-error

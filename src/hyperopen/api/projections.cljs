@@ -486,25 +486,45 @@
         (assoc-in [:vaults :loading :user-equities?] false)
         (assoc-in [:vaults :errors :user-equities] message))))
 
+(def ^:private user-scoped-vault-detail-keys
+  #{:follower-state
+    :max-distributable
+    :max-withdrawable})
+
+(defn- public-vault-details-payload
+  [payload viewer-address]
+  (if (and (map? payload)
+           (normalize-vault-address viewer-address))
+    (apply dissoc payload user-scoped-vault-detail-keys)
+    payload))
+
 (defn begin-vault-details-load
-  [state vault-address]
-  (if-let [vault-address* (normalize-vault-address vault-address)]
-    (let [state* (-> state
-                     (assoc-in [:vaults :loading :details-by-address vault-address*] true)
-                     (assoc-in [:vaults :errors :details-by-address vault-address*] nil))]
-      (assoc-in state* [:vaults-ui :detail-loading?] (vault-detail-loading? state* vault-address*)))
-    state))
+  ([state vault-address]
+   (begin-vault-details-load state vault-address nil))
+  ([state vault-address _viewer-address]
+   (if-let [vault-address* (normalize-vault-address vault-address)]
+     (let [state* (-> state
+                      (assoc-in [:vaults :loading :details-by-address vault-address*] true)
+                      (assoc-in [:vaults :errors :details-by-address vault-address*] nil))]
+       (assoc-in state* [:vaults-ui :detail-loading?] (vault-detail-loading? state* vault-address*)))
+     state)))
 
 (defn apply-vault-details-success
-  [state vault-address payload]
-  (if-let [vault-address* (normalize-vault-address vault-address)]
-    (let [state* (-> state
-                     (assoc-in [:vaults :details-by-address vault-address*] payload)
-                     (assoc-in [:vaults :loading :details-by-address vault-address*] false)
-                     (assoc-in [:vaults :errors :details-by-address vault-address*] nil)
-                     (assoc-in [:vaults :loaded-at-ms :details-by-address vault-address*] (.now js/Date)))]
-      (assoc-in state* [:vaults-ui :detail-loading?] (vault-detail-loading? state* vault-address*)))
-    state))
+  ([state vault-address payload]
+   (apply-vault-details-success state vault-address nil payload))
+  ([state vault-address viewer-address payload]
+   (if-let [vault-address* (normalize-vault-address vault-address)]
+     (let [viewer-address* (normalize-vault-address viewer-address)
+           state* (cond-> (-> state
+                              (assoc-in [:vaults :details-by-address vault-address*]
+                                        (public-vault-details-payload payload viewer-address*))
+                              (assoc-in [:vaults :loading :details-by-address vault-address*] false)
+                              (assoc-in [:vaults :errors :details-by-address vault-address*] nil)
+                              (assoc-in [:vaults :loaded-at-ms :details-by-address vault-address*] (.now js/Date)))
+                    viewer-address*
+                    (assoc-in [:vaults :viewer-details-by-address vault-address* viewer-address*] payload))]
+       (assoc-in state* [:vaults-ui :detail-loading?] (vault-detail-loading? state* vault-address*)))
+     state)))
 
 (defn apply-vault-details-error
   [state vault-address err]

@@ -3,6 +3,11 @@
             [cljs.test :refer-macros [deftest is]]
             [hyperopen.views.vaults.detail-vm :as detail-vm]))
 
+(defn- approx=
+  [expected actual tolerance]
+  (and (number? actual)
+       (< (js/Math.abs (- expected actual)) tolerance)))
+
 (def sample-state
   {:router {:path "/vaults/0x1234567890abcdef1234567890abcdef12345678"}
    :vaults-ui {:detail-tab :about
@@ -129,7 +134,9 @@
     (is (= "0x9999999999999999999999999999999999999999"
            (get-in vm [:relationship :parent-address])))
     (is (= 200 (get-in vm [:metrics :tvl])))
-    (is (= 20 (get-in vm [:metrics :past-month-return])))
+    (is (approx= 34.61538461538461
+                 (get-in vm [:metrics :past-month-return])
+                 1e-9))
     (is (= 50 (get-in vm [:metrics :your-deposit])))
     (is (= 12 (get-in vm [:metrics :all-time-earned])))
     (is (= false (get-in vm [:vault-transfer :can-open-deposit?])))
@@ -223,14 +230,19 @@
     (is (= :detail (:kind vm)))
     (is (true? (:invalid-address? vm)))))
 
-(deftest vault-detail-vm-uses-month-snapshot-for-past-month-return-and-normalizes-depositor-count-test
+(deftest vault-detail-vm-uses-month-portfolio-return-and-normalizes-depositor-count-test
   (let [state (-> sample-state
                   (assoc-in [:vaults :details-by-address "0x1234567890abcdef1234567890abcdef12345678" :apr] 0.21)
+                  (assoc-in [:vaults :details-by-address "0x1234567890abcdef1234567890abcdef12345678" :portfolio :month]
+                            {:accountValueHistory [[1 100] [2 110]]
+                             :pnlHistory [[1 0] [2 10]]})
                   (assoc-in [:vaults :details-by-address "0x1234567890abcdef1234567890abcdef12345678" :followers] [])
                   (assoc-in [:vaults :details-by-address "0x1234567890abcdef1234567890abcdef12345678" :followers-count] 137)
                   (assoc-in [:vaults :merged-index-rows 0 :snapshot-by-key :month] [0.0 0.19]))
         vm (detail-vm/vault-detail-vm state)]
-    (is (= 19 (get-in vm [:metrics :past-month-return])))
+    (is (approx= 10
+                 (get-in vm [:metrics :past-month-return])
+                 1e-9))
     (is (= 21 (get-in vm [:metrics :apr])))
     (is (= 137 (:followers vm)))
     (is (= 137
@@ -239,13 +251,34 @@
                     first
                     :count)))))
 
-(deftest vault-detail-vm-does-not-fallback-to-apr-when-month-snapshot-is-missing-test
+(deftest vault-detail-vm-leaves-month-return-missing-when-summary-and-snapshot-are-both-absent-test
   (let [state (-> sample-state
                   (assoc-in [:vaults :details-by-address "0x1234567890abcdef1234567890abcdef12345678" :apr] 0.21)
+                  (assoc-in [:vaults :details-by-address "0x1234567890abcdef1234567890abcdef12345678" :portfolio] {})
                   (assoc-in [:vaults :merged-index-rows 0 :snapshot-by-key] {:all-time [0.5]}))
         vm (detail-vm/vault-detail-vm state)]
     (is (nil? (get-in vm [:metrics :past-month-return])))
     (is (= 21 (get-in vm [:metrics :apr])))))
+
+(deftest vault-detail-vm-uses-viewer-scoped-vault-details-for-account-metrics-test
+  (let [vault-address "0x1234567890abcdef1234567890abcdef12345678"
+        viewer-address "0xffffffffffffffffffffffffffffffffffffffff"
+        state (-> sample-state
+                  (assoc-in [:wallet :address] "0xaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa")
+                  (assoc-in [:account-context :spectate-mode] {:active? true
+                                                               :address viewer-address})
+                  (assoc-in [:vaults :user-equity-by-address] {})
+                  (update-in [:vaults :details-by-address vault-address] dissoc :follower-state)
+                  (assoc-in [:vaults :viewer-details-by-address vault-address viewer-address]
+                            {:follower-state {:user viewer-address
+                                              :vault-equity 88
+                                              :all-time-pnl 13
+                                              :vault-entry-time-ms 1000
+                                              :lockup-until-ms (+ 1000 (* 3 24 60 60 1000))}}))
+        vm (detail-vm/vault-detail-vm state)]
+    (is (= 88 (get-in vm [:metrics :your-deposit])))
+    (is (= 13 (get-in vm [:metrics :all-time-earned])))
+    (is (= 3 (get-in vm [:vault-transfer :deposit-lockup-days])))))
 
 (deftest vault-detail-vm-selects-account-value-series-when-user-selects-it-test
   (let [state (assoc-in sample-state [:vaults-ui :detail-chart-series] :account-value)

@@ -1,5 +1,6 @@
 (ns hyperopen.views.vaults.detail-vm
   (:require [clojure.string :as str]
+            [hyperopen.account.context :as account-context]
             [hyperopen.vaults.adapters.webdata :as webdata-adapter]
             [hyperopen.vaults.detail.activity :as activity-model]
             [hyperopen.vaults.detail.benchmarks :as benchmarks-model]
@@ -104,6 +105,11 @@
             row))
         (or (get-in state [:vaults :merged-index-rows]) [])))
 
+(defn- viewer-details-by-address
+  [state vault-address viewer-address]
+  (when-let [viewer-address* (vault-identity/normalize-vault-address viewer-address)]
+    (get-in state [:vaults :viewer-details-by-address vault-address viewer-address*])))
+
 (defn- normalize-depositor-row
   [row]
   (when (map? row)
@@ -122,6 +128,21 @@
                     (js/Math.abs (or vault-amount 0)))
                   >)
          vec)))
+
+(defn- viewer-follower-row
+  [details viewer-address]
+  (let [viewer-address* (vault-identity/normalize-vault-address viewer-address)
+        follower-state (:follower-state details)]
+    (or (when (and viewer-address*
+                   (= viewer-address*
+                      (vault-identity/normalize-vault-address (:user follower-state))))
+          follower-state)
+        (when viewer-address*
+          (some (fn [row]
+                  (when (= viewer-address*
+                           (vault-identity/normalize-vault-address (:user row)))
+                    row))
+                (or (:followers details) []))))))
 
 (defn- resolve-chart-series
   [series-by-key selected-series]
@@ -174,6 +195,7 @@
                      (.now js/Date))
          route (get-in state [:router :path])
          {:keys [kind vault-address]} (vault-routes/parse-vault-route route)
+         viewer-address (account-context/effective-account-address state)
         detail-tab (vault-ui-state/normalize-vault-detail-tab
                     (get-in state [:vaults-ui :detail-tab]))
         activity-tab (vault-ui-state/normalize-vault-detail-activity-tab
@@ -183,10 +205,13 @@
         snapshot-range (vault-ui-state/normalize-vault-snapshot-range
                         (get-in state [:vaults-ui :snapshot-range]))
         detail-loading? (true? (get-in state [:vaults-ui :detail-loading?]))
-        details (get-in state [:vaults :details-by-address vault-address])
+        details-base (get-in state [:vaults :details-by-address vault-address])
+        details (merge (or details-base {})
+                       (or (viewer-details-by-address state vault-address viewer-address) {}))
         row (row-by-address state vault-address)
         webdata (get-in state [:vaults :webdata-by-vault vault-address])
         user-equity (get-in state [:vaults :user-equity-by-address vault-address])
+        viewer-follower (viewer-follower-row details viewer-address)
         relationship (or (:relationship details)
                          (:relationship row)
                          {:type :normal})
@@ -225,10 +250,17 @@
                 0)
         apr (or (optional-number (:apr details))
                 (optional-number (:apr row)))
-        month-return (performance-model/snapshot-value-by-range row :month tvl)
+        return-for-range (fn [snapshot-range]
+                           (or (performance-model/summary-cumulative-return-percent
+                                state
+                                (performance-model/portfolio-summary-by-range details snapshot-range))
+                               (performance-model/snapshot-value-by-range row snapshot-range tvl)))
+        month-return (return-for-range :month)
         your-deposit (or (optional-number (:equity user-equity))
+                         (optional-number (:vault-equity viewer-follower))
                          (optional-number (get-in details [:follower-state :vault-equity])))
-        all-time-earned (optional-number (get-in details [:follower-state :all-time-pnl]))
+        all-time-earned (or (optional-number (:all-time-pnl viewer-follower))
+                            (optional-number (get-in details [:follower-state :all-time-pnl])))
         vault-name (or (non-blank-text (:name details))
                        (non-blank-text (:name row))
                        vault-address
@@ -387,10 +419,10 @@
              :label "Your Performance"}]
      :selected-tab detail-tab
      :snapshot-range snapshot-range
-     :snapshot {:day (performance-model/snapshot-value-by-range row :day tvl)
-                :week (performance-model/snapshot-value-by-range row :week tvl)
-                :month (performance-model/snapshot-value-by-range row :month tvl)
-                :all-time (performance-model/snapshot-value-by-range row :all-time tvl)}
+     :snapshot {:day (return-for-range :day)
+                :week (return-for-range :week)
+                :month month-return
+                :all-time (return-for-range :all-time)}
      :performance-metrics (assoc performance-metrics
                                  :timeframe-options chart-timeframe-options
                                  :selected-timeframe snapshot-range)

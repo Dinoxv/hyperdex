@@ -148,6 +148,21 @@
         all-time-summary
         {})))
 
+(defn portfolio-summary-by-range
+  [details snapshot-range]
+  (let [portfolio (or (:portfolio details) {})
+        direct-summary (get portfolio snapshot-range)
+        all-time-summary (get portfolio :all-time)]
+    (or direct-summary
+        (derived-portfolio-summary all-time-summary snapshot-range))))
+
+(defn summary-cumulative-return-percent
+  [state summary]
+  (some->> (portfolio-metrics/returns-history-rows state summary :all)
+           last
+           portfolio-metrics/history-point-value
+           optional-number))
+
 (defn- history-point
   [row]
   (cond
