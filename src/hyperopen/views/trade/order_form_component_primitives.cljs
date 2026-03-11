@@ -321,10 +321,13 @@
     [:button (bind-event
               {:type "button"
                :class (into ["flex-1"
-                             "h-10"
-                             "text-sm"
-                             "font-semibold"
-                             "rounded-md"
+                             "inline-flex"
+                             "h-[29px]"
+                             "items-center"
+                             "justify-center"
+                             "rounded-[5px]"
+                             "text-xs"
+                             "font-normal"
                              "transition-colors"]
                             (if active?
                               active-classes

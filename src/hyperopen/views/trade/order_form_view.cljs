@@ -405,7 +405,7 @@
      (primitives/chip-button "Classic" true :disabled? true)]))
 
 (defn- side-row [side side-handlers]
-  [:div {:class ["flex" "items-center" "gap-1.5" "bg-base-200" "rounded-md" "p-0.5" "sm:gap-2" "sm:p-1"]}
+  [:div {:class ["flex" "h-[33px]" "items-center" "gap-1.5" "rounded-lg" "bg-base-200" "p-0.5" "sm:gap-2"]}
    (primitives/side-button "Buy / Long"
                            :buy
                            (= side :buy)
