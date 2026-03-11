@@ -4,11 +4,13 @@
             [hyperopen.views.account-info.table :as table]
             [hyperopen.views.account-info.tabs.trade-history :as trade-history-tab]))
 
-(def ^:private active-grid-template-class
-  "grid-cols-[minmax(110px,1fr)_minmax(90px,0.9fr)_minmax(110px,1fr)_minmax(90px,0.85fr)_minmax(150px,1.25fr)_minmax(88px,0.72fr)_minmax(150px,1.1fr)_minmax(96px,0.8fr)]")
+(def ^:private active-grid-template-style
+  {:grid-template-columns
+   "minmax(110px,1fr) minmax(90px,0.9fr) minmax(110px,1fr) minmax(90px,0.85fr) minmax(150px,1.25fr) minmax(88px,0.72fr) minmax(150px,1.1fr) minmax(96px,0.8fr)"})
 
-(def ^:private history-grid-template-class
-  "grid-cols-[minmax(150px,1.2fr)_minmax(110px,0.9fr)_minmax(90px,0.82fr)_minmax(100px,0.9fr)_minmax(90px,0.82fr)_minmax(110px,0.92fr)_minmax(88px,0.72fr)_minmax(88px,0.72fr)_minmax(90px,0.82fr)]")
+(def ^:private history-grid-template-style
+  {:grid-template-columns
+   "minmax(150px,1.2fr) minmax(110px,0.9fr) minmax(90px,0.82fr) minmax(100px,0.9fr) minmax(90px,0.82fr) minmax(110px,0.92fr) minmax(88px,0.72fr) minmax(88px,0.72fr) minmax(90px,0.82fr)"})
 
 (def ^:private subtab-order
   [:active :history :fill-history])
@@ -164,7 +166,8 @@
   [rows]
   (if (seq rows)
     (table/tab-table-content
-     [:div {:class ["grid" "gap-2" "py-1" "px-3" "bg-base-200" "text-xs" "font-medium" active-grid-template-class]}
+     [:div {:class ["grid" "gap-2" "py-1" "px-3" "bg-base-200" "text-xs" "font-medium"]
+            :style active-grid-template-style}
       [:div.text-left (table/non-sortable-header "Coin")]
       [:div.text-left (table/non-sortable-header "Size")]
       [:div.text-left (table/non-sortable-header "Executed Size")]
@@ -175,7 +178,8 @@
       [:div.text-left (table/non-sortable-header "Terminate")]]
      (for [row rows]
        ^{:key (str "twap-active-" (:twap-id row) "-" (:creation-time-ms row))}
-       [:div {:class ["grid" "items-center" "gap-2" "py-px" "px-3" "hover:bg-base-300" "text-xs" active-grid-template-class]}
+       [:div {:class ["grid" "items-center" "gap-2" "py-px" "px-3" "hover:bg-base-300" "text-xs"]
+              :style active-grid-template-style}
         [:div.text-left (coin-node (:coin row) (:side row))]
         [:div.text-left.num (format-size (:size row))]
         [:div.text-left.num (format-size (:executed-size row))]
@@ -190,7 +194,8 @@
   [rows]
   (if (seq rows)
     (table/tab-table-content
-     [:div {:class ["grid" "gap-2" "py-1" "px-3" "bg-base-200" "text-xs" "font-medium" history-grid-template-class]}
+     [:div {:class ["grid" "gap-2" "py-1" "px-3" "bg-base-200" "text-xs" "font-medium"]
+            :style history-grid-template-style}
       [:div.text-left (table/non-sortable-header "Time")]
       [:div.text-left (table/non-sortable-header "Coin")]
       [:div.text-left (table/non-sortable-header "Total Size")]
@@ -202,7 +207,8 @@
       [:div.text-left (table/non-sortable-header "Status")]]
      (for [row rows]
        ^{:key (str "twap-history-" (:time-ms row) "-" (:coin row) "-" (:status-label row))}
-       [:div {:class ["grid" "items-center" "gap-2" "py-px" "px-3" "hover:bg-base-300" "text-xs" history-grid-template-class]}
+       [:div {:class ["grid" "items-center" "gap-2" "py-px" "px-3" "hover:bg-base-300" "text-xs"]
+              :style history-grid-template-style}
         [:div.text-left.whitespace-nowrap (shared/format-open-orders-time (:time-ms row))]
         [:div.text-left (coin-node (:coin row) (:side row))]
         [:div.text-left.num (format-size (:size row))]

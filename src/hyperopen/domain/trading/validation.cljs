@@ -16,7 +16,7 @@
    :scale/endpoint-notional-too-small {:message "Scale start/end orders must each be at least 10 in order value."
                                        :fields []}
    :twap/runtime-invalid {:message "TWAP runtime must be between 5 minutes and 24 hours."
-                          :fields [:twap-runtime]}
+                          :fields []}
    :twap/suborder-notional-too-small {:message "Each TWAP suborder must be at least 10 USDC in order value."
                                       :fields []}
    :tpsl/tp-trigger-required {:message "TP trigger price is required when TP is enabled."

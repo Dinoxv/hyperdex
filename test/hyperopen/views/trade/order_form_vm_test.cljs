@@ -66,6 +66,21 @@
     (is (= "Fill required fields: Size."
            (get-in view-model [:submit :tooltip])))))
 
+(deftest order-form-vm-twap-runtime-invalid-surfaces-explicit-tooltip-test
+  (let [state (base-state {:type :twap
+                           :size "1"
+                           :twap {:hours 0
+                                  :minutes 2
+                                  :randomize false}}
+                          {:entry-mode :pro
+                           :size-input-mode :base
+                           :size-display "1"})
+        view-model (vm/order-form-vm state)]
+    (is (true? (get-in view-model [:submit :disabled?])))
+    (is (= :validation-errors (get-in view-model [:submit :reason])))
+    (is (= "TWAP runtime must be between 5 minutes and 24 hours."
+           (get-in view-model [:submit :tooltip])))))
+
 (deftest order-form-vm-shows-spectate-mode-submit-remediation-tooltip-test
   (let [state (assoc (base-state {:type :limit :size "1" :price "100"} {})
                      :asset-contexts {:BTC {:idx 0}}

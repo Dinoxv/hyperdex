@@ -185,6 +185,7 @@
             [hyperopen.views.account-info.tabs.order-history-test]
             [hyperopen.views.account-info.tabs.positions-test]
             [hyperopen.views.account-info.tabs.trade-history-test]
+            [hyperopen.views.account-info.tabs.twap-test]
             [hyperopen.views.account-info.vm-test]
             [hyperopen.views.active-asset-view-test]
             [hyperopen.views.agent-trading-recovery-modal-test]
@@ -511,6 +512,7 @@
              'hyperopen.views.account-info.tabs.order-history-test
              'hyperopen.views.account-info.tabs.positions-test
              'hyperopen.views.account-info.tabs.trade-history-test
+             'hyperopen.views.account-info.tabs.twap-test
              'hyperopen.views.account-info.vm-test
              'hyperopen.views.active-asset-view-test
              'hyperopen.views.agent-trading-recovery-modal-test
