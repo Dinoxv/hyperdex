@@ -213,6 +213,9 @@ clojure -P
 # Main development workflow
 npm run dev
 
+# Main app plus UI workbench
+npm run dev:portfolio
+
 # Same-origin HyperUnit proxy for funding flows
 npm run dev:proxy
 ```

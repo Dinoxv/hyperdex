@@ -30,7 +30,8 @@ Use this file as the single starting point for what actions this repo provides t
 | `npm test` | Full test suite | Regular validation and regression confidence |
 | `npm run test:crap` | Fast Babashka tests for CRAP-tool parsing and report math | Before changing the CRAP analyzer/reporter |
 | `npm run test:websocket` | Websocket-only suite | Websocket runtime/API changes |
-| `npm run dev` | Watch app, Portfolio workbench, and portfolio worker builds alongside Tailwind | Normal frontend development |
+| `npm run dev` | Watch app and portfolio worker builds alongside Tailwind | Normal frontend development |
+| `npm run dev:portfolio` | Watch app, Portfolio workbench, and portfolio worker builds alongside Tailwind | When you need the main app and workbench together |
 | `npm run portfolio` | Watch only the Portfolio workbench plus Tailwind | Isolated component workbench iteration |
 | `npm run portfolio:watch` | Watch the dedicated Shadow `:portfolio` target | Workbench-only CLJS compile loop |
 | `npm run test:runner:generate` | Regenerate test runner list | Usually after adding/removing test namespaces |

@@ -14,6 +14,7 @@ Repository build and test entry points:
 - `npm run test:crap`
 - `npm run test:websocket`
 - `npm run dev`
+- `npm run dev:portfolio`
 - `npm run portfolio`
 - `bb tools/crap_report.clj --scope src`
 - `npm run test:browser-inspection`
@@ -48,7 +49,7 @@ Comprehensive tool surface and use guidance:
 UI workbench reference:
 - URL: `http://localhost:8080/ui-workbench.html`
 - Shadow build: `:portfolio`
-- Watch commands: `npm run dev` or `npm run portfolio`
+- Watch commands: `npm run dev:portfolio` or `npm run portfolio`
 - Scene tree: `/hyperopen/portfolio/hyperopen/workbench/scenes/**`
 - Shared workbench helpers: `/hyperopen/portfolio/hyperopen/workbench/support/**`
 - Naming convention: file names end with `_scenes.cljs`, namespaces end with `-scenes`
