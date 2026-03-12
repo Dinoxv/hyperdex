@@ -296,6 +296,7 @@
      [:actions/load-staking :load-staking]
      [:actions/set-staking-active-tab :set-staking-active-tab]
      [:actions/set-staking-validator-timeframe :set-staking-validator-timeframe]
+     [:actions/set-staking-validator-sort :set-staking-validator-sort]
      [:actions/open-staking-action-popover :open-staking-action-popover]
      [:actions/close-staking-action-popover :close-staking-action-popover]
      [:actions/handle-staking-action-popover-keydown :handle-staking-action-popover-keydown]

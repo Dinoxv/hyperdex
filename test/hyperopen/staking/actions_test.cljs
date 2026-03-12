@@ -51,6 +51,22 @@
   (is (= []
          (actions/load-staking-route {} "/portfolio"))))
 
+(deftest set-staking-validator-sort-toggles-direction-and-switches-columns-test
+  (is (= [[:effects/save [:staking-ui :validator-sort]
+           {:column :stake
+            :direction :asc}]]
+         (actions/set-staking-validator-sort
+          {:staking-ui {:validator-sort {:column :stake
+                                         :direction :desc}}}
+          :stake)))
+  (is (= [[:effects/save [:staking-ui :validator-sort]
+           {:column :name
+            :direction :asc}]]
+         (actions/set-staking-validator-sort
+          {:staking-ui {:validator-sort {:column :stake
+                                         :direction :desc}}}
+          :name))))
+
 (deftest set-staking-form-field-normalizes-validator-and-ignores-unknown-fields-test
   (is (= [[:effects/save [:staking-ui :selected-validator]
            "0x1234567890abcdef1234567890abcdef12345678"]]

@@ -73,22 +73,49 @@
           {}
           (or delegations [])))
 
+(defn- compare-string-ci
+  [left right]
+  (compare (str/lower-case (str (or left "")))
+           (str/lower-case (str (or right "")))))
+
+(defn- status-rank
+  [status]
+  (case status
+    :active 3
+    :inactive 2
+    :jailed 1
+    0))
+
+(defn- compare-validators
+  [column left right]
+  (case column
+    :name (compare-string-ci (:name left) (:name right))
+    :description (compare-string-ci (:description left) (:description right))
+    :stake (compare (or (:stake left) 0) (or (:stake right) 0))
+    :your-stake (compare (or (:your-stake left) 0) (or (:your-stake right) 0))
+    :uptime (compare (or (:uptime-fraction left) 0) (or (:uptime-fraction right) 0))
+    :apr (compare (or (:predicted-apr left) 0) (or (:predicted-apr right) 0))
+    :status (compare (status-rank (:status left)) (status-rank (:status right)))
+    :commission (compare (or (:commission left) 0) (or (:commission right) 0))
+    (compare (or (:stake left) 0) (or (:stake right) 0))))
+
 (defn- sort-validators
-  [rows]
-  (vec (sort (fn [left right]
-               (let [stake-cmp (compare (or (:stake right) 0)
-                                        (or (:stake left) 0))]
-                 (if (zero? stake-cmp)
-                   (compare (str/lower-case (normalize-validator-name left))
-                            (str/lower-case (normalize-validator-name right)))
-                   stake-cmp)))
-             (or rows []))))
+  [validator-sort rows]
+  (let [{:keys [column direction]} (staking-actions/normalize-staking-validator-sort validator-sort)]
+    (vec (sort (fn [left right]
+                 (let [cmp (compare-validators column left right)
+                       cmp* (if (zero? cmp)
+                              (compare-string-ci (:name left) (:name right))
+                              cmp)]
+                   (if (= :desc direction)
+                     (- cmp*)
+                     cmp*)))
+               (or rows [])))))
 
 (defn- validators-vm
-  [validator-summaries delegations timeframe]
+  [validator-summaries delegations timeframe validator-sort]
   (let [delegation-by-validator (delegation-map delegations)]
     (->> validator-summaries
-         sort-validators
          (mapv (fn [row]
                  (let [validator (normalize-validator-address (:validator row))
                        stats (stats-for-timeframe row timeframe)]
@@ -101,7 +128,8 @@
                     :predicted-apr (:predicted-apr stats)
                     :sample-count (:sample-count stats)
                     :status (validator-status row)
-                    :commission (optional-number (:commission row))}))))))
+                    :commission (optional-number (:commission row))})))
+         (sort-validators validator-sort))))
 
 (defn- reward-rows
   [rows]
@@ -162,6 +190,8 @@
                     (get-in state [:staking-ui :active-tab]))
         timeframe (staking-actions/normalize-staking-validator-timeframe
                    (get-in state [:staking-ui :validator-timeframe]))
+        validator-sort (staking-actions/normalize-staking-validator-sort
+                        (get-in state [:staking-ui :validator-sort]))
         popover-state (or (get-in state [:staking-ui :action-popover]) {})
         popover-kind (staking-actions/normalize-staking-action-popover-kind
                       (:kind popover-state))
@@ -174,7 +204,7 @@
         delegations (or (get-in state [:staking :delegations]) [])
         rewards (or (get-in state [:staking :rewards]) [])
         history (or (get-in state [:staking :history]) [])
-        validators (validators-vm validator-summaries delegations timeframe)
+        validators (validators-vm validator-summaries delegations timeframe validator-sort)
         total-staked (or (optional-number (:total-staked delegator-summary))
                          (reduce (fn [sum row]
                                    (+ sum (or (optional-number (:stake row)) 0)))
@@ -199,6 +229,7 @@
             {:value :staking-reward-history :label "Staking Reward History"}
             {:value :staking-action-history :label "Staking Action History"}]
      :validator-timeframe timeframe
+     :validator-sort validator-sort
      :timeframe-options timeframe-options
      :loading? loading?
      :error (or (get-in state [:staking-ui :form-error]) route-error)

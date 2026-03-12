@@ -608,6 +608,7 @@
    :actions/load-staking ::no-args
    :actions/set-staking-active-tab ::keyword-or-string-args
    :actions/set-staking-validator-timeframe ::keyword-or-string-args
+   :actions/set-staking-validator-sort ::keyword-or-string-args
    :actions/open-staking-action-popover ::staking-action-popover-open-args
    :actions/close-staking-action-popover ::no-args
    :actions/handle-staking-action-popover-keydown ::key-args

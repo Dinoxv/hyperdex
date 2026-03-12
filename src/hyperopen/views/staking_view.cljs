@@ -619,6 +619,36 @@
             :on {:click [action]}}
    label])
 
+(defn- sortable-validator-header
+  [label column validator-sort]
+  (let [active? (= column (:column validator-sort))
+        direction (:direction validator-sort)
+        indicator (if active?
+                    (if (= :asc direction) "↑" "↓")
+                    "↕")]
+    [:th {:class ["px-3" "py-2.5" "text-left" "font-normal"]}
+     [:button {:type "button"
+               :class (into ["inline-flex"
+                             "items-center"
+                             "gap-1.5"
+                             "text-xs"
+                             "font-normal"
+                             "transition-colors"
+                             "focus:outline-none"
+                             "focus:ring-0"
+                             "focus:ring-offset-0"]
+                            (if active?
+                              ["text-[#f6fefd]"]
+                              ["text-[#949e9c]" "hover:text-[#c5d0ce]"]))
+               :data-role (str "staking-sort-header-" (name column))
+               :on {:click [[:actions/set-staking-validator-sort column]]}}
+      [:span label]
+      [:span {:class ["num"
+                      (if active?
+                        "text-[#97fce4]"
+                        "text-[#5f6d70]")]}
+       indicator]]]))
+
 (defn- validator-row
   [{:keys [validator
            name
@@ -681,6 +711,7 @@
                 active-tab
                 tabs
                 validator-timeframe
+                validator-sort
                 timeframe-options
                 loading?
                 error
@@ -849,14 +880,14 @@
                   :data-role "staking-validator-table"}
           [:thead
            [:tr {:class ["border-b" "border-[#1b2429]" "text-xs" "text-[#949e9c]"]}
-            [:th {:class ["px-3" "py-2.5" "text-left" "font-normal"]} "Name"]
-            [:th {:class ["px-3" "py-2.5" "text-left" "font-normal"]} "Description"]
-            [:th {:class ["px-3" "py-2.5" "text-left" "font-normal"]} "Stake"]
-            [:th {:class ["px-3" "py-2.5" "text-left" "font-normal"]} "Your Stake"]
-            [:th {:class ["px-3" "py-2.5" "text-left" "font-normal"]} "Uptime"]
-            [:th {:class ["px-3" "py-2.5" "text-left" "font-normal"]} "Est. APR"]
-            [:th {:class ["px-3" "py-2.5" "text-left" "font-normal"]} "Status"]
-            [:th {:class ["px-3" "py-2.5" "text-left" "font-normal"]} "Commission"]]]
+            (sortable-validator-header "Name" :name validator-sort)
+            (sortable-validator-header "Description" :description validator-sort)
+            (sortable-validator-header "Stake" :stake validator-sort)
+            (sortable-validator-header "Your Stake" :your-stake validator-sort)
+            (sortable-validator-header "Uptime" :uptime validator-sort)
+            (sortable-validator-header "Est. APR" :apr validator-sort)
+            (sortable-validator-header "Status" :status validator-sort)
+            (sortable-validator-header "Commission" :commission validator-sort)]]
           [:tbody
            (if (seq validators)
              (for [row validators]

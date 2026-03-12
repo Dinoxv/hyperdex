@@ -81,6 +81,8 @@
     (is (nil? (get-in state [:staking-ui :action-popover :kind])))
     (is (nil? (get-in state [:staking-ui :action-popover :anchor])))
     (is (= :spot->staking (get-in state [:staking-ui :transfer-direction])))
+    (is (= :stake (get-in state [:staking-ui :validator-sort :column])))
+    (is (= :desc (get-in state [:staking-ui :validator-sort :direction])))
     (is (= "" (get-in state [:staking-ui :selected-validator])))
     (is (= "" (get-in state [:staking-ui :validator-search-query])))
     (is (= false (get-in state [:staking-ui :validator-dropdown-open?])))

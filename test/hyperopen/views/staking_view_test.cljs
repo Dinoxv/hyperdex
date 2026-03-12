@@ -54,6 +54,9 @@
         transfer-button (find-node #(= "staking-action-transfer-button"
                                        (get-in % [1 :data-role]))
                                    view)
+        stake-sort-header (find-node #(= "staking-sort-header-stake"
+                                         (get-in % [1 :data-role]))
+                                     view)
         row (find-node #(and (= :tr (first %))
                              (= "staking-validator-row"
                                 (get-in % [1 :data-role])))
@@ -64,6 +67,9 @@
              :transfer
              :event.currentTarget/bounds]]
            (get-in transfer-button [1 :on :click])))
+    (is (some? stake-sort-header))
+    (is (= [[:actions/set-staking-validator-sort :stake]]
+           (get-in stake-sort-header [1 :on :click])))
     (is (some? row))
     (is (= [[:actions/select-staking-validator validator]]
            (get-in row [1 :on :click])))))

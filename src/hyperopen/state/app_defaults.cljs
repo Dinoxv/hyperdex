@@ -254,6 +254,8 @@
                     :kind nil
                     :anchor nil}
    :transfer-direction :spot->staking
+   :validator-sort {:column :stake
+                    :direction :desc}
    :selected-validator ""
    :validator-search-query ""
    :validator-dropdown-open? false

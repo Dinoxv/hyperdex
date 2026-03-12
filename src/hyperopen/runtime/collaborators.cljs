@@ -304,6 +304,7 @@
    :load-staking staking-actions/load-staking
    :set-staking-active-tab staking-actions/set-staking-active-tab
    :set-staking-validator-timeframe staking-actions/set-staking-validator-timeframe
+   :set-staking-validator-sort staking-actions/set-staking-validator-sort
    :open-staking-action-popover staking-actions/open-staking-action-popover
    :close-staking-action-popover staking-actions/close-staking-action-popover
    :handle-staking-action-popover-keydown staking-actions/handle-staking-action-popover-keydown

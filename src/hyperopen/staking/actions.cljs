@@ -10,6 +10,10 @@
 (def default-validator-timeframe
   :week)
 
+(def default-validator-sort
+  {:column :stake
+   :direction :desc})
+
 (def ^:private staking-route-kinds
   #{"/staking"})
 
@@ -20,6 +24,19 @@
 
 (def ^:private valid-validator-timeframes
   #{:day :week :month})
+
+(def ^:private valid-validator-sort-columns
+  #{:name
+    :description
+    :stake
+    :your-stake
+    :uptime
+    :apr
+    :status
+    :commission})
+
+(def ^:private text-validator-sort-columns
+  #{:name :description :status})
 
 (def ^:private valid-action-popover-kinds
   #{:transfer :stake :unstake})
@@ -136,6 +153,59 @@
     (if (contains? valid-validator-timeframes normalized)
       normalized
       default-validator-timeframe)))
+
+(defn normalize-staking-validator-sort-column
+  [value]
+  (let [token (cond
+                (keyword? value) value
+                (string? value) (-> value
+                                    str/trim
+                                    str/lower-case
+                                    (str/replace #"[^a-z0-9]+" "-")
+                                    keyword)
+                :else nil)
+        normalized (case token
+                     :name :name
+                     :description :description
+                     :stake :stake
+                     :your-stake :your-stake
+                     :yourstake :your-stake
+                     :uptime :uptime
+                     :est-apr :apr
+                     :apr :apr
+                     :status :status
+                     :commission :commission
+                     token)]
+    (if (contains? valid-validator-sort-columns normalized)
+      normalized
+      (:column default-validator-sort))))
+
+(defn normalize-staking-validator-sort-direction
+  [value]
+  (let [token (cond
+                (keyword? value) value
+                (string? value) (-> value
+                                    str/trim
+                                    str/lower-case
+                                    keyword)
+                :else nil)
+        normalized (case token
+                     :ascending :asc
+                     :asc :asc
+                     :descending :desc
+                     :desc :desc
+                     token)]
+    (if (contains? #{:asc :desc} normalized)
+      normalized
+      (:direction default-validator-sort))))
+
+(defn normalize-staking-validator-sort
+  [value]
+  (let [value* (if (map? value) value {})
+        column (normalize-staking-validator-sort-column (:column value*))
+        direction (normalize-staking-validator-sort-direction (:direction value*))]
+    {:column column
+     :direction direction}))
 
 (defn normalize-staking-action-popover-kind
   [value]
@@ -357,6 +427,24 @@
   [_state timeframe]
   [[:effects/save [:staking-ui :validator-timeframe]
     (normalize-staking-validator-timeframe timeframe)]])
+
+(defn set-staking-validator-sort
+  [state column]
+  (if-let [column* (normalize-staking-validator-sort-column column)]
+    (let [current (normalize-staking-validator-sort
+                   (get-in state [:staking-ui :validator-sort]))
+          default-direction (if (contains? text-validator-sort-columns column*)
+                              :asc
+                              :desc)
+          next-direction (if (= column* (:column current))
+                           (if (= :asc (:direction current))
+                             :desc
+                             :asc)
+                           default-direction)]
+      [[:effects/save [:staking-ui :validator-sort]
+        {:column column*
+         :direction next-direction}]])
+    []))
 
 (defn open-staking-action-popover
   ([state kind]
