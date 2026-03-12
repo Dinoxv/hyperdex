@@ -661,7 +661,7 @@
         indicator (if active?
                     (if (= :asc direction) "↑" "↓")
                     "↕")]
-    [:th {:class ["px-3" "py-2.5" "text-left" "font-normal"]}
+    [:th {:class ["px-3" "py-2" "text-left" "font-normal"]}
      [:button {:type "button"
                :class (into ["inline-flex"
                              "items-center"
@@ -707,19 +707,19 @@
                          ["bg-[#1a2c31]"]))
           :on {:click [[:actions/select-staking-validator validator]]}
         :data-role "staking-validator-row"}
-     [:td {:class ["px-3" "py-2.5" "font-normal" "text-[#f6fefd]"]}
+     [:td {:class ["px-3" "py-1.5" "font-normal" "text-[#f6fefd]"]}
       name]
-     [:td {:class ["px-3" "py-2.5" "text-[#9aa3a4]" "max-w-[260px]" "truncate"]}
+     [:td {:class ["px-3" "py-1.5" "text-[#9aa3a4]" "max-w-[260px]" "truncate"]}
       (or description "--")]
-     [:td {:class ["px-3" "py-2.5" "num" "text-[#f6fefd]"]} (format-table-hype stake)]
-     [:td {:class ["px-3" "py-2.5" "num" "text-[#f6fefd]"]}
+     [:td {:class ["px-3" "py-1.5" "num" "text-[#f6fefd]"]} (format-table-hype stake)]
+     [:td {:class ["px-3" "py-1.5" "num" "text-[#f6fefd]"]}
       (if (pos? (or your-stake 0))
         (format-table-hype your-stake)
         "-")]
-     [:td {:class ["px-3" "py-2.5" "num" "text-[#f6fefd]"]} (format-percent uptime-fraction)]
-     [:td {:class ["px-3" "py-2.5" "num" "text-[#f6fefd]"]} (format-percent predicted-apr)]
-     [:td {:class ["px-3" "py-2.5"]} (status-pill status)]
-     [:td {:class ["px-3" "py-2.5" "num" "text-[#f6fefd]"]} (format-percent commission)]]))
+     [:td {:class ["px-3" "py-1.5" "num" "text-[#f6fefd]"]} (format-percent uptime-fraction)]
+     [:td {:class ["px-3" "py-1.5" "num" "text-[#f6fefd]"]} (format-percent predicted-apr)]
+     [:td {:class ["px-3" "py-1.5"]} (status-pill status)]
+     [:td {:class ["px-3" "py-1.5" "num" "text-[#f6fefd]"]} (format-percent commission)]]))
 
 (defn- history-table
   [rows columns empty-text row-render]
@@ -850,8 +850,10 @@
                 form
                 submitting]} (staking-vm/staking-vm state)]
     [:div {:class ["flex"
-                   "h-full"
+                   "flex-1"
+                   "min-h-0"
                    "w-full"
+                   "overflow-y-auto"
                    "flex-col"
                    "gap-2"
                    "app-shell-gutter"
