@@ -575,8 +575,8 @@
     (is (some? value-node))
     (is (contains? (hiccup/node-class-set action-button) "h-6"))
     (is (contains? (hiccup/node-class-set action-button) "w-6"))
-    (is (contains? (hiccup/node-class-set edit-icon-node) "h-5"))
-    (is (contains? (hiccup/node-class-set edit-icon-node) "w-5"))
+    (is (contains? (hiccup/node-class-set edit-icon-node) "h-4"))
+    (is (contains? (hiccup/node-class-set edit-icon-node) "w-4"))
     (is (= "1.6" (get-in edit-icon-node [1 :stroke-width])))
     (is (= "Edit TP/SL" (get-in action-button [1 :aria-label])))))
 
@@ -655,8 +655,8 @@
     (is (some? value-node))
     (is (contains? (hiccup/node-class-set action-button) "h-6"))
     (is (contains? (hiccup/node-class-set action-button) "w-6"))
-    (is (contains? (hiccup/node-class-set edit-icon-node) "h-5"))
-    (is (contains? (hiccup/node-class-set edit-icon-node) "w-5"))
+    (is (contains? (hiccup/node-class-set edit-icon-node) "h-4"))
+    (is (contains? (hiccup/node-class-set edit-icon-node) "w-4"))
     (is (vector? click-actions))
     (is (= :actions/open-position-margin-modal
            (first (first click-actions))))
