@@ -612,21 +612,21 @@
                            positions-state
                            mobile-expanded-card]}]
                 (if (some? positions)
-                  (positions-tab-content positions
-                                         positions-sort
-                                         position-tpsl-modal
-                                         position-reduce-popover
-                                         position-margin-modal
-                                         (assoc positions-state
-                                                :mobile-expanded-card mobile-expanded-card))
-                  (positions-tab-content webdata2
-                                         positions-sort
-                                         perp-dex-states
-                                         position-tpsl-modal
-                                         position-reduce-popover
-                                         position-margin-modal
-                                         (assoc positions-state
-                                                :mobile-expanded-card mobile-expanded-card))))
+                  (positions-tab-content {:positions positions
+                                          :sort-state positions-sort
+                                          :tpsl-modal position-tpsl-modal
+                                          :reduce-popover position-reduce-popover
+                                          :margin-modal position-margin-modal
+                                          :positions-state (assoc positions-state
+                                                                  :mobile-expanded-card mobile-expanded-card)})
+                  (positions-tab-content {:webdata2 webdata2
+                                          :sort-state positions-sort
+                                          :perp-dex-states perp-dex-states
+                                          :tpsl-modal position-tpsl-modal
+                                          :reduce-popover position-reduce-popover
+                                          :margin-modal position-margin-modal
+                                          :positions-state (assoc positions-state
+                                                                  :mobile-expanded-card mobile-expanded-card)})))
    :open-orders (fn [{:keys [open-orders open-orders-sort open-orders-state]}]
                   (open-orders-tab-content open-orders open-orders-sort open-orders-state))
    :twap (fn [view-model]

@@ -34,46 +34,30 @@
 (portfolio/defscene mixed-book
   []
   (positions-panel
-   (positions/positions-tab-content
-    (positions-rows)
-    {:column "Position Value" :direction :desc}
-    nil
-    nil
-    nil
-    {:direction-filter :all})))
+   (positions/positions-tab-content {:positions (positions-rows)
+                                     :sort-state {:column "Position Value" :direction :desc}
+                                     :positions-state {:direction-filter :all}})))
 
 (portfolio/defscene long-only
   []
   (positions-panel
-   (positions/positions-tab-content
-    [(fixtures/position-row)]
-    {:column "Coin" :direction :asc}
-    nil
-    nil
-    nil
-    {:direction-filter :long})))
+   (positions/positions-tab-content {:positions [(fixtures/position-row)]
+                                     :sort-state {:column "Coin" :direction :asc}
+                                     :positions-state {:direction-filter :long}})))
 
 (portfolio/defscene empty-state
   []
   (positions-panel
-   (positions/positions-tab-content
-    []
-    {:column "Coin" :direction :asc}
-    nil
-    nil
-    nil
-    {:direction-filter :all})))
+   (positions/positions-tab-content {:positions []
+                                     :sort-state {:column "Coin" :direction :asc}
+                                     :positions-state {:direction-filter :all}})))
 
 (portfolio/defscene mobile-expanded-card
   []
   (layout/page-shell
    (layout/mobile-shell
     (layout/panel-shell {:class ["h-[720px]" "p-0"]}
-     (positions/positions-tab-content
-      (positions-rows)
-      {:column "Coin" :direction :asc}
-      nil
-      nil
-      nil
-      {:direction-filter :all
-       :mobile-expanded-card {:positions (positions/position-unique-key (first (positions-rows)))}})))))
+     (positions/positions-tab-content {:positions (positions-rows)
+                                       :sort-state {:column "Coin" :direction :asc}
+                                       :positions-state {:direction-filter :all
+                                                         :mobile-expanded-card {:positions (positions/position-unique-key (first (positions-rows)))}}})))))

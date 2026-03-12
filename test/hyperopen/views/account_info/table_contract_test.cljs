@@ -34,9 +34,9 @@
 (defn- tab-contents
   []
   [(view/balances-tab-content [fixtures/sample-balance-row] false fixtures/default-sort-state)
-   (view/positions-tab-content {:clearinghouseState {:assetPositions [fixtures/sample-position-data]}}
-                               fixtures/default-sort-state
-                               {})
+   (view/positions-tab-content {:webdata2 {:clearinghouseState {:assetPositions [fixtures/sample-position-data]}}
+                                :sort-state fixtures/default-sort-state
+                                :perp-dex-states {}})
    (view/open-orders-tab-content (sample-open-orders) {:column "Time" :direction :desc})
    (view/trade-history-tab-content (sample-fills))
    (view/funding-history-tab-content (sample-fundings))
@@ -45,9 +45,9 @@
 (defn- keyed-tab-contents
   []
   [[:balances (view/balances-tab-content [fixtures/sample-balance-row] false fixtures/default-sort-state)]
-   [:positions (view/positions-tab-content {:clearinghouseState {:assetPositions [fixtures/sample-position-data]}}
-                                           fixtures/default-sort-state
-                                           {})]
+   [:positions (view/positions-tab-content {:webdata2 {:clearinghouseState {:assetPositions [fixtures/sample-position-data]}}
+                                            :sort-state fixtures/default-sort-state
+                                            :perp-dex-states {}})]
    [:open-orders (view/open-orders-tab-content (sample-open-orders) {:column "Time" :direction :desc})]
    [:trade-history (view/trade-history-tab-content (sample-fills))]
    [:funding-history (view/funding-history-tab-content (sample-fundings))]

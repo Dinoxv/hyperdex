@@ -4,6 +4,7 @@
             [hyperopen.account.history.position-margin :as position-margin]
             [hyperopen.account.history.position-reduce :as position-reduce]
             [hyperopen.account.history.position-tpsl :as position-tpsl]
+            [hyperopen.views.account-info.positions-vm :as positions-vm]
             [hyperopen.views.account-info.test-support.fixtures :as fixtures]
             [hyperopen.views.account-info.test-support.hiccup :as hiccup]
             [hyperopen.views.account-info.tabs.positions :as positions-tab]
@@ -28,6 +29,25 @@
 
 (use-fixtures :each reset-positions-sort-cache-fixture)
 
+(defn- render-positions-tab-from-rows
+  ([rows sort-state]
+   (render-positions-tab-from-rows rows sort-state nil nil nil {}))
+  ([rows sort-state tpsl-modal positions-state]
+   (render-positions-tab-from-rows rows sort-state tpsl-modal nil nil positions-state))
+  ([rows sort-state tpsl-modal reduce-popover margin-modal positions-state]
+   (view/positions-tab-content {:positions rows
+                                :sort-state sort-state
+                                :tpsl-modal tpsl-modal
+                                :reduce-popover reduce-popover
+                                :margin-modal margin-modal
+                                :positions-state positions-state})))
+
+(defn- render-positions-tab-from-webdata
+  [webdata2 sort-state perp-dex-states]
+  (view/positions-tab-content {:webdata2 webdata2
+                               :sort-state sort-state
+                               :perp-dex-states perp-dex-states}))
+
 (deftest position-headers-use-secondary-text-and-hover-affordance-test
   (let [position-header-node (view/position-table-header fixtures/default-sort-state)
         position-coin-header (hiccup/find-first-node position-header-node
@@ -43,41 +63,41 @@
         coin-header-cell (nth header-cells 0)]
     (is (contains? (hiccup/node-class-set coin-header-cell) "pl-3"))))
 
-(deftest positions-tab-content-memoizes-sorting-by-input-signature-and-sort-state-test
+(deftest positions-tab-content-recomputes-sorting-per-render-without-view-cache-test
   (let [positions [fixtures/sample-position-data]
         sort-state {:column "Coin" :direction :asc}
         sort-calls (atom 0)]
     (positions-tab/reset-positions-sort-cache!)
-    (with-redefs [positions-tab/sort-positions-by-column
+    (with-redefs [positions-vm/sort-row-vms-by-column
                   (fn [rows _column _direction]
                     (swap! sort-calls inc)
                     rows)]
-      (view/positions-tab-content positions sort-state)
-      (view/positions-tab-content positions sort-state)
-      (is (= 1 @sort-calls))
+      (render-positions-tab-from-rows positions sort-state)
+      (render-positions-tab-from-rows positions sort-state)
+      (is (= 2 @sort-calls))
 
       (let [desc-state (assoc sort-state :direction :desc)]
-        (view/positions-tab-content positions desc-state)
-        (view/positions-tab-content positions desc-state)
-        (is (= 2 @sort-calls))
+        (render-positions-tab-from-rows positions desc-state)
+        (render-positions-tab-from-rows positions desc-state)
+        (is (= 4 @sort-calls))
 
         (let [churned-positions (into [] positions)]
-          (view/positions-tab-content churned-positions desc-state)
-          (view/positions-tab-content churned-positions desc-state)
-          (is (= 2 @sort-calls)))
+          (render-positions-tab-from-rows churned-positions desc-state)
+          (render-positions-tab-from-rows churned-positions desc-state)
+          (is (= 6 @sort-calls)))
 
         (let [changed-positions (assoc-in (into [] positions) [0 :position :coin] "xyz:TSLA")]
-          (view/positions-tab-content changed-positions desc-state)
-          (is (= 3 @sort-calls)))))))
+          (render-positions-tab-from-rows changed-positions desc-state)
+          (is (= 7 @sort-calls)))))))
 
 (deftest positions-tab-content-filters-rows-by-direction-filter-test
   (let [rows [(fixtures/sample-position-row "LONGCOIN" 5 "1.0")
               (fixtures/sample-position-row "SHORTA" 5 "-2.0")
               (fixtures/sample-position-row "SHORTB" 5 "-3.0")]
         sort-state {:column "Coin" :direction :asc}
-        all-content (view/positions-tab-content rows sort-state nil {:direction-filter :all})
-        long-content (view/positions-tab-content rows sort-state nil {:direction-filter :long})
-        short-content (view/positions-tab-content rows sort-state nil {:direction-filter :short})
+        all-content (render-positions-tab-from-rows rows sort-state nil {:direction-filter :all})
+        long-content (render-positions-tab-from-rows rows sort-state nil {:direction-filter :long})
+        short-content (render-positions-tab-from-rows rows sort-state nil {:direction-filter :short})
         all-row-count (count (vec (hiccup/node-children (hiccup/tab-rows-viewport-node all-content))))
         long-row-count (count (vec (hiccup/node-children (hiccup/tab-rows-viewport-node long-content))))
         short-row-count (count (vec (hiccup/node-children (hiccup/tab-rows-viewport-node short-content))))
@@ -98,16 +118,16 @@
               (fixtures/sample-position-row "SOL" 5 "1.0")
               (fixtures/sample-position-row "PUMP" 5 "-1.0")]
         sort-state {:column "Coin" :direction :asc}
-        search-content (view/positions-tab-content rows
-                                                   sort-state
-                                                   nil
-                                                   {:direction-filter :all
-                                                    :coin-search "nd"})
-        short-and-search-content (view/positions-tab-content rows
-                                                             sort-state
-                                                             nil
-                                                             {:direction-filter :short
-                                                              :coin-search "pu"})
+        search-content (render-positions-tab-from-rows rows
+                                                       sort-state
+                                                       nil
+                                                       {:direction-filter :all
+                                                        :coin-search "nd"})
+        short-and-search-content (render-positions-tab-from-rows rows
+                                                                 sort-state
+                                                                 nil
+                                                                 {:direction-filter :short
+                                                                  :coin-search "pu"})
         search-row-count (count (vec (hiccup/node-children (hiccup/tab-rows-viewport-node search-content))))
         short-search-row-count (count (vec (hiccup/node-children (hiccup/tab-rows-viewport-node short-and-search-content))))
         search-strings (set (hiccup/collect-strings search-content))
@@ -118,6 +138,22 @@
     (is (= 1 short-search-row-count))
     (is (contains? short-search-strings "PUMP"))
     (is (not (contains? short-search-strings "NVDA")))))
+
+(deftest positions-tab-content-empty-state-distinguishes-no-rows-vs-no-matches-test
+  (let [sort-state {:column "Coin" :direction :asc}
+        no-rows-content (render-positions-tab-from-rows []
+                                                       sort-state
+                                                       nil
+                                                       {:direction-filter :all})
+        no-matches-content (render-positions-tab-from-rows [(fixtures/sample-position-row "SOL" 5 "1.0")]
+                                                           sort-state
+                                                           nil
+                                                           {:direction-filter :short
+                                                            :coin-search "zzzz"})
+        no-rows-strings (set (hiccup/collect-strings no-rows-content))
+        no-matches-strings (set (hiccup/collect-strings no-matches-content))]
+    (is (contains? no-rows-strings "No active positions"))
+    (is (contains? no-matches-strings "No matching positions"))))
 
 (deftest positions-tab-content-renders-mobile-summary-cards-with-inline-expansion-test
   (with-phone-viewport
@@ -134,13 +170,13 @@
                              (assoc-in [:position :leverage :type] "isolated"))
             collapsed-row (fixtures/sample-position-row "SOL" 10 "0.61")
             expanded-row-id (view/position-unique-key expanded-row)
-            content (view/positions-tab-content [expanded-row collapsed-row]
-                                                fixtures/default-sort-state
-                                                nil
-                                                nil
-                                                nil
-                                                {:direction-filter :all
-                                                 :mobile-expanded-card {:positions expanded-row-id}})
+            content (render-positions-tab-from-rows [expanded-row collapsed-row]
+                                                    fixtures/default-sort-state
+                                                    nil
+                                                    nil
+                                                    nil
+                                                    {:direction-filter :all
+                                                     :mobile-expanded-card {:positions expanded-row-id}})
             mobile-viewport (hiccup/find-by-data-role content "positions-mobile-cards-viewport")
             mobile-cards (vec (hiccup/node-children mobile-viewport))
             expanded-card (hiccup/find-by-data-role content (str "mobile-position-card-" expanded-row-id))
@@ -237,26 +273,25 @@
         (is (contains? collapsed-strings "SOL"))
         (is (not (contains? collapsed-strings "Entry Price")))))))
 
-(deftest positions-tab-content-re-sorts-when-direction-filter-changes-test
+(deftest positions-tab-content-invokes-sort-kernel-across-direction-filter-renders-test
   (let [rows [(fixtures/sample-position-row "ETH" 5 "1.0")
               (fixtures/sample-position-row "BTC" 5 "-1.0")]
         sort-state {:column "Coin" :direction :asc}
         sort-calls (atom 0)]
     (positions-tab/reset-positions-sort-cache!)
-    (with-redefs [positions-tab/sort-positions-by-column
+    (with-redefs [positions-vm/sort-row-vms-by-column
                   (fn [positions _column _direction]
                     (swap! sort-calls inc)
                     positions)]
-      (view/positions-tab-content rows sort-state nil {:direction-filter :all})
-      (view/positions-tab-content rows sort-state nil {:direction-filter :all})
-      (is (= 1 @sort-calls))
-      (view/positions-tab-content rows sort-state nil {:direction-filter :short})
-      (view/positions-tab-content rows sort-state nil {:direction-filter :short})
-      (is (= 2 @sort-calls)))))
+      (render-positions-tab-from-rows rows sort-state nil {:direction-filter :all})
+      (render-positions-tab-from-rows rows sort-state nil {:direction-filter :all})
+      (render-positions-tab-from-rows rows sort-state nil {:direction-filter :short})
+      (render-positions-tab-from-rows rows sort-state nil {:direction-filter :short})
+      (is (= 4 @sort-calls)))))
 
 (deftest positions-tab-content-does-not-render-legacy-subheader-row-test
   (let [webdata2 {:clearinghouseState {:assetPositions [fixtures/sample-position-data]}}
-        content (view/positions-tab-content webdata2 fixtures/default-sort-state {})
+        content (render-positions-tab-from-webdata webdata2 fixtures/default-sort-state {})
         title-node (hiccup/find-first-node content #(contains? (hiccup/direct-texts %) "Positions ("))
         active-positions-node (hiccup/find-first-node content #(contains? (hiccup/direct-texts %) "Active positions"))]
     (is (nil? title-node))
@@ -386,6 +421,37 @@
     (is (= ["PAID" "ZERO" "RECEIVED"] (mapv #(get-in % [:position :coin]) asc-result)))
     (is (= ["RECEIVED" "ZERO" "PAID"] (mapv #(get-in % [:position :coin]) desc-result)))))
 
+(deftest sort-positions-by-column-size-uses-absolute-size-values-test
+  (let [positions [{:position {:coin "TEN" :szi "-10"}}
+                   {:position {:coin "ONE" :szi "1"}}
+                   {:position {:coin "TWO" :szi "-2"}}]
+        asc-result (view/sort-positions-by-column positions "Size" :asc)
+        desc-result (view/sort-positions-by-column positions "Size" :desc)]
+    (is (= ["ONE" "TWO" "TEN"] (mapv #(get-in % [:position :coin]) asc-result)))
+    (is (= ["TEN" "TWO" "ONE"] (mapv #(get-in % [:position :coin]) desc-result)))))
+
+(deftest sort-positions-by-column-coin-uses-displayed-coin-label-test
+  (let [positions [{:position {:coin "z:AAA"}}
+                   {:position {:coin "AAB"}}
+                   {:position {:coin "z:AAC"}}]
+        asc-result (view/sort-positions-by-column positions "Coin" :asc)]
+    (is (= ["z:AAA" "AAB" "z:AAC"] (mapv #(get-in % [:position :coin]) asc-result)))))
+
+(deftest sort-positions-by-column-pnl-uses-roe-tie-breaker-test
+  (let [positions [{:position {:coin "LOW-ROE"
+                               :unrealizedPnl "5"
+                               :returnOnEquity "0.10"}}
+                   {:position {:coin "HIGH-ROE"
+                               :unrealizedPnl "5"
+                               :returnOnEquity "0.25"}}
+                   {:position {:coin "LOWER-PNL"
+                               :unrealizedPnl "4"
+                               :returnOnEquity "0.99"}}]
+        asc-result (view/sort-positions-by-column positions "PNL (ROE %)" :asc)
+        desc-result (view/sort-positions-by-column positions "PNL (ROE %)" :desc)]
+    (is (= ["LOWER-PNL" "LOW-ROE" "HIGH-ROE"] (mapv #(get-in % [:position :coin]) asc-result)))
+    (is (= ["HIGH-ROE" "LOW-ROE" "LOWER-PNL"] (mapv #(get-in % [:position :coin]) desc-result)))))
+
 (deftest position-row-uses-safe-placeholders-for-invalid-pnl-and-funding-values-test
   (let [row-node (view/position-row {:position {:coin "HYPE"
                                                 :leverage {:value 3}
@@ -408,6 +474,24 @@
     (is (contains? funding-strings "--"))
     (is (not-any? #(str/includes? % "NaN") (hiccup/collect-strings row-node)))
     (is (contains? (hiccup/node-class-set funding-value-node) "text-trading-text"))))
+
+(deftest position-row-mark-price-renders-placeholder-when-mark-is-missing-test
+  (let [row-node (view/position-row {:position {:coin "NOMARK"
+                                                :leverage {:value 3}
+                                                :szi "1.0"
+                                                :positionValue "100"
+                                                :entryPx "10"
+                                                :markPx nil
+                                                :markPrice nil
+                                                :unrealizedPnl "1"
+                                                :returnOnEquity "0.1"
+                                                :liquidationPx "5"
+                                                :marginUsed "20"
+                                                :cumFunding {:allTime "0"}}})
+        mark-cell (nth (vec (hiccup/node-children row-node)) 4)
+        mark-strings (set (hiccup/collect-strings mark-cell))]
+    (is (contains? mark-strings "--"))
+    (is (not (contains? mark-strings "10.00")))))
 
 (deftest position-row-renders-pnl-on-one-line-with-inline-percent-test
   (let [row-node (view/position-row (fixtures/sample-position-row "xyz:NVDA" 10 "0.500"))
@@ -597,6 +681,17 @@
     (is (contains? isolated-strings "(Isolated)"))
     (is (contains? cross-strings "(Cross)"))))
 
+(deftest position-row-margin-cell-preserves-explicit-false-is-cross-flag-test
+  (let [row-data (-> (fixtures/sample-position-row "xyz:NVDA" 10 "0.500")
+                     (assoc-in [:position :leverage :type] nil)
+                     (assoc-in [:position :isCross] false))
+        row-node (view/position-row row-data)
+        margin-cell (nth (vec (hiccup/node-children row-node)) 7)
+        margin-strings (set (hiccup/collect-strings margin-cell))
+        action-button (hiccup/find-first-node margin-cell #(= :button (first %)))]
+    (is (contains? margin-strings "(Isolated)"))
+    (is (some? action-button))))
+
 (deftest position-row-cross-margin-cell-omits-edit-affordance-test
   (let [row-data (assoc-in (fixtures/sample-position-row "xyz:NVDA" 10 "0.500")
                            [:position :leverage :type]
@@ -616,13 +711,13 @@
                                 [:position :leverage :type]
                                 "cross")
             row-id (view/position-unique-key cross-row)
-            content (view/positions-tab-content [cross-row]
-                                                fixtures/default-sort-state
-                                                nil
-                                                nil
-                                                nil
-                                                {:direction-filter :all
-                                                 :mobile-expanded-card {:positions row-id}})
+            content (render-positions-tab-from-rows [cross-row]
+                                                    fixtures/default-sort-state
+                                                    nil
+                                                    nil
+                                                    nil
+                                                    {:direction-filter :all
+                                                     :mobile-expanded-card {:positions row-id}})
             expanded-card (hiccup/find-by-data-role content (str "mobile-position-card-" row-id))
             margin-edit-button (hiccup/find-first-node expanded-card #(= "Edit Margin" (get-in % [1 :aria-label])))
             margin-footer-button (hiccup/find-first-node expanded-card #(and (= :button (first %))
