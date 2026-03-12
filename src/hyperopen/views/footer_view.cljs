@@ -370,28 +370,20 @@
 (defn- connection-meter-tone [status active-bars]
   (cond
     (or (= status :offline) (zero? active-bars))
-    {:border "border-error/50"
-     :bg "bg-error/10"
-     :label-text "text-error"
+    {:label-text "text-error"
      :bar-active "bg-error"}
 
     (= status :reconnecting)
-    {:border "border-warning/50"
-     :bg "bg-warning/10"
-     :label-text "text-warning"
+    {:label-text "text-warning"
      :bar-active "bg-warning"}
 
     (or (= status :delayed)
         (<= active-bars 2))
-    {:border "border-warning/50"
-     :bg "bg-warning/10"
-     :label-text "text-warning"
+    {:label-text "text-warning"
      :bar-active "bg-warning"}
 
     :else
-    {:border "border-success/50"
-     :bg "bg-success/10"
-     :label-text "text-success"
+    {:label-text "text-success"
      :bar-active "bg-success"}))
 
 (defn- connection-meter-model [health]
@@ -1180,7 +1172,7 @@
 (defn footer-view [state]
   (let [health (get-in state [:websocket :health] {})
         {:keys [status active-bars label tooltip]} (connection-meter-model health)
-        {:keys [border bg label-text bar-active]} (connection-meter-tone status active-bars)
+        {:keys [label-text bar-active]} (connection-meter-tone status active-bars)
         diagnostics-open? (boolean (get-in state [:websocket-ui :diagnostics-open?] false))
         footer-z-class (if diagnostics-open? "z-[260]" "z-40")
         banner (banner-model state health)]
@@ -1202,17 +1194,17 @@
        [:div {:class ["flex" "items-center" "space-x-3"]}
         [:button {:type "button"
                   :class ["inline-flex"
+                          "min-h-6"
                           "items-center"
                           "gap-2"
-                          "rounded"
-                          "border"
-                          "px-2.5"
+                          "px-1"
                           "py-1"
                           "text-xs"
                           "font-medium"
                           "transition-colors"
-                          border
-                          bg
+                          "focus:outline-none"
+                          "focus:ring-0"
+                          "focus:ring-offset-0"
                           label-text]
                   :on {:click [[:actions/toggle-ws-diagnostics]]}
                   :title tooltip

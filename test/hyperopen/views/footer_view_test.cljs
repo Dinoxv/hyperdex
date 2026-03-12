@@ -189,6 +189,19 @@
     (is (some? pill))
     (is (= "Online" (node-text pill)))))
 
+(deftest status-meter-button-has-no-border-or-shaded-background-test
+  (let [view (footer-view/footer-view (base-state))
+        pill (find-pill view)
+        classes (set (class-values (get-in pill [1 :class])))]
+    (is (some? pill))
+    (is (not (contains? classes "border")))
+    (is (not (contains? classes "border-success/50")))
+    (is (not (contains? classes "border-warning/50")))
+    (is (not (contains? classes "border-error/50")))
+    (is (not (contains? classes "bg-success/10")))
+    (is (not (contains? classes "bg-warning/10")))
+    (is (not (contains? classes "bg-error/10")))))
+
 (deftest status-meter-click-dispatches-diagnostics-toggle-test
   (let [view (footer-view/footer-view (base-state))
         pill (find-pill view)]
