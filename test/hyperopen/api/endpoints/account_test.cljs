@@ -318,6 +318,51 @@
                    (done)))
           (.catch (async-support/unexpected-error done))))))
 
+(deftest request-staking-validator-summaries-normalizes-array-stats-shape-test
+  (async done
+    (let [calls (atom [])
+          validator "0x000000000056f99d36b6f2e0c51fd41496bbacb8"
+          post-info! (api-stubs/post-info-stub
+                      calls
+                      [{:validator validator
+                        :signer "0x0000000008b0b558419582041f85740344ae8fde"
+                        :name "ValiDAO"
+                        :description "The People's Validator."
+                        :stake 556530876114619
+                        :isJailed false
+                        :isActive true
+                        :commission "0.04"
+                        :stats [["day" {:uptimeFraction "1.0"
+                                        :predictedApr "0.0215700249"
+                                        :nSamples 1440}]
+                                ["week" {:uptimeFraction "0.9941468254"
+                                         :predictedApr "0.0214437718"
+                                         :nSamples 10080}]
+                                ["month" {:uptimeFraction "0.9986342593"
+                                          :predictedApr "0.0215405659"
+                                          :nSamples 43200}]]}])]
+      (-> (account/request-staking-validator-summaries! post-info! {})
+          (.then (fn [rows]
+                   (is (= 1 (count rows)))
+                   (let [row (first rows)]
+                     (is (= validator (:validator row)))
+                     (is (= "ValiDAO" (:name row)))
+                     (is (< (js/Math.abs (- 5565308.76114619
+                                            (:stake row)))
+                            1e-9))
+                     (is (= 1 (:uptime-fraction (get-in row [:stats :day]))))
+                     (is (= 0.0215700249 (get-in row [:stats :day :predicted-apr])))
+                     (is (= 0.9941468254 (get-in row [:stats :week :uptime-fraction])))
+                     (is (= 0.0215405659 (get-in row [:stats :month :predicted-apr]))))
+                   (let [[body opts] (first @calls)]
+                     (is (= {"type" "validatorSummaries"} body))
+                     (is (= {:priority :high
+                             :dedupe-key :validator-summaries
+                             :cache-ttl-ms 10000}
+                            opts)))
+                   (done)))
+          (.catch (async-support/unexpected-error done))))))
+
 (deftest request-spot-clearinghouse-state-short-circuits-without-address-test
   (async done
     (let [calls (atom 0)

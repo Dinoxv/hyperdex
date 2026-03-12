@@ -143,11 +143,48 @@
       (/ stake validator-stake-scale)
       stake)))
 
+(defn- validator-stats-window
+  [stats target-window]
+  (let [target (name target-window)]
+    (cond
+      (map? stats)
+      (or (get stats target-window)
+          (get stats target))
+
+      (sequential? stats)
+      (some (fn [entry]
+              (cond
+                (and (vector? entry)
+                     (= 2 (count entry)))
+                (let [[window-name window-payload] entry
+                      window-token (some-> window-name str str/lower-case)]
+                  (when (= target window-token)
+                    window-payload))
+
+                (map? entry)
+                (let [window-name (or (:window entry)
+                                      (:name entry)
+                                      (:period entry)
+                                      (:key entry))
+                      window-token (some-> window-name str str/lower-case)]
+                  (when (= target window-token)
+                    (or (:stats entry)
+                        (:value entry)
+                        entry)))
+
+                :else
+                nil))
+            stats)
+
+      :else
+      nil)))
+
 (defn- normalize-validator-summary-row
   [row]
   (when (map? row)
     (let [validator (normalize-address (:validator row))
-          signer (normalize-address (:signer row))]
+          signer (normalize-address (:signer row))
+          stats (:stats row)]
       (when (seq validator)
          {:validator validator
           :signer signer
@@ -158,14 +195,11 @@
          :is-jailed? (true? (:isJailed row))
          :commission (optional-number (:commission row))
          :stats {:day (normalize-validator-stats-window
-                       (or (get-in row [:stats :day])
-                           (get-in row [:stats "day"])))
+                       (validator-stats-window stats :day))
                  :week (normalize-validator-stats-window
-                        (or (get-in row [:stats :week])
-                            (get-in row [:stats "week"])))
+                        (validator-stats-window stats :week))
                  :month (normalize-validator-stats-window
-                         (or (get-in row [:stats :month])
-                             (get-in row [:stats "month"])))}}))))
+                         (validator-stats-window stats :month))}}))))
 
 (defn- normalize-validator-summaries
   [payload]
