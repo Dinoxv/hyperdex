@@ -223,6 +223,12 @@
 (s/def ::api-wallet-form-field #{:name :address :days-valid})
 (s/def ::api-wallet-form-field-args (s/tuple ::api-wallet-form-field any?))
 (s/def ::api-wallet-row-args (s/tuple map?))
+(s/def ::staking-form-field #{:deposit-amount
+                              :withdraw-amount
+                              :delegate-amount
+                              :undelegate-amount
+                              :selected-validator})
+(s/def ::staking-form-field-args (s/tuple ::staking-form-field any?))
 
 (def ^:private hyperunit-lifecycle-keys
   #{:direction
@@ -590,6 +596,20 @@
    :actions/set-funding-comparison-query ::single-input-args
    :actions/set-funding-comparison-timeframe ::keyword-or-string-args
    :actions/set-funding-comparison-sort ::keyword-or-string-args
+   :actions/load-staking-route ::path-args
+   :actions/load-staking ::no-args
+   :actions/set-staking-active-tab ::keyword-or-string-args
+   :actions/set-staking-validator-timeframe ::keyword-or-string-args
+   :actions/set-staking-form-field ::staking-form-field-args
+   :actions/select-staking-validator ::optional-string-args
+   :actions/set-staking-deposit-amount-to-max ::no-args
+   :actions/set-staking-withdraw-amount-to-max ::no-args
+   :actions/set-staking-delegate-amount-to-max ::no-args
+   :actions/set-staking-undelegate-amount-to-max ::no-args
+   :actions/submit-staking-deposit ::no-args
+   :actions/submit-staking-withdraw ::no-args
+   :actions/submit-staking-delegate ::no-args
+   :actions/submit-staking-undelegate ::no-args
    :actions/load-vault-route ::path-args
    :actions/load-vaults ::no-args
    :actions/load-vault-detail ::address-args
@@ -693,8 +713,18 @@
    :effects/api-fetch-vault-order-history ::address-args
    :effects/api-fetch-vault-ledger-updates ::address-args
    :effects/api-submit-vault-transfer ::api-submit-vault-transfer-args
+   :effects/api-fetch-staking-validator-summaries ::no-args
+   :effects/api-fetch-staking-delegator-summary ::address-args
+   :effects/api-fetch-staking-delegations ::address-args
+   :effects/api-fetch-staking-rewards ::address-args
+   :effects/api-fetch-staking-history ::address-args
+   :effects/api-fetch-staking-spot-state ::address-args
+   :effects/api-submit-staking-deposit ::api-submit-order-args
+   :effects/api-submit-staking-withdraw ::api-submit-order-args
+   :effects/api-submit-staking-delegate ::api-submit-order-args
+   :effects/api-submit-staking-undelegate ::api-submit-order-args
    :effects/api-fetch-hyperunit-fee-estimate ::no-args
-   :effects/api-fetch-hyperunit-withdrawal-queue ::no-args
+         :effects/api-fetch-hyperunit-withdrawal-queue ::no-args
          :effects/api-submit-funding-send ::api-submit-funding-send-args
          :effects/api-submit-funding-transfer ::api-submit-funding-transfer-args
          :effects/api-submit-funding-withdraw ::api-submit-funding-withdraw-args

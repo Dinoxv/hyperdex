@@ -31,6 +31,8 @@
                     (get-in deps [:api :api-fetch-vault-index])))
     (is (identical? effect-adapters/api-fetch-vault-ledger-updates-effect
                     (get-in deps [:api :api-fetch-vault-ledger-updates])))
+    (is (identical? effect-adapters/api-fetch-staking-validator-summaries-effect
+                    (get-in deps [:api :api-fetch-staking-validator-summaries])))
     (is (identical? action-adapters/enable-agent-trading
                     (get-in deps [:wallet :enable-agent-trading])))))
 
@@ -46,6 +48,8 @@
                     (get-in deps [:vaults :load-vault-route])))
     (is (identical? action-adapters/load-funding-comparison-route-action
                     (get-in deps [:funding-comparison :load-funding-comparison-route])))
+    (is (identical? action-adapters/load-staking-route-action
+                    (get-in deps [:staking :load-staking-route])))
     (is (identical? action-adapters/navigate
                     (get-in deps [:core :navigate])))))
 

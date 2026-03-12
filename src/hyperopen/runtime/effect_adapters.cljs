@@ -8,6 +8,7 @@
             [hyperopen.runtime.effect-adapters.common :as common]
             [hyperopen.runtime.effect-adapters.funding :as funding-adapters]
             [hyperopen.runtime.effect-adapters.order :as order-adapters]
+            [hyperopen.runtime.effect-adapters.staking :as staking-adapters]
             [hyperopen.runtime.effect-adapters.vaults :as vault-adapters]
             [hyperopen.runtime.effect-adapters.wallet :as wallet-adapters]
             [hyperopen.runtime.effect-adapters.websocket :as ws-adapters]
@@ -247,6 +248,24 @@
 (def api-fetch-vault-ledger-updates-effect
   vault-adapters/api-fetch-vault-ledger-updates-effect)
 
+(def api-fetch-staking-validator-summaries-effect
+  staking-adapters/api-fetch-staking-validator-summaries-effect)
+
+(def api-fetch-staking-delegator-summary-effect
+  staking-adapters/api-fetch-staking-delegator-summary-effect)
+
+(def api-fetch-staking-delegations-effect
+  staking-adapters/api-fetch-staking-delegations-effect)
+
+(def api-fetch-staking-rewards-effect
+  staking-adapters/api-fetch-staking-rewards-effect)
+
+(def api-fetch-staking-history-effect
+  staking-adapters/api-fetch-staking-history-effect)
+
+(def api-fetch-staking-spot-state-effect
+  staking-adapters/api-fetch-staking-spot-state-effect)
+
 (defn- api-wallets-load-deps
   [store]
   {:store store
@@ -306,6 +325,38 @@
 (defn api-submit-vault-transfer-effect
   [_ store request]
   (apply vault-adapters/api-submit-vault-transfer-effect
+         [nil
+          store
+          request
+          {:show-toast! show-order-feedback-toast!}]))
+
+(defn api-submit-staking-deposit-effect
+  [_ store request]
+  (apply staking-adapters/api-submit-staking-deposit-effect
+         [nil
+          store
+          request
+          {:show-toast! show-order-feedback-toast!}]))
+
+(defn api-submit-staking-withdraw-effect
+  [_ store request]
+  (apply staking-adapters/api-submit-staking-withdraw-effect
+         [nil
+          store
+          request
+          {:show-toast! show-order-feedback-toast!}]))
+
+(defn api-submit-staking-delegate-effect
+  [_ store request]
+  (apply staking-adapters/api-submit-staking-delegate-effect
+         [nil
+          store
+          request
+          {:show-toast! show-order-feedback-toast!}]))
+
+(defn api-submit-staking-undelegate-effect
+  [_ store request]
+  (apply staking-adapters/api-submit-staking-undelegate-effect
          [nil
           store
           request

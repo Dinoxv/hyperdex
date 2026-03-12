@@ -11,10 +11,12 @@
             [hyperopen.order.actions :as order-actions]
             [hyperopen.orderbook.actions :as orderbook-actions]
             [hyperopen.portfolio.actions :as portfolio-actions]
+            [hyperopen.staking.actions :as staking-actions]
             [hyperopen.trade.layout-actions :as trade-layout-actions]
             [hyperopen.funding-comparison.actions :as funding-comparison-actions]
             [hyperopen.vaults.actions :as vault-actions]
             [hyperopen.funding-comparison.effects :as funding-comparison-effects]
+            [hyperopen.staking.effects :as staking-effects]
             [hyperopen.vaults.effects :as vault-effects]
             [hyperopen.wallet.actions :as wallet-actions]))
 
@@ -297,6 +299,22 @@
    :set-funding-comparison-timeframe funding-comparison-actions/set-funding-comparison-timeframe
    :set-funding-comparison-sort funding-comparison-actions/set-funding-comparison-sort})
 
+(defn- staking-action-deps []
+  {:load-staking-route staking-actions/load-staking-route
+   :load-staking staking-actions/load-staking
+   :set-staking-active-tab staking-actions/set-staking-active-tab
+   :set-staking-validator-timeframe staking-actions/set-staking-validator-timeframe
+   :set-staking-form-field staking-actions/set-staking-form-field
+   :select-staking-validator staking-actions/select-staking-validator
+   :set-staking-deposit-amount-to-max staking-actions/set-staking-deposit-amount-to-max
+   :set-staking-withdraw-amount-to-max staking-actions/set-staking-withdraw-amount-to-max
+   :set-staking-delegate-amount-to-max staking-actions/set-staking-delegate-amount-to-max
+   :set-staking-undelegate-amount-to-max staking-actions/set-staking-undelegate-amount-to-max
+   :submit-staking-deposit staking-actions/submit-staking-deposit
+   :submit-staking-withdraw staking-actions/submit-staking-withdraw
+   :submit-staking-delegate staking-actions/submit-staking-delegate
+   :submit-staking-undelegate staking-actions/submit-staking-undelegate})
+
 (defn runtime-effect-deps
   [effect-overrides]
   (merge-nested
@@ -314,6 +332,16 @@
           :api-fetch-vault-order-history vault-effects/api-fetch-vault-order-history!
           :api-fetch-vault-ledger-updates vault-effects/api-fetch-vault-ledger-updates!
           :api-submit-vault-transfer vault-effects/api-submit-vault-transfer!
+          :api-fetch-staking-validator-summaries staking-effects/api-fetch-staking-validator-summaries!
+          :api-fetch-staking-delegator-summary staking-effects/api-fetch-staking-delegator-summary!
+          :api-fetch-staking-delegations staking-effects/api-fetch-staking-delegations!
+          :api-fetch-staking-rewards staking-effects/api-fetch-staking-rewards!
+          :api-fetch-staking-history staking-effects/api-fetch-staking-history!
+          :api-fetch-staking-spot-state staking-effects/api-fetch-staking-spot-state!
+          :api-submit-staking-deposit staking-effects/api-submit-staking-deposit!
+          :api-submit-staking-withdraw staking-effects/api-submit-staking-withdraw!
+          :api-submit-staking-delegate staking-effects/api-submit-staking-delegate!
+          :api-submit-staking-undelegate staking-effects/api-submit-staking-undelegate!
           :api-fetch-hyperunit-fee-estimate funding-effects/api-fetch-hyperunit-fee-estimate!
           :api-fetch-hyperunit-withdrawal-queue funding-effects/api-fetch-hyperunit-withdrawal-queue!
           :api-submit-funding-send funding-effects/api-submit-funding-send!
@@ -333,5 +361,6 @@
     :spectate-mode (spectate-mode-action-deps)
     :vaults (vault-action-deps)
     :funding-comparison (funding-comparison-action-deps)
+    :staking (staking-action-deps)
     :orders (order-action-deps)}
    action-overrides))

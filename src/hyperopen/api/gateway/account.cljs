@@ -59,6 +59,35 @@
    opts]
   (account-endpoints/request-user-webdata2! post-info! address opts))
 
+(defn request-staking-validator-summaries!
+  [{:keys [post-info!]}
+   opts]
+  (account-endpoints/request-staking-validator-summaries! post-info! opts))
+
+(defn request-staking-delegator-summary!
+  [{:keys [post-info!]}
+   address
+   opts]
+  (account-endpoints/request-staking-delegator-summary! post-info! address opts))
+
+(defn request-staking-delegations!
+  [{:keys [post-info!]}
+   address
+   opts]
+  (account-endpoints/request-staking-delegations! post-info! address opts))
+
+(defn request-staking-delegator-rewards!
+  [{:keys [post-info!]}
+   address
+   opts]
+  (account-endpoints/request-staking-delegator-rewards! post-info! address opts))
+
+(defn request-staking-delegator-history!
+  [{:keys [post-info!]}
+   address
+   opts]
+  (account-endpoints/request-staking-delegator-history! post-info! address opts))
+
 (defn fetch-spot-clearinghouse-state!
   [{:keys [log-fn
            request-spot-clearinghouse-state!

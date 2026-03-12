@@ -58,6 +58,16 @@
          :api-fetch-vault-order-history effect-adapters/api-fetch-vault-order-history-effect
          :api-fetch-vault-ledger-updates effect-adapters/api-fetch-vault-ledger-updates-effect
          :api-submit-vault-transfer effect-adapters/api-submit-vault-transfer-effect
+         :api-fetch-staking-validator-summaries effect-adapters/api-fetch-staking-validator-summaries-effect
+         :api-fetch-staking-delegator-summary effect-adapters/api-fetch-staking-delegator-summary-effect
+         :api-fetch-staking-delegations effect-adapters/api-fetch-staking-delegations-effect
+         :api-fetch-staking-rewards effect-adapters/api-fetch-staking-rewards-effect
+         :api-fetch-staking-history effect-adapters/api-fetch-staking-history-effect
+         :api-fetch-staking-spot-state effect-adapters/api-fetch-staking-spot-state-effect
+         :api-submit-staking-deposit effect-adapters/api-submit-staking-deposit-effect
+         :api-submit-staking-withdraw effect-adapters/api-submit-staking-withdraw-effect
+         :api-submit-staking-delegate effect-adapters/api-submit-staking-delegate-effect
+         :api-submit-staking-undelegate effect-adapters/api-submit-staking-undelegate-effect
          :api-fetch-hyperunit-fee-estimate effect-adapters/api-fetch-hyperunit-fee-estimate-effect
          :api-fetch-hyperunit-withdrawal-queue effect-adapters/api-fetch-hyperunit-withdrawal-queue-effect
          :api-submit-funding-transfer effect-adapters/api-submit-funding-transfer-effect

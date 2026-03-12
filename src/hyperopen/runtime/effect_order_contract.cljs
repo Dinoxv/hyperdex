@@ -216,6 +216,52 @@
     :heavy-effect-ids #{:effects/api-fetch-predicted-fundings
                         :effects/fetch-asset-selector-markets}}
 
+   :actions/load-staking
+   {:required-phase-order [:projection :persistence :heavy-io]
+    :require-projection-before-heavy? true
+    :allow-duplicate-heavy-effects? false
+    :heavy-effect-ids #{:effects/api-fetch-staking-validator-summaries
+                        :effects/api-fetch-staking-delegator-summary
+                        :effects/api-fetch-staking-delegations
+                        :effects/api-fetch-staking-rewards
+                        :effects/api-fetch-staking-history
+                        :effects/api-fetch-staking-spot-state}}
+
+   :actions/load-staking-route
+   {:required-phase-order [:projection :persistence :heavy-io]
+    :require-projection-before-heavy? true
+    :allow-duplicate-heavy-effects? false
+    :heavy-effect-ids #{:effects/api-fetch-staking-validator-summaries
+                        :effects/api-fetch-staking-delegator-summary
+                        :effects/api-fetch-staking-delegations
+                        :effects/api-fetch-staking-rewards
+                        :effects/api-fetch-staking-history
+                        :effects/api-fetch-staking-spot-state}}
+
+   :actions/submit-staking-deposit
+   {:required-phase-order [:projection :persistence :heavy-io]
+    :require-projection-before-heavy? true
+    :allow-duplicate-heavy-effects? false
+    :heavy-effect-ids #{:effects/api-submit-staking-deposit}}
+
+   :actions/submit-staking-withdraw
+   {:required-phase-order [:projection :persistence :heavy-io]
+    :require-projection-before-heavy? true
+    :allow-duplicate-heavy-effects? false
+    :heavy-effect-ids #{:effects/api-submit-staking-withdraw}}
+
+   :actions/submit-staking-delegate
+   {:required-phase-order [:projection :persistence :heavy-io]
+    :require-projection-before-heavy? true
+    :allow-duplicate-heavy-effects? false
+    :heavy-effect-ids #{:effects/api-submit-staking-delegate}}
+
+   :actions/submit-staking-undelegate
+   {:required-phase-order [:projection :persistence :heavy-io]
+    :require-projection-before-heavy? true
+    :allow-duplicate-heavy-effects? false
+    :heavy-effect-ids #{:effects/api-submit-staking-undelegate}}
+
    :actions/load-api-wallet-route
    {:required-phase-order [:projection :persistence :heavy-io]
     :require-projection-before-heavy? true
@@ -243,6 +289,12 @@
                         :effects/api-fetch-vault-order-history
                         :effects/api-fetch-vault-ledger-updates
                         :effects/api-fetch-predicted-fundings
+                        :effects/api-fetch-staking-validator-summaries
+                        :effects/api-fetch-staking-delegator-summary
+                        :effects/api-fetch-staking-delegations
+                        :effects/api-fetch-staking-rewards
+                        :effects/api-fetch-staking-history
+                        :effects/api-fetch-staking-spot-state
                         :effects/api-load-api-wallets
                         :effects/fetch-asset-selector-markets}}
 
@@ -260,6 +312,12 @@
                         :effects/api-fetch-vault-order-history
                         :effects/api-fetch-vault-ledger-updates
                         :effects/api-fetch-predicted-fundings
+                        :effects/api-fetch-staking-validator-summaries
+                        :effects/api-fetch-staking-delegator-summary
+                        :effects/api-fetch-staking-delegations
+                        :effects/api-fetch-staking-rewards
+                        :effects/api-fetch-staking-history
+                        :effects/api-fetch-staking-spot-state
                         :effects/fetch-asset-selector-markets}}})
 
 (defn action-policy

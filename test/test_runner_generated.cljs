@@ -131,6 +131,8 @@
             [hyperopen.schema.contracts-coverage-test]
             [hyperopen.schema.contracts-test]
             [hyperopen.schema.order-form-command-catalog-test]
+            [hyperopen.staking.actions-test]
+            [hyperopen.staking.effects-test]
             [hyperopen.startup.collaborators-test]
             [hyperopen.startup.init-test]
             [hyperopen.startup.restore-test]
@@ -219,6 +221,7 @@
             [hyperopen.views.portfolio.vm.summary-test]
             [hyperopen.views.portfolio.vm.volume-helpers-test]
             [hyperopen.views.portfolio.vm.volume-test]
+            [hyperopen.views.staking-view-test]
             [hyperopen.views.trade.order-form-commands-test]
             [hyperopen.views.trade.order-form-component-primitives-test]
             [hyperopen.views.trade.order-form-component-sections-test]
@@ -459,6 +462,8 @@
              'hyperopen.schema.contracts-coverage-test
              'hyperopen.schema.contracts-test
              'hyperopen.schema.order-form-command-catalog-test
+             'hyperopen.staking.actions-test
+             'hyperopen.staking.effects-test
              'hyperopen.startup.collaborators-test
              'hyperopen.startup.init-test
              'hyperopen.startup.restore-test
@@ -547,6 +552,7 @@
              'hyperopen.views.portfolio.vm.summary-test
              'hyperopen.views.portfolio.vm.volume-helpers-test
              'hyperopen.views.portfolio.vm.volume-test
+             'hyperopen.views.staking-view-test
              'hyperopen.views.trade.order-form-commands-test
              'hyperopen.views.trade.order-form-component-primitives-test
              'hyperopen.views.trade.order-form-component-sections-test

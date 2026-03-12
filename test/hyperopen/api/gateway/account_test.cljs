@@ -105,6 +105,21 @@
                   account-endpoints/request-user-webdata2! (fn [& args]
                                                              (swap! called conj [:request-user-webdata2 args])
                                                              {:ok :request-user-webdata2})
+                  account-endpoints/request-staking-validator-summaries! (fn [& args]
+                                                                            (swap! called conj [:request-staking-validator-summaries args])
+                                                                            {:ok :request-staking-validator-summaries})
+                  account-endpoints/request-staking-delegator-summary! (fn [& args]
+                                                                          (swap! called conj [:request-staking-delegator-summary args])
+                                                                          {:ok :request-staking-delegator-summary})
+                  account-endpoints/request-staking-delegations! (fn [& args]
+                                                                    (swap! called conj [:request-staking-delegations args])
+                                                                    {:ok :request-staking-delegations})
+                  account-endpoints/request-staking-delegator-rewards! (fn [& args]
+                                                                          (swap! called conj [:request-staking-delegator-rewards args])
+                                                                          {:ok :request-staking-delegator-rewards})
+                  account-endpoints/request-staking-delegator-history! (fn [& args]
+                                                                          (swap! called conj [:request-staking-delegator-history args])
+                                                                          {:ok :request-staking-delegator-history})
                   account-endpoints/request-user-abstraction! (fn [& args]
                                                                 (swap! called conj [:request-abstraction args])
                                                                 {:ok :request-abstraction})
@@ -132,6 +147,25 @@
              (account-gateway/request-user-webdata2! {:post-info! post-info!}
                                                      "0xabc"
                                                      {:priority :high})))
+      (is (= {:ok :request-staking-validator-summaries}
+             (account-gateway/request-staking-validator-summaries! {:post-info! post-info!}
+                                                                   {:priority :high})))
+      (is (= {:ok :request-staking-delegator-summary}
+             (account-gateway/request-staking-delegator-summary! {:post-info! post-info!}
+                                                                 "0xabc"
+                                                                 {:priority :high})))
+      (is (= {:ok :request-staking-delegations}
+             (account-gateway/request-staking-delegations! {:post-info! post-info!}
+                                                           "0xabc"
+                                                           {:priority :high})))
+      (is (= {:ok :request-staking-delegator-rewards}
+             (account-gateway/request-staking-delegator-rewards! {:post-info! post-info!}
+                                                                 "0xabc"
+                                                                 {:priority :high})))
+      (is (= {:ok :request-staking-delegator-history}
+             (account-gateway/request-staking-delegator-history! {:post-info! post-info!}
+                                                                 "0xabc"
+                                                                 {:priority :high})))
       (is (= {:ok :fetch-spot}
              (account-gateway/fetch-spot-clearinghouse-state! {:log-fn identity
                                                                 :request-spot-clearinghouse-state! identity
@@ -171,4 +205,9 @@
       (is (some #(= :request-spot (first %)) @called))
       (is (some #(= :request-extra-agents (first %)) @called))
       (is (some #(= :request-user-webdata2 (first %)) @called))
+      (is (some #(= :request-staking-validator-summaries (first %)) @called))
+      (is (some #(= :request-staking-delegator-summary (first %)) @called))
+      (is (some #(= :request-staking-delegations (first %)) @called))
+      (is (some #(= :request-staking-delegator-rewards (first %)) @called))
+      (is (some #(= :request-staking-delegator-history (first %)) @called))
       (is (some #(= :fetch-clearinghouse (first %)) @called)))))

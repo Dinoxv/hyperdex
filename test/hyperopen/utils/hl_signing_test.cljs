@@ -115,6 +115,50 @@
     (is (= "" (get-in typed-data [:message :fromSubAccount])))
     (is (= 1700000003500 (get-in typed-data [:message :nonce])))))
 
+(deftest build-c-deposit-typed-data-test
+  (let [typed-data (signing/build-c-deposit-typed-data
+                    {:hyperliquidChain "Mainnet"
+                     :signatureChainId "0xa4b1"
+                     :wei 1234500000
+                     :nonce 1700000003600})]
+    (is (= "HyperliquidSignTransaction" (get-in typed-data [:domain :name])))
+    (is (= 42161 (get-in typed-data [:domain :chainId])))
+    (is (= "HyperliquidTransaction:CDeposit" (:primaryType typed-data)))
+    (is (= "Mainnet" (get-in typed-data [:message :hyperliquidChain])))
+    (is (= 1234500000 (get-in typed-data [:message :wei])))
+    (is (= 1700000003600 (get-in typed-data [:message :nonce])))))
+
+(deftest build-c-withdraw-typed-data-test
+  (let [typed-data (signing/build-c-withdraw-typed-data
+                    {:hyperliquidChain "Mainnet"
+                     :signatureChainId "0xa4b1"
+                     :wei 9876500000
+                     :nonce 1700000003700})]
+    (is (= "HyperliquidSignTransaction" (get-in typed-data [:domain :name])))
+    (is (= 42161 (get-in typed-data [:domain :chainId])))
+    (is (= "HyperliquidTransaction:CWithdraw" (:primaryType typed-data)))
+    (is (= "Mainnet" (get-in typed-data [:message :hyperliquidChain])))
+    (is (= 9876500000 (get-in typed-data [:message :wei])))
+    (is (= 1700000003700 (get-in typed-data [:message :nonce])))))
+
+(deftest build-token-delegate-typed-data-test
+  (let [typed-data (signing/build-token-delegate-typed-data
+                    {:hyperliquidChain "Testnet"
+                     :signatureChainId "0x66eee"
+                     :validator "0x1234567890abcdef1234567890abcdef12345678"
+                     :wei 250000000
+                     :isUndelegate true
+                     :nonce 1700000003800})]
+    (is (= "HyperliquidSignTransaction" (get-in typed-data [:domain :name])))
+    (is (= 421614 (get-in typed-data [:domain :chainId])))
+    (is (= "HyperliquidTransaction:TokenDelegate" (:primaryType typed-data)))
+    (is (= "Testnet" (get-in typed-data [:message :hyperliquidChain])))
+    (is (= "0x1234567890abcdef1234567890abcdef12345678"
+           (get-in typed-data [:message :validator])))
+    (is (= 250000000 (get-in typed-data [:message :wei])))
+    (is (= true (get-in typed-data [:message :isUndelegate])))
+    (is (= 1700000003800 (get-in typed-data [:message :nonce])))))
+
 (deftest build-withdraw3-typed-data-test
   (let [typed-data (signing/build-withdraw3-typed-data
                     {:hyperliquidChain "Testnet"

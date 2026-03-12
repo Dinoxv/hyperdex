@@ -43,6 +43,23 @@
    {:name "fromSubAccount" :type "string"}
    {:name "nonce" :type "uint64"}])
 
+(def ^:private c-deposit-fields
+  [{:name "hyperliquidChain" :type "string"}
+   {:name "wei" :type "uint64"}
+   {:name "nonce" :type "uint64"}])
+
+(def ^:private c-withdraw-fields
+  [{:name "hyperliquidChain" :type "string"}
+   {:name "wei" :type "uint64"}
+   {:name "nonce" :type "uint64"}])
+
+(def ^:private token-delegate-fields
+  [{:name "hyperliquidChain" :type "string"}
+   {:name "validator" :type "address"}
+   {:name "wei" :type "uint64"}
+   {:name "isUndelegate" :type "bool"}
+   {:name "nonce" :type "uint64"}])
+
 (def ^:private withdraw-fields
   [{:name "hyperliquidChain" :type "string"}
    {:name "destination" :type "string"}
@@ -206,6 +223,47 @@
              :fromSubAccount (or fromSubAccount "")
              :nonce nonce}})
 
+(defn build-c-deposit-typed-data
+  [{:keys [hyperliquidChain signatureChainId wei nonce]}]
+  {:types {"HyperliquidTransaction:CDeposit" c-deposit-fields
+           "EIP712Domain" eip712-domain-fields}
+   :domain {:name "HyperliquidSignTransaction"
+            :version "1"
+            :chainId (parse-chain-id signatureChainId)
+            :verifyingContract zero-address}
+   :primaryType "HyperliquidTransaction:CDeposit"
+   :message {:hyperliquidChain hyperliquidChain
+             :wei wei
+             :nonce nonce}})
+
+(defn build-c-withdraw-typed-data
+  [{:keys [hyperliquidChain signatureChainId wei nonce]}]
+  {:types {"HyperliquidTransaction:CWithdraw" c-withdraw-fields
+           "EIP712Domain" eip712-domain-fields}
+   :domain {:name "HyperliquidSignTransaction"
+            :version "1"
+            :chainId (parse-chain-id signatureChainId)
+            :verifyingContract zero-address}
+   :primaryType "HyperliquidTransaction:CWithdraw"
+   :message {:hyperliquidChain hyperliquidChain
+             :wei wei
+             :nonce nonce}})
+
+(defn build-token-delegate-typed-data
+  [{:keys [hyperliquidChain signatureChainId validator wei isUndelegate nonce]}]
+  {:types {"HyperliquidTransaction:TokenDelegate" token-delegate-fields
+           "EIP712Domain" eip712-domain-fields}
+   :domain {:name "HyperliquidSignTransaction"
+            :version "1"
+            :chainId (parse-chain-id signatureChainId)
+            :verifyingContract zero-address}
+   :primaryType "HyperliquidTransaction:TokenDelegate"
+   :message {:hyperliquidChain hyperliquidChain
+             :validator validator
+             :wei wei
+             :isUndelegate (boolean isUndelegate)
+             :nonce nonce}})
+
 (defn build-withdraw3-typed-data
   [{:keys [hyperliquidChain signatureChainId destination amount time]}]
   {:types {"HyperliquidTransaction:Withdraw" withdraw-fields
@@ -358,6 +416,18 @@
 (defn sign-send-asset-action!
   [address action]
   (sign-typed-data! address (build-send-asset-typed-data action)))
+
+(defn sign-c-deposit-action!
+  [address action]
+  (sign-typed-data! address (build-c-deposit-typed-data action)))
+
+(defn sign-c-withdraw-action!
+  [address action]
+  (sign-typed-data! address (build-c-withdraw-typed-data action)))
+
+(defn sign-token-delegate-action!
+  [address action]
+  (sign-typed-data! address (build-token-delegate-typed-data action)))
 
 (defn sign-withdraw3-action!
   [address action]

@@ -11,6 +11,7 @@
             [hyperopen.api.trading :as trading-api]
             [hyperopen.funding-comparison.actions :as funding-comparison-actions]
             [hyperopen.router :as router]
+            [hyperopen.staking.actions :as staking-actions]
             [hyperopen.runtime.state :as runtime-state]
             [hyperopen.vaults.actions :as vault-actions]
             [hyperopen.wallet.agent-runtime :as agent-runtime]
@@ -140,6 +141,7 @@
         route-effects (into []
                             (concat (vault-actions/load-vault-route state p)
                                     (funding-comparison-actions/load-funding-comparison-route state p)
+                                    (staking-actions/load-staking-route state p)
                                     (api-wallets-actions/load-api-wallet-route state p)))
         portfolio-effects (portfolio-route-effects state p)
         route-entry-effects (projection-first-effects
@@ -155,6 +157,10 @@
 (defn load-funding-comparison-route-action
   [state path]
   (funding-comparison-actions/load-funding-comparison-route state path))
+
+(defn load-staking-route-action
+  [state path]
+  (staking-actions/load-staking-route state path))
 
 (defn load-api-wallet-route-action
   [state path]
@@ -182,6 +188,8 @@
         route (get-in @store [:router :path])]
     (when (str/starts-with? (or route "") "/vaults")
       (nxr/dispatch store nil [[:actions/load-vault-route route]]))
+    (when (staking-actions/staking-route? route)
+      (nxr/dispatch store nil [[:actions/load-staking-route route]]))
     result))
 
 (defn- exchange-response-error

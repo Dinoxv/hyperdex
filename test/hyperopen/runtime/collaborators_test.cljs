@@ -8,9 +8,11 @@
             [hyperopen.funding.actions :as funding-actions]
             [hyperopen.order.actions :as order-actions]
             [hyperopen.portfolio.actions :as portfolio-actions]
+            [hyperopen.staking.actions :as staking-actions]
             [hyperopen.funding-comparison.actions :as funding-comparison-actions]
             [hyperopen.runtime.collaborators :as collaborators]
             [hyperopen.funding-comparison.effects :as funding-comparison-effects]
+            [hyperopen.staking.effects :as staking-effects]
             [hyperopen.vaults.actions :as vault-actions]
             [hyperopen.vaults.effects :as vault-effects]
             [hyperopen.wallet.actions :as wallet-actions]))
@@ -36,7 +38,11 @@
     (is (identical? vault-effects/api-fetch-vault-ledger-updates!
                     (get-in deps [:api :api-fetch-vault-ledger-updates])))
     (is (identical? vault-effects/api-submit-vault-transfer!
-                    (get-in deps [:api :api-submit-vault-transfer])))))
+                    (get-in deps [:api :api-submit-vault-transfer])))
+    (is (identical? staking-effects/api-fetch-staking-validator-summaries!
+                    (get-in deps [:api :api-fetch-staking-validator-summaries])))
+    (is (identical? staking-effects/api-submit-staking-deposit!
+                    (get-in deps [:api :api-submit-staking-deposit])))))
 
 (deftest runtime-action-deps-provides-default-domain-action-handlers-test
   (let [deps (collaborators/runtime-action-deps {})]
@@ -100,6 +106,10 @@
                     (get-in deps [:vaults :set-vault-detail-chart-series])))
     (is (identical? funding-comparison-actions/load-funding-comparison-route
                     (get-in deps [:funding-comparison :load-funding-comparison-route])))
+    (is (identical? staking-actions/load-staking-route
+                    (get-in deps [:staking :load-staking-route])))
+    (is (identical? staking-actions/submit-staking-delegate
+                    (get-in deps [:staking :submit-staking-delegate])))
     (is (identical? funding-comparison-actions/set-funding-comparison-query
                     (get-in deps [:funding-comparison :set-funding-comparison-query])))
     (is (identical? vault-actions/open-vault-transfer-modal

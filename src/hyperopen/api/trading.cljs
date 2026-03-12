@@ -565,6 +565,30 @@
                               :nonce
                               signing/sign-send-asset-action!))
 
+(defn submit-c-deposit!
+  [store address action]
+  (sign-and-post-user-action! store
+                              address
+                              action
+                              :nonce
+                              signing/sign-c-deposit-action!))
+
+(defn submit-c-withdraw!
+  [store address action]
+  (sign-and-post-user-action! store
+                              address
+                              action
+                              :nonce
+                              signing/sign-c-withdraw-action!))
+
+(defn submit-token-delegate!
+  [store address action]
+  (sign-and-post-user-action! store
+                              address
+                              action
+                              :nonce
+                              signing/sign-token-delegate-action!))
+
 (defn submit-withdraw3!
   [store address action]
   (sign-and-post-user-action! store

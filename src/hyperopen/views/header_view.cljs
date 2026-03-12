@@ -730,7 +730,7 @@
         (nav-link "Funding" "/funding-comparison" (funding-route-active? route))
         (nav-link "Earn" "/earn" false)
         (nav-link "Vaults" "/vaults" (route-active? route "/vaults"))
-        (nav-link "Staking" "/staking" false)
+        (nav-link "Staking" "/staking" (route-active? route "/staking"))
         (nav-link "Referrals" "/referrals" false)
         (nav-link "Leaderboard" "/leaderboard" false)
         [:details {:class ["relative" "group"]

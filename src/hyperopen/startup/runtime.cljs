@@ -381,6 +381,7 @@
                         "/trade")]
           (dispatch! store nil [[:actions/load-vault-route route]])
           (dispatch! store nil [[:actions/load-funding-comparison-route route]])
+          (dispatch! store nil [[:actions/load-staking-route route]])
           (dispatch! store nil [[:actions/load-api-wallet-route route]])
           (when (and new-address
                      (str/starts-with? route "/portfolio"))
@@ -448,6 +449,9 @@
                          (or (get-in @store [:router :path])
                              "/trade")]])
   (dispatch! store nil [[:actions/load-funding-comparison-route
+                         (or (get-in @store [:router :path])
+                             "/trade")]])
+  (dispatch! store nil [[:actions/load-staking-route
                          (or (get-in @store [:router :path])
                              "/trade")]])
   (dispatch! store nil [[:actions/load-api-wallet-route

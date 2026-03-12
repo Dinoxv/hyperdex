@@ -298,6 +298,49 @@
     address
     opts)))
 
+(defn request-staking-validator-summaries!
+  ([] (request-staking-validator-summaries! {}))
+  ([opts]
+   (account-gateway/request-staking-validator-summaries!
+    {:post-info! post-info!}
+    opts)))
+
+(defn request-staking-delegator-summary!
+  ([address]
+   (request-staking-delegator-summary! address {}))
+  ([address opts]
+   (account-gateway/request-staking-delegator-summary!
+    {:post-info! post-info!}
+    address
+    opts)))
+
+(defn request-staking-delegations!
+  ([address]
+   (request-staking-delegations! address {}))
+  ([address opts]
+   (account-gateway/request-staking-delegations!
+    {:post-info! post-info!}
+    address
+    opts)))
+
+(defn request-staking-delegator-rewards!
+  ([address]
+   (request-staking-delegator-rewards! address {}))
+  ([address opts]
+   (account-gateway/request-staking-delegator-rewards!
+    {:post-info! post-info!}
+    address
+    opts)))
+
+(defn request-staking-delegator-history!
+  ([address]
+   (request-staking-delegator-history! address {}))
+  ([address opts]
+   (account-gateway/request-staking-delegator-history!
+    {:post-info! post-info!}
+    address
+    opts)))
+
 (defn request-hyperunit-operations!
   [opts]
   (funding-hyperunit-gateway/request-hyperunit-operations!

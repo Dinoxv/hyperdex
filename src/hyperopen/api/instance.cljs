@@ -229,6 +229,44 @@
               {:post-info! post-info!}
               address
               opts)))
+          (request-staking-validator-summaries!
+            ([] (request-staking-validator-summaries! {}))
+            ([opts]
+             (account-gateway/request-staking-validator-summaries!
+              {:post-info! post-info!}
+              opts)))
+          (request-staking-delegator-summary!
+            ([address]
+             (request-staking-delegator-summary! address {}))
+            ([address opts]
+             (account-gateway/request-staking-delegator-summary!
+              {:post-info! post-info!}
+              address
+              opts)))
+          (request-staking-delegations!
+            ([address]
+             (request-staking-delegations! address {}))
+            ([address opts]
+             (account-gateway/request-staking-delegations!
+              {:post-info! post-info!}
+              address
+              opts)))
+          (request-staking-delegator-rewards!
+            ([address]
+             (request-staking-delegator-rewards! address {}))
+            ([address opts]
+             (account-gateway/request-staking-delegator-rewards!
+              {:post-info! post-info!}
+              address
+              opts)))
+          (request-staking-delegator-history!
+            ([address]
+             (request-staking-delegator-history! address {}))
+            ([address opts]
+             (account-gateway/request-staking-delegator-history!
+              {:post-info! post-info!}
+              address
+              opts)))
           (request-spot-clearinghouse-state!
             ([address]
              (request-spot-clearinghouse-state! address {}))
@@ -285,6 +323,11 @@
     {:request-user-funding-history! request-user-funding-history!
      :request-extra-agents! request-extra-agents!
      :request-user-webdata2! request-user-webdata2!
+     :request-staking-validator-summaries! request-staking-validator-summaries!
+     :request-staking-delegator-summary! request-staking-delegator-summary!
+     :request-staking-delegations! request-staking-delegations!
+     :request-staking-delegator-rewards! request-staking-delegator-rewards!
+     :request-staking-delegator-history! request-staking-delegator-history!
      :request-spot-clearinghouse-state! request-spot-clearinghouse-state!
      :request-user-abstraction! request-user-abstraction!
      :request-portfolio! request-portfolio!

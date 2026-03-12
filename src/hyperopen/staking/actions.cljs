@@ -1,0 +1,437 @@
+(ns hyperopen.staking.actions
+  (:require [clojure.string :as str]
+            [hyperopen.account.context :as account-context]
+            [hyperopen.domain.trading :as trading-domain]
+            [hyperopen.utils.parse :as parse-utils]))
+
+(def default-staking-tab
+  :validator-performance)
+
+(def default-validator-timeframe
+  :week)
+
+(def ^:private staking-route-kinds
+  #{"/staking"})
+
+(def ^:private valid-staking-tabs
+  #{:validator-performance
+    :staking-reward-history
+    :staking-action-history})
+
+(def ^:private valid-validator-timeframes
+  #{:day :week :month})
+
+(def ^:private valid-form-fields
+  #{:deposit-amount
+    :withdraw-amount
+    :delegate-amount
+    :undelegate-amount
+    :selected-validator})
+
+(def ^:private hype-decimals
+  8)
+
+(def ^:private hype-wei-factor
+  (js/BigInt "100000000"))
+
+(defn- split-path-from-query-fragment
+  [path]
+  (let [path* (if (string? path) path (str (or path "")))]
+    (or (first (str/split path* #"[?#]" 2))
+        "")))
+
+(defn- trim-trailing-slashes
+  [path]
+  (loop [path* path]
+    (if (and (> (count path*) 1)
+             (str/ends-with? path* "/"))
+      (recur (subs path* 0 (dec (count path*))))
+      path*)))
+
+(defn normalize-route-path
+  [path]
+  (-> path
+      split-path-from-query-fragment
+      str/trim
+      trim-trailing-slashes))
+
+(defn parse-staking-route
+  [path]
+  (let [path* (normalize-route-path path)
+        path-lower (str/lower-case path*)]
+    (if (contains? staking-route-kinds path-lower)
+      {:kind :page
+       :path path*}
+      {:kind :other
+       :path path*})))
+
+(defn staking-route?
+  [path]
+  (= :page (:kind (parse-staking-route path))))
+
+(defn normalize-staking-tab
+  [value]
+  (let [token (cond
+                (keyword? value) value
+                (string? value) (-> value
+                                    str/trim
+                                    str/lower-case
+                                    (str/replace #"[^a-z0-9]+" "-")
+                                    keyword)
+                :else nil)
+        normalized (case token
+                     :validators :validator-performance
+                     :validator :validator-performance
+                     :validator-performance :validator-performance
+                     :staking-reward-history :staking-reward-history
+                     :staking-rewards :staking-reward-history
+                     :rewards :staking-reward-history
+                     :staking-action-history :staking-action-history
+                     :actions :staking-action-history
+                     token)]
+    (if (contains? valid-staking-tabs normalized)
+      normalized
+      default-staking-tab)))
+
+(defn normalize-staking-validator-timeframe
+  [value]
+  (let [token (cond
+                (keyword? value) value
+                (string? value) (-> value
+                                    str/trim
+                                    str/lower-case
+                                    (str/replace #"[^a-z0-9]+" "-")
+                                    keyword)
+                :else nil)
+        normalized (case token
+                     :1d :day
+                     :24h :day
+                     :day :day
+                     :7d :week
+                     :week :week
+                     :30d :month
+                     :month :month
+                     token)]
+    (if (contains? valid-validator-timeframes normalized)
+      normalized
+      default-validator-timeframe)))
+
+(defn- finite-number?
+  [value]
+  (and (number? value)
+       (js/isFinite value)
+       (not (js/isNaN value))))
+
+(defn- optional-number
+  [value]
+  (when-let [parsed (trading-domain/parse-num value)]
+    (when (finite-number? parsed)
+      parsed)))
+
+(defn- normalize-validator-address
+  [value]
+  (let [text (some-> value str str/trim str/lower-case)]
+    (when (and (seq text)
+               (re-matches #"^0x[0-9a-f]{40}$" text))
+      text)))
+
+(defn- normalize-coin-token
+  [value]
+  (some-> value str str/trim str/upper-case))
+
+(defn- balance-row-available
+  [row]
+  (when (map? row)
+    (let [available-direct (or (optional-number (:available row))
+                               (optional-number (:availableBalance row))
+                               (optional-number (:free row)))
+          total (or (optional-number (:total row))
+                    (optional-number (:totalBalance row)))
+          hold (optional-number (:hold row))
+          derived (cond
+                    (finite-number? total)
+                    (if (finite-number? hold)
+                      (- total hold)
+                      total)
+
+                    :else nil)
+          available (or available-direct derived)]
+      (when (finite-number? available)
+        (max 0 available)))))
+
+(defn- spot-hype-available
+  [state]
+  (some (fn [row]
+          (when (= "HYPE"
+                   (normalize-coin-token (:coin row)))
+            (balance-row-available row)))
+        (get-in state [:spot :clearinghouse-state :balances])))
+
+(defn- undelegated-hype-available
+  [state]
+  (or (optional-number (get-in state [:staking :delegator-summary :undelegated]))
+      0))
+
+(defn- delegation-amount-by-validator
+  [state validator]
+  (let [validator* (normalize-validator-address validator)]
+    (or (some (fn [row]
+                (when (= validator*
+                         (normalize-validator-address (:validator row)))
+                  (optional-number (:amount row))))
+              (get-in state [:staking :delegations]))
+        0)))
+
+(defn- parse-amount-number
+  [state value]
+  (parse-utils/parse-localized-decimal value (get-in state [:ui :locale])))
+
+(defn- canonical-decimal-input
+  [state value]
+  (let [normalized (parse-utils/normalize-localized-decimal-input
+                    value
+                    (get-in state [:ui :locale]))
+        fallback (some-> value str str/trim)]
+    (or normalized fallback)))
+
+(defn- parse-hype-input->wei
+  [state value]
+  (let [input (canonical-decimal-input state value)
+        input* (cond
+                 (nil? input) nil
+                 (str/starts-with? input ".") (str "0" input)
+                 :else input)]
+    (when-let [[_ whole fract]
+               (and (string? input*)
+                    (re-matches #"^([0-9]+)(?:\.([0-9]{1,8}))?$" input*))]
+      (let [fract* (subs (str (or fract "") "00000000") 0 hype-decimals)
+            wei (+ (* (js/BigInt whole) hype-wei-factor)
+                   (js/BigInt fract*))
+            wei-number (js/Number (.toString wei))]
+        (when (and (js/Number.isSafeInteger wei-number)
+                   (> wei-number 0))
+          wei-number)))))
+
+(defn- format-hype-input
+  [value]
+  (if (finite-number? value)
+    (trading-domain/number->clean-string (max 0 value) hype-decimals)
+    ""))
+
+(defn- selected-validator
+  [state]
+  (or (normalize-validator-address (get-in state [:staking-ui :selected-validator]))
+      (normalize-validator-address (get-in state [:staking :delegations 0 :validator]))))
+
+(defn- start-submit-effects
+  [submitting-key]
+  [[:effects/save [:staking-ui :form-error] nil]
+   [:effects/save [:staking-ui :submitting submitting-key] true]])
+
+(defn- submit-guard-error
+  [submitting-key message]
+  [[:effects/save [:staking-ui :form-error] message]
+   [:effects/save [:staking-ui :submitting submitting-key] false]])
+
+(defn load-staking
+  [state]
+  (let [address (account-context/effective-account-address state)
+        no-user-effects [[:effects/save-many
+                          [[[:staking :delegator-summary] nil]
+                           [[:staking :delegations] []]
+                           [[:staking :rewards] []]
+                           [[:staking :history] []]
+                           [[:staking :errors :delegator-summary] nil]
+                           [[:staking :errors :delegations] nil]
+                           [[:staking :errors :rewards] nil]
+                           [[:staking :errors :history] nil]]]]
+        user-effects (if (seq address)
+                       [[:effects/api-fetch-staking-delegator-summary address]
+                        [:effects/api-fetch-staking-delegations address]
+                        [:effects/api-fetch-staking-rewards address]
+                        [:effects/api-fetch-staking-history address]
+                        [:effects/api-fetch-staking-spot-state address]]
+                       no-user-effects)]
+    (into [[:effects/save [:staking-ui :form-error] nil]
+           [:effects/api-fetch-staking-validator-summaries]]
+          user-effects)))
+
+(defn load-staking-route
+  [state path]
+  (if (staking-route? path)
+    (load-staking state)
+    []))
+
+(defn set-staking-active-tab
+  [_state tab]
+  [[:effects/save [:staking-ui :active-tab]
+    (normalize-staking-tab tab)]])
+
+(defn set-staking-validator-timeframe
+  [_state timeframe]
+  [[:effects/save [:staking-ui :validator-timeframe]
+    (normalize-staking-validator-timeframe timeframe)]])
+
+(defn set-staking-form-field
+  [_state field value]
+  (if-not (contains? valid-form-fields field)
+    []
+    [[:effects/save [:staking-ui field]
+      (if (= :selected-validator field)
+        (or (normalize-validator-address value) "")
+        (str (or value "")))]]))
+
+(defn select-staking-validator
+  [_state validator]
+  [[:effects/save [:staking-ui :selected-validator]
+    (or (normalize-validator-address validator) "")]])
+
+(defn set-staking-deposit-amount-to-max
+  [state]
+  [[:effects/save [:staking-ui :deposit-amount]
+    (format-hype-input (spot-hype-available state))]])
+
+(defn set-staking-withdraw-amount-to-max
+  [state]
+  [[:effects/save [:staking-ui :withdraw-amount]
+    (format-hype-input (undelegated-hype-available state))]])
+
+(defn set-staking-delegate-amount-to-max
+  [state]
+  [[:effects/save [:staking-ui :delegate-amount]
+    (format-hype-input (undelegated-hype-available state))]])
+
+(defn set-staking-undelegate-amount-to-max
+  [state]
+  (let [validator (selected-validator state)]
+    [[:effects/save [:staking-ui :undelegate-amount]
+      (format-hype-input (delegation-amount-by-validator state validator))]]))
+
+(defn submit-staking-deposit
+  [state]
+  (let [blocked-message (account-context/mutations-blocked-message state)
+        owner-address (account-context/owner-address state)
+        amount-input (get-in state [:staking-ui :deposit-amount])
+        amount (parse-amount-number state amount-input)
+        wei (parse-hype-input->wei state amount-input)
+        available (spot-hype-available state)]
+    (cond
+      (seq blocked-message)
+      (submit-guard-error :deposit? blocked-message)
+
+      (nil? owner-address)
+      (submit-guard-error :deposit? "Connect your wallet before transferring to staking balance.")
+
+      (nil? wei)
+      (submit-guard-error :deposit? "Enter a valid amount up to 8 decimals.")
+
+      (and (finite-number? available)
+           (finite-number? amount)
+           (> amount available))
+      (submit-guard-error :deposit? "Amount exceeds available HYPE in spot balance.")
+
+      :else
+      (into (start-submit-effects :deposit?)
+            [[:effects/api-submit-staking-deposit
+              {:kind :deposit
+               :action {:type "cDeposit"
+                        :wei wei}}]]))))
+
+(defn submit-staking-withdraw
+  [state]
+  (let [blocked-message (account-context/mutations-blocked-message state)
+        owner-address (account-context/owner-address state)
+        amount-input (get-in state [:staking-ui :withdraw-amount])
+        amount (parse-amount-number state amount-input)
+        wei (parse-hype-input->wei state amount-input)
+        available (undelegated-hype-available state)]
+    (cond
+      (seq blocked-message)
+      (submit-guard-error :withdraw? blocked-message)
+
+      (nil? owner-address)
+      (submit-guard-error :withdraw? "Connect your wallet before withdrawing from staking balance.")
+
+      (nil? wei)
+      (submit-guard-error :withdraw? "Enter a valid amount up to 8 decimals.")
+
+      (and (finite-number? amount)
+           (> amount available))
+      (submit-guard-error :withdraw? "Amount exceeds available staking balance.")
+
+      :else
+      (into (start-submit-effects :withdraw?)
+            [[:effects/api-submit-staking-withdraw
+              {:kind :withdraw
+               :action {:type "cWithdraw"
+                        :wei wei}}]]))))
+
+(defn submit-staking-delegate
+  [state]
+  (let [blocked-message (account-context/mutations-blocked-message state)
+        owner-address (account-context/owner-address state)
+        validator (selected-validator state)
+        amount-input (get-in state [:staking-ui :delegate-amount])
+        amount (parse-amount-number state amount-input)
+        wei (parse-hype-input->wei state amount-input)
+        available (undelegated-hype-available state)]
+    (cond
+      (seq blocked-message)
+      (submit-guard-error :delegate? blocked-message)
+
+      (nil? owner-address)
+      (submit-guard-error :delegate? "Connect your wallet before staking.")
+
+      (nil? validator)
+      (submit-guard-error :delegate? "Select a validator before staking.")
+
+      (nil? wei)
+      (submit-guard-error :delegate? "Enter a valid amount up to 8 decimals.")
+
+      (and (finite-number? amount)
+           (> amount available))
+      (submit-guard-error :delegate? "Amount exceeds available staking balance.")
+
+      :else
+      (into (start-submit-effects :delegate?)
+            [[:effects/api-submit-staking-delegate
+              {:kind :delegate
+               :action {:type "tokenDelegate"
+                        :validator validator
+                        :wei wei
+                        :isUndelegate false}}]]))))
+
+(defn submit-staking-undelegate
+  [state]
+  (let [blocked-message (account-context/mutations-blocked-message state)
+        owner-address (account-context/owner-address state)
+        validator (selected-validator state)
+        amount-input (get-in state [:staking-ui :undelegate-amount])
+        amount (parse-amount-number state amount-input)
+        wei (parse-hype-input->wei state amount-input)
+        delegated-amount (delegation-amount-by-validator state validator)]
+    (cond
+      (seq blocked-message)
+      (submit-guard-error :undelegate? blocked-message)
+
+      (nil? owner-address)
+      (submit-guard-error :undelegate? "Connect your wallet before undelegating.")
+
+      (nil? validator)
+      (submit-guard-error :undelegate? "Select a validator before undelegating.")
+
+      (nil? wei)
+      (submit-guard-error :undelegate? "Enter a valid amount up to 8 decimals.")
+
+      (and (finite-number? amount)
+           (> amount delegated-amount))
+      (submit-guard-error :undelegate? "Amount exceeds your delegated amount for this validator.")
+
+      :else
+      (into (start-submit-effects :undelegate?)
+            [[:effects/api-submit-staking-undelegate
+              {:kind :undelegate
+               :action {:type "tokenDelegate"
+                        :validator validator
+                        :wei wei
+                        :isUndelegate true}}]]))))

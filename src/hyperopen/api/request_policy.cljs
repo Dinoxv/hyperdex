@@ -8,6 +8,11 @@
    :public-webdata2 30000
    :extra-agents 5000
    :user-webdata2 5000
+   :validator-summaries 10000
+   :delegator-summary 5000
+   :delegations 5000
+   :delegator-rewards 10000
+   :delegator-history 10000
    :user-funding-history 5000
    :historical-orders 5000
    :clearinghouse-state 5000

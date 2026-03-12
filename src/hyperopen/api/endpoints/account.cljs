@@ -103,6 +103,176 @@
     payload
     {}))
 
+(defn- normalize-address
+  [value]
+  (let [text (some-> value str str/trim str/lower-case)]
+    (when (and (seq text)
+               (re-matches #"^0x[0-9a-f]{40}$" text))
+      text)))
+
+(defn- optional-number
+  [value]
+  (let [parsed (cond
+                 (number? value) value
+                 (string? value) (js/Number (str/trim value))
+                 :else js/NaN)]
+    (when (and (number? parsed)
+               (not (js/isNaN parsed))
+               (js/isFinite parsed))
+      parsed)))
+
+(defn- normalize-validator-stats-window
+  [window]
+  (when (map? window)
+    {:uptime-fraction (optional-number (or (:uptimeFraction window)
+                                           (:uptime-fraction window)))
+     :predicted-apr (optional-number (or (:predictedApr window)
+                                         (:predicted-apr window)))
+     :sample-count (some parse-ms
+                         [(:nSamples window)
+                          (:sampleCount window)
+                          (:sample-count window)])}))
+
+(defn- normalize-validator-summary-row
+  [row]
+  (when (map? row)
+    (let [validator (normalize-address (:validator row))
+          signer (normalize-address (:signer row))]
+      (when (seq validator)
+        {:validator validator
+         :signer signer
+         :name (some-> (:name row) str str/trim not-empty)
+         :description (some-> (:description row) str str/trim not-empty)
+         :stake (optional-number (:stake row))
+         :is-active? (true? (:isActive row))
+         :is-jailed? (true? (:isJailed row))
+         :commission (optional-number (:commission row))
+         :stats {:day (normalize-validator-stats-window
+                       (or (get-in row [:stats :day])
+                           (get-in row [:stats "day"])))
+                 :week (normalize-validator-stats-window
+                        (or (get-in row [:stats :week])
+                            (get-in row [:stats "week"])))
+                 :month (normalize-validator-stats-window
+                         (or (get-in row [:stats :month])
+                             (get-in row [:stats "month"])))}}))))
+
+(defn- normalize-validator-summaries
+  [payload]
+  (if (sequential? payload)
+    (->> payload
+         (keep normalize-validator-summary-row)
+         vec)
+    []))
+
+(defn- normalize-delegator-summary
+  [payload]
+  (if (map? payload)
+    {:delegated (optional-number (:delegated payload))
+     :undelegated (optional-number (:undelegated payload))
+     :total-pending-withdrawal (optional-number (or (:totalPendingWithdrawal payload)
+                                                    (:total-pending-withdrawal payload)))
+     :pending-withdrawals (some parse-ms
+                              [(:nPendingWithdrawals payload)
+                               (:pendingWithdrawals payload)
+                               (:pending-withdrawals payload)])}
+    nil))
+
+(defn- normalize-delegation-row
+  [row]
+  (when (map? row)
+    (let [validator (normalize-address (:validator row))]
+      (when (seq validator)
+        {:validator validator
+         :amount (optional-number (:amount row))
+         :locked-until-timestamp (some parse-ms
+                                       [(:lockedUntilTimestamp row)
+                                        (:lockedUntil row)
+                                        (:locked-until-timestamp row)])}))))
+
+(defn- normalize-delegations
+  [payload]
+  (if (sequential? payload)
+    (->> payload
+         (keep normalize-delegation-row)
+         vec)
+    []))
+
+(defn- normalize-delegator-reward-row
+  [row]
+  (when (map? row)
+    {:time-ms (some parse-ms [(:time row) (:time-ms row)])
+     :source (keyword (str (or (:source row) "unknown")))
+     :total-amount (optional-number (or (:totalAmount row)
+                                        (:total-amount row)
+                                        (:amount row)))}))
+
+(defn- normalize-delegator-rewards
+  [payload]
+  (if (sequential? payload)
+    (->> payload
+         (keep normalize-delegator-reward-row)
+         (sort-by :time-ms >)
+         vec)
+    []))
+
+(defn- normalize-delegator-history-delta
+  [delta]
+  (let [delegate (when (map? (:delegate delta))
+                   (:delegate delta))
+        c-deposit (when (map? (:cDeposit delta))
+                    (:cDeposit delta))
+        c-withdraw (when (map? (:cWithdraw delta))
+                     (:cWithdraw delta))
+        withdrawal (when (map? (:withdrawal delta))
+                     (:withdrawal delta))]
+    (cond
+      delegate
+      {:kind (if (true? (:isUndelegate delegate))
+               :undelegate
+               :delegate)
+       :validator (normalize-address (:validator delegate))
+       :amount (optional-number (:amount delegate))
+       :is-undelegate? (true? (:isUndelegate delegate))}
+
+      c-deposit
+      {:kind :deposit
+       :amount (optional-number (:amount c-deposit))}
+
+      c-withdraw
+      {:kind :withdraw
+       :amount (optional-number (:amount c-withdraw))}
+
+      withdrawal
+      {:kind :withdrawal
+       :amount (optional-number (:amount withdrawal))
+       :phase (keyword (str (or (:phase withdrawal) "unknown")))}
+
+      :else
+      {:kind :unknown
+       :raw delta})))
+
+(defn- normalize-delegator-history-row
+  [row]
+  (when (map? row)
+    (let [time-ms (some parse-ms [(:time row) (:time-ms row)])]
+      (when (number? time-ms)
+        {:time-ms time-ms
+         :hash (some-> (:hash row) str str/trim not-empty)
+         :delta (normalize-delegator-history-delta
+                 (if (map? (:delta row))
+                   (:delta row)
+                   {}))}))))
+
+(defn- normalize-delegator-history
+  [payload]
+  (if (sequential? payload)
+    (->> payload
+         (keep normalize-delegator-history-row)
+         (sort-by :time-ms >)
+         vec)
+    []))
+
 (defn- strip-user-funding-pagination-opts
   [opts]
   (dissoc (or opts {})
@@ -277,6 +447,77 @@
                        "user" address}
                       opts*)
           (.then normalize-user-webdata2-payload)))))
+
+(defn request-staking-validator-summaries!
+  [post-info! opts]
+  (let [opts* (request-policy/apply-info-request-policy
+               :validator-summaries
+               (merge {:priority :high
+                       :dedupe-key :validator-summaries}
+                      opts))]
+    (-> (post-info! {"type" "validatorSummaries"}
+                    opts*)
+        (.then normalize-validator-summaries))))
+
+(defn request-staking-delegator-summary!
+  [post-info! address opts]
+  (if-not address
+    (js/Promise.resolve nil)
+    (let [requested-address (some-> address str str/lower-case)
+          opts* (request-policy/apply-info-request-policy
+                 :delegator-summary
+                 (merge {:priority :high
+                         :dedupe-key [:delegator-summary requested-address]}
+                        opts))]
+      (-> (post-info! {"type" "delegatorSummary"
+                       "user" address}
+                      opts*)
+          (.then normalize-delegator-summary)))))
+
+(defn request-staking-delegations!
+  [post-info! address opts]
+  (if-not address
+    (js/Promise.resolve [])
+    (let [requested-address (some-> address str str/lower-case)
+          opts* (request-policy/apply-info-request-policy
+                 :delegations
+                 (merge {:priority :high
+                         :dedupe-key [:delegations requested-address]}
+                        opts))]
+      (-> (post-info! {"type" "delegations"
+                       "user" address}
+                      opts*)
+          (.then normalize-delegations)))))
+
+(defn request-staking-delegator-rewards!
+  [post-info! address opts]
+  (if-not address
+    (js/Promise.resolve [])
+    (let [requested-address (some-> address str str/lower-case)
+          opts* (request-policy/apply-info-request-policy
+                 :delegator-rewards
+                 (merge {:priority :high
+                         :dedupe-key [:delegator-rewards requested-address]}
+                        opts))]
+      (-> (post-info! {"type" "delegatorRewards"
+                       "user" address}
+                      opts*)
+          (.then normalize-delegator-rewards)))))
+
+(defn request-staking-delegator-history!
+  [post-info! address opts]
+  (if-not address
+    (js/Promise.resolve [])
+    (let [requested-address (some-> address str str/lower-case)
+          opts* (request-policy/apply-info-request-policy
+                 :delegator-history
+                 (merge {:priority :high
+                         :dedupe-key [:delegator-history requested-address]}
+                        opts))]
+      (-> (post-info! {"type" "delegatorHistory"
+                       "user" address}
+                      opts*)
+          (.then normalize-delegator-history)))))
 
 (defn normalize-user-abstraction-mode
   [abstraction]

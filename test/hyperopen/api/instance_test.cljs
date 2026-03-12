@@ -82,6 +82,16 @@
                                                           (record! :request-extra-agents [deps address opts]))
                   account-gateway/request-user-webdata2! (fn [deps address opts]
                                                            (record! :request-user-webdata2 [deps address opts]))
+                  account-gateway/request-staking-validator-summaries! (fn [deps opts]
+                                                                         (record! :request-staking-validator-summaries [deps opts]))
+                  account-gateway/request-staking-delegator-summary! (fn [deps address opts]
+                                                                       (record! :request-staking-delegator-summary [deps address opts]))
+                  account-gateway/request-staking-delegations! (fn [deps address opts]
+                                                                 (record! :request-staking-delegations [deps address opts]))
+                  account-gateway/request-staking-delegator-rewards! (fn [deps address opts]
+                                                                       (record! :request-staking-delegator-rewards [deps address opts]))
+                  account-gateway/request-staking-delegator-history! (fn [deps address opts]
+                                                                       (record! :request-staking-delegator-history [deps address opts]))
                   account-gateway/request-spot-clearinghouse-state! (fn [deps address opts]
                                                                        (record! :request-spot-clearinghouse-state [deps address opts]))
                   account-gateway/request-user-abstraction! (fn [deps address opts]
@@ -204,6 +214,26 @@
                ((:request-user-webdata2! api) "0xabc")))
         (is (= {:ok :request-user-webdata2}
                ((:request-user-webdata2! api) "0xabc" {:priority :high})))
+        (is (= {:ok :request-staking-validator-summaries}
+               ((:request-staking-validator-summaries! api))))
+        (is (= {:ok :request-staking-validator-summaries}
+               ((:request-staking-validator-summaries! api) {:priority :high})))
+        (is (= {:ok :request-staking-delegator-summary}
+               ((:request-staking-delegator-summary! api) "0xabc")))
+        (is (= {:ok :request-staking-delegator-summary}
+               ((:request-staking-delegator-summary! api) "0xabc" {:priority :high})))
+        (is (= {:ok :request-staking-delegations}
+               ((:request-staking-delegations! api) "0xabc")))
+        (is (= {:ok :request-staking-delegations}
+               ((:request-staking-delegations! api) "0xabc" {:priority :high})))
+        (is (= {:ok :request-staking-delegator-rewards}
+               ((:request-staking-delegator-rewards! api) "0xabc")))
+        (is (= {:ok :request-staking-delegator-rewards}
+               ((:request-staking-delegator-rewards! api) "0xabc" {:priority :high})))
+        (is (= {:ok :request-staking-delegator-history}
+               ((:request-staking-delegator-history! api) "0xabc")))
+        (is (= {:ok :request-staking-delegator-history}
+               ((:request-staking-delegator-history! api) "0xabc" {:priority :high})))
         (is (= {:ok :request-spot-clearinghouse-state}
                ((:request-spot-clearinghouse-state! api) "0xabc")))
         (is (= {:ok :request-spot-clearinghouse-state}

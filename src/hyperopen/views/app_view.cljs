@@ -3,6 +3,7 @@
             [hyperopen.account.context :as account-context]
             [hyperopen.api-wallets.actions :as api-wallets-actions]
             [hyperopen.funding-comparison.actions :as funding-actions]
+            [hyperopen.staking.actions :as staking-actions]
             [hyperopen.trade.layout-actions :as trade-layout-actions]
             [hyperopen.views.agent-trading-recovery-modal :as agent-trading-recovery-modal]
             [hyperopen.views.funding-modal :as funding-modal]
@@ -12,6 +13,7 @@
             [hyperopen.views.spectate-mode-modal :as spectate-mode-modal]
             [hyperopen.views.header-view :as header-view]
             [hyperopen.views.notifications-view :as notifications-view]
+            [hyperopen.views.staking-view :as staking-view]
             [hyperopen.views.vaults.detail-view :as vault-detail-view]
             [hyperopen.views.vaults.list-view :as vaults-view]
             [hyperopen.views.vaults.vm :as vault-vm]
@@ -93,6 +95,7 @@
         trade-route? (str/starts-with? route "/trade")
         portfolio-route? (str/starts-with? route "/portfolio")
         funding-route? (funding-actions/funding-comparison-route? route)
+        staking-route? (staking-actions/staking-route? route)
         api-wallet-route? (api-wallets-actions/api-wallet-route? route)
         vault-route? (vault-vm/vault-route? route)
         vault-detail-route? (vault-vm/vault-detail-route? route)
@@ -120,6 +123,7 @@
         trade-route? (trade-view/trade-view state)
         portfolio-route? (portfolio-view/portfolio-view state)
         funding-route? (funding-comparison-view/funding-comparison-view state)
+        staking-route? (staking-view/staking-view state)
         api-wallet-route? (api-wallets-view/api-wallets-view state)
         vault-detail-route? (vault-detail-view/vault-detail-view state)
         vault-route? (vaults-view/vaults-view state)

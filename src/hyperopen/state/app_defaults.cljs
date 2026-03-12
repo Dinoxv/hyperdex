@@ -246,6 +246,44 @@
    :error-category nil
    :loaded-at-ms nil})
 
+(defn default-staking-ui-state
+  []
+  {:active-tab :validator-performance
+   :validator-timeframe :week
+   :selected-validator ""
+   :deposit-amount ""
+   :withdraw-amount ""
+   :delegate-amount ""
+   :undelegate-amount ""
+   :form-error nil
+   :submitting {:deposit? false
+                :withdraw? false
+                :delegate? false
+                :undelegate? false}})
+
+(defn default-staking-state
+  []
+  {:validator-summaries []
+   :delegator-summary nil
+   :delegations []
+   :rewards []
+   :history []
+   :loading {:validator-summaries false
+             :delegator-summary false
+             :delegations false
+             :rewards false
+             :history false}
+   :errors {:validator-summaries nil
+            :delegator-summary nil
+            :delegations nil
+            :rewards nil
+            :history nil}
+   :loaded-at-ms {:validator-summaries nil
+                  :delegator-summary nil
+                  :delegations nil
+                  :rewards nil
+                  :history nil}})
+
 (defn default-api-wallets-ui-state
   []
   {:form (api-wallets-policy/default-form)
@@ -342,6 +380,8 @@
                 :hypothetical-position-by-coin {}}
    :funding-comparison-ui (default-funding-comparison-ui-state)
    :funding-comparison (default-funding-comparison-state)
+   :staking-ui (default-staking-ui-state)
+   :staking (default-staking-state)
    :api-wallets-ui (default-api-wallets-ui-state)
    :api-wallets (default-api-wallets-state)
    :asset-selector (default-asset-selector-state)

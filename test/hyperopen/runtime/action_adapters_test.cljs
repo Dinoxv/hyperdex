@@ -1,10 +1,12 @@
 (ns hyperopen.runtime.action-adapters-test
   (:require [cljs.test :refer-macros [deftest is]]
             [nexus.registry :as nxr]
+            [hyperopen.api-wallets.actions :as api-wallets-actions]
             [hyperopen.funding-comparison.actions :as funding-comparison-actions]
             [hyperopen.platform :as platform]
             [hyperopen.portfolio.actions :as portfolio-actions]
             [hyperopen.runtime.action-adapters :as action-adapters]
+            [hyperopen.staking.actions :as staking-actions]
             [hyperopen.vaults.actions :as vault-actions]
             [hyperopen.wallet.agent-runtime :as agent-runtime]
             [hyperopen.wallet.connection-runtime :as wallet-connection-runtime]))
@@ -52,6 +54,19 @@
             [:effects/save [:funding-comparison-ui :loading?] true]
             [:effects/api-fetch-predicted-fundings]]
            (action-adapters/navigate {} "/funding-comparison")))))
+
+(deftest navigate-appends-staking-route-effects-after-route-projection-test
+  (with-redefs [vault-actions/load-vault-route (fn [_state _path] [])
+                funding-comparison-actions/load-funding-comparison-route (fn [_state _path] [])
+                api-wallets-actions/load-api-wallet-route (fn [_state _path] [])
+                staking-actions/load-staking-route (fn [_state _path]
+                                                     [[:effects/save [:staking-ui :form-error] nil]
+                                                      [:effects/api-fetch-staking-validator-summaries]])]
+    (is (= [[:effects/save [:router :path] "/staking"]
+            [:effects/push-state "/staking"]
+            [:effects/save [:staking-ui :form-error] nil]
+            [:effects/api-fetch-staking-validator-summaries]]
+           (action-adapters/navigate {} "/staking")))))
 
 (deftest navigate-entering-portfolio-loads-chart-benchmark-effects-test
   (with-redefs [portfolio-actions/select-portfolio-chart-tab (fn [_state tab]
@@ -119,4 +134,17 @@
             result (action-adapters/handle-wallet-connected store "0xabc")]
         (is (= :handled result))
         (is (= [[store [[:actions/load-vault-route "/vaults/0x1234567890abcdef1234567890abcdef12345678"]]]]
+               @dispatch-calls))))))
+
+(deftest handle-wallet-connected-refreshes-staking-route-when-active-test
+  (let [dispatch-calls (atom [])]
+    (with-redefs [wallet-connection-runtime/handle-wallet-connected!
+                  (fn [_]
+                    :handled)
+                  nxr/dispatch (fn [store _ctx effects]
+                                 (swap! dispatch-calls conj [store effects]))]
+      (let [store (atom {:router {:path "/staking"}})
+            result (action-adapters/handle-wallet-connected store "0xabc")]
+        (is (= :handled result))
+        (is (= [[store [[:actions/load-staking-route "/staking"]]]]
                @dispatch-calls))))))
