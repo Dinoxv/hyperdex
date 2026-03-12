@@ -70,6 +70,21 @@
 (def ^:private minimum-popover-anchor-height-px
   36)
 
+(def ^:private neutral-input-focus-classes
+  ["outline-none"
+   "transition-[border-color,box-shadow]"
+   "duration-150"
+   "hover:border-[#6f7a88]"
+   "hover:ring-1"
+   "hover:ring-[#6f7a88]/30"
+   "hover:ring-offset-0"
+   "focus:outline-none"
+   "focus:ring-1"
+   "focus:ring-[#8a96a6]/40"
+   "focus:ring-offset-0"
+   "focus:shadow-none"
+   "focus:border-[#8a96a6]"])
+
 (def ^:private popover-fallback-viewport-width
   1280)
 
@@ -210,19 +225,17 @@
             :inputmode "decimal"
             :placeholder "Amount"
             :value amount
-            :class ["h-10"
-                    "w-full"
-                    "rounded-[10px]"
-                    "border"
-                    "border-[#1b2429]"
-                    "bg-[#08161f]"
-                    "px-3"
-                    "pr-16"
-                    "text-sm"
-                    "text-[#f6fefd]"
-                    "focus:outline-none"
-                    "focus:ring-0"
-                    "focus:ring-offset-0"]
+            :class (into ["h-10"
+                          "w-full"
+                          "rounded-[10px]"
+                          "border"
+                          "border-[#1b2429]"
+                          "bg-[#08161f]"
+                          "px-3"
+                          "pr-16"
+                          "text-sm"
+                          "text-[#f6fefd]"]
+                         neutral-input-focus-classes)
             :on {:input [on-change]}}]
    [:button {:type "button"
              :class ["absolute"
@@ -303,20 +316,18 @@
       [:input {:type "text"
                :value (or search-query "")
                :placeholder (or (:name selected-option) "Select a Validator")
-               :class ["h-10"
-                       "w-full"
-                       "rounded-[10px]"
-                       "border"
-                       "border-[#1b2429]"
-                       "bg-[#08161f]"
-                       "px-3"
-                       "pr-9"
-                       "text-sm"
-                       "text-[#c8d5d7]"
-                       "placeholder:text-[#9aa3a4]"
-                       "focus:outline-none"
-                       "focus:ring-0"
-                       "focus:ring-offset-0"]
+               :class (into ["h-10"
+                             "w-full"
+                             "rounded-[10px]"
+                             "border"
+                             "border-[#1b2429]"
+                             "bg-[#08161f]"
+                             "px-3"
+                             "pr-9"
+                             "text-sm"
+                             "text-[#c8d5d7]"
+                             "placeholder:text-[#9aa3a4]"]
+                            neutral-input-focus-classes)
                :on {:focus [[:actions/set-staking-form-field :validator-dropdown-open? true]]
                     :input [[:actions/set-staking-form-field :validator-search-query [:event.target/value]]
                             [:actions/set-staking-form-field :validator-dropdown-open? true]]}}]
@@ -767,20 +778,18 @@
          [:div {:class ["relative"]
                 :data-role "staking-timeframe-toggle"}
           [:select {:value (name validator-timeframe)
-                    :class ["h-8"
-                            "rounded-lg"
-                            "border"
-                            "border-[#1b2429]"
-                            "bg-[#0f1a1f]"
-                            "pl-2.5"
-                            "pr-7"
-                            "text-xs"
-                            "font-normal"
-                            "text-[#f6fefd]"
-                            "appearance-none"
-                            "focus:outline-none"
-                            "focus:ring-0"
-                            "focus:ring-offset-0"]
+                    :class (into ["h-8"
+                                  "rounded-lg"
+                                  "border"
+                                  "border-[#1b2429]"
+                                  "bg-[#0f1a1f]"
+                                  "pl-2.5"
+                                  "pr-7"
+                                  "text-xs"
+                                  "font-normal"
+                                  "text-[#f6fefd]"
+                                  "appearance-none"]
+                                 neutral-input-focus-classes)
                     :on {:change [[:actions/set-staking-validator-timeframe [:event.target/value]]]}}
            (for [{:keys [value label]} timeframe-options]
              ^{:key value}
