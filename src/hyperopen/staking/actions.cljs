@@ -236,25 +236,30 @@
 (defn load-staking
   [state]
   (let [address (account-context/effective-account-address state)
-        no-user-effects [[:effects/save-many
-                          [[[:staking :delegator-summary] nil]
-                           [[:staking :delegations] []]
-                           [[:staking :rewards] []]
-                           [[:staking :history] []]
-                           [[:staking :errors :delegator-summary] nil]
-                           [[:staking :errors :delegations] nil]
-                           [[:staking :errors :rewards] nil]
-                           [[:staking :errors :history] nil]]]]
-        user-effects (if (seq address)
-                       [[:effects/api-fetch-staking-delegator-summary address]
-                        [:effects/api-fetch-staking-delegations address]
-                        [:effects/api-fetch-staking-rewards address]
-                        [:effects/api-fetch-staking-history address]
-                        [:effects/api-fetch-staking-spot-state address]]
-                       no-user-effects)]
-    (into [[:effects/save [:staking-ui :form-error] nil]
-           [:effects/api-fetch-staking-validator-summaries]]
-          user-effects)))
+        no-user-projection-effects
+        [[:effects/save-many
+          [[[:staking :delegator-summary] nil]
+           [[:staking :delegations] []]
+           [[:staking :rewards] []]
+           [[:staking :history] []]
+           [[:staking :errors :delegator-summary] nil]
+           [[:staking :errors :delegations] nil]
+           [[:staking :errors :rewards] nil]
+           [[:staking :errors :history] nil]]]]
+        user-heavy-effects (if (seq address)
+                             [[:effects/api-fetch-staking-delegator-summary address]
+                              [:effects/api-fetch-staking-delegations address]
+                              [:effects/api-fetch-staking-rewards address]
+                              [:effects/api-fetch-staking-history address]
+                              [:effects/api-fetch-staking-spot-state address]]
+                             [])
+        projection-effects (if (seq address)
+                             [[:effects/save [:staking-ui :form-error] nil]]
+                             (into [[:effects/save [:staking-ui :form-error] nil]]
+                                   no-user-projection-effects))]
+    (into projection-effects
+          (into [[:effects/api-fetch-staking-validator-summaries]]
+                user-heavy-effects))))
 
 (defn load-staking-route
   [state path]

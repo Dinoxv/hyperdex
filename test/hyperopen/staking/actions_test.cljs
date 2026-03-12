@@ -1,5 +1,6 @@
 (ns hyperopen.staking.actions-test
   (:require [cljs.test :refer-macros [deftest is]]
+            [hyperopen.core-bootstrap.test-support.effect-extractors :as effect-extractors]
             [hyperopen.staking.actions :as actions]))
 
 (def ^:private wallet-address
@@ -17,28 +18,36 @@
          (actions/parse-staking-route "/trade"))))
 
 (deftest load-staking-route-emits-validator-and-user-load-effects-test
-  (is (= [[:effects/save [:staking-ui :form-error] nil]
-          [:effects/api-fetch-staking-validator-summaries]
-          [:effects/api-fetch-staking-delegator-summary wallet-address]
-          [:effects/api-fetch-staking-delegations wallet-address]
-          [:effects/api-fetch-staking-rewards wallet-address]
-          [:effects/api-fetch-staking-history wallet-address]
-          [:effects/api-fetch-staking-spot-state wallet-address]]
-         (actions/load-staking-route
-          {:wallet {:address wallet-address}}
-          "/staking")))
-  (is (= [[:effects/save [:staking-ui :form-error] nil]
-          [:effects/api-fetch-staking-validator-summaries]
-          [:effects/save-many
-           [[[:staking :delegator-summary] nil]
-            [[:staking :delegations] []]
-            [[:staking :rewards] []]
-            [[:staking :history] []]
-            [[:staking :errors :delegator-summary] nil]
-            [[:staking :errors :delegations] nil]
-            [[:staking :errors :rewards] nil]
-            [[:staking :errors :history] nil]]]]
-         (actions/load-staking-route {} "/staking")))
+  (let [heavy-effect-ids #{:effects/api-fetch-staking-validator-summaries
+                           :effects/api-fetch-staking-delegator-summary
+                           :effects/api-fetch-staking-delegations
+                           :effects/api-fetch-staking-rewards
+                           :effects/api-fetch-staking-history
+                           :effects/api-fetch-staking-spot-state}]
+    (is (= [[:effects/save [:staking-ui :form-error] nil]
+            [:effects/api-fetch-staking-validator-summaries]
+            [:effects/api-fetch-staking-delegator-summary wallet-address]
+            [:effects/api-fetch-staking-delegations wallet-address]
+            [:effects/api-fetch-staking-rewards wallet-address]
+            [:effects/api-fetch-staking-history wallet-address]
+            [:effects/api-fetch-staking-spot-state wallet-address]]
+           (actions/load-staking-route
+            {:wallet {:address wallet-address}}
+            "/staking")))
+    (let [effects (actions/load-staking-route {} "/staking")]
+      (is (= [[:effects/save [:staking-ui :form-error] nil]
+              [:effects/save-many
+               [[[:staking :delegator-summary] nil]
+                [[:staking :delegations] []]
+                [[:staking :rewards] []]
+                [[:staking :history] []]
+                [[:staking :errors :delegator-summary] nil]
+                [[:staking :errors :delegations] nil]
+                [[:staking :errors :rewards] nil]
+                [[:staking :errors :history] nil]]]
+              [:effects/api-fetch-staking-validator-summaries]]
+             effects))
+      (is (effect-extractors/projection-before-heavy? effects heavy-effect-ids))))
   (is (= []
          (actions/load-staking-route {} "/portfolio"))))
 
