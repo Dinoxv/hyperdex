@@ -128,6 +128,29 @@
     (is (contains? strings
                    "The validator does not have enough stake to participate in the active validator set."))))
 
+(deftest staking-view-validator-description-renders-hover-tooltip-test
+  (let [validator "0x2222222222222222222222222222222222222222"
+        description "Trusted infrastructure for institutions. This node combines FalconX's leading trading and prime platform with Chorus One's institutional-grade staking."
+        view (staking-view/staking-view
+              {:wallet {:connected? true
+                        :address "0xabcdefabcdefabcdefabcdefabcdefabcdefabcd"}
+               :staking {:validator-summaries [{:validator validator
+                                               :name "FalconX <> Chorus One"
+                                               :description description
+                                               :stake 3763524
+                                               :is-active? true
+                                               :is-jailed? false
+                                               :commission 0.03
+                                               :stats {:week {:uptime-fraction 1
+                                                              :predicted-apr 0.0218
+                                                              :sample-count 7}}}]}})
+        description-tooltip (find-node #(= "staking-validator-description-tooltip"
+                                           (get-in % [1 :data-role]))
+                                       view)
+        strings (set (collect-strings view))]
+    (is (some? description-tooltip))
+    (is (contains? strings description))))
+
 (deftest staking-view-renders-validator-pagination-and-total-count-test
   (let [validator-rows (mapv (fn [idx]
                                {:validator (validator-address idx)

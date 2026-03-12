@@ -684,6 +684,40 @@
                         "text-[#5f6d70]")]}
        indicator]]]))
 
+(defn- validator-description-cell
+  [{:keys [description]}]
+  (let [description-text (or description "--")]
+    [:td {:class ["px-3" "py-1.5" "text-[#9aa3a4]"]}
+     [:div {:class ["group" "relative" "max-w-[260px]"]}
+      [:span {:class ["block" "truncate"]
+              :title description-text}
+       description-text]
+      (when (seq description)
+        [:div {:class ["pointer-events-none"
+                       "absolute"
+                       "left-0"
+                       "bottom-full"
+                       "z-[120]"
+                       "mb-1"
+                       "w-max"
+                       "max-w-[520px]"
+                       "rounded-lg"
+                       "border"
+                       "border-[#2b3b42]"
+                       "bg-[#202b32]"
+                       "px-3"
+                       "py-2"
+                       "text-xs"
+                       "leading-tight"
+                       "text-[#f6fefd]"
+                       "whitespace-normal"
+                       "opacity-0"
+                       "transition-opacity"
+                       "duration-150"
+                       "group-hover:opacity-100"]
+               :data-role "staking-validator-description-tooltip"}
+         description])]]))
+
 (defn- validator-row
   [{:keys [validator
            name
@@ -709,8 +743,7 @@
         :data-role "staking-validator-row"}
      [:td {:class ["px-3" "py-1.5" "font-normal" "text-[#f6fefd]"]}
       name]
-     [:td {:class ["px-3" "py-1.5" "text-[#9aa3a4]" "max-w-[260px]" "truncate"]}
-      (or description "--")]
+     (validator-description-cell {:description description})
      [:td {:class ["px-3" "py-1.5" "num" "text-[#f6fefd]"]} (format-table-hype stake)]
      [:td {:class ["px-3" "py-1.5" "num" "text-[#f6fefd]"]}
       (if (pos? (or your-stake 0))
