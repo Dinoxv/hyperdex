@@ -98,7 +98,7 @@
                                  :size-unit-dropdown-visible? true}}
                  market)]
     (is (= [[:effects/save [:router :path] "/trade/xyz:GOLD"]
-            [:effects/push-state "/trade/xyz:GOLD"]]
+            [:effects/push-state "/trade?market=xyz%3AGOLD"]]
            (subvec effects 2 4)))
     (is (= [[:effects/unsubscribe-active-asset "BTC"]
             [:effects/unsubscribe-orderbook "BTC"]
@@ -121,7 +121,19 @@
                     :asset-selector {:market-by-key {}}}
                    market)]
       (is (= [[:effects/save [:router :path] "/trade/ETH"]
-              [:effects/push-state (str "/trade/ETH?spectate=" spectate-address)]]
+              [:effects/push-state (str "/trade?market=ETH&spectate=" spectate-address)]]
+             (subvec effects 2 4)))))
+
+  (testing "trade route sync includes account tab query when available"
+    (let [effects (actions/select-asset
+                   {:active-asset "BTC"
+                    :router {:path "/trade"}
+                    :account-info {:selected-tab :positions}
+                    :asset-selector {:market-by-key {}}}
+                   {:key "perp:ETH"
+                    :coin "ETH"})]
+      (is (= [[:effects/save [:router :path] "/trade/ETH"]
+              [:effects/push-state "/trade?market=ETH&tab=positions"]]
              (subvec effects 2 4)))))
 
   (testing "non-trade routes do not emit route-sync effects from select-asset"

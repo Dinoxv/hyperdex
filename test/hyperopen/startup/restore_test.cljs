@@ -188,3 +188,41 @@
     (startup-restore/restore-spectate-mode-url! store "?spectate=not-an-address" 1710000000000)
     (is (= false (get-in @store [:account-context :spectate-mode :active?])))
     (is (nil? (get-in @store [:account-context :spectate-mode :address])))))
+
+(deftest restore-trade-route-tab-normalizes-url-query-tab-test
+  (let [store (atom {:account-info {:selected-tab :balances}})]
+    (startup-restore/restore-trade-route-tab! store "?tab=orderHistory")
+    (is (= :order-history
+           (get-in @store [:account-info :selected-tab])))
+    (startup-restore/restore-trade-route-tab! store "?tab=accountActivity")
+    (is (= :funding-history
+           (get-in @store [:account-info :selected-tab])))))
+
+(deftest restore-trade-route-tab-ignores-unknown-url-query-tab-test
+  (let [store (atom {:account-info {:selected-tab :positions}})]
+    (startup-restore/restore-trade-route-tab! store "?tab=not-a-tab")
+    (is (= :positions
+           (get-in @store [:account-info :selected-tab])))))
+
+(deftest restore-active-asset-prefers-market-query-over-route-and-storage-test
+  (let [store (atom {:router {:path "/trade/BTC"}
+                     :active-asset nil
+                     :selected-asset nil
+                     :active-market nil})
+        local-storage-set-calls (atom [])]
+    (with-redefs [platform/local-storage-get (fn [key]
+                                               (case key
+                                                 "active-asset" "ETH"
+                                                 nil))
+                  platform/local-storage-set! (fn [key value]
+                                                (swap! local-storage-set-calls conj [key value]))]
+      (startup-restore/restore-active-asset!
+       store
+       {:connected?-fn (constantly false)
+        :dispatch! (fn [& _] nil)
+        :load-active-market-display-fn (fn [_] nil)
+        :search "?market=CL&tab=positions"}))
+    (is (= "CL" (:active-asset @store)))
+    (is (= "CL" (:selected-asset @store)))
+    (is (= [["active-asset" "CL"]]
+           @local-storage-set-calls))))

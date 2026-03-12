@@ -198,6 +198,28 @@
       (is (= [[:effects/save [:account-info :selected-tab] :order-history]]
              (history-actions/select-account-info-tab state :order-history))))))
 
+(deftest select-account-info-tab-syncs-trade-url-with-market-and-tab-query-test
+  (let [state {:router {:path "/trade"}
+               :active-asset "ETH"
+               :account-info {:selected-tab :balances}}
+        effects (history-actions/select-account-info-tab state :positions)]
+    (is (= [[:effects/save [:account-info :selected-tab] :positions]
+            [:effects/push-state "/trade?market=ETH&tab=positions"]]
+           effects))))
+
+(deftest select-account-info-tab-sync-preserves-spectate-query-when-active-test
+  (let [spectate-address "0xdddddddddddddddddddddddddddddddddddddddd"
+        state {:router {:path "/trade"}
+               :active-asset "ETH"
+               :account-info {:selected-tab :balances}
+               :account-context {:spectate-mode {:active? true
+                                                 :address spectate-address}}}
+        effects (history-actions/select-account-info-tab state :positions)]
+    (is (= [[:effects/save [:account-info :selected-tab] :positions]
+            [:effects/push-state
+             "/trade?market=ETH&tab=positions&spectate=0xdddddddddddddddddddddddddddddddddddddddd"]]
+           effects))))
+
 (deftest sort-positions-balances-and-open-orders-cover-direction-branches-test
   (testing "positions and balances toggle to desc only for same-column asc"
     (is (= [[:effects/save [:account-info :positions-sort] {:column "Coin" :direction :desc}]]

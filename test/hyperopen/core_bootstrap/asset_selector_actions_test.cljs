@@ -149,7 +149,7 @@
                                                    :size-unit-dropdown-visible? true}}
                                    market)]
     (is (= [[:effects/save [:router :path] "/trade/BTC"]
-            [:effects/push-state "/trade/BTC"]]
+            [:effects/push-state "/trade?market=BTC"]]
            (subvec effects 2 4)))
     (is (= [[:effects/unsubscribe-active-asset "ETH"]
             [:effects/unsubscribe-orderbook "ETH"]

@@ -1,10 +1,13 @@
 (ns hyperopen.account.history.actions
-  (:require [hyperopen.account.history.funding-actions :as funding-actions]
+  (:require [clojure.string :as str]
+            [hyperopen.account.context :as account-context]
+            [hyperopen.account.history.funding-actions :as funding-actions]
             [hyperopen.account.history.order-actions :as order-actions]
             [hyperopen.account.history.position-overlay-actions :as position-overlay-actions]
             [hyperopen.account.history.shared :as history-shared]
             [hyperopen.account.history.surface-actions :as surface-actions]
-            [hyperopen.account.history.twap-actions :as twap-actions]))
+            [hyperopen.account.history.twap-actions :as twap-actions]
+            [hyperopen.router :as router]))
 
 (def default-funding-history-state
   funding-actions/default-funding-history-state)
@@ -45,16 +48,41 @@
 (def order-history-request-id
   order-actions/order-history-request-id)
 
+(defn- non-blank-text
+  [value]
+  (let [text (some-> value str str/trim)]
+    (when (seq text)
+      text)))
+
+(defn- trade-route-tab-sync-effects
+  [state tab]
+  (let [route (some-> (get-in state [:router :path]) str str/trim)
+        tab* (history-shared/normalize-account-info-route-tab tab)]
+    (if (and (seq route)
+             (router/trade-route? route)
+             tab*)
+      (let [market* (or (non-blank-text (:active-asset state))
+                        (router/trade-route-asset route))
+            browser-route (router/trade-browser-path
+                           {:market market*
+                            :tab tab*
+                            :spectate (when (account-context/spectate-mode-active? state)
+                                        (account-context/spectate-address state))})]
+        [[:effects/push-state browser-route]])
+      [])))
+
 (defn select-account-info-tab [state tab]
-  (cond
-    (= tab :funding-history)
-    (funding-actions/select-funding-history-tab state)
+  (let [base-effects (cond
+                       (= tab :funding-history)
+                       (funding-actions/select-funding-history-tab state)
 
-    (= tab :order-history)
-    (order-actions/select-order-history-tab state)
+                       (= tab :order-history)
+                       (order-actions/select-order-history-tab state)
 
-    :else
-    [[:effects/save [:account-info :selected-tab] tab]]))
+                       :else
+                       [[:effects/save [:account-info :selected-tab] tab]])]
+    (into (vec base-effects)
+          (trade-route-tab-sync-effects state tab))))
 
 (def set-funding-history-filters
   funding-actions/set-funding-history-filters)

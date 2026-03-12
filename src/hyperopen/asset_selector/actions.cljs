@@ -1,7 +1,7 @@
 (ns hyperopen.asset-selector.actions
   (:require [clojure.string :as str]
             [hyperopen.account.context :as account-context]
-            [hyperopen.account.spectate-mode-links :as spectate-mode-links]
+            [hyperopen.account.history.shared :as history-shared]
             [hyperopen.asset-selector.list-metrics :as list-metrics]
             [hyperopen.asset-selector.markets :as markets]
             [hyperopen.router :as router]
@@ -117,10 +117,12 @@
              (seq canonical-coin)
              (not= (router/normalize-path current-route)
                    target-route))
-      (let [browser-route (spectate-mode-links/spectate-url-path
-                           target-route
-                           (when (account-context/spectate-mode-active? state)
-                             (account-context/spectate-address state)))]
+      (let [browser-route (router/trade-browser-path
+                           {:market canonical-coin
+                            :tab (history-shared/normalize-account-info-route-tab
+                                  (get-in state [:account-info :selected-tab]))
+                            :spectate (when (account-context/spectate-mode-active? state)
+                                        (account-context/spectate-address state))})]
         [[:effects/save [:router :path] target-route]
          [:effects/push-state browser-route]])
       [])))

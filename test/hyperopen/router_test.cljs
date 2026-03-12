@@ -41,4 +41,19 @@
   (is (= "/trade" (router/trade-route-path nil)))
   (is (= "/trade/xyz:GOLD" (router/trade-route-path "xyz:GOLD")))
   (is (= "/trade/MEOW/USDC" (router/trade-route-path "MEOW/USDC")))
-  (is (= "/trade/HYPE%20TOKEN" (router/trade-route-path "HYPE TOKEN"))))
+  (is (= "/trade/HYPE%20TOKEN" (router/trade-route-path "HYPE TOKEN")))
+
+  (is (= "CL" (router/trade-route-market-from-search "?market=CL&tab=positions")))
+  (is (= "positions" (router/trade-route-tab-from-search "?market=CL&tab=positions")))
+  (is (= "CL" (router/trade-route-asset-or-market "/trade/BTC" "?market=CL")))
+  (is (= "BTC" (router/trade-route-asset-or-market "/trade/BTC" nil)))
+
+  (is (= "/trade?market=CL&tab=positions"
+         (router/trade-browser-path {:market "CL"
+                                     :tab :positions})))
+  (is (= "/trade?market=CL&tab=positions&spectate=0xabcdef"
+         (router/trade-browser-path {:market "CL"
+                                     :tab "positions"
+                                     :spectate "0xabcdef"})))
+  (is (= "/trade"
+         (router/trade-browser-path {}))))

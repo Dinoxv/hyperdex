@@ -1,5 +1,6 @@
 (ns hyperopen.startup.restore
   (:require [clojure.string :as str]
+            [hyperopen.account.history.shared :as history-shared]
             [hyperopen.i18n.locale :as i18n-locale]
             [hyperopen.account.context :as account-context]
             [hyperopen.account.spectate-mode-links :as spectate-mode-links]
@@ -129,10 +130,23 @@
                   (assoc-in [:account-context :spectate-ui :editing-watchlist-address] nil)
                   (assoc-in [:account-context :spectate-ui :search-error] nil)))))))
 
+(defn restore-trade-route-tab!
+  ([store]
+   (restore-trade-route-tab! store
+                             (some-> js/globalThis .-location .-search)))
+  ([store search]
+   (when-let [tab (history-shared/normalize-account-info-route-tab
+                   (router/trade-route-tab-from-search search))]
+     (swap! store assoc-in [:account-info :selected-tab] tab))))
+
 (defn restore-active-asset!
-  [store {:keys [connected?-fn dispatch! load-active-market-display-fn]}]
+  [store {:keys [connected?-fn dispatch! load-active-market-display-fn search]}]
   (when (nil? (:active-asset @store))
-    (let [route-asset (router/trade-route-asset (get-in @store [:router :path]))
+    (let [search* (if (string? search)
+                    search
+                    (some-> js/globalThis .-location .-search))
+          route-asset (router/trade-route-asset-or-market (get-in @store [:router :path])
+                                                          search*)
           stored-asset (platform/local-storage-get "active-asset")
           asset (cond
                   (seq route-asset) route-asset

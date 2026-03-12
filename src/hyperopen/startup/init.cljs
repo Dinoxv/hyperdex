@@ -24,6 +24,7 @@
            restore-agent-storage-mode!
            restore-spectate-mode-preferences!
            restore-spectate-mode-url!
+           restore-trade-route-tab!
            restore-active-asset!
            restore-asset-selector-markets-cache!
            restore-open-orders-sort-settings!
@@ -50,6 +51,8 @@
   (restore-spectate-mode-preferences! store)
   ;; Restore Spectate Mode directly from the current URL query when present.
   (restore-spectate-mode-url! store)
+  ;; Restore trade account-info tab directly from the current URL query when present.
+  (restore-trade-route-tab! store)
   ;; Restore selected asset from localStorage (default to BTC).
   (restore-active-asset! store)
   ;; Restore cached selector market symbols for immediate dropdown population.

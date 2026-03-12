@@ -154,6 +154,7 @@
        :restore-agent-storage-mode! startup-restore/restore-agent-storage-mode!
        :restore-spectate-mode-preferences! startup-restore/restore-spectate-mode-preferences!
        :restore-spectate-mode-url! startup-restore/restore-spectate-mode-url!
+       :restore-trade-route-tab! startup-restore/restore-trade-route-tab!
        :restore-active-asset! runtime-effect-adapters/restore-active-asset!
        :restore-asset-selector-markets-cache! runtime-effect-adapters/restore-asset-selector-markets-cache!
        :restore-open-orders-sort-settings! surface-actions/restore-open-orders-sort-settings!

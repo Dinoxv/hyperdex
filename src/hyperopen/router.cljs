@@ -10,6 +10,21 @@
 (def ^:private trade-route-prefix-with-separator
   "/trade/")
 
+(def ^:private trade-market-query-param
+  "market")
+
+(def ^:private trade-tab-query-param
+  "tab")
+
+(def ^:private trade-spectate-query-param
+  "spectate")
+
+(defn- non-blank-text
+  [value]
+  (let [text (some-> value str str/trim)]
+    (when (seq text)
+      text)))
+
 (defn- parse-absolute-url-path
   [text]
   (when (and (string? text)
@@ -56,9 +71,39 @@
       default-route
       normalized)))
 
+(defn- normalize-search
+  [search]
+  (let [search* (some-> search str str/trim)]
+    (if-not (seq search*)
+      ""
+      (let [without-fragment (or (first (str/split search* #"#" 2))
+                                 "")
+            query-index (.indexOf without-fragment "?")
+            query-text (if (>= query-index 0)
+                         (subs without-fragment query-index)
+                         without-fragment)]
+        (if (str/starts-with? query-text "?")
+          query-text
+          (str "?" query-text))))))
+
+(defn query-param-value
+  [search param]
+  (when-let [param* (non-blank-text param)]
+    (-> (js/URLSearchParams. (normalize-search search))
+        (.get param*)
+        non-blank-text)))
+
 (defn trade-route?
   [path]
   (str/starts-with? (normalize-path path) trade-route-prefix))
+
+(defn trade-route-market-from-search
+  [search]
+  (query-param-value search trade-market-query-param))
+
+(defn trade-route-tab-from-search
+  [search]
+  (query-param-value search trade-tab-query-param))
 
 (defn- decode-trade-route-asset
   [raw-asset]
@@ -76,6 +121,11 @@
         (when (seq raw-asset*)
           (decode-trade-route-asset raw-asset*))))))
 
+(defn trade-route-asset-or-market
+  [path search]
+  (or (trade-route-market-from-search search)
+      (trade-route-asset path)))
+
 (defn- encode-trade-route-asset
   [asset]
   (-> (js/encodeURIComponent asset)
@@ -89,6 +139,26 @@
       (str trade-route-prefix-with-separator
            (encode-trade-route-asset asset*))
       default-route)))
+
+(defn- query-param-token
+  [value]
+  (cond
+    (keyword? value) (non-blank-text (name value))
+    :else (non-blank-text value)))
+
+(defn trade-browser-path
+  [{:keys [market tab spectate]}]
+  (let [params (js/URLSearchParams.)]
+    (when-let [market* (query-param-token market)]
+      (.set params trade-market-query-param market*))
+    (when-let [tab* (query-param-token tab)]
+      (.set params trade-tab-query-param tab*))
+    (when-let [spectate* (query-param-token spectate)]
+      (.set params trade-spectate-query-param spectate*))
+    (let [query-text (.toString params)]
+      (if (seq query-text)
+        (str default-route "?" query-text)
+        default-route))))
 
 (defn normalize-location-path
   [pathname hash]

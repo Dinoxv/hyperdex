@@ -164,3 +164,19 @@
          (spectate-mode-actions/stop-spectate-mode {})))
   (is (= []
          (spectate-mode-actions/start-spectate-mode-watchlist-address {} " "))))
+
+(deftest spectate-mode-trade-route-links-preserve-market-and-tab-query-test
+  (with-redefs [platform/now-ms (fn [] 1710000000000)]
+    (let [state {:active-asset "ETH"
+                 :router {:path "/trade/ETH"}
+                 :account-info {:selected-tab :positions}
+                 :account-context {:spectate-ui {:search spectated-address
+                                                 :label ""}
+                                   :watchlist []}}
+          start-effects (spectate-mode-actions/start-spectate-mode state)]
+      (is (= [:effects/replace-state
+              "/trade?market=ETH&tab=positions&spectate=0xabcdefabcdefabcdefabcdefabcdefabcdefabcd"]
+             (second start-effects)))
+      (is (= [:effects/replace-state
+              "/trade?market=ETH&tab=positions"]
+             (second (spectate-mode-actions/stop-spectate-mode state)))))))
