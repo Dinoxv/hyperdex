@@ -1,6 +1,7 @@
 (ns hyperopen.views.staking-view
   (:require [hyperopen.utils.formatting :as fmt]
-            [hyperopen.views.staking.vm :as staking-vm]))
+            [hyperopen.views.staking.vm :as staking-vm]
+            [hyperopen.views.ui.anchored-popover :as anchored-popover]))
 
 (defn- format-summary-hype
   [value]
@@ -60,83 +61,334 @@
    [:span {:class ["num" "text-[#f6fefd]" "font-normal" "leading-[15px]"]}
     value]])
 
-(defn- action-card
-  [{:keys [title
-           description
-           input-id
-           amount
-           submitting?
-           connected?
-           on-change
-           on-max
-           on-submit
-           button-label]}]
-  [:div {:class ["rounded-[10px]"
-                 "border"
-                 "border-[#1b2429]"
-                 "bg-[#0f1a1f]"
-                 "p-4"
-                 "space-y-3"]}
-   [:div {:class ["space-y-1"]}
-    [:h3 {:class ["text-sm" "font-normal" "text-[#f6fefd]"]}
-     title]
-    [:p {:class ["text-xs" "text-[#9aa3a4]"]}
-     description]]
-   [:div {:class ["flex" "items-center" "gap-2"]}
-    [:input {:id input-id
-             :type "text"
-             :inputmode "decimal"
-             :placeholder "0.0"
-             :value amount
-             :class ["h-10"
-                     "w-full"
-                     "rounded-lg"
-                     "border"
-                     "border-[#1b2429]"
-                     "bg-[#0f1a1f]"
-                     "px-3"
-                     "text-sm"
-                     "text-[#f6fefd]"
+(defn- toolbar-action-button
+  [{:keys [label data-role primary? action]}]
+  [:button {:type "button"
+            :class (into ["h-9"
+                          "rounded-[10px]"
+                          "border"
+                          "px-4"
+                          "text-sm"
+                          "font-normal"
+                          "transition-colors"
+                          "focus:outline-none"
+                          "focus:ring-0"
+                          "focus:ring-offset-0"
+                          "whitespace-nowrap"]
+                         (if primary?
+                           ["border-[#50d2c1]"
+                            "bg-[#50d2c1]"
+                            "text-[#041914]"
+                            "hover:bg-[#6de3d5]"]
+                           ["border-[#2f7f73]"
+                            "bg-[#041a1f]"
+                            "text-[#97fce4]"
+                            "hover:bg-[#0b262c]"]))
+            :data-role data-role
+            :on {:click [action]}}
+   label])
+
+(defn- popover-close-button []
+  [:button {:type "button"
+            :class ["absolute"
+                    "right-5"
+                    "top-4"
+                    "inline-flex"
+                    "h-8"
+                    "w-8"
+                    "items-center"
+                    "justify-center"
+                    "rounded-lg"
+                    "text-[#f6fefd]"
+                    "transition-colors"
+                    "hover:bg-[#16313b]"
+                    "focus:outline-none"
+                    "focus:ring-0"
+                    "focus:ring-offset-0"]
+            :aria-label "Close staking action popover"
+            :on {:click [[:actions/close-staking-action-popover]]}}
+   "x"])
+
+(defn- popover-amount-input
+  [{:keys [input-id amount on-change on-max]}]
+  [:div {:class ["relative"]}
+   [:input {:id input-id
+            :type "text"
+            :inputmode "decimal"
+            :placeholder "Amount"
+            :value amount
+            :class ["h-10"
+                    "w-full"
+                    "rounded-[10px]"
+                    "border"
+                    "border-[#1b2429]"
+                    "bg-[#08161f]"
+                    "px-3"
+                    "pr-16"
+                    "text-sm"
+                    "text-[#f6fefd]"
+                    "focus:outline-none"
+                    "focus:ring-0"
+                    "focus:ring-offset-0"]
+            :on {:input [on-change]}}]
+   [:button {:type "button"
+             :class ["absolute"
+                     "right-3"
+                     "top-1/2"
+                     "-translate-y-1/2"
+                     "text-[22px]"
+                     "leading-none"
+                     "text-[#50d2c1]"
                      "focus:outline-none"
                      "focus:ring-0"
                      "focus:ring-offset-0"]
-             :on {:input [on-change]}}]
-    [:button {:type "button"
-              :class ["h-10"
-                      "rounded-lg"
-                      "border"
-                      "border-[#1b2429]"
-                      "px-2.5"
-                      "text-xs"
-                      "font-normal"
-                      "text-[#9aa3a4]"
-                      "transition-colors"
-                      "hover:bg-[#1d2a30]"
-                      "focus:outline-none"
-                      "focus:ring-0"
-                      "focus:ring-offset-0"]
-              :on {:click [on-max]}}
-     "Max"]]
-   [:button {:type "button"
-             :class ["h-10"
-                     "w-full"
-                     "rounded-lg"
-                     "border"
-                     "border-[#2f7f73]/70"
-                     "bg-[#0e4d46]"
+             :on {:click [on-max]}}
+    "MAX"]])
+
+(defn- popover-cta-button
+  [{:keys [label submitting? on-submit]}]
+  [:button {:type "button"
+            :class ["h-10"
+                    "w-full"
+                    "rounded-[10px]"
+                    "border"
+                    "border-[#2f7f73]"
+                    "bg-[#0f544b]"
+                    "text-sm"
+                    "font-normal"
+                    "text-[#021510]"
+                    "transition-colors"
+                    "hover:bg-[#1a6f63]"
+                    "disabled:cursor-not-allowed"
+                    "disabled:opacity-65"]
+            :disabled submitting?
+            :on {:click [on-submit]}}
+   (if submitting?
+     "Submitting..."
+     label)])
+
+(defn- validator-options
+  [validators selected-validator]
+  (let [validators* (reduce (fn [acc {:keys [validator name]}]
+                              (if (seq validator)
+                                (conj acc {:validator validator
+                                           :name (or name validator)})
+                                acc))
+                            []
+                            (or validators []))
+        selected-present? (boolean (some #(= selected-validator (:validator %))
+                                         validators*))]
+    (cond-> validators*
+      (and (seq selected-validator)
+           (not selected-present?))
+      (conj {:validator selected-validator
+             :name selected-validator}))))
+
+(defn- popover-validator-select
+  [selected-validator validators]
+  (let [options (validator-options validators selected-validator)]
+    [:div {:class ["relative"]}
+     [:select {:value (or selected-validator "")
+               :class ["h-10"
+                       "w-full"
+                       "rounded-[10px]"
+                       "border"
+                       "border-[#1b2429]"
+                       "bg-[#08161f]"
+                       "px-3"
+                       "pr-8"
+                       "text-sm"
+                       "text-[#c8d5d7]"
+                       "appearance-none"
+                       "focus:outline-none"
+                       "focus:ring-0"
+                       "focus:ring-offset-0"]
+               :on {:change [[:actions/set-staking-form-field :selected-validator [:event.target/value]]]}}
+      [:option {:value ""}
+       "Select a Validator"]
+      (for [{:keys [validator name]} options]
+        ^{:key (str "staking-validator-option-" validator)}
+        [:option {:value validator}
+         name])]
+     [:span {:class ["pointer-events-none"
+                     "absolute"
+                     "right-3"
+                     "top-1/2"
+                     "-translate-y-1/2"
                      "text-xs"
-                     "font-normal"
-                     "text-[#97fce4]"
-                     "transition-colors"
-                     "hover:bg-[#126158]"
-                     "disabled:cursor-not-allowed"
-                     "disabled:opacity-60"]
-             :disabled (or submitting?
-                           (not connected?))
-             :on {:click [on-submit]}}
-    (if submitting?
-      "Submitting..."
-      button-label)]])
+                     "text-[#949e9c]"]}
+      "▾"]]))
+
+(defn- transfer-direction-button
+  [{:keys [label active? direction]}]
+  [:button {:type "button"
+            :class (into ["h-9"
+                          "rounded-lg"
+                          "px-3"
+                          "text-[18px]"
+                          "font-normal"
+                          "leading-none"
+                          "transition-colors"
+                          "focus:outline-none"
+                          "focus:ring-0"
+                          "focus:ring-offset-0"]
+                         (if active?
+                           ["bg-[#1d2f39]" "text-[#f6fefd]"]
+                           ["bg-transparent" "text-[#9aa3a4]" "hover:text-[#cbd8da]"]))
+            :on {:click [[:actions/set-staking-transfer-direction direction]]}}
+   label])
+
+(defn- transfer-direction-toggle
+  [direction]
+  [:div {:class ["mx-auto"
+                 "inline-flex"
+                 "items-center"
+                 "gap-1"
+                 "rounded-[10px]"
+                 "bg-[#13242d]"
+                 "p-1"]}
+   (transfer-direction-button {:label "Spot Balance"
+                               :active? (= direction :spot->staking)
+                               :direction :spot->staking})
+   [:span {:class ["text-xs" "text-[#50d2c1]"]}
+    "<->"]
+   (transfer-direction-button {:label "Staking Balance"
+                               :active? (= direction :staking->spot)
+                               :direction :staking->spot})])
+
+(defn- transfer-popover-content
+  [{:keys [form submitting balances transfer-direction]}]
+  (let [spot->staking? (= transfer-direction :spot->staking)
+        amount (if spot->staking?
+                 (:deposit-amount form)
+                 (:withdraw-amount form))
+        on-change (if spot->staking?
+                    [:actions/set-staking-form-field :deposit-amount [:event.target/value]]
+                    [:actions/set-staking-form-field :withdraw-amount [:event.target/value]])
+        on-max (if spot->staking?
+                 :actions/set-staking-deposit-amount-to-max
+                 :actions/set-staking-withdraw-amount-to-max)
+        on-submit (if spot->staking?
+                    :actions/submit-staking-deposit
+                    :actions/submit-staking-withdraw)
+        submitting? (if spot->staking?
+                      (true? (:deposit? submitting))
+                      (true? (:withdraw? submitting)))
+        source-label (if spot->staking?
+                       "Available to Transfer to Staking Balance"
+                       "Available to Transfer to Spot Balance")
+        source-value (if spot->staking?
+                       (format-balance-hype (:available-transfer balances))
+                       (format-balance-hype (:available-stake balances)))]
+    [:div {:class ["space-y-3"]}
+     [:div {:class ["space-y-1" "text-center"]}
+      [:p {:class ["text-sm" "text-[#9aa3a4]"]}
+       "Transfer HYPE between your staking and spot balances."]
+      [:p {:class ["text-sm" "text-[#9aa3a4]"]}
+       "Transfers from Staking Balance to Spot Balance are locked for 7 days."]]
+     (transfer-direction-toggle transfer-direction)
+     (popover-amount-input {:input-id "staking-transfer-amount"
+                            :amount amount
+                            :on-change on-change
+                            :on-max on-max})
+     [:div {:class ["space-y-1.5"]}
+      (key-value-row source-label source-value)
+      (key-value-row "Available to Stake" (format-balance-hype (:available-stake balances)))
+      (key-value-row "Pending Transfers to Spot Balance"
+                     (format-balance-hype (:pending-withdrawals balances)))]
+     (popover-cta-button {:label "Transfer"
+                          :submitting? submitting?
+                          :on-submit on-submit})]))
+
+(defn- stake-popover-content
+  [{:keys [form submitting balances selected-validator validators]}]
+  [:div {:class ["space-y-3"]}
+   (popover-amount-input {:input-id "staking-delegate-amount"
+                          :amount (:delegate-amount form)
+                          :on-change [:actions/set-staking-form-field :delegate-amount [:event.target/value]]
+                          :on-max :actions/set-staking-delegate-amount-to-max})
+   (popover-validator-select selected-validator validators)
+   [:div {:class ["space-y-1.5"]}
+    (key-value-row "Available to Stake" (format-balance-hype (:available-stake balances)))
+    (key-value-row "Total Staked" (format-balance-hype (:total-staked balances)))]
+   [:p {:class ["text-sm" "text-[#9aa3a4]"]}
+    "The staking lockup period is 1 day."]
+   (popover-cta-button {:label "Stake"
+                        :submitting? (true? (:delegate? submitting))
+                        :on-submit :actions/submit-staking-delegate})])
+
+(defn- unstake-popover-content
+  [{:keys [form submitting selected-validator validators]}]
+  [:div {:class ["space-y-3"]}
+   (popover-amount-input {:input-id "staking-undelegate-amount"
+                          :amount (:undelegate-amount form)
+                          :on-change [:actions/set-staking-form-field :undelegate-amount [:event.target/value]]
+                          :on-max :actions/set-staking-undelegate-amount-to-max})
+   (popover-validator-select selected-validator validators)
+   (popover-cta-button {:label "Unstake"
+                        :submitting? (true? (:undelegate? submitting))
+                        :on-submit :actions/submit-staking-undelegate})])
+
+(defn- action-popover-layer
+  [{:keys [action-popover
+           form
+           submitting
+           balances
+           selected-validator
+           validators]}]
+  (when (:open? action-popover)
+    (let [kind (:kind action-popover)
+          panel-style (anchored-popover/anchored-popover-layout-style
+                       {:anchor (:anchor action-popover)
+                        :preferred-width-px 560
+                        :estimated-height-px (if (= kind :transfer)
+                                               440
+                                               400)})
+          title (case kind
+                  :transfer "Transfer HYPE"
+                  :unstake "Unstake"
+                  "Stake")]
+      [:div {:class ["fixed" "inset-0" "z-[230]" "pointer-events-none"]
+             :data-role "staking-action-popover-layer"}
+       [:button {:type "button"
+                 :class ["absolute" "inset-0" "pointer-events-auto" "bg-transparent"]
+                 :aria-label "Close staking action popover"
+                 :on {:click [[:actions/close-staking-action-popover]]}}]
+       [:div {:class ["absolute"
+                      "pointer-events-auto"
+                      "rounded-[22px]"
+                      "border"
+                      "border-[#1d3540]"
+                      "bg-[#061722]"
+                      "p-4"
+                      "pt-5"
+                      "shadow-[0_24px_58px_rgba(0,0,0,0.55)]"
+                      "space-y-3"]
+              :style panel-style
+              :tab-index 0
+              :role "dialog"
+              :aria-modal true
+              :data-role "staking-action-popover"
+              :on {:keydown [[:actions/handle-staking-action-popover-keydown [:event/key]]]}}
+        (popover-close-button)
+        [:h2 {:class ["text-[50px]" "font-normal" "leading-none" "text-[#f6fefd]" "text-center"]}
+         title]
+        (case kind
+          :transfer
+          (transfer-popover-content {:form form
+                                     :submitting submitting
+                                     :balances balances
+                                     :transfer-direction (:transfer-direction action-popover)})
+          :unstake
+          (unstake-popover-content {:form form
+                                    :submitting submitting
+                                    :selected-validator selected-validator
+                                    :validators validators})
+          (stake-popover-content {:form form
+                                  :submitting submitting
+                                  :balances balances
+                                  :selected-validator selected-validator
+                                  :validators validators}))]])))
 
 (defn- tab-button
   [active? label action]
@@ -227,10 +479,10 @@
                 validators
                 rewards
                 history
+                action-popover
                 selected-validator
                 form
-                submitting
-                delegations]} (staking-vm/staking-vm state)]
+                submitting]} (staking-vm/staking-vm state)]
     [:div {:class ["flex"
                    "h-full"
                    "w-full"
@@ -254,7 +506,24 @@
         (when (seq effective-address)
           [:p {:class ["text-xs" "text-[#878c8f]" "num"]}
            (str "Account: " effective-address)])]
-       (when-not connected?
+       (if connected?
+         [:div {:class ["flex" "flex-wrap" "items-center" "gap-2"]}
+          (toolbar-action-button {:label "Spot <-> Staking Balance Transfer"
+                                  :data-role "staking-action-transfer-button"
+                                  :action [:actions/open-staking-action-popover
+                                           :transfer
+                                           :event.currentTarget/bounds]})
+          (toolbar-action-button {:label "Unstake"
+                                  :data-role "staking-action-unstake-button"
+                                  :action [:actions/open-staking-action-popover
+                                           :unstake
+                                           :event.currentTarget/bounds]})
+          (toolbar-action-button {:label "Stake"
+                                  :primary? true
+                                  :data-role "staking-action-stake-button"
+                                  :action [:actions/open-staking-action-popover
+                                           :stake
+                                           :event.currentTarget/bounds]})]
          [:button {:type "button"
                    :class ["h-9"
                            "min-w-[90px]"
@@ -284,78 +553,6 @@
         (key-value-row "Total Staked" (format-balance-hype (:total-staked balances)))
         (key-value-row "Pending Transfers to Spot Balance"
                        (format-balance-hype (:pending-withdrawals balances)))]]]
-
-     (when connected?
-       [:div {:class ["space-y-2"]}
-        [:div {:class ["grid" "gap-2" "lg:grid-cols-2"]}
-         (action-card {:title "Transfer to Staking Balance"
-                       :description "Move HYPE from spot to staking balance."
-                       :input-id "staking-deposit-amount"
-                       :amount (:deposit-amount form)
-                       :submitting? (true? (:deposit? submitting))
-                       :connected? connected?
-                       :on-change [:actions/set-staking-form-field :deposit-amount [:event.target/value]]
-                       :on-max :actions/set-staking-deposit-amount-to-max
-                       :on-submit :actions/submit-staking-deposit
-                       :button-label "Transfer In"})
-         (action-card {:title "Transfer to Spot Balance"
-                       :description "Move HYPE from staking balance back to spot."
-                       :input-id "staking-withdraw-amount"
-                       :amount (:withdraw-amount form)
-                       :submitting? (true? (:withdraw? submitting))
-                       :connected? connected?
-                       :on-change [:actions/set-staking-form-field :withdraw-amount [:event.target/value]]
-                       :on-max :actions/set-staking-withdraw-amount-to-max
-                       :on-submit :actions/submit-staking-withdraw
-                       :button-label "Transfer Out"})
-         (action-card {:title "Stake"
-                       :description "Delegate staking balance to a validator."
-                       :input-id "staking-delegate-amount"
-                       :amount (:delegate-amount form)
-                       :submitting? (true? (:delegate? submitting))
-                       :connected? connected?
-                       :on-change [:actions/set-staking-form-field :delegate-amount [:event.target/value]]
-                       :on-max :actions/set-staking-delegate-amount-to-max
-                       :on-submit :actions/submit-staking-delegate
-                       :button-label "Stake"})
-         (action-card {:title "Unstake"
-                       :description "Undelegate a validator position back to staking balance."
-                       :input-id "staking-undelegate-amount"
-                       :amount (:undelegate-amount form)
-                       :submitting? (true? (:undelegate? submitting))
-                       :connected? connected?
-                       :on-change [:actions/set-staking-form-field :undelegate-amount [:event.target/value]]
-                       :on-max :actions/set-staking-undelegate-amount-to-max
-                       :on-submit :actions/submit-staking-undelegate
-                       :button-label "Unstake"})]
-
-        [:div {:class ["flex" "flex-wrap" "items-center" "gap-2"]}
-         [:label {:for "staking-selected-validator"
-                  :class ["text-xs" "uppercase" "tracking-[0.08em]" "text-[#9aa3a4]"]}
-          "Selected Validator"]
-         [:input {:id "staking-selected-validator"
-                  :type "text"
-                  :value selected-validator
-                  :placeholder "0x..."
-                  :class ["h-10"
-                          "w-full"
-                          "max-w-xl"
-                          "rounded-lg"
-                          "border"
-                          "border-[#1b2429]"
-                          "bg-[#0f1a1f]"
-                          "px-3"
-                          "text-sm"
-                          "text-[#f6fefd]"
-                          "focus:outline-none"
-                          "focus:ring-0"
-                          "focus:ring-offset-0"]
-                  :on {:input [[:actions/set-staking-form-field :selected-validator [:event.target/value]]]}}]
-
-        (when (and (empty? selected-validator)
-                   (seq delegations))
-          [:p {:class ["text-xs" "text-[#9aa3a4]"]}
-           "Select a validator from the table to prefill stake/unstake actions."])]])
 
      [:div {:class ["rounded-[10px]" "border" "border-[#1b2429]" "bg-[#0f1a1f]" "overflow-hidden"]}
       [:div {:class ["flex" "flex-wrap" "items-end" "justify-between" "gap-2" "px-3" "pt-2" "pb-0"]}
@@ -472,4 +669,13 @@
                       "text-sm"
                       "text-[#ff9db2]"]
               :data-role "staking-error"}
-        error])]))
+        error])
+
+     (when (and connected?
+                (:open? action-popover))
+       (action-popover-layer {:action-popover action-popover
+                              :form form
+                              :submitting submitting
+                              :balances balances
+                              :selected-validator selected-validator
+                              :validators validators}))]))

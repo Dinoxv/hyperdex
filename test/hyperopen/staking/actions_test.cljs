@@ -66,6 +66,46 @@
   (is (= []
          (actions/set-staking-form-field {} :not-a-field "1"))))
 
+(deftest staking-action-popover-actions-normalize-kind-anchor-and-direction-test
+  (is (= [[:effects/save-many
+           [[[:staking-ui :action-popover]
+             {:open? true
+              :kind :transfer
+              :anchor {:left 12
+                       :right 44
+                       :top 6
+                       :viewport-width 1024}}]
+            [[:staking-ui :transfer-direction] :spot->staking]
+            [[:staking-ui :form-error] nil]]]]
+         (actions/open-staking-action-popover
+          {}
+          :transfer
+          {:left "12"
+           :right "44"
+           :top "6"
+           :viewport-width 1024
+           :height "not-a-number"})))
+  (is (= []
+         (actions/open-staking-action-popover {} :unknown nil)))
+  (is (= [[:effects/save [:staking-ui :transfer-direction] :spot->staking]]
+         (actions/set-staking-transfer-direction {} :deposit)))
+  (is (= [[:effects/save [:staking-ui :transfer-direction] :staking->spot]]
+         (actions/set-staking-transfer-direction {} "staking-to-spot"))))
+
+(deftest staking-action-popover-close-and-escape-actions-test
+  (is (= [[:effects/save [:staking-ui :action-popover]
+           {:open? false
+            :kind nil
+            :anchor nil}]]
+         (actions/close-staking-action-popover {})))
+  (is (= [[:effects/save [:staking-ui :action-popover]
+           {:open? false
+            :kind nil
+            :anchor nil}]]
+         (actions/handle-staking-action-popover-keydown {} "Escape")))
+  (is (= []
+         (actions/handle-staking-action-popover-keydown {} "Enter"))))
+
 (deftest submit-staking-deposit-validates-wallet-and-builds-cdeposit-request-test
   (is (= [[:effects/save [:staking-ui :form-error]
            "Connect your wallet before transferring to staking balance."]

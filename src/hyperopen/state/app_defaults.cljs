@@ -250,6 +250,10 @@
   []
   {:active-tab :validator-performance
    :validator-timeframe :week
+   :action-popover {:open? false
+                    :kind nil
+                    :anchor nil}
+   :transfer-direction :spot->staking
    :selected-validator ""
    :deposit-amount ""
    :withdraw-amount ""

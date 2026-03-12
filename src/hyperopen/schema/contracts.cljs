@@ -340,6 +340,12 @@
 (s/def ::spectate-mode-open-args
   (s/or :none ::no-args
         :anchor-only (s/tuple any?)))
+(s/def ::staking-action-popover-open-args
+  (s/or :kind-only (s/tuple (s/or :keyword keyword?
+                                   :string string?))
+        :kind-and-anchor (s/tuple (s/or :keyword keyword?
+                                        :string string?)
+                                   any?)))
 (s/def ::ws-reset-source-args (s/or :none ::no-args
                                     :source (s/tuple ::source)))
 
@@ -600,6 +606,10 @@
    :actions/load-staking ::no-args
    :actions/set-staking-active-tab ::keyword-or-string-args
    :actions/set-staking-validator-timeframe ::keyword-or-string-args
+   :actions/open-staking-action-popover ::staking-action-popover-open-args
+   :actions/close-staking-action-popover ::no-args
+   :actions/handle-staking-action-popover-keydown ::key-args
+   :actions/set-staking-transfer-direction ::keyword-or-string-args
    :actions/set-staking-form-field ::staking-form-field-args
    :actions/select-staking-validator ::optional-string-args
    :actions/set-staking-deposit-amount-to-max ::no-args

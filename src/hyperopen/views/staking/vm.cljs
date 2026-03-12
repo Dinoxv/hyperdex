@@ -162,6 +162,13 @@
                     (get-in state [:staking-ui :active-tab]))
         timeframe (staking-actions/normalize-staking-validator-timeframe
                    (get-in state [:staking-ui :validator-timeframe]))
+        popover-state (or (get-in state [:staking-ui :action-popover]) {})
+        popover-kind (staking-actions/normalize-staking-action-popover-kind
+                      (:kind popover-state))
+        popover-open? (and (true? (:open? popover-state))
+                           (some? popover-kind))
+        transfer-direction (staking-actions/normalize-staking-transfer-direction
+                            (get-in state [:staking-ui :transfer-direction]))
         validator-summaries (or (get-in state [:staking :validator-summaries]) [])
         delegator-summary (or (get-in state [:staking :delegator-summary]) {})
         delegations (or (get-in state [:staking :delegations]) [])
@@ -205,6 +212,11 @@
      :validators validators
      :rewards (reward-rows rewards)
      :history (history-rows history)
+     :action-popover {:open? popover-open?
+                      :kind popover-kind
+                      :anchor (when popover-open?
+                                (:anchor popover-state))
+                      :transfer-direction transfer-direction}
      :selected-validator (or (normalize-validator-address (get-in state [:staking-ui :selected-validator]))
                              (normalize-validator-address (get-in state [:staking :delegations 0 :validator]))
                              "")

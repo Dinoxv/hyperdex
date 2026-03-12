@@ -21,12 +21,24 @@
 (def ^:private valid-validator-timeframes
   #{:day :week :month})
 
+(def ^:private valid-action-popover-kinds
+  #{:transfer :stake :unstake})
+
+(def default-transfer-direction
+  :spot->staking)
+
+(def ^:private valid-transfer-directions
+  #{:spot->staking :staking->spot})
+
 (def ^:private valid-form-fields
   #{:deposit-amount
     :withdraw-amount
     :delegate-amount
     :undelegate-amount
     :selected-validator})
+
+(def ^:private anchor-keys
+  [:left :right :top :bottom :width :height :viewport-width :viewport-height])
 
 (def ^:private hype-decimals
   8)
@@ -115,6 +127,48 @@
     (if (contains? valid-validator-timeframes normalized)
       normalized
       default-validator-timeframe)))
+
+(defn normalize-staking-action-popover-kind
+  [value]
+  (let [token (cond
+                (keyword? value) value
+                (string? value) (-> value
+                                    str/trim
+                                    str/lower-case
+                                    (str/replace #"[^a-z0-9]+" "-")
+                                    keyword)
+                :else nil)
+        normalized (case token
+                     :transfer :transfer
+                     :stake :stake
+                     :unstake :unstake
+                     token)]
+    (when (contains? valid-action-popover-kinds normalized)
+      normalized)))
+
+(defn normalize-staking-transfer-direction
+  [value]
+  (let [token (cond
+                (keyword? value) value
+                (string? value) (-> value
+                                    str/trim
+                                    str/lower-case
+                                    (str/replace #"[^a-z0-9]+" "-")
+                                    keyword)
+                :else nil)
+        normalized (case token
+                     :spot->staking :spot->staking
+                     :spot-to-staking :spot->staking
+                     :spot-staking :spot->staking
+                     :deposit :spot->staking
+                     :staking->spot :staking->spot
+                     :staking-to-spot :staking->spot
+                     :staking-spot :staking->spot
+                     :withdraw :staking->spot
+                     token)]
+    (if (contains? valid-transfer-directions normalized)
+      normalized
+      default-transfer-direction)))
 
 (defn- finite-number?
   [value]
@@ -223,6 +277,22 @@
   (or (normalize-validator-address (get-in state [:staking-ui :selected-validator]))
       (normalize-validator-address (get-in state [:staking :delegations 0 :validator]))))
 
+(defn- normalize-anchor
+  [anchor]
+  (let [anchor* (cond
+                  (map? anchor) anchor
+                  (some? anchor) (js->clj anchor :keywordize-keys true)
+                  :else nil)]
+    (when (map? anchor*)
+      (let [normalized (reduce (fn [acc k]
+                                 (if-let [num (optional-number (get anchor* k))]
+                                   (assoc acc k num)
+                                   acc))
+                               {}
+                               anchor-keys)]
+        (when (seq normalized)
+          normalized)))))
+
 (defn- start-submit-effects
   [submitting-key]
   [[:effects/save [:staking-ui :form-error] nil]
@@ -276,6 +346,39 @@
   [_state timeframe]
   [[:effects/save [:staking-ui :validator-timeframe]
     (normalize-staking-validator-timeframe timeframe)]])
+
+(defn open-staking-action-popover
+  ([state kind]
+   (open-staking-action-popover state kind nil))
+  ([state kind trigger-bounds]
+   (if-let [kind* (normalize-staking-action-popover-kind kind)]
+     [[:effects/save-many
+       [[[:staking-ui :action-popover]
+         {:open? true
+          :kind kind*
+          :anchor (normalize-anchor trigger-bounds)}]
+        [[:staking-ui :transfer-direction]
+         (normalize-staking-transfer-direction (get-in state [:staking-ui :transfer-direction]))]
+        [[:staking-ui :form-error] nil]]]]
+     [])))
+
+(defn close-staking-action-popover
+  [_state]
+  [[:effects/save [:staking-ui :action-popover]
+    {:open? false
+     :kind nil
+     :anchor nil}]])
+
+(defn handle-staking-action-popover-keydown
+  [state key]
+  (if (= key "Escape")
+    (close-staking-action-popover state)
+    []))
+
+(defn set-staking-transfer-direction
+  [_state direction]
+  [[:effects/save [:staking-ui :transfer-direction]
+    (normalize-staking-transfer-direction direction)]])
 
 (defn set-staking-form-field
   [_state field value]
