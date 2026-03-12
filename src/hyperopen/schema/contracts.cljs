@@ -607,6 +607,8 @@
    :actions/load-staking-route ::path-args
    :actions/load-staking ::no-args
    :actions/set-staking-active-tab ::keyword-or-string-args
+   :actions/toggle-staking-validator-timeframe-menu ::no-args
+   :actions/close-staking-validator-timeframe-menu ::no-args
    :actions/set-staking-validator-timeframe ::keyword-or-string-args
    :actions/set-staking-validator-sort ::keyword-or-string-args
    :actions/open-staking-action-popover ::staking-action-popover-open-args

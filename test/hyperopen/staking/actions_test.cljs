@@ -67,6 +67,20 @@
                                          :direction :desc}}}
           :name))))
 
+(deftest staking-validator-timeframe-menu-actions-test
+  (is (= [[:effects/save [:staking-ui :validator-timeframe-dropdown-open?] true]]
+         (actions/toggle-staking-validator-timeframe-menu
+          {:staking-ui {:validator-timeframe-dropdown-open? false}})))
+  (is (= [[:effects/save [:staking-ui :validator-timeframe-dropdown-open?] false]]
+         (actions/toggle-staking-validator-timeframe-menu
+          {:staking-ui {:validator-timeframe-dropdown-open? true}})))
+  (is (= [[:effects/save [:staking-ui :validator-timeframe-dropdown-open?] false]]
+         (actions/close-staking-validator-timeframe-menu {})))
+  (is (= [[:effects/save-many
+           [[[:staking-ui :validator-timeframe] :day]
+            [[:staking-ui :validator-timeframe-dropdown-open?] false]]]]
+         (actions/set-staking-validator-timeframe {} "1d"))))
+
 (deftest set-staking-form-field-normalizes-validator-and-ignores-unknown-fields-test
   (is (= [[:effects/save [:staking-ui :selected-validator]
            "0x1234567890abcdef1234567890abcdef12345678"]]

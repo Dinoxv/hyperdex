@@ -250,6 +250,7 @@
   []
   {:active-tab :validator-performance
    :validator-timeframe :week
+   :validator-timeframe-dropdown-open? false
    :action-popover {:open? false
                     :kind nil
                     :anchor nil}

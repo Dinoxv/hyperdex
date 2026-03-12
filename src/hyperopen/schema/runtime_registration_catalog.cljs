@@ -295,6 +295,8 @@
      [:actions/load-staking-route :load-staking-route]
      [:actions/load-staking :load-staking]
      [:actions/set-staking-active-tab :set-staking-active-tab]
+     [:actions/toggle-staking-validator-timeframe-menu :toggle-staking-validator-timeframe-menu]
+     [:actions/close-staking-validator-timeframe-menu :close-staking-validator-timeframe-menu]
      [:actions/set-staking-validator-timeframe :set-staking-validator-timeframe]
      [:actions/set-staking-validator-sort :set-staking-validator-sort]
      [:actions/open-staking-action-popover :open-staking-action-popover]

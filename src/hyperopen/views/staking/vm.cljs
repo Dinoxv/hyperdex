@@ -190,6 +190,7 @@
                     (get-in state [:staking-ui :active-tab]))
         timeframe (staking-actions/normalize-staking-validator-timeframe
                    (get-in state [:staking-ui :validator-timeframe]))
+        timeframe-dropdown-open? (true? (get-in state [:staking-ui :validator-timeframe-dropdown-open?]))
         validator-sort (staking-actions/normalize-staking-validator-sort
                         (get-in state [:staking-ui :validator-sort]))
         popover-state (or (get-in state [:staking-ui :action-popover]) {})
@@ -229,6 +230,7 @@
             {:value :staking-reward-history :label "Staking Reward History"}
             {:value :staking-action-history :label "Staking Action History"}]
      :validator-timeframe timeframe
+     :validator-timeframe-dropdown-open? timeframe-dropdown-open?
      :validator-sort validator-sort
      :timeframe-options timeframe-options
      :loading? loading?

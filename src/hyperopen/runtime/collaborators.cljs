@@ -303,6 +303,8 @@
   {:load-staking-route staking-actions/load-staking-route
    :load-staking staking-actions/load-staking
    :set-staking-active-tab staking-actions/set-staking-active-tab
+   :toggle-staking-validator-timeframe-menu staking-actions/toggle-staking-validator-timeframe-menu
+   :close-staking-validator-timeframe-menu staking-actions/close-staking-validator-timeframe-menu
    :set-staking-validator-timeframe staking-actions/set-staking-validator-timeframe
    :set-staking-validator-sort staking-actions/set-staking-validator-sort
    :open-staking-action-popover staking-actions/open-staking-action-popover

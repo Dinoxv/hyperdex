@@ -735,9 +735,96 @@
      (if (seq rows)
        (map row-render rows)
        [:tr
-        [:td {:col-span (count columns)
+       [:td {:col-span (count columns)
               :class ["px-3" "py-6" "text-center" "text-sm" "text-[#949e9c]"]}
          empty-text]])]]])
+
+(defn- staking-timeframe-menu
+  [selected-timeframe timeframe-options open?]
+  (let [selected-label (or (some (fn [{:keys [value label]}]
+                                   (when (= value selected-timeframe)
+                                     label))
+                                 timeframe-options)
+                           "7D")]
+    [:div {:class ["relative"]
+           :data-role "staking-timeframe-toggle"}
+     (when open?
+       [:button {:type "button"
+                 :class ["fixed" "inset-0" "z-[9]" "cursor-default"]
+                 :aria-label "Close staking timeframe menu"
+                 :on {:click [[:actions/close-staking-validator-timeframe-menu]]}}])
+     [:button {:type "button"
+               :class (into ["relative"
+                             "z-[10]"
+                             "h-8"
+                             "min-w-[58px]"
+                             "inline-flex"
+                             "items-center"
+                             "justify-between"
+                             "gap-1.5"
+                             "rounded-lg"
+                             "border"
+                             "border-[#1b2429]"
+                             "bg-[#0f1a1f]"
+                             "px-2.5"
+                             "text-xs"
+                             "font-normal"
+                             "text-[#f6fefd]"
+                             "transition-colors"
+                             "hover:border-[#6f7a88]"]
+                            neutral-input-focus-classes)
+               :aria-expanded (boolean open?)
+               :data-role "staking-timeframe-menu-trigger"
+               :on {:click [[:actions/toggle-staking-validator-timeframe-menu]]}}
+      [:span selected-label]
+      [:svg {:class (into ["h-3.5"
+                           "w-3.5"
+                           "text-[#949e9c]"
+                           "transition-transform"
+                           "duration-150"]
+                          (when open?
+                            ["rotate-180"]))
+             :fill "none"
+             :stroke "currentColor"
+             :viewBox "0 0 24 24"}
+       [:path {:stroke-linecap "round"
+               :stroke-linejoin "round"
+               :stroke-width 2
+               :d "M6 9l6 6 6-6"}]]]
+     [:div {:class (into ["absolute"
+                          "right-0"
+                          "top-[calc(100%+6px)]"
+                          "z-[11]"
+                          "min-w-[72px]"
+                          "overflow-hidden"
+                          "rounded-[10px]"
+                          "border"
+                          "border-[#1b2429]"
+                          "bg-[#0f1a1f]"
+                          "shadow-[0_14px_28px_rgba(0,0,0,0.45)]"
+                          "transition-[opacity,transform]"
+                          "duration-100"]
+                         (if open?
+                           ["opacity-100" "translate-y-0" "pointer-events-auto"]
+                           ["opacity-0" "-translate-y-1" "pointer-events-none"]))
+            :data-role "staking-timeframe-menu"}
+      (for [{:keys [value label]} timeframe-options]
+        ^{:key (str "staking-timeframe-option-" (name value))}
+        [:button {:type "button"
+                  :class (into ["block"
+                                "w-full"
+                                "px-3"
+                                "py-2"
+                                "text-left"
+                                "text-xs"
+                                "font-normal"
+                                "transition-colors"]
+                               (if (= value selected-timeframe)
+                                 ["bg-[#122c37]" "text-[#f6fefd]"]
+                                 ["text-[#c8d5d7]" "hover:bg-[#112733]"]))
+                  :data-role (str "staking-timeframe-option-" (name value))
+                  :on {:click [[:actions/set-staking-validator-timeframe value]]}}
+         label])]]))
 
 (defn staking-view
   [state]
@@ -746,6 +833,7 @@
                 active-tab
                 tabs
                 validator-timeframe
+                validator-timeframe-dropdown-open?
                 validator-sort
                 timeframe-options
                 loading?
@@ -841,34 +929,9 @@
                       label
                       [:actions/set-staking-active-tab value]))]
        (when (= :validator-performance active-tab)
-         [:div {:class ["relative"]
-                :data-role "staking-timeframe-toggle"}
-          [:select {:value (name validator-timeframe)
-                    :class (into ["h-8"
-                                  "rounded-lg"
-                                  "border"
-                                  "border-[#1b2429]"
-                                  "bg-[#0f1a1f]"
-                                  "pl-2.5"
-                                  "pr-7"
-                                  "text-xs"
-                                  "font-normal"
-                                  "text-[#f6fefd]"
-                                  "appearance-none"]
-                                 neutral-input-focus-classes)
-                    :on {:change [[:actions/set-staking-validator-timeframe [:event.target/value]]]}}
-           (for [{:keys [value label]} timeframe-options]
-             ^{:key value}
-             [:option {:value (name value)}
-              label])]
-          [:span {:class ["pointer-events-none"
-                          "absolute"
-                          "right-2.5"
-                          "top-1/2"
-                          "-translate-y-1/2"
-                          "text-xs"
-                          "text-[#949e9c]"]}
-           "▾"]])]
+         (staking-timeframe-menu validator-timeframe
+                                 timeframe-options
+                                 validator-timeframe-dropdown-open?))]
 
       (case active-tab
         :staking-reward-history

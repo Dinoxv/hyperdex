@@ -423,10 +423,21 @@
   [[:effects/save [:staking-ui :active-tab]
     (normalize-staking-tab tab)]])
 
+(defn toggle-staking-validator-timeframe-menu
+  [state]
+  [[:effects/save [:staking-ui :validator-timeframe-dropdown-open?]
+    (not (true? (get-in state [:staking-ui :validator-timeframe-dropdown-open?])))]])
+
+(defn close-staking-validator-timeframe-menu
+  [_state]
+  [[:effects/save [:staking-ui :validator-timeframe-dropdown-open?] false]])
+
 (defn set-staking-validator-timeframe
   [_state timeframe]
-  [[:effects/save [:staking-ui :validator-timeframe]
-    (normalize-staking-validator-timeframe timeframe)]])
+  [[:effects/save-many
+    [[[:staking-ui :validator-timeframe]
+      (normalize-staking-validator-timeframe timeframe)]
+     [[:staking-ui :validator-timeframe-dropdown-open?] false]]]])
 
 (defn set-staking-validator-sort
   [state column]

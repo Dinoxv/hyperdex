@@ -77,6 +77,7 @@
     (is (nil? (get-in state [:funding-comparison :error])))
     (is (= :validator-performance (get-in state [:staking-ui :active-tab])))
     (is (= :week (get-in state [:staking-ui :validator-timeframe])))
+    (is (= false (get-in state [:staking-ui :validator-timeframe-dropdown-open?])))
     (is (= false (get-in state [:staking-ui :action-popover :open?])))
     (is (nil? (get-in state [:staking-ui :action-popover :kind])))
     (is (nil? (get-in state [:staking-ui :action-popover :anchor])))

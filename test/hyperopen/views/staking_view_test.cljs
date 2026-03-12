@@ -65,6 +65,12 @@
         stake-sort-header (find-node #(= "staking-sort-header-stake"
                                          (get-in % [1 :data-role]))
                                      view)
+        timeframe-trigger (find-node #(= "staking-timeframe-menu-trigger"
+                                         (get-in % [1 :data-role]))
+                                     view)
+        timeframe-option-day (find-node #(= "staking-timeframe-option-day"
+                                            (get-in % [1 :data-role]))
+                                        view)
         row (find-node #(and (= :tr (first %))
                              (= "staking-validator-row"
                                 (get-in % [1 :data-role])))
@@ -78,6 +84,12 @@
     (is (some? stake-sort-header))
     (is (= [[:actions/set-staking-validator-sort :stake]]
            (get-in stake-sort-header [1 :on :click])))
+    (is (some? timeframe-trigger))
+    (is (= [[:actions/toggle-staking-validator-timeframe-menu]]
+           (get-in timeframe-trigger [1 :on :click])))
+    (is (some? timeframe-option-day))
+    (is (= [[:actions/set-staking-validator-timeframe :day]]
+           (get-in timeframe-option-day [1 :on :click])))
     (is (some? row))
     (is (= [[:actions/select-staking-validator validator]]
            (get-in row [1 :on :click])))))
