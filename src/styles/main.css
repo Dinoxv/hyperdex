@@ -33,6 +33,7 @@
     --font-ui: var(--font-ui-system);
     --font-mono: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas,
       "Liberation Mono", "Courier New", monospace;
+    --staking-action-popover-bg: rgb(15, 26, 31);
   }
 
   :root[data-ui-font="inter"] {
@@ -74,6 +75,10 @@
 
   .trading-input {
     @apply input input-sm bg-trading-surface border-trading-border text-trading-text;
+  }
+
+  .staking-action-popover-surface {
+    background-color: var(--staking-action-popover-bg);
   }
 
   .asset-selector-search-input {

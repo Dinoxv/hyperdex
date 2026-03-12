@@ -64,7 +64,10 @@
   12)
 
 (def ^:private popover-gap-px
-  8)
+  0)
+
+(def ^:private minimum-popover-anchor-height-px
+  36)
 
 (def ^:private popover-fallback-viewport-width
   1280)
@@ -99,9 +102,15 @@
         anchor-right (anchor-number anchor*
                                     :right
                                     (- viewport-width popover-margin-px))
-        anchor-bottom (anchor-number anchor*
-                                     :bottom
-                                     (+ (anchor-number anchor* :top popover-margin-px) 32))
+        anchor-top (anchor-number anchor* :top popover-margin-px)
+        anchor-height (max minimum-popover-anchor-height-px
+                           (anchor-number anchor* :height 0))
+        anchor-bottom* (anchor-number anchor*
+                                      :bottom
+                                      (+ anchor-top anchor-height))
+        anchor-bottom (if (>= (- anchor-bottom* anchor-top) 8)
+                        anchor-bottom*
+                        (+ anchor-top anchor-height))
         preferred-left (- anchor-right panel-width)
         left (clamp preferred-left
                     popover-margin-px
@@ -285,30 +294,30 @@
         next-direction (if spot->staking?
                          :staking->spot
                          :spot->staking)]
-    [:button {:type "button"
-              :class ["mx-auto"
-                      "h-9"
-                      "inline-flex"
-                      "items-center"
-                      "gap-2"
-                      "rounded-[10px]"
-                      "bg-[#13242d]"
-                      "px-3"
-                      "text-[18px]"
-                      "font-normal"
-                      "leading-none"
-                      "text-[#c8d5d7]"
-                      "transition-colors"
-                      "hover:bg-[#1a3039]"
-                      "focus:outline-none"
-                      "focus:ring-0"
-                      "focus:ring-offset-0"]
-              :data-role "staking-transfer-direction-toggle"
-              :on {:click [[:actions/set-staking-transfer-direction next-direction]]}}
-     [:span from-label]
-     [:span {:class ["text-[16px]" "text-[#50d2c1]"]}
-      "->"]
-     [:span to-label]]))
+    [:div {:class ["flex" "justify-center"]}
+     [:button {:type "button"
+               :class ["h-9"
+                       "inline-flex"
+                       "items-center"
+                       "gap-2"
+                       "rounded-[10px]"
+                       "bg-[#13242d]"
+                       "px-3"
+                       "text-[18px]"
+                       "font-normal"
+                       "leading-none"
+                       "text-[#c8d5d7]"
+                       "transition-colors"
+                       "hover:bg-[#1a3039]"
+                       "focus:outline-none"
+                       "focus:ring-0"
+                       "focus:ring-offset-0"]
+               :data-role "staking-transfer-direction-toggle"
+               :on {:click [[:actions/set-staking-transfer-direction next-direction]]}}
+      [:span from-label]
+      [:span {:class ["text-[16px]" "text-[#50d2c1]"]}
+       "->"]
+      [:span to-label]]]))
 
 (defn- transfer-popover-content
   [{:keys [form submitting balances transfer-direction]}]
@@ -405,10 +414,10 @@
                  :on {:click [[:actions/close-staking-action-popover]]}}]
        [:div {:class ["absolute"
                       "pointer-events-auto"
+                      "staking-action-popover-surface"
                       "rounded-[22px]"
                       "border"
                       "border-[#1d3540]"
-                      "bg-[#061722]"
                       "p-4"
                       "pt-5"
                       "shadow-[0_24px_58px_rgba(0,0,0,0.55)]"
