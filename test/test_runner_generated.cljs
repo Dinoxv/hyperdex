@@ -109,6 +109,7 @@
             [hyperopen.portfolio.metrics.history-test]
             [hyperopen.portfolio.metrics.quantstats-parity-test]
             [hyperopen.registry.runtime-test]
+            [hyperopen.router-test]
             [hyperopen.runtime.action-adapters-test]
             [hyperopen.runtime.api-effects-test]
             [hyperopen.runtime.app-effects-test]
@@ -146,6 +147,7 @@
             [hyperopen.state.trading.order-form-state-test]
             [hyperopen.state.trading.order-request-test]
             [hyperopen.state.trading.validation-and-scale-test]
+            [hyperopen.system-test]
             [hyperopen.telemetry-test]
             [hyperopen.telemetry.console-preload-test]
             [hyperopen.telemetry.console-preload.simulators-test]
@@ -440,6 +442,7 @@
              'hyperopen.portfolio.metrics.history-test
              'hyperopen.portfolio.metrics.quantstats-parity-test
              'hyperopen.registry.runtime-test
+             'hyperopen.router-test
              'hyperopen.runtime.action-adapters-test
              'hyperopen.runtime.api-effects-test
              'hyperopen.runtime.app-effects-test
@@ -477,6 +480,7 @@
              'hyperopen.state.trading.order-form-state-test
              'hyperopen.state.trading.order-request-test
              'hyperopen.state.trading.validation-and-scale-test
+             'hyperopen.system-test
              'hyperopen.telemetry-test
              'hyperopen.telemetry.console-preload-test
              'hyperopen.telemetry.console-preload.simulators-test

@@ -1,15 +1,77 @@
 (ns hyperopen.router
   (:require [clojure.string :as str]))
 
+(def ^:private default-route
+  "/trade")
+
+(defn- parse-absolute-url-path
+  [text]
+  (when (and (string? text)
+             (re-find #"^[a-zA-Z][a-zA-Z0-9+.-]*://" text))
+    (try
+      (some-> (js/URL. text) .-pathname)
+      (catch :default _ nil))))
+
+(defn- split-path-from-query-fragment
+  [text]
+  (or (first (str/split (or text "") #"[?#]" 2))
+      ""))
+
+(defn- ensure-leading-slash
+  [path]
+  (let [path* (or path "")]
+    (if (seq path*)
+      (if (str/starts-with? path* "/")
+        path*
+        (str "/" path*))
+      "/")))
+
+(defn- trim-trailing-slashes
+  [path]
+  (loop [path* (or path "")]
+    (if (and (> (count path*) 1)
+             (str/ends-with? path* "/"))
+      (recur (subs path* 0 (dec (count path*))))
+      path*)))
+
 (defn normalize-path [path]
-  (let [p (or path "/")]
-    (if (or (= p "") (= p "/")) "/trade" p)))
+  (let [path* (if (string? path)
+                path
+                (str (or path "")))
+        trimmed (str/trim path*)
+        url-path (or (parse-absolute-url-path trimmed)
+                     trimmed)
+        normalized (-> url-path
+                       split-path-from-query-fragment
+                       ensure-leading-slash
+                       trim-trailing-slashes)]
+    (if (or (= normalized "")
+            (= normalized "/"))
+      default-route
+      normalized)))
+
+(defn normalize-location-path
+  [pathname hash]
+  (let [pathname* (if (string? pathname)
+                    pathname
+                    (str (or pathname "")))
+        hash* (if (string? hash) (str/trim hash) "")
+        hash-path (when (str/starts-with? hash* "#/")
+                    (subs hash* 1))
+        candidate-path (if (or (= pathname* "")
+                               (= pathname* "/"))
+                         (or hash-path pathname*)
+                         pathname*)]
+    (normalize-path candidate-path)))
 
 (defn set-route! [store path]
   (swap! store assoc :router {:path (normalize-path path)}))
 
 (defn current-path []
-  (normalize-path (.-pathname js/location)))
+  (let [location (some-> js/globalThis .-location)]
+    (normalize-location-path
+     (some-> location .-pathname)
+     (some-> location .-hash))))
 
 (defn init! [store]
   (set-route! store (current-path))
