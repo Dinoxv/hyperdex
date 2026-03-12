@@ -30,34 +30,34 @@
   [status]
   (let [[label classes]
         (case status
-          :active ["Active" ["text-[#3fd9c0]"]]
+          :active ["Active" ["text-[#97fce4]"]]
           :jailed ["Jailed" ["text-[#ff99ac]"]]
-          ["Inactive" ["text-trading-text-secondary"]])]
-    [:span {:class (into ["text-sm" "font-medium"]
+          ["Inactive" ["text-[#9aa3a4]"]])]
+    [:span {:class (into ["text-xs" "font-normal" "leading-6"]
                          classes)}
      label]))
 
 (defn- summary-card
   [label value data-role]
-  [:div {:class ["rounded-xl"
+  [:div {:class ["rounded-[10px]"
                  "border"
-                 "border-base-300"
-                 "bg-base-100"
+                 "border-[#1b2429]"
+                 "bg-[#0f1a1f]"
                  "px-4"
-                 "py-3.5"
+                 "py-3"
                  "space-y-2"]
          :data-role data-role}
-   [:div {:class ["text-lg" "leading-none" "font-medium" "text-trading-text-secondary"]}
+   [:div {:class ["text-sm" "leading-[15px]" "font-normal" "text-[#878c8f]"]}
     label]
-   [:div {:class ["text-5xl" "leading-none" "font-semibold" "text-white" "num"]}
+   [:div {:class ["text-[30px]" "sm:text-[34px]" "leading-none" "font-normal" "text-[#f6fefd]" "num"]}
     value]])
 
 (defn- key-value-row
   [label value]
-  [:div {:class ["flex" "items-start" "justify-between" "gap-3" "text-sm"]}
-   [:span {:class ["text-trading-text-secondary" "leading-5"]}
+  [:div {:class ["flex" "items-start" "justify-between" "gap-3" "text-xs"]}
+   [:span {:class ["text-[#9aa3a4]" "leading-[15px]"]}
     label]
-   [:span {:class ["num" "text-trading-text" "font-semibold"]}
+   [:span {:class ["num" "text-[#f6fefd]" "font-normal" "leading-[15px]"]}
     value]])
 
 (defn- action-card
@@ -71,16 +71,16 @@
            on-max
            on-submit
            button-label]}]
-  [:div {:class ["rounded-xl"
+  [:div {:class ["rounded-[10px]"
                  "border"
-                 "border-base-300"
-                 "bg-base-100"
+                 "border-[#1b2429]"
+                 "bg-[#0f1a1f]"
                  "p-4"
                  "space-y-3"]}
    [:div {:class ["space-y-1"]}
-    [:h3 {:class ["text-sm" "font-semibold" "text-white"]}
+    [:h3 {:class ["text-sm" "font-normal" "text-[#f6fefd]"]}
      title]
-    [:p {:class ["text-xs" "text-trading-text-secondary"]}
+    [:p {:class ["text-xs" "text-[#9aa3a4]"]}
      description]]
    [:div {:class ["flex" "items-center" "gap-2"]}
     [:input {:id input-id
@@ -88,47 +88,47 @@
              :inputmode "decimal"
              :placeholder "0.0"
              :value amount
-             :class ["h-9"
+             :class ["h-10"
                      "w-full"
-                     "rounded-xl"
+                     "rounded-lg"
                      "border"
-                     "border-base-300"
-                     "bg-base-100"
+                     "border-[#1b2429]"
+                     "bg-[#0f1a1f]"
                      "px-3"
                      "text-sm"
-                     "text-trading-text"
+                     "text-[#f6fefd]"
                      "focus:outline-none"
                      "focus:ring-0"
                      "focus:ring-offset-0"]
              :on {:input [on-change]}}]
     [:button {:type "button"
-              :class ["h-9"
+              :class ["h-10"
                       "rounded-lg"
                       "border"
-                      "border-base-300"
+                      "border-[#1b2429]"
                       "px-2.5"
                       "text-xs"
-                      "font-semibold"
-                      "text-trading-text-secondary"
+                      "font-normal"
+                      "text-[#9aa3a4]"
                       "transition-colors"
-                      "hover:bg-base-200"
+                      "hover:bg-[#1d2a30]"
                       "focus:outline-none"
                       "focus:ring-0"
                       "focus:ring-offset-0"]
               :on {:click [on-max]}}
      "Max"]]
    [:button {:type "button"
-             :class ["h-9"
+             :class ["h-10"
                      "w-full"
-                     "rounded-xl"
+                     "rounded-lg"
                      "border"
-                     "border-[#2f7f73]"
-                     "bg-[#123a36]"
-                     "text-sm"
-                     "font-semibold"
+                     "border-[#2f7f73]/70"
+                     "bg-[#0e4d46]"
+                     "text-xs"
+                     "font-normal"
                      "text-[#97fce4]"
                      "transition-colors"
-                     "hover:bg-[#185047]"
+                     "hover:bg-[#126158]"
                      "disabled:cursor-not-allowed"
                      "disabled:opacity-60"]
              :disabled (or submitting?
@@ -141,18 +141,19 @@
 (defn- tab-button
   [active? label action]
   [:button {:type "button"
-            :class (into ["border-b-2"
-                          "px-2"
-                          "pb-2"
-                          "text-sm"
-                          "font-medium"
+            :class (into ["border-b"
+                          "px-0"
+                          "mr-4"
+                          "text-xs"
+                          "font-normal"
+                          "leading-[34px]"
                           "transition-colors"
                           "focus:outline-none"
                           "focus:ring-0"
                           "focus:ring-offset-0"]
                          (if active?
-                           ["border-[#2f7f73]" "text-[#d8f4ef]"]
-                           ["border-transparent" "text-trading-text-secondary" "hover:text-trading-text"]))
+                           ["border-[#303030]" "text-[#f6fefd]"]
+                           ["border-[#303030]" "text-[#949e9c]" "hover:text-[#c5d0ce]"]))
             :on {:click [action]}}
    label])
 
@@ -170,45 +171,45 @@
   (let [selected? (and (seq validator)
                        (= validator selected-validator))]
     [:tr {:class (into ["border-b"
-                        "border-base-300/50"
-                        "text-sm"
+                        "border-[#1b2429]"
+                        "text-xs"
                         "cursor-pointer"
                         "transition-colors"
-                        "hover:bg-base-200/40"]
+                        "hover:bg-[#1d2a30]"]
                        (when selected?
-                         ["bg-[#103a35]/50"]))
+                         ["bg-[#1a2c31]"]))
           :on {:click [[:actions/select-staking-validator validator]]}
         :data-role "staking-validator-row"}
-     [:td {:class ["px-3" "py-2.5" "font-medium" "text-white"]}
+     [:td {:class ["px-3" "py-2.5" "font-normal" "text-[#f6fefd]"]}
       name]
-     [:td {:class ["px-3" "py-2.5" "text-trading-text-secondary" "max-w-[260px]" "truncate"]}
+     [:td {:class ["px-3" "py-2.5" "text-[#9aa3a4]" "max-w-[260px]" "truncate"]}
       (or description "--")]
-     [:td {:class ["px-3" "py-2.5" "num"]} (format-table-hype stake)]
-     [:td {:class ["px-3" "py-2.5" "num"]}
+     [:td {:class ["px-3" "py-2.5" "num" "text-[#f6fefd]"]} (format-table-hype stake)]
+     [:td {:class ["px-3" "py-2.5" "num" "text-[#f6fefd]"]}
       (if (pos? (or your-stake 0))
         (format-table-hype your-stake)
         "-")]
-     [:td {:class ["px-3" "py-2.5" "num"]} (format-percent uptime-fraction)]
-     [:td {:class ["px-3" "py-2.5" "num"]} (format-percent predicted-apr)]
+     [:td {:class ["px-3" "py-2.5" "num" "text-[#f6fefd]"]} (format-percent uptime-fraction)]
+     [:td {:class ["px-3" "py-2.5" "num" "text-[#f6fefd]"]} (format-percent predicted-apr)]
      [:td {:class ["px-3" "py-2.5"]} (status-pill status)]
-     [:td {:class ["px-3" "py-2.5" "num"]} (format-percent commission)]]))
+     [:td {:class ["px-3" "py-2.5" "num" "text-[#f6fefd]"]} (format-percent commission)]]))
 
 (defn- history-table
   [rows columns empty-text row-render]
-  [:div {:class ["overflow-x-auto" "rounded-xl" "border" "border-base-300"]}
-   [:table {:class ["min-w-full" "bg-base-100"]}
+  [:div {:class ["overflow-x-auto" "rounded-[10px]" "border" "border-[#1b2429]"]}
+   [:table {:class ["min-w-full" "bg-[#0f1a1f]"]}
     [:thead
-     [:tr {:class ["text-xs" "text-trading-text-secondary"]}
+     [:tr {:class ["text-xs" "text-[#949e9c]"]}
       (for [column columns]
         ^{:key column}
-        [:th {:class ["px-3" "py-2" "text-left"]}
+        [:th {:class ["px-3" "py-2.5" "text-left" "font-normal"]}
          column])]]
     [:tbody
      (if (seq rows)
        (map row-render rows)
        [:tr
         [:td {:col-span (count columns)
-              :class ["px-3" "py-6" "text-center" "text-sm" "text-trading-text-secondary"]}
+              :class ["px-3" "py-6" "text-center" "text-sm" "text-[#949e9c]"]}
          empty-text]])]]])
 
 (defn staking-view
@@ -234,53 +235,48 @@
                    "h-full"
                    "w-full"
                    "flex-col"
-                   "gap-3"
+                   "gap-2"
                    "app-shell-gutter"
-                   "pt-4"
-                   "pb-16"]
+                   "pt-3"
+                   "pb-10"]
            :data-parity-id "staking-root"}
-     [:div {:class ["rounded-xl"
-                    "border"
-                    "border-[#165049]/70"
-                    "bg-[#02262a]/70"
-                    "p-4"
+     [:div {:class ["bg-[#04251f]"
+                    "px-4"
+                    "py-3"
                     "space-y-3"
-                    "backdrop-blur-[1px]"]}
+                    "rounded-[10px]"]}
       [:div {:class ["flex" "flex-wrap" "items-start" "justify-between" "gap-3"]}
        [:div {:class ["space-y-2" "max-w-[980px]"]}
-        [:h1 {:class ["text-5xl" "font-semibold" "tracking-tight" "text-[#e4f3f1]"]}
+        [:h1 {:class ["text-[24px]" "md:text-[34px]" "font-normal" "leading-[1.08]" "text-[#ffffff]"]}
          "Staking"]
-        [:p {:class ["text-base" "leading-tight" "text-[#d4ece7]" "sm:text-lg" "lg:text-[31px]"]}
+        [:p {:class ["text-sm" "leading-[15px]" "text-[#f6fefd]" "max-w-[1200px]"]}
          "The Hyperliquid L1 is a proof-of-stake blockchain where stakers delegate the native token HYPE to validators to earn staking rewards. Stakers only receive rewards when the validator successfully participates in consensus, so stakers should only delegate to reputable and trusted validators."]
         (when (seq effective-address)
-          [:p {:class ["text-xs" "text-trading-text-secondary" "num"]}
+          [:p {:class ["text-xs" "text-[#878c8f]" "num"]}
            (str "Account: " effective-address)])]
        (when-not connected?
          [:button {:type "button"
                    :class ["h-9"
-                           "w-full"
-                           "sm:w-auto"
-                           "rounded-xl"
-                           "border"
-                           "border-[#2f7f73]"
-                           "bg-[#174f49]"
-                           "px-5"
-                           "text-sm"
-                           "font-semibold"
-                           "text-[#97fce4]"
+                           "min-w-[90px]"
+                           "rounded-lg"
+                           "bg-[#50d2c1]"
+                           "px-4"
+                           "text-xs"
+                           "font-normal"
+                           "text-[#04060c]"
                            "transition-colors"
-                           "hover:bg-[#1c5d55]"]
+                           "hover:bg-[#72e5d7]"]
                    :data-role "staking-establish-connection"
                    :on {:click [[:actions/connect-wallet]]}}
-          "Establish Connection"])]
+          "Connect"])]
 
       [:div {:class ["grid" "gap-2" "lg:grid-cols-[340px_minmax(0,1fr)]"]}
        [:div {:class ["grid" "gap-2"]}
         (summary-card "Total Staked" (format-summary-hype (:total-staked summary)) "staking-summary-total")
         (summary-card "Your Stake" (format-summary-hype (:your-stake summary)) "staking-summary-user")]
-       [:div {:class ["rounded-xl" "border" "border-base-300" "bg-base-100" "p-4" "space-y-2"]
+       [:div {:class ["rounded-[10px]" "border" "border-[#1b2429]" "bg-[#0f1a1f]" "p-4" "space-y-2"]
               :data-role "staking-balance-panel"}
-        [:div {:class ["text-lg" "leading-none" "font-medium" "text-trading-text-secondary"]}
+        [:div {:class ["text-sm" "leading-[15px]" "font-normal" "text-[#878c8f]"]}
          "Staking Balance"]
         (key-value-row "Available to Transfer to Staking Balance"
                        (format-balance-hype (:available-transfer balances)))
@@ -290,8 +286,8 @@
                        (format-balance-hype (:pending-withdrawals balances)))]]]
 
      (when connected?
-       [:div {:class ["space-y-3"]}
-        [:div {:class ["grid" "gap-3" "lg:grid-cols-2"]}
+       [:div {:class ["space-y-2"]}
+        [:div {:class ["grid" "gap-2" "lg:grid-cols-2"]}
          (action-card {:title "Transfer to Staking Balance"
                        :description "Move HYPE from spot to staking balance."
                        :input-id "staking-deposit-amount"
@@ -335,22 +331,22 @@
 
         [:div {:class ["flex" "flex-wrap" "items-center" "gap-2"]}
          [:label {:for "staking-selected-validator"
-                  :class ["text-xs" "uppercase" "tracking-[0.08em]" "text-trading-text-secondary"]}
+                  :class ["text-xs" "uppercase" "tracking-[0.08em]" "text-[#9aa3a4]"]}
           "Selected Validator"]
          [:input {:id "staking-selected-validator"
                   :type "text"
                   :value selected-validator
                   :placeholder "0x..."
-                  :class ["h-9"
+                  :class ["h-10"
                           "w-full"
                           "max-w-xl"
-                          "rounded-xl"
+                          "rounded-lg"
                           "border"
-                          "border-base-300"
-                          "bg-base-100"
+                          "border-[#1b2429]"
+                          "bg-[#0f1a1f]"
                           "px-3"
                           "text-sm"
-                          "text-trading-text"
+                          "text-[#f6fefd]"
                           "focus:outline-none"
                           "focus:ring-0"
                           "focus:ring-offset-0"]
@@ -358,11 +354,11 @@
 
         (when (and (empty? selected-validator)
                    (seq delegations))
-          [:p {:class ["text-xs" "text-trading-text-secondary"]}
+          [:p {:class ["text-xs" "text-[#9aa3a4]"]}
            "Select a validator from the table to prefill stake/unstake actions."])]])
 
-     [:div {:class ["rounded-xl" "border" "border-base-300" "bg-base-100" "overflow-hidden"]}
-      [:div {:class ["flex" "flex-wrap" "items-end" "justify-between" "gap-2" "px-3" "pt-3" "pb-0"]}
+     [:div {:class ["rounded-[10px]" "border" "border-[#1b2429]" "bg-[#0f1a1f]" "overflow-hidden"]}
+      [:div {:class ["flex" "flex-wrap" "items-end" "justify-between" "gap-2" "px-3" "pt-2" "pb-0"]}
        [:div {:class ["flex" "flex-wrap" "items-center" "gap-2"]}
         (for [{:keys [value label]} tabs]
           ^{:key value}
@@ -376,13 +372,13 @@
                     :class ["h-8"
                             "rounded-lg"
                             "border"
-                            "border-base-300"
-                            "bg-base-100"
+                            "border-[#1b2429]"
+                            "bg-[#0f1a1f]"
                             "pl-2.5"
                             "pr-7"
-                            "text-sm"
-                            "font-medium"
-                            "text-trading-text"
+                            "text-xs"
+                            "font-normal"
+                            "text-[#f6fefd]"
                             "appearance-none"
                             "focus:outline-none"
                             "focus:ring-0"
@@ -398,7 +394,7 @@
                           "top-1/2"
                           "-translate-y-1/2"
                           "text-xs"
-                          "text-trading-text-secondary"]}
+                          "text-[#949e9c]"]}
            "▾"]])]
 
       (case active-tab
@@ -442,18 +438,18 @@
 
         ;; Default: validator performance table
         [:div {:class ["overflow-x-auto"]}
-         [:table {:class ["min-w-full" "bg-base-100"]
+         [:table {:class ["min-w-full" "bg-[#0f1a1f]"]
                   :data-role "staking-validator-table"}
           [:thead
-           [:tr {:class ["text-xs" "text-trading-text-secondary"]}
-            [:th {:class ["px-3" "py-2.5" "text-left"]} "Name"]
-            [:th {:class ["px-3" "py-2.5" "text-left"]} "Description"]
-            [:th {:class ["px-3" "py-2.5" "text-left"]} "Stake"]
-            [:th {:class ["px-3" "py-2.5" "text-left"]} "Your Stake"]
-            [:th {:class ["px-3" "py-2.5" "text-left"]} "Uptime"]
-            [:th {:class ["px-3" "py-2.5" "text-left"]} "Est. APR"]
-            [:th {:class ["px-3" "py-2.5" "text-left"]} "Status"]
-            [:th {:class ["px-3" "py-2.5" "text-left"]} "Commission"]]]
+           [:tr {:class ["border-b" "border-[#1b2429]" "text-xs" "text-[#949e9c]"]}
+            [:th {:class ["px-3" "py-2.5" "text-left" "font-normal"]} "Name"]
+            [:th {:class ["px-3" "py-2.5" "text-left" "font-normal"]} "Description"]
+            [:th {:class ["px-3" "py-2.5" "text-left" "font-normal"]} "Stake"]
+            [:th {:class ["px-3" "py-2.5" "text-left" "font-normal"]} "Your Stake"]
+            [:th {:class ["px-3" "py-2.5" "text-left" "font-normal"]} "Uptime"]
+            [:th {:class ["px-3" "py-2.5" "text-left" "font-normal"]} "Est. APR"]
+            [:th {:class ["px-3" "py-2.5" "text-left" "font-normal"]} "Status"]
+            [:th {:class ["px-3" "py-2.5" "text-left" "font-normal"]} "Commission"]]]
           [:tbody
            (if (seq validators)
              (for [row validators]
@@ -461,7 +457,7 @@
                (validator-row row selected-validator))
              [:tr
                [:td {:col-span 8
-                    :class ["px-3" "py-6" "text-center" "text-sm" "text-trading-text-secondary"]}
+                    :class ["px-3" "py-6" "text-center" "text-sm" "text-[#949e9c]"]}
                (if loading?
                  "Loading validators..."
                  "No validator data available.")]])]]])]
