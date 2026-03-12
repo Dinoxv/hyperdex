@@ -3,9 +3,42 @@
             [hyperopen.views.trading-chart.utils.chart-interop.chart-navigation-overlay :as chart-navigation-overlay]
             [hyperopen.views.trading-chart.test-support.fake-dom :as fake-dom]))
 
+(defn- make-animation-clock
+  []
+  (let [queued-frames* (atom [])
+        next-frame-id* (atom 0)
+        now-ms* (atom 1000)
+        cancelled-frame-ids* (atom [])]
+    (letfn [(flush-next! []
+              (when-let [[_ callback] (first @queued-frames*)]
+                (swap! queued-frames* #(vec (rest %)))
+                (swap! now-ms* + 90)
+                (callback @now-ms*)
+                true))
+            (flush-all! []
+              (loop []
+                (when (flush-next!)
+                  (recur))))]
+      {:request-frame! (fn [callback]
+                         (let [frame-id (swap! next-frame-id* inc)]
+                           (swap! queued-frames* conj [frame-id callback])
+                           frame-id))
+       :cancel-frame! (fn [frame-id]
+                        (swap! cancelled-frame-ids* conj frame-id)
+                        (swap! queued-frames*
+                               (fn [queued]
+                                 (vec (remove #(= frame-id (first %)) queued)))))
+       :now-ms! (fn []
+                  @now-ms*)
+       :flush-next! flush-next!
+       :flush-all! flush-all!
+       :queued-frames* queued-frames*
+       :cancelled-frame-ids* cancelled-frame-ids*})))
+
 (deftest chart-navigation-overlay-sync-renders-hover-focus-and-controls-test
   (let [document (fake-dom/make-fake-document)
         container (fake-dom/make-fake-element "div")
+        animation-clock (make-animation-clock)
         visible-range* (atom {:from 100 :to 200})
         applied-ranges* (atom [])
         interaction-count* (atom 0)
@@ -33,6 +66,9 @@
      {:document document
       :on-interaction (fn []
                         (swap! interaction-count* inc))
+      :now-ms-fn (:now-ms! animation-clock)
+      :request-animation-frame-fn (:request-frame! animation-clock)
+      :cancel-animation-frame-fn (:cancel-frame! animation-clock)
       :on-reset (fn [_chart _candles]
                   (swap! reset-count* inc)
                   (reset! visible-range* {:from 50 :to 150}))})
@@ -76,25 +112,33 @@
 
       (reset! visible-range* {:from 100 :to 200})
       (fake-dom/click-dom-node! zoom-out-button)
+      (is (= {:from 100 :to 200} @visible-range*))
+      ((:flush-next! animation-clock))
       (is (> (- (:to @visible-range*) (:from @visible-range*)) 100))
+      ((:flush-all! animation-clock))
 
       (reset! visible-range* {:from 100 :to 200})
       (fake-dom/click-dom-node! zoom-in-button)
+      (is (= {:from 100 :to 200} @visible-range*))
+      ((:flush-next! animation-clock))
       (is (< (- (:to @visible-range*) (:from @visible-range*)) 100))
+      ((:flush-all! animation-clock))
 
       (reset! visible-range* {:from 100 :to 200})
       (fake-dom/click-dom-node! scroll-left-button)
+      ((:flush-all! animation-clock))
       (is (< (:from @visible-range*) 100))
 
       (reset! visible-range* {:from 100 :to 200})
       (fake-dom/click-dom-node! scroll-right-button)
+      ((:flush-all! animation-clock))
       (is (> (:from @visible-range*) 100))
 
       (fake-dom/click-dom-node! reset-button)
       (is (= 1 @reset-count*))
       (is (= {:from 50 :to 150} @visible-range*))
       (is (= 5 @interaction-count*))
-      (is (= 4 (count @applied-ranges*))))
+      (is (>= (count @applied-ranges*) 8)))
 
     (chart-navigation-overlay/clear-chart-navigation-overlay! chart-obj)
     (is (zero? (alength (.-children container))))
@@ -105,6 +149,7 @@
   (let [document (fake-dom/make-fake-document)
         container-a (fake-dom/make-fake-element "div")
         container-b (fake-dom/make-fake-element "div")
+        animation-clock (make-animation-clock)
         visible-range* (atom {:from 1 :to 2})
         reset-calls* (atom 0)
         interaction-calls* (atom 0)
@@ -127,7 +172,10 @@
      candles
      {:document document
       :on-interaction (fn []
-                        (swap! interaction-calls* inc))})
+                        (swap! interaction-calls* inc))
+      :now-ms-fn (:now-ms! animation-clock)
+      :request-animation-frame-fn (:request-frame! animation-clock)
+      :cancel-animation-frame-fn (:cancel-frame! animation-clock)})
     (is (fn? (aget (.-listeners ^js container-a) "pointerenter")))
 
     (chart-navigation-overlay/sync-chart-navigation-overlay!
@@ -136,19 +184,29 @@
      candles
      {:document document
       :on-interaction (fn []
-                        (swap! interaction-calls* inc))})
+                        (swap! interaction-calls* inc))
+      :now-ms-fn (:now-ms! animation-clock)
+      :request-animation-frame-fn (:request-frame! animation-clock)
+      :cancel-animation-frame-fn (:cancel-frame! animation-clock)})
     (is (nil? (aget (.-listeners ^js container-a) "pointerenter")))
     (is (fn? (aget (.-listeners ^js container-b) "pointerenter")))
 
     (let [state (@#'hyperopen.views.trading-chart.utils.chart-interop.chart-navigation-overlay/overlay-state
                  chart-obj)
           root (:root state)
+          zoom-out-button (fake-dom/find-dom-node root
+                                                  #(= "Zoom out"
+                                                      (aget ^js % "aria-label")))
           reset-button (fake-dom/find-dom-node root
                                                #(= "Reset chart view"
                                                    (aget ^js % "aria-label")))]
       (fake-dom/click-dom-node! reset-button)
       (is (= 1 @reset-calls*))
-      (is (= 1 @interaction-calls*)))
+      (is (= 1 @interaction-calls*))
+      (fake-dom/click-dom-node! zoom-out-button)
+      (is (= 1 (count @(:queued-frames* animation-clock)))))
 
     (chart-navigation-overlay/clear-chart-navigation-overlay! chart-obj)
-    (is (nil? (aget (.-listeners ^js container-b) "pointerenter")))))
+    (is (nil? (aget (.-listeners ^js container-b) "pointerenter")))
+    (is (= [1] @(:cancelled-frame-ids* animation-clock)))
+    (is (empty? @(:queued-frames* animation-clock)))))

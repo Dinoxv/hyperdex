@@ -1,10 +1,12 @@
-(ns hyperopen.views.trading-chart.utils.chart-interop.chart-navigation-overlay)
+(ns hyperopen.views.trading-chart.utils.chart-interop.chart-navigation-overlay
+  (:require [hyperopen.platform :as platform]))
 
 (defonce ^:private chart-navigation-overlay-sidecar (js/WeakMap.))
 
 (def ^:private min-visible-bars 24)
 (def ^:private zoom-step-fraction 0.20)
 (def ^:private pan-step-fraction 0.25)
+(def ^:private navigation-animation-duration-ms 180)
 
 (defn- overlay-state
   [chart-obj]
@@ -39,6 +41,18 @@
                  (aget target method-name))]
     (when (fn? method)
       (.apply method target (to-array args)))))
+
+(defn- default-now-ms []
+  (if-let [performance* (some-> js/globalThis .-performance)]
+    (.now performance*)
+    (platform/now-ms)))
+
+(defn- default-cancel-animation-frame!
+  [frame-id]
+  (when (some? frame-id)
+    (if (fn? (.-cancelAnimationFrame js/globalThis))
+      (.cancelAnimationFrame js/globalThis frame-id)
+      (js/clearTimeout frame-id))))
 
 (defn- normalize-range
   [range-data]
@@ -77,6 +91,22 @@
   (-> value
       (max min-value)
       (min max-value)))
+
+(defn- lerp
+  [start end progress]
+  (+ start (* (- end start) progress)))
+
+(defn- ease-out-cubic
+  [progress]
+  (let [t (- 1 progress)]
+    (- 1 (* t t t))))
+
+(defn- ranges-close?
+  [a b]
+  (and a
+       b
+       (< (js/Math.abs (- (:from a) (:from b))) 0.0001)
+       (< (js/Math.abs (- (:to a) (:to b))) 0.0001)))
 
 (defn- max-visible-bars
   [candle-count]
@@ -125,6 +155,61 @@
     (when (fn? on-interaction)
       (on-interaction))))
 
+(defn- clear-active-animation!
+  [chart-obj]
+  (when-let [{:keys [frame-id cancel-animation-frame-fn]} (:active-animation (overlay-state chart-obj))]
+    (when (and frame-id (fn? cancel-animation-frame-fn))
+      (cancel-animation-frame-fn frame-id)))
+  (update-overlay-state! chart-obj dissoc :active-animation))
+
+(defn- animation-frame-now-ms
+  [timestamp now-ms-fn]
+  (if (finite-number? timestamp)
+    timestamp
+    (now-ms-fn)))
+
+(defn- animate-logical-range!
+  [chart-obj time-scale current-range target-range]
+  (let [{:keys [request-animation-frame-fn
+                cancel-animation-frame-fn
+                now-ms-fn
+                animation-duration-ms]}
+        (overlay-state chart-obj)
+        duration-ms (max 1 (or animation-duration-ms navigation-animation-duration-ms))
+        started-at-ms (now-ms-fn)]
+    (clear-active-animation! chart-obj)
+    (notify-interaction! chart-obj)
+    (letfn [(queue-frame! [step-fn]
+              (let [frame-id (request-animation-frame-fn step-fn)]
+                (update-overlay-state! chart-obj
+                                       assoc
+                                       :active-animation {:frame-id frame-id
+                                                          :cancel-animation-frame-fn cancel-animation-frame-fn})
+                frame-id))
+            (step [timestamp]
+              (let [current-state (overlay-state chart-obj)
+                    active-animation (:active-animation current-state)]
+                (when (and active-animation
+                           (identical? time-scale
+                                       (invoke-method (:chart current-state) "timeScale")))
+                  (let [elapsed-ms (- (animation-frame-now-ms timestamp now-ms-fn) started-at-ms)
+                        progress (clamp (/ elapsed-ms duration-ms) 0 1)
+                        eased-progress (ease-out-cubic progress)
+                        next-range {:from (lerp (:from current-range)
+                                                (:from target-range)
+                                                eased-progress)
+                                    :to (lerp (:to current-range)
+                                              (:to target-range)
+                                              eased-progress)}]
+                    (set-logical-range! time-scale next-range)
+                    (if (< progress 1)
+                      (queue-frame! step)
+                      (update-overlay-state! chart-obj
+                                             dissoc
+                                             :active-animation))))))]
+      (queue-frame! step)
+      true)))
+
 (defn- apply-navigation-range!
   [chart-obj transform-fn]
   (let [{:keys [chart candle-count]} (overlay-state chart-obj)
@@ -132,15 +217,16 @@
         current-range (current-logical-range time-scale)]
     (when (and current-range
                time-scale)
-      (when (set-logical-range! time-scale
-                                (transform-fn current-range candle-count))
-        (notify-interaction! chart-obj)
-        true))))
+      (when-let [target-range (some-> (transform-fn current-range candle-count)
+                                      normalize-range)]
+        (when-not (ranges-close? current-range target-range)
+          (animate-logical-range! chart-obj time-scale current-range target-range))))))
 
 (defn- reset-view!
   [chart-obj]
   (let [{:keys [chart candles on-reset]} (overlay-state chart-obj)]
     (when chart
+      (clear-active-animation! chart-obj)
       (let [handled? (if (fn? on-reset)
                        (do
                          (on-reset chart candles)
@@ -355,6 +441,7 @@
 (defn clear-chart-navigation-overlay!
   [chart-obj]
   (when chart-obj
+    (clear-active-animation! chart-obj)
     (teardown-container-listeners! (:container-listeners (overlay-state chart-obj)))
     (when-let [root (:root (overlay-state chart-obj))]
       (when-let [parent (.-parentNode root)]
@@ -364,7 +451,13 @@
 (defn sync-chart-navigation-overlay!
   ([chart-obj container candles]
    (sync-chart-navigation-overlay! chart-obj container candles {}))
-  ([chart-obj container candles {:keys [document on-interaction on-reset]
+  ([chart-obj container candles {:keys [document
+                                        on-interaction
+                                        on-reset
+                                        now-ms-fn
+                                        request-animation-frame-fn
+                                        cancel-animation-frame-fn
+                                        animation-duration-ms]
                                  :or {on-interaction (fn [] nil)
                                       on-reset nil}}]
    (if-not (and chart-obj container)
@@ -395,6 +488,18 @@
                    :candle-count candle-count
                    :on-interaction on-interaction
                    :on-reset on-reset
+                   :now-ms-fn (or now-ms-fn
+                                  (:now-ms-fn state)
+                                  default-now-ms)
+                   :request-animation-frame-fn (or request-animation-frame-fn
+                                                   (:request-animation-frame-fn state)
+                                                   platform/request-animation-frame!)
+                   :cancel-animation-frame-fn (or cancel-animation-frame-fn
+                                                  (:cancel-animation-frame-fn state)
+                                                  default-cancel-animation-frame!)
+                   :animation-duration-ms (or animation-duration-ms
+                                              (:animation-duration-ms state)
+                                              navigation-animation-duration-ms)
                    :container-listeners next-listeners))
            (sync-root-visibility! chart-obj))
          (clear-chart-navigation-overlay! chart-obj))))))
