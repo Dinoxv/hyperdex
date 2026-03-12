@@ -256,6 +256,7 @@
             [hyperopen.views.trading-chart.utils.position-overlay-model-test]
             [hyperopen.views.typography-scale-test]
             [hyperopen.views.ui.anchored-popover-test]
+            [hyperopen.views.ui.funding-modal-positioning-test]
             [hyperopen.views.vaults.detail-view-test]
             [hyperopen.views.vaults.detail-vm-test]
             [hyperopen.views.vaults.detail.activity-test]
@@ -583,6 +584,7 @@
              'hyperopen.views.trading-chart.utils.position-overlay-model-test
              'hyperopen.views.typography-scale-test
              'hyperopen.views.ui.anchored-popover-test
+             'hyperopen.views.ui.funding-modal-positioning-test
              'hyperopen.views.vaults.detail-view-test
              'hyperopen.views.vaults.detail-vm-test
              'hyperopen.views.vaults.detail.activity-test

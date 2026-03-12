@@ -1,6 +1,7 @@
 (ns hyperopen.views.trade-view
   (:require [hyperopen.trade.layout-actions :as trade-layout-actions]
             [hyperopen.views.active-asset-view :as active-asset-view]
+            [hyperopen.views.ui.funding-modal-positioning :as funding-modal-positioning]
             [hyperopen.views.l2-orderbook-view :as l2-orderbook-view]
             [hyperopen.views.trading-chart.core :as trading-chart]
             [hyperopen.views.account-info-view :as account-info-view]
@@ -160,7 +161,7 @@
                              "lg:border-base-300"
                              "xl:col-start-3"
                              "xl:row-span-2"])
-               :data-parity-id "trade-order-entry-panel"}
+               :data-parity-id funding-modal-positioning/trade-order-entry-panel-parity-id}
          (order-form-view/order-form-view state*)
          [:div {:class ["hidden" "border-t" "border-base-300" "lg:block"]
                 :data-parity-id "trade-desktop-account-equity-panel"}

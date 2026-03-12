@@ -2,37 +2,8 @@
   (:require [clojure.string :as str]
             [hyperopen.funding.actions :as funding-actions]
             [hyperopen.views.asset-icon :as asset-icon]
-            [hyperopen.views.ui.anchored-popover :as anchored-popover]))
-
-(def ^:private preferred-panel-width-px
-  448)
-
-(def ^:private estimated-panel-height-px
-  560)
-
-(def ^:private popover-divider-gap-px
-  10)
-
-(def ^:private trade-order-entry-panel-max-width-px
-  320)
-
-(def ^:private trade-order-entry-panel-selector
-  "[data-parity-id='trade-order-entry-panel']")
-
-(def ^:private fallback-viewport-width
-  1280)
-
-(def ^:private fallback-viewport-height
-  800)
-
-(def ^:private mobile-sheet-breakpoint-px
-  640)
-
-(def ^:private mobile-sheet-top-offset-px
-  20)
-
-(def ^:private mobile-sheet-modes
-  #{:send :deposit :transfer :withdraw})
+            [hyperopen.views.ui.funding-modal-positioning
+             :as funding-modal-positioning]))
 
 (defn- base-button-classes
   [primary?]
@@ -134,87 +105,6 @@
 
           :else
           grouped-whole)))))
-
-(defn- mode->fallback-anchor-selector
-  [mode]
-  (case mode
-    :deposit "[data-role='funding-action-deposit']"
-    :transfer "[data-role='funding-action-transfer']"
-    :withdraw "[data-role='funding-action-withdraw']"
-    nil))
-
-(defn- anchor-number
-  [anchor k default]
-  (let [value (get anchor k)]
-    (if (number? value)
-      value
-      default)))
-
-(defn- modal-viewport-width
-  [anchor]
-  (max 320
-       (or (when (number? (:viewport-width anchor))
-             (:viewport-width anchor))
-           (some-> js/globalThis .-innerWidth)
-           (when (number? (:right anchor))
-             (+ (:right anchor) 16))
-           fallback-viewport-width)))
-
-(defn- modal-viewport-height
-  [anchor]
-  (max 320
-       (or (when (number? (:viewport-height anchor))
-             (:viewport-height anchor))
-           (some-> js/globalThis .-innerHeight)
-           fallback-viewport-height)))
-
-(defn- mobile-sheet?
-  [modal]
-  (and (contains? mobile-sheet-modes (:mode modal))
-       (<= (modal-viewport-width (or (:anchor modal) {}))
-           mobile-sheet-breakpoint-px)))
-
-(defn- mobile-sheet-style
-  [modal]
-  (let [max-height (max 320
-                        (- (modal-viewport-height (or (:anchor modal) {}))
-                           mobile-sheet-top-offset-px))]
-    {:max-height (str max-height "px")
-     :padding-bottom "max(env(safe-area-inset-bottom), 1rem)"}))
-
-(defn- element-anchor-bounds
-  [selector]
-  (when (seq selector)
-    (let [document* (some-> js/globalThis .-document)
-          target (some-> document* (.querySelector selector))]
-      (when (and target (fn? (.-getBoundingClientRect target)))
-        (let [rect (.getBoundingClientRect target)]
-          {:left (.-left rect)
-           :right (.-right rect)
-           :top (.-top rect)
-           :bottom (.-bottom rect)
-           :width (.-width rect)
-           :height (.-height rect)
-           :viewport-width (some-> js/globalThis .-innerWidth)
-           :viewport-height (some-> js/globalThis .-innerHeight)})))))
-
-(defn- trade-order-entry-divider-left
-  []
-  (let [panel-bounds (element-anchor-bounds trade-order-entry-panel-selector)]
-    (when (and (number? (:left panel-bounds))
-               (number? (:width panel-bounds))
-               (<= (:width panel-bounds) trade-order-entry-panel-max-width-px))
-      (:left panel-bounds))))
-
-(defn- align-anchor-to-trade-order-entry-divider
-  [anchor]
-  (if-let [divider-left (and (anchored-popover/complete-anchor? anchor)
-                             (trade-order-entry-divider-left))]
-    (let [divider-anchor (+ divider-left popover-divider-gap-px)]
-      (assoc anchor
-             :left divider-anchor
-             :right divider-anchor))
-    anchor))
 
 (defn- lifecycle-tx-hash-content
   [{:keys [hash explorer-url]}]
@@ -416,7 +306,7 @@
                   "py-2"
                   "gap-2"]}
     [:input {:type "text"
-             :input-mode "decimal"
+             :inputmode "decimal"
              :placeholder placeholder
              :disabled disabled?
              :value (format-grouped-amount-input value)
@@ -484,7 +374,7 @@
               :on {:click [[max-action]]}}
      "MAX"]
     [:input {:type "text"
-             :input-mode "decimal"
+             :inputmode "decimal"
              :placeholder placeholder
              :disabled disabled?
              :value (format-grouped-amount-input value)
@@ -614,7 +504,7 @@
 
 (defn- deposit-address-content
   [{:keys [selected-asset flow summary lifecycle actions]}]
-  [:div {:class ["space-y-3"] :data-role "funding-deposit-amount-step"}
+  [:div {:class ["space-y-3"] :data-role "funding-deposit-address-step"}
    [:p {:class ["text-sm" "text-[#8ea4ab]"]}
     (str "From the " (:network selected-asset) " network")]
    (deposit-asset-card selected-asset)
@@ -670,81 +560,105 @@
 
 (defn- deposit-amount-content
   [{:keys [selected-asset amount summary actions]}]
-  [:div {:class ["space-y-3"] :data-role "funding-deposit-amount-step"}
-   [:p {:class ["text-sm" "text-[#8ea4ab]"]}
-    (str "From the " (:network selected-asset) " network")]
-   (deposit-asset-card selected-asset)
-   [:div {:class ["space-y-1.5"]}
-    [:label {:class ["block" "text-xs" "text-[#7e94a0]"]}
-     "Amount"]
-    [:div {:class ["flex"
-                   "items-center"
-                   "rounded-lg"
-                   "border"
-                   "border-[#2a4658]"
-                   "bg-[#0f2230]"
-                   "px-2"
-                   "py-1.5"
-                   "gap-2"]}
-     [:button {:type "button"
-               :class ["rounded-md"
-                       "border"
-                       "border-[#445565]"
-                       "bg-[#26313d]"
-                       "px-2"
-                       "py-0.5"
-                       "text-xs"
-                       "font-semibold"
-                       "text-[#e6eef2]"
-                       "hover:border-[#607487]"]
-               :on {:click [[:actions/set-funding-deposit-amount-to-minimum]]}}
-      "MIN"]
-     [:input {:type "text"
-              :input-mode "decimal"
-              :placeholder (str (:minimum-value amount))
-              :disabled (get-in actions [:submitting?])
-              :value (format-grouped-amount-input (:value amount))
-              :class ["flex-1"
-                      "bg-transparent"
-                      "border-0"
-                      "ring-0"
-                      "text-sm"
-                      "text-[#e6eef2]"
-                      "text-right"
-                      "outline-none"
-                      "focus:border-0"
-                      "focus:ring-0"
-                      "disabled:opacity-70"]
-              :on {:input [[:actions/enter-funding-deposit-amount
-                            [:event.target/value]]]}}]
-     [:span {:class ["text-sm" "text-[#7e95a0]"]} (:symbol selected-asset)]]]
-   [:div {:class ["flex" "gap-2"]}
-    (for [quick-amount (:quick-amounts amount)]
-      ^{:key (str "deposit-quick-" quick-amount)}
-      [:button {:type "button"
-                :class ["rounded-md"
-                        "border"
-                        "border-[#3a4d5d]"
-                        "bg-[#111f29]"
-                        "px-3"
-                        "py-1.5"
-                        "text-xs"
-                        "text-[#e0ebef]"
-                        "hover:border-[#537089]"
-                        "hover:bg-[#162b37]"]
-                :on {:click [[:actions/enter-funding-deposit-amount
-                              (str quick-amount)]]}}
-       (if (>= quick-amount 1000)
-         (str (/ quick-amount 1000) "k")
-         (str quick-amount))])]
-   [:div {:class ["space-y-1.5" "pt-2" "text-sm"]}
-    (for [row (:rows summary)]
-      ^{:key (:label row)}
-      (summary-row row))]
-   (action-row {:back-action :actions/return-to-funding-deposit-asset-select
-                :submit-action :actions/submit-funding-deposit
-                :submit-label (get-in actions [:submit-label])
-                :submit-disabled? (get-in actions [:submit-disabled?])})])
+  (let [submitting? (get-in actions [:submitting?])]
+    [:div {:class ["space-y-3"] :data-role "funding-deposit-amount-step"}
+     [:p {:class ["text-sm" "text-[#8ea4ab]"]}
+      (str "From the " (:network selected-asset) " network")]
+     (deposit-asset-card selected-asset)
+     [:div {:class ["space-y-1.5"]}
+      [:label {:class ["block" "text-xs" "text-[#7e94a0]"]}
+       "Amount"]
+      [:div {:class ["flex"
+                     "items-center"
+                     "rounded-lg"
+                     "border"
+                     "border-[#2a4658]"
+                     "bg-[#0f2230]"
+                     "px-2"
+                     "py-1.5"
+                     "gap-2"]}
+       [:button {:type "button"
+                 :disabled submitting?
+                 :class (if submitting?
+                          ["rounded-md"
+                           "border"
+                           "border-[#445565]"
+                           "bg-[#1d2933]"
+                           "px-2"
+                           "py-0.5"
+                           "text-xs"
+                           "font-semibold"
+                           "text-[#6f868c]"
+                           "cursor-not-allowed"]
+                          ["rounded-md"
+                           "border"
+                           "border-[#445565]"
+                           "bg-[#26313d]"
+                           "px-2"
+                           "py-0.5"
+                           "text-xs"
+                           "font-semibold"
+                           "text-[#e6eef2]"
+                           "hover:border-[#607487]"])
+                 :on {:click [[:actions/set-funding-deposit-amount-to-minimum]]}}
+        "MIN"]
+       [:input {:type "text"
+                :inputmode "decimal"
+                :placeholder (str (:minimum-value amount))
+                :disabled submitting?
+                :value (format-grouped-amount-input (:value amount))
+                :class ["flex-1"
+                        "bg-transparent"
+                        "border-0"
+                        "ring-0"
+                        "text-sm"
+                        "text-[#e6eef2]"
+                        "text-right"
+                        "outline-none"
+                        "focus:border-0"
+                        "focus:ring-0"
+                        "disabled:opacity-70"]
+                :on {:input [[:actions/enter-funding-deposit-amount
+                              [:event.target/value]]]}}]
+       [:span {:class ["text-sm" "text-[#7e95a0]"]} (:symbol selected-asset)]]]
+     [:div {:class ["flex" "gap-2"]}
+      (for [quick-amount (:quick-amounts amount)]
+        ^{:key (str "deposit-quick-" quick-amount)}
+        [:button {:type "button"
+                  :disabled submitting?
+                  :class (if submitting?
+                           ["rounded-md"
+                            "border"
+                            "border-[#31404c]"
+                            "bg-[#111921]"
+                            "px-3"
+                            "py-1.5"
+                            "text-xs"
+                            "text-[#6f868c]"
+                            "cursor-not-allowed"]
+                           ["rounded-md"
+                            "border"
+                            "border-[#3a4d5d]"
+                            "bg-[#111f29]"
+                            "px-3"
+                            "py-1.5"
+                            "text-xs"
+                            "text-[#e0ebef]"
+                            "hover:border-[#537089]"
+                            "hover:bg-[#162b37]"])
+                  :on {:click [[:actions/enter-funding-deposit-amount
+                                (str quick-amount)]]}}
+         (if (>= quick-amount 1000)
+           (str (/ quick-amount 1000) "k")
+           (str quick-amount))])]
+     [:div {:class ["space-y-1.5" "pt-2" "text-sm"]}
+      (for [row (:rows summary)]
+        ^{:key (:label row)}
+        (summary-row row))]
+     (action-row {:back-action :actions/return-to-funding-deposit-asset-select
+                  :submit-action :actions/submit-funding-deposit
+                  :submit-label (get-in actions [:submit-label])
+                  :submit-disabled? (get-in actions [:submit-disabled?])})]))
 
 (defn- deposit-unavailable-content
   [{:keys [flow actions]}]
@@ -1136,6 +1050,26 @@
               :on {:click [[:actions/close-funding-modal]]}}
      "Close"]]])
 
+(defn- unknown-content
+  [{:keys [kind]}]
+  [:div {:class ["space-y-3"] :data-role "funding-unknown-content"}
+   [:div {:class ["rounded-lg"
+                  "border"
+                  "border-[#7b3340]"
+                  "bg-[#3a1b22]/55"
+                  "px-3"
+                  "py-3"
+                  "space-y-1.5"]}
+    [:p {:class ["text-sm" "text-[#f2b8c5]"]}
+     "This funding modal state is not supported yet."]
+    [:p {:class ["text-xs" "text-[#d7b8c0]"]}
+     (str "Unhandled content kind: " (pr-str kind))]]
+   [:div {:class ["flex" "justify-end"]}
+    [:button {:type "button"
+              :class (base-button-classes true)
+              :on {:click [[:actions/close-funding-modal]]}}
+     "Close"]]])
+
 (defn- render-content
   [{:keys [content deposit send transfer withdraw legacy]}]
   (case (:kind content)
@@ -1149,73 +1083,63 @@
     :withdraw/select (withdraw-select-content withdraw)
     :withdraw/detail (withdraw-detail-content withdraw)
     :unsupported/workflow (legacy-content legacy)
-    nil))
+    (unknown-content content)))
 
 (defn render-funding-modal
   [{:keys [modal feedback] :as view-model}]
-  (let [open? (:open? modal)
-        stored-anchor* (if (map? (:anchor modal)) (:anchor modal) {})
-        mobile-sheet? (mobile-sheet? modal)
-        fallback-anchor* (when-not (anchored-popover/complete-anchor? stored-anchor*)
-                           (element-anchor-bounds
-                            (mode->fallback-anchor-selector (:mode modal))))
-        anchor (-> (or fallback-anchor* stored-anchor*)
-                   align-anchor-to-trade-order-entry-divider)
-        anchored-popover? (and (not mobile-sheet?)
-                               (anchored-popover/complete-anchor? anchor))
-        popover-style (when anchored-popover?
-                        (anchored-popover/anchored-popover-layout-style
-                         {:anchor anchor
-                          :preferred-width-px preferred-panel-width-px
-                          :estimated-height-px estimated-panel-height-px}))
-        sheet-style (when mobile-sheet?
-                      (mobile-sheet-style (assoc modal :anchor anchor)))
-        panel-children
-        [[:div {:class ["flex" "items-center" "justify-between"]}
-          [:h2 {:class ["text-lg" "font-semibold" "text-[#e5eef1]"]}
-           (:title modal)]
-          [:button {:type "button"
-                    :class (into ["h-8"
-                                  "w-8"
-                                  "leading-none"
-                                  "text-xl"
-                                  "transition-colors"
-                                  "focus:outline-none"
-                                  "focus:ring-1"
-                                  "focus:ring-[#66e3c5]/40"
-                                  "focus:ring-offset-0"
-                                  "focus:shadow-none"]
-                                 (if mobile-sheet?
-                                   ["inline-flex"
-                                    "items-center"
-                                    "justify-center"
-                                    "rounded-lg"
-                                    "border"
-                                    "border-[#17313d]"
-                                    "bg-[#0b181d]"
-                                    "text-gray-300"
-                                    "hover:bg-[#102229]"
-                                    "hover:text-gray-100"]
-                                   ["rounded-md"
-                                    "text-[#7f98a0]"
-                                    "hover:bg-[#0f2834]"
-                                    "hover:text-[#dce9ee]"]))
-                    :on {:click [[:actions/close-funding-modal]]}}
-           "×"]]
-         (render-content view-model)
-         (when (:visible? feedback)
-           [:div {:class ["rounded-md"
-                          "border"
-                          "border-[#7b3340]"
-                          "bg-[#3a1b22]/55"
-                          "px-3"
-                          "py-2"
-                          "text-sm"
-                          "text-[#f2b8c5]"]
-                  :data-role "funding-status"}
-            (:message feedback)])]]
+  (let [open? (:open? modal)]
     (when open?
-      (if mobile-sheet?
+      (let [{:keys [mobile-sheet?
+                    anchored-popover?
+                    popover-style
+                    sheet-style]}
+            (funding-modal-positioning/resolve-modal-layout modal)
+            panel-children
+            [[:div {:class ["flex" "items-center" "justify-between"]}
+              [:h2 {:class ["text-lg" "font-semibold" "text-[#e5eef1]"]}
+               (:title modal)]
+              [:button {:type "button"
+                        :aria-label "Close funding dialog"
+                        :class (into ["h-8"
+                                      "w-8"
+                                      "leading-none"
+                                      "text-xl"
+                                      "transition-colors"
+                                      "focus:outline-none"
+                                      "focus:ring-1"
+                                      "focus:ring-[#66e3c5]/40"
+                                      "focus:ring-offset-0"
+                                      "focus:shadow-none"]
+                                     (if mobile-sheet?
+                                       ["inline-flex"
+                                        "items-center"
+                                        "justify-center"
+                                        "rounded-lg"
+                                        "border"
+                                        "border-[#17313d]"
+                                        "bg-[#0b181d]"
+                                        "text-gray-300"
+                                        "hover:bg-[#102229]"
+                                        "hover:text-gray-100"]
+                                       ["rounded-md"
+                                        "text-[#7f98a0]"
+                                        "hover:bg-[#0f2834]"
+                                        "hover:text-[#dce9ee]"]))
+                        :on {:click [[:actions/close-funding-modal]]}}
+               "×"]]
+             (render-content view-model)
+             (when (:visible? feedback)
+               [:div {:class ["rounded-md"
+                              "border"
+                              "border-[#7b3340]"
+                              "bg-[#3a1b22]/55"
+                              "px-3"
+                              "py-2"
+                              "text-sm"
+                              "text-[#f2b8c5]"]
+                      :data-role "funding-status"}
+                (:message feedback)])]]
+        (if mobile-sheet?
         [:div {:class ["fixed" "inset-0" "z-[80]"]
                :data-role "funding-mobile-sheet-layer"}
          [:button {:type "button"
@@ -1287,7 +1211,7 @@
                         :data-parity-id "funding-modal-desktop"
                         :on {:keydown [[:actions/handle-funding-modal-keydown
                                         [:event/key]]]}}]
-               (keep identity panel-children))]))))
+               (keep identity panel-children))])))))
 
 (defn funding-modal-view
   [state]

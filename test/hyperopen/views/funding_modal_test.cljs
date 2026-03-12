@@ -81,12 +81,28 @@
                                                :last-updated-ms 1700000000000
                                                :error nil}})
         view-node (view/funding-modal-view state)
-        deposit-step (find-first-node view-node #(= "funding-deposit-amount-step"
+        deposit-step (find-first-node view-node #(= "funding-deposit-address-step"
                                                     (get-in % [1 :data-role])))
         deposit-lifecycle (find-first-node view-node #(= "funding-deposit-lifecycle"
                                                          (get-in % [1 :data-role])))]
     (is (some? deposit-step))
     (is (nil? deposit-lifecycle))))
+
+(deftest closed-funding-modal-does-not-read-dom-for-layout-test
+  (let [query-count (atom 0)
+        original-document (.-document js/globalThis)]
+    (set! (.-document js/globalThis)
+          #js {:querySelector (fn [_selector]
+                                (swap! query-count inc)
+                                nil)})
+    (try
+      (is (nil? (view/render-funding-modal {:modal {:open? false
+                                                    :mode :deposit
+                                                    :title "Deposit"}
+                                            :content {:kind :deposit/select}})))
+      (is (zero? @query-count))
+      (finally
+        (set! (.-document js/globalThis) original-document)))))
 
 (deftest funding-modal-falls-back-to-selector-anchor-when-stored-anchor-missing-test
   (let [state (assoc-in (base-state)
@@ -222,6 +238,45 @@
     (is (contains? all-text "Bridge broadcast failed"))
     (is (contains? all-text "1.25 BTC available"))))
 
+(deftest deposit-address-content-uses-address-step-role-test
+  (let [content (@#'view/deposit-address-content {:selected-asset {:symbol "BTC"
+                                                                   :network "Bitcoin"}
+                                                  :flow {}
+                                                  :summary {:rows []}
+                                                  :lifecycle nil
+                                                  :actions {:submit-label "Deposit"
+                                                            :submit-disabled? false}})
+        address-step (find-first-node content #(= "funding-deposit-address-step"
+                                                  (get-in % [1 :data-role])))
+        amount-step (find-first-node content #(= "funding-deposit-amount-step"
+                                                 (get-in % [1 :data-role])))]
+    (is (some? address-step))
+    (is (nil? amount-step))))
+
+(deftest deposit-amount-content-disables-quick-controls-while-submitting-test
+  (let [content (@#'view/deposit-amount-content {:selected-asset {:symbol "USDC"
+                                                                  :network "Ethereum"}
+                                                 :amount {:minimum-value "5"
+                                                          :value "12.5"
+                                                          :quick-amounts [25 1000]}
+                                                 :summary {:rows []}
+                                                 :actions {:submit-label "Submitting..."
+                                                           :submit-disabled? true
+                                                           :submitting? true}})
+        min-button (find-first-node content
+                                    #(= [[:actions/set-funding-deposit-amount-to-minimum]]
+                                        (get-in % [1 :on :click])))
+        quick-button (find-first-node content
+                                      #(= [[:actions/enter-funding-deposit-amount "25"]]
+                                          (get-in % [1 :on :click])))
+        input-node (find-first-node content
+                                    #(and (= :input (first %))
+                                          (= "decimal" (get-in % [1 :inputmode]))))]
+    (is (true? (get-in min-button [1 :disabled])))
+    (is (true? (get-in quick-button [1 :disabled])))
+    (is (= "decimal" (get-in input-node [1 :inputmode])))
+    (is (nil? (get-in input-node [1 :input-mode])))))
+
 (deftest withdraw-detail-content-renders-unavailable-queue-and-error-copy-from-flow-model-test
   (let [selected-asset {:key :btc
                         :symbol "BTC"
@@ -340,6 +395,22 @@
     (is (contains? all-text "Destination tx hash"))
     (is (contains? all-text "tx-raw"))
     (is (contains? all-text "Scheduled"))))
+
+(deftest funding-modal-renders-explicit-fallback-for-unknown-content-kind-test
+  (let [view-node (view/render-funding-modal {:modal {:open? true
+                                                      :mode :deposit
+                                                      :title "Funding"}
+                                              :content {:kind :mystery/state}})
+        fallback-node (find-first-node view-node #(= "funding-unknown-content"
+                                                     (get-in % [1 :data-role])))
+        close-button (find-first-node view-node
+                                      #(and (= :button (first %))
+                                            (= "×" (last %))))
+        all-text (set (collect-strings view-node))]
+    (is (some? fallback-node))
+    (is (contains? all-text "This funding modal state is not supported yet."))
+    (is (contains? all-text "Unhandled content kind: :mystery/state"))
+    (is (= "Close funding dialog" (get-in close-button [1 :aria-label])))))
 
 (deftest funding-send-modal-renders-mobile-sheet-layout-test
   (let [state (assoc-in (base-state)

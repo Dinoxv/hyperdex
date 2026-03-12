@@ -2,6 +2,7 @@
   (:require [clojure.string :as str]
             [hyperopen.account.context :as account-context]
             [hyperopen.views.account-info.projections :as account-projections]
+            [hyperopen.views.ui.funding-modal-positioning :as funding-modal-positioning]
             [hyperopen.utils.formatting :as fmt]))
 
 (defn parse-num [value]
@@ -122,14 +123,14 @@
   [:div.space-y-2
    (funding-action-button {:label "Deposit"
                            :primary? true
-                           :data-role "funding-action-deposit"
+                           :data-role funding-modal-positioning/deposit-action-data-role
                            :action [:actions/open-funding-deposit-modal :event.currentTarget/bounds]})
    [:div.grid.grid-cols-2.gap-2.5
     (funding-action-button {:label "Perps <-> Spot"
-                            :data-role "funding-action-transfer"
+                            :data-role funding-modal-positioning/transfer-action-data-role
                             :action [:actions/open-funding-transfer-modal :event.currentTarget/bounds]})
     (funding-action-button {:label "Withdraw"
-                            :data-role "funding-action-withdraw"
+                            :data-role funding-modal-positioning/withdraw-action-data-role
                             :action [:actions/open-funding-withdraw-modal :event.currentTarget/bounds]})]])
 
 (defn funding-actions-view
