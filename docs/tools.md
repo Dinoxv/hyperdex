@@ -17,8 +17,9 @@ Use this file as the single starting point for what actions this repo provides t
 3. For shared command phrase lookup, use `/hyperopen/tools/phrase get "<phrase>"` and `/hyperopen/command-phrases.edn`.
 4. For browser parity/debug workflows, use the Browser Inspection section below.
 5. For CRAP hotspot analysis after generating coverage, use `bb tools/crap_report.clj --scope src` or `bb tools/crap_report.clj --module <path> --format json`.
-6. For issue tracking and session handoff rules, use `/hyperopen/docs/WORK_TRACKING.md`.
-7. For exact browser inspection command syntax, see:
+6. For repo-local mutation testing on one covered module at a time, use `bb tools/mutate.clj --scan --module <path>` after `npm run coverage`.
+7. For issue tracking and session handoff rules, use `/hyperopen/docs/WORK_TRACKING.md`.
+8. For exact browser inspection command syntax, see:
    - `/hyperopen/tools/browser-inspection/src/cli.mjs`
    - `/hyperopen/tools/browser-inspection/src/mcp_server.mjs`
 
@@ -29,6 +30,7 @@ Use this file as the single starting point for what actions this repo provides t
 | `npm run check` | Lint, docs checks, and compile app/test builds | Before finishing code changes |
 | `npm test` | Full test suite | Regular validation and regression confidence |
 | `npm run test:crap` | Fast Babashka tests for CRAP-tool parsing and report math | Before changing the CRAP analyzer/reporter |
+| `npm run test:mutation` | Fast Babashka tests for the mutation tool | Before changing `/hyperopen/tools/mutate/**` |
 | `npm run lint:delimiters -- --changed` | Fast Clojure/CLJS reader preflight on changed files | Before `npm test`, `npm run test:websocket`, or manual `shadow-cljs` compiles after syntax-heavy edits |
 | `npm run test:websocket` | Websocket-only suite | Websocket runtime/API changes |
 | `npm run dev` | Watch app and portfolio worker builds alongside Tailwind | Normal frontend development |
@@ -37,6 +39,8 @@ Use this file as the single starting point for what actions this repo provides t
 | `npm run portfolio:watch` | Watch the dedicated Shadow `:portfolio` target | Workbench-only CLJS compile loop |
 | `npm run test:runner:generate` | Regenerate test runner list | Usually after adding/removing test namespaces |
 | `bb tools/crap_report.clj --scope src` | Print CRAP hotspots from existing `coverage/lcov.info` | After `npm run coverage` when triaging risky functions/modules |
+| `bb tools/mutate.clj --scan --module src/hyperopen/...` | Report mutation counts and coverage-aware eligible sites for one module | After `npm run coverage` when validating a hotspot module or pure policy seam |
+| `bb tools/mutate.clj --module src/hyperopen/...` | Run mutation testing for one module and write artifacts under `target/mutation/**` | Local confidence pass on a covered module after targeted refactors or bug fixes |
 | `npm run browser:inspect -- --url <url> --target <label>` | One-off parity capture | Visual/runtime parity evidence and smoke checks |
 | `npm run browser:compare` | One-off compare capture | Compare two targets (Hyperliquid vs local) |
 | `npm run qa:pr-ui` | Run the fixed critical UI scenario bundle | Required merge-time validation for high-risk UI changes |

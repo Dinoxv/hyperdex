@@ -12,12 +12,14 @@ Repository build and test entry points:
 - `npm run check`
 - `npm test`
 - `npm run test:crap`
+- `npm run test:mutation`
 - `npm run lint:delimiters -- --changed`
 - `npm run test:websocket`
 - `npm run dev`
 - `npm run dev:portfolio`
 - `npm run portfolio`
 - `bb tools/crap_report.clj --scope src`
+- `bb tools/mutate.clj --scan --module src/hyperopen/...`
 - `npm run test:browser-inspection`
 
 Local discovery and semantic analysis commands:

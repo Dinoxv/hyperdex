@@ -119,6 +119,24 @@
   [a b]
   (merge-with max a b))
 
+(defn line-builds-by-file
+  [records]
+  (reduce (fn [acc {:keys [file build lines]}]
+            (if (and file build)
+              (reduce-kv (fn [line-acc line hits]
+                           (if (pos? hits)
+                             (update-in line-acc [file line] (fnil conj #{}) build)
+                             line-acc))
+                         acc
+                         lines)
+              acc))
+          {}
+          records))
+
+(defn covered-builds-for-line
+  [line-builds file line]
+  (get-in line-builds [file line] #{}))
+
 (defn merge-file-coverage
   [records {:keys [build]}]
   (reduce (fn [acc {:keys [file lines function-lines] :as record}]
