@@ -7,6 +7,7 @@
 (def ^:private zoom-step-fraction 0.20)
 (def ^:private pan-step-bars 4)
 (def ^:private navigation-animation-duration-ms 180)
+(def ^:private hover-activation-fraction 0.55)
 (def ^:private editable-tag-names #{"INPUT" "TEXTAREA" "SELECT"})
 (def ^:private shortcut-labels
   {:zoom-in "Ctrl/Cmd + Up"
@@ -151,6 +152,33 @@
   [chart-obj]
   (let [{:keys [hovered? focus-within?]} (overlay-state chart-obj)]
     (or hovered? focus-within?)))
+
+(defn- container-hover-active?
+  [container event]
+  (let [rect (when (fn? (.-getBoundingClientRect container))
+               (.getBoundingClientRect container))
+        height (cond
+                 (finite-number? (some-> rect .-height))
+                 (.-height rect)
+
+                 (finite-number? (.-clientHeight container))
+                 (.-clientHeight container)
+
+                 :else nil)
+        pointer-y (cond
+                    (and rect
+                         (finite-number? (some-> rect .-top))
+                         (finite-number? (.-clientY event)))
+                    (- (.-clientY event) (.-top rect))
+
+                    (finite-number? (.-offsetY event))
+                    (.-offsetY event)
+
+                    :else nil)]
+    (and (finite-number? height)
+         (pos? height)
+         (finite-number? pointer-y)
+         (>= pointer-y (* height hover-activation-fraction)))))
 
 (defn- event-target-editable?
   [event]
@@ -391,23 +419,33 @@
 
 (defn- attach-container-listeners!
   [chart-obj container]
-  (let [on-pointer-enter (fn [_]
-                           (update-overlay-state! chart-obj assoc :hovered? true)
-                           (sync-root-visibility! chart-obj))
+  (let [sync-hover-state! (fn [event]
+                            (update-overlay-state! chart-obj
+                                                   assoc
+                                                   :hovered? (container-hover-active? container event))
+                            (sync-root-visibility! chart-obj))
+        on-pointer-enter (fn [event]
+                           (sync-hover-state! event))
+        on-pointer-move (fn [event]
+                          (sync-hover-state! event))
         on-pointer-leave (fn [_]
                            (update-overlay-state! chart-obj assoc :hovered? false)
                            (sync-root-visibility! chart-obj))]
     (.addEventListener container "pointerenter" on-pointer-enter)
+    (.addEventListener container "pointermove" on-pointer-move)
     (.addEventListener container "pointerleave" on-pointer-leave)
     {:container container
      :on-pointer-enter on-pointer-enter
+     :on-pointer-move on-pointer-move
      :on-pointer-leave on-pointer-leave}))
 
 (defn- teardown-container-listeners!
-  [{:keys [container on-pointer-enter on-pointer-leave]}]
+  [{:keys [container on-pointer-enter on-pointer-move on-pointer-leave]}]
   (when container
     (when on-pointer-enter
       (.removeEventListener container "pointerenter" on-pointer-enter))
+    (when on-pointer-move
+      (.removeEventListener container "pointermove" on-pointer-move))
     (when on-pointer-leave
       (.removeEventListener container "pointerleave" on-pointer-leave))))
 

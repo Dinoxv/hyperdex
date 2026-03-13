@@ -46,6 +46,8 @@
         element #js {:tagName tag
                      :nodeType 1
                      :style #js {}
+                     :clientWidth 320
+                     :clientHeight 200
                      :children children
                      :childNodes child-nodes
                      :listeners listeners
@@ -117,7 +119,15 @@
       (set! (.-dispatchEvent element)
             (fn [event-name payload]
               (when-let [handler (aget listeners event-name)]
-                (handler payload)))))
+                (handler payload))))
+      (set! (.-getBoundingClientRect element)
+            (fn []
+              #js {:top 0
+                   :left 0
+                   :width (.-clientWidth element)
+                   :height (.-clientHeight element)
+                   :right (.-clientWidth element)
+                   :bottom (.-clientHeight element)})))
     element))
 
 (defn make-fake-document []

@@ -107,9 +107,17 @@
       (is (= "Scroll to the right (Right Arrow)" (aget ^js scroll-right-button "title")))
       (is (= "Reset chart view" (aget ^js reset-button "title")))
 
-      (fake-dom/dispatch-dom-event! container "pointerenter")
+      (fake-dom/dispatch-dom-event-with-payload! container "pointerenter" #js {:clientY 60})
+      (is (= "0" (.-opacity (.-style root))))
+      (is (= "none" (.-pointerEvents (.-style root))))
+
+      (fake-dom/dispatch-dom-event-with-payload! container "pointermove" #js {:clientY 140})
       (is (= "1" (.-opacity (.-style root))))
       (is (= "auto" (.-pointerEvents (.-style root))))
+
+      (fake-dom/dispatch-dom-event-with-payload! container "pointermove" #js {:clientY 70})
+      (is (= "0" (.-opacity (.-style root))))
+      (is (= "none" (.-pointerEvents (.-style root))))
 
       (fake-dom/dispatch-dom-event! container "pointerleave")
       (is (= "0" (.-opacity (.-style root))))
@@ -200,7 +208,7 @@
       (is (false? @stopped?))
       (is (empty? @(:queued-frames* animation-clock))))
 
-    (fake-dom/dispatch-dom-event! container "pointerenter")
+    (fake-dom/dispatch-dom-event-with-payload! container "pointerenter" #js {:clientY 140})
 
     (let [{:keys [event prevented? stopped?]} (keydown-event "ArrowDown")]
       (set! (.-metaKey event) true)
@@ -269,6 +277,7 @@
       :request-animation-frame-fn (:request-frame! animation-clock)
       :cancel-animation-frame-fn (:cancel-frame! animation-clock)})
     (is (fn? (aget (.-listeners ^js container-a) "pointerenter")))
+    (is (fn? (aget (.-listeners ^js container-a) "pointermove")))
 
     (chart-navigation-overlay/sync-chart-navigation-overlay!
      chart-obj
@@ -281,7 +290,9 @@
       :request-animation-frame-fn (:request-frame! animation-clock)
       :cancel-animation-frame-fn (:cancel-frame! animation-clock)})
     (is (nil? (aget (.-listeners ^js container-a) "pointerenter")))
+    (is (nil? (aget (.-listeners ^js container-a) "pointermove")))
     (is (fn? (aget (.-listeners ^js container-b) "pointerenter")))
+    (is (fn? (aget (.-listeners ^js container-b) "pointermove")))
 
     (let [state (@#'hyperopen.views.trading-chart.utils.chart-interop.chart-navigation-overlay/overlay-state
                  chart-obj)
@@ -300,5 +311,6 @@
 
     (chart-navigation-overlay/clear-chart-navigation-overlay! chart-obj)
     (is (nil? (aget (.-listeners ^js container-b) "pointerenter")))
+    (is (nil? (aget (.-listeners ^js container-b) "pointermove")))
     (is (= [1] @(:cancelled-frame-ids* animation-clock)))
     (is (empty? @(:queued-frames* animation-clock)))))
