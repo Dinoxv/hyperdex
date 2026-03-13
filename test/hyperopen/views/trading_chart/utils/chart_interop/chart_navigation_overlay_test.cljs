@@ -103,6 +103,8 @@
       (is (= "4px" (.-gap (.-style panel))))
       (is (= "rgba(58, 66, 79, 0.94)" (.-background (.-style zoom-out-button))))
       (is (= "none" (.-border (.-style zoom-out-button))))
+      (is (= "Zoom out (Ctrl/Cmd + Down)" (aget ^js zoom-out-button "title")))
+      (is (= "Scroll to the right (Right Arrow)" (aget ^js scroll-right-button "title")))
       (is (= "Reset chart view" (aget ^js reset-button "title")))
 
       (fake-dom/dispatch-dom-event! container "pointerenter")
@@ -152,6 +154,88 @@
     (is (zero? (alength (.-children container))))
     (is (= {} (@#'hyperopen.views.trading-chart.utils.chart-interop.chart-navigation-overlay/overlay-state
                chart-obj)))))
+
+(deftest chart-navigation-overlay-keyboard-shortcuts-require-active-overlay-and-map-actions-test
+  (let [document (fake-dom/make-fake-document)
+        container (fake-dom/make-fake-element "div")
+        animation-clock (make-animation-clock)
+        visible-range* (atom {:from 100 :to 200})
+        interaction-count* (atom 0)
+        time-scale #js {:getVisibleLogicalRange (fn []
+                                                  (clj->js @visible-range*))
+                        :setVisibleLogicalRange (fn [range]
+                                                  (reset! visible-range* (js->clj range :keywordize-keys true)))}
+        chart #js {:timeScale (fn []
+                                time-scale)}
+        chart-obj #js {:chart chart}
+        keydown-event (fn [key]
+                        (let [prevented? (atom false)
+                              stopped? (atom false)]
+                          {:event (doto #js {:key key
+                                             :target #js {:tagName "DIV"}
+                                             :metaKey false
+                                             :ctrlKey false
+                                             :altKey false
+                                             :shiftKey false}
+                                    (aset "preventDefault" (fn [] (reset! prevented? true)))
+                                    (aset "stopPropagation" (fn [] (reset! stopped? true))))
+                           :prevented? prevented?
+                           :stopped? stopped?}))]
+    (chart-navigation-overlay/sync-chart-navigation-overlay!
+     chart-obj
+     container
+     []
+     {:document document
+      :on-interaction (fn []
+                        (swap! interaction-count* inc))
+      :now-ms-fn (:now-ms! animation-clock)
+      :request-animation-frame-fn (:request-frame! animation-clock)
+      :cancel-animation-frame-fn (:cancel-frame! animation-clock)})
+
+    (let [{:keys [event prevented? stopped?]} (keydown-event "ArrowDown")]
+      (set! (.-metaKey event) true)
+      (fake-dom/dispatch-dom-event-with-payload! document "keydown" event)
+      (is (= {:from 100 :to 200} @visible-range*))
+      (is (false? @prevented?))
+      (is (false? @stopped?))
+      (is (empty? @(:queued-frames* animation-clock))))
+
+    (fake-dom/dispatch-dom-event! container "pointerenter")
+
+    (let [{:keys [event prevented? stopped?]} (keydown-event "ArrowDown")]
+      (set! (.-metaKey event) true)
+      (fake-dom/dispatch-dom-event-with-payload! document "keydown" event)
+      (is @prevented?)
+      (is @stopped?))
+    ((:flush-all! animation-clock))
+    (is (= {:from 90 :to 210} @visible-range*))
+
+    (reset! visible-range* {:from 100 :to 200})
+    (let [{:keys [event]} (keydown-event "ArrowUp")]
+      (set! (.-ctrlKey event) true)
+      (fake-dom/dispatch-dom-event-with-payload! document "keydown" event))
+    ((:flush-all! animation-clock))
+    (is (= {:from 110 :to 190} @visible-range*))
+
+    (reset! visible-range* {:from 100 :to 200})
+    (let [{:keys [event prevented? stopped?]} (keydown-event "ArrowLeft")]
+      (fake-dom/dispatch-dom-event-with-payload! document "keydown" event)
+      (is @prevented?)
+      (is @stopped?))
+    ((:flush-all! animation-clock))
+    (is (= {:from 96 :to 196} @visible-range*))
+
+    (reset! visible-range* {:from 100 :to 200})
+    (let [{:keys [event prevented? stopped?]} (keydown-event "ArrowRight")]
+      (fake-dom/dispatch-dom-event-with-payload! document "keydown" event)
+      (is @prevented?)
+      (is @stopped?))
+    ((:flush-all! animation-clock))
+    (is (= {:from 104 :to 204} @visible-range*))
+    (is (= 4 @interaction-count*))
+
+    (chart-navigation-overlay/clear-chart-navigation-overlay! chart-obj)
+    (is (nil? (aget (.-listeners ^js document) "keydown")))))
 
 (deftest chart-navigation-overlay-resync-rebinds-container-listeners-and-default-reset-test
   (let [document (fake-dom/make-fake-document)

@@ -7,6 +7,14 @@
 (def ^:private zoom-step-fraction 0.20)
 (def ^:private pan-step-bars 4)
 (def ^:private navigation-animation-duration-ms 180)
+(def ^:private editable-tag-names #{"INPUT" "TEXTAREA" "SELECT"})
+(def ^:private shortcut-labels
+  {:zoom-in "Ctrl/Cmd + Up"
+   :zoom-out "Ctrl/Cmd + Down"
+   :scroll-left "Left Arrow"
+   :scroll-right "Right Arrow"})
+
+(declare reset-view!)
 
 (defn- overlay-state
   [chart-obj]
@@ -139,6 +147,34 @@
     {:from (+ (:from range-data) delta)
      :to (+ (:to range-data) delta)}))
 
+(defn- overlay-interactive?
+  [chart-obj]
+  (let [{:keys [hovered? focus-within?]} (overlay-state chart-obj)]
+    (or hovered? focus-within?)))
+
+(defn- event-target-editable?
+  [event]
+  (let [target (.-target event)
+        tag-name (some-> target .-tagName)]
+    (or (true? (some-> target .-isContentEditable))
+        (contains? editable-tag-names tag-name))))
+
+(defn- navigation-shortcut-action
+  [event]
+  (when (and (not (.-altKey event))
+             (not (.-shiftKey event))
+             (not (event-target-editable? event)))
+    (case (.-key event)
+      "ArrowUp" (when (or (.-metaKey event)
+                          (.-ctrlKey event))
+                  :zoom-in)
+      "ArrowDown" (when (or (.-metaKey event)
+                            (.-ctrlKey event))
+                    :zoom-out)
+      "ArrowLeft" :scroll-left
+      "ArrowRight" :scroll-right
+      nil)))
+
 (defn- default-reset!
   [chart]
   (or (true? (invoke-method chart "resetTimeScale"))
@@ -221,6 +257,28 @@
         (when-not (ranges-close? current-range target-range)
           (animate-logical-range! chart-obj time-scale current-range target-range))))))
 
+(defn- zoom-chart!
+  [chart-obj direction]
+  (apply-navigation-range! chart-obj
+                           (fn [range-data candle-count]
+                             (zoom-range range-data direction candle-count))))
+
+(defn- pan-chart!
+  [chart-obj direction]
+  (apply-navigation-range! chart-obj
+                           (fn [range-data _]
+                             (pan-range range-data direction))))
+
+(defn- perform-navigation-action!
+  [chart-obj action]
+  (case action
+    :zoom-in (zoom-chart! chart-obj :in)
+    :zoom-out (zoom-chart! chart-obj :out)
+    :scroll-left (pan-chart! chart-obj :left)
+    :scroll-right (pan-chart! chart-obj :right)
+    :reset-view (reset-view! chart-obj)
+    nil))
+
 (defn- reset-view!
   [chart-obj]
   (let [{:keys [chart candles on-reset]} (overlay-state chart-obj)]
@@ -269,11 +327,15 @@
     icon))
 
 (defn- build-control-button!
-  [document {:keys [aria-label title icon-path on-click]}]
+  [document {:keys [aria-label title icon-path on-click shortcut-key]}]
   (let [button (.createElement document "button")]
     (.setAttribute button "type" "button")
     (.setAttribute button "aria-label" aria-label)
-    (.setAttribute button "title" title)
+    (.setAttribute button
+                   "title"
+                   (if-let [shortcut-label (get shortcut-labels shortcut-key)]
+                     (str title " (" shortcut-label ")")
+                     title))
     (let [style (.-style button)]
       (set! (.-width style) "28px")
       (set! (.-height style) "26px")
@@ -349,6 +411,23 @@
     (when on-pointer-leave
       (.removeEventListener container "pointerleave" on-pointer-leave))))
 
+(defn- attach-document-listeners!
+  [chart-obj document]
+  (let [on-key-down (fn [event]
+                      (when (overlay-interactive? chart-obj)
+                        (when-let [action (navigation-shortcut-action event)]
+                          (.preventDefault event)
+                          (.stopPropagation event)
+                          (perform-navigation-action! chart-obj action))))]
+    (.addEventListener document "keydown" on-key-down)
+    {:document document
+     :on-key-down on-key-down}))
+
+(defn- teardown-document-listeners!
+  [{:keys [document on-key-down]}]
+  (when (and document on-key-down)
+    (.removeEventListener document "keydown" on-key-down)))
+
 (defn- create-overlay-root!
   [chart-obj document]
   (let [root (.createElement document "div")
@@ -356,27 +435,27 @@
         controls [{:id :zoom-out
                    :aria-label "Zoom out"
                    :title "Zoom out"
+                   :shortcut-key :zoom-out
                    :icon-path "M5 10h10"
-                   :on-click #(apply-navigation-range! chart-obj (fn [range-data candle-count]
-                                                                   (zoom-range range-data :out candle-count)))}
+                   :on-click #(zoom-chart! chart-obj :out)}
                   {:id :zoom-in
                    :aria-label "Zoom in"
                    :title "Zoom in"
+                   :shortcut-key :zoom-in
                    :icon-path "M10 5v10M5 10h10"
-                   :on-click #(apply-navigation-range! chart-obj (fn [range-data candle-count]
-                                                                   (zoom-range range-data :in candle-count)))}
+                   :on-click #(zoom-chart! chart-obj :in)}
                   {:id :scroll-left
                    :aria-label "Scroll left"
-                   :title "Scroll left"
+                   :title "Scroll to the left"
+                   :shortcut-key :scroll-left
                    :icon-path "M12.5 5L7.5 10l5 5"
-                   :on-click #(apply-navigation-range! chart-obj (fn [range-data _]
-                                                                   (pan-range range-data :left)))}
+                   :on-click #(pan-chart! chart-obj :left)}
                   {:id :scroll-right
                    :aria-label "Scroll right"
-                   :title "Scroll right"
+                   :title "Scroll to the right"
+                   :shortcut-key :scroll-right
                    :icon-path "M7.5 5l5 5-5 5"
-                   :on-click #(apply-navigation-range! chart-obj (fn [range-data _]
-                                                                   (pan-range range-data :right)))}
+                   :on-click #(pan-chart! chart-obj :right)}
                   {:id :reset-view
                    :aria-label "Reset chart view"
                    :title "Reset chart view"
@@ -413,12 +492,13 @@
                                      (not (.contains panel next-focused)))
                              (update-overlay-state! chart-obj assoc :focus-within? false)
                              (sync-root-visibility! chart-obj)))))
-    (doseq [{:keys [aria-label title icon-path on-click]} controls]
+    (doseq [{:keys [aria-label title icon-path on-click shortcut-key]} controls]
       (.appendChild panel
                     (build-control-button!
                      document
                      {:aria-label aria-label
                       :title title
+                      :shortcut-key shortcut-key
                       :icon-path icon-path
                       :on-click on-click})))
     (.appendChild root panel)
@@ -446,6 +526,7 @@
   (when chart-obj
     (clear-active-animation! chart-obj)
     (teardown-container-listeners! (:container-listeners (overlay-state chart-obj)))
+    (teardown-document-listeners! (:document-listeners (overlay-state chart-obj)))
     (when-let [root (:root (overlay-state chart-obj))]
       (when-let [parent (.-parentNode root)]
         (.removeChild parent root)))
@@ -471,13 +552,21 @@
          (let [{:keys [root panel]} (ensure-overlay-root! chart-obj container document*)
                state (overlay-state chart-obj)
                current-listeners (:container-listeners state)
+               current-document-listeners (:document-listeners state)
                listeners-reused? (and current-listeners
                                       (identical? container (:container current-listeners)))
+               document-listeners-reused? (and current-document-listeners
+                                              (identical? document* (:document current-document-listeners)))
                next-listeners (if listeners-reused?
                                 current-listeners
                                 (do
                                   (teardown-container-listeners! current-listeners)
                                   (attach-container-listeners! chart-obj container)))
+               next-document-listeners (if document-listeners-reused?
+                                         current-document-listeners
+                                         (do
+                                           (teardown-document-listeners! current-document-listeners)
+                                           (attach-document-listeners! chart-obj document*)))
                candle-count (if (sequential? candles)
                               (count candles)
                               0)]
@@ -503,6 +592,7 @@
                    :animation-duration-ms (or animation-duration-ms
                                               (:animation-duration-ms state)
                                               navigation-animation-duration-ms)
+                   :document-listeners next-document-listeners
                    :container-listeners next-listeners))
            (sync-root-visibility! chart-obj))
          (clear-chart-navigation-overlay! chart-obj))))))

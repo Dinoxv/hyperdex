@@ -121,12 +121,25 @@
     element))
 
 (defn make-fake-document []
-  #js {:createElement (fn [tag]
-                        (make-fake-element tag))
-       :createElementNS (fn [_ns tag]
-                          (make-fake-element tag))
-       :createTextNode (fn [text]
-                         (make-fake-text-node text))})
+  (let [listeners (js-obj)
+        document #js {:listeners listeners
+                      :createElement (fn [tag]
+                                       (make-fake-element tag))
+                      :createElementNS (fn [_ns tag]
+                                         (make-fake-element tag))
+                      :createTextNode (fn [text]
+                                        (make-fake-text-node text))}]
+    (set! (.-addEventListener document)
+          (fn [event-name handler]
+            (aset listeners event-name handler)))
+    (set! (.-removeEventListener document)
+          (fn [event-name _handler]
+            (js-delete listeners event-name)))
+    (set! (.-dispatchEvent document)
+          (fn [event-name payload]
+            (when-let [handler (aget listeners event-name)]
+              (handler payload))))
+    document))
 
 (defn collect-text-nodes [node]
   (cond
