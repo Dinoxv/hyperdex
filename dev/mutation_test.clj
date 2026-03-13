@@ -3,6 +3,7 @@
 (ns dev.mutation-test
   (:require [clojure.java.io :as io]
             [clojure.test :refer [deftest is run-tests testing]]
+            [dev.mutation-nightly-test]
             [tools.mutate.cli-options :as cli]
             [tools.mutate.core :as core]
             [tools.mutate.coverage :as coverage]
@@ -227,7 +228,8 @@
 
 (defn -main
   [& _args]
-  (let [{:keys [fail error]} (run-tests 'dev.mutation-test)]
+  (let [{:keys [fail error]} (run-tests 'dev.mutation-test
+                                        'dev.mutation-nightly-test)]
     (System/exit (if (zero? (+ fail error)) 0 1))))
 
 (when (= *file* (System/getProperty "babashka.file"))

@@ -18,8 +18,9 @@ Use this file as the single starting point for what actions this repo provides t
 4. For browser parity/debug workflows, use the Browser Inspection section below.
 5. For CRAP hotspot analysis after generating coverage, use `bb tools/crap_report.clj --scope src` or `bb tools/crap_report.clj --module <path> --format json`.
 6. For repo-local mutation testing on one covered module at a time, use `bb tools/mutate.clj --scan --module <path>` after `npm run coverage`.
-7. For issue tracking and session handoff rules, use `/hyperopen/docs/WORK_TRACKING.md`.
-8. For exact browser inspection command syntax, see:
+7. For a checked-in overnight hotspot sweep, use `bb tools/mutate_nightly.clj` with targets from `/hyperopen/tools/mutate/nightly_targets.edn`.
+8. For issue tracking and session handoff rules, use `/hyperopen/docs/WORK_TRACKING.md`.
+9. For exact browser inspection command syntax, see:
    - `/hyperopen/tools/browser-inspection/src/cli.mjs`
    - `/hyperopen/tools/browser-inspection/src/mcp_server.mjs`
 
@@ -33,6 +34,7 @@ Use this file as the single starting point for what actions this repo provides t
 | `npm run test:mutation` | Fast Babashka tests for the mutation tool | Before changing `/hyperopen/tools/mutate/**` |
 | `npm run lint:delimiters -- --changed` | Fast Clojure/CLJS reader preflight on changed files | Before `npm test`, `npm run test:websocket`, or manual `shadow-cljs` compiles after syntax-heavy edits |
 | `npm run test:websocket` | Websocket-only suite | Websocket runtime/API changes |
+| `npm run mutate:nightly` | Rebuild coverage, run the configured nightly mutation sweep, and write aggregate summaries under `target/mutation/nightly/**` | Overnight hotspot sweeps or local batch mutation audits |
 | `npm run dev` | Watch app and portfolio worker builds alongside Tailwind | Normal frontend development |
 | `npm run dev:portfolio` | Watch app, Portfolio workbench, and portfolio worker builds alongside Tailwind | When you need the main app and workbench together |
 | `npm run portfolio` | Watch only the Portfolio workbench plus Tailwind | Isolated component workbench iteration |
@@ -41,6 +43,7 @@ Use this file as the single starting point for what actions this repo provides t
 | `bb tools/crap_report.clj --scope src` | Print CRAP hotspots from existing `coverage/lcov.info` | After `npm run coverage` when triaging risky functions/modules |
 | `bb tools/mutate.clj --scan --module src/hyperopen/...` | Report mutation counts and coverage-aware eligible sites for one module | After `npm run coverage` when validating a hotspot module or pure policy seam |
 | `bb tools/mutate.clj --module src/hyperopen/...` | Run mutation testing for one module and write artifacts under `target/mutation/**` | Local confidence pass on a covered module after targeted refactors or bug fixes |
+| `bb tools/mutate_nightly.clj` | Run the checked-in nightly mutation target list serially and aggregate markdown/JSON summaries | Overnight mutation sweeps, regression spotting, or local ranking of weak modules |
 | `npm run browser:inspect -- --url <url> --target <label>` | One-off parity capture | Visual/runtime parity evidence and smoke checks |
 | `npm run browser:compare` | One-off compare capture | Compare two targets (Hyperliquid vs local) |
 | `npm run qa:pr-ui` | Run the fixed critical UI scenario bundle | Required merge-time validation for high-risk UI changes |
