@@ -1,4 +1,5 @@
-(ns hyperopen.websocket.diagnostics-runtime)
+(ns hyperopen.websocket.diagnostics-runtime
+  (:require [hyperopen.websocket.diagnostics.policy :as diagnostics-policy]))
 
 (defn- reset-group-match?
   [stream group]
@@ -42,16 +43,9 @@
            append-diagnostics-event!]}]
   (let [state @store
         health (get-health-snapshot)
-        transport-state (get-in health [:transport :state])
         generated-at-ms (or (:generated-at-ms health) 0)
         now-ms (effective-now-ms generated-at-ms)
-        in-progress? (boolean (get-in state [:websocket-ui :reset-in-progress?]))
-        cooldown-until-ms (get-in state [:websocket-ui :reset-cooldown-until-ms])
-        cooldown-active? (and (number? cooldown-until-ms)
-                              (> cooldown-until-ms now-ms))
-        blocked? (or in-progress?
-                     cooldown-active?
-                     (contains? #{:connecting :reconnecting} transport-state))
+        blocked? (diagnostics-policy/reset-blocked? state health now-ms)
         group-key (if (= group :all) :all group)
         descriptors (reset-target-descriptors health group)]
     (when (and (not blocked?)

@@ -301,6 +301,9 @@
             [hyperopen.websocket.diagnostics-payload-test]
             [hyperopen.websocket.diagnostics-runtime-test]
             [hyperopen.websocket.diagnostics-sanitize-test]
+            [hyperopen.websocket.diagnostics.catalog-test]
+            [hyperopen.websocket.diagnostics.policy-test]
+            [hyperopen.websocket.diagnostics.view-model-test]
             [hyperopen.websocket.domain.model-test]
             [hyperopen.websocket.domain.policy-test]
             [hyperopen.websocket.endpoints-coverage-test]
@@ -635,6 +638,9 @@
              'hyperopen.websocket.diagnostics-payload-test
              'hyperopen.websocket.diagnostics-runtime-test
              'hyperopen.websocket.diagnostics-sanitize-test
+             'hyperopen.websocket.diagnostics.catalog-test
+             'hyperopen.websocket.diagnostics.policy-test
+             'hyperopen.websocket.diagnostics.view-model-test
              'hyperopen.websocket.domain.model-test
              'hyperopen.websocket.domain.policy-test
              'hyperopen.websocket.endpoints-coverage-test

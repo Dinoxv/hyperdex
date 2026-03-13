@@ -1,15 +1,12 @@
 (ns hyperopen.websocket.health-runtime
   (:require [clojure.string :as str]
             [hyperopen.platform :as platform]
+            [hyperopen.websocket.diagnostics.policy :as diagnostics-policy]
             [hyperopen.websocket.health-projection :as health-projection]))
 
 (defn effective-now-ms
   [generated-at-ms]
-  (let [generated* (or generated-at-ms 0)
-        wall-now-ms (platform/now-ms)]
-    (if (>= generated* 1000000000000)
-      (max generated* wall-now-ms)
-      generated*)))
+  (diagnostics-policy/effective-now-ms generated-at-ms (platform/now-ms)))
 
 (defn auto-recover-enabled? []
   (let [flag (some-> js/globalThis (aget "ENABLE_WS_AUTO_RECOVER"))]

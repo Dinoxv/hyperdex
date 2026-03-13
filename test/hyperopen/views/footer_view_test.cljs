@@ -241,6 +241,19 @@
         (is (= "Online" (node-text pill)))
         (is (= 3 (meter-active-bar-count view)))))))
 
+(deftest diagnostics-drawer-surfaces-browser-network-penalty-breakdown-test
+  (with-browser-connection
+    #js {:effectiveType "3g"
+         :rtt 450
+         :downlink 0.7
+         :saveData false}
+    (fn []
+      (let [view (footer-view/footer-view (assoc-in (base-state) [:websocket-ui :diagnostics-open?] true))
+            text (node-text view)]
+        (is (str/includes? text "Browser network hint"))
+        (is (str/includes? text "3g"))
+        (is (str/includes? text "20"))))))
+
 (deftest status-meter-degrades-for-live-headroom-before-delayed-threshold-test
   (let [state (-> (base-state)
                   (assoc-in [:websocket :health :generated-at-ms] 10000)

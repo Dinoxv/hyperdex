@@ -1,4 +1,5 @@
-(ns hyperopen.websocket.diagnostics-actions)
+(ns hyperopen.websocket.diagnostics-actions
+  (:require [hyperopen.websocket.diagnostics.policy :as diagnostics-policy]))
 
 (defn toggle-ws-diagnostics
   [state]
@@ -26,10 +27,11 @@
   (let [transport-state (get-in state [:websocket :health :transport :state])
         generated-at-ms (or (get-in state [:websocket :health :generated-at-ms]) 0)
         now-ms (effective-now-ms generated-at-ms)
-        cooldown-until-ms (get-in state [:websocket-ui :reconnect-cooldown-until-ms])]
-    (or (contains? #{:connecting :reconnecting} transport-state)
-        (and (number? cooldown-until-ms)
-             (> cooldown-until-ms now-ms)))))
+        health {:transport {:state transport-state}}]
+    (diagnostics-policy/reconnect-blocked?
+     state
+     health
+     now-ms)))
 
 (defn ws-diagnostics-reconnect-now
   [state {:keys [effective-now-ms reconnect-cooldown-ms]}]
@@ -62,12 +64,11 @@
   (let [transport-state (get-in state [:websocket :health :transport :state])
         generated-at-ms (or (get-in state [:websocket :health :generated-at-ms]) 0)
         now-ms (effective-now-ms generated-at-ms)
-        in-progress? (boolean (get-in state [:websocket-ui :reset-in-progress?]))
-        cooldown-until-ms (get-in state [:websocket-ui :reset-cooldown-until-ms])]
-    (or in-progress?
-        (contains? #{:connecting :reconnecting} transport-state)
-        (and (number? cooldown-until-ms)
-             (> cooldown-until-ms now-ms)))))
+        health {:transport {:state transport-state}}]
+    (diagnostics-policy/reset-blocked?
+     state
+     health
+     now-ms)))
 
 (defn ws-diagnostics-reset-subscriptions
   [state group source {:keys [effective-now-ms]}]

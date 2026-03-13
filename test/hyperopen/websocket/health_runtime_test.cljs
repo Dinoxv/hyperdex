@@ -1,5 +1,6 @@
 (ns hyperopen.websocket.health-runtime-test
   (:require [cljs.test :refer-macros [deftest is]]
+            [hyperopen.platform :as platform]
             [hyperopen.websocket.health-projection :as health-projection]
             [hyperopen.websocket.health-runtime :as health-runtime]))
 
@@ -17,6 +18,11 @@
   (is (= 500 (health-runtime/effective-now-ms 500)))
   (is (= 9999999999999
          (health-runtime/effective-now-ms 9999999999999))))
+
+(deftest effective-now-ms-falls-back-to-wall-time-when-generated-at-ms-missing-test
+  (with-redefs [platform/now-ms (constantly 1700000001234)]
+    (is (= 1700000001234
+           (health-runtime/effective-now-ms nil)))))
 
 (deftest sync-websocket-health-refreshes-when-time-bucket-advances-test
   (let [store (atom {:websocket {:health {}}
