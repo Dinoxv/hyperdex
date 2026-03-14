@@ -58,6 +58,14 @@
                          (when (pred x) idx))
                        xs)))
 
+(defn- approx=
+  ([expected actual]
+   (approx= expected actual 1e-9))
+  ([expected actual epsilon]
+   (and (number? expected)
+        (number? actual)
+        (<= (js/Math.abs (- expected actual)) epsilon))))
+
 (deftest account-equity-heading-and-label-contrast-test
   (let [view-node (view/account-equity-view {:webdata2 {}
                                              :spot {}
@@ -351,3 +359,76 @@
     (is (= 204.45 expected-portfolio))
     (is (some? portfolio-value-node))
     (is (contains? (node-class-set portfolio-value-node) "text-trading-text"))))
+
+(deftest unified-account-summary-aggregates-named-dex-clearinghouse-states-test
+  (let [state {:account {:mode :unified}
+               :webdata2 {:clearinghouseState {:marginSummary {:accountValue "0.0"
+                                                                :totalNtlPos "0.0"
+                                                                :totalRawUsd "0.0"
+                                                                :totalMarginUsed "0.0"}
+                                                :crossMarginSummary {:accountValue "0.0"
+                                                                     :totalNtlPos "0.0"
+                                                                     :totalRawUsd "0.0"
+                                                                     :totalMarginUsed "0.0"}
+                                                :crossMaintenanceMarginUsed "0.0"
+                                                :assetPositions []}
+                          :spotAssetCtxs []}
+               :spot {:meta {:tokens [{:index 0
+                                       :name "USDC"
+                                       :weiDecimals 6}
+                                      {:index 1
+                                       :name "MEOW"
+                                       :weiDecimals 6}]
+                             :universe []}
+                      :clearinghouse-state {:balances [{:coin "USDC"
+                                                        :token 0
+                                                        :hold "0.0"
+                                                        :total "400.0"
+                                                        :entryNtl "0"}
+                                                       {:coin "MEOW"
+                                                        :token 1
+                                                        :hold "0.0"
+                                                        :total "100.0"
+                                                        :entryNtl "0"}]}}
+               :asset-selector {:market-by-key {"perp:xyz:GOLD" {:key "perp:xyz:GOLD"
+                                                                 :coin "xyz:GOLD"
+                                                                 :market-type :perp
+                                                                 :dex "xyz"
+                                                                 :quote "USDC"}
+                                                "perp:xyz:AAPL" {:key "perp:xyz:AAPL"
+                                                                 :coin "xyz:AAPL"
+                                                                 :market-type :perp
+                                                                 :dex "xyz"
+                                                                 :quote "USDC"}
+                                                "spot:MEOW/USDC" {:key "spot:MEOW/USDC"
+                                                                  :coin "MEOW/USDC"
+                                                                  :market-type :spot
+                                                                  :base "MEOW"
+                                                                  :quote "USDC"
+                                                                  :mark 1.0}}}
+               :perp-dex-clearinghouse {"xyz" {:marginSummary {:accountValue "90.0"
+                                                                :totalNtlPos "150.0"
+                                                                :totalRawUsd "0.0"
+                                                                :totalMarginUsed "30.0"}
+                                                :crossMarginSummary {:accountValue "80.0"
+                                                                     :totalNtlPos "50.0"
+                                                                     :totalRawUsd "0.0"
+                                                                     :totalMarginUsed "10.0"}
+                                                :crossMaintenanceMarginUsed "1.0"
+                                                :assetPositions [{:position {:coin "xyz:GOLD"
+                                                                             :marginUsed "20.0"
+                                                                             :leverage {:type "isolated"
+                                                                                        :value 20}
+                                                                             :positionValue "100.0"
+                                                                             :unrealizedPnl "3.0"}}
+                                                                 {:position {:coin "xyz:AAPL"
+                                                                             :marginUsed "10.0"
+                                                                             :leverage {:type "cross"
+                                                                                        :value 5}
+                                                                             :positionValue "50.0"
+                                                                             :unrealizedPnl "-1.0"}}]}}}
+        metrics (view/account-equity-metrics state)]
+    (is (approx= 500.0 (:portfolio-value metrics)))
+    (is (approx= (/ 1.0 380.0) (:unified-account-ratio metrics)))
+    (is (approx= 1.0 (:maintenance-margin metrics)))
+    (is (approx= 0.125 (:unified-account-leverage metrics)))))
