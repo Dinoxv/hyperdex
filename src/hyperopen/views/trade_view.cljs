@@ -80,7 +80,7 @@
                               :show-surface-freshness-cues? show-surface-freshness-cues?
                               :websocket-health websocket-health
                               :loading (and active-asset (nil? orderbook-data))}]
-    [:div {:class ["flex-1" "flex" "flex-col" "min-h-0"]
+    [:div {:class ["flex-1" "flex" "flex-col" "min-h-0" "scrollbar-hide" "xl:overflow-y-auto"]
            :data-parity-id "trade-root"}
      [:div {:class ["w-full" "h-full" "px-0" "py-0" "space-y-0" "flex" "flex-col" "min-h-0"]}
       [:div {:class (into ["lg:hidden" "border-b" "border-base-300" "bg-base-200"]
@@ -108,6 +108,7 @@
                       "lg:h-full"
                       "lg:grid-cols-[minmax(0,1fr)_320px]"
                       "lg:grid-rows-[minmax(520px,1fr)_minmax(300px,auto)]"
+                      "xl:min-h-[964px]"
                       "xl:grid-cols-[minmax(0,1fr)_280px_320px]"
                       "xl:grid-rows-[minmax(580px,1fr)_auto]"]}
         [:div {:class (into [(if (= mobile-surface :chart) "flex" "hidden")

@@ -164,9 +164,12 @@
         root-classes (root-class-set view-node)]
     (is (not (contains? root-classes "overflow-auto")))
     (is (contains? root-classes "min-h-0"))
+    (is (contains? root-classes "scrollbar-hide"))
+    (is (contains? root-classes "xl:overflow-y-auto"))
     (is (contains-class? view-node "right-[320px]"))
     (is (contains-class? view-node "lg:grid-cols-[minmax(0,1fr)_320px]"))
     (is (contains-class? view-node "lg:grid-rows-[minmax(520px,1fr)_minmax(300px,auto)]"))
+    (is (contains-class? view-node "xl:min-h-[964px]"))
     (is (contains-class? view-node "xl:grid-cols-[minmax(0,1fr)_280px_320px]"))
     (is (contains-class? view-node "xl:grid-rows-[minmax(580px,1fr)_auto]"))
     (is (not (contains-class? view-node "xl:grid-rows-[minmax(580px,auto)_auto]")))
