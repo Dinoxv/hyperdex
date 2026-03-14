@@ -1,6 +1,7 @@
 (ns hyperopen.views.account-equity-view-test
   (:require [clojure.string :as str]
             [cljs.test :refer-macros [deftest is testing]]
+            [hyperopen.views.account-info.derived-cache :as derived-cache]
             [hyperopen.views.account-info.projections :as projections]
             [hyperopen.views.account-equity-view :as view]))
 
@@ -468,3 +469,41 @@
     (is (approx= (/ 1.0 380.0) (:unified-account-ratio metrics)))
     (is (approx= 1.0 (:maintenance-margin metrics)))
     (is (approx= 0.125 (:unified-account-leverage metrics)))))
+
+(deftest account-equity-metrics-memoize-by-relevant-state-slices-test
+  (let [webdata2 {:clearinghouseState {:marginSummary {:accountValue "25.0"
+                                                       :totalNtlPos "0.0"
+                                                       :totalRawUsd "25.0"
+                                                       :totalMarginUsed "0.0"}
+                                       :crossMarginSummary {:accountValue "25.0"
+                                                            :totalNtlPos "0.0"
+                                                            :totalRawUsd "25.0"
+                                                            :totalMarginUsed "0.0"}
+                                       :crossMaintenanceMarginUsed "0.0"
+                                       :assetPositions []}}
+        spot {:meta nil
+              :clearinghouse-state nil}
+        account {:mode :classic}
+        perp-dex-clearinghouse {}
+        market-by-key {}
+        state-a {:webdata2 webdata2
+                 :spot spot
+                 :account account
+                 :perp-dex-clearinghouse perp-dex-clearinghouse
+                 :asset-selector {:market-by-key market-by-key}
+                 :orderbooks {:BTC []}}
+        state-b (assoc state-a :orderbooks {:ETH []})
+        balance-row-calls (atom 0)
+        positions-calls (atom 0)]
+    (with-redefs [derived-cache/memoized-balance-rows (fn [_webdata2 _spot-data _account _market-by-key]
+                                                        (swap! balance-row-calls inc)
+                                                        [])
+                  derived-cache/memoized-positions (fn [_webdata2 _perp-dex-states]
+                                                     (swap! positions-calls inc)
+                                                     [])]
+      (view/reset-account-equity-metrics-cache!)
+      (view/account-equity-metrics state-a)
+      (view/account-equity-metrics state-b)
+      (is (= 1 @balance-row-calls))
+      (is (= 1 @positions-calls))
+      (view/reset-account-equity-metrics-cache!))))

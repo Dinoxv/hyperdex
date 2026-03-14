@@ -2,9 +2,13 @@
   (:require [clojure.string :as str]
             [hyperopen.account.context :as account-context]
             [hyperopen.asset-selector.markets :as asset-selector-markets]
+            [hyperopen.views.account-info.derived-cache :as derived-cache]
             [hyperopen.views.account-info.projections :as account-projections]
             [hyperopen.views.ui.funding-modal-positioning :as funding-modal-positioning]
             [hyperopen.utils.formatting :as fmt]))
+
+(defonce ^:private account-equity-metrics-cache
+  (atom nil))
 
 (defn parse-num [value]
   (cond
@@ -400,11 +404,11 @@
         cross-total-margin-used (parse-num (:totalMarginUsed cross-summary))
         maintenance-margin (parse-num (:crossMaintenanceMarginUsed clearinghouse-state))
         market-by-key (get-in state [:asset-selector :market-by-key] {})
-        balance-rows (account-projections/build-balance-rows webdata2 (:spot state) (:account state) market-by-key)
+        balance-rows (derived-cache/memoized-balance-rows webdata2 (:spot state) (:account state) market-by-key)
         balance-row-by-token (balance-rows-by-token balance-rows)
         perps-row (first (filter #(= "perps-usdc" (:key %)) balance-rows))
         perps-row-balance (parse-num (:total-balance perps-row))
-        positions (account-projections/collect-positions webdata2 (:perp-dex-clearinghouse state))
+        positions (derived-cache/memoized-positions webdata2 (:perp-dex-clearinghouse state))
         unrealized-from-positions (let [vals (keep #(parse-num (get-in % [:position :unrealizedPnl])) positions)]
                                     (when (seq vals)
                                       (reduce + vals)))
@@ -463,8 +467,37 @@
      :account-value-display account-value-display
      :pnl-info pnl-info}))
 
+(defn- memoized-account-equity-metrics
+  [state]
+  (let [webdata2 (:webdata2 state)
+        spot-data (:spot state)
+        account (:account state)
+        perp-dex-states (:perp-dex-clearinghouse state)
+        market-by-key (get-in state [:asset-selector :market-by-key])
+        cache @account-equity-metrics-cache
+        cache-hit? (and (map? cache)
+                        (identical? webdata2 (:webdata2 cache))
+                        (identical? spot-data (:spot-data cache))
+                        (identical? account (:account cache))
+                        (identical? perp-dex-states (:perp-dex-states cache))
+                        (identical? market-by-key (:market-by-key cache)))]
+    (if cache-hit?
+      (:result cache)
+      (let [result (derive-account-equity-metrics state)]
+        (reset! account-equity-metrics-cache {:webdata2 webdata2
+                                              :spot-data spot-data
+                                              :account account
+                                              :perp-dex-states perp-dex-states
+                                              :market-by-key market-by-key
+                                              :result result})
+        result))))
+
 (defn account-equity-metrics [state]
-  (derive-account-equity-metrics state))
+  (memoized-account-equity-metrics state))
+
+(defn reset-account-equity-metrics-cache!
+  []
+  (reset! account-equity-metrics-cache nil))
 
 (defn- classic-account-equity-view [{:keys [spot-equity
                                             perps-value
@@ -535,16 +568,17 @@
 (defn account-equity-view
   ([state]
    (account-equity-view state {}))
-  ([state {:keys [fill-height? show-funding-actions?]
+  ([state {:keys [fill-height? show-funding-actions? metrics]
            :or {fill-height? true
                 show-funding-actions? true}}]
-   (let [metrics (derive-account-equity-metrics state)]
-    (if (unified-account? state)
-      (unified-account-summary-view (assoc metrics
+   (let [metrics* (or metrics
+                      (account-equity-metrics state))]
+     (if (unified-account? state)
+       (unified-account-summary-view (assoc metrics*
+                                            :fill-height? fill-height?
+                                            :show-funding-actions? show-funding-actions?
+                                            :state state))
+       (classic-account-equity-view (assoc metrics*
                                            :fill-height? fill-height?
                                            :show-funding-actions? show-funding-actions?
-                                           :state state))
-      (classic-account-equity-view (assoc metrics
-                                          :fill-height? fill-height?
-                                          :show-funding-actions? show-funding-actions?
-                                          :state state))))))
+                                           :state state))))))

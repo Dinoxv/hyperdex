@@ -41,11 +41,12 @@
                                 :trades
                                 :orderbook)))
 
-(defn- mobile-account-surface [state]
+(defn- mobile-account-surface [state equity-metrics]
   [:div {:class ["flex" "h-full" "min-h-0" "flex-col" "bg-base-100"]
          :data-parity-id "trade-mobile-account-surface"}
-   (account-equity-view/account-equity-view state {:fill-height? false
-                                                   :show-funding-actions? false})
+  (account-equity-view/account-equity-view state {:fill-height? false
+                                                   :show-funding-actions? false
+                                                   :metrics equity-metrics})
    (account-equity-view/funding-actions-view
     state
     {:container-classes ["mt-auto"
@@ -71,6 +72,7 @@
         (boolean (get-in state [:websocket-ui :show-surface-freshness-cues?] false))
         websocket-health (get-in state [:websocket :health])
         state* (assoc state :websocket-health websocket-health)
+        equity-metrics (account-equity-view/account-equity-metrics state)
         orderbook-view-state {:coin (or active-asset "No Asset Selected")
                               :market (:active-market state)
                               :orderbook orderbook-data
@@ -96,18 +98,18 @@
           (mobile-surface-button mobile-surface surface))]]
       [:div {:class ["relative" "flex-1" "min-h-0"]}
        [:div {:class ["hidden" "xl:block" "absolute" "top-0" "bottom-0" "right-[320px]" "w-px" "bg-base-300" "pointer-events-none" "z-10"]}]
-        [:div {:class ["grid"
-                       "h-auto"
-                       "min-h-0"
-                       "grid-cols-1"
-                       "gap-x-0" "gap-y-0"
-                       "bg-base-100"
-                       "items-stretch"
-                       "lg:h-full"
-                       "lg:grid-cols-[minmax(0,1fr)_320px]"
-                       "lg:grid-rows-[minmax(520px,1fr)_minmax(300px,auto)]"
-                       "xl:grid-cols-[minmax(0,1fr)_280px_320px]"
-                        "xl:grid-rows-[minmax(580px,1fr)_auto]"]}
+       [:div {:class ["grid"
+                      "h-auto"
+                      "min-h-0"
+                      "grid-cols-1"
+                      "gap-x-0" "gap-y-0"
+                      "bg-base-100"
+                      "items-stretch"
+                      "lg:h-full"
+                      "lg:grid-cols-[minmax(0,1fr)_320px]"
+                      "lg:grid-rows-[minmax(520px,1fr)_minmax(300px,auto)]"
+                      "xl:grid-cols-[minmax(0,1fr)_280px_320px]"
+                      "xl:grid-rows-[minmax(580px,1fr)_auto]"]}
         [:div {:class (into [(if (= mobile-surface :chart) "flex" "hidden")
                              "bg-base-100"
                              "flex-col"
@@ -165,7 +167,7 @@
          (order-form-view/order-form-view state*)
          [:div {:class ["hidden" "border-t" "border-base-300" "lg:block"]
                 :data-parity-id "trade-desktop-account-equity-panel"}
-          (account-equity-view/account-equity-view state*)]]
+          (account-equity-view/account-equity-view state* {:metrics equity-metrics})]]
 
         [:div {:class (into [(if (= mobile-surface :account)
                                "hidden"
@@ -185,23 +187,20 @@
          [:div {:class ["w-full" "lg:hidden"]
                 :data-parity-id "trade-mobile-account-panel"}
           (account-info-view/account-info-view state*)]
-        [:div {:class ["hidden" "w-full" "min-h-0" "lg:flex"]
+         [:div {:class ["hidden" "w-full" "min-h-0" "lg:flex"]
                 :data-parity-id "trade-desktop-account-panel"}
-          (account-info-view/account-info-view state*)]]
-        ]
+          (account-info-view/account-info-view state*)]]]
 
-       [:div {:class (into [(if mobile-account-surface?
-                               "flex"
-                               "hidden")
-                             "absolute"
-                             "inset-0"
-                             "z-20"
-                             "bg-base-100"
-                             "border-t"
-                             "border-base-300"
-                             "flex-col"
-                             "min-h-0"
-                             "lg:hidden"]
-                            [])
-               :data-parity-id "trade-mobile-account-summary-panel"}
-        (mobile-account-surface state*)]]]]))
+       (when mobile-account-surface?
+         [:div {:class ["absolute"
+                        "inset-0"
+                        "z-20"
+                        "bg-base-100"
+                        "border-t"
+                        "border-base-300"
+                        "flex"
+                        "flex-col"
+                        "min-h-0"
+                        "lg:hidden"]
+                :data-parity-id "trade-mobile-account-summary-panel"}
+          (mobile-account-surface state* equity-metrics)])]]]))

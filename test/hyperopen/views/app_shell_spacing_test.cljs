@@ -3,6 +3,7 @@
             [cljs.test :refer-macros [deftest is]]
             [hyperopen.state.trading :as trading]
             [hyperopen.views.app-view :as app-view]
+            [hyperopen.views.account-equity-view :as account-equity-view]
             [hyperopen.views.footer-view :as footer-view]
             [hyperopen.views.header-view :as header-view]
             [hyperopen.views.trade-view :as trade-view]))
@@ -294,7 +295,7 @@
         account-mobile-text (set (collect-strings account-mobile-panel))]
     (is (contains? chart-classes "flex"))
     (is (not (contains? chart-classes "hidden")))
-    (is (contains? chart-summary-classes "hidden"))
+    (is (nil? chart-summary-panel))
     (is (some #(str/starts-with? % "Balances") chart-account-text))
     (is (some #(str/starts-with? % "Open Orders") chart-account-text))
     (is (contains? chart-account-text "Trade History"))
@@ -304,7 +305,7 @@
     (is (not (contains? trades-orderbook-classes "hidden")))
     (is (contains? trades-order-entry-classes "hidden"))
     (is (contains? ticket-classes "hidden"))
-    (is (contains? ticket-summary-classes "hidden"))
+    (is (nil? ticket-summary-panel))
     (is (contains? ticket-desktop-equity-classes "hidden"))
     (is (contains? account-active-asset-strip-classes "hidden"))
     (is (contains? account-surface-tabs-classes "hidden"))
@@ -323,6 +324,41 @@
     (is (not (some #(str/starts-with? % "Balances") account-mobile-text)))
     (is (not (some #(str/starts-with? % "Open Orders") account-mobile-text)))
     (is (not (contains? account-mobile-text "Trade History")))))
+
+(deftest trade-view-computes-account-equity-metrics-once-per-render-test
+  (let [metrics-calls (atom 0)
+        rendered-account-equity-views (atom 0)
+        stub-metrics {:account-value-display 25}
+        account-view (assoc-in trade-view-test-state
+                               [:trade-ui :mobile-surface]
+                               :account)]
+    (with-redefs [account-equity-view/account-equity-metrics (fn [_state]
+                                                               (swap! metrics-calls inc)
+                                                               stub-metrics)
+                  account-equity-view/account-equity-view (fn
+                                                            ([_state]
+                                                             (swap! rendered-account-equity-views inc)
+                                                             [:div {:data-role "stub-account-equity"
+                                                                    :data-metrics nil}])
+                                                            ([_state opts]
+                                                             (swap! rendered-account-equity-views inc)
+                                                             [:div {:data-role "stub-account-equity"
+                                                                    :data-metrics (:metrics opts)}]))
+                  account-equity-view/funding-actions-view (fn
+                                                             ([_state]
+                                                              [:div {:data-role "stub-mobile-funding-actions"}])
+                                                             ([_state _opts]
+                                                              [:div {:data-role "stub-mobile-funding-actions"}]))]
+      (let [view-node (trade-view/trade-view account-view)
+            stub-equity-nodes (find-nodes view-node
+                                          #(= "stub-account-equity"
+                                              (get-in % [1 :data-role])))]
+        (is (= 1 @metrics-calls))
+        (is (= 2 @rendered-account-equity-views))
+        (is (= 2 (count stub-equity-nodes)))
+        (is (every? #(= stub-metrics
+                        (get-in % [1 :data-metrics]))
+                    stub-equity-nodes))))))
 
 (deftest trade-view-primary-mobile-tabs-route-to-market-surfaces-test
   (let [view-node (trade-view/trade-view trade-view-test-state)
