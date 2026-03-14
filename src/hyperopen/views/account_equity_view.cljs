@@ -178,6 +178,12 @@
 (defn- normalized-dex-name [value]
   (some-> value str str/trim not-empty))
 
+(defn- scalar-coin-id?
+  [value]
+  (or (string? value)
+      (keyword? value)
+      (number? value)))
+
 (defn- same-dex?
   [left right]
   (= (normalized-dex-name left)
@@ -202,12 +208,14 @@
 
 (defn- perp-market-for-coin
   [market-by-key coin]
-  (let [direct (get market-by-key (str "perp:" coin))
-        resolved (asset-selector-markets/resolve-market-by-coin market-by-key coin)]
-    (cond
-      (= :perp (:market-type direct)) direct
-      (= :perp (:market-type resolved)) resolved
-      :else nil)))
+  (when-let [coin* (when (scalar-coin-id? coin)
+                     (str coin))]
+    (let [direct (get market-by-key (str "perp:" coin*))
+          resolved (asset-selector-markets/resolve-market-by-coin market-by-key coin*)]
+      (cond
+        (= :perp (:market-type direct)) direct
+        (= :perp (:market-type resolved)) resolved
+        :else nil))))
 
 (defn- balance-row-token-key
   [row]
@@ -271,10 +279,9 @@
   [market-by-key dex clearinghouse-state]
   (or (some->> (or (:assetPositions clearinghouse-state) [])
                (some (fn [row]
-                       (some-> (get-in row [:position :coin])
-                               (perp-market-for-coin market-by-key)
-                               :quote
-                               normalized-token-name))))
+                       (let [coin (get-in row [:position :coin])
+                             market (perp-market-for-coin market-by-key coin)]
+                         (some-> market :quote normalized-token-name)))))
       (some->> (vals market-by-key)
                (some (fn [market]
                        (when (and (= :perp (:market-type market))
@@ -318,10 +325,9 @@
 
 (defn- position-quote-token
   [market-by-key {:keys [quote-token]} position-row]
-  (or (some-> (get-in position-row [:position :coin])
-              (perp-market-for-coin market-by-key)
-              :quote
-              normalized-token-name)
+  (or (let [coin (get-in position-row [:position :coin])
+            market (perp-market-for-coin market-by-key coin)]
+        (some-> market :quote normalized-token-name))
       quote-token))
 
 (defn- isolated-margin-by-token

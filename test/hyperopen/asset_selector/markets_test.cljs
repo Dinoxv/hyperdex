@@ -121,4 +121,9 @@
       (is (= "spot:@1" (:key (markets/resolve-market-by-coin market-by-key "@1"))))
       (is (= "spot:@1" (:key (markets/resolve-market-by-coin market-by-key "1"))))
       (is (= "spot:MEOW/USDC" (:key (markets/resolve-market-by-coin market-by-key "MEOW"))))
-      (is (nil? (markets/resolve-market-by-coin market-by-key "hyna:MEOW"))))))
+      (is (nil? (markets/resolve-market-by-coin market-by-key "hyna:MEOW")))))
+  (testing "resolve-market-by-coin rejects non-scalar coin inputs"
+    (let [market-by-key {"perp:BTC" {:key "perp:BTC" :coin "BTC"}}]
+      (is (nil? (markets/resolve-market-by-coin market-by-key {:coin "BTC"})))
+      (is (nil? (markets/resolve-market-by-coin market-by-key ["BTC"])))
+      (is (nil? (markets/resolve-market-by-coin market-by-key #js {:coin "BTC"}))))))

@@ -17,6 +17,12 @@
 (defn- perp-market-key [coin]
   (str "perp:" coin))
 
+(defn- scalar-coin-id?
+  [coin]
+  (or (string? coin)
+      (keyword? coin)
+      (number? coin)))
+
 (defn coin->market-key
   "Best-effort mapping from a coin string to a market key.
    Spot coins contain '/' or provider spot ids prefixed with '@'."
@@ -52,7 +58,7 @@
 (defn resolve-market-by-coin
   "Resolve a market from market-by-key using deterministic fallback keys."
   [market-by-key coin]
-  (let [coin* (when (some? coin) (str coin))]
+  (let [coin* (when (scalar-coin-id? coin) (str coin))]
     (when (and (map? market-by-key) (seq coin*))
       (or (some #(get market-by-key %)
                 (candidate-market-keys coin*))

@@ -1,6 +1,7 @@
 (ns hyperopen.views.account-equity-view-test
   (:require [clojure.string :as str]
             [cljs.test :refer-macros [deftest is testing]]
+            [hyperopen.asset-selector.markets :as asset-selector-markets]
             [hyperopen.views.account-info.derived-cache :as derived-cache]
             [hyperopen.views.account-info.projections :as projections]
             [hyperopen.views.account-equity-view :as view]))
@@ -66,6 +67,12 @@
    (and (number? expected)
         (number? actual)
         (<= (js/Math.abs (- expected actual)) epsilon))))
+
+(defn- scalar-coin-value?
+  [value]
+  (or (string? value)
+      (keyword? value)
+      (number? value)))
 
 (deftest account-equity-heading-and-label-contrast-test
   (let [view-node (view/account-equity-view {:webdata2 {}
@@ -452,7 +459,7 @@
                                                                      :totalRawUsd "0.0"
                                                                      :totalMarginUsed "10.0"}
                                                 :crossMaintenanceMarginUsed "1.0"
-                                                :assetPositions [{:position {:coin "xyz:GOLD"
+                                                 :assetPositions [{:position {:coin "xyz:GOLD"
                                                                              :marginUsed "20.0"
                                                                              :leverage {:type "isolated"
                                                                                         :value 20}
@@ -464,11 +471,26 @@
                                                                                         :value 5}
                                                                              :positionValue "50.0"
                                                                              :unrealizedPnl "-1.0"}}]}}}
-        metrics (view/account-equity-metrics state)]
-    (is (approx= 500.0 (:portfolio-value metrics)))
-    (is (approx= (/ 1.0 380.0) (:unified-account-ratio metrics)))
-    (is (approx= 1.0 (:maintenance-margin metrics)))
-    (is (approx= 0.125 (:unified-account-leverage metrics)))))
+        original-resolve-market-by-coin asset-selector-markets/resolve-market-by-coin
+        resolver-coins (atom [])]
+    (view/reset-account-equity-metrics-cache!)
+    (with-redefs [asset-selector-markets/resolve-market-by-coin
+                  (fn [market-by-key coin]
+                    (swap! resolver-coins conj coin)
+                    (is (scalar-coin-value? coin))
+                    (original-resolve-market-by-coin market-by-key coin))]
+      (let [metrics (view/account-equity-metrics state)
+            coins @resolver-coins]
+        (is (approx= 500.0 (:portfolio-value metrics)))
+        (is (approx= (/ 1.0 380.0) (:unified-account-ratio metrics)))
+        (is (approx= 1.0 (:maintenance-margin metrics)))
+        (is (approx= 0.125 (:unified-account-leverage metrics)))
+        (is (seq coins))
+        (is (every? scalar-coin-value? coins))
+        (is (not-any? map? coins))
+        (is (not-any? vector? coins))
+        (is (some #{"xyz:GOLD" "xyz:AAPL"} (map str coins)))))
+    (view/reset-account-equity-metrics-cache!)))
 
 (deftest account-equity-metrics-memoize-by-relevant-state-slices-test
   (let [webdata2 {:clearinghouseState {:marginSummary {:accountValue "25.0"
