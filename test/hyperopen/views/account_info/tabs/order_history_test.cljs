@@ -433,6 +433,43 @@
     (is (= "No" (@#'view/format-order-history-reduce-only (assoc market-row :reduce-only false))))
     (is (= "N/A" (@#'view/format-order-history-trigger market-row)))))
 
+(deftest order-history-direction-label-prefers-explicit-text-and-reduce-only-fallbacks-test
+  (is (= "Open Short"
+         (@#'order-history-tab/order-history-direction-label
+          {:direction "open short"
+           :side "B"
+           :reduce-only true})))
+  (is (= "Close Short"
+         (@#'order-history-tab/order-history-direction-label
+          {:side "B"
+           :reduce-only true})))
+  (is (= "Close Long"
+         (@#'order-history-tab/order-history-direction-label
+          {:side "A"
+           :reduce-only true})))
+  (is (= "Long"
+         (@#'order-history-tab/order-history-direction-label
+          {:side "B"
+           :reduce-only false}))))
+
+(deftest order-history-direction-class-infers-buy-sell-and-neutral-tones-test
+  (is (= "text-success"
+         (@#'order-history-tab/order-history-direction-class {:side "B"})))
+  (is (= "text-error"
+         (@#'order-history-tab/order-history-direction-class {:side "S"})))
+  (is (= "text-success"
+         (@#'order-history-tab/order-history-direction-class
+          {:direction "buy"})))
+  (is (= "text-error"
+         (@#'order-history-tab/order-history-direction-class
+          {:direction "close long"})))
+  (is (= "text-success"
+         (@#'order-history-tab/order-history-direction-class
+          {:direction "Market Order Liquidation: Close Short"})))
+  (is (= "text-base-content"
+         (@#'order-history-tab/order-history-direction-class
+          {:direction "hold"}))))
+
 (deftest sort-order-history-by-column-is-deterministic-on-ties-test
   (let [rows (view/normalized-order-history
               [{:order {:coin "BTC" :oid "2" :side "B" :origSz "1.0" :remainingSz "0.0" :limitPx "1.0"}
@@ -445,6 +482,67 @@
         oid-desc (view/sort-order-history-by-column rows "Order ID" :desc)]
     (is (= ["1" "2"] (mapv (comp str :oid) time-asc)))
     (is (= ["2" "1"] (mapv (comp str :oid) oid-desc)))))
+
+(deftest sort-order-history-by-column-supports-derived-order-history-columns-test
+  (let [rows [{:id :alpha
+               :time-ms 200
+               :type "Market"
+               :coin "BTC"
+               :direction "close long"
+               :size-num 1
+               :filled-size 0
+               :order-value 0
+               :market? true
+               :reduce-only nil
+               :is-trigger false
+               :is-position-tpsl false
+               :status-label "Rejected"
+               :oid "beta"}
+              {:id :beta
+               :time-ms 100
+               :type "Limit"
+               :coin "ETH"
+               :direction "buy"
+               :size-num 2
+               :filled-size 1
+               :order-value 50
+               :market? false
+               :px "25"
+               :reduce-only false
+               :is-trigger true
+               :trigger-condition "Above"
+               :trigger-px "30"
+               :is-position-tpsl true
+               :status-label "Filled"
+               :oid "12"}
+              {:id :gamma
+               :time-ms 150
+               :type "Stop Market"
+               :coin "ADA"
+               :side "B"
+               :size-num 3
+               :filled-size 2
+               :order-value 75
+               :market? false
+               :px "24"
+               :reduce-only true
+               :is-trigger true
+               :trigger-condition "Below"
+               :trigger-px "10"
+               :is-position-tpsl false
+               :status-label "Canceled"
+               :oid "3"}]
+        column-cases [["Direction" :asc [:beta :alpha :gamma]]
+                      ["Price" :asc [:alpha :gamma :beta]]
+                      ["Reduce Only" :asc [:alpha :beta :gamma]]
+                      ["Trigger Conditions" :asc [:alpha :gamma :beta]]
+                      ["TP/SL" :asc [:gamma :alpha :beta]]
+                      ["Status" :asc [:gamma :beta :alpha]]
+                      ["Order ID" :asc [:gamma :beta :alpha]]]]
+    (doseq [[column direction expected-order] column-cases]
+      (is (= expected-order
+             (mapv :id (view/sort-order-history-by-column rows column direction)))
+          (str "Unexpected order for column " column)))))
 
 (deftest order-history-direction-filter-controls-and-filtering-test
   (let [rows [{:order {:coin "NVDA"

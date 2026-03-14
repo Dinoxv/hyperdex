@@ -135,35 +135,57 @@
            (map str/capitalize)
            (str/join " ")))))
 
+(def ^:private reduce-only-order-history-direction-label-by-side
+  {"B" "Close Short"
+   "A" "Close Long"
+   "S" "Close Long"})
+
+(def ^:private order-history-side-class->action-side
+  {"text-success" :buy
+   "text-error" :sell})
+
+(def ^:private order-history-buy-direction-phrases
+  ["buy" "open long" "close short"])
+
+(def ^:private order-history-sell-direction-phrases
+  ["sell" "open short" "close long"])
+
+(defn- reduce-only-order-history-direction-label [side]
+  (get reduce-only-order-history-direction-label-by-side side))
+
+(defn- fallback-order-history-direction-label [side reduce-only]
+  (or (when reduce-only
+        (reduce-only-order-history-direction-label side))
+      (open-orders-tab/direction-label side)))
+
 (defn- order-history-direction-label
   [{:keys [direction side reduce-only]}]
   (or (normalized-direction-label direction)
-      (if reduce-only
-        (case side
-          "B" "Close Short"
-          "A" "Close Long"
-          "S" "Close Long"
-          (open-orders-tab/direction-label side))
-        (open-orders-tab/direction-label side))))
+      (fallback-order-history-direction-label side reduce-only)))
+
+(defn- direction-label-matches-phrases? [direction-label phrases]
+  (let [normalized (some-> direction-label shared/non-blank-text str/lower-case)]
+    (boolean
+     (and normalized
+          (some #(str/includes? normalized %) phrases)))))
+
+(defn- order-history-action-side-from-label [direction-label]
+  (cond
+    (direction-label-matches-phrases? direction-label order-history-buy-direction-phrases) :buy
+    (direction-label-matches-phrases? direction-label order-history-sell-direction-phrases) :sell
+    :else nil))
+
+(defn- order-history-action-side [row]
+  (or (get order-history-side-class->action-side
+           (open-orders-tab/direction-class (:side row)))
+      (order-history-action-side-from-label (order-history-direction-label row))))
 
 (defn- order-history-direction-class
   [row]
-  (let [side-class (open-orders-tab/direction-class (:side row))
-        direction-label (some-> (order-history-direction-label row) str/lower-case)]
-    (if (not= side-class "text-base-content")
-      side-class
-      (cond
-        (or (str/includes? direction-label "buy")
-            (str/includes? direction-label "open long")
-            (str/includes? direction-label "close short"))
-        "text-success"
-
-        (or (str/includes? direction-label "sell")
-            (str/includes? direction-label "open short")
-            (str/includes? direction-label "close long"))
-        "text-error"
-
-        :else "text-base-content"))))
+  (case (order-history-action-side row)
+    :buy "text-success"
+    :sell "text-error"
+    "text-base-content"))
 
 (defn- format-order-history-value [order-value]
   (if (and (number? order-value)
@@ -299,35 +321,38 @@
                   (map first))
             (or indexed-rows [])))))
 
+(defn- order-history-sort-order-id [row]
+  (let [oid (:oid row)
+        oid-num (shared/parse-optional-num oid)]
+    (if (number? oid-num)
+      [0 oid-num]
+      [1 (str (or oid ""))])))
+
+(def ^:private order-history-sort-accessor-by-column
+  {"Time" (fn [row] (or (:time-ms row) 0))
+   "Type" (fn [row] (title-case-label (:type row)))
+   "Coin" (fn [row] (or (:coin row) ""))
+   "Direction" (fn [row] (or (order-history-direction-label row) ""))
+   "Size" (fn [row] (or (:size-num row) 0))
+   "Filled Size" (fn [row] (or (:filled-size row) 0))
+   "Order Value" (fn [row] (or (:order-value row) 0))
+   "Price" (fn [row] (or (shared/parse-optional-num (:px row)) 0))
+   "Reduce Only" (fn [row]
+                   (case (:reduce-only row)
+                     true 1
+                     false 0
+                     -1))
+   "Trigger Conditions" format-order-history-trigger
+   "TP/SL" (fn [row] (if (:is-position-tpsl row) 1 0))
+   "Status" (fn [row] (or (:status-label row) ""))
+   "Order ID" order-history-sort-order-id})
+
 (defn sort-order-history-by-column [rows column direction]
   (sort-kernel/sort-rows-by-column
    rows
    {:column column
     :direction direction
-    :accessor-by-column
-     {"Time" (fn [row] (or (:time-ms row) 0))
-      "Type" (fn [row] (title-case-label (:type row)))
-      "Coin" (fn [row] (or (:coin row) ""))
-      "Direction" (fn [row] (or (order-history-direction-label row) ""))
-      "Size" (fn [row] (or (:size-num row) 0))
-      "Filled Size" (fn [row] (or (:filled-size row) 0))
-     "Order Value" (fn [row] (or (:order-value row) 0))
-     "Price" (fn [row] (or (shared/parse-optional-num (:px row)) 0))
-     "Reduce Only" (fn [row]
-                     (case (:reduce-only row)
-                       true 1
-                       false 0
-                       -1))
-     "Trigger Conditions" (fn [row]
-                            (format-order-history-trigger row))
-     "TP/SL" (fn [row] (if (:is-position-tpsl row) 1 0))
-     "Status" (fn [row] (or (:status-label row) ""))
-     "Order ID" (fn [row]
-                  (let [oid (:oid row)
-                        oid-num (shared/parse-optional-num oid)]
-                    (if (number? oid-num)
-                      [0 oid-num]
-                      [1 (str (or oid ""))])))}
+    :accessor-by-column order-history-sort-accessor-by-column
     :tie-breaker order-history-row-sort-id}))
 
 (defonce ^:private sorted-order-history-cache (atom nil))
