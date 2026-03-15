@@ -1,5 +1,6 @@
 (ns test-runner
-  (:require [test-runner-generated :as generated-runner]))
+  (:require [hyperopen.test-runner-support :as runner-support]
+            [test-runner-generated :as generated-runner]))
 
 (defn run-all-tests
   "Run all test namespaces and return the results"
@@ -12,7 +13,7 @@
   (println "\n=== Running Hyperopen Tests ===")
   (let [results (run-all-tests)]
     (println "\n=== Test Results ===")
-    results))
+    (runner-support/apply-process-exit! results)))
 
 ;; Run tests when this namespace loads in test environment
 (-main)

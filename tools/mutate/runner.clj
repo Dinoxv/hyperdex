@@ -3,6 +3,20 @@
   (:import [java.io ByteArrayOutputStream]
            [java.util.concurrent TimeUnit]))
 
+(def ^:private cljs-test-summary-re
+  #"(?m)^\s*(\d+)\s+failures?,\s+(\d+)\s+errors?\s*$")
+
+(defn- cljs-test-output-failed?
+  [output]
+  (let [output* (or output "")
+        summary-match (re-find cljs-test-summary-re output*)]
+    (or (re-find #"(?m)^FAIL in \(" output*)
+        (re-find #"(?m)^ERROR in \(" output*)
+        (when summary-match
+          (let [[_ fail-count error-count] summary-match]
+            (or (pos? (Long/parseLong fail-count))
+                (pos? (Long/parseLong error-count))))))))
+
 (defn- shell-argv
   [command]
   ["/bin/sh" "-lc" command])
@@ -43,6 +57,7 @@
      :output (.toString output-buffer "UTF-8")}))
 
 (defn success?
-  [{:keys [exit timeout?]}]
+  [{:keys [exit timeout? output]}]
   (and (not timeout?)
-       (zero? (or exit 1))))
+       (zero? (or exit 1))
+       (not (cljs-test-output-failed? output))))

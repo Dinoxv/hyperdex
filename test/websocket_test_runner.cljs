@@ -1,5 +1,6 @@
 (ns websocket-test-runner
   (:require [cljs.test :refer-macros [run-tests]]
+            [hyperopen.test-runner-support :as runner-support]
             [hyperopen.platform-test]
             [hyperopen.schema.contracts-coverage-test]
             [hyperopen.schema.contracts-test]
@@ -65,4 +66,4 @@
   (println "\n=== Running Hyperopen WebSocket Tests ===")
   (let [results (run-websocket-tests)]
     (println "\n=== WebSocket Test Results ===")
-    results))
+    (runner-support/apply-process-exit! results)))

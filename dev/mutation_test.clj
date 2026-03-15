@@ -158,6 +158,20 @@
         (is (.contains (slurp module-path) "restored"))
         (is (false? (.exists (io/file backup-path))))))))
 
+(deftest runner-success-detects-cljs-test-failures-even-with-zero-exit
+  (is (true? (runner/success? {:exit 0
+                               :timeout? false
+                               :output "Ran 4 tests containing 8 assertions.\n0 failures, 0 errors.\n"})))
+  (is (false? (runner/success? {:exit 0
+                                :timeout? false
+                                :output "FAIL in (sample-test)\nRan 4 tests containing 8 assertions.\n1 failures, 0 errors.\n"})))
+  (is (false? (runner/success? {:exit 0
+                                :timeout? false
+                                :output "ERROR in (sample-test)\nRan 4 tests containing 8 assertions.\n0 failures, 1 errors.\n"})))
+  (is (false? (runner/success? {:exit 1
+                                :timeout? false
+                                :output ""}))))
+
 (deftest execute-command-supports-scan-update-and-full-run-with-stubbed-shells
   (with-temp-root
     (fn [root]
