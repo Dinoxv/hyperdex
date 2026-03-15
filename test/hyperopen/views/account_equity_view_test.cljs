@@ -489,7 +489,7 @@
         (is (every? scalar-coin-value? coins))
         (is (not-any? map? coins))
         (is (not-any? vector? coins))
-        (is (some #{"xyz:GOLD" "xyz:AAPL"} (map str coins)))))
+        (is (not-any? #{"xyz:GOLD" "xyz:AAPL"} (map str coins)))))
     (view/reset-account-equity-metrics-cache!)))
 
 (deftest account-equity-metrics-memoize-by-relevant-state-slices-test

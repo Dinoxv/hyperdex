@@ -210,12 +210,12 @@
   [market-by-key coin]
   (when-let [coin* (when (scalar-coin-id? coin)
                      (str coin))]
-    (let [direct (get market-by-key (str "perp:" coin*))
-          resolved (asset-selector-markets/resolve-market-by-coin market-by-key coin*)]
-      (cond
-        (= :perp (:market-type direct)) direct
-        (= :perp (:market-type resolved)) resolved
-        :else nil))))
+    (let [direct (get market-by-key (str "perp:" coin*))]
+      (if (= :perp (:market-type direct))
+        direct
+        (let [resolved (asset-selector-markets/resolve-market-by-coin market-by-key coin*)]
+          (when (= :perp (:market-type resolved))
+            resolved))))))
 
 (defn- balance-row-token-key
   [row]
