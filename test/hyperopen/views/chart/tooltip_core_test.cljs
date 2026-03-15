@@ -20,6 +20,12 @@
                                                      :stroke "#33d1b7"
                                                      :points [{:value 0.3}
                                                               {:value js/NaN}]}
+                                                    {:id :sol
+                                                     :coin " "
+                                                     :label ""
+                                                     :stroke nil
+                                                     :points [{:value 0.4}
+                                                              {:value 0.5}]}
                                                     {:id "bad-id"
                                                      :points [{:value 1}
                                                               {:value 2}]}]}
@@ -28,6 +34,10 @@
     (is (= [{:coin "BTC"
              :label "Bitcoin"
              :value "v:0.2"
+             :stroke "#e6edf2"}
+            {:coin "sol"
+             :label "sol"
+             :value "v:0.5"
              :stroke "#e6edf2"}]
            rows))
     (is (= []

@@ -51,6 +51,40 @@
                  :else neutral-value-classes)
       neutral-value-classes)))
 
+(defn- benchmark-series?
+  [{:keys [id]}]
+  (and (keyword? id)
+       (not= id :strategy)))
+
+(defn- benchmark-series-name
+  [{:keys [id coin]}]
+  (or (non-blank-text coin)
+      (name id)))
+
+(defn- benchmark-series-label
+  [{:keys [label] :as series}]
+  (or (non-blank-text label)
+      (benchmark-series-name series)))
+
+(defn- benchmark-series-stroke
+  [fallback-stroke stroke]
+  (or (non-blank-text stroke)
+      fallback-stroke))
+
+(defn- benchmark-point-value
+  [hovered-index series]
+  (get-in series [:points hovered-index :value]))
+
+(defn- benchmark-row
+  [hovered-index format-benchmark-value fallback-stroke {:keys [stroke] :as series}]
+  (let [value (benchmark-point-value hovered-index series)]
+    (when (finite-number? value)
+      (let [series-name (benchmark-series-name series)]
+        {:coin series-name
+         :label (benchmark-series-label series)
+         :value (format-benchmark-value value)
+         :stroke (benchmark-series-stroke fallback-stroke stroke)}))))
+
 (defn benchmark-rows
   [{:keys [metric-kind hovered-index series]} {:keys [benchmark-enabled?
                                                       format-benchmark-value
@@ -59,29 +93,12 @@
                                                     fallback-stroke default-benchmark-stroke}}]
   (if (and (benchmark-enabled? metric-kind)
            (number? hovered-index))
-    (->> (or series [])
-         (keep (fn [{:keys [id coin label stroke points]}]
-                 (when (and (keyword? id)
-                            (not= id :strategy))
-                   (let [point (get (or points []) hovered-index)
-                         value (:value point)
-                         coin* (or (non-blank-text coin)
-                                   (when (keyword? id)
-                                     (name id))
-                                   "benchmark")
-                         label* (or (non-blank-text label)
-                                    (non-blank-text coin)
-                                    (when (keyword? id)
-                                      (name id))
-                                    "Benchmark")
-                         stroke* (or (non-blank-text stroke)
-                                     fallback-stroke)]
-                     (when (finite-number? value)
-                       {:coin coin*
-                        :label label*
-                        :value (format-benchmark-value value)
-                        :stroke stroke*})))))
-         vec)
+    (into [] (comp (filter benchmark-series?)
+                   (keep #(benchmark-row hovered-index
+                                         format-benchmark-value
+                                         fallback-stroke
+                                         %)))
+          series)
     []))
 
 (defn build-hover-tooltip
