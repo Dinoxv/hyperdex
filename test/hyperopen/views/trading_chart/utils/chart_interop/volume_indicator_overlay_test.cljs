@@ -184,3 +184,23 @@
     (is (= 11 (:close (get lookup "ts:1"))))
     (is (= 12 (:close (get lookup "txt:t2"))))))
 
+(deftest volume-indicator-overlay-reconciles-candle-index-tail-updates-test
+  (let [reconcile-state @#'hyperopen.views.trading-chart.utils.chart-interop.volume-indicator-overlay/reconcile-candle-index-state
+        base-candles [{:time 1 :open 10 :close 11 :volume 100}
+                      {:time 2 :open 11 :close 12 :volume 120}]
+        rewritten-tail [{:time 1 :open 10 :close 11 :volume 100}
+                        {:time 2 :open 11 :close 13 :volume 140}]
+        appended-tail [{:time 1 :open 10 :close 11 :volume 100}
+                       {:time 2 :open 11 :close 13 :volume 140}
+                       {:time 3 :open 13 :close 14 :volume 160}]
+        seeded-state (reconcile-state nil base-candles)
+        noop-state (reconcile-state seeded-state base-candles)
+        updated-state (reconcile-state seeded-state rewritten-tail)
+        appended-state (reconcile-state updated-state appended-tail)]
+    (is (identical? seeded-state noop-state))
+    (is (= 2 (count (:lookup updated-state))))
+    (is (= 140 (:volume (:latest updated-state))))
+    (is (= 13 (:close (get (:lookup updated-state) "ts:2"))))
+    (is (= 3 (count (:lookup appended-state))))
+    (is (= 160 (:volume (:latest appended-state))))
+    (is (= 14 (:close (get (:lookup appended-state) "ts:3"))))))

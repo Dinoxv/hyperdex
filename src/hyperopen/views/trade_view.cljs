@@ -16,6 +16,147 @@
 (def ^:private desktop-breakpoint-px
   1024)
 
+(def ^:private active-asset-view-state-keys
+  [:active-assets
+   :active-asset
+   :active-market
+   :asset-contexts
+   :asset-selector
+   :account
+   :funding-ui
+   :perp-dex-clearinghouse
+   :spot
+   :trade-ui
+   :ui
+   :webdata2])
+
+(def ^:private trade-chart-view-base-state-keys
+  [:active-asset
+   :active-market
+   :account
+   :asset-contexts
+   :asset-selector
+   :candles
+   :chart-options
+   :orders
+   :perp-dex-clearinghouse
+   :positions-ui
+   :router
+   :spot
+   :trade-modules
+   :webdata2])
+
+(def ^:private account-info-view-base-state-keys
+  [:account
+   :account-info
+   :asset-selector
+   :orders
+   :perp-dex-clearinghouse
+   :positions-ui
+   :spot
+   :webdata2])
+
+(def ^:private account-equity-view-state-keys
+  [:account
+   :asset-selector
+   :perp-dex-clearinghouse
+   :spot
+   :webdata2])
+
+(def ^:private order-form-view-state-keys
+  [:account
+   :active-asset
+   :active-assets
+   :active-market
+   :asset-contexts
+   :asset-selector
+   :order-form
+   :order-form-runtime
+   :order-form-ui
+   :orderbooks
+   :perp-dex-clearinghouse
+   :spot
+   :wallet
+   :webdata2])
+
+(declare trade-chart-loading-shell)
+
+(defn- memoize-last
+  [f]
+  (let [cache (atom nil)]
+    (fn [& args]
+      (let [cached @cache]
+        (if (and (map? cached)
+                 (= args (:args cached)))
+          (:result cached)
+          (let [result (apply f args)]
+            (reset! cache {:args args
+                           :result result})
+            result))))))
+
+(defn- select-view-state
+  [state ks]
+  (select-keys (or state {}) ks))
+
+(defn- surface-freshness-cues-enabled?
+  [state]
+  (boolean (get-in state [:websocket-ui :show-surface-freshness-cues?] false)))
+
+(defn- active-asset-view-state
+  [state]
+  (select-view-state state active-asset-view-state-keys))
+
+(defn- trade-chart-view-state
+  [state]
+  (cond-> (select-view-state state trade-chart-view-base-state-keys)
+    (surface-freshness-cues-enabled? state)
+    (assoc :websocket (:websocket state)
+           :websocket-ui (:websocket-ui state))))
+
+(defn- account-info-view-state
+  [state]
+  (cond-> (select-view-state state account-info-view-base-state-keys)
+    (surface-freshness-cues-enabled? state)
+    (assoc :websocket (:websocket state)
+           :websocket-ui (:websocket-ui state))))
+
+(defn- account-equity-view-state
+  [state]
+  (select-view-state state account-equity-view-state-keys))
+
+(defn- order-form-view-state
+  [state]
+  (select-view-state state order-form-view-state-keys))
+
+(def ^:private memoized-active-asset-view
+  (memoize-last (fn [render-fn state]
+                  (render-fn state))))
+
+(def ^:private memoized-trade-chart-panel-content
+  (memoize-last (fn [render-fn state]
+                  (or (render-fn state)
+                      (trade-chart-loading-shell state)))))
+
+(def ^:private memoized-account-info-view
+  (memoize-last (fn [render-fn state]
+                  (render-fn state))))
+
+(def ^:private memoized-account-equity-view
+  (memoize-last (fn [render-fn state opts]
+                  (render-fn state opts))))
+
+(def ^:private memoized-orderbook-view
+  (memoize-last (fn [render-fn state]
+                  (render-fn state))))
+
+(def ^:private memoized-order-form-view
+  (memoize-last (fn [render-fn state]
+                  (render-fn state))))
+
+(def ^:private memoized-account-equity-metrics
+  (memoize-last (fn [metrics-fn state]
+                  (metrics-fn state))))
+
 (defn- viewport-width-px []
   (let [width (some-> js/globalThis .-innerWidth)]
     (if (number? width)
@@ -53,12 +194,42 @@
                                 :trades
                                 :orderbook)))
 
+(defn- render-active-asset-panel
+  [state]
+  (memoized-active-asset-view active-asset-view/active-asset-view
+                              (active-asset-view-state state)))
+
+(defn- render-account-info-panel
+  [state]
+  (memoized-account-info-view account-info-view/account-info-view
+                              (account-info-view-state state)))
+
+(defn- render-account-equity-panel
+  [state equity-metrics opts]
+  (memoized-account-equity-view account-equity-view/account-equity-view
+                                (account-equity-view-state state)
+                                (assoc opts :metrics equity-metrics)))
+
+(defn- render-account-equity-metrics
+  [state]
+  (memoized-account-equity-metrics account-equity-view/account-equity-metrics
+                                   (account-equity-view-state state)))
+
+(defn- render-orderbook-panel
+  [state]
+  (memoized-orderbook-view l2-orderbook-view/l2-orderbook-view
+                           state))
+
+(defn- render-order-form-panel
+  [state]
+  (memoized-order-form-view order-form-view/order-form-view
+                            (order-form-view-state state)))
+
 (defn- mobile-account-surface [state equity-metrics]
   [:div {:class ["flex" "h-full" "min-h-0" "flex-col" "bg-base-100"]
          :data-parity-id "trade-mobile-account-surface"}
-  (account-equity-view/account-equity-view state {:fill-height? false
-                                                   :show-funding-actions? false
-                                                   :metrics equity-metrics})
+  (render-account-equity-panel state equity-metrics {:fill-height? false
+                                                     :show-funding-actions? false})
    (account-equity-view/funding-actions-view
     state
     {:container-classes ["mt-auto"
@@ -119,8 +290,8 @@
 
 (defn- trade-chart-panel-content
   [state]
-  (or (trade-modules/render-trade-chart-view state)
-      (trade-chart-loading-shell state)))
+  (memoized-trade-chart-panel-content trade-modules/render-trade-chart-view
+                                      (trade-chart-view-state state)))
 
 (defn trade-view [state]
   (let [active-asset (:active-asset state)
@@ -142,18 +313,17 @@
                                        (not mobile-account-surface?))
         show-equity-surface? (or desktop-layout?
                                  mobile-account-summary-visible?)
-        show-surface-freshness-cues?
-        (boolean (get-in state [:websocket-ui :show-surface-freshness-cues?] false))
+        show-surface-freshness-cues? (surface-freshness-cues-enabled? state)
         websocket-health (get-in state [:websocket :health])
-        state* (assoc state :websocket-health websocket-health)
         equity-metrics (when show-equity-surface?
-                         (account-equity-view/account-equity-metrics state))
+                         (render-account-equity-metrics state))
         orderbook-view-state {:coin (or active-asset "No Asset Selected")
                               :market (:active-market state)
                               :orderbook orderbook-data
                               :orderbook-ui (:orderbook-ui state)
                               :show-surface-freshness-cues? show-surface-freshness-cues?
-                              :websocket-health websocket-health
+                              :websocket-health (when show-surface-freshness-cues?
+                                                  websocket-health)
                               :loading (and active-asset (nil? orderbook-data))}]
     [:div {:class ["flex-1" "flex" "flex-col" "min-h-0" "scrollbar-hide" "xl:overflow-y-auto"]
            :data-parity-id "trade-root"}
@@ -163,7 +333,7 @@
                             ["hidden"]))
              :data-parity-id "trade-mobile-active-asset-strip"}
        (when show-mobile-active-asset?
-         (active-asset-view/active-asset-view state*))]
+         (render-active-asset-panel state))]
       [:div {:class (into ["lg:hidden" "border-b" "border-base-300" "bg-base-200/70" "px-3"]
                           (when mobile-account-surface?
                             ["hidden"]))
@@ -199,10 +369,10 @@
                :data-parity-id "trade-chart-panel"}
          [:div {:class ["hidden" "lg:block"]}
           (when desktop-layout?
-            (active-asset-view/active-asset-view state*))]
+            (render-active-asset-panel state))]
          (when chart-panel-visible?
            [:div {:class ["overflow-hidden" "flex-1" "min-h-0"]}
-            (trade-chart-panel-content state*)])]
+            (trade-chart-panel-content state)])]
 
         [:div {:class (into [(if mobile-orderbook-surface? "block" "hidden")
                              "bg-base-100"
@@ -227,12 +397,12 @@
          [:div {:class ["h-full" "min-h-0" "lg:hidden"]}
           (when (and orderbook-panel-visible?
                      (not desktop-layout?))
-            (l2-orderbook-view/l2-orderbook-view
+            (render-orderbook-panel
              (mobile-orderbook-view-state orderbook-view-state mobile-surface)))]
          [:div {:class ["hidden" "h-full" "min-h-0" "lg:block"]}
           (when (and orderbook-panel-visible?
                      desktop-layout?)
-            (l2-orderbook-view/l2-orderbook-view orderbook-view-state))]]
+            (render-orderbook-panel orderbook-view-state))]]
 
         [:div {:class (into [(if (= mobile-surface :ticket) "flex" "hidden")
                              "bg-base-100"
@@ -248,12 +418,12 @@
                              "xl:row-span-2"])
                :data-parity-id funding-modal-positioning/trade-order-entry-panel-parity-id}
          (when order-entry-panel-visible?
-           (order-form-view/order-form-view state*))
+           (render-order-form-panel state))
          [:div {:class ["hidden" "border-t" "border-base-300" "lg:block"]
                 :data-parity-id "trade-desktop-account-equity-panel"}
           (when (and desktop-layout?
                      order-entry-panel-visible?)
-            (account-equity-view/account-equity-view state* {:metrics equity-metrics}))]]
+            (render-account-equity-panel state equity-metrics {}))]]
 
         [:div {:class (into [(if (= mobile-surface :account)
                                "hidden"
@@ -274,12 +444,12 @@
                 :data-parity-id "trade-mobile-account-panel"}
           (when (and account-panel-visible?
                      (not desktop-layout?))
-            (account-info-view/account-info-view state*))]
+            (render-account-info-panel state))]
          [:div {:class ["hidden" "w-full" "min-h-0" "lg:flex"]
                 :data-parity-id "trade-desktop-account-panel"}
           (when (and account-panel-visible?
                      desktop-layout?)
-            (account-info-view/account-info-view state*))]]]
+            (render-account-info-panel state))]]]
 
        (when mobile-account-summary-visible?
          [:div {:class ["absolute"
@@ -293,4 +463,4 @@
                         "min-h-0"
                         "lg:hidden"]
                 :data-parity-id "trade-mobile-account-summary-panel"}
-          (mobile-account-surface state* equity-metrics)])]]]))
+          (mobile-account-surface state equity-metrics)])]]]))

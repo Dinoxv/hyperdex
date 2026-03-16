@@ -360,6 +360,56 @@
       (chart-core/chart-canvas candle-data-new-identity :candlestick active-indicators-b legend-meta :4h chart-runtime-options)
       (is (= 4 @calls*) "new candle data identity should recompute indicator output"))))
 
+(deftest trading-chart-view-reuses-overlay-input-identities-when-chart-inputs-are-unchanged-test
+  (let [captured-args* (atom [])
+        raw-candles [{:t 1700000000000 :o "100" :h "101" :l "99" :c "100" :v "10"}
+                     {:t 1700000060000 :o "100" :h "102" :l "98" :c "101" :v "12"}]
+        transformed [{:time 1700000000 :open 100 :high 101 :low 99 :close 100 :volume 10}
+                     {:time 1700000060 :open 100 :high 102 :low 98 :close 101 :volume 12}]
+        state {:active-asset "BTC"
+               :active-market {:price-decimals 2 :dex "xyz"}
+               :candles {"BTC" {:1d raw-candles}}
+               :chart-options {:selected-timeframe :1d
+                               :selected-chart-type :candlestick
+                               :active-indicators {}
+                               :volume-visible? true}
+               :orders {:open-orders [{:coin "BTC" :oid 1 :px "100" :sz "1" :side "B"}]
+                        :fills [{:coin "BTC" :time 1700000000000 :side "B" :sz "1" :startPosition "0"}]}
+               :asset-selector {:market-by-key {}}
+               :positions-ui {}}]
+    (derived-cache/reset-derived-cache!)
+    (binding [derived-cache/*process-candle-data* (fn [_] transformed)]
+      (with-redefs [trading-state/position-for-active-asset (fn [_]
+                                                               {:coin "BTC"
+                                                                :szi "1"
+                                                                :entryPx "100"
+                                                                :liquidationPx "90"})
+                    chart-core/chart-canvas (fn
+                                              ([a b c d e f]
+                                               (swap! captured-args* conj [a b c d e f])
+                                               [:div])
+                                              ([a b c d e f g h]
+                                               (swap! captured-args* conj [a b c d e f g h])
+                                               [:div]))]
+        (chart-core/trading-chart-view state)
+        (chart-core/trading-chart-view state)))
+    (let [[[first-candle-data _ _ first-legend-meta _ first-runtime-options first-open-orders first-on-cancel-order]
+           [second-candle-data _ _ second-legend-meta _ second-runtime-options second-open-orders second-on-cancel-order]]
+          @captured-args*]
+      (is (identical? first-candle-data second-candle-data))
+      (is (identical? first-legend-meta second-legend-meta))
+      (is (identical? first-runtime-options second-runtime-options))
+      (is (identical? first-open-orders second-open-orders))
+      (is (identical? first-on-cancel-order second-on-cancel-order))
+      (is (identical? (:position-overlay first-runtime-options)
+                      (:position-overlay second-runtime-options)))
+      (is (identical? (:on-hide-volume-indicator first-runtime-options)
+                      (:on-hide-volume-indicator second-runtime-options)))
+      (is (identical? (:on-liquidation-drag-preview first-runtime-options)
+                      (:on-liquidation-drag-preview second-runtime-options)))
+      (is (identical? (:on-liquidation-drag-confirm first-runtime-options)
+                      (:on-liquidation-drag-confirm second-runtime-options))))))
+
 (deftest trading-chart-view-passes-asset-candles-and-position-overlay-into-runtime-options-test
   (let [raw-candles [{:t 1700000000000 :o "100" :h "101" :l "99" :c "100" :v "10"}
                      {:t 1700000060000 :o "100" :h "102" :l "98" :c "101" :v "12"}]

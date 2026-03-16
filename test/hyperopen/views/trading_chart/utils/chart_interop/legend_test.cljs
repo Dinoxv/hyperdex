@@ -137,3 +137,24 @@
         (.destroy ^js legend-control))
       (finally
         (aset js/globalThis "document" original-document)))))
+
+(deftest legend-candle-lookup-state-incrementally-updates-tail-test
+  (let [reconcile-state @#'hyperopen.views.trading-chart.utils.chart-interop.legend/reconcile-candle-lookup-state
+        base-candles [{:time 1 :open 10 :high 12 :low 9 :close 11}
+                      {:time 2 :open 11 :high 13 :low 10 :close 12}]
+        rewritten-tail [{:time 1 :open 10 :high 12 :low 9 :close 11}
+                        {:time 2 :open 11 :high 14 :low 10 :close 13}]
+        appended-tail [{:time 1 :open 10 :high 12 :low 9 :close 11}
+                       {:time 2 :open 11 :high 14 :low 10 :close 13}
+                       {:time 3 :open 13 :high 15 :low 12 :close 14}]
+        seeded-state (reconcile-state nil base-candles)
+        noop-state (reconcile-state seeded-state base-candles)
+        updated-state (reconcile-state seeded-state rewritten-tail)
+        appended-state (reconcile-state updated-state appended-tail)]
+    (is (identical? seeded-state noop-state))
+    (is (= 2 (count (:candle-lookup updated-state))))
+    (is (= 13 (get-in updated-state [:latest-entry :candle :close])))
+    (is (= 11 (get-in updated-state [:latest-entry :prev-close])))
+    (is (= 3 (count (:candle-lookup appended-state))))
+    (is (= 14 (get-in appended-state [:latest-entry :candle :close])))
+    (is (= 13 (get-in appended-state [:latest-entry :prev-close])))))

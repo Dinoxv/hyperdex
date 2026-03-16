@@ -1,5 +1,6 @@
 (ns hyperopen.views.trading-chart.utils.chart-interop.volume-indicator-overlay
-  (:require [clojure.string :as str]))
+  (:require [clojure.string :as str]
+            [hyperopen.views.trading-chart.utils.chart-interop.candle-sync-policy :as candle-sync-policy]))
 
 (defonce ^:private volume-indicator-overlay-sidecar (js/WeakMap.))
 
@@ -43,6 +44,10 @@
                  (aget target method-name))]
     (when (fn? method)
       (.apply method target (to-array args)))))
+
+(defn- vectorize-candles
+  [candles]
+  (if (vector? candles) candles (vec candles)))
 
 (defn- normalize-time-key
   [value]
@@ -110,19 +115,58 @@
       :else
       down-value-color)))
 
+(defn- assoc-candle
+  [lookup candle]
+  (if-let [lookup-key (normalize-time-key (:time candle))]
+    (assoc lookup lookup-key candle)
+    lookup))
+
+(defn- build-candle-index-state
+  [candles]
+  (let [candles* (vectorize-candles candles)]
+    (loop [remaining candles*
+           lookup {}
+           latest nil]
+      (if-let [candle (first remaining)]
+        (recur (rest remaining)
+               (assoc-candle lookup candle)
+               candle)
+        {:candles candles*
+         :lookup lookup
+         :latest latest}))))
+
 (defn- build-candle-index
   [candles]
-  (loop [remaining candles
-         lookup {}
-         latest nil]
-    (if-let [candle (first remaining)]
-      (let [lookup-key (normalize-time-key (:time candle))
-            next-lookup (if lookup-key
-                          (assoc lookup lookup-key candle)
-                          lookup)]
-        (recur (rest remaining) next-lookup candle))
-      {:lookup lookup
-       :latest latest})))
+  (select-keys (build-candle-index-state candles) [:lookup :latest]))
+
+(defn- reconcile-candle-index-state
+  [previous-state candles]
+  (let [candles* (vectorize-candles candles)
+        previous-state* (select-keys (or previous-state {}) [:candles :lookup :latest])
+        previous-candles (:candles previous-state*)
+        decision (if (contains? previous-state* :candles)
+                   (candle-sync-policy/infer-decision previous-candles candles*)
+                   {:mode :full-reset})]
+    (case (:mode decision)
+      :noop (or previous-state previous-state*)
+
+      :append-last
+      (let [next-last (peek candles*)]
+        {:candles candles*
+         :lookup (assoc-candle (:lookup previous-state*) next-last)
+         :latest next-last})
+
+      :update-last
+      (let [next-last (peek candles*)
+            previous-last (peek previous-candles)
+            previous-key (normalize-time-key (:time previous-last))
+            lookup* (cond-> (or (:lookup previous-state*) {})
+                      previous-key (dissoc previous-key))]
+        {:candles candles*
+         :lookup (assoc-candle lookup* next-last)
+         :latest next-last})
+
+      (build-candle-index-state candles*))))
 
 (defn- set-controls-visible!
   [controls visible?]
@@ -401,9 +445,12 @@
            volume-pane-index (.-volumePaneIndex ^js chart-obj)
            document* (resolve-document document)]
        (if (and chart volume-series (finite-number? volume-pane-index) document*)
-         (let [{:keys [lookup latest]} (build-candle-index (if (sequential? candles) candles []))
+         (let [state (overlay-state chart-obj)
+               {:keys [candles lookup latest]} (reconcile-candle-index-state state
+                                                                             (if (sequential? candles)
+                                                                               candles
+                                                                               []))
                {:keys [root value-node controls]} (ensure-overlay-root! chart-obj container document*)
-               state (overlay-state chart-obj)
                current-subscription (:subscription state)
                needs-resubscribe?
                (or (nil? current-subscription)
@@ -421,6 +468,7 @@
                    :controls controls
                    :chart chart
                    :volume-pane-index volume-pane-index
+                   :candles candles
                    :lookup lookup
                    :latest latest
                    :on-remove on-remove

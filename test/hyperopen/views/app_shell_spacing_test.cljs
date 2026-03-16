@@ -442,6 +442,131 @@
             (is (= 1 (count (find-nodes view-node #(= "stub-account-equity"
                                                       (get-in % [1 :data-role]))))))))))))
 
+(deftest trade-view-memoizes-non-orderbook-subtrees-across-orderbook-only-updates-test
+  (with-viewport-width
+    1280
+    (fn []
+      (let [active-asset-calls (atom 0)
+            chart-calls (atom 0)
+            orderbook-calls (atom 0)
+            order-form-calls (atom 0)
+            account-info-calls (atom 0)
+            equity-metrics-calls (atom 0)
+            account-equity-calls (atom 0)
+            state-a (assoc trade-view-test-state
+                           :active-asset "BTC"
+                           :active-market {:coin "BTC"
+                                           :market-type :perp
+                                           :base "BTC"
+                                           :quote "USDC"
+                                           :szDecimals 4}
+                           :orderbooks {"BTC" {:bids [{:px "99" :sz "2"}]
+                                               :asks [{:px "101" :sz "1"}]}})
+            state-b (assoc state-a
+                           :orderbooks {"BTC" {:bids [{:px "98.5" :sz "2.5"}]
+                                               :asks [{:px "101.5" :sz "1.5"}]}})]
+        (with-redefs [active-asset-view/active-asset-view (fn [_state]
+                                                            (swap! active-asset-calls inc)
+                                                            [:div {:data-role "stub-active-asset"}])
+                      trade-modules/render-trade-chart-view (fn [_state]
+                                                              (swap! chart-calls inc)
+                                                              [:div {:data-role "stub-chart"}])
+                      l2-orderbook-view/l2-orderbook-view (fn [_state]
+                                                            (swap! orderbook-calls inc)
+                                                            [:div {:data-role "stub-orderbook"}])
+                      order-form-view/order-form-view (fn [_state]
+                                                        (swap! order-form-calls inc)
+                                                        [:div {:data-role "stub-order-form"}])
+                      account-info-view/account-info-view (fn
+                                                            ([_state]
+                                                             (swap! account-info-calls inc)
+                                                             [:div {:data-role "stub-account-info"}])
+                                                            ([_state _options]
+                                                             (swap! account-info-calls inc)
+                                                             [:div {:data-role "stub-account-info"}]))
+                      account-equity-view/account-equity-metrics (fn [_state]
+                                                                   (swap! equity-metrics-calls inc)
+                                                                   {:account-value-display 12})
+                      account-equity-view/account-equity-view (fn
+                                                                ([_state]
+                                                                 (swap! account-equity-calls inc)
+                                                                 [:div {:data-role "stub-account-equity"}])
+                                                                ([_state _opts]
+                                                                 (swap! account-equity-calls inc)
+                                                                 [:div {:data-role "stub-account-equity"}]))]
+          (trade-view/trade-view state-a)
+          (trade-view/trade-view state-b)
+          (is (= 1 @active-asset-calls))
+          (is (= 1 @chart-calls))
+          (is (= 2 @orderbook-calls))
+          (is (= 2 @order-form-calls))
+          (is (= 1 @account-info-calls))
+          (is (= 1 @equity-metrics-calls))
+          (is (= 1 @account-equity-calls)))))))
+
+(deftest trade-view-skips-websocket-only-rerenders-when-surface-freshness-cues-are-disabled-test
+  (with-viewport-width
+    1280
+    (fn []
+      (let [active-asset-calls (atom 0)
+            chart-calls (atom 0)
+            orderbook-calls (atom 0)
+            order-form-calls (atom 0)
+            account-info-calls (atom 0)
+            equity-metrics-calls (atom 0)
+            account-equity-calls (atom 0)
+            state-a (assoc trade-view-test-state
+                           :active-asset "BTC"
+                           :active-market {:coin "BTC"
+                                           :market-type :perp
+                                           :base "BTC"
+                                           :quote "USDC"
+                                           :szDecimals 4}
+                           :orderbooks {"BTC" {:bids [{:px "99" :sz "2"}]
+                                               :asks [{:px "101" :sz "1"}]}}
+                           :websocket {:health {:generated-at-ms 5000}})
+            state-b (assoc-in state-a
+                              [:websocket :health :generated-at-ms]
+                              6000)]
+        (with-redefs [active-asset-view/active-asset-view (fn [_state]
+                                                            (swap! active-asset-calls inc)
+                                                            [:div {:data-role "stub-active-asset"}])
+                      trade-modules/render-trade-chart-view (fn [_state]
+                                                              (swap! chart-calls inc)
+                                                              [:div {:data-role "stub-chart"}])
+                      l2-orderbook-view/l2-orderbook-view (fn [_state]
+                                                            (swap! orderbook-calls inc)
+                                                            [:div {:data-role "stub-orderbook"}])
+                      order-form-view/order-form-view (fn [_state]
+                                                        (swap! order-form-calls inc)
+                                                        [:div {:data-role "stub-order-form"}])
+                      account-info-view/account-info-view (fn
+                                                            ([_state]
+                                                             (swap! account-info-calls inc)
+                                                             [:div {:data-role "stub-account-info"}])
+                                                            ([_state _options]
+                                                             (swap! account-info-calls inc)
+                                                             [:div {:data-role "stub-account-info"}]))
+                      account-equity-view/account-equity-metrics (fn [_state]
+                                                                   (swap! equity-metrics-calls inc)
+                                                                   {:account-value-display 12})
+                      account-equity-view/account-equity-view (fn
+                                                                ([_state]
+                                                                 (swap! account-equity-calls inc)
+                                                                 [:div {:data-role "stub-account-equity"}])
+                                                                ([_state _opts]
+                                                                 (swap! account-equity-calls inc)
+                                                                 [:div {:data-role "stub-account-equity"}]))]
+          (trade-view/trade-view state-a)
+          (trade-view/trade-view state-b)
+          (is (= 1 @active-asset-calls))
+          (is (= 1 @chart-calls))
+          (is (= 1 @orderbook-calls))
+          (is (= 1 @order-form-calls))
+          (is (= 1 @account-info-calls))
+          (is (= 1 @equity-metrics-calls))
+          (is (= 1 @account-equity-calls)))))))
+
 (deftest trade-view-skips-hidden-heavy-surface-subtrees-on-mobile-chart-layout-test
   (with-viewport-width
     430

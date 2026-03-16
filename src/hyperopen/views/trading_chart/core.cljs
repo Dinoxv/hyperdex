@@ -24,6 +24,126 @@
     (get-in state [:orders k])
     (get-in state [:webdata2 k])))
 
+(declare dispatch-chart-cancel-order!
+         dispatch-hide-volume-indicator!
+         dispatch-chart-liquidation-drag-margin-preview!
+         dispatch-chart-liquidation-drag-margin-confirm!)
+
+(defn- memoize-last
+  [f]
+  (let [cache (atom nil)]
+    (fn [& args]
+      (let [cached @cache]
+        (if (and (map? cached)
+                 (= args (:args cached)))
+          (:result cached)
+          (let [result (apply f args)]
+            (reset! cache {:args args
+                           :result result})
+            result))))))
+
+(def ^:private memoized-chart-open-orders
+  (memoize-last
+   (fn [open-orders-source
+        open-orders-snapshot-source
+        open-orders-snapshot-by-dex-source
+        active-asset
+        pending-cancel-oids]
+     (account-projections/normalized-open-orders-for-active-asset
+      open-orders-source
+      open-orders-snapshot-source
+      open-orders-snapshot-by-dex-source
+      active-asset
+      pending-cancel-oids))))
+
+(def ^:private memoized-chart-fills
+  (memoize-last
+   (fn [fills-source]
+     (cond
+       (vector? fills-source) fills-source
+       (sequential? fills-source) (vec fills-source)
+       :else []))))
+
+(def ^:private memoized-position-overlay-base
+  (memoize-last
+   (fn [active-asset active-position active-fills market-by-key selected-timeframe candle-data]
+     (position-overlay-model/build-position-overlay
+      {:active-asset active-asset
+       :position active-position
+       :fills active-fills
+       :market-by-key market-by-key
+       :selected-timeframe selected-timeframe
+       :candle-data candle-data}))))
+
+(def ^:private memoized-position-overlay
+  (memoize-last
+   (fn [position-overlay-base preview]
+     (cond-> position-overlay-base
+       (and (map? position-overlay-base)
+            (map? preview))
+       (assoc :current-liquidation-price (:current-liquidation-price preview)
+              :liquidation-price (:target-liquidation-price preview))))))
+
+(def ^:private memoized-liquidation-drag-preview-callback
+  (memoize-last
+   (fn [dispatch-fn active-position-data]
+     (fn [suggestion]
+       (dispatch-chart-liquidation-drag-margin-preview!
+        dispatch-fn
+        active-position-data
+        suggestion)))))
+
+(def ^:private memoized-liquidation-drag-confirm-callback
+  (memoize-last
+   (fn [dispatch-fn active-position-data]
+     (fn [suggestion]
+       (dispatch-chart-liquidation-drag-margin-confirm!
+        dispatch-fn
+        active-position-data
+        suggestion)))))
+
+(def ^:private memoized-cancel-order-callback
+  (memoize-last
+   (fn [dispatch-fn]
+     (fn [order]
+       (dispatch-chart-cancel-order! dispatch-fn order)))))
+
+(def ^:private memoized-hide-volume-indicator-callback
+  (memoize-last
+   (fn [dispatch-fn]
+     (fn []
+       (dispatch-hide-volume-indicator! dispatch-fn)))))
+
+(def ^:private memoized-chart-runtime-options
+  (memoize-last
+   (fn [price-decimals
+        volume-visible?
+        on-hide-volume-indicator
+        active-asset
+        candle-data
+        on-liquidation-drag-preview
+        on-liquidation-drag-confirm
+        position-overlay]
+     {:series-options {:price-decimals price-decimals}
+      :legend-deps {:format-price fmt/format-trade-price-plain
+                    :format-delta fmt/format-trade-price-delta}
+      :volume-visible? volume-visible?
+      :on-hide-volume-indicator on-hide-volume-indicator
+      :persistence-deps {:asset active-asset
+                         :candles candle-data}
+      :on-liquidation-drag-preview on-liquidation-drag-preview
+      :on-liquidation-drag-confirm on-liquidation-drag-confirm
+      :position-overlay position-overlay})))
+
+(def ^:private memoized-legend-meta
+  (memoize-last
+   (fn [symbol timeframe-label candle-data]
+     {:symbol symbol
+      :timeframe-label timeframe-label
+      :venue "Hyperopen"
+      :market-open? true
+      :candle-data candle-data})))
+
 (defn- chart-open-orders
   [state]
   (let [active-asset (:active-asset state)
@@ -31,7 +151,7 @@
         open-orders-snapshot-source (preferred-orders-value state :open-orders-snapshot)
         open-orders-snapshot-by-dex-source (preferred-orders-value state :open-orders-snapshot-by-dex)
         pending-cancel-oids (get-in state [:orders :pending-cancel-oids])]
-    (account-projections/normalized-open-orders-for-active-asset
+    (memoized-chart-open-orders
      open-orders-source
      open-orders-snapshot-source
      open-orders-snapshot-by-dex-source
@@ -41,10 +161,7 @@
 (defn- chart-fills
   [state]
   (let [fills-source (preferred-orders-value state :fills)]
-    (cond
-      (vector? fills-source) fills-source
-      (sequential? fills-source) (vec fills-source)
-      :else [])))
+    (memoized-chart-fills fills-source)))
 
 (defn- runtime-dispatch-fn
   []
@@ -491,30 +608,22 @@
                       (get api-response :data []))  ; Wrapped in :data
         candle-data (derived-cache/memoized-candle-data raw-candles selected-timeframe)
         preview (pending-liquidation-preview state active-position-data)
-        position-overlay-base (position-overlay-model/build-position-overlay
-                               {:active-asset active-asset
-                                :position active-position
-                                :fills active-fills
-                                :market-by-key market-by-key
-                                :selected-timeframe selected-timeframe
-                                :candle-data candle-data})
-        position-overlay (cond-> position-overlay-base
-                           (and (map? position-overlay-base)
-                                (map? preview))
-                           (assoc :current-liquidation-price (:current-liquidation-price preview)
-                                  :liquidation-price (:target-liquidation-price preview)))
-        on-liquidation-drag-preview (fn [suggestion]
-                                      (dispatch-chart-liquidation-drag-margin-preview!
-                                       dispatch-fn
-                                       active-position-data
-                                       suggestion))
-        on-liquidation-drag-confirm (fn [suggestion]
-                                      (dispatch-chart-liquidation-drag-margin-confirm!
-                                       dispatch-fn
-                                       active-position-data
-                                       suggestion))
-        on-cancel-order (fn [order]
-                          (dispatch-chart-cancel-order! dispatch-fn order))
+        position-overlay-base (memoized-position-overlay-base
+                               active-asset
+                               active-position
+                               active-fills
+                               market-by-key
+                               selected-timeframe
+                               candle-data)
+        position-overlay (memoized-position-overlay position-overlay-base preview)
+        on-liquidation-drag-preview (memoized-liquidation-drag-preview-callback
+                                     dispatch-fn
+                                     active-position-data)
+        on-liquidation-drag-confirm (memoized-liquidation-drag-confirm-callback
+                                     dispatch-fn
+                                     active-position-data)
+        on-cancel-order (memoized-cancel-order-callback dispatch-fn)
+        on-hide-volume-indicator (memoized-hide-volume-indicator-callback dispatch-fn)
         symbol (or active-asset "—")
         timeframe-label (str/upper-case (name selected-timeframe))
         price-decimals (or (:price-decimals active-market)
@@ -522,21 +631,17 @@
                            (:pxDecimals active-market)
                            (fmt/price-decimals-from-raw (:markRaw active-market))
                            (fmt/price-decimals-from-raw (:prevDayRaw active-market)))
-        chart-runtime-options {:series-options {:price-decimals price-decimals}
-                               :legend-deps {:format-price fmt/format-trade-price-plain
-                                             :format-delta fmt/format-trade-price-delta}
-                               :volume-visible? (boolean (get-in state [:chart-options :volume-visible?] true))
-                               :on-hide-volume-indicator #(dispatch-hide-volume-indicator! dispatch-fn)
-                               :persistence-deps {:asset active-asset
-                                                  :candles candle-data}
-                               :on-liquidation-drag-preview on-liquidation-drag-preview
-                               :on-liquidation-drag-confirm on-liquidation-drag-confirm
-                               :position-overlay position-overlay}
-        legend-meta {:symbol symbol
-                     :timeframe-label timeframe-label
-                     :venue "Hyperopen"
-                     :market-open? true
-                     :candle-data candle-data}]
+        volume-visible? (boolean (get-in state [:chart-options :volume-visible?] true))
+        chart-runtime-options (memoized-chart-runtime-options
+                               price-decimals
+                               volume-visible?
+                               on-hide-volume-indicator
+                               active-asset
+                               candle-data
+                               on-liquidation-drag-preview
+                               on-liquidation-drag-confirm
+                               position-overlay)
+        legend-meta (memoized-legend-meta symbol timeframe-label candle-data)]
     [:div {:class ["w-full" "h-full"]
            :data-parity-id "chart-panel"}
      ;; Chart container with consistent width for both menu and chart

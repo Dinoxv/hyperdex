@@ -1,5 +1,6 @@
 (ns hyperopen.views.trading-chart.utils.chart-interop.legend
   (:require [hyperopen.utils.formatting :as fmt]
+            [hyperopen.views.trading-chart.utils.chart-interop.candle-sync-policy :as candle-sync-policy]
             [hyperopen.views.trading-chart.utils.chart-options :as chart-options]))
 
 (defn- normalize-time-key
@@ -30,37 +31,87 @@
       business-day (str "bd:" (:year business-day) "-" (:month business-day) "-" (:day business-day))
       :else nil)))
 
+(defn- vectorize-candles
+  [candles]
+  (if (vector? candles) candles (vec candles)))
+
+(defn- legend-entry
+  [candle prev-close]
+  (when candle
+    {:candle candle
+     :prev-close prev-close}))
+
+(defn- assoc-candle-entry
+  [lookup candle entry]
+  (if-let [key* (normalize-time-key (:time candle))]
+    (assoc lookup key* entry)
+    lookup))
+
+(defn- build-candle-lookup-state
+  [candles]
+  (let [candles* (vectorize-candles candles)]
+    (loop [remaining candles*
+           prev-close nil
+           acc {}
+           latest-entry nil]
+      (if-let [candle (first remaining)]
+        (let [entry (legend-entry candle prev-close)]
+          (recur (rest remaining)
+                 (:close candle)
+                 (assoc-candle-entry acc candle entry)
+                 entry))
+        {:candles candles*
+         :candle-lookup acc
+         :latest-entry latest-entry}))))
+
+(defn- reconcile-candle-lookup-state
+  [previous-state candles]
+  (let [candles* (vectorize-candles candles)
+        previous-state* (select-keys (or previous-state {}) [:candles :candle-lookup :latest-entry])
+        previous-candles (:candles previous-state*)
+        decision (if (contains? previous-state* :candles)
+                   (candle-sync-policy/infer-decision previous-candles candles*)
+                   {:mode :full-reset})]
+    (case (:mode decision)
+      :noop (or previous-state previous-state*)
+
+      :append-last
+      (let [next-last (peek candles*)
+            previous-last (peek previous-candles)
+            next-entry (legend-entry next-last (:close previous-last))]
+        {:candles candles*
+         :candle-lookup (assoc-candle-entry (:candle-lookup previous-state*) next-last next-entry)
+         :latest-entry next-entry})
+
+      :update-last
+      (let [next-last (peek candles*)
+            previous-last (peek previous-candles)
+            previous-key (normalize-time-key (:time previous-last))
+            next-prev-close (when (> (count candles*) 1)
+                              (:close (nth candles* (- (count candles*) 2))))
+            next-entry (legend-entry next-last next-prev-close)
+            lookup* (cond-> (or (:candle-lookup previous-state*) {})
+                      previous-key (dissoc previous-key))]
+        {:candles candles*
+         :candle-lookup (assoc-candle-entry lookup* next-last next-entry)
+         :latest-entry next-entry})
+
+      (build-candle-lookup-state candles*))))
+
 (defn- build-legend-state
-  [legend-meta]
-  (let [symbol (or (:symbol legend-meta) "—")
-        timeframe-label (or (:timeframe-label legend-meta) "—")
-        venue (or (:venue legend-meta) "—")
-        header-text (str symbol " · " timeframe-label " · " venue)
-        market-open? (not (false? (:market-open? legend-meta)))
-        candle-data (or (:candle-data legend-meta) [])
-        candle-lookup (when (seq candle-data)
-                        (loop [remaining candle-data
-                               prev-close nil
-                               acc {}]
-                          (if (empty? remaining)
-                            acc
-                            (let [c (first remaining)
-                                  key* (normalize-time-key (:time c))
-                                  acc* (if key*
-                                         (assoc acc key* {:candle c :prev-close prev-close})
-                                         acc)
-                                  prev-close* (:close c)]
-                              (recur (rest remaining) prev-close* acc*)))))
-        latest-candle (last candle-data)
-        latest-prev-close (when (> (count candle-data) 1)
-                            (:close (nth candle-data (- (count candle-data) 2))))
-        latest-entry (when latest-candle
-                       {:candle latest-candle
-                        :prev-close latest-prev-close})]
-    {:header-text header-text
-     :market-open? market-open?
-     :candle-lookup candle-lookup
-     :latest-entry latest-entry}))
+  ([legend-meta]
+   (build-legend-state nil legend-meta))
+  ([previous-state legend-meta]
+   (let [symbol (or (:symbol legend-meta) "—")
+         timeframe-label (or (:timeframe-label legend-meta) "—")
+         venue (or (:venue legend-meta) "—")
+         header-text (str symbol " · " timeframe-label " · " venue)
+         market-open? (not (false? (:market-open? legend-meta)))
+         candle-state (reconcile-candle-lookup-state previous-state
+                                                     (or (:candle-data legend-meta) []))]
+     (assoc candle-state
+            :header-text header-text
+            :market-open? market-open?))))
 
 (defn- create-value-node!
   [document row label]
@@ -151,7 +202,7 @@
        (.appendChild legend header-row)
        (.appendChild legend values-row)
        (.appendChild container legend)
-       (let [state (atom (build-legend-state legend-meta))
+       (let [state (atom (build-legend-state nil legend-meta))
              format-price* (or format-price
                                (fn [price]
                                  (when (number? price)
@@ -220,7 +271,7 @@
                                            (get candle-lookup lookup-key))]
                                (render-legend! (or entry latest-entry))))
              update! (fn [new-meta]
-                       (reset! state (build-legend-state new-meta))
+                       (swap! state build-legend-state new-meta)
                        (update-legend nil))
              destroy! (fn []
                         (try
