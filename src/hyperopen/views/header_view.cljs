@@ -21,6 +21,20 @@
          "hover:opacity-100"
          "hover:text-white"]))
 
+(def brand-mark-classes
+  ["text-primary"
+   "font-black"
+   "tracking-[-0.12em]"
+   "italic"
+   "select-none"])
+
+(def brand-wordmark-classes
+  ["text-primary"
+   "font-black"
+   "tracking-[-0.06em]"
+   "italic"
+   "select-none"])
+
 (defn- nav-link [label route active?]
   [:a {:class (if active?
                 header-nav-link-active-classes
@@ -630,7 +644,8 @@
                       "px-4"
                       "py-4"]}
         [:div {:class ["flex" "items-center" "gap-3"]}
-         [:span {:class ["font-splash" "text-[1.9rem]" "leading-none" "text-primary"]
+         [:span {:class (into ["text-[1.9rem]" "leading-none"]
+                              brand-mark-classes)
                  :data-role "mobile-header-menu-brand-mark"}
           "HO"]
          [:div {:class ["text-xs" "font-semibold" "uppercase" "tracking-[0.18em]" "text-[#85a3a8]"]}
@@ -716,10 +731,12 @@
                   :class ["md:hidden" "inline-flex" "items-center" "rounded-lg" "px-1" "py-0.5"]
                   :on {:click [[:actions/navigate "/trade"]]}
                   :data-role "mobile-brand"}
-         [:span {:class ["font-splash" "text-lg" "leading-none" "text-primary"]}
+         [:span {:class (into ["text-lg" "leading-none"]
+                              brand-mark-classes)}
           "HO"]]
         [:div {:class ["hidden" "md:flex" "items-center" "space-x-2" "sm:space-x-3"]}
-         [:span {:class ["text-primary" "text-xl" "leading-none" "sm:text-3xl" "font-bold" "font-splash"]}
+         [:span {:class (into ["text-xl" "leading-none" "sm:text-3xl"]
+                              brand-wordmark-classes)}
           "HyperOpen"]]]
 
        ;; Navigation Links

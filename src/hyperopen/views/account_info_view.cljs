@@ -1,5 +1,6 @@
 (ns hyperopen.views.account-info-view
-  (:require [hyperopen.views.account-info.shared :as shared]
+  (:require [hyperopen.ui.fonts :as fonts]
+            [hyperopen.views.account-info.shared :as shared]
             [hyperopen.views.account-info.table :as account-table]
             [hyperopen.views.account-info.vm :as account-info-vm]
             [hyperopen.views.account-info.tabs.balances :as balances-tab]
@@ -130,8 +131,7 @@
         label-width (if context
                       (do
                         ;; Match the compact 12px tab label metrics used by the tab strip.
-                        (set! (.-font context)
-                              "400 12px \"Inter Variable\", system-ui, -apple-system, \"Segoe UI\", Roboto, \"Helvetica Neue\", Arial, sans-serif")
+                        (set! (.-font context) (fonts/canvas-font 12))
                         (-> context
                             (.measureText (or label ""))
                             .-width))

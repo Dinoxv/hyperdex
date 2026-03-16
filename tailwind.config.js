@@ -28,7 +28,6 @@ module.exports = {
           "sans-serif",
         ],
         mono: ["var(--font-mono)", "ui-monospace", "monospace"],
-        splash: ["Splash", "ui-sans-serif", "system-ui", "sans-serif"],
       },
     },
   },

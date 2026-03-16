@@ -1,5 +1,6 @@
 (ns hyperopen.views.vaults.detail.chart-view
   (:require [clojure.string :as str]
+            [hyperopen.ui.fonts :as fonts]
             [hyperopen.utils.formatting :as fmt]
             [hyperopen.views.chart.d3.model :as chart-d3-model]
             [hyperopen.views.chart.d3.runtime :as chart-d3-runtime]
@@ -45,7 +46,7 @@
     (if context
       (do
         ;; Match chart tick labels rendered at 12px for reliable gutter width.
-        (set! (.-font context) "12px \"Inter Variable\", system-ui, -apple-system, \"Segoe UI\", sans-serif")
+        (set! (.-font context) (fonts/canvas-font 12))
         (-> context
             (.measureText text)
             .-width))

@@ -1,12 +1,4 @@
 @font-face {
-  font-family: "Splash";
-  src: url("/fonts/Splash-Regular.ttf") format("truetype");
-  font-weight: normal;
-  font-style: normal;
-  font-display: swap;
-}
-
-@font-face {
   font-family: "Inter Variable";
   src: url("/fonts/InterVariable.woff2") format("woff2");
   font-weight: 100 900;
@@ -24,6 +16,7 @@
    * Typography tokens:
    * - Default UI text uses system fonts for fast first paint.
    * - `data-ui-font="inter"` opt-in swaps UI text to Inter Variable.
+   * - Optional fonts should only load when the active UI path actually uses them.
    * - Monospace is reserved for dense numeric views only.
    */
   :root,

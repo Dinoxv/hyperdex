@@ -1,9 +1,7 @@
-(ns hyperopen.views.trading-chart.utils.chart-options)
+(ns hyperopen.views.trading-chart.utils.chart-options
+  (:require [hyperopen.ui.fonts :as fonts]))
 
 (def default-right-offset-bars 4)
-
-(def default-chart-font-family
-  "system-ui, -apple-system, \"Segoe UI\", Roboto, \"Helvetica Neue\", Arial, \"Noto Sans\", \"Liberation Sans\", sans-serif")
 
 (def chart-visual-profile-local-storage-key "chart-visual-profile")
 (def default-chart-visual-profile :subtle-v1)
@@ -50,19 +48,7 @@
     (resolve-local-storage-chart-visual-profile)))
 
 (defn resolve-chart-font-family []
-  (if (and (exists? js/window) (exists? js/document))
-    (try
-      (let [root (.-documentElement js/document)
-            computed-style (.getComputedStyle js/window root)
-            configured (some-> (.getPropertyValue computed-style "--font-ui")
-                               str
-                               .trim)]
-        (if (seq configured)
-          configured
-          default-chart-font-family))
-      (catch :default _
-        default-chart-font-family))
-    default-chart-font-family))
+  (fonts/resolve-ui-font-family))
 
 (defn- common-chart-options [profile]
   (let [{:keys [text-color

@@ -1,6 +1,7 @@
 (ns hyperopen.views.portfolio-view
   (:require [clojure.string :as string]
             [hyperopen.portfolio.actions :as portfolio-actions]
+            [hyperopen.ui.fonts :as fonts]
             [hyperopen.utils.formatting :as fmt]
             [hyperopen.views.account-info-view :as account-info-view]
             [hyperopen.views.chart.d3.model :as chart-d3-model]
@@ -127,7 +128,7 @@
     (if context
       (do
         ;; Keep axis width in sync with actual rendered 12px label metrics.
-        (set! (.-font context) "12px \"Inter Variable\", system-ui, -apple-system, \"Segoe UI\", sans-serif")
+        (set! (.-font context) (fonts/canvas-font 12))
         (-> context
             (.measureText text)
             .-width))

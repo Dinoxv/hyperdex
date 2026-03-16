@@ -143,3 +143,27 @@
       (is (re-find #"\.num-right\s*\{[\s\S]*?text-align:\s*right;" styles-source)))
     (testing "Inter Variable font-face uses swap display behavior"
       (is (re-find #"@font-face\s*\{[\s\S]*?font-family:\s*\"Inter Variable\";[\s\S]*?font-display:\s*swap;" styles-source)))))
+
+(deftest cold-load-font-contract-avoids-custom-brand-font-and-hard-coded-inter-measurement-test
+  (let [styles-path (join-path (project-root) "src" "styles" "main.css")
+        styles-source (read-text styles-path)
+        tailwind-config-path (join-path (project-root) "tailwind.config.js")
+        tailwind-config (read-text tailwind-config-path)
+        header-source (read-text (join-path (project-root) "src" "hyperopen" "views" "header_view.cljs"))
+        account-info-source (read-text (join-path (project-root) "src" "hyperopen" "views" "account_info_view.cljs"))
+        portfolio-source (read-text (join-path (project-root) "src" "hyperopen" "views" "portfolio_view.cljs"))
+        vault-chart-source (read-text (join-path (project-root) "src" "hyperopen" "views" "vaults" "detail" "chart_view.cljs"))]
+    (testing "default stylesheet no longer defines the retired Splash font face"
+      (is (not (re-find #"font-family:\s*\"Splash\"" styles-source)))
+      (is (not (re-find #"Splash-Regular\.ttf" styles-source))))
+    (testing "tailwind font families no longer expose a splash font utility"
+      (is (not (re-find #"splash\s*:" tailwind-config))))
+    (testing "header no longer uses the retired font-splash utility"
+      (is (not (re-find #"font-splash" header-source))))
+    (testing "canvas measurement paths use the shared UI font resolver instead of hard-coded Inter"
+      (is (re-find #"fonts/canvas-font 12" account-info-source))
+      (is (re-find #"fonts/canvas-font 12" portfolio-source))
+      (is (re-find #"fonts/canvas-font 12" vault-chart-source))
+      (is (not (re-find #"Inter Variable" account-info-source)))
+      (is (not (re-find #"Inter Variable" portfolio-source)))
+      (is (not (re-find #"Inter Variable" vault-chart-source))))))
