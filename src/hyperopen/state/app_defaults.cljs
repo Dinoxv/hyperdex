@@ -185,6 +185,8 @@
    :detail-returns-benchmark-search ""
    :detail-returns-benchmark-suggestions-open? false
    :detail-chart-hover-index nil
+   :detail-performance-metrics-result nil
+   :detail-performance-metrics-loading? false
    :vault-transfer-modal (vault-transfer-policy/default-vault-transfer-modal-state)
    :list-loading? false
    :detail-loading? false})

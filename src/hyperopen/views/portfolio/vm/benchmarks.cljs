@@ -16,8 +16,15 @@
    :rolling-hash 1
    :xor-hash 0})
 
+(def ^:private empty-vault-benchmark-rows-signature
+  {:count 0
+   :rolling-hash 1
+   :xor-hash 0})
+
 (def ^:private empty-source-version-counter
   0)
+
+(declare mix-benchmark-markets-hash)
 
 (defn- parse-cache-order
   [value]
@@ -100,6 +107,25 @@
   [(- (benchmark-vault-tvl row))
    (str/lower-case (or (benchmark-vault-name row) ""))
    (str/lower-case (or (normalize-vault-address (:vault-address row)) ""))])
+
+(defn benchmark-vault-row-signature
+  [row]
+  (hash [(normalize-vault-address (:vault-address row))
+         (benchmark-vault-name row)
+         (benchmark-vault-tvl row)
+         (get-in row [:relationship :type])]))
+
+(defn benchmark-vault-rows-signature
+  [rows]
+  (reduce (fn [{:keys [count rolling-hash xor-hash] :as signature} row]
+            (if (map? row)
+              (let [row-hash (benchmark-vault-row-signature row)]
+                {:count (inc count)
+                 :rolling-hash (mix-benchmark-markets-hash rolling-hash row-hash)
+                 :xor-hash (bit-xor (bit-or xor-hash 0) (bit-or row-hash 0))})
+              signature))
+          empty-vault-benchmark-rows-signature
+          (or rows [])))
 
 (defn benchmark-vault-row?
   [row]
@@ -210,27 +236,48 @@
 (defonce eligible-vault-benchmark-rows-cache
   (atom nil))
 
+(defonce vault-benchmark-selector-options-cache
+  (atom nil))
+
+(defonce returns-benchmark-selector-model-cache
+  (atom nil))
+
 (defn memoized-eligible-vault-benchmark-rows
   [rows]
   (let [cache @eligible-vault-benchmark-rows-cache]
-    (if (and (map? cache)
-             (identical? rows (:rows cache)))
+    (cond
+      (and (map? cache)
+           (identical? rows (:rows cache)))
       (:eligible-rows cache)
-      (let [eligible-rows (eligible-vault-benchmark-rows rows)]
-        (reset! eligible-vault-benchmark-rows-cache {:rows rows
-                                                     :eligible-rows eligible-rows})
-        eligible-rows))))
+
+      :else
+      (let [rows-signature (benchmark-vault-rows-signature rows)]
+        (if (and (map? cache)
+                 (= rows-signature (:rows-signature cache)))
+          (do
+            (reset! eligible-vault-benchmark-rows-cache (assoc cache
+                                                               :rows rows
+                                                               :rows-signature rows-signature))
+            (:eligible-rows cache))
+          (let [eligible-rows (eligible-vault-benchmark-rows rows)]
+            (reset! eligible-vault-benchmark-rows-cache {:rows rows
+                                                         :rows-signature rows-signature
+                                                         :eligible-rows eligible-rows})
+            eligible-rows))))))
 
 (def ^:dynamic *build-benchmark-selector-options*
   build-benchmark-selector-options)
 
-(defn memoized-benchmark-selector-options
+(def ^:dynamic *build-vault-benchmark-selector-options*
+  build-vault-benchmark-selector-options)
+
+(defn- memoized-benchmark-selector-options-result
   [markets]
   (let [cache @benchmark-selector-options-cache]
     (cond
       (and (map? cache)
            (identical? markets (:markets cache)))
-      (:options cache)
+      cache
 
       :else
       (let [signature (benchmark-markets-signature markets)]
@@ -240,25 +287,65 @@
             (reset! benchmark-selector-options-cache (assoc cache
                                                            :markets markets
                                                            :markets-signature signature))
-            (:options cache))
+            @benchmark-selector-options-cache)
           (let [options (*build-benchmark-selector-options* markets)]
             (reset! benchmark-selector-options-cache {:markets markets
                                                       :markets-signature signature
                                                       :options options})
-            options))))))
+            @benchmark-selector-options-cache))))))
+
+(defn memoized-benchmark-selector-options
+  [markets]
+  (:options (memoized-benchmark-selector-options-result markets)))
+
+(defn- memoized-vault-benchmark-selector-options-result
+  [rows]
+  (let [cache @vault-benchmark-selector-options-cache]
+    (cond
+      (and (map? cache)
+           (identical? rows (:rows cache)))
+      cache
+
+      :else
+      (let [rows-signature (benchmark-vault-rows-signature rows)]
+        (if (and (map? cache)
+                 (= rows-signature (:rows-signature cache)))
+          (do
+            (reset! vault-benchmark-selector-options-cache (assoc cache
+                                                                  :rows rows
+                                                                  :rows-signature rows-signature))
+            @vault-benchmark-selector-options-cache)
+          (let [options (*build-vault-benchmark-selector-options* rows)]
+            (reset! vault-benchmark-selector-options-cache {:rows rows
+                                                            :rows-signature rows-signature
+                                                            :options options})
+            @vault-benchmark-selector-options-cache))))))
+
+(defn memoized-vault-benchmark-selector-options
+  [rows]
+  (:options (memoized-vault-benchmark-selector-options-result rows)))
 
 (defn reset-portfolio-vm-cache!
   []
   (reset! benchmark-selector-options-cache nil)
-  (reset! eligible-vault-benchmark-rows-cache nil))
+  (reset! eligible-vault-benchmark-rows-cache nil)
+  (reset! vault-benchmark-selector-options-cache nil)
+  (reset! returns-benchmark-selector-model-cache nil))
+
+(defn- benchmark-selector-options-result
+  [state]
+  (let [market-result (memoized-benchmark-selector-options-result
+                       (get-in state [:asset-selector :markets]))
+        vault-result (memoized-vault-benchmark-selector-options-result
+                      (get-in state [:vaults :merged-index-rows]))]
+    {:options (into (vec (:options market-result))
+                    (:options vault-result))
+     :options-signature {:markets (:markets-signature market-result)
+                         :vault-rows (:rows-signature vault-result)}}))
 
 (defn benchmark-selector-options
   [state]
-  (let [market-options (memoized-benchmark-selector-options
-                        (get-in state [:asset-selector :markets]))
-        vault-options (build-vault-benchmark-selector-options
-                       (get-in state [:vaults :merged-index-rows]))]
-    (into (vec market-options) vault-options)))
+  (:options (benchmark-selector-options-result state)))
 
 (defn normalize-benchmark-search-query
   [value]
@@ -296,7 +383,7 @@
 
 (defn returns-benchmark-selector-model
   [state]
-  (let [options (benchmark-selector-options state)
+  (let [{:keys [options options-signature]} (benchmark-selector-options-result state)
         option-values (into #{} (map :value) options)
         selected-coins (->> (selected-returns-benchmark-coins state)
                             (filter (fn [coin]
@@ -304,30 +391,43 @@
                                         (contains? option-values coin)
                                         true)))
                             vec)
-        selected-coin-set (set selected-coins)
         search (or (get-in state [:portfolio-ui :returns-benchmark-search]) "")
-        search-query (normalize-benchmark-search-query search)
         suggestions-open? (boolean (get-in state [:portfolio-ui :returns-benchmark-suggestions-open?]))
-        selected-options (selected-benchmark-options options selected-coins)
-        candidates (->> options
-                        (remove (fn [{:keys [value]}]
-                                  (contains? selected-coin-set value)))
-                        (filter #(benchmark-option-matches-search? % search-query))
-                        vec)
-        top-coin (some-> candidates first :value)
-        empty-message (cond
-                        (empty? options) "No benchmark symbols available."
-                        (seq candidates) nil
-                        (seq search-query) "No matching symbols."
-                        :else "All symbols selected.")]
-    {:selected-coins selected-coins
-     :selected-options selected-options
-     :coin-search search
-     :suggestions-open? suggestions-open?
-     :candidates candidates
-     :top-coin top-coin
-     :empty-message empty-message
-     :label-by-coin (into {} (map (juxt :value :label)) options)}))
+        cache @returns-benchmark-selector-model-cache]
+    (if (and (map? cache)
+             (= options-signature (:options-signature cache))
+             (= selected-coins (:selected-coins cache))
+             (= search (:search cache))
+             (= suggestions-open? (:suggestions-open? cache)))
+      (:model cache)
+      (let [selected-coin-set (set selected-coins)
+            search-query (normalize-benchmark-search-query search)
+            selected-options (selected-benchmark-options options selected-coins)
+            candidates (->> options
+                            (remove (fn [{:keys [value]}]
+                                      (contains? selected-coin-set value)))
+                            (filter #(benchmark-option-matches-search? % search-query))
+                            vec)
+            top-coin (some-> candidates first :value)
+            empty-message (cond
+                            (empty? options) "No benchmark symbols available."
+                            (seq candidates) nil
+                            (seq search-query) "No matching symbols."
+                            :else "All symbols selected.")
+            model {:selected-coins selected-coins
+                   :selected-options selected-options
+                   :coin-search search
+                   :suggestions-open? suggestions-open?
+                   :candidates candidates
+                   :top-coin top-coin
+                   :empty-message empty-message
+                   :label-by-coin (into {} (map (juxt :value :label)) options)}]
+        (reset! returns-benchmark-selector-model-cache {:options-signature options-signature
+                                                        :selected-coins selected-coins
+                                                        :search search
+                                                        :suggestions-open? suggestions-open?
+                                                        :model model})
+        model))))
 
 (defn- vault-benchmark-row-by-address
   [state]

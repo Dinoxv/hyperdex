@@ -150,6 +150,31 @@
           (is (= ["BTC" "ETH"] (mapv :value second-options)))
           (is (= ["BTC" "ETH"] (mapv :value signature-hit)))
           (is (= ["ETH" "BTC"] (mapv :value changed-options)))))
+      (let [vault-build-count (atom 0)
+            original-vault-builder vm-benchmarks/*build-vault-benchmark-selector-options*
+            vaults-a [{:name "Alpha"
+                       :vault-address "0xabc"
+                       :relationship {:type :normal}
+                       :tvl 10}
+                      {:name "Beta"
+                       :vault-address "0xdef"
+                       :relationship {:type :normal}
+                       :tvl 5}]
+            vaults-b (mapv identity vaults-a)
+            vaults-c (assoc-in vaults-b [1 :tvl] 25)]
+        (with-redefs [vm-benchmarks/*build-vault-benchmark-selector-options*
+                      (fn [rows]
+                        (swap! vault-build-count inc)
+                        (original-vault-builder rows))]
+          (let [first-options (vm-benchmarks/memoized-vault-benchmark-selector-options vaults-a)
+                second-options (vm-benchmarks/memoized-vault-benchmark-selector-options vaults-a)
+                signature-hit (vm-benchmarks/memoized-vault-benchmark-selector-options vaults-b)
+                changed-options (vm-benchmarks/memoized-vault-benchmark-selector-options vaults-c)]
+            (is (= 2 @vault-build-count))
+            (is (= ["vault:0xabc" "vault:0xdef"] (mapv :value first-options)))
+            (is (= ["vault:0xabc" "vault:0xdef"] (mapv :value second-options)))
+            (is (= ["vault:0xabc" "vault:0xdef"] (mapv :value signature-hit)))
+            (is (= ["vault:0xdef" "vault:0xabc"] (mapv :value changed-options))))))
       (let [vaults [{:name "Alpha"
                      :vault-address "0xabc"
                      :relationship {:type :normal}
@@ -157,6 +182,30 @@
             first-rows (vm-benchmarks/memoized-eligible-vault-benchmark-rows vaults)
             second-rows (vm-benchmarks/memoized-eligible-vault-benchmark-rows vaults)]
         (is (identical? first-rows second-rows))))))
+
+(deftest returns-benchmark-selector-model-cache-reuses-closed-suggestion-models-test
+  (let [state {:asset-selector {:markets [{:coin "BTC"
+                                           :symbol "BTC-USD"
+                                           :dex "hl"
+                                           :market-type :perp
+                                           :openInterest "300"
+                                           :cache-order 1}
+                                          {:coin "ETH"
+                                           :symbol "ETH-USD"
+                                           :dex "hl"
+                                           :market-type :perp
+                                           :openInterest "200"
+                                           :cache-order 2}]}
+               :portfolio-ui {:returns-benchmark-coins ["BTC"]
+                              :returns-benchmark-search "eth"
+                              :returns-benchmark-suggestions-open? false}}]
+    (let [first-model (vm-benchmarks/returns-benchmark-selector-model state)
+          second-model (vm-benchmarks/returns-benchmark-selector-model (assoc state :toast {:id 1}))
+          reopened-model (vm-benchmarks/returns-benchmark-selector-model
+                          (assoc-in state [:portfolio-ui :returns-benchmark-suggestions-open?] true))]
+      (is (identical? first-model second-model))
+      (is (not (identical? first-model reopened-model)))
+      (is (= ["ETH"] (mapv :value (:candidates first-model)))))))
 
 (deftest benchmark-computation-context-builds_strategy_and_benchmark_rows-test
   (let [t0 1704067200000

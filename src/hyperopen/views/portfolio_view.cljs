@@ -1002,11 +1002,14 @@
        state
        {:extra-tabs [{:id :deposits-withdrawals
                       :label "Deposits & Withdrawals"
-                      :content (deposits-withdrawals-card)}
+                      :render (fn [_]
+                                (deposits-withdrawals-card))}
                      {:id :performance-metrics
                       :label "Performance Metrics"
-                      :content (performance-metrics-card (assoc (:performance-metrics view-model)
-                                                                :time-range-selector (get-in view-model [:selectors :performance-metrics-time-range])))}]
+                      :render (fn [_]
+                                (performance-metrics-card
+                                 (assoc (:performance-metrics view-model)
+                                        :time-range-selector (get-in view-model [:selectors :performance-metrics-time-range]))))}]
         :selected-tab-override (get-in state [:portfolio-ui :account-info-tab] portfolio-actions/default-account-info-tab)
         :default-selected-tab portfolio-actions/default-account-info-tab
         :tab-click-actions-by-tab portfolio-account-tab-click-actions-by-tab

@@ -316,9 +316,11 @@
                                                       ([_]
                                                        [:div {:data-role "stub-account-info"}])
                                                       ([_ {:keys [extra-tabs]}]
-                                                       (or (some (fn [{:keys [id content]}]
+                                                       (or (some (fn [{:keys [id content render]}]
                                                                    (when (= id :performance-metrics)
-                                                                     content))
+                                                                     (or content
+                                                                         (when (fn? render)
+                                                                           (render nil)))))
                                                                  extra-tabs)
                                                            [:div {:data-role "stub-account-info"}])))]
     (let [view-node (portfolio-view/portfolio-view {})
@@ -548,9 +550,11 @@
                                                       ([_]
                                                        [:div {:data-role "stub-account-info"}])
                                                       ([_ {:keys [extra-tabs]}]
-                                                       (or (some (fn [{:keys [id content]}]
+                                                       (or (some (fn [{:keys [id content render]}]
                                                                    (when (= id :performance-metrics)
-                                                                     content))
+                                                                     (or content
+                                                                         (when (fn? render)
+                                                                           (render nil)))))
                                                                  extra-tabs)
                                                            [:div {:data-role "stub-account-info"}])))]
     (let [view-node (portfolio-view/portfolio-view {})
@@ -643,9 +647,11 @@
                                                       ([_]
                                                        [:div {:data-role "stub-account-info"}])
                                                       ([_ {:keys [extra-tabs]}]
-                                                       (or (some (fn [{:keys [id content]}]
+                                                       (or (some (fn [{:keys [id content render]}]
                                                                    (when (= id :performance-metrics)
-                                                                     content))
+                                                                     (or content
+                                                                         (when (fn? render)
+                                                                           (render nil)))))
                                                                  extra-tabs)
                                                            [:div {:data-role "stub-account-info"}])))]
     (let [view-node (portfolio-view/portfolio-view {})
@@ -694,14 +700,16 @@
       (is (contains? month-tooltip-strings "$203"))
       (is (str/includes? month-tooltip-class "rounded-xl"))
       (is (str/includes? month-tooltip-class "min-w-[188px]"))
-      (is (= "110px" (aget (.-style month-tooltip-node) "top"))))
+      (is (= "translate3d(390px, 110px, 0px) translate(calc(-100% - 8px), -50%)"
+             (aget (.-style month-tooltip-node) "transform"))))
     (fake-dom/dispatch-dom-event-with-payload! (:host day-runtime) "pointermove" #js {:clientX 390})
     (let [day-tooltip-node (find-dom-node-by-role (:host day-runtime) "portfolio-chart-hover-tooltip")
           day-tooltip-strings (set (fake-dom/collect-text-content day-tooltip-node))]
       (is (some? day-tooltip-node))
       (is (contains? day-tooltip-strings "PNL"))
       (is (contains? day-tooltip-strings "$203"))
-      (is (= "110px" (aget (.-style day-tooltip-node) "top")))
+      (is (= "translate3d(390px, 110px, 0px) translate(calc(-100% - 8px), -50%)"
+             (aget (.-style day-tooltip-node) "transform")))
       (is (some #(re-matches #"[0-9]{2}:[0-9]{2}" %) day-tooltip-strings)))))
 
 (deftest portfolio-view-returns-tooltip-runtime-renders-selected-benchmark-values-with-series-color-test

@@ -6,6 +6,9 @@
 (def ^:private svg-namespace
   "http://www.w3.org/2000/svg")
 
+(def ^:private tooltip-row-grid-template
+  "minmax(0, 1fr) max-content")
+
 (defn- class-string
   [classes]
   (->> (cond
@@ -95,6 +98,13 @@
   [node]
   (when-let [parent (some-> node .-parentNode)]
     (.removeChild parent node)))
+
+(defn- tooltip-transform
+  [left-px top-px right-side?]
+  (str "translate3d(" left-px "px, " top-px "px, 0px) "
+       (if right-side?
+         "translate(calc(-100% - 8px), -50%)"
+         "translate(8px, -50%)")))
 
 (defn- clip-id
   [runtime series-id suffix]
@@ -360,17 +370,16 @@
                                                "-hover-tooltip-benchmark-row-"
                                                coin)
                                :class ["grid"
-                                       "grid-cols-[1fr_auto]"
                                        "items-center"
                                        "gap-3"]}
-                              nil)
+                              {:grid-template-columns tooltip-row-grid-template})
         label-node (create-html-node doc
                                      "span"
                                      {:class ["text-[12px]"
                                               "font-medium"
                                               "leading-4"
                                               "text-[#909fac]"]}
-                                     nil)
+                                     {:min-width "0px"})
         value-node (create-html-node doc
                                      "span"
                                      {:data-role (str data-role-prefix
@@ -381,7 +390,7 @@
                                               "font-semibold"
                                               "leading-[1.1]"
                                               "tracking-tight"]}
-                                     nil)
+                                     {:justify-self "end"})
         row-nodes {:row row
                    :label-node label-node
                    :value-node value-node}]
@@ -444,11 +453,7 @@
                                                                    pointer-x
                                                                    hovered-point)]
     (set-style-map! (:tooltip-root runtime)
-                    {:left (str left-px "px")
-                     :top (str top-px "px")
-                     :transform (if right-side?
-                                  "translate(calc(-100% - 8px), -50%)"
-                                  "translate(8px, -50%)")})
+                    {:transform (tooltip-transform left-px top-px right-side?)})
     (set-attrs! (:hover-line runtime)
                 {:x1 left-px
                  :x2 left-px
@@ -522,6 +527,12 @@
                                                 "spectate-lg"
                                                 "z-20"]}
                                        {:white-space "nowrap"
+                                        :left "0px"
+                                        :top "0px"
+                                        :transform "translate3d(0px, 0px, 0px)"
+                                        :transform-origin "0 0"
+                                        :contain "layout style paint"
+                                        :will-change "transform"
                                         :border-color (:tooltip-border-color theme)
                                         :background (:tooltip-background theme)})
         tooltip-timestamp (create-html-node doc
@@ -536,17 +547,16 @@
                                              "div"
                                              {:class ["mt-2"
                                                       "grid"
-                                                      "grid-cols-[1fr_auto]"
                                                       "items-center"
                                                       "gap-3"]}
-                                             nil)
+                                             {:grid-template-columns tooltip-row-grid-template})
         tooltip-label (create-html-node doc
                                         "span"
                                         {:class ["text-[12px]"
                                                  "font-medium"
                                                  "leading-4"
                                                  "text-[#909fac]"]}
-                                        nil)
+                                        {:min-width "0px"})
         tooltip-value (create-html-node doc
                                         "span"
                                         {:class ["num"
@@ -554,7 +564,7 @@
                                                  "font-semibold"
                                                  "leading-[1]"
                                                  "tracking-tight"]}
-                                        nil)
+                                        {:justify-self "end"})
         tooltip-benchmark-rows (create-html-node doc
                                                  "div"
                                                  {:class ["mt-1.5" "space-y-1"]}

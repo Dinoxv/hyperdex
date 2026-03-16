@@ -1,6 +1,12 @@
 (ns hyperopen.vaults.detail.benchmarks-test
-  (:require [cljs.test :refer-macros [deftest is]]
+  (:require [cljs.test :refer-macros [deftest is use-fixtures]]
             [hyperopen.vaults.detail.benchmarks :as benchmarks]))
+
+(use-fixtures :each
+  (fn [f]
+    (benchmarks/reset-vault-detail-benchmarks-cache!)
+    (f)
+    (benchmarks/reset-vault-detail-benchmarks-cache!)))
 
 (deftest returns-benchmark-selector-model-builds-market-and-vault-options-test
   (let [vault-address "0xaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
@@ -45,3 +51,42 @@
            (mapv :value (get rows-by-coin "BTC"))))
     (is (= [2 8]
            (mapv :value (get rows-by-coin (str "vault:" vault-address)))))))
+
+(deftest vault-benchmark-selector-cache-hits-identity-signature-and-invalidation-paths-test
+  (let [rows-a [{:name "Alpha"
+                 :vault-address "0xaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+                 :relationship {:type :normal}
+                 :tvl 120}
+                {:name "Beta"
+                 :vault-address "0xbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+                 :relationship {:type :normal}
+                 :tvl 90}]
+        rows-b (mapv identity rows-a)
+        rows-c (assoc-in rows-b [1 :tvl] 180)
+        first-rows (benchmarks/memoized-eligible-vault-benchmark-rows rows-a)
+        second-rows (benchmarks/memoized-eligible-vault-benchmark-rows rows-a)
+        signature-hit (benchmarks/memoized-eligible-vault-benchmark-rows rows-b)
+        invalidated (benchmarks/memoized-eligible-vault-benchmark-rows rows-c)]
+    (is (identical? first-rows second-rows))
+    (is (identical? first-rows signature-hit))
+    (is (not (identical? first-rows invalidated)))
+    (is (= "0xbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+           (:vault-address (first invalidated))))))
+
+(deftest returns-benchmark-selector-model-cache-reuses-closed-suggestion-models-test
+  (let [state {:asset-selector {:markets [{:coin "BTC"
+                                           :symbol "BTC"
+                                           :dex "hl"
+                                           :market-type :perp
+                                           :openInterest 1000}]}
+               :vaults-ui {:detail-returns-benchmark-coins ["BTC"]
+                           :detail-returns-benchmark-search "btc"
+                           :detail-returns-benchmark-suggestions-open? false}
+               :vaults {:merged-index-rows []}}]
+    (let [first-model (benchmarks/returns-benchmark-selector-model state)
+          second-model (benchmarks/returns-benchmark-selector-model (assoc state :toast {:id 1}))
+          reopened-model (benchmarks/returns-benchmark-selector-model
+                          (assoc-in state [:vaults-ui :detail-returns-benchmark-suggestions-open?] true))]
+      (is (identical? first-model second-model))
+      (is (not (identical? first-model reopened-model)))
+      (is (= [] (mapv :value (:candidates first-model)))))))

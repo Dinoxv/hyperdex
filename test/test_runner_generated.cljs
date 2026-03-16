@@ -168,6 +168,7 @@
             [hyperopen.vaults.application.transfer-commands-test]
             [hyperopen.vaults.detail.activity-test]
             [hyperopen.vaults.detail.benchmarks-test]
+            [hyperopen.vaults.detail.metrics-bridge-test]
             [hyperopen.vaults.detail.performance-test]
             [hyperopen.vaults.detail.transfer-test]
             [hyperopen.vaults.detail.types-test]
@@ -509,6 +510,7 @@
              'hyperopen.vaults.application.transfer-commands-test
              'hyperopen.vaults.detail.activity-test
              'hyperopen.vaults.detail.benchmarks-test
+             'hyperopen.vaults.detail.metrics-bridge-test
              'hyperopen.vaults.detail.performance-test
              'hyperopen.vaults.detail.transfer-test
              'hyperopen.vaults.detail.types-test

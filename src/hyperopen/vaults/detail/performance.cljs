@@ -1,9 +1,13 @@
 (ns hyperopen.vaults.detail.performance
   (:require [clojure.string :as str]
-            [hyperopen.portfolio.metrics :as portfolio-metrics]))
+            [hyperopen.portfolio.metrics :as portfolio-metrics]
+            [hyperopen.vaults.detail.metrics-bridge :as metrics-bridge]))
 
 (def ^:private performance-periods-per-year
   365)
+
+(def ^:private empty-source-version-counter
+  0)
 
 (defn- optional-number
   [value]
@@ -237,6 +241,13 @@
           [time-ms value])
         (or points [])))
 
+(defn- current-worker
+  [worker-ref]
+  (cond
+    (nil? worker-ref) nil
+    (satisfies? IDeref worker-ref) @worker-ref
+    :else worker-ref))
+
 (defn- benchmark-performance-column
   [benchmark-cumulative-rows label-by-coin coin]
   (let [benchmark-daily-rows (portfolio-metrics/daily-compounded-returns benchmark-cumulative-rows)
@@ -273,35 +284,67 @@
                                (or rows []))))
           (or groups []))))
 
-(defn performance-metrics-model
-  [returns-benchmark-selector strategy-cumulative-rows benchmark-cumulative-rows-by-coin]
-  (let [strategy-daily-rows (portfolio-metrics/daily-compounded-returns strategy-cumulative-rows)
-        selected-benchmark-coins (vec (or (:selected-coins returns-benchmark-selector)
+(defn build-metrics-request-data
+  [strategy-cumulative-rows benchmark-cumulative-rows-by-coin selected-benchmark-coins]
+  (let [benchmark-requests (mapv (fn [coin]
+                                   {:coin coin
+                                    :request {:strategy-cumulative-rows (or (get benchmark-cumulative-rows-by-coin coin)
+                                                                            [])}})
+                                 selected-benchmark-coins)
+        portfolio-request {:strategy-cumulative-rows strategy-cumulative-rows
+                           :strategy-daily-rows (portfolio-metrics/daily-compounded-returns strategy-cumulative-rows)
+                           :benchmark-cumulative-rows (or (some-> benchmark-requests first :request :strategy-cumulative-rows)
+                                                          [])}]
+    {:portfolio-request portfolio-request
+     :benchmark-requests benchmark-requests}))
+
+(defn compute-metrics-sync
+  [request-data]
+  (metrics-bridge/compute-metrics-sync request-data))
+
+(def ^:dynamic *metrics-worker*
+  metrics-bridge/metrics-worker)
+
+(def ^:dynamic *last-metrics-request*
+  metrics-bridge/last-metrics-request)
+
+(def ^:dynamic *metrics-request-signature*
+  metrics-bridge/metrics-request-signature)
+
+(def ^:dynamic *build-metrics-request-data*
+  build-metrics-request-data)
+
+(def ^:dynamic *request-metrics-computation!*
+  metrics-bridge/request-metrics-computation!)
+
+(def ^:dynamic *compute-metrics-sync*
+  compute-metrics-sync)
+
+(defn- performance-metrics-from-result
+  [returns-benchmark-selector metrics-result loading?]
+  (let [selected-benchmark-coins (vec (or (:selected-coins returns-benchmark-selector)
                                           []))
         benchmark-label-by-coin (or (:label-by-coin returns-benchmark-selector)
                                     {})
+        portfolio-values (or (:portfolio-values metrics-result) {})
+        benchmark-values-by-coin-result (or (:benchmark-values-by-coin metrics-result) {})
         benchmark-columns (mapv (fn [coin]
-                                  (benchmark-performance-column (or (get benchmark-cumulative-rows-by-coin coin)
-                                                                    [])
-                                                                benchmark-label-by-coin
-                                                                coin))
+                                  {:coin coin
+                                   :label (or (get benchmark-label-by-coin coin)
+                                              coin)
+                                   :values (or (get benchmark-values-by-coin-result coin)
+                                               {})})
                                 selected-benchmark-coins)
         primary-benchmark-column (first benchmark-columns)
         benchmark-coin (:coin primary-benchmark-column)
-        benchmark-daily-rows (or (:daily-rows primary-benchmark-column)
-                                 [])
-        portfolio-values (portfolio-metrics/compute-performance-metrics {:strategy-daily-rows strategy-daily-rows
-                                                                         :benchmark-daily-rows benchmark-daily-rows
-                                                                         :rf 0
-                                                                         :periods-per-year performance-periods-per-year
-                                                                         :compounded true})
         benchmark-values (or (:values primary-benchmark-column)
                              {})
         groups (with-performance-metric-columns (portfolio-metrics/metric-rows portfolio-values)
                  portfolio-values
                  benchmark-columns)
         benchmark-label (:label primary-benchmark-column)]
-    {:benchmark-selected? (boolean (seq benchmark-columns))
+    {:loading? loading?
+     :benchmark-selected? (boolean (seq benchmark-columns))
      :benchmark-coin benchmark-coin
      :benchmark-label benchmark-label
      :benchmark-coins (mapv :coin benchmark-columns)
@@ -312,3 +355,47 @@
      :values portfolio-values
      :benchmark-values benchmark-values
      :groups groups}))
+
+(defn performance-metrics-model
+  ([returns-benchmark-selector strategy-cumulative-rows benchmark-cumulative-rows-by-coin]
+   (let [selected-benchmark-coins (vec (or (:selected-coins returns-benchmark-selector)
+                                           []))
+         request-data (*build-metrics-request-data* strategy-cumulative-rows
+                                                    benchmark-cumulative-rows-by-coin
+                                                    selected-benchmark-coins)
+         metrics-result (*compute-metrics-sync* request-data)]
+     (performance-metrics-from-result returns-benchmark-selector metrics-result false)))
+  ([state snapshot-range returns-benchmark-selector benchmark-context]
+   (let [strategy-cumulative-rows (or (:strategy-cumulative-rows benchmark-context)
+                                      [])
+         benchmark-cumulative-rows-by-coin (or (:benchmark-cumulative-rows-by-coin benchmark-context)
+                                               {})
+         strategy-source-version (or (:strategy-source-version benchmark-context)
+                                     empty-source-version-counter)
+         benchmark-source-version-map (or (:benchmark-source-version-map benchmark-context)
+                                          {})
+         selected-benchmark-coins (vec (or (:selected-coins returns-benchmark-selector)
+                                           []))
+         request-signature (*metrics-request-signature* snapshot-range
+                                                        selected-benchmark-coins
+                                                        strategy-source-version
+                                                        benchmark-source-version-map)
+         worker (current-worker *metrics-worker*)
+         request-signature-changed? (not= request-signature
+                                         (:signature @*last-metrics-request*))
+         request-data (when (or (nil? worker)
+                                request-signature-changed?)
+                        (*build-metrics-request-data* strategy-cumulative-rows
+                                                      benchmark-cumulative-rows-by-coin
+                                                      selected-benchmark-coins))
+         _ (when (and worker
+                      request-signature-changed?
+                      request-data)
+             (*request-metrics-computation!* request-data request-signature))
+         metrics-result (if worker
+                          (get-in state [:vaults-ui :detail-performance-metrics-result])
+                          (*compute-metrics-sync* request-data))
+         loading? (if worker
+                    (boolean (get-in state [:vaults-ui :detail-performance-metrics-loading?]))
+                    false)]
+     (performance-metrics-from-result returns-benchmark-selector metrics-result loading?))))

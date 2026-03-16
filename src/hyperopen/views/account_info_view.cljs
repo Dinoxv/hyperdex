@@ -35,7 +35,8 @@
              (seq label))
     {:id id
      :label label
-     :content (:content tab)}))
+     :content (:content tab)
+     :render (:render tab)}))
 
 (defn- normalized-extra-tabs [extra-tabs]
   (->> (or extra-tabs [])
@@ -643,11 +644,17 @@
                     (order-history-tab-content order-history-rows order-history-state))})
 
 (defn- extra-tab-renderers [extra-tabs]
-  (reduce (fn [acc {:keys [id content]}]
-            (if (and (keyword? id)
-                     (some? content))
-              (assoc acc id (fn [_]
-                              content))
+  (reduce (fn [acc {:keys [id content render]}]
+            (if (keyword? id)
+              (cond
+                (fn? render)
+                (assoc acc id render)
+
+                (some? content)
+                (assoc acc id (fn [_]
+                                content))
+
+                :else acc)
               acc))
           {}
           (normalized-extra-tabs extra-tabs)))

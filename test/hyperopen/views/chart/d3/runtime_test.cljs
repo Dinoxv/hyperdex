@@ -125,8 +125,7 @@
         (is (= "" (aget (.-style tooltip) "display")))
         (is (= "" (aget (.-style hover-line) "display")))
         (is (= "380" (.getAttribute hover-line "x1")))
-        (is (= "120px" (aget (.-style tooltip) "top")))
-        (is (= "translate(calc(-100% - 8px), -50%)"
+        (is (= "translate3d(380px, 120px, 0px) translate(calc(-100% - 8px), -50%)"
                (aget (.-style tooltip) "transform")))
         (is (str/includes? (str/join " " (fake-dom/collect-text-content tooltip))
                            "T1 Returns V1"))

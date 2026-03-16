@@ -238,11 +238,45 @@
         (is (= "Portfolio analytics are still syncing" (:title background-status)))
         (is (= "The chart is ready. The remaining analytics will fill in automatically."
                (:detail background-status)))
-        (is (= [{:id :benchmark-history
+               (is (= [{:id :benchmark-history
                  :label "Benchmark history"}
                 {:id :performance-metrics
                  :label "Performance metrics"}]
                (:items background-status)))))))
+
+(deftest portfolio-vm-skips-heavy-derivations-on-unrelated-state-writes-test
+  (with-redefs [account-equity-view/account-equity-metrics (fn [_]
+                                                              {:spot-equity 10
+                                                               :perps-value 10
+                                                               :cross-account-value 10
+                                                               :unrealized-pnl 0})]
+    (let [base-state {:account {:mode :classic}
+                      :portfolio-ui {:summary-scope :all
+                                     :summary-time-range :month
+                                     :chart-tab :returns}
+                      :asset-selector {:markets [{:coin "SPY"
+                                                  :symbol "SPY"
+                                                  :market-type :spot
+                                                  :cache-order 1}]}
+                      :portfolio {:summary-by-key {:month {:pnlHistory [[1 0] [2 0] [3 0]]
+                                                           :accountValueHistory [[1 100] [2 105] [3 110]]
+                                                           :vlm 10}}
+                                  :loaded-at-ms 1
+                                  :user-fees-loaded-at-ms 1}
+                      :webdata2 {:clearinghouseState {:marginSummary {:accountValue 10}}
+                                :totalVaultEquity 0}
+                      :borrow-lend {:total-supplied-usd 0}}]
+      (vm/portfolio-vm base-state)
+      (let [benchmark-cache @#'vm/benchmark-computation-context-cache
+            performance-cache @#'vm/performance-metrics-model-cache
+            chart-cache @#'vm/chart-model-cache]
+        (vm/portfolio-vm (assoc base-state :toast {:id 1}))
+        (is (identical? (:context benchmark-cache)
+                        (:context @#'vm/benchmark-computation-context-cache)))
+        (is (identical? (:model performance-cache)
+                        (:model @#'vm/performance-metrics-model-cache)))
+        (is (identical? (:model chart-cache)
+                        (:model @#'vm/chart-model-cache)))))))
 
 (deftest portfolio-vm-builds-performance-metrics-groups-with-benchmark-fallbacks-test
   (with-redefs [account-equity-view/account-equity-metrics (fn [_]

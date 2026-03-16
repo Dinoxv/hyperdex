@@ -108,8 +108,7 @@
           secondary-path (find-dom-node-by-role host "vault-detail-chart-path-btc")
           tooltip-strings (set (fake-dom/collect-text-content hover-tooltip))]
       (is (some? hover-tooltip))
-      (is (= "130px" (aget (.-style hover-tooltip) "top")))
-      (is (= "translate(calc(-100% - 8px), -50%)"
+      (is (= "translate3d(390px, 130px, 0px) translate(calc(-100% - 8px), -50%)"
              (aget (.-style hover-tooltip) "transform")))
       (is (contains? tooltip-strings "Returns"))
       (is (contains? tooltip-strings "-0.10%"))

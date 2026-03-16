@@ -49,6 +49,13 @@
                      :modules {:portfolio_worker {:init-fn hyperopen.portfolio.worker/init
                                                   :web-worker true}}
                      :compiler-options {:optimizations :advanced}}
+
+  :vault-detail-worker {:target :browser
+                        :output-dir "resources/public/js"
+                        :asset-path "/js"
+                        :modules {:vault_detail_worker {:init-fn hyperopen.vaults.detail.worker/init
+                                                        :web-worker true}}
+                     :compiler-options {:optimizations :advanced}}
   
   :test {:target :node-test
          :output-to "out/test.js"

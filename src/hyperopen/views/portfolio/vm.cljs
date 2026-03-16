@@ -134,9 +134,41 @@
 (def ^:dynamic *build-benchmark-selector-options*
   vm-benchmarks/build-benchmark-selector-options)
 
+(defonce benchmark-computation-context-cache
+  (atom nil))
+
+(defonce performance-metrics-model-cache
+  (atom nil))
+
+(defonce chart-model-cache
+  (atom nil))
+
+(defn- summary-entry-source-version
+  [summary-entry]
+  (hash [(vm-benchmarks/sampled-series-source-version-counter
+          (:accountValueHistory summary-entry))
+         (vm-benchmarks/sampled-series-source-version-counter
+          (:pnlHistory summary-entry))
+         (optional-number (:vlm summary-entry))
+         (optional-number (:volume summary-entry))]))
+
+(defn- selected-benchmark-labels
+  [returns-benchmark-selector]
+  (let [label-by-coin (or (:label-by-coin returns-benchmark-selector)
+                          {})]
+    (mapv (fn [coin]
+            [coin
+             (or (get label-by-coin coin)
+                 coin)])
+          (vec (or (:selected-coins returns-benchmark-selector)
+                   [])))))
+
 (defn reset-portfolio-vm-cache!
   []
-  (vm-benchmarks/reset-portfolio-vm-cache!))
+  (vm-benchmarks/reset-portfolio-vm-cache!)
+  (reset! benchmark-computation-context-cache nil)
+  (reset! performance-metrics-model-cache nil)
+  (reset! chart-model-cache nil))
 
 (defn- returns-benchmark-selector-model [state]
   (binding [vm-benchmarks/*build-benchmark-selector-options* *build-benchmark-selector-options*]
@@ -160,11 +192,33 @@
 
 (defn- benchmark-computation-context
   [state summary-entry summary-scope summary-time-range returns-benchmark-selector]
-  (vm-benchmarks/benchmark-computation-context state
-                                               summary-entry
-                                               summary-scope
-                                               summary-time-range
-                                               returns-benchmark-selector))
+  (let [summary-source-version (summary-entry-source-version summary-entry)
+        selected-benchmark-coins (vec (or (:selected-coins returns-benchmark-selector)
+                                          []))
+        candles (get state :candles)
+        merged-index-rows (get-in state [:vaults :merged-index-rows])
+        cache @benchmark-computation-context-cache]
+    (if (and (map? cache)
+             (= summary-source-version (:summary-source-version cache))
+             (= summary-scope (:summary-scope cache))
+             (= summary-time-range (:summary-time-range cache))
+             (= selected-benchmark-coins (:selected-benchmark-coins cache))
+             (identical? candles (:candles cache))
+             (identical? merged-index-rows (:merged-index-rows cache)))
+      (:context cache)
+      (let [context (vm-benchmarks/benchmark-computation-context state
+                                                                 summary-entry
+                                                                 summary-scope
+                                                                 summary-time-range
+                                                                 returns-benchmark-selector)]
+        (reset! benchmark-computation-context-cache {:summary-source-version summary-source-version
+                                                     :summary-scope summary-scope
+                                                     :summary-time-range summary-time-range
+                                                     :selected-benchmark-coins selected-benchmark-coins
+                                                     :candles candles
+                                                     :merged-index-rows merged-index-rows
+                                                     :context context})
+        context))))
 
 (defn- build-metrics-request-data
   [strategy-cumulative-rows benchmark-cumulative-rows-by-coin selected-benchmark-coins]
@@ -177,19 +231,87 @@
 
 (defn- performance-metrics-model
   [state summary-time-range returns-benchmark-selector benchmark-context]
-  (binding [vm-performance/*metrics-worker* metrics-worker
-            vm-performance/*last-metrics-request* last-metrics-request
-            vm-performance/*metrics-request-signature* metrics-request-signature
-            vm-performance/*build-metrics-request-data* build-metrics-request-data
-            vm-performance/*request-metrics-computation!* request-metrics-computation!
-            vm-performance/*compute-metrics-sync* compute-metrics-sync]
-    (vm-performance/performance-metrics-model state
-                                              summary-time-range
-                                              returns-benchmark-selector
-                                              benchmark-context)))
+  (let [selected-benchmark-coins (vec (or (:selected-coins returns-benchmark-selector)
+                                          []))
+        benchmark-labels (selected-benchmark-labels returns-benchmark-selector)
+        request-signature (metrics-request-signature summary-time-range
+                                                     selected-benchmark-coins
+                                                     (:strategy-source-version benchmark-context)
+                                                     (:benchmark-source-version-map benchmark-context))
+        metrics-result (get-in state [:portfolio-ui :metrics-result])
+        loading? (boolean (get-in state [:portfolio-ui :metrics-loading?]))
+        cache @performance-metrics-model-cache]
+    (if (and (map? cache)
+             (= request-signature (:request-signature cache))
+             (= benchmark-labels (:benchmark-labels cache))
+             (identical? metrics-result (:metrics-result cache))
+             (= loading? (:loading? cache)))
+      (:model cache)
+      (let [model (binding [vm-performance/*metrics-worker* metrics-worker
+                            vm-performance/*last-metrics-request* last-metrics-request
+                            vm-performance/*metrics-request-signature* metrics-request-signature
+                            vm-performance/*build-metrics-request-data* build-metrics-request-data
+                            vm-performance/*request-metrics-computation!* request-metrics-computation!
+                            vm-performance/*compute-metrics-sync* compute-metrics-sync]
+                    (vm-performance/performance-metrics-model state
+                                                              summary-time-range
+                                                              returns-benchmark-selector
+                                                              benchmark-context))]
+        (reset! performance-metrics-model-cache {:request-signature request-signature
+                                                 :benchmark-labels benchmark-labels
+                                                 :metrics-result metrics-result
+                                                 :loading? loading?
+                                                 :model model})
+        model))))
 
 (defn- chart-line-path [points]
   (vm-chart-math/chart-line-path points))
+
+(defn- chart-model
+  [state summary-entry summary-scope summary-time-range returns-benchmark-selector benchmark-context]
+  (let [selected-tab (portfolio-actions/normalize-portfolio-chart-tab
+                      (get-in state [:portfolio-ui :chart-tab]
+                              portfolio-actions/default-chart-tab))
+        hover-index (get-in state [:portfolio-ui :chart-hover-index])
+        include-svg-paths? (not (chart-renderer/d3-performance-chart? :portfolio))
+        summary-source-version (summary-entry-source-version summary-entry)
+        selected-benchmark-coins (vec (or (:selected-coins returns-benchmark-selector)
+                                          []))
+        benchmark-labels (selected-benchmark-labels returns-benchmark-selector)
+        strategy-source-version (:strategy-source-version benchmark-context)
+        benchmark-source-version-map (:benchmark-source-version-map benchmark-context)
+        cache @chart-model-cache]
+    (if (and (map? cache)
+             (= selected-tab (:selected-tab cache))
+             (= hover-index (:hover-index cache))
+             (= summary-scope (:summary-scope cache))
+             (= summary-time-range (:summary-time-range cache))
+             (= summary-source-version (:summary-source-version cache))
+             (= selected-benchmark-coins (:selected-benchmark-coins cache))
+             (= benchmark-labels (:benchmark-labels cache))
+             (= strategy-source-version (:strategy-source-version cache))
+             (= benchmark-source-version-map (:benchmark-source-version-map cache))
+             (= include-svg-paths? (:include-svg-paths? cache)))
+      (:model cache)
+      (let [model (vm-chart/build-chart-model state
+                                              summary-entry
+                                              summary-scope
+                                              summary-time-range
+                                              returns-benchmark-selector
+                                              benchmark-context
+                                              {:include-svg-paths? include-svg-paths?})]
+        (reset! chart-model-cache {:selected-tab selected-tab
+                                   :hover-index hover-index
+                                   :summary-scope summary-scope
+                                   :summary-time-range summary-time-range
+                                   :summary-source-version summary-source-version
+                                   :selected-benchmark-coins selected-benchmark-coins
+                                   :benchmark-labels benchmark-labels
+                                   :strategy-source-version strategy-source-version
+                                   :benchmark-source-version-map benchmark-source-version-map
+                                   :include-svg-paths? include-svg-paths?
+                                   :model model})
+        model))))
 
 (defn portfolio-vm [state]
   (let [metrics (account-equity-view/account-equity-metrics state)
@@ -242,13 +364,12 @@
                                                        summary-time-range
                                                        returns-benchmark-selector
                                                        benchmark-context)
-        chart (vm-chart/build-chart-model state
-                                          summary-entry
-                                          summary-scope
-                                          summary-time-range
-                                          returns-benchmark-selector
-                                          benchmark-context
-                                          {:include-svg-paths? (not (chart-renderer/d3-performance-chart? :portfolio))})]
+        chart (chart-model state
+                           summary-entry
+                           summary-scope
+                           summary-time-range
+                           returns-benchmark-selector
+                           benchmark-context)]
     {:volume-14d-usd volume-14d
      :fees fees
      :background-status (background-status-model state

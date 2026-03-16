@@ -1,12 +1,18 @@
 (ns hyperopen.views.vaults.detail-vm-test
   (:require [clojure.string :as str]
-            [cljs.test :refer-macros [deftest is]]
+            [cljs.test :refer-macros [deftest is use-fixtures]]
             [hyperopen.views.vaults.detail-vm :as detail-vm]))
 
 (defn- approx=
   [expected actual tolerance]
   (and (number? actual)
        (< (js/Math.abs (- expected actual)) tolerance)))
+
+(use-fixtures :each
+  (fn [f]
+    (detail-vm/reset-vault-detail-vm-cache!)
+    (f)
+    (detail-vm/reset-vault-detail-vm-cache!)))
 
 (def sample-state
   {:router {:path "/vaults/0x1234567890abcdef1234567890abcdef12345678"}
@@ -501,3 +507,19 @@
     (is (= :asc (get-in vm [:activity-sort-state-by-tab :positions :direction])))
     (is (= "BTC" (get-in vm [:activity-positions 0 :coin])))
     (is (= "ETH" (get-in vm [:activity-positions 1 :coin])))))
+
+(deftest vault-detail-vm-skips-heavy-derivations-on-unrelated-state-writes-test
+  (detail-vm/vault-detail-vm sample-state)
+  (let [summary-cache @#'detail-vm/summary-cache
+        chart-series-cache @#'detail-vm/chart-series-data-cache
+        benchmark-cache @#'detail-vm/benchmark-points-cache
+        metrics-cache @#'detail-vm/performance-metrics-cache]
+    (detail-vm/vault-detail-vm (assoc sample-state :toast {:id 1}))
+    (is (identical? (:summary summary-cache)
+                    (:summary @#'detail-vm/summary-cache)))
+    (is (identical? (:series-by-key chart-series-cache)
+                    (:series-by-key @#'detail-vm/chart-series-data-cache)))
+    (is (identical? (:benchmark-points-by-coin benchmark-cache)
+                    (:benchmark-points-by-coin @#'detail-vm/benchmark-points-cache)))
+    (is (identical? (:model metrics-cache)
+                    (:model @#'detail-vm/performance-metrics-cache)))))
