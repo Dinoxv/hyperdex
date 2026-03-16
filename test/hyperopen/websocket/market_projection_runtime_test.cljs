@@ -368,3 +368,29 @@
         (is (not (str/starts-with? store-id "#object[")))))
     (finally
       (market-runtime/reset-market-projection-runtime!))))
+
+(deftest flush-store-updates-skips-default-store-write-for-net-noop-test
+  (market-runtime/reset-market-projection-runtime!)
+  (try
+    (let [store (atom {:orderbooks {}})
+          watch-count (atom 0)
+          watch-key ::noop-watch
+          scheduled-callback (atom nil)
+          schedule-animation-frame! (fn [f]
+                                      (reset! scheduled-callback f)
+                                      :raf-id)]
+      (add-watch store watch-key
+                 (fn [_ _ _ _]
+                   (swap! watch-count inc)))
+      (market-runtime/queue-market-projection!
+       {:store store
+        :coalesce-key [:orderbook "BTC"]
+        :apply-update-fn identity
+        :schedule-animation-frame! schedule-animation-frame!
+        :emit-fn (fn [_ _] nil)})
+      (@scheduled-callback 16)
+      (is (= {:orderbooks {}} @store))
+      (is (= 0 @watch-count))
+      (remove-watch store watch-key))
+    (finally
+      (market-runtime/reset-market-projection-runtime!))))

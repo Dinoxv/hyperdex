@@ -73,6 +73,40 @@
     (swap! store assoc :count 1)
     (is (empty? @render-calls))))
 
+(deftest install-render-loop-emits-render-telemetry-with-root-diff-and-duration-test
+  (let [store (atom {:count 0
+                     :router {:path "/trade"}
+                     :orderbooks {}})
+        scheduled-frame-callbacks (atom [])
+        emitted-events (atom [])
+        now-values (atom [100 112])
+        now-ms-fn (fn []
+                    (let [value (first @now-values)]
+                      (swap! now-values subvec 1)
+                      value))]
+    (runtime-bootstrap/install-render-loop!
+     {:store store
+      :render-watch-key ::render-telemetry
+      :set-dispatch! (fn [_] nil)
+      :dispatch! (fn [& _] nil)
+      :render! (fn [_] nil)
+      :document? true
+      :request-animation-frame! (fn [cb]
+                                  (swap! scheduled-frame-callbacks conj cb)
+                                  :frame-id)
+      :emit-fn (fn [event payload]
+                 (swap! emitted-events conj [event payload]))
+      :now-ms-fn now-ms-fn})
+    (swap! store assoc :count 1)
+    (swap! store assoc-in [:router :path] "/portfolio")
+    (is (= 1 (count @scheduled-frame-callbacks)))
+    ((first @scheduled-frame-callbacks) 0)
+    (is (= [[:ui/app-render-flush
+             {:changed-root-keys [:count :router]
+              :changed-root-key-count 2
+              :render-duration-ms 12}]]
+           @emitted-events))))
+
 (deftest install-runtime-watchers-delegates-store-and-websocket-watcher-deps-test
   (let [store (atom {})
         store-watcher-calls (atom [])

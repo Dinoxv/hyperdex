@@ -95,7 +95,7 @@
 (deftest build-book-invalid-max-levels-falls-back-to-default-depth-limit-test
   (let [bids (mapv (fn [n]
                      {:px (str n)
-                      :sz "1"})
+                     :sz "1"})
                    (range 100 0 -1))
         asks (mapv (fn [n]
                      {:px (str n)
@@ -120,6 +120,17 @@
            (get-in book [:render :display-asks 0 :px-num])))
     (is (= 280
            (get-in book [:render :display-asks 79 :px-num])))))
+
+(deftest same-render-book-ignores-timestamp-only-differences-test
+  (let [book-a {:bids [{:px "100" :sz "2"}]
+                :asks [{:px "101" :sz "3"}]
+                :render {:best-bid {:px "100" :sz "2"}
+                         :best-ask {:px "101" :sz "3"}}
+                :timestamp 1}
+        book-b (assoc book-a :timestamp 2)
+        book-c (assoc-in book-a [:bids 0 :sz] "4")]
+    (is (true? (policy/same-render-book? book-a book-b)))
+    (is (false? (policy/same-render-book? book-a book-c)))))
 
 (deftest normalize-aggregation-config-test
   (is (= {:nSigFigs 4}

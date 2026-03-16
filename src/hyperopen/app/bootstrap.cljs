@@ -32,7 +32,9 @@
                        :dispatch! nxr/dispatch
                        :render! render-app!
                        :document? (exists? js/document)
-                       :request-animation-frame! platform/request-animation-frame!}
+                       :request-animation-frame! platform/request-animation-frame!
+                       :emit-fn telemetry/emit!
+                       :now-ms-fn platform/now-ms}
     :watchers-deps
     {:store store
      :install-store-cache-watchers! startup-watchers/install-store-cache-watchers!

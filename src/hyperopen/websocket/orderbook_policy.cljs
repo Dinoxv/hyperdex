@@ -107,6 +107,11 @@
                :best-bid (first sorted-bids)
                :best-ask (peek sorted-asks)}})))
 
+(defn same-render-book?
+  [left right]
+  (= (dissoc (or left {}) :timestamp)
+     (dissoc (or right {}) :timestamp)))
+
 (defn normalize-aggregation-config [aggregation-config]
   (let [n-sig-figs (:nSigFigs aggregation-config)]
     (cond-> {}

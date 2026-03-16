@@ -56,11 +56,14 @@
           (let [bids (first levels)
                 asks (second levels)
                 next-book (assoc (policy/build-book bids asks)
-                                 :timestamp (:time book-data))]
+                                 :timestamp (:time book-data))
+                previous-book (get-in @orderbook-state [:books coin])
+                render-changed? (not (policy/same-render-book? previous-book next-book))]
             ;; Update local state
             (swap! orderbook-state assoc-in [:books coin] next-book)
-            ;; Update app store
-            (when store
+            ;; Keep duplicate visual snapshots out of the app store so the
+            ;; trade route does not rerender on timestamp-only book refreshes.
+            (when (and store render-changed?)
               (market-projection-runtime/queue-market-projection!
                {:store store
                 :coalesce-key [:orderbook coin]

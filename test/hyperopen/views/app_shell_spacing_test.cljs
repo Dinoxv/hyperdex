@@ -1,12 +1,17 @@
 (ns hyperopen.views.app-shell-spacing-test
   (:require [clojure.string :as str]
             [cljs.test :refer-macros [deftest is]]
+            [hyperopen.trade-modules :as trade-modules]
             [hyperopen.state.trading :as trading]
-            [hyperopen.views.app-view :as app-view]
+            [hyperopen.views.account-info-view :as account-info-view]
+            [hyperopen.views.active-asset-view :as active-asset-view]
             [hyperopen.views.account-equity-view :as account-equity-view]
+            [hyperopen.views.app-view :as app-view]
             [hyperopen.views.api-wallets-view]
             [hyperopen.views.footer-view :as footer-view]
             [hyperopen.views.header-view :as header-view]
+            [hyperopen.views.l2-orderbook-view :as l2-orderbook-view]
+            [hyperopen.views.trade.order-form-view :as order-form-view]
             [hyperopen.views.trade-view :as trade-view]))
 
 (defn- class-values [class-attr]
@@ -80,6 +85,15 @@
   (let [attrs (when (and (vector? node) (map? (second node)))
                 (second node))]
     (set (class-values (:class attrs)))))
+
+(defn- with-viewport-width
+  [width f]
+  (let [original-inner-width (.-innerWidth js/globalThis)]
+    (set! (.-innerWidth js/globalThis) width)
+    (try
+      (f)
+      (finally
+        (set! (.-innerWidth js/globalThis) original-inner-width)))))
 
 (def trade-view-test-state
   {:active-asset nil
@@ -230,139 +244,261 @@
     (is (contains? orderbook-classes "lg:min-h-0"))))
 
 (deftest trade-view-restores-market-tables-and-keeps-account-surface-summary-only-test
-  (let [chart-view (trade-view/trade-view trade-view-test-state)
-        chart-account-panel (find-first-node chart-view
-                                             #(= "trade-account-tables-panel"
-                                                 (get-in % [1 :data-parity-id])))
-        chart-classes (node-class-set chart-account-panel)
-        chart-account-text (set (collect-strings chart-account-panel))
-        chart-summary-panel (find-first-node chart-view
-                                             #(= "trade-mobile-account-summary-panel"
-                                                 (get-in % [1 :data-parity-id])))
-        chart-summary-classes (node-class-set chart-summary-panel)
-        trades-view (trade-view/trade-view (assoc-in trade-view-test-state
-                                                     [:trade-ui :mobile-surface]
-                                                     :trades))
-        trades-account-panel (find-first-node trades-view
-                                              #(= "trade-account-tables-panel"
-                                                  (get-in % [1 :data-parity-id])))
-        trades-orderbook-panel (find-first-node trades-view
-                                                #(= "trade-orderbook-panel"
-                                                    (get-in % [1 :data-parity-id])))
-        trades-order-entry-panel (find-first-node trades-view
-                                                  #(= "trade-order-entry-panel"
+  (with-viewport-width
+    430
+    (fn []
+      (let [chart-view (trade-view/trade-view trade-view-test-state)
+            chart-account-panel (find-first-node chart-view
+                                                 #(= "trade-account-tables-panel"
+                                                     (get-in % [1 :data-parity-id])))
+            chart-classes (node-class-set chart-account-panel)
+            chart-account-text (set (collect-strings chart-account-panel))
+            chart-summary-panel (find-first-node chart-view
+                                                 #(= "trade-mobile-account-summary-panel"
+                                                     (get-in % [1 :data-parity-id])))
+            chart-summary-classes (node-class-set chart-summary-panel)
+            trades-view (trade-view/trade-view (assoc-in trade-view-test-state
+                                                         [:trade-ui :mobile-surface]
+                                                         :trades))
+            trades-account-panel (find-first-node trades-view
+                                                  #(= "trade-account-tables-panel"
                                                       (get-in % [1 :data-parity-id])))
-        trades-account-classes (node-class-set trades-account-panel)
-        trades-orderbook-classes (node-class-set trades-orderbook-panel)
-        trades-order-entry-classes (node-class-set trades-order-entry-panel)
-        ticket-view (trade-view/trade-view (assoc-in trade-view-test-state
-                                                     [:trade-ui :mobile-surface]
-                                                     :ticket))
-        ticket-account-panel (find-first-node ticket-view
-                                              #(= "trade-account-tables-panel"
-                                                  (get-in % [1 :data-parity-id])))
-        ticket-classes (node-class-set ticket-account-panel)
-        ticket-desktop-equity-panel (find-first-node ticket-view
-                                                     #(= "trade-desktop-account-equity-panel"
-                                                         (get-in % [1 :data-parity-id])))
-        ticket-desktop-equity-classes (node-class-set ticket-desktop-equity-panel)
-        ticket-summary-panel (find-first-node ticket-view
-                                              #(= "trade-mobile-account-summary-panel"
-                                                  (get-in % [1 :data-parity-id])))
-        ticket-summary-classes (node-class-set ticket-summary-panel)
-        account-view (trade-view/trade-view (assoc-in trade-view-test-state
-                                                      [:trade-ui :mobile-surface]
-                                                      :account))
-        account-active-asset-strip (find-first-node account-view
-                                                    #(= "trade-mobile-active-asset-strip"
+            trades-orderbook-panel (find-first-node trades-view
+                                                    #(= "trade-orderbook-panel"
                                                         (get-in % [1 :data-parity-id])))
-        account-active-asset-strip-classes (node-class-set account-active-asset-strip)
-        account-surface-tabs (find-first-node account-view
-                                              #(= "trade-mobile-surface-tabs"
-                                                  (get-in % [1 :data-parity-id])))
-        account-surface-tabs-classes (node-class-set account-surface-tabs)
-        account-panel (find-first-node account-view
-                                       #(= "trade-account-tables-panel"
-                                           (get-in % [1 :data-parity-id])))
-        account-panel-classes (node-class-set account-panel)
-        account-summary-panel (find-first-node account-view
-                                               #(= "trade-mobile-account-summary-panel"
-                                                   (get-in % [1 :data-parity-id])))
-        account-summary-classes (node-class-set account-summary-panel)
-        account-actions-panel (find-first-node account-view
-                                               #(= "trade-mobile-account-actions"
-                                                   (get-in % [1 :data-parity-id])))
-        account-actions-classes (node-class-set account-actions-panel)
-        account-mobile-panel (find-first-node account-view
-                                              #(= "trade-mobile-account-surface"
-                                                  (get-in % [1 :data-parity-id])))
-        account-mobile-text (set (collect-strings account-mobile-panel))]
-    (is (contains? chart-classes "flex"))
-    (is (not (contains? chart-classes "hidden")))
-    (is (nil? chart-summary-panel))
-    (is (some #(str/starts-with? % "Balances") chart-account-text))
-    (is (some #(str/starts-with? % "Open Orders") chart-account-text))
-    (is (contains? chart-account-text "Trade History"))
-    (is (contains? trades-account-classes "flex"))
-    (is (not (contains? trades-account-classes "hidden")))
-    (is (contains? trades-orderbook-classes "block"))
-    (is (not (contains? trades-orderbook-classes "hidden")))
-    (is (contains? trades-order-entry-classes "hidden"))
-    (is (contains? ticket-classes "hidden"))
-    (is (nil? ticket-summary-panel))
-    (is (contains? ticket-desktop-equity-classes "hidden"))
-    (is (contains? account-active-asset-strip-classes "hidden"))
-    (is (contains? account-surface-tabs-classes "hidden"))
-    (is (contains? account-panel-classes "hidden"))
-    (is (contains? account-summary-classes "flex"))
-    (is (not (contains? account-summary-classes "hidden")))
-    (is (contains? account-summary-classes "absolute"))
-    (is (contains? account-summary-classes "inset-0"))
-    (is (contains? account-actions-classes "mt-auto"))
-    (is (contains? account-actions-classes "pt-2"))
-    (is (contains? account-actions-classes "pb-1.5"))
-    (is (not (contains? account-actions-classes "py-3")))
-    (is (contains? account-mobile-text "Account Equity"))
-    (is (contains? account-mobile-text "Deposit"))
-    (is (contains? account-mobile-text "Withdraw"))
-    (is (not (some #(str/starts-with? % "Balances") account-mobile-text)))
-    (is (not (some #(str/starts-with? % "Open Orders") account-mobile-text)))
-    (is (not (contains? account-mobile-text "Trade History")))))
+            trades-order-entry-panel (find-first-node trades-view
+                                                      #(= "trade-order-entry-panel"
+                                                          (get-in % [1 :data-parity-id])))
+            trades-account-classes (node-class-set trades-account-panel)
+            trades-orderbook-classes (node-class-set trades-orderbook-panel)
+            trades-order-entry-classes (node-class-set trades-order-entry-panel)
+            ticket-view (trade-view/trade-view (assoc-in trade-view-test-state
+                                                         [:trade-ui :mobile-surface]
+                                                         :ticket))
+            ticket-account-panel (find-first-node ticket-view
+                                                  #(= "trade-account-tables-panel"
+                                                      (get-in % [1 :data-parity-id])))
+            ticket-classes (node-class-set ticket-account-panel)
+            ticket-desktop-equity-panel (find-first-node ticket-view
+                                                         #(= "trade-desktop-account-equity-panel"
+                                                             (get-in % [1 :data-parity-id])))
+            ticket-desktop-equity-classes (node-class-set ticket-desktop-equity-panel)
+            ticket-summary-panel (find-first-node ticket-view
+                                                  #(= "trade-mobile-account-summary-panel"
+                                                      (get-in % [1 :data-parity-id])))
+            account-view (trade-view/trade-view (assoc-in trade-view-test-state
+                                                          [:trade-ui :mobile-surface]
+                                                          :account))
+            account-active-asset-strip (find-first-node account-view
+                                                        #(= "trade-mobile-active-asset-strip"
+                                                            (get-in % [1 :data-parity-id])))
+            account-active-asset-strip-classes (node-class-set account-active-asset-strip)
+            account-surface-tabs (find-first-node account-view
+                                                  #(= "trade-mobile-surface-tabs"
+                                                      (get-in % [1 :data-parity-id])))
+            account-surface-tabs-classes (node-class-set account-surface-tabs)
+            account-panel (find-first-node account-view
+                                           #(= "trade-account-tables-panel"
+                                               (get-in % [1 :data-parity-id])))
+            account-panel-classes (node-class-set account-panel)
+            account-summary-panel (find-first-node account-view
+                                                   #(= "trade-mobile-account-summary-panel"
+                                                       (get-in % [1 :data-parity-id])))
+            account-summary-classes (node-class-set account-summary-panel)
+            account-actions-panel (find-first-node account-view
+                                                   #(= "trade-mobile-account-actions"
+                                                       (get-in % [1 :data-parity-id])))
+            account-actions-classes (node-class-set account-actions-panel)
+            account-mobile-panel (find-first-node account-view
+                                                  #(= "trade-mobile-account-surface"
+                                                      (get-in % [1 :data-parity-id])))
+            account-mobile-text (set (collect-strings account-mobile-panel))]
+        (is (contains? chart-classes "flex"))
+        (is (not (contains? chart-classes "hidden")))
+        (is (nil? chart-summary-panel))
+        (is (some #(str/starts-with? % "Balances") chart-account-text))
+        (is (some #(str/starts-with? % "Open Orders") chart-account-text))
+        (is (contains? chart-account-text "Trade History"))
+        (is (contains? trades-account-classes "flex"))
+        (is (not (contains? trades-account-classes "hidden")))
+        (is (contains? trades-orderbook-classes "block"))
+        (is (not (contains? trades-orderbook-classes "hidden")))
+        (is (contains? trades-order-entry-classes "hidden"))
+        (is (contains? ticket-classes "hidden"))
+        (is (nil? ticket-summary-panel))
+        (is (contains? ticket-desktop-equity-classes "hidden"))
+        (is (contains? account-active-asset-strip-classes "hidden"))
+        (is (contains? account-surface-tabs-classes "hidden"))
+        (is (contains? account-panel-classes "hidden"))
+        (is (contains? account-summary-classes "flex"))
+        (is (not (contains? account-summary-classes "hidden")))
+        (is (contains? account-summary-classes "absolute"))
+        (is (contains? account-summary-classes "inset-0"))
+        (is (contains? account-actions-classes "mt-auto"))
+        (is (contains? account-actions-classes "pt-2"))
+        (is (contains? account-actions-classes "pb-1.5"))
+        (is (not (contains? account-actions-classes "py-3")))
+        (is (contains? account-mobile-text "Account Equity"))
+        (is (contains? account-mobile-text "Deposit"))
+        (is (contains? account-mobile-text "Withdraw"))
+        (is (not (some #(str/starts-with? % "Balances") account-mobile-text)))
+        (is (not (some #(str/starts-with? % "Open Orders") account-mobile-text)))
+        (is (not (contains? account-mobile-text "Trade History")))))))
 
-(deftest trade-view-computes-account-equity-metrics-once-per-render-test
+(deftest trade-view-computes-account-equity-metrics-once-per-rendered-equity-surface-test
   (let [metrics-calls (atom 0)
         rendered-account-equity-views (atom 0)
         stub-metrics {:account-value-display 25}
         account-view (assoc-in trade-view-test-state
                                [:trade-ui :mobile-surface]
                                :account)]
-    (with-redefs [account-equity-view/account-equity-metrics (fn [_state]
-                                                               (swap! metrics-calls inc)
-                                                               stub-metrics)
-                  account-equity-view/account-equity-view (fn
+    (with-viewport-width
+      430
+      (fn []
+        (with-redefs [account-equity-view/account-equity-metrics (fn [_state]
+                                                                   (swap! metrics-calls inc)
+                                                                   stub-metrics)
+                      account-equity-view/account-equity-view (fn
+                                                                ([_state]
+                                                                 (swap! rendered-account-equity-views inc)
+                                                                 [:div {:data-role "stub-account-equity"
+                                                                        :data-metrics nil}])
+                                                                ([_state opts]
+                                                                 (swap! rendered-account-equity-views inc)
+                                                                 [:div {:data-role "stub-account-equity"
+                                                                        :data-metrics (:metrics opts)}]))
+                      account-equity-view/funding-actions-view (fn
+                                                                 ([_state]
+                                                                  [:div {:data-role "stub-mobile-funding-actions"}])
+                                                                 ([_state _opts]
+                                                                  [:div {:data-role "stub-mobile-funding-actions"}]))]
+          (let [view-node (trade-view/trade-view account-view)
+                stub-equity-nodes (find-nodes view-node
+                                              #(= "stub-account-equity"
+                                                  (get-in % [1 :data-role])))]
+            (is (= 1 @metrics-calls))
+            (is (= 1 @rendered-account-equity-views))
+            (is (= 1 (count stub-equity-nodes)))
+            (is (every? #(= stub-metrics
+                            (get-in % [1 :data-metrics]))
+                        stub-equity-nodes))))))))
+
+(deftest trade-view-renders-heavy-surfaces-once-on-desktop-layout-test
+  (with-viewport-width
+    1280
+    (fn []
+      (let [active-asset-calls (atom 0)
+            chart-calls (atom 0)
+            orderbook-calls (atom 0)
+            order-form-calls (atom 0)
+            account-info-calls (atom 0)
+            equity-metrics-calls (atom 0)
+            account-equity-calls (atom 0)]
+        (with-redefs [active-asset-view/active-asset-view (fn [_state]
+                                                            (swap! active-asset-calls inc)
+                                                            [:div {:data-role "stub-active-asset"}])
+                      trade-modules/render-trade-chart-view (fn [_state]
+                                                              (swap! chart-calls inc)
+                                                              [:div {:data-role "stub-chart"}])
+                      l2-orderbook-view/l2-orderbook-view (fn [_state]
+                                                            (swap! orderbook-calls inc)
+                                                            [:div {:data-role "stub-orderbook"}])
+                      order-form-view/order-form-view (fn [_state]
+                                                        (swap! order-form-calls inc)
+                                                        [:div {:data-role "stub-order-form"}])
+                      account-info-view/account-info-view (fn
                                                             ([_state]
-                                                             (swap! rendered-account-equity-views inc)
-                                                             [:div {:data-role "stub-account-equity"
-                                                                    :data-metrics nil}])
-                                                            ([_state opts]
-                                                             (swap! rendered-account-equity-views inc)
-                                                             [:div {:data-role "stub-account-equity"
-                                                                    :data-metrics (:metrics opts)}]))
-                  account-equity-view/funding-actions-view (fn
-                                                             ([_state]
-                                                              [:div {:data-role "stub-mobile-funding-actions"}])
-                                                             ([_state _opts]
-                                                              [:div {:data-role "stub-mobile-funding-actions"}]))]
-      (let [view-node (trade-view/trade-view account-view)
-            stub-equity-nodes (find-nodes view-node
-                                          #(= "stub-account-equity"
-                                              (get-in % [1 :data-role])))]
-        (is (= 1 @metrics-calls))
-        (is (= 2 @rendered-account-equity-views))
-        (is (= 2 (count stub-equity-nodes)))
-        (is (every? #(= stub-metrics
-                        (get-in % [1 :data-metrics]))
-                    stub-equity-nodes))))))
+                                                             (swap! account-info-calls inc)
+                                                             [:div {:data-role "stub-account-info"}])
+                                                            ([_state _options]
+                                                             (swap! account-info-calls inc)
+                                                             [:div {:data-role "stub-account-info"}]))
+                      account-equity-view/account-equity-metrics (fn [_state]
+                                                                   (swap! equity-metrics-calls inc)
+                                                                   {:account-value-display 12})
+                      account-equity-view/account-equity-view (fn
+                                                                ([_state]
+                                                                 (swap! account-equity-calls inc)
+                                                                 [:div {:data-role "stub-account-equity"}])
+                                                                ([_state _opts]
+                                                                 (swap! account-equity-calls inc)
+                                                                 [:div {:data-role "stub-account-equity"}]))]
+          (let [view-node (trade-view/trade-view trade-view-test-state)]
+            (is (= 1 @active-asset-calls))
+            (is (= 1 @chart-calls))
+            (is (= 1 @orderbook-calls))
+            (is (= 1 @order-form-calls))
+            (is (= 1 @account-info-calls))
+            (is (= 1 @equity-metrics-calls))
+            (is (= 1 @account-equity-calls))
+            (is (= 1 (count (find-nodes view-node #(= "stub-active-asset"
+                                                      (get-in % [1 :data-role]))))))
+            (is (= 1 (count (find-nodes view-node #(= "stub-orderbook"
+                                                      (get-in % [1 :data-role]))))))
+            (is (= 1 (count (find-nodes view-node #(= "stub-order-form"
+                                                      (get-in % [1 :data-role]))))))
+            (is (= 1 (count (find-nodes view-node #(= "stub-account-info"
+                                                      (get-in % [1 :data-role]))))))
+            (is (= 1 (count (find-nodes view-node #(= "stub-account-equity"
+                                                      (get-in % [1 :data-role]))))))))))))
+
+(deftest trade-view-skips-hidden-heavy-surface-subtrees-on-mobile-chart-layout-test
+  (with-viewport-width
+    430
+    (fn []
+      (let [active-asset-calls (atom 0)
+            chart-calls (atom 0)
+            orderbook-calls (atom 0)
+            order-form-calls (atom 0)
+            account-info-calls (atom 0)
+            equity-metrics-calls (atom 0)
+            account-equity-calls (atom 0)]
+        (with-redefs [active-asset-view/active-asset-view (fn [_state]
+                                                            (swap! active-asset-calls inc)
+                                                            [:div {:data-role "stub-active-asset"}])
+                      trade-modules/render-trade-chart-view (fn [_state]
+                                                              (swap! chart-calls inc)
+                                                              [:div {:data-role "stub-chart"}])
+                      l2-orderbook-view/l2-orderbook-view (fn [_state]
+                                                            (swap! orderbook-calls inc)
+                                                            [:div {:data-role "stub-orderbook"}])
+                      order-form-view/order-form-view (fn [_state]
+                                                        (swap! order-form-calls inc)
+                                                        [:div {:data-role "stub-order-form"}])
+                      account-info-view/account-info-view (fn
+                                                            ([_state]
+                                                             (swap! account-info-calls inc)
+                                                             [:div {:data-role "stub-account-info"}])
+                                                            ([_state _options]
+                                                             (swap! account-info-calls inc)
+                                                             [:div {:data-role "stub-account-info"}]))
+                      account-equity-view/account-equity-metrics (fn [_state]
+                                                                   (swap! equity-metrics-calls inc)
+                                                                   {:account-value-display 12})
+                      account-equity-view/account-equity-view (fn
+                                                                ([_state]
+                                                                 (swap! account-equity-calls inc)
+                                                                 [:div {:data-role "stub-account-equity"}])
+                                                                ([_state _opts]
+                                                                 (swap! account-equity-calls inc)
+                                                                 [:div {:data-role "stub-account-equity"}]))]
+          (let [view-node (trade-view/trade-view trade-view-test-state)
+                orderbook-nodes (find-nodes view-node #(= "stub-orderbook"
+                                                          (get-in % [1 :data-role])))
+                order-form-nodes (find-nodes view-node #(= "stub-order-form"
+                                                           (get-in % [1 :data-role])))
+                account-equity-nodes (find-nodes view-node #(= "stub-account-equity"
+                                                               (get-in % [1 :data-role])))]
+            (is (= 1 @active-asset-calls))
+            (is (= 1 @chart-calls))
+            (is (= 0 @orderbook-calls))
+            (is (= 0 @order-form-calls))
+            (is (= 1 @account-info-calls))
+            (is (= 0 @equity-metrics-calls))
+            (is (= 0 @account-equity-calls))
+            (is (= 0 (count orderbook-nodes)))
+            (is (= 0 (count order-form-nodes)))
+            (is (= 0 (count account-equity-nodes)))))))))
 
 (deftest trade-view-primary-mobile-tabs-route-to-market-surfaces-test
   (let [view-node (trade-view/trade-view trade-view-test-state)

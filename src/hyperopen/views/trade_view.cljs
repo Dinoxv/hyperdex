@@ -13,6 +13,18 @@
    [:orderbook "Order Book"]
    [:trades "Trades"]])
 
+(def ^:private desktop-breakpoint-px
+  1024)
+
+(defn- viewport-width-px []
+  (let [width (some-> js/globalThis .-innerWidth)]
+    (if (number? width)
+      width
+      desktop-breakpoint-px)))
+
+(defn- desktop-trade-layout? []
+  (>= (viewport-width-px) desktop-breakpoint-px))
+
 (defn- mobile-surface-button
   [selected-surface [surface-id label]]
   [:button {:type "button"
@@ -115,15 +127,27 @@
         orderbook-data (when active-asset (get-in state [:orderbooks active-asset]))
         mobile-surface (trade-layout-actions/normalize-trade-mobile-surface
                          (get-in state [:trade-ui :mobile-surface]))
+        desktop-layout? (desktop-trade-layout?)
         mobile-market-surface? (contains? trade-layout-actions/market-mobile-surfaces
                                           mobile-surface)
         mobile-account-surface? (= mobile-surface :account)
         mobile-orderbook-surface? (contains? #{:orderbook :trades} mobile-surface)
+        chart-panel-visible? (or desktop-layout? (= mobile-surface :chart))
+        orderbook-panel-visible? (or desktop-layout? mobile-orderbook-surface?)
+        order-entry-panel-visible? (or desktop-layout? (= mobile-surface :ticket))
+        account-panel-visible? (or desktop-layout? mobile-market-surface?)
+        mobile-account-summary-visible? (and (not desktop-layout?)
+                                             mobile-account-surface?)
+        show-mobile-active-asset? (and (not desktop-layout?)
+                                       (not mobile-account-surface?))
+        show-equity-surface? (or desktop-layout?
+                                 mobile-account-summary-visible?)
         show-surface-freshness-cues?
         (boolean (get-in state [:websocket-ui :show-surface-freshness-cues?] false))
         websocket-health (get-in state [:websocket :health])
         state* (assoc state :websocket-health websocket-health)
-        equity-metrics (account-equity-view/account-equity-metrics state)
+        equity-metrics (when show-equity-surface?
+                         (account-equity-view/account-equity-metrics state))
         orderbook-view-state {:coin (or active-asset "No Asset Selected")
                               :market (:active-market state)
                               :orderbook orderbook-data
@@ -138,7 +162,8 @@
                           (when mobile-account-surface?
                             ["hidden"]))
              :data-parity-id "trade-mobile-active-asset-strip"}
-       (active-asset-view/active-asset-view state*)]
+       (when show-mobile-active-asset?
+         (active-asset-view/active-asset-view state*))]
       [:div {:class (into ["lg:hidden" "border-b" "border-base-300" "bg-base-200/70" "px-3"]
                           (when mobile-account-surface?
                             ["hidden"]))
@@ -173,9 +198,11 @@
                              "lg:border-base-300"])
                :data-parity-id "trade-chart-panel"}
          [:div {:class ["hidden" "lg:block"]}
-          (active-asset-view/active-asset-view state*)]
-         [:div {:class ["overflow-hidden" "flex-1" "min-h-0"]}
-          (trade-chart-panel-content state*)]]
+          (when desktop-layout?
+            (active-asset-view/active-asset-view state*))]
+         (when chart-panel-visible?
+           [:div {:class ["overflow-hidden" "flex-1" "min-h-0"]}
+            (trade-chart-panel-content state*)])]
 
         [:div {:class (into [(if mobile-orderbook-surface? "block" "hidden")
                              "bg-base-100"
@@ -198,10 +225,14 @@
                              "xl:border-t-0"])
                :data-parity-id "trade-orderbook-panel"}
          [:div {:class ["h-full" "min-h-0" "lg:hidden"]}
-          (l2-orderbook-view/l2-orderbook-view
-           (mobile-orderbook-view-state orderbook-view-state mobile-surface))]
+          (when (and orderbook-panel-visible?
+                     (not desktop-layout?))
+            (l2-orderbook-view/l2-orderbook-view
+             (mobile-orderbook-view-state orderbook-view-state mobile-surface)))]
          [:div {:class ["hidden" "h-full" "min-h-0" "lg:block"]}
-          (l2-orderbook-view/l2-orderbook-view orderbook-view-state)]]
+          (when (and orderbook-panel-visible?
+                     desktop-layout?)
+            (l2-orderbook-view/l2-orderbook-view orderbook-view-state))]]
 
         [:div {:class (into [(if (= mobile-surface :ticket) "flex" "hidden")
                              "bg-base-100"
@@ -216,10 +247,13 @@
                              "xl:col-start-3"
                              "xl:row-span-2"])
                :data-parity-id funding-modal-positioning/trade-order-entry-panel-parity-id}
-         (order-form-view/order-form-view state*)
+         (when order-entry-panel-visible?
+           (order-form-view/order-form-view state*))
          [:div {:class ["hidden" "border-t" "border-base-300" "lg:block"]
                 :data-parity-id "trade-desktop-account-equity-panel"}
-          (account-equity-view/account-equity-view state* {:metrics equity-metrics})]]
+          (when (and desktop-layout?
+                     order-entry-panel-visible?)
+            (account-equity-view/account-equity-view state* {:metrics equity-metrics}))]]
 
         [:div {:class (into [(if (= mobile-surface :account)
                                "hidden"
@@ -238,12 +272,16 @@
                :data-parity-id "trade-account-tables-panel"}
          [:div {:class ["w-full" "lg:hidden"]
                 :data-parity-id "trade-mobile-account-panel"}
-          (account-info-view/account-info-view state*)]
+          (when (and account-panel-visible?
+                     (not desktop-layout?))
+            (account-info-view/account-info-view state*))]
          [:div {:class ["hidden" "w-full" "min-h-0" "lg:flex"]
                 :data-parity-id "trade-desktop-account-panel"}
-          (account-info-view/account-info-view state*)]]]
+          (when (and account-panel-visible?
+                     desktop-layout?)
+            (account-info-view/account-info-view state*))]]]
 
-       (when mobile-account-surface?
+       (when mobile-account-summary-visible?
          [:div {:class ["absolute"
                         "inset-0"
                         "z-20"

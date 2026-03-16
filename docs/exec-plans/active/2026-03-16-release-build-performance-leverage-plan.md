@@ -31,6 +31,10 @@ The work is intentionally ordered by leverage. The first wave removes large cold
 - [x] (2026-03-16 19:08Z) Completed Milestone 3 by removing asset-selector market bootstrap from the critical startup phase and eliminating the automatic deferred full selector-market fetch from cold `/trade` startup; full selector-market expansion now waits for explicit UI demand such as opening the asset selector or navigating to a route that needs it.
 - [x] (2026-03-16 19:08Z) Validated the completed Milestone 3 cut with `npm run check`, `npm test`, `npm run test:websocket`, and `npm run build`; startup/runtime integration tests now lock in that initial `/trade` startup only fetches asset contexts and does not auto-schedule selector-market expansion.
 - [x] (2026-03-16 19:08Z) Closed `hyperopen-p4dz` as completed and opened `hyperopen-e0cr` for Milestone 4 render-churn reduction work.
+- [x] (2026-03-16 19:25Z) Implemented the first Milestone 4 cut by suppressing duplicate visual `l2Book` projections, skipping default store rewrites for net-noop queued market projections, and instrumenting the root render loop to emit `:ui/app-render-flush` telemetry with changed top-level store keys and render duration.
+- [x] (2026-03-16 19:25Z) Validated the Milestone 4 first cut with `npm run check`, `npm test`, `npm run test:websocket`, and `npm run build`; new regression coverage now locks in timestamp-only orderbook dedupe, no-op market-projection suppression, and render-flush telemetry emission.
+- [x] (2026-03-16 19:45Z) Implemented the second Milestone 4 cut in `/hyperopen/src/hyperopen/views/trade_view.cljs` by pruning hidden mobile/desktop subtree renders for chart, orderbook, order-entry, account-info, and account-equity surfaces; the trade route now keeps the panel shells and parity IDs but only invokes the heavy child views for the currently visible breakpoint/surface combination.
+- [x] (2026-03-16 19:45Z) Validated the second Milestone 4 cut with `npm run check`, `npm test`, `npm run test:websocket`, and `npm run build`; the view suite now includes viewport-aware regression tests that prove desktop heavy surfaces render once each and hidden mobile chart-mode subtrees are skipped entirely.
 - [ ] Implement Milestone 0 (clean measurement harness and extension-free baseline capture).
 - [x] Implement Milestone 1 (remove non-essential cold-load font payloads).
 - [x] Implement Milestone 2 (split the monolithic app bundle and defer non-critical route code).
@@ -76,6 +80,21 @@ The work is intentionally ordered by leverage. The first wave removes large cold
 - Observation: the startup “deferred bootstrap” still ran only `1200 ms` after initialization, so leaving it enabled would continue to pull the full selector-market catalog into the same cold-load performance window.
   Evidence: `/hyperopen/src/hyperopen/config.cljs` sets `:startup {:deferred-bootstrap-delay-ms 1200}`, `/hyperopen/src/hyperopen/app/startup.cljs` wires that delay into `schedule-idle-or-timeout!`, and `/hyperopen/src/hyperopen/startup/runtime.cljs` previously used that deferred phase solely for `fetch-asset-selector-markets!`.
 
+- Observation: `l2Book` traffic still produced app-store writes when only the transport timestamp changed, so visually identical depth snapshots could keep waking the whole-store render loop on the trade route.
+  Evidence: `/hyperopen/src/hyperopen/websocket/orderbook.cljs` previously queued every parsed book into `[:orderbooks coin]`, and the book payload always included `:time` even when the sorted levels were unchanged.
+
+- Observation: the default market-projection store writer still touched the root atom for queued net-noop updates, which means coalescing alone did not eliminate useless render-loop wakeups.
+  Evidence: `/hyperopen/src/hyperopen/websocket/market_projection_runtime.cljs` previously implemented `default-apply-store!` as an unconditional `swap!`, so equal pre/post states still triggered store watches.
+
+- Observation: Milestone 4 needed cheap render-loop telemetry before deeper root splitting so follow-on work can target the top-level state changes that actually flush frames under release traffic.
+  Evidence: `/hyperopen/src/hyperopen/runtime/bootstrap.cljs` previously had no built-in visibility into which top-level store keys changed before each RAF render or how long each render flush took.
+
+- Observation: the trade route was still invoking both mobile and desktop variants of several expensive subtrees even when one branch was hidden by responsive classes, so a single render could pay twice for orderbook, account-info, and account-equity work.
+  Evidence: `/hyperopen/src/hyperopen/views/trade_view.cljs` previously called both `l2-orderbook-view/l2-orderbook-view` branches, both account-info branches, the hidden mobile active-asset strip, and the hidden desktop account-equity panel unconditionally, relying on CSS classes such as `lg:hidden` and `lg:block` to suppress only the DOM visibility.
+
+- Observation: `trade-view` still derived account-equity metrics on mobile market surfaces where no equity surface was rendered.
+  Evidence: `/hyperopen/src/hyperopen/views/trade_view.cljs` previously called `account-equity-view/account-equity-metrics` before selecting the visible mobile surface, even though chart/orderbook/trades mobile layouts do not render the account-equity view.
+
 ## Decision Log
 
 - Decision: Treat the March 16 release report as the performance baseline, but require extension-free reruns before implementation milestones are judged complete.
@@ -118,11 +137,19 @@ The work is intentionally ordered by leverage. The first wave removes large cold
   Rationale: the asset selector already refreshes to `:full` on first open and route-specific loaders request the catalog when needed, so keeping these fetches on startup only widens the Lighthouse cold path without improving initial trade correctness.
   Date/Author: 2026-03-16 / Codex
 
+- Decision: Start Milestone 4 at the projection boundary and render-loop seam before attempting larger app-root refactors.
+  Rationale: duplicate market snapshots and net-noop store writes are low-risk sources of render churn that can be removed immediately, and render-flush telemetry provides the evidence needed to choose the next, more invasive cut.
+  Date/Author: 2026-03-16 / Codex
+
+- Decision: Keep the existing trade panel shells and parity IDs, but stop invoking hidden breakpoint-specific child views.
+  Rationale: this removes duplicated render work on the trade route without changing the current layout grid, CSS breakpoint behavior, or QA selectors that depend on the panel structure.
+  Date/Author: 2026-03-16 / Codex
+
 ## Outcomes & Retrospective
 
-Milestones 1 through 3 are now implemented. The default route no longer cold-loads Splash or Inter, the browser build loads portfolio, funding comparison, staking, API-wallets, and vault screens from dedicated async route chunks, the trade route now resolves its chart stack from a separate `trade_chart` module instead of baking that code into the initial browser entrypoint, and cold `/trade` startup no longer fetches or auto-schedules asset-selector market expansion before the user asks for it.
+Milestones 1 through 3 are now implemented, and two Milestone 4 cuts are in place. The default route no longer cold-loads Splash or Inter, the browser build loads portfolio, funding comparison, staking, API-wallets, and vault screens from dedicated async route chunks, the trade route now resolves its chart stack from a separate `trade_chart` module instead of baking that code into the initial browser entrypoint, and cold `/trade` startup no longer fetches or auto-schedules asset-selector market expansion before the user asks for it. On top of that, duplicate timestamp-only orderbook snapshots no longer write into the app store, queued market projections no longer rewrite the store when they net to the same state, the app render loop now emits per-frame telemetry for changed top-level keys and render duration, and the trade route no longer invokes hidden mobile/desktop heavy surfaces just to discard one branch with CSS.
 
-The verification result is strong for correctness and build topology, and still incomplete for final performance scoring. Repository gates all pass, the release build emits the expected async chunks including `trade_chart.js`, startup and navigation now know how to load them on demand, and the cold `/trade` startup path is narrower because selector-market bootstrap now waits for demand instead of running automatically. Milestone 0 remains open as measurement debt, and the next highest-leverage work is Milestone 4 render-churn reduction under `hyperopen-e0cr`.
+The verification result is strong for correctness and build topology, and still incomplete for final performance scoring. Repository gates all pass, the release build emits the expected async chunks including `trade_chart.js`, startup and navigation now know how to load them on demand, the cold `/trade` startup path is narrower because selector-market bootstrap now waits for demand instead of running automatically, and the Milestone 4 regression tests now cover both projection-boundary dedupe and responsive hidden-subtree pruning. Milestone 0 remains open as measurement debt, and Milestone 4 remains open because the next step is to use the new render telemetry to identify and narrow the remaining highest-cost always-visible trade-route subtrees under live updates.
 
 ## Context and Orientation
 

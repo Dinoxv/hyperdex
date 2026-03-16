@@ -90,3 +90,46 @@
       (remove-watch orderbook/orderbook-state watch-key))
     (finally
       (reset-orderbook-state!))))
+
+(deftest create-orderbook-data-handler-skips-store-projection-for-timestamp-only-refresh-test
+  (reset-orderbook-state!)
+  (market-runtime/reset-market-projection-runtime!)
+  (try
+    (let [store (atom {:orderbooks {}})
+          store-write-count (atom 0)
+          schedule-count (atom 0)
+          scheduled-callbacks (atom [])
+          watch-key ::duplicate-store-write-counter
+          payload-a {:channel "l2Book"
+                     :data {:coin "BTC"
+                            :levels [[{:px "100" :sz "2"}]
+                                     [{:px "101" :sz "3"}]]
+                            :time 1}}
+          payload-b {:channel "l2Book"
+                     :data {:coin "BTC"
+                            :levels [[{:px "100" :sz "2"}]
+                                     [{:px "101" :sz "3"}]]
+                            :time 2}}]
+      (add-watch store watch-key
+                 (fn [_ _ old-state new-state]
+                   (when (not= old-state new-state)
+                     (swap! store-write-count inc))))
+      (with-redefs [platform/request-animation-frame! (fn [f]
+                                                        (swap! schedule-count inc)
+                                                        (swap! scheduled-callbacks conj f)
+                                                        (keyword (str "raf-" @schedule-count)))]
+        (let [handler (orderbook/create-orderbook-data-handler store)]
+          (handler payload-a)
+          (is (= 1 @schedule-count))
+          ((first @scheduled-callbacks) 16)
+          (is (= 1 @store-write-count))
+          (is (= 1 (:timestamp (get-in @store [:orderbooks "BTC"]))))
+          (handler payload-b)
+          (is (= 1 @schedule-count))
+          (is (= 1 @store-write-count))
+          (is (= 2 (get-in @orderbook/orderbook-state [:books "BTC" :timestamp])))
+          (is (= 1 (get-in @store [:orderbooks "BTC" :timestamp])))))
+      (remove-watch store watch-key))
+    (finally
+      (reset-orderbook-state!)
+      (market-runtime/reset-market-projection-runtime!))))

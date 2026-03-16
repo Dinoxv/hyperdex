@@ -32,7 +32,10 @@
 
 (defn- default-apply-store!
   [store apply-update-fn]
-  (swap! store apply-update-fn))
+  (let [state @store
+        next-state (apply-update-fn state)]
+    (when (not= state next-state)
+      (reset! store next-state))))
 
 (defn- default-emit-fn
   [event attrs]

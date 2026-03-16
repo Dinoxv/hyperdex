@@ -1,5 +1,6 @@
 (ns hyperopen.runtime.bootstrap
-  (:require [hyperopen.platform :as platform]))
+  (:require [clojure.set :as set]
+            [hyperopen.platform :as platform]))
 
 (defn register-runtime!
   [{:keys [register-effects!
@@ -20,7 +21,10 @@
            dispatch!
            render!
            document?
-           request-animation-frame!]}]
+           request-animation-frame!
+           emit-fn
+           now-ms-fn]
+    :or {now-ms-fn platform/now-ms}}]
   (set-dispatch! #(dispatch! store %1 %2))
   (when (if (some? document?)
           document?
@@ -28,21 +32,47 @@
     (let [request-frame! (or request-animation-frame!
                              platform/request-animation-frame!)
           pending-state (atom nil)
-          frame-pending? (atom false)]
+          pending-root-keys (atom #{})
+          frame-pending? (atom false)
+          changed-root-keys (fn [old-state new-state]
+                              (if (and (map? old-state)
+                                       (map? new-state))
+                                (reduce (fn [acc key]
+                                          (if (= (get old-state key) (get new-state key))
+                                            acc
+                                            (conj acc key)))
+                                        #{}
+                                        (set/union (set (keys old-state))
+                                                   (set (keys new-state))))
+                                #{}))
+          emit-render-flush! (fn [changed-root-keys* render-duration-ms]
+                               (when (fn? emit-fn)
+                                 (emit-fn :ui/app-render-flush
+                                          {:changed-root-keys changed-root-keys*
+                                           :changed-root-key-count (count changed-root-keys*)
+                                           :render-duration-ms render-duration-ms})))]
       (remove-watch store render-watch-key)
       (add-watch store
                  render-watch-key
-                 (fn [_ _ _ new-state]
-                   (reset! pending-state new-state)
-                   (when-not @frame-pending?
-                     (reset! frame-pending? true)
-                     (request-frame!
-                      (fn [_]
-                        (let [state-to-render @pending-state]
-                          (reset! pending-state nil)
-                          (reset! frame-pending? false)
-                          (when (some? state-to-render)
-                            (render! state-to-render)))))))))))
+                 (fn [_ _ old-state new-state]
+                   (when (not= old-state new-state)
+                     (reset! pending-state new-state)
+                     (swap! pending-root-keys into (changed-root-keys old-state new-state))
+                     (when-not @frame-pending?
+                       (reset! frame-pending? true)
+                       (request-frame!
+                        (fn [_]
+                          (let [state-to-render @pending-state
+                                changed-root-keys* (vec (sort-by str @pending-root-keys))]
+                            (reset! pending-state nil)
+                            (reset! pending-root-keys #{})
+                            (reset! frame-pending? false)
+                            (when (some? state-to-render)
+                              (let [render-start-ms (now-ms-fn)]
+                                (render! state-to-render)
+                                (let [render-end-ms (now-ms-fn)]
+                                  (emit-render-flush! changed-root-keys*
+                                                      (max 0 (- render-end-ms render-start-ms))))))))))))))))
 
 (defn install-runtime-watchers!
   [{:keys [store
