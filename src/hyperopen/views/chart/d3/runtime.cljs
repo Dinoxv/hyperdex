@@ -1,5 +1,5 @@
 (ns hyperopen.views.chart.d3.runtime
-  (:require ["d3" :as d3]
+  (:require ["d3-shape" :as d3-shape]
             [clojure.string :as str]
             [hyperopen.views.chart.d3.model :as model]))
 
@@ -177,7 +177,7 @@
   [runtime points]
   (let [{:keys [width]} (current-size runtime)
         points* (model/extend-single-point width points)
-        generator (doto (.line d3)
+        generator (doto (.line d3-shape)
                     (.x (fn [point]
                           (.-x point)))
                     (.y (fn [point]
@@ -188,7 +188,7 @@
   [runtime points baseline-y]
   (let [{:keys [width]} (current-size runtime)
         points* (model/extend-single-point width points)
-        generator (doto (.area d3)
+        generator (doto (.area d3-shape)
                     (.x (fn [point]
                           (.-x point)))
                     (.y0 (fn [_point]
