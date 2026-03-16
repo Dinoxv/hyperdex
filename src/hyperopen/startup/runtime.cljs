@@ -395,10 +395,13 @@
 (defn start-critical-bootstrap!
   [{:keys [store
            fetch-asset-contexts!
+           fetch-asset-selector-markets!
            mark-performance!]}]
-  ;; Keep first-load trade bootstrap narrow. The selector can refresh on demand
-  ;; when opened, and a full fetch still runs in the deferred phase.
-  (-> (fetch-asset-contexts! store {:priority :high})
+  ;; Keep first-load trade bootstrap narrow, but still hydrate the bootstrap
+  ;; selector metadata required by balances/account views.
+  (-> (js/Promise.all
+       (clj->js [(fetch-asset-contexts! store {:priority :high})
+                 (fetch-asset-selector-markets! store {:phase :bootstrap})]))
       (.finally
        (fn []
          (mark-performance! "app:critical-data:ready")))))

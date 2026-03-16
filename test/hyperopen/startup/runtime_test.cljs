@@ -1023,6 +1023,7 @@
       (is (= 2 (count (filter #(= [:dispatch [[:actions/load-api-wallet-route "/trade"]]] %) @mark-calls))))
       (is (zero? (count (filter #{:schedule-deferred} @mark-calls))))
       (let [critical-context-fetches (atom [])
+            bootstrap-selector-fetches (atom [])
             deferred-selector-fetches (atom [])]
         (with-redefs [platform/set-timeout! (fn [_f _delay-ms]
                                               :timer-id)]
@@ -1031,6 +1032,9 @@
             :fetch-asset-contexts! (fn [_store opts]
                                      (swap! critical-context-fetches conj opts)
                                      (js/Promise.resolve :ctx))
+            :fetch-asset-selector-markets! (fn [_store opts]
+                                             (swap! bootstrap-selector-fetches conj opts)
+                                             (js/Promise.resolve :bootstrap))
             :mark-performance! (fn [mark]
                                  (swap! mark-calls conj [:mark mark]))})
           (startup-runtime/run-deferred-bootstrap!
@@ -1043,6 +1047,7 @@
           (js/setTimeout
            (fn []
              (is (= [{:priority :high}] @critical-context-fetches))
+             (is (= [{:phase :bootstrap}] @bootstrap-selector-fetches))
              (is (= [{:phase :full}] @deferred-selector-fetches))
              (is (some #(= [:mark "app:critical-data:ready"] %) @mark-calls))
              (is (some #(= [:mark "app:full-bootstrap:ready"] %) @mark-calls))
