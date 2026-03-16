@@ -1,7 +1,7 @@
 ---
 owner: platform
 status: canonical
-last_reviewed: 2026-03-10
+last_reviewed: 2026-03-16
 review_cycle_days: 90
 source_of_truth: true
 ---
@@ -46,9 +46,11 @@ Use this file as the single starting point for what actions this repo provides t
 | `bb tools/mutate_nightly.clj` | Run the checked-in nightly mutation target list serially and aggregate markdown/JSON summaries | Overnight mutation sweeps, regression spotting, or local ranking of weak modules |
 | `npm run browser:inspect -- --url <url> --target <label>` | One-off parity capture | Visual/runtime parity evidence and smoke checks |
 | `npm run browser:compare` | One-off compare capture | Compare two targets (Hyperliquid vs local) |
+| `npm run qa:design-ui` | Run the design-system browser QA contract | Required evidence-backed conformance review for UI-facing changes |
 | `npm run qa:pr-ui` | Run the fixed critical UI scenario bundle | Required merge-time validation for high-risk UI changes |
 | `npm run qa:nightly-ui` | Run the broader nightly UI scenario bundle | Full desktop/mobile matrix and nightly reporting |
 | `npm run browser:mcp` | Start Codex MCP tools host | When invoking via MCP instead of CLI |
+| `npm run test:browser-qa-evals` | Run the design-review eval corpus and narrow graders | Before changing design-review report rules or browser-QA prompts |
 | `npm run test:browser-inspection` | Browser-inspection unit tests | Before changing inspection tooling |
 | `npm run test:browser-inspection:smoke` | Optional real-Chrome smoke | Manual confidence check before parity workflows |
 
@@ -143,6 +145,7 @@ All browser-inspection tooling lives under `/hyperopen/tools/browser-inspection/
 | `node tools/browser-inspection/src/cli.mjs preflight` | `... preflight --strict` | Validate local/attach prerequisites before expensive capture workflows |
 | `node tools/browser-inspection/src/cli.mjs inspect` | `... inspect --url https://app.hyperliquid.xyz/trade --target hyperliquid` | One-off snapshot capture |
 | `node tools/browser-inspection/src/cli.mjs compare` | `... compare --left-url ... --right-url ... --left-label ... --right-label ...` | Diff local vs reference across viewports |
+| `node tools/browser-inspection/src/cli.mjs design-review` | `... design-review --changed-files src/styles/main.css` | Run the six-pass design-system review and write `summary.json` / `summary.md` |
 | `node tools/browser-inspection/src/cli.mjs scenario list` | `... scenario list --tags critical,wallet` | Discover checked-in UI scenarios and tag bundles |
 | `node tools/browser-inspection/src/cli.mjs scenario run` | `... scenario run --ids wallet-enable-trading-simulated` | Run one scenario or a tagged bundle through the scenario runner |
 
@@ -151,8 +154,11 @@ All browser-inspection tooling lives under `/hyperopen/tools/browser-inspection/
 - Session commands are read-only by design.
 - Snapshot output is written to `/hyperopen/tmp/browser-inspection/`.
 - Scenario bundles classify each scenario as `pass`, `product-regression`, `automation-gap`, or `manual-exception`.
+- Design-review runs classify each named pass as `PASS`, `FAIL`, or `BLOCKED`, then aggregate an overall `PASS`, `FAIL`, or `BLOCKED` state.
+- Design-review artifacts are written under `/hyperopen/tmp/browser-inspection/design-review-*/` and include `review-spec.json`, `summary.json`, `summary.md`, per-pass JSON, screenshots, DOM/style captures, and interaction traces.
 - Scenario captures prefer the compact dev-only `HYPEROPEN_DEBUG.qaSnapshot()` payload when available so artifacts stay bounded even on subscription-heavy routes.
 - Nightly QA wrapper command is `npm run qa:nightly-ui`; each run writes a timestamped bundle under `/hyperopen/tmp/browser-inspection/nightly-ui-qa-*/` including `preflight.json`, `attempt-summary.tsv`, and `failure-classification.json`.
+- Missing references or unavailable probes are `BLOCKED` design-review outcomes, not manual exceptions. Manual exceptions stay limited to real extension, hardware-wallet, browser-permission, and third-party provider UI.
 - Use explicit `--target-id` when attaching to avoid wrong tab capture.
 - For tab-selection stability, follow `/hyperopen/docs/runbooks/browser-live-inspection.md` and use marker verification steps.
 - Browser attach only works when the user or tool launched a compatible Chromium browser with a reachable CDP endpoint. Without that, use the worktree-scoped Shadow nREPL for runtime-state inspection instead of assuming tab-level browser access exists.
@@ -172,6 +178,12 @@ Register once in Codex once and then call MCP tools directly:
 | `browser_targets_list` | List page targets by session or attach endpoint |
 | `browser_navigate` | Navigate a session target to a URL |
 | `browser_eval` | Read-only JS eval in-session |
+| `browser_design_review` | Run the six-pass design-system review and persist artifacts |
+| `browser_get_computed_style` | Inspect computed styles for selector matches |
+| `browser_list_native_controls` | Enumerate visible native controls and allowlist mismatches |
+| `browser_get_bounding_boxes` | Capture selector bounding boxes and identity metadata |
+| `browser_focus_walk` | Walk keyboard focus order and visible-focus coverage |
+| `browser_trace_interaction` | Sample layout-shift and long-task metrics for repeated interactions |
 | `browser_capture_snapshot` | Capture snapshot artifacts for a target |
 | `browser_compare_targets` | Capture+compare two URLs/targets |
 | `browser_scenarios_list` | List checked-in scenario manifests by id or tag |

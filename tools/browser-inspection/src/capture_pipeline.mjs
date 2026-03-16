@@ -303,8 +303,8 @@ export async function captureSnapshot(sessionManager, sessionId, options = {}) {
       {
         expression: semanticScript(
           options.maskSelectors || config.masking.selectors,
-          config.masking.computedStyleKeys,
-          config.masking.maxSemanticNodes
+          options.computedStyleKeys || config.masking.computedStyleKeys,
+          options.maxSemanticNodes || config.masking.maxSemanticNodes
         ),
         returnByValue: true
       },

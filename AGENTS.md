@@ -1,7 +1,7 @@
 ---
 owner: platform
 status: canonical
-last_reviewed: 2026-03-05
+last_reviewed: 2026-03-16
 review_cycle_days: 90
 source_of_truth: true
 ---
@@ -51,8 +51,10 @@ This file is the agent entry point for this repository. It is a table of content
 ## UI Tasks
 When work touches `/hyperopen/src/hyperopen/views/**`, `/hyperopen/src/styles/**`, or user interaction flows:
 1. Follow `/hyperopen/docs/FRONTEND.md`.
-2. Then apply `/hyperopen/docs/agent-guides/ui-foundations.md`.
-3. Then apply `/hyperopen/docs/agent-guides/trading-ui-policy.md`.
+2. Apply `/hyperopen/docs/agent-guides/browser-qa.md` for design-system review passes, required widths, and PASS / FAIL / BLOCKED reporting.
+3. Then apply `/hyperopen/docs/agent-guides/ui-foundations.md`.
+4. Then apply `/hyperopen/docs/agent-guides/trading-ui-policy.md`.
+5. Do not conclude a UI review with “looks good” unless every browser-QA pass is explicitly accounted for.
 
 ## Planning Workflow
 - Complex work must use an ExecPlan shaped by `/hyperopen/.agents/PLANS.md`.
@@ -161,7 +163,7 @@ This repository uses `bd` in local-only mode:
 - ❌ Do NOT use external issue trackers
 - ❌ Do NOT duplicate tracking systems
 
-For more details, see README.md and docs/QUICKSTART.md.
+For more details, see README.md and `/hyperopen/docs/WORK_TRACKING.md`.
 
 ## Landing the Plane (Session Completion)
 

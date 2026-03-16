@@ -4,6 +4,7 @@ import path from "node:path";
 import { execFile } from "node:child_process";
 import { promisify } from "node:util";
 import { BrowserInspectionService } from "./service.mjs";
+import { runDesignReview } from "./design_review_runner.mjs";
 import { runScenarioBundle } from "./scenario_runner.mjs";
 import { safeNowIso, writeJsonFile } from "./util.mjs";
 
@@ -194,6 +195,19 @@ function classifyNightlyFailures(summary, previousSummary) {
   };
 }
 
+function combinedNightlyState(scenarioState, designReviewState) {
+  if (scenarioState !== "pass") {
+    return scenarioState;
+  }
+  if (designReviewState === "FAIL") {
+    return "design-review-fail";
+  }
+  if (designReviewState === "BLOCKED") {
+    return "design-review-blocked";
+  }
+  return "pass";
+}
+
 async function createBdIssue({ title, description, type, priority, cwd, dryRun }) {
   if (dryRun) {
     return {
@@ -295,7 +309,9 @@ async function fileNightlyIssues({
 }
 
 function renderReport({
+  overallState,
   summary,
+  designReview,
   classification,
   branch,
   reportDate,
@@ -359,12 +375,26 @@ function renderReport({
           })
           .join("\n");
 
+  const designReviewLines = !designReview
+    ? "- Not run."
+    : [
+        `- State: \`${designReview.state}\``,
+        `- Run id: \`${designReview.runId}\``,
+        `- Artifacts: \`${designReview.runDir}\``,
+        ...(designReview.passes || []).map(
+          (entry) =>
+            `- ${entry.pass}: ${entry.status} (${entry.issueCount} issue(s))${entry.blockedReason ? ` - ${entry.blockedReason}` : ""}`
+        )
+      ].join("\n");
+
   return `# Nightly UI QA Report - ${reportDate}
 
 ## Summary
 
+- Overall state: \`${overallState}\`
 - Run id: \`${summary.runId}\`
-- State: \`${summary.state}\`
+- Scenario bundle state: \`${summary.state}\`
+- Design review state: \`${designReview?.state || "not-run"}\`
 - Branch: \`${branch}\`
 - Artifacts: \`${summary.runDir}\`
 - Previous nightly: \`${previousRunDir || "none"}\`
@@ -393,6 +423,10 @@ ${automationGapLines}
 
 ${manualExceptionLines}
 
+## Design Review
+
+${designReviewLines}
+
 ## Filed bd issues
 
 ${issueLines}
@@ -415,10 +449,13 @@ async function main() {
   const service = await BrowserInspectionService.create();
 
   if (dryRun) {
-    const result = await runScenarioBundle(service, {
+    const scenarioBundle = await runScenarioBundle(service, {
       tags: NIGHTLY_TAGS,
       dryRun: true,
       includeCompare: true
+    });
+    const designReview = await runDesignReview(service, {
+      dryRun: true
     });
     process.stdout.write(
       `${JSON.stringify(
@@ -427,7 +464,8 @@ async function main() {
           branch,
           allowNonMain,
           tags: NIGHTLY_TAGS,
-          ...result
+          scenarioBundle,
+          designReview
         },
         null,
         2
@@ -447,12 +485,23 @@ async function main() {
     targetId: args["target-id"] || null,
     localUrl: args["local-url"] || null
   });
+  const designReview = await runDesignReview(service, {
+    headless: !Boolean(args.headed),
+    manageLocalApp: args["manage-local-app"] ? true : undefined,
+    attachPort: args["attach-port"] || null,
+    attachHost: args["attach-host"] || null,
+    targetId: args["target-id"] || null,
+    localUrl: args["local-url"] || null
+  });
+  const overallState = combinedNightlyState(summary.state, designReview.state);
 
   const previousRunDir = await findPreviousNightlyRun(service.config.artifactRoot, summary.runDir);
   const previousSummary = previousRunDir
     ? await readJson(path.join(previousRunDir, "summary.json"), null)
     : null;
   const classification = classifyNightlyFailures(summary, previousSummary);
+  classification.overallState = overallState;
+  classification.designReviewState = designReview.state;
   const reportDate = reportDateString();
   const reportPath = path.resolve(repoRoot, `docs/qa/nightly-ui-report-${reportDate}.md`);
 
@@ -463,7 +512,10 @@ async function main() {
     tags: NIGHTLY_TAGS,
     previousRunDir,
     currentRunId: summary.runId,
-    currentRunDir: summary.runDir
+    currentRunDir: summary.runDir,
+    designReviewRunId: designReview.runId,
+    designReviewRunDir: designReview.runDir,
+    overallState
   };
 
   const resultRows = [
@@ -483,6 +535,7 @@ async function main() {
 
   await writeJsonFile(path.join(summary.runDir, "run-meta.json"), runMeta);
   await writeJsonFile(path.join(summary.runDir, "failure-classification.json"), classification);
+  await writeJsonFile(path.join(summary.runDir, "design-review-summary.json"), designReview);
   await fs.writeFile(path.join(summary.runDir, "attempt-summary.tsv"), `${toTsv(resultRows)}\n`);
 
   const filedIssues = await fileNightlyIssues({
@@ -498,7 +551,9 @@ async function main() {
   await fs.writeFile(
     reportPath,
     renderReport({
+      overallState,
       summary,
+      designReview,
       classification,
       branch,
       reportDate,
@@ -511,9 +566,11 @@ async function main() {
   process.stdout.write(
     `${JSON.stringify(
       {
+        state: overallState,
         runId: summary.runId,
         runDir: summary.runDir,
-        state: summary.state,
+        scenarioState: summary.state,
+        designReview,
         branch,
         previousRunDir,
         reportPath,
@@ -525,8 +582,9 @@ async function main() {
     )}\n`
   );
 
-  if (summary.state !== "pass") {
-    process.exitCode = summary.state === "manual-exception" ? 3 : 2;
+  if (overallState !== "pass") {
+    process.exitCode =
+      overallState === "manual-exception" || overallState === "design-review-blocked" ? 3 : 2;
   }
 }
 

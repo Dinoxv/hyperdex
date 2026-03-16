@@ -1,7 +1,12 @@
 #!/usr/bin/env node
+import { execFile } from "node:child_process";
+import { promisify } from "node:util";
 import { BrowserInspectionService } from "./service.mjs";
 import { loadScenarios } from "./scenario_loader.mjs";
 import { parseCsvArg, runScenarioBundle } from "./scenario_runner.mjs";
+import { runDesignReview } from "./design_review_runner.mjs";
+
+const execFileAsync = promisify(execFile);
 
 function parseArgs(argv) {
   const out = { _: [] };
@@ -41,6 +46,14 @@ function parseViewportList(value) {
     .filter(Boolean);
 }
 
+async function changedFilesFromGit(baseRef) {
+  const { stdout } = await execFileAsync("git", ["diff", "--name-only", baseRef, "--"]);
+  return stdout
+    .split("\n")
+    .map((line) => line.trim())
+    .filter(Boolean);
+}
+
 function asJson(value) {
   process.stdout.write(`${JSON.stringify(value, null, 2)}\n`);
 }
@@ -49,6 +62,7 @@ function usage() {
   process.stdout.write(`Usage:
   inspect --url <url> [--target <label>] [--viewports desktop,mobile] [--session-id <id>] [--headed] [--manage-local-app] [--attach-port <port>] [--attach-host <host>] [--target-id <cdp-target-id>]
   compare [--left-url <url>] [--right-url <url>] [--left-label <label>] [--right-label <label>] [--viewports desktop,mobile] [--session-id <id>] [--headed] [--manage-local-app] [--attach-port <port>] [--attach-host <host>] [--target-id <cdp-target-id>]
+  design-review [--changed-files a,b] [--base-ref <ref>] [--targets target-a,target-b] [--viewports review-375,review-768,review-1280,review-1440] [--dry-run] [--session-id <id>] [--headed] [--manage-local-app] [--attach-port <port>] [--attach-host <host>] [--target-id <cdp-target-id>] [--local-url <url>]
   preflight [--attach-port <port>] [--attach-host <host>] [--local-url <url>] [--strict]
   navigate --session-id <id> --url <url> [--viewport desktop]
   eval --session-id <id> --expression <js>
@@ -157,6 +171,32 @@ async function run() {
     asJson(result);
     if (!result.dryRun && result.state !== "pass") {
       process.exitCode = result.state === "manual-exception" ? 3 : 2;
+    }
+    return;
+  }
+
+  if (command === "design-review") {
+    const changedFiles = args["changed-files"]
+      ? parseCsvArg(args["changed-files"])
+      : args["base-ref"]
+        ? await changedFilesFromGit(String(args["base-ref"]))
+        : [];
+    const result = await runDesignReview(service, {
+      changedFiles,
+      targetIds: parseCsvArg(args.targets),
+      viewports: parseViewportList(args.viewports),
+      dryRun: Boolean(args["dry-run"]),
+      sessionId: args["session-id"] || null,
+      headless: !Boolean(args.headed),
+      manageLocalApp: args["manage-local-app"] ? true : undefined,
+      attachPort: args["attach-port"] || null,
+      attachHost: args["attach-host"] || null,
+      targetId: args["target-id"] || null,
+      localUrl: args["local-url"] || null
+    });
+    asJson(result);
+    if (!result.dryRun && result.state !== "PASS") {
+      process.exitCode = result.state === "BLOCKED" ? 3 : 2;
     }
     return;
   }

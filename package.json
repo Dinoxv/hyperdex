@@ -46,10 +46,12 @@
     "browser:inspect:iphone14promax": "BROWSER_INSPECTION_CONFIG=tools/browser-inspection/config/iphone-14-pro-max.json node tools/browser-inspection/src/cli.mjs inspect --viewports mobile",
     "browser:compare:iphone14promax": "BROWSER_INSPECTION_CONFIG=tools/browser-inspection/config/iphone-14-pro-max.json node tools/browser-inspection/src/cli.mjs compare --viewports mobile",
     "browser:mcp": "node tools/browser-inspection/src/mcp_server.mjs",
+    "qa:design-ui": "node tools/browser-inspection/src/cli.mjs design-review",
     "qa:pr-ui": "node tools/browser-inspection/src/qa_pr_ui.mjs",
     "qa:nightly-ui": "node tools/browser-inspection/src/nightly_ui_qa.mjs",
     "test:browser-inspection": "node --test tools/browser-inspection/test/*.test.mjs",
     "test:browser-inspection:smoke": "RUN_BROWSER_INSPECTION_SMOKE=1 node --test tools/browser-inspection/test/smoke.test.mjs",
+    "test:browser-qa-evals": "node tools/browser-inspection/src/browser_qa_eval.mjs",
     "css:build": "tailwindcss -i ./src/styles/main.css -o ./resources/public/css/main.css --minify",
     "css:watch": "tailwindcss -i ./src/styles/main.css -o ./resources/public/css/main.css --watch"
   },

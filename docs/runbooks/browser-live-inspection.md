@@ -12,6 +12,7 @@ It enables live Chromium-browser control through Chrome DevTools Protocol (CDP) 
 - Default launched browser: macOS Chrome path `/Applications/Google Chrome.app/Contents/MacOS/Google Chrome`
 - Mode: headless, read-only, ephemeral profile
 - Viewports: desktop and mobile
+- Design-review viewports: `review-375`, `review-768`, `review-1280`, and `review-1440`
 - Artifact root: `/hyperopen/tmp/browser-inspection/`
 
 ## Commands
@@ -24,6 +25,8 @@ Run from `/hyperopen`:
   - `npm run browser:inspect -- --url https://app.hyperliquid.xyz/trade --target hyperliquid`
 - One-off parity compare:
   - `npm run browser:compare`
+- Run the design-system review:
+  - `npm run qa:design-ui -- --changed-files src/styles/main.css`
 - List checked-in scenarios:
   - `node tools/browser-inspection/src/cli.mjs scenario list --tags critical`
 - Run one scenario or tag bundle:
@@ -64,6 +67,10 @@ Each run creates `/hyperopen/tmp/browser-inspection/<run-id>/` with:
 - `manifest.json` (run metadata and artifact index)
 - `<target>/<viewport>/snapshot.json`
 - `<target>/<viewport>/screenshot.png`
+- `review-spec.json` (design-review runs)
+- `summary.json` and `summary.md` (design-review runs)
+- `passes/*.json` (design-review runs)
+- `<target>/<viewport>/probes/*.json` (design-review runs)
 - `<viewport>-report.json` (compare runs)
 - `<viewport>-report.md` (compare runs)
 - `<viewport>-visual-diff.png` (compare runs)
@@ -94,6 +101,7 @@ Read-only guardrails block:
 Scenario captures prefer `HYPEROPEN_DEBUG.qaSnapshot()` when the debug bridge exposes it. That keeps scenario artifacts bounded while preserving the full `HYPEROPEN_DEBUG.snapshot()` object for manual console debugging.
 
 If the nightly or PR bundle reports `manual-exception`, follow `/hyperopen/docs/qa/agent-first-ui-manual-exceptions.md` instead of inventing an ad hoc manual matrix.
+If a design-review pass cannot complete because tooling or references are missing, mark that pass `BLOCKED`; do not reclassify it as a manual exception.
 
 ## Full Compare Workflow
 
@@ -124,6 +132,22 @@ If the nightly or PR bundle reports `manual-exception`, follow `/hyperopen/docs/
    - `/hyperopen/tmp/browser-inspection/pr-ui-<timestamp>/summary.json`
 3. Drill into a failing scenario when needed:
    - `/hyperopen/tmp/browser-inspection/pr-ui-<timestamp>/scenarios/<scenario>-<viewport>.md`
+
+## Design Review Workflow
+
+1. Run the design-system review:
+   - `npm run qa:design-ui -- --changed-files <comma-separated-paths>`
+2. Inspect the design-review summary:
+   - `/hyperopen/tmp/browser-inspection/design-review-<timestamp>/summary.json`
+3. Confirm every pass is explicitly marked `PASS`, `FAIL`, or `BLOCKED`:
+   - `visual`
+   - `native-control`
+   - `styling-consistency`
+   - `interaction`
+   - `layout-regression`
+   - `jank-perf`
+4. If visual or styling references are missing, keep the affected pass `BLOCKED` and record the exact missing reference.
+5. Do not conclude “looks good” unless every pass is explicitly accounted for.
 
 ## Optional Smoke Test
 

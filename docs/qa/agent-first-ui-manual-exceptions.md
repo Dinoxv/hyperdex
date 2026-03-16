@@ -1,7 +1,7 @@
 ---
 owner: platform
 status: canonical
-last_reviewed: 2026-03-09
+last_reviewed: 2026-03-16
 review_cycle_days: 90
 source_of_truth: true
 ---
@@ -19,6 +19,7 @@ Use this runbook only when the scenario runner classifies a failure as `manual-e
 
 ## What Still Runs First
 
+- `npm run qa:design-ui` for the six-pass design-system review when the change is UI-facing.
 - `npm run qa:pr-ui` for the fixed critical bundle.
 - `npm run qa:nightly-ui -- --allow-non-main` for the broad matrix when validating locally.
 - Scenario-level evidence from `/hyperopen/tmp/browser-inspection/**` before any human retest.
@@ -33,6 +34,7 @@ Use this runbook only when the scenario runner classifies a failure as `manual-e
 
 ## Non-Exceptions
 
+- Missing design references, unavailable browser probes, or blocked CDP tooling: keep the affected design-review pass as `BLOCKED`, not `manual-exception`.
 - Anchor-sensitive popovers and mobile sheets: use explicit debug dispatch with anchor bounds, not manual clicks.
 - Funding modal, mobile account surface, and position overlay regressions: use the checked-in scenarios first.
 - Wallet connect, enable trading, submit-order gating, and cancel-order gating: use the simulator lane first.

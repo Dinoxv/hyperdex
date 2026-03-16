@@ -1,7 +1,7 @@
 ---
 owner: trading-ui
 status: canonical
-last_reviewed: 2026-02-13
+last_reviewed: 2026-03-16
 review_cycle_days: 90
 source_of_truth: true
 ---
@@ -12,9 +12,17 @@ source_of_truth: true
 This guidance applies only when tasks touch UI-facing code such as `/hyperopen/src/hyperopen/views/**`, `/hyperopen/src/styles/**`, or interaction flows (selectors/modals/dropdowns/forms/tables).
 
 Use this document first, then apply:
+- `/hyperopen/docs/agent-guides/browser-qa.md`
 - `/hyperopen/docs/agent-guides/ui-foundations.md`
 - `/hyperopen/docs/agent-guides/trading-ui-policy.md`
 If guidance conflicts, this document wins for UI runtime behavior and invariant ownership.
+
+## UI QA Contract (MUST)
+- MUST run the design-system browser QA flow from `/hyperopen/docs/agent-guides/browser-qa.md` for UI-facing changes before signoff.
+- MUST account for all six browser-QA passes: visual, native-control, styling-consistency, interaction, layout-regression, and jank/perf.
+- MUST account for all four design-review widths: `375`, `768`, `1280`, and `1440`.
+- MUST report browser-QA results as `PASS`, `FAIL`, or `BLOCKED` with evidence-backed issues and residual blind spots.
+- MUST NOT conclude “looks good” or equivalent unless every required pass is explicitly accounted for.
 
 ## UI Interaction Runtime Rules (MUST)
 - MUST apply user-visible UI state transitions first in an action pipeline (example: close dropdown immediately before unsubscribe/subscribe/fetch effects).
@@ -57,6 +65,7 @@ If guidance conflicts, this document wins for UI runtime behavior and invariant 
 - Default policy style is strict `MUST` / `DO NOT` guidance for interaction flow constraints.
 
 ## Companion Guides
+- Browser QA contract: `/hyperopen/docs/agent-guides/browser-qa.md`
 - UI foundations: `/hyperopen/docs/agent-guides/ui-foundations.md`
 - Trading UI policy: `/hyperopen/docs/agent-guides/trading-ui-policy.md`
 

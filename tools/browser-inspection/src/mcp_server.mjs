@@ -3,6 +3,14 @@ import * as z from "zod/v4";
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js";
 import { BrowserInspectionService } from "./service.mjs";
+import { runDesignReview } from "./design_review_runner.mjs";
+import {
+  getBoundingBoxes,
+  getComputedStyles,
+  listNativeControls,
+  runFocusWalk,
+  traceInteraction
+} from "./dom_probes.mjs";
 import { loadScenarios } from "./scenario_loader.mjs";
 import { runScenarioBundle } from "./scenario_runner.mjs";
 
@@ -117,6 +125,59 @@ export async function buildServer() {
           attachHost,
           targetId,
           runKind: runKind || "scenario"
+        });
+        return textResult(result);
+      } catch (error) {
+        return errorResult(error);
+      }
+    }
+  );
+
+  server.registerTool(
+    "browser_design_review",
+    {
+      description:
+        "Run the design-system browser QA review across the required passes and review viewports, writing artifacts under the browser inspection artifact root.",
+      inputSchema: {
+        changedFiles: z.array(z.string()).optional(),
+        targetIds: z.array(z.string()).optional(),
+        viewports: z.array(z.string()).optional(),
+        dryRun: z.boolean().optional(),
+        sessionId: z.string().optional(),
+        headless: z.boolean().optional(),
+        manageLocalApp: z.boolean().optional(),
+        localUrl: z.string().optional(),
+        attachPort: z.number().int().positive().optional(),
+        attachHost: z.string().optional(),
+        targetId: z.string().optional()
+      }
+    },
+    async ({
+      changedFiles,
+      targetIds,
+      viewports,
+      dryRun,
+      sessionId,
+      headless,
+      manageLocalApp,
+      localUrl,
+      attachPort,
+      attachHost,
+      targetId
+    }) => {
+      try {
+        const result = await runDesignReview(service, {
+          changedFiles,
+          targetIds,
+          viewports,
+          dryRun,
+          sessionId,
+          headless,
+          manageLocalApp,
+          localUrl,
+          attachPort,
+          attachHost,
+          targetId
         });
         return textResult(result);
       } catch (error) {
@@ -249,6 +310,130 @@ export async function buildServer() {
     async ({ sessionId, expression, allowUnsafeEval }) => {
       try {
         const result = await service.evaluate({ sessionId, expression, allowUnsafeEval });
+        return textResult(result);
+      } catch (error) {
+        return errorResult(error);
+      }
+    }
+  );
+
+  server.registerTool(
+    "browser_get_computed_style",
+    {
+      description:
+        "Inspect computed styles for one or more selectors in the current page of an existing browser session.",
+      inputSchema: {
+        sessionId: z.string(),
+        selectors: z.array(z.string()),
+        props: z.array(z.string()).optional(),
+        maxMatches: z.number().int().positive().optional()
+      }
+    },
+    async ({ sessionId, selectors, props, maxMatches }) => {
+      try {
+        const result = await getComputedStyles(service, sessionId, {
+          selectors,
+          props,
+          maxMatches
+        });
+        return textResult(result);
+      } catch (error) {
+        return errorResult(error);
+      }
+    }
+  );
+
+  server.registerTool(
+    "browser_list_native_controls",
+    {
+      description:
+        "Enumerate visible native form controls in the current page and flag special native widgets against an optional allowlist.",
+      inputSchema: {
+        sessionId: z.string(),
+        allowlist: z.array(z.string()).optional()
+      }
+    },
+    async ({ sessionId, allowlist }) => {
+      try {
+        const result = await listNativeControls(service, sessionId, {
+          allowlist
+        });
+        return textResult(result);
+      } catch (error) {
+        return errorResult(error);
+      }
+    }
+  );
+
+  server.registerTool(
+    "browser_get_bounding_boxes",
+    {
+      description:
+        "Capture bounding boxes and basic identity metadata for selector matches in the current page.",
+      inputSchema: {
+        sessionId: z.string(),
+        selectors: z.array(z.string())
+      }
+    },
+    async ({ sessionId, selectors }) => {
+      try {
+        const result = await getBoundingBoxes(service, sessionId, {
+          selectors
+        });
+        return textResult(result);
+      } catch (error) {
+        return errorResult(error);
+      }
+    }
+  );
+
+  server.registerTool(
+    "browser_focus_walk",
+    {
+      description:
+        "Walk keyboard-focusable elements in selector scope and report visible-focus coverage and tab-sequence metadata.",
+      inputSchema: {
+        sessionId: z.string(),
+        selectors: z.array(z.string()).optional(),
+        limit: z.number().int().positive().optional()
+      }
+    },
+    async ({ sessionId, selectors, limit }) => {
+      try {
+        const result = await runFocusWalk(service, sessionId, {
+          selectors,
+          limit
+        });
+        return textResult(result);
+      } catch (error) {
+        return errorResult(error);
+      }
+    }
+  );
+
+  server.registerTool(
+    "browser_trace_interaction",
+    {
+      description:
+        "Repeat focus and scroll interactions in selector scope and return layout-shift and long-task metrics.",
+      inputSchema: {
+        sessionId: z.string(),
+        selectors: z.array(z.string()).optional(),
+        focusLimit: z.number().int().positive().optional(),
+        scrollFractions: z.array(z.number()).optional(),
+        delayMs: z.number().int().positive().optional(),
+        dispatchActions: z.array(z.unknown()).optional()
+      }
+    },
+    async ({ sessionId, selectors, focusLimit, scrollFractions, delayMs, dispatchActions }) => {
+      try {
+        const result = await traceInteraction(service, sessionId, {
+          selectors,
+          focusLimit,
+          scrollFractions,
+          delayMs,
+          dispatchActions
+        });
         return textResult(result);
       } catch (error) {
         return errorResult(error);

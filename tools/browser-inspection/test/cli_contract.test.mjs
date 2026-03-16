@@ -78,3 +78,24 @@ test("cli scenario run dry-run returns selected scenarios", async () => {
   assert.ok(Array.isArray(parsed.selected));
   assert.ok(parsed.selected.some((scenario) => scenario.id === "wallet-enable-trading-simulated"));
 });
+
+test("cli design-review dry-run returns review targets and pass matrix", async () => {
+  const { stdout } = await execFileAsync(process.execPath, [
+    cliPath,
+    "design-review",
+    "--dry-run",
+    "--targets",
+    "trade-route"
+  ]);
+  const parsed = JSON.parse(stdout);
+  assert.equal(parsed.dryRun, true);
+  assert.deepEqual(parsed.passes, [
+    "visual",
+    "native-control",
+    "styling-consistency",
+    "interaction",
+    "layout-regression",
+    "jank-perf"
+  ]);
+  assert.deepEqual(parsed.selection.targets.map((target) => target.id), ["trade-route"]);
+});

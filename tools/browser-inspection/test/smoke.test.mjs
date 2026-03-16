@@ -1,4 +1,5 @@
 import { execFile } from "node:child_process";
+import fs from "node:fs/promises";
 import { promisify } from "node:util";
 import path from "node:path";
 import test from "node:test";
@@ -13,6 +14,17 @@ const spectateFixtureUrl =
 async function runCli(args) {
   const { stdout } = await execFileAsync(process.execPath, [cliPath, ...args]);
   return JSON.parse(stdout);
+}
+
+async function runCliAllowFailure(args) {
+  try {
+    return await runCli(args);
+  } catch (error) {
+    if (error?.stdout) {
+      return JSON.parse(error.stdout);
+    }
+    throw error;
+  }
 }
 
 async function pollUntil(fn, predicate, { timeoutMs = 60000, intervalMs = 1000 } = {}) {
@@ -151,6 +163,21 @@ test(
 
       assert.ok(probe.visibleCoinCount > 0);
       assert.deepEqual(probe.visibleAtCoins, []);
+
+      const designReview = await runCliAllowFailure([
+        "design-review",
+        "--session-id",
+        session.id,
+        "--targets",
+        "trade-route",
+        "--viewports",
+        "review-375"
+      ]);
+
+      assert.ok(designReview.runDir);
+      assert.equal(designReview.passes.length, 6);
+      await fs.access(path.join(designReview.runDir, "review-spec.json"));
+      await fs.access(path.join(designReview.runDir, "summary.json"));
     } finally {
       await runCli(["session", "stop", "--session-id", session.id]).catch(() => null);
     }

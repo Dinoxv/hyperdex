@@ -2,6 +2,7 @@
 import { execFile } from "node:child_process";
 import { promisify } from "node:util";
 import { BrowserInspectionService } from "./service.mjs";
+import { runDesignReview } from "./design_review_runner.mjs";
 import { parseCsvArg, resolvePrSelection, runScenarioBundle } from "./scenario_runner.mjs";
 
 const execFileAsync = promisify(execFile);
@@ -39,6 +40,29 @@ async function changedFilesFromGit(baseRef) {
     .filter(Boolean);
 }
 
+function combinedPrState(scenarioState, designReviewState) {
+  if (scenarioState !== "pass") {
+    return scenarioState;
+  }
+  if (designReviewState === "FAIL") {
+    return "design-review-fail";
+  }
+  if (designReviewState === "BLOCKED") {
+    return "design-review-blocked";
+  }
+  return "pass";
+}
+
+function exitCodeForPrState(state) {
+  if (state === "pass") {
+    return 0;
+  }
+  if (state === "manual-exception" || state === "design-review-blocked") {
+    return 3;
+  }
+  return 2;
+}
+
 async function main() {
   const args = parseArgs(process.argv.slice(2));
   const changedFiles = args["changed-files"]
@@ -50,16 +74,22 @@ async function main() {
 
   if (args["dry-run"]) {
     const service = await BrowserInspectionService.create();
-    const result = await runScenarioBundle(service, {
+    const scenarioBundle = await runScenarioBundle(service, {
       tags: selection.tags,
       dryRun: true
     });
-    process.stdout.write(`${JSON.stringify({ selection, ...result }, null, 2)}\n`);
+    const designReview = await runDesignReview(service, {
+      changedFiles,
+      dryRun: true
+    });
+    process.stdout.write(
+      `${JSON.stringify({ dryRun: true, selection, scenarioBundle, designReview }, null, 2)}\n`
+    );
     return;
   }
 
   const service = await BrowserInspectionService.create();
-  const result = await runScenarioBundle(service, {
+  const scenarioSummary = await runScenarioBundle(service, {
     tags: selection.tags,
     runKind: "pr-ui",
     headless: !Boolean(args.headed),
@@ -69,10 +99,22 @@ async function main() {
     targetId: args["target-id"] || null,
     localUrl: args["local-url"] || null
   });
+  const designReview = await runDesignReview(service, {
+    changedFiles,
+    headless: !Boolean(args.headed),
+    manageLocalApp: args["manage-local-app"] ? true : undefined,
+    attachPort: args["attach-port"] || null,
+    attachHost: args["attach-host"] || null,
+    targetId: args["target-id"] || null,
+    localUrl: args["local-url"] || null
+  });
+  const state = combinedPrState(scenarioSummary.state, designReview.state);
 
-  process.stdout.write(`${JSON.stringify({ selection, ...result }, null, 2)}\n`);
-  if (result.state !== "pass") {
-    process.exitCode = result.state === "manual-exception" ? 3 : 2;
+  process.stdout.write(
+    `${JSON.stringify({ selection, scenarioSummary, designReview, state }, null, 2)}\n`
+  );
+  if (state !== "pass") {
+    process.exitCode = exitCodeForPrState(state);
   }
 }
 
