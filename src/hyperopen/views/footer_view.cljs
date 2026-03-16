@@ -71,7 +71,8 @@
          (:message banner)])
       [:div {:class ["flex" "justify-between" "items-center"]}
        [:div {:class ["flex" "items-center" "space-x-3"]}
-        (connection-meter/render (:connection-meter vm))]
+        (connection-meter/render (:connection-meter vm))
+        (footer-links/render-social-placeholders)]
        (footer-links/render (:footer-links vm))]
       (when-let [diagnostics (:diagnostics vm)]
         (diagnostics-drawer/render diagnostics))]]))
