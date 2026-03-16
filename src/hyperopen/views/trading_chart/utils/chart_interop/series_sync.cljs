@@ -24,6 +24,39 @@
   [candles]
   (if (vector? candles) candles (vec candles)))
 
+(defn- incremental-sync-mode?
+  [decision]
+  (contains? #{:update-last :append-last} (:mode decision)))
+
+(defn- full-main-transformed-data
+  [candles chart-type]
+  (vec (series/transform-main-series-data candles chart-type)))
+
+(defn- full-volume-transformed-data
+  [candles]
+  (vec (transforms/transform-data-for-volume candles)))
+
+(defn- maybe-incremental-main-transformed-data
+  [state candles chart-type decision]
+  (when (and (incremental-sync-mode? decision)
+             (contains? state :transformed-data))
+    (transforms/derive-next-main-series-data
+     (:source-candles state)
+     (:transformed-data state)
+     candles
+     chart-type
+     (:mode decision))))
+
+(defn- maybe-incremental-volume-transformed-data
+  [state candles decision]
+  (when (and (incremental-sync-mode? decision)
+             (contains? state :transformed-data))
+    (transforms/derive-next-volume-data
+     (:source-candles state)
+     (:transformed-data state)
+     candles
+     (:mode decision))))
+
 (defn- config-reset-decision
   [previous-candles next-candles]
   {:mode :full-reset
@@ -70,7 +103,8 @@
                    (candle-sync-policy/infer-decision (:source-candles state) candles*))]
     (when (or config-changed?
               (not= :noop (:mode decision)))
-      (let [transformed-data (series/transform-main-series-data candles* chart-type*)
+      (let [transformed-data (or (maybe-incremental-main-transformed-data state candles* chart-type* decision)
+                                 (full-main-transformed-data candles* chart-type*))
             base-value (when (= chart-type* :baseline)
                          (baseline/infer-baseline-base-value transformed-data))
             price-format* (price-format/infer-series-price-format
@@ -89,6 +123,7 @@
          main-series-sync-sidecar
          series*
          {:source-candles candles*
+          :transformed-data transformed-data
           :chart-type chart-type*
           :price-decimals price-decimals
           :series-options series-options})))))
@@ -99,9 +134,11 @@
         state (sidecar-state volume-series-sync-sidecar volume-series)
         decision (candle-sync-policy/infer-decision (:source-candles state) candles*)]
     (when (not= :noop (:mode decision))
-      (let [volume-data (vec (transforms/transform-data-for-volume candles*))]
+      (let [volume-data (or (maybe-incremental-volume-transformed-data state candles* decision)
+                            (full-volume-transformed-data candles*))]
         (apply-sync-decision! volume-series decision volume-data)
         (remember-state!
          volume-series-sync-sidecar
          volume-series
-         {:source-candles candles*})))))
+         {:source-candles candles*
+          :transformed-data volume-data})))))

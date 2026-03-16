@@ -2,7 +2,8 @@
   (:require [cljs.test :refer-macros [deftest is]]
             [hyperopen.views.trading-chart.test-support.series :as series-support]
             [hyperopen.views.trading-chart.utils.chart-interop :as chart-interop]
-            [hyperopen.views.trading-chart.utils.chart-interop.series :as series]))
+            [hyperopen.views.trading-chart.utils.chart-interop.series :as series]
+            [hyperopen.views.trading-chart.utils.chart-interop.transforms :as transforms]))
 
 (deftest set-series-data-applies-hlc-area-transform-test
   (let [applied-options (atom nil)
@@ -117,6 +118,59 @@
     (is (= [:update {:time 3 :open 12.0 :high 12.2 :low 11.6 :close 11.8}]
            (nth @calls* 2)))))
 
+(deftest set-series-data-reuses-incremental-main-transform-helper-for-tail-updates-test
+  (let [full-transform series/transform-main-series-data
+        calls* (atom [])
+        helper-calls* (atom [])
+        full-transform-calls* (atom 0)
+        candles [{:time 1 :open 10 :high 11 :low 9 :close 10.5}
+                 {:time 2 :open 10.5 :high 12 :low 10 :close 11.5}]
+        updated-last [{:time 1 :open 10 :high 11 :low 9 :close 10.5}
+                      {:time 2 :open 10.5 :high 12.5 :low 10 :close 12.0}]
+        appended (conj updated-last {:time 3 :open 12.0 :high 12.2 :low 11.6 :close 11.8})
+        initial-transformed (vec (full-transform candles :line))
+        updated-transformed (vec (full-transform updated-last :line))
+        appended-transformed (vec (full-transform appended :line))
+        series* (series-support/make-series
+                 :apply-options (fn [_] nil)
+                 :set-data (fn [data]
+                             (swap! calls* conj [:set (js->clj data :keywordize-keys true)]))
+                 :update (fn [point]
+                           (swap! calls* conj [:update (js->clj point :keywordize-keys true)])))]
+    (with-redefs [transforms/derive-next-main-series-data
+                  (fn [previous-candles previous-transformed-data next-candles chart-type decision-mode]
+                    (swap! helper-calls* conj {:chart-type chart-type
+                                               :mode decision-mode
+                                               :next-candles next-candles
+                                               :previous-candles previous-candles
+                                               :previous-transformed-data previous-transformed-data})
+                    (case decision-mode
+                      :update-last (assoc previous-transformed-data
+                                          (dec (count previous-transformed-data))
+                                          (peek updated-transformed))
+                      :append-last (conj previous-transformed-data (peek appended-transformed))
+                      nil))
+                  series/transform-main-series-data
+                  (fn [data chart-type]
+                    (swap! full-transform-calls* inc)
+                    (if (= data candles)
+                      initial-transformed
+                      (throw (js/Error.
+                              (str "full main transform should not run for incremental updates: "
+                                   chart-type)))))]
+      (chart-interop/set-series-data! series* candles :line)
+      (chart-interop/set-series-data! series* updated-last :line)
+      (chart-interop/set-series-data! series* appended :line))
+    (is (= 1 @full-transform-calls*))
+    (is (= [:set initial-transformed]
+           (first @calls*)))
+    (is (= [:update {:time 2 :value 12.0}]
+           (second @calls*)))
+    (is (= [:update {:time 3 :value 11.8}]
+           (nth @calls* 2)))
+    (is (= [:update-last :append-last]
+           (mapv :mode @helper-calls*)))))
+
 (deftest set-series-data-non-tail-mutation-falls-back-to-full-reset-test
   (let [calls* (atom [])
         candles [{:time 1 :open 10 :high 11 :low 9 :close 10.5}
@@ -171,6 +225,56 @@
            (second @calls*)))
     (is (= [:update {:value 90 :time 3 :color "rgba(34, 171, 148, 0.5)"}]
            (nth @calls* 2)))))
+
+(deftest set-volume-data-reuses-incremental-volume-transform-helper-for-tail-updates-test
+  (let [full-transform transforms/transform-data-for-volume
+        calls* (atom [])
+        helper-calls* (atom [])
+        full-transform-calls* (atom 0)
+        candles [{:time 1 :open 10 :high 11 :low 9 :close 10.5 :volume 100}
+                 {:time 2 :open 10.5 :high 12 :low 10 :close 11.5 :volume 120}]
+        updated-last [{:time 1 :open 10 :high 11 :low 9 :close 10.5 :volume 100}
+                      {:time 2 :open 10.5 :high 12 :low 10 :close 11.0 :volume 140}]
+        appended (conj updated-last {:time 3 :open 11.0 :high 11.4 :low 10.9 :close 11.2 :volume 90})
+        initial-transformed (vec (full-transform candles))
+        updated-transformed (vec (full-transform updated-last))
+        appended-transformed (vec (full-transform appended))
+        volume-series (series-support/make-series
+                       :set-data (fn [data]
+                                   (swap! calls* conj [:set (js->clj data :keywordize-keys true)]))
+                       :update (fn [point]
+                                 (swap! calls* conj [:update (js->clj point :keywordize-keys true)])))]
+    (with-redefs [transforms/derive-next-volume-data
+                  (fn [previous-candles previous-transformed-data next-candles decision-mode]
+                    (swap! helper-calls* conj {:mode decision-mode
+                                               :next-candles next-candles
+                                               :previous-candles previous-candles
+                                               :previous-transformed-data previous-transformed-data})
+                    (case decision-mode
+                      :update-last (assoc previous-transformed-data
+                                          (dec (count previous-transformed-data))
+                                          (peek updated-transformed))
+                      :append-last (conj previous-transformed-data (peek appended-transformed))
+                      nil))
+                  transforms/transform-data-for-volume
+                  (fn [data]
+                    (swap! full-transform-calls* inc)
+                    (if (= data candles)
+                      initial-transformed
+                      (throw (js/Error.
+                              "full volume transform should not run for incremental updates"))))]
+      (chart-interop/set-volume-data! volume-series candles)
+      (chart-interop/set-volume-data! volume-series updated-last)
+      (chart-interop/set-volume-data! volume-series appended))
+    (is (= 1 @full-transform-calls*))
+    (is (= [:set initial-transformed]
+           (first @calls*)))
+    (is (= [:update {:value 140 :time 2 :color "rgba(34, 171, 148, 0.5)"}]
+           (second @calls*)))
+    (is (= [:update {:value 90 :time 3 :color "rgba(34, 171, 148, 0.5)"}]
+           (nth @calls* 2)))
+    (is (= [:update-last :append-last]
+           (mapv :mode @helper-calls*)))))
 
 (deftest set-volume-data-non-tail-mutation-falls-back-to-full-reset-test
   (let [calls* (atom [])
