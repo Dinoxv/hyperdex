@@ -222,6 +222,22 @@
         (is (= "agent-not-ready" (:submitReason order-form)))
         (is (true? (:submitDisabled order-form)))))))
 
+(deftest agent-trading-recovery-oracle-surfaces-wallet-agent-recovery-state-test
+  (let [message "Enable trading before submitting orders."
+        store (atom {:wallet {:connected? true
+                              :address "0xabc"
+                              :agent {:status :not-ready
+                                      :error message
+                                      :recovery-modal-open? true}}})
+        api (@#'console-preload/debug-api)
+        oracle! (aget api "oracle")]
+    (with-redefs [app-system/store store]
+      (let [wallet (js->clj (oracle! "wallet-status" #js {}) :keywordize-keys true)
+            recovery (js->clj (oracle! "agent-trading-recovery" #js {}) :keywordize-keys true)]
+        (is (= message (:agentError wallet)))
+        (is (true? (:open recovery)))
+        (is (= message (:message recovery)))))))
+
 (deftest funding-modal-oracle-reads-selected-asset-from-view-model-test
   (let [store (atom {})
         api (@#'console-preload/debug-api)

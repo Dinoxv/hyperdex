@@ -221,6 +221,13 @@
      :agentAddress (get-in wallet [:agent :agent-address])
      :agentError (get-in wallet [:agent :error])}))
 
+(defn- agent-trading-recovery-oracle
+  []
+  (let [agent-state (get-in @app-system/store [:wallet :agent] {})
+        message (some-> (:error agent-state) str str/trim not-empty)]
+    {:open (true? (:recovery-modal-open? agent-state))
+     :message message}))
+
 (defn- account-surface-oracle
   []
   (let [state @app-system/store]
@@ -335,6 +342,7 @@
       "parity-element" (parity-element-info (:parityId args))
       "funding-modal" (funding-modal-oracle)
       "wallet-status" (wallet-status-oracle)
+      "agent-trading-recovery" (agent-trading-recovery-oracle)
       "account-surface" (account-surface-oracle)
       "asset-selector" (asset-selector-oracle)
       "order-form" (order-form-oracle)

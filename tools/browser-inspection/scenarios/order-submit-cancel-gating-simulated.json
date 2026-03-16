@@ -155,9 +155,24 @@
     },
     {
       "type": "oracle",
+      "name": "wallet-status",
+      "expect": {
+        "agentError": "Enable trading before submitting orders."
+      }
+    },
+    {
+      "type": "oracle",
+      "name": "agent-trading-recovery",
+      "expect": {
+        "open": true,
+        "message": "Enable trading before submitting orders."
+      }
+    },
+    {
+      "type": "oracle",
       "name": "order-form",
       "expect": {
-        "runtimeError": "Enable trading before submitting orders."
+        "runtimeError": null
       }
     },
     {
