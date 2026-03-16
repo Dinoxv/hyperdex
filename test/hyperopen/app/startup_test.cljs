@@ -1,6 +1,8 @@
 (ns hyperopen.app.startup-test
   (:require [cljs.test :refer-macros [deftest is]]
+            [nexus.registry :as nxr]
             [hyperopen.app.startup :as app-startup]
+            [hyperopen.router :as router]
             [hyperopen.runtime.state :as runtime-state]
             [hyperopen.startup.collaborators :as startup-collaborators]
             [hyperopen.startup.init :as startup-init]
@@ -139,3 +141,36 @@
               "0xabc")))
       (is (= [["0xabc" ["dex-a"]]]
              @stage-b-calls)))))
+
+(deftest init-wraps-router-with-route-module-loading-dispatch-test
+  (let [store (atom {:router {:path "/trade"}})
+        runtime (atom {})
+        captured-init-deps (atom nil)
+        captured-router-opts (atom nil)
+        dispatch-calls (atom [])]
+    (with-redefs [startup-collaborators/startup-base-deps
+                  (fn [deps]
+                    (merge
+                     {:store (:store deps)
+                      :runtime (:runtime deps)
+                      :dispatch! (fn [& _] nil)
+                      :log-fn (fn [& _] nil)}
+                     deps))
+                  startup-init/init!
+                  (fn [deps]
+                    (reset! captured-init-deps deps))
+                  router/init!
+                  (fn
+                    ([_store]
+                     nil)
+                    ([_store opts]
+                     (reset! captured-router-opts opts)))
+                  nxr/dispatch
+                  (fn [store-arg _ctx effects]
+                    (swap! dispatch-calls conj [store-arg effects]))]
+      (app-startup/init! {:runtime runtime
+                          :store store})
+      ((:init-router! @captured-init-deps) store)
+      ((:on-route-change @captured-router-opts) "/portfolio"))
+    (is (= [[store [[:effects/load-route-module "/portfolio"]]]]
+           @dispatch-calls))))

@@ -381,6 +381,9 @@
    :account {:mode :classic
              :abstraction-raw nil}
    :router {:path "/trade"}
+   :route-modules {:loaded #{}
+                   :loading nil
+                   :errors {}}
    :order-form (or default-order-form {})
    :order-form-ui (or default-order-form-ui {})
    :order-form-runtime (or default-order-form-runtime {})

@@ -279,7 +279,8 @@
    {:required-phase-order [:projection :persistence :heavy-io]
     :require-projection-before-heavy? true
     :allow-duplicate-heavy-effects? false
-   :heavy-effect-ids #{:effects/api-fetch-vault-index
+   :heavy-effect-ids #{:effects/load-route-module
+                        :effects/api-fetch-vault-index
                         :effects/api-fetch-vault-summaries
                         :effects/api-fetch-user-vault-equities
                         :effects/api-fetch-vault-details
@@ -302,7 +303,8 @@
    {:required-phase-order [:projection :persistence :heavy-io]
     :require-projection-before-heavy? true
     :allow-duplicate-heavy-effects? false
-    :heavy-effect-ids #{:effects/api-fetch-vault-index
+    :heavy-effect-ids #{:effects/load-route-module
+                        :effects/api-fetch-vault-index
                         :effects/api-fetch-vault-summaries
                         :effects/api-fetch-user-vault-equities
                         :effects/api-fetch-vault-details

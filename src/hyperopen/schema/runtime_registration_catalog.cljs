@@ -10,6 +10,7 @@
    [:effects/sync-asset-selector-active-ctx-subscriptions :sync-asset-selector-active-ctx-subscriptions]
    [:effects/push-state :push-state]
    [:effects/replace-state :replace-state]
+   [:effects/load-route-module :load-route-module]
    [:effects/init-websocket :init-websocket]
    [:effects/subscribe-active-asset :subscribe-active-asset]
    [:effects/sync-active-candle-subscription :sync-active-candle-subscription]

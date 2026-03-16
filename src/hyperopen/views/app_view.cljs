@@ -1,23 +1,16 @@
 (ns hyperopen.views.app-view
   (:require [clojure.string :as str]
             [hyperopen.account.context :as account-context]
-            [hyperopen.api-wallets.actions :as api-wallets-actions]
-            [hyperopen.funding-comparison.actions :as funding-actions]
+            [hyperopen.route-modules :as route-modules]
+            [hyperopen.router :as router]
             [hyperopen.staking.actions :as staking-actions]
             [hyperopen.trade.layout-actions :as trade-layout-actions]
             [hyperopen.views.agent-trading-recovery-modal :as agent-trading-recovery-modal]
             [hyperopen.views.funding-modal :as funding-modal]
             [hyperopen.views.footer-view :as footer-view]
-            [hyperopen.views.funding-comparison-view :as funding-comparison-view]
-            [hyperopen.views.api-wallets-view :as api-wallets-view]
             [hyperopen.views.spectate-mode-modal :as spectate-mode-modal]
             [hyperopen.views.header-view :as header-view]
             [hyperopen.views.notifications-view :as notifications-view]
-            [hyperopen.views.staking-view :as staking-view]
-            [hyperopen.views.vaults.detail-view :as vault-detail-view]
-            [hyperopen.views.vaults.list-view :as vaults-view]
-            [hyperopen.views.vaults.vm :as vault-vm]
-            [hyperopen.views.portfolio-view :as portfolio-view]
             [hyperopen.views.trade-view :as trade-view]
             [hyperopen.wallet.core :as wallet]))
 
@@ -90,15 +83,54 @@
                    :data-role "spectate-mode-banner-stop"}
           "Stop Spectate Mode"]]]])))
 
+(defn- deferred-route-loading-shell
+  [state route]
+  (let [error-message (route-modules/route-error state route)]
+    [:div {:class ["flex-1"
+                   "flex"
+                   "items-center"
+                   "justify-center"
+                   "bg-base-100"
+                   "px-6"
+                   "py-10"]
+           :data-parity-id "app-route-module-shell"}
+     [:div {:class ["flex"
+                    "max-w-md"
+                    "flex-col"
+                    "items-center"
+                    "gap-3"
+                    "text-center"]}
+      [:div {:class ["text-sm"
+                     "font-semibold"
+                     "uppercase"
+                     "tracking-[0.12em]"
+                     "text-trading-text-secondary"]}
+       (if error-message
+         "Route Load Failed"
+         "Loading Route")]
+      [:p {:class ["text-sm" "text-trading-text-secondary"]}
+       (or error-message
+           "Loading this screen on demand to keep the trade landing route smaller.")]
+      (when error-message
+        [:button {:type "button"
+                  :class ["rounded-lg"
+                          "border"
+                          "border-base-300"
+                          "px-3"
+                          "py-2"
+                          "text-sm"
+                          "font-medium"
+                          "text-trading-text"
+                          "transition-colors"
+                          "hover:border-primary"
+                          "hover:text-primary"]
+                  :on {:click [[:actions/navigate route {:replace? true}]]}}
+         "Retry"])]]))
+
 (defn app-view [state]
   (let [route (get-in state [:router :path] "/trade")
-        trade-route? (str/starts-with? route "/trade")
-        portfolio-route? (str/starts-with? route "/portfolio")
-        funding-route? (funding-actions/funding-comparison-route? route)
-        staking-route? (staking-actions/staking-route? route)
-        api-wallet-route? (api-wallets-actions/api-wallet-route? route)
-        vault-route? (vault-vm/vault-route? route)
-        vault-detail-route? (vault-vm/vault-detail-route? route)
+        trade-route? (router/trade-route? route)
+        deferred-route? (some? (route-modules/route-module-id route))
         mobile-surface (trade-layout-actions/normalize-trade-mobile-surface
                         (get-in state [:trade-ui :mobile-surface]))
         mobile-account-surface? (and trade-route? (= mobile-surface :account))
@@ -121,12 +153,11 @@
             :data-parity-id "app-main"}
       (cond
         trade-route? (trade-view/trade-view state)
-        portfolio-route? (portfolio-view/portfolio-view state)
-        funding-route? (funding-comparison-view/funding-comparison-view state)
-        staking-route? (staking-view/staking-view state)
-        api-wallet-route? (api-wallets-view/api-wallets-view state)
-        vault-detail-route? (vault-detail-view/vault-detail-view state)
-        vault-route? (vaults-view/vaults-view state)
+        (and deferred-route?
+             (route-modules/route-ready? state route))
+        (or (route-modules/render-route-view state route)
+            (deferred-route-loading-shell state route))
+        deferred-route? (deferred-route-loading-shell state route)
         :else (trade-view/trade-view state))]
      (funding-modal/funding-modal-view state)
      (spectate-mode-modal/spectate-mode-modal-view state)

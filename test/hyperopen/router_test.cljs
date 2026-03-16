@@ -57,3 +57,10 @@
                                      :spectate "0xabcdef"})))
   (is (= "/trade"
          (router/trade-browser-path {}))))
+
+(deftest set-route-invokes-route-change-callback-with-normalized-path-test
+  (let [store (atom {:router {:path "/trade"}})
+        callbacks (atom [])]
+    (router/set-route! store "portfolio" #(swap! callbacks conj %))
+    (is (= "/portfolio" (get-in @store [:router :path])))
+    (is (= ["/portfolio"] @callbacks))))

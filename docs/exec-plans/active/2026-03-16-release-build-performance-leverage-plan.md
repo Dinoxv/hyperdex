@@ -4,7 +4,7 @@ This ExecPlan is a living document. The sections `Progress`, `Surprises & Discov
 
 This document is maintained in accordance with `/hyperopen/.agents/PLANS.md`.
 
-Linked live work: `hyperopen-finw` ("Reduce cold-load font payloads on release landing route").
+Linked live work: `hyperopen-0pgn` ("Split trading chart code out of the initial trade bundle").
 
 ## Purpose / Big Picture
 
@@ -21,6 +21,10 @@ The work is intentionally ordered by leverage. The first wave removes large cold
 - [x] (2026-03-16 12:18Z) Promoted this plan into `/hyperopen/docs/exec-plans/active/` and linked live `bd` work via `hyperopen-finw`.
 - [x] (2026-03-16 16:24Z) Implemented Milestone 1 by removing Splash from the default stylesheet path, restyling the header brand on the system stack, and routing canvas text measurement through a shared UI-font resolver.
 - [x] (2026-03-16 16:31Z) Rebuilt the release app, ran required validation gates, and confirmed via extension-free Lighthouse that `http://localhost:8081/` now issues zero font requests on the default route; the run still hit the 45 second load timeout, so Milestone 0 remains open for clean score baselining.
+- [x] (2026-03-16 16:46Z) Created and claimed `hyperopen-7nop` to execute Milestone 2 as route-level bundle splitting while keeping the trade route in the initial browser module.
+- [x] (2026-03-16 17:09Z) Completed the route-level Milestone 2 split: portfolio, funding comparison, staking, API-wallets, and vault screens now compile into separate browser modules and load on demand through the router/runtime effect path.
+- [x] (2026-03-16 17:10Z) Validated the route-level split with `npm test`, `npm run build`, `npm run test:websocket`, and `npm run check`; the release build now emits `portfolio_route.js`, `funding_comparison_route.js`, `staking_route.js`, `api_wallets_route.js`, and `vaults_route.js`.
+- [x] (2026-03-16 17:11Z) Closed `hyperopen-7nop` as completed and opened `hyperopen-0pgn` for the remaining trade-chart split that still belongs to Milestone 2.
 - [ ] Implement Milestone 0 (clean measurement harness and extension-free baseline capture).
 - [x] Implement Milestone 1 (remove non-essential cold-load font payloads).
 - [ ] Implement Milestone 2 (split the monolithic app bundle and defer non-critical route code).
@@ -54,6 +58,12 @@ The work is intentionally ordered by leverage. The first wave removes large cold
 - Observation: headless Lighthouse is still not a trustworthy source for score deltas on this route because the page consistently exhausts the 45 second load budget before the browser reports load complete.
   Evidence: the extension-free rerun includes the warning `The page loaded too slowly to finish within the time limit. Results may be incomplete.` and the captured timing shows `lh:driver:navigate` consuming about `45019 ms`.
 
+- Observation: the route-level Milestone 2 split is real at build time; release output now contains dedicated chunks for every non-trade top-level screen.
+  Evidence: `npm run build` now emits `resources/public/js/portfolio_route.js` (`413,024` bytes), `resources/public/js/funding_comparison_route.js` (`98,351` bytes), `resources/public/js/staking_route.js` (`211,052` bytes), `resources/public/js/api_wallets_route.js` (`90,718` bytes), and `resources/public/js/vaults_route.js` (`851,863` bytes), alongside `module-loader.edn` and `module-loader.json`.
+
+- Observation: route-level splitting alone does not finish Milestone 2 because the initial trade bundle still contains the entire chart stack.
+  Evidence: after the route split, `resources/public/js/main.js` remains `15,007,924` bytes on disk in the release output, which confirms that the next meaningful JavaScript cut is still the trade-chart/libraries path.
+
 ## Decision Log
 
 - Decision: Treat the March 16 release report as the performance baseline, but require extension-free reruns before implementation milestones are judged complete.
@@ -84,11 +94,15 @@ The work is intentionally ordered by leverage. The first wave removes large cold
   Rationale: the headless run reliably proves the font requests are gone, but the repeated page-load timeout makes its score, TTI, and transfer totals too noisy for sign-off-quality comparisons.
   Date/Author: 2026-03-16 / Codex
 
+- Decision: Treat route-level code splitting as the first completed wave of Milestone 2 and keep the milestone open for the trade-chart split.
+  Rationale: moving non-trade routes out of `:main` removes obvious landing-route waste, but the chart stack remains the largest trade-owned code path still loaded on the default route.
+  Date/Author: 2026-03-16 / Codex
+
 ## Outcomes & Retrospective
 
-Milestone 1 is implemented. The default route no longer cold-loads Splash or Inter, the header brand now renders on the existing system typography path, and all known canvas measurement sites resolve their font family through shared UI-font helpers instead of hard-coding Inter.
+Milestone 1 is implemented, and the first route-level wave of Milestone 2 is now implemented as well. The default route no longer cold-loads Splash or Inter, and the browser build now loads portfolio, funding comparison, staking, API-wallets, and vault screens from dedicated async route chunks instead of eagerly requiring those views from the app shell.
 
-The verification result is strong for the network goal and incomplete for the overall performance score. Extension-free Lighthouse now proves the route issues zero font requests, but it still times out before a clean score comparison can be trusted. Milestone 0 therefore remains open as measurement debt, and Milestone 2 remains the next highest-leverage product change once a clean baseline loop is in place.
+The verification result is strong for correctness and build topology, and still incomplete for final performance scoring. Repository gates all pass, the release build emits the expected route chunks, and navigation/startup now know how to load them on demand. Milestone 0 remains open as measurement debt, and the remaining Milestone 2 work is now explicitly narrowed to splitting the trade-chart stack under `hyperopen-0pgn`.
 
 ## Context and Orientation
 

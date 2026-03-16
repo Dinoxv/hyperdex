@@ -12,6 +12,7 @@
             [hyperopen.runtime.effect-adapters.vaults :as vault-adapters]
             [hyperopen.runtime.effect-adapters.wallet :as wallet-adapters]
             [hyperopen.runtime.effect-adapters.websocket :as ws-adapters]
+            [hyperopen.route-modules :as route-modules]
             [hyperopen.runtime.api-effects :as api-effects]
             [hyperopen.runtime.state :as runtime-state]
             [hyperopen.api.trading :as trading-api]
@@ -66,6 +67,10 @@
 (def push-state common/push-state)
 
 (def replace-state common/replace-state)
+
+(defn load-route-module-effect
+  [_ store path]
+  (route-modules/load-route-module! store path))
 
 (def make-fetch-candle-snapshot ws-adapters/make-fetch-candle-snapshot)
 

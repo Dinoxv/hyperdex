@@ -4,6 +4,7 @@
             [hyperopen.state.trading :as trading]
             [hyperopen.views.app-view :as app-view]
             [hyperopen.views.account-equity-view :as account-equity-view]
+            [hyperopen.views.api-wallets-view]
             [hyperopen.views.footer-view :as footer-view]
             [hyperopen.views.header-view :as header-view]
             [hyperopen.views.trade-view :as trade-view]))

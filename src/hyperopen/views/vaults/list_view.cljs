@@ -634,3 +634,9 @@
                                                             :pagination user-pagination})
        [:div {:class ["text-right" "text-xs" "text-trading-text-secondary"]}
         (str (count protocol-rows) " protocol vaults | " (count user-rows) " user vaults")]]]]))
+
+(defn ^:export route-view
+  [state]
+  (vaults-view state))
+
+(goog/exportSymbol "hyperopen.views.vaults.list_view.route_view" route-view)

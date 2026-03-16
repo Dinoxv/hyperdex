@@ -10,6 +10,7 @@
             [hyperopen.portfolio.actions :as portfolio-actions]
             [hyperopen.api.trading :as trading-api]
             [hyperopen.funding-comparison.actions :as funding-comparison-actions]
+            [hyperopen.route-modules :as route-modules]
             [hyperopen.router :as router]
             [hyperopen.staking.actions :as staking-actions]
             [hyperopen.runtime.state :as runtime-state]
@@ -102,12 +103,11 @@
   [effect]
   (contains? projection-effect-ids (first effect)))
 
-(defn- projection-first-effects
+(defn- split-projection-effects
   [effects]
   (let [effects* (vec (or effects []))]
-    (into []
-          (concat (filter projection-effect? effects*)
-                  (remove projection-effect? effects*)))))
+    {:projection-effects (into [] (filter projection-effect? effects*))
+     :follow-up-effects (into [] (remove projection-effect? effects*))}))
 
 (defn- entering-portfolio-route?
   [state normalized-path]
@@ -135,20 +135,27 @@
   (let [p (router/normalize-path path)
         replace? (boolean (:replace? opts))
         browser-path (navigation-browser-path state p)
-        base-effects (cond-> [[:effects/save [:router :path] p]]
-        replace? (conj [:effects/replace-state browser-path])
-                       (not replace?) (conj [:effects/push-state browser-path]))
+        module-effect (when-let [_module-id (route-modules/route-module-id p)]
+                        [:effects/load-route-module p])
         route-effects (into []
                             (concat (vault-actions/load-vault-route state p)
                                     (funding-comparison-actions/load-funding-comparison-route state p)
                                     (staking-actions/load-staking-route state p)
                                     (api-wallets-actions/load-api-wallet-route state p)))
         portfolio-effects (portfolio-route-effects state p)
-        route-entry-effects (projection-first-effects
-                             (into []
-                                   (concat portfolio-effects
-                                           route-effects)))]
-    (into base-effects route-entry-effects)))
+        {:keys [projection-effects follow-up-effects]}
+        (split-projection-effects
+         (into []
+               (concat portfolio-effects
+                       route-effects)))
+        navigation-effect (if replace?
+                            [:effects/replace-state browser-path]
+                            [:effects/push-state browser-path])]
+    (cond-> [[:effects/save [:router :path] p]]
+      (seq projection-effects) (into projection-effects)
+      true (conj navigation-effect)
+      module-effect (conj module-effect)
+      (seq follow-up-effects) (into follow-up-effects))))
 
 (defn load-vault-route-action
   [state path]

@@ -624,3 +624,9 @@
                   :generated-private-key generated-private-key
                   :valid-until-preview-ms valid-until-preview-ms
                   :modal-confirm-disabled? modal-confirm-disabled?})]))
+
+(defn ^:export route-view
+  [state]
+  (api-wallets-view state))
+
+(goog/exportSymbol "hyperopen.views.api_wallets_view.route_view" route-view)

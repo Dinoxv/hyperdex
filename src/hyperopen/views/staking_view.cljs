@@ -234,3 +234,9 @@
                                                :validator-search-query validator-search-query
                                                :validator-dropdown-open? validator-dropdown-open?
                                                :validators validators}))]))
+
+(defn ^:export route-view
+  [state]
+  (staking-view state))
+
+(goog/exportSymbol "hyperopen.views.staking_view.route_view" route-view)

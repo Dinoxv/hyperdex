@@ -6,6 +6,7 @@
             [hyperopen.platform :as platform]
             [hyperopen.portfolio.actions :as portfolio-actions]
             [hyperopen.runtime.action-adapters :as action-adapters]
+            [hyperopen.runtime.effect-order-contract :as effect-order-contract]
             [hyperopen.staking.actions :as staking-actions]
             [hyperopen.vaults.actions :as vault-actions]
             [hyperopen.wallet.agent-runtime :as agent-runtime]
@@ -33,13 +34,15 @@
                                                  [[:effects/save [:vaults-ui :list-loading?] true]
                                                   [:effects/api-fetch-vault-index]])]
     (is (= [[:effects/save [:router :path] "/vaults"]
-            [:effects/push-state "/vaults"]
             [:effects/save [:vaults-ui :list-loading?] true]
+            [:effects/push-state "/vaults"]
+            [:effects/load-route-module "/vaults"]
             [:effects/api-fetch-vault-index]]
            (action-adapters/navigate {} "/vaults")))
     (is (= [[:effects/save [:router :path] "/vaults"]
-            [:effects/replace-state "/vaults"]
             [:effects/save [:vaults-ui :list-loading?] true]
+            [:effects/replace-state "/vaults"]
+            [:effects/load-route-module "/vaults"]
             [:effects/api-fetch-vault-index]]
            (action-adapters/navigate {} "/vaults" {:replace? true})))))
 
@@ -50,8 +53,9 @@
                   [[:effects/save [:funding-comparison-ui :loading?] true]
                    [:effects/api-fetch-predicted-fundings]])]
     (is (= [[:effects/save [:router :path] "/funding-comparison"]
-            [:effects/push-state "/funding-comparison"]
             [:effects/save [:funding-comparison-ui :loading?] true]
+            [:effects/push-state "/funding-comparison"]
+            [:effects/load-route-module "/funding-comparison"]
             [:effects/api-fetch-predicted-fundings]]
            (action-adapters/navigate {} "/funding-comparison")))))
 
@@ -63,8 +67,9 @@
                                                      [[:effects/save [:staking-ui :form-error] nil]
                                                       [:effects/api-fetch-staking-validator-summaries]])]
     (is (= [[:effects/save [:router :path] "/staking"]
-            [:effects/push-state "/staking"]
             [:effects/save [:staking-ui :form-error] nil]
+            [:effects/push-state "/staking"]
+            [:effects/load-route-module "/staking"]
             [:effects/api-fetch-staking-validator-summaries]]
            (action-adapters/navigate {} "/staking")))))
 
@@ -81,11 +86,12 @@
                                                  [[:effects/save [:vaults-ui :list-loading?] true]
                                                   [:effects/api-fetch-vault-index]])]
     (is (= [[:effects/save [:router :path] "/portfolio"]
-            [:effects/push-state "/portfolio"]
             [:effects/save-many
              [[[:portfolio-ui :chart-tab] :returns]
               [[:portfolio-ui :chart-hover-index] nil]]]
             [:effects/save [:vaults-ui :list-loading?] true]
+            [:effects/push-state "/portfolio"]
+            [:effects/load-route-module "/portfolio"]
             [:effects/fetch-candle-snapshot
              :coin "BTC"
              :interval :1h
@@ -105,8 +111,9 @@
                   vault-actions/load-vault-route (fn [_state _path]
                                                    [[:effects/save [:vaults-ui :list-loading?] true]])]
       (is (= [[:effects/save [:router :path] "/portfolio"]
+              [:effects/save [:vaults-ui :list-loading?] true]
               [:effects/push-state "/portfolio"]
-              [:effects/save [:vaults-ui :list-loading?] true]]
+              [:effects/load-route-module "/portfolio"]]
              (action-adapters/navigate {:router {:path "/portfolio"}
                                         :portfolio-ui {:chart-tab :returns}}
                                        "/portfolio")))
@@ -117,11 +124,36 @@
                 vault-actions/load-vault-route (fn [_state _path] [])
                 funding-comparison-actions/load-funding-comparison-route (fn [_state _path] [])]
     (is (= [[:effects/save [:router :path] "/portfolio"]
-            [:effects/push-state "/portfolio?spectate=0xabcdefabcdefabcdefabcdefabcdefabcdefabcd"]]
+            [:effects/push-state "/portfolio?spectate=0xabcdefabcdefabcdefabcdefabcdefabcdefabcd"]
+            [:effects/load-route-module "/portfolio"]]
            (action-adapters/navigate {:router {:path "/trade"}
                                       :account-context {:spectate-mode {:active? true
                                                                         :address "0xabcdefabcdefabcdefabcdefabcdefabcdefabcd"}}}
                                      "/portfolio")))))
+
+(deftest navigate-satisfies-effect-order-contract-for-deferred-routes-test
+  (with-redefs [portfolio-actions/select-portfolio-chart-tab
+                (fn [_state tab]
+                  [[:effects/save-many
+                    [[[:portfolio-ui :chart-tab] tab]
+                     [[:portfolio-ui :chart-hover-index] nil]]]
+                   [:effects/fetch-candle-snapshot
+                    :coin "BTC"
+                    :interval :1h
+                    :bars 800]])
+                vault-actions/load-vault-route
+                (fn [_state _path]
+                  [[:effects/save [:vaults-ui :list-loading?] true]
+                   [:effects/api-fetch-vault-index]])]
+    (let [effects (action-adapters/navigate {:router {:path "/trade"}
+                                             :portfolio-ui {:chart-tab :returns}}
+                                            "/portfolio")]
+      (is (= effects
+             (effect-order-contract/assert-action-effect-order!
+              :actions/navigate
+              effects
+              {:phase :action-emission
+               :action-id :actions/navigate}))))))
 
 (deftest handle-wallet-connected-refreshes-vault-route-when-active-test
   (let [dispatch-calls (atom [])]

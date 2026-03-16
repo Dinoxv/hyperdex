@@ -174,8 +174,14 @@
                          pathname*)]
     (normalize-path candidate-path)))
 
-(defn set-route! [store path]
-  (swap! store assoc :router {:path (normalize-path path)}))
+(defn set-route!
+  ([store path]
+   (set-route! store path nil))
+  ([store path on-route-change]
+   (let [normalized-path (normalize-path path)]
+     (swap! store assoc :router {:path normalized-path})
+     (when (fn? on-route-change)
+       (on-route-change normalized-path)))))
 
 (defn current-path []
   (let [location (some-> js/globalThis .-location)]
@@ -183,8 +189,11 @@
      (some-> location .-pathname)
      (some-> location .-hash))))
 
-(defn init! [store]
-  (set-route! store (current-path))
-  (.addEventListener js/window "popstate"
-                     (fn [_]
-                       (set-route! store (current-path)))))
+(defn init!
+  ([store]
+   (init! store {}))
+  ([store {:keys [on-route-change]}]
+   (set-route! store (current-path) on-route-change)
+   (.addEventListener js/window "popstate"
+                      (fn [_]
+                        (set-route! store (current-path) on-route-change)))))

@@ -96,3 +96,9 @@
 
         (activity/activity-panel vm)
         (transfer-modal/vault-transfer-modal-view vault-transfer*)])]))
+
+(defn ^:export route-view
+  [state]
+  (vault-detail-view state))
+
+(goog/exportSymbol "hyperopen.views.vaults.detail_view.route_view" route-view)

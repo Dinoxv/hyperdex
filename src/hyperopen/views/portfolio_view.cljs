@@ -1016,3 +1016,9 @@
         :tab-click-actions-by-tab portfolio-account-tab-click-actions-by-tab
         :tab-label-overrides portfolio-account-tab-label-overrides
         :tab-order portfolio-account-tab-order})]]))
+
+(defn ^:export route-view
+  [state]
+  (portfolio-view state))
+
+(goog/exportSymbol "hyperopen.views.portfolio_view.route_view" route-view)

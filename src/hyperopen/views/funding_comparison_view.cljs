@@ -278,7 +278,7 @@
               "No rows match the current filters.")]])]]]
 
      [:div {:class ["grid" "gap-2" "md:hidden"]}
-      (if (seq rows)
+     (if (seq rows)
         (for [row rows]
           ^{:key (:coin row)}
           (mobile-row row))
@@ -291,3 +291,9 @@
        [:div {:class ["rounded-xl" "border" "border-[#7a2836]" "bg-[#2b1118]" "px-3" "py-2" "text-sm" "text-[#ff9db2"]
               :data-role "funding-comparison-error"}
         error])]))
+
+(defn ^:export route-view
+  [state]
+  (funding-comparison-view state))
+
+(goog/exportSymbol "hyperopen.views.funding_comparison_view.route_view" route-view)

@@ -12,7 +12,19 @@
  {:app {:target :browser
         :output-dir "resources/public/js"
         :asset-path "/js"
-        :modules {:main {:init-fn hyperopen.core/start!}}
+        :module-loader true
+        :modules {:main {:init-fn hyperopen.core/start!}
+                  :portfolio_route {:entries [hyperopen.views.portfolio-view]
+                                    :depends-on #{:main}}
+                  :funding_comparison_route {:entries [hyperopen.views.funding-comparison-view]
+                                             :depends-on #{:main}}
+                  :staking_route {:entries [hyperopen.views.staking-view]
+                                  :depends-on #{:main}}
+                  :api_wallets_route {:entries [hyperopen.views.api-wallets-view]
+                                      :depends-on #{:main}}
+                  :vaults_route {:entries [hyperopen.views.vaults.list-view
+                                           hyperopen.views.vaults.detail-view]
+                                 :depends-on #{:main}}}
         :devtools {:preloads [hyperopen.telemetry.console-preload]
                    :http-root "resources/public"
                    :http-port 8080
@@ -72,5 +84,17 @@
   :release {:target :browser
             :output-dir "resources/public/js"
             :asset-path "/js"
-            :modules {:main {:init-fn hyperopen.core/start!}}
+            :module-loader true
+            :modules {:main {:init-fn hyperopen.core/start!}
+                      :portfolio_route {:entries [hyperopen.views.portfolio-view]
+                                        :depends-on #{:main}}
+                      :funding_comparison_route {:entries [hyperopen.views.funding-comparison-view]
+                                                 :depends-on #{:main}}
+                      :staking_route {:entries [hyperopen.views.staking-view]
+                                      :depends-on #{:main}}
+                      :api_wallets_route {:entries [hyperopen.views.api-wallets-view]
+                                          :depends-on #{:main}}
+                      :vaults_route {:entries [hyperopen.views.vaults.list-view
+                                               hyperopen.views.vaults.detail-view]
+                                     :depends-on #{:main}}}
             :compiler-options {:optimizations :advanced}}}} 

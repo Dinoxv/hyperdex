@@ -4,6 +4,7 @@
             [hyperopen.account.history.surface-actions :as surface-actions]
             [hyperopen.asset-selector.settings :as asset-selector-settings]
             [hyperopen.chart.settings :as chart-settings]
+            [nexus.registry :as nxr]
             [hyperopen.orderbook.settings :as orderbook-settings]
             [hyperopen.portfolio.actions :as portfolio-actions]
             [hyperopen.router :as router]
@@ -164,7 +165,12 @@
        :set-on-connected-handler! wallet/set-on-connected-handler!
        :handle-wallet-connected runtime-action-adapters/handle-wallet-connected
        :init-wallet! wallet/init-wallet!
-       :init-router! router/init!
+       :init-router! (fn [startup-store]
+                       (router/init!
+                        startup-store
+                        {:on-route-change
+                         (fn [path]
+                           (nxr/dispatch startup-store nil [[:effects/load-route-module path]]))}))
        :install-asset-selector-shortcuts! (fn []
                                             (startup-runtime-lib/install-asset-selector-shortcuts!
                                              {:store (:store base-deps)
