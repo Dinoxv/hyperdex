@@ -74,7 +74,65 @@
       (is (= {:px "100" :sz "2" :px-num 100 :sz-num 2}
              (get-in book [:render :best-bid])))
       (is (= {:px "101" :sz "4" :px-num 101 :sz-num 4}
-             (get-in book [:render :best-ask]))))))
+             (get-in book [:render :best-ask]))))
+    (testing "render snapshot includes branch-independent precomputed metadata"
+      (is (= 1
+             (get-in book [:render :spread :absolute])))
+      (is (= "1.00"
+             (get-in book [:render :spread :absolute-label])))
+      (is (= "0.990%"
+             (get-in book [:render :spread :percentage-label])))
+      (is (= {:base 4 :quote 404}
+             (get-in book [:render :max-total-by-unit])))
+      (is (not (contains? (:render book) :desktop-bids)))
+      (is (not (contains? (:render book) :desktop-asks)))
+      (is (not (contains? (:render book) :mobile-pairs))))))
+
+(deftest build-render-snapshot-can-trim-inactive-responsive-branch-test
+  (let [bids [{:px "100" :sz "2"} {:px "99" :sz "1"}]
+        asks [{:px "101" :sz "4"} {:px "102" :sz "5"}]
+        mobile-snapshot (policy/build-render-snapshot bids
+                                                      asks
+                                                      2
+                                                      {:visible-branch :mobile})
+        desktop-snapshot (policy/build-render-snapshot bids
+                                                       asks
+                                                       2
+                                                       {:visible-branch :desktop})]
+    (testing "mobile-only snapshots keep mobile pairs and skip desktop rows"
+      (is (contains? mobile-snapshot :mobile-pairs))
+      (is (not (contains? mobile-snapshot :desktop-bids)))
+      (is (not (contains? mobile-snapshot :desktop-asks)))
+      (is (= ["100" "99"]
+             (mapv (fn [{:keys [bid]}]
+                     (:px bid))
+                   (:mobile-pairs mobile-snapshot)))))
+    (testing "desktop-only snapshots keep ladder rows and skip mobile pairs"
+      (is (contains? desktop-snapshot :desktop-bids))
+      (is (contains? desktop-snapshot :desktop-asks))
+      (is (not (contains? desktop-snapshot :mobile-pairs)))
+      (is (= ["100" "99"]
+             (mapv :px (:desktop-bids desktop-snapshot))))
+      (is (= ["102" "101"]
+             (mapv :px (:desktop-asks desktop-snapshot))))
+      (let [desktop-bid (get-in desktop-snapshot [:desktop-bids 0])
+            desktop-ask (get-in desktop-snapshot [:desktop-asks 0])]
+        (is (= :bid (:side desktop-bid)))
+        (is (= "bid-100" (:row-key desktop-bid)))
+        (is (= "100.00" (get-in desktop-bid [:display :price])))
+        (is (= "2" (get-in desktop-bid [:display :size :base])))
+        (is (= "200" (get-in desktop-bid [:display :size :quote])))
+        (is (= "2" (get-in desktop-bid [:display :total :base])))
+        (is (= "200" (get-in desktop-bid [:display :total :quote])))
+        (is (= "22.22222222222222%" (get-in desktop-bid [:display :bar-width :base])))
+        (is (= :ask (:side desktop-ask)))
+        (is (= "ask-102" (:row-key desktop-ask)))
+        (is (= "102.00" (get-in desktop-ask [:display :price])))
+        (is (= "5" (get-in desktop-ask [:display :size :base])))
+        (is (= "510" (get-in desktop-ask [:display :size :quote])))
+        (is (= "9" (get-in desktop-ask [:display :total :base])))
+        (is (= "914" (get-in desktop-ask [:display :total :quote])))
+        (is (= "100%" (get-in desktop-ask [:display :bar-width :quote])))))))
 
 (deftest build-book-ask-derivation-compatibility-test
   (let [book (policy/build-book [{:px "100" :sz "1"}]

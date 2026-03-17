@@ -139,6 +139,62 @@
                   :positions-sort {:column nil :direction :asc}
                   :open-orders-sort {:column "Time" :direction :desc}}})
 
+(defn- active-asset-panel-test-state []
+  (assoc trade-view-test-state
+         :active-asset "BTC"
+         :active-market {:key "perp:BTC"
+                         :coin "BTC"
+                         :symbol "BTC-USDC"
+                         :base "BTC"
+                         :market-type :perp}
+         :active-assets {:contexts {"BTC" {:coin "BTC"
+                                           :mark 64000.0
+                                           :markRaw "64000.0"
+                                           :oracle 63990.0
+                                           :oracleRaw "63990.0"
+                                           :change24h 1500.0
+                                           :change24hPct 2.4
+                                           :volume24h 1250000.0
+                                           :openInterest 250000.0
+                                           :fundingRate 0.01}}
+                         :funding-predictability {:by-coin {}
+                                                  :loading-by-coin {}
+                                                  :error-by-coin {}}}
+         :asset-selector {:visible-dropdown nil
+                          :search-term ""
+                          :sort-by :volume
+                          :sort-direction :desc
+                          :markets [{:key "perp:BTC"
+                                     :coin "BTC"
+                                     :symbol "BTC-USDC"
+                                     :base "BTC"
+                                     :market-type :perp}
+                                    {:key "perp:ETH"
+                                     :coin "ETH"
+                                     :symbol "ETH-USDC"
+                                     :base "ETH"
+                                     :market-type :perp}]
+                          :market-by-key {"perp:BTC" {:key "perp:BTC"
+                                                      :coin "BTC"
+                                                      :symbol "BTC-USDC"
+                                                      :base "BTC"
+                                                      :market-type :perp}
+                                          "perp:ETH" {:key "perp:ETH"
+                                                      :coin "ETH"
+                                                      :symbol "ETH-USDC"
+                                                      :base "ETH"
+                                                      :market-type :perp}}
+                          :loading? false
+                          :phase :bootstrap
+                          :favorites #{}
+                          :missing-icons #{}
+                          :loaded-icons #{"perp:BTC"}
+                          :favorites-only? false
+                          :strict? false
+                          :active-tab :all}
+         :funding-ui {:tooltip {}}
+         :trade-ui {:mobile-asset-details-open? false}))
+
 (deftest header-view-uses-app-shell-gutter-test
   (let [view-node (header-view/header-view {:wallet {}})]
     (is (contains-class? view-node "app-shell-gutter"))))
@@ -173,6 +229,30 @@
 (deftest trade-view-does-not-use-app-shell-gutter-test
   (let [view-node (trade-view/trade-view trade-view-test-state)]
     (is (not (contains-class? view-node "app-shell-gutter")))))
+
+(deftest trade-view-active-asset-panel-memoization-ignores-closed-selector-bookkeeping-test
+  (let [render-panel @#'trade-view/render-active-asset-panel
+        base-state (active-asset-panel-test-state)
+        changed-state (-> base-state
+                          (assoc-in [:asset-selector :search-term] "eth")
+                          (assoc-in [:asset-selector :scroll-top] 144)
+                          (assoc-in [:asset-selector :highlighted-market-key] "perp:ETH")
+                          (assoc-in [:active-assets :contexts "ETH"] {:coin "ETH"
+                                                                      :mark 3200.0})
+                          (assoc-in [:active-assets :funding-predictability :by-coin "ETH"] {:mean 0.2}))]
+    (is (identical? (render-panel base-state)
+                    (render-panel changed-state)))))
+
+(deftest trade-view-active-asset-panel-open-selector-still-reacts-to-dropdown-state-test
+  (let [render-panel @#'trade-view/render-active-asset-panel
+        base-state (assoc-in (active-asset-panel-test-state)
+                             [:asset-selector :visible-dropdown]
+                             :asset-selector)
+        changed-state (assoc-in base-state
+                                [:asset-selector :search-term]
+                                "eth")]
+    (is (not (identical? (render-panel base-state)
+                         (render-panel changed-state))))))
 
 (deftest trade-view-root-and-right-column-layout-test
   (let [view-node (trade-view/trade-view trade-view-test-state)

@@ -4,8 +4,25 @@
             [hyperopen.views.active-asset.icon-button :as icon-button]
             [hyperopen.views.active-asset.vm :as active-asset-vm]))
 
+(def ^:private desktop-breakpoint-px
+  1024)
+
 (def active-asset-grid-template
   "md:grid-cols-[minmax(max-content,1.4fr)_minmax(0,0.9fr)_minmax(0,0.9fr)_minmax(0,1.1fr)_minmax(0,1.1fr)_minmax(0,1.2fr)_minmax(0,1.6fr)]")
+
+(defn- viewport-width-px []
+  (let [width (some-> js/globalThis .-innerWidth)]
+    (if (number? width)
+      width
+      desktop-breakpoint-px)))
+
+(defn- desktop-layout? []
+  (>= (viewport-width-px) desktop-breakpoint-px))
+
+(defn- render-visible-branch [mobile-render desktop-render]
+  (if (desktop-layout?)
+    (desktop-render)
+    (mobile-render)))
 
 (defn- change-indicator [change-value change-pct & [change-raw]]
   (let [is-positive (and change-value (>= change-value 0))
@@ -306,8 +323,8 @@
 
 (defn active-asset-row-from-vm [row-vm]
   [:div
-   (mobile-active-asset-row row-vm)
-   (desktop-active-asset-row row-vm)])
+   (render-visible-branch #(mobile-active-asset-row row-vm)
+                          #(desktop-active-asset-row row-vm))])
 
 (defn active-asset-row [ctx-data market dropdown-state full-state]
   (active-asset-row-from-vm
@@ -333,34 +350,37 @@
                   "text-trading-text-secondary"]}
     "Select a market to view price, liquidity, and funding details."]])
 
+(defn- desktop-select-asset-row
+  [dropdown-visible?]
+  [:div {:class ["relative"
+                 "hidden"
+                 "grid-cols-7"
+                 "items-center"
+                 "gap-2"
+                 "px-0"
+                 "py-2"
+                 "lg:grid"
+                 "md:gap-3"
+                 active-asset-grid-template]}
+   [:div {:class ["flex" "justify-start" "app-shell-gutter-left" "min-w-fit"]}
+    (asset-selector-trigger dropdown-visible?)]
+   [:div {:class ["flex" "justify-center"]}
+    (data-column "Mark" "—" {:underlined true})]
+   [:div {:class ["flex" "justify-center"]}
+    (data-column "Oracle" "—" {:underlined true})]
+   [:div {:class ["flex" "justify-center"]}
+    (data-column "24h Change" "—")]
+   [:div {:class ["flex" "justify-center"]}
+    (data-column "24h Volume" "—")]
+   [:div {:class ["flex" "justify-center"]}
+    (data-column "Open Interest" "—" {:underlined true})]
+   [:div {:class ["flex" "justify-center"]}
+    [:div {:class ["text-center"]}
+     [:div {:class ["mb-1" "text-xs" "text-gray-400"]} "Funding / Countdown"]
+     [:div {:class ["text-xs" "text-gray-400"]} "— / —"]]]])
+
 (defn select-asset-row [dropdown-state]
-  (let [dropdown-visible? (= (:visible-dropdown dropdown-state) :asset-selector)
-        desktop-layout [:div {:class ["relative"
-                                      "hidden"
-                                      "grid-cols-7"
-                                      "items-center"
-                                      "gap-2"
-                                      "px-0"
-                                      "py-2"
-                                      "lg:grid"
-                                      "md:gap-3"
-                                      active-asset-grid-template]}
-                        [:div {:class ["flex" "justify-start" "app-shell-gutter-left" "min-w-fit"]}
-                         (asset-selector-trigger dropdown-visible?)]
-                        [:div {:class ["flex" "justify-center"]}
-                         (data-column "Mark" "—" {:underlined true})]
-                        [:div {:class ["flex" "justify-center"]}
-                         (data-column "Oracle" "—" {:underlined true})]
-                        [:div {:class ["flex" "justify-center"]}
-                         (data-column "24h Change" "—")]
-                        [:div {:class ["flex" "justify-center"]}
-                         (data-column "24h Volume" "—")]
-                        [:div {:class ["flex" "justify-center"]}
-                         (data-column "Open Interest" "—" {:underlined true})]
-                        [:div {:class ["flex" "justify-center"]}
-                         [:div {:class ["text-center"]}
-                          [:div {:class ["mb-1" "text-xs" "text-gray-400"]} "Funding / Countdown"]
-                          [:div {:class ["text-xs" "text-gray-400"]} "— / —"]]]]]
+  (let [dropdown-visible? (= (:visible-dropdown dropdown-state) :asset-selector)]
     [:div
-     (mobile-select-asset-row dropdown-visible?)
-     desktop-layout]))
+     (render-visible-branch #(mobile-select-asset-row dropdown-visible?)
+                            #(desktop-select-asset-row dropdown-visible?))]))

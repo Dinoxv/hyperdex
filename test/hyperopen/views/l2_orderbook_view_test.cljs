@@ -1,6 +1,7 @@
 (ns hyperopen.views.l2-orderbook-view-test
   (:require [clojure.string :as str]
             [cljs.test :refer-macros [deftest is testing]]
+            [hyperopen.websocket.orderbook-policy :as orderbook-policy]
             [hyperopen.websocket.trades :as ws-trades]
             [hyperopen.views.l2-orderbook-view :as view]))
 
@@ -79,6 +80,17 @@
     (seq? node) (mapcat collect-strings node)
     :else []))
 
+(defn- single-render-row [side order]
+  (let [snapshot (case side
+                   :ask (orderbook-policy/build-render-snapshot [] [order] 1)
+                   :bid (orderbook-policy/build-render-snapshot [order] [] 1))]
+    (first (case side
+             :ask (:desktop-asks snapshot)
+             :bid (:desktop-bids snapshot)))))
+
+(defn- responsive-layout [viewport-width]
+  {:viewport-width viewport-width})
+
 (deftest symbol-resolution-test
   (testing "market metadata takes precedence"
     (is (= "PUMP" (view/resolve-base-symbol "PUMP" {:base "PUMP"})))
@@ -152,8 +164,10 @@
                :sz "2"
                :cum-size 2
                :cum-value 203}
-        ask-classes (frequencies (collect-all-classes (view/order-row order 3 true :base)))
-        bid-classes (frequencies (collect-all-classes (view/order-row order 3 false :base)))]
+        ask-row (single-render-row :ask order)
+        bid-row (single-render-row :bid order)
+        ask-classes (frequencies (collect-all-classes (view/order-row ask-row :base)))
+        bid-classes (frequencies (collect-all-classes (view/order-row bid-row :base)))]
     (testing "ask rows keep price red while rendering size/total in Hyperliquid neutral tone"
       (is (= 1 (get ask-classes "text-[rgb(237,112,136)]" 0)))
       (is (= 2 (get ask-classes "text-[rgb(210,218,215)]" 0)))
@@ -168,8 +182,10 @@
                :sz "2"
                :cum-size 2
                :cum-value 203}
-        ask-classes (set (collect-all-classes (view/order-row order 3 true :base)))
-        bid-classes (set (collect-all-classes (view/order-row order 3 false :base)))]
+        ask-row (single-render-row :ask order)
+        bid-row (single-render-row :bid order)
+        ask-classes (set (collect-all-classes (view/order-row ask-row :base)))
+        bid-classes (set (collect-all-classes (view/order-row bid-row :base)))]
     (testing "ask depth bars use Hyperliquid red at 15pct translucency"
       (is (contains? ask-classes "bg-[rgba(237,112,136,0.15)]"))
       (is (not (contains? ask-classes "bg-[rgba(237,112,136,0.20)]")))
@@ -458,24 +474,31 @@
                                        {:size-unit :quote
                                         :size-unit-dropdown-visible? false
                                         :price-aggregation-dropdown-visible? false
-                                        :price-aggregation-by-coin {"BTC" :full}})
+                                        :price-aggregation-by-coin {"BTC" :full}}
+                                       nil
+                                       true
+                                       (responsive-layout 375))
         mobile-panel (find-first-node panel (data-role= "orderbook-mobile-split-panel"))
+        desktop-panel (find-first-node panel (data-role= "orderbook-desktop-panel"))
         mobile-header-row (find-first-node panel (data-role= "orderbook-mobile-split-headers"))
         mobile-panel-classes (node-class-set mobile-panel)
         header-text (set (collect-strings mobile-header-row))
         mobile-row-count (count-nodes panel (data-role= "orderbook-mobile-split-row"))
+        level-row-count (count-nodes panel (data-role= "orderbook-level-row"))
         bid-price-cell-count (count-nodes panel (data-role= "orderbook-mobile-bid-price-cell"))
         ask-price-cell-count (count-nodes panel (data-role= "orderbook-mobile-ask-price-cell"))]
     (is (some? mobile-panel))
+    (is (nil? desktop-panel))
     (is (contains? mobile-panel-classes "lg:hidden"))
     (is (= 10 mobile-row-count))
+    (is (= 0 level-row-count))
     (is (= 10 bid-price-cell-count))
     (is (= 10 ask-price-cell-count))
     (is (contains? header-text "Bid"))
     (is (contains? header-text "Ask"))
     (is (contains? header-text "Total (USDC)"))))
 
-(deftest orderbook-panel-keeps-desktop-ladder-behind-lg-breakpoint-contract-test
+(deftest orderbook-panel-renders-only-desktop-ladder-at-lg-breakpoint-test
   (let [panel (view/l2-orderbook-panel "BTC"
                                        {:market-type :perp
                                         :base "BTC"
@@ -486,16 +509,21 @@
                                        {:size-unit :base
                                         :size-unit-dropdown-visible? false
                                         :price-aggregation-dropdown-visible? false
-                                        :price-aggregation-by-coin {"BTC" :full}})
+                                        :price-aggregation-by-coin {"BTC" :full}}
+                                       nil
+                                       true
+                                       (responsive-layout 1280))
         mobile-panel (find-first-node panel (data-role= "orderbook-mobile-split-panel"))
         desktop-panel (find-first-node panel (data-role= "orderbook-desktop-panel"))
-        mobile-classes (node-class-set mobile-panel)
-        desktop-classes (node-class-set desktop-panel)]
-    (is (some? mobile-panel))
+        desktop-classes (node-class-set desktop-panel)
+        mobile-row-count (count-nodes panel (data-role= "orderbook-mobile-split-row"))
+        level-row-count (count-nodes panel (data-role= "orderbook-level-row"))]
+    (is (nil? mobile-panel))
     (is (some? desktop-panel))
-    (is (contains? mobile-classes "lg:hidden"))
     (is (contains? desktop-classes "hidden"))
-    (is (contains? desktop-classes "lg:flex"))))
+    (is (contains? desktop-classes "lg:flex"))
+    (is (= 0 mobile-row-count))
+    (is (= 2 level-row-count))))
 
 (deftest orderbook-panel-can-render-from-precomputed-slices-without-raw-levels-test
   (let [panel (view/l2-orderbook-panel "BTC"
@@ -517,6 +545,111 @@
                                         :price-aggregation-by-coin {"BTC" :full}})
         level-row-count (count-nodes panel (data-role= "orderbook-level-row"))]
     (is (= 2 level-row-count))))
+
+(deftest orderbook-panel-consumes-fully-precomputed-render-contract-test
+  (let [bid-row {:side :bid
+                 :row-key "bid-custom"
+                 :px "100"
+                 :display {:price "bid-price-label"
+                           :size {:base "bid-size-base"
+                                  :quote "bid-size-quote"}
+                           :total {:base "bid-total-base"
+                                   :quote "bid-total-quote"}
+                           :bar-width {:base "33%"
+                                       :quote "44%"}}}
+        ask-row {:side :ask
+                 :row-key "ask-custom"
+                 :px "101"
+                 :display {:price "ask-price-label"
+                           :size {:base "ask-size-base"
+                                  :quote "ask-size-quote"}
+                           :total {:base "ask-total-base"
+                                   :quote "ask-total-quote"}
+                           :bar-width {:base "55%"
+                                       :quote "66%"}}}
+        panel (view/l2-orderbook-panel "BTC"
+                                       {:market-type :perp
+                                        :base "BTC"
+                                        :quote "USDC"
+                                        :szDecimals 4}
+                                       {:bids []
+                                        :asks []
+                                        :render {:desktop-bids [bid-row]
+                                                 :desktop-asks [ask-row]
+                                                 :mobile-pairs [{:bid bid-row
+                                                                 :ask ask-row
+                                                                 :row-key "mobile-split-row-custom"}]
+                                                 :best-bid {:px "100"}
+                                                 :best-ask {:px "101"}
+                                                 :spread {:absolute-label "spread-absolute-label"
+                                                          :percentage-label "spread-percent-label"}
+                                                 :max-total-by-unit {:base 10
+                                                                     :quote 20}}}
+                                       {:size-unit :base
+                                        :size-unit-dropdown-visible? false
+                                        :price-aggregation-dropdown-visible? false
+                                        :price-aggregation-by-coin {"BTC" :full}})
+        panel-strings (set (collect-strings panel))]
+    (is (contains? panel-strings "bid-price-label"))
+    (is (contains? panel-strings "bid-total-base"))
+    (is (contains? panel-strings "ask-price-label"))
+    (is (contains? panel-strings "ask-total-base"))
+    (is (contains? panel-strings "spread-absolute-label"))
+    (is (contains? panel-strings "spread-percent-label"))))
+
+(deftest orderbook-panel-consumes-mobile-only-render-contract-on-mobile-layout-test
+  (let [bid-row {:side :bid
+                 :row-key "bid-mobile-only"
+                 :px "100"
+                 :display {:price "mobile-bid-price"
+                           :size {:base "mobile-bid-size"
+                                  :quote "mobile-bid-size-quote"}
+                           :total {:base "mobile-bid-total"
+                                   :quote "mobile-bid-total-quote"}
+                           :bar-width {:base "33%"
+                                       :quote "44%"}}}
+        ask-row {:side :ask
+                 :row-key "ask-mobile-only"
+                 :px "101"
+                 :display {:price "mobile-ask-price"
+                           :size {:base "mobile-ask-size"
+                                  :quote "mobile-ask-size-quote"}
+                           :total {:base "mobile-ask-total"
+                                   :quote "mobile-ask-total-quote"}
+                           :bar-width {:base "55%"
+                                       :quote "66%"}}}
+        panel (view/l2-orderbook-panel "BTC"
+                                       {:market-type :perp
+                                        :base "BTC"
+                                        :quote "USDC"
+                                        :szDecimals 4}
+                                       {:bids []
+                                        :asks []
+                                        :render {:mobile-pairs [{:bid bid-row
+                                                                 :ask ask-row
+                                                                 :row-key "mobile-pair-only"}]
+                                                 :best-bid {:px "100"}
+                                                 :best-ask {:px "101"}
+                                                 :spread {:absolute-label "mobile-spread-absolute"
+                                                          :percentage-label "mobile-spread-percent"}
+                                                 :max-total-by-unit {:base 10
+                                                                     :quote 20}}}
+                                       {:size-unit :base
+                                        :size-unit-dropdown-visible? false
+                                        :price-aggregation-dropdown-visible? false
+                                        :price-aggregation-by-coin {"BTC" :full}}
+                                       nil
+                                       true
+                                       (responsive-layout 375))
+        mobile-panel (find-first-node panel (data-role= "orderbook-mobile-split-panel"))
+        desktop-panel (find-first-node panel (data-role= "orderbook-desktop-panel"))
+        panel-strings (set (collect-strings panel))]
+    (is (some? mobile-panel))
+    (is (nil? desktop-panel))
+    (is (contains? panel-strings "mobile-bid-price"))
+    (is (contains? panel-strings "mobile-bid-total"))
+    (is (contains? panel-strings "mobile-ask-price"))
+    (is (contains? panel-strings "mobile-ask-total"))))
 
 (deftest orderbook-panel-depth-panes-use-flex-constrained-layout-contract-test
   (let [panel (view/l2-orderbook-panel "BTC"

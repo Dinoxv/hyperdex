@@ -1,6 +1,7 @@
 (ns hyperopen.views.trade-view
   (:require [hyperopen.trade.layout-actions :as trade-layout-actions]
             [hyperopen.trade-modules :as trade-modules]
+            [hyperopen.views.active-asset.vm :as active-asset-vm]
             [hyperopen.views.active-asset-view :as active-asset-view]
             [hyperopen.views.ui.funding-modal-positioning :as funding-modal-positioning]
             [hyperopen.views.l2-orderbook-view :as l2-orderbook-view]
@@ -15,20 +16,6 @@
 
 (def ^:private desktop-breakpoint-px
   1024)
-
-(def ^:private active-asset-view-state-keys
-  [:active-assets
-   :active-asset
-   :active-market
-   :asset-contexts
-   :asset-selector
-   :account
-   :funding-ui
-   :perp-dex-clearinghouse
-   :spot
-   :trade-ui
-   :ui
-   :webdata2])
 
 (def ^:private trade-chart-view-base-state-keys
   [:active-asset
@@ -104,7 +91,7 @@
 
 (defn- active-asset-view-state
   [state]
-  (select-view-state state active-asset-view-state-keys))
+  (active-asset-vm/panel-dependency-state state))
 
 (defn- trade-chart-view-state
   [state]

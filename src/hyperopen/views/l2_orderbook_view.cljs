@@ -2,6 +2,7 @@
   (:require [clojure.string :as str]
             [hyperopen.domain.market.instrument :as instrument]
             [hyperopen.orderbook.price-aggregation :as price-agg]
+            [hyperopen.websocket.orderbook-policy :as orderbook-policy]
             [hyperopen.websocket.trades :as trades]
             [hyperopen.utils.formatting :as fmt]
             [hyperopen.views.websocket-freshness :as ws-freshness]))
@@ -17,8 +18,7 @@
 (def orderbook-tabs
   #{:orderbook :trades})
 
-(def ^:private max-render-levels-per-side 80)
-(def ^:private mobile-split-max-levels-per-side 10)
+(def ^:private max-render-levels-per-side orderbook-policy/default-max-render-levels-per-side)
 (def ^:private orderbook-columns-class "grid-cols-[1fr_2fr_2fr]")
 (def ^:private mobile-split-columns-class "grid-cols-[minmax(0,1.2fr)_minmax(0,0.8fr)_minmax(0,0.8fr)_minmax(0,1.2fr)]")
 (def ^:private header-neutral-text-class "text-[rgb(148,158,156)]")
@@ -28,6 +28,7 @@
 (def ^:private ask-price-text-class "text-[rgb(237,112,136)]")
 (def ^:private bid-price-text-class "text-[rgb(31,166,125)]")
 (def ^:private orderbook-tab-indicator-class "bg-[rgb(80,210,193)]")
+(def ^:private desktop-breakpoint-px 1024)
 
 (defn normalize-orderbook-tab [tab]
   (let [tab* (cond
@@ -36,57 +37,34 @@
                :else :orderbook)]
     (if (contains? orderbook-tabs tab*) tab* :orderbook)))
 
+(defn- viewport-width-px [viewport-width]
+  (let [width (or (when (number? viewport-width) viewport-width)
+                  (some-> js/globalThis .-innerWidth))]
+    (if (number? width)
+      width
+      desktop-breakpoint-px)))
+
+(defn- desktop-orderbook-layout? [layout]
+  (if (boolean? (:desktop-layout? layout))
+    (:desktop-layout? layout)
+    (>= (viewport-width-px (:viewport-width layout))
+        desktop-breakpoint-px)))
+
 (defn format-price
-  ([price] (fmt/format-trade-price-plain price price))
-  ([price raw] (fmt/format-trade-price-plain price raw)))
+  ([price] (orderbook-policy/format-price price))
+  ([price raw] (orderbook-policy/format-price price raw)))
 
 (defn format-percent [value decimals]
-  (when-some [num-value (parse-number value)]
-    (fmt/format-intl-number num-value
-                            {:minimumFractionDigits decimals
-                             :maximumFractionDigits decimals})))
+  (orderbook-policy/format-percent value decimals))
 
 (defn format-total [total & {:keys [decimals] :or {decimals 0}}]
-  (when-some [num-total (parse-number total)]
-    (fmt/format-intl-number num-total
-                            {:maximumFractionDigits decimals})))
+  (orderbook-policy/format-total total :decimals decimals))
 
 (defn calculate-spread [best-bid best-ask]
-  (when (and best-bid best-ask)
-    (let [bid-price (parse-number (:px best-bid))
-          ask-price (parse-number (:px best-ask))]
-      (when (and bid-price ask-price (number? bid-price) (number? ask-price))
-        (let [spread-abs (- ask-price bid-price)
-              spread-pct (* (/ spread-abs ask-price) 100)]
-          {:absolute spread-abs
-           :percentage spread-pct})))))
+  (orderbook-policy/calculate-spread best-bid best-ask))
 
 (defn calculate-cumulative-totals [orders]
-  "Given a vector of orders {:px price :sz size}
-   returns the same orders with:
-     :cum-size   running total size
-     :cum-value  running notional value in quote currency (price*size)
-   Orders must already be sorted in display order."
-  (if (empty? orders)
-    []
-    (loop [remaining orders
-           cum-size 0
-           cum-value 0
-           result []]
-      (if (empty? remaining)
-        result
-        (let [order (first remaining)
-              price (parse-number (:px order))
-              size (parse-number (:sz order))
-              new-cum-size (+ cum-size (or size 0))
-              new-cum-value (+ cum-value (* (or price 0) (or size 0)))
-              updated-order (assoc order
-                                   :cum-size new-cum-size
-                                   :cum-value new-cum-value)]
-          (recur (rest remaining)
-                 new-cum-size
-                 new-cum-value
-                 (conj result updated-order)))))))
+  (orderbook-policy/calculate-cumulative-totals orders))
 
 (defn normalize-size-unit [size-unit]
   (if (= size-unit :quote) :quote :base))
@@ -170,39 +148,22 @@
            (take 100)))))
 
 (defn order-size-for-unit [order size-unit]
-  (let [price (or (:px-num order) (parse-number (:px order)) 0)
-        size (or (:sz-num order) (parse-number (:sz order)) 0)]
-    (if (= size-unit :quote)
-      (* price size)
-      size)))
+  (orderbook-policy/order-size-for-unit order size-unit))
 
 (defn order-total-for-unit [order size-unit]
-  (if (= size-unit :quote)
-    (:cum-value order)
-    (:cum-size order)))
+  (orderbook-policy/order-total-for-unit order size-unit))
 
 (defn get-max-cumulative-total [orders size-unit]
-  (when (seq orders)
-    (apply max (map #(or (order-total-for-unit % size-unit) 0) orders))))
+  (orderbook-policy/get-max-cumulative-total orders size-unit))
 
 (defn format-order-size [order size-unit]
-  (if (= size-unit :quote)
-    (or (format-total (order-size-for-unit order size-unit) :decimals 0) "0")
-    (let [raw-size (:sz order)
-          size (or (:sz-num order)
-                   (parse-number raw-size))]
-      (if (string? raw-size)
-        raw-size
-        (or (format-total size :decimals 8) "0")))))
+  (orderbook-policy/format-order-size order size-unit))
 
 (defn format-order-total [order size-unit]
-  (if (= size-unit :quote)
-    (or (format-total (:cum-value order) :decimals 0) "0")
-    (or (format-total (:cum-size order) :decimals 8) "0")))
+  (orderbook-policy/format-order-total order size-unit))
 
 (defn cumulative-bar-width [cum-size max-cum-size]
-  (when (and cum-size max-cum-size (> max-cum-size 0))
-    (* (/ cum-size max-cum-size) 100)))
+  (orderbook-policy/cumulative-bar-width cum-size max-cum-size))
 
 (defn precision-dropdown [selected-option price-options dropdown-visible?]
   (let [selected-label (or (:label selected-option) "0.000001")
@@ -368,11 +329,29 @@
           (trades-row trade))]]
       (empty-trades))))
 
+(defn- row-price-label [row]
+  (or (get-in row [:display :price])
+      (format-price (:px row) (:px row))
+      "0.00"))
+
+(defn- row-size-label [row size-unit]
+  (or (get-in row [:display :size size-unit])
+      (format-order-size row size-unit)))
+
+(defn- row-total-label [row size-unit]
+  (or (get-in row [:display :total size-unit])
+      (format-order-total row size-unit)))
+
+(defn- row-bar-width [row size-unit]
+  (or (get-in row [:display :bar-width size-unit])
+      (str (or (cumulative-bar-width (order-total-for-unit row size-unit)
+                                     (get-in row [:max-total-by-unit size-unit]))
+               0)
+           "%")))
+
 ;; Component for individual order row
-(defn order-row [order max-cum-size is-ask? size-unit]
-  (let [price (:px order)
-        cum-total (order-total-for-unit order size-unit)
-        bar-width (cumulative-bar-width cum-total max-cum-size)
+(defn order-row [row size-unit]
+  (let [is-ask? (= :ask (:side row))
         bar-color (if is-ask? ask-depth-bar-class bid-depth-bar-class)
         price-text-color (if is-ask? ask-price-text-class bid-price-text-class)]
     [:div {:class ["flex" "items-center" "h-[23px]" "relative" "bg-base-100" "text-xs" "orderbook-level-row"]
@@ -380,32 +359,32 @@
      ;; Size bar background - always positioned from left
      [:div.absolute.inset-0.flex.items-center.justify-start
       [:div {:class ["h-full" bar-color "transition-all" "duration-300" "ease-[cubic-bezier(0.68,-0.6,0.32,1.6)]"]
-             :style {:width (str (or bar-width 0) "%")}}]]
+             :style {:width (row-bar-width row size-unit)}}]]
      ;; Content
      [:div {:class ["grid" orderbook-columns-class "w-full" "items-center" "pl-2" "pr-2" "relative" "z-10"]
             :data-role "orderbook-level-content-row"}
       [:div {:class ["text-left"]
              :data-role "orderbook-level-price-cell"}
        [:span {:class [price-text-color "num" "orderbook-level-value"]}
-        (or (format-price price price) "0.00")]]
+        (row-price-label row)]]
       [:div {:class ["text-right" "num-right"]
              :data-role "orderbook-level-size-cell"}
        [:span {:class [body-neutral-text-class "num" "orderbook-level-value"]}
-        (format-order-size order size-unit)]]
+        (row-size-label row size-unit)]]
       [:div {:class ["text-right" "num-right"]
              :data-role "orderbook-level-total-cell"}
        [:span {:class [body-neutral-text-class "num" "orderbook-level-value"]}
-        (format-order-total order size-unit)]]]]))
+        (row-total-label row size-unit)]]]]))
 
 ;; Spread component
 (defn spread-row [spread]
-  (let [absolute (:absolute spread)
-        percentage (:percentage spread)]
-    [:div {:class ["flex" "items-center" "justify-center" "h-[23px]" "bg-base-100" "border-y" "border-base-300" "text-xs"]}
-     [:div {:class ["flex" "items-center" "space-x-3" "text-white" "num" "orderbook-level-value"]}
-      [:span "Spread"]
-      [:span (format-price absolute)]
-      [:span (str (format-percent percentage 3) "%")]]]))
+  [:div {:class ["flex" "items-center" "justify-center" "h-[23px]" "bg-base-100" "border-y" "border-base-300" "text-xs"]}
+   [:div {:class ["flex" "items-center" "space-x-3" "text-white" "num" "orderbook-level-value"]}
+    [:span "Spread"]
+    [:span (or (:absolute-label spread)
+               (format-price (:absolute spread)))]
+    [:span (or (:percentage-label spread)
+               (str (format-percent (:percentage spread) 3) "%"))]]])
 
 ;; Column headers
 (defn column-headers [size-symbol]
@@ -420,16 +399,6 @@
    [:div {:class ["text-right" "num-right"]
           :data-role "orderbook-total-header-cell"}
     [:span {:class [header-neutral-text-class "text-xs" "num"]} (str "Total (" size-symbol ")")]]])
-
-(defn- mobile-split-level-pairs [bids-with-totals asks-with-totals]
-  (let [visible-bids (vec (take mobile-split-max-levels-per-side bids-with-totals))
-        visible-asks (vec (take mobile-split-max-levels-per-side asks-with-totals))
-        row-count (max (count visible-bids)
-                       (count visible-asks))]
-    (mapv (fn [idx]
-            {:bid (get visible-bids idx)
-             :ask (get visible-asks idx)})
-          (range row-count))))
 
 (defn- mobile-split-column-headers [size-symbol]
   [:div {:class ["grid" mobile-split-columns-class "items-center" "gap-x-2" "px-2" "py-2" "bg-base-100" "border-b" "border-base-300"]
@@ -447,27 +416,21 @@
           :data-role "orderbook-mobile-ask-total-header-cell"}
     [:span {:class [header-neutral-text-class "text-xs" "num"]} (str "Total (" size-symbol ")")]]])
 
-(defn- mobile-split-order-row [{:keys [bid ask]} max-cum-size size-unit]
-  (let [bid-total (when bid (format-order-total bid size-unit))
-        ask-total (when ask (format-order-total ask size-unit))
-        bid-price (when bid (or (format-price (:px bid) (:px bid)) "0.00"))
-        ask-price (when ask (or (format-price (:px ask) (:px ask)) "0.00"))
-        bid-bar-width (some-> bid
-                              (order-total-for-unit size-unit)
-                              (cumulative-bar-width max-cum-size))
-        ask-bar-width (some-> ask
-                              (order-total-for-unit size-unit)
-                              (cumulative-bar-width max-cum-size))]
+(defn- mobile-split-order-row [{:keys [bid ask]} size-unit]
+  (let [bid-total (when bid (row-total-label bid size-unit))
+        ask-total (when ask (row-total-label ask size-unit))
+        bid-price (when bid (row-price-label bid))
+        ask-price (when ask (row-price-label ask))]
     [:div {:class ["relative" "grid" mobile-split-columns-class "items-center" "gap-x-2" "px-2" "h-5" "bg-base-100" "text-xs" "border-b" "border-base-300/60"]
            :data-role "orderbook-mobile-split-row"}
      [:div {:class ["pointer-events-none" "absolute" "inset-y-0" "left-0" "flex" "w-1/2" "items-center" "justify-end" "pr-1"]}
       (when bid
         [:div {:class ["h-full" bid-depth-bar-class "transition-all" "duration-300" "ease-[cubic-bezier(0.68,-0.6,0.32,1.6)]"]
-               :style {:width (str (or bid-bar-width 0) "%")}}])]
+               :style {:width (row-bar-width bid size-unit)}}])]
      [:div {:class ["pointer-events-none" "absolute" "inset-y-0" "right-0" "flex" "w-1/2" "items-center" "justify-start" "pl-1"]}
       (when ask
         [:div {:class ["h-full" ask-depth-bar-class "transition-all" "duration-300" "ease-[cubic-bezier(0.68,-0.6,0.32,1.6)]"]
-               :style {:width (str (or ask-bar-width 0) "%")}}])]
+               :style {:width (row-bar-width ask size-unit)}}])]
      [:div {:class ["relative" "z-10" "text-left"]
             :data-role "orderbook-mobile-bid-total-cell"}
       [:span {:class [body-neutral-text-class "num"]} bid-total]]
@@ -481,31 +444,58 @@
             :data-role "orderbook-mobile-ask-total-cell"}
       [:span {:class [body-neutral-text-class "num"]} ask-total]]]))
 
-(defn- fallback-render-snapshot [orderbook-data]
-  (let [raw-bids (:bids orderbook-data)
-        raw-asks (:asks orderbook-data)
-        sorted-asks (sort-by #(or (parse-number (:px %)) 0) < raw-asks)
-        sorted-bids (sort-by #(or (parse-number (:px %)) 0) > raw-bids)
-        asks-limited (take max-render-levels-per-side sorted-asks)
-        bids-limited (take max-render-levels-per-side sorted-bids)]
-    {:asks-with-totals (calculate-cumulative-totals asks-limited)
-     :bids-with-totals (calculate-cumulative-totals bids-limited)
-     :best-bid (first sorted-bids)
-     :best-ask (first sorted-asks)}))
+(defn- strip-cumulative-totals [levels]
+  (mapv #(dissoc % :cum-size :cum-value) (or levels [])))
 
-(defn- render-snapshot [orderbook-data]
-  (let [render (:render orderbook-data)
-        precomputed? (and (map? render)
-                          (contains? render :asks-with-totals)
-                          (contains? render :bids-with-totals)
-                          (contains? render :best-bid)
-                          (contains? render :best-ask))]
-    (if precomputed?
-      {:asks-with-totals (or (:asks-with-totals render) [])
-       :bids-with-totals (or (:bids-with-totals render) [])
-       :best-bid (:best-bid render)
-       :best-ask (:best-ask render)}
-      (fallback-render-snapshot orderbook-data))))
+(defn- fallback-render-snapshot [orderbook-data visible-branch]
+  (orderbook-policy/build-render-snapshot (:bids orderbook-data)
+                                          (:asks orderbook-data)
+                                          max-render-levels-per-side
+                                          {:visible-branch visible-branch}))
+
+(defn- render-branch-keys [visible-branch]
+  (case visible-branch
+    :mobile [:mobile-pairs]
+    :desktop [:desktop-bids :desktop-asks]
+    [:desktop-bids :desktop-asks :mobile-pairs]))
+
+(defn- full-render-snapshot? [render visible-branch]
+  (and (map? render)
+       (every? #(contains? render %)
+               (concat (render-branch-keys visible-branch)
+                       [:best-bid
+                        :best-ask
+                        :spread
+                        :max-total-by-unit]))))
+
+(defn- legacy-render-snapshot? [render]
+  (and (map? render)
+       (every? #(contains? render %)
+               [:best-bid :best-ask])
+       (or (contains? render :display-bids)
+           (contains? render :bids-with-totals))
+       (or (contains? render :display-asks)
+           (contains? render :asks-with-totals))))
+
+(defn- upgrade-legacy-render-snapshot [render visible-branch]
+  (let [display-bids (or (:display-bids render)
+                         (strip-cumulative-totals (:bids-with-totals render)))
+        display-asks (or (:display-asks render)
+                         (strip-cumulative-totals (:asks-with-totals render)))
+        snapshot (orderbook-policy/build-render-snapshot display-bids
+                                                         display-asks
+                                                         max-render-levels-per-side
+                                                         {:visible-branch visible-branch})]
+    (assoc snapshot
+           :best-bid (or (:best-bid render) (:best-bid snapshot))
+           :best-ask (or (:best-ask render) (:best-ask snapshot)))))
+
+(defn- render-snapshot [orderbook-data visible-branch]
+  (let [render (:render orderbook-data)]
+    (cond
+      (full-render-snapshot? render visible-branch) render
+      (legacy-render-snapshot? render) (upgrade-legacy-render-snapshot render visible-branch)
+      :else (fallback-render-snapshot orderbook-data visible-branch))))
 
 ;; Main order book component
 (defn l2-orderbook-panel
@@ -514,87 +504,78 @@
   ([coin market orderbook-data orderbook-ui websocket-health]
    (l2-orderbook-panel coin market orderbook-data orderbook-ui websocket-health true))
   ([coin market orderbook-data orderbook-ui websocket-health show-freshness-cue?]
+   (l2-orderbook-panel coin market orderbook-data orderbook-ui websocket-health show-freshness-cue? nil))
+  ([coin market orderbook-data orderbook-ui websocket-health show-freshness-cue? layout]
    (let [size-unit (normalize-size-unit (:size-unit orderbook-ui))
-        size-unit-dropdown-visible? (boolean (:size-unit-dropdown-visible? orderbook-ui))
-        price-dropdown-visible? (boolean (:price-aggregation-dropdown-visible? orderbook-ui))
-        aggregation-by-coin (or (:price-aggregation-by-coin orderbook-ui) {})
-        selected-mode (get aggregation-by-coin coin :full)
-        base-symbol (resolve-base-symbol coin market)
-        quote-symbol (resolve-quote-symbol coin market)
-        selected-size-symbol (if (= size-unit :quote) quote-symbol base-symbol)
-        snapshot (render-snapshot orderbook-data)
-        asks-with-totals (:asks-with-totals snapshot)
-        bids-with-totals (:bids-with-totals snapshot)
-        best-bid (:best-bid snapshot)
-        best-ask (:best-ask snapshot)
-        spread (calculate-spread best-bid best-ask)
+         size-unit-dropdown-visible? (boolean (:size-unit-dropdown-visible? orderbook-ui))
+         price-dropdown-visible? (boolean (:price-aggregation-dropdown-visible? orderbook-ui))
+         aggregation-by-coin (or (:price-aggregation-by-coin orderbook-ui) {})
+         selected-mode (get aggregation-by-coin coin :full)
+         base-symbol (resolve-base-symbol coin market)
+         quote-symbol (resolve-quote-symbol coin market)
+         selected-size-symbol (if (= size-unit :quote) quote-symbol base-symbol)
+         desktop-layout? (desktop-orderbook-layout? layout)
+         visible-branch (if desktop-layout? :desktop :mobile)
+         snapshot (render-snapshot orderbook-data visible-branch)
+         desktop-asks (:desktop-asks snapshot)
+         desktop-bids (:desktop-bids snapshot)
+         mobile-pairs (:mobile-pairs snapshot)
+         best-bid (:best-bid snapshot)
+         best-ask (:best-ask snapshot)
+         spread (:spread snapshot)
+         reference-price (resolve-reference-price best-bid best-ask market)
+         market-type (infer-market-type coin market)
+         sz-decimals (:szDecimals market)
+         price-options (price-agg/build-options {:market-type market-type
+                                                 :sz-decimals sz-decimals
+                                                 :reference-price reference-price})
+         selected-option (price-agg/option-for-mode price-options selected-mode)
+         freshness-cue (when show-freshness-cue?
+                         (ws-freshness/surface-cue websocket-health
+                                                   {:topic "l2Book"
+                                                    :selector {:coin coin}
+                                                    :live-prefix "Updated"}))
+         depth-dimmed? (boolean (and freshness-cue (:delayed? freshness-cue)))]
+     [:div {:class ["bg-base-100" "border" "border-base-300" "rounded-none" "overflow-hidden" "h-full" "flex" "flex-col" "num" "orderbook-panel-aligned"]}
+      ;; Header
+      (orderbook-header selected-option
+                        price-options
+                        price-dropdown-visible?
+                        base-symbol
+                        quote-symbol
+                        size-unit
+                        size-unit-dropdown-visible?
+                        show-freshness-cue?
+                        freshness-cue)
 
-        reference-price (resolve-reference-price best-bid best-ask market)
-        market-type (infer-market-type coin market)
-        sz-decimals (:szDecimals market)
-        price-options (price-agg/build-options {:market-type market-type
-                                                :sz-decimals sz-decimals
-                                                :reference-price reference-price})
-        selected-option (price-agg/option-for-mode price-options selected-mode)
-
-        ;; Calculate max size for bar width in the selected unit
-        max-ask-cum-size (get-max-cumulative-total asks-with-totals size-unit)
-        max-bid-cum-size (get-max-cumulative-total bids-with-totals size-unit)
-        max-cum-size (max (or max-ask-cum-size 0) (or max-bid-cum-size 0))
-        freshness-cue (when show-freshness-cue?
-                        (ws-freshness/surface-cue websocket-health
-                                                  {:topic "l2Book"
-                                                   :selector {:coin coin}
-                                                   :live-prefix "Updated"}))
-        depth-dimmed? (boolean (and freshness-cue (:delayed? freshness-cue)))]
-    [:div {:class ["bg-base-100" "border" "border-base-300" "rounded-none" "overflow-hidden" "h-full" "flex" "flex-col" "num" "orderbook-panel-aligned"]}
-     ;; Header
-     (orderbook-header selected-option
-                       price-options
-                       price-dropdown-visible?
-                       base-symbol
-                       quote-symbol
-                       size-unit
-                       size-unit-dropdown-visible?
-                       show-freshness-cue?
-                       freshness-cue)
-
-     [:div {:class (cond-> ["flex" "flex-1" "min-h-0" "flex-col" "lg:hidden"]
-                     depth-dimmed? (conj "opacity-90"))
-            :data-role "orderbook-mobile-split-panel"}
-      (mobile-split-column-headers selected-size-symbol)
-      [:div {:class ["flex-1" "min-h-0" "overflow-hidden" "bg-base-100"]
-             :data-role "orderbook-mobile-split-body"}
-       (for [{:keys [bid ask] :as split-row} (mobile-split-level-pairs bids-with-totals asks-with-totals)]
-         ^{:key (str "mobile-split-row-" (:px bid "bid-empty") "-" (:px ask "ask-empty"))}
-         (mobile-split-order-row split-row max-cum-size size-unit))]]
-
-     [:div {:class ["hidden" "flex-1" "min-h-0" "flex-col" "lg:flex"]
-            :data-role "orderbook-desktop-panel"}
-      ;; Column headers
-      (column-headers selected-size-symbol)
-
-      ;; Order rows
-      [:div {:class (cond-> ["flex-1" "min-h-0" "flex" "flex-col"]
-                      depth-dimmed? (conj "opacity-90"))
-             :data-role "orderbook-depth-body"}
-       ;; Asks (sell orders) - top section, rendered worst->best (reversed for display)
-       [:div {:class ["flex-1" "min-h-0" "overflow-hidden" "flex" "flex-col" "gap-0.5" "justify-end"]
-              :data-role "orderbook-asks-pane"}
-        (for [ask (reverse asks-with-totals)]
-          ^{:key (str "ask-" (:px ask))}
-          (order-row ask max-cum-size true size-unit))]
-
-       ;; Spread - middle section
-       (when spread
-         (spread-row spread))
-
-       ;; Bids (buy orders) - bottom section, rendered best->worst
-       [:div {:class ["flex-1" "min-h-0" "overflow-hidden" "flex" "flex-col" "gap-0.5"]
-              :data-role "orderbook-bids-pane"}
-        (for [bid bids-with-totals]
-          ^{:key (str "bid-" (:px bid))}
-          (order-row bid max-cum-size false size-unit))]]]])))
+      (if desktop-layout?
+        [:div {:class ["hidden" "flex-1" "min-h-0" "flex-col" "lg:flex"]
+               :data-role "orderbook-desktop-panel"}
+         (column-headers selected-size-symbol)
+         [:div {:class (cond-> ["flex-1" "min-h-0" "flex" "flex-col"]
+                         depth-dimmed? (conj "opacity-90"))
+                :data-role "orderbook-depth-body"}
+          [:div {:class ["flex-1" "min-h-0" "overflow-hidden" "flex" "flex-col" "gap-0.5" "justify-end"]
+                 :data-role "orderbook-asks-pane"}
+           (for [ask desktop-asks]
+             ^{:key (:row-key ask)}
+             (order-row ask size-unit))]
+          (when spread
+            (spread-row spread))
+          [:div {:class ["flex-1" "min-h-0" "overflow-hidden" "flex" "flex-col" "gap-0.5"]
+                 :data-role "orderbook-bids-pane"}
+           (for [bid desktop-bids]
+             ^{:key (:row-key bid)}
+             (order-row bid size-unit))]]]
+        [:div {:class (cond-> ["flex" "flex-1" "min-h-0" "flex-col" "lg:hidden"]
+                        depth-dimmed? (conj "opacity-90"))
+               :data-role "orderbook-mobile-split-panel"}
+         (mobile-split-column-headers selected-size-symbol)
+         [:div {:class ["flex-1" "min-h-0" "overflow-hidden" "bg-base-100"]
+                :data-role "orderbook-mobile-split-body"}
+          (for [split-row mobile-pairs]
+            ^{:key (:row-key split-row)}
+            (mobile-split-order-row split-row size-unit))]])])))
 
 ;; Empty state
 (defn empty-orderbook []
@@ -627,6 +608,8 @@
                              :price-aggregation-by-coin {}
                              :active-tab :orderbook}
                             (:orderbook-ui state))
+        layout {:desktop-layout? (:desktop-layout? state)
+                :viewport-width (:viewport-width state)}
         loading? (:loading state)
         active-tab (normalize-orderbook-tab (or active-tab-override
                                                (:active-tab orderbook-ui)))
@@ -647,5 +630,6 @@
                                                           orderbook-data
                                                           orderbook-ui
                                                           websocket-health
-                                                          show-surface-freshness-cues?)
+                                                          show-surface-freshness-cues?
+                                                          layout)
            :else (empty-orderbook))))]]))
