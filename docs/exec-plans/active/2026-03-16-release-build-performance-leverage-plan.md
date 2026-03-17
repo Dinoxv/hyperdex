@@ -60,6 +60,8 @@ The work is intentionally ordered by leverage. The first wave removes large cold
 - [x] (2026-03-17 15:10Z) Closed `hyperopen-e0cr` as completed and opened `hyperopen-s95z` for Milestone 5 repeat-visit caching and back/forward cache work.
 - [x] (2026-03-17 15:39Z) Completed Milestone 5 scope discovery against the clean release artifacts and current serving/runtime surfaces: Lighthouse still reports `cache-insight` savings on local `main.js` and `main.css`, but `bf-cache` remains blocked by `WebSocket` as `Pending browser support`, and the repo currently serves stable asset URLs that make broad local JS/CSS service-worker caching unsafe without stronger versioning.
 - [x] (2026-03-17 15:39Z) Filed `hyperopen-8jtk` as discovered follow-up work for the broader in-repo asset-fingerprinting path; Milestone 5 stays active under `hyperopen-s95z`, but the next safe product change is deployment-owned cache policy or a deliberate fingerprinted-asset redesign rather than a narrow service-worker expansion.
+- [x] (2026-03-17 16:16Z) Implemented the first `hyperopen-8jtk` cut by teaching the browser build to emit a release manifest plus hashed JS module filenames and updating `/hyperopen/resources/public/index.html` to resolve the entry script from `/js/manifest.json` with explicit revalidation before falling back to `/js/main.js`.
+- [x] (2026-03-17 16:16Z) Validated the first fingerprinting cut with `npm run check`, `npm test`, `npm run test:websocket`, `npm run build`, and a clean desktop Lighthouse smoke at `http://localhost:8082/trade?market=HYPE&tab=positions`; the release trace in `/hyperopen/tmp/lighthouse-20260317-hyperopen-8jtk-smoke/run3.json` shows Perf `99`, FCP `256.864 ms`, LCP `953.296 ms`, TTI `1104.864 ms`, TBT `38 ms`, CLS `0.003964`, and requests for `/js/main.0FD3BCB763CB1BD0DA77FA2DFEE3ADE8.js` plus `/js/trade_chart.7CED2DBCC881884096D87A7AACB372E5.js`.
 - [x] Implement Milestone 0 (clean measurement harness and extension-free baseline capture).
 - [x] Implement Milestone 1 (remove non-essential cold-load font payloads).
 - [x] Implement Milestone 2 (split the monolithic app bundle and defer non-critical route code).
@@ -102,6 +104,12 @@ The work is intentionally ordered by leverage. The first wave removes large cold
 
 - Observation: Milestone 5's remaining `bf-cache` audit is currently blocked by browser WebSocket support, and the repo's stable local asset URLs make broad service-worker caching of JS/CSS/chunks unsafe without stronger versioning.
   Evidence: `/hyperopen/tmp/lighthouse-20260317-chart-shell-followup/run1.json` reports `Pages with WebSocket cannot enter back/forward cache` with failure type `Pending browser support`, while `/hyperopen/resources/public/index.html` still references stable `/css/main.css` and `/js/main.js` and the release build emits stable module URLs from `/hyperopen/shadow-cljs.edn` plus `/hyperopen/resources/public/js/module-loader.json`.
+
+- Observation: the first in-repo fingerprinting cut is enough to version the JS entrypoint and async browser modules without regressing cold-load paint or trade-route correctness, but CSS still remains on a stable URL.
+  Evidence: `/hyperopen/shadow-cljs.edn` now emits `/hyperopen/resources/public/js/manifest.json` plus hashed JS output names, `/hyperopen/resources/public/index.html` resolves the entry script from that manifest, and the clean smoke in `/hyperopen/tmp/lighthouse-20260317-hyperopen-8jtk-smoke/run3.json` requested hashed `main` and `trade_chart` URLs while still loading `/css/main.css` directly.
+
+- Observation: the repo's shipped "release build" path currently runs `shadow-cljs release app`, not the separate `:release` build config, so release-only browser asset behavior must remain encoded on the `:app` build until the build scripts are redesigned.
+  Evidence: `/hyperopen/package.json` defines `npm run build` as `npx shadow-cljs release app portfolio-worker vault-detail-worker`, and removing `:module-hash-names true` from the `:app` build immediately reverted `/hyperopen/resources/public/js/manifest.json` back to `main.js` on the next release build.
 
 - Observation: the route-level Milestone 2 split is real at build time; release output now contains dedicated chunks for every non-trade top-level screen.
   Evidence: `npm run build` now emits `resources/public/js/portfolio_route.js` (`413,024` bytes), `resources/public/js/funding_comparison_route.js` (`98,351` bytes), `resources/public/js/staking_route.js` (`211,052` bytes), `resources/public/js/api_wallets_route.js` (`90,718` bytes), and `resources/public/js/vaults_route.js` (`851,863` bytes), alongside `module-loader.edn` and `module-loader.json`.
@@ -234,17 +242,21 @@ The work is intentionally ordered by leverage. The first wave removes large cold
   Rationale: without fingerprinted/versioned local asset URLs, a service worker that serves cached `main.js` or async route chunks can create stale-bundle and mixed-generation failures after deploy; the current `bf-cache` finding is also not app-fixable in scope because Lighthouse marks the WebSocket blocker as pending browser support.
   Date/Author: 2026-03-17 / Codex
 
+- Decision: Land the Milestone 5 fingerprinting work in bounded waves, starting with JS entry/chunk versioning and manifest-driven bootstrapping before attempting CSS fingerprinting or broader local asset caching.
+  Rationale: the JS module path is already owned by Shadow's manifest and module-loader outputs, so it can be versioned with a small, reversible change to `/hyperopen/shadow-cljs.edn` plus `/hyperopen/resources/public/index.html`. CSS fingerprinting would require a larger release-HTML or asset-pipeline redesign and should stay explicit rather than being hidden inside this smaller patch.
+  Date/Author: 2026-03-17 / Codex
+
 ## Outcomes & Retrospective
 
 Milestones 1 through 4 are now implemented. The default route no longer cold-loads Splash or Inter, the browser build loads portfolio, funding comparison, staking, API-wallets, vault screens, and the trade chart from dedicated async modules, cold `/trade` startup now performs only the active-asset contexts plus the minimal selector `:bootstrap` metadata that balances/account surfaces require, and the render loop plus trade/chart surfaces now avoid several classes of unnecessary participation under live market traffic. That includes duplicate timestamp-only orderbook suppression, net-noop market-projection suppression, render-flush telemetry, hidden responsive subtree pruning, reduced-slice trade-view memoization, stable chart overlay identities, incremental legend/volume overlay reconciliation, incremental transformed candle reuse for tail updates, and now a deferred chart shell that preserves the resolved chart host geometry during async load.
 
 The verification result is now strong enough to move the plan forward. Repository gates all pass, the startup follow-up remains narrowed without reintroducing the balances metadata regression, and clean extension-free desktop Lighthouse reruns now meet the concrete release targets in this plan: Perf `94 / 95`, FCP `831 / 842 ms`, LCP `1.34 / 1.51 s`, TTI `1.34 / 1.51 s`, TBT `29 / 32 ms`, and CLS `0.004183 / 0.005112`. The dominant pre-fix chart-shell root shift is gone, so the active remaining work is Milestone 5 repeat-visit caching and `bf-cache` polish rather than further cold-load or chart-stability rewrites.
 
-The first Milestone 5 investigation clarified the safe boundary. The repo already owns a narrow icon-only service worker and can keep that behavior, but it does not yet own a safe stronger cache story for local JS/CSS/chunk assets because those URLs remain stable across builds. That means the next safe product move is either deployment-owned revalidation cache policy for the current assets or a deliberate in-repo asset-fingerprinting redesign, now tracked as `hyperopen-8jtk`, before any broader local asset caching is attempted.
+The first Milestone 5 investigation clarified the safe boundary, and the first in-repo follow-up has now landed its smallest safe slice. The repo already owns a narrow icon-only service worker and can keep that behavior. The release build now emits hashed JS module URLs and a manifest-driven entrypoint bootstrap, which removes the prior mixed-generation risk for `main` and async browser chunks. The remaining gap is explicit: `/css/main.css` still uses a stable URL, and deployment-owned cache headers are still outside this repo. That means Milestone 5 remains open even after this first `hyperopen-8jtk` cut; the next safe product move is either deployment-owned revalidation or a broader release HTML/CSS fingerprinting redesign before any attempt to cache local CSS or declare full immutable-asset coverage.
 
 ## Context and Orientation
 
-The release build currently starts from `/hyperopen/resources/public/index.html`, which loads `/css/main.css` and `/js/main.js`. The browser build is configured in `/hyperopen/shadow-cljs.edn`. Right now that build still emits one primary browser app module, `:main`, so route-level code is compiled into a single app payload.
+The release build currently starts from `/hyperopen/resources/public/index.html`, which still links `/css/main.css` directly but now resolves the browser entry script from `/hyperopen/resources/public/js/manifest.json` before falling back to `/js/main.js`. The browser build is configured in `/hyperopen/shadow-cljs.edn`, and the release/browser module outputs now use hashed JS filenames through Shadow's manifest plus module-loader metadata.
 
 The app shell lives in `/hyperopen/src/hyperopen/views/app_view.cljs`. That namespace requires the trade, portfolio, funding, staking, vault, and API-wallet surfaces directly, which means the landing route pays for those namespaces even when the user only needs the trade view. The trade surface itself lives in `/hyperopen/src/hyperopen/views/trade_view.cljs` and mounts the chart, orderbook, order entry, and account-info surfaces together on desktop.
 
@@ -318,7 +330,7 @@ The final milestone should address serving concerns that improve repeat visits a
 
 This milestone is now the active linked work via `hyperopen-s95z`.
 
-The current blocker split is explicit. `bf-cache` is presently blocked by browser WebSocket support rather than an app-local defect, and stronger source-owned repeat-visit caching for local JS/CSS/chunks should not be attempted until the release build emits fingerprinted/versioned asset URLs. Treat deployment cache policy and the discovered in-repo fingerprinting follow-up `hyperopen-8jtk` as the two safe paths forward.
+The current blocker split is explicit. `bf-cache` is presently blocked by browser WebSocket support rather than an app-local defect. The first in-repo fingerprinting wave is now complete for JS entry/chunk assets, but CSS and release-HTML cache ownership are still unfinished. Treat deployment cache policy and the still-open `hyperopen-8jtk` HTML/CSS fingerprinting remainder as the two safe paths forward from here.
 
 ### Deferred Follow-Up: Static App Shell and Non-JavaScript First Frame
 
@@ -383,9 +395,9 @@ From `/hyperopen`:
 
    Rebuild and re-run Lighthouse plus a focused performance trace. Confirm that style/layout and rendering shrink materially relative to the clean baseline, that the landing route reaches quiet main-thread time sooner, and that chart/overlay work no longer produces the remaining meaningful CLS on the trade route.
 
-6. Implement Milestone 5 and validate repeat-visit improvements.
+6. Implement Milestone 5 in bounded waves and validate repeat-visit improvements.
 
-   Adjust serving or deployment-layer configuration as needed for cache headers and back/forward cache compatibility, then confirm with repeat-visit traces and Lighthouse’s cache and `bf-cache` audits.
+   First, keep the JS fingerprinting/manifest path working in release and confirm the landing route requests hashed module URLs. Then either adjust serving or deployment-layer configuration for revalidation headers, or extend the in-repo fingerprinting path to CSS plus release HTML generation. Only after that should broader local asset caching be considered. Confirm the chosen path with repeat-visit traces and Lighthouse’s cache and `bf-cache` audits.
 
 ## Validation and Acceptance
 

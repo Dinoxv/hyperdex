@@ -12,6 +12,8 @@
  {:app {:target :browser
         :output-dir "resources/public/js"
         :asset-path "/js"
+        :module-hash-names true
+        :build-options {:manifest-name "manifest.json"}
         :module-loader true
         :modules {:main {:init-fn hyperopen.core/start!}
                   :trade_chart {:entries [hyperopen.views.trading-chart.module]
@@ -86,6 +88,8 @@
   :release {:target :browser
             :output-dir "resources/public/js"
             :asset-path "/js"
+            :module-hash-names true
+            :build-options {:manifest-name "manifest.json"}
             :module-loader true
             :modules {:main {:init-fn hyperopen.core/start!}
                       :trade_chart {:entries [hyperopen.views.trading-chart.module]

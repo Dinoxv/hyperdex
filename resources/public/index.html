@@ -19,6 +19,64 @@
     <div id="app" class="h-full">
       <!-- App content will be rendered here -->
     </div>
-    <script src="/js/main.js"></script>
+    <script>
+      (function () {
+        const manifestUrl = "/js/manifest.json";
+        const defaultMainScriptUrl = "/js/main.js";
+
+        function normalizeScriptUrl(outputName) {
+          if (typeof outputName !== "string" || outputName.length === 0) {
+            return null;
+          }
+
+          if (outputName.startsWith("/")) {
+            return outputName;
+          }
+
+          const normalized = outputName.replace(/^\.?\//, "");
+          return normalized.startsWith("js/") ? `/${normalized}` : `/js/${normalized}`;
+        }
+
+        function resolveMainScriptUrl(manifest) {
+          if (!Array.isArray(manifest)) {
+            return null;
+          }
+
+          for (const moduleInfo of manifest) {
+            if (!moduleInfo || typeof moduleInfo !== "object") {
+              continue;
+            }
+
+            const moduleId =
+              moduleInfo["module-id"] ??
+              moduleInfo.moduleId ??
+              moduleInfo.name;
+
+            if (moduleId === "main" || moduleId === ":main") {
+              return normalizeScriptUrl(
+                moduleInfo["output-name"] ?? moduleInfo.outputName
+              );
+            }
+          }
+
+          return null;
+        }
+
+        function loadMainScript(src) {
+          const script = document.createElement("script");
+          script.src = src;
+          document.body.appendChild(script);
+        }
+
+        fetch(manifestUrl, { cache: "no-cache" })
+          .then((response) => (response.ok ? response.json() : null))
+          .then((manifest) => {
+            loadMainScript(resolveMainScriptUrl(manifest) || defaultMainScriptUrl);
+          })
+          .catch(() => {
+            loadMainScript(defaultMainScriptUrl);
+          });
+      })();
+    </script>
   </body>
 </html>
