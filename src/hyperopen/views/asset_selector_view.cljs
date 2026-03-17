@@ -432,11 +432,13 @@
          (fmt/format-percentage safe-change-pct)
          "—")]]]))
 
-(defn- mobile-asset-list [assets selected-market-key highlighted-market-key favorites]
+(defn- mobile-asset-list [assets selected-market-key highlighted-market-key favorites suppress-empty-state?]
   (if (empty? assets)
-    [:div {:class ["flex-1" "px-4" "py-10" "text-center" "text-gray-400"]}
-     [:div "No assets found"]
-     [:div {:class ["mt-1" "text-xs"]} "Try adjusting your search"]]
+    (if suppress-empty-state?
+      [:div {:class ["flex-1" "px-4" "py-10"]}]
+      [:div {:class ["flex-1" "px-4" "py-10" "text-center" "text-gray-400"]}
+       [:div "No assets found"]
+       [:div {:class ["mt-1" "text-xs"]} "Try adjusting your search"]])
     [:div {:class ["flex-1" "overflow-y-auto" "scrollbar-hide"]}
      (for [asset assets]
        ^{:key (:key asset)}
@@ -451,6 +453,7 @@
            render-limit scroll-top]}]
   (let [processed-assets-list (processed-assets markets search-term sort-by sort-direction
                                                 favorites favorites-only? strict? active-tab)
+        suppress-empty-state? (and loading? (empty? markets))
         ordered-market-keys (mapv :key processed-assets-list)
         highlighted-market-key* (effective-highlighted-market-key
                                   processed-assets-list
@@ -484,7 +487,7 @@
       (search-controls search-term strict? favorites-only?)
       (tab-row active-tab)
       (sort-controls sort-by sort-direction)
-      (asset-list processed-assets-list selected-market-key highlighted-market-key* favorites missing-icons loaded-icons render-limit scroll-top)
+      (asset-list processed-assets-list selected-market-key highlighted-market-key* favorites missing-icons loaded-icons render-limit scroll-top suppress-empty-state?)
       (selector-shortcut-footer)]]))
 
 (defn- mobile-asset-selector-dropdown
@@ -492,6 +495,7 @@
            markets selected-market-key favorites highlighted-market-key]}]
   (let [processed-assets-list (processed-assets markets search-term sort-by sort-direction
                                                 favorites favorites-only? strict? active-tab)
+        suppress-empty-state? (and loading? (empty? markets))
         ordered-market-keys (mapv :key processed-assets-list)
         highlighted-market-key* (effective-highlighted-market-key
                                   processed-assets-list
@@ -536,43 +540,48 @@
       (search-controls search-term strict? favorites-only?)
       (mobile-tab-row active-tab)
       (mobile-sort-header sort-by sort-direction)
-      (mobile-asset-list processed-assets-list selected-market-key highlighted-market-key* favorites)]]))
+      (mobile-asset-list processed-assets-list selected-market-key highlighted-market-key* favorites suppress-empty-state?)]]))
 
-(defn asset-list [assets selected-market-key highlighted-market-key favorites missing-icons loaded-icons render-limit scroll-top]
-  (let [assets* (if (vector? assets) assets (vec assets))
-        total (count assets*)]
-    (if (zero? total)
-      [:div.max-h-64.overflow-y-auto.scrollbar-hide
-       [:div.text-center.py-8.text-gray-400
-        [:div "No assets found"]
-        [:div.text-xs "Try adjusting your search"]]]
-      (let [limit (query/normalize-render-limit render-limit total)
-            scroll-top* (query/normalize-scroll-top scroll-top)
-            {:keys [start-index end-index top-spacer-px bottom-spacer-px]}
-            (query/virtual-window limit scroll-top*)
-            visible-assets (subvec assets* start-index end-index)
-            rows (mapv (fn [asset]
-                         ^{:key (:key asset)}
-                         (asset-list-item asset
-                                          (= selected-market-key (:key asset))
-                                          (= highlighted-market-key (:key asset))
-                                          favorites
-                                          missing-icons
-                                          loaded-icons))
-                       visible-assets)]
-        [:div.max-h-64.overflow-y-auto.scrollbar-hide
-         {:style {:overflow-anchor "none"}
-          :on {:scroll [[:actions/maybe-increase-asset-selector-render-limit
-                         [:event.target/scrollTop]
-                         [:event/timeStamp]]]}}
-         (into
-           [:div {:style {:overflow-anchor "none"}}]
-           (concat
-             (when (pos? top-spacer-px)
-               [[:div {:style {:height (str top-spacer-px "px")}}]])
-             rows
-             (when (pos? bottom-spacer-px)
-               [[:div {:style {:height (str bottom-spacer-px "px")}}]])))]))))
+(defn asset-list
+  ([assets selected-market-key highlighted-market-key favorites missing-icons loaded-icons render-limit scroll-top]
+   (asset-list assets selected-market-key highlighted-market-key favorites missing-icons loaded-icons render-limit scroll-top false))
+  ([assets selected-market-key highlighted-market-key favorites missing-icons loaded-icons render-limit scroll-top suppress-empty-state?]
+   (let [assets* (if (vector? assets) assets (vec assets))
+         total (count assets*)]
+     (if (zero? total)
+       [:div.max-h-64.overflow-y-auto.scrollbar-hide
+        (if suppress-empty-state?
+          [:div.py-8]
+          [:div.text-center.py-8.text-gray-400
+           [:div "No assets found"]
+           [:div.text-xs "Try adjusting your search"]])]
+       (let [limit (query/normalize-render-limit render-limit total)
+             scroll-top* (query/normalize-scroll-top scroll-top)
+             {:keys [start-index end-index top-spacer-px bottom-spacer-px]}
+             (query/virtual-window limit scroll-top*)
+             visible-assets (subvec assets* start-index end-index)
+             rows (mapv (fn [asset]
+                          ^{:key (:key asset)}
+                          (asset-list-item asset
+                                           (= selected-market-key (:key asset))
+                                           (= highlighted-market-key (:key asset))
+                                           favorites
+                                           missing-icons
+                                           loaded-icons))
+                        visible-assets)]
+         [:div.max-h-64.overflow-y-auto.scrollbar-hide
+          {:style {:overflow-anchor "none"}
+           :on {:scroll [[:actions/maybe-increase-asset-selector-render-limit
+                          [:event.target/scrollTop]
+                          [:event/timeStamp]]]}}
+          (into
+            [:div {:style {:overflow-anchor "none"}}]
+            (concat
+              (when (pos? top-spacer-px)
+                [[:div {:style {:height (str top-spacer-px "px")}}]])
+              rows
+              (when (pos? bottom-spacer-px)
+                [[:div {:style {:height (str bottom-spacer-px "px")}}]])))])))))
 
 (defn matches-search? [asset search-term strict?]
   (query/matches-search? asset search-term strict?))

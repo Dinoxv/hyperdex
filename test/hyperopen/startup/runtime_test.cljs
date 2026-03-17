@@ -1021,7 +1021,7 @@
       (is (= 2 (count (filter #(= [:dispatch [[:actions/load-funding-comparison-route "/trade"]]] %) @mark-calls))))
       (is (= 2 (count (filter #(= [:dispatch [[:actions/load-staking-route "/trade"]]] %) @mark-calls))))
       (is (= 2 (count (filter #(= [:dispatch [[:actions/load-api-wallet-route "/trade"]]] %) @mark-calls))))
-      (is (zero? (count (filter #{:schedule-deferred} @mark-calls))))
+      (is (= 2 (count (filter #{:schedule-deferred} @mark-calls))))
       (let [critical-context-fetches (atom [])
             bootstrap-selector-fetches (atom [])
             deferred-selector-fetches (atom [])]

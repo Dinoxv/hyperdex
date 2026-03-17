@@ -59,8 +59,9 @@
       (app-core/initialize-remote-data-streams!)
       (is (= 1 @critical-fetches))
       (is (= [:bootstrap] @phases))
-      (is (nil? @deferred-callback))
-      (is (= [:bootstrap] @phases)))))
+      (is (fn? @deferred-callback))
+      (@deferred-callback)
+      (is (= [:bootstrap :full] @phases)))))
 
 (deftest ensure-runtime-bootstrapped-runs-bootstrap-once-test
   (let [calls (atom 0)]

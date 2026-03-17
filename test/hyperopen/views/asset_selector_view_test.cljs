@@ -362,6 +362,24 @@
     (is (contains? full-strings "Loading markets..."))
     (is (contains? bootstrap-strings "Loading markets (bootstrap)..."))))
 
+(deftest asset-selector-loading-state-suppresses-empty-state-until-markets-arrive-test
+  (let [desktop-view (view/asset-selector-dropdown (assoc (selector-props true)
+                                                          :markets []
+                                                          :loading? true
+                                                          :phase :full))
+        mobile-view (view/asset-selector-dropdown (assoc (selector-props false)
+                                                         :markets []
+                                                         :loading? true
+                                                         :phase :full))
+        desktop-strings (set (collect-strings desktop-view))
+        mobile-strings (set (collect-strings mobile-view))]
+    (is (contains? desktop-strings "Loading markets..."))
+    (is (contains? mobile-strings "Loading markets..."))
+    (is (not (contains? desktop-strings "No assets found")))
+    (is (not (contains? mobile-strings "No assets found")))
+    (is (not (contains? desktop-strings "Try adjusting your search")))
+    (is (not (contains? mobile-strings "Try adjusting your search")))))
+
 (deftest asset-selector-dropdown-renders-desktop-layout-only-when-desktop-test
   (let [dropdown (view/asset-selector-dropdown (selector-props true))
         desktop-dropdown (find-node-by-role dropdown "asset-selector-desktop-dropdown")

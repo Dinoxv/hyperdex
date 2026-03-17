@@ -432,7 +432,8 @@
            init-webdata2!
            dispatch!
            install-address-handlers!
-           start-critical-bootstrap!]}]
+           start-critical-bootstrap!
+           schedule-deferred-bootstrap!]}]
   (log-fn "Initializing remote data streams...")
   ;; Initialize websocket client.
   (init-connection! ws-url)
@@ -460,5 +461,8 @@
                              "/trade")]])
   (install-address-handlers!)
   ;; Keep startup scoped to the active trade route. Full selector-market expansion
-  ;; now waits for an explicit UI demand such as opening the asset selector.
-  (start-critical-bootstrap!))
+  ;; off the critical path, but restore the prefetch as deferred idle work so the
+  ;; selector is usually warm by the time the user opens it.
+  (start-critical-bootstrap!)
+  (when (fn? schedule-deferred-bootstrap!)
+    (schedule-deferred-bootstrap!)))
