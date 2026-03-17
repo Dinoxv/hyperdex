@@ -4,7 +4,7 @@ This ExecPlan is a living document. The sections `Progress`, `Surprises & Discov
 
 This document is maintained in accordance with `/hyperopen/.agents/PLANS.md`.
 
-Linked live work: `hyperopen-s95z` ("Implement repeat-visit caching and bfcache polish").
+Linked live work: `hyperopen-c2xn` ("Decide deployment cache policy for release-public assets").
 
 ## Purpose / Big Picture
 
@@ -66,13 +66,15 @@ The work is intentionally ordered by leverage. The first wave removes large cold
 - [x] (2026-03-17 18:35Z) Implemented `hyperopen-sr8q` by generating a release-only static artifact root at `/hyperopen/out/release-public`: the generated release `index.html` now points at fingerprinted parser-time CSS plus the hashed `main` script directly, and the release-assets tool copies only explicit release JS/module-loader/worker/static assets instead of cloning the full shared `resources/public` tree.
 - [x] (2026-03-17 18:35Z) Hardened the `hyperopen-sr8q` generator to fail closed when any required release asset is missing and to preserve module-loader-relative JS paths without relying on `path.basename`; the release-asset test suite now covers deterministic artifact assembly, real-entry rewriting, missing-asset failure, and nested/query-decorated module URIs.
 - [x] (2026-03-17 18:35Z) Validated the release-entry redesign with `npm run test:release-assets`, `npm run check`, `npm test`, `npm run test:websocket`, and `npm run build`, then compared Lighthouse samples across `out/release-public` (`http://localhost:8082`) and the shared `resources/public` root (`http://localhost:8083`). The March 17 A/B traces were degraded for both roots, so they are useful only to confirm that the release artifact now loads hashed CSS plus a direct hashed `main` script without the manifest fetch; they are not clean sign-off-quality before/after evidence for score deltas.
+- [x] (2026-03-17 18:06Z) Marked the remaining Milestone 5 work as deployment-blocked: filed `hyperopen-c2xn` for deployment cache-header policy on the generated `out/release-public` root and deferred any further in-repo cache-header work until a real hosting target exists.
 - [x] Implement Milestone 0 (clean measurement harness and extension-free baseline capture).
 - [x] Implement Milestone 1 (remove non-essential cold-load font payloads).
 - [x] Implement Milestone 2 (split the monolithic app bundle and defer non-critical route code).
 - [x] Implement Milestone 3 (reduce startup fetch and subscription work on initial trade load).
 - [x] Implement Milestone 3 follow-up (trim the remaining critical-path `/info` market-loader chain without regressing the selector metadata that balances and account surfaces require).
 - [x] Implement Milestone 4 (close out remaining trade-route render churn and chart/overlay layout instability, with CLS as the primary user-visible finish-line metric).
-- [ ] Implement Milestone 5 (repeat-visit caching and back/forward cache polish).
+- [x] Implement Milestone 5 repo-side work (safe repeat-visit artifact versioning and `bf-cache` boundary discovery).
+- [ ] Decide and implement deployment cache policy for the generated release artifact root once a deployment target exists.
 
 ## Surprises & Discoveries
 
@@ -263,7 +265,7 @@ Milestones 1 through 4 are now implemented. The default route no longer cold-loa
 
 The verification result is now strong enough to move the plan forward. Repository gates all pass, the startup follow-up remains narrowed without reintroducing the balances metadata regression, and clean extension-free desktop Lighthouse reruns now meet the concrete release targets in this plan: Perf `94 / 95`, FCP `831 / 842 ms`, LCP `1.34 / 1.51 s`, TTI `1.34 / 1.51 s`, TBT `29 / 32 ms`, and CLS `0.004183 / 0.005112`. The dominant pre-fix chart-shell root shift is gone, so the active remaining work is Milestone 5 repeat-visit caching and `bf-cache` polish rather than further cold-load or chart-stability rewrites.
 
-Milestone 5 is now split between completed in-repo artifact work and remaining deployment-owned serving policy. The repo still owns a narrow icon-only service worker and can keep that behavior. The release build now emits a generated `/hyperopen/out/release-public` root with fingerprinted parser-time CSS, hashed JS module URLs, a direct hashed `main` script in the generated release entry, and a fail-closed explicit asset-copy contract for module-loader metadata, async chunks, workers, fonts, and selected root assets. That completes the in-repo fingerprinting redesign needed to avoid mixed-generation JS/CSS failures on the shipped artifact path. The remaining gap is outside this repo: deployment-owned cache headers still need to decide how aggressively the generated release assets should revalidate or cache immutably, and `bf-cache` remains blocked by browser WebSocket support rather than an app-local defect. The March 17 A/B Lighthouse reruns against `http://localhost:8082` and `http://localhost:8083` were noisy and materially slower than the earlier clean desktop baseline for both roots, so they should be treated as environment checks rather than final score evidence.
+Milestone 5 is now split between completed in-repo artifact work and deferred deployment-owned serving policy. The repo still owns a narrow icon-only service worker and can keep that behavior. The release build now emits a generated `/hyperopen/out/release-public` root with fingerprinted parser-time CSS, hashed JS module URLs, a direct hashed `main` script in the generated release entry, and a fail-closed explicit asset-copy contract for module-loader metadata, async chunks, workers, fonts, and selected root assets. That completes the in-repo fingerprinting redesign needed to avoid mixed-generation JS/CSS failures on the shipped artifact path. The remaining gap is outside this repo: deployment-owned cache headers still need to decide how aggressively the generated release assets should revalidate or cache immutably, and `bf-cache` remains blocked by browser WebSocket support rather than an app-local defect. Because there is no deployment target yet, that remaining work is now explicitly deferred under `hyperopen-c2xn` rather than kept as active repo implementation scope. The March 17 A/B Lighthouse reruns against `http://localhost:8082` and `http://localhost:8083` were noisy and materially slower than the earlier clean desktop baseline for both roots, so they should be treated as environment checks rather than final score evidence.
 
 ## Context and Orientation
 
@@ -339,7 +341,7 @@ That closeout is now complete. Reshaping the deferred chart shell to preserve th
 
 The final milestone should address serving concerns that improve repeat visits after the cold-load bottlenecks are reduced. This includes cache lifetimes for the release assets served from `/hyperopen/resources/public`, immutable fingerprinting if asset naming needs to change, and the `bf-cache` failure reason reported by Lighthouse. These changes matter most after the app’s first-load script, startup, and render churn have been reduced. They should not pre-empt the earlier milestones because they will not fix the current `TTI` tail on their own.
 
-This milestone is now narrowed to deployment-owned serving policy via `hyperopen-s95z`; the in-repo asset-fingerprinting redesign has been implemented locally.
+This milestone is now narrowed to deployment-owned serving policy via `hyperopen-c2xn`; the in-repo asset-fingerprinting redesign has been implemented locally and the remaining serving work is deferred until a deployment target exists.
 
 The current blocker split is explicit. `bf-cache` is presently blocked by browser WebSocket support rather than an app-local defect. The in-repo fingerprinting path is now complete across release HTML, CSS, JS entry, and async browser modules through the generated `/hyperopen/out/release-public` root. Treat deployment cache policy for that generated artifact root as the remaining safe path forward from here.
 
