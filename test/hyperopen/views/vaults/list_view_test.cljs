@@ -19,12 +19,34 @@
 
     :else nil))
 
+(defn- find-nodes [node pred]
+  (cond
+    (vector? node)
+    (let [children (node-children node)
+          child-matches (mapcat #(find-nodes % pred) children)]
+      (cond-> child-matches
+        (pred node) (conj node)))
+
+    (seq? node)
+    (mapcat #(find-nodes % pred) node)
+
+    :else []))
+
 (defn- collect-strings [node]
   (cond
     (string? node) [node]
     (vector? node) (mapcat collect-strings (node-children node))
     (seq? node) (mapcat collect-strings node)
     :else []))
+
+(defn- with-viewport-width
+  [width f]
+  (let [original-inner-width (.-innerWidth js/globalThis)]
+    (set! (.-innerWidth js/globalThis) width)
+    (try
+      (f)
+      (finally
+        (set! (.-innerWidth js/globalThis) original-inner-width)))))
 
 (def sample-state
   {:wallet {:address "0xabcdefabcdefabcdefabcdefabcdefabcdefabcd"}
@@ -114,3 +136,29 @@
         text (set (collect-strings view))]
     (is (some? loading-row))
     (is (not (contains? text "Loading vaults...")))))
+
+(deftest vaults-view-desktop-layout-skips-mobile-card-subtree-test
+  (with-viewport-width
+    1280
+    (fn []
+      (let [view (vaults-view/vaults-view sample-state)
+            desktop-table (find-first-node view #(= "vaults-user-vaults-table"
+                                                    (get-in % [1 :data-role])))
+            desktop-rows (find-nodes view #(= "vault-row" (get-in % [1 :data-role])))
+            mobile-cards (find-nodes view #(= "vault-mobile-card" (get-in % [1 :data-role])))]
+        (is (some? desktop-table))
+        (is (= 2 (count desktop-rows)))
+        (is (= 0 (count mobile-cards)))))))
+
+(deftest vaults-view-mobile-layout-skips-desktop-table-subtree-test
+  (with-viewport-width
+    430
+    (fn []
+      (let [view (vaults-view/vaults-view sample-state)
+            desktop-table (find-first-node view #(= "vaults-user-vaults-table"
+                                                    (get-in % [1 :data-role])))
+            desktop-rows (find-nodes view #(= "vault-row" (get-in % [1 :data-role])))
+            mobile-cards (find-nodes view #(= "vault-mobile-card" (get-in % [1 :data-role])))]
+        (is (nil? desktop-table))
+        (is (= 0 (count desktop-rows)))
+        (is (= 2 (count mobile-cards)))))))

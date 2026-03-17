@@ -161,3 +161,16 @@
                           %)
                        (:rows view-model))]
     (is (= [20 30] (:snapshot-series beta-row)))))
+
+(deftest vault-list-vm-reuses-cache-for-unrelated-state-changes-test
+  (vm/reset-vault-list-vm-cache!)
+  (let [base-view-model (vm/vault-list-vm sample-state)
+        unrelated-state-model (vm/vault-list-vm (assoc sample-state
+                                                       :websocket {:health {:generated-at-ms 1234}}))
+        query-changed-model (vm/vault-list-vm (assoc-in sample-state [:vaults-ui :search-query] "beta"))
+        cloned-rows-model (vm/vault-list-vm (assoc-in sample-state
+                                                      [:vaults :merged-index-rows]
+                                                      (into [] (get-in sample-state [:vaults :merged-index-rows]))))]
+    (is (identical? base-view-model unrelated-state-model))
+    (is (not (identical? base-view-model query-changed-model)))
+    (is (not (identical? base-view-model cloned-rows-model)))))

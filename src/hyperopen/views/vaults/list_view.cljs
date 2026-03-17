@@ -4,6 +4,9 @@
             [hyperopen.wallet.core :as wallet]
             [hyperopen.views.vaults.vm :as vault-vm]))
 
+(def ^:private desktop-breakpoint-px
+  768)
+
 (defn- format-total-currency
   [value]
   (or (fmt/format-large-currency (if (number? value) value 0))
@@ -157,6 +160,15 @@
   [vault-address]
   (str "/vaults/" vault-address))
 
+(defn- viewport-width-px []
+  (let [width (some-> js/globalThis .-innerWidth)]
+    (if (number? width)
+      width
+      desktop-breakpoint-px)))
+
+(defn- desktop-vaults-layout? []
+  (>= (viewport-width-px) desktop-breakpoint-px))
+
 (defn- normalize-series [series]
   (let [values (if (sequential? series)
                  (->> series
@@ -167,37 +179,40 @@
       values
       [0 0])))
 
-(defn- sparkline-path
-  [series width height]
-  (let [points (normalize-series series)
-        min-value (apply min points)
-        max-value (apply max points)
-        value-span (max 0.000001 (- max-value min-value))
-        step-x (/ width (max 1 (dec (count points))))]
-    (->> points
-         (map-indexed (fn [idx value]
-                        (let [x (* idx step-x)
-                              normalized (/ (- value min-value) value-span)
-                              y (* (- 1 normalized) height)]
-                          (str (if (zero? idx) "M" "L")
-                               (.toFixed x 2)
-                               ","
-                               (.toFixed y 2)))))
-         (str/join " "))))
+(def ^:private memoized-sparkline-model
+  (memoize
+   (fn [series width height]
+     (let [values (normalize-series series)
+           start-value (first values)
+           end-value (last values)
+           positive? (>= end-value start-value)
+           stroke (if positive?
+                    "#36e1d3"
+                    "#ff6b8a")
+           min-value (apply min values)
+           max-value (apply max values)
+           value-span (max 0.000001 (- max-value min-value))
+           step-x (/ width (max 1 (dec (count values))))
+           path (->> values
+                     (map-indexed (fn [idx value]
+                                    (let [x (* idx step-x)
+                                          normalized (/ (- value min-value) value-span)
+                                          y (* (- 1 normalized) height)]
+                                      (str (if (zero? idx) "M" "L")
+                                           (.toFixed x 2)
+                                           ","
+                                           (.toFixed y 2)))))
+                     (str/join " "))]
+       {:path path
+        :stroke stroke}))))
 
 (defn- snapshot-sparkline [series]
-  (let [values (normalize-series series)
-        start-value (first values)
-        end-value (last values)
-        positive? (>= end-value start-value)
-        stroke (if positive?
-                 "#36e1d3"
-                 "#ff6b8a")]
+  (let [{:keys [path stroke]} (memoized-sparkline-model series 80 28)]
     [:svg {:class ["h-7" "w-20"]
            :viewBox "0 0 80 28"
            :preserveAspectRatio "none"
            :aria-label "Vault snapshot trend"}
-     [:path {:d (sparkline-path values 80 28)
+     [:path {:d path
              :fill "none"
              :stroke stroke
              :stroke-width 2
@@ -252,6 +267,7 @@
 (defn- mobile-vault-card
   [{:keys [name vault-address leader apr tvl your-deposit age-days snapshot-series]}]
   [:a {:href (vault-detail-route vault-address)
+       :data-role "vault-mobile-card"
        :class ["block"
                "w-full"
                "rounded-lg"
@@ -294,6 +310,9 @@
 
 (def ^:private loading-skeleton-row-count
   5)
+
+(def ^:private max-stable-loading-row-count
+  10)
 
 (defn- skeleton-block
   [extra-classes]
@@ -473,70 +492,81 @@
                   :on {:click [[:actions/next-vaults-user-page page-count]]}}
          "Next"]]])))
 
-(defn- section-table [label rows sort-state {:keys [loading? pagination]}]
-  [:section {:class ["space-y-2"]}
-   [:h3 {:class ["text-sm" "font-normal" "text-trading-text"]} label]
-   [:div {:class ["hidden" "md:block" "overflow-x-auto"]}
-    [:table {:class ["w-full" "border-collapse"]
-             :data-role (str "vaults-" (str/lower-case (str/replace label #"\\s+" "-")) "-table")}
-     [:colgroup
-      [:col {:style {:width "24%"}}]
-      [:col {:style {:width "16%"}}]
-      [:col {:style {:width "12%"}}]
-      [:col {:style {:width "12%"}}]
-      [:col {:style {:width "12%"}}]
-      [:col {:style {:width "12%"}}]
-      [:col {:style {:width "12%"}}]]
-     [:thead
-      [:tr {:class ["border-b" "border-base-300/70"]}
-       [:th {:class ["px-3" "py-2" "text-left"]} (sort-header "Vault" :vault sort-state)]
-       [:th {:class ["px-3" "py-2" "text-left"]} (sort-header "Leader" :leader sort-state)]
-       [:th {:class ["px-3" "py-2" "text-left"]} (sort-header "APR" :apr sort-state)]
-       [:th {:class ["px-3" "py-2" "text-left"]} (sort-header "TVL" :tvl sort-state)]
-       [:th {:class ["px-3" "py-2" "text-left"]} (sort-header "Your Deposit" :your-deposit sort-state)]
-       [:th {:class ["px-3" "py-2" "text-left"]} (sort-header "Age" :age sort-state)]
-       [:th {:class ["px-3" "py-2" "text-right"]} (sort-header "Snapshot" :snapshot sort-state)]]]
-     [:tbody
-      (cond
-        loading?
-        (for [idx (range loading-skeleton-row-count)]
-          ^{:key (str "vault-loading-row-" label "-" idx)}
-          (desktop-loading-row idx))
+(defn- section-loading-row-count
+  [pagination]
+  (let [page-size (:page-size pagination)]
+    (if (and (number? page-size)
+             (pos? page-size))
+      (min max-stable-loading-row-count
+           page-size)
+      loading-skeleton-row-count)))
 
-        (seq rows)
-        (for [row rows]
-          ^{:key (str "vault-row-" (:vault-address row))}
-          (vault-row row))
+(defn- section-table [label rows sort-state {:keys [loading? pagination desktop-layout?]}]
+  (let [loading-row-count (section-loading-row-count pagination)]
+    [:section {:class ["space-y-2"]}
+     [:h3 {:class ["text-sm" "font-normal" "text-trading-text"]} label]
+     (if desktop-layout?
+       [:div {:class ["overflow-x-auto"]}
+        [:table {:class ["w-full" "border-collapse"]
+                 :data-role (str "vaults-" (str/lower-case (str/replace label #"\s+" "-")) "-table")}
+         [:colgroup
+          [:col {:style {:width "24%"}}]
+          [:col {:style {:width "16%"}}]
+          [:col {:style {:width "12%"}}]
+          [:col {:style {:width "12%"}}]
+          [:col {:style {:width "12%"}}]
+          [:col {:style {:width "12%"}}]
+          [:col {:style {:width "12%"}}]]
+         [:thead
+          [:tr {:class ["border-b" "border-base-300/70"]}
+           [:th {:class ["px-3" "py-2" "text-left"]} (sort-header "Vault" :vault sort-state)]
+           [:th {:class ["px-3" "py-2" "text-left"]} (sort-header "Leader" :leader sort-state)]
+           [:th {:class ["px-3" "py-2" "text-left"]} (sort-header "APR" :apr sort-state)]
+           [:th {:class ["px-3" "py-2" "text-left"]} (sort-header "TVL" :tvl sort-state)]
+           [:th {:class ["px-3" "py-2" "text-left"]} (sort-header "Your Deposit" :your-deposit sort-state)]
+           [:th {:class ["px-3" "py-2" "text-left"]} (sort-header "Age" :age sort-state)]
+           [:th {:class ["px-3" "py-2" "text-right"]} (sort-header "Snapshot" :snapshot sort-state)]]]
+         [:tbody
+          (cond
+            loading?
+            (for [idx (range loading-row-count)]
+              ^{:key (str "vault-loading-row-" label "-" idx)}
+              (desktop-loading-row idx))
 
-        :else
-        [:tr
-         [:td {:col-span 7
-               :class ["px-3" "py-6" "text-center" "text-sm" "text-trading-text-secondary"]}
-          "No vaults match current filters."]])]]]
-   [:div {:class ["space-y-2" "md:hidden"]}
-    (cond
-      loading?
-      (for [idx (range loading-skeleton-row-count)]
-        ^{:key (str "mobile-vault-loading-row-" label "-" idx)}
-        (mobile-loading-card idx))
+            (seq rows)
+            (for [row rows]
+              ^{:key (str "vault-row-" (:vault-address row))}
+              (vault-row row))
 
-      (seq rows)
-      (for [row rows]
-        ^{:key (str "mobile-vault-row-" (:vault-address row))}
-        (mobile-vault-card row))
+            :else
+            [:tr
+             [:td {:col-span 7
+                   :class ["px-3" "py-6" "text-center" "text-sm" "text-trading-text-secondary"]}
+              "No vaults match current filters."]])]]]
+       [:div {:class ["space-y-2"]}
+        (cond
+          loading?
+          (for [idx (range loading-row-count)]
+            ^{:key (str "mobile-vault-loading-row-" label "-" idx)}
+            (mobile-loading-card idx))
 
-      :else
-      [:div {:class ["rounded-lg"
-                     "border"
-                     "border-base-300"
-                     "bg-base-200/60"
-                     "px-3"
-                     "py-4"
-                     "text-center"
-                     "text-sm"
-                     "text-trading-text-secondary"]}
-       "No vaults match current filters."])]
-   (user-vault-pagination-controls pagination)])
+          (seq rows)
+          (for [row rows]
+            ^{:key (str "mobile-vault-row-" (:vault-address row))}
+            (mobile-vault-card row))
+
+          :else
+          [:div {:class ["rounded-lg"
+                         "border"
+                         "border-base-300"
+                         "bg-base-200/60"
+                         "px-3"
+                         "py-4"
+                         "text-center"
+                         "text-sm"
+                         "text-trading-text-secondary"]}
+           "No vaults match current filters."])])
+     (user-vault-pagination-controls pagination)]))
 
 (defn vaults-view
   [state]
@@ -551,6 +581,7 @@
                 visible-user-rows
                 user-pagination
                 total-visible-tvl]} (vault-vm/vault-list-vm state)
+        desktop-layout? (desktop-vaults-layout?)
         wallet-connected? (boolean (get-in state [:wallet :connected?]))
         wallet-connecting? (boolean (get-in state [:wallet :connecting?]))]
     [:div {:class ["relative" "w-full" "app-shell-gutter" "py-4" "md:py-6"]
@@ -628,10 +659,21 @@
         [:div {:class ["rounded-xl" "border" "border-red-500/40" "bg-red-900/20" "px-3" "py-2.5" "text-sm" "text-red-200"]}
          error])
 
-      [:section {:class ["rounded-xl" "border" "border-base-300/80" "bg-base-100/95" "p-2.5" "space-y-6" "md:rounded-2xl" "md:p-3"]}
-       (section-table "Protocol Vaults" protocol-rows sort {:loading? loading?})
+      [:section {:class (into ["rounded-xl"
+                               "border"
+                               "border-base-300/80"
+                               "bg-base-100/95"
+                               "p-2.5"
+                               "space-y-6"
+                               "md:rounded-2xl"
+                               "md:p-3"]
+                              (when loading?
+                                ["min-h-[24rem]" "md:min-h-[36rem]"]))}
+       (section-table "Protocol Vaults" protocol-rows sort {:loading? loading?
+                                                            :desktop-layout? desktop-layout?})
        (section-table "User Vaults" visible-user-rows sort {:loading? loading?
-                                                            :pagination user-pagination})
+                                                            :pagination user-pagination
+                                                            :desktop-layout? desktop-layout?})
        [:div {:class ["text-right" "text-xs" "text-trading-text-secondary"]}
         (str (count protocol-rows) " protocol vaults | " (count user-rows) " user vaults")]]]]))
 
