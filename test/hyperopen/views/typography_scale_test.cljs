@@ -72,8 +72,11 @@
     (testing "hide small balances label uses text-sm"
       (is (re-find #"\[:label\.text-sm\.text-trading-text(?:\.[A-Za-z0-9_-]+)*\s+\{:for \"hide-small-balances\"\}\s+\"Hide Small Balances\"\]"
                    account-info-source)))
+    (testing "balance desktop grid declares the dedicated parity template"
+      (is (re-find #"\(def \^:private balances-desktop-grid-template-class\s+\"grid-cols-\["
+                   balances-tab-source)))
     (testing "balance row wrapper includes text-sm for 12px baseline"
-      (is (re-find #"\[:div\.grid\.grid-cols-8\.gap-2\.py-px\.px-3\.hover:bg-base-300\.items-center\.text-sm(?:\.[A-Za-z0-9_-]+)*"
+      (is (re-find #"\[:div\s+\{:class\s+\[\"grid\"\s+balances-desktop-grid-template-class[\s\S]*?\"text-sm\""
                    balances-tab-source)))))
 
 (deftest header-nav-link-css-uses-14px-and-600-weight-test

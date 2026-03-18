@@ -96,13 +96,16 @@
    (let [base (get labels tab (name tab))
          count (get counts tab)]
      (cond
-       (and (= tab :positions) (number? count) (pos? count))
+       (and (contains? #{:positions :open-orders :twap} tab)
+            (number? count)
+            (pos? count))
        (str base " (" count ")")
 
-       (and (= tab :positions) (number? count))
+       (and (contains? #{:positions :open-orders :twap} tab)
+            (number? count))
        base
 
-       (number? count)
+       (and (= tab :balances) (number? count))
        (str base " (" count ")")
 
        :else base))))
@@ -319,6 +322,31 @@
 (defn- open-orders-direction-filter-key [open-orders-state]
   (open-orders-tab/open-orders-direction-filter-key open-orders-state))
 
+(defn- balances-header-actions [hide-small? coin-search]
+  [:div {:class ["ml-auto" "relative" "flex" "items-center" "justify-end" "gap-3" "px-4" "py-2"]}
+   (account-info-coin-search-control :balances coin-search)
+   [:div {:class ["flex" "items-center" "space-x-2"]}
+    [:input
+     {:type "checkbox"
+      :id "hide-small-balances"
+      :class ["h-4"
+              "w-4"
+              "rounded-[3px]"
+              "border"
+              "border-base-300"
+              "bg-transparent"
+              "trade-toggle-checkbox"
+              "transition-colors"
+              "focus:outline-none"
+              "focus:ring-0"
+              "focus:ring-offset-0"
+              "focus:shadow-none"]
+      :checked (boolean hide-small?)
+      :on {:change [[:actions/set-hide-small-balances :event.target/checked]]}}]
+    [:label.text-sm.text-trading-text.cursor-pointer.select-none
+     {:for "hide-small-balances"}
+     "Hide Small Balances"]]])
+
 (defn- open-orders-header-actions [open-orders-state freshness-cue]
   (let [filter-open? (boolean (:filter-open? open-orders-state))
         direction-filter (open-orders-direction-filter-key open-orders-state)
@@ -430,29 +458,7 @@
            (tab-label tab counts tab-labels*)])]]
       (case selected-tab
         :balances
-        [:div {:class ["flex" "items-center" "gap-3" "px-4" "py-2"]}
-         [:div {:class ["flex" "items-center" "space-x-2"]}
-          [:input
-           {:type "checkbox"
-            :id "hide-small-balances"
-            :class ["h-4"
-                    "w-4"
-                    "rounded-[3px]"
-                    "border"
-                    "border-base-300"
-                    "bg-transparent"
-                    "trade-toggle-checkbox"
-                    "transition-colors"
-                    "focus:outline-none"
-                    "focus:ring-0"
-                    "focus:ring-offset-0"
-                    "focus:shadow-none"]
-            :checked (boolean hide-small?)
-            :on {:change [[:actions/set-hide-small-balances :event.target/checked]]}}]
-          [:label.text-sm.text-trading-text.cursor-pointer.select-none
-           {:for "hide-small-balances"}
-           "Hide Small Balances"]]
-         (account-info-coin-search-control :balances balances-coin-search)]
+        (balances-header-actions hide-small? balances-coin-search)
 
         :funding-history
         (funding-history-header-actions)
@@ -736,8 +742,21 @@
                            candidate
                            fallback-selected-tab))
          extra-renderers (extra-tab-renderers extra-tabs)
-         selected-extra-renderer (get extra-renderers selected-tab*)]
-     [:div {:class ["bg-base-100" "border-t" "border-base-300" "rounded-none" "spectate-none" "overflow-hidden" "w-full" "h-96" "flex" "flex-col" "min-h-0"]
+         selected-extra-renderer (get extra-renderers selected-tab*)
+         panel-height-classes (if (= selected-tab* :balances)
+                                ["h-96" "lg:h-[29rem]"]
+                                ["h-96"])]
+     [:div {:class (into ["bg-base-100"
+                          "border-t"
+                          "border-base-300"
+                          "rounded-none"
+                          "spectate-none"
+                          "overflow-hidden"
+                          "w-full"
+                          "flex"
+                          "flex-col"
+                          "min-h-0"]
+                         panel-height-classes)
             :data-parity-id "account-tables"}
       (tab-navigation selected-tab*
                       tab-counts

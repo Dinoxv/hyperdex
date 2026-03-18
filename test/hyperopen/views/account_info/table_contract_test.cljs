@@ -85,7 +85,9 @@
       (do
         (is (contains? row-classes "py-px"))
         (is (contains? row-classes "px-3"))))
-    (is (contains? row-classes "gap-2"))))
+    (if (= tab-key :balances)
+      (is (contains? row-classes "gap-x-3"))
+      (is (contains? row-classes "gap-2")))))
 
 (deftest account-info-table-headers-use-compact-density-classes-test
   (doseq [[tab-key content] (keyed-tab-contents)
@@ -96,7 +98,9 @@
         (is (contains? header-classes "pr-3"))
         (is (not (contains? header-classes "px-3"))))
       (is (contains? header-classes "px-3")))
-    (is (contains? header-classes "gap-2"))))
+    (if (= tab-key :balances)
+      (is (contains? header-classes "gap-x-3"))
+      (is (contains? header-classes "gap-2")))))
 
 (deftest account-info-numeric-cells-use-num-utility-test
   (let [balance-node (view/balance-row fixtures/sample-balance-row)

@@ -5,7 +5,7 @@
             [hyperopen.views.account-info.test-support.hiccup :as hiccup]
             [hyperopen.views.account-info-view :as view]))
 
-(deftest tab-navigation-renders-hide-small-toggle-only-on-balances-tab-test
+(deftest tab-navigation-renders-balances-search-and-hide-small-toggle-on-balances-tab-test
   (let [counts {:balances 1 :positions 1}
         balances-nav (view/tab-navigation :balances counts true {} {} {} {} {} nil "hype")
         positions-nav (view/tab-navigation :positions counts true {})
@@ -192,6 +192,15 @@
         positions-tab-count-node (hiccup/find-first-node nav #(contains? (hiccup/direct-texts %) "Positions (0)"))]
     (is (some? positions-tab-base-node))
     (is (nil? positions-tab-count-node))))
+
+(deftest tab-label-suppresses-zero-counts-for-open-orders-and-twap-test
+  (let [counts {:balances 2 :open-orders 0 :twap 0}]
+    (is (= "Open Orders" (view/tab-label :open-orders counts)))
+    (is (= "TWAP" (view/tab-label :twap counts)))
+    (is (= "Open Orders (2)"
+           (view/tab-label :open-orders (assoc counts :open-orders 2))))
+    (is (= "TWAP (1)"
+           (view/tab-label :twap (assoc counts :twap 1))))))
 
 (deftest tab-navigation-uses-hyperliquid-style-tab-indicator-and-text-states-test
   (let [nav (view/tab-navigation :funding-history {} false {})

@@ -23,7 +23,7 @@
   (let [header-node (view/balance-table-header fixtures/default-sort-state)
         header-cells (vec (hiccup/node-children header-node))
         header-labels (mapv #(first (hiccup/collect-strings %)) header-cells)]
-    (is (= 8 (count header-cells)))
+    (is (= 9 (count header-cells)))
     (is (= ["Coin"
             "Total Balance"
             "Available Balance"
@@ -31,6 +31,7 @@
             "PNL (ROE %)"
             "Send"
             "Transfer"
+            "Repay"
             "Contract"]
            header-labels))))
 
@@ -444,8 +445,8 @@
     (is (not (contains? rows-viewport-classes "pt-12")))))
 
 (deftest balance-row-primary-value-and-action-contrast-test
-  (let [row-node (view/balance-row fixtures/sample-balance-row)
-        coin-node (hiccup/find-first-node row-node #(contains? (hiccup/direct-texts %) "USDC (Spot)"))
+  (let [row-node (view/balance-row (assoc fixtures/sample-balance-row :selection-coin "USDC"))
+        coin-node (first (vec (hiccup/node-children row-node)))
         send-button-node (hiccup/find-first-node row-node #(contains? (hiccup/direct-texts %) "Send"))
         transfer-button-node (hiccup/find-first-node row-node #(contains? (hiccup/direct-texts %) "Transfer"))]
     (is (contains? (hiccup/node-class-set row-node) "text-trading-text"))
@@ -483,7 +484,7 @@
                                     :amount-decimals 8
                                     :transfer-disabled? true})
         tooltip-trigger-node (hiccup/find-first-node row-node #(and (contains? (hiccup/node-class-set %) "decoration-dashed")
-                                                              (contains? (hiccup/direct-texts %) "201.38936500")))
+                                                              (contains? (hiccup/direct-texts %) "201.38936500 USDC")))
         tooltip-panel-node (hiccup/find-first-node row-node #(and (= :div (first %))
                                                            (contains? (hiccup/node-class-set %) "group-hover:opacity-100")))
         tooltip-panel-classes (hiccup/node-class-set tooltip-panel-node)
@@ -505,6 +506,23 @@
     (is (some? tooltip-bubble-node))
     (is (contains? tooltip-bubble-classes "text-left"))
     (is (str/includes? tooltip-text "201.38936500 USDC is available to withdraw or transfer."))))
+
+(deftest balance-row-renders-balance-units-and-placeholder-repay-column-test
+  (let [row-node (view/balance-row (assoc fixtures/sample-balance-row :selection-coin "USDC"))
+        row-cells (vec (hiccup/node-children row-node))
+        total-cell (nth row-cells 1)
+        available-cell (nth row-cells 2)
+        repay-cell (nth row-cells 7)]
+    (is (= 9 (count row-cells)))
+    (is (= "150.12 USDC"
+           (->> (hiccup/collect-strings total-cell)
+                (remove str/blank?)
+                (str/join " "))))
+    (is (= "120.45 USDC"
+           (->> (hiccup/collect-strings available-cell)
+                (remove str/blank?)
+                (str/join " "))))
+    (is (empty? (remove str/blank? (hiccup/collect-strings repay-cell))))))
 
 (deftest balances-tab-content-first-row-tooltip-falls-back-below-test
   (let [rows [{:key "unified-usdc"

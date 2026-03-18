@@ -11,6 +11,9 @@
 (def ^:private balance-contract-explorer-token-base-url
   "https://app.hyperliquid.xyz/explorer/token/")
 
+(def ^:private balances-desktop-grid-template-class
+  "grid-cols-[minmax(88px,0.84fr)_minmax(96px,0.8fr)_minmax(140px,1.16fr)_minmax(92px,0.76fr)_minmax(180px,1.58fr)_minmax(56px,0.5fr)_minmax(104px,0.88fr)_minmax(40px,0.22fr)_minmax(112px,0.9fr)]")
+
 (defn- empty-state [message]
   [:div.flex.flex-col.items-center.justify-center.py-12.text-base-content
    [:div.text-lg.font-medium message]
@@ -23,11 +26,15 @@
        unified-available-balance-tooltip-suffix))
 
 (defn- available-balance-value-node [{:keys [coin
+                                             unit-label
                                              available-balance
                                              amount-decimals
                                              transfer-disabled?
                                              tooltip-position]}]
-  (let [value-text (shared/format-balance-amount available-balance amount-decimals)]
+  (let [display-unit-label (or unit-label coin "USDC")
+        value-text (str (shared/format-balance-amount available-balance amount-decimals)
+                        " "
+                        display-unit-label)]
     (if transfer-disabled?
       (let [position (or tooltip-position :top)
             panel-position-classes (case position
@@ -74,7 +81,7 @@
                        "text-gray-100"
                        "spectate-lg"
                        "whitespace-normal"]}
-         (unified-available-balance-tooltip-text coin available-balance amount-decimals)
+         (unified-available-balance-tooltip-text display-unit-label available-balance amount-decimals)
          [:div {:class (into ["absolute"
                               "left-1/2"
                               "-translate-x-1/2"
@@ -155,6 +162,7 @@
                       "items-center"
                       "justify-end"
                       "gap-1"
+                      "whitespace-nowrap"
                       tone-class]}
        [:span {:class ["num"]} pnl-text]
        (when explorer-url
@@ -162,6 +170,26 @@
                                (str "Open " asset-label " in Hyperliquid Explorer")
                                [tone-class]))])
     [:span {:class ["text-trading-text"]} "--"]))
+
+(defn- balance-coin-display [{:keys [coin selection-coin]}]
+  (let [{:keys [base-label prefix-label]}
+        (shared/resolve-coin-display (or selection-coin coin) {})]
+    {:base-label (or base-label coin "Asset")
+     :prefix-label prefix-label}))
+
+(defn- balance-coin-node [{:keys [base-label prefix-label]}]
+  [:span {:class ["flex" "min-w-0" "items-center" "gap-1"]}
+   [:span {:class ["truncate"]} base-label]
+   (when prefix-label
+     [:span {:class shared/position-chip-classes}
+      prefix-label])])
+
+(defn- balance-amount-cell [amount amount-decimals unit-label]
+  [:div {:class ["text-right" "font-semibold" "num" "num-right" "whitespace-nowrap"]}
+   [:span {:class ["num" "num-right"]}
+    (shared/format-balance-amount amount amount-decimals)]
+   " "
+   [:span unit-label]])
 
 (defn build-balance-rows [webdata2 spot-data]
   (projections/build-balance-rows webdata2 spot-data nil))
@@ -317,6 +345,8 @@
   (let [coin-style (when-not (usdc-balance-row? {:coin coin})
                      {:color "rgb(151, 252, 228)"})
         selectable-coin (or selection-coin coin)
+        {:keys [base-label prefix-label] :as coin-display} (balance-coin-display {:coin coin
+                                                                                   :selection-coin selection-coin})
         send-enabled?* (send-enabled? {:key key
                                        :selection-coin selection-coin
                                        :coin coin
@@ -328,30 +358,41 @@
                                              :available-balance available-balance
                                              :amount-decimals amount-decimals})
                        :event.currentTarget/bounds])]
-    [:div.grid.grid-cols-8.gap-2.py-px.px-3.hover:bg-base-300.items-center.text-sm.text-trading-text
+    [:div {:class ["grid"
+                   balances-desktop-grid-template-class
+                   "gap-x-3"
+                   "items-center"
+                   "px-3"
+                   "py-px"
+                   "text-sm"
+                   "leading-4"
+                   "text-trading-text"
+                   "hover:bg-base-300"]}
      (shared/coin-select-control selectable-coin
-                                 (or coin "")
+                                 (balance-coin-node {:base-label base-label
+                                                     :prefix-label prefix-label})
                                  {:style coin-style
                                   :extra-classes ["w-full"
                                                   "justify-start"
                                                   "text-left"
                                                   "font-semibold"
                                                   "truncate"]})
-     [:div.text-right.font-semibold.num.num-right (shared/format-balance-amount total-balance amount-decimals)]
-     [:div.text-right.font-semibold.num.num-right
+     (balance-amount-cell total-balance amount-decimals base-label)
+     [:div.text-right.font-semibold.num.num-right.whitespace-nowrap
       (available-balance-value-node {:coin coin
+                                     :unit-label base-label
                                      :available-balance available-balance
                                      :amount-decimals amount-decimals
                                      :transfer-disabled? transfer-disabled?
                                      :tooltip-position available-balance-tooltip-position})]
      [:div.text-right.font-semibold.num.num-right "$" (shared/format-currency usdc-value)]
-     [:div.text-right.font-medium.num.num-right
+     [:div.text-right.font-medium.num.num-right.pr-4
       (balance-pnl-node {:coin coin
                          :selection-coin selection-coin
                          :pnl-value pnl-value
                          :pnl-pct pnl-pct
                          :contract-id contract-id})]
-     [:div.text-left
+     [:div.pl-2.text-left
       (if send-enabled?*
         (balance-row-action-button "Send" send-action)
         (balance-row-disabled-action "Send"))]
@@ -359,6 +400,7 @@
       (if transfer-disabled?
         [:span {:class ["text-xs" "text-trading-text-secondary"]} "Unified"]
         (balance-row-action-button "Transfer"))]
+     [:div.text-left]
      [:div.text-left
       (balance-contract-node contract-id)]]))
 
@@ -367,8 +409,8 @@
    (balance-table-header sort-state []))
   ([sort-state extra-classes]
    [:div {:class (into ["grid"
-                        "grid-cols-8"
-                        "gap-2"
+                        balances-desktop-grid-template-class
+                        "gap-x-3"
                         "py-1"
                         "px-3"
                         "bg-base-200"
@@ -380,9 +422,10 @@
     [:div (sortable-balances-header "Total Balance" sort-state :right)]
     [:div (sortable-balances-header "Available Balance" sort-state :right)]
     [:div (sortable-balances-header "USDC Value" sort-state :right)]
-    [:div (sortable-balances-header "PNL (ROE %)" sort-state :right)]
-    [:div (table/non-sortable-header "Send" :left)]
+    [:div.pr-4 (sortable-balances-header "PNL (ROE %)" sort-state :right)]
+    [:div.pl-2 (table/non-sortable-header "Send" :left)]
     [:div (table/non-sortable-header "Transfer" :left)]
+    [:div (table/non-sortable-header "Repay" :left)]
     [:div (table/non-sortable-header "Contract" :left)]]))
 
 (defn- mobile-balance-coin-node [{:keys [coin selection-coin]}]
@@ -483,8 +526,9 @@
                        (mobile-cards/detail-grid
                         "grid-cols-2"
                         [(mobile-cards/detail-item
-                          "Available Balance"
-                          (available-balance-value-node {:coin coin
+                         "Available Balance"
+                         (available-balance-value-node {:coin coin
+                                                         :unit-label base-label
                                                          :available-balance available-balance
                                                          :amount-decimals amount-decimals
                                                          :transfer-disabled? transfer-disabled?

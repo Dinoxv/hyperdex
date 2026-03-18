@@ -96,7 +96,7 @@
 
 (defn- balance-row-coin [row-node]
   (let [coin-cell (first (vec (node-children row-node)))]
-    (first (direct-texts coin-cell))))
+    (first (remove str/blank? (collect-strings coin-cell)))))
 
 (defn balance-tab-coins [tab-content]
   (->> (node-children (tab-rows-viewport-node tab-content))
@@ -104,4 +104,4 @@
        vec))
 
 (defn balance-row-contract-cell [row-node]
-  (nth (vec (node-children row-node)) 7))
+  (nth (vec (node-children row-node)) 8))
