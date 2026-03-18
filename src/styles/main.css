@@ -121,13 +121,13 @@
     opacity: 0;
     visibility: hidden;
     pointer-events: none;
-    transform: translate3d(0, -6px, 0);
+    transform: translate3d(0, -8px, 0) scale(0.985);
     transform-origin: var(--ui-dropdown-origin, top right);
     will-change: opacity, transform;
     transition:
-      opacity 120ms ease-out,
-      transform 120ms cubic-bezier(0.22, 1, 0.36, 1),
-      visibility 0s linear 120ms;
+      opacity 140ms ease-out,
+      transform 140ms cubic-bezier(0.22, 1, 0.36, 1),
+      visibility 0s linear 140ms;
   }
 
   .ui-dropdown-panel[data-ui-state="open"],
@@ -135,10 +135,10 @@
     opacity: 1;
     visibility: visible;
     pointer-events: auto;
-    transform: translate3d(0, 0, 0);
+    transform: translate3d(0, 0, 0) scale(1);
     transition:
-      opacity 120ms ease-out,
-      transform 120ms cubic-bezier(0.22, 1, 0.36, 1),
+      opacity 140ms ease-out,
+      transform 140ms cubic-bezier(0.22, 1, 0.36, 1),
       visibility 0s linear 0s;
   }
 

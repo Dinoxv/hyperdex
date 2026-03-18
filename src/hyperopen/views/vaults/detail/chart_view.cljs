@@ -120,7 +120,7 @@
                            "day")
         selected-label (selected-timeframe-label timeframe-options selected-token)
         role-prefix (or data-role-prefix "vault-detail-timeframe")]
-    [:details {:class ["relative"]
+    [:details {:class ["relative" "group"]
                :data-role (str role-prefix "-menu")}
      [:summary {:class ["flex"
                         "h-8"
@@ -142,14 +142,21 @@
                 :data-role (str role-prefix "-trigger")}
       [:span "Range "]
       [:span selected-label]
-      [:svg {:class ["h-3.5" "w-3.5" "text-[#8aa0a7]"]
+      [:svg {:class ["h-3.5"
+                     "w-3.5"
+                     "text-[#8aa0a7]"
+                     "transition-transform"
+                     "duration-150"
+                     "ease-out"
+                     "group-open:rotate-180"]
              :viewBox "0 0 20 20"
              :fill "currentColor"
              :aria-hidden true}
        [:path {:fill-rule "evenodd"
                :clip-rule "evenodd"
                :d "M5.23 7.21a.75.75 0 0 1 1.06.02L10 11.168l3.71-3.938a.75.75 0 1 1 1.08 1.04l-4.25 4.5a.75.75 0 0 1-1.08 0l-4.25-4.5a.75.75 0 0 1 .02-1.06Z"}]]]
-     [:div {:class ["absolute"
+     [:div {:class ["ui-dropdown-panel"
+                    "absolute"
                     "right-0"
                     "top-full"
                     "z-30"
@@ -161,6 +168,7 @@
                     "bg-[#071e25]"
                     "p-2"
                     "shadow-2xl"]
+            :data-ui-native-details-panel "true"
             :data-role (str role-prefix "-options")}
       (for [{:keys [value] :as option} timeframe-options
             :let [option-token (or (timeframe-token value) "day")]]

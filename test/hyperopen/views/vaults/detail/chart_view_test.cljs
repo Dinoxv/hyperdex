@@ -31,6 +31,9 @@
         trigger (hiccup/find-first-node menu
                                         #(= "vault-detail-timeframe-trigger"
                                             (get-in % [1 :data-role])))
+        options-panel (hiccup/find-first-node menu
+                                              #(= "vault-detail-timeframe-options"
+                                                  (get-in % [1 :data-role])))
         selected-option (hiccup/find-first-node menu
                                                 #(= "vault-detail-timeframe-option-week"
                                                     (get-in % [1 :data-role])))
@@ -44,6 +47,8 @@
            (get-in selected-option [1 :on :click])))
     (is (contains? (set (hiccup/collect-strings trigger)) "Range "))
     (is (contains? (set (hiccup/collect-strings trigger)) "7D"))
+    (is (contains? (set (get-in options-panel [1 :class])) "ui-dropdown-panel"))
+    (is (= "true" (get-in options-panel [1 :data-ui-native-details-panel])))
     (is (contains? (set (hiccup/collect-strings selected-option)) "ON"))
     (is (contains? (set (hiccup/collect-strings fallback-trigger)) "24H"))))
 

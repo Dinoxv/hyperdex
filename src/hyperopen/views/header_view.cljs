@@ -757,7 +757,15 @@
          [:summary {:class (more-trigger-classes api-wallet-route?)
                     :data-role "header-more-trigger"}
           [:span "More"]
-          [:svg.w-4.h-4 {:viewBox "0 0 20 20" :fill "currentColor"}
+          [:svg {:class ["h-4"
+                         "w-4"
+                         "transition-transform"
+                         "duration-150"
+                         "ease-out"
+                         "group-open:rotate-180"]
+                 :viewBox "0 0 20 20"
+                 :fill "currentColor"
+                 :data-role "header-more-chevron"}
            [:path {:fill-rule "evenodd" :d "M5.293 7.293a1 1 0 011.414 0L10 10.586l3.293-3.293a1 1 0 111.414 1.414l-4 4a1 1 0 01-1.414 0l-4-4a1 1 0 010-1.414z" :clip-rule "evenodd"}]]]
          [:div {:class ["ui-dropdown-panel"
                         "absolute"

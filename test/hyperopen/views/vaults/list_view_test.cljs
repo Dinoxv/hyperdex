@@ -129,12 +129,23 @@
 
 (deftest vaults-view-range-menu-options-dispatch-snapshot-range-action-test
   (let [view (vaults-view/vaults-view sample-state)
+        range-menu (find-first-node view #(= "vaults-range-menu" (get-in % [1 :data-role])))
+        range-trigger (find-first-node view #(= "vaults-range-menu-trigger" (get-in % [1 :data-role])))
+        range-chevron (find-first-node view #(= "vaults-range-menu-chevron" (get-in % [1 :data-role])))
+        range-panel (find-first-node view #(= "vaults-range-menu-panel" (get-in % [1 :data-role])))
         six-month-option (find-first-node view
                                           (fn [candidate]
                                             (and (= :button (first candidate))
                                                  (= [[:actions/set-vaults-snapshot-range :six-month]]
                                                     (get-in candidate [1 :on :click]))
                                                  (some #{"6M"} (collect-strings candidate)))))]
+    (is (some? range-menu))
+    (is (some? range-trigger))
+    (is (some? range-chevron))
+    (is (some? range-panel))
+    (is (contains? (set (get-in range-chevron [1 :class])) "group-open:rotate-180"))
+    (is (contains? (set (get-in range-panel [1 :class])) "ui-dropdown-panel"))
+    (is (= "true" (get-in range-panel [1 :data-ui-native-details-panel])))
     (is (some? six-month-option))
     (is (= [[:actions/set-vaults-snapshot-range :six-month]]
            (get-in six-month-option [1 :on :click])))))

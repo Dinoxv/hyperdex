@@ -52,9 +52,18 @@
    (when active?
      [:span {:aria-hidden true} "ON"])])
 
+(defn- menu-role-token [label]
+  (-> (or label "menu")
+      str
+      str/lower-case
+      (str/replace #"[^a-z0-9]+" "-")
+      (str/replace #"^-+|-+$" "")))
+
 (defn- control-menu [label summary-text options]
-  [:details {:class ["relative"]}
-   [:summary {:class ["flex"
+  (let [role-token (menu-role-token label)]
+    [:details {:class ["relative" "group"]
+               :data-role (str "vaults-" role-token "-menu")}
+     [:summary {:class ["flex"
                       "h-8"
                       "list-none"
                       "cursor-pointer"
@@ -70,17 +79,26 @@
                       "hover:bg-base-200"
                       "focus:outline-none"
                       "focus:ring-0"
-                      "focus:ring-offset-0"]}
-    [:span {:class ["hidden" "sm:inline" "text-trading-text-secondary"]} label]
-    [:span {:class ["max-w-[180px]" "truncate"]} summary-text]
-    [:svg {:class ["h-3.5" "w-3.5" "text-trading-text-secondary"]
+                      "focus:ring-offset-0"]
+               :data-role (str "vaults-" role-token "-menu-trigger")}
+      [:span {:class ["hidden" "sm:inline" "text-trading-text-secondary"]} label]
+      [:span {:class ["max-w-[180px]" "truncate"]} summary-text]
+      [:svg {:class ["h-3.5"
+                   "w-3.5"
+                   "text-trading-text-secondary"
+                   "transition-transform"
+                   "duration-150"
+                   "ease-out"
+                   "group-open:rotate-180"]
+             :data-role (str "vaults-" role-token "-menu-chevron")
            :viewBox "0 0 20 20"
            :fill "currentColor"
            :aria-hidden true}
-     [:path {:fill-rule "evenodd"
-             :clip-rule "evenodd"
-             :d "M5.23 7.21a.75.75 0 0 1 1.06.02L10 11.168l3.71-3.938a.75.75 0 1 1 1.08 1.04l-4.25 4.5a.75.75 0 0 1-1.08 0l-4.25-4.5a.75.75 0 0 1 .02-1.06Z"}]]]
-   [:div {:class ["absolute"
+       [:path {:fill-rule "evenodd"
+               :clip-rule "evenodd"
+               :d "M5.23 7.21a.75.75 0 0 1 1.06.02L10 11.168l3.71-3.938a.75.75 0 1 1 1.08 1.04l-4.25 4.5a.75.75 0 0 1-1.08 0l-4.25-4.5a.75.75 0 0 1 .02-1.06Z"}]]]
+     [:div {:class ["ui-dropdown-panel"
+                  "absolute"
                   "right-0"
                   "top-full"
                   "z-30"
@@ -91,8 +109,10 @@
                   "border-base-300"
                   "bg-base-100"
                   "p-2"
-                  "shadow-2xl"]}
-    options]])
+                  "shadow-2xl"]
+            :data-role (str "vaults-" role-token "-menu-panel")
+            :data-ui-native-details-panel "true"}
+      options]]))
 
 (defn- selected-role-labels [{:keys [leading? deposited? others?]}]
   (cond-> []
