@@ -51,6 +51,50 @@
             {:sz "2" :cum-size 2 :cum-value 0}]
            with-totals))))
 
+(deftest formatting-defaults-and-order-fallbacks-test
+  (testing "format-total defaults to whole-number rounding when decimals are omitted"
+    (is (= "5"
+           (policy/format-total 5.4))))
+  (testing "quote sizing falls back missing price or size to zero"
+    (is (= 0
+           (policy/order-size-for-unit {:sz "3"} :quote)))
+    (is (= 0
+           (policy/order-size-for-unit {:px "5"} :quote))))
+  (testing "quote formatting rounds to whole numbers while base formatting keeps raw strings"
+    (is (= "5"
+           (policy/format-order-size {:px "2.55" :sz "2"} :quote)))
+    (is (= "2.50000000"
+           (policy/format-order-size {:sz "2.50000000" :sz-num 2.5} :base)))
+    (is (= "2.5"
+           (policy/format-order-size {:sz 2.5} :base)))
+    (is (= "5"
+           (policy/format-order-total {:cum-value 5.1} :quote)))))
+
+(deftest cumulative-defaults-stay-zero-based-test
+  (testing "missing cumulative totals are treated as zero when taking maxima"
+    (is (= 0.5
+           (policy/get-max-cumulative-total [{:cum-size nil}
+                                             {:cum-size 0.5}]
+                                            :base))))
+  (testing "bar widths only render for positive maxima and keep zero fallback styling"
+    (is (= 50
+           (policy/cumulative-bar-width 1 2)))
+    (is (= 100
+           (policy/cumulative-bar-width 1 1)))
+    (is (nil? (policy/cumulative-bar-width 1 0)))
+    (is (= "0%"
+           (policy/cumulative-bar-width-style 1 0)))))
+
+(deftest build-book-one-sided-max-totals-do-not-inflate-missing-side-test
+  (testing "missing ask totals do not override small bid maxima"
+    (let [book (policy/build-book [{:px "0.2" :sz "0.5"}] [] 1)]
+      (is (= {:base 0.5 :quote 0.1}
+             (get-in book [:render :max-total-by-unit])))))
+  (testing "missing bid totals do not override small ask maxima"
+    (let [book (policy/build-book [] [{:px "0.2" :sz "0.25"}] 1)]
+      (is (= {:base 0.25 :quote 0.05}
+             (get-in book [:render :max-total-by-unit]))))))
+
 (deftest build-book-test
   (let [book (policy/build-book [{:px "100" :sz "2"}
                                  {:px "99" :sz "1"}]

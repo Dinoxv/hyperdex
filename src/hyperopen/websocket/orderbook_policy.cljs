@@ -74,10 +74,13 @@
                             {:minimumFractionDigits decimals
                              :maximumFractionDigits decimals})))
 
-(defn format-total [total & {:keys [decimals] :or {decimals 0}}]
+(defn- normalize-total-decimals [decimals]
+  (if (some? decimals) decimals 0))
+
+(defn format-total [total & {:keys [decimals]}]
   (when-some [num-total (parse-number total)]
     (fmt/format-intl-number num-total
-                            {:maximumFractionDigits decimals})))
+                            {:maximumFractionDigits (normalize-total-decimals decimals)})))
 
 (defn calculate-cumulative-totals [orders]
   (if (empty? orders)
