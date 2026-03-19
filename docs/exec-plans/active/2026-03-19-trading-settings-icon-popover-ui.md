@@ -16,7 +16,10 @@ This remains a visual refinement pass. Settings behavior, scope, persistence, an
 - [x] (2026-03-19 17:42Z) Re-read the current Trading Settings render path and header tests and inspected nearby repo patterns for animation and translucent surfaces.
 - [x] (2026-03-19 17:53Z) Implemented the icon-enriched layered popover restyle in `header_view.cljs`, kept the existing typography language, and expanded deterministic header-view coverage for the new shell, section cards, and motion hooks.
 - [x] (2026-03-19 17:55Z) Ran required repo gates and governed browser QA. The Trading Settings surface passed visual, native-control, and styling-consistency review; the overall governed run still fails on the standing `/portfolio` `375px` layout and jank issue.
-- [ ] Re-run governed browser QA after the latest non-glass and opaque-background adjustments and confirm the rendered result tracks the newest reference more closely.
+- [x] (2026-03-19 23:38Z) Ran a shadow-focused refinement pass against the zoomed reference, tightening the shell top highlight, bottom falloff, grouped-card lift, divider contrast, and switch geometry.
+- [x] (2026-03-19 23:42Z) Re-ran the governed browser review after the shadow-stack adjustments. `/trade` still passed visual, native-control, and styling-consistency review, while the overall run remained blocked by standing `/portfolio`, `/trade` desktop overflow, and `/vaults` route issues.
+- [x] (2026-03-19 23:49Z) Removed the residual row-hover darkening from Trading Settings after manual verification showed the grouped cards should stay visually stable on pointer hover.
+- [ ] Validate the latest hover-stability pass with user review and decide whether to keep iterating on Trading Settings polish in this active ExecPlan or move it to `completed`.
 
 ## Surprises & Discoveries
 
@@ -28,6 +31,9 @@ This remains a visual refinement pass. Settings behavior, scope, persistence, an
 
 - Observation: the current tests pin semantics and content, but they do not yet pin icon presence, layered section containers, or animated panel-shell styling.
   Evidence: `/hyperopen/test/hyperopen/views/header_view_test.cljs`.
+
+- Observation: the reference uses a tighter, denser lower shadow and a faint top inset highlight on both the outer shell and inner cards; the earlier shadow stack was too diffuse and read more like a generic SaaS modal.
+  Evidence: user-supplied zoomed reference image and `/hyperopen/src/hyperopen/views/header_view.cljs`.
 
 ## Decision Log
 
@@ -43,11 +49,19 @@ This remains a visual refinement pass. Settings behavior, scope, persistence, an
   Rationale: the user explicitly asked to preserve the current font feel, so the redesign leans on iconography, layering, color, and spacing rather than a typography reset.
   Date/Author: 2026-03-19 / Codex
 
+- Decision: bias the shell and grouped cards toward a compact top-light plus short dark-base shadow stack instead of a softer long-blur treatment.
+  Rationale: the zoomed reference depends on that asymmetric shading to create the floating-tile feel the user called out, especially on the grouped rows.
+  Date/Author: 2026-03-19 / Codex
+
+- Decision: keep Trading Settings rows visually static on hover instead of darkening the inner row wrapper.
+  Rationale: the grouped cards already provide the elevation treatment, and the hover darkening introduced a mismatch against the reference and the user's manual review.
+  Date/Author: 2026-03-19 / Codex
+
 ## Outcomes & Retrospective
 
-This pass landed the requested icon-enriched popover treatment: linear row icons, grouped layered cards, glassy shell chrome, anchored motion, and custom switches, while preserving the existing font language and settings behavior.
+This pass landed the requested icon-enriched popover treatment: linear row icons, grouped layered cards, anchored motion, and custom switches, while preserving the existing font language and settings behavior. The latest refinement tightened the top inset highlight and bottom falloff so the shell and cards read closer to the floating-tile reference.
 
-Repo gates are green. Governed browser QA is green for the Trading Settings surface and `/trade`, but the overall run still fails because `/portfolio` at `375px` has an unrelated `portfolio-root` vertical-overflow plus jank regression.
+Repo gates are green. Governed browser QA continues to pass the visual, native-control, and styling-consistency checks for the Trading Settings surface on `/trade`, but the overall run still fails because of unrelated `/portfolio`, `/trade` desktop overflow, and `/vaults` route regressions.
 
 ## Context and Orientation
 
@@ -70,7 +84,7 @@ This visual pass should add:
 - a darker semi-transparent elevated container
 - rounded inner layered cards
 - custom toggle switches
-- subtle row hover highlight
+- stable row color on hover
 - anchored entry and exit motion
 
 Non-goals:

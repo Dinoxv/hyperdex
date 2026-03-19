@@ -567,8 +567,8 @@
   [:label {:class ["relative"
                    "mt-0.5"
                    "inline-flex"
-                   "h-[22px]"
-                   "w-[42px]"
+                   "h-[20px]"
+                   "w-[40px]"
                    "shrink-0"
                    "cursor-pointer"
                    "items-center"]}
@@ -588,7 +588,7 @@
                          "inset-0"
                          "rounded-full"
                          "border"
-                         "shadow-[inset_0_1px_0_rgba(255,255,255,0.05),inset_0_-1px_1px_rgba(0,0,0,0.18)]"
+                         "shadow-[inset_0_1px_0_rgba(255,255,255,0.04),inset_0_-1px_1px_rgba(0,0,0,0.22)]"
                          "transition-all"
                          "duration-200"
                          "peer-focus-visible:ring-2"
@@ -597,30 +597,30 @@
                         (if checked?
                           ["border-[#67e5ba]"
                            "bg-[#67e5ba]"]
-                          ["border-[#434b52]"
-                           "bg-[#2b3238]"]))}]
+                          ["border-[#4a5258]"
+                           "bg-[#353c42]"]))}]
    [:span {:aria-hidden true
            :class (into ["absolute"
                          "left-[3px]"
                          "top-[3px]"
-                         "h-4"
-                         "w-4"
+                         "h-[14px]"
+                         "w-[14px]"
                          "rounded-full"
                          "shadow-[0_1px_4px_rgba(0,0,0,0.32)]"
                          "transition-transform"
                          "duration-200"]
                         (if checked?
-                          ["translate-x-[18px]" "bg-[#1e262b]"]
-                          ["translate-x-0" "bg-[#69727a]"]))}]])
+                          ["translate-x-[18px]" "bg-[#1f272c]"]
+                          ["translate-x-0" "bg-[#687078]"]))}]])
 
 (defn- trading-settings-section
   [{:keys [data-role title]} & children]
   [:section {:class ["overflow-hidden"
                      "rounded-[14px]"
                      "border"
-                     "border-[#394047]"
-                     "bg-[#262d33]"
-                     "shadow-[inset_0_1px_0_rgba(255,255,255,0.03),0_8px_18px_rgba(0,0,0,0.22)]"]
+                     "border-[#353d43]"
+                     "bg-[#252c32]"
+                     "shadow-[inset_0_1px_0_rgba(255,255,255,0.045),inset_0_-1px_0_rgba(0,0,0,0.14),0_4px_10px_rgba(0,0,0,0.20)]"]
              :data-role data-role}
    [:div {:class ["px-4"
                   "pt-3.5"
@@ -703,8 +703,7 @@
                   "rounded-[10px]"
                   "px-1"
                   "py-1.5"
-                  "transition-colors"
-                  "hover:bg-[#20262b]"]}
+                  "transition-colors"]}
     (trading-settings-icon-shell icon-kind checked?)
     [:div {:class ["min-w-0" "flex-1" "space-y-1" "pt-0.5"]}
      [:div {:class ["text-[0.95rem]" "font-semibold" "leading-5" "text-white"]}
@@ -745,9 +744,9 @@
                         "justify-center"
                         "rounded-[10px]"
                         "border"
-                        "border-[#40484f]"
-                        "bg-[#2a3137]"
-                        "shadow-[inset_0_1px_0_rgba(255,255,255,0.03)]"
+                        "border-[#3a4248]"
+                        "bg-[#2a3136]"
+                        "shadow-[inset_0_1px_0_rgba(255,255,255,0.02)]"
                         "text-[#aeb6bc]"
                         "transition-colors"
                         "hover:bg-[#333b42]"
@@ -794,7 +793,7 @@
           :data-role "trading-settings-animate-orderbook-row"
           :on-change [[:actions/set-animate-orderbook-enabled :event.target/checked]]}
          nil)
-        [:div {:class ["mx-4" "h-px" "bg-[#353b42]"]}]
+        [:div {:class ["mx-4" "h-px" "bg-[#31383e]"]}]
         (trading-settings-row
          {:title "Fill markers"
           :helper-copy "Show buy and sell markers for the active asset on the chart."
@@ -804,8 +803,8 @@
           :data-role "trading-settings-fill-markers-row"
           :on-change [[:actions/set-fill-markers-enabled :event.target/checked]]}
          nil)
-        [:div {:class ["mx-4" "h-px" "bg-[#353b42]"]}]
-        [:div {:class ["px-4" "py-3" "text-[0.75rem]" "leading-5" "text-[#9ba1a6]"]
+        [:div {:class ["mx-4" "h-px" "bg-[#31383e]"]}]
+        [:div {:class ["px-4" "pb-2.5" "pt-4" "text-[0.75rem]" "leading-5" "text-[#9aa1a7]"]
                :data-role "trading-settings-footer-note"}
          trading-settings-footer-copy])]]]))
 
@@ -833,9 +832,9 @@
                       "overflow-hidden"
                       "rounded-[16px]"
                       "border"
-                      "border-[#394147]"
-                      "bg-[#20272d]"
-                      "shadow-[inset_0_1px_0_rgba(255,255,255,0.03),0_20px_40px_rgba(0,0,0,0.42)]"
+                      "border-[#3b4349]"
+                      "bg-[#232a30]"
+                      "shadow-[inset_0_1px_0_rgba(255,255,255,0.05),inset_0_-1px_0_rgba(0,0,0,0.18),0_10px_18px_rgba(0,0,0,0.28),0_2px_4px_rgba(0,0,0,0.18)]"
                       "md:block"]
               :role "dialog"
               :aria-modal true
@@ -861,9 +860,9 @@
                       "overflow-hidden"
                       "rounded-[18px]"
                       "border"
-                      "border-[#394147]"
-                      "bg-[#20272d]"
-                      "shadow-[inset_0_1px_0_rgba(255,255,255,0.03),0_20px_40px_rgba(0,0,0,0.42)]"
+                      "border-[#3b4349]"
+                      "bg-[#232a30]"
+                      "shadow-[inset_0_1px_0_rgba(255,255,255,0.05),inset_0_-1px_0_rgba(0,0,0,0.18),0_10px_18px_rgba(0,0,0,0.28),0_2px_4px_rgba(0,0,0,0.18)]"
                       "md:hidden"]
               :role "dialog"
               :aria-modal true
