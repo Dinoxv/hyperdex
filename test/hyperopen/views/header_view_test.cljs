@@ -39,6 +39,18 @@
 (defn- class-token-set [node]
   (set (class-values (get-in node [1 :class]))))
 
+(defn- ordered-settings-sections
+  [node]
+  (->> (tree-seq coll? seq node)
+       (filter vector?)
+       (keep #(get-in % [1 :data-role]))
+       (filter #(#{"trading-settings-session-section"
+                   "trading-settings-confirmations-section"
+                   "trading-settings-alerts-section"
+                   "trading-settings-display-section"} %))
+       distinct
+       vec))
+
 (def connected-address
   "0x1234567890abcdef1234567890abcdef12345678")
 
@@ -144,6 +156,11 @@
     (is (some? session-section))
     (is (some? alerts-section))
     (is (some? display-section))
+    (is (= ["trading-settings-session-section"
+            "trading-settings-confirmations-section"
+            "trading-settings-alerts-section"
+            "trading-settings-display-section"]
+           (ordered-settings-sections view)))
     (is (= "dialog" (get-in panel [1 :role])))
     (is (= true (get-in panel [1 :aria-modal])))
     (is (= "Trading settings" (get-in panel [1 :aria-label])))

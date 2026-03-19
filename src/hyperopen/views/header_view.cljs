@@ -784,6 +784,18 @@
      [:div {:class ["overflow-y-auto" "px-3" "pb-3" "pt-1"]}
       [:div {:class ["space-y-3"]}
        (trading-settings-section
+        {:title "Session"
+         :data-role "trading-settings-session-section"}
+        (trading-settings-row
+         {:title "Remember session"
+          :helper-copy "Keep trading enabled across browser restarts on this device."
+          :checked? remember?
+          :icon-kind :session
+          :aria-label "Remember session"
+          :data-role "trading-settings-storage-mode-row"
+          :on-change [[:actions/request-agent-storage-mode-change :event.target/checked]]}
+         (trading-settings-confirmation-strip confirmation)))
+       (trading-settings-section
         {:title "Confirmations"
          :data-role "trading-settings-confirmations-section"}
         (trading-settings-row
@@ -805,18 +817,6 @@
           :data-role "trading-settings-confirm-close-position-row"
           :on-change [[:actions/set-confirm-close-position-enabled :event.target/checked]]}
          nil))
-       (trading-settings-section
-        {:title "Session"
-         :data-role "trading-settings-session-section"}
-        (trading-settings-row
-         {:title "Remember session"
-          :helper-copy "Keep trading enabled across browser restarts on this device."
-          :checked? remember?
-          :icon-kind :session
-          :aria-label "Remember session"
-          :data-role "trading-settings-storage-mode-row"
-          :on-change [[:actions/request-agent-storage-mode-change :event.target/checked]]}
-         (trading-settings-confirmation-strip confirmation)))
        (trading-settings-section
         {:title "Alerts"
          :data-role "trading-settings-alerts-section"}

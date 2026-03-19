@@ -21,6 +21,7 @@ Both toggles must be backed by actual behavior, not placeholder UI. Open-order s
 - [x] (2026-03-19 19:34Z) Updated deterministic coverage for Trading Settings rendering, settings persistence, order-submit behavior, close-position behavior, and the new confirm effect adapter.
 - [x] (2026-03-19 19:34Z) Ran `npm test`, `npm run test:websocket`, and `npm run check` successfully.
 - [x] (2026-03-19 19:34Z) Ran governed browser QA for the changed header surface. `/trade` remained visually clean for the header slice, while the overall review still failed on standing `/portfolio`, desktop `/trade`, and `/vaults` route debt unrelated to this feature.
+- [ ] Move this ExecPlan out of `active` once the next user-directed Trading Settings follow-up or closeout pass is complete.
 
 ## Surprises & Discoveries
 
