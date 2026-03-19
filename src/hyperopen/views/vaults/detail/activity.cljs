@@ -70,41 +70,148 @@
     :benchmark-coverage-gate-failed "Estimated from limited benchmark overlap."
     "Low-confidence estimate."))
 
+(def ^:private low-confidence-reason-order
+  [:daily-coverage-gate-failed
+   :psr-gate-failed
+   :drawdown-reliability-gate-failed
+   :drawdown-unavailable
+   :rolling-window-span-insufficient
+   :benchmark-coverage-gate-failed])
+
+(defn- ordered-low-confidence-reasons
+  [reasons]
+  (let [reason-set (disj (set reasons) nil)
+        known-reasons (filter reason-set low-confidence-reason-order)
+        unknown-reasons (sort (remove (set low-confidence-reason-order) reason-set))]
+    (vec (concat known-reasons unknown-reasons))))
+
+(defn- low-confidence-banner-summary
+  [reasons]
+  (let [reason-set (set reasons)]
+    (cond
+      (empty? reason-set)
+      nil
+
+      (every? #{:daily-coverage-gate-failed :psr-gate-failed} reason-set)
+      "Some metrics are estimated from incomplete daily data."
+
+      (every? #{:drawdown-reliability-gate-failed :drawdown-unavailable} reason-set)
+      "Some metrics are estimated from sparse drawdown data."
+
+      (= reason-set #{:benchmark-coverage-gate-failed})
+      "Some metrics are estimated from limited benchmark overlap."
+
+      :else
+      "Some metrics are estimated from incomplete or limited data.")))
+
+(defn- low-confidence-info-icon
+  [classes]
+  [:svg {:viewBox "0 0 20 20"
+         :fill "none"
+         :stroke "currentColor"
+         :class classes
+         :aria-hidden true}
+   [:circle {:cx "10"
+             :cy "10"
+             :r "7.25"
+             :stroke-width "1.6"}]
+   [:path {:d "M10 8.2v4.1"
+           :stroke-linecap "round"
+           :stroke-width "1.6"}]
+   [:circle {:cx "10"
+             :cy "5.8"
+             :r "0.95"
+             :fill "currentColor"
+             :stroke "none"}]])
+
+(defn- estimated-banner-tooltip
+  [reasons data-role]
+  [:div {:class ["pointer-events-none"
+                 "absolute"
+                 "left-0"
+                 "top-full"
+                 "z-50"
+                 "mt-2"
+                 "max-w-[min(420px,calc(100vw-2rem))]"
+                 "opacity-0"
+                 "transition-opacity"
+                 "duration-100"
+                 "group-hover:opacity-100"
+                 "group-focus-within:opacity-100"]
+         :data-role (when data-role
+                      (str data-role "-tooltip"))}
+   [:div {:class ["relative"
+                  "rounded-lg"
+                  "border"
+                  "border-[#2b5562]"
+                  "bg-[#081923]"
+                  "px-3"
+                  "py-2.5"
+                  "text-left"
+                  "text-xs"
+                  "leading-5"
+                  "text-[#d7e9ed]"
+                  "spectate-lg"
+                  "whitespace-normal"]
+          :role "tooltip"}
+    [:div {:class ["text-xs" "font-medium" "uppercase" "tracking-[0.18em]" "text-[#8fb2bc]"]}
+     "Estimation Method"]
+    [:div {:class ["mt-1.5" "text-xs" "leading-5" "text-[#d7e9ed]"]}
+     "Estimated rows stay visible when the selected range does not meet the usual reliability gates."]
+    (when (seq reasons)
+      [:ul {:class ["mt-2" "space-y-1" "pl-4" "list-disc" "text-[#bcd2d7]"]}
+       (for [reason reasons]
+         ^{:key (str data-role "-reason-" (name reason))}
+         [:li (low-confidence-metric-title reason)])])
+    [:div {:class ["absolute"
+                   "bottom-full"
+                   "left-5"
+                   "h-0"
+                   "w-0"
+                   "border-4"
+                   "border-transparent"
+                   "border-b-[#081923]"]}]]])
+
+(defn- estimated-metrics-banner
+  [reasons]
+  (when-let [summary (low-confidence-banner-summary reasons)]
+    [:div {:class ["group"
+                   "relative"
+                   "rounded-lg"
+                   "border"
+                   "px-3"
+                   "py-2.5"]
+           :style {:border-color "rgba(66, 102, 128, 0.52)"
+                   :background "linear-gradient(135deg, rgba(18, 53, 79, 0.58) 0%, rgba(14, 40, 61, 0.52) 100%)"}
+           :data-role "vault-detail-performance-metrics-estimated-banner"
+           :tab-index 0}
+     [:div {:class ["flex" "items-start" "justify-between" "gap-3"]}
+      [:div {:class ["flex" "min-w-0" "items-start" "gap-2.5"]}
+       (low-confidence-info-icon ["mt-0.5" "h-4" "w-4" "shrink-0" "text-[#8fc7ff]"])
+       [:div {:class ["min-w-0" "text-sm" "leading-5" "text-[#d5e8ff]"]}
+        summary]]
+      [:span {:class ["shrink-0" "text-xs" "leading-5" "text-[#9eb8d4]"]}
+       "Hover for details"]]
+     (estimated-banner-tooltip reasons "vault-detail-performance-metrics-estimated-banner")]))
+
 (defn- performance-metric-value-cell
   ([kind value]
    (performance-metric-value-cell kind value nil))
-  ([kind value {:keys [status reason data-role] :as attrs}]
-   (let [attrs* (dissoc attrs :status :reason)
+  ([kind value {:keys [status] :as attrs}]
+   (let [attrs* (dissoc attrs :status :reason :metric-label :metric-description)
          formatted-value (format-metric-value kind value)
-         low-confidence? (= status :low-confidence)]
+         tone-class (if (= status :low-confidence)
+                      "text-[#9fb4bb]"
+                      "text-trading-text")]
      [:span (merge {:class ["justify-self-start"
-                            "inline-flex"
-                            "items-center"
-                            "gap-1.5"
                             "text-left"
                             "text-sm"
-                            "text-trading-text"]}
+                            tone-class]}
                    attrs*)
       [:span {:class (into []
                            (when (not= kind :date)
                              ["num"]))}
-       formatted-value]
-      (when low-confidence?
-        [:span {:class ["rounded-full"
-                        "border"
-                        "border-[#35535d]"
-                        "bg-[#0d2430]"
-                        "px-1.5"
-                        "py-0.5"
-                        "text-xs"
-                        "font-medium"
-                        "uppercase"
-                        "tracking-[0.16em]"
-                        "text-[#8fb2bc]"]
-                :title (low-confidence-metric-title reason)
-                :data-role (when data-role
-                             (str data-role "-status-badge"))}
-         "Est."])])))
+       formatted-value]])))
 
 (defn- resolved-benchmark-metric-columns
   [{:keys [benchmark-columns benchmark-selected? benchmark-label benchmark-coin]}]
@@ -148,6 +255,26 @@
       (get reasons coin)
       (:benchmark-reason row))))
 
+(defn- performance-metric-row-reasons
+  [row benchmark-columns]
+  (ordered-low-confidence-reasons
+   (concat [(when (= :low-confidence (:portfolio-status row))
+              (:portfolio-reason row))]
+           (keep (fn [{:keys [coin]}]
+                   (when (= :low-confidence (benchmark-row-status row coin))
+                     (benchmark-row-reason row coin)))
+                 benchmark-columns))))
+
+(defn- performance-metric-row-estimated?
+  [row benchmark-columns]
+  (boolean (seq (performance-metric-row-reasons row benchmark-columns))))
+
+(defn- visible-low-confidence-reasons
+  [groups benchmark-columns]
+  (ordered-low-confidence-reasons
+   (mapcat #(performance-metric-row-reasons % benchmark-columns)
+           (mapcat :rows groups))))
+
 (defn- metric-value-present?
   [kind value]
   (not= "--" (format-metric-value kind value)))
@@ -172,7 +299,8 @@
 (defn- performance-metric-row [{:keys [key label kind value] :as row} benchmark-columns grid-style]
   (let [portfolio-value (if (contains? row :portfolio-value)
                           (:portfolio-value row)
-                          value)]
+                          value)
+        estimated-row? (performance-metric-row-estimated? row benchmark-columns)]
     [:div {:class ["grid"
                    "items-center"
                    "justify-items-start"
@@ -180,21 +308,29 @@
                    "hover:bg-[#0e2630]"]
            :style grid-style
            :data-role (str "vault-detail-performance-metric-" (name key))}
-     [:span {:class ["text-sm"]
-             :style {:color "#9CA3AF"}}
-      label]
+     [:span {:class ["inline-flex"
+                     "items-center"
+                     "gap-1"
+                     "text-sm"]
+             :style {:color (if estimated-row?
+                              "#95A8B0"
+                              "#F6FEFD")}
+             :data-role (str "vault-detail-performance-metric-" (name key) "-label")}
+      label
+      (when estimated-row?
+        [:span {:class ["text-xs" "font-semibold" "leading-none" "text-[#8fc7ff]"]
+                :data-role (str "vault-detail-performance-metric-" (name key) "-estimated-mark")}
+         "~"])]
      (for [{:keys [coin]} benchmark-columns]
        (let [cell-data-role (str "vault-detail-performance-metric-" (name key) "-benchmark-value-" coin)]
          ^{:key (str "vault-detail-performance-metric-" (name key) "-benchmark-" coin)}
          (performance-metric-value-cell kind
                                         (benchmark-row-value row coin)
                                         {:status (benchmark-row-status row coin)
-                                         :reason (benchmark-row-reason row coin)
                                          :data-role cell-data-role})))
      (performance-metric-value-cell kind
                                     portfolio-value
                                     {:status (:portfolio-status row)
-                                     :reason (:portfolio-reason row)
                                      :data-role (str "vault-detail-performance-metric-" (name key) "-vault-value")})]))
 
 (defn- performance-metrics-card [{:keys [benchmark-selected?
@@ -218,7 +354,8 @@
                                                      vec)]
                                      (when (seq rows*)
                                         (assoc group :rows rows*)))))
-                            vec)]
+                            vec)
+        visible-reasons (visible-low-confidence-reasons visible-groups benchmark-columns*)]
     [:div {:class ["relative" "flex" "flex-1" "min-h-0" "flex-col"]
            :data-role "vault-detail-performance-metrics-card"}
      (when loading?
@@ -278,6 +415,7 @@
             :role "region"
             :aria-label "Vault performance metrics"
             :tab-index 0}
+      (estimated-metrics-banner visible-reasons)
       (for [[idx {:keys [id rows]}] (map-indexed vector visible-groups)]
         ^{:key (str "vault-detail-performance-metrics-group-" (name id))}
         [:div {:class (into ["space-y-1.5"]

@@ -1,5 +1,56 @@
 (ns hyperopen.portfolio.metrics.catalog)
 
+(def ^:private metric-descriptions
+  {:time-in-market "Share of days in the selected window with active exposure."
+   :cumulative-return "Total compounded return over the selected window."
+   :cagr "Annualized compounded growth rate over the selected window."
+   :sharpe "Risk-adjusted return using excess return divided by volatility."
+   :prob-sharpe-ratio "Probability that the observed Sharpe ratio is greater than zero."
+   :smart-sharpe "Sharpe ratio adjusted for autocorrelation in returns."
+   :sortino "Excess return divided by downside volatility only."
+   :smart-sortino "Sortino ratio adjusted for autocorrelation in returns."
+   :sortino-sqrt2 "Sortino ratio scaled by sqrt(2) for alternate reporting conventions."
+   :smart-sortino-sqrt2 "Autocorrelation-adjusted Sortino ratio scaled by sqrt(2)."
+   :omega "Ratio of gains above the target return to losses below it."
+   :max-drawdown "Largest peak-to-trough loss in the selected window."
+   :max-dd-date "Date the maximum drawdown reached its trough."
+   :max-dd-period-start "Date the maximum drawdown began at its prior peak."
+   :max-dd-period-end "Date the maximum drawdown recovered, or the latest observed point."
+   :longest-dd-days "Longest drawdown duration in calendar days."
+   :volatility-ann "Annualized standard deviation of returns."
+   :r2 "How closely returns moved with the benchmark, on a 0 to 1 scale."
+   :information-ratio "Active return divided by tracking error versus the benchmark."
+   :calmar "Annualized return divided by maximum drawdown."
+   :skew "Asymmetry of the return distribution."
+   :kurtosis "Fat-tailedness of the return distribution relative to normal."
+   :expected-daily "Average expected one-day return from the observed history."
+   :expected-monthly "Average expected one-month return implied by the observed history."
+   :expected-yearly "Average expected one-year return implied by the observed history."
+   :kelly-criterion "Suggested capital fraction from the observed win and loss profile."
+   :risk-of-ruin "Estimated chance of compounding down to a near-zero capital threshold."
+   :daily-var "Expected one-day loss threshold at the configured confidence level."
+   :expected-shortfall "Average loss on days worse than Value-at-Risk."
+   :max-consecutive-wins "Longest streak of positive-return days."
+   :max-consecutive-losses "Longest streak of negative-return days."
+   :gain-pain-ratio "Total gains divided by total losses."
+   :gain-pain-1m "One-month gain-to-pain ratio using rolling monthly results."
+   :payoff-ratio "Average winning return divided by average losing return."
+   :profit-factor "Gross gains divided by gross losses."
+   :common-sense-ratio "Tail-aware return quality ratio combining gain and loss efficiency."
+   :cpc-index "Composite ratio summarizing payoff quality and consistency."
+   :tail-ratio "Magnitude of right-tail gains relative to left-tail losses."
+   :outlier-win-ratio "Contribution of extreme winning days relative to typical wins."
+   :outlier-loss-ratio "Contribution of extreme losing days relative to typical losses."
+   :mtd "Return since the start of the current month."
+   :m3 "Return over the last three months."
+   :m6 "Return over the last six months."
+   :ytd "Return since the start of the current calendar year."
+   :y1 "Return over the last year."
+   :y3-ann "Annualized return over the last three years."
+   :y5-ann "Annualized return over the last five years."
+   :y10-ann "Annualized return over the last ten years."
+   :all-time-ann "Annualized return over the full available history."})
+
 (def ^:private performance-metric-groups
   [{:id :overview
     :rows [{:key :time-in-market
@@ -166,6 +217,7 @@
             (assoc group
                    :rows (mapv (fn [{:keys [key] :as row}]
                                  (assoc row
+                                        :description (get metric-descriptions key)
                                         :value (get metric-values key)
                                         :status (get metric-status key)
                                         :reason (get metric-reason key)))

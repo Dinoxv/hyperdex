@@ -129,6 +129,7 @@
                                                              :benchmark-values {"BTC" 0.98}}
                                                             {:key :omega
                                                              :label "Omega"
+                                                             :description "Ratio of gains above the target return to losses below it."
                                                              :kind :ratio
                                                              :value 1.11
                                                              :portfolio-status :low-confidence
@@ -147,12 +148,24 @@
         hidden-row (hiccup/find-first-node view
                                            #(= "vault-detail-performance-metric-hidden"
                                                (get-in % [1 :data-role])))
-        vault-low-confidence-badge (hiccup/find-first-node view
-                                                           #(= "vault-detail-performance-metric-omega-vault-value-status-badge"
-                                                               (get-in % [1 :data-role])))
-        benchmark-low-confidence-badge (hiccup/find-first-node view
-                                                               #(= "vault-detail-performance-metric-omega-benchmark-value-BTC-status-badge"
-                                                                   (get-in % [1 :data-role])))
+        estimated-banner (hiccup/find-first-node view
+                                                 #(= "vault-detail-performance-metrics-estimated-banner"
+                                                     (get-in % [1 :data-role])))
+        estimated-banner-tooltip (hiccup/find-first-node view
+                                                         #(= "vault-detail-performance-metrics-estimated-banner-tooltip"
+                                                             (get-in % [1 :data-role])))
+        estimated-mark (hiccup/find-first-node view
+                                               #(= "vault-detail-performance-metric-omega-estimated-mark"
+                                                   (get-in % [1 :data-role])))
+        vault-low-confidence-cell (hiccup/find-first-node view
+                                                          #(= "vault-detail-performance-metric-omega-vault-value"
+                                                              (get-in % [1 :data-role])))
+        benchmark-low-confidence-cell (hiccup/find-first-node view
+                                                              #(= "vault-detail-performance-metric-omega-benchmark-value-BTC"
+                                                                  (get-in % [1 :data-role])))
+        badge-node (hiccup/find-first-node view
+                                           #(= "vault-detail-performance-metric-omega-vault-value-status-badge"
+                                               (get-in % [1 :data-role])))
         benchmark-label (hiccup/find-first-node view
                                                 #(= "vault-detail-performance-metrics-benchmark-label"
                                                     (get-in % [1 :data-role])))
@@ -173,10 +186,21 @@
                                                      (get-in % [1 :data-role])))]
     (is (some? sharpe-row))
     (is (nil? hidden-row))
-    (is (= "Est." (first (hiccup/collect-strings vault-low-confidence-badge))))
-    (is (= "Estimated from incomplete daily coverage."
-           (get-in vault-low-confidence-badge [1 :title])))
-    (is (= "Est." (first (hiccup/collect-strings benchmark-low-confidence-badge))))
+    (is (some? estimated-banner))
+    (is (contains? (set (hiccup/collect-strings estimated-banner))
+                   "Some metrics are estimated from incomplete daily data."))
+    (is (contains? (set (hiccup/collect-strings estimated-banner))
+                   "Hover for details"))
+    (is (contains? (set (hiccup/collect-strings estimated-banner-tooltip))
+                   "Estimated rows stay visible when the selected range does not meet the usual reliability gates."))
+    (is (contains? (set (hiccup/collect-strings estimated-banner-tooltip))
+                   "Estimated from incomplete daily coverage."))
+    (is (= "~" (first (hiccup/collect-strings estimated-mark))))
+    (is (contains? (set (get-in vault-low-confidence-cell [1 :class]))
+                   "text-[#9fb4bb]"))
+    (is (contains? (set (get-in benchmark-low-confidence-cell [1 :class]))
+                   "text-[#9fb4bb]"))
+    (is (nil? badge-node))
     (is (some? benchmark-label))
     (is (contains? (set (get-in activity-panel [1 :class])) "max-h-[75vh]"))
     (is (some? scroll-region))

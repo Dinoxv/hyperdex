@@ -13,8 +13,12 @@
         cagr-row (first (filter #(= :cagr (:key %)) rows))
         sharpe-row (first (filter #(= :sharpe (:key %)) rows))]
     (is (= 0.123 (:value cagr-row)))
+    (is (= "Annualized compounded growth rate over the selected window."
+           (:description cagr-row)))
     (is (= :ok (:status cagr-row)))
     (is (nil? (:reason cagr-row)))
+    (is (= "Risk-adjusted return using excess return divided by volatility."
+           (:description sharpe-row)))
     (is (= :suppressed (:status sharpe-row)))
     (is (= :core-gate-failed (:reason sharpe-row)))))
 
