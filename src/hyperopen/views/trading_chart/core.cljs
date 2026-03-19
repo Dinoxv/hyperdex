@@ -330,7 +330,7 @@
                                                   {:topic "trades"
                                                    :selector {:coin (:active-asset state)}
                                                    :live-prefix "Last tick"}))]
-    [:div.flex.items-center.border-b.border-gray-700.px-4.pt-2.pb-1.w-full.space-x-4.bg-base-100
+    [:div.flex.items-center.border-b.border-gray-700.px-4.pt-2.pb-1.w-full.min-w-0.space-x-4.bg-base-100
      {:data-parity-id "chart-toolbar"}
      ;; Left side - Favorite timeframes + dropdown
      [:div.flex.items-center.space-x-1
@@ -599,7 +599,7 @@
                           (catch :default _ nil)))
                       (chart-runtime/clear-state! node))
                     nil))]
-     [:div {:class ["w-full" "relative" "flex-1" "h-full" "min-h-[360px]" "bg-base-100" "trading-chart-host"]
+     [:div {:class ["w-full" "relative" "flex-1" "min-h-[360px]" "min-w-0" "bg-base-100" "trading-chart-host"]
             :data-parity-id "chart-canvas"
             :replicant/key (str "chart-" (hash active-indicators) "-" legend-key "-" volume-visible?)
             :replicant/on-render mount!}])))
@@ -672,10 +672,10 @@
                                fill-markers
                                show-fill-markers?)
         legend-meta (memoized-legend-meta symbol timeframe-label candle-data)]
-    [:div {:class ["w-full" "h-full"]
+    [:div {:class ["w-full" "h-full" "min-h-0" "min-w-0" "overflow-hidden"]
            :data-parity-id "chart-panel"}
      ;; Chart container with consistent width for both menu and chart
-     [:div {:class ["w-full" "h-full" "flex" "flex-col"]}
+     [:div {:class ["w-full" "flex" "flex-col" "min-h-0" "min-w-0" "overflow-hidden"]}
       ;; Add the top menu above the chart
       (chart-top-menu state)
       (if has-error?

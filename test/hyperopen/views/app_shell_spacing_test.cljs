@@ -279,12 +279,12 @@
         root-classes (root-class-set view-node)]
     (is (not (contains? root-classes "overflow-auto")))
     (is (contains? root-classes "min-h-0"))
+    (is (contains? root-classes "overflow-hidden"))
     (is (contains? root-classes "scrollbar-hide"))
     (is (contains? root-classes "xl:overflow-y-auto"))
     (is (contains-class? view-node "right-[320px]"))
     (is (contains-class? view-node "lg:grid-cols-[minmax(0,1fr)_320px]"))
     (is (contains-class? view-node "lg:grid-rows-[minmax(520px,1fr)_minmax(300px,auto)]"))
-    (is (contains-class? view-node "xl:min-h-[964px]"))
     (is (contains-class? view-node "xl:grid-cols-[minmax(0,1fr)_280px_320px]"))
     (is (contains-class? view-node "xl:grid-rows-[minmax(580px,1fr)_auto]"))
     (is (not (contains-class? view-node "xl:grid-rows-[minmax(580px,auto)_auto]")))
@@ -292,6 +292,9 @@
 
 (deftest trade-view-xl-panel-span-contract-test
   (let [view-node (trade-view/trade-view trade-view-test-state)
+        chart-panel (find-first-node view-node
+                                     #(= "trade-chart-panel"
+                                         (get-in % [1 :data-parity-id])))
         orderbook-panel (find-first-node view-node
                                          #(= "trade-orderbook-panel"
                                              (get-in % [1 :data-parity-id])))
@@ -301,12 +304,16 @@
         account-panel (find-first-node view-node
                                        #(= "trade-account-tables-panel"
                                            (get-in % [1 :data-parity-id])))
+        chart-panel-classes (node-class-set chart-panel)
         orderbook-classes (node-class-set orderbook-panel)
         order-entry-classes (node-class-set order-entry-panel)
         account-panel-classes (node-class-set account-panel)]
+    (is (some? chart-panel))
     (is (some? orderbook-panel))
     (is (some? order-entry-panel))
     (is (some? account-panel))
+    (is (contains? chart-panel-classes "min-w-0"))
+    (is (contains? chart-panel-classes "overflow-hidden"))
     (is (contains? orderbook-classes "xl:col-start-2"))
     (is (contains? orderbook-classes "xl:row-start-1"))
     (is (not (contains? orderbook-classes "xl:row-span-2")))

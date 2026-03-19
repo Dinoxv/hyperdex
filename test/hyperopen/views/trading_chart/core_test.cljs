@@ -107,6 +107,7 @@
         classes (set (collect-all-classes menu))
         bg-colors (set (collect-background-colors menu))]
     (is (contains? classes "bg-base-100"))
+    (is (contains? classes "min-w-0"))
     (is (not (contains? bg-colors "rgb(30, 41, 55)")))))
 
 (deftest chart-canvas-uses-base-background-class-and-no-inline-legacy-color-test
@@ -122,8 +123,23 @@
         classes (set (class-values (get-in canvas [1 :class])))
         bg-colors (set (collect-background-colors canvas))]
     (is (contains? classes "bg-base-100"))
+    (is (contains? classes "min-w-0"))
     (is (contains? classes "trading-chart-host"))
     (is (not (contains? bg-colors "rgb(30, 41, 55)")))))
+
+(deftest trading-chart-view-contains-panel-overflow-to-chart-bounds-test
+  (let [view-node (chart-core/trading-chart-view {:active-asset "BTC"
+                                                  :active-market {:price-decimals 2}
+                                                  :candles {"BTC" {:1d []}}
+                                                  :chart-options {:selected-timeframe :1d
+                                                                  :selected-chart-type :candlestick
+                                                                  :active-indicators {}}})
+        panel-node (find-first-node view-node #(= "chart-panel" (get-in % [1 :data-parity-id])))
+        panel-classes (set (class-values (get-in panel-node [1 :class])))]
+    (is (some? panel-node))
+    (is (contains? panel-classes "min-h-0"))
+    (is (contains? panel-classes "min-w-0"))
+    (is (contains? panel-classes "overflow-hidden"))))
 
 (deftest chart-top-menu-dropdowns-use-high-z-opaque-tokenized-classes-test
   (let [menu (chart-core/chart-top-menu {:chart-options {:timeframes-dropdown-visible true

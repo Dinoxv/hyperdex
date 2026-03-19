@@ -234,9 +234,9 @@
   [state]
   (let [error-message (trade-modules/trade-chart-error state)
         route (get-in state [:router :path] "/trade")]
-    [:div {:class ["w-full" "h-full"]
+    [:div {:class ["w-full" "h-full" "min-h-0" "min-w-0" "overflow-hidden"]
            :data-parity-id "trade-chart-module-shell"}
-     [:div {:class ["w-full" "h-full" "flex" "flex-col"]}
+     [:div {:class ["w-full" "flex" "flex-col" "min-h-0" "min-w-0" "overflow-hidden"]}
       [:div {:class ["flex"
                      "items-center"
                      "justify-between"
@@ -265,8 +265,8 @@
       [:div {:class ["w-full"
                      "relative"
                      "flex-1"
-                     "h-full"
                      "min-h-[360px]"
+                     "min-w-0"
                      "bg-base-100"
                      "trading-chart-host"]}
        [:div {:class ["absolute"
@@ -347,7 +347,7 @@
                               :websocket-health (when show-surface-freshness-cues?
                                                   websocket-health)
                               :loading (and active-asset (nil? orderbook-data))}]
-    [:div {:class ["flex-1" "flex" "flex-col" "min-h-0" "scrollbar-hide" "xl:overflow-y-auto"]
+    [:div {:class ["flex-1" "flex" "flex-col" "min-h-0" "overflow-hidden" "scrollbar-hide" "xl:overflow-y-auto"]
            :data-parity-id "trade-root"}
      [:div {:class ["w-full" "h-full" "px-0" "py-0" "space-y-0" "flex" "flex-col" "min-h-0"]}
       [:div {:class (into ["lg:hidden" "border-b" "border-base-300" "bg-base-200"]
@@ -367,7 +367,7 @@
       [:div {:class ["relative" "flex-1" "min-h-0"]}
        [:div {:class ["hidden" "xl:block" "absolute" "top-0" "bottom-0" "right-[320px]" "w-px" "bg-base-300" "pointer-events-none" "z-10"]}]
        [:div {:class ["grid"
-                      "h-auto"
+                      "h-full"
                       "min-h-0"
                       "grid-cols-1"
                       "gap-x-0" "gap-y-0"
@@ -376,13 +376,14 @@
                       "lg:h-full"
                       "lg:grid-cols-[minmax(0,1fr)_320px]"
                       "lg:grid-rows-[minmax(520px,1fr)_minmax(300px,auto)]"
-                      "xl:min-h-[964px]"
                       "xl:grid-cols-[minmax(0,1fr)_280px_320px]"
                       "xl:grid-rows-[minmax(580px,1fr)_auto]"]}
         [:div {:class (into [(if (= mobile-surface :chart) "flex" "hidden")
                              "bg-base-100"
                              "flex-col"
-                             "min-h-0"]
+                             "min-h-0"
+                             "min-w-0"
+                             "overflow-hidden"]
                             ["lg:flex"
                              "lg:row-start-1"
                              "lg:col-start-1"
@@ -390,10 +391,10 @@
                              "lg:border-base-300"])
                :data-parity-id "trade-chart-panel"}
          [:div {:class ["hidden" "lg:block"]}
-          (when desktop-layout?
+         (when desktop-layout?
             (render-active-asset-panel state))]
          (when chart-panel-visible?
-           [:div {:class ["overflow-hidden" "flex-1" "min-h-0"]}
+           [:div {:class ["overflow-hidden" "flex-1" "min-h-0" "min-w-0"]}
             (trade-chart-panel-content state)])]
 
         [:div {:class (into [(if mobile-orderbook-surface? "block" "hidden")
