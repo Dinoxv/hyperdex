@@ -16,6 +16,9 @@
    :notation "compact"
    :maximumFractionDigits 1})
 
+(def ^:private performance-metrics-panel-height
+  "min(44rem, calc(100dvh - 22rem))")
+
 (def ^:private action-items
   [{:label "Link Staking"
     :mobile-label "Staking"
@@ -193,6 +196,47 @@
                    "border-transparent"
                    "border-b-gray-800"]}]]])
 
+(defn- metric-label-tooltip
+  [label description data-role]
+  (when (seq description)
+    [:div {:class ["pointer-events-none"
+                   "absolute"
+                   "left-0"
+                   "top-full"
+                   "z-50"
+                   "mt-2"
+                   "w-[min(420px,calc(100vw-2rem))]"
+                   "min-w-[280px]"
+                   "opacity-0"
+                   "transition-opacity"
+                   "duration-100"
+                   "group-hover:opacity-100"]
+           :data-role (when data-role
+                        (str data-role "-tooltip"))}
+     [:div {:class ["relative"
+                    "rounded-lg"
+                    "border"
+                    "border-base-300"
+                    "bg-gray-800"
+                    "px-3"
+                    "py-2.5"
+                    "text-left"
+                    "spectate-lg"
+                    "whitespace-normal"]
+            :role "tooltip"}
+      [:div {:class ["text-xs" "font-medium" "uppercase" "tracking-[0.18em]" "text-[#8ea1b3]"]}
+       label]
+      [:div {:class ["mt-1.5" "text-xs" "leading-5" "text-gray-100"]}
+       description]
+      [:div {:class ["absolute"
+                     "bottom-full"
+                     "left-5"
+                     "h-0"
+                     "w-0"
+                     "border-4"
+                     "border-transparent"
+                     "border-b-gray-800"]}]]]))
+
 (defn- estimated-metrics-banner
   [reasons]
   (when-let [summary (low-confidence-banner-summary reasons)]
@@ -206,13 +250,10 @@
                    :background "linear-gradient(135deg, rgba(30, 58, 106, 0.52) 0%, rgba(21, 46, 88, 0.46) 100%)"}
            :data-role "portfolio-performance-metrics-estimated-banner"
            :tab-index 0}
-     [:div {:class ["flex" "items-start" "justify-between" "gap-3"]}
-      [:div {:class ["flex" "min-w-0" "items-start" "gap-2.5"]}
-       (low-confidence-info-icon ["mt-0.5" "h-4" "w-4" "shrink-0" "text-[#7fb5ff]"])
-       [:div {:class ["min-w-0" "text-sm" "leading-5" "text-[#d5e4ff]"]}
-        summary]]
-      [:span {:class ["shrink-0" "text-xs" "leading-5" "text-[#9cb8e0]"]}
-       "Hover for details"]]
+     [:div {:class ["flex" "min-w-0" "items-start" "gap-2.5"]}
+      (low-confidence-info-icon ["mt-0.5" "h-4" "w-4" "shrink-0" "text-[#7fb5ff]"])
+      [:div {:class ["min-w-0" "text-sm" "leading-5" "text-[#d5e4ff]"]}
+       summary]]
      (estimated-banner-tooltip reasons "portfolio-performance-metrics-estimated-banner")]))
 
 (defn- format-drawdown [ratio]
@@ -938,7 +979,7 @@
                                                (repeat benchmark-column-count "132px")
                                                ["132px"]))})
 
-(defn- performance-metric-row [{:keys [key label kind value] :as row} benchmark-columns grid-style]
+(defn- performance-metric-row [{:keys [key label description kind value] :as row} benchmark-columns grid-style]
   (let [portfolio-value (if (contains? row :portfolio-value)
                           (:portfolio-value row)
                           value)
@@ -950,7 +991,9 @@
                    "hover:bg-base-300"]
            :style grid-style
            :data-role (str "portfolio-performance-metric-" (name key))}
-     [:span {:class ["inline-flex"
+     [:span {:class ["group"
+                     "relative"
+                     "inline-flex"
                      "items-center"
                      "gap-1"
                      "text-sm"]
@@ -962,7 +1005,10 @@
       (when estimated-row?
         [:span {:class ["text-xs" "font-semibold" "leading-none" "text-[#7fb5ff]"]
                 :data-role (str "portfolio-performance-metric-" (name key) "-estimated-mark")}
-         "~"])]
+         "~"])
+      (metric-label-tooltip label
+                            description
+                            (str "portfolio-performance-metric-" (name key) "-label"))]
      (for [{:keys [coin]} benchmark-columns]
        (let [cell-data-role (str "portfolio-performance-metric-" (name key) "-benchmark-value-" coin)]
          ^{:key (str "portfolio-performance-metric-" (name key) "-benchmark-" coin)}
@@ -1205,8 +1251,9 @@
                                 (deposits-withdrawals-card))}
                      {:id :performance-metrics
                       :label "Performance Metrics"
-                      :panel-classes ["min-h-96"]
-                      :panel-style {:max-height "min(44rem, calc(100dvh - 22rem))"}
+                      :panel-classes ["min-h-0"]
+                      :panel-style {:height performance-metrics-panel-height
+                                    :max-height performance-metrics-panel-height}
                       :render (fn [_]
                                 (performance-metrics-card
                                  (assoc (:performance-metrics view-model)

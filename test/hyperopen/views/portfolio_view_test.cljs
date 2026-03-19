@@ -210,8 +210,10 @@
     (is (some? balances-tab-button))
     (is (= "Performance Metrics" (first portfolio-tab-labels)))
     (is (str/starts-with? (or (second portfolio-tab-labels) "") "Balances"))
-    (is (contains? (set (class-values account-tables-panel)) "min-h-96"))
+    (is (contains? (set (class-values account-tables-panel)) "min-h-0"))
     (is (not (contains? (set (class-values account-tables-panel)) "h-96")))
+    (is (= "min(44rem, calc(100dvh - 22rem))"
+           (get-in account-tables-panel [1 :style :height])))
     (is (= "min(44rem, calc(100dvh - 22rem))"
            (get-in account-tables-panel [1 :style :max-height])))
     (is (contains? (set (class-values performance-tab-button)) "account-info-tab-button-active"))
@@ -576,6 +578,8 @@
                                                           (get-in % [1 :data-role])))
           estimated-banner-tooltip (find-first-node view-node #(= "portfolio-performance-metrics-estimated-banner-tooltip"
                                                                   (get-in % [1 :data-role])))
+          daily-var-label-tooltip (find-first-node view-node #(= "portfolio-performance-metric-daily-var-label-tooltip"
+                                                                 (get-in % [1 :data-role])))
           estimated-mark (find-first-node view-node #(= "portfolio-performance-metric-daily-var-estimated-mark"
                                                         (get-in % [1 :data-role])))
           portfolio-low-confidence-cell (find-first-node view-node #(= "portfolio-performance-metric-daily-var-portfolio-value"
@@ -601,12 +605,14 @@
       (is (some? estimated-banner))
       (is (contains? (set (collect-strings estimated-banner))
                      "Some metrics are estimated from incomplete daily data."))
-      (is (contains? (set (collect-strings estimated-banner))
-                     "Hover for details"))
       (is (contains? (set (collect-strings estimated-banner-tooltip))
                      "Estimated rows stay visible when the selected range does not meet the usual reliability gates."))
       (is (contains? (set (collect-strings estimated-banner-tooltip))
                      "Estimated from incomplete daily coverage."))
+      (is (contains? (set (collect-strings daily-var-label-tooltip))
+                     "Daily Value-at-Risk"))
+      (is (contains? (set (collect-strings daily-var-label-tooltip))
+                     "Expected one-day loss threshold at the configured confidence level."))
       (is (= "~" (first (collect-strings estimated-mark))))
       (is (contains? (set (class-values portfolio-low-confidence-cell))
                      "text-trading-text-secondary"))
