@@ -473,6 +473,7 @@
                                                         :mark 10}}}}
         submit-effects (history-actions/submit-position-reduce-close
                         (assoc market-state
+                               :trading-settings {:confirm-close-position? false}
                                :ui {:locale "fr-FR"}
                                :positions-ui {:reduce-popover (assoc percent-popover
                                                                      :close-type :limit
@@ -527,7 +528,9 @@
                                                         :asset-id 123
                                                         :mark 10}}}}
         valid-effects (history-actions/submit-position-reduce-close
-                       (assoc market-state :positions-ui {:reduce-popover popover}))
+                       (assoc market-state
+                              :trading-settings {:confirm-close-position? false}
+                              :positions-ui {:reduce-popover popover}))
         invalid-effects (history-actions/submit-position-reduce-close
                          (assoc market-state
                                 :positions-ui {:reduce-popover (assoc popover :limit-price "")}))]
@@ -544,10 +547,34 @@
            (get-in (second (second valid-effects)) [:action :orders 0 :b])))
     (is (= [[:effects/save
              [:positions-ui :reduce-popover]
-             (assoc popover
+            (assoc popover
                     :limit-price ""
                     :error "Price is required for limit orders.")]]
            invalid-effects))))
+
+(deftest submit-position-reduce-close-emits-confirm-effect-when-enabled-test
+  (let [row (fixtures/sample-position-row "xyz:NVDA" 10 "0.500")
+        popover (-> (position-reduce/from-position-row row)
+                    (assoc :close-type :limit
+                           :limit-price "11"))
+        state {:trading-settings {:confirm-close-position? true}
+               :positions-ui {:reduce-popover popover}
+               :asset-selector {:market-by-key {"perp:xyz:NVDA"
+                                                {:coin "xyz:NVDA"
+                                                 :market-type :perp
+                                                 :asset-id 123
+                                                 :mark 10}}}}
+        effects (history-actions/submit-position-reduce-close state)
+        confirm-effect (first effects)
+        payload (second confirm-effect)]
+    (is (= 1 (count effects)))
+    (is (= :effects/confirm-api-submit-order (first confirm-effect)))
+    (is (= "Submit this close order?\n\nDisable close-position confirmation in Trading settings if you prefer one-click closes."
+           (:message payload)))
+    (is (= [[:positions-ui :reduce-popover] (assoc popover :error nil)]
+           (first (:path-values payload))))
+    (is (= "order"
+           (get-in payload [:request :action :type])))))
 
 (deftest position-margin-modal-actions-open-update-close-test
   (let [row (fixtures/sample-position-row "xyz:NVDA" 10 "0.500")

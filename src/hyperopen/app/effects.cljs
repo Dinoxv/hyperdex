@@ -43,6 +43,7 @@
                  :api-authorize-api-wallet effect-adapters/api-authorize-api-wallet-effect
                  :api-remove-api-wallet effect-adapters/api-remove-api-wallet-effect}
    :orders {:api-submit-order (effect-adapters/make-api-submit-order runtime)
+            :confirm-api-submit-order effect-adapters/confirm-api-submit-order
             :api-cancel-order (effect-adapters/make-api-cancel-order runtime)
             :api-submit-position-tpsl (effect-adapters/make-api-submit-position-tpsl runtime)
             :api-submit-position-margin (effect-adapters/make-api-submit-position-margin runtime)}

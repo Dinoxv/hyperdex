@@ -356,6 +356,7 @@
   (let [state {:active-asset "BTC"
                :active-market {:coin "BTC" :market-type :perp}
                :asset-contexts {:BTC {:idx 0}}
+               :trading-settings {:confirm-open-orders? false}
                :wallet {:connected? true
                         :address "0xabc"
                         :agent {:status :ready
@@ -378,10 +379,40 @@
     (is (= true (:isCross pre-action)))
     (is (= 20 (:leverage pre-action)))))
 
+(deftest submit-order-emits-confirm-effect-when-open-order-confirmation-is-enabled-test
+  (let [state {:active-asset "BTC"
+               :active-market {:coin "BTC" :market-type :perp}
+               :asset-contexts {:BTC {:idx 0}}
+               :trading-settings {:confirm-open-orders? true}
+               :wallet {:connected? true
+                        :address "0xabc"
+                        :agent {:status :ready
+                                :storage-mode :session
+                                :agent-address "0xagent"}}
+               :orderbooks {"BTC" {:bids [{:px "99"}]
+                                   :asks [{:px "101"}]}}
+               :order-form (assoc (trading/default-order-form)
+                                  :type :limit
+                                  :side :buy
+                                  :size "1"
+                                  :price "100")}
+        effects (core/submit-order state)
+        confirm-effect (first effects)
+        payload (second confirm-effect)]
+    (is (= 1 (count effects)))
+    (is (= :effects/confirm-api-submit-order (first confirm-effect)))
+    (is (= "Submit this order?\n\nDisable open-order confirmation in Trading settings if you prefer one-click submits."
+           (:message payload)))
+    (is (= [[:order-form-runtime :error] nil]
+           (first (:path-values payload))))
+    (is (= "order"
+           (get-in payload [:request :action :type])))))
+
 (deftest submit-order-limit-with-blank-price-uses-fallback-and-emits-single-submit-effect-test
   (let [state {:active-asset "BTC"
                :active-market {:coin "BTC" :market-type :perp}
                :asset-contexts {:BTC {:idx 0}}
+               :trading-settings {:confirm-open-orders? false}
                :wallet {:connected? true
                         :address "0xabc"
                         :agent {:status :ready
@@ -408,6 +439,7 @@
   (let [state {:active-asset "BTC"
                :active-market {:coin "BTC" :market-type :perp}
                :asset-contexts {:BTC {:idx 0}}
+               :trading-settings {:confirm-open-orders? false}
                :wallet {:connected? true
                         :address "0xabc"
                         :agent {:status :ready

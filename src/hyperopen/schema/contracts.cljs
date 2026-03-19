@@ -140,6 +140,15 @@
 (s/def ::enable-agent-trading-args (s/tuple map?))
 (s/def ::api-submit-request (s/keys :req-un [::action]))
 (s/def ::api-submit-order-args (s/tuple ::api-submit-request))
+(defn- confirm-api-submit-order-args?
+  [args]
+  (and (= 1 (count args))
+       (let [{:keys [message request path-values]} (first args)]
+         (and (non-empty-string? message)
+              (s/valid? ::api-submit-request request)
+              (s/valid? ::path-values path-values)))))
+
+(s/def ::confirm-api-submit-order-args confirm-api-submit-order-args?)
 (s/def ::api-cancel-order-args (s/tuple ::api-submit-request))
 (s/def ::api-submit-position-tpsl-args (s/tuple ::api-submit-request))
 (s/def ::api-submit-position-margin-args (s/tuple ::api-submit-request))
@@ -382,6 +391,8 @@
    :actions/set-fill-alerts-enabled ::boolean-args
    :actions/set-animate-orderbook-enabled ::boolean-args
    :actions/set-fill-markers-enabled ::boolean-args
+   :actions/set-confirm-open-orders-enabled ::boolean-args
+   :actions/set-confirm-close-position-enabled ::boolean-args
    :actions/navigate-mobile-header-menu ::path-args
    :actions/open-spectate-mode-mobile-header-menu ::spectate-mode-open-args
    :actions/open-spectate-mode-modal ::spectate-mode-open-args
@@ -739,6 +750,7 @@
    :effects/export-funding-history-csv ::export-funding-history-csv-args
    :effects/api-fetch-predicted-fundings ::no-args
    :effects/api-submit-order ::api-submit-order-args
+   :effects/confirm-api-submit-order ::confirm-api-submit-order-args
    :effects/api-cancel-order ::api-cancel-order-args
    :effects/api-submit-position-tpsl ::api-submit-position-tpsl-args
    :effects/api-submit-position-margin ::api-submit-position-margin-args

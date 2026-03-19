@@ -87,6 +87,14 @@
   [state enabled?]
   (persist-trading-settings state {:show-fill-markers? (boolean enabled?)}))
 
+(defn set-confirm-open-orders-enabled
+  [state enabled?]
+  (persist-trading-settings state {:confirm-open-orders? (boolean enabled?)}))
+
+(defn set-confirm-close-position-enabled
+  [state enabled?]
+  (persist-trading-settings state {:confirm-close-position? (boolean enabled?)}))
+
 (defn navigate-mobile-header-menu
   [state path]
   (into [[:effects/save [:header-ui :mobile-menu-open?] false]]

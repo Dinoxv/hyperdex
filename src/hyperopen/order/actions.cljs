@@ -4,6 +4,7 @@
             [hyperopen.order.cancel-visible-confirmation :as cancel-visible-confirmation]
             [hyperopen.order.effects :as order-effects]
             [hyperopen.state.trading :as trading]
+            [hyperopen.trading-settings :as trading-settings]
             [hyperopen.trading.order-form-transitions :as transitions]))
 
 (defn- next-order-form-ui-state
@@ -223,6 +224,9 @@
                         [[:wallet :agent :error] error-message]
                         [[:wallet :agent :recovery-modal-open?] true]]]])
 
+(def ^:private confirm-open-order-message
+  "Submit this order?\n\nDisable open-order confirmation in Trading settings if you prefer one-click submits.")
+
 (defn submit-order [state]
   (let [spectate-mode-message (account-context/mutations-blocked-message state)
         raw-form (trading/order-form-draft state)
@@ -245,11 +249,18 @@
 
       :else
       (let [persisted-form (trading/persist-order-form form)
-            persisted-ui (next-order-form-ui-state state form nil)]
-      [[:effects/save [:order-form-runtime :error] nil]
-       [:effects/save [:order-form] persisted-form]
-       [:effects/save [:order-form-ui] persisted-ui]
-       [:effects/api-submit-order request]]))))
+            persisted-ui (next-order-form-ui-state state form nil)
+            path-values [[[:order-form-runtime :error] nil]
+                         [[:order-form] persisted-form]
+                         [[:order-form-ui] persisted-ui]]]
+        (if (trading-settings/confirm-open-orders? state)
+          [[:effects/confirm-api-submit-order {:message confirm-open-order-message
+                                               :request request
+                                               :path-values path-values}]]
+          [[:effects/save [:order-form-runtime :error] nil]
+           [:effects/save [:order-form] persisted-form]
+           [:effects/save [:order-form-ui] persisted-ui]
+           [:effects/api-submit-order request]])))))
 
 (defn prune-canceled-open-orders
   [state request]

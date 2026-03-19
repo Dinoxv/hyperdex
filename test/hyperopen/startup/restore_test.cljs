@@ -211,7 +211,9 @@
       (with-redefs [platform/local-storage-get (constantly nil)]
         (restore-fn store)
         (is (= true (get-in @store [:trading-settings :animate-orderbook?])))
-        (is (= false (get-in @store [:trading-settings :show-fill-markers?])))))))
+        (is (= false (get-in @store [:trading-settings :show-fill-markers?])))
+        (is (= true (get-in @store [:trading-settings :confirm-open-orders?])))
+        (is (= true (get-in @store [:trading-settings :confirm-close-position?])))))))
 
 (deftest restore-trading-settings-valid-storage-restores-phase-1-5-settings-test
   (let [store (atom {})
@@ -221,12 +223,14 @@
       (with-redefs [platform/local-storage-get (fn [key]
                                                  (case key
                                                    "hyperopen:trading-settings:v1"
-                                                   "{\"fill-alerts-enabled?\":false,\"animate-orderbook?\":false,\"show-fill-markers?\":true}"
+                                                   "{\"fill-alerts-enabled?\":false,\"animate-orderbook?\":false,\"show-fill-markers?\":true,\"confirm-open-orders?\":false,\"confirm-close-position?\":false}"
                                                    nil))]
         (restore-fn store)
         (is (= false (get-in @store [:trading-settings :fill-alerts-enabled?])))
         (is (= false (get-in @store [:trading-settings :animate-orderbook?])))
-        (is (= true (get-in @store [:trading-settings :show-fill-markers?])))))))
+        (is (= true (get-in @store [:trading-settings :show-fill-markers?])))
+        (is (= false (get-in @store [:trading-settings :confirm-open-orders?])))
+        (is (= false (get-in @store [:trading-settings :confirm-close-position?])))))))
 
 (deftest restore-trading-settings-malformed-storage-falls-back-safely-test
   (let [store (atom {:trading-settings {:fill-alerts-enabled? false}})

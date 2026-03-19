@@ -1,7 +1,8 @@
 (ns hyperopen.account.history.position-overlay-actions
   (:require [hyperopen.account.history.position-margin :as position-margin]
             [hyperopen.account.history.position-reduce :as position-reduce]
-            [hyperopen.account.history.position-tpsl :as position-tpsl]))
+            [hyperopen.account.history.position-tpsl :as position-tpsl]
+            [hyperopen.trading-settings :as trading-settings]))
 
 (defn- tpsl-modal-with-locale
   [state]
@@ -110,15 +111,23 @@
     [[:effects/save [:positions-ui :reduce-popover]
       (position-reduce/set-limit-price-to-mid popover)]]))
 
+(def ^:private confirm-close-position-message
+  "Submit this close order?\n\nDisable close-position confirmation in Trading settings if you prefer one-click closes.")
+
 (defn submit-position-reduce-close [state]
   (let [popover (reduce-popover-with-locale state)
         result (position-reduce/prepare-submit state popover)]
     (if-not (:ok? result)
       [[:effects/save [:positions-ui :reduce-popover]
         (assoc popover :error (:display-message result))]]
-      [[:effects/save [:positions-ui :reduce-popover]
-        (assoc popover :error nil)]
-       [:effects/api-submit-order (:request result)]])))
+      (let [next-popover (assoc popover :error nil)]
+        (if (trading-settings/confirm-close-position? state)
+          [[:effects/confirm-api-submit-order {:message confirm-close-position-message
+                                               :request (:request result)
+                                               :path-values [[[:positions-ui :reduce-popover] next-popover]]}]]
+          [[:effects/save [:positions-ui :reduce-popover]
+            next-popover]
+           [:effects/api-submit-order (:request result)]])))))
 
 (defn open-position-margin-modal
   ([state position-data]

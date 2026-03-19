@@ -6,11 +6,14 @@
 (def ^:private action-vars
   {'open-header-settings (resolve 'hyperopen.header.actions/open-header-settings)
    'close-header-settings (resolve 'hyperopen.header.actions/close-header-settings)
-  'handle-header-settings-keydown (resolve 'hyperopen.header.actions/handle-header-settings-keydown)
+   'handle-header-settings-keydown (resolve 'hyperopen.header.actions/handle-header-settings-keydown)
   'request-agent-storage-mode-change (resolve 'hyperopen.header.actions/request-agent-storage-mode-change)
    'confirm-agent-storage-mode-change (resolve 'hyperopen.header.actions/confirm-agent-storage-mode-change)
+   'set-fill-alerts-enabled (resolve 'hyperopen.header.actions/set-fill-alerts-enabled)
    'set-animate-orderbook-enabled (resolve 'hyperopen.header.actions/set-animate-orderbook-enabled)
-   'set-fill-markers-enabled (resolve 'hyperopen.header.actions/set-fill-markers-enabled)})
+   'set-fill-markers-enabled (resolve 'hyperopen.header.actions/set-fill-markers-enabled)
+   'set-confirm-open-orders-enabled (resolve 'hyperopen.header.actions/set-confirm-open-orders-enabled)
+   'set-confirm-close-position-enabled (resolve 'hyperopen.header.actions/set-confirm-close-position-enabled)})
 
 (defn- resolve-action
   [sym]
@@ -109,31 +112,89 @@
                                        {:kind :agent-storage-mode
                                         :next-mode :local})))))))
 
-(deftest header-settings-phase-1-5-toggle-actions-persist-bound-local-preferences-test
-  (let [animate-action (resolve-action 'set-animate-orderbook-enabled)
+(deftest header-settings-toggle-actions-persist-bound-local-preferences-test
+  (let [fill-alerts-action (resolve-action 'set-fill-alerts-enabled)
+        animate-action (resolve-action 'set-animate-orderbook-enabled)
         fill-markers-action (resolve-action 'set-fill-markers-enabled)
+        confirm-open-action (resolve-action 'set-confirm-open-orders-enabled)
+        confirm-close-action (resolve-action 'set-confirm-close-position-enabled)
         base-state {:trading-settings {:fill-alerts-enabled? true
                                        :animate-orderbook? true
-                                       :show-fill-markers? false}}]
+                                       :show-fill-markers? false
+                                       :confirm-open-orders? true
+                                       :confirm-close-position? true}}]
+    (is (some? fill-alerts-action))
     (is (some? animate-action))
     (is (some? fill-markers-action))
+    (is (some? confirm-open-action))
+    (is (some? confirm-close-action))
+    (when fill-alerts-action
+      (is (= [[:effects/save [:trading-settings]
+               {:fill-alerts-enabled? false
+                :animate-orderbook? true
+                :show-fill-markers? false
+                :confirm-open-orders? true
+                :confirm-close-position? true}]
+              [:effects/local-storage-set-json trading-settings/storage-key
+               {:fill-alerts-enabled? false
+                :animate-orderbook? true
+                :show-fill-markers? false
+                :confirm-open-orders? true
+                :confirm-close-position? true}]]
+             (fill-alerts-action base-state false))))
     (when animate-action
       (is (= [[:effects/save [:trading-settings]
                {:fill-alerts-enabled? true
                 :animate-orderbook? false
-                :show-fill-markers? false}]
+                :show-fill-markers? false
+                :confirm-open-orders? true
+                :confirm-close-position? true}]
               [:effects/local-storage-set-json trading-settings/storage-key
                {:fill-alerts-enabled? true
                 :animate-orderbook? false
-                :show-fill-markers? false}]]
+                :show-fill-markers? false
+                :confirm-open-orders? true
+                :confirm-close-position? true}]]
              (animate-action base-state false))))
     (when fill-markers-action
       (is (= [[:effects/save [:trading-settings]
                {:fill-alerts-enabled? true
                 :animate-orderbook? true
-                :show-fill-markers? true}]
+                :show-fill-markers? true
+                :confirm-open-orders? true
+                :confirm-close-position? true}]
               [:effects/local-storage-set-json trading-settings/storage-key
                {:fill-alerts-enabled? true
                 :animate-orderbook? true
-                :show-fill-markers? true}]]
-             (fill-markers-action base-state true))))))
+                :show-fill-markers? true
+                :confirm-open-orders? true
+                :confirm-close-position? true}]]
+             (fill-markers-action base-state true))))
+    (when confirm-open-action
+      (is (= [[:effects/save [:trading-settings]
+               {:fill-alerts-enabled? true
+                :animate-orderbook? true
+                :show-fill-markers? false
+                :confirm-open-orders? false
+                :confirm-close-position? true}]
+              [:effects/local-storage-set-json trading-settings/storage-key
+               {:fill-alerts-enabled? true
+                :animate-orderbook? true
+                :show-fill-markers? false
+                :confirm-open-orders? false
+                :confirm-close-position? true}]]
+             (confirm-open-action base-state false))))
+    (when confirm-close-action
+      (is (= [[:effects/save [:trading-settings]
+               {:fill-alerts-enabled? true
+                :animate-orderbook? true
+                :show-fill-markers? false
+                :confirm-open-orders? true
+                :confirm-close-position? false}]
+              [:effects/local-storage-set-json trading-settings/storage-key
+               {:fill-alerts-enabled? true
+                :animate-orderbook? true
+                :show-fill-markers? false
+                :confirm-open-orders? true
+                :confirm-close-position? false}]]
+             (confirm-close-action base-state false))))))

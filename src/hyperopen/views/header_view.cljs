@@ -524,6 +524,30 @@
                :stroke-width "1.6"
                :stroke-linecap "round"}]]
 
+      :confirm-open-orders
+      [:svg {:viewBox "0 0 20 20"
+             :fill "none"
+             :stroke "currentColor"
+             :class icon-classes}
+       [:circle {:cx "10" :cy "10" :r "6.7" :stroke-width "1.65"}]
+       [:path {:d "M7.3 10.1 9 11.8l3.7-3.8"
+               :stroke-width "1.7"
+               :stroke-linecap "round"
+               :stroke-linejoin "round"}]]
+
+      :confirm-close-position
+      [:svg {:viewBox "0 0 20 20"
+             :fill "none"
+             :stroke "currentColor"
+             :class icon-classes}
+       [:circle {:cx "10" :cy "10" :r "6.7" :stroke-width "1.65"}]
+       [:path {:d "M7.6 7.6 12.4 12.4"
+               :stroke-width "1.7"
+               :stroke-linecap "round"}]
+       [:path {:d "M12.4 7.6 7.6 12.4"
+               :stroke-width "1.7"
+               :stroke-linecap "round"}]]
+
       :animate-orderbook
       [:svg {:viewBox "0 0 20 20"
              :fill "none"
@@ -719,6 +743,8 @@
 (defn- trading-settings-content
   [state surface-id]
   (let [remember? (remember-trading-session? state)
+        confirm-open-orders? (trading-settings/confirm-open-orders? state)
+        confirm-close-position? (trading-settings/confirm-close-position? state)
         fill-alerts-enabled? (trading-settings/fill-alerts-enabled? state)
         animate-orderbook? (trading-settings/animate-orderbook? state)
         show-fill-markers? (trading-settings/show-fill-markers? state)
@@ -757,6 +783,28 @@
        (trading-settings-close-icon)]]
      [:div {:class ["overflow-y-auto" "px-3" "pb-3" "pt-1"]}
       [:div {:class ["space-y-3"]}
+       (trading-settings-section
+        {:title "Confirmations"
+         :data-role "trading-settings-confirmations-section"}
+        (trading-settings-row
+         {:title "Confirm open orders"
+          :helper-copy "Ask before sending a new order from the trade form."
+          :checked? confirm-open-orders?
+          :icon-kind :confirm-open-orders
+          :aria-label "Confirm open orders"
+          :data-role "trading-settings-confirm-open-orders-row"
+          :on-change [[:actions/set-confirm-open-orders-enabled :event.target/checked]]}
+         nil)
+        [:div {:class ["mx-4" "h-px" "bg-[#31383e]"]}]
+        (trading-settings-row
+         {:title "Confirm close position"
+          :helper-copy "Ask before submitting from the close-position popover."
+          :checked? confirm-close-position?
+          :icon-kind :confirm-close-position
+          :aria-label "Confirm close position"
+          :data-role "trading-settings-confirm-close-position-row"
+          :on-change [[:actions/set-confirm-close-position-enabled :event.target/checked]]}
+         nil))
        (trading-settings-section
         {:title "Session"
          :data-role "trading-settings-session-section"}

@@ -7,14 +7,18 @@
 (def default-state
   {:fill-alerts-enabled? true
    :animate-orderbook? true
-   :show-fill-markers? false})
+   :show-fill-markers? false
+   :confirm-open-orders? true
+   :confirm-close-position? true})
 
 (defn normalize-state
   [value]
   (let [settings (if (map? value) value {})]
     {:fill-alerts-enabled? (not (false? (:fill-alerts-enabled? settings)))
      :animate-orderbook? (not (false? (:animate-orderbook? settings)))
-     :show-fill-markers? (true? (:show-fill-markers? settings))}))
+     :show-fill-markers? (true? (:show-fill-markers? settings))
+     :confirm-open-orders? (not (false? (:confirm-open-orders? settings)))
+     :confirm-close-position? (not (false? (:confirm-close-position? settings)))}))
 
 (defn restore-state
   []
@@ -41,3 +45,11 @@
 (defn show-fill-markers?
   [state]
   (:show-fill-markers? (state-settings state)))
+
+(defn confirm-open-orders?
+  [state]
+  (:confirm-open-orders? (state-settings state)))
+
+(defn confirm-close-position?
+  [state]
+  (:confirm-close-position? (state-settings state)))

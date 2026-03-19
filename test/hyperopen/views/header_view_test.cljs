@@ -122,9 +122,12 @@
         panel (find-node-by-role view "trading-settings-panel")
         sheet (find-node-by-role view "trading-settings-sheet")
         title (find-node-by-role view "trading-settings-title")
+        confirmations-section (find-node-by-role view "trading-settings-confirmations-section")
         session-section (find-node-by-role view "trading-settings-session-section")
         alerts-section (find-node-by-role view "trading-settings-alerts-section")
         display-section (find-node-by-role view "trading-settings-display-section")
+        confirm-open-orders-row (find-node-by-role view "trading-settings-confirm-open-orders-row")
+        confirm-close-position-row (find-node-by-role view "trading-settings-confirm-close-position-row")
         storage-row (find-node-by-role view "trading-settings-storage-mode-row")
         fill-alerts-row (find-node-by-role view "trading-settings-fill-alerts-row")
         footer-note (find-node-by-role view "trading-settings-footer-note")
@@ -137,6 +140,7 @@
         all-text (set (collect-strings view))]
     (is (some? panel))
     (is (some? sheet))
+    (is (some? confirmations-section))
     (is (some? session-section))
     (is (some? alerts-section))
     (is (some? display-section))
@@ -156,12 +160,18 @@
     (is (= "translateY(18px)" (:transform sheet-mounting)))
     (is (= 0 (:opacity sheet-mounting)))
     (is (contains? (set (collect-strings title)) "Trading settings"))
+    (is (some? confirm-open-orders-row))
+    (is (some? confirm-close-position-row))
     (is (some? storage-row))
     (is (some? fill-alerts-row))
     (is (some? footer-note))
     (is (nil? (find-node #(contains? (class-token-set %) "hover:bg-[#20262b]") storage-row)))
+    (is (contains? all-text "Confirm open orders"))
+    (is (contains? all-text "Confirm close position"))
     (is (contains? all-text "Remember session"))
     (is (contains? all-text "Fill alerts"))
+    (is (contains? all-text "Ask before sending a new order from the trade form."))
+    (is (contains? all-text "Ask before submitting from the close-position popover."))
     (is (contains? all-text "Keep trading enabled across browser restarts on this device."))
     (is (contains? all-text "Show fill alerts while Hyperopen is open."))
     (is (contains? all-text "Applies only to this browser on this device."))
@@ -171,6 +181,24 @@
     (is (not (contains? all-text "Disable Unified Account Mode")))
     (is (not (contains? all-text "Disable HIP-3 Dex Abstraction")))
     (is (not (contains? all-text "Disable Transaction Delay Protection")))))
+
+(deftest header-renders-order-confirmation-settings-when-open-test
+  (let [view (header-view/header-view {:wallet {:connected? false
+                                                :agent {:storage-mode :local}}
+                                       :router {:path "/trade"}
+                                       :header-ui {:settings-open? true
+                                                   :settings-confirmation nil}
+                                       :trading-settings {:fill-alerts-enabled? true
+                                                          :confirm-open-orders? true
+                                                          :confirm-close-position? false}})
+        confirmations-section (find-node-by-role view "trading-settings-confirmations-section")
+        all-text (set (collect-strings view))]
+    (is (some? confirmations-section))
+    (is (contains? all-text "Confirmations"))
+    (is (contains? all-text "Confirm open orders"))
+    (is (contains? all-text "Confirm close position"))
+    (is (contains? all-text "Ask before sending a new order from the trade form."))
+    (is (contains? all-text "Ask before submitting from the close-position popover."))))
 
 (deftest header-renders-phase-1-5-display-settings-when-open-test
   (let [view (header-view/header-view {:wallet {:connected? false

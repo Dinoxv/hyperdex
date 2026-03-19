@@ -186,6 +186,8 @@
 
 (def api-submit-order order-adapters/api-submit-order)
 
+(def confirm-api-submit-order order-adapters/confirm-api-submit-order)
+
 (def api-cancel-order order-adapters/api-cancel-order)
 
 (def api-submit-position-tpsl order-adapters/api-submit-position-tpsl)
