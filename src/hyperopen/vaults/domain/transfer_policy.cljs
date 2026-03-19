@@ -43,7 +43,7 @@
        (let [whole (or (parse-utils/parse-int-value int-part) 0)
              fraction-source (or frac-part frac-only "")
              fraction-padded (subs (str fraction-source "000000") 0 6)
-             fraction (or (parse-utils/parse-int-value fraction-padded) 0)
+             fraction (parse-utils/parse-int-value fraction-padded)
              whole-micros (* whole vault-usdc-micros-scale)
              micros (+ whole-micros fraction)]
          (when (and (number? micros)
