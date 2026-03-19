@@ -161,6 +161,36 @@ export function focusWalkExpression({ selectors = [], limit = 20 } = {}) {
     const roots = selectors.length === 0
       ? [document.body]
       : selectors.flatMap((selector) => safeQuery(selector));
+    const isVisibleForFocusWalk = (node) => {
+      if (!node || typeof getComputedStyle !== "function") {
+        return false;
+      }
+      if ("disabled" in node && node.disabled) {
+        return false;
+      }
+      const rect = rectFor(node);
+      if (rect.width <= 0 || rect.height <= 0) {
+        return false;
+      }
+      const style = getComputedStyle(node);
+      if (!style || style.display === "none" || style.visibility === "hidden") {
+        return false;
+      }
+      const opacity = parseFloat(style.opacity || "1");
+      if (Number.isFinite(opacity) && opacity <= 0) {
+        return false;
+      }
+      if (style.pointerEvents === "none") {
+        return false;
+      }
+      if (typeof node.closest === "function") {
+        const hiddenAncestor = node.closest("[hidden],[aria-hidden='true']");
+        if (hiddenAncestor) {
+          return false;
+        }
+      }
+      return true;
+    };
 
     const seen = new Set();
     const focusables = [];
@@ -174,8 +204,7 @@ export function focusWalkExpression({ selectors = [], limit = 20 } = {}) {
           continue;
         }
         seen.add(node);
-        const rect = rectFor(node);
-        if (rect.width <= 0 || rect.height <= 0) {
+        if (!isVisibleForFocusWalk(node)) {
           continue;
         }
         focusables.push(node);
@@ -243,6 +272,22 @@ export function layoutAuditExpression({ selectors = [], maxMatches = 20 } = {}) 
       document.documentElement ? document.documentElement.scrollWidth : 0,
       document.body ? document.body.scrollWidth : 0
     );
+    const hasScrollableOverflowAncestor = (el, axis) => {
+      const styleProp = axis === "x" ? "overflowX" : "overflowY";
+      let current = el ? el.parentElement : null;
+      while (current) {
+        const style = getComputedStyle(current);
+        const overflowValue = style?.[styleProp];
+        const canScroll = axis === "x"
+          ? current.scrollWidth > current.clientWidth + 1
+          : current.scrollHeight > current.clientHeight + 1;
+        if (canScroll && ["auto", "scroll", "overlay"].includes(overflowValue)) {
+          return true;
+        }
+        current = current.parentElement;
+      }
+      return false;
+    };
     const fixedSticky = [...document.querySelectorAll("body *")]
       .filter((el) => {
         const rect = rectFor(el);
@@ -265,7 +310,8 @@ export function layoutAuditExpression({ selectors = [], maxMatches = 20 } = {}) 
         const rect = rectFor(el);
         const style = getComputedStyle(el);
         const issues = [];
-        if (rect.left < -1 || rect.right > viewportWidth + 1) {
+        const horizontallyOutOfViewport = rect.left < -1 || rect.right > viewportWidth + 1;
+        if (horizontallyOutOfViewport && !hasScrollableOverflowAncestor(el, "x")) {
           issues.push("out-of-viewport");
         }
         if (el.scrollWidth > el.clientWidth + 1 && !["hidden", "clip"].includes(style.overflowX)) {
@@ -329,6 +375,13 @@ export function interactionTraceExpression({
       dispatchedActionCount: 0
     };
 
+    if (globalThis.HYPEROPEN_DEBUG?.waitForIdle) {
+      try {
+        await globalThis.HYPEROPEN_DEBUG.waitForIdle({ quietMs: 160, timeoutMs: 4000, pollMs: 30 });
+      } catch (_error) {
+      }
+    }
+
     const observers = [];
     if (metrics.performanceObserverSupported) {
       try {
@@ -340,7 +393,7 @@ export function interactionTraceExpression({
             }
           }
         });
-        ls.observe({ type: "layout-shift", buffered: true });
+        ls.observe({ type: "layout-shift" });
         observers.push(ls);
       } catch (_error) {
       }
@@ -351,7 +404,7 @@ export function interactionTraceExpression({
             metrics.maxLongTaskMs = Math.max(metrics.maxLongTaskMs, entry.duration || 0);
           }
         });
-        lt.observe({ type: "longtask", buffered: true });
+        lt.observe({ type: "longtask" });
         observers.push(lt);
       } catch (_error) {
       }

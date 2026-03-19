@@ -117,29 +117,35 @@
                                        {:symbol "BTC"
                                         :timeframe-label "1D"
                                         :venue "Hyperopen"
-                                        :candle-data []}
+                                       :candle-data []}
                                        :1d
                                        {})
         classes (set (class-values (get-in canvas [1 :class])))
         bg-colors (set (collect-background-colors canvas))]
     (is (contains? classes "bg-base-100"))
     (is (contains? classes "min-w-0"))
+    (is (contains? classes "overflow-hidden"))
     (is (contains? classes "trading-chart-host"))
+    (is (not (contains? classes "h-full")))
     (is (not (contains? bg-colors "rgb(30, 41, 55)")))))
 
-(deftest trading-chart-view-contains-panel-overflow-to-chart-bounds-test
-  (let [view-node (chart-core/trading-chart-view {:active-asset "BTC"
-                                                  :active-market {:price-decimals 2}
-                                                  :candles {"BTC" {:1d []}}
-                                                  :chart-options {:selected-timeframe :1d
-                                                                  :selected-chart-type :candlestick
-                                                                  :active-indicators {}}})
-        panel-node (find-first-node view-node #(= "chart-panel" (get-in % [1 :data-parity-id])))
-        panel-classes (set (class-values (get-in panel-node [1 :class])))]
-    (is (some? panel-node))
+(deftest trading-chart-view-clips-chart-panel-overflow-test
+  (let [view (chart-core/trading-chart-view {:active-asset "BTC"
+                                             :active-market {:price-decimals 2}
+                                             :candles {"BTC" {:1d []}}
+                                             :chart-options {:selected-timeframe :1d
+                                                             :selected-chart-type :candlestick
+                                                             :active-indicators {}}})
+        panel (find-first-node view #(= "chart-panel" (get-in % [1 :data-parity-id])))
+        panel-classes (set (class-values (get-in panel [1 :class])))
+        shell-classes (set (class-values (get-in (nth panel 2) [1 :class])))]
+    (is (some? panel))
+    (is (contains? panel-classes "overflow-hidden"))
     (is (contains? panel-classes "min-h-0"))
     (is (contains? panel-classes "min-w-0"))
-    (is (contains? panel-classes "overflow-hidden"))))
+    (is (contains? shell-classes "overflow-hidden"))
+    (is (contains? shell-classes "min-w-0"))
+    (is (contains? shell-classes "min-h-0"))))
 
 (deftest chart-top-menu-dropdowns-use-high-z-opaque-tokenized-classes-test
   (let [menu (chart-core/chart-top-menu {:chart-options {:timeframes-dropdown-visible true

@@ -173,6 +173,18 @@
   (set! (.-display (.-style controls))
         (if visible? "inline-flex" "none")))
 
+(defn- set-panel-focus-state!
+  [panel focused?]
+  (let [style (.-style panel)]
+    (set! (.-borderColor style)
+          (if focused?
+            "rgba(56, 189, 248, 0.72)"
+            "rgba(148, 163, 184, 0.2)"))
+    (set! (.-boxShadow style)
+          (if focused?
+            "0 0 0 2px rgba(56, 189, 248, 0.28)"
+            "none"))))
+
 (defn- make-icon!
   [document path-d]
   (let [icon (.createElementNS document "http://www.w3.org/2000/svg" "svg")
@@ -305,6 +317,7 @@
                "background:rgba(7,17,25,0.56);"
                "font-size:12px;line-height:1.2;font-weight:500;"
                "color:#e5e7eb;pointer-events:auto;outline:none;"))
+    (set-panel-focus-state! panel false)
     (set! (.-textContent label-node) indicator-label)
     (set! (.-cssText (.-style label-node)) "color:#d1d5db;white-space:nowrap;")
     (set! (.-textContent value-node) "--")
@@ -323,13 +336,16 @@
     (.addEventListener panel "mouseleave"
                        (fn [_] (set-controls-visible! controls false)))
     (.addEventListener panel "focusin"
-                       (fn [_] (set-controls-visible! controls true)))
+                       (fn [_]
+                         (set-controls-visible! controls true)
+                         (set-panel-focus-state! panel true)))
     (.addEventListener panel "focusout"
                        (fn [event]
                          (let [next-focused (.-relatedTarget event)]
                            (when (or (nil? next-focused)
                                      (not (.contains panel next-focused)))
-                             (set-controls-visible! controls false)))))
+                             (set-controls-visible! controls false)
+                             (set-panel-focus-state! panel false)))))
     {:root root
      :value-node value-node
      :controls controls}))

@@ -276,12 +276,19 @@
 
 (deftest trade-view-root-and-right-column-layout-test
   (let [view-node (trade-view/trade-view trade-view-test-state)
-        root-classes (root-class-set view-node)]
+        root-classes (root-class-set view-node)
+        scroll-shell (find-first-node view-node
+                                      #(= "trade-scroll-shell"
+                                          (get-in % [1 :data-role])))
+        scroll-shell-classes (node-class-set scroll-shell)]
     (is (not (contains? root-classes "overflow-auto")))
     (is (contains? root-classes "min-h-0"))
     (is (contains? root-classes "overflow-hidden"))
-    (is (contains? root-classes "scrollbar-hide"))
-    (is (contains? root-classes "xl:overflow-y-auto"))
+    (is (not (contains? root-classes "scrollbar-hide")))
+    (is (not (contains? root-classes "xl:overflow-y-auto")))
+    (is (some? scroll-shell))
+    (is (contains? scroll-shell-classes "scrollbar-hide"))
+    (is (contains? scroll-shell-classes "overflow-y-auto"))
     (is (contains-class? view-node "right-[320px]"))
     (is (contains-class? view-node "lg:grid-cols-[minmax(0,1fr)_320px]"))
     (is (contains-class? view-node "lg:grid-rows-[minmax(520px,1fr)_minmax(300px,auto)]"))

@@ -599,7 +599,7 @@
                           (catch :default _ nil)))
                       (chart-runtime/clear-state! node))
                     nil))]
-     [:div {:class ["w-full" "relative" "flex-1" "min-h-[360px]" "min-w-0" "bg-base-100" "trading-chart-host"]
+     [:div {:class ["w-full" "min-w-0" "relative" "flex-1" "min-h-[360px]" "overflow-hidden" "bg-base-100" "trading-chart-host"]
             :data-parity-id "chart-canvas"
             :replicant/key (str "chart-" (hash active-indicators) "-" legend-key "-" volume-visible?)
             :replicant/on-render mount!}])))

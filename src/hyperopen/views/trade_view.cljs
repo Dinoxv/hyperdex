@@ -347,9 +347,19 @@
                               :websocket-health (when show-surface-freshness-cues?
                                                   websocket-health)
                               :loading (and active-asset (nil? orderbook-data))}]
-    [:div {:class ["flex-1" "flex" "flex-col" "min-h-0" "overflow-hidden" "scrollbar-hide" "xl:overflow-y-auto"]
+    [:div {:class ["flex-1" "flex" "flex-col" "min-h-0" "overflow-hidden"]
            :data-parity-id "trade-root"}
-     [:div {:class ["w-full" "h-full" "px-0" "py-0" "space-y-0" "flex" "flex-col" "min-h-0"]}
+     [:div {:class ["w-full"
+                    "h-full"
+                    "px-0"
+                    "py-0"
+                    "space-y-0"
+                    "flex"
+                    "flex-col"
+                    "min-h-0"
+                    "scrollbar-hide"
+                    "overflow-y-auto"]
+            :data-role "trade-scroll-shell"}
       [:div {:class (into ["lg:hidden" "border-b" "border-base-300" "bg-base-200"]
                           (when mobile-account-surface?
                             ["hidden"]))

@@ -5,6 +5,7 @@ import {
   computedStyleExpression,
   focusWalkExpression,
   interactionTraceExpression,
+  layoutAuditExpression,
   nativeControlsExpression
 } from "../src/dom_probes.mjs";
 
@@ -96,6 +97,9 @@ function buildContext() {
   context.getComputedStyle = (element) => ({
     display: "block",
     position: "static",
+    visibility: "visible",
+    opacity: "1",
+    pointerEvents: "auto",
     outlineWidth: "0px",
     outlineStyle: "none",
     outlineColor: "rgba(0, 0, 0, 0)",
@@ -197,6 +201,123 @@ test("focusWalkExpression reports controls without visible focus indicators", as
 
   assert.equal(result.count, 2);
   assert.deepEqual(Array.from(result.invisibleFocusSelectors), ["plain-button"]);
+});
+
+test("focusWalkExpression skips hidden and disabled controls", async () => {
+  const context = buildContext();
+  const root = createElement(context, { tagName: "div", className: "scope" });
+  const hiddenButton = createElement(context, {
+    tagName: "button",
+    id: "hidden-button"
+  });
+  hiddenButton.__style = {
+    visibility: "hidden",
+    opacity: "0",
+    pointerEvents: "none"
+  };
+  const disabledButton = createElement(context, {
+    tagName: "button",
+    id: "disabled-button",
+    disabled: true
+  });
+  const visibleButton = createElement(context, {
+    tagName: "button",
+    id: "visible-button"
+  });
+  visibleButton.__style = {
+    outlineWidth: "2px",
+    outlineStyle: "solid",
+    outlineColor: "rgb(255, 0, 0)"
+  };
+  root.querySelectorAll = (selector) =>
+    selector === "a[href], button, input, select, textarea, [tabindex]:not([tabindex='-1'])"
+      ? [hiddenButton, disabledButton, visibleButton]
+      : [];
+  hiddenButton.parentElement = root;
+  disabledButton.parentElement = root;
+  visibleButton.parentElement = root;
+  context.document.body = root;
+  context.document.activeElement = root;
+  context.document.querySelectorAll = (selector) => (selector === ".scope" ? [root] : []);
+
+  const result = await vm.runInNewContext(
+    focusWalkExpression({ selectors: [".scope"], limit: 5 }),
+    context
+  );
+
+  assert.equal(result.count, 1);
+  assert.equal(result.steps[0].id, "visible-button");
+  assert.deepEqual(Array.from(result.invisibleFocusSelectors), []);
+});
+
+test("layoutAuditExpression ignores out-of-viewport descendants inside horizontal scrollers", async () => {
+  const context = buildContext();
+  context.window.innerWidth = 768;
+  const body = createElement(context, {
+    tagName: "body",
+    rect: {
+      left: 0,
+      top: 0,
+      right: 768,
+      bottom: 900,
+      width: 768,
+      height: 900
+    },
+    scrollWidth: 768,
+    clientWidth: 768
+  });
+  const scroller = createElement(context, {
+    tagName: "div",
+    className: "scroller",
+    rect: {
+      left: 24,
+      top: 120,
+      right: 744,
+      bottom: 420,
+      width: 720,
+      height: 300
+    },
+    scrollWidth: 920,
+    clientWidth: 720
+  });
+  scroller.__style = {
+    overflowX: "auto"
+  };
+  const row = createElement(context, {
+    tagName: "tr",
+    attributes: { "data-role": "vault-row" },
+    rect: {
+      left: 24,
+      top: 180,
+      right: 804,
+      bottom: 232,
+      width: 780,
+      height: 52
+    },
+    scrollWidth: 780,
+    clientWidth: 780
+  });
+  scroller.parentElement = body;
+  row.parentElement = scroller;
+  context.document.body = body;
+  context.document.documentElement.scrollWidth = 768;
+  context.document.querySelectorAll = (selector) => {
+    if (selector === "[data-role='vault-row']") {
+      return [row];
+    }
+    if (selector === "body *") {
+      return [body, scroller, row];
+    }
+    return [];
+  };
+
+  const result = await vm.runInNewContext(
+    layoutAuditExpression({ selectors: ["[data-role='vault-row']"] }),
+    context
+  );
+
+  assert.equal(result.documentHorizontalOverflowPx, 0);
+  assert.deepEqual(Array.from(result.overflowIssues), []);
 });
 
 test("interactionTraceExpression records layout shift and long-task metrics", async () => {

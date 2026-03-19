@@ -1136,9 +1136,7 @@
 
 (defn portfolio-view [state]
   (let [view-model (portfolio-vm/portfolio-vm state)]
-    [:div {:class ["flex-1"
-                   "min-h-0"
-                   "overflow-y-auto"
+    [:div {:class ["w-full"
                    "app-shell-gutter"
                    "py-4"
                    "space-y-4"

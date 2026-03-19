@@ -192,6 +192,11 @@
                                                           "overflow-y-auto")))
         all-text (set (collect-strings view-node))]
     (is (some? root-node))
+    (is (contains? (set (class-values root-node)) "w-full"))
+    (is (contains? (set (class-values root-node)) "app-shell-gutter"))
+    (is (not (contains? (set (class-values root-node)) "flex-1")))
+    (is (not (contains? (set (class-values root-node)) "min-h-0")))
+    (is (not (contains? (set (class-values root-node)) "overflow-y-auto")))
     (is (some? actions-row))
     (is (some? volume-card))
     (is (some? fees-card))
