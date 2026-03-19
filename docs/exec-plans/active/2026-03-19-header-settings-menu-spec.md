@@ -6,9 +6,9 @@ This document is governed by `/hyperopen/.agents/PLANS.md` and `/hyperopen/docs/
 
 ## Purpose / Big Picture
 
-After this change, a user on Hyperopen should be able to click the existing header gear icon on the trade route and open a real `Trading Settings` surface instead of a dead icon. The surface should expose only settings that Hyperopen can honor truthfully, with conservative defaults, clear risk copy, and no fake parity checkboxes.
+After this change, a user on Hyperopen should be able to click the existing header gear icon on the trade route and open a real `Trading settings` surface instead of a dead icon. The surface should expose only settings that Hyperopen can honor truthfully, with conservative defaults, clear risk copy, and no fake parity checkboxes.
 
-Phase 1 is already shipped. This refresh narrows the next implementation increment to phase 1.5: `Animate order book` and `Show fill markers on chart`. The plan should continue to defer transaction-delay protection, verbose diagnostics, and order confirmation toggles to a later follow-up until the underlying product flows are ready.
+Phase 1 and phase 1.5 are already implemented. This refresh shifts the active work to a UI-improvement pass on the same surface: reduce copy, remove ambiguous status pills, flatten the rows into a compact divider-based panel, and make the component feel like a dense trading popover instead of a generic settings modal. The plan should continue to defer transaction-delay protection, verbose diagnostics, and order confirmation toggles to a later follow-up until the underlying product flows are ready.
 
 ## Progress
 
@@ -21,7 +21,11 @@ Phase 1 is already shipped. This refresh narrows the next implementation increme
 - [x] (2026-03-19 15:30Z) Re-scoped the active plan for phase 1.5 so implementation can add order-book animation and fill markers without widening into unrelated security or confirmation flows.
 - [x] (2026-03-19 16:01Z) Collected `acceptance_test_writer` and `edge_case_test_writer` proposals aligned on startup restore, order-book transition gating, chart marker gating, and persistence invariants.
 - [x] (2026-03-19 16:01Z) Collected `ui_designer` copy and grouping guidance for a compact `Display` section with scoped chart-marker wording.
-- [ ] Materialize the approved RED-phase tests and begin phase-1.5 execution.
+- [x] (2026-03-19 16:29Z) Shipped phase-1.5 behavior for `Animate order book` and `Show fill markers on chart`, including persisted preferences and chart marker runtime wiring.
+- [x] (2026-03-19 20:42Z) Collected a follow-up `ui_designer` recommendation to compress the settings surface into a single divider-based list with shorter labels, shorter helper copy, no badge pills, and a bottom scope note.
+- [x] (2026-03-19 20:58Z) Implemented the compact Trading Settings redesign with shorter copy, divider-based rows, inline confirmation, and confirmation-first `Escape` handling.
+- [x] (2026-03-19 20:59Z) Restored explicit `Enable Trading` warning copy inside the inline session-persistence confirmation after read-only review flagged the regression.
+- [x] (2026-03-19 20:59Z) Reran required repo gates and governed browser QA for the redesigned surface. Repo gates passed; browser QA still failed on standing `/trade`, `/portfolio`, and `/vaults` route-level findings rather than Trading Settings selectors.
 
 ## Surprises & Discoveries
 
@@ -89,6 +93,14 @@ Phase 1 is already shipped. This refresh narrows the next implementation increme
   Rationale: the surface should behave like a product control panel, not a screenshot replica, and the new phase should stay focused on the two adjacent settings we can honestly honor.
   Date/Author: 2026-03-19 / Codex
 
+- Decision: redesign the settings surface as a compact, divider-based popover or sheet with no nested setting cards or status badges.
+  Rationale: the first implementation was accurate but visually too tall and too prose-heavy for a dense trading workflow. Flattening the rows and moving scope language into quieter supporting copy reduces cognitive load without widening feature scope.
+  Date/Author: 2026-03-19 / Codex
+
+- Decision: shorten the visible labels to `Remember session`, `Fill alerts`, `Animate order book`, and `Fill markers`.
+  Rationale: the helper line should carry the specific behavior, while the primary row label should remain highly scannable inside a compact trading popover.
+  Date/Author: 2026-03-19 / Codex
+
 - Decision: keep new phase-1 preferences in a small versioned local preference record, but keep trading-session persistence authoritative in the existing wallet storage-mode path.
   Rationale: `localStorage` is appropriate for bounded startup preferences under `/hyperopen/docs/BROWSER_STORAGE.md`, while duplicating `:local` versus `:session` state in two places would create drift.
   Date/Author: 2026-03-19 / Codex
@@ -99,9 +111,9 @@ Phase 1 is already shipped. This refresh narrows the next implementation increme
 
 ## Outcomes & Retrospective
 
-This planning pass refreshed the original phase-1 spec into a narrower phase-1.5 implementation story. The resulting surface still behaves like a trustworthy Hyperopen control panel, but the next increment is now constrained to two adjacent runtime-backed preferences: order-book animation and chart fill markers.
+This planning pass first refreshed the original phase-1 spec into a narrower phase-1.5 implementation story and then into a UI-improvement pass for the same settings surface. The resulting surface now uses a denser divider-based layout, shorter labels, shorter helper copy, a quiet footer note, and an inline session-persistence confirmation that still preserves the re-enable warning for the only security-adjacent row that mutates trading state.
 
-The plan keeps the broader safety line intact. It continues to separate local UI toggles from account-level trading semantics, and it now makes the remaining work explicit for transaction delay protection, verbose diagnostics, and confirmation toggles as later follow-up items rather than implied next-step scope. No production code has been written for phase 1.5 yet; the remaining work is implementation and governed UI validation.
+The plan keeps the broader safety line intact. It continues to separate local UI toggles from account-level trading semantics, and it keeps transaction delay protection, verbose diagnostics, and confirmation toggles as later follow-up items rather than implied next-step scope. The remaining blocker is not Trading Settings behavior itself; it is the repository’s standing governed browser-QA failures on shared `/trade`, `/portfolio`, and `/vaults` route surfaces.
 
 ## Context and Orientation
 
@@ -125,11 +137,13 @@ This product spec deliberately translates the screenshot into a smaller Hyperope
 
 ### Surface Design
 
-On desktop and larger tablet widths, the gear should open a right-aligned `Trading Settings` popover anchored to the trigger. The popover should be approximately `320` to `360` pixels wide, use the existing dropdown panel visual language, and stay short enough that it does not feel like a second navigation menu. On narrow mobile widths, the same trigger should open a bottom sheet with the same content order, a clear title, a close affordance, and scrollable body content when needed.
+On desktop and larger tablet widths, the gear should open a right-aligned `Trading settings` popover anchored to the trigger. The popover should be approximately `320` to `344` pixels wide, use the existing dropdown panel visual language, and stay short enough that it does not feel like a second navigation menu. On narrow mobile widths, the same trigger should open a compact bottom sheet with the same content order, a clear title, a close affordance, and scrollable body content when needed.
 
 The gear trigger itself should be available at all required review widths: `375`, `768`, `1280`, and `1440`. The current `md:hidden lg:flex` treatment creates a product gap at `768`, so the implementation must remove that breakpoint hole.
 
-Every settings row in this surface should have three parts: a plain-English label, a short supporting sentence when risk or scope needs clarification, and a right-side control or status cue. Suitable cues are `This device`, `In app`, or `Requires re-enable`. Avoid color-only meaning. Avoid long disabled lists. If a future version needs to hint that more controls are coming, use one muted note at the bottom instead of fake switches.
+Every settings row in this surface should have three parts: a short label, a one-line supporting sentence when risk or scope needs clarification, and a right-side toggle. Avoid badge pills, nested cards, or color-only meaning. Scope language should live in the supporting sentence or one muted footer note at the bottom instead of decorative chips. If a future version needs to hint that more controls are coming, use one muted note at the bottom instead of fake switches.
+
+The visual structure should be one outer surface with divider-separated rows, not stacked inner cards. Use tight row padding, a short title bar, and a single bottom scope note equivalent to `Applies only to this browser on this device.`
 
 Phase-1 rows should save immediately only when the effect is a local UI preference. Settings that invalidate trading state must show a short confirmation step first. The open or close UI state should update before any side effects fire, in line with `/hyperopen/docs/FRONTEND.md`.
 
@@ -154,12 +168,18 @@ This bounded phase adds only the two settings that the codebase can support with
 
 The new rows should live under a compact `Display` section rather than expanding the panel with parity filler. Use one short helper sentence per row and small scope badges rather than extra explanatory blocks.
 
+The UI-improvement pass for this phase should restyle all four visible rows with shorter labels and shorter helper copy:
+
+- `Remember session`
+  Supporting copy equivalent to: `Keep trading enabled across browser restarts on this device.`
+- `Fill alerts`
+  Supporting copy equivalent to: `Show fill alerts while Hyperopen is open.`
 - `Animate order book`
-  Use helper copy equivalent to: `Smooths bid and ask depth-bar changes when the order book updates. Turning it off keeps the same data, just without motion.`
-  Use badges equivalent to `Order Book` and `Motion`.
-- `Show fill markers on chart`
-  Use helper copy equivalent to: `Shows fill markers for the active asset on the price chart. This does not add account-wide markers or markers for other assets.`
-  Use badges equivalent to `Chart` and `Active Asset`.
+  Supporting copy equivalent to: `Smooth bid and ask depth changes as the book updates.`
+- `Fill markers`
+  Supporting copy equivalent to: `Show buy and sell markers for the active asset on the chart.`
+
+The session-persistence confirmation state should appear inline under `Remember session` as a short confirm strip with `Cancel` and `Change`, not as a separate nested card. `Escape` should dismiss that inline confirmation first before closing the overall surface.
 
 ### Later
 

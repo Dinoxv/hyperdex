@@ -124,19 +124,24 @@
         title (find-node-by-role view "trading-settings-title")
         storage-row (find-node-by-role view "trading-settings-storage-mode-row")
         fill-alerts-row (find-node-by-role view "trading-settings-fill-alerts-row")
+        footer-note (find-node-by-role view "trading-settings-footer-note")
         all-text (set (collect-strings view))]
     (is (some? panel))
     (is (some? sheet))
     (is (= "dialog" (get-in panel [1 :role])))
     (is (= true (get-in panel [1 :aria-modal])))
-    (is (contains? (set (collect-strings title)) "Trading Settings"))
+    (is (contains? (set (collect-strings title)) "Trading settings"))
     (is (some? storage-row))
     (is (some? fill-alerts-row))
-    (is (contains? all-text "Remember trading session on this device"))
-    (is (contains? all-text "Show fill alerts in app"))
-    (is (contains? all-text "This device"))
-    (is (contains? all-text "Requires re-enable"))
-    (is (contains? all-text "In app"))
+    (is (some? footer-note))
+    (is (contains? all-text "Remember session"))
+    (is (contains? all-text "Fill alerts"))
+    (is (contains? all-text "Keep trading enabled across browser restarts on this device."))
+    (is (contains? all-text "Show fill alerts while Hyperopen is open."))
+    (is (contains? all-text "Applies only to this browser on this device."))
+    (is (not (contains? all-text "This device")))
+    (is (not (contains? all-text "Requires re-enable")))
+    (is (not (contains? all-text "In app")))
     (is (not (contains? all-text "Disable Unified Account Mode")))
     (is (not (contains? all-text "Disable HIP-3 Dex Abstraction")))
     (is (not (contains? all-text "Disable Transaction Delay Protection")))))
@@ -153,13 +158,13 @@
         all-text (set (collect-strings view))]
     (is (contains? all-text "Display"))
     (is (contains? all-text "Animate order book"))
-    (is (contains? all-text "Smooths bid and ask depth-bar changes when the order book updates. Turning it off keeps the same data, just without motion."))
-    (is (contains? all-text "Show fill markers on chart"))
-    (is (contains? all-text "Shows fill markers for the active asset on the price chart. This does not add account-wide markers or markers for other assets."))
-    (is (contains? all-text "Order Book"))
-    (is (contains? all-text "Motion"))
-    (is (contains? all-text "Chart"))
-    (is (contains? all-text "Active Asset"))))
+    (is (contains? all-text "Fill markers"))
+    (is (contains? all-text "Smooth bid and ask depth changes as the book updates."))
+    (is (contains? all-text "Show buy and sell markers for the active asset on the chart."))
+    (is (not (contains? all-text "Order Book")))
+    (is (not (contains? all-text "Motion")))
+    (is (not (contains? all-text "Chart")))
+    (is (not (contains? all-text "Active Asset")))))
 
 (deftest header-renders-session-default-when-storage-mode-is-missing-test
   (let [view (header-view/header-view {:wallet {:connected? false}
@@ -168,8 +173,24 @@
                                                    :settings-confirmation nil}
                                        :trading-settings {:fill-alerts-enabled? true}})
         all-text (set (collect-strings view))]
-    (is (contains? all-text "This session"))
+    (is (contains? all-text "Remember session"))
+    (is (contains? all-text "Fill alerts"))
+    (is (not (contains? all-text "This session")))
     (is (not (contains? all-text "This device")))))
+
+(deftest header-renders-storage-mode-confirmation-warning-when-open-test
+  (let [view (header-view/header-view {:wallet {:connected? false
+                                                :agent {:storage-mode :session}}
+                                       :router {:path "/trade"}
+                                       :header-ui {:settings-open? true
+                                                   :settings-confirmation {:kind :agent-storage-mode
+                                                                           :next-mode :local}}
+                                       :trading-settings {:fill-alerts-enabled? true}})
+        all-text (set (collect-strings view))]
+    (is (contains? all-text "Remember session on this device?"))
+    (is (contains? all-text "Changes trading persistence on this device and will require Enable Trading again."))
+    (is (contains? all-text "Cancel"))
+    (is (contains? all-text "Change"))))
 
 (deftest header-settings-trigger-focus-return-hook-focuses-trigger-when-flagged-test
   (let [focus-calls (atom 0)

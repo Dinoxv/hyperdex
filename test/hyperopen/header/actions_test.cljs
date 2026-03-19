@@ -70,6 +70,12 @@
 (deftest header-settings-escape-key-closes-only-on-escape-test
   (let [keydown-action (resolve-action 'handle-header-settings-keydown)]
     (is (some? keydown-action))
+    (is (= [[:effects/save [:header-ui :settings-confirmation] nil]]
+           (when keydown-action
+             (keydown-action {:header-ui {:settings-open? true
+                                          :settings-confirmation {:kind :agent-storage-mode
+                                                                  :next-mode :local}}}
+                             "Escape"))))
     (is (= [[:effects/save [:header-ui :settings-confirmation] nil]
             [:effects/save [:header-ui :settings-open?] false]
             [:effects/save [:header-ui :settings-return-focus?] true]]

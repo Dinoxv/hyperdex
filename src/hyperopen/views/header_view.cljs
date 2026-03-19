@@ -431,8 +431,8 @@
              extra-attrs)
     body]))
 
-(def ^:private trading-settings-intro-copy
-  "Controls Hyperopen can honor today. Changes apply only to this browser on this device.")
+(def ^:private trading-settings-footer-copy
+  "Applies only to this browser on this device.")
 
 (def ^:private trading-settings-close-actions
   [[:actions/close-header-settings]])
@@ -446,21 +446,6 @@
 (defn- remember-trading-session?
   [state]
   (= :local (trading-settings-storage-mode state)))
-
-(defn- trading-settings-badge
-  [label tone]
-  [:span {:class (into ["inline-flex"
-                        "items-center"
-                        "rounded-full"
-                        "border"
-                        "px-2.5"
-                        "py-1"
-                        "text-[0.68rem]"
-                        "font-medium"
-                        "uppercase"
-                        "tracking-[0.08em]"]
-                       tone)}
-   label])
 
 (defn- focus-visible-settings-surface!
   [node]
@@ -487,42 +472,44 @@
   (case (some-> (:next-mode confirmation)
                 agent-session/normalize-storage-mode)
     :local
-    {:title "Remember trading on this device?"
-     :body "Hyperopen will keep your trading session on this browser and device after restart. This applies only here. To finish the change, you’ll need to Enable Trading again."
-     :confirm-label "Remember on this device"}
+    {:title "Remember session on this device?"
+     :body "Changes trading persistence on this device and will require Enable Trading again."
+     :confirm-label "Change"}
 
     :session
-    {:title "Stop remembering this trading session?"
-     :body "Hyperopen will stop keeping your trading session after browser restart on this device. Trading will stay enabled only for the current browser session. To finish the change, you’ll need to Enable Trading again."
-     :confirm-label "Keep session-only"}
+    {:title "Use session-only trading?"
+     :body "Changes trading persistence for this browser session and will require Enable Trading again."
+     :confirm-label "Change"}
 
     nil))
 
-(defn- trading-settings-confirmation-card
+(defn- trading-settings-confirmation-strip
   [confirmation]
   (when-let [{:keys [title body confirm-label]}
              (agent-storage-confirmation-copy confirmation)]
-    [:div {:class ["rounded-2xl"
-                   "border"
-                   "border-base-300"
-                   "bg-base-100"
-                   "p-4"
-                   "shadow-2xl"]
+    [:div {:class ["mt-3"
+                   "flex"
+                   "items-center"
+                   "justify-between"
+                   "gap-3"
+                   "border-t"
+                   "border-base-300/70"
+                   "pt-3"]
            :data-role "trading-settings-storage-mode-confirmation"}
-     [:div {:class ["space-y-2"]}
-      [:h4 {:class ["text-sm" "font-semibold" "text-white"]}
+     [:div {:class ["min-w-0" "space-y-1"]}
+      [:div {:class ["text-[0.84rem]" "font-semibold" "text-white"]}
        title]
-      [:p {:class ["text-sm" "leading-6" "text-gray-300"]}
+      [:p {:class ["text-[0.75rem]" "leading-5" "text-gray-400"]}
        body]]
-     [:div {:class ["mt-4" "flex" "flex-wrap" "justify-end" "gap-2"]}
+     [:div {:class ["flex" "shrink-0" "gap-2"]}
       [:button {:type "button"
-                :class ["rounded-xl"
+                :class ["rounded-lg"
                         "border"
                         "border-base-300"
                         "bg-transparent"
-                        "px-3.5"
-                        "py-2"
-                        "text-sm"
+                        "px-3"
+                        "py-1.5"
+                        "text-[0.8rem]"
                         "font-medium"
                         "text-gray-200"
                         "transition-colors"
@@ -531,13 +518,13 @@
                 :on {:click [[:actions/cancel-agent-storage-mode-change]]}}
        "Cancel"]
       [:button {:type "button"
-                :class ["rounded-xl"
+                :class ["rounded-lg"
                         "border"
                         "border-teal-500/40"
                         "bg-teal-600/20"
-                        "px-3.5"
-                        "py-2"
-                        "text-sm"
+                        "px-3"
+                        "py-1.5"
+                        "text-[0.8rem]"
                         "font-medium"
                         "text-teal-100"
                         "transition-colors"
@@ -551,29 +538,19 @@
            data-role
            helper-copy
            on-change
-           status-cues
            title]}
    body]
-  [:div {:class ["space-y-3"
-                 "rounded-2xl"
-                 "border"
-                 "border-base-300"
-                 "bg-base-100"
-                 "p-4"]
+  [:div {:class ["px-4" "py-3.5"]
          :data-role data-role}
-   [:div {:class ["flex" "items-start" "justify-between" "gap-3"]}
-    [:div {:class ["min-w-0" "space-y-2"]}
-     [:div {:class ["text-sm" "font-medium" "text-white"]}
+   [:div {:class ["flex" "items-start" "justify-between" "gap-4"]}
+    [:div {:class ["min-w-0" "space-y-1"]}
+     [:div {:class ["text-[0.95rem]" "font-semibold" "leading-5" "text-white"]}
       title]
-     [:p {:class ["text-sm" "leading-6" "text-gray-300"]}
-      helper-copy]
-     [:div {:class ["flex" "flex-wrap" "gap-2"]}
-      (for [{:keys [label tone]} status-cues]
-        ^{:key label}
-        (trading-settings-badge label tone))]]
+     [:p {:class ["text-[0.75rem]" "leading-5" "text-gray-400"]}
+      helper-copy]]
     [:input {:type "checkbox"
              :checked (boolean checked?)
-             :class ["mt-1"
+             :class ["mt-0.5"
                      "h-4"
                      "w-4"
                      "shrink-0"
@@ -595,20 +572,17 @@
         show-fill-markers? (trading-settings/show-fill-markers? state)
         confirmation (get-in state [:header-ui :settings-confirmation])]
     [:div {:class ["flex" "max-h-full" "flex-col"]}
-    [:div {:class ["flex"
-                    "items-start"
+     [:div {:class ["flex"
+                    "items-center"
                     "justify-between"
                     "gap-4"
                     "border-b"
                     "border-base-300"
-                    "px-5"
-                    "py-4"]}
-      [:div {:class ["space-y-2"]}
-       [:h3 {:class ["text-lg" "font-semibold" "text-white"]
-             :data-role "trading-settings-title"}
-        "Trading Settings"]
-       [:p {:class ["max-w-[24rem]" "text-sm" "leading-6" "text-gray-300"]}
-        trading-settings-intro-copy]]
+                    "px-4"
+                    "py-3.5"]}
+      [:h3 {:class ["text-[1rem]" "font-semibold" "text-white"]
+            :data-role "trading-settings-title"}
+       "Trading settings"]
       [:button {:type "button"
                 :class ["inline-flex"
                         "h-9"
@@ -627,76 +601,52 @@
                 :data-role "trading-settings-close"
                 :on {:click trading-settings-close-actions}}
        "×"]]
-     [:div {:class ["space-y-4" "overflow-y-auto" "px-5" "py-4"]}
-      [:div {:class ["space-y-3"]}
-       [:div {:class ["text-[0.68rem]"
-                      "font-semibold"
-                      "uppercase"
-                      "tracking-[0.14em]"
-                      "text-gray-400"]}
-        "Trading Session"]
+     [:div {:class ["overflow-y-auto" "py-2"]}
+      (list
+       [:div {:class ["px-4" "pb-2" "pt-2" "text-[0.68rem]" "font-semibold" "uppercase" "tracking-[0.14em]" "text-gray-400"]}
+        "Session"]
        (trading-settings-row
-        {:title "Remember trading session on this device"
-         :helper-copy "When on, Hyperopen can keep trading enabled after this browser restarts on this device. When off, trading stays enabled only for the current browser session."
+        {:title "Remember session"
+         :helper-copy "Keep trading enabled across browser restarts on this device."
          :checked? remember?
-         :aria-label "Remember trading session on this device"
-         :status-cues [{:label (if remember? "This device" "This session")
-                        :tone ["border-base-300" "bg-base-200" "text-gray-300"]}
-                       {:label "Requires re-enable"
-                        :tone ["border-base-300" "bg-base-200" "text-gray-200"]}]
+         :aria-label "Remember session"
          :data-role "trading-settings-storage-mode-row"
          :on-change [[:actions/request-agent-storage-mode-change :event.target/checked]]}
-        (trading-settings-confirmation-card confirmation))]
-      [:div {:class ["h-px" "bg-base-300"]}]
-      [:div {:class ["space-y-3"]}
-       [:div {:class ["text-[0.68rem]"
-                      "font-semibold"
-                      "uppercase"
-                      "tracking-[0.14em]"
-                      "text-gray-400"]}
+        (trading-settings-confirmation-strip confirmation))
+       [:div {:class ["h-px" "bg-base-300/70"]}]
+       [:div {:class ["px-4" "pb-2" "pt-3" "text-[0.68rem]" "font-semibold" "uppercase" "tracking-[0.14em]" "text-gray-400"]}
         "Alerts"]
        (trading-settings-row
-        {:title "Show fill alerts in app"
-         :helper-copy "Shows fill alerts while Hyperopen is open. This does not enable browser or system notifications."
+        {:title "Fill alerts"
+         :helper-copy "Show fill alerts while Hyperopen is open."
          :checked? fill-alerts-enabled?
-         :aria-label "Show fill alerts in app"
-         :status-cues [{:label "In app"
-                        :tone ["border-base-300" "bg-base-200" "text-primary"]}]
+         :aria-label "Fill alerts"
          :data-role "trading-settings-fill-alerts-row"
          :on-change [[:actions/set-fill-alerts-enabled :event.target/checked]]}
-        nil)]
-      [:div {:class ["h-px" "bg-base-300"]}]
-      [:div {:class ["space-y-3"]}
-       [:div {:class ["text-[0.68rem]"
-                      "font-semibold"
-                      "uppercase"
-                      "tracking-[0.14em]"
-                      "text-gray-400"]}
+        nil)
+       [:div {:class ["h-px" "bg-base-300/70"]}]
+       [:div {:class ["px-4" "pb-2" "pt-3" "text-[0.68rem]" "font-semibold" "uppercase" "tracking-[0.14em]" "text-gray-400"]}
         "Display"]
        (trading-settings-row
         {:title "Animate order book"
-         :helper-copy "Smooths bid and ask depth-bar changes when the order book updates. Turning it off keeps the same data, just without motion."
+         :helper-copy "Smooth bid and ask depth changes as the book updates."
          :checked? animate-orderbook?
          :aria-label "Animate order book"
-         :status-cues [{:label "Order Book"
-                        :tone ["border-base-300" "bg-base-200" "text-gray-200"]}
-                       {:label "Motion"
-                        :tone ["border-base-300" "bg-base-200" "text-primary"]}]
          :data-role "trading-settings-animate-orderbook-row"
          :on-change [[:actions/set-animate-orderbook-enabled :event.target/checked]]}
         nil)
+       [:div {:class ["h-px" "bg-base-300/70"]}]
        (trading-settings-row
-        {:title "Show fill markers on chart"
-         :helper-copy "Shows fill markers for the active asset on the price chart. This does not add account-wide markers or markers for other assets."
+        {:title "Fill markers"
+         :helper-copy "Show buy and sell markers for the active asset on the chart."
          :checked? show-fill-markers?
-         :aria-label "Show fill markers on chart"
-         :status-cues [{:label "Chart"
-                        :tone ["border-base-300" "bg-base-200" "text-gray-200"]}
-                       {:label "Active Asset"
-                        :tone ["border-base-300" "bg-base-200" "text-primary"]}]
+         :aria-label "Fill markers"
          :data-role "trading-settings-fill-markers-row"
          :on-change [[:actions/set-fill-markers-enabled :event.target/checked]]}
-        nil)]]]))
+        nil)
+       [:div {:class ["border-t" "border-base-300/70" "px-4" "py-3" "text-[0.75rem]" "leading-5" "text-gray-400"]
+              :data-role "trading-settings-footer-note"}
+        trading-settings-footer-copy])]]))
 
 (defn- trading-settings-shell
   [state]
@@ -712,7 +662,7 @@
                       "z-[285]"
                       "mt-2"
                       "hidden"
-                      "w-[344px]"
+                      "w-[336px]"
                       "max-h-[70vh]"
                       "max-w-[calc(100vw-1.5rem)]"
                       "overflow-hidden"
@@ -733,9 +683,9 @@
                       "inset-x-0"
                       "bottom-0"
                       "z-[285]"
-                      "max-h-[82vh]"
+                      "max-h-[76vh]"
                       "overflow-hidden"
-                      "rounded-t-[28px]"
+                      "rounded-t-[24px]"
                       "border-t"
                       "border-base-300"
                       "bg-trading-bg"
