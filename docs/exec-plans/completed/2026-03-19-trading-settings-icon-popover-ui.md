@@ -19,7 +19,7 @@ This remains a visual refinement pass. Settings behavior, scope, persistence, an
 - [x] (2026-03-19 23:38Z) Ran a shadow-focused refinement pass against the zoomed reference, tightening the shell top highlight, bottom falloff, grouped-card lift, divider contrast, and switch geometry.
 - [x] (2026-03-19 23:42Z) Re-ran the governed browser review after the shadow-stack adjustments. `/trade` still passed visual, native-control, and styling-consistency review, while the overall run remained blocked by standing `/portfolio`, `/trade` desktop overflow, and `/vaults` route issues.
 - [x] (2026-03-19 23:49Z) Removed the residual row-hover darkening from Trading Settings after manual verification showed the grouped cards should stay visually stable on pointer hover.
-- [ ] Validate the latest hover-stability pass with user review and decide whether to keep iterating on Trading Settings polish in this active ExecPlan or move it to `completed`.
+- [x] (2026-03-20 01:14Z) Accepted the latest hover-stability pass based on direct user review and prepared the plan for closeout.
 
 ## Surprises & Discoveries
 
@@ -34,6 +34,9 @@ This remains a visual refinement pass. Settings behavior, scope, persistence, an
 
 - Observation: the reference uses a tighter, denser lower shadow and a faint top inset highlight on both the outer shell and inner cards; the earlier shadow stack was too diffuse and read more like a generic SaaS modal.
   Evidence: user-supplied zoomed reference image and `/hyperopen/src/hyperopen/views/header_view.cljs`.
+
+- Observation: the final remaining acceptance item was direct user polish review rather than another implementation or test gap.
+  Evidence: the only unchecked progress item before closeout was explicit user review of the hover-stability pass, and the user confirmed the work was done on 2026-03-20.
 
 ## Decision Log
 
@@ -57,9 +60,13 @@ This remains a visual refinement pass. Settings behavior, scope, persistence, an
   Rationale: the grouped cards already provide the elevation treatment, and the hover darkening introduced a mismatch against the reference and the user's manual review.
   Date/Author: 2026-03-19 / Codex
 
+- Decision: treat the user's direct review as final acceptance and close this visual refinement pass.
+  Rationale: the implementation, tests, and governed QA were already complete; the only open item was explicit user confirmation on the final polish pass, and that confirmation has now been provided.
+  Date/Author: 2026-03-20 / Codex
+
 ## Outcomes & Retrospective
 
-This pass landed the requested icon-enriched popover treatment: linear row icons, grouped layered cards, anchored motion, and custom switches, while preserving the existing font language and settings behavior. The latest refinement tightened the top inset highlight and bottom falloff so the shell and cards read closer to the floating-tile reference.
+This pass landed the requested icon-enriched popover treatment: linear row icons, grouped layered cards, anchored motion, and custom switches, while preserving the existing font language and settings behavior. The latest refinement tightened the top inset highlight and bottom falloff so the shell and cards read closer to the floating-tile reference, and the user has now approved the resulting Trading Settings polish.
 
 Repo gates are green. Governed browser QA continues to pass the visual, native-control, and styling-consistency checks for the Trading Settings surface on `/trade`, but the overall run still fails because of unrelated `/portfolio`, `/trade` desktop overflow, and `/vaults` route regressions.
 
