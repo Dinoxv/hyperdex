@@ -24,7 +24,7 @@ The user explicitly excluded action-semantics work from this pass. That means th
 - [x] (2026-03-18 19:28Z) Re-ran `npm test`, `npm run test:websocket`, and `npm run check` successfully after the visible-search and PNL-width follow-up patch.
 - [x] (2026-03-18 19:33Z) Tightened `Coin`, `Total Balance`, and `Repay` again, widened `PNL (ROE %)` further, and added an explicit `PNL -> Send` gutter via padding and alignment adjustments.
 - [x] (2026-03-18 19:33Z) Re-ran `npm test`, `npm run test:websocket`, and `npm run check` successfully after the second balances-spacing pass.
-- [ ] Re-run browser validation at `375`, `768`, `1280`, and `1440`, then record residual parity gaps that remain out of scope.
+- [x] (2026-03-20 00:55Z) Accepted manual live-route review from the user and treated browser signoff as complete for this issue closeout.
 
 ## Surprises & Discoveries
 
@@ -45,6 +45,9 @@ The user explicitly excluded action-semantics work from this pass. That means th
 
 - Observation: the live browser process on port `8083` is still executing the pre-change account-info bundle even after the current worktree passed compile and test gates.
   Evidence: a fresh browser-inspection session against `http://localhost:8083/trade?tab=balances` still reports `Balances (0)`, `Open Orders (0)`, `TWAP (0)`, no `Repay` header, and a panel class of `... h-96 ...`, while the served `resources/public/js/main.js` and local test/build outputs contained the newer balances-parity markers and `lg:h-[29rem]` at the time of inspection.
+
+- Observation: the user manually inspected the balances tab after implementation and approved closing the work without another recorded agent-run browser sweep.
+  Evidence: direct user instruction on 2026-03-20 to "just close out that feed" after manually looking into the remaining browser-signoff item.
 
 ## Decision Log
 
@@ -72,11 +75,15 @@ The user explicitly excluded action-semantics work from this pass. That means th
   Rationale: the user feedback and UI-agent review both pointed to the `USDC Value -> PNL -> Send` pinch point, so the effective fix was to reclaim width from low-value columns and combine a wider PNL track with extra right padding on `PNL` and left padding on `Send`.
   Date/Author: 2026-03-18 / Codex
 
+- Decision: accept the user's manual live-route inspection as the final browser signoff for this issue and close the tracked work.
+  Rationale: the remaining incomplete item was acceptance-only, the implementation and required repository gates were already complete, and the user explicitly confirmed they manually reviewed the live result and wanted the work closed out.
+  Date/Author: 2026-03-20 / Codex
+
 ## Outcomes & Retrospective
 
-The implementation work completed successfully. The balances header now keeps `Coins...` visible inline next to `Hide Small Balances`, the desktop shell can opt into a taller balances panel, zero counts are suppressed for the tabs that should stay unlabeled at zero, and the balances desktop grid now exposes the missing `Repay` lane while tightening formatting around coin labels, units, and PNL density. Two follow-up spacing passes reclaimed width from `Coin`, `Total Balance`, and the empty `Repay` lane, then used that room to enlarge `PNL (ROE %)` and create a more deliberate gutter between `PNL` and `Send`. Automated validation passed through `npm test`, `npm run test:websocket`, and `npm run check` again after the latest patch; this plan still needs a final browser rerun on the live `8083` route.
+The implementation work completed successfully. The balances header now keeps `Coins...` visible inline next to `Hide Small Balances`, the desktop shell can opt into a taller balances panel, zero counts are suppressed for the tabs that should stay unlabeled at zero, and the balances desktop grid now exposes the missing `Repay` lane while tightening formatting around coin labels, units, and PNL density. Two follow-up spacing passes reclaimed width from `Coin`, `Total Balance`, and the empty `Repay` lane, then used that room to enlarge `PNL (ROE %)` and create a more deliberate gutter between `PNL` and `Send`. Automated validation passed through `npm test`, `npm run test:websocket`, and `npm run check` again after the latest patch, and the user subsequently performed the final live-route manual review and approved closing the issue.
 
-Live browser signoff remains blocked for the exact user-requested `8083` site because that process is still rendering the older balances bundle in spite of the current worktree build succeeding. The next session should either refresh or restart the `8083` app process from the current worktree, then re-run the four required browser widths and the Hyperliquid parity comparison before claiming full visual completion.
+The earlier `8083` stale-bundle observation remains useful historical context for why agent-run browser evidence stopped short of final signoff during implementation, but it is no longer an open blocker for this plan. The tracked work is accepted and ready to move into `/hyperopen/docs/exec-plans/completed/`.
 
 ## Context and Orientation
 
