@@ -58,6 +58,24 @@ Before calling a UI change done, mark every pass `PASS`, `FAIL`, or `BLOCKED`.
 - Repeat open/close, resize, focus, and scroll interactions.
 - Look for layout shifts, flicker, dropped frames, delayed paints, and unstable measurements.
 
+## High-Risk Trade Route Checks
+
+When the changed surface touches the desktop `/trade` shell, treat the chart row, order book, and lower account tables as one geometry contract and verify all of the following in browser QA:
+
+- Inspect `1280` and `1440` widths with DOM or bounding-box evidence, not screenshots alone.
+- Switch the seven standard account tabs:
+  - `Balances`
+  - `Positions`
+  - `Open Orders`
+  - `TWAP`
+  - `Trade History`
+  - `Funding History`
+  - `Order History`
+- Mark the review `FAIL` if the outer account-panel width or height changes when those tabs change.
+- Mark the review `FAIL` if the chart bottom edge or order-book bottom edge stops being flush with the top edge of the lower account panel.
+- Mark the review `FAIL` if the lower account panel collapses toward content height as viewport height grows instead of preserving the governed desktop shell proportion.
+- When a parity reference exists, record the measured chart, order-book, and account-panel rects in the artifact or report.
+
 ## Reference Precedence
 
 When judging visual or styling correctness, use this precedence order:

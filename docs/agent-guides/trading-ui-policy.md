@@ -48,6 +48,7 @@
 ## Real-Time and Performance Rules (MUST)
 - MUST decouple ingestion rate from render rate and throttle render updates for high-frequency streams.
 - MUST keep layout and table geometry stable during live updates.
+- MUST keep the desktop `/trade` shell geometry stable: chart and order-book bottoms stay flush with the lower account panel, and switching the standard account tabs MUST NOT change that panel's outer height or width.
 - MUST virtualize long frequently-updating lists.
 - MUST show persistent connection health and data freshness status.
 - MUST freeze and label stale values as stale; MUST NOT display fake zeros/placeholders as real data.

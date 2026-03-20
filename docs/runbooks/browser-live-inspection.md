@@ -149,6 +149,40 @@ If a design-review pass cannot complete because tooling or references are missin
 4. If visual or styling references are missing, keep the affected pass `BLOCKED` and record the exact missing reference.
 5. Do not conclude “looks good” unless every pass is explicitly accounted for.
 
+## Desktop Trade Shell Regression Workflow
+
+Use this flow when work can affect the desktop `/trade` layout, including chart sizing, order book sizing, order-ticket layout, the lower account tables, or app-shell spacing.
+
+1. Run route smoke first:
+   - `node tools/browser-inspection/src/cli.mjs scenario run --ids trade-route-smoke --manage-local-app`
+2. Run the governed trade-route design review:
+   - `npm run qa:design-ui -- --targets trade-route --manage-local-app`
+3. Capture a desktop parity reference when the task is about proportions or shell geometry:
+   - `npm run browser:compare -- --left-url http://localhost:8080/trade --right-url https://app.hyperliquid.xyz/trade --viewports desktop`
+4. Inspect the live desktop shell with measured rects for:
+   - chart panel
+   - order-book panel
+   - lower account panel
+5. Switch these seven tabs in the live app and confirm the outer account-panel box stays stable:
+   - `Balances`
+   - `Positions`
+   - `Open Orders`
+   - `TWAP`
+   - `Trade History`
+   - `Funding History`
+   - `Order History`
+6. Treat the review as failed if any of the following occur:
+   - the lower account panel changes outer height or width when switching those tabs
+   - the chart bottom edge is no longer flush with the top edge of the lower account panel
+   - the order-book bottom edge is no longer flush with the top edge of the lower account panel
+   - a blank band appears under the chart inside the top trading row
+   - the lower account panel collapses toward content height instead of preserving the governed desktop shell proportion
+7. Save the artifact paths or measured rects in the final QA result so future regressions have a concrete baseline.
+
+For direct geometry probes in an attached or launched session, use:
+
+- `node tools/browser-inspection/src/cli.mjs eval --session-id <id> --expression "(() => { const rect = (sel) => { const el = document.querySelector(sel); if (!el) return null; const r = el.getBoundingClientRect(); return {x:r.x,y:r.y,width:r.width,height:r.height,bottom:r.bottom,right:r.right}; }; return { chart: rect('[data-parity-id=\"trade-chart-panel\"]'), orderbook: rect('[data-parity-id=\"trade-orderbook-panel\"]'), account: rect('[data-parity-id=\"trade-account-tables-panel\"]') }; })()"`
+
 ## Optional Smoke Test
 
 - `npm run test:browser-inspection:smoke`
