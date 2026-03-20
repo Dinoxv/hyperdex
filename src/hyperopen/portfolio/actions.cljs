@@ -20,6 +20,24 @@
 (def ^:private summary-time-range-options
   #{:day :week :month :three-month :six-month :one-year :two-year :all-time})
 
+(def ^:private returns-benchmark-candle-request-by-summary-time-range
+  {:day {:interval :5m
+         :bars 400}
+   :week {:interval :15m
+          :bars 800}
+   :month {:interval :1h
+           :bars 800}
+   :three-month {:interval :4h
+                 :bars 720}
+   :six-month {:interval :8h
+               :bars 720}
+   :one-year {:interval :12h
+              :bars 900}
+   :two-year {:interval :1d
+              :bars 900}
+   :all-time {:interval :1d
+              :bars 5000}})
+
 (def ^:private chart-tab-options
   #{:account-value :pnl :returns})
 
@@ -230,25 +248,10 @@
 
 (defn returns-benchmark-candle-request
   [summary-time-range]
-  (case (normalize-summary-time-range summary-time-range)
-    :day {:interval :5m
-          :bars 400}
-    :week {:interval :15m
-           :bars 800}
-    :month {:interval :1h
-            :bars 800}
-    :three-month {:interval :4h
-                  :bars 720}
-    :six-month {:interval :8h
-                :bars 720}
-    :one-year {:interval :12h
-               :bars 900}
-    :two-year {:interval :1d
-               :bars 900}
-    :all-time {:interval :1d
-               :bars 5000}
-    {:interval :1h
-     :bars 800}))
+  (get returns-benchmark-candle-request-by-summary-time-range
+       (normalize-summary-time-range summary-time-range)
+       {:interval :1h
+        :bars 800}))
 
 (defn- returns-benchmark-fetch-effects
   [summary-time-range benchmark-coins]

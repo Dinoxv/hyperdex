@@ -138,34 +138,48 @@
              (not (trade-modules/trade-chart-loading? state)))
     [:effects/load-trade-chart-module]))
 
+(defn- route-loader-effects
+  [state normalized-path]
+  (into []
+        (concat (vault-actions/load-vault-route state normalized-path)
+                (funding-comparison-actions/load-funding-comparison-route state normalized-path)
+                (staking-actions/load-staking-route state normalized-path)
+                (api-wallets-actions/load-api-wallet-route state normalized-path))))
+
+(defn- route-projection-and-follow-up-effects
+  [state normalized-path]
+  (split-projection-effects
+   (into []
+         (concat (portfolio-route-effects state normalized-path)
+                 (route-loader-effects state normalized-path)))))
+
+(defn- deferred-route-effects
+  [state normalized-path]
+  (let [module-effect (when-let [_module-id (route-modules/route-module-id normalized-path)]
+                        [:effects/load-route-module normalized-path])
+        trade-chart-effect (trade-chart-module-effect state normalized-path)]
+    (cond-> []
+      module-effect (conj module-effect)
+      trade-chart-effect (conj trade-chart-effect))))
+
+(defn- browser-navigation-effect
+  [browser-path replace?]
+  (if replace?
+    [:effects/replace-state browser-path]
+    [:effects/push-state browser-path]))
+
 (defn navigate
   [state path & [opts]]
-  (let [p (router/normalize-path path)
+  (let [normalized-path (router/normalize-path path)
+        browser-path (navigation-browser-path state normalized-path)
         replace? (boolean (:replace? opts))
-        browser-path (navigation-browser-path state p)
-        module-effect (when-let [_module-id (route-modules/route-module-id p)]
-                        [:effects/load-route-module p])
-        trade-chart-effect (trade-chart-module-effect state p)
-        route-effects (into []
-                            (concat (vault-actions/load-vault-route state p)
-                                    (funding-comparison-actions/load-funding-comparison-route state p)
-                                    (staking-actions/load-staking-route state p)
-                                    (api-wallets-actions/load-api-wallet-route state p)))
-        portfolio-effects (portfolio-route-effects state p)
         {:keys [projection-effects follow-up-effects]}
-        (split-projection-effects
-         (into []
-               (concat portfolio-effects
-                       route-effects)))
-        navigation-effect (if replace?
-                            [:effects/replace-state browser-path]
-                            [:effects/push-state browser-path])]
-    (cond-> [[:effects/save [:router :path] p]]
-      (seq projection-effects) (into projection-effects)
-      true (conj navigation-effect)
-      module-effect (conj module-effect)
-      trade-chart-effect (conj trade-chart-effect)
-      (seq follow-up-effects) (into follow-up-effects))))
+        (route-projection-and-follow-up-effects state normalized-path)]
+    (into [[:effects/save [:router :path] normalized-path]]
+          (concat projection-effects
+                  [(browser-navigation-effect browser-path replace?)]
+                  (deferred-route-effects state normalized-path)
+                  follow-up-effects))))
 
 (defn load-vault-route-action
   [state path]

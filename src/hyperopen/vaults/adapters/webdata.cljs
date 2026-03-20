@@ -262,6 +262,45 @@
       total-label total-label
       :else "—")))
 
+(defn- fill-time-ms
+  [row]
+  (or (optional-number (:time row))
+      (optional-number (:timestamp row))
+      (optional-number (:timeMs row))))
+
+(defn- fill-coin
+  [row]
+  (non-blank-text (or (:coin row)
+                      (:symbol row)
+                      (:asset row))))
+
+(defn- fill-side
+  [row]
+  (normalize-side (or (:side row)
+                      (:dir row))))
+
+(defn- fill-side-key
+  [row]
+  (normalize-side-key (or (:side row)
+                          (:dir row))))
+
+(defn- fill-size
+  [row]
+  (optional-number (or (:sz row)
+                       (:size row)
+                       (:closedSize row))))
+
+(defn- fill-price
+  [row]
+  (optional-number (or (:px row)
+                       (:price row))))
+
+(defn- fill-closed-pnl
+  [row]
+  (optional-number (or (:closedPnl row)
+                       (:closed-pnl row)
+                       (:pnl row))))
+
 (defn- normalize-twap-row
   [row now-ms]
   (when (map? row)
@@ -303,7 +342,7 @@
        :running-label (twap-running-label running-times)
        :running-ms (:elapsed-ms running-times)
        :total-ms (:total-ms running-times)
-       :reduce-only? reduce-only?
+      :reduce-only? reduce-only?
        :creation-time-ms creation-time-ms})))
 
 (defn twaps
@@ -319,30 +358,19 @@
 (defn- fill-row
   [row]
   (when (map? row)
-    (let [size (optional-number (or (:sz row)
-                                    (:size row)
-                                    (:closedSize row)))
-          price (optional-number (or (:px row)
-                                     (:price row)))]
-      {:time-ms (or (optional-number (:time row))
-                    (optional-number (:timestamp row))
-                    (optional-number (:timeMs row)))
-       :coin (non-blank-text (or (:coin row)
-                                 (:symbol row)
-                                 (:asset row)))
-       :side (normalize-side (or (:side row)
-                                 (:dir row)))
-       :side-key (normalize-side-key (or (:side row)
-                                         (:dir row)))
+    (let [size (fill-size row)
+          price (fill-price row)]
+      {:time-ms (fill-time-ms row)
+       :coin (fill-coin row)
+       :side (fill-side row)
+       :side-key (fill-side-key row)
        :size size
        :price price
        :trade-value (when (and (number? size)
                                (number? price))
                       (* (js/Math.abs size) price))
        :fee (optional-number (:fee row))
-       :closed-pnl (optional-number (or (:closedPnl row)
-                                        (:closed-pnl row)
-                                        (:pnl row)))})))
+       :closed-pnl (fill-closed-pnl row)})))
 
 (defn fills
   [rows]
@@ -473,49 +501,58 @@
                   >)
          vec)))
 
+(defn- spot-balance-source
+  [webdata]
+  (first-sequential
+   [(get-in webdata [:spotState :balances])
+    (:balances webdata)
+    (get-in webdata [:data :spotState :balances])
+    (get-in webdata [:data :balances])]))
+
+(defn- spot-balance-row
+  [row]
+  (when (map? row)
+    {:coin (or (non-blank-text (:coin row))
+               (non-blank-text (:token row)))
+     :total (or (optional-number (:total row))
+                (optional-number (:totalBalance row))
+                (optional-number (:hold row)))
+     :available (or (optional-number (:available row))
+                    (optional-number (:availableBalance row))
+                    (optional-number (:free row)))
+     :usdc-value (or (optional-number (:usdcValue row))
+                     (optional-number (:usdValue row)))}))
+
+(defn- perps-balance-row
+  [webdata]
+  (let [clearinghouse-state (or (:clearinghouseState webdata)
+                                (get-in webdata [:data :clearinghouseState])
+                                {})
+        margin-summary (or (:marginSummary clearinghouse-state)
+                           (:crossMarginSummary clearinghouse-state)
+                           {})
+        account-value (optional-number (:accountValue margin-summary))
+        total-margin-used (optional-number (:totalMarginUsed margin-summary))
+        withdrawable (optional-number (:withdrawable clearinghouse-state))
+        available (or withdrawable
+                      (when (and (number? account-value)
+                                 (number? total-margin-used))
+                        (- account-value total-margin-used)))]
+    (when (number? account-value)
+      [{:coin "USDC (Perps)"
+        :total account-value
+        :available available
+        :usdc-value account-value}])))
+
 (defn balances
   [webdata]
-  (let [balances (or (first-sequential
-                      [(get-in webdata [:spotState :balances])
-                       (:balances webdata)
-                       (get-in webdata [:data :spotState :balances])
-                       (get-in webdata [:data :balances])])
-                     [])
-        spot-rows (->> (if (sequential? balances) balances [])
-                       (keep (fn [row]
-                               (when (map? row)
-                                 {:coin (or (non-blank-text (:coin row))
-                                            (non-blank-text (:token row)))
-                                  :total (or (optional-number (:total row))
-                                             (optional-number (:totalBalance row))
-                                             (optional-number (:hold row)))
-                                  :available (or (optional-number (:available row))
-                                                 (optional-number (:availableBalance row))
-                                                 (optional-number (:free row)))
-                                  :usdc-value (or (optional-number (:usdcValue row))
-                                                  (optional-number (:usdValue row)))})))
+  (let [spot-rows (->> (or (spot-balance-source webdata) [])
+                       (keep spot-balance-row)
                        (sort-by (fn [{:keys [total]}]
                                   (js/Math.abs (or total 0)))
                                 >)
                        vec)]
     (if (seq spot-rows)
       spot-rows
-      (let [clearinghouse-state (or (:clearinghouseState webdata)
-                                    (get-in webdata [:data :clearinghouseState])
-                                    {})
-            margin-summary (or (:marginSummary clearinghouse-state)
-                               (:crossMarginSummary clearinghouse-state)
-                               {})
-            account-value (optional-number (:accountValue margin-summary))
-            total-margin-used (optional-number (:totalMarginUsed margin-summary))
-            withdrawable (optional-number (:withdrawable clearinghouse-state))
-            available (or withdrawable
-                          (when (and (number? account-value)
-                                     (number? total-margin-used))
-                            (- account-value total-margin-used)))]
-        (if (number? account-value)
-          [{:coin "USDC (Perps)"
-            :total account-value
-            :available available
-            :usdc-value account-value}]
-          [])))))
+      (or (perps-balance-row webdata)
+          []))))

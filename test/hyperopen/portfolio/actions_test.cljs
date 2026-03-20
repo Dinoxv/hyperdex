@@ -380,3 +380,16 @@
          (actions/returns-benchmark-candle-request "2Y")))
   (is (= {:interval :1d :bars 5000}
          (actions/returns-benchmark-candle-request :all-time))))
+
+(deftest normalize-summary-time-range-recognizes-common-aliases-test
+  (is (= :three-month (actions/normalize-summary-time-range "3M")))
+  (is (= :three-month (actions/normalize-summary-time-range "quarter")))
+  (is (= :six-month (actions/normalize-summary-time-range "halfYear")))
+  (is (= :one-year (actions/normalize-summary-time-range "1y")))
+  (is (= :two-year (actions/normalize-summary-time-range "two_year"))))
+
+(deftest normalize-summary-time-range-falls-back-for-invalid-values-test
+  (is (= :month (actions/normalize-summary-time-range nil)))
+  (is (= :month (actions/normalize-summary-time-range "not-a-range")))
+  (is (= {:interval :1h :bars 800}
+         (actions/returns-benchmark-candle-request "not-a-range"))))

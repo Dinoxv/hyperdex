@@ -35,6 +35,30 @@
     (is (= "Deposit funds to Hyperliquidity Provider (HLP). The deposit lock-up period is 4 days."
            (:deposit-lockup-copy model)))))
 
+(deftest read-model-uses-webdata-balance-rows-for-deposit-max-test
+  (let [details {:allow-deposits? true
+                 :name "Vault Detail"}
+        state {:wallet {:address leader-address
+                        :agent {:status :ready}}
+               :webdata2 {:spotState {:balances [{:coin "USDC"
+                                                  :available "88.888"
+                                                  :total "90"}]}}
+               :vaults-ui {:vault-transfer-modal {:open? true
+                                                  :mode :deposit
+                                                  :vault-address vault-address
+                                                  :amount-input "1"
+                                                  :withdraw-all? false
+                                                  :submitting? false
+                                                  :error nil}}
+               :vaults {:details-by-address {vault-address details}}}
+        model (transfer/read-model state {:vault-address vault-address
+                                          :vault-name (:name details)
+                                          :details details
+                                          :webdata {}})]
+    (is (= 88.88 (:deposit-max-usdc model)))
+    (is (= "88.88" (:deposit-max-display model)))
+    (is (= "88.88" (:deposit-max-input model)))))
+
 (deftest read-model-prefers-follower-lockup-window-test
   (let [details {:allow-deposits? true
                  :name "Vault Detail"

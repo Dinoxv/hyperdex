@@ -226,6 +226,74 @@
            (aget (.-style (find-dom-node-by-role host "vault-detail-chart-hover-tooltip"))
                  "display")))))
 
+(deftest chart-series-area-layers-returns-nil-when-area-path-is-missing-test
+  (is (nil? (@#'hyperopen.views.vaults.detail.chart-view/chart-series-area-layers
+             {:id :strategy
+              :area-fill "rgba(247, 147, 26, 0.24)"}))))
+
+(deftest chart-series-area-layers-renders-single-fill-area-with-strategy-role-test
+  (is (= [:path {:d "M 0 0 L 10 10"
+                 :fill "rgba(247, 147, 26, 0.24)"
+                 :data-role "vault-detail-chart-area"}]
+         (@#'hyperopen.views.vaults.detail.chart-view/chart-series-area-layers
+          {:id :strategy
+           :area-path "M 0 0 L 10 10"
+           :area-fill "rgba(247, 147, 26, 0.24)"}))))
+
+(deftest chart-series-area-layers-renders-split-fill-area-with-clamped-zero-y-ratio-test
+  (is (= [:g {:data-role "vault-detail-chart-area-split-btc"}
+          [:defs
+           [:clipPath {:id "vault-detail-chart-area-clip-positive-btc"}
+            [:rect {:x 0
+                    :y 0
+                    :width 100
+                    :height 100}]]
+           [:clipPath {:id "vault-detail-chart-area-clip-negative-btc"}
+            [:rect {:x 0
+                    :y 100
+                    :width 100
+                    :height 0}]]]
+          [:path {:d "M 0 0 L 10 10"
+                  :fill "rgba(22, 214, 161, 0.24)"
+                  :clip-path "url(#vault-detail-chart-area-clip-positive-btc)"
+                  :data-role "vault-detail-chart-area-positive-btc"}]
+          [:path {:d "M 0 0 L 10 10"
+                  :fill "rgba(237, 112, 136, 0.24)"
+                  :clip-path "url(#vault-detail-chart-area-clip-negative-btc)"
+                  :data-role "vault-detail-chart-area-negative-btc"}]]
+         (@#'hyperopen.views.vaults.detail.chart-view/chart-series-area-layers
+          {:id :btc
+           :area-path "M 0 0 L 10 10"
+           :area-positive-fill "rgba(22, 214, 161, 0.24)"
+           :area-negative-fill "rgba(237, 112, 136, 0.24)"
+           :zero-y-ratio 1.3})))
+  (is (= [:g {:data-role "vault-detail-chart-area-split-btc"}
+          [:defs
+           [:clipPath {:id "vault-detail-chart-area-clip-positive-btc"}
+            [:rect {:x 0
+                    :y 0
+                    :width 100
+                    :height 0}]]
+           [:clipPath {:id "vault-detail-chart-area-clip-negative-btc"}
+            [:rect {:x 0
+                    :y 0
+                    :width 100
+                    :height 100}]]]
+          [:path {:d "M 0 0 L 10 10"
+                  :fill "rgba(22, 214, 161, 0.24)"
+                  :clip-path "url(#vault-detail-chart-area-clip-positive-btc)"
+                  :data-role "vault-detail-chart-area-positive-btc"}]
+          [:path {:d "M 0 0 L 10 10"
+                  :fill "rgba(237, 112, 136, 0.24)"
+                  :clip-path "url(#vault-detail-chart-area-clip-negative-btc)"
+                  :data-role "vault-detail-chart-area-negative-btc"}]]
+         (@#'hyperopen.views.vaults.detail.chart-view/chart-series-area-split-fill
+          :btc
+          "M 0 0 L 10 10"
+          "rgba(22, 214, 161, 0.24)"
+          "rgba(237, 112, 136, 0.24)"
+          -0.4))))
+
 (deftest chart-section-centers-fallback-hover-tooltip-vertically-test
   (with-redefs [chart-renderer/d3-performance-chart? (fn [_surface] false)]
     (let [view (chart/chart-section {:axis-kind :returns

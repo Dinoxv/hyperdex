@@ -198,6 +198,7 @@
             [hyperopen.views.account-info.vm-test]
             [hyperopen.views.active-asset-view-test]
             [hyperopen.views.agent-trading-recovery-modal-test]
+            [hyperopen.views.api-wallets-view-test]
             [hyperopen.views.api-wallets.vm-test]
             [hyperopen.views.app-shell-spacing-test]
             [hyperopen.views.asset-icon-test]
@@ -543,6 +544,7 @@
              'hyperopen.views.account-info.vm-test
              'hyperopen.views.active-asset-view-test
              'hyperopen.views.agent-trading-recovery-modal-test
+             'hyperopen.views.api-wallets-view-test
              'hyperopen.views.api-wallets.vm-test
              'hyperopen.views.app-shell-spacing-test
              'hyperopen.views.asset-icon-test

@@ -121,20 +121,41 @@
       (= trade-coin coin)
       true)))
 
+(defn- first-trade-value
+  [trade keys]
+  (some #(get trade %) keys))
+
+(defn- trade-price-raw
+  [trade]
+  (first-trade-value trade [:px :price :p]))
+
+(defn- trade-size-raw
+  [trade]
+  (first-trade-value trade [:sz :size :s]))
+
+(defn- trade-time-raw
+  [trade]
+  (first-trade-value trade [:time :t :ts :timestamp]))
+
+(defn- trade-coin
+  [trade]
+  (first-trade-value trade [:coin :symbol :asset]))
+
+(defn- trade-id
+  [trade]
+  (first-trade-value trade [:tid :id]))
+
 (defn normalize-trade [trade]
-  (let [price-raw (or (:px trade) (:price trade) (:p trade))
-        size-raw (or (:sz trade) (:size trade) (:s trade))
-        time-raw (or (:time trade) (:t trade) (:ts trade) (:timestamp trade))
-        side (or (:side trade) (:dir trade))
-        coin (or (:coin trade) (:symbol trade) (:asset trade))]
-    {:coin coin
+  (let [price-raw (trade-price-raw trade)
+        size-raw (trade-size-raw trade)]
+    {:coin (trade-coin trade)
      :price (parse-number price-raw)
      :price-raw price-raw
      :size (or (parse-number size-raw) 0)
      :size-raw size-raw
-     :side side
-     :time-ms (trade-time->ms time-raw)
-     :tid (or (:tid trade) (:id trade))}))
+     :side (or (:side trade) (:dir trade))
+     :time-ms (trade-time->ms (trade-time-raw trade))
+     :tid (trade-id trade)}))
 
 (defn format-trade-size [trade]
   (let [raw-size (:size-raw trade)]

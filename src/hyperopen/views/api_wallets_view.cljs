@@ -448,6 +448,77 @@
      [:span {:class ["text-trading-text-secondary"]} "Valid Until"]
      [:span {:class ["num" "text-white"]} (format-valid-until (:valid-until-ms row))]]]])
 
+(defn- remove-modal?
+  [modal]
+  (= :remove (:type modal)))
+
+(defn- modal-title
+  [modal]
+  (if (remove-modal? modal)
+    "Remove API Wallet"
+    "Authorize API Wallet"))
+
+(defn- modal-aria-label
+  [modal]
+  (if (remove-modal? modal)
+    "Remove API wallet"
+    "Authorize API wallet"))
+
+(defn- modal-body
+  [{:keys [modal form generated-private-key valid-until-preview-ms]}]
+  (if (remove-modal? modal)
+    (remove-modal-body {:row (:row modal)})
+    (authorize-modal-body {:form form
+                           :generated-private-key generated-private-key
+                           :valid-until-preview-ms valid-until-preview-ms})))
+
+(defn- modal-error-view
+  [modal]
+  (when (seq (:error modal))
+    [:div {:class ["rounded-lg"
+                   "border"
+                   "border-[#7b3340]"
+                   "bg-[#3a1b22]/55"
+                   "px-3"
+                   "py-2"
+                   "text-sm"
+                   "text-[#f2b8c5]"]
+            :data-role "api-wallets-modal-error"}
+     (:error modal)]))
+
+(defn- modal-confirm-classes
+  [modal-confirm-disabled?]
+  (into ["rounded-lg"
+         "border"
+         "px-3.5"
+         "py-2"
+         "text-sm"
+         "font-medium"]
+        (if modal-confirm-disabled?
+          ["border-[#2a4b4b]"
+           "bg-[#08202a]/55"
+           "text-[#6c8e93]"
+           "cursor-not-allowed"]
+          ["border-[#2f625a]"
+           "bg-[#0d3a35]"
+           "text-[#daf3ef]"
+           "hover:border-[#3f7f75]"
+           "hover:bg-[#115046]"])))
+
+(defn- modal-confirm-label
+  [modal]
+  (cond
+    (true? (:submitting? modal))
+    (if (remove-modal? modal)
+      "Removing..."
+      "Authorizing...")
+
+    (remove-modal? modal)
+    "Remove"
+
+    :else
+    "Authorize"))
+
 (defn- modal-view
   [{:keys [modal
            form
@@ -475,15 +546,11 @@
                     "space-y-4"]
             :role "dialog"
             :aria-modal true
-            :aria-label (if (= :remove (:type modal))
-                          "Remove API wallet"
-                          "Authorize API wallet")
+            :aria-label (modal-aria-label modal)
             :data-role "api-wallets-modal"}
       [:div {:class ["flex" "items-center" "justify-between" "gap-3"]}
        [:h2 {:class ["text-lg" "font-semibold" "text-white"]}
-        (if (= :remove (:type modal))
-          "Remove API Wallet"
-          "Authorize API Wallet")]
+        (modal-title modal)]
        [:button {:type "button"
                  :class ["text-sm"
                          "text-trading-text-secondary"
@@ -493,22 +560,11 @@
                          "focus:ring-offset-0"]
                  :on {:click [[:actions/close-api-wallet-modal]]}}
         "Close"]]
-      (case (:type modal)
-        :remove (remove-modal-body {:row (:row modal)})
-        (authorize-modal-body {:form form
-                               :generated-private-key generated-private-key
-                               :valid-until-preview-ms valid-until-preview-ms}))
-      (when (seq (:error modal))
-        [:div {:class ["rounded-lg"
-                       "border"
-                       "border-[#7b3340]"
-                       "bg-[#3a1b22]/55"
-                       "px-3"
-                       "py-2"
-                       "text-sm"
-                       "text-[#f2b8c5]"]
-                :data-role "api-wallets-modal-error"}
-         (:error modal)])
+      (modal-body {:modal modal
+                   :form form
+                   :generated-private-key generated-private-key
+                   :valid-until-preview-ms valid-until-preview-ms})
+      (modal-error-view modal)
       [:div {:class ["flex" "justify-end" "gap-2"]}
        [:button {:type "button"
                  :class ["rounded-lg"
@@ -528,35 +584,10 @@
         "Cancel"]
        [:button {:type "button"
                  :disabled modal-confirm-disabled?
-                 :class (into ["rounded-lg"
-                               "border"
-                               "px-3.5"
-                               "py-2"
-                               "text-sm"
-                               "font-medium"]
-                              (if modal-confirm-disabled?
-                                ["border-[#2a4b4b]"
-                                 "bg-[#08202a]/55"
-                                 "text-[#6c8e93]"
-                                 "cursor-not-allowed"]
-                                ["border-[#2f625a]"
-                                 "bg-[#0d3a35]"
-                                 "text-[#daf3ef]"
-                                 "hover:border-[#3f7f75]"
-                                 "hover:bg-[#115046]"]))
+                 :class (modal-confirm-classes modal-confirm-disabled?)
                  :data-role "api-wallets-modal-confirm"
                  :on {:click [[:actions/confirm-api-wallet-modal]]}}
-        (cond
-          (true? (:submitting? modal))
-          (if (= :remove (:type modal))
-            "Removing..."
-            "Authorizing...")
-
-          (= :remove (:type modal))
-          "Remove"
-
-          :else
-          "Authorize")]]]]))
+        (modal-confirm-label modal)]]]]))
 
 (defn api-wallets-view
   [state]

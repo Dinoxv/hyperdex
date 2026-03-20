@@ -310,77 +310,130 @@
           dedupe-open-orders-by-identity)
      [])))
 
+(defn- first-some
+  [& values]
+  (some identity values))
+
+(defn- map-or-empty
+  [value]
+  (if (map? value) value {}))
+
+(defn- order-history-root-map
+  [row]
+  (map-or-empty (or (:order row) row)))
+
+(defn- order-history-row-map
+  [row]
+  (map-or-empty row))
+
+(defn- order-history-field
+  [root-map row-map & keys]
+  (some #(first-some (get root-map %) (get row-map %)) keys))
+
+(defn- order-history-prefer-root-flag
+  [root-map row-map key]
+  (if (contains? root-map key)
+    (get root-map key)
+    (get row-map key)))
+
+(defn- order-history-identity-fields
+  [root-map row-map]
+  {:coin (first-some (:coin root-map) (:coin row-map))
+   :oid (some parse/normalize-id
+              [(:oid root-map) (:oid row-map) (:orderId root-map) (:orderId row-map)])
+   :side (first-some (:side root-map) (:side row-map))
+   :direction (order-history-field root-map row-map :dir :direction)})
+
+(defn- order-history-size-fields
+  [root-map row-map]
+  (let [size (order-history-field root-map row-map :origSz :sz)
+        remaining-size (first-some (:remainingSz root-map)
+                                   (:remainingSz row-map)
+                                   (:sz root-map)
+                                   (:sz row-map))
+        size-num (parse/parse-optional-num size)
+        remaining-size-num (parse/parse-optional-num remaining-size)
+        filled-size (when (and (number? size-num)
+                               (number? remaining-size-num))
+                      (max 0 (- size-num remaining-size-num)))]
+    {:size size
+     :remaining-size remaining-size
+     :size-num size-num
+     :remaining-size-num remaining-size-num
+     :filled-size filled-size}))
+
+(defn- order-history-trigger-fields
+  [root-map row-map]
+  {:trigger-px (order-history-field root-map row-map :triggerPx)
+   :is-trigger (true? (parse/boolean-value (order-history-field root-map row-map :isTrigger)))
+   :trigger-condition (order-history-field root-map row-map :triggerCondition :triggerCond)})
+
+(defn- order-history-status-fields
+  [root-map row-map]
+  {:status (first-some (:status row-map)
+                       (:status root-map)
+                       (:orderStatus row-map)
+                       (:orderStatus root-map))
+   :status-timestamp (first-some (:statusTimestamp row-map)
+                                 (:statusTimestamp root-map)
+                                 (:statusTime row-map)
+                                 (:statusTime root-map)
+                                 (:timestamp root-map)
+                                 (:timestamp row-map)
+                                 (:time root-map)
+                                 (:time row-map))})
+
+(defn- order-history-order-type
+  [root-map row-map]
+  (order-history-field root-map row-map :orderType :type :tif))
+
+(defn- order-history-market?
+  [order-type root-map row-map limit-px fallback-px]
+  (or (= "market" (some-> order-type str str/trim str/lower-case))
+      (true? (parse/boolean-value (order-history-field root-map row-map :isMarket)))
+      (zero? (or (parse/parse-optional-num (first-some limit-px fallback-px)) 0))))
+
+(defn- order-history-price-fields
+  [order-type root-map row-map]
+  (let [limit-px (order-history-field root-map row-map :limitPx)
+        fallback-px (order-history-field root-map row-map :px)
+        market? (order-history-market? order-type root-map row-map limit-px fallback-px)]
+    {:px (when-not market?
+           (first-some limit-px fallback-px))
+     :market? market?}))
+
+(defn- order-history-flag-fields
+  [root-map row-map]
+  {:reduce-only (parse/boolean-value (order-history-prefer-root-flag root-map row-map :reduceOnly))
+   :is-position-tpsl (true? (parse/boolean-value
+                             (order-history-prefer-root-flag root-map row-map :isPositionTpsl)))})
+
+(defn- order-history-order-value
+  [market? size-num px]
+  (let [price-num (parse/parse-optional-num px)]
+    (when (and (not market?)
+               (number? size-num)
+               (number? price-num)
+               (pos? size-num)
+               (pos? price-num))
+      (* size-num price-num))))
+
 (defn normalize-order-history-row
   ([row]
    (normalize-order-history-row row nil))
   ([row _order-history-status-labels]
-   (let [root (or (:order row) row)
-         root-map (if (map? root) root {})
-         row-map (if (map? row) row {})
-         coin (or (:coin root-map) (:coin row-map))
-         oid (some parse/normalize-id
-                   [(:oid root-map) (:oid row-map) (:orderId root-map) (:orderId row-map)])
-         side (or (:side root-map) (:side row-map))
-         direction (or (:dir root-map)
-                       (:dir row-map)
-                       (:direction root-map)
-                       (:direction row-map))
-         size (or (:origSz root-map) (:origSz row-map) (:sz root-map) (:sz row-map))
-         remaining-size (or (:remainingSz root-map)
-                            (:remainingSz row-map)
-                            (:sz root-map)
-                            (:sz row-map))
-         limit-px (or (:limitPx root-map) (:limitPx row-map))
-         fallback-px (or (:px root-map) (:px row-map))
-         trigger-px (or (:triggerPx root-map) (:triggerPx row-map))
-         is-trigger (true? (parse/boolean-value (or (:isTrigger root-map) (:isTrigger row-map))))
-         trigger-condition (or (:triggerCondition root-map)
-                               (:triggerCondition row-map)
-                               (:triggerCond root-map)
-                               (:triggerCond row-map))
-         reduce-only-value (if (contains? root-map :reduceOnly)
-                             (:reduceOnly root-map)
-                             (:reduceOnly row-map))
-         reduce-only (parse/boolean-value reduce-only-value)
-         is-position-tpsl-value (if (contains? root-map :isPositionTpsl)
-                                  (:isPositionTpsl root-map)
-                                  (:isPositionTpsl row-map))
-         is-position-tpsl (true? (parse/boolean-value is-position-tpsl-value))
-         order-type (or (:orderType root-map)
-                        (:orderType row-map)
-                        (:type root-map)
-                        (:type row-map)
-                        (:tif root-map)
-                        (:tif row-map))
-         status (or (:status row-map)
-                    (:status root-map)
-                    (:orderStatus row-map)
-                    (:orderStatus root-map))
-         status-timestamp (or (:statusTimestamp row-map)
-                              (:statusTimestamp root-map)
-                              (:statusTime row-map)
-                              (:statusTime root-map)
-                              (:timestamp root-map)
-                              (:timestamp row-map)
-                              (:time root-map)
-                              (:time row-map))
-         size-num (parse/parse-optional-num size)
-         remaining-size-num (parse/parse-optional-num remaining-size)
-         market? (or (= "market" (some-> order-type str str/trim str/lower-case))
-                     (true? (parse/boolean-value (or (:isMarket root-map) (:isMarket row-map))))
-                     (zero? (or (parse/parse-optional-num (or limit-px fallback-px)) 0)))
-         px (when-not market?
-              (or limit-px fallback-px))
-         filled-size (when (and (number? size-num)
-                                (number? remaining-size-num))
-                       (max 0 (- size-num remaining-size-num)))
-         order-value (let [price-num (parse/parse-optional-num px)]
-                       (when (and (not market?)
-                                  (number? size-num)
-                                  (number? price-num)
-                                  (pos? size-num)
-                                  (pos? price-num))
-                         (* size-num price-num)))
+   (let [root-map (order-history-root-map row)
+         row-map (order-history-row-map row)
+         {:keys [coin oid side direction]} (order-history-identity-fields root-map row-map)
+         {:keys [size remaining-size size-num remaining-size-num filled-size]}
+         (order-history-size-fields root-map row-map)
+         {:keys [trigger-px is-trigger trigger-condition]}
+         (order-history-trigger-fields root-map row-map)
+         {:keys [status status-timestamp]} (order-history-status-fields root-map row-map)
+         order-type (order-history-order-type root-map row-map)
+         {:keys [px market?]} (order-history-price-fields order-type root-map row-map)
+         {:keys [reduce-only is-position-tpsl]} (order-history-flag-fields root-map row-map)
+         order-value (order-history-order-value market? size-num px)
          status-key (order-history-status-key status)
          status-label (order-history-status-label status
                                                  remaining-size-num

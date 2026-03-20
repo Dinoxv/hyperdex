@@ -165,6 +165,49 @@
     (is (= "text-red-400" (view/trade-side->price-class "S")))
     (is (= "text-gray-100" (view/trade-side->price-class "X")))))
 
+(deftest normalize-trade-resolves-alias-precedence-and-fallbacks-test
+  (testing "primary aliases win when multiple trade keys are present"
+    (let [trade (view/normalize-trade {:px "61500.1"
+                                       :price "1"
+                                       :p "2"
+                                       :sz "0.03"
+                                       :size "1.0"
+                                       :s "2.0"
+                                       :time 1700000003
+                                       :t 1700000002
+                                       :ts 1700000001
+                                       :timestamp 1700000000000
+                                       :coin "BTC"
+                                       :symbol "ETH"
+                                       :asset "SOL"
+                                       :side "A"
+                                       :tid "trade-1"
+                                       :id "fallback-id"})]
+      (is (= "BTC" (:coin trade)))
+      (is (= "61500.1" (:price-raw trade)))
+      (is (= 61500.1 (:price trade)))
+      (is (= "0.03" (:size-raw trade)))
+      (is (= 0.03 (:size trade)))
+      (is (= "A" (:side trade)))
+      (is (= "trade-1" (:tid trade)))
+      (is (= 1700000003000 (:time-ms trade)))))
+
+  (testing "fallback aliases and invalid sizes normalize predictably"
+    (let [trade (view/normalize-trade {:price "3010.5"
+                                       :size "not-a-number"
+                                       :timestamp "1700000000000"
+                                       :asset "ETH"
+                                       :dir "B"
+                                       :id "fallback-id"})]
+      (is (= "ETH" (:coin trade)))
+      (is (= "3010.5" (:price-raw trade)))
+      (is (= 3010.5 (:price trade)))
+      (is (= "not-a-number" (:size-raw trade)))
+      (is (= 0 (:size trade)))
+      (is (= "B" (:side trade)))
+      (is (= "fallback-id" (:tid trade)))
+      (is (= 1700000000000 (:time-ms trade))))))
+
 (deftest order-row-renders-hyperliquid-neutral-size-and-total-columns-test
   (let [order {:px "101.5"
                :sz "2"

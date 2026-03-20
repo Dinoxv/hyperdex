@@ -433,6 +433,24 @@
     (is (= "No" (@#'view/format-order-history-reduce-only (assoc market-row :reduce-only false))))
     (is (= "N/A" (@#'view/format-order-history-trigger market-row)))))
 
+(deftest order-history-normalize-row-supports-top-level-history-shapes-test
+  (let [row (view/normalize-order-history-row
+             {:coin "ETH"
+              :orderId "abc-123"
+              :side "A"
+              :direction "close long"
+              :origSz "4.0"
+              :remainingSz "1.5"
+              :limitPx "2500.5"
+              :orderStatus "triggered"
+              :statusTime 1700000000100
+              :reduceOnly true})]
+    (is (= "ETH" (:coin row)))
+    (is (= "abc-123" (:oid row)))
+    (is (= "close long" (:direction row)))
+    (is (= "Yes" (@#'view/format-order-history-reduce-only row)))
+    (is (= "2.5" (@#'view/format-order-history-filled-size (:filled-size row))))))
+
 (deftest order-history-direction-label-prefers-explicit-text-and-reduce-only-fallbacks-test
   (is (= "Open Short"
          (@#'order-history-tab/order-history-direction-label

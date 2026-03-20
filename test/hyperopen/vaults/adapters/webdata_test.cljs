@@ -10,6 +10,39 @@
          (webdata/rows-from-source {:openOrders {:orders [{:time 2}]}}
                                    [:openOrders :orders]))))
 
+(deftest fills-normalizes-aliases-and-sorts-newest-first-test
+  (let [rows (webdata/fills {:fills [{:timeMs 20
+                                      :symbol "BTC"
+                                      :dir "sell"
+                                      :size "1.25"
+                                      :price "100.5"
+                                      :closed-pnl "2.5"}
+                                     {:timestamp 10
+                                      :asset "ETH"
+                                      :side "buy"
+                                      :closedSize "2"
+                                      :px "50"
+                                      :pnl -1}]})
+        first-row (first rows)
+        second-row (second rows)]
+    (is (= 2 (count rows)))
+    (is (= 20 (:time-ms first-row)))
+    (is (= "BTC" (:coin first-row)))
+    (is (= "Short" (:side first-row)))
+    (is (= :short (:side-key first-row)))
+    (is (= 1.25 (:size first-row)))
+    (is (= 100.5 (:price first-row)))
+    (is (= 125.625 (:trade-value first-row)))
+    (is (= 2.5 (:closed-pnl first-row)))
+    (is (= 10 (:time-ms second-row)))
+    (is (= "ETH" (:coin second-row)))
+    (is (= "Long" (:side second-row)))
+    (is (= :long (:side-key second-row)))
+    (is (= 2 (:size second-row)))
+    (is (= 50 (:price second-row)))
+    (is (= 100 (:trade-value second-row)))
+    (is (= -1 (:closed-pnl second-row)))))
+
 (deftest positions-normalizes-clearinghouse-shapes-test
   (let [rows (webdata/positions {:clearinghouseState {:assetPositions [{:position {:coin "BTC"
                                                                                      :szi "0.5"
@@ -32,6 +65,41 @@
     (is (= 1 (count rows)))
     (is (= 3660000 (get-in rows [0 :running-ms])))
     (is (= "1h 1m / 3h 0m" (get-in rows [0 :running-label])))))
+
+(deftest balances-prefers-spot-state-balances-and-sorts-by-absolute-total-test
+  (let [rows (webdata/balances {:spotState {:balances [{:token "USDC"
+                                                        :hold "2"
+                                                        :free "8"
+                                                        :usdValue "10"}
+                                                       {:coin "ETH"
+                                                        :total "5"
+                                                        :availableBalance "4"
+                                                        :usdcValue "9"}]}
+                               :balances [{:coin "SHOULD-NOT-SEE"
+                                           :total "999"}]
+                               :data {:spotState {:balances [{:coin "ALT"
+                                                              :total "100"}]}}})
+        first-row (first rows)
+        second-row (second rows)]
+    (is (= 2 (count rows)))
+    (is (= "ETH" (:coin first-row)))
+    (is (= 5 (:total first-row)))
+    (is (= 4 (:available first-row)))
+    (is (= 9 (:usdc-value first-row)))
+    (is (= "USDC" (:coin second-row)))
+    (is (= 2 (:total second-row)))
+    (is (= 8 (:available second-row)))
+    (is (= 10 (:usdc-value second-row)))))
+
+(deftest balances-falls-back-to-perps-row-when-spot-balances-are-missing-test
+  (let [rows (webdata/balances {:clearinghouseState {:marginSummary {:accountValue 159.379
+                                                                     :totalMarginUsed 10.001}
+                                                     :withdrawable 150}})]
+    (is (= 1 (count rows)))
+    (is (= "USDC (Perps)" (:coin (first rows))))
+    (is (= 159.379 (:total (first rows))))
+    (is (= 150 (:available (first rows))))
+    (is (= 159.379 (:usdc-value (first rows))))))
 
 (deftest ledger-updates-filters-to-target-vault-address-test
   (let [rows (webdata/ledger-updates {:nonFundingLedgerUpdates

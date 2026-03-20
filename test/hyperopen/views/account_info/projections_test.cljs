@@ -292,6 +292,43 @@
     (is (= "Partially Filled" (:status-label normalized)))
     (is (< (js/Math.abs (- 12.23 (:filled-size normalized))) 1e-9))))
 
+(deftest normalize-order-history-row-prefers-root-false-flag-values-over-row-fallbacks-test
+  (let [row {:order {:coin "BTC"
+                     :oid 99
+                     :side "B"
+                     :origSz "2.0"
+                     :remainingSz "1.0"
+                     :limitPx "100.0"
+                     :reduceOnly false
+                     :isPositionTpsl false}
+             :reduceOnly true
+             :isPositionTpsl true
+             :status "open"
+             :statusTimestamp 1710000400}
+        normalized (projections/normalize-order-history-row row)]
+    (is (= false (:reduce-only normalized)))
+    (is (= false (:is-position-tpsl normalized)))))
+
+(deftest normalize-order-history-row-uses-top-level-order-history-fields-when-nested-order-is-missing-test
+  (let [row {:coin "ETH"
+             :orderId "abc-123"
+             :side "A"
+             :direction "close long"
+             :origSz "4.0"
+             :remainingSz "1.5"
+             :limitPx "2500.5"
+             :reduceOnly true
+             :status "triggered"
+             :statusTime 1710000500}
+        normalized (projections/normalize-order-history-row row)]
+    (is (= "ETH" (:coin normalized)))
+    (is (= "abc-123" (:oid normalized)))
+    (is (= "close long" (:direction normalized)))
+    (is (= 10002 (:order-value normalized)))
+    (is (= true (:reduce-only normalized)))
+    (is (= :triggered (:status-key normalized)))
+    (is (= 1710000500000 (:time-ms normalized)))))
+
 (deftest normalized-order-history-prefers-filled-rows-over-open-rows-for-the-same-order-id-test
   (let [open-row {:order {:coin "PUMP"
                           :oid 330007475448

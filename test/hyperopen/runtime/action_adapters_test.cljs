@@ -74,6 +74,20 @@
             [:effects/api-fetch-staking-validator-summaries]]
            (action-adapters/navigate {} "/staking")))))
 
+(deftest navigate-appends-api-wallet-route-effects-after-route-projection-test
+  (with-redefs [vault-actions/load-vault-route (fn [_state _path] [])
+                funding-comparison-actions/load-funding-comparison-route (fn [_state _path] [])
+                staking-actions/load-staking-route (fn [_state _path] [])
+                api-wallets-actions/load-api-wallet-route (fn [_state _path]
+                                                            [[:effects/save [:api-wallets :loading :extra-agents?] true]
+                                                             [:effects/api-load-api-wallets]])]
+    (is (= [[:effects/save [:router :path] "/API"]
+            [:effects/save [:api-wallets :loading :extra-agents?] true]
+            [:effects/push-state "/API"]
+            [:effects/load-route-module "/API"]
+            [:effects/api-load-api-wallets]]
+           (action-adapters/navigate {} "/API")))))
+
 (deftest navigate-trade-route-loads-deferred-chart-module-test
   (with-redefs [vault-actions/load-vault-route (fn [_state _path] [])
                 funding-comparison-actions/load-funding-comparison-route (fn [_state _path] [])

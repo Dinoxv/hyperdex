@@ -369,50 +369,60 @@
                          "vault-detail-chart-path"
                          (str "vault-detail-chart-path-" (name id)))}]))
 
+(defn- chart-series-area-role
+  [id suffix]
+  (if (= id :strategy)
+    (str "vault-detail-chart-area" suffix)
+    (str "vault-detail-chart-area" suffix "-" (name id))))
+
+(defn- chart-series-area-single-fill
+  [id area-path area-fill]
+  [:path {:d area-path
+          :fill area-fill
+          :data-role (chart-series-area-role id "")}])
+
+(defn- chart-series-area-split-fill
+  [id area-path area-positive-fill area-negative-fill zero-y-ratio]
+  (let [clip-ratio (clamp-number zero-y-ratio 0 1)
+        clip-y (max 0 (min 100 (* 100 clip-ratio)))
+        positive-clip-id (str "vault-detail-chart-area-clip-positive-" (name id))
+        negative-clip-id (str "vault-detail-chart-area-clip-negative-" (name id))]
+    [:g {:data-role (chart-series-area-role id "-split")}
+     [:defs
+      [:clipPath {:id positive-clip-id}
+       [:rect {:x 0
+               :y 0
+               :width 100
+               :height clip-y}]]
+      [:clipPath {:id negative-clip-id}
+       [:rect {:x 0
+               :y clip-y
+               :width 100
+               :height (- 100 clip-y)}]]]
+     [:path {:d area-path
+             :fill area-positive-fill
+             :clip-path (str "url(#" positive-clip-id ")")
+             :data-role (chart-series-area-role id "-positive")}]
+     [:path {:d area-path
+             :fill area-negative-fill
+             :clip-path (str "url(#" negative-clip-id ")")
+             :data-role (chart-series-area-role id "-negative")}]]))
+
 (defn- chart-series-area-layers
   [{:keys [id area-path area-fill area-positive-fill area-negative-fill zero-y-ratio]}]
   (when (seq area-path)
     (cond
       (string? area-fill)
-      [:path {:d area-path
-              :fill area-fill
-              :data-role (if (= id :strategy)
-                           "vault-detail-chart-area"
-                           (str "vault-detail-chart-area-" (name id)))}]
+      (chart-series-area-single-fill id area-path area-fill)
 
       (and (string? area-positive-fill)
            (string? area-negative-fill)
            (number? zero-y-ratio))
-      (let [clip-ratio (clamp-number zero-y-ratio 0 1)
-            clip-y (max 0 (min 100 (* 100 clip-ratio)))
-            positive-clip-id (str "vault-detail-chart-area-clip-positive-" (name id))
-            negative-clip-id (str "vault-detail-chart-area-clip-negative-" (name id))]
-        [:g {:data-role (if (= id :strategy)
-                          "vault-detail-chart-area-split"
-                          (str "vault-detail-chart-area-split-" (name id)))}
-         [:defs
-          [:clipPath {:id positive-clip-id}
-           [:rect {:x 0
-                   :y 0
-                   :width 100
-                   :height clip-y}]]
-          [:clipPath {:id negative-clip-id}
-           [:rect {:x 0
-                   :y clip-y
-                   :width 100
-                   :height (- 100 clip-y)}]]]
-         [:path {:d area-path
-                 :fill area-positive-fill
-                 :clip-path (str "url(#" positive-clip-id ")")
-                 :data-role (if (= id :strategy)
-                              "vault-detail-chart-area-positive"
-                              (str "vault-detail-chart-area-positive-" (name id)))}]
-         [:path {:d area-path
-                 :fill area-negative-fill
-                 :clip-path (str "url(#" negative-clip-id ")")
-                 :data-role (if (= id :strategy)
-                              "vault-detail-chart-area-negative"
-                              (str "vault-detail-chart-area-negative-" (name id)))}]])
+      (chart-series-area-split-fill id
+                                    area-path
+                                    area-positive-fill
+                                    area-negative-fill
+                                    zero-y-ratio)
 
       :else
       nil)))
