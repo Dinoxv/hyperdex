@@ -76,11 +76,26 @@
           (.then (fn [_]
                    response))))))
 
+(defn- persist-vault-startup-preview-from-store!
+  [{:keys [store
+           persist-vault-startup-preview-record!]}
+   result]
+  (when (fn? persist-vault-startup-preview-record!)
+    (let [rows (or (get-in @store [:vaults :merged-index-rows])
+                   (get-in @store [:vaults :index-rows]))]
+      (when (seq rows)
+        (try
+          (persist-vault-startup-preview-record! @store)
+          (catch :default error
+            (warn-cache-error! "Failed to persist vault startup preview cache:" error)))))
+  result))
+
 (defn- perform-vault-index-request!
   [{:keys [store
            request-vault-index-response!
            apply-vault-index-success
            apply-vault-index-error
+           persist-vault-startup-preview-record!
            persist-vault-index-cache-record!]
     :as deps}
    opts]
@@ -89,6 +104,10 @@
               store
               apply-vault-index-success))
       (.then (fn [response]
+               (persist-vault-startup-preview-from-store!
+                {:store store
+                 :persist-vault-startup-preview-record! persist-vault-startup-preview-record!}
+                response)
                (persist-vault-index-cache-after-success!
                 {:store store
                  :persist-vault-index-cache-record! persist-vault-index-cache-record!}
@@ -103,6 +122,7 @@
            begin-vault-index-load
            apply-vault-index-success
            apply-vault-index-error
+           persist-vault-startup-preview-record!
            persist-vault-index-cache-record!
            opts]}]
   (if (allow-route? store opts false)
@@ -113,6 +133,7 @@
         :request-vault-index-response! request-vault-index-response!
         :apply-vault-index-success apply-vault-index-success
         :apply-vault-index-error apply-vault-index-error
+        :persist-vault-startup-preview-record! persist-vault-startup-preview-record!
         :persist-vault-index-cache-record! persist-vault-index-cache-record!}
        request-opts*))
     (js/Promise.resolve nil)))
@@ -122,6 +143,7 @@
            request-vault-index-response!
            load-vault-index-cache-record!
            persist-vault-index-cache-record!
+           persist-vault-startup-preview-record!
            begin-vault-index-load
            apply-vault-index-cache-hydration
            apply-vault-index-success
@@ -135,6 +157,7 @@
                        :request-vault-index-response! request-vault-index-response!
                        :apply-vault-index-success apply-vault-index-success
                        :apply-vault-index-error apply-vault-index-error
+                       :persist-vault-startup-preview-record! persist-vault-startup-preview-record!
                        :persist-vault-index-cache-record! persist-vault-index-cache-record!}
                       request-opts*))]
       (swap! store begin-vault-index-load)

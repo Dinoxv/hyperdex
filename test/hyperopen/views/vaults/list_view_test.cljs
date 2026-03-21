@@ -90,8 +90,27 @@
                                  :tvl 80
                                  :apr 0.08
                                  :is-closed? false
-                                 :create-time-ms (- (.now js/Date) (* 8 24 60 60 1000))
-                                 :snapshot-by-key {:month [0.05 0.09]}}]}})
+                                :create-time-ms (- (.now js/Date) (* 8 24 60 60 1000))
+                                :snapshot-by-key {:month [0.05 0.09]}}]}})
+
+(def startup-preview-row
+  {:name "Preview Vault"
+   :vault-address "0x6666666666666666666666666666666666666666"
+   :leader "0x7777777777777777777777777777777777777777"
+   :tvl 42
+   :apr 15
+   :your-deposit 0
+   :age-days 2
+   :is-closed? false
+   :snapshot-series [8 16]})
+
+(def startup-preview-record
+  {:saved-at-ms 1700000000000
+   :snapshot-range :month
+   :wallet-address nil
+   :total-visible-tvl 42
+   :protocol-rows [startup-preview-row]
+   :user-rows []})
 
 (deftest vaults-view-renders-shell-toolbar-and-sections-test
   (let [view (vaults-view/vaults-view sample-state)
@@ -181,6 +200,28 @@
         text (set (collect-strings view))]
     (is (some? loading-row))
     (is (not (contains? text "Loading vaults...")))))
+
+(deftest vaults-view-keeps-startup-preview-visible-during-handoff-test
+  (let [view (vaults-view/vaults-view (-> sample-state
+                                          (assoc-in [:vaults :merged-index-rows] [])
+                                          (assoc-in [:vaults :index-rows] [])
+                                          (assoc-in [:vaults :startup-preview] startup-preview-record)
+                                          (assoc-in [:vaults :loading :index?] true)))
+        root (find-first-node view #(= "vaults-root" (get-in % [1 :data-parity-id])))
+        refreshing-banner (find-first-node view #(= "vaults-refreshing-banner" (get-in % [1 :data-role])))
+        loading-row (find-first-node view #(= "vault-loading-row" (get-in % [1 :data-role])))
+        row-link-node (find-first-node view #(= "vault-row-link" (get-in % [1 :data-role])))
+        tvl-node (find-first-node view #(= "vaults-total-visible-tvl" (get-in % [1 :data-role])))
+        loading-tvl-node (find-first-node view #(= "vaults-total-visible-tvl-loading" (get-in % [1 :data-role])))
+        text (set (collect-strings view))]
+    (is (= "startup-preview" (get-in root [1 :data-preview-state])))
+    (is (some? refreshing-banner))
+    (is (= "Refreshing vaults…" (last (collect-strings refreshing-banner))))
+    (is (nil? loading-row))
+    (is (some? row-link-node))
+    (is (some? tvl-node))
+    (is (nil? loading-tvl-node))
+    (is (contains? text "Preview Vault"))))
 
 (deftest vaults-view-keeps-stale-rows-visible-while-refreshing-test
   (let [view (vaults-view/vaults-view (-> sample-state

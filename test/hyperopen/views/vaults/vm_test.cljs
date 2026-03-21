@@ -53,8 +53,8 @@
                                  :apr 0.4
                                  :relationship {:type :normal}
                                  :is-closed? true
-                                 :create-time-ms (- (.now js/Date) (* 1 24 60 60 1000))
-                                 :snapshot-by-key {:month [0.03]}}
+                                :create-time-ms (- (.now js/Date) (* 1 24 60 60 1000))
+                                :snapshot-by-key {:month [0.03]}}
                                 {:name "Child Vault"
                                  :vault-address "0x5555555555555555555555555555555555555555"
                                  :leader "0x6666666666666666666666666666666666666666"
@@ -64,6 +64,25 @@
                                  :is-closed? false
                                  :create-time-ms (- (.now js/Date) (* 4 24 60 60 1000))
                                  :snapshot-by-key {:month [0.03]}}]}})
+
+(def startup-preview-row
+  {:name "Preview Vault"
+   :vault-address "0x6666666666666666666666666666666666666666"
+   :leader "0x7777777777777777777777777777777777777777"
+   :tvl 42
+   :apr 15
+   :your-deposit 0
+   :age-days 2
+   :is-closed? false
+   :snapshot-series [8 16]})
+
+(def startup-preview-record
+  {:saved-at-ms 1700000000000
+   :snapshot-range :month
+   :wallet-address nil
+   :total-visible-tvl 42
+   :protocol-rows [startup-preview-row]
+   :user-rows []})
 
 (deftest vault-route-helper-parses-list-and-detail-routes-test
   (is (true? (vm/vault-route? "/vaults")))
@@ -174,6 +193,48 @@
                           %)
                        (:rows view-model))]
     (is (= [20 30] (:snapshot-series beta-row)))))
+
+(deftest vault-list-vm-treats-startup-preview-as-visible-baseline-test
+  (let [preview-only-state (-> sample-state
+                               (assoc-in [:vaults :merged-index-rows] [])
+                               (assoc-in [:vaults :index-rows] [])
+                               (assoc-in [:vaults :startup-preview] startup-preview-record)
+                               (assoc-in [:vaults :loading :index?] true))
+        preview-only-model (vm/vault-list-vm preview-only-state)
+        live-preview-model (vm/vault-list-vm (assoc-in sample-state
+                                                       [:vaults :startup-preview]
+                                                       startup-preview-record))]
+    (is (= :startup-preview (get-in preview-only-model [:preview-state :source])))
+    (is (true? (get-in preview-only-model [:preview-state :previewing?])))
+    (is (true? (get-in preview-only-model [:preview-state :has-startup-preview?])))
+    (is (false? (get-in preview-only-model [:preview-state :has-live-rows?])))
+    (is (false? (:loading? preview-only-model)))
+    (is (true? (:refreshing? preview-only-model)))
+    (is (= ["Preview Vault"] (mapv :name (:rows preview-only-model))))
+    (is (= 42 (:total-visible-tvl preview-only-model)))
+    (is (= 1 (:visible-count preview-only-model)))
+    (is (= :live (get-in live-preview-model [:preview-state :source])))
+    (is (false? (get-in live-preview-model [:preview-state :previewing?])))))
+
+(deftest build-startup-preview-record-uses-startup-list-defaults-test
+  (let [preview-record (vm/build-startup-preview-record
+                        (-> sample-state
+                            (assoc-in [:vaults-ui :search-query] "beta")
+                            (assoc-in [:vaults-ui :filter-leading?] false)
+                            (assoc-in [:vaults-ui :filter-deposited?] false)
+                            (assoc-in [:vaults-ui :filter-others?] true)
+                            (assoc-in [:vaults-ui :user-vaults-page-size] 5)
+                            (assoc-in [:vaults-ui :user-vaults-page] 2))
+                        {:now-ms 1700000000000
+                         :protocol-row-limit 2
+                         :user-row-limit 2})]
+    (is (= 1700000000000 (:saved-at-ms preview-record)))
+    (is (= :month (:snapshot-range preview-record)))
+    (is (= ["Hyperliquidity Provider (HLP)"]
+           (mapv :name (:protocol-rows preview-record))))
+    (is (= ["Beta" "Gamma"]
+           (mapv :name (:user-rows preview-record))))
+    (is (= 250 (:total-visible-tvl preview-record)))))
 
 (deftest vault-list-vm-reuses-cache-for-unrelated-state-changes-test
   (vm/reset-vault-list-vm-cache!)

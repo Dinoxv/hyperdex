@@ -609,6 +609,7 @@
                 loading?
                 refreshing?
                 error
+                preview-state
                 protocol-rows
                 user-rows
                 visible-user-rows
@@ -618,7 +619,8 @@
         wallet-connected? (boolean (get-in state [:wallet :connected?]))
         wallet-connecting? (boolean (get-in state [:wallet :connecting?]))]
     [:div {:class ["relative" "w-full" "app-shell-gutter" "py-4" "md:py-6"]
-           :data-parity-id "vaults-root"}
+           :data-parity-id "vaults-root"
+           :data-preview-state (some-> (:source preview-state) name)}
      [:div {:class ["pointer-events-none"
                     "absolute"
                     "inset-x-0"
@@ -660,9 +662,11 @@
        [:div {:class ["text-sm" "font-normal" "text-trading-text-secondary"]}
         "Total Value Locked"]
        (if loading?
-         [:div {:class ["mt-3" "h-10" "w-44" "rounded-md" "bg-base-300/70" "animate-pulse"]}
-         [:div {:class ["sr-only"]} "Loading total value locked"]]
-         [:div {:class ["mt-1" "num" "text-[44px]" "leading-[46px]" "font-normal" "text-trading-text"]}
+         [:div {:class ["mt-3" "h-10" "w-44" "rounded-md" "bg-base-300/70" "animate-pulse"]
+                :data-role "vaults-total-visible-tvl-loading"}
+          [:div {:class ["sr-only"]} "Loading total value locked"]]
+         [:div {:class ["mt-1" "num" "text-[44px]" "leading-[46px]" "font-normal" "text-trading-text"]
+                :data-role "vaults-total-visible-tvl"}
           (format-total-currency total-visible-tvl)])]
 
       [:div {:class ["rounded-lg" "border" "border-base-300/80" "bg-base-100/90" "p-2.5" "md:rounded-2xl" "md:p-3"]}

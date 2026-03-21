@@ -182,6 +182,7 @@
             :etag nil
             :last-modified nil}
            (get-in state [:vaults :index-cache])))
+    (is (nil? (get-in state [:vaults :startup-preview])))
     (is (= [] (get-in state [:vaults :user-equities])))
     (is (= {} (get-in state [:vaults :user-equity-by-address])))
     (is (= {} (get-in state [:vaults :details-by-address])))

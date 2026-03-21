@@ -211,6 +211,7 @@
                  :saved-at-ms nil
                  :etag nil
                  :last-modified nil}
+   :startup-preview nil
    :user-equities []
    :user-equity-by-address {}
    :details-by-address {}

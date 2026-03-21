@@ -1,6 +1,7 @@
 (ns hyperopen.views.app-shell-spacing-test
   (:require [clojure.string :as str]
             [cljs.test :refer-macros [deftest is]]
+            [hyperopen.route-modules :as route-modules]
             [hyperopen.trade-modules :as trade-modules]
             [hyperopen.state.trading :as trading]
             [hyperopen.views.active-asset.test-support :as active-asset-support]
@@ -1020,6 +1021,99 @@
                                                      (get-in % [1 :data-parity-id])))]
     (is (some? list-root))
     (is (some? detail-root))))
+
+(deftest app-view-renders-vault-startup-preview-when-route-module-is-still-loading-test
+  (let [view-node (with-redefs [route-modules/route-ready? (constantly false)
+                                route-modules/render-route-view (constantly nil)
+                                route-modules/route-error (constantly nil)]
+                    (app-view/app-view (assoc trade-view-test-state
+                                              :router {:path "/vaults"}
+                                              :wallet {}
+                                              :vaults {:startup-preview {:saved-at-ms 1711022400000
+                                                                         :snapshot-range :month
+                                                                         :wallet-address "0xabcdefabcdefabcdefabcdefabcdefabcdefabcd"
+                                                                         :total-visible-tvl 1234567.89
+                                                                         :stale? true
+                                                                         :protocol-rows [{:name "Alpha Vault"
+                                                                                          :vault-address "0x1111111111111111111111111111111111111111"
+                                                                                          :leader "0x2222222222222222222222222222222222222222"
+                                                                                          :apr 12.34
+                                                                                          :tvl 1000000
+                                                                                          :your-deposit 2500
+                                                                                          :age-days 3}
+                                                                                         {:name "Beta Vault"
+                                                                                          :vault-address "0x3333333333333333333333333333333333333333"
+                                                                                          :leader "0x4444444444444444444444444444444444444444"
+                                                                                          :apr 8.76
+                                                                                          :tvl 345678.9
+                                                                                          :your-deposit 100
+                                                                                          :age-days 11}]
+                                                                         :user-rows [{:name "Gamma Vault"
+                                                                                      :vault-address "0x5555555555555555555555555555555555555555"
+                                                                                      :leader "0x6666666666666666666666666666666666666666"
+                                                                                      :apr 6.54
+                                                                                      :tvl 42000
+                                                                                      :your-deposit 900
+                                                                                      :age-days 21}]}})))
+        preview-shell (find-first-node view-node
+                                       #(= "vaults-startup-preview-shell"
+                                           (get-in % [1 :data-role])))
+        refreshing-banner (find-first-node view-node
+                                            #(= "vaults-refreshing-banner"
+                                                (get-in % [1 :data-role])))
+        rendered-strings (set (collect-strings view-node))]
+    (is (some? preview-shell))
+    (is (some? refreshing-banner))
+    (is (contains? rendered-strings "Vaults"))
+    (is (contains? rendered-strings "Refreshing vaults…"))
+    (is (contains? rendered-strings "Alpha Vault"))
+    (is (contains? rendered-strings "Beta Vault"))
+    (is (contains? rendered-strings "Gamma Vault"))
+    (is (not (contains? rendered-strings "Loading Route")))
+    (is (not (contains? rendered-strings "Route Load Failed")))))
+
+(deftest app-view-keeps-generic-route-loader-for-route-errors-and-other-routes-test
+  (let [route-error-view (with-redefs [route-modules/route-ready? (constantly false)
+                                      route-modules/render-route-view (constantly nil)
+                                      route-modules/route-error (constantly "Route module failed to load.")]
+                          (app-view/app-view (assoc trade-view-test-state
+                                                    :router {:path "/vaults"}
+                                                    :wallet {}
+                                                    :vaults {:startup-preview {:protocol-rows [{:name "Alpha Vault"
+                                                                                                :vault-address "0x1111111111111111111111111111111111111111"
+                                                                                                :leader "0x2222222222222222222222222222222222222222"
+                                                                                                :apr 12.34
+                                                                                                :tvl 1000000
+                                                                                                :your-deposit 2500
+                                                                                                :age-days 3}]}})))
+        other-route-view (with-redefs [route-modules/route-ready? (constantly false)
+                                       route-modules/render-route-view (constantly nil)
+                                       route-modules/route-error (constantly nil)]
+                           (app-view/app-view (assoc trade-view-test-state
+                                                     :router {:path "/portfolio"}
+                                                     :wallet {}
+                                                     :vaults {:startup-preview {:protocol-rows [{:name "Alpha Vault"
+                                                                                                 :vault-address "0x1111111111111111111111111111111111111111"
+                                                                                                 :leader "0x2222222222222222222222222222222222222222"
+                                                                                                 :apr 12.34
+                                                                                                 :tvl 1000000
+                                                                                                 :your-deposit 2500
+                                                                                                 :age-days 3}]}})))
+        route-error-shell (find-first-node route-error-view
+                                           #(= "app-route-module-shell"
+                                               (get-in % [1 :data-parity-id])))
+        other-route-shell (find-first-node other-route-view
+                                           #(= "app-route-module-shell"
+                                               (get-in % [1 :data-parity-id])))
+        route-error-strings (set (collect-strings route-error-shell))
+        other-route-strings (set (collect-strings other-route-shell))]
+    (is (some? route-error-shell))
+    (is (some? other-route-shell))
+    (is (contains? route-error-strings "Route Load Failed"))
+    (is (contains? route-error-strings "Retry"))
+    (is (contains? other-route-strings "Loading Route"))
+    (is (not (contains? other-route-strings "Refreshing vaults…")))
+    (is (not (contains? other-route-strings "Alpha Vault")))))
 
 (deftest app-view-renders-global-order-feedback-toast-when-present-test
   (let [view-node (app-view/app-view (assoc trade-view-test-state

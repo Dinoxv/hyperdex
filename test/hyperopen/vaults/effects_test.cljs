@@ -58,6 +58,43 @@
                     (is false "Unexpected vault index error")
                     (done)))))))
 
+(deftest api-fetch-vault-index-persists-bounded-startup-preview-on-success-test
+  (async done
+    (let [preview-persist-calls (atom [])
+          store (atom {:router {:path "/vaults"}
+                       :vaults {:index-rows []}})
+          rows (vec (for [idx (range 30)]
+                      {:vault-address (str "0x" idx)
+                       :name (str "Vault " idx)}))]
+      (-> (effects/api-fetch-vault-index!
+           {:store store
+            :request-vault-index-response! (fn [opts]
+                                             (is (empty? opts))
+                                             (js/Promise.resolve {:status :ok
+                                                                  :rows rows}))
+            :begin-vault-index-load (fn [state]
+                                      (assoc state :index-loading? true))
+            :apply-vault-index-success (fn [state response]
+                                         (assoc-in state [:vaults :index-rows] (:rows response)))
+            :apply-vault-index-error (fn [state err]
+                                       (assoc state :index-error err))
+            :persist-vault-startup-preview-record! (fn [preview-state]
+                                                    (swap! preview-persist-calls conj preview-state)
+                                                    true)
+            :persist-vault-index-cache-record! (fn [_rows _metadata]
+                                                (js/Promise.resolve true))})
+          (.then (fn [response]
+                   (is (= 30 (count (:rows response))))
+                   (is (= 1 (count @preview-persist-calls)))
+                   (is (= rows (get-in (first @preview-persist-calls)
+                                       [:vaults :index-rows])))
+                   (is (= rows (get-in @store [:vaults :index-rows])))
+                   (done)))
+          (.catch (fn [err]
+                    (js/console.error err)
+                    (is false "Unexpected vault preview persistence error")
+                    (done)))))))
+
 (deftest api-fetch-vault-details-passes-vault-and-user-address-to-request-and-projections-test
   (async done
     (let [request-calls (atom [])

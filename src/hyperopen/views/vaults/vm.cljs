@@ -16,13 +16,21 @@
 (defonce ^:private vault-list-model-cache
   (atom nil))
 
+(def ^:private default-startup-preview-protocol-row-limit
+  4)
+
+(def ^:private default-startup-preview-user-row-limit
+  8)
+
 (declare snapshot-last-value
          normalize-age-days
-         row-search-text)
+         row-search-text
+         vault-list-vm)
 
 (declare snapshot-last-value
          row-search-text
-         normalize-age-days)
+         normalize-age-days
+         vault-list-vm)
 
 (defn- optional-number
   [value]
@@ -306,14 +314,42 @@
      :page-count page-count
      :total-rows total-rows}))
 
-(defn- rows-source
+(defn- present-rows
+  [rows]
+  (when (seq rows)
+    rows))
+
+(defn- live-rows-source
   [state]
-  (let [rows (or (get-in state [:vaults :merged-index-rows])
-                 (get-in state [:vaults :index-rows])
-                 [])]
-    (if (sequential? rows)
-      rows
-      [])))
+  (or (present-rows (get-in state [:vaults :merged-index-rows]))
+      (present-rows (get-in state [:vaults :index-rows]))
+      []))
+
+(defn- startup-preview-record
+  [state snapshot-range]
+  (let [preview (get-in state [:vaults :startup-preview])
+        preview-snapshot-range (vault-ui-state/normalize-vault-snapshot-range
+                                (:snapshot-range preview))]
+    (when (and (map? preview)
+               (= snapshot-range preview-snapshot-range)
+               (or (seq (:protocol-rows preview))
+                   (seq (:user-rows preview))))
+      preview)))
+
+(defn- preview-state
+  [live-rows preview]
+  (let [startup-preview? (boolean (or (seq (:protocol-rows preview))
+                                      (seq (:user-rows preview))))
+        source (cond
+                 (seq live-rows) :live
+                 startup-preview? :startup-preview
+                 :else nil)]
+    {:has-startup-preview? startup-preview?
+     :has-live-rows? (boolean (seq live-rows))
+     :baseline-visible? (or (boolean (seq live-rows))
+                            startup-preview?)
+     :previewing? (= source :startup-preview)
+     :source source}))
 
 (defn reset-vault-list-vm-cache! []
   (reset! parsed-vault-rows-cache nil)
@@ -355,6 +391,7 @@
   [parsed-rows
   {:keys [query
            snapshot-range
+           preview-state
            filters
            sort-state
            user-page-size
@@ -376,6 +413,7 @@
              (= user-page-size (:user-page-size cache))
              (= requested-user-page (:requested-user-page cache))
              (= page-size-dropdown-open? (:page-size-dropdown-open? cache))
+             (= preview-state (:preview-state cache))
              (= loading? (:loading? cache))
              (= refreshing? (:refreshing? cache))
              (= error (:error cache)))
@@ -398,6 +436,7 @@
                    :loading? loading?
                    :refreshing? refreshing?
                    :error error
+                   :preview-state preview-state
                    :rows visible-rows
                    :protocol-rows (:protocol-rows grouped)
                    :user-rows (:user-rows grouped)
@@ -422,11 +461,106 @@
                                         :user-page-size user-page-size
                                         :requested-user-page requested-user-page
                                         :page-size-dropdown-open? page-size-dropdown-open?
+                                        :preview-state preview-state
                                         :loading? loading?
                                         :refreshing? refreshing?
                                         :error error
                                         :model model})
         model))))
+
+(defn- preview-total-visible-tvl
+  [preview]
+  (or (optional-number (:total-visible-tvl preview))
+      (reduce (fn [acc row]
+                (+ acc (or (:tvl row) 0)))
+              0
+              (concat (or (:protocol-rows preview) [])
+                      (or (:user-rows preview) [])))))
+
+(defn- preview-vault-list-model
+  [preview
+   {:keys [query
+           snapshot-range
+           filters
+           sort-state
+           user-page-size
+           requested-user-page
+           page-size-dropdown-open?
+           preview-state
+           loading?
+           refreshing?
+           error]}]
+  (let [sort-column (vault-ui-state/normalize-vault-sort-column (:column sort-state))
+        sort-direction (if (= :asc (:direction sort-state)) :asc :desc)
+        protocol-rows (vec (or (:protocol-rows preview) []))
+        user-rows (vec (or (:user-rows preview) []))
+        visible-rows (vec (concat protocol-rows user-rows))
+        user-pagination (paginate-user-rows user-rows
+                                            user-page-size
+                                            requested-user-page)]
+    {:query query
+     :snapshot-range snapshot-range
+     :sort {:column sort-column
+            :direction sort-direction}
+     :filters filters
+     :loading? loading?
+     :refreshing? refreshing?
+     :error error
+     :preview-state preview-state
+     :rows visible-rows
+     :protocol-rows protocol-rows
+     :user-rows user-rows
+     :visible-user-rows (:rows user-pagination)
+     :user-pagination {:total-rows (:total-rows user-pagination)
+                       :page-size user-page-size
+                       :page-size-options vault-ui-state/vault-user-page-size-options
+                       :page-size-dropdown-open? page-size-dropdown-open?
+                       :page (:page user-pagination)
+                       :page-count (:page-count user-pagination)}
+     :visible-count (count visible-rows)
+     :total-visible-tvl (preview-total-visible-tvl preview)}))
+
+(defn build-startup-preview-record
+  ([state]
+   (build-startup-preview-record state {}))
+  ([state {:keys [now-ms
+                  protocol-row-limit
+                  user-row-limit]
+           :or {protocol-row-limit default-startup-preview-protocol-row-limit
+                user-row-limit default-startup-preview-user-row-limit}}]
+   (let [snapshot-range (vault-ui-state/normalize-vault-snapshot-range
+                         (get-in state [:vaults-ui :snapshot-range]))
+         startup-state (-> state
+                           (assoc-in [:vaults-ui :search-query] "")
+                           (assoc-in [:vaults-ui :filter-leading?] true)
+                           (assoc-in [:vaults-ui :filter-deposited?] true)
+                           (assoc-in [:vaults-ui :filter-others?] true)
+                           (assoc-in [:vaults-ui :filter-closed?] false)
+                           (assoc-in [:vaults-ui :sort] {:column vault-ui-state/default-vault-sort-column
+                                                         :direction vault-ui-state/default-vault-sort-direction})
+                           (assoc-in [:vaults-ui :user-vaults-page-size] vault-ui-state/default-vault-user-page-size)
+                           (assoc-in [:vaults-ui :user-vaults-page] vault-ui-state/default-vault-user-page)
+                           (assoc-in [:vaults-ui :user-vaults-page-size-dropdown-open?] false)
+                           (assoc-in [:vaults :startup-preview] nil))
+         live-rows (live-rows-source startup-state)]
+     (when (seq live-rows)
+       (let [now-ms* (if (number? now-ms) now-ms (.now js/Date))
+             model (vault-list-vm startup-state {:now-ms now-ms*})
+             protocol-rows (->> (:protocol-rows model)
+                                (take protocol-row-limit)
+                                vec)
+             user-rows (->> (:visible-user-rows model)
+                            (take user-row-limit)
+                            vec)]
+         (when (or (seq protocol-rows)
+                   (seq user-rows))
+           {:saved-at-ms now-ms*
+            :snapshot-range snapshot-range
+            :wallet-address (normalize-address (get-in startup-state [:wallet :address]))
+            :total-visible-tvl (:total-visible-tvl model)
+            :protocol-rows protocol-rows
+            :user-rows user-rows
+            :stale? false}))))))
 
 (defn vault-list-vm
   ([state]
@@ -448,16 +582,18 @@
                         {:column vault-ui-state/default-vault-sort-column
                          :direction vault-ui-state/default-vault-sort-direction})
          equity-by-address (or (get-in state [:vaults :user-equity-by-address]) {})
-         rows (rows-source state)
+         live-rows (live-rows-source state)
          now-ms* (if (number? now-ms) now-ms (.now js/Date))
-         parsed-rows (cached-parsed-rows rows
+         preview-record (startup-preview-record state snapshot-range)
+         parsed-rows (cached-parsed-rows live-rows
                                          wallet-address
                                          equity-by-address
                                          snapshot-range
                                          now-ms*)
+         preview-state* (preview-state live-rows preview-record)
          list-loading? (or (true? (get-in state [:vaults :loading :index?]))
                            (true? (get-in state [:vaults :loading :summaries?])))
-         baseline-visible? (boolean (seq parsed-rows))
+         baseline-visible? (:baseline-visible? preview-state*)
          loading? (and list-loading?
                        (not baseline-visible?))
          refreshing? (and list-loading?
@@ -465,14 +601,28 @@
          list-error (or (get-in state [:vaults :errors :index])
                         (get-in state [:vaults :errors :summaries]))
          page-size-dropdown-open? (true? (get-in state [:vaults-ui :user-vaults-page-size-dropdown-open?]))]
-     (cached-vault-list-model parsed-rows
-                              {:query query
-                               :snapshot-range snapshot-range
-                               :filters filters
-                               :sort-state sort-state
-                               :user-page-size user-page-size
-                               :requested-user-page requested-user-page
-                               :page-size-dropdown-open? page-size-dropdown-open?
-                               :loading? loading?
-                               :refreshing? refreshing?
-                               :error list-error}))))
+     (if (:previewing? preview-state*)
+       (preview-vault-list-model preview-record
+                                 {:query query
+                                  :snapshot-range snapshot-range
+                                  :filters filters
+                                  :sort-state sort-state
+                                  :user-page-size user-page-size
+                                  :requested-user-page requested-user-page
+                                  :page-size-dropdown-open? page-size-dropdown-open?
+                                  :preview-state preview-state*
+                                  :loading? loading?
+                                  :refreshing? refreshing?
+                                  :error list-error})
+       (cached-vault-list-model parsed-rows
+                                {:query query
+                                 :snapshot-range snapshot-range
+                                 :filters filters
+                                 :sort-state sort-state
+                                 :user-page-size user-page-size
+                                 :requested-user-page requested-user-page
+                                 :page-size-dropdown-open? page-size-dropdown-open?
+                                 :preview-state preview-state*
+                                 :loading? loading?
+                                 :refreshing? refreshing?
+                                 :error list-error})))))

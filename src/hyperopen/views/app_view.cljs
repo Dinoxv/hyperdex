@@ -12,6 +12,8 @@
             [hyperopen.views.header-view :as header-view]
             [hyperopen.views.notifications-view :as notifications-view]
             [hyperopen.views.trade-view :as trade-view]
+            [hyperopen.views.vaults.preview-shell :as vaults-preview-shell]
+            [hyperopen.vaults.infrastructure.routes :as vault-routes]
             [hyperopen.wallet.core :as wallet]))
 
 (defn- spectate-mode-banner
@@ -127,10 +129,15 @@
                   :on {:click [[:actions/navigate route {:replace? true}]]}}
          "Retry"])]]))
 
+(defn- vaults-list-route?
+  [route]
+  (= :list (:kind (vault-routes/parse-vault-route route))))
+
 (defn app-view [state]
   (let [route (get-in state [:router :path] "/trade")
         trade-route? (router/trade-route? route)
         deferred-route? (some? (route-modules/route-module-id route))
+        route-error (route-modules/route-error state route)
         mobile-surface (trade-layout-actions/normalize-trade-mobile-surface
                         (get-in state [:trade-ui :mobile-surface]))
         mobile-account-surface? (and trade-route? (= mobile-surface :account))
@@ -154,9 +161,16 @@
       (cond
         trade-route? (trade-view/trade-view state)
         (and deferred-route?
+             route-error)
+        (deferred-route-loading-shell state route)
+        (and deferred-route?
              (route-modules/route-ready? state route))
         (or (route-modules/render-route-view state route)
             (deferred-route-loading-shell state route))
+        (and deferred-route?
+             (vaults-list-route? route)
+             (vaults-preview-shell/startup-preview-valid? (get-in state [:vaults :startup-preview])))
+        (vaults-preview-shell/startup-preview-shell state)
         deferred-route? (deferred-route-loading-shell state route)
         :else (trade-view/trade-view state))]
      (funding-modal/funding-modal-view state)

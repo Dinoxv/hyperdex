@@ -4,7 +4,8 @@
             [hyperopen.api.projections :as api-projections]
             [hyperopen.runtime.effect-adapters.common :as common]
             [hyperopen.vaults.effects :as vault-effects]
-            [hyperopen.vaults.infrastructure.list-cache :as vault-list-cache]))
+            [hyperopen.vaults.infrastructure.list-cache :as vault-list-cache]
+            [hyperopen.vaults.infrastructure.preview-cache :as vault-preview-cache]))
 
 (defn api-fetch-vault-index-effect
   [_ store]
@@ -14,6 +15,7 @@
     :begin-vault-index-load api-projections/begin-vault-index-load
     :apply-vault-index-success api-projections/apply-vault-index-success
     :apply-vault-index-error api-projections/apply-vault-index-error
+    :persist-vault-startup-preview-record! vault-preview-cache/persist-vault-startup-preview-record!
     :persist-vault-index-cache-record! vault-list-cache/persist-vault-index-cache-record!}))
 
 (defn api-fetch-vault-index-with-cache-effect
@@ -23,6 +25,7 @@
     :request-vault-index-response! api/request-vault-index-response!
     :load-vault-index-cache-record! vault-list-cache/load-vault-index-cache-record!
     :persist-vault-index-cache-record! vault-list-cache/persist-vault-index-cache-record!
+    :persist-vault-startup-preview-record! vault-preview-cache/persist-vault-startup-preview-record!
     :begin-vault-index-load api-projections/begin-vault-index-load
     :apply-vault-index-cache-hydration api-projections/apply-vault-index-cache-hydration
     :apply-vault-index-success api-projections/apply-vault-index-success
