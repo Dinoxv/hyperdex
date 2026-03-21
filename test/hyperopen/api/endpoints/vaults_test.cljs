@@ -11,6 +11,118 @@
        :json (fn []
                (js/Promise.resolve (clj->js payload)))})
 
+(defn- response-headers
+  [headers]
+  #js {:get (fn [header-name]
+              (get headers header-name))})
+
+(defn- ok-response-with-headers
+  [payload headers]
+  #js {:ok true
+       :status 200
+       :headers (response-headers headers)
+       :json (fn []
+               (js/Promise.resolve (clj->js payload)))})
+
+(defn- not-modified-response
+  [headers]
+  #js {:ok false
+       :status 304
+       :headers (response-headers headers)})
+
+(deftest request-vault-index-response-normalizes-shape-and-preserves-validators-test
+  (async done
+    (let [calls (atom [])
+          fetch-fn (fn [url init]
+                     (swap! calls conj [url init])
+                     (js/Promise.resolve
+                      (ok-response-with-headers
+                       [{:apr "0.25"
+                         :summary {:name "Alpha Vault"
+                                   :vaultAddress "0xABc"
+                                   :leader "0xDEF"
+                                   :tvl "12.5"
+                                   :isClosed "false"
+                                   :relationship {:type "parent"
+                                                  :data {:childAddresses ["0xC1"]}}
+                                   :createTimeMillis "1700"}}]
+                       {"ETag" "\"etag-1\""
+                        "Last-Modified" "Thu, 20 Mar 2026 12:00:00 GMT"})))]
+      (-> (vaults/request-vault-index-response! fetch-fn
+                                                "https://vaults.test/index"
+                                                {:fetch-opts {:headers {"If-None-Match" "\"etag-0\""}}})
+          (.then (fn [response]
+                   (let [[called-url init] (first @calls)
+                         init* (js->clj init)]
+                     (is (= "https://vaults.test/index" called-url))
+                     (is (= "GET" (get init* "method")))
+                     (is (= "\"etag-0\"" (get-in init* ["headers" "If-None-Match"]))))
+                   (is (= :ok (:status response)))
+                   (is (= "\"etag-1\"" (:etag response)))
+                   (is (= "Thu, 20 Mar 2026 12:00:00 GMT" (:last-modified response)))
+                   (is (= [{:name "Alpha Vault"
+                            :vault-address "0xabc"
+                            :leader "0xdef"
+                            :tvl 12.5
+                            :tvl-raw "12.5"
+                            :is-closed? false
+                            :relationship {:type :parent
+                                           :child-addresses ["0xc1"]}
+                            :create-time-ms 1700
+                            :apr 0.25
+                            :apr-raw "0.25"
+                            :snapshot-preview-by-key {}}]
+                          (:rows response)))
+                   (done)))
+          (.catch (async-support/unexpected-error done))))))
+
+(deftest request-vault-index-response-handles-not-modified-test
+  (async done
+    (let [fetch-fn (fn [_url _init]
+                     (js/Promise.resolve
+                      (not-modified-response
+                       {"ETag" "\"etag-2\""
+                        "Last-Modified" "Thu, 20 Mar 2026 13:00:00 GMT"})))]
+      (-> (vaults/request-vault-index-response! fetch-fn "https://vaults.test/index" {})
+          (.then (fn [response]
+                   (is (= {:status :not-modified
+                           :rows []
+                           :etag "\"etag-2\""
+                           :last-modified "Thu, 20 Mar 2026 13:00:00 GMT"}
+                          response))
+                   (done)))
+          (.catch (async-support/unexpected-error done))))))
+
+(deftest request-vault-index-response-avoids-cors-preflight-validator-headers-test
+  (async done
+    (let [calls (atom [])
+          fetch-fn (fn [url init]
+                     (swap! calls conj [url init])
+                     (js/Promise.resolve
+                      (ok-response [])))]
+      (with-redefs [hyperopen.api.endpoints.vaults/cross-origin-browser-request? (fn [_]
+                                                                                   true)]
+        (-> (vaults/request-vault-index-response! fetch-fn
+                                                  "https://vaults.test/index"
+                                                  {:fetch-opts {:headers {"If-None-Match" "\"etag-0\""
+                                                                          "If-Modified-Since" "Thu, 20 Mar 2026 12:00:00 GMT"
+                                                                          "X-Test" "kept"}}})
+            (.then (fn [response]
+                     (let [[called-url init] (first @calls)
+                           init* (js->clj init)]
+                       (is (= "https://vaults.test/index" called-url))
+                       (is (= "GET" (get init* "method")))
+                       (is (= "no-cache" (get init* "cache")))
+                       (is (= {"X-Test" "kept"}
+                              (get init* "headers"))))
+                     (is (= {:status :ok
+                             :rows []
+                             :etag nil
+                             :last-modified nil}
+                            response))
+                     (done)))
+            (.catch (async-support/unexpected-error done)))))))
+
 (deftest request-vault-index-normalizes-summary-shape-test
   (async done
     (let [calls (atom [])

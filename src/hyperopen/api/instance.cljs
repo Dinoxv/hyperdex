@@ -337,7 +337,12 @@
 
 (defn- make-instance-vault-ops
   [post-info!]
-  (letfn [(request-vault-index!
+  (letfn [(request-vault-index-response!
+            ([] (request-vault-index-response! {}))
+            ([opts]
+             (vault-gateway/request-vault-index-response! {:fetch-fn js/fetch}
+                                                          opts)))
+          (request-vault-index!
             ([] (request-vault-index! {}))
             ([opts]
              (vault-gateway/request-vault-index! {:fetch-fn js/fetch}
@@ -374,7 +379,8 @@
              (vault-gateway/request-vault-webdata2! {:post-info! post-info!}
                                                     vault-address
                                                     opts)))]
-    {:request-vault-index! request-vault-index!
+    {:request-vault-index-response! request-vault-index-response!
+     :request-vault-index! request-vault-index!
      :request-vault-summaries! request-vault-summaries!
      :request-merged-vault-index! request-merged-vault-index!
      :request-user-vault-equities! request-user-vault-equities!

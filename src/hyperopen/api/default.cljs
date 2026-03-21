@@ -367,6 +367,12 @@
    (vault-gateway/request-vault-index! {:fetch-fn js/fetch}
                                        opts)))
 
+(defn request-vault-index-response!
+  ([] (request-vault-index-response! {}))
+  ([opts]
+   (vault-gateway/request-vault-index-response! {:fetch-fn js/fetch}
+                                                opts)))
+
 (defn request-vault-summaries!
   ([] (request-vault-summaries! {}))
   ([opts]

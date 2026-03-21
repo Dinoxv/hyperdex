@@ -85,6 +85,8 @@
 
 (deftest vault-list-vm-groups-filters-and-sorts-rows-test
   (let [view-model (vm/vault-list-vm sample-state)]
+    (is (false? (:loading? view-model)))
+    (is (false? (:refreshing? view-model)))
     (is (= 3 (:visible-count view-model)))
     (is (= 250 (:total-visible-tvl view-model)))
     (is (= ["Hyperliquidity Provider (HLP)"]
@@ -185,3 +187,17 @@
     (is (identical? base-view-model unrelated-state-model))
     (is (not (identical? base-view-model query-changed-model)))
     (is (not (identical? base-view-model cloned-rows-model)))))
+
+(deftest vault-list-vm-distinguishes-initial-loading-from-refreshing-test
+  (let [initial-loading (vm/vault-list-vm (-> sample-state
+                                              (assoc-in [:vaults :loading :index?] true)
+                                              (assoc-in [:vaults :merged-index-rows] [])))
+        refreshing (vm/vault-list-vm (assoc-in sample-state
+                                               [:vaults :loading :index?]
+                                               true))]
+    (is (true? (:loading? initial-loading)))
+    (is (false? (:refreshing? initial-loading)))
+    (is (= 0 (:visible-count initial-loading)))
+    (is (false? (:loading? refreshing)))
+    (is (true? (:refreshing? refreshing)))
+    (is (= 3 (:visible-count refreshing)))))

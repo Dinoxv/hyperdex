@@ -756,6 +756,7 @@
    :effects/api-submit-position-margin ::api-submit-position-margin-args
    :effects/api-load-user-data ::address-args
    :effects/api-fetch-vault-index ::no-args
+   :effects/api-fetch-vault-index-with-cache ::no-args
    :effects/api-fetch-vault-summaries ::no-args
    :effects/api-fetch-user-vault-equities ::optional-address-args
    :effects/api-fetch-vault-details ::address-and-optional-address-args

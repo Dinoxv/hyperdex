@@ -74,7 +74,7 @@
             [:effects/save [:vaults-ui :detail-loading?] true]
             [:effects/save [:vaults-ui :detail-chart-hover-index] nil]
             [:effects/api-fetch-user-vault-equities "0xabcdefabcdefabcdefabcdefabcdefabcdefabcd"]
-            [:effects/api-fetch-vault-index]
+            [:effects/api-fetch-vault-index-with-cache]
             [:effects/api-fetch-vault-summaries]
             [:effects/api-fetch-vault-benchmark-details benchmark-address]
             [:effects/api-fetch-vault-details "0x1234567890abcdef1234567890abcdef12345678" "0xabcdefabcdefabcdefabcdefabcdefabcdefabcd"]

@@ -1,6 +1,15 @@
 (ns hyperopen.api.gateway.vaults
   (:require [hyperopen.api.endpoints.vaults :as vault-endpoints]))
 
+(defn request-vault-index-response!
+  ([deps]
+   (request-vault-index-response! deps {}))
+  ([{:keys [fetch-fn vault-index-url]} opts]
+   (vault-endpoints/request-vault-index-response! (or fetch-fn js/fetch)
+                                                  (or vault-index-url
+                                                      vault-endpoints/default-vault-index-url)
+                                                  opts)))
+
 (defn request-vault-index!
   ([deps]
    (request-vault-index! deps {}))

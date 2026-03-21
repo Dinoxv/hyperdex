@@ -39,7 +39,7 @@
   [state]
   (if (seq (get-in state [:vaults :merged-index-rows]))
     []
-    [[:effects/api-fetch-vault-index]
+    [[:effects/api-fetch-vault-index-with-cache]
      [:effects/api-fetch-vault-summaries]]))
 
 (defn- vault-benchmark-details-fetch-effects

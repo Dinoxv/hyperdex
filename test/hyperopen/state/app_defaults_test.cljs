@@ -177,6 +177,11 @@
     (is (= [] (get-in state [:vaults :index-rows])))
     (is (= [] (get-in state [:vaults :recent-summaries])))
     (is (= [] (get-in state [:vaults :merged-index-rows])))
+    (is (= {:hydrated? false
+            :saved-at-ms nil
+            :etag nil
+            :last-modified nil}
+           (get-in state [:vaults :index-cache])))
     (is (= [] (get-in state [:vaults :user-equities])))
     (is (= {} (get-in state [:vaults :user-equity-by-address])))
     (is (= {} (get-in state [:vaults :details-by-address])))

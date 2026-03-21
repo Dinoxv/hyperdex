@@ -29,6 +29,8 @@
                     (get-in deps [:api :api-fetch-predicted-fundings])))
     (is (identical? effect-adapters/api-fetch-vault-index-effect
                     (get-in deps [:api :api-fetch-vault-index])))
+    (is (identical? effect-adapters/api-fetch-vault-index-with-cache-effect
+                    (get-in deps [:api :api-fetch-vault-index-with-cache])))
     (is (identical? effect-adapters/api-fetch-vault-ledger-updates-effect
                     (get-in deps [:api :api-fetch-vault-ledger-updates])))
     (is (identical? effect-adapters/api-fetch-staking-validator-summaries-effect

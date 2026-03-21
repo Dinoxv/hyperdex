@@ -236,6 +236,9 @@
 (def api-fetch-vault-index-effect
   vault-adapters/api-fetch-vault-index-effect)
 
+(def api-fetch-vault-index-with-cache-effect
+  vault-adapters/api-fetch-vault-index-with-cache-effect)
+
 (def api-fetch-vault-summaries-effect
   vault-adapters/api-fetch-vault-summaries-effect)
 

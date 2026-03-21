@@ -207,6 +207,10 @@
   {:index-rows []
    :recent-summaries []
    :merged-index-rows []
+   :index-cache {:hydrated? false
+                 :saved-at-ms nil
+                 :etag nil
+                 :last-modified nil}
    :user-equities []
    :user-equity-by-address {}
    :details-by-address {}

@@ -129,6 +129,11 @@
                                                                      (record! :request-user-abstraction [deps address opts]))
                          account-gateway/request-clearinghouse-state! (fn [deps address dex opts]
                                                                         (record! :request-clearinghouse-state [deps address dex opts]))
+                         vault-gateway/request-vault-index-response! (fn
+                                                                       ([deps]
+                                                                        (record! :request-vault-index-response [deps {}]))
+                                                                       ([deps opts]
+                                                                        (record! :request-vault-index-response [deps opts])))
                          vault-gateway/request-vault-index! (fn
                                                               ([deps]
                                                                (record! :request-vault-index [deps {}]))
@@ -232,6 +237,10 @@
              (api/request-vault-index!)))
       (is (= {:ok :request-vault-index}
              (api/request-vault-index! {:fetch-opts {:cache "no-store"}})))
+      (is (= {:ok :request-vault-index-response}
+             (api/request-vault-index-response!)))
+      (is (= {:ok :request-vault-index-response}
+             (api/request-vault-index-response! {:fetch-opts {:headers {"If-None-Match" "\"etag-0\""}}})))
       (is (= {:ok :request-vault-summaries}
              (api/request-vault-summaries!)))
       (is (= {:ok :request-vault-summaries}

@@ -51,6 +51,7 @@
    [:effects/api-submit-position-margin :api-submit-position-margin]
    [:effects/api-load-user-data :api-load-user-data]
    [:effects/api-fetch-vault-index :api-fetch-vault-index]
+   [:effects/api-fetch-vault-index-with-cache :api-fetch-vault-index-with-cache]
    [:effects/api-fetch-vault-summaries :api-fetch-vault-summaries]
    [:effects/api-fetch-user-vault-equities :api-fetch-user-vault-equities]
    [:effects/api-fetch-vault-details :api-fetch-vault-details]

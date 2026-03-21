@@ -504,6 +504,28 @@
                                                               (or summary-rows [])))]
     (mapv by-address order)))
 
+(defn- update-vault-index-cache
+  [state {:keys [hydrated?
+                 saved-at-ms
+                 etag
+                 last-modified]
+          :as metadata}]
+  (let [current (or (get-in state [:vaults :index-cache]) {})]
+    (assoc-in state
+              [:vaults :index-cache]
+              {:hydrated? (if (contains? metadata :hydrated?)
+                            (boolean hydrated?)
+                            (boolean (:hydrated? current)))
+               :saved-at-ms (if (contains? metadata :saved-at-ms)
+                              saved-at-ms
+                              (:saved-at-ms current))
+               :etag (if (contains? metadata :etag)
+                       (or etag (:etag current))
+                       (:etag current))
+               :last-modified (if (contains? metadata :last-modified)
+                                (or last-modified (:last-modified current))
+                                (:last-modified current))})))
+
 (defn- vault-list-loading?
   [state]
   (or (true? (get-in state [:vaults :loading :index?]))
@@ -521,17 +543,60 @@
                    (assoc-in [:vaults :errors :index] nil))]
     (assoc-in state* [:vaults-ui :list-loading?] (vault-list-loading? state*))))
 
-(defn apply-vault-index-success
-  [state rows]
-  (let [rows* (if (sequential? rows) (vec rows) [])
+(defn apply-vault-index-cache-hydration
+  [state cache-record]
+  (let [rows* (if (sequential? (:rows cache-record))
+                (vec (:rows cache-record))
+                [])
         summaries (get-in state [:vaults :recent-summaries] [])
-        state* (-> state
-                   (assoc-in [:vaults :index-rows] rows*)
-                   (assoc-in [:vaults :merged-index-rows] (merge-vault-rows rows* summaries))
-                   (assoc-in [:vaults :loading :index?] false)
-                   (assoc-in [:vaults :errors :index] nil)
-                   (assoc-in [:vaults :loaded-at-ms :index] (.now js/Date)))]
+        saved-at-ms (:saved-at-ms cache-record)
+        state* (cond-> (-> state
+                           (assoc-in [:vaults :index-rows] rows*)
+                           (assoc-in [:vaults :merged-index-rows] (merge-vault-rows rows* summaries))
+                           (assoc-in [:vaults :errors :index] nil)
+                           (update-vault-index-cache {:hydrated? (seq rows*)
+                                                      :saved-at-ms saved-at-ms
+                                                      :etag (:etag cache-record)
+                                                      :last-modified (:last-modified cache-record)}))
+                 (number? saved-at-ms) (assoc-in [:vaults :loaded-at-ms :index] saved-at-ms))]
     (assoc-in state* [:vaults-ui :list-loading?] (vault-list-loading? state*))))
+
+(defn- normalize-vault-index-success-payload
+  [payload]
+  (if (and (map? payload)
+           (contains? #{:ok :not-modified} (:status payload)))
+    payload
+    {:status :ok
+     :rows payload}))
+
+(defn apply-vault-index-success
+  [state payload]
+  (let [{:keys [status rows etag last-modified]} (normalize-vault-index-success-payload payload)
+        now-ms (.now js/Date)]
+    (case status
+      :not-modified
+      (let [state* (-> state
+                       (assoc-in [:vaults :loading :index?] false)
+                       (assoc-in [:vaults :errors :index] nil)
+                       (assoc-in [:vaults :loaded-at-ms :index] now-ms)
+                       (update-vault-index-cache {:saved-at-ms now-ms
+                                                  :etag etag
+                                                  :last-modified last-modified}))]
+        (assoc-in state* [:vaults-ui :list-loading?] (vault-list-loading? state*)))
+
+      (let [rows* (if (sequential? rows) (vec rows) [])
+            summaries (get-in state [:vaults :recent-summaries] [])
+            state* (-> state
+                       (assoc-in [:vaults :index-rows] rows*)
+                       (assoc-in [:vaults :merged-index-rows] (merge-vault-rows rows* summaries))
+                       (assoc-in [:vaults :loading :index?] false)
+                       (assoc-in [:vaults :errors :index] nil)
+                       (assoc-in [:vaults :loaded-at-ms :index] now-ms)
+                       (update-vault-index-cache {:hydrated? false
+                                                  :saved-at-ms now-ms
+                                                  :etag etag
+                                                  :last-modified last-modified}))]
+        (assoc-in state* [:vaults-ui :list-loading?] (vault-list-loading? state*))))))
 
 (defn apply-vault-index-error
   [state err]

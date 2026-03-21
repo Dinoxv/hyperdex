@@ -12,24 +12,46 @@
 (deftest api-fetch-vault-index-applies-begin-and-success-projections-test
   (async done
     (let [request-calls (atom [])
-          store (atom {:router {:path "/vaults"}})]
+          persist-calls (atom [])
+          store (atom {:router {:path "/vaults"}
+                       :vaults {:index-rows [{:vault-address "0xstale"}]
+                                :index-cache {:etag "\"etag-0\""
+                                              :last-modified "Thu, 20 Mar 2026 11:00:00 GMT"}}})]
       (-> (effects/api-fetch-vault-index!
            {:store store
-            :request-vault-index! (fn [opts]
-                                    (swap! request-calls conj opts)
-                                    (js/Promise.resolve [{:vault-address "0x1"}]))
+            :request-vault-index-response! (fn [opts]
+                                             (swap! request-calls conj opts)
+                                             (js/Promise.resolve
+                                              {:status :ok
+                                               :rows [{:vault-address "0x1"}]
+                                               :etag "\"etag-1\""
+                                               :last-modified "Thu, 20 Mar 2026 12:00:00 GMT"}))
             :begin-vault-index-load (fn [state]
                                       (assoc state :index-loading? true))
-            :apply-vault-index-success (fn [state rows]
-                                         (assoc state :index-rows rows))
+            :apply-vault-index-success (fn [state response]
+                                         (assoc state :index-response response))
             :apply-vault-index-error (fn [state err]
                                        (assoc state :index-error err))
+            :persist-vault-index-cache-record! (fn [rows metadata]
+                                                (swap! persist-calls conj [rows metadata])
+                                                (js/Promise.resolve true))
             :opts {:priority :high}})
-          (.then (fn [rows]
-                   (is (= [{:vault-address "0x1"}] rows))
-                   (is (= [{:priority :high}] @request-calls))
+          (.then (fn [response]
+                   (is (= {:status :ok
+                           :rows [{:vault-address "0x1"}]
+                           :etag "\"etag-1\""
+                           :last-modified "Thu, 20 Mar 2026 12:00:00 GMT"}
+                          response))
+                   (is (= [{:priority :high
+                            :fetch-opts {:headers {"If-None-Match" "\"etag-0\""
+                                                   "If-Modified-Since" "Thu, 20 Mar 2026 11:00:00 GMT"}}}]
+                          @request-calls))
                    (is (= true (:index-loading? @store)))
-                   (is (= [{:vault-address "0x1"}] (:index-rows @store)))
+                   (is (= response (:index-response @store)))
+                   (is (= [[[{:vault-address "0x1"}]
+                            {:etag "\"etag-1\""
+                             :last-modified "Thu, 20 Mar 2026 12:00:00 GMT"}]]
+                          @persist-calls))
                    (done)))
           (.catch (fn [err]
                     (js/console.error err)
@@ -166,26 +188,125 @@
           store (atom {:router {:path "/portfolio?vaults=1"}})]
       (-> (effects/api-fetch-vault-index!
            {:store store
-            :request-vault-index! (fn [opts]
-                                    (swap! request-calls conj opts)
-                                    (js/Promise.resolve []))
+            :request-vault-index-response! (fn [opts]
+                                             (swap! request-calls conj opts)
+                                             (js/Promise.resolve {:status :ok
+                                                                  :rows []}))
             :begin-vault-index-load (fn [state]
                                       (assoc state :portfolio-index-loading? true))
-            :apply-vault-index-success (fn [state rows]
-                                         (assoc state :portfolio-index rows))
+            :apply-vault-index-success (fn [state response]
+                                         (assoc state :portfolio-index response))
             :apply-vault-index-error (fn [state err]
                                        (assoc state :portfolio-index-error err))
             :opts {:skip-route-gate? true
                    :cache-ttl-ms 2500}})
-          (.then (fn [rows]
-                   (is (= [] rows))
+          (.then (fn [response]
+                   (is (= {:status :ok
+                           :rows []}
+                          response))
                    (is (= [{:cache-ttl-ms 2500}] @request-calls))
                    (is (= true (:portfolio-index-loading? @store)))
-                   (is (= [] (:portfolio-index @store)))
+                   (is (= response (:portfolio-index @store)))
                    (done)))
           (.catch (fn [err]
                     (js/console.error err)
                     (is false "Unexpected portfolio vault index error")
+                    (done)))))))
+
+(deftest api-fetch-vault-index-with-cache-hydrates-before-conditional-request-test
+  (async done
+    (let [request-calls (atom [])
+          persist-calls (atom [])
+          store (atom {:router {:path "/vaults"}
+                       :vaults {:index-rows []}})
+          cache-record {:rows [{:vault-address "0xcache"}]
+                        :saved-at-ms 1700000000000
+                        :etag "\"etag-cache\""
+                        :last-modified "Thu, 20 Mar 2026 10:00:00 GMT"}]
+      (-> (effects/api-fetch-vault-index-with-cache!
+           {:store store
+            :load-vault-index-cache-record! (fn []
+                                              (js/Promise.resolve cache-record))
+            :request-vault-index-response! (fn [opts]
+                                             (swap! request-calls conj opts)
+                                             (js/Promise.resolve
+                                              {:status :not-modified
+                                               :etag "\"etag-cache-2\""
+                                               :last-modified "Thu, 20 Mar 2026 12:00:00 GMT"}))
+            :persist-vault-index-cache-record! (fn [rows metadata]
+                                                (swap! persist-calls conj [rows metadata])
+                                                (js/Promise.resolve true))
+            :begin-vault-index-load (fn [state]
+                                      (assoc state :index-loading? true))
+            :apply-vault-index-cache-hydration (fn [state record]
+                                                (-> state
+                                                    (assoc :hydrated-cache record)
+                                                    (assoc-in [:vaults :index-rows] (:rows record))
+                                                    (assoc-in [:vaults :index-cache] {:etag (:etag record)
+                                                                                      :last-modified (:last-modified record)})))
+            :apply-vault-index-success (fn [state response]
+                                         (assoc state :index-response response))
+            :apply-vault-index-error (fn [state err]
+                                       (assoc state :index-error err))})
+          (.then (fn [response]
+                   (is (= cache-record (:hydrated-cache @store)))
+                   (is (= [{:fetch-opts {:headers {"If-None-Match" "\"etag-cache\""
+                                                  "If-Modified-Since" "Thu, 20 Mar 2026 10:00:00 GMT"}}}]
+                          @request-calls))
+                   (is (= {:status :not-modified
+                           :etag "\"etag-cache-2\""
+                           :last-modified "Thu, 20 Mar 2026 12:00:00 GMT"}
+                          response))
+                   (is (= [{:vault-address "0xcache"}]
+                          (get-in @store [:vaults :index-rows])))
+                   (is (= [[[{:vault-address "0xcache"}]
+                            {:etag "\"etag-cache-2\""
+                             :last-modified "Thu, 20 Mar 2026 12:00:00 GMT"}]]
+                          @persist-calls))
+                   (done)))
+          (.catch (fn [err]
+                    (js/console.error err)
+                    (is false "Unexpected cache-backed vault index error")
+                    (done)))))))
+
+(deftest api-fetch-vault-index-with-cache-keeps-hydrated-rows-when-request-fails-test
+  (async done
+    (let [persist-calls (atom [])
+          store (atom {:router {:path "/vaults"}
+                       :vaults {:index-rows []}})
+          cache-record {:rows [{:vault-address "0xcache"}]
+                        :saved-at-ms 1700000000000
+                        :etag "\"etag-cache\""
+                        :last-modified "Thu, 20 Mar 2026 10:00:00 GMT"}]
+      (-> (effects/api-fetch-vault-index-with-cache!
+           {:store store
+            :load-vault-index-cache-record! (fn []
+                                              (js/Promise.resolve cache-record))
+            :request-vault-index-response! (fn [_opts]
+                                             (js/Promise.reject (js/Error. "index-boom")))
+            :persist-vault-index-cache-record! (fn [rows metadata]
+                                                (swap! persist-calls conj [rows metadata])
+                                                (js/Promise.resolve true))
+            :begin-vault-index-load (fn [state]
+                                      (assoc state :index-loading? true))
+            :apply-vault-index-cache-hydration (fn [state record]
+                                                (-> state
+                                                    (assoc-in [:vaults :index-rows] (:rows record))
+                                                    (assoc-in [:vaults :index-cache] {:etag (:etag record)
+                                                                                      :last-modified (:last-modified record)})))
+            :apply-vault-index-success (fn [state response]
+                                         (assoc state :index-response response))
+            :apply-vault-index-error (fn [state err]
+                                       (assoc state :index-error (.-message err)))})
+          (.then (fn [_]
+                   (is false "Expected vault index request to reject")
+                   (done)))
+          (.catch (fn [err]
+                    (is (= "index-boom" (.-message err)))
+                    (is (= [{:vault-address "0xcache"}]
+                           (get-in @store [:vaults :index-rows])))
+                    (is (= "index-boom" (:index-error @store)))
+                    (is (= [] @persist-calls))
                     (done)))))))
 
 (deftest api-fetch-vault-summaries-applies-error-projection-test

@@ -6,11 +6,14 @@
             [hyperopen.runtime.effect-adapters :as effect-adapters]
             [hyperopen.runtime.effect-adapters.common :as common]
             [hyperopen.runtime.effect-adapters.vaults :as vault-adapters]
-            [hyperopen.vaults.effects :as vault-effects]))
+            [hyperopen.vaults.effects :as vault-effects]
+            [hyperopen.vaults.infrastructure.list-cache :as vault-list-cache]))
 
 (deftest facade-vault-adapters-delegate-to-vault-module-test
   (is (identical? vault-adapters/api-fetch-vault-index-effect
                   effect-adapters/api-fetch-vault-index-effect))
+  (is (identical? vault-adapters/api-fetch-vault-index-with-cache-effect
+                  effect-adapters/api-fetch-vault-index-with-cache-effect))
   (is (identical? vault-adapters/api-fetch-vault-summaries-effect
                   effect-adapters/api-fetch-vault-summaries-effect))
   (is (identical? vault-adapters/api-fetch-user-vault-equities-effect
@@ -56,6 +59,10 @@
                   (fn [deps]
                     (swap! calls conj [:index deps])
                     :index-result)
+                  vault-effects/api-fetch-vault-index-with-cache!
+                  (fn [deps]
+                    (swap! calls conj [:index-with-cache deps])
+                    :index-with-cache-result)
                   vault-effects/api-fetch-vault-summaries!
                   (fn [deps]
                     (swap! calls conj [:summaries deps])
@@ -90,6 +97,8 @@
                     :ledger-updates-result)]
       (is (= :index-result
              (vault-adapters/api-fetch-vault-index-effect nil store)))
+      (is (= :index-with-cache-result
+             (vault-adapters/api-fetch-vault-index-with-cache-effect nil store)))
       (is (= :summaries-result
              (vault-adapters/api-fetch-vault-summaries-effect nil store)))
       (is (= :equities-result
@@ -108,14 +117,32 @@
              (vault-adapters/api-fetch-vault-ledger-updates-effect nil store "0xvault"))))
     (let [captured (into {} (map (juxt first second) @calls))]
       (is (= store (get-in captured [:index :store])))
-      (is (identical? api/request-vault-index!
-                      (get-in captured [:index :request-vault-index!])))
+      (is (identical? api/request-vault-index-response!
+                      (get-in captured [:index :request-vault-index-response!])))
       (is (identical? api-projections/begin-vault-index-load
                       (get-in captured [:index :begin-vault-index-load])))
       (is (identical? api-projections/apply-vault-index-success
                       (get-in captured [:index :apply-vault-index-success])))
       (is (identical? api-projections/apply-vault-index-error
                       (get-in captured [:index :apply-vault-index-error])))
+      (is (identical? vault-list-cache/persist-vault-index-cache-record!
+                      (get-in captured [:index :persist-vault-index-cache-record!])))
+
+      (is (= store (get-in captured [:index-with-cache :store])))
+      (is (identical? api/request-vault-index-response!
+                      (get-in captured [:index-with-cache :request-vault-index-response!])))
+      (is (identical? vault-list-cache/load-vault-index-cache-record!
+                      (get-in captured [:index-with-cache :load-vault-index-cache-record!])))
+      (is (identical? vault-list-cache/persist-vault-index-cache-record!
+                      (get-in captured [:index-with-cache :persist-vault-index-cache-record!])))
+      (is (identical? api-projections/begin-vault-index-load
+                      (get-in captured [:index-with-cache :begin-vault-index-load])))
+      (is (identical? api-projections/apply-vault-index-cache-hydration
+                      (get-in captured [:index-with-cache :apply-vault-index-cache-hydration])))
+      (is (identical? api-projections/apply-vault-index-success
+                      (get-in captured [:index-with-cache :apply-vault-index-success])))
+      (is (identical? api-projections/apply-vault-index-error
+                      (get-in captured [:index-with-cache :apply-vault-index-error])))
 
       (is (= store (get-in captured [:summaries :store])))
       (is (identical? api/request-vault-summaries!

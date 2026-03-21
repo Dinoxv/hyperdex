@@ -81,6 +81,7 @@
     :require-projection-before-heavy? true
     :allow-duplicate-heavy-effects? false
     :heavy-effect-ids #{:effects/api-fetch-vault-index
+                        :effects/api-fetch-vault-index-with-cache
                         :effects/api-fetch-vault-summaries}}
 
    :actions/select-account-info-tab
@@ -191,6 +192,7 @@
     :require-projection-before-heavy? true
     :allow-duplicate-heavy-effects? false
     :heavy-effect-ids #{:effects/api-fetch-vault-index
+                        :effects/api-fetch-vault-index-with-cache
                         :effects/api-fetch-vault-summaries
                         :effects/api-fetch-user-vault-equities}}
 
@@ -210,6 +212,7 @@
     :require-projection-before-heavy? true
     :allow-duplicate-heavy-effects? false
     :heavy-effect-ids #{:effects/api-fetch-vault-index
+                        :effects/api-fetch-vault-index-with-cache
                         :effects/api-fetch-vault-summaries
                         :effects/api-fetch-user-vault-equities
                         :effects/api-fetch-vault-benchmark-details
@@ -299,6 +302,7 @@
    :heavy-effect-ids #{:effects/load-route-module
                        :effects/load-trade-chart-module
                         :effects/api-fetch-vault-index
+                        :effects/api-fetch-vault-index-with-cache
                         :effects/api-fetch-vault-summaries
                         :effects/api-fetch-user-vault-equities
                         :effects/api-fetch-vault-details
@@ -324,6 +328,7 @@
     :heavy-effect-ids #{:effects/load-route-module
                         :effects/load-trade-chart-module
                         :effects/api-fetch-vault-index
+                        :effects/api-fetch-vault-index-with-cache
                         :effects/api-fetch-vault-summaries
                         :effects/api-fetch-user-vault-equities
                         :effects/api-fetch-vault-details

@@ -24,7 +24,7 @@
 
 (deftest load-vault-actions-emit-projection-before-api-effects-test
   (is (= [[:effects/save [:vaults-ui :list-loading?] true]
-          [:effects/api-fetch-vault-index]
+          [:effects/api-fetch-vault-index-with-cache]
           [:effects/api-fetch-vault-summaries]
           [:effects/api-fetch-user-vault-equities "0x1234567890abcdef1234567890abcdef12345678"]]
          (actions/load-vaults
@@ -250,7 +250,7 @@
           {:vaults {:merged-index-rows [{:vault-address "0xabc"}]}}
           true)))
   (is (= [[:effects/save [:vaults-ui :detail-returns-benchmark-suggestions-open?] true]
-          [:effects/api-fetch-vault-index]
+          [:effects/api-fetch-vault-index-with-cache]
           [:effects/api-fetch-vault-summaries]]
          (actions/set-vault-detail-returns-benchmark-suggestions-open
           {:vaults {}}

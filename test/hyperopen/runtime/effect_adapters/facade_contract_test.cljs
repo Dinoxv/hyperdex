@@ -27,6 +27,7 @@
   (is (fn? effect-adapters/sync-active-asset-funding-predictability))
   (is (fn? effect-adapters/api-fetch-predicted-fundings-effect))
   (is (fn? effect-adapters/api-fetch-vault-index-effect))
+  (is (fn? effect-adapters/api-fetch-vault-index-with-cache-effect))
   (is (fn? effect-adapters/api-submit-vault-transfer-effect))
   (is (fn? effect-adapters/api-fetch-hyperunit-fee-estimate-effect))
   (is (fn? effect-adapters/api-submit-funding-send-effect))

@@ -186,6 +186,7 @@
             [hyperopen.vaults.detail.types-test]
             [hyperopen.vaults.domain.transfer-policy-test]
             [hyperopen.vaults.effects-test]
+            [hyperopen.vaults.infrastructure.list-cache-test]
             [hyperopen.vaults.infrastructure.persistence-test]
             [hyperopen.vaults.infrastructure.routes-test]
             [hyperopen.views.account-equity-view-test]
@@ -546,6 +547,7 @@
              'hyperopen.vaults.detail.types-test
              'hyperopen.vaults.domain.transfer-policy-test
              'hyperopen.vaults.effects-test
+             'hyperopen.vaults.infrastructure.list-cache-test
              'hyperopen.vaults.infrastructure.persistence-test
              'hyperopen.vaults.infrastructure.routes-test
              'hyperopen.views.account-equity-view-test

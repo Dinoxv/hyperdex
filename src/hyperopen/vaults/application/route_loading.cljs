@@ -23,13 +23,14 @@
   [state]
   (let [viewer-address (account-context/effective-account-address state)]
     (cond-> [[:effects/save [:vaults-ui :list-loading?] true]
-             [:effects/api-fetch-vault-index]
+             [:effects/api-fetch-vault-index-with-cache]
              [:effects/api-fetch-vault-summaries]]
       viewer-address
       (conj [:effects/api-fetch-user-vault-equities viewer-address]))))
 
 (def ^:private vault-list-effect-ids
   #{:effects/api-fetch-vault-index
+    :effects/api-fetch-vault-index-with-cache
     :effects/api-fetch-vault-summaries})
 
 (defn- list-fetch-effect?

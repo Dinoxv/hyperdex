@@ -182,6 +182,20 @@
     (is (some? loading-row))
     (is (not (contains? text "Loading vaults...")))))
 
+(deftest vaults-view-keeps-stale-rows-visible-while-refreshing-test
+  (let [view (vaults-view/vaults-view (-> sample-state
+                                          (assoc-in [:vaults :loading :index?] true)
+                                          (assoc-in [:vaults :loading :summaries?] false)))
+        refreshing-banner (find-first-node view #(= "vaults-refreshing-banner" (get-in % [1 :data-role])))
+        loading-row (find-first-node view #(= "vault-loading-row" (get-in % [1 :data-role])))
+        row-link-node (find-first-node view #(= "vault-row-link" (get-in % [1 :data-role])))
+        text (set (collect-strings view))]
+    (is (some? refreshing-banner))
+    (is (= "Refreshing vaults…" (last (collect-strings refreshing-banner))))
+    (is (nil? loading-row))
+    (is (some? row-link-node))
+    (is (contains? text "Total Value Locked"))))
+
 (deftest vaults-view-desktop-layout-skips-mobile-card-subtree-test
   (with-viewport-width
     1280

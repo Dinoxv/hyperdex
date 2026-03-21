@@ -52,6 +52,7 @@
          :api-fetch-predicted-fundings effect-adapters/api-fetch-predicted-fundings-effect
          :api-load-user-data effect-adapters/api-load-user-data-effect
          :api-fetch-vault-index effect-adapters/api-fetch-vault-index-effect
+         :api-fetch-vault-index-with-cache effect-adapters/api-fetch-vault-index-with-cache-effect
          :api-fetch-vault-summaries effect-adapters/api-fetch-vault-summaries-effect
          :api-fetch-user-vault-equities effect-adapters/api-fetch-user-vault-equities-effect
          :api-fetch-vault-details effect-adapters/api-fetch-vault-details-effect

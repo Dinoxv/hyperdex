@@ -106,6 +106,11 @@
                                                                                (record! :request-hyperunit-estimate-fees [deps opts]))
                   funding-hyperunit-gateway/request-hyperunit-withdrawal-queue! (fn [deps opts]
                                                                                   (record! :request-hyperunit-withdrawal-queue [deps opts]))
+                  vault-gateway/request-vault-index-response! (fn
+                                                                ([deps]
+                                                                 (record! :request-vault-index-response [deps {}]))
+                                                                ([deps opts]
+                                                                 (record! :request-vault-index-response [deps opts])))
                   vault-gateway/request-vault-index! (fn
                                                        ([deps]
                                                         (record! :request-vault-index [deps {}]))
@@ -270,6 +275,11 @@
                ((:request-vault-index! api))))
         (is (= {:ok :request-vault-index}
                ((:request-vault-index! api) {:fetch-opts {:cache "no-store"}})))
+        (is (= {:ok :request-vault-index-response}
+               ((:request-vault-index-response! api))))
+        (is (= {:ok :request-vault-index-response}
+               ((:request-vault-index-response! api)
+                {:fetch-opts {:headers {"If-None-Match" "\"etag-0\""}}})))
         (is (= {:ok :request-vault-summaries}
                ((:request-vault-summaries! api))))
         (is (= {:ok :request-vault-summaries}

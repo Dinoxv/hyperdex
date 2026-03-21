@@ -347,6 +347,7 @@
           :export-funding-history-csv account-history-effects/export-funding-history-csv-effect
           :api-fetch-predicted-fundings funding-comparison-effects/api-fetch-predicted-fundings!
           :api-fetch-vault-index vault-effects/api-fetch-vault-index!
+          :api-fetch-vault-index-with-cache vault-effects/api-fetch-vault-index-with-cache!
           :api-fetch-vault-summaries vault-effects/api-fetch-vault-summaries!
           :api-fetch-user-vault-equities vault-effects/api-fetch-user-vault-equities!
           :api-fetch-vault-details vault-effects/api-fetch-vault-details!

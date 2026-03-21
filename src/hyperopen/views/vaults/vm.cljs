@@ -353,7 +353,7 @@
 
 (defn- cached-vault-list-model
   [parsed-rows
-   {:keys [query
+  {:keys [query
            snapshot-range
            filters
            sort-state
@@ -361,6 +361,7 @@
            requested-user-page
            page-size-dropdown-open?
            loading?
+           refreshing?
            error]}]
   (let [sort-column (vault-ui-state/normalize-vault-sort-column (:column sort-state))
         sort-direction (if (= :asc (:direction sort-state)) :asc :desc)
@@ -376,6 +377,7 @@
              (= requested-user-page (:requested-user-page cache))
              (= page-size-dropdown-open? (:page-size-dropdown-open? cache))
              (= loading? (:loading? cache))
+             (= refreshing? (:refreshing? cache))
              (= error (:error cache)))
       (:model cache)
       (let [visible-rows (->> parsed-rows
@@ -394,6 +396,7 @@
                           :direction sort-direction}
                    :filters filters
                    :loading? loading?
+                   :refreshing? refreshing?
                    :error error
                    :rows visible-rows
                    :protocol-rows (:protocol-rows grouped)
@@ -420,6 +423,7 @@
                                         :requested-user-page requested-user-page
                                         :page-size-dropdown-open? page-size-dropdown-open?
                                         :loading? loading?
+                                        :refreshing? refreshing?
                                         :error error
                                         :model model})
         model))))
@@ -453,6 +457,11 @@
                                          now-ms*)
          list-loading? (or (true? (get-in state [:vaults :loading :index?]))
                            (true? (get-in state [:vaults :loading :summaries?])))
+         baseline-visible? (boolean (seq parsed-rows))
+         loading? (and list-loading?
+                       (not baseline-visible?))
+         refreshing? (and list-loading?
+                          baseline-visible?)
          list-error (or (get-in state [:vaults :errors :index])
                         (get-in state [:vaults :errors :summaries]))
          page-size-dropdown-open? (true? (get-in state [:vaults-ui :user-vaults-page-size-dropdown-open?]))]
@@ -464,5 +473,6 @@
                                :user-page-size user-page-size
                                :requested-user-page requested-user-page
                                :page-size-dropdown-open? page-size-dropdown-open?
-                               :loading? list-loading?
+                               :loading? loading?
+                               :refreshing? refreshing?
                                :error list-error}))))

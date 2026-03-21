@@ -4,7 +4,7 @@
   "hyperopen-persistence")
 
 (def app-db-version
-  1)
+  2)
 
 (def asset-selector-markets-store
   "asset-selector-markets-cache")
@@ -15,10 +15,14 @@
 (def chart-visible-range-store
   "chart-visible-range-cache")
 
+(def vault-index-store
+  "vault-index-cache")
+
 (def ^:private app-store-names
   [asset-selector-markets-store
    funding-history-store
-   chart-visible-range-store])
+   chart-visible-range-store
+   vault-index-store])
 
 (defonce ^:private open-db-cache (atom {}))
 

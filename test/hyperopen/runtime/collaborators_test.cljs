@@ -33,6 +33,8 @@
                     (get-in deps [:api :api-fetch-predicted-fundings])))
     (is (identical? vault-effects/api-fetch-vault-index!
                     (get-in deps [:api :api-fetch-vault-index])))
+    (is (identical? vault-effects/api-fetch-vault-index-with-cache!
+                    (get-in deps [:api :api-fetch-vault-index-with-cache])))
     (is (identical? vault-effects/api-fetch-vault-webdata2!
                     (get-in deps [:api :api-fetch-vault-webdata2])))
     (is (identical? vault-effects/api-fetch-vault-ledger-updates!

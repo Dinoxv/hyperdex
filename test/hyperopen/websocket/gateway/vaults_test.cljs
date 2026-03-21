@@ -11,6 +11,49 @@
        :json (fn []
                (js/Promise.resolve (clj->js payload)))})
 
+(defn- response-headers
+  [headers]
+  #js {:get (fn [header-name]
+              (get headers header-name))})
+
+(defn- ok-response-with-headers
+  [payload headers]
+  #js {:ok true
+       :status 200
+       :headers (response-headers headers)
+       :json (fn []
+               (js/Promise.resolve (clj->js payload)))})
+
+(deftest request-vault-index-response-uses-custom-fetch-and-url-test
+  (async done
+    (let [calls (atom [])
+          fetch-fn (fn [url init]
+                     (swap! calls conj [url init])
+                     (js/Promise.resolve
+                      (ok-response-with-headers
+                       [{:summary {:name "Vault One"
+                                   :vaultAddress "0xA1"
+                                   :leader "0xB1"
+                                   :tvl "10.0"
+                                   :createTimeMillis 100}}]
+                       {"ETag" "\"etag-1\""
+                        "Last-Modified" "Thu, 20 Mar 2026 12:00:00 GMT"})))]
+      (-> (vault-gateway/request-vault-index-response! {:fetch-fn fetch-fn
+                                                        :vault-index-url "https://vaults.test/index"}
+                                                       {:fetch-opts {:headers {"If-None-Match" "\"etag-0\""}}})
+          (.then (fn [response]
+                   (let [[url init] (first @calls)
+                         init* (js->clj init)]
+                     (is (= "https://vaults.test/index" url))
+                     (is (= "GET" (get init* "method")))
+                     (is (= "\"etag-0\"" (get-in init* ["headers" "If-None-Match"]))))
+                   (is (= :ok (:status response)))
+                   (is (= "\"etag-1\"" (:etag response)))
+                   (is (= "Thu, 20 Mar 2026 12:00:00 GMT" (:last-modified response)))
+                   (is (= ["0xa1"] (mapv :vault-address (:rows response))))
+                   (done)))
+          (.catch (async-support/unexpected-error done))))))
+
 (deftest request-vault-index-uses-custom-fetch-and-url-test
   (async done
     (let [calls (atom [])
