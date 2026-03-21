@@ -18,6 +18,7 @@ The current top CRAP hotspots are concentrated in five pure or mostly pure seams
 - [x] (2026-03-20) Extended focused CLJS tests for protocol-address validation, transfer-balance fallback rules, vault detail hover behavior, snapshot-range fallback ordering, and vault-detail activity loading/error collation.
 - [x] (2026-03-20) Installed missing JS dependencies with `npm ci`, then ran `npm run check`, `npm test`, `npm run test:websocket`, `npm run coverage`, and `npm run crap:report`.
 - [x] (2026-03-20) Ran governed browser QA for `vaults-route` and `vault-detail-route`, recorded the evidence under `/hyperopen/tmp/browser-inspection/design-review-2026-03-20T15-42-30-800Z-7c1841eb`, and filed follow-up `hyperopen-ksuk` for the remaining `vault-detail-route` blocker.
+- [x] (2026-03-21 19:58Z) Closed `hyperopen-55nd` with `bd close ... --reason "Completed"` and prepared this ExecPlan to move from `active/` to `completed/`.
 
 ## Surprises & Discoveries
 
