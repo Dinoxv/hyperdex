@@ -12,7 +12,7 @@
   "https://app.hyperliquid.xyz/explorer/token/")
 
 (def ^:private balances-desktop-grid-template-class
-  "grid-cols-[minmax(88px,0.82fr)_minmax(152px,1.08fr)_minmax(176px,1.22fr)_minmax(112px,0.82fr)_minmax(196px,1.42fr)_minmax(72px,0.44fr)_minmax(116px,0.66fr)_minmax(56px,0.26fr)_minmax(132px,0.72fr)]")
+  "grid-cols-[minmax(84px,0.78fr)_minmax(132px,0.98fr)_minmax(152px,1.08fr)_minmax(102px,0.74fr)_minmax(176px,1.28fr)_minmax(64px,0.4fr)_minmax(104px,0.56fr)_minmax(48px,0.2fr)_minmax(120px,0.64fr)]")
 
 (defn- empty-state [message]
   [:div.flex.flex-col.items-center.justify-center.py-12.text-base-content
@@ -141,12 +141,13 @@
   (let [display-contract-id (abbreviate-contract-id contract-id)]
     (when-let [explorer-url (balance-contract-explorer-url contract-id)]
       [:span {:class ["inline-flex"
+                      "min-w-0"
                       "min-h-6"
                       "items-center"
                       "gap-1"
                       "whitespace-nowrap"
                       "text-trading-text"]}
-       [:span display-contract-id]
+       [:span {:class ["truncate"]} display-contract-id]
        (external-link-button explorer-url
                              (str "Open contract " display-contract-id " in Hyperliquid Explorer")
                              ["text-trading-green"])])))
@@ -360,7 +361,7 @@
                        :event.currentTarget/bounds])]
     [:div {:class ["grid"
                    balances-desktop-grid-template-class
-                   "gap-x-5"
+                   "gap-x-4"
                    "items-center"
                    "px-3"
                    "py-px"
@@ -410,7 +411,7 @@
   ([sort-state extra-classes]
    [:div {:class (into ["grid"
                         balances-desktop-grid-template-class
-                        "gap-x-5"
+                        "gap-x-4"
                         "py-1"
                         "px-3"
                         "bg-base-200"
