@@ -12,7 +12,7 @@
   "https://app.hyperliquid.xyz/explorer/token/")
 
 (def ^:private balances-desktop-grid-template-class
-  "grid-cols-[minmax(88px,0.84fr)_minmax(96px,0.8fr)_minmax(140px,1.16fr)_minmax(92px,0.76fr)_minmax(180px,1.58fr)_minmax(56px,0.5fr)_minmax(104px,0.88fr)_minmax(40px,0.22fr)_minmax(112px,0.9fr)]")
+  "grid-cols-[minmax(88px,0.82fr)_minmax(152px,1.08fr)_minmax(176px,1.22fr)_minmax(112px,0.82fr)_minmax(196px,1.42fr)_minmax(72px,0.44fr)_minmax(116px,0.66fr)_minmax(56px,0.26fr)_minmax(132px,0.72fr)]")
 
 (defn- empty-state [message]
   [:div.flex.flex-col.items-center.justify-center.py-12.text-base-content
@@ -360,7 +360,7 @@
                        :event.currentTarget/bounds])]
     [:div {:class ["grid"
                    balances-desktop-grid-template-class
-                   "gap-x-3"
+                   "gap-x-5"
                    "items-center"
                    "px-3"
                    "py-px"
@@ -410,7 +410,7 @@
   ([sort-state extra-classes]
    [:div {:class (into ["grid"
                         balances-desktop-grid-template-class
-                        "gap-x-3"
+                        "gap-x-5"
                         "py-1"
                         "px-3"
                         "bg-base-200"
