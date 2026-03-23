@@ -54,6 +54,9 @@
 (def ^:private sync-asset-selector-active-ctx-subscriptions-effect
   [:effects/sync-asset-selector-active-ctx-subscriptions])
 
+(def ^:private asset-selector-live-market-subscriptions-paused-path
+  [:asset-selector :live-market-subscriptions-paused?])
+
 (declare toggle-asset-dropdown
          close-asset-dropdown
          select-asset
@@ -432,11 +435,27 @@
   (let [raw-scroll-top (max 0 (or (parse-int-value scroll-top) 0))
         next-scroll-top (-> (/ raw-scroll-top asset-selector-row-height-px)
                             js/Math.floor
-                            (* asset-selector-row-height-px))]
-    (if (= next-scroll-top (get-in state [:asset-selector :scroll-top] 0))
+                            (* asset-selector-row-height-px))
+        current-scroll-top (get-in state [:asset-selector :scroll-top] 0)
+        subscriptions-paused? (true? (get-in state asset-selector-live-market-subscriptions-paused-path))
+        path-values (cond-> []
+                      (not= next-scroll-top current-scroll-top)
+                      (conj [[:asset-selector :scroll-top] next-scroll-top])
+                      subscriptions-paused?
+                      (conj [asset-selector-live-market-subscriptions-paused-path false]))]
+    (if (empty? path-values)
       []
       (append-selector-subscription-sync
-       [[:effects/save [:asset-selector :scroll-top] next-scroll-top]]))))
+       [[:effects/save-many path-values]]))))
+
+(defn set-asset-selector-live-market-subscriptions-paused
+  [state paused?]
+  (let [next-paused? (boolean paused?)
+        current-paused? (true? (get-in state asset-selector-live-market-subscriptions-paused-path))]
+    (if (= next-paused? current-paused?)
+      []
+      (append-selector-subscription-sync
+       [[:effects/save asset-selector-live-market-subscriptions-paused-path next-paused?]]))))
 
 (defn- current-asset-selector-render-limit
   [state total]

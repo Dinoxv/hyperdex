@@ -19,10 +19,12 @@ After this work, a user should be able to open the asset selector on `/trade`, f
 - [x] (2026-03-23 18:42Z) Extended the same active-scroll freeze boundary to the desktop chart/account siblings and the desktop active-asset panel, with render-cache coverage proving those surfaces also stop rerendering during active selector scroll.
 - [x] (2026-03-23 18:32Z) Froze the desktop active-asset selector wrapper props while the local selector list runtime is actively scrolling and memoized the wrapper so parent churn no longer rebuilds the selector dropdown during a fling.
 - [x] (2026-03-23 18:40Z) Gated selector market-cache persistence to actual selector refreshes instead of every live selector market patch so websocket updates stop re-sorting and re-normalizing the full selector list during scroll.
+- [x] (2026-03-23 18:49Z) Added a stronger blank-pixel coverage probe, confirmed the remaining one-frame flash was still present on deep jump-scrolls, and switched the desktop selector to full-row rendering for normal-sized market sets while keeping the large-list virtualization fallback.
+- [x] (2026-03-23 18:50Z) Tightened the committed browser regression to assert blank viewport coverage stays at `<=1px`, not merely that some rows remain visible.
 - [x] (2026-03-23 18:37Z) Re-ran the committed asset-selector Playwright regression plus the required repository gates after the panel-freeze experiment.
 - [x] Refresh browser evidence after each experiment with a short trace or QA artifact and record whether the change reduced black flashes, reduced frozen scroll frames, both, or neither.
 - [x] Reduce or eliminate the remaining scroll-time work on the selector path without regressing reachability of the full market list.
-- [ ] Decide whether the remaining long-tail wheel-stall outliers justify a final chart-runtime-specific pass, then either land that pass or move this ExecPlan out of `active`.
+- [ ] Confirm the latest desktop full-render pass on real manual hardware scroll and decide whether any remaining long-tail jank still justifies a chart/runtime-specific follow-up before moving this ExecPlan out of `active`.
 
 ## Surprises & Discoveries
 
@@ -37,6 +39,9 @@ After this work, a user should be able to open the asset selector on `/trade`, f
 
 - Observation: prior fixes did improve some symptoms but not the user-visible outcome.
   Evidence: windowed virtualization and larger overscan eliminated the obvious blank viewport, and the nested render warnings disappeared, but the user can still reproduce brief black flashes and scroll stutter in a live browser session.
+
+- Observation: the earlier browser regression was too weak to catch the remaining flash because it only asserted that some rows stayed visible, not that the viewport stayed fully covered by rows.
+  Evidence: the stronger live coverage probe from the parent thread showed `blank=256px` immediately after deep `scrollTop` jumps even while later frames recovered, and the tightened Playwright regression now checks blank coverage directly instead of `visibleRows > 0`.
 
 - Observation: the first automated post-fix headless probe was invalid because it started before the selector finished materializing its rows.
   Evidence: the probe artifact at `/Users/barry/.codex/worktrees/2790/hyperopen/tmp/browser-inspection/asset-selector-scroll-probe-2026-03-23T18-02-14.985Z/probe.json` showed `scrollHeight=64`, `clientHeight=64`, and `0` rendered rows before the list populated. Tightening the probe to wait for visible selector rows restored comparable measurements.
@@ -75,6 +80,10 @@ After this work, a user should be able to open the asset selector on `/trade`, f
 
 - Decision: do not persist the selector market cache off live websocket-driven selector market patches.
   Rationale: the cache exists for startup symbol metadata, not live marks, and the startup watcher was re-running `hyperopen.asset_selector.markets_cache` sorting/normalization work during scroll for no user-visible benefit.
+  Date/Author: 2026-03-23 / Codex
+
+- Decision: for normal-sized desktop market sets, render the full selector row list instead of a windowed slice; keep the existing virtualization path only as a fallback for much larger lists.
+  Rationale: the latest probe showed the remaining black flash was the viewport outrunning the mounted slice for a frame, which cannot be prevented reliably by more throttling once the scroll delta exceeds the retained buffer. Rendering the full current desktop list removes that one-frame failure mode while the earlier route-freeze work keeps the surrounding churn low enough to absorb the extra rows.
   Date/Author: 2026-03-23 / Codex
 
 ## Outcomes & Retrospective
@@ -171,6 +180,11 @@ Research log:
   Evidence addressed: the post-freeze CPU profile at `/Users/barry/.codex/worktrees/2790/hyperopen/tmp/browser-inspection/asset-selector-cpuprofile-2026-03-23T18-09-55-020Z/profile.cpuprofile` still showed `hyperopen.asset_selector.markets_cache/sort_token`, `compare_selector_markets`, and `normalize_asset_selector_market_cache_entry` samples during the scroll burst.
   Result: improved, but not yet fully decisive. The immediate single wheel probe after the watcher fix reduced long-task total to roughly `53ms`, max long task to `53ms`, and max stall window to roughly `125ms`, but repeated wheel trials still showed noisy long-tail outliers. That keeps the issue open even though the clear wasted cache-persistence work is now gone.
   Next hypothesis: if the remaining tail is still visible in manual browser use, the next experiment should target chart-runtime or websocket-health work that still runs on the main thread even after selector view churn and cache persistence have been reduced.
+
+- Experiment: replace the desktop selector’s normal-sized virtual row window with a fully rendered row list, while keeping the local scroll runtime and a large-list virtualization fallback.
+  Evidence addressed: the new stronger coverage probe from the parent thread showed the remaining failure mode directly: after deep jump-scrolls to `900px`, `1800px`, `3600px`, and beyond, the current implementation exposed `256px` of blank viewport immediately and only recovered on the next animation frame, which matches the user-visible black flash.
+  Result: improved. The post-fix live browser inspection summary at `/Users/barry/.codex/worktrees/2790/hyperopen/tmp/browser-inspection/asset-selector-scroll-coverage-2026-03-23T18-49-09Z/probe-summary.json` recorded `658` rendered rows and `0px` blank coverage across all sampled deep scroll targets, and the tightened Playwright regression now passes while asserting blank coverage directly.
+  Next hypothesis: if manual hardware scroll still finds noticeable lag after this pass, the next remaining path is likely long-tail non-selector main-thread work rather than the selector viewport outrunning its own row window.
 
 ## Interfaces and Dependencies
 

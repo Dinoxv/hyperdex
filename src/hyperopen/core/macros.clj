@@ -84,6 +84,7 @@
     set-asset-selector-favorites-only
     set-asset-selector-tab
     handle-asset-selector-shortcut
+    set-asset-selector-live-market-subscriptions-paused
     set-asset-selector-scroll-top
     increase-asset-selector-render-limit
     show-all-asset-selector-markets

@@ -1,6 +1,5 @@
 (ns hyperopen.runtime.effect-adapters.asset-selector
-  (:require [clojure.set :as set]
-            [hyperopen.asset-selector.active-market-cache :as active-market-cache]
+  (:require [hyperopen.asset-selector.active-market-cache :as active-market-cache]
             [hyperopen.asset-selector.actions :as asset-actions]
             [hyperopen.asset-selector.icon-status-runtime :as icon-status-runtime]
             [hyperopen.asset-selector.markets :as markets]
@@ -67,11 +66,7 @@
 (defn sync-asset-selector-active-ctx-subscriptions
   [_ store]
   (let [state @store
-        desired-coins (asset-selector-query/selector-visible-market-coins state)
-        owned-coins (active-ctx/get-subscribed-coins-by-owner asset-selector-active-ctx-owner)
-        subscribe-coins (sort (set/difference desired-coins owned-coins))
-        unsubscribe-coins (sort (set/difference owned-coins desired-coins))]
-    (doseq [coin subscribe-coins]
-      (active-ctx/subscribe-active-asset-ctx! coin asset-selector-active-ctx-owner))
-    (doseq [coin unsubscribe-coins]
-      (active-ctx/unsubscribe-active-asset-ctx! coin asset-selector-active-ctx-owner))))
+        desired-coins (if (true? (get-in state [:asset-selector :live-market-subscriptions-paused?]))
+                        #{}
+                        (asset-selector-query/selector-visible-market-coins state))]
+    (active-ctx/sync-owner-subscriptions! asset-selector-active-ctx-owner desired-coins)))

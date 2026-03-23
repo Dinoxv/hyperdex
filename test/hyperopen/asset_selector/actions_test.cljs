@@ -352,11 +352,27 @@
          (actions/set-asset-selector-scroll-top
            {:asset-selector {:scroll-top 48}}
            "63.9")))
-  (is (= [[:effects/save [:asset-selector :scroll-top] 0]
+  (is (= [[:effects/save-many [[[:asset-selector :scroll-top] 0]]]
           [:effects/sync-asset-selector-active-ctx-subscriptions]]
          (actions/set-asset-selector-scroll-top
            {:asset-selector {:scroll-top 10}}
            "-5")))
+  (is (= [[:effects/save-many [[[:asset-selector :scroll-top] 240]
+                               [[:asset-selector :live-market-subscriptions-paused?] false]]]
+          [:effects/sync-asset-selector-active-ctx-subscriptions]]
+         (actions/set-asset-selector-scroll-top
+           {:asset-selector {:scroll-top 0
+                             :live-market-subscriptions-paused? true}}
+           "255")))
+  (is (= [[:effects/save [:asset-selector :live-market-subscriptions-paused?] true]
+          [:effects/sync-asset-selector-active-ctx-subscriptions]]
+         (actions/set-asset-selector-live-market-subscriptions-paused
+           {:asset-selector {}}
+           true)))
+  (is (= []
+         (actions/set-asset-selector-live-market-subscriptions-paused
+           {:asset-selector {:live-market-subscriptions-paused? true}}
+           true)))
 
   (is (= [[:effects/save [:asset-selector :render-limit] 10]
           [:effects/sync-asset-selector-active-ctx-subscriptions]]

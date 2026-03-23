@@ -140,6 +140,7 @@
      [:actions/set-asset-selector-favorites-only :set-asset-selector-favorites-only]
      [:actions/set-asset-selector-tab :set-asset-selector-tab]
      [:actions/handle-asset-selector-shortcut :handle-asset-selector-shortcut]
+     [:actions/set-asset-selector-live-market-subscriptions-paused :set-asset-selector-live-market-subscriptions-paused]
      [:actions/set-asset-selector-scroll-top :set-asset-selector-scroll-top]
      [:actions/increase-asset-selector-render-limit :increase-asset-selector-render-limit]
      [:actions/show-all-asset-selector-markets :show-all-asset-selector-markets]

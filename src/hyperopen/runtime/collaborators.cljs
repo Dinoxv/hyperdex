@@ -47,6 +47,7 @@
    :set-asset-selector-favorites-only asset-actions/set-asset-selector-favorites-only
    :set-asset-selector-tab asset-actions/set-asset-selector-tab
    :handle-asset-selector-shortcut asset-actions/handle-asset-selector-shortcut
+   :set-asset-selector-live-market-subscriptions-paused asset-actions/set-asset-selector-live-market-subscriptions-paused
    :set-asset-selector-scroll-top asset-actions/set-asset-selector-scroll-top
    :increase-asset-selector-render-limit asset-actions/increase-asset-selector-render-limit
    :show-all-asset-selector-markets asset-actions/show-all-asset-selector-markets

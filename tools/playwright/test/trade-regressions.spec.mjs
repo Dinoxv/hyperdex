@@ -60,18 +60,35 @@ test("asset selector rapid scroll keeps rows visible @regression", async ({ page
   await expect(page.locator('[data-role="asset-selector-scroll-container"]')).toBeVisible();
   await expect(page.locator('[data-role="asset-selector-row"]').first()).toBeVisible();
 
-  const visibility = await page.evaluate(async () => {
+  const coverageSamples = await page.evaluate(async () => {
     const container = document.querySelector('[data-role="asset-selector-scroll-container"]');
     if (!container) {
       throw new Error("asset selector scroll container not found");
     }
 
-    const visibleRowCount = () => {
+    const rowCoverage = () => {
       const containerRect = container.getBoundingClientRect();
-      return Array.from(document.querySelectorAll('[data-role="asset-selector-row"]')).filter((row) => {
-        const rect = row.getBoundingClientRect();
-        return rect.bottom > containerRect.top && rect.top < containerRect.bottom;
-      }).length;
+      const intervals = Array.from(document.querySelectorAll('[data-role="asset-selector-row"]'))
+        .map((row) => row.getBoundingClientRect())
+        .map((rect) => [Math.max(containerRect.top, rect.top), Math.min(containerRect.bottom, rect.bottom)])
+        .filter(([top, bottom]) => bottom > top)
+        .sort((a, b) => a[0] - b[0]);
+
+      let covered = 0;
+      let cursor = containerRect.top;
+      for (const [top, bottom] of intervals) {
+        const start = Math.max(top, cursor);
+        if (bottom > start) {
+          covered += bottom - start;
+          cursor = bottom;
+        }
+      }
+
+      return {
+        covered,
+        height: containerRect.height,
+        blank: Math.max(0, containerRect.height - covered)
+      };
     };
 
     const maxScrollTop = Math.max(0, container.scrollHeight - container.clientHeight);
@@ -81,12 +98,16 @@ test("asset selector rapid scroll keeps rows visible @regression", async ({ page
 
     const sampleTarget = async (target) => {
       container.scrollTop = target;
-      container.dispatchEvent(new Event("scroll"));
-      const immediateVisibleRows = visibleRowCount();
+      const immediateCoverage = rowCoverage();
       await new Promise((resolve) => requestAnimationFrame(() => resolve()));
-      const nextFrameVisibleRows = visibleRowCount();
+      const nextFrameCoverage = rowCoverage();
       await new Promise((resolve) => requestAnimationFrame(() => resolve()));
-      return { target, immediateVisibleRows, nextFrameVisibleRows, visibleRows: visibleRowCount() };
+      return {
+        target,
+        immediateCoverage,
+        nextFrameCoverage,
+        settledCoverage: rowCoverage()
+      };
     };
 
     const samples = [];
@@ -97,10 +118,10 @@ test("asset selector rapid scroll keeps rows visible @regression", async ({ page
     return samples;
   });
 
-  for (const sample of visibility) {
-    expect(sample.immediateVisibleRows).toBeGreaterThan(0);
-    expect(sample.nextFrameVisibleRows).toBeGreaterThan(0);
-    expect(sample.visibleRows).toBeGreaterThan(0);
+  for (const sample of coverageSamples) {
+    expect(sample.immediateCoverage.blank).toBeLessThanOrEqual(1);
+    expect(sample.nextFrameCoverage.blank).toBeLessThanOrEqual(1);
+    expect(sample.settledCoverage.blank).toBeLessThanOrEqual(1);
   }
   expect(nestedRenderWarnings).toEqual([]);
   expect(pageErrors).toEqual([]);

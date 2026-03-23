@@ -437,6 +437,7 @@
    :actions/set-asset-selector-favorites-only ::boolean-args
    :actions/set-asset-selector-tab ::tab-args
    :actions/handle-asset-selector-shortcut ::asset-selector-shortcut-args
+   :actions/set-asset-selector-live-market-subscriptions-paused ::boolean-args
    :actions/set-asset-selector-scroll-top ::single-input-args
    :actions/increase-asset-selector-render-limit ::no-args
    :actions/show-all-asset-selector-markets ::no-args

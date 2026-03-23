@@ -12,7 +12,7 @@
 (def ^:private asset-list-viewport-height-px
   list-metrics/viewport-height-px)
 
-(def ^:private asset-list-overscan-rows
+(def default-overscan-rows
   12)
 
 (defn- parse-cache-order [value]
@@ -133,12 +133,12 @@
 
 (defn virtual-window
   ([limit scroll-top]
-   (virtual-window limit scroll-top asset-list-overscan-rows))
+   (virtual-window limit scroll-top default-overscan-rows))
   ([limit scroll-top overscan-rows]
    (let [overscan-rows* (let [candidate (parse-cache-order overscan-rows)]
                           (if (number? candidate)
                             (max 0 candidate)
-                            asset-list-overscan-rows))
+                            default-overscan-rows))
          rows-in-view (-> (/ asset-list-viewport-height-px asset-list-row-height-px)
                           js/Math.ceil
                           int)

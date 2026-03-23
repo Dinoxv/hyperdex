@@ -1,5 +1,6 @@
 (ns hyperopen.websocket.active-asset-ctx
-  (:require [hyperopen.telemetry :as telemetry]
+  (:require [clojure.set :as set]
+            [hyperopen.telemetry :as telemetry]
             [hyperopen.asset-selector.market-live-projection :as market-live-projection]
             [hyperopen.websocket.client :as ws-client]
             [hyperopen.websocket.market-projection-runtime :as market-projection-runtime]))
@@ -172,6 +173,18 @@
   (get-in (normalized-state @active-asset-ctx-state)
           [:coins-by-owner (normalize-owner owner)]
           #{}))
+
+(defn sync-owner-subscriptions!
+  [owner desired-coins]
+  (let [owner* (normalize-owner owner)
+        desired-coins* (set (remove nil? desired-coins))
+        owned-coins (get-subscribed-coins-by-owner owner*)
+        subscribe-coins (sort (set/difference desired-coins* owned-coins))
+        unsubscribe-coins (sort (set/difference owned-coins desired-coins*))]
+    (doseq [coin subscribe-coins]
+      (subscribe-active-asset-ctx! coin owner*))
+    (doseq [coin unsubscribe-coins]
+      (unsubscribe-active-asset-ctx! coin owner*))))
 
 ;; Get active asset context for a specific coin
 (defn get-active-asset-ctx [coin]

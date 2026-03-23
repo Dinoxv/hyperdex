@@ -185,6 +185,9 @@
     [:div.grid.grid-cols-12.gap-2.items-center.px-2.h-6.box-border.cursor-pointer.bg-base-100.hover:bg-base-200.transition-colors
      {:class row-highlight-classes
       :data-role "asset-selector-row"
+      :style {:contain "layout paint style"
+              :content-visibility "auto"
+              :contain-intrinsic-size (str list-metrics/row-height-px "px")}
       :on {:click [[:actions/select-asset asset]]}}
      ;; Symbol column
      [:div.col-span-3.flex.items-center.space-x-1.5.min-w-0
@@ -560,10 +563,40 @@
       (mobile-sort-header sort-by sort-direction)
       (mobile-asset-list processed-assets-list selected-market-key highlighted-market-key* favorites suppress-empty-state?)]]))
 
+(def ^:private asset-list-full-render-threshold
+  1000)
+
+(def ^:private asset-list-max-active-scroll-overscan-rows
+  120)
+
+(defn- asset-list-full-render?
+  [assets]
+  (<= (count assets) asset-list-full-render-threshold))
+
+(defn- asset-list-window
+  [limit scroll-top full-render? overscan-rows]
+  (if full-render?
+    (query/virtual-window limit scroll-top limit)
+    (query/virtual-window limit
+                          scroll-top
+                          (or overscan-rows query/default-overscan-rows))))
+
 (defn- asset-list-body
-  [assets selected-market-key highlighted-market-key favorites missing-icons loaded-icons render-limit scroll-top suppress-empty-state?]
+  ([assets selected-market-key highlighted-market-key favorites missing-icons loaded-icons render-limit scroll-top suppress-empty-state?]
+   (asset-list-body assets
+                    selected-market-key
+                    highlighted-market-key
+                    favorites
+                    missing-icons
+                    loaded-icons
+                    render-limit
+                    scroll-top
+                    suppress-empty-state?
+                    nil))
+  ([assets selected-market-key highlighted-market-key favorites missing-icons loaded-icons render-limit scroll-top suppress-empty-state? overscan-rows]
   (let [assets* (if (vector? assets) assets (vec assets))
-        total (count assets*)]
+        total (count assets*)
+        full-render? (asset-list-full-render? assets*)]
     (if (zero? total)
       (if suppress-empty-state?
         [:div.py-8]
@@ -573,7 +606,7 @@
       (let [limit total
             scroll-top* (query/normalize-scroll-top scroll-top)
             {:keys [start-index end-index top-spacer-px bottom-spacer-px]}
-            (query/virtual-window limit scroll-top*)
+            (asset-list-window limit scroll-top* full-render? overscan-rows)
             visible-assets (subvec assets* start-index end-index)
             rows (mapv (fn [asset]
                          ^{:key (:key asset)}
@@ -591,23 +624,27 @@
               [[:div {:style {:height (str top-spacer-px "px")}}]])
             rows
             (when (pos? bottom-spacer-px)
-              [[:div {:style {:height (str bottom-spacer-px "px")}}]])))))))
+              [[:div {:style {:height (str bottom-spacer-px "px")}}]]))))))))
 
 (defn- render-asset-list-body!
-  [host-node {:keys [assets selected-market-key highlighted-market-key favorites missing-icons loaded-icons
-                     render-limit suppress-empty-state?]}
-   scroll-top]
-  (when host-node
-    (r/render host-node
-              (asset-list-body assets
-                               selected-market-key
-                               highlighted-market-key
-                               favorites
-                               missing-icons
-                               loaded-icons
-                               render-limit
-                               scroll-top
-                               suppress-empty-state?))))
+  ([host-node props scroll-top]
+   (render-asset-list-body! host-node props scroll-top nil))
+  ([host-node {:keys [assets selected-market-key highlighted-market-key favorites missing-icons loaded-icons
+                      render-limit suppress-empty-state?]}
+    scroll-top
+    overscan-rows]
+   (when host-node
+     (r/render host-node
+               (asset-list-body assets
+                                selected-market-key
+                                highlighted-market-key
+                                favorites
+                                missing-icons
+                                loaded-icons
+                                render-limit
+                                scroll-top
+                                suppress-empty-state?
+                                overscan-rows)))))
 
 (def ^:private asset-list-scroll-settle-delay-ms
   120)
@@ -667,6 +704,14 @@
                   [[:actions/set-asset-selector-scroll-top
                     scroll-top]])))
 
+(defn- set-asset-list-live-market-subscriptions-paused!
+  [paused?]
+  (when app-system/store
+    (nxr/dispatch app-system/store
+                  nil
+                  [[:actions/set-asset-selector-live-market-subscriptions-paused
+                    paused?]])))
+
 (declare asset-list-window-state
          ensure-asset-list-scroll-settle!)
 
@@ -712,10 +757,13 @@
               (asset-list-set-timeout! tick asset-list-scroll-settle-delay-ms)))))
 
 (defn- asset-list-window-state
-  [{:keys [assets]} scroll-top]
+  ([props scroll-top]
+   (asset-list-window-state props scroll-top nil))
+  ([{:keys [assets]} scroll-top overscan-rows]
   (let [assets* (if (vector? assets) assets (vec assets))
         total (count assets*)
         limit total
+        full-render? (asset-list-full-render? assets*)
         scroll-top* (query/normalize-scroll-top scroll-top)
         visible-row-count (-> (/ list-metrics/viewport-height-px
                                  list-metrics/row-height-px)
@@ -730,10 +778,13 @@
     {:total total
      :limit limit
      :scroll-top scroll-top*
+     :overscan-rows (if full-render?
+                      total
+                      (or overscan-rows query/default-overscan-rows))
      :first-visible-row first-visible-row
      :last-visible-row last-visible-row
      :window (when (pos? total)
-               (query/virtual-window limit scroll-top*))}))
+               (asset-list-window limit scroll-top* full-render? overscan-rows))})))
 
 (defn- asset-list-viewport-covered?
   [current-window-state next-window-state]
@@ -742,6 +793,33 @@
          end-index
          (<= start-index (:first-visible-row next-window-state))
          (>= end-index (:last-visible-row next-window-state)))))
+
+(defn- asset-list-window-covered?
+  [current-window-state next-window-state]
+  (let [current-start-index (get-in current-window-state [:window :start-index])
+        current-end-index (get-in current-window-state [:window :end-index])
+        next-start-index (get-in next-window-state [:window :start-index])
+        next-end-index (get-in next-window-state [:window :end-index])]
+    (and (number? current-start-index)
+         (number? current-end-index)
+         (number? next-start-index)
+         (number? next-end-index)
+         (<= current-start-index next-start-index)
+         (>= current-end-index next-end-index))))
+
+(defn- asset-list-dynamic-overscan-rows
+  [current-window-state next-scroll-top]
+  (let [previous-scroll-top (or (:scroll-top current-window-state) 0)
+        delta-px (-> (- (query/normalize-scroll-top next-scroll-top)
+                        previous-scroll-top)
+                     js/Math.abs)
+        delta-rows (-> (/ delta-px list-metrics/row-height-px)
+                       js/Math.ceil
+                       int)]
+    (-> (+ query/default-overscan-rows
+           (* 2 delta-rows))
+        (max query/default-overscan-rows)
+        (min asset-list-max-active-scroll-overscan-rows))))
 
 (defn- asset-list-host-node
   [node]
@@ -774,15 +852,20 @@
             on-scroll-end (fn [_]
                             (finalize-asset-list-scroll! runtime-state))
             on-scroll (fn [_event]
-                        (let [next-scroll-top (.-scrollTop node)
-                              next-window-state (asset-list-window-state @props* next-scroll-top)
+                        (let [was-scrolling? @scrolling?*
+                              next-scroll-top (.-scrollTop node)
+                              current-window-state @last-window-state*
+                              overscan-rows (asset-list-dynamic-overscan-rows current-window-state next-scroll-top)
+                              next-window-state (asset-list-window-state @props* next-scroll-top overscan-rows)
                               host-node (or @host-node* (asset-list-host-node node))]
                           (reset! scroll-top* next-scroll-top)
                           (reset! host-node* host-node)
                           (reset! scrolling?* true)
                           (set-asset-list-scroll-active! true)
-                          (when-not (asset-list-viewport-covered? @last-window-state* next-window-state)
-                            (render-asset-list-body! host-node @props* next-scroll-top)
+                          (when-not was-scrolling?
+                            (set-asset-list-live-market-subscriptions-paused! true))
+                          (when-not (asset-list-window-covered? current-window-state next-window-state)
+                            (render-asset-list-body! host-node @props* next-scroll-top overscan-rows)
                             (reset! last-window-state* next-window-state))
                           (ensure-asset-list-scroll-settle! runtime-state)))]
         (set-asset-list-scroll-active! false)
@@ -846,6 +929,7 @@
       :replicant.life-cycle/unmount
       (do
         (set-asset-list-scroll-active! false)
+        (set-asset-list-live-market-subscriptions-paused! false)
         (when-let [on-scroll (:on-scroll memory)]
           (.removeEventListener node "scroll" on-scroll))
         (when-let [on-scroll-end (:on-scroll-end memory)]
