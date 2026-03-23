@@ -488,7 +488,8 @@
         update-assets (vec (reverse assets))
         remembered* (atom nil)
         rendered* (atom [])
-        timeout-installs* (atom 0)
+        now* (atom 0)
+        timeouts* (atom [])
         {node :node host-node :host-node listeners* :listeners*} (fake-scroll-node)]
     (with-redefs [r/render
                   (fn [runtime-host hiccup]
@@ -496,10 +497,16 @@
                                            :strings (set (collect-strings hiccup))}))
                   view/schedule-asset-list-render-limit-sync!
                   (fn [& _] nil)
+                  view/asset-list-now-ms
+                  (fn [] @now*)
                   view/asset-list-set-timeout!
-                  (fn [_f _delay-ms]
-                    (swap! timeout-installs* inc)
-                    :timeout-handle)
+                  (fn [f delay-ms]
+                    (let [timeout-handle {:delay-ms delay-ms
+                                          :index (count @timeouts*)}]
+                      (swap! timeouts* conj {:fn f
+                                             :delay-ms delay-ms
+                                             :handle timeout-handle})
+                      timeout-handle))
                   view/asset-list-clear-timeout!
                   (fn [_timeout-handle] nil)]
       (let [mount-on-render (get-in (view/asset-list assets "perp:T0" nil #{} #{} #{} 120 0 false)
@@ -517,11 +524,12 @@
                            :replicant/memory @remembered*
                            :replicant/remember (fn [memory]
                                                  (reset! remembered* memory))})
-        (is (= 1 @timeout-installs*))
+        (is (= 1 (count @timeouts*)))
         (is (= 1 (count @rendered*)))
         (is (= host-node (:host (first @rendered*))))
         (is (contains? (:strings (first @rendered*)) "T0-USDC"))
-        ((:on-scroll-end @remembered*) #js {})
+        (reset! now* 120)
+        ((:fn (first @timeouts*)))
         (is (= 2 (count @rendered*)))
         (is (= host-node (:host (second @rendered*))))
         (is (contains? (:strings (second @rendered*)) "T59-USDC"))))))
@@ -556,7 +564,31 @@
       ((get @listeners* "scroll") #js {:timeStamp 2})
       (is (= 1 @timeout-installs*))))))    
 
-(deftest asset-list-runtime-pauses-live-market-subscriptions-only-on-scroll-boundaries-test
+(deftest asset-list-runtime-uses-idle-settle-timer-instead-of-scrollend-listener-test
+  (let [assets (vec (for [n (range 60)]
+                      {:key (str "perp:T" n)
+                       :symbol (str "T" n "-USDC")
+                       :coin (str "T" n)
+                       :base (str "T" n)
+                       :market-type :perp}))
+        remembered* (atom nil)
+        {node :node listeners* :listeners*} (fake-scroll-node)]
+    (with-redefs [r/render
+                  (fn [& _] nil)
+                  view/schedule-asset-list-render-limit-sync!
+                  (fn [& _] nil)]
+      (let [on-render (get-in (view/asset-list assets nil nil #{} #{} #{} 120 0 false)
+                              [1 :replicant/on-render])]
+        (on-render {:replicant/life-cycle :replicant.life-cycle/mount
+                    :replicant/node node
+                    :replicant/remember (fn [memory]
+                                          (reset! remembered* memory))})
+        (is (contains? @listeners* "wheel"))
+        (is (contains? @listeners* "scroll"))
+        (is (not (contains? @listeners* "scrollend")))
+        (is (nil? (:on-scroll-end @remembered*)))))))
+
+(deftest asset-list-runtime-delays-live-market-subscription-resume-until-post-settle-timeout-test
   (let [assets (vec (for [n (range 60)]
                       {:key (str "perp:T" n)
                        :symbol (str "T" n "-USDC")
@@ -565,14 +597,23 @@
                        :market-type :perp}))
         remembered* (atom nil)
         dispatches* (atom [])
+        now* (atom 0)
+        timeouts* (atom [])
         {node :node listeners* :listeners*} (fake-scroll-node)]
     (with-redefs [r/render
                   (fn [& _] nil)
                   view/schedule-asset-list-render-limit-sync!
                   (fn [& _] nil)
+                  view/asset-list-now-ms
+                  (fn [] @now*)
                   view/asset-list-set-timeout!
-                  (fn [_f _delay-ms]
-                    :timeout-handle)
+                  (fn [f delay-ms]
+                    (let [timeout-handle {:delay-ms delay-ms
+                                          :index (count @timeouts*)}]
+                      (swap! timeouts* conj {:fn f
+                                             :delay-ms delay-ms
+                                             :handle timeout-handle})
+                      timeout-handle))
                   view/asset-list-clear-timeout!
                   (fn [_timeout-handle] nil)
                   app-system/store ::store
@@ -590,14 +631,83 @@
         ((get @listeners* "scroll") #js {:timeStamp 1})
         (set! (.-scrollTop node) 96)
         ((get @listeners* "scroll") #js {:timeStamp 2})
-        ((:on-scroll-end @remembered*) #js {})
+        (is (= 1 (count @timeouts*)))
+        (is (true? (view/asset-list-scroll-active?)))
+        (is (true? (view/asset-list-freeze-active?)))
+        (reset! now* 120)
+        ((:fn (first @timeouts*)))
+        (is (false? (view/asset-list-scroll-active?)))
+        (is (true? (view/asset-list-freeze-active?)))
         (is (= [{:store ::store
                  :event nil
                  :actions [[:actions/set-asset-selector-live-market-subscriptions-paused true]]}
                 {:store ::store
                  :event nil
                  :actions [[:actions/set-asset-selector-scroll-top 96]]}]
+               @dispatches*))
+        (is (= 2 (count @timeouts*)))
+        ((:fn (second @timeouts*)))
+        (is (false? (view/asset-list-scroll-active?)))
+        (is (false? (view/asset-list-freeze-active?)))
+        (is (= [{:store ::store
+                 :event nil
+                 :actions [[:actions/set-asset-selector-live-market-subscriptions-paused true]]}
+                {:store ::store
+                 :event nil
+                 :actions [[:actions/set-asset-selector-scroll-top 96]]}
+                {:store ::store
+                 :event nil
+                 :actions [[:actions/set-asset-selector-live-market-subscriptions-paused false]]}]
                @dispatches*))))))
+
+(deftest asset-list-runtime-cancels-pending-live-market-resume-when-wheel-input-continues-at-boundary-test
+  (let [assets (vec (for [n (range 60)]
+                      {:key (str "perp:T" n)
+                       :symbol (str "T" n "-USDC")
+                       :coin (str "T" n)
+                       :base (str "T" n)
+                       :market-type :perp}))
+        remembered* (atom nil)
+        cleared-timeouts* (atom [])
+        now* (atom 0)
+        timeouts* (atom [])
+        {node :node listeners* :listeners*} (fake-scroll-node)]
+    (with-redefs [r/render
+                  (fn [& _] nil)
+                  view/schedule-asset-list-render-limit-sync!
+                  (fn [& _] nil)
+                  view/asset-list-now-ms
+                  (fn [] @now*)
+                  view/asset-list-set-timeout!
+                  (fn [f delay-ms]
+                    (let [timeout-handle {:delay-ms delay-ms
+                                          :index (count @timeouts*)}]
+                      (swap! timeouts* conj {:fn f
+                                             :delay-ms delay-ms
+                                             :handle timeout-handle})
+                      timeout-handle))
+                  view/asset-list-clear-timeout!
+                  (fn [timeout-handle]
+                    (swap! cleared-timeouts* conj timeout-handle))]
+      (let [on-render (get-in (view/asset-list assets nil nil #{} #{} #{} 120 0 false)
+                              [1 :replicant/on-render])]
+        (on-render {:replicant/life-cycle :replicant.life-cycle/mount
+                    :replicant/node node
+                    :replicant/remember (fn [memory]
+                                          (reset! remembered* memory))})
+        (set! (.-scrollTop node) 96)
+        ((get @listeners* "scroll") #js {:timeStamp 1})
+        (reset! now* 120)
+        ((:fn (first @timeouts*)))
+        (is (false? (view/asset-list-scroll-active?)))
+        (is (true? (view/asset-list-freeze-active?)))
+        (let [resume-timeout-handle (:handle (second @timeouts*))]
+          ((get @listeners* "wheel") #js {:deltaY 640})
+          (is (true? (view/asset-list-scroll-active?)))
+          (is (true? (view/asset-list-freeze-active?)))
+          (is (= resume-timeout-handle
+                 (last @cleared-timeouts*)))
+          (is (= 2 (count @cleared-timeouts*))))))))
 
 (deftest asset-list-item-sub-cent-formatting-test
   (testing "last price renders adaptive decimals for tiny assets"

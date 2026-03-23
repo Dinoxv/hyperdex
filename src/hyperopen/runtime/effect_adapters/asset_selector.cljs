@@ -67,6 +67,6 @@
   [_ store]
   (let [state @store
         desired-coins (if (true? (get-in state [:asset-selector :live-market-subscriptions-paused?]))
-                        #{}
+                        (active-ctx/get-subscribed-coins-by-owner asset-selector-active-ctx-owner)
                         (asset-selector-query/selector-visible-market-coins state))]
     (active-ctx/sync-owner-subscriptions! asset-selector-active-ctx-owner desired-coins)))

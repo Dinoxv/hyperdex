@@ -440,13 +440,13 @@
         subscriptions-paused? (true? (get-in state asset-selector-live-market-subscriptions-paused-path))
         path-values (cond-> []
                       (not= next-scroll-top current-scroll-top)
-                      (conj [[:asset-selector :scroll-top] next-scroll-top])
-                      subscriptions-paused?
-                      (conj [asset-selector-live-market-subscriptions-paused-path false]))]
+                      (conj [[:asset-selector :scroll-top] next-scroll-top]))]
     (if (empty? path-values)
       []
-      (append-selector-subscription-sync
-       [[:effects/save-many path-values]]))))
+      (let [effects [[:effects/save-many path-values]]]
+        (if subscriptions-paused?
+          effects
+          (append-selector-subscription-sync effects))))))
 
 (defn set-asset-selector-live-market-subscriptions-paused
   [state paused?]

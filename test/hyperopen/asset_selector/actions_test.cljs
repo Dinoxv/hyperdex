@@ -357,9 +357,7 @@
          (actions/set-asset-selector-scroll-top
            {:asset-selector {:scroll-top 10}}
            "-5")))
-  (is (= [[:effects/save-many [[[:asset-selector :scroll-top] 240]
-                               [[:asset-selector :live-market-subscriptions-paused?] false]]]
-          [:effects/sync-asset-selector-active-ctx-subscriptions]]
+  (is (= [[:effects/save-many [[[:asset-selector :scroll-top] 240]]]]
          (actions/set-asset-selector-scroll-top
            {:asset-selector {:scroll-top 0
                              :live-market-subscriptions-paused? true}}

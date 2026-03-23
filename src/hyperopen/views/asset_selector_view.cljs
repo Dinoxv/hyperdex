@@ -649,15 +649,28 @@
 (def ^:private asset-list-scroll-settle-delay-ms
   120)
 
+(def ^:private asset-list-live-subscription-resume-delay-ms
+  180)
+
 (defonce ^:private asset-list-scroll-active* (atom false))
+
+(defonce ^:private asset-list-freeze-active* (atom false))
 
 (defn asset-list-scroll-active?
   []
   (true? @asset-list-scroll-active*))
 
+(defn asset-list-freeze-active?
+  []
+  (true? @asset-list-freeze-active*))
+
 (defn- set-asset-list-scroll-active!
   [active?]
   (reset! asset-list-scroll-active* (boolean active?)))
+
+(defn- set-asset-list-freeze-active!
+  [active?]
+  (reset! asset-list-freeze-active* (boolean active?)))
 
 (defn- asset-list-now-ms
   []
@@ -722,12 +735,33 @@
   (render-asset-list-body! host-node next-props scroll-top)
   (reset! last-window-state* (asset-list-window-state next-props scroll-top)))
 
+(defn- clear-asset-list-timeout-atom!
+  [timeout*]
+  (when-let [timeout-handle @timeout*]
+    (asset-list-clear-timeout! timeout-handle)
+    (reset! timeout* nil)))
+
+(defn- cancel-asset-list-live-subscription-resume!
+  [live-subscription-resume-timeout*]
+  (clear-asset-list-timeout-atom! live-subscription-resume-timeout*))
+
+(defn- schedule-asset-list-live-subscription-resume!
+  [{:keys [live-subscription-resume-timeout* scrolling?*]}]
+  (when (nil? @live-subscription-resume-timeout*)
+    (reset! live-subscription-resume-timeout*
+            (asset-list-set-timeout!
+             (fn []
+               (reset! live-subscription-resume-timeout* nil)
+               (when-not @scrolling?*
+                 (set-asset-list-freeze-active! false)
+                 (set-asset-list-live-market-subscriptions-paused! false)))
+             asset-list-live-subscription-resume-delay-ms))))
+
 (defn- finalize-asset-list-scroll!
   [{:keys [host-node* props* pending-props* last-window-state* scroll-top*
-           scroll-settle-timeout* scrolling?* render-limit-sync-timeout*]}]
-  (when-let [timeout-handle @scroll-settle-timeout*]
-    (asset-list-clear-timeout! timeout-handle)
-    (reset! scroll-settle-timeout* nil))
+           scroll-settle-timeout* scrolling?* render-limit-sync-timeout*
+           live-subscription-resume-timeout*] :as runtime-state}]
+  (clear-asset-list-timeout-atom! scroll-settle-timeout*)
   (reset! scrolling?* false)
   (set-asset-list-scroll-active! false)
   (persist-asset-list-scroll-top! @scroll-top*)
@@ -739,7 +773,8 @@
                               last-window-state*
                               pending-props
                               @scroll-top*)
-      (schedule-asset-list-render-limit-sync! pending-props render-limit-sync-timeout*))))
+      (schedule-asset-list-render-limit-sync! pending-props render-limit-sync-timeout*)))
+  (schedule-asset-list-live-subscription-resume! runtime-state))
 
 (defn- ensure-asset-list-scroll-settle!
   [{:keys [last-scroll-activity-ms* scroll-settle-timeout*] :as runtime-state}]
@@ -840,6 +875,7 @@
             scrolling?* (atom false)
             scroll-settle-timeout* (atom nil)
             render-limit-sync-timeout* (atom nil)
+            live-subscription-resume-timeout* (atom nil)
             runtime-state {:host-node* host-node*
                            :props* props*
                            :pending-props* pending-props*
@@ -848,9 +884,20 @@
                            :scroll-top* scroll-top*
                            :scroll-settle-timeout* scroll-settle-timeout*
                            :scrolling?* scrolling?*
-                           :render-limit-sync-timeout* render-limit-sync-timeout*}
-            on-scroll-end (fn [_]
-                            (finalize-asset-list-scroll! runtime-state))
+                           :render-limit-sync-timeout* render-limit-sync-timeout*
+                           :live-subscription-resume-timeout* live-subscription-resume-timeout*}
+            begin-active-scroll!
+            (fn []
+              (when-not @scrolling?*
+                (reset! scrolling?* true)
+                (set-asset-list-scroll-active! true)
+                (set-asset-list-freeze-active! true)
+                (cancel-asset-list-live-subscription-resume! live-subscription-resume-timeout*)
+                (set-asset-list-live-market-subscriptions-paused! true)))
+            on-wheel (fn [event]
+                       (when-not (zero? (or (.-deltaY event) 0))
+                         (begin-active-scroll!)
+                         (ensure-asset-list-scroll-settle! runtime-state)))
             on-scroll (fn [_event]
                         (let [was-scrolling? @scrolling?*
                               next-scroll-top (.-scrollTop node)
@@ -860,23 +907,22 @@
                               host-node (or @host-node* (asset-list-host-node node))]
                           (reset! scroll-top* next-scroll-top)
                           (reset! host-node* host-node)
-                          (reset! scrolling?* true)
-                          (set-asset-list-scroll-active! true)
                           (when-not was-scrolling?
-                            (set-asset-list-live-market-subscriptions-paused! true))
+                            (begin-active-scroll!))
                           (when-not (asset-list-window-covered? current-window-state next-window-state)
                             (render-asset-list-body! host-node @props* next-scroll-top overscan-rows)
                             (reset! last-window-state* next-window-state))
                           (ensure-asset-list-scroll-settle! runtime-state)))]
         (set-asset-list-scroll-active! false)
+        (set-asset-list-freeze-active! false)
         (set! (.-scrollTop node) @scroll-top*)
+        (.addEventListener node "wheel" on-wheel)
         (.addEventListener node "scroll" on-scroll)
-        (.addEventListener node "scrollend" on-scroll-end)
         (render-asset-list-body! @host-node* @props* @scroll-top*)
         (reset! last-window-state* (asset-list-window-state @props* @scroll-top*))
         (schedule-asset-list-render-limit-sync! @props* render-limit-sync-timeout*)
-        (remember {:on-scroll on-scroll
-                   :on-scroll-end on-scroll-end
+        (remember {:on-wheel on-wheel
+                   :on-scroll on-scroll
                    :props* props*
                    :pending-props* pending-props*
                    :scroll-top* scroll-top*
@@ -885,7 +931,8 @@
                    :last-scroll-activity-ms* last-scroll-activity-ms*
                    :scrolling?* scrolling?*
                    :scroll-settle-timeout* scroll-settle-timeout*
-                   :render-limit-sync-timeout* render-limit-sync-timeout*}))
+                   :render-limit-sync-timeout* render-limit-sync-timeout*
+                   :live-subscription-resume-timeout* live-subscription-resume-timeout*}))
 
       :replicant.life-cycle/update
       (let [props* (or (:props* memory) (atom props))
@@ -898,8 +945,9 @@
             scrolling?* (or (:scrolling?* memory) (atom false))
             scroll-settle-timeout* (or (:scroll-settle-timeout* memory) (atom nil))
             render-limit-sync-timeout* (or (:render-limit-sync-timeout* memory) (atom nil))
+            live-subscription-resume-timeout* (or (:live-subscription-resume-timeout* memory) (atom nil))
+            on-wheel (:on-wheel memory)
             on-scroll (:on-scroll memory)
-            on-scroll-end (:on-scroll-end memory)
             live-scroll-top (or (.-scrollTop node) @scroll-top*)
             host-node (or @host-node* (asset-list-host-node node))]
         (reset! scroll-top* live-scroll-top)
@@ -914,8 +962,8 @@
                                     props
                                     @scroll-top*)
             (schedule-asset-list-render-limit-sync! @props* render-limit-sync-timeout*)))
-        (remember {:on-scroll on-scroll
-                   :on-scroll-end on-scroll-end
+        (remember {:on-wheel on-wheel
+                   :on-scroll on-scroll
                    :props* props*
                    :pending-props* pending-props*
                    :scroll-top* scroll-top*
@@ -924,20 +972,24 @@
                    :last-scroll-activity-ms* last-scroll-activity-ms*
                    :scrolling?* scrolling?*
                    :scroll-settle-timeout* scroll-settle-timeout*
-                   :render-limit-sync-timeout* render-limit-sync-timeout*}))
+                   :render-limit-sync-timeout* render-limit-sync-timeout*
+                   :live-subscription-resume-timeout* live-subscription-resume-timeout*}))
 
       :replicant.life-cycle/unmount
       (do
         (set-asset-list-scroll-active! false)
+        (set-asset-list-freeze-active! false)
         (set-asset-list-live-market-subscriptions-paused! false)
+        (when-let [on-wheel (:on-wheel memory)]
+          (.removeEventListener node "wheel" on-wheel))
         (when-let [on-scroll (:on-scroll memory)]
           (.removeEventListener node "scroll" on-scroll))
-        (when-let [on-scroll-end (:on-scroll-end memory)]
-          (.removeEventListener node "scrollend" on-scroll-end))
-        (when-let [timeout-handle (some-> (:scroll-settle-timeout* memory) deref)]
-          (asset-list-clear-timeout! timeout-handle))
-        (when-let [timeout-handle (some-> (:render-limit-sync-timeout* memory) deref)]
-          (asset-list-clear-timeout! timeout-handle))
+        (when-let [timeout* (:scroll-settle-timeout* memory)]
+          (clear-asset-list-timeout-atom! timeout*))
+        (when-let [timeout* (:render-limit-sync-timeout* memory)]
+          (clear-asset-list-timeout-atom! timeout*))
+        (when-let [timeout* (:live-subscription-resume-timeout* memory)]
+          (clear-asset-list-timeout-atom! timeout*))
         (when-let [host-node (some-> (:host-node* memory) deref)]
           (r/unmount host-node)))
 

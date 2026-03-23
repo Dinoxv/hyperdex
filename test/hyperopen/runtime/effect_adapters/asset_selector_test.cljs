@@ -56,7 +56,7 @@
       (finally
         (reset! active-ctx/active-asset-ctx-state original-state)))))
 
-(deftest sync-asset-selector-active-ctx-subscriptions-unsubscribes-selector-coins-while-live-updates-are-paused-test
+(deftest sync-asset-selector-active-ctx-subscriptions-preserves-owned-selector-coins-while-live-updates-are-paused-test
   (let [store (atom {:asset-selector {:live-market-subscriptions-paused? true}})
         sent-messages (atom [])
         original-state @active-ctx/active-asset-ctx-state]
@@ -72,14 +72,8 @@
                                               (swap! sent-messages conj message)
                                               true)]
         (effect-adapters/sync-asset-selector-active-ctx-subscriptions nil store))
-      (is (= [{:method "unsubscribe"
-               :subscription {:type "activeAssetCtx"
-                              :coin "BTC"}}
-              {:method "unsubscribe"
-               :subscription {:type "activeAssetCtx"
-                              :coin "SOL"}}]
-             @sent-messages))
-      (is (= #{}
+      (is (empty? @sent-messages))
+      (is (= #{"BTC" "SOL"}
              (active-ctx/get-subscribed-coins-by-owner :asset-selector)))
       (finally
         (reset! active-ctx/active-asset-ctx-state original-state)))))

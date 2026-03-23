@@ -41,7 +41,7 @@
     (support/with-viewport-width
       1280
       (fn []
-        (with-redefs [asset-selector-view/asset-list-scroll-active? (constantly false)
+        (with-redefs [asset-selector-view/asset-list-freeze-active? (constantly false)
                       active-asset-view/active-asset-view (fn [_state]
                                                             (swap! active-asset-calls inc)
                                                             [:div {:data-role "stub-active-asset"}])]
@@ -274,7 +274,7 @@
                                                    :asks [{:px "101.5" :sz "1.5"}]}})
                         (assoc-in [:active-assets :contexts "BTC" :mark] 64125.0)
                         (assoc-in [:active-assets :contexts "BTC" :change24h] 1600.0))]
-        (with-redefs [asset-selector-view/asset-list-scroll-active? (fn []
+        (with-redefs [asset-selector-view/asset-list-freeze-active? (fn []
                                                                       @scroll-active?*)
                       l2-orderbook-view/l2-orderbook-view (fn [_state]
                                                             (swap! orderbook-calls inc)
@@ -306,7 +306,7 @@
                                                    :asks [{:px "101.5" :sz "1.5"}]}})
                         (assoc-in [:active-assets :contexts "BTC" :mark] 64125.0)
                         (assoc-in [:active-assets :contexts "BTC" :change24h] 1600.0))]
-        (with-redefs [asset-selector-view/asset-list-scroll-active? (constantly false)
+        (with-redefs [asset-selector-view/asset-list-freeze-active? (constantly false)
                       l2-orderbook-view/l2-orderbook-view (fn [_state]
                                                             (swap! orderbook-calls inc)
                                                             [:div {:data-role "stub-orderbook"}])
@@ -336,7 +336,7 @@
                         (assoc-in [:asset-selector :market-by-key "perp:ETH" :mark] 3300.0)
                         (assoc-in [:websocket :health :generated-at-ms] 6000)
                         (assoc-in [:webdata2 :updated-at] 1234))]
-        (with-redefs [asset-selector-view/asset-list-scroll-active? (fn []
+        (with-redefs [asset-selector-view/asset-list-freeze-active? (fn []
                                                                       @scroll-active?*)
                       trade-modules/render-trade-chart-view (fn [_state]
                                                               (swap! chart-calls inc)
@@ -372,6 +372,88 @@
           (is (= 2 @equity-metrics-calls))
           (is (= 2 @account-equity-calls)))))))
 
+(deftest trade-view-freezes-heavy-panel-state-builders-during-active-selector-scroll-test
+  (support/with-viewport-width
+    1280
+    (fn []
+      (let [scroll-active?* (atom false)
+            calls* (atom {:active-asset 0
+                          :chart 0
+                          :account-info 0
+                          :account-equity 0
+                          :orderbook 0
+                          :order-form 0})
+            state-a (-> (support/active-asset-state)
+                        (assoc-in [:asset-selector :visible-dropdown] :asset-selector))
+            state-b (-> state-a
+                        (assoc-in [:active-assets :contexts "BTC" :mark] 64125.0)
+                        (assoc :orderbooks {"BTC" {:bids [{:px "98.5" :sz "2.5"}]
+                                                   :asks [{:px "101.5" :sz "1.5"}]}})
+                        (assoc-in [:websocket-ui :show-surface-freshness-cues?] true)
+                        (assoc-in [:websocket :health :generated-at-ms] 6000)
+                        (assoc-in [:asset-selector :search-term] "eth")
+                        (assoc-in [:account-info :selected-tab] :positions)
+                        (assoc-in [:webdata2 :updated-at] 1234))]
+        (with-redefs [asset-selector-view/asset-list-freeze-active? (fn []
+                                                                      @scroll-active?*)
+                      hyperopen.views.trade-view/active-asset-view-state (fn [_state]
+                                                                            (swap! calls* update :active-asset inc)
+                                                                            {:surface :active-asset})
+                      hyperopen.views.trade-view/trade-chart-view-state (fn [_state]
+                                                                          (swap! calls* update :chart inc)
+                                                                          {:surface :chart})
+                      hyperopen.views.trade-view/account-info-view-state (fn [_state]
+                                                                           (swap! calls* update :account-info inc)
+                                                                           {:surface :account-info})
+                      hyperopen.views.trade-view/account-equity-view-state (fn [_state]
+                                                                             (swap! calls* update :account-equity inc)
+                                                                             {:surface :account-equity})
+                      hyperopen.views.trade-view/orderbook-view-state (fn [& _]
+                                                                        (swap! calls* update :orderbook inc)
+                                                                        {:surface :orderbook})
+                      hyperopen.views.trade-view/order-form-view-state (fn [_state]
+                                                                         (swap! calls* update :order-form inc)
+                                                                         {:surface :order-form})
+                      active-asset-view/active-asset-view (fn [_state]
+                                                            [:div {:data-role "stub-active-asset"}])
+                      trade-modules/render-trade-chart-view (fn [_state]
+                                                              [:div {:data-role "stub-chart"}])
+                      account-info-view/account-info-view (fn
+                                                            ([_state]
+                                                             [:div {:data-role "stub-account-info"}])
+                                                            ([_state _options]
+                                                             [:div {:data-role "stub-account-info"}]))
+                      account-equity-view/account-equity-metrics (fn [_state]
+                                                                   {:account-value-display 12})
+                      account-equity-view/account-equity-view (fn
+                                                                ([_state]
+                                                                 [:div {:data-role "stub-account-equity"}])
+                                                                ([_state _opts]
+                                                                 [:div {:data-role "stub-account-equity"}]))
+                      l2-orderbook-view/l2-orderbook-view (fn [_state]
+                                                            [:div {:data-role "stub-orderbook"}])
+                      order-form-view/order-form-view (fn [_state]
+                                                        [:div {:data-role "stub-order-form"}])]
+          (trade-view/trade-view state-a)
+          (reset! scroll-active?* true)
+          (trade-view/trade-view state-b)
+          (is (= {:active-asset 1
+                  :chart 1
+                  :account-info 1
+                  :account-equity 1
+                  :orderbook 1
+                  :order-form 1}
+                 @calls*))
+          (reset! scroll-active?* false)
+          (trade-view/trade-view state-b)
+          (is (= {:active-asset 2
+                  :chart 2
+                  :account-info 2
+                  :account-equity 2
+                  :orderbook 2
+                  :order-form 2}
+                 @calls*)))))))
+
 (deftest trade-view-freezes-desktop-active-asset-panel-during-active-selector-scroll-test
   (support/with-viewport-width
     1280
@@ -384,7 +466,7 @@
                         (assoc-in [:asset-selector :search-term] "eth")
                         (assoc-in [:active-assets :contexts "BTC" :mark] 64125.0)
                         (assoc-in [:asset-selector :highlighted-market-key] "perp:ETH"))]
-        (with-redefs [asset-selector-view/asset-list-scroll-active? (fn []
+        (with-redefs [asset-selector-view/asset-list-freeze-active? (fn []
                                                                       @scroll-active?*)
                       active-asset-view/active-asset-view (fn [_state]
                                                             (swap! active-asset-calls inc)

@@ -280,20 +280,34 @@
   [state desktop-layout?]
   (and desktop-layout?
        (= :asset-selector (get-in state [:asset-selector :visible-dropdown]))
-       (asset-selector-view/asset-list-scroll-active?)))
+       (asset-selector-view/asset-list-freeze-active?)))
 
 (defn- selector-scroll-snapshot
-  [snapshot* freeze? next-state]
+  [snapshot* freeze? next-state-fn]
   (if freeze?
     (let [snapshot @snapshot*]
       (if (some? snapshot)
         snapshot
         (do
-          (reset! snapshot* next-state)
-          next-state)))
+          (let [next-state (next-state-fn)]
+            (reset! snapshot* next-state)
+            next-state))))
     (do
-      (reset! snapshot* next-state)
-      next-state)))
+      (let [next-state (next-state-fn)]
+        (reset! snapshot* next-state)
+        next-state))))
+
+(defn- orderbook-view-state
+  [state active-asset orderbook-data show-surface-freshness-cues? websocket-health]
+  {:coin (or active-asset "No Asset Selected")
+   :market (:active-market state)
+   :orderbook orderbook-data
+   :orderbook-ui (:orderbook-ui state)
+   :trading-settings (:trading-settings state)
+   :show-surface-freshness-cues? show-surface-freshness-cues?
+   :websocket-health (when show-surface-freshness-cues?
+                       websocket-health)
+   :loading (and active-asset (nil? orderbook-data))})
 
 (defn- mobile-account-surface [state equity-metrics]
   [:div {:class ["flex" "h-full" "min-h-0" "flex-col" "bg-base-100"]
@@ -414,19 +428,19 @@
         active-asset-panel-state (selector-scroll-snapshot
                                    frozen-active-asset-view-state*
                                    freeze-heavy-panels?
-                                   (active-asset-view-state state))
+                                   #(active-asset-view-state state))
         trade-chart-panel-state (selector-scroll-snapshot
                                   frozen-trade-chart-view-state*
                                   freeze-heavy-panels?
-                                  (trade-chart-view-state state))
+                                  #(trade-chart-view-state state))
         account-info-panel-state (selector-scroll-snapshot
                                    frozen-account-info-view-state*
                                    freeze-heavy-panels?
-                                   (account-info-view-state state))
+                                   #(account-info-view-state state))
         account-equity-panel-state (selector-scroll-snapshot
                                      frozen-account-equity-view-state*
                                      freeze-heavy-panels?
-                                     (account-equity-view-state state))
+                                     #(account-equity-view-state state))
         show-equity-surface? (or desktop-layout?
                                  mobile-account-summary-visible?)
         show-surface-freshness-cues? (surface-freshness-cues-enabled? state)
@@ -436,19 +450,15 @@
         orderbook-view-state (selector-scroll-snapshot
                                frozen-orderbook-view-state*
                                freeze-heavy-panels?
-                               {:coin (or active-asset "No Asset Selected")
-                                :market (:active-market state)
-                                :orderbook orderbook-data
-                                :orderbook-ui (:orderbook-ui state)
-                                :trading-settings (:trading-settings state)
-                                :show-surface-freshness-cues? show-surface-freshness-cues?
-                                :websocket-health (when show-surface-freshness-cues?
-                                                    websocket-health)
-                                :loading (and active-asset (nil? orderbook-data))})
+                               #(orderbook-view-state state
+                                                     active-asset
+                                                     orderbook-data
+                                                     show-surface-freshness-cues?
+                                                     websocket-health))
         order-form-panel-state (selector-scroll-snapshot
                                  frozen-order-form-view-state*
                                  freeze-heavy-panels?
-                                 (order-form-view-state state))]
+                                 #(order-form-view-state state))]
     [:div {:class ["flex-1" "flex" "flex-col" "min-h-0" "overflow-hidden"]
            :data-parity-id "trade-root"}
      [:div {:class ["w-full"

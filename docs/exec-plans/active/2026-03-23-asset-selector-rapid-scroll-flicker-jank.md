@@ -22,9 +22,17 @@ After this work, a user should be able to open the asset selector on `/trade`, f
 - [x] (2026-03-23 18:49Z) Added a stronger blank-pixel coverage probe, confirmed the remaining one-frame flash was still present on deep jump-scrolls, and switched the desktop selector to full-row rendering for normal-sized market sets while keeping the large-list virtualization fallback.
 - [x] (2026-03-23 18:50Z) Tightened the committed browser regression to assert blank viewport coverage stays at `<=1px`, not merely that some rows remain visible.
 - [x] (2026-03-23 18:37Z) Re-ran the committed asset-selector Playwright regression plus the required repository gates after the panel-freeze experiment.
+- [x] (2026-03-23 23:15Z) Reproduced the remaining bottom-edge upward-scroll jank with a dedicated headless wheel probe and isolated the reversal-specific path to eager settle/resume behavior plus selector active-context subscription churn.
+- [x] (2026-03-23 23:19Z) Moved selector live-subscription resume behind a post-settle idle window, stopped `set-asset-selector-scroll-top` from implicitly resuming paused selector subscriptions, and removed eager `scrollend` finalization from the desktop selector runtime.
+- [x] (2026-03-23 23:22Z) Fixed the remaining bottom-edge reversal case by treating `wheel` input on the selector container as active scroll activity even when `scrollTop` is pinned at a boundary, so settle cannot fire while the user is still interacting at the edge.
+- [x] (2026-03-23 23:24Z) Changed paused selector active-context sync to freeze the current owner subscription set instead of diffing to `#{}`, removing the unsubscribe/resubscribe tax from scroll-start boundaries while keeping the selector’s visible-subscription refresh settled.
+- [x] (2026-03-23 23:27Z) Re-ran the bottom-up wheel probe, committed browser regression, required repo gates, and governed browser QA after the reversal-specific fixes.
+- [x] (2026-03-23 23:35Z) Split the desktop selector runtime signal into “actual scroll active” versus a slightly longer “heavy-panel freeze active” window so selector controls resume immediately after settle while sibling desktop panels stay frozen through the live-subscription resume cooldown.
+- [x] (2026-03-23 23:37Z) Made the desktop trade view compute heavy panel state lazily behind the selector freeze boundary so scroll-time route churn no longer rebuilds chart, account, orderbook, order form, or active-asset view-state maps while the selector is frozen.
+- [x] (2026-03-23 23:42Z) Re-ran the focused selector/trade-view tests, the committed asset-selector Playwright regression, a fresh bottom-up wheel probe, the full repo gates, and governed browser QA after the lazy-freeze follow-up.
 - [x] Refresh browser evidence after each experiment with a short trace or QA artifact and record whether the change reduced black flashes, reduced frozen scroll frames, both, or neither.
 - [x] Reduce or eliminate the remaining scroll-time work on the selector path without regressing reachability of the full market list.
-- [ ] Confirm the latest desktop full-render pass on real manual hardware scroll and decide whether any remaining long-tail jank still justifies a chart/runtime-specific follow-up before moving this ExecPlan out of `active`.
+- [ ] Confirm the latest desktop full-render and bottom-edge reversal behavior on real manual hardware scroll and decide whether any remaining long-tail jank still justifies a chart/runtime-specific follow-up before moving this ExecPlan out of `active`.
 
 ## Surprises & Discoveries
 
@@ -51,6 +59,18 @@ After this work, a user should be able to open the asset selector on `/trade`, f
 
 - Observation: once the route-wide desktop siblings were frozen, the next meaningful savings came from stopping parent selector rerenders and cache-persistence churn rather than changing the list window again.
   Evidence: the post-freeze wheel probe in the parent thread showed worst wheel-to-scroll delay improving from roughly `117ms` to roughly `92ms` after freezing selector props and memoizing the wrapper, and then the startup watcher fix cut the same probe’s long-task total from roughly `173ms` to roughly `53ms` while keeping visible rows stable at `11`. The follow-up CPU profile at `/Users/barry/.codex/worktrees/2790/hyperopen/tmp/browser-inspection/asset-selector-cpuprofile-2026-03-23T18-09-55-020Z/profile.cpuprofile` also showed the remaining selector-specific hot samples dominated by `hyperopen.asset_selector.markets_cache/*` and `hyperopen.asset_selector.query/*`, which traced back to cache-persistence work rather than row-window blanking.
+
+- Observation: the remaining bottom-edge reversal jank was not just “fast upward scroll from the bottom.” The idle timer was only refreshed by `scroll` events, so continued wheel input at the bottom edge could let the selector finalize and resume while the user was still interacting, because wheel gestures at a pinned boundary do not produce new scroll events.
+  Evidence: the new bottom-up probe at `/Users/barry/.codex/worktrees/2790/hyperopen/tmp/browser-inspection/asset-selector-bottom-up-probe-2026-03-23T19-11-38-605Z/probe-summary.json` still showed fast first upward movement but noisy bad-tail stalls, and the telemetry run showed a full selector active-context transition even during a down-to-bottom-then-up sequence until wheel input itself started extending the active-scroll window.
+
+- Observation: “pause selector live subscriptions” was still implemented as “diff desired selector coins to `#{}`,” which meant every scroll session paid an owner-scoped unsubscribe burst on entry and a resubscribe burst on resume even after the view stopped rerendering mid-scroll.
+  Evidence: the reversal telemetry probe consistently emitted a full set of selector `Unsubscribed` / `Subscribed` active-asset-context logs during the bad path. Freezing the current owner subscription set while paused removed that forced zero-state diff while preserving the settled visible-set refresh.
+
+- Observation: freezing the heavy desktop trade surfaces at render time was not enough by itself because `trade-view` still eagerly built the “frozen” state maps before deciding to reuse them.
+  Evidence: the uncommitted `trade_view.cljs` follow-up showed `active-asset-view-state`, `trade-chart-view-state`, `account-info-view-state`, `account-equity-view-state`, `orderbook-view-state`, and `order-form-view-state` were all evaluated before `selector-scroll-snapshot` returned the cached snapshot. Making the snapshot helper thunk-based removed that remaining eager work, and the new render-cache test now proves those state builders stop executing while selector freeze is active.
+
+- Observation: using the same selector runtime signal for both “user is actively scrolling” and “keep heavy siblings frozen through the cooldown” risked leaving selector-adjacent UI stale after scrolling settled.
+  Evidence: once the freeze window extended beyond immediate scroll activity, the wrapper-freeze logic and desktop sibling-freeze logic were both keying off the same global flag. Splitting that state into `asset-list-scroll-active?` and `asset-list-freeze-active?` kept selector controls live again while preserving the longer sibling freeze window.
 
 ## Decision Log
 
@@ -84,6 +104,22 @@ After this work, a user should be able to open the asset selector on `/trade`, f
 
 - Decision: for normal-sized desktop market sets, render the full selector row list instead of a windowed slice; keep the existing virtualization path only as a fallback for much larger lists.
   Rationale: the latest probe showed the remaining black flash was the viewport outrunning the mounted slice for a frame, which cannot be prevented reliably by more throttling once the scroll delta exceeds the retained buffer. Rendering the full current desktop list removes that one-frame failure mode while the earlier route-freeze work keeps the surrounding churn low enough to absorb the extra rows.
+  Date/Author: 2026-03-23 / Codex
+
+- Decision: do not let `scrollend` or a `scrollTop`-only idle clock decide that selector scrolling has settled.
+  Rationale: the remaining bottom-edge case proved that boundary wheel input can continue after `scrollTop` stops changing, so settle must follow user interaction at the container boundary, not just scroll deltas.
+  Date/Author: 2026-03-23 / Codex
+
+- Decision: while selector live updates are “paused,” freeze the selector owner’s existing active-asset-context subscription set instead of syncing desired coins to `#{}`.
+  Rationale: by this point the selector UI itself and the heavy desktop siblings were already held stable during scroll, so forced unsubscribe/resubscribe churn was more expensive than the residual cost of letting the pre-scroll visible coin set stay subscribed until the settled refresh.
+  Date/Author: 2026-03-23 / Codex
+
+- Decision: separate the selector runtime’s “actively scrolling” signal from the slightly longer “freeze heavy siblings” signal.
+  Rationale: the selector wrapper and container interactions should resume as soon as scrolling settles, but the heavy desktop trade surfaces still benefit from staying frozen through the short live-subscription resume delay. One flag cannot serve both timing requirements without either reintroducing sibling churn or holding selector UI stale too long.
+  Date/Author: 2026-03-23 / Codex
+
+- Decision: make `trade-view` freeze snapshots lazy by passing a thunk into `selector-scroll-snapshot`.
+  Rationale: a cached snapshot is only useful if the expensive next state is not computed first. The remaining route-churn hole was eager view-state derivation, not repainting, so the freeze boundary had to cover state-building work as well as child view invocation.
   Date/Author: 2026-03-23 / Codex
 
 ## Outcomes & Retrospective
@@ -185,6 +221,21 @@ Research log:
   Evidence addressed: the new stronger coverage probe from the parent thread showed the remaining failure mode directly: after deep jump-scrolls to `900px`, `1800px`, `3600px`, and beyond, the current implementation exposed `256px` of blank viewport immediately and only recovered on the next animation frame, which matches the user-visible black flash.
   Result: improved. The post-fix live browser inspection summary at `/Users/barry/.codex/worktrees/2790/hyperopen/tmp/browser-inspection/asset-selector-scroll-coverage-2026-03-23T18-49-09Z/probe-summary.json` recorded `658` rendered rows and `0px` blank coverage across all sampled deep scroll targets, and the tightened Playwright regression now passes while asserting blank coverage directly.
   Next hypothesis: if manual hardware scroll still finds noticeable lag after this pass, the next remaining path is likely long-tail non-selector main-thread work rather than the selector viewport outrunning its own row window.
+
+- Experiment: remove eager `scrollend` finalization, keep paused selector subscriptions paused across scroll-top persistence, and resume them only after a second post-settle idle timer.
+  Evidence addressed: the local reversal probe and the first dedicated bottom-up probe at `/Users/barry/.codex/worktrees/2790/hyperopen/tmp/browser-inspection/asset-selector-bottom-up-probe-2026-03-23T19-11-38-605Z/probe-summary.json` showed the worst remaining symptom at the bottom edge when the user quickly reversed upward and the selector appeared to “unfreeze” late.
+  Result: partially improved. The first upward response tightened materially, but the probe still showed noisy long-tail stalls because the idle window still only followed `scroll` events, not boundary wheel input.
+  Next hypothesis: the settle window must treat wheel input at the pinned bottom edge as scroll activity too, otherwise resume can still fire while the user is actively trying to reverse direction.
+
+- Experiment: treat selector `wheel` input as active scroll activity even when `scrollTop` is pinned, and freeze the current selector active-context owner set while paused instead of diffing to `#{}`.
+  Evidence addressed: the local down-to-bottom-then-up telemetry run still showed selector active-context churn in the reversal path, and the first post-delay probe still showed bad-tail frame gaps inconsistent with the old blank-window bug.
+  Result: improved. The follow-up bottom-up probe at `/Users/barry/.codex/worktrees/2790/hyperopen/tmp/browser-inspection/asset-selector-bottom-up-probe-2026-03-23T19-19-31-801Z/probe-summary.json` reduced worst first upward movement to `21.4-33.9ms`, reduced max frame gaps to `75-110.3ms`, and cut long-task totals to `890-1112ms`, down from the previous `1820-8051ms` run at `/Users/barry/.codex/worktrees/2790/hyperopen/tmp/browser-inspection/asset-selector-bottom-up-probe-2026-03-23T19-11-38-605Z/probe-summary.json`. The committed browser regression still passed, and governed browser QA at `/Users/barry/.codex/worktrees/2790/hyperopen/tmp/browser-inspection/design-review-2026-03-23T19-21-14-480Z-8830ed25` passed visual, native-control, interaction, layout-regression, and jank-perf with only the known styling-consistency tooling gap remaining blocked.
+  Next hypothesis: if the user can still feel long-tail stalls on real hardware after this pass, the remaining work is likely outside the selector boundary logic and would justify a narrower follow-up into chart/runtime or websocket main-thread work.
+
+- Experiment: split selector “scroll active” from selector “freeze heavy siblings” and make the desktop trade-view freeze snapshots lazy.
+  Evidence addressed: the remaining bottom-edge path still had one route-churn hole because heavy desktop panel state builders were being recomputed even while the freeze boundary reused their last rendered snapshot, and extending a single global signal through the cooldown risked regressing selector responsiveness.
+  Result: improved. The focused render-cache regression now proves the heavy state builders do not run while selector freeze is active, the selector runtime tests prove scroll-active drops immediately while freeze-active remains high through the resume cooldown, the fresh bottom-up probe at `/Users/barry/.codex/worktrees/2790/hyperopen/tmp/browser-inspection/asset-selector-bottom-up-probe-2026-03-23T19-33-12-356Z/probe-summary.json` showed `0ms` reversal-window long-task time with working trials moving upward in roughly `55.6-56.7ms`, and governed browser QA at `/Users/barry/.codex/worktrees/2790/hyperopen/tmp/browser-inspection/design-review-2026-03-23T19-33-43-404Z-66eb2fc3` again passed visual, native-control, interaction, layout-regression, and jank-perf with only the known styling-consistency tooling gap blocked.
+  Next hypothesis: if the user can still feel bottom-edge jank on real hardware after this pass, the remaining tail is likely outside the selector route-freeze boundary and should be investigated as browser or chart/runtime work rather than more selector list changes.
 
 ## Interfaces and Dependencies
 
