@@ -1,13 +1,9 @@
 (ns hyperopen.views.trade.order-form.test-support
   (:require [clojure.string :as str]
+            [hyperopen.test-support.hiccup :as hiccup]
             [hyperopen.state.trading :as trading]))
 
-(defn collect-strings [node]
-  (cond
-    (string? node) [node]
-    (vector? node) (mapcat collect-strings node)
-    (seq? node) (mapcat collect-strings node)
-    :else []))
+(def collect-strings hiccup/collect-strings)
 
 (defn collect-text-and-placeholders [node]
   (cond
@@ -30,31 +26,9 @@
                          (when (= item target) idx))
                        items)))
 
-(defn find-first-node [node pred]
-  (cond
-    (vector? node)
-    (let [attrs (when (map? (second node)) (second node))
-          children (if attrs (drop 2 node) (drop 1 node))]
-      (or (when (pred node) node)
-          (some #(find-first-node % pred) children)))
+(def find-first-node hiccup/find-first-node)
 
-    (seq? node)
-    (some #(find-first-node % pred) node)
-
-    :else nil))
-
-(defn find-all-nodes [node pred]
-  (cond
-    (vector? node)
-    (let [attrs (when (map? (second node)) (second node))
-          children (if attrs (drop 2 node) (drop 1 node))
-          self (if (pred node) [node] [])]
-      (into self (mapcat #(find-all-nodes % pred) children)))
-
-    (seq? node)
-    (mapcat #(find-all-nodes % pred) node)
-
-    :else []))
+(def find-all-nodes hiccup/find-all-nodes)
 
 (defn button-node-by-label [node label]
   (find-first-node node

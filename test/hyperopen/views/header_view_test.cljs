@@ -3,6 +3,7 @@
             [cljs.test :refer-macros [deftest is]]
             [hyperopen.account.context :as account-context]
             [hyperopen.platform :as platform]
+            [hyperopen.test-support.hiccup :as hiccup]
             [hyperopen.views.header-view :as header-view]
             [hyperopen.wallet.core :as wallet]))
 
@@ -528,3 +529,34 @@
     (is (contains? api-classes "bg-[#123a36]"))
     (is (= [[:actions/navigate "/API"]]
            (get-in api-link [1 :on :click])))))
+
+(deftest header-view-uses-app-shell-gutter-test
+  (let [view (header-view/header-view {:wallet {}})]
+    (is (hiccup/contains-class? view "app-shell-gutter"))))
+
+(deftest header-navigation-links-remain-left-aligned-test
+  (let [view (header-view/header-view {:wallet {}})
+        nav-node (hiccup/find-first-node view
+                                         (fn [candidate]
+                                           (and (vector? candidate)
+                                                (keyword? (first candidate))
+                                                (str/starts-with? (name (first candidate)) "nav."))))]
+    (is (= :nav.hidden.md:flex.flex-1.items-center.justify-start.space-x-8.ml-8
+           (first nav-node)))))
+
+(deftest header-navigation-links-use-hyperliquid-typography-classes-test
+  (let [view (header-view/header-view {:wallet {}})
+        trade-link (hiccup/find-first-node view
+                                           (fn [candidate]
+                                             (and (= :a (first candidate))
+                                                  (some #{"Trade"} (hiccup/collect-strings candidate)))))
+        vaults-link (hiccup/find-first-node view
+                                            (fn [candidate]
+                                              (and (= :a (first candidate))
+                                                   (some #{"Vaults"} (hiccup/collect-strings candidate)))))
+        trade-classes (set (class-values (get-in trade-link [1 :class])))
+        vaults-classes (set (class-values (get-in vaults-link [1 :class])))]
+    (is (contains? trade-classes "header-nav-link"))
+    (is (contains? trade-classes "header-nav-link-active"))
+    (is (contains? vaults-classes "header-nav-link"))
+    (is (not (contains? vaults-classes "header-nav-link-active")))))

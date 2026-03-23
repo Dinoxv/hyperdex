@@ -1,13 +1,8 @@
 (ns hyperopen.views.active-asset.test-support
-  (:require [clojure.string :as str]))
+  (:require [clojure.string :as str]
+            [hyperopen.test-support.hiccup :as hiccup]))
 
-(defn collect-strings
-  [node]
-  (cond
-    (string? node) [node]
-    (vector? node) (mapcat collect-strings node)
-    (seq? node) (mapcat collect-strings node)
-    :else []))
+(def collect-strings hiccup/collect-strings)
 
 (defn collect-path-ds
   [node]
@@ -45,45 +40,11 @@
                    (= role (get-in % [1 :data-role])))
              node))
 
-(defn class-values
-  [class-attr]
-  (cond
-    (nil? class-attr) []
-    (string? class-attr) (remove str/blank? (str/split class-attr #"\s+"))
-    (sequential? class-attr) (mapcat class-values class-attr)
-    :else []))
+(def class-values hiccup/class-values)
 
-(defn contains-class?
-  [node class-name]
-  (letfn [(walk [n]
-            (cond
-              (vector? n)
-              (let [attrs (when (map? (second n)) (second n))
-                    children (if attrs (drop 2 n) (drop 1 n))
-                    class-set (set (class-values (:class attrs)))]
-                (or (contains? class-set class-name)
-                    (some walk children)))
+(def contains-class? hiccup/contains-class?)
 
-              (seq? n)
-              (some walk n)
-
-              :else
-              nil))]
-    (boolean (walk node))))
-
-(defn find-first-node
-  [node pred]
-  (cond
-    (vector? node)
-    (let [attrs (when (map? (second node)) (second node))
-          children (if attrs (drop 2 node) (drop 1 node))]
-      (or (when (pred node) node)
-          (some #(find-first-node % pred) children)))
-
-    (seq? node)
-    (some #(find-first-node % pred) node)
-
-    :else nil))
+(def find-first-node hiccup/find-first-node)
 
 (defn find-img-nodes
   [node]
@@ -125,14 +86,7 @@
               []))]
     (vec (walk node))))
 
-(defn with-viewport-width
-  [width f]
-  (let [original-inner-width (.-innerWidth js/globalThis)]
-    (set! (.-innerWidth js/globalThis) width)
-    (try
-      (f)
-      (finally
-        (set! (.-innerWidth js/globalThis) original-inner-width)))))
+(def with-viewport-width hiccup/with-viewport-width)
 
 (defn fake-image-node
   [{:keys [complete? natural-width]}]

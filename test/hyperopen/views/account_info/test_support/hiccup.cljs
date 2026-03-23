@@ -1,89 +1,22 @@
 (ns hyperopen.views.account-info.test-support.hiccup
-  (:require [clojure.string :as str]))
+  (:require [clojure.string :as str]
+            [hyperopen.test-support.hiccup :as hiccup]))
 
-(defn- class-values [class-attr]
-  (cond
-    (nil? class-attr) []
-    (string? class-attr) (remove str/blank? (str/split class-attr #"\s+"))
-    (sequential? class-attr) (mapcat class-values class-attr)
-    :else []))
+(def node-class-set hiccup/node-class-set)
 
-(defn- classes-from-tag [tag]
-  (if (keyword? tag)
-    (let [parts (str/split (name tag) #"\.")]
-      (if (> (count parts) 1)
-        (rest parts)
-        []))
-    []))
+(def node-children hiccup/node-children)
 
-(defn node-class-set [node]
-  (let [attrs (when (and (vector? node) (map? (second node)))
-                (second node))
-        classes (concat (classes-from-tag (first node))
-                        (class-values (:class attrs)))]
-    (set classes)))
+(def direct-texts hiccup/direct-texts)
 
-(defn node-children [node]
-  (if (map? (second node))
-    (drop 2 node)
-    (drop 1 node)))
+(def collect-strings hiccup/collect-strings)
 
-(defn direct-texts [node]
-  (->> (node-children node)
-       (filter string?)
-       set))
+(def find-first-node hiccup/find-first-node)
 
-(defn collect-strings [node]
-  (cond
-    (string? node) [node]
+(def find-by-data-role hiccup/find-by-data-role)
 
-    (vector? node)
-    (mapcat collect-strings (node-children node))
+(def find-all-nodes hiccup/find-all-nodes)
 
-    (seq? node)
-    (mapcat collect-strings node)
-
-    :else []))
-
-(defn find-first-node [node pred]
-  (cond
-    (vector? node)
-    (let [children (node-children node)]
-      (or (when (pred node) node)
-          (some #(find-first-node % pred) children)))
-
-    (seq? node)
-    (some #(find-first-node % pred) node)
-
-    :else nil))
-
-(defn find-by-data-role [node data-role]
-  (find-first-node node #(= data-role (get-in % [1 :data-role]))))
-
-(defn find-all-nodes [node pred]
-  (cond
-    (vector? node)
-    (let [children (node-children node)
-          self-match (when (pred node) [node])]
-      (into (or self-match [])
-            (mapcat #(find-all-nodes % pred) children)))
-
-    (seq? node)
-    (mapcat #(find-all-nodes % pred) node)
-
-    :else []))
-
-(defn count-nodes [node pred]
-  (cond
-    (vector? node)
-    (let [children (node-children node)
-          self-count (if (pred node) 1 0)]
-      (+ self-count (reduce + 0 (map #(count-nodes % pred) children))))
-
-    (seq? node)
-    (reduce + 0 (map #(count-nodes % pred) node))
-
-    :else 0))
+(def count-nodes hiccup/count-nodes)
 
 (defn tab-header-node [tab-content]
   (first (vec (node-children tab-content))))

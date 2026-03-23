@@ -2,6 +2,7 @@
   (:require [clojure.string :as str]
             [cljs.test :refer-macros [deftest is]]
             [hyperopen.config :as app-config]
+            [hyperopen.test-support.hiccup :as hiccup]
             [hyperopen.views.footer-view :as footer-view]))
 
 (defn- find-node [pred node]
@@ -796,3 +797,13 @@
       (is (some? svg))
       (is (= "currentColor" (get-in svg [1 :fill])))
       (is (= "none" (get-in svg [1 :stroke]))))))
+
+(deftest footer-view-uses-app-shell-gutter-test
+  (let [view-node (footer-view/footer-view {:websocket {:status :connected}})]
+    (is (hiccup/contains-class? view-node "app-shell-gutter"))
+    (is (hiccup/contains-class? view-node "fixed"))
+    (is (hiccup/contains-class? view-node "inset-x-0"))
+    (is (hiccup/contains-class? view-node "bottom-0"))
+    (is (hiccup/contains-class? view-node "z-40"))
+    (is (hiccup/contains-class? view-node "bg-base-200"))
+    (is (hiccup/contains-class? view-node "isolate"))))

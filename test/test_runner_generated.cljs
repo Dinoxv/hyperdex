@@ -215,7 +215,7 @@
             [hyperopen.views.agent-trading-recovery-modal-test]
             [hyperopen.views.api-wallets-view-test]
             [hyperopen.views.api-wallets.vm-test]
-            [hyperopen.views.app-shell-spacing-test]
+            [hyperopen.views.app-view-test]
             [hyperopen.views.asset-icon-test]
             [hyperopen.views.asset-selector-view-test]
             [hyperopen.views.autocorrelation-plot-test]
@@ -248,6 +248,10 @@
             [hyperopen.views.portfolio.vm.volume-helpers-test]
             [hyperopen.views.portfolio.vm.volume-test]
             [hyperopen.views.staking-view-test]
+            [hyperopen.views.trade-view.layout-test]
+            [hyperopen.views.trade-view.loading-shell-test]
+            [hyperopen.views.trade-view.mobile-surface-test]
+            [hyperopen.views.trade-view.render-cache-test]
             [hyperopen.views.trade.order-form-commands-test]
             [hyperopen.views.trade.order-form-component-primitives-test]
             [hyperopen.views.trade.order-form-component-sections-test]
@@ -577,7 +581,7 @@
              'hyperopen.views.agent-trading-recovery-modal-test
              'hyperopen.views.api-wallets-view-test
              'hyperopen.views.api-wallets.vm-test
-             'hyperopen.views.app-shell-spacing-test
+             'hyperopen.views.app-view-test
              'hyperopen.views.asset-icon-test
              'hyperopen.views.asset-selector-view-test
              'hyperopen.views.autocorrelation-plot-test
@@ -610,6 +614,10 @@
              'hyperopen.views.portfolio.vm.volume-helpers-test
              'hyperopen.views.portfolio.vm.volume-test
              'hyperopen.views.staking-view-test
+             'hyperopen.views.trade-view.layout-test
+             'hyperopen.views.trade-view.loading-shell-test
+             'hyperopen.views.trade-view.mobile-surface-test
+             'hyperopen.views.trade-view.render-cache-test
              'hyperopen.views.trade.order-form-commands-test
              'hyperopen.views.trade.order-form-component-primitives-test
              'hyperopen.views.trade.order-form-component-sections-test
