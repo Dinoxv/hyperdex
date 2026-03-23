@@ -750,6 +750,25 @@
     (is (contains? classes "bg-base-200/70"))
     (is (not (contains? classes "ring-primary")))))
 
+(deftest favorite-button-uses-lucide-star-styling-for-inactive-and-active-states-test
+  (let [inactive (view/favorite-button false "perp:BTC")
+        active (view/favorite-button true "perp:BTC")
+        inactive-attrs (second inactive)
+        active-attrs (second active)
+        inactive-icon (last inactive)
+        active-icon (last active)
+        inactive-classes (set (collect-all-classes inactive))
+        active-classes (set (collect-all-classes active))]
+    (is (= "Add favorite" (:aria-label inactive-attrs)))
+    (is (= "Remove favorite" (:aria-label active-attrs)))
+    (is (= "asset-selector-favorite-button" (:data-role inactive-attrs)))
+    (is (= "none" (get-in inactive-icon [1 :fill])))
+    (is (= "currentColor" (get-in active-icon [1 :fill])))
+    (is (contains? inactive-classes "hover:bg-amber-400/10"))
+    (is (contains? inactive-classes "group-hover:text-amber-200"))
+    (is (contains? active-classes "text-amber-300"))
+    (is (contains? active-classes "drop-shadow-[0_0_6px_rgba(245,158,11,0.18)]"))))
+
 (deftest search-controls-use-parity-input-styling-test
   (let [controls (view/search-controls "" false false)
         search-input (find-first-node controls

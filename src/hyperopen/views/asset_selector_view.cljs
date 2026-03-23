@@ -1,5 +1,6 @@
 (ns hyperopen.views.asset-selector-view
-  (:require [clojure.string :as str]
+  (:require ["lucide/dist/esm/icons/star.js" :default lucide-star-node]
+            [clojure.string :as str]
             [hyperopen.asset-selector.list-metrics :as list-metrics]
             [hyperopen.asset-selector.query :as query]
             [hyperopen.system :as app-system]
@@ -146,15 +147,52 @@
    [:div.col-span-2.text-left (sort-button "Volume" (= sort-by :volume) sort-direction :volume)]
    [:div.col-span-2.text-left (sort-button "Open Interest" (= sort-by :openInterest) sort-direction :openInterest)]])
 
-(defn favorite-button [favorite? market-key]
-  [:button.w-3.h-3.text-gray-400.hover:text-yellow-400.transition-colors
-   {:on {:click [[:actions/toggle-asset-favorite market-key]]}}
-   [:svg.w-3.h-3 {:viewBox "0 0 24 24"
-                 :fill (if favorite? "currentColor" "none")
+(defn- lucide-node->hiccup [node]
+  (let [tag-name (aget node 0)
+        attrs (js->clj (aget node 1) :keywordize-keys true)]
+    [(keyword tag-name) attrs]))
+
+(defn- favorite-star-icon [favorite?]
+  (let [classes (if favorite?
+                  ["h-3.5" "w-3.5" "shrink-0" "text-amber-300" "drop-shadow-[0_0_6px_rgba(245,158,11,0.18)]"]
+                  ["h-3.5" "w-3.5" "shrink-0" "text-slate-500" "group-hover:text-amber-200"])
+        fill-color (if favorite? "currentColor" "none")]
+    (into [:svg {:class classes
+                 :viewBox "0 0 24 24"
+                 :fill fill-color
                  :stroke "currentColor"
-                 :stroke-width 1.5}
-    [:path {:stroke-linecap "round" :stroke-linejoin "round"
-            :d "M11.48 3.499a.75.75 0 011.04 0l2.162 2.162 3.03.44a.75.75 0 01.416 1.279l-2.192 2.136.517 3.018a.75.75 0 01-1.088.79L12 13.347l-2.715 1.425a.75.75 0 01-1.088-.79l.517-3.018-2.192-2.136a.75.75 0 01.416-1.279l3.03-.44 2.162-2.162z"}]]])
+                 :stroke-width 1.9
+                 :stroke-linecap "round"
+                 :stroke-linejoin "round"
+                 :aria-hidden true}]
+          (map lucide-node->hiccup
+               (array-seq lucide-star-node)))))
+
+(defn favorite-button [favorite? market-key]
+  [:button {:class ["group"
+                    "-ml-0.5"
+                    "inline-flex"
+                    "h-4"
+                    "w-4"
+                    "items-center"
+                    "justify-center"
+                    "rounded-[4px]"
+                    "bg-transparent"
+                    "p-0"
+                    "transition-all"
+                    "duration-150"
+                    "hover:bg-amber-400/10"
+                    "focus:outline-none"
+                    "focus:ring-0"
+                    "focus:ring-offset-0"
+                    "focus-visible:outline-none"
+                    "focus-visible:ring-0"
+                    "focus-visible:ring-offset-0"]
+            :type "button"
+            :aria-label (if favorite? "Remove favorite" "Add favorite")
+            :data-role "asset-selector-favorite-button"
+            :on {:click [[:actions/toggle-asset-favorite market-key]]}}
+   (favorite-star-icon favorite?)])
 
 (defn format-or-dash [value formatter]
   (or (formatter value) "—"))
