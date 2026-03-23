@@ -1,7 +1,7 @@
 ---
 owner: platform
 status: canonical
-last_reviewed: 2026-03-18
+last_reviewed: 2026-03-22
 review_cycle_days: 90
 source_of_truth: true
 ---
@@ -15,14 +15,15 @@ Use this file as the single starting point for what actions this repo provides t
 1. For a quick list of build/test commands, start with this section in `/hyperopen/docs/references/toolchain.md`.
 2. For local Clojure discovery, semantic references, renames, diagnostics, and current-worktree Shadow nREPL lookup, use the Local Clojure Navigation and Analysis section below.
 3. For shared command phrase lookup, use `/hyperopen/tools/phrase get "<phrase>"` and `/hyperopen/command-phrases.edn`.
-4. For browser parity/debug workflows, use the Browser Inspection section below.
-5. For CRAP hotspot analysis after generating coverage, use `bb tools/crap_report.clj --scope src` or `bb tools/crap_report.clj --module <path> --format json`.
-6. For repo-local mutation testing on one covered module at a time, use `bb tools/mutate.clj --scan --module <path>` after `npm run coverage`.
-7. For a checked-in overnight hotspot sweep, use `bb tools/mutate_nightly.clj` with targets from `/hyperopen/tools/mutate/nightly_targets.edn`.
-8. For interactive feature, bug, and UI orchestration, invoke `$feature-flow`, `$bug-flow`, or `$ui-flow` explicitly.
-9. For multi-agent role, artifact, and gate rules, use `/hyperopen/docs/MULTI_AGENT.md` and the manager under `/hyperopen/tools/multi-agent/`.
-10. For issue tracking and session handoff rules, use `/hyperopen/docs/WORK_TRACKING.md`.
-11. For exact browser inspection command syntax, see:
+4. For browser tool selection and exact Playwright versus Browser MCP routing, use `/hyperopen/docs/BROWSER_TESTING.md`.
+5. For browser parity/debug workflows, use the Browser Inspection section below.
+6. For CRAP hotspot analysis after generating coverage, use `bb tools/crap_report.clj --scope src` or `bb tools/crap_report.clj --module <path> --format json`.
+7. For repo-local mutation testing on one covered module at a time, use `bb tools/mutate.clj --scan --module <path>` after `npm run coverage`.
+8. For a checked-in overnight hotspot sweep, use `bb tools/mutate_nightly.clj` with targets from `/hyperopen/tools/mutate/nightly_targets.edn`.
+9. For interactive feature, bug, and UI orchestration, invoke `$feature-flow`, `$bug-flow`, or `$ui-flow` explicitly.
+10. For multi-agent role, artifact, and gate rules, use `/hyperopen/docs/MULTI_AGENT.md` and the manager under `/hyperopen/tools/multi-agent/`.
+11. For issue tracking and session handoff rules, use `/hyperopen/docs/WORK_TRACKING.md`.
+12. For exact browser inspection command syntax, see:
    - `/hyperopen/tools/browser-inspection/src/cli.mjs`
    - `/hyperopen/tools/browser-inspection/src/mcp_server.mjs`
 
@@ -32,6 +33,10 @@ Use this file as the single starting point for what actions this repo provides t
 | --- | --- | --- |
 | `npm run check` | Lint, docs checks, and compile app/test builds | Before finishing code changes |
 | `npm test` | Full test suite | Regular validation and regression confidence |
+| `npm run test:playwright:install` | Install Chromium for the Playwright suite | First-time local browser-test setup |
+| `npm run test:playwright:smoke` | Run the quick committed Playwright smoke suite | Fast local browser regression check before broader gates |
+| `npm run test:playwright:headed` | Run Playwright headed with one worker | Local browser-flow debugging with the committed suite |
+| `npm run test:playwright:ci` | Run the full committed Playwright suite in CI mode | CI-safe browser regression coverage or a full local browser pass |
 | `npm run test:crap` | Fast Babashka tests for CRAP-tool parsing and report math | Before changing the CRAP analyzer/reporter |
 | `npm run test:mutation` | Fast Babashka tests for the mutation tool | Before changing `/hyperopen/tools/mutate/**` |
 | `npm run lint:delimiters -- --changed` | Fast Clojure/CLJS reader preflight on changed files | Before `npm test`, `npm run test:websocket`, or manual `shadow-cljs` compiles after syntax-heavy edits |
@@ -97,6 +102,8 @@ Live local bug workflow selection:
 | `/hyperopen/.agents/skills/feature-flow/SKILL.md` | Explicit workflow for complex features and refactors | Invoke explicitly with `$feature-flow` |
 | `/hyperopen/.agents/skills/bug-flow/SKILL.md` | Explicit workflow for diagnosis-first bug work | Invoke explicitly with `$bug-flow` |
 | `/hyperopen/.agents/skills/ui-flow/SKILL.md` | Explicit workflow for governed UI work | Invoke explicitly with `$ui-flow` |
+| `/hyperopen/.agents/skills/playwright-e2e/SKILL.md` | Playwright routing for committed deterministic browser coverage | Use when browser work should land as repeatable tests or CI coverage |
+| `/hyperopen/.agents/skills/browser-mcp-explore/SKILL.md` | Browser MCP routing for exploratory browser work | Use when the work is exploratory, live-session, or parity/design-review oriented |
 | `/hyperopen/.agents/skills/spec-writer/SKILL.md` | ExecPlan-first spec writing for multi-agent tickets | Use when acting as `spec_writer` |
 | `/hyperopen/.agents/skills/acceptance-tests/SKILL.md` | Acceptance/integration proposal workflow | Use when acting as `acceptance_test_writer` |
 | `/hyperopen/.agents/skills/edge-case-tests/SKILL.md` | Boundary-case and invariant proposal workflow | Use when acting as `edge_case_test_writer` |
@@ -158,6 +165,8 @@ For policy details, including markdown-vs-`bd` boundaries and session-completion
 ## 7) Browser Inspection tools (CLI)
 
 All browser-inspection tooling lives under `/hyperopen/tools/browser-inspection/`.
+
+Playwright owns committed deterministic browser assertions and CI-safe regression coverage. Browser inspection remains the exploratory, attach, parity-compare, and design-review tool. Start with `/hyperopen/docs/BROWSER_TESTING.md` when you need to choose between them.
 
 ### Start/end session and tab management
 
@@ -225,6 +234,9 @@ Register once in Codex once and then call MCP tools directly:
 ## 9) Where definitions live
 
 - Scripted command surface: `/hyperopen/package.json`
+- Browser-testing routing doc: `/hyperopen/docs/BROWSER_TESTING.md`
+- Playwright config: `/hyperopen/playwright.config.mjs`
+- Playwright helpers and tests: `/hyperopen/tools/playwright/**`
 - Multi-agent manager: `/hyperopen/tools/multi-agent/src/cli.mjs`
 - Multi-agent policy: `/hyperopen/docs/MULTI_AGENT.md`
 - Repo-local Codex project config: `/hyperopen/.codex/config.toml`

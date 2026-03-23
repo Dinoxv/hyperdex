@@ -1,7 +1,7 @@
 ---
 owner: platform
 status: canonical
-last_reviewed: 2026-03-18
+last_reviewed: 2026-03-22
 review_cycle_days: 90
 source_of_truth: true
 ---
@@ -15,6 +15,8 @@ Root operating contract for Codex in this repository. Keep the first screen prac
 - Use `$feature-flow` for complex features, significant refactors, or multi-file behavior changes.
 - Use `$bug-flow` for unclear bugs or regressions that need structured diagnosis.
 - Use `$ui-flow` for UI work under `/hyperopen/src/hyperopen/views/**`, `/hyperopen/src/styles/**`, or interaction flows.
+- Use the repo-local `playwright-e2e` skill for committed deterministic browser coverage.
+- Use the repo-local `browser-mcp-explore` skill for exploratory browser debugging, live attach, design review, and parity investigation.
 - If a workflow skill is unavailable, follow `/hyperopen/docs/MULTI_AGENT.md` and use exact agent `name` values.
 
 ## Immediate Rules
@@ -25,6 +27,11 @@ Root operating contract for Codex in this repository. Keep the first screen prac
 - Keep websocket runtime decisions pure and deterministic.
 - Keep side effects in interpreters and infrastructure boundaries only.
 - Follow `/hyperopen/docs/BROWSER_STORAGE.md` for browser persistence changes.
+- Use Playwright for anything that should be committed, asserted, repeated, reviewed, or run in CI.
+- Use Playwright for deterministic browser verification, smoke tests, regression coverage, and stable multi-viewport validation.
+- Use Browser MCP for exploratory debugging, reproducing flaky UI behavior, inspecting live browser state, parity compare, and selector or flow discovery before converting a stable path into Playwright coverage.
+- After Browser MCP exploration stabilizes a flow, convert that stable local path into Playwright unless the task is explicitly exploratory.
+- Follow `/hyperopen/docs/BROWSER_TESTING.md` for browser-tool routing and exact commands.
 - Never run `git pull --rebase` or `git push` unless the user explicitly requests remote sync in the current session.
 
 ## Write Authority
@@ -41,10 +48,12 @@ Root operating contract for Codex in this repository. Keep the first screen prac
 
 ## Validation And Return Contract
 - Required gates when code changes: `npm run check`, `npm test`, `npm run test:websocket`.
+- When browser flows or browser-test tooling change, also run the smallest relevant Playwright command first and broaden only after that passes.
 - Always return changed files, commands run, validation results, and remaining risks or blockers.
 
 ## UI-Specific Docs
 When work touches UI code or interaction flows, also follow:
+- [BROWSER_TESTING.md](/hyperopen/docs/BROWSER_TESTING.md)
 - [FRONTEND.md](/hyperopen/docs/FRONTEND.md)
 - [browser-qa.md](/hyperopen/docs/agent-guides/browser-qa.md)
 - [ui-foundations.md](/hyperopen/docs/agent-guides/ui-foundations.md)
@@ -54,6 +63,6 @@ Do not conclude UI work is complete unless every required browser-QA pass is exp
 
 ## Canonical References
 - Architecture and runtime: [ARCHITECTURE.md](/hyperopen/ARCHITECTURE.md), [RELIABILITY.md](/hyperopen/docs/RELIABILITY.md), [SECURITY.md](/hyperopen/docs/SECURITY.md)
-- Design and product: [DESIGN.md](/hyperopen/docs/DESIGN.md), [FRONTEND.md](/hyperopen/docs/FRONTEND.md), [PRODUCT_SENSE.md](/hyperopen/docs/PRODUCT_SENSE.md), [QUALITY_SCORE.md](/hyperopen/docs/QUALITY_SCORE.md)
+- Design and product: [DESIGN.md](/hyperopen/docs/DESIGN.md), [FRONTEND.md](/hyperopen/docs/FRONTEND.md), [BROWSER_TESTING.md](/hyperopen/docs/BROWSER_TESTING.md), [PRODUCT_SENSE.md](/hyperopen/docs/PRODUCT_SENSE.md), [QUALITY_SCORE.md](/hyperopen/docs/QUALITY_SCORE.md)
 - Planning and execution: [PLANS.md](/hyperopen/docs/PLANS.md), [MULTI_AGENT.md](/hyperopen/docs/MULTI_AGENT.md), [WORK_TRACKING.md](/hyperopen/docs/WORK_TRACKING.md), [tools.md](/hyperopen/docs/tools.md), [BROWSER_STORAGE.md](/hyperopen/docs/BROWSER_STORAGE.md)
 - Indexes: [design docs index](/hyperopen/docs/design-docs/index.md), [AGENTS section reindex map](/hyperopen/docs/design-docs/agents-section-index.md), [product specs index](/hyperopen/docs/product-specs/index.md), [references index](/hyperopen/docs/references/index.md)

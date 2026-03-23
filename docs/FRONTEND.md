@@ -1,7 +1,7 @@
 ---
 owner: trading-ui
 status: canonical
-last_reviewed: 2026-03-16
+last_reviewed: 2026-03-22
 review_cycle_days: 90
 source_of_truth: true
 ---
@@ -18,7 +18,9 @@ Use this document first, then apply:
 If guidance conflicts, this document wins for UI runtime behavior and invariant ownership.
 
 ## UI QA Contract (MUST)
+- MUST use Playwright for committed deterministic browser regression coverage when a stable UI or interaction path should be asserted, repeated, reviewed, or run in CI.
 - MUST run the design-system browser QA flow from `/hyperopen/docs/agent-guides/browser-qa.md` for UI-facing changes before signoff.
+- MUST keep Browser MCP design-review and exploratory browser QA available; it does not replace committed Playwright regression coverage.
 - MUST account for all six browser-QA passes: visual, native-control, styling-consistency, interaction, layout-regression, and jank/perf.
 - MUST account for all four design-review widths: `375`, `768`, `1280`, and `1440`.
 - MUST report browser-QA results as `PASS`, `FAIL`, or `BLOCKED` with evidence-backed issues and residual blind spots.
