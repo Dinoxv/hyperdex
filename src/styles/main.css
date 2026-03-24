@@ -99,6 +99,31 @@
     color: rgb(246 254 253 / 0.6);
   }
 
+  .asset-selector-row-surface {
+    background-color: transparent;
+    transition: background-color 140ms ease-out;
+  }
+
+  .asset-selector-row-surface:hover {
+    background-color: rgb(27 39 44 / 0.88);
+  }
+
+  .asset-selector-row-surface[data-row-state="highlighted"] {
+    background-color: rgb(24 45 50 / 0.82);
+  }
+
+  .asset-selector-row-surface[data-row-state="highlighted"]:hover {
+    background-color: rgb(28 51 57 / 0.94);
+  }
+
+  .asset-selector-row-surface[data-row-state="selected"] {
+    background-color: rgb(30 56 61 / 0.94);
+  }
+
+  .asset-selector-row-surface[data-row-state="selected"]:hover {
+    background-color: rgb(34 62 68 / 0.98);
+  }
+
   .header-nav-link {
     font-family: var(--font-ui);
     font-style: normal;

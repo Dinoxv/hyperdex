@@ -203,6 +203,13 @@
 (defn format-or-dash [value formatter]
   (or (formatter value) "—"))
 
+(defn- asset-selector-row-state
+  [selected? highlighted?]
+  (cond
+    selected? "selected"
+    highlighted? "highlighted"
+    :else "idle"))
+
 (defn asset-list-item [asset selected? highlighted? favorites _missing-icons _loaded-icons]
   (let [{:keys [key coin symbol mark markRaw volume24h change24h change24hPct openInterest fundingRate
                 market-type dex maxLeverage]} asset
@@ -222,12 +229,9 @@
                               (>= safe-funding-rate 0))
         funding-color (if funding-positive "text-success" "text-error")
         is-spot (= market-type :spot)
-        favorite? (contains? favorites key)
-        row-highlight-classes (cond-> []
-                                highlighted? (into ["bg-base-200/70"])
-                                selected? (into ["bg-base-200"]))]
-    [:div.grid.grid-cols-12.gap-2.items-center.px-2.h-6.box-border.cursor-pointer.bg-base-100.hover:bg-base-200.transition-colors
-     {:class row-highlight-classes
+        favorite? (contains? favorites key)]
+    [:div.grid.grid-cols-12.gap-2.items-center.px-2.h-6.box-border.cursor-pointer.asset-selector-row-surface
+     {:data-row-state (asset-selector-row-state selected? highlighted?)
       :data-role "asset-selector-row"
       :style {:contain "layout paint style"
               :content-visibility "auto"
@@ -467,21 +471,18 @@
         positive-change? (and change-available? (>= safe-change 0))
         change-color (if positive-change? "text-success" "text-error")
         is-spot (= market-type :spot)
-        favorite? (contains? favorites key)
-        row-highlight-classes (cond-> []
-                                highlighted? (into ["bg-base-200/60"])
-                                selected? (into ["bg-base-200"]))]
-    [:div {:class (into ["grid"
-                         "grid-cols-[minmax(0,1.35fr)_minmax(0,1fr)_minmax(0,0.95fr)]"
-                         "gap-3"
-                         "items-center"
-                         "border-b"
-                         "border-base-300/70"
-                         "px-4"
-                         "py-3"
-                         "transition-colors"
-                         "cursor-pointer"]
-                        row-highlight-classes)
+        favorite? (contains? favorites key)]
+    [:div {:class ["grid"
+                   "grid-cols-[minmax(0,1.35fr)_minmax(0,1fr)_minmax(0,0.95fr)]"
+                   "gap-3"
+                   "items-center"
+                   "border-b"
+                   "border-base-300/70"
+                   "px-4"
+                   "py-3"
+                   "cursor-pointer"
+                   "asset-selector-row-surface"]
+           :data-row-state (asset-selector-row-state selected? highlighted?)
            :on {:click [[:actions/select-asset asset]]}
            :data-role "mobile-asset-selector-row"}
      [:div {:class ["flex" "items-start" "gap-2.5" "min-w-0"]}
