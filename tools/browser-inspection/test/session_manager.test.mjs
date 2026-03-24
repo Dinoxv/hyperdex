@@ -74,3 +74,165 @@ test("navigateAttachedTarget bootstraps same-origin local routes through index.h
   assert.ok(runtimeExpressions[2].includes("waitForIdle"));
   assert.ok(runtimeExpressions[3].includes("document.title"));
 });
+
+test("navigateAttachedTarget tolerates delayed bridge availability within one wait budget", async () => {
+  const calls = [];
+  let bridgeChecks = 0;
+  const attached = {
+    cdpSessionId: "cdp-1",
+    client: {
+      async send(method, params = {}, sessionId) {
+        calls.push({ method, params, sessionId });
+        if (method === "Runtime.evaluate") {
+          if (params.expression.includes("Boolean(globalThis.HYPEROPEN_DEBUG")) {
+            bridgeChecks += 1;
+            await new Promise((resolve) => setTimeout(resolve, 1));
+            return { result: { value: bridgeChecks >= 3 } };
+          }
+          if (params.expression.includes("document.title")) {
+            return { result: { value: "Trade" } };
+          }
+          return { result: { value: null } };
+        }
+        return {};
+      },
+      async waitForEvent(method, options = {}) {
+        calls.push({ method: `waitForEvent:${method}`, params: options, sessionId: options.sessionId });
+        return { method, options };
+      }
+    }
+  };
+
+  const session = {
+    id: "sess-1",
+    localApp: {
+      url: "http://localhost:8080/index.html"
+    }
+  };
+
+  await navigateAttachedTarget(attached, session, "http://localhost:8080/trade", {
+    debugBridgeTimeoutMs: 20,
+    debugBridgePollMs: 0,
+    debugBridgeRetryCount: 0
+  });
+
+  assert.equal(calls.filter((call) => call.method === "Page.navigate").length, 1);
+  assert.equal(bridgeChecks, 3);
+  assert.equal(
+    calls.some(
+      (call) =>
+        call.method === "Runtime.evaluate" && call.params.expression.includes(":actions/navigate")
+    ),
+    true
+  );
+});
+
+test("navigateAttachedTarget retries bootstrap navigation once when the first bridge wait times out", async () => {
+  const calls = [];
+  let navigationCount = 0;
+  let bridgeChecksForNavigation = 0;
+  const attached = {
+    cdpSessionId: "cdp-1",
+    client: {
+      async send(method, params = {}, sessionId) {
+        calls.push({ method, params, sessionId });
+        if (method === "Page.navigate") {
+          navigationCount += 1;
+          bridgeChecksForNavigation = 0;
+          return {};
+        }
+        if (method === "Runtime.evaluate") {
+          if (params.expression.includes("Boolean(globalThis.HYPEROPEN_DEBUG")) {
+            bridgeChecksForNavigation += 1;
+            await new Promise((resolve) =>
+              setTimeout(resolve, navigationCount > 1 ? 1 : 2)
+            );
+            return { result: { value: navigationCount > 1 && bridgeChecksForNavigation >= 2 } };
+          }
+          if (params.expression.includes("document.title")) {
+            return { result: { value: "Trade" } };
+          }
+          return { result: { value: null } };
+        }
+        return {};
+      },
+      async waitForEvent(method, options = {}) {
+        calls.push({ method: `waitForEvent:${method}`, params: options, sessionId: options.sessionId });
+        return { method, options };
+      }
+    }
+  };
+
+  const session = {
+    id: "sess-1",
+    localApp: {
+      url: "http://localhost:8080/index.html"
+    }
+  };
+
+  const result = await navigateAttachedTarget(attached, session, "http://localhost:8080/trade", {
+    debugBridgeTimeoutMs: 6,
+    debugBridgePollMs: 0,
+    debugBridgeRetryCount: 1,
+    debugBridgeRetryDelayMs: 0
+  });
+
+  assert.equal(result.navigatedUrl, "http://localhost:8080/index.html");
+  const navigateCalls = calls.filter((call) => call.method === "Page.navigate");
+  assert.equal(navigateCalls.length, 2);
+  assert.equal(navigateCalls[0].params.url, "http://localhost:8080/index.html");
+  assert.equal(navigateCalls[1].params.url, "http://localhost:8080/index.html");
+  assert.equal(
+    calls.some(
+      (call) =>
+        call.method === "Runtime.evaluate" && call.params.expression.includes(":actions/navigate")
+    ),
+    true
+  );
+});
+
+test("navigateAttachedTarget preserves the bridge timeout error when startup never recovers", async () => {
+  const calls = [];
+  const attached = {
+    cdpSessionId: "cdp-1",
+    client: {
+      async send(method, params = {}, sessionId) {
+        calls.push({ method, params, sessionId });
+        if (method === "Runtime.evaluate") {
+          if (params.expression.includes("Boolean(globalThis.HYPEROPEN_DEBUG")) {
+            await new Promise((resolve) => setTimeout(resolve, 2));
+            return { result: { value: false } };
+          }
+          if (params.expression.includes("document.title")) {
+            return { result: { value: "Trade" } };
+          }
+          return { result: { value: null } };
+        }
+        return {};
+      },
+      async waitForEvent(method, options = {}) {
+        calls.push({ method: `waitForEvent:${method}`, params: options, sessionId: options.sessionId });
+        return { method, options };
+      }
+    }
+  };
+
+  const session = {
+    id: "sess-1",
+    localApp: {
+      url: "http://localhost:8080/index.html"
+    }
+  };
+
+  await assert.rejects(
+    navigateAttachedTarget(attached, session, "http://localhost:8080/trade", {
+      debugBridgeTimeoutMs: 3,
+      debugBridgePollMs: 0,
+      debugBridgeRetryCount: 1,
+      debugBridgeRetryDelayMs: 0
+    }),
+    /Timed out waiting for HYPEROPEN_DEBUG to initialize\./
+  );
+
+  assert.equal(calls.filter((call) => call.method === "Page.navigate").length, 2);
+});

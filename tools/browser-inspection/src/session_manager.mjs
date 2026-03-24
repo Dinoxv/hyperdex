@@ -101,6 +101,12 @@ function localBootstrapNavigationDetails(url, bootstrapUrl) {
   };
 }
 
+function isDebugBridgeTimeout(error) {
+  return (error?.message || String(error || "")).includes(
+    "Timed out waiting for HYPEROPEN_DEBUG to initialize."
+  );
+}
+
 async function waitForDebugBridge(attached, timeoutMs = 15000, pollMs = 50) {
   const deadline = Date.now() + timeoutMs;
   while (Date.now() < deadline) {
@@ -125,6 +131,16 @@ async function waitForDebugBridge(attached, timeoutMs = 15000, pollMs = 50) {
     await sleep(pollMs);
   }
   throw new Error("Timed out waiting for HYPEROPEN_DEBUG to initialize.");
+}
+
+async function navigatePage(attached, url, timeoutMs) {
+  const loadEvent = attached.client.waitForEvent("Page.loadEventFired", {
+    sessionId: attached.cdpSessionId,
+    timeoutMs
+  });
+
+  await attached.client.send("Page.navigate", { url }, attached.cdpSessionId);
+  await loadEvent;
 }
 
 async function waitForDebugIdle(attached, options = {}) {
@@ -191,21 +207,36 @@ export async function navigateAttachedTarget(attached, session, url, options = {
   const timeoutMs = options.timeoutMs || 15000;
   await prepareAttachedTarget(attached, options);
 
-  const loadEvent = attached.client.waitForEvent("Page.loadEventFired", {
-    sessionId: attached.cdpSessionId,
-    timeoutMs
-  });
-
   const bootstrapUrl = options.bootstrapUrl || session?.localApp?.url || null;
   const bootstrapDetails =
     options.useBootstrap !== false && bootstrapUrl ? localBootstrapNavigationDetails(url, bootstrapUrl) : null;
   const navigateUrl = bootstrapDetails?.bootstrapUrl || url;
 
-  await attached.client.send("Page.navigate", { url: navigateUrl }, attached.cdpSessionId);
-  await loadEvent;
+  await navigatePage(attached, navigateUrl, timeoutMs);
 
   if (bootstrapDetails) {
-    await waitForDebugBridge(attached, options.debugBridgeTimeoutMs || 15000, options.debugBridgePollMs || 50);
+    const debugBridgeTimeoutMs = options.debugBridgeTimeoutMs ?? 15000;
+    const debugBridgePollMs = options.debugBridgePollMs ?? 50;
+    const debugBridgeRetryCount = options.debugBridgeRetryCount ?? 1;
+    const debugBridgeRetryDelayMs = options.debugBridgeRetryDelayMs ?? 250;
+
+    let attempt = 0;
+    while (true) {
+      try {
+        await waitForDebugBridge(attached, debugBridgeTimeoutMs, debugBridgePollMs);
+        break;
+      } catch (error) {
+        if (!isDebugBridgeTimeout(error) || attempt >= debugBridgeRetryCount) {
+          throw error;
+        }
+        attempt += 1;
+        if (debugBridgeRetryDelayMs > 0) {
+          await sleep(debugBridgeRetryDelayMs);
+        }
+        await navigatePage(attached, navigateUrl, timeoutMs);
+      }
+    }
+
     await dispatchNavigationAction(attached, bootstrapDetails.routePath, options.dispatchTimeoutMs || 15000);
     await waitForDebugIdle(
       attached,

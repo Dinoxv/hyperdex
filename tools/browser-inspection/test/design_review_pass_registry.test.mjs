@@ -100,7 +100,72 @@ test("styling-consistency reports unsupported non-px values as a tooling gap", a
         selectors: [
           {
             selector: "[data-parity-id='trade-root']",
-            matches: [{ styles: { lineHeight: "normal" } }]
+            matches: [{ styles: { lineHeight: "calc(1em + 2px)" } }]
+          }
+        ]
+      }
+    },
+    artifacts: baseArtifacts(),
+    policy: config
+  });
+
+  assert.equal(result.status, "TOOLING_GAP");
+  assert.equal(result.issues.length, 0);
+  assert.equal(result.blindSpots[0].reasonCode, "unsupported-style-unit");
+});
+
+test("styling-consistency accepts valid normal defaults for letter spacing and gap properties", async () => {
+  const config = await loadDesignReviewConfig();
+  const result = pass("styling-consistency").grade({
+    ctx: baseCtx(),
+    probes: {
+      computedStyles: {
+        selectors: [
+          {
+            selector: "[data-parity-id='trade-root']",
+            matches: [
+              {
+                styles: {
+                  letterSpacing: "normal",
+                  gap: "normal",
+                  rowGap: "normal",
+                  columnGap: "normal",
+                  columnCount: "auto",
+                  columnWidth: "auto"
+                }
+              }
+            ]
+          }
+        ]
+      }
+    },
+    artifacts: baseArtifacts(),
+    policy: config
+  });
+
+  assert.equal(result.status, "PASS");
+  assert.equal(result.issues.length, 0);
+  assert.equal(result.blindSpots.length, 0);
+});
+
+test("styling-consistency keeps multicolumn normal gap values as explicit tooling gaps", async () => {
+  const config = await loadDesignReviewConfig();
+  const result = pass("styling-consistency").grade({
+    ctx: baseCtx(),
+    probes: {
+      computedStyles: {
+        selectors: [
+          {
+            selector: "[data-parity-id='trade-root']",
+            matches: [
+              {
+                styles: {
+                  columnGap: "normal",
+                  columnCount: "2",
+                  columnWidth: "auto"
+                }
+              }
+            ]
           }
         ]
       }

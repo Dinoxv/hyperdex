@@ -5,7 +5,9 @@ import {
   PASS_STATUS
 } from "./models.mjs";
 
-function parseComparablePx(value) {
+const GAP_PROPS = new Set(["gap", "rowGap", "columnGap"]);
+
+function normalizeComparableValue(prop, value, styles = {}) {
   if (typeof value === "number" && Number.isFinite(value)) {
     return value;
   }
@@ -16,6 +18,15 @@ function parseComparablePx(value) {
   if (trimmed === "0") {
     return 0;
   }
+  if (trimmed === "normal") {
+    if (prop === "letterSpacing") {
+      return 0;
+    }
+    if (GAP_PROPS.has(prop) && !usesMultiColumnLayout(styles)) {
+      return 0;
+    }
+    return null;
+  }
   if (!trimmed.endsWith("px")) {
     return null;
   }
@@ -23,8 +34,25 @@ function parseComparablePx(value) {
   return Number.isFinite(number) ? number : null;
 }
 
-function hasAllowedPxValue(value, allowed = []) {
-  const parsed = parseComparablePx(value);
+function normalizeMultiColumnValue(value) {
+  if (typeof value !== "string") {
+    return "";
+  }
+  return value.trim().toLowerCase();
+}
+
+function usesMultiColumnLayout(styles = {}) {
+  const columnCount = normalizeMultiColumnValue(styles.columnCount);
+  const columnWidth = normalizeMultiColumnValue(styles.columnWidth);
+
+  return (
+    (columnCount !== "" && columnCount !== "auto" && columnCount !== "none" && columnCount !== "1") ||
+    (columnWidth !== "" && columnWidth !== "auto" && columnWidth !== "normal")
+  );
+}
+
+function hasAllowedPxValue(prop, value, allowed = [], styles = {}) {
+  const parsed = normalizeComparableValue(prop, value, styles);
   if (parsed === null) {
     return null;
   }
@@ -259,7 +287,7 @@ function gradeStyleConsistency({ ctx, probes, artifacts, policy }) {
       for (const group of styleGroups) {
         for (const prop of group.props) {
           const value = match.styles?.[prop];
-          const allowedValue = hasAllowedPxValue(value, group.allowed);
+          const allowedValue = hasAllowedPxValue(prop, value, group.allowed, match.styles);
           if (allowedValue === null) {
             if (typeof value === "string" && value.trim() !== "") {
               blindSpots.push(
