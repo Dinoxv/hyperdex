@@ -243,22 +243,74 @@
                  :click [[:actions/set-leaderboard-page-size size]]}}
    (str size)])
 
+(defn- loading-skeleton-block
+  [extra-classes]
+  [:span {:class (into ["block"
+                        "h-3.5"
+                        "rounded"
+                        "bg-base-300/70"
+                        "animate-pulse"]
+                       extra-classes)}])
+
+(defn- desktop-loading-row
+  [idx]
+  [:tr {:class ["border-b" "border-base-300/40"]
+        :data-index idx}
+   [:td {:class ["px-3" "py-3"]} (loading-skeleton-block ["w-10"])]
+   [:td {:class ["px-3" "py-3"]} (loading-skeleton-block ["w-32"])]
+   [:td {:class ["px-3" "py-3"]} (loading-skeleton-block ["w-24"])]
+   [:td {:class ["px-3" "py-3"]} (loading-skeleton-block ["w-20"])]
+   [:td {:class ["px-3" "py-3"]} (loading-skeleton-block ["w-16"])]
+   [:td {:class ["px-3" "py-3"]} (loading-skeleton-block ["w-24"])]])
+
+(defn- mobile-loading-card
+  [idx]
+  [:div {:class ["rounded-xl"
+                 "border"
+                 "border-base-300"
+                 "bg-base-100"
+                 "p-3"
+                 "space-y-3"]
+         :data-index idx}
+   [:div {:class ["flex" "items-center" "justify-between" "gap-3"]}
+    (loading-skeleton-block ["w-28"])
+    (loading-skeleton-block ["w-16"])]
+   [:div {:class ["grid" "grid-cols-2" "gap-2"]}
+    (loading-skeleton-block ["w-20"])
+    (loading-skeleton-block ["w-20"])
+    (loading-skeleton-block ["w-24"])
+    (loading-skeleton-block ["w-16"])]])
+
 (defn- loading-state
-  []
-  [:div {:class ["space-y-3" "p-4" "md:p-5"]
-         :data-role "leaderboard-loading"}
-   (for [idx (range 4)]
-     ^{:key (str "leaderboard-loading-" idx)}
-     [:div {:class ["grid"
-                    "grid-cols-[72px_minmax(0,1fr)_repeat(4,minmax(0,1fr))]"
-                    "gap-3"
-                    "animate-pulse"]}
-      [:div {:class ["h-5" "rounded" "bg-base-200"]}]
-      [:div {:class ["h-5" "rounded" "bg-base-200"]}]
-      [:div {:class ["h-5" "rounded" "bg-base-200"]}]
-      [:div {:class ["h-5" "rounded" "bg-base-200"]}]
-      [:div {:class ["h-5" "rounded" "bg-base-200"]}]
-      [:div {:class ["h-5" "rounded" "bg-base-200"]}]])])
+  [{:keys [desktop-layout? page-size]}]
+  (let [row-count (-> (or page-size 5)
+                      (max 1)
+                      (min 5))]
+    [:div {:class ["space-y-3" "p-4" "md:p-5"]
+           :data-role "leaderboard-loading"}
+     [:div {:class ["flex" "items-center" "gap-2" "text-xs" "text-trading-text-secondary"]}
+      [:span {:class ["h-2" "w-2" "rounded-full" "bg-emerald-300" "animate-pulse"]
+              :aria-hidden true}]
+      [:span "Loading ranked traders and vault exclusions..."]]
+     (if desktop-layout?
+       [:div {:class ["overflow-x-auto"]}
+        [:table {:class ["min-w-full"]}
+         [:thead
+          [:tr {:class ["border-b" "border-base-300/60"]}
+           [:th {:class ["px-3" "py-2" "text-left" "text-xs" "font-normal" "text-trading-text-secondary"]} "Rank"]
+           [:th {:class ["px-3" "py-2" "text-left" "text-xs" "font-normal" "text-trading-text-secondary"]} "Trader"]
+           [:th {:class ["px-3" "py-2" "text-left" "text-xs" "font-normal" "text-trading-text-secondary"]} "Account Value"]
+           [:th {:class ["px-3" "py-2" "text-left" "text-xs" "font-normal" "text-trading-text-secondary"]} "PnL"]
+           [:th {:class ["px-3" "py-2" "text-left" "text-xs" "font-normal" "text-trading-text-secondary"]} "ROI"]
+           [:th {:class ["px-3" "py-2" "text-left" "text-xs" "font-normal" "text-trading-text-secondary"]} "Volume"]]]
+         [:tbody
+          (for [idx (range row-count)]
+            ^{:key (str "leaderboard-loading-row-" idx)}
+            (desktop-loading-row idx))]]]
+       [:div {:class ["space-y-2"]}
+        (for [idx (range row-count)]
+          ^{:key (str "leaderboard-loading-card-" idx)}
+          (mobile-loading-card idx))])]))
 
 (defn- empty-state
   []
@@ -522,6 +574,7 @@
                 page-size
                 page-size-options
                 page-size-dropdown-open?
+                show-loading?
                 has-results?]}
         (leaderboard-vm/leaderboard-vm state)]
     [:div {:class ["relative"
@@ -582,8 +635,9 @@
          (seq error)
          (error-state error)
 
-         loading?
-         (loading-state)
+         show-loading?
+         (loading-state {:desktop-layout? desktop-layout?
+                         :page-size page-size})
 
          (not has-results?)
          (empty-state)
@@ -594,7 +648,7 @@
          :else
          (mobile-shell rows timeframe-label))
 
-       (when (and (not loading?)
+       (when (and (not show-loading?)
                   (not (seq error))
                   has-results?)
          (pagination-controls {:page page

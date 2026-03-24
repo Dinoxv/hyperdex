@@ -148,3 +148,21 @@
     (is (= 5 (:visible-rows-count result)))
     (is (= [6 7 8 9 10]
            (mapv :rank (:rows result))))))
+
+(deftest leaderboard-vm-shows-cold-start-loading-before-first-response-test
+  (let [state {:wallet {:address nil}
+               :leaderboard-ui {:query ""
+                                :timeframe :month
+                                :sort {:column :pnl
+                                       :direction :desc}
+                                :page 1}
+               :leaderboard {:rows []
+                             :excluded-addresses #{}
+                             :loading? false
+                             :error nil
+                             :loaded-at-ms nil}}
+        result (vm/leaderboard-vm state)]
+    (is (false? (:loading? result)))
+    (is (true? (:show-loading? result)))
+    (is (zero? (:total-rows result)))
+    (is (empty? (:rows result)))))

@@ -168,3 +168,20 @@
                                                                            :all-time {:pnl 40 :roi 0.04 :volume 400}}}]))
         text (collect-strings view-node)]
     (is (= 1 (count (filter #(= "0x393d…2109" %) text))))))
+
+(deftest leaderboard-view-shows-workspace-loading-on-cold-start-test
+  (with-viewport-width
+    1280
+    (fn []
+      (let [view-node (view/leaderboard-view (assoc sample-state
+                                                    :leaderboard {:rows []
+                                                                  :excluded-addresses #{}
+                                                                  :loading? false
+                                                                  :error nil
+                                                                  :loaded-at-ms nil}))
+            loading-node (find-first-node view-node #(= "leaderboard-loading" (get-in % [1 :data-role])))
+            table-node (find-first-node view-node #(= "leaderboard-table" (get-in % [1 :data-role])))
+            text (set (collect-strings view-node))]
+        (is (some? loading-node))
+        (is (nil? table-node))
+        (is (contains? text "Loading ranked traders and vault exclusions..."))))))

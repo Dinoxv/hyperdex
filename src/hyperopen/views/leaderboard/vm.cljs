@@ -157,6 +157,13 @@
                            (#(sort-rows % sort))
                            rank-rows
                            vec)
+        loading? (true? (get-in state [:leaderboard :loading?]))
+        error (get-in state [:leaderboard :error])
+        loaded-at-ms (get-in state [:leaderboard :loaded-at-ms])
+        cold-start-loading? (and (not loading?)
+                                 (nil? loaded-at-ms)
+                                 (not (seq error))
+                                 (empty? raw-rows))
         pinned-row (first (filter :you? filtered-rows))
         unpinned-rows (if pinned-row
                         (into [] (remove #(= (:eth-address %) (:eth-address pinned-row)) filtered-rows))
@@ -170,9 +177,10 @@
      :page-size page-size
      :page-size-options page-size-options
      :page-size-dropdown-open? (true? (get-in state [:leaderboard-ui :page-size-dropdown-open?]))
-     :loading? (true? (get-in state [:leaderboard :loading?]))
-     :error (get-in state [:leaderboard :error])
-     :loaded-at-ms (get-in state [:leaderboard :loaded-at-ms])
+     :loading? loading?
+     :show-loading? (or loading? cold-start-loading?)
+     :error error
+     :loaded-at-ms loaded-at-ms
      :desktop-layout? (desktop-layout?)
      :pinned-row pinned-row
      :rows (:rows pagination)
