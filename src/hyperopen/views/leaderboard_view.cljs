@@ -212,6 +212,29 @@
             :on {:click [[:actions/set-leaderboard-timeframe value]]}}
    label])
 
+(defn- page-size-option
+  [size active?]
+  [:button {:type "button"
+            :class (into ["flex"
+                          "w-full"
+                          "items-center"
+                          "justify-between"
+                          "rounded-md"
+                          "px-2.5"
+                          "py-1.5"
+                          "text-xs"
+                          "transition-colors"]
+                         (concat (if active?
+                                   ["bg-[#123a36]" "text-[#97fce4]"]
+                                   ["text-trading-text-secondary" "hover:bg-base-200" "hover:text-trading-text"])
+                                 focus-visible-ring-classes))
+            :role "option"
+            :aria-selected (boolean active?)
+            :on {:click [[:actions/set-leaderboard-page-size size]]}}
+   [:span {:class ["num"]} (str size)]
+   (when active?
+     [:span {:aria-hidden true} "ON"])])
+
 (defn- loading-state
   []
   [:div {:class ["space-y-3" "p-4" "md:p-5"]
@@ -304,56 +327,131 @@
        (mobile-row row timeframe-label))]))
 
 (defn- pagination-controls
-  [{:keys [page page-count total-rows]}]
-  [:div {:class ["flex"
-                 "items-center"
-                 "justify-between"
-                 "gap-3"
-                 "border-t"
-                 "border-base-300/60"
-                 "px-4"
-                 "py-3"]
-         :data-role "leaderboard-pagination"}
-   [:div {:class ["text-sm" "text-trading-text-secondary"]}
-    (str total-rows " ranked trader"
-         (when (not= 1 total-rows) "s"))]
-   [:div {:class ["flex" "items-center" "gap-2"]}
-    [:button {:type "button"
-              :class (into ["rounded-lg"
-                            "border"
-                            "border-base-300"
-                            "px-3"
-                            "py-1.5"
-                            "text-sm"
-                            "text-trading-text-secondary"
-                            "transition-colors"
-                            "hover:bg-base-200"
-                            "hover:text-trading-text"
-                            "disabled:cursor-not-allowed"
-                            "disabled:opacity-50"]
-                           focus-visible-ring-classes)
-              :disabled (= page 1)
-              :on {:click [[:actions/prev-leaderboard-page page-count]]}}
-     "Prev"]
-    [:div {:class ["num" "text-sm" "text-trading-text-secondary"]}
-     (str page " / " page-count)]
-    [:button {:type "button"
-              :class (into ["rounded-lg"
-                            "border"
-                            "border-base-300"
-                            "px-3"
-                            "py-1.5"
-                            "text-sm"
-                            "text-trading-text-secondary"
-                            "transition-colors"
-                            "hover:bg-base-200"
-                            "hover:text-trading-text"
-                            "disabled:cursor-not-allowed"
-                            "disabled:opacity-50"]
-                           focus-visible-ring-classes)
-              :disabled (= page page-count)
-              :on {:click [[:actions/next-leaderboard-page page-count]]}}
-     "Next"]]])
+  [{:keys [page
+           page-count
+           total-rows
+           page-size
+           page-size-options
+           page-size-dropdown-open?]}]
+  (let [page-size* (str page-size)]
+    [:div {:class ["flex"
+                   "flex-wrap"
+                   "items-center"
+                   "justify-between"
+                   "gap-3"
+                   "border-t"
+                   "border-base-300/60"
+                   "px-4"
+                   "py-3"]
+           :data-role "leaderboard-pagination"}
+     [:div {:class ["flex" "flex-wrap" "items-center" "gap-3"]}
+      [:div {:class ["flex" "items-center" "gap-2"]}
+       [:span {:id "leaderboard-page-size-label"
+               :class ["text-sm" "text-trading-text-secondary"]}
+        "Rows"]
+       [:div {:class ["relative"]
+              :style (when page-size-dropdown-open?
+                       {:z-index 1200})}
+        (when page-size-dropdown-open?
+          [:button {:type "button"
+                    :class ["fixed" "inset-0" "cursor-default" "bg-transparent"]
+                    :style {:z-index 1200}
+                    :aria-label "Close rows per page menu"
+                    :on {:click [[:actions/close-leaderboard-page-size-dropdown]]}}])
+        [:button {:id "leaderboard-page-size"
+                  :type "button"
+                  :aria-haspopup "listbox"
+                  :aria-expanded (boolean page-size-dropdown-open?)
+                  :aria-labelledby "leaderboard-page-size-label"
+                  :class (into ["relative"
+                                "flex"
+                                "h-8"
+                                "min-w-[72px]"
+                                "cursor-pointer"
+                                "items-center"
+                                "justify-between"
+                                "gap-2"
+                                "rounded-lg"
+                                "border"
+                                "border-base-300"
+                                "bg-base-100"
+                                "pl-3"
+                                "pr-2"
+                                "text-xs"
+                                "text-trading-text"
+                                "hover:bg-base-200"]
+                               focus-visible-ring-classes)
+                  :style (when page-size-dropdown-open?
+                           {:z-index 1201})
+                  :on {:click [[:actions/toggle-leaderboard-page-size-dropdown]]}}
+         [:span {:class ["num" "text-sm" "leading-none"]} page-size*]
+         [:svg {:class ["h-3.5" "w-3.5" "shrink-0" "text-trading-text-secondary"]
+                :viewBox "0 0 20 20"
+                :fill "currentColor"
+                :aria-hidden true}
+          [:path {:fill-rule "evenodd"
+                  :clip-rule "evenodd"
+                  :d "M5.23 7.21a.75.75 0 0 1 1.06.02L10 11.168l3.71-3.938a.75.75 0 1 1 1.08 1.04l-4.25 4.5a.75.75 0 0 1-1.08 0l-4.25-4.5a.75.75 0 0 1 .02-1.06Z"}]]]
+        (when page-size-dropdown-open?
+          [:div {:class ["absolute"
+                         "left-0"
+                         "bottom-full"
+                         "mb-1"
+                         "min-w-[88px]"
+                         "max-h-40"
+                         "overflow-y-auto"
+                         "rounded-lg"
+                         "border"
+                         "border-base-300"
+                         "bg-base-100"
+                         "p-1"
+                         "shadow-2xl"]
+                 :style {:z-index 1202}
+                 :role "listbox"
+                 :aria-labelledby "leaderboard-page-size-label"}
+           (for [size page-size-options]
+             ^{:key (str "leaderboard-page-size-" size)}
+             (page-size-option size (= size page-size)))])]]
+      [:span {:class ["text-sm" "text-trading-text-secondary"]}
+       (str "Total: " total-rows " ranked trader"
+            (when (not= 1 total-rows) "s"))]]
+     [:div {:class ["flex" "items-center" "gap-2"]}
+      [:button {:type "button"
+                :class (into ["rounded-lg"
+                              "border"
+                              "border-base-300"
+                              "px-3"
+                              "py-1.5"
+                              "text-sm"
+                              "text-trading-text-secondary"
+                              "transition-colors"
+                              "hover:bg-base-200"
+                              "hover:text-trading-text"
+                              "disabled:cursor-not-allowed"
+                              "disabled:opacity-50"]
+                             focus-visible-ring-classes)
+                :disabled (= page 1)
+                :on {:click [[:actions/prev-leaderboard-page page-count]]}}
+       "Prev"]
+      [:div {:class ["num" "text-sm" "text-trading-text-secondary"]}
+       (str page " / " page-count)]
+      [:button {:type "button"
+                :class (into ["rounded-lg"
+                              "border"
+                              "border-base-300"
+                              "px-3"
+                              "py-1.5"
+                              "text-sm"
+                              "text-trading-text-secondary"
+                              "transition-colors"
+                              "hover:bg-base-200"
+                              "hover:text-trading-text"
+                              "disabled:cursor-not-allowed"
+                              "disabled:opacity-50"]
+                             focus-visible-ring-classes)
+                :disabled (= page page-count)
+                :on {:click [[:actions/next-leaderboard-page page-count]]}}
+       "Next"]]]))
 
 (defn- table-shell
   [rows timeframe-label sort]
@@ -413,6 +511,9 @@
                 page
                 page-count
                 total-rows
+                page-size
+                page-size-options
+                page-size-dropdown-open?
                 has-results?]}
         (leaderboard-vm/leaderboard-vm state)]
     [:div {:class ["relative"
@@ -490,7 +591,10 @@
                   has-results?)
          (pagination-controls {:page page
                                :page-count page-count
-                               :total-rows total-rows}))]
+                               :total-rows total-rows
+                               :page-size page-size
+                               :page-size-options page-size-options
+                               :page-size-dropdown-open? page-size-dropdown-open?}))]
 
       (methodology-note timeframe-label)]]))
 

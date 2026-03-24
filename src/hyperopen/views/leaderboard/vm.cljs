@@ -6,9 +6,6 @@
 (def ^:private desktop-breakpoint-px
   1024)
 
-(def ^:private page-size
-  10)
-
 (def timeframe-options
   [{:value :day :label "Day"}
    {:value :week :label "Week"}
@@ -123,7 +120,7 @@
                rows))
 
 (defn- paginate-rows
-  [rows requested-page]
+  [rows requested-page page-size]
   (let [rows* (vec (or rows []))
         total-rows (count rows*)
         page-count (max 1 (int (js/Math.ceil (/ total-rows page-size))))
@@ -143,6 +140,10 @@
   (let [query (get-in state [:leaderboard-ui :query] "")
         timeframe (leaderboard-actions/normalize-leaderboard-timeframe
                    (get-in state [:leaderboard-ui :timeframe]))
+        page-size (leaderboard-actions/normalize-leaderboard-page-size
+                   (get-in state [:leaderboard-ui :page-size]))
+        page-size-options (or (get-in state [:leaderboard-ui :page-size-options])
+                              leaderboard-actions/leaderboard-page-size-options)
         sort (or (get-in state [:leaderboard-ui :sort])
                  {:column leaderboard-actions/default-sort-column
                   :direction leaderboard-actions/default-sort-direction})
@@ -160,12 +161,15 @@
         unpinned-rows (if pinned-row
                         (into [] (remove #(= (:eth-address %) (:eth-address pinned-row)) filtered-rows))
                         filtered-rows)
-        pagination (paginate-rows unpinned-rows requested-page)]
+        pagination (paginate-rows unpinned-rows requested-page page-size)]
     {:query query
      :timeframe timeframe
      :timeframe-label (timeframe-label timeframe)
      :timeframe-options timeframe-options
      :sort sort
+     :page-size page-size
+     :page-size-options page-size-options
+     :page-size-dropdown-open? (true? (get-in state [:leaderboard-ui :page-size-dropdown-open?]))
      :loading? (true? (get-in state [:leaderboard :loading?]))
      :error (get-in state [:leaderboard :error])
      :loaded-at-ms (get-in state [:leaderboard :loaded-at-ms])
@@ -174,7 +178,6 @@
      :rows (:rows pagination)
      :page (:page pagination)
      :page-count (:page-count pagination)
-     :page-size page-size
      :total-rows (count filtered-rows)
      :visible-rows-count (count (:rows pagination))
      :has-results? (pos? (count filtered-rows))}))
@@ -187,6 +190,8 @@
                    :timeframe (get-in state [:leaderboard-ui :timeframe])
                    :sort (get-in state [:leaderboard-ui :sort])
                    :page (get-in state [:leaderboard-ui :page])
+                   :page-size (get-in state [:leaderboard-ui :page-size])
+                   :page-size-dropdown-open? (get-in state [:leaderboard-ui :page-size-dropdown-open?])
                    :wallet-address (get-in state [:wallet :address])
                    :loading? (get-in state [:leaderboard :loading?])
                    :error (get-in state [:leaderboard :error])

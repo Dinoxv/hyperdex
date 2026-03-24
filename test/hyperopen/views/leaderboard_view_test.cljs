@@ -126,6 +126,32 @@
         (is (some? mobile-list))
         (is (pos? (count mobile-links)))))))
 
+(deftest leaderboard-view-renders-page-size-dropdown-controls-test
+  (let [view-node (view/leaderboard-view sample-state)
+        page-size-button (find-first-node view-node #(= "leaderboard-page-size" (get-in % [1 :id])))
+        page-size-label (find-first-node view-node #(= "leaderboard-page-size-label" (get-in % [1 :id])))
+        text (set (collect-strings view-node))]
+    (is (some? page-size-button))
+    (is (some? page-size-label))
+    (is (= [[:actions/toggle-leaderboard-page-size-dropdown]]
+           (get-in page-size-button [1 :on :click])))
+    (is (contains? text "Rows"))
+    (is (contains? text "Total: 2 ranked traders"))))
+
+(deftest leaderboard-view-open-page-size-dropdown-renders-options-test
+  (let [view-node (view/leaderboard-view (assoc-in sample-state [:leaderboard-ui :page-size-dropdown-open?] true))
+        close-overlay (find-first-node view-node
+                                       (fn [node]
+                                         (= [[:actions/close-leaderboard-page-size-dropdown]]
+                                            (get-in node [1 :on :click]))))
+        option (find-first-node view-node
+                                (fn [node]
+                                  (and (= :button (first node))
+                                       (= [[:actions/set-leaderboard-page-size 25]]
+                                          (get-in node [1 :on :click])))))]
+    (is (some? close-overlay))
+    (is (some? option))))
+
 (deftest leaderboard-view-renders-address-only-once-when-display-name-is-missing-test
   (let [view-node (view/leaderboard-view (assoc-in sample-state
                                                    [:leaderboard :rows]

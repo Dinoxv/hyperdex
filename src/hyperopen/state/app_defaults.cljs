@@ -8,6 +8,7 @@
             [hyperopen.i18n.locale :as i18n-locale]
             [hyperopen.order.cancel-visible-confirmation :as cancel-visible-confirmation]
             [hyperopen.order.submit-confirmation :as submit-confirmation]
+            [hyperopen.leaderboard.actions :as leaderboard-actions]
             [hyperopen.platform :as platform]
             [hyperopen.portfolio.actions :as portfolio-actions]
             [hyperopen.trade-modules :as trade-modules]
@@ -275,7 +276,10 @@
    :timeframe :month
    :sort {:column :pnl
           :direction :desc}
-   :page 1})
+   :page 1
+   :page-size leaderboard-actions/default-page-size
+   :page-size-options leaderboard-actions/leaderboard-page-size-options
+   :page-size-dropdown-open? false})
 
 (defn default-leaderboard-state
   []

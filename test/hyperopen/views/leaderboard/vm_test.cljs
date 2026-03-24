@@ -100,7 +100,10 @@
                                 :timeframe :month
                                 :sort {:column :pnl
                                        :direction :desc}
-                                :page 2}
+                                :page 2
+                                :page-size 10
+                                :page-size-options [5 10 25 50]
+                                :page-size-dropdown-open? false}
                :leaderboard {:rows rows
                              :excluded-addresses #{}
                              :loading? false
@@ -111,4 +114,37 @@
     (is (= 2 (:page-count result)))
     (is (= 5 (:visible-rows-count result)))
     (is (= [11 12 13 14 15]
+           (mapv :rank (:rows result))))))
+
+(deftest leaderboard-vm-uses-selected-page-size-and-exposes-dropdown-state-test
+  (let [rows (mapv (fn [idx]
+                     {:eth-address (str "0x" (.padStart (str idx) 40 "0"))
+                      :account-value idx
+                      :display-name (str "Trader " idx)
+                      :window-performances {:day {:pnl idx :roi (/ idx 1000) :volume idx}
+                                            :week {:pnl idx :roi (/ idx 1000) :volume idx}
+                                            :month {:pnl idx :roi (/ idx 1000) :volume idx}
+                                            :all-time {:pnl idx :roi (/ idx 1000) :volume idx}}})
+                   (range 1 16))
+        state {:wallet {:address nil}
+               :leaderboard-ui {:query ""
+                                :timeframe :month
+                                :sort {:column :pnl
+                                       :direction :desc}
+                                :page 2
+                                :page-size 5
+                                :page-size-options [5 10 25 50]
+                                :page-size-dropdown-open? true}
+               :leaderboard {:rows rows
+                             :excluded-addresses #{}
+                             :loading? false
+                             :error nil
+                             :loaded-at-ms 1700000000000}}
+        result (vm/leaderboard-vm state)]
+    (is (= 5 (:page-size result)))
+    (is (= [5 10 25 50] (:page-size-options result)))
+    (is (true? (:page-size-dropdown-open? result)))
+    (is (= 3 (:page-count result)))
+    (is (= 5 (:visible-rows-count result)))
+    (is (= [6 7 8 9 10]
            (mapv :rank (:rows result))))))

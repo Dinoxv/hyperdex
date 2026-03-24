@@ -4,6 +4,12 @@
 (def default-timeframe
   :month)
 
+(def default-page-size
+  10)
+
+(def leaderboard-page-size-options
+  [5 10 25 50])
+
 (def default-sort-column
   :pnl)
 
@@ -21,6 +27,9 @@
 
 (def ^:private valid-sort-directions
   #{:asc :desc})
+
+(def ^:private valid-page-sizes
+  (set leaderboard-page-size-options))
 
 (defn- split-path-from-query-fragment
   [path]
@@ -103,6 +112,16 @@
       direction
       default-sort-direction)))
 
+(defn normalize-leaderboard-page-size
+  [value]
+  (let [candidate (cond
+                    (number? value) (js/Math.floor value)
+                    (string? value) (some-> value str/trim js/Number js/Math.floor)
+                    :else nil)]
+    (if (contains? valid-page-sizes candidate)
+      candidate
+      default-page-size)))
+
 (defn- normalize-page
   [page]
   (let [candidate (cond
@@ -152,6 +171,13 @@
                             :direction next-direction}]
                           [[:leaderboard-ui :page] default-page]]]]))
 
+(defn set-leaderboard-page-size
+  [_state page-size]
+  [[:effects/save-many [[[:leaderboard-ui :page-size]
+                         (normalize-leaderboard-page-size page-size)]
+                        [[:leaderboard-ui :page] default-page]
+                        [[:leaderboard-ui :page-size-dropdown-open?] false]]]])
+
 (defn set-leaderboard-page
   [_state page max-page]
   (let [max-page* (max 1 (normalize-page max-page))
@@ -168,3 +194,12 @@
   [state max-page]
   (let [current-page (normalize-page (get-in state [:leaderboard-ui :page]))]
     (set-leaderboard-page state (dec current-page) max-page)))
+
+(defn toggle-leaderboard-page-size-dropdown
+  [state]
+  [[:effects/save [:leaderboard-ui :page-size-dropdown-open?]
+    (not (boolean (get-in state [:leaderboard-ui :page-size-dropdown-open?])))]])
+
+(defn close-leaderboard-page-size-dropdown
+  [_state]
+  [[:effects/save [:leaderboard-ui :page-size-dropdown-open?] false]])

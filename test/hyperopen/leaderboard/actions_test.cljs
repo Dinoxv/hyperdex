@@ -48,3 +48,18 @@
          (actions/set-leaderboard-page {} "8" 3)))
   (is (= [[:effects/save [:leaderboard-ui :page] 1]]
          (actions/prev-leaderboard-page {:leaderboard-ui {:page 1}} 4))))
+
+(deftest leaderboard-page-size-actions-normalize-reset-and-toggle-dropdown-test
+  (is (= [[:effects/save-many [[[:leaderboard-ui :page-size] 25]
+                               [[:leaderboard-ui :page] 1]
+                               [[:leaderboard-ui :page-size-dropdown-open?] false]]]]
+         (actions/set-leaderboard-page-size {} "25")))
+  (is (= [[:effects/save-many [[[:leaderboard-ui :page-size] 10]
+                               [[:leaderboard-ui :page] 1]
+                               [[:leaderboard-ui :page-size-dropdown-open?] false]]]]
+         (actions/set-leaderboard-page-size {} "999")))
+  (is (= [[:effects/save [:leaderboard-ui :page-size-dropdown-open?] true]]
+         (actions/toggle-leaderboard-page-size-dropdown
+          {:leaderboard-ui {:page-size-dropdown-open? false}})))
+  (is (= [[:effects/save [:leaderboard-ui :page-size-dropdown-open?] false]]
+         (actions/close-leaderboard-page-size-dropdown {}))))

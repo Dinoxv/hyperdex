@@ -632,6 +632,9 @@
    :actions/set-leaderboard-query ::single-input-args
    :actions/set-leaderboard-timeframe ::keyword-or-string-args
    :actions/set-leaderboard-sort ::keyword-or-string-args
+   :actions/set-leaderboard-page-size ::single-input-args
+   :actions/toggle-leaderboard-page-size-dropdown ::no-args
+   :actions/close-leaderboard-page-size-dropdown ::no-args
    :actions/set-leaderboard-page ::page-and-max-page-args
    :actions/next-leaderboard-page ::max-page-args
    :actions/prev-leaderboard-page ::max-page-args

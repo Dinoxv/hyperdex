@@ -10,6 +10,7 @@
             [hyperopen.leaderboard.effects :as leaderboard-effects]
             [hyperopen.order.actions :as order-actions]
             [hyperopen.portfolio.actions :as portfolio-actions]
+            [hyperopen.runtime.action-adapters :as action-adapters]
             [hyperopen.staking.actions :as staking-actions]
             [hyperopen.funding-comparison.actions :as funding-comparison-actions]
             [hyperopen.runtime.collaborators :as collaborators]
@@ -86,10 +87,13 @@
                     (get-in deps [:account-history :select-account-info-tab])))
     (is (identical? account-history-actions/toggle-positions-direction-filter-open
                     (get-in deps [:account-history :toggle-positions-direction-filter-open])))
-    (is (identical? leaderboard-actions/load-leaderboard-route
+    (is (identical? action-adapters/load-leaderboard-route-action
                     (get-in deps [:leaderboard :load-leaderboard-route])))
-    (is (identical? leaderboard-actions/set-leaderboard-sort
+    (is (identical? action-adapters/set-leaderboard-sort-action
                     (get-in deps [:leaderboard :set-leaderboard-sort])))
+    (is (fn? (get-in deps [:leaderboard :set-leaderboard-page-size])))
+    (is (fn? (get-in deps [:leaderboard :toggle-leaderboard-page-size-dropdown])))
+    (is (fn? (get-in deps [:leaderboard :close-leaderboard-page-size-dropdown])))
     (is (identical? vault-actions/load-vault-route
                     (get-in deps [:vaults :load-vault-route])))
     (is (identical? vault-actions/set-vaults-user-page-size
