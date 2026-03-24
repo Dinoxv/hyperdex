@@ -594,14 +594,12 @@
                     "opacity-90"]
             :style {:background-image "radial-gradient(120% 120% at 15% -10%, rgba(0, 148, 111, 0.22), rgba(6, 30, 34, 0.02) 60%), radial-gradient(130% 140% at 85% 20%, rgba(0, 138, 96, 0.14), rgba(6, 30, 34, 0) 68%), linear-gradient(180deg, rgba(4, 43, 36, 0.54) 0%, rgba(6, 27, 32, 0.08) 100%)"}}]
      [:div {:class ["relative" "mx-auto" "w-full" "max-w-[1280px]" "space-y-4"]}
-      [:div {:class ["flex" "flex-wrap" "items-end" "justify-between" "gap-3"]}
+     [:div {:class ["flex" "flex-wrap" "items-end" "justify-between" "gap-3"]}
        [:div {:class ["space-y-1"]}
         [:h1 {:class ["text-2xl" "font-normal" "text-trading-text"]}
          "Leaderboard"]
         [:p {:class ["max-w-2xl" "text-sm" "text-trading-text-secondary"]}
-         "Track ranked traders across selectable performance windows."]]
-       [:div {:class ["text-xs" "uppercase" "tracking-[0.08em]" "text-trading-text-secondary"]}
-        "Read-only ranking surface"]]
+         "Track ranked traders across selectable performance windows."]]]
       [:div {:class control-shell-classes}
        [:div {:class ["flex" "flex-col" "gap-2.5" "lg:flex-row" "lg:items-center" "lg:justify-between"]}
         [:input {:id "leaderboard-search"

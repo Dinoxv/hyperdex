@@ -96,7 +96,6 @@
         (is (string? (get-in root [1 :style :background-image])))
         (is (contains? text "Leaderboard"))
         (is (contains? text "Methodology"))
-        (is (contains? text "Read-only ranking surface"))
         (is (contains? text "Pinned separately from paginated results."))))))
 
 (deftest leaderboard-view-timeframe-and-retry-actions-are-wired-test
