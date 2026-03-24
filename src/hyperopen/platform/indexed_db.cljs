@@ -4,7 +4,7 @@
   "hyperopen-persistence")
 
 (def app-db-version
-  3)
+  4)
 
 (def asset-selector-markets-store
   "asset-selector-markets-cache")
@@ -21,12 +21,16 @@
 (def leaderboard-preferences-store
   "leaderboard-preferences")
 
+(def leaderboard-cache-store
+  "leaderboard-cache")
+
 (def ^:private app-store-names
   [asset-selector-markets-store
    funding-history-store
    chart-visible-range-store
    vault-index-store
-   leaderboard-preferences-store])
+   leaderboard-preferences-store
+   leaderboard-cache-store])
 
 (defonce ^:private open-db-cache (atom {}))
 

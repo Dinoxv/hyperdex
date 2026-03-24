@@ -1,5 +1,5 @@
 import { expect, test } from "@playwright/test";
-import { expectOracle, mobileViewport, visitRoute } from "../support/hyperopen.mjs";
+import { dispatch, expectOracle, mobileViewport, visitRoute, waitForIdle } from "../support/hyperopen.mjs";
 
 const routeCases = [
   { name: "trade", route: "/trade", parityId: "trade-root" },
@@ -68,4 +68,170 @@ test("leaderboard preferences persist across reload via IndexedDB @smoke", async
   await expect(page.locator("[data-role='leaderboard-timeframes'] button", { hasText: "All Time" }))
     .toHaveClass(/text-\[#97fce4\]/);
   await expect(page.locator("button:has-text('Volume') svg")).toHaveClass(/rotate-0/);
+});
+
+test("leaderboard cache serves reload when live endpoints are blocked @smoke", async ({ page }) => {
+  const leaderboardUrl = "https://stats-data.hyperliquid.xyz/Mainnet/leaderboard";
+  const vaultsUrl = "https://stats-data.hyperliquid.xyz/Mainnet/vaults";
+  let allowNetwork = true;
+  let leaderboardRequests = 0;
+  let vaultRequests = 0;
+
+  await page.route(leaderboardUrl, async route => {
+    leaderboardRequests += 1;
+    if (!allowNetwork) {
+      await route.abort();
+      return;
+    }
+    await route.fulfill({
+      status: 200,
+      contentType: "application/json",
+      body: JSON.stringify({
+        leaderboardRows: [
+          {
+            ethAddress: "0x1111111111111111111111111111111111111111",
+            displayName: "Alpha Desk",
+            accountValue: 1200000,
+            windowPerformances: [["month", { pnl: 1200, roi: 0.2, vlm: 9000 }]]
+          },
+          {
+            ethAddress: "0x2222222222222222222222222222222222222222",
+            displayName: "Hidden Vault",
+            accountValue: 900000,
+            windowPerformances: [["month", { pnl: 500, roi: 0.1, vlm: 4000 }]]
+          }
+        ]
+      })
+    });
+  });
+
+  await page.route(vaultsUrl, async route => {
+    vaultRequests += 1;
+    if (!allowNetwork) {
+      await route.abort();
+      return;
+    }
+    await route.fulfill({
+      status: 200,
+      contentType: "application/json",
+      body: JSON.stringify([
+        {
+          name: "Shadow Vault",
+          vaultAddress: "0x2222222222222222222222222222222222222222",
+          relationship: { type: "child" }
+        }
+      ])
+    });
+  });
+
+  await visitRoute(page, "/leaderboard");
+  await expect(page.getByText("Alpha Desk")).toBeVisible();
+  await expect(page.getByText("Hidden Vault")).toHaveCount(0);
+  await expect(leaderboardRequests).toBe(1);
+  await expect(vaultRequests).toBe(1);
+
+  allowNetwork = false;
+  await page.reload();
+  await expectOracle(
+    page,
+    "parity-element",
+    { present: true },
+    { args: { parityId: "leaderboard-root" } }
+  );
+
+  await expect(page.getByText("Alpha Desk")).toBeVisible();
+  await expect(page.getByText("Hidden Vault")).toHaveCount(0);
+  await expect(page.locator("[data-role='leaderboard-error']")).toHaveCount(0);
+  await expect(leaderboardRequests).toBe(1);
+  await expect(vaultRequests).toBe(1);
+});
+
+test("leaderboard cache serves in-app revisit without hitting live endpoints again @smoke", async ({ page }) => {
+  const leaderboardUrl = "https://stats-data.hyperliquid.xyz/Mainnet/leaderboard";
+  const vaultsUrl = "https://stats-data.hyperliquid.xyz/Mainnet/vaults";
+  let allowNetwork = true;
+  let leaderboardRequests = 0;
+  let vaultRequests = 0;
+
+  await page.route(leaderboardUrl, async route => {
+    leaderboardRequests += 1;
+    if (!allowNetwork) {
+      await route.abort();
+      return;
+    }
+    await route.fulfill({
+      status: 200,
+      contentType: "application/json",
+      body: JSON.stringify({
+        leaderboardRows: [
+          {
+            ethAddress: "0x1111111111111111111111111111111111111111",
+            displayName: "Alpha Desk",
+            accountValue: 1200000,
+            windowPerformances: [["month", { pnl: 1200, roi: 0.2, vlm: 9000 }]]
+          },
+          {
+            ethAddress: "0x2222222222222222222222222222222222222222",
+            displayName: "Hidden Vault",
+            accountValue: 900000,
+            windowPerformances: [["month", { pnl: 500, roi: 0.1, vlm: 4000 }]]
+          }
+        ]
+      })
+    });
+  });
+
+  await page.route(vaultsUrl, async route => {
+    vaultRequests += 1;
+    if (!allowNetwork) {
+      await route.abort();
+      return;
+    }
+    await route.fulfill({
+      status: 200,
+      contentType: "application/json",
+      body: JSON.stringify([
+        {
+          name: "Shadow Vault",
+          vaultAddress: "0x2222222222222222222222222222222222222222",
+          relationship: { type: "child" }
+        }
+      ])
+    });
+  });
+
+  await visitRoute(page, "/leaderboard");
+  await expect(page.getByText("Alpha Desk")).toBeVisible();
+  await expect(page.getByText("Hidden Vault")).toHaveCount(0);
+  await expect(leaderboardRequests).toBe(1);
+  await expect(vaultRequests).toBe(1);
+
+  allowNetwork = false;
+  await dispatch(page, [":actions/navigate", "/vaults", { "replace?": true }]);
+  await waitForIdle(page);
+  await expectOracle(
+    page,
+    "parity-element",
+    { present: true },
+    { args: { parityId: "vaults-root" } }
+  );
+  const leaderboardRequestsAfterLeaving = leaderboardRequests;
+  const vaultRequestsAfterLeaving = vaultRequests;
+
+  await dispatch(page, [":actions/navigate", "/leaderboard", { "replace?": true }]);
+  await waitForIdle(page);
+  await expectOracle(
+    page,
+    "parity-element",
+    { present: true },
+    { args: { parityId: "leaderboard-root" } }
+  );
+
+  await expect(page.getByText("Alpha Desk")).toBeVisible();
+  await expect(page.getByText("Hidden Vault")).toHaveCount(0);
+  await expect(page.locator("[data-role='leaderboard-error']")).toHaveCount(0);
+  await expect(leaderboardRequestsAfterLeaving).toBe(1);
+  await expect(vaultRequestsAfterLeaving).toBeGreaterThanOrEqual(1);
+  await expect(leaderboardRequests).toBe(leaderboardRequestsAfterLeaving);
+  await expect(vaultRequests).toBe(vaultRequestsAfterLeaving);
 });

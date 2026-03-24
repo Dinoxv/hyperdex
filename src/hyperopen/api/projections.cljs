@@ -225,6 +225,26 @@
       (assoc-in [:leaderboard :error-category] nil)
       (assoc-in [:leaderboard :loaded-at-ms] (.now js/Date))))
 
+(defn apply-leaderboard-cache-hydration
+  [state cache-record]
+  (let [rows (if (sequential? (:rows cache-record))
+               (vec (:rows cache-record))
+               [])
+        excluded-addresses (or (:excluded-addresses cache-record) [])
+        saved-at-ms (:saved-at-ms cache-record)]
+    (-> state
+        (assoc-in [:leaderboard :rows] rows)
+        (assoc-in [:leaderboard :excluded-addresses]
+                  (if (set? excluded-addresses)
+                    excluded-addresses
+                    (set excluded-addresses)))
+        (assoc-in [:leaderboard :loading?] false)
+        (assoc-in [:leaderboard :error] nil)
+        (assoc-in [:leaderboard :error-category] nil)
+        (assoc-in [:leaderboard :loaded-at-ms]
+                  (when (number? saved-at-ms)
+                    saved-at-ms)))))
+
 (defn apply-leaderboard-error
   [state err]
   (let [{:keys [message category]} (normalized-error err)]

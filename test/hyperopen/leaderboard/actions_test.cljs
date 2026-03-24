@@ -17,6 +17,9 @@
   (is (= [[:effects/save [:leaderboard-ui :page] 1]
           [:effects/api-fetch-leaderboard]]
          (actions/load-leaderboard-route {} "/leaderboard")))
+  (is (= [[:effects/save [:leaderboard-ui :page] 1]
+          [:effects/api-fetch-leaderboard {:force-refresh? true}]]
+         (actions/load-leaderboard {})))
   (is (= []
          (actions/load-leaderboard-route {} "/portfolio"))))
 

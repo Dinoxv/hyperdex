@@ -168,7 +168,14 @@
       (and (= 1 (count args))
            (map? (first args)))))
 
+(defn- api-fetch-leaderboard-args?
+  [args]
+  (or (empty? args)
+      (and (= 1 (count args))
+           (map? (first args)))))
+
 (s/def ::fetch-asset-selector-markets-args fetch-asset-selector-markets-args?)
+(s/def ::api-fetch-leaderboard-args api-fetch-leaderboard-args?)
 (s/def ::fetch-candle-snapshot-args fetch-candle-snapshot-args?)
 (s/def ::request-id ::non-negative-int)
 (s/def ::request-id-args (s/tuple ::request-id))
@@ -768,7 +775,7 @@
    :effects/api-fetch-user-funding-history ::request-id-args
    :effects/api-fetch-historical-orders ::request-id-args
    :effects/export-funding-history-csv ::export-funding-history-csv-args
-   :effects/api-fetch-leaderboard ::no-args
+   :effects/api-fetch-leaderboard ::api-fetch-leaderboard-args
    :effects/api-fetch-predicted-fundings ::no-args
    :effects/api-submit-order ::api-submit-order-args
    :effects/confirm-api-submit-order ::confirm-api-submit-order-args

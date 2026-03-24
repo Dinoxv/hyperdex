@@ -82,6 +82,37 @@
     (is (= "Error: funding-fail" (get-in failed [:funding-comparison :error])))
     (is (= :unexpected (get-in failed [:funding-comparison :error-category])))))
 
+(deftest leaderboard-projections-track-success-error-and-cache-hydration-test
+  (let [state {:leaderboard {:rows []
+                             :excluded-addresses #{}
+                             :loading? false
+                             :error "stale"
+                             :error-category :transport
+                             :loaded-at-ms nil}}
+        loading (projections/begin-leaderboard-load state)
+        success (projections/apply-leaderboard-success
+                 loading
+                 {:rows [{:eth-address "0x1"}]
+                  :excluded-addresses ["0x2"]})
+        hydrated (projections/apply-leaderboard-cache-hydration
+                  loading
+                  {:saved-at-ms 1700000000000
+                   :rows [{:eth-address "0x3"}]
+                   :excluded-addresses ["0x4"]})
+        failed (projections/apply-leaderboard-error loading (js/Error. "leaderboard-fail"))]
+    (is (= true (get-in loading [:leaderboard :loading?])))
+    (is (nil? (get-in loading [:leaderboard :error])))
+    (is (= [{:eth-address "0x1"}] (get-in success [:leaderboard :rows])))
+    (is (= #{"0x2"} (get-in success [:leaderboard :excluded-addresses])))
+    (is (number? (get-in success [:leaderboard :loaded-at-ms])))
+    (is (= [{:eth-address "0x3"}] (get-in hydrated [:leaderboard :rows])))
+    (is (= #{"0x4"} (get-in hydrated [:leaderboard :excluded-addresses])))
+    (is (= 1700000000000 (get-in hydrated [:leaderboard :loaded-at-ms])))
+    (is (= false (get-in hydrated [:leaderboard :loading?])))
+    (is (nil? (get-in hydrated [:leaderboard :error])))
+    (is (= "Error: leaderboard-fail" (get-in failed [:leaderboard :error])))
+    (is (= :unexpected (get-in failed [:leaderboard :error-category])))))
+
 (deftest api-wallet-default-agent-projection-falls-back-to-default-name-test
   (let [state {:wallet {:address "0x162cc7c861ebd0c06b3d72319201150482518185"}
                :api-wallets {:loading {:default-agent? true}

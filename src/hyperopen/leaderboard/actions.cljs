@@ -136,12 +136,13 @@
 (defn load-leaderboard
   [_state]
   [[:effects/save [:leaderboard-ui :page] default-page]
-   [:effects/api-fetch-leaderboard]])
+   [:effects/api-fetch-leaderboard {:force-refresh? true}]])
 
 (defn load-leaderboard-route
   [state path]
   (if (leaderboard-route? path)
-    (load-leaderboard state)
+    [[:effects/save [:leaderboard-ui :page] default-page]
+     [:effects/api-fetch-leaderboard]]
     []))
 
 (defn set-leaderboard-query

@@ -109,6 +109,8 @@
             [hyperopen.header.actions-test]
             [hyperopen.i18n.locale-test]
             [hyperopen.leaderboard.actions-test]
+            [hyperopen.leaderboard.cache-test]
+            [hyperopen.leaderboard.effects-test]
             [hyperopen.leaderboard.preferences-test]
             [hyperopen.order.feedback-runtime-test]
             [hyperopen.orderbook.actions-test]
@@ -479,6 +481,8 @@
              'hyperopen.header.actions-test
              'hyperopen.i18n.locale-test
              'hyperopen.leaderboard.actions-test
+             'hyperopen.leaderboard.cache-test
+             'hyperopen.leaderboard.effects-test
              'hyperopen.leaderboard.preferences-test
              'hyperopen.order.feedback-runtime-test
              'hyperopen.orderbook.actions-test
