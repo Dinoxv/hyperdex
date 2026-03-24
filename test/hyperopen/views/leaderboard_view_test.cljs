@@ -135,6 +135,7 @@
     (is (some? page-size-label))
     (is (= [[:actions/toggle-leaderboard-page-size-dropdown]]
            (get-in page-size-button [1 :on :click])))
+    (is (not (contains? (set (get-in page-size-button [1 :class])) "focus:ring-2")))
     (is (contains? text "Rows"))
     (is (contains? text "Total: 2 ranked traders"))))
 
@@ -150,7 +151,10 @@
                                        (= [[:actions/set-leaderboard-page-size 25]]
                                           (get-in node [1 :on :click])))))]
     (is (some? close-overlay))
-    (is (some? option))))
+    (is (some? option))
+    (is (= [[:actions/set-leaderboard-page-size 25]]
+           (get-in option [1 :on :mousedown])))
+    (is (not (contains? (set (collect-strings option)) "ON")))))
 
 (deftest leaderboard-view-renders-address-only-once-when-display-name-is-missing-test
   (let [view-node (view/leaderboard-view (assoc-in sample-state

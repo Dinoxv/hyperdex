@@ -33,6 +33,14 @@
    "focus-visible:ring-offset-1"
    "focus-visible:ring-offset-base-100"])
 
+(def ^:private focus-reset-classes
+  ["focus:outline-none"
+   "focus:ring-0"
+   "focus:ring-offset-0"
+   "focus-visible:outline-none"
+   "focus-visible:ring-0"
+   "focus-visible:ring-offset-0"])
+
 (defn- address-link
   [address child]
   [:a {:href (str "https://app.hyperliquid.xyz/explorer/address/" address)
@@ -218,22 +226,22 @@
             :class (into ["flex"
                           "w-full"
                           "items-center"
-                          "justify-between"
+                          "justify-start"
                           "rounded-md"
                           "px-2.5"
                           "py-1.5"
                           "text-xs"
-                          "transition-colors"]
-                         (concat (if active?
-                                   ["bg-[#123a36]" "text-[#97fce4]"]
-                                   ["text-trading-text-secondary" "hover:bg-base-200" "hover:text-trading-text"])
-                                 focus-visible-ring-classes))
+                          "text-left"
+                          "num"
+                          "text-trading-text-secondary"
+                          "hover:bg-base-200"
+                          "hover:text-trading-text"]
+                         focus-reset-classes)
             :role "option"
             :aria-selected (boolean active?)
-            :on {:click [[:actions/set-leaderboard-page-size size]]}}
-   [:span {:class ["num"]} (str size)]
-   (when active?
-     [:span {:aria-hidden true} "ON"])])
+            :on {:mousedown [[:actions/set-leaderboard-page-size size]]
+                 :click [[:actions/set-leaderboard-page-size size]]}}
+   (str size)])
 
 (defn- loading-state
   []
@@ -380,7 +388,7 @@
                                 "text-xs"
                                 "text-trading-text"
                                 "hover:bg-base-200"]
-                               focus-visible-ring-classes)
+                               focus-reset-classes)
                   :style (when page-size-dropdown-open?
                            {:z-index 1201})
                   :on {:click [[:actions/toggle-leaderboard-page-size-dropdown]]}}
