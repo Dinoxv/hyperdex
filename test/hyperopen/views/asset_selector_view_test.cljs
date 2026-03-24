@@ -751,8 +751,10 @@
                :base "ABC"
                :market-type :perp}
         row (view/asset-list-item asset false true #{} #{} #{})
-        classes (set (collect-all-classes row))]
-    (is (contains? classes "bg-base-200/70"))
+        classes (set (collect-all-classes row))
+        row-attrs (second row)]
+    (is (contains? classes "asset-selector-row-surface"))
+    (is (= "highlighted" (:data-row-state row-attrs)))
     (is (not (contains? classes "ring-primary")))))
 
 (deftest favorite-button-uses-lucide-star-styling-for-inactive-and-active-states-test
