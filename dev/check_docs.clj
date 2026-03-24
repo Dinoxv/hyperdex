@@ -72,6 +72,13 @@
   []
   (java.time.LocalDate/now (java.time.ZoneId/of "UTC")))
 
+(defn env-true?
+  [name]
+  (contains? #{"1" "true" "yes" "on"}
+             (some-> (System/getenv name)
+                     str/trim
+                     str/lower-case)))
+
 (defn default-config
   []
   {:required-files default-required-files
@@ -81,6 +88,7 @@
    :agents-required-links default-agents-required-links
    :active-exec-plan-dir default-active-exec-plan-dir
    :bd-show-fn nil
+   :skip-bd-validation? (env-true? "HYPEROPEN_SKIP_BD_DOCS_CHECK")
    :today (utc-today)})
 
 (defn normalize-path
@@ -318,7 +326,7 @@
           issue-ids))
 
 (defn active-exec-plan-errors
-  [root {:keys [active-exec-plan-dir bd-show-fn]}]
+  [root {:keys [active-exec-plan-dir bd-show-fn skip-bd-validation?]}]
   (let [plan-dir (or active-exec-plan-dir default-active-exec-plan-dir)
         plan-files (->> (markdown-files-in-dir root plan-dir)
                         (remove #(= % (str plan-dir "/README.md")))
@@ -334,30 +342,43 @@
                         plan-files)
             all-ids (->> plans (mapcat :issue-ids) distinct sort vec)
             lookup (or bd-show-fn default-bd-show-fn)]
-        (try
-          (let [status-by-id (lookup all-ids)]
-            (mapcat (fn [{:keys [path issue-ids unchecked-count]}]
-                      (let [valid-ids (filter #(contains? status-by-id %) issue-ids)
-                            open-ids (filter #(not= "closed" (get status-by-id %)) valid-ids)]
-                        (cond-> []
-                          (empty? valid-ids)
-                          (conj (err :active-exec-plan-missing-bd-link
-                                     path
-                                     "active ExecPlan must reference at least one valid bd issue id"))
+        (if skip-bd-validation?
+          (mapcat (fn [{:keys [path issue-ids unchecked-count]}]
+                    (cond-> []
+                      (empty? issue-ids)
+                      (conj (err :active-exec-plan-missing-bd-link
+                                 path
+                                 "active ExecPlan must reference at least one bd issue id"))
 
-                          (and (seq valid-ids) (empty? open-ids))
-                          (conj (err :active-exec-plan-no-open-bd-issue
-                                     path
-                                     (str "active ExecPlan only references closed bd issues: "
-                                          (str/join ", " valid-ids))))
+                      (zero? unchecked-count)
+                      (conj (err :active-exec-plan-no-unchecked-progress
+                                 path
+                                 "active ExecPlan has no remaining unchecked progress items; move it out of active"))))
+                  plans)
+          (try
+            (let [status-by-id (lookup all-ids)]
+              (mapcat (fn [{:keys [path issue-ids unchecked-count]}]
+                        (let [valid-ids (filter #(contains? status-by-id %) issue-ids)
+                              open-ids (filter #(not= "closed" (get status-by-id %)) valid-ids)]
+                          (cond-> []
+                            (empty? valid-ids)
+                            (conj (err :active-exec-plan-missing-bd-link
+                                       path
+                                       "active ExecPlan must reference at least one valid bd issue id"))
 
-                          (zero? unchecked-count)
-                          (conj (err :active-exec-plan-no-unchecked-progress
-                                     path
-                                     "active ExecPlan has no remaining unchecked progress items; move it out of active")))))
-                    plans))
-          (catch Exception ex
-            [(err :bd-query-failed plan-dir (or (.getMessage ex) "failed to query bd issue status"))]))))))
+                            (and (seq valid-ids) (empty? open-ids))
+                            (conj (err :active-exec-plan-no-open-bd-issue
+                                       path
+                                       (str "active ExecPlan only references closed bd issues: "
+                                            (str/join ", " valid-ids))))
+
+                            (zero? unchecked-count)
+                            (conj (err :active-exec-plan-no-unchecked-progress
+                                       path
+                                       "active ExecPlan has no remaining unchecked progress items; move it out of active")))))
+                      plans))
+            (catch Exception ex
+              [(err :bd-query-failed plan-dir (or (.getMessage ex) "failed to query bd issue status"))])))))))
 
 (defn validate-governed-doc
   [root rel-path today]
@@ -427,10 +448,13 @@
 (defn -main
   [& _args]
   (let [root (.getCanonicalPath (io/file "."))
-        errors (check-repo root)]
+        config (default-config)
+        errors (check-repo root config)]
     (if (empty? errors)
       (do
-        (println "Docs check passed.")
+        (println (if (:skip-bd-validation? config)
+                   "Docs check passed. Skipped bd issue status validation."
+                   "Docs check passed."))
         (System/exit 0))
       (do
         (print-errors! errors)

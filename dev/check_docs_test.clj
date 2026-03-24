@@ -19,6 +19,7 @@
            :agents-required-links ["docs/product-specs/index.md"]
            :active-exec-plan-dir "docs/exec-plans/active"
            :bd-show-fn (fn [_issue-ids] {})
+           :skip-bd-validation? false
            :today test-today}
           overrides)))
 
@@ -207,6 +208,31 @@
                                                    (test-config {:bd-show-fn (fn [_issue-ids]
                                                                                {"hyperopen-123" "open"})}))))]
         (is (contains? codes :active-exec-plan-no-unchecked-progress))))))
+
+(deftest active-exec-plan-skip-bd-validation-keeps-structural-guardrails
+  (with-temp-repo
+    (fn [root]
+      (baseline-files! root)
+      (let [exploding-bd-show (fn [_issue-ids]
+                                (throw (ex-info "bd should not be called" {})))]
+        (write-file! root
+                     "docs/exec-plans/active/2026-03-09-sample.md"
+                     (active-plan {:issue-id "hyperopen-123"
+                                   :checked-count 1
+                                   :unchecked-count 1}))
+        (is (empty? (docs/check-repo root
+                                     (test-config {:skip-bd-validation? true
+                                                   :bd-show-fn exploding-bd-show}))))
+
+        (write-file! root
+                     "docs/exec-plans/active/2026-03-09-sample.md"
+                     (active-plan {:checked-count 0
+                                   :unchecked-count 1}))
+        (let [codes (set (map :code (docs/check-repo root
+                                                     (test-config {:skip-bd-validation? true
+                                                                   :bd-show-fn exploding-bd-show}))))]
+          (is (contains? codes :active-exec-plan-missing-bd-link))
+          (is (not (contains? codes :active-exec-plan-no-open-bd-issue))))))))
 
 (defn -main
   [& _args]
