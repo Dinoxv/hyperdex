@@ -4,6 +4,11 @@ import { expectOracle, mobileViewport, visitRoute } from "../support/hyperopen.m
 const routeCases = [
   { name: "trade", route: "/trade", parityId: "trade-root" },
   { name: "portfolio", route: "/portfolio", parityId: "portfolio-root" },
+  {
+    name: "trader-portfolio",
+    route: "/portfolio/trader/0x3333333333333333333333333333333333333333",
+    parityId: "portfolio-root"
+  },
   { name: "leaderboard", route: "/leaderboard", parityId: "leaderboard-root" },
   { name: "vaults", route: "/vaults", parityId: "vaults-root" }
 ];

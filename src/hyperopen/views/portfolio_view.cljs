@@ -1,6 +1,8 @@
 (ns hyperopen.views.portfolio-view
   (:require [clojure.string :as string]
+            [hyperopen.account.context :as account-context]
             [hyperopen.portfolio.actions :as portfolio-actions]
+            [hyperopen.portfolio.routes :as portfolio-routes]
             [hyperopen.ui.fonts :as fonts]
             [hyperopen.utils.formatting :as fmt]
             [hyperopen.views.account-info-view :as account-info-view]
@@ -9,7 +11,8 @@
             [hyperopen.views.chart.renderer :as chart-renderer]
             [hyperopen.views.ui.performance-metrics-tooltip :as metrics-tooltip]
             [hyperopen.views.portfolio.vm.chart-tooltip :as chart-tooltip]
-            [hyperopen.views.portfolio.vm :as portfolio-vm]))
+            [hyperopen.views.portfolio.vm :as portfolio-vm]
+            [hyperopen.wallet.core :as wallet]))
 
 (def ^:private compact-currency-format-options
   {:style "currency"
@@ -254,6 +257,122 @@
             :on {:click [action]}}
    [:span {:class ["sm:hidden"]} (or mobile-label label)]
    [:span {:class ["hidden" "sm:inline"]} label]])
+
+(defn- inspected-trader-display-name
+  [state inspected-address]
+  (some (fn [row]
+          (when (= inspected-address (:eth-address row))
+            (:display-name row)))
+        (get-in state [:leaderboard :rows])))
+
+(defn- trader-explorer-url
+  [address]
+  (when (seq address)
+    (str "https://app.hyperliquid.xyz/explorer/address/" address)))
+
+(def ^:private portfolio-header-button-classes
+  ["inline-flex"
+   "items-center"
+   "justify-center"
+   "rounded-lg"
+   "border"
+   "px-3"
+   "py-2"
+   "text-sm"
+   "font-medium"
+   "transition-colors"
+   "focus:outline-none"
+   "focus:ring-0"
+   "focus:ring-offset-0"
+   "focus-visible:outline-none"
+   "focus-visible:ring-0"
+   "focus-visible:ring-offset-0"])
+
+(defn- portfolio-inspection-header
+  [state]
+  (let [inspected-address (account-context/trader-portfolio-address state)
+        display-name (inspected-trader-display-name state inspected-address)
+        explorer-url (trader-explorer-url inspected-address)
+        inspected-label (or display-name
+                            (wallet/short-addr inspected-address)
+                            inspected-address)]
+    [:div {:class ["flex" "flex-col" "gap-3" "lg:flex-row" "lg:items-start" "lg:justify-between"]
+           :data-role "portfolio-inspection-header"}
+     [:div {:class ["space-y-2"]}
+      [:div {:class ["flex" "flex-wrap" "items-center" "gap-2"]}
+       [:span {:class ["rounded-full"
+                       "border"
+                       "border-[#2b5d5b]"
+                       "bg-[#103c39]"
+                       "px-2.5"
+                       "py-1"
+                       "text-xs"
+                       "font-semibold"
+                       "uppercase"
+                       "tracking-[0.14em]"
+                       "text-[#9cf9e2]"]}
+        "Trader View"]
+       [:span {:class ["rounded-full"
+                       "border"
+                       "border-base-300"
+                       "bg-base-100/95"
+                       "px-2.5"
+                       "py-1"
+                       "text-xs"
+                       "font-semibold"
+                       "uppercase"
+                       "tracking-[0.14em]"
+                       "text-trading-text-secondary"]}
+        "Read Only"]]
+      [:div {:class ["space-y-1"]}
+       [:h1 {:class ["text-4xl" "font-medium" "tracking-tight" "text-trading-text" "sm:text-5xl"]}
+        "Portfolio"]
+       [:p {:class ["max-w-3xl" "text-sm" "leading-6" "text-trading-text-secondary"]
+            :data-role "portfolio-inspection-summary"}
+        (str "Inspecting "
+             (or inspected-label "this trader")
+             " without enabling Spectate Mode. Leaving this route returns the app to its normal account context.")]]
+      (when inspected-address
+        [:div {:class ["inline-flex"
+                       "max-w-full"
+                       "items-center"
+                       "gap-2"
+                       "rounded-lg"
+                       "border"
+                       "border-base-300"
+                       "bg-base-100/95"
+                       "px-3"
+                       "py-2"
+                       "text-sm"
+                       "text-trading-text-secondary"]
+               :data-role "portfolio-inspection-address"}
+         [:span {:class ["font-medium" "text-trading-text"]}
+          (or display-name "Trader")]
+         [:span {:class ["num" "truncate"]}
+          inspected-address]])]
+     [:div {:class ["flex" "flex-wrap" "items-center" "gap-2"]
+            :data-role "portfolio-inspection-actions-row"}
+      [:button {:type "button"
+                :class (into portfolio-header-button-classes
+                             ["border-base-300"
+                              "bg-base-100"
+                              "text-trading-text-secondary"
+                              "hover:bg-base-200"
+                              "hover:text-trading-text"])
+                :on {:click [[:actions/navigate portfolio-routes/canonical-route]]}
+                :data-role "portfolio-inspection-own-portfolio"}
+       "Your Portfolio"]
+      (when explorer-url
+        [:a {:href explorer-url
+             :target "_blank"
+             :rel "noreferrer"
+             :class (into portfolio-header-button-classes
+                          ["border-[#2f7067]"
+                           "bg-[#0f433d]"
+                           "text-[#dbf7f2]"
+                           "hover:bg-[#14544c]"])
+             :data-role "portfolio-inspection-explorer-link"}
+         "Hyperliquid Explorer"])]]))
 
 (defn- summary-row [label value & [value-class]]
   [:div {:class ["grid" "grid-cols-[1fr_auto]" "items-center" "gap-3"]}
@@ -1105,9 +1224,9 @@
                    "backdrop-blur-sm"]
            :style {:border-color "rgba(46, 91, 98, 0.9)"
                    :background "linear-gradient(135deg, rgba(8, 24, 30, 0.96) 0%, rgba(9, 35, 42, 0.96) 54%, rgba(14, 44, 37, 0.92) 100%)"}
-           :data-role "portfolio-background-status"
-           :role "status"
-           :aria-live "polite"}
+                 :data-role "portfolio-background-status"
+                 :role "status"
+                 :aria-live "polite"}
      [:div {:class ["flex" "flex-col" "gap-3" "xl:flex-row" "xl:items-center" "xl:justify-between"]}
       [:div {:class ["flex" "items-start" "gap-3"]}
        [:span {:class ["mt-0.5" "loading" "loading-spinner" "loading-sm" "text-trading-green"]
@@ -1132,10 +1251,25 @@
                          :background-color "rgba(12, 29, 35, 0.92)"
                          :color "#9fb6bc"}
                  :data-role (str "portfolio-background-status-item-" (name id))}
-          label])]]]))
+         label])]]]))
 
 (defn portfolio-view [state]
-  (let [view-model (portfolio-vm/portfolio-vm state)]
+  (let [view-model (portfolio-vm/portfolio-vm state)
+        trader-portfolio-route? (account-context/trader-portfolio-route-active? state)
+        extra-tabs (cond-> [{:id :performance-metrics
+                             :label "Performance Metrics"
+                             :panel-classes ["min-h-0"]
+                             :panel-style {:height performance-metrics-panel-height
+                                           :max-height performance-metrics-panel-height}
+                             :render (fn [_]
+                                       (performance-metrics-card
+                                        (assoc (:performance-metrics view-model)
+                                               :time-range-selector (get-in view-model [:selectors :performance-metrics-time-range]))))}]
+                     (not trader-portfolio-route?)
+                     (into [{:id :deposits-withdrawals
+                             :label "Deposits & Withdrawals"
+                             :render (fn [_]
+                                       (deposits-withdrawals-card))}]))]
     [:div {:class ["w-full"
                    "app-shell-gutter"
                    "py-4"
@@ -1143,7 +1277,9 @@
                    "md:py-5"]
            :style {:background-image "radial-gradient(circle at 15% 0%, rgba(0, 212, 170, 0.10), transparent 35%), radial-gradient(circle at 85% 100%, rgba(0, 212, 170, 0.08), transparent 40%)"}
            :data-parity-id "portfolio-root"}
-     (header-actions)
+     (if trader-portfolio-route?
+       (portfolio-inspection-header state)
+       (header-actions))
      (background-status-banner (:background-status view-model))
      [:div {:class ["grid"
                     "grid-cols-1"
@@ -1157,19 +1293,7 @@
             :data-role "portfolio-account-table"}
       (account-info-view/account-info-view
        state
-       {:extra-tabs [{:id :deposits-withdrawals
-                      :label "Deposits & Withdrawals"
-                      :render (fn [_]
-                                (deposits-withdrawals-card))}
-                     {:id :performance-metrics
-                      :label "Performance Metrics"
-                      :panel-classes ["min-h-0"]
-                      :panel-style {:height performance-metrics-panel-height
-                                    :max-height performance-metrics-panel-height}
-                      :render (fn [_]
-                                (performance-metrics-card
-                                 (assoc (:performance-metrics view-model)
-                                        :time-range-selector (get-in view-model [:selectors :performance-metrics-time-range]))))}]
+       {:extra-tabs extra-tabs
         :selected-tab-override (get-in state [:portfolio-ui :account-info-tab] portfolio-actions/default-account-info-tab)
         :default-selected-tab portfolio-actions/default-account-info-tab
         :tab-click-actions-by-tab portfolio-account-tab-click-actions-by-tab

@@ -42,3 +42,21 @@ test("resolveDesignReviewSelection honors explicit target ids", async () => {
   });
   assert.deepEqual(selection.targets.map((target) => target.id), ["vault-detail-route"]);
 });
+
+test("portfolio view design review selection includes the trader portfolio route", async () => {
+  const routing = await loadDesignReviewRouting();
+  const selection = selectDesignReviewTargetsForChangedFiles(
+    ["src/hyperopen/views/portfolio_view.cljs"],
+    routing
+  );
+  assert.ok(selection.targets.some((target) => target.id === "trader-portfolio-route"));
+});
+
+test("leaderboard view design review selection includes the leaderboard route", async () => {
+  const routing = await loadDesignReviewRouting();
+  const selection = selectDesignReviewTargetsForChangedFiles(
+    ["src/hyperopen/views/leaderboard_view.cljs"],
+    routing
+  );
+  assert.ok(selection.targets.some((target) => target.id === "leaderboard-route"));
+});

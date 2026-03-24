@@ -977,6 +977,42 @@
               [store [[:actions/select-portfolio-chart-tab :returns]]]]
              @dispatch-calls)))))
 
+(deftest install-address-handlers-dispatches-portfolio-chart-bootstrap-on-trader-portfolio-route-test
+  (let [route "/portfolio/trader/0xaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+        store (atom {:router {:path route}
+                     :portfolio-ui {:chart-tab :returns}})
+        dispatch-calls (atom [])
+        handlers (atom [])]
+    (startup-runtime/install-address-handlers!
+     {:store store
+      :bootstrap-account-data! (fn [_new-address] nil)
+      :init-with-webdata2! (fn [_store _subscribe-fn _unsubscribe-fn] nil)
+      :add-handler! (fn [handler]
+                      (swap! handlers conj handler))
+      :sync-current-address! (fn [_store] nil)
+      :create-user-handler (fn [_subscribe-fn _unsubscribe-fn]
+                             {:kind :user-handler})
+      :subscribe-user! (fn [& _] nil)
+      :unsubscribe-user! (fn [& _] nil)
+      :subscribe-webdata2! (fn [& _] nil)
+      :unsubscribe-webdata2! (fn [& _] nil)
+      :dispatch! (fn [store-arg _ctx effects]
+                   (swap! dispatch-calls conj [store-arg effects]))
+      :address-handler-reify (fn [on-change handler-name]
+                               {:kind :address-handler
+                                :name handler-name
+                                :on-change on-change})
+      :address-handler-name "startup-account-bootstrap-handler"})
+    (let [address-handler (last @handlers)]
+      ((:on-change address-handler) "0xaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa")
+      (is (= [[store [[:actions/load-leaderboard-route route]]]
+              [store [[:actions/load-vault-route route]]]
+              [store [[:actions/load-funding-comparison-route route]]]
+              [store [[:actions/load-staking-route route]]]
+              [store [[:actions/load-api-wallet-route route]]]
+              [store [[:actions/select-portfolio-chart-tab :returns]]]]
+             @dispatch-calls)))))
+
 (deftest critical-deferred-and-stream-initialization-cover-remaining-runtime-branches-test
   (async done
     (let [mark-calls (atom [])

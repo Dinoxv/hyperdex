@@ -4,6 +4,7 @@
             [hyperopen.account.context :as account-context]
             [hyperopen.api.info-client :as info-client]
             [hyperopen.platform :as platform]
+            [hyperopen.portfolio.routes :as portfolio-routes]
             [hyperopen.wallet.address-watcher :as address-watcher]))
 
 (defn default-startup-runtime-state
@@ -385,7 +386,7 @@
           (dispatch! store nil [[:actions/load-staking-route route]])
           (dispatch! store nil [[:actions/load-api-wallet-route route]])
           (when (and new-address
-                     (str/starts-with? route "/portfolio"))
+                     (portfolio-routes/portfolio-route? route))
             ;; Ensure returns benchmark candles load on initial portfolio view entry.
             (dispatch! store nil [[:actions/select-portfolio-chart-tab
                                    (get-in @store [:portfolio-ui :chart-tab])]])))))

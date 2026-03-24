@@ -9,6 +9,7 @@
             [hyperopen.leaderboard.actions :as leaderboard-actions]
             [hyperopen.platform :as platform]
             [hyperopen.portfolio.actions :as portfolio-actions]
+            [hyperopen.portfolio.routes :as portfolio-routes]
             [hyperopen.api.trading :as trading-api]
             [hyperopen.funding-comparison.actions :as funding-comparison-actions]
             [hyperopen.route-modules :as route-modules]
@@ -114,8 +115,8 @@
 (defn- entering-portfolio-route?
   [state normalized-path]
   (let [current-route (router/normalize-path (get-in state [:router :path]))]
-    (and (str/starts-with? normalized-path "/portfolio")
-         (not (str/starts-with? current-route "/portfolio")))))
+    (and (portfolio-routes/portfolio-route? normalized-path)
+         (not (portfolio-routes/portfolio-route? current-route)))))
 
 (defn- portfolio-route-effects
   [state normalized-path]
@@ -129,7 +130,8 @@
   [state normalized-path]
   (spectate-mode-links/spectate-url-path
    normalized-path
-   (when (account-context/spectate-mode-active? state)
+   (when (and (account-context/spectate-mode-active? state)
+              (not (portfolio-routes/trader-portfolio-route? normalized-path)))
      (account-context/spectate-address state))))
 
 (defn- trade-chart-module-effect

@@ -170,6 +170,21 @@
                                                                         :address "0xabcdefabcdefabcdefabcdefabcdefabcdefabcd"}}}
                                      "/portfolio")))))
 
+(deftest navigate-to-trader-portfolio-suppresses-spectate-query-test
+  (let [trader-route "/portfolio/trader/0x3333333333333333333333333333333333333333"]
+    (with-redefs [portfolio-actions/select-portfolio-chart-tab (fn [_state _tab] [])
+                  vault-actions/load-vault-route (fn [_state _path] [])
+                  funding-comparison-actions/load-funding-comparison-route (fn [_state _path] [])
+                  api-wallets-actions/load-api-wallet-route (fn [_state _path] [])
+                  staking-actions/load-staking-route (fn [_state _path] [])]
+      (is (= [[:effects/save [:router :path] trader-route]
+              [:effects/push-state trader-route]
+              [:effects/load-route-module trader-route]]
+             (action-adapters/navigate {:router {:path "/leaderboard"}
+                                        :account-context {:spectate-mode {:active? true
+                                                                          :address "0xabcdefabcdefabcdefabcdefabcdefabcdefabcd"}}}
+                                       trader-route))))))
+
 (deftest navigate-satisfies-effect-order-contract-for-deferred-routes-test
   (with-redefs [portfolio-actions/select-portfolio-chart-tab
                 (fn [_state tab]

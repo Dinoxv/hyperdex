@@ -58,9 +58,25 @@
                                             :address spectate}}})))
     (is (= owner
            (account-context/effective-account-address
-            {:wallet {:address owner}
+           {:wallet {:address owner}
              :account-context {:spectate-mode {:active? true
                                             :address "bad"}}})))))
+
+(deftest effective-account-address-prefers-trader-portfolio-route-over-spectate-and-owner-test
+  (let [owner "0x1111111111111111111111111111111111111111"
+        spectate "0x2222222222222222222222222222222222222222"
+        trader "0x3333333333333333333333333333333333333333"]
+    (is (= trader
+           (account-context/effective-account-address
+            {:wallet {:address owner}
+             :router {:path (str "/portfolio/trader/" trader)}
+             :account-context {:spectate-mode {:active? true
+                                               :address spectate}}})))
+    (is (= trader
+           (account-context/trader-portfolio-address
+            {:router {:path (str "/portfolio/trader/" trader)}})))
+    (is (true? (account-context/trader-portfolio-route-active?
+                {:router {:path (str "/portfolio/trader/" trader)}})))))
 
 (deftest mutations-allowed-is-disabled-during-spectate-mode-test
   (is (false? (account-context/mutations-allowed?
@@ -69,3 +85,11 @@
   (is (true? (account-context/mutations-allowed?
               {:account-context {:spectate-mode {:active? false
                                               :address "0x1111111111111111111111111111111111111111"}}}))))
+
+(deftest mutations-allowed-is-disabled-on-trader-portfolio-route-test
+  (let [trader "0x3333333333333333333333333333333333333333"]
+    (is (false? (account-context/mutations-allowed?
+                 {:router {:path (str "/portfolio/trader/" trader)}})))
+    (is (= account-context/trader-portfolio-read-only-message
+           (account-context/mutations-blocked-message
+            {:router {:path (str "/portfolio/trader/" trader)}})))))

@@ -1,5 +1,6 @@
 (ns hyperopen.views.leaderboard-view
   (:require [hyperopen.utils.formatting :as fmt]
+            [hyperopen.portfolio.routes :as portfolio-routes]
             [hyperopen.views.leaderboard.vm :as leaderboard-vm]
             [hyperopen.wallet.core :as wallet]))
 
@@ -41,15 +42,65 @@
    "focus-visible:ring-0"
    "focus-visible:ring-offset-0"])
 
-(defn- address-link
+(declare trader-chip)
+
+(defn- trader-link
   [address child]
+  [:button {:type "button"
+            :class (into ["inline-flex" "min-w-0" "items-center" "gap-2" "text-left"]
+                         focus-visible-ring-classes)
+            :on {:click [[:actions/navigate
+                          (or (portfolio-routes/trader-portfolio-path address)
+                              portfolio-routes/canonical-route)]]}
+            :data-role "leaderboard-address-link"}
+   child])
+
+(defn- explorer-link
+  [address]
   [:a {:href (str "https://app.hyperliquid.xyz/explorer/address/" address)
        :target "_blank"
        :rel "noreferrer"
-       :class (into ["inline-flex" "min-w-0" "items-center" "gap-2" "text-left"]
+       :class (into ["inline-flex"
+                     "items-center"
+                     "justify-center"
+                     "rounded-md"
+                     "border"
+                     "border-base-300/80"
+                     "bg-base-100/95"
+                     "px-2.5"
+                     "py-1.5"
+                     "text-xs"
+                     "font-medium"
+                     "text-trading-text-secondary"
+                     "transition-colors"
+                     "hover:bg-base-200"
+                     "hover:text-trading-text"]
                     focus-visible-ring-classes)
-       :data-role "leaderboard-address-link"}
-   child])
+       :aria-label "Open trader in Hyperliquid Explorer"
+       :data-role "leaderboard-explorer-link"}
+   "Explorer"])
+
+(defn- trader-link-shell
+  [row]
+  [:div {:class ["flex" "min-w-0" "items-center" "justify-between" "gap-3"]}
+   [:div {:class ["min-w-0" "flex-1"]}
+    (trader-link (:eth-address row)
+                 (trader-chip row))]
+   (explorer-link (:eth-address row))])
+
+(defn- trader-card-header
+  [row]
+  [:div {:class ["flex" "items-start" "justify-between" "gap-3"]}
+   [:div {:class ["min-w-0" "flex-1"]}
+    (trader-link (:eth-address row)
+                 (trader-chip row))]
+   [:div {:class ["flex" "shrink-0" "flex-col" "items-end" "gap-2"]}
+    [:div {:class ["text-right"]}
+     [:div {:class ["text-xs" "uppercase" "tracking-[0.08em]" "text-trading-text-secondary"]}
+      "Rank"]
+     [:div {:class ["num" "text-sm" "font-semibold" "text-trading-text"]}
+      (str "#" (:rank row))]]
+    (explorer-link (:eth-address row))]])
 
 (defn- format-account-value
   [value]
@@ -147,8 +198,7 @@
         :data-role "leaderboard-row"}
    [:td {:class ["px-3" "py-3" "num"]} (:rank row)]
    [:td {:class ["px-3" "py-3"]}
-    (address-link (:eth-address row)
-                  (trader-chip row))]
+    (trader-link-shell row)]
    [:td {:class ["px-3" "py-3" "num"]}
     (format-account-value (:account-value row))]
    [:td {:class (into ["px-3" "py-3" "num"] (metric-tone-class (:pnl row)))}
@@ -172,33 +222,25 @@
                             "hover:bg-base-200"]
                            (when (:you? row)
                              ["border-[#2c6d64]" "bg-[#0f2220]"]))]
-    (address-link
-     (:eth-address row)
-     [:div {:class card-classes}
-      [:div {:class ["flex" "items-start" "justify-between" "gap-3"]}
-       (trader-chip row)
-       [:div {:class ["text-right"]}
-        [:div {:class ["text-xs" "uppercase" "tracking-[0.08em]" "text-trading-text-secondary"]}
-         "Rank"]
-        [:div {:class ["num" "text-sm" "font-semibold" "text-trading-text"]}
-         (str "#" (:rank row))]]]
-      [:div {:class ["grid" "grid-cols-2" "gap-x-3" "gap-y-2" "text-xs"]}
-       [:div
-        [:div {:class ["text-trading-text-secondary"]} "Account Value"]
-        [:div {:class ["num" "text-sm" "text-trading-text"]}
-         (format-account-value (:account-value row))]]
-       [:div
-        [:div {:class ["text-trading-text-secondary"]} (str "PnL (" timeframe-label ")")]
-        [:div {:class (into ["num" "text-sm"] (metric-tone-class (:pnl row)))}
-         (format-pnl (:pnl row))]]
-       [:div
-        [:div {:class ["text-trading-text-secondary"]} (str "ROI (" timeframe-label ")")]
-        [:div {:class (into ["num" "text-sm"] (metric-tone-class (:roi row)))}
-         (format-roi (:roi row))]]
-       [:div
-        [:div {:class ["text-trading-text-secondary"]} (str "Volume (" timeframe-label ")")]
-        [:div {:class ["num" "text-sm" "text-trading-text"]}
-         (format-volume (:volume row))]]]])))
+    [:div {:class card-classes}
+     (trader-card-header row)
+     [:div {:class ["grid" "grid-cols-2" "gap-x-3" "gap-y-2" "text-xs"]}
+      [:div
+       [:div {:class ["text-trading-text-secondary"]} "Account Value"]
+       [:div {:class ["num" "text-sm" "text-trading-text"]}
+        (format-account-value (:account-value row))]]
+      [:div
+       [:div {:class ["text-trading-text-secondary"]} (str "PnL (" timeframe-label ")")]
+       [:div {:class (into ["num" "text-sm"] (metric-tone-class (:pnl row)))}
+        (format-pnl (:pnl row))]]
+      [:div
+       [:div {:class ["text-trading-text-secondary"]} (str "ROI (" timeframe-label ")")]
+       [:div {:class (into ["num" "text-sm"] (metric-tone-class (:roi row)))}
+        (format-roi (:roi row))]]
+      [:div
+       [:div {:class ["text-trading-text-secondary"]} (str "Volume (" timeframe-label ")")]
+       [:div {:class ["num" "text-sm" "text-trading-text"]}
+        (format-volume (:volume row))]]]]))
 
 (defn- timeframe-button
   [selected? {:keys [value label]}]

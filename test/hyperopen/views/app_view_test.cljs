@@ -398,6 +398,26 @@
     (is (= [[:actions/stop-spectate-mode]]
            (get-in stop-button [1 :on :click])))))
 
+(deftest app-view-hides-spectate-banner-on-trader-portfolio-route-test
+  (let [address "0xabcdefabcdefabcdefabcdefabcdefabcdefabcd"
+        trader "0x3333333333333333333333333333333333333333"
+        view-node (with-redefs [route-modules/route-ready? (constantly true)
+                                route-modules/render-route-view
+                                (fn [_state route]
+                                  (when (= (str "/portfolio/trader/" trader) route)
+                                    [:div {:data-parity-id "portfolio-root"}]))]
+                    (app-view/app-view (assoc (base-state)
+                                              :router {:path (str "/portfolio/trader/" trader)}
+                                              :wallet {}
+                                              :account-context {:spectate-mode {:active? true
+                                                                                :address address}
+                                                                :spectate-ui {:modal-open? false}
+                                                                :watchlist []})))
+        banner-node (hiccup/find-by-data-role view-node "spectate-mode-active-banner")
+        portfolio-root (hiccup/find-by-parity-id view-node "portfolio-root")]
+    (is (nil? banner-node))
+    (is (some? portfolio-root))))
+
 (deftest app-view-renders-spectate-mode-modal-and-stop-control-when-open-and-active-test
   (let [address "0xabcdefabcdefabcdefabcdefabcdefabcdefabcd"
         label "The Assistance Fund"

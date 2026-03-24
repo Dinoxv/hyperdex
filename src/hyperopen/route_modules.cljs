@@ -4,6 +4,7 @@
             [hyperopen.api-wallets.actions :as api-wallets-actions]
             [hyperopen.funding-comparison.actions :as funding-comparison-actions]
             [hyperopen.leaderboard.actions :as leaderboard-actions]
+            [hyperopen.portfolio.routes :as portfolio-routes]
             [hyperopen.router :as router]
             [hyperopen.staking.actions :as staking-actions]
             [hyperopen.views.vaults.vm :as vault-vm]
@@ -41,7 +42,7 @@
   (let [route (router/normalize-path path)]
     (cond
       (router/trade-route? route) nil
-      (str/starts-with? route "/portfolio") :portfolio
+      (portfolio-routes/portfolio-route? route) :portfolio
       (leaderboard-actions/leaderboard-route? route) :leaderboard
       (funding-comparison-actions/funding-comparison-route? route) :funding-comparison
       (staking-actions/staking-route? route) :staking

@@ -113,6 +113,22 @@
     (is (= [[:actions/load-leaderboard]]
            (get-in retry-button [1 :on :click])))))
 
+(deftest leaderboard-view-trader-click-navigates-to-portfolio-and-explorer-remains-separate-test
+  (with-viewport-width
+    1280
+    (fn []
+      (let [state (assoc sample-state :wallet {:address "0xffffffffffffffffffffffffffffffffffffffff"})
+            view-node (view/leaderboard-view state)
+            trader-link (find-first-node view-node
+                                         (fn [node]
+                                           (and (= "leaderboard-address-link" (get-in node [1 :data-role]))
+                                                (contains? (set (collect-strings node)) "Alpha"))))
+            explorer-link (find-first-node view-node #(= "leaderboard-explorer-link" (get-in % [1 :data-role])))]
+        (is (= [[:actions/navigate "/portfolio/trader/0x1111111111111111111111111111111111111111"]]
+               (get-in trader-link [1 :on :click])))
+        (is (= "https://app.hyperliquid.xyz/explorer/address/0x1111111111111111111111111111111111111111"
+               (get-in explorer-link [1 :href])))))))
+
 (deftest leaderboard-view-mobile-layout-renders-cards-instead-of-table-test
   (with-viewport-width
     430
@@ -120,10 +136,12 @@
       (let [view-node (view/leaderboard-view sample-state)
             table-node (find-first-node view-node #(= "leaderboard-table" (get-in % [1 :data-role])))
             mobile-list (find-first-node view-node #(= "leaderboard-mobile-list" (get-in % [1 :data-role])))
-            mobile-links (find-nodes view-node #(= "leaderboard-address-link" (get-in % [1 :data-role])))]
+            mobile-links (find-nodes view-node #(= "leaderboard-address-link" (get-in % [1 :data-role])))
+            explorer-links (find-nodes view-node #(= "leaderboard-explorer-link" (get-in % [1 :data-role])))]
         (is (nil? table-node))
         (is (some? mobile-list))
-        (is (pos? (count mobile-links)))))))
+        (is (pos? (count mobile-links)))
+        (is (pos? (count explorer-links)))))))
 
 (deftest leaderboard-view-renders-page-size-dropdown-controls-test
   (let [view-node (view/leaderboard-view sample-state)

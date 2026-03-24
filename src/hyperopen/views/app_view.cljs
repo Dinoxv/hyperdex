@@ -20,8 +20,10 @@
 (defn- spectate-mode-banner
   [state]
   (let [spectate-active? (account-context/spectate-mode-active? state)
+        trader-portfolio-route? (account-context/trader-portfolio-route-active? state)
         spectate-address (account-context/spectate-address state)]
     (when (and spectate-active?
+               (not trader-portfolio-route?)
                (seq spectate-address))
       [:div {:class ["border-b"
                      "border-[#1f4746]"

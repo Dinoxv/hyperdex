@@ -1,5 +1,6 @@
 (ns hyperopen.router-test
   (:require [cljs.test :refer-macros [deftest is]]
+            [hyperopen.portfolio.routes :as portfolio-routes]
             [hyperopen.router :as router]))
 
 (deftest normalize-path-supports-deep-link-variants-test
@@ -64,3 +65,15 @@
     (router/set-route! store "portfolio" #(swap! callbacks conj %))
     (is (= "/portfolio" (get-in @store [:router :path])))
     (is (= ["/portfolio"] @callbacks))))
+
+(deftest portfolio-route-helpers-handle-trader-inspection-subroutes-test
+  (let [trader "0x3333333333333333333333333333333333333333"]
+    (is (true? (portfolio-routes/portfolio-route? "/portfolio")))
+    (is (true? (portfolio-routes/portfolio-route? (str "/portfolio/trader/" trader))))
+    (is (false? (portfolio-routes/portfolio-route? "/portfoliox")))
+    (is (true? (portfolio-routes/trader-portfolio-route? (str "/portfolio/trader/" trader))))
+    (is (= trader
+           (portfolio-routes/trader-portfolio-address
+            (str "/portfolio/trader/" trader "?ignored=true"))))
+    (is (= (str "/portfolio/trader/" trader)
+           (portfolio-routes/trader-portfolio-path (str " " trader " "))))))

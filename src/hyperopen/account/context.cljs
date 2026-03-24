@@ -1,5 +1,6 @@
 (ns hyperopen.account.context
-  (:require [clojure.string :as str]))
+  (:require [clojure.string :as str]
+            [hyperopen.portfolio.routes :as portfolio-routes]))
 
 (def spectate-watchlist-storage-key
   "spectate-mode-watchlist:v1")
@@ -9,6 +10,9 @@
 
 (def spectate-mode-read-only-message
   "Spectate Mode is read-only. Stop Spectate Mode to place trades or move funds.")
+
+(def trader-portfolio-read-only-message
+  "Trader portfolio routes are read-only. Open your Portfolio to place trades or move funds.")
 
 (def ^:private max-watchlist-size
   50)
@@ -135,20 +139,43 @@
     (and active?
          (some? (spectate-address state)))))
 
+(defn trader-portfolio-address
+  [state]
+  (portfolio-routes/trader-portfolio-address
+   (get-in state [:router :path])))
+
+(defn trader-portfolio-route-active?
+  [state]
+  (some? (trader-portfolio-address state)))
+
 (defn effective-account-address
   [state]
-  (if (spectate-mode-active? state)
-    (spectate-address state)
-    (owner-address state)))
+  (if-let [trader-address (trader-portfolio-address state)]
+    trader-address
+    (if (spectate-mode-active? state)
+      (spectate-address state)
+      (owner-address state))))
+
+(defn inspected-account-read-only?
+  [state]
+  (or (spectate-mode-active? state)
+      (trader-portfolio-route-active? state)))
 
 (defn mutations-allowed?
   [state]
-  (not (spectate-mode-active? state)))
+  (not (inspected-account-read-only? state)))
 
 (defn mutations-blocked-message
   [state]
-  (when-not (mutations-allowed? state)
-    spectate-mode-read-only-message))
+  (cond
+    (spectate-mode-active? state)
+    spectate-mode-read-only-message
+
+    (trader-portfolio-route-active? state)
+    trader-portfolio-read-only-message
+
+    :else
+    nil))
 
 (defn default-account-context-state
   []

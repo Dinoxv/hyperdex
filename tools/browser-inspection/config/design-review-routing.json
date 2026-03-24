@@ -52,6 +52,45 @@
       "nativeControlAllowlist": []
     },
     {
+      "id": "trader-portfolio-route",
+      "route": "/portfolio/trader",
+      "url": "http://localhost:8080/portfolio/trader/0x3333333333333333333333333333333333333333",
+      "selectors": [
+        "[data-parity-id='portfolio-root']",
+        "[data-role='portfolio-inspection-header']",
+        "[data-role='portfolio-account-table']"
+      ],
+      "referenceDocs": [
+        "/hyperopen/docs/FRONTEND.md",
+        "/hyperopen/docs/agent-guides/browser-qa.md",
+        "/hyperopen/docs/product-specs/portfolio-page-parity-prd.md"
+      ],
+      "workbenchScenes": [
+        "/hyperopen/portfolio/hyperopen/workbench/scenes/account/portfolio_chart_scenes.cljs"
+      ],
+      "interactionTrace": {
+        "settleDelayMs": 5000
+      },
+      "nativeControlAllowlist": []
+    },
+    {
+      "id": "leaderboard-route",
+      "route": "/leaderboard",
+      "url": "http://localhost:8080/leaderboard",
+      "selectors": [
+        "[data-parity-id='leaderboard-root']",
+        "[data-role='leaderboard-table']",
+        "[data-role='leaderboard-mobile-list']"
+      ],
+      "referenceDocs": [
+        "/hyperopen/docs/FRONTEND.md",
+        "/hyperopen/docs/agent-guides/browser-qa.md",
+        "/hyperopen/docs/product-specs/leaderboard-page-parity-prd.md"
+      ],
+      "workbenchScenes": [],
+      "nativeControlAllowlist": []
+    },
+    {
       "id": "vaults-route",
       "route": "/vaults",
       "url": "http://localhost:8080/vaults",
@@ -115,12 +154,24 @@
     {
       "id": "app-shell",
       "glob": "src/hyperopen/views/app_view.cljs",
-      "targets": ["trade-route", "portfolio-route", "vaults-route"]
+      "targets": [
+        "trade-route",
+        "portfolio-route",
+        "trader-portfolio-route",
+        "vaults-route",
+        "leaderboard-route"
+      ]
     },
     {
       "id": "header-shell",
       "glob": "src/hyperopen/views/header_view.cljs",
-      "targets": ["trade-route", "portfolio-route", "vaults-route"]
+      "targets": [
+        "trade-route",
+        "portfolio-route",
+        "trader-portfolio-route",
+        "vaults-route",
+        "leaderboard-route"
+      ]
     },
     {
       "id": "trade-view",
@@ -140,7 +191,7 @@
     {
       "id": "account-info-shared",
       "glob": "src/hyperopen/views/account_info/**",
-      "targets": ["trade-route", "portfolio-route"]
+      "targets": ["trade-route", "portfolio-route", "trader-portfolio-route"]
     },
     {
       "id": "account-equity",
@@ -155,7 +206,12 @@
     {
       "id": "portfolio-view",
       "glob": "src/hyperopen/views/portfolio_view.cljs",
-      "targets": ["portfolio-route"]
+      "targets": ["portfolio-route", "trader-portfolio-route"]
+    },
+    {
+      "id": "leaderboard-view",
+      "glob": "src/hyperopen/views/leaderboard_view.cljs",
+      "targets": ["leaderboard-route"]
     },
     {
       "id": "vaults-list",

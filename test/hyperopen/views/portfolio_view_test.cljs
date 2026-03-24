@@ -253,6 +253,38 @@
     (is (contains? all-text "Staking Account"))
     (is (some #(str/includes? % "Open Orders") all-text))))
 
+(deftest portfolio-view-renders-trader-inspection-header-and-hides-mutation-tabs-test
+  (let [trader "0x3333333333333333333333333333333333333333"
+        view-node (portfolio-view/portfolio-view
+                   (-> sample-state
+                       (assoc :router {:path (str "/portfolio/trader/" trader)})
+                       (assoc-in [:portfolio-ui :account-info-tab] :deposits-withdrawals)
+                       (assoc-in [:leaderboard :rows]
+                                 [{:eth-address trader
+                                   :display-name "Gamma"}])))
+        standard-actions-row (find-first-node view-node #(= "portfolio-actions-row" (get-in % [1 :data-role])))
+        inspection-header (find-first-node view-node #(= "portfolio-inspection-header" (get-in % [1 :data-role])))
+        inspection-address (find-first-node view-node #(= "portfolio-inspection-address" (get-in % [1 :data-role])))
+        inspection-summary (find-first-node view-node #(= "portfolio-inspection-summary" (get-in % [1 :data-role])))
+        own-portfolio-button (find-first-node view-node #(= "portfolio-inspection-own-portfolio" (get-in % [1 :data-role])))
+        explorer-link (find-first-node view-node #(= "portfolio-inspection-explorer-link" (get-in % [1 :data-role])))
+        deposits-tab-button (find-first-node view-node
+                                             #(= [[:actions/set-portfolio-account-info-tab :deposits-withdrawals]]
+                                                 (get-in % [1 :on :click])))
+        all-text (set (collect-strings view-node))]
+    (is (nil? standard-actions-row))
+    (is (some? inspection-header))
+    (is (contains? all-text "Trader View"))
+    (is (contains? all-text "Read Only"))
+    (is (some #(str/includes? % "Gamma") (collect-strings inspection-summary)))
+    (is (contains? (set (collect-strings inspection-address)) trader))
+    (is (= [[:actions/navigate "/portfolio"]]
+           (get-in own-portfolio-button [1 :on :click])))
+    (is (= "https://app.hyperliquid.xyz/explorer/address/0x3333333333333333333333333333333333333333"
+           (get-in explorer-link [1 :href])))
+    (is (nil? deposits-tab-button))
+    (is (not (contains? all-text "Deposits & Withdrawals")))))
+
 (deftest portfolio-view-renders-background-status-banner-when-pending-work-exists-test
   (with-redefs [portfolio-vm/portfolio-vm (fn [_]
                                              {:volume-14d-usd 0

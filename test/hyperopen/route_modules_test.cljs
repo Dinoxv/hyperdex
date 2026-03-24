@@ -7,11 +7,14 @@
   (is (nil? (route-modules/route-module-id "/trade")))
   (is (nil? (route-modules/route-module-id "/trade/HYPE")))
   (is (= :portfolio (route-modules/route-module-id "/portfolio")))
+  (is (= :portfolio
+         (route-modules/route-module-id "/portfolio/trader/0x1234567890abcdef1234567890abcdef12345678")))
   (is (= :leaderboard (route-modules/route-module-id "/leaderboard")))
   (is (= :funding-comparison (route-modules/route-module-id "/funding-comparison")))
   (is (= :staking (route-modules/route-module-id "/staking")))
   (is (= :api-wallets (route-modules/route-module-id "/api")))
   (is (= :vaults (route-modules/route-module-id "/vaults")))
+  (is (nil? (route-modules/route-module-id "/portfoliox")))
   (is (= :vaults
          (route-modules/route-module-id "/vaults/0x1234567890abcdef1234567890abcdef12345678"))))
 
