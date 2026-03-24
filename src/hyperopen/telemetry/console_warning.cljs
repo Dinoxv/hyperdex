@@ -36,6 +36,9 @@
 (def ^:private banner-gradient-end-rgb
   [15 26 31])
 
+(def ^:private banner-top-fade-floor
+  0.18)
+
 (def ^:private warning-style
   "color: #ff6257; font-family: Menlo, Monaco, Consolas, 'Courier New', monospace; font-size: 78px; font-weight: 700; line-height: 1.05;")
 
@@ -57,7 +60,7 @@
 
 (defn- gradient-rgb
   [t]
-  (let [t* (max 0 (min 1 t))
+  (let [t* (max banner-top-fade-floor (min 1 t))
         eased-t (ease-out t*)
         [r-dark g-dark b-dark] banner-gradient-end-rgb
         [r-lite g-lite b-lite] banner-gradient-start-rgb
