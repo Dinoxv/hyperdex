@@ -168,6 +168,11 @@
           (map lucide-node->hiccup
                (array-seq lucide-star-node)))))
 
+(defn- favorite-toggle-click-handler [market-key]
+  (fn [event]
+    (.stopPropagation event)
+    (nxr/dispatch app-system/store nil [[:actions/toggle-asset-favorite market-key]])))
+
 (defn favorite-button [favorite? market-key]
   [:button {:class ["group"
                     "-ml-0.5"
@@ -190,8 +195,9 @@
                     "focus-visible:ring-offset-0"]
             :type "button"
             :aria-label (if favorite? "Remove favorite" "Add favorite")
+            :aria-pressed (if favorite? "true" "false")
             :data-role "asset-selector-favorite-button"
-            :on {:click [[:actions/toggle-asset-favorite market-key]]}}
+            :on {:click (favorite-toggle-click-handler market-key)}}
    (favorite-star-icon favorite?)])
 
 (defn format-or-dash [value formatter]
@@ -422,15 +428,33 @@
    (mobile-sort-header-cell "Last Price" "24h Change" (= sort-by :price) sort-direction [[:actions/update-asset-selector-sort :price]] :right)])
 
 (defn- mobile-favorite-button [favorite? market-key]
-  [:button {:class ["mt-0.5" "shrink-0" "text-gray-400" "hover:text-yellow-400" "transition-colors"]
-            :on {:click [[:actions/toggle-asset-favorite market-key]]}}
-   [:svg {:class ["h-4" "w-4"]
-          :viewBox "0 0 24 24"
-          :fill (if favorite? "currentColor" "none")
-          :stroke "currentColor"
-          :stroke-width 1.5}
-    [:path {:stroke-linecap "round" :stroke-linejoin "round"
-            :d "M11.48 3.499a.75.75 0 011.04 0l2.162 2.162 3.03.44a.75.75 0 01.416 1.279l-2.192 2.136.517 3.018a.75.75 0 01-1.088.79L12 13.347l-2.715 1.425a.75.75 0 01-1.088-.79l.517-3.018-2.192-2.136a.75.75 0 01.416-1.279l3.03-.44 2.162-2.162z"}]]])
+  [:button {:class ["group"
+                    "-ml-0.5"
+                    "mt-0.5"
+                    "inline-flex"
+                    "h-5"
+                    "w-5"
+                    "shrink-0"
+                    "items-center"
+                    "justify-center"
+                    "rounded-[4px]"
+                    "bg-transparent"
+                    "p-0"
+                    "transition-all"
+                    "duration-150"
+                    "hover:bg-amber-400/10"
+                    "focus:outline-none"
+                    "focus:ring-0"
+                    "focus:ring-offset-0"
+                    "focus-visible:outline-none"
+                    "focus-visible:ring-0"
+                    "focus-visible:ring-offset-0"]
+            :type "button"
+            :aria-label (if favorite? "Remove favorite" "Add favorite")
+            :aria-pressed (if favorite? "true" "false")
+            :data-role "asset-selector-favorite-button"
+            :on {:click (favorite-toggle-click-handler market-key)}}
+   (favorite-star-icon favorite?)])
 
 (defn- mobile-asset-list-item [asset selected? highlighted? favorites]
   (let [{:keys [key symbol mark markRaw volume24h change24h change24hPct openInterest market-type dex maxLeverage]} asset

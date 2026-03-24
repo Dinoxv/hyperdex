@@ -3,6 +3,7 @@ import {
   debugCall,
   dispatch,
   expectOracle,
+  oracle,
   visitRoute,
   waitForIdle
 } from "../support/hyperopen.mjs";
@@ -35,6 +36,30 @@ test("asset selector opens and selects ETH @regression", async ({ page }) => {
     },
     { args: { actionId: ":actions/select-asset" } }
   );
+});
+
+test("asset selector favorite toggle keeps dropdown open @regression", async ({ page }) => {
+  await visitRoute(page, "/trade");
+
+  await dispatch(page, [":actions/toggle-asset-dropdown", ":asset-selector"]);
+  await waitForIdle(page, { quietMs: 150, timeoutMs: 4_000, pollMs: 50 });
+  await expectOracle(page, "asset-selector", {
+    visibleDropdown: "asset-selector",
+    desktopPresent: true
+  });
+
+  const selectorState = await oracle(page, "asset-selector");
+  const favoriteButton = page.locator('[data-role="asset-selector-row"] [data-role="asset-selector-favorite-button"]').first();
+
+  await expect(favoriteButton).toHaveAttribute("aria-pressed", "false");
+  await favoriteButton.click();
+  await waitForIdle(page, { quietMs: 150, timeoutMs: 4_000, pollMs: 50 });
+
+  await expect(favoriteButton).toHaveAttribute("aria-pressed", "true");
+  await expectOracle(page, "asset-selector", {
+    visibleDropdown: "asset-selector",
+    activeAsset: selectorState.activeAsset
+  });
 });
 
 test("asset selector rapid scroll keeps rows visible @regression", async ({ page }) => {

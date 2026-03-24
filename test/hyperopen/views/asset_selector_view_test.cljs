@@ -246,10 +246,15 @@
     (vector? node)
     (let [attrs (when (map? (second node)) (second node))
           children (if attrs (drop 2 node) (drop 1 node))
-          row? (= :actions/select-asset
-                  (-> attrs :on :click first first))]
+          click-handler (get-in attrs [:on :click])
+          row? (and (vector? click-handler)
+                    (= :actions/select-asset
+                       (-> click-handler first first)))]
       (+ (if row? 1 0)
          (reduce + 0 (map count-selectable-asset-rows children))))
+
+    (map? node)
+    0
 
     (seq? node)
     (reduce + 0 (map count-selectable-asset-rows node))
@@ -768,6 +773,31 @@
     (is (contains? inactive-classes "group-hover:text-amber-200"))
     (is (contains? active-classes "text-amber-300"))
     (is (contains? active-classes "drop-shadow-[0_0_6px_rgba(245,158,11,0.18)]"))))
+
+(deftest favorite-buttons-stop-row-bubbling-and-dispatch-toggle-test
+  (let [dispatches* (atom [])
+        stop-calls* (atom 0)
+        desktop-button (view/favorite-button false "perp:BTC")
+        mobile-button (@#'hyperopen.views.asset-selector-view/mobile-favorite-button false "perp:BTC")
+        desktop-click (get-in desktop-button [1 :on :click])
+        mobile-click (get-in mobile-button [1 :on :click])
+        event #js {}]
+    (aset event "stopPropagation" (fn [] (swap! stop-calls* inc)))
+    (with-redefs [app-system/store ::store
+                  nxr/dispatch (fn [store event actions]
+                                 (swap! dispatches* conj {:store store
+                                                          :event event
+                                                          :actions actions}))]
+      (desktop-click event)
+      (mobile-click event))
+    (is (= 2 @stop-calls*))
+    (is (= [{:store ::store
+             :event nil
+             :actions [[:actions/toggle-asset-favorite "perp:BTC"]]}
+            {:store ::store
+             :event nil
+             :actions [[:actions/toggle-asset-favorite "perp:BTC"]]}]
+           @dispatches*))))
 
 (deftest search-controls-use-parity-input-styling-test
   (let [controls (view/search-controls "" false false)
