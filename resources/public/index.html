@@ -17,12 +17,105 @@
   </head>
   <body>
     <div id="app" class="h-full">
-      <!-- App content will be rendered here -->
+      <div
+        id="boot-loading-shell"
+        class="h-full bg-base-100 text-trading-text"
+        aria-live="polite"
+        aria-busy="true"
+      >
+        <div class="flex min-h-full flex-col">
+          <div class="border-b border-base-300/70 bg-base-100/95">
+            <div
+              class="app-shell-gutter flex items-center justify-between gap-3 py-3"
+            >
+              <div class="space-y-1">
+                <div
+                  id="boot-loading-title"
+                  class="text-sm font-semibold uppercase tracking-[0.12em] text-trading-text-secondary"
+                >
+                  Loading Route
+                </div>
+                <p
+                  id="boot-loading-copy"
+                  class="text-sm text-trading-text-secondary"
+                >
+                  Preparing this screen...
+                </p>
+              </div>
+              <div class="flex items-center gap-2 text-xs text-trading-text-secondary">
+                <span class="h-2 w-2 rounded-full bg-emerald-300 animate-pulse"></span>
+                <span>Booting UI</span>
+              </div>
+            </div>
+          </div>
+          <div class="app-shell-gutter flex-1 py-4 md:py-5">
+            <div class="mx-auto w-full max-w-[1280px] space-y-4">
+              <div class="rounded-xl border border-base-300/80 bg-base-100/95 p-4 md:p-5">
+                <div class="space-y-3">
+                  <div class="flex items-center gap-2 text-xs text-trading-text-secondary">
+                    <span class="h-2 w-2 rounded-full bg-emerald-300 animate-pulse"></span>
+                    <span id="boot-loading-status">Loading workspace…</span>
+                  </div>
+                  <div class="overflow-hidden rounded-lg border border-base-300/60">
+                    <div class="border-b border-base-300/60 px-3 py-2">
+                      <span class="ui-loading-shimmer block h-3.5 w-24 rounded"></span>
+                    </div>
+                    <div class="space-y-0">
+                      <div class="grid grid-cols-[72px_minmax(0,1fr)_repeat(4,minmax(0,1fr))] gap-3 border-b border-base-300/40 px-3 py-3">
+                        <span class="ui-loading-shimmer block h-3.5 w-10 rounded"></span>
+                        <span class="ui-loading-shimmer block h-3.5 w-32 rounded"></span>
+                        <span class="ui-loading-shimmer block h-3.5 w-24 rounded"></span>
+                        <span class="ui-loading-shimmer block h-3.5 w-20 rounded"></span>
+                        <span class="ui-loading-shimmer block h-3.5 w-16 rounded"></span>
+                        <span class="ui-loading-shimmer block h-3.5 w-24 rounded"></span>
+                      </div>
+                      <div class="grid grid-cols-[72px_minmax(0,1fr)_repeat(4,minmax(0,1fr))] gap-3 border-b border-base-300/40 px-3 py-3">
+                        <span class="ui-loading-shimmer block h-3.5 w-10 rounded"></span>
+                        <span class="ui-loading-shimmer block h-3.5 w-28 rounded"></span>
+                        <span class="ui-loading-shimmer block h-3.5 w-24 rounded"></span>
+                        <span class="ui-loading-shimmer block h-3.5 w-20 rounded"></span>
+                        <span class="ui-loading-shimmer block h-3.5 w-16 rounded"></span>
+                        <span class="ui-loading-shimmer block h-3.5 w-24 rounded"></span>
+                      </div>
+                      <div class="grid grid-cols-[72px_minmax(0,1fr)_repeat(4,minmax(0,1fr))] gap-3 px-3 py-3">
+                        <span class="ui-loading-shimmer block h-3.5 w-10 rounded"></span>
+                        <span class="ui-loading-shimmer block h-3.5 w-36 rounded"></span>
+                        <span class="ui-loading-shimmer block h-3.5 w-24 rounded"></span>
+                        <span class="ui-loading-shimmer block h-3.5 w-20 rounded"></span>
+                        <span class="ui-loading-shimmer block h-3.5 w-16 rounded"></span>
+                        <span class="ui-loading-shimmer block h-3.5 w-24 rounded"></span>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
     </div>
     <script>
       (function () {
         const manifestUrl = "/js/manifest.json";
         const defaultMainScriptUrl = "/js/main.js";
+        const pathname = window.location.pathname || "/";
+        const bootTitle = document.getElementById("boot-loading-title");
+        const bootCopy = document.getElementById("boot-loading-copy");
+        const bootStatus = document.getElementById("boot-loading-status");
+
+        if (pathname.startsWith("/leaderboard")) {
+          bootTitle.textContent = "Loading Leaderboard";
+          bootCopy.textContent = "Preparing ranked trader data and exclusions...";
+          bootStatus.textContent = "Loading leaderboard workspace...";
+        } else if (pathname.startsWith("/vaults")) {
+          bootTitle.textContent = "Loading Vaults";
+          bootCopy.textContent = "Preparing vault data and route surface...";
+          bootStatus.textContent = "Loading vault workspace...";
+        } else if (pathname.startsWith("/portfolio")) {
+          bootTitle.textContent = "Loading Portfolio";
+          bootCopy.textContent = "Preparing account summary and charts...";
+          bootStatus.textContent = "Loading portfolio workspace...";
+        }
 
         function normalizeScriptUrl(outputName) {
           if (typeof outputName !== "string" || outputName.length === 0) {
