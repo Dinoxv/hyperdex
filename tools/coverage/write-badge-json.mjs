@@ -35,62 +35,82 @@ function escapeXml(value) {
     .replaceAll("'", "&apos;");
 }
 
-function badgeWidth(text) {
-  return Math.max(40, text.length * 7 + 10);
+function badgeWidth(text, { minWidth, padding }) {
+  return Math.max(minWidth, text.length * 10 + padding);
 }
 
 function renderSvgBadge({ label, message, color }) {
-  const labelWidth = badgeWidth(label);
-  const messageWidth = badgeWidth(message);
+  const displayLabel = label.toUpperCase();
+  const displayMessage = message.toUpperCase();
+  const labelWidth = badgeWidth(displayLabel, { minWidth: 62, padding: 9 });
+  const messageWidth = badgeWidth(displayMessage, {
+    minWidth: 57,
+    padding: 16,
+  });
   const totalWidth = labelWidth + messageWidth;
   const colorHex = COLOR_HEX_BY_NAME[color] ?? COLOR_HEX_BY_NAME.red;
-  const safeLabel = escapeXml(label);
-  const safeMessage = escapeXml(message);
-  const safeAriaLabel = escapeXml(`${label}: ${message}`);
+  const safeLabel = escapeXml(displayLabel);
+  const safeMessage = escapeXml(displayMessage);
+  const safeAriaLabel = escapeXml(`${displayLabel}: ${displayMessage}`);
 
-  return `<svg xmlns="http://www.w3.org/2000/svg" width="${totalWidth}" height="20" role="img" aria-label="${safeAriaLabel}">
-  <linearGradient id="s" x2="0" y2="100%">
-    <stop offset="0" stop-color="#fff" stop-opacity=".7"/>
-    <stop offset=".1" stop-color="#aaa" stop-opacity=".1"/>
-    <stop offset=".9" stop-opacity=".3"/>
-    <stop offset="1" stop-opacity=".5"/>
-  </linearGradient>
-  <mask id="m">
-    <rect width="${totalWidth}" height="20" rx="3" fill="#fff"/>
-  </mask>
-  <g mask="url(#m)">
-    <rect width="${labelWidth}" height="20" fill="#555"/>
-    <rect x="${labelWidth}" width="${messageWidth}" height="20" fill="${colorHex}"/>
-    <rect width="${totalWidth}" height="20" fill="url(#s)"/>
+  return `<svg xmlns="http://www.w3.org/2000/svg" width="${totalWidth}" height="28" role="img" aria-label="${safeAriaLabel}">
+  <title>${safeAriaLabel}</title>
+  <g shape-rendering="crispEdges">
+    <rect width="${labelWidth}" height="28" fill="#555"/>
+    <rect x="${labelWidth}" width="${messageWidth}" height="28" fill="${colorHex}"/>
   </g>
-  <g fill="#fff" text-anchor="middle" font-family="Verdana,Geneva,DejaVu Sans,sans-serif" text-rendering="geometricPrecision" font-size="110">
-    <text aria-hidden="true" x="${(labelWidth * 10) / 2}" y="150" fill="#010101" fill-opacity=".3" transform="scale(.1)" textLength="${Math.max(1, label.length * 70)}">${safeLabel}</text>
-    <text x="${(labelWidth * 10) / 2}" y="140" transform="scale(.1)" fill="#fff" textLength="${Math.max(1, label.length * 70)}">${safeLabel}</text>
-    <text aria-hidden="true" x="${((labelWidth + messageWidth / 2) * 10)}" y="150" fill="#010101" fill-opacity=".3" transform="scale(.1)" textLength="${Math.max(1, message.length * 70)}">${safeMessage}</text>
-    <text x="${((labelWidth + messageWidth / 2) * 10)}" y="140" transform="scale(.1)" fill="#fff" textLength="${Math.max(1, message.length * 70)}">${safeMessage}</text>
+  <g fill="#fff" text-anchor="middle" font-family="Verdana,Geneva,DejaVu Sans,sans-serif" text-rendering="geometricPrecision" font-size="100">
+    <text transform="scale(.1)" x="${labelWidth * 5}" y="175">${safeLabel}</text>
+    <text transform="scale(.1)" x="${(labelWidth + messageWidth / 2) * 10}" y="175" font-weight="bold">${safeMessage}</text>
   </g>
 </svg>
 `;
 }
 
-async function main() {
-  const rawSummary = await fs.readFile(COVERAGE_SUMMARY_PATH, "utf8");
-  const summary = JSON.parse(rawSummary);
-  const lineCoverage = summary?.total?.lines?.pct;
+async function readBadgePayloadFromJson(jsonPath) {
+  const rawPayload = await fs.readFile(jsonPath, "utf8");
+  const payload = JSON.parse(rawPayload);
 
-  if (typeof lineCoverage !== "number" || Number.isNaN(lineCoverage)) {
-    throw new Error(
-      `Expected numeric total.lines.pct in ${COVERAGE_SUMMARY_PATH}`,
-    );
+  if (
+    typeof payload?.label !== "string" ||
+    typeof payload?.message !== "string" ||
+    typeof payload?.color !== "string"
+  ) {
+    throw new Error(`Expected label/message/color fields in ${jsonPath}`);
   }
 
-  const badgePayload = {
-    schemaVersion: 1,
-    label: "coverage",
-    message: `${lineCoverage.toFixed(2)}%`,
-    color: coverageColor(lineCoverage),
-  };
+  return payload;
+}
 
+async function buildCoverageBadgePayload() {
+  try {
+    const rawSummary = await fs.readFile(COVERAGE_SUMMARY_PATH, "utf8");
+    const summary = JSON.parse(rawSummary);
+    const lineCoverage = summary?.total?.lines?.pct;
+
+    if (typeof lineCoverage !== "number" || Number.isNaN(lineCoverage)) {
+      throw new Error(
+        `Expected numeric total.lines.pct in ${COVERAGE_SUMMARY_PATH}`,
+      );
+    }
+
+    return {
+      schemaVersion: 1,
+      label: "coverage",
+      message: `${lineCoverage.toFixed(2)}%`,
+      color: coverageColor(lineCoverage),
+    };
+  } catch (error) {
+    if (error?.code !== "ENOENT") {
+      throw error;
+    }
+
+    return readBadgePayloadFromJson(COVERAGE_BADGE_JSON_PATH);
+  }
+}
+
+async function main() {
+  const badgePayload = await buildCoverageBadgePayload();
   const badgeSvg = renderSvgBadge(badgePayload);
 
   await fs.mkdir(path.dirname(COVERAGE_BADGE_JSON_PATH), { recursive: true });

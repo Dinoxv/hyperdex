@@ -1,12 +1,26 @@
-# Hyperopen
+<h1 align="center">Hyperopen</h1>
 
-> Open-source trading interface for [Hyperliquid](https://hyperliquid.xyz). Inspect it, fork it, make it yours.
+<p align="center">
+  The open-source feature-complete <a href="https://hyperliquid.xyz">Hyperliquid</a> trading client
+</p>
 
-[![Tests](https://github.com/thegeronimo/hyperopen/actions/workflows/tests.yml/badge.svg)](https://github.com/thegeronimo/hyperopen/actions/workflows/tests.yml)
-[![Coverage](.github/badges/coverage.svg)](https://github.com/thegeronimo/hyperopen/actions/workflows/tests.yml)
-[![Tests Total](.github/badges/tests-total.svg)](https://github.com/thegeronimo/hyperopen/actions/workflows/tests.yml)
-[![Assertions Total](.github/badges/assertions-total.svg)](https://github.com/thegeronimo/hyperopen/actions/workflows/tests.yml)
-[![License: AGPL v3](https://img.shields.io/badge/License-AGPL_v3-blue.svg)](LICENSE)
+<p align="center">
+  <a href="https://github.com/thegeronimo/hyperopen/actions/workflows/tests.yml">
+    <img src="https://img.shields.io/github/actions/workflow/status/thegeronimo/hyperopen/tests.yml?branch=main&label=tests&style=for-the-badge" alt="Tests" />
+  </a>
+  <a href="https://github.com/thegeronimo/hyperopen/actions/workflows/tests.yml">
+    <img src=".github/badges/coverage.svg" alt="Coverage" />
+  </a>
+  <a href="https://github.com/thegeronimo/hyperopen/actions/workflows/tests.yml">
+    <img src=".github/badges/tests-total.svg" alt="Tests Total" />
+  </a>
+  <a href="https://github.com/thegeronimo/hyperopen/actions/workflows/tests.yml">
+    <img src=".github/badges/assertions-total.svg" alt="Assertions Total" />
+  </a>
+  <a href="LICENSE">
+    <img src="https://img.shields.io/badge/License-AGPL_v3-blue.svg?style=for-the-badge" alt="License: AGPL v3" />
+  </a>
+</p>
 <p align="center">
   <img src="docs/images/screenshot-trade.png" alt="Hyperopen trading interface" width="100%" />
 </p>

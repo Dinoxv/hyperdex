@@ -19,6 +19,10 @@ const COLOR_HEX_BY_NAME = {
   red: "#e05d44",
 };
 
+function formatCount(value) {
+  return value.toLocaleString("en-US");
+}
+
 function escapeXml(value) {
   return value
     .replaceAll("&", "&amp;")
@@ -28,42 +32,56 @@ function escapeXml(value) {
     .replaceAll("'", "&apos;");
 }
 
-function badgeWidth(text) {
-  return Math.max(40, text.length * 7 + 10);
+function badgeWidth(text, { minWidth, padding }) {
+  return Math.max(minWidth, text.length * 10 + padding);
 }
 
 function renderSvgBadge({ label, message, color }) {
-  const labelWidth = badgeWidth(label);
-  const messageWidth = badgeWidth(message);
+  const displayLabel = label.toUpperCase();
+  const displayMessage = message.toUpperCase();
+  const labelWidth = badgeWidth(displayLabel, { minWidth: 62, padding: 9 });
+  const messageWidth = badgeWidth(displayMessage, {
+    minWidth: 57,
+    padding: 16,
+  });
   const totalWidth = labelWidth + messageWidth;
   const colorHex = COLOR_HEX_BY_NAME[color] ?? COLOR_HEX_BY_NAME.red;
-  const safeLabel = escapeXml(label);
-  const safeMessage = escapeXml(message);
-  const safeAriaLabel = escapeXml(`${label}: ${message}`);
+  const safeLabel = escapeXml(displayLabel);
+  const safeMessage = escapeXml(displayMessage);
+  const safeAriaLabel = escapeXml(`${displayLabel}: ${displayMessage}`);
 
-  return `<svg xmlns="http://www.w3.org/2000/svg" width="${totalWidth}" height="20" role="img" aria-label="${safeAriaLabel}">
-  <linearGradient id="s" x2="0" y2="100%">
-    <stop offset="0" stop-color="#fff" stop-opacity=".7"/>
-    <stop offset=".1" stop-color="#aaa" stop-opacity=".1"/>
-    <stop offset=".9" stop-opacity=".3"/>
-    <stop offset="1" stop-opacity=".5"/>
-  </linearGradient>
-  <mask id="m">
-    <rect width="${totalWidth}" height="20" rx="3" fill="#fff"/>
-  </mask>
-  <g mask="url(#m)">
-    <rect width="${labelWidth}" height="20" fill="#555"/>
-    <rect x="${labelWidth}" width="${messageWidth}" height="20" fill="${colorHex}"/>
-    <rect width="${totalWidth}" height="20" fill="url(#s)"/>
+  return `<svg xmlns="http://www.w3.org/2000/svg" width="${totalWidth}" height="28" role="img" aria-label="${safeAriaLabel}">
+  <title>${safeAriaLabel}</title>
+  <g shape-rendering="crispEdges">
+    <rect width="${labelWidth}" height="28" fill="#555"/>
+    <rect x="${labelWidth}" width="${messageWidth}" height="28" fill="${colorHex}"/>
   </g>
-  <g fill="#fff" text-anchor="middle" font-family="Verdana,Geneva,DejaVu Sans,sans-serif" text-rendering="geometricPrecision" font-size="110">
-    <text aria-hidden="true" x="${(labelWidth * 10) / 2}" y="150" fill="#010101" fill-opacity=".3" transform="scale(.1)" textLength="${Math.max(1, label.length * 70)}">${safeLabel}</text>
-    <text x="${(labelWidth * 10) / 2}" y="140" transform="scale(.1)" fill="#fff" textLength="${Math.max(1, label.length * 70)}">${safeLabel}</text>
-    <text aria-hidden="true" x="${((labelWidth + messageWidth / 2) * 10)}" y="150" fill="#010101" fill-opacity=".3" transform="scale(.1)" textLength="${Math.max(1, message.length * 70)}">${safeMessage}</text>
-    <text x="${((labelWidth + messageWidth / 2) * 10)}" y="140" transform="scale(.1)" fill="#fff" textLength="${Math.max(1, message.length * 70)}">${safeMessage}</text>
+  <g fill="#fff" text-anchor="middle" font-family="Verdana,Geneva,DejaVu Sans,sans-serif" text-rendering="geometricPrecision" font-size="100">
+    <text transform="scale(.1)" x="${labelWidth * 5}" y="175">${safeLabel}</text>
+    <text transform="scale(.1)" x="${(labelWidth + messageWidth / 2) * 10}" y="175" font-weight="bold">${safeMessage}</text>
   </g>
 </svg>
 `;
+}
+
+async function readBadgePayloadFromJson(jsonPath) {
+  const rawPayload = await fs.readFile(jsonPath, "utf8");
+  const payload = JSON.parse(rawPayload);
+
+  if (
+    typeof payload?.label !== "string" ||
+    typeof payload?.message !== "string" ||
+    typeof payload?.color !== "string"
+  ) {
+    throw new Error(`Expected label/message/color fields in ${jsonPath}`);
+  }
+
+  return {
+    ...payload,
+    message: /^\d+$/.test(payload.message)
+      ? formatCount(Number.parseInt(payload.message, 10))
+      : payload.message,
+  };
 }
 
 function parseRunSummary(logText, sourcePath) {
@@ -95,47 +113,53 @@ async function writeBadge(jsonPath, svgPath, payload) {
   await fs.writeFile(svgPath, renderSvgBadge(payload), "utf8");
 }
 
+async function buildBadgePayloads() {
+  try {
+    const [mainLogText, websocketLogText] = await Promise.all([
+      fs.readFile(MAIN_TEST_LOG_PATH, "utf8"),
+      fs.readFile(WEBSOCKET_TEST_LOG_PATH, "utf8"),
+    ]);
+
+    const mainSummary = parseRunSummary(mainLogText, MAIN_TEST_LOG_PATH);
+    const websocketSummary = parseRunSummary(
+      websocketLogText,
+      WEBSOCKET_TEST_LOG_PATH,
+    );
+    const totalTests = mainSummary.tests + websocketSummary.tests;
+    const totalAssertions =
+      mainSummary.assertions + websocketSummary.assertions;
+
+    return {
+      testsBadgePayload: {
+        schemaVersion: 1,
+        label: "tests",
+        message: formatCount(totalTests),
+        color: "blue",
+      },
+      assertionsBadgePayload: {
+        schemaVersion: 1,
+        label: "assertions",
+        message: formatCount(totalAssertions),
+        color: "blue",
+      },
+    };
+  } catch (error) {
+    if (error?.code !== "ENOENT") {
+      throw error;
+    }
+
+    const [testsBadgePayload, assertionsBadgePayload] = await Promise.all([
+      readBadgePayloadFromJson(TESTS_BADGE_JSON_PATH),
+      readBadgePayloadFromJson(ASSERTIONS_BADGE_JSON_PATH),
+    ]);
+
+    return { testsBadgePayload, assertionsBadgePayload };
+  }
+}
+
 async function main() {
-  const [mainLogText, websocketLogText] = await Promise.all([
-    fs.readFile(MAIN_TEST_LOG_PATH, "utf8").catch((error) => {
-      if (error?.code === "ENOENT") {
-        throw new Error(
-          `Missing ${MAIN_TEST_LOG_PATH}. Run npm run test:ci and capture output to that file before generating test metric badges.`,
-        );
-      }
-      throw error;
-    }),
-    fs.readFile(WEBSOCKET_TEST_LOG_PATH, "utf8").catch((error) => {
-      if (error?.code === "ENOENT") {
-        throw new Error(
-          `Missing ${WEBSOCKET_TEST_LOG_PATH}. Run npm run test:websocket and capture output to that file before generating test metric badges.`,
-        );
-      }
-      throw error;
-    }),
-  ]);
-
-  const mainSummary = parseRunSummary(mainLogText, MAIN_TEST_LOG_PATH);
-  const websocketSummary = parseRunSummary(
-    websocketLogText,
-    WEBSOCKET_TEST_LOG_PATH,
-  );
-  const totalTests = mainSummary.tests + websocketSummary.tests;
-  const totalAssertions =
-    mainSummary.assertions + websocketSummary.assertions;
-
-  const testsBadgePayload = {
-    schemaVersion: 1,
-    label: "tests",
-    message: totalTests.toString(),
-    color: "blue",
-  };
-  const assertionsBadgePayload = {
-    schemaVersion: 1,
-    label: "assertions",
-    message: totalAssertions.toString(),
-    color: "blue",
-  };
+  const { testsBadgePayload, assertionsBadgePayload } =
+    await buildBadgePayloads();
 
   await Promise.all([
     writeBadge(TESTS_BADGE_JSON_PATH, TESTS_BADGE_SVG_PATH, testsBadgePayload),
@@ -147,7 +171,7 @@ async function main() {
   ]);
 
   console.log(
-    `Wrote test metric badges (tests=${totalTests}, assertions=${totalAssertions}).`,
+    `Wrote test metric badges (tests=${testsBadgePayload.message}, assertions=${assertionsBadgePayload.message}).`,
   );
 }
 
