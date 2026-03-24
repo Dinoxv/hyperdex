@@ -153,7 +153,8 @@
   [_state timeframe]
   [[:effects/save-many [[[:leaderboard-ui :timeframe]
                          (normalize-leaderboard-timeframe timeframe)]
-                        [[:leaderboard-ui :page] default-page]]]])
+                        [[:leaderboard-ui :page] default-page]]]
+   [:effects/persist-leaderboard-preferences]])
 
 (defn set-leaderboard-sort
   [state sort-column]
@@ -169,14 +170,16 @@
     [[:effects/save-many [[[:leaderboard-ui :sort]
                            {:column column*
                             :direction next-direction}]
-                          [[:leaderboard-ui :page] default-page]]]]))
+                          [[:leaderboard-ui :page] default-page]]]
+     [:effects/persist-leaderboard-preferences]]))
 
 (defn set-leaderboard-page-size
   [_state page-size]
   [[:effects/save-many [[[:leaderboard-ui :page-size]
                          (normalize-leaderboard-page-size page-size)]
                         [[:leaderboard-ui :page] default-page]
-                        [[:leaderboard-ui :page-size-dropdown-open?] false]]]])
+                        [[:leaderboard-ui :page-size-dropdown-open?] false]]]
+   [:effects/persist-leaderboard-preferences]])
 
 (defn set-leaderboard-page
   [_state page max-page]

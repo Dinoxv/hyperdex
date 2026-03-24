@@ -95,9 +95,15 @@
 (defn restore-asset-selector-markets-cache! [store]
   (asset-adapters/restore-asset-selector-markets-cache! {:store store}))
 
+(defn restore-leaderboard-preferences! [store]
+  (leaderboard-adapters/restore-leaderboard-preferences! store))
+
 (def persist-active-market-display! asset-adapters/persist-active-market-display!)
 
 (def load-active-market-display asset-adapters/load-active-market-display)
+
+(def persist-leaderboard-preferences-effect
+  leaderboard-adapters/persist-leaderboard-preferences-effect)
 
 (defn subscribe-active-asset [_ store coin]
   (ws-adapters/subscribe-active-asset

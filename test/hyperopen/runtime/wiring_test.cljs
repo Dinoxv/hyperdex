@@ -19,6 +19,8 @@
   (let [deps (wiring/runtime-effect-deps)]
     (is (identical? effect-adapters/save
                     (get-in deps [:storage :save])))
+    (is (identical? effect-adapters/persist-leaderboard-preferences-effect
+                    (get-in deps [:storage :persist-leaderboard-preferences])))
     (is (identical? effect-adapters/sync-asset-selector-active-ctx-subscriptions
                     (get-in deps [:asset-selector :sync-asset-selector-active-ctx-subscriptions])))
     (is (identical? effect-adapters/fetch-candle-snapshot

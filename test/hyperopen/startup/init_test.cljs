@@ -42,6 +42,7 @@
         :restore-trade-route-tab! (record-store-call :restore-trade-route-tab)
         :restore-active-asset! (record-store-call :restore-active-asset)
         :restore-asset-selector-markets-cache! (record-store-call :restore-selector-markets-cache)
+        :restore-leaderboard-preferences! (record-store-call :restore-leaderboard-preferences)
         :restore-open-orders-sort-settings! (record-store-call :restore-open-orders-sort)
         :restore-funding-history-pagination-settings! (record-store-call :restore-funding-history-pagination)
         :restore-trade-history-pagination-settings! (record-store-call :restore-trade-history-pagination)
@@ -79,6 +80,7 @@
             [:restore-trade-route-tab true]
             [:restore-active-asset true]
             [:restore-selector-markets-cache true]
+            [:restore-leaderboard-preferences true]
             [:restore-open-orders-sort true]
             [:restore-funding-history-pagination true]
             [:restore-trade-history-pagination true]

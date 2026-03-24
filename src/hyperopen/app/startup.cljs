@@ -173,6 +173,7 @@
        :restore-trade-route-tab! startup-restore/restore-trade-route-tab!
        :restore-active-asset! runtime-effect-adapters/restore-active-asset!
        :restore-asset-selector-markets-cache! runtime-effect-adapters/restore-asset-selector-markets-cache!
+       :restore-leaderboard-preferences! runtime-effect-adapters/restore-leaderboard-preferences!
        :restore-open-orders-sort-settings! surface-actions/restore-open-orders-sort-settings!
        :restore-funding-history-pagination-settings! funding-actions/restore-funding-history-pagination-settings!
        :restore-trade-history-pagination-settings! order-actions/restore-trade-history-pagination-settings!

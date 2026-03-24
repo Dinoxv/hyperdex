@@ -1,6 +1,7 @@
 (ns hyperopen.runtime.effect-adapters.leaderboard
   (:require [hyperopen.api.default :as api]
             [hyperopen.api.projections :as api-projections]
+            [hyperopen.leaderboard.preferences :as leaderboard-preferences]
             [hyperopen.leaderboard.effects :as leaderboard-effects]))
 
 (def ^:private known-excluded-addresses
@@ -16,3 +17,11 @@
     :apply-leaderboard-success api-projections/apply-leaderboard-success
     :apply-leaderboard-error api-projections/apply-leaderboard-error
     :known-excluded-addresses known-excluded-addresses}))
+
+(defn persist-leaderboard-preferences-effect
+  [_ store]
+  (leaderboard-preferences/persist-leaderboard-preferences! @store))
+
+(defn restore-leaderboard-preferences!
+  [store]
+  (leaderboard-preferences/restore-leaderboard-preferences! store))

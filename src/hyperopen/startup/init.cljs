@@ -55,6 +55,7 @@
            restore-trade-route-tab!
            restore-active-asset!
            restore-asset-selector-markets-cache!
+           restore-leaderboard-preferences!
            restore-open-orders-sort-settings!
            restore-funding-history-pagination-settings!
            restore-trade-history-pagination-settings!
@@ -90,6 +91,9 @@
   (restore-active-asset! store)
   ;; Restore cached selector market symbols for immediate dropdown population.
   (restore-asset-selector-markets-cache! store)
+  ;; Restore leaderboard timeframe, sort, and page-size preferences from IndexedDB.
+  (when (fn? restore-leaderboard-preferences!)
+    (restore-leaderboard-preferences! store))
   ;; Restore open orders sort settings from localStorage.
   (restore-open-orders-sort-settings! store)
   ;; Restore funding history pagination settings from localStorage.

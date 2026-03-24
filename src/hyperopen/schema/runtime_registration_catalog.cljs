@@ -6,6 +6,7 @@
    [:effects/save-many :save-many]
    [:effects/local-storage-set :local-storage-set]
    [:effects/local-storage-set-json :local-storage-set-json]
+   [:effects/persist-leaderboard-preferences :persist-leaderboard-preferences]
    [:effects/queue-asset-icon-status :queue-asset-icon-status]
    [:effects/sync-asset-selector-active-ctx-subscriptions :sync-asset-selector-active-ctx-subscriptions]
    [:effects/push-state :push-state]

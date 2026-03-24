@@ -730,6 +730,7 @@
    :effects/save-many ::save-many-args
    :effects/local-storage-set ::storage-args
    :effects/local-storage-set-json ::storage-args
+   :effects/persist-leaderboard-preferences ::no-args
    :effects/queue-asset-icon-status ::queue-asset-icon-status-args
    :effects/sync-asset-selector-active-ctx-subscriptions ::no-args
    :effects/push-state ::path-args

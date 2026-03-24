@@ -24,14 +24,16 @@
   (is (= :month (actions/normalize-leaderboard-timeframe nil)))
   (is (= :all-time (actions/normalize-leaderboard-timeframe "all time")))
   (is (= [[:effects/save-many [[[:leaderboard-ui :timeframe] :week]
-                               [[:leaderboard-ui :page] 1]]]]
+                               [[:leaderboard-ui :page] 1]]]
+          [:effects/persist-leaderboard-preferences]]
          (actions/set-leaderboard-timeframe {} :week))))
 
 (deftest leaderboard-sort-and-pagination-actions-reset-or-clamp-page-test
   (is (= [[:effects/save-many [[[:leaderboard-ui :sort]
                                 {:column :roi
                                  :direction :desc}]
-                               [[:leaderboard-ui :page] 1]]]]
+                               [[:leaderboard-ui :page] 1]]]
+          [:effects/persist-leaderboard-preferences]]
          (actions/set-leaderboard-sort
           {:leaderboard-ui {:sort {:column :pnl
                                    :direction :desc}}}
@@ -39,7 +41,8 @@
   (is (= [[:effects/save-many [[[:leaderboard-ui :sort]
                                 {:column :pnl
                                  :direction :asc}]
-                               [[:leaderboard-ui :page] 1]]]]
+                               [[:leaderboard-ui :page] 1]]]
+          [:effects/persist-leaderboard-preferences]]
          (actions/set-leaderboard-sort
           {:leaderboard-ui {:sort {:column :pnl
                                    :direction :desc}}}
@@ -52,11 +55,13 @@
 (deftest leaderboard-page-size-actions-normalize-reset-and-toggle-dropdown-test
   (is (= [[:effects/save-many [[[:leaderboard-ui :page-size] 25]
                                [[:leaderboard-ui :page] 1]
-                               [[:leaderboard-ui :page-size-dropdown-open?] false]]]]
+                               [[:leaderboard-ui :page-size-dropdown-open?] false]]]
+          [:effects/persist-leaderboard-preferences]]
          (actions/set-leaderboard-page-size {} "25")))
   (is (= [[:effects/save-many [[[:leaderboard-ui :page-size] 10]
                                [[:leaderboard-ui :page] 1]
-                               [[:leaderboard-ui :page-size-dropdown-open?] false]]]]
+                               [[:leaderboard-ui :page-size-dropdown-open?] false]]]
+          [:effects/persist-leaderboard-preferences]]
          (actions/set-leaderboard-page-size {} "999")))
   (is (= [[:effects/save [:leaderboard-ui :page-size-dropdown-open?] true]]
          (actions/toggle-leaderboard-page-size-dropdown

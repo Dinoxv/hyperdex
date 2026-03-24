@@ -109,6 +109,7 @@
             [hyperopen.header.actions-test]
             [hyperopen.i18n.locale-test]
             [hyperopen.leaderboard.actions-test]
+            [hyperopen.leaderboard.preferences-test]
             [hyperopen.order.feedback-runtime-test]
             [hyperopen.orderbook.actions-test]
             [hyperopen.orderbook.price-aggregation-test]
@@ -478,6 +479,7 @@
              'hyperopen.header.actions-test
              'hyperopen.i18n.locale-test
              'hyperopen.leaderboard.actions-test
+             'hyperopen.leaderboard.preferences-test
              'hyperopen.order.feedback-runtime-test
              'hyperopen.orderbook.actions-test
              'hyperopen.orderbook.price-aggregation-test

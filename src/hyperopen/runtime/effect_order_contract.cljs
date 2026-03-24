@@ -9,7 +9,8 @@
 
 (def ^:private persistence-effect-ids
   #{:effects/local-storage-set
-    :effects/local-storage-set-json})
+    :effects/local-storage-set-json
+    :effects/persist-leaderboard-preferences})
 
 (def ^:private effect-order-policy-by-action-id
   {:actions/select-asset
