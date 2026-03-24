@@ -125,3 +125,16 @@
         (is (nil? table-node))
         (is (some? mobile-list))
         (is (pos? (count mobile-links)))))))
+
+(deftest leaderboard-view-renders-address-only-once-when-display-name-is-missing-test
+  (let [view-node (view/leaderboard-view (assoc-in sample-state
+                                                   [:leaderboard :rows]
+                                                   [{:eth-address "0x393d393d393d393d393d393d393d393d393d2109"
+                                                     :account-value 1000
+                                                     :display-name nil
+                                                     :window-performances {:day {:pnl 10 :roi 0.01 :volume 100}
+                                                                           :week {:pnl 20 :roi 0.02 :volume 200}
+                                                                           :month {:pnl 30 :roi 0.03 :volume 300}
+                                                                           :all-time {:pnl 40 :roi 0.04 :volume 400}}}]))
+        text (collect-strings view-node)]
+    (is (= 1 (count (filter #(= "0x393d…2109" %) text))))))

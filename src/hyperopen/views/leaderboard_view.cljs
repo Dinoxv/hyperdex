@@ -107,13 +107,11 @@
 (defn- trader-chip
   [row]
   [:div {:class ["flex" "min-w-0" "items-center" "gap-2"]}
-   [:div {:class ["min-w-0" "space-y-0.5"]}
+   [:div {:class ["min-w-0"]}
     [:div {:class ["truncate" "font-semibold" "text-trading-text"]}
      (or (:display-name row)
          (wallet/short-addr (:eth-address row))
-         (:eth-address row))]
-    [:div {:class ["num" "truncate" "text-xs" "text-trading-text-secondary"]}
-     (wallet/short-addr (:eth-address row))]]
+         (:eth-address row))]]
    (when (:you? row)
      [:span {:class ["rounded-full"
                      "border"
