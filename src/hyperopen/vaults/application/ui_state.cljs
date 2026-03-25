@@ -1,4 +1,4 @@
-(ns hyperopen.vaults.domain.ui-state
+(ns hyperopen.vaults.application.ui-state
   (:require [clojure.string :as str]
             [hyperopen.portfolio.actions :as portfolio-actions]
             [hyperopen.utils.parse :as parse-utils]))

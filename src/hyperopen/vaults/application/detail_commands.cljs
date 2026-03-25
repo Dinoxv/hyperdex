@@ -3,7 +3,7 @@
             [hyperopen.views.chart.hover :as chart-hover]
             [hyperopen.vaults.detail.activity :as activity-model]
             [hyperopen.vaults.detail.types :as detail-types]
-            [hyperopen.vaults.domain.ui-state :as ui-state]))
+            [hyperopen.vaults.application.ui-state :as ui-state]))
 
 (def ^:private vault-detail-chart-hover-index-path
   [:vaults-ui :detail-chart-hover-index])

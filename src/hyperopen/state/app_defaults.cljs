@@ -13,8 +13,8 @@
             [hyperopen.portfolio.actions :as portfolio-actions]
             [hyperopen.trade-modules :as trade-modules]
             [hyperopen.trading-settings :as trading-settings]
-            [hyperopen.vaults.domain.transfer-policy :as vault-transfer-policy]
-            [hyperopen.vaults.domain.ui-state :as vault-ui-state]
+            [hyperopen.vaults.application.transfer-state :as vault-transfer-state]
+            [hyperopen.vaults.application.ui-state :as vault-ui-state]
             [hyperopen.vaults.infrastructure.persistence :as vault-persistence]))
 
 (def ^:private portfolio-summary-time-range-storage-key
@@ -200,7 +200,7 @@
    :detail-chart-hover-index nil
    :detail-performance-metrics-result nil
    :detail-performance-metrics-loading? false
-   :vault-transfer-modal (vault-transfer-policy/default-vault-transfer-modal-state)
+   :vault-transfer-modal (vault-transfer-state/default-vault-transfer-modal-state)
    :list-loading? false
    :detail-loading? false})
 

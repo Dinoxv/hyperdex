@@ -2,10 +2,11 @@
   (:require [hyperopen.vaults.application.detail-commands :as detail-commands]
             [hyperopen.vaults.application.list-commands :as list-commands]
             [hyperopen.vaults.application.route-loading :as route-loading]
+            [hyperopen.vaults.application.transfer-state :as transfer-state]
             [hyperopen.vaults.application.transfer-commands :as transfer-commands]
+            [hyperopen.vaults.application.ui-state :as ui-state]
             [hyperopen.vaults.domain.identity :as identity]
             [hyperopen.vaults.domain.transfer-policy :as transfer-policy]
-            [hyperopen.vaults.domain.ui-state :as ui-state]
             [hyperopen.vaults.infrastructure.persistence :as persistence]
             [hyperopen.vaults.infrastructure.routes :as routes]))
 
@@ -36,7 +37,7 @@
   ui-state/normalize-vault-detail-activity-direction-filter)
 (def normalize-vault-detail-chart-series ui-state/normalize-vault-detail-chart-series)
 (def normalize-vault-transfer-mode transfer-policy/normalize-vault-transfer-mode)
-(def default-vault-transfer-modal-state transfer-policy/default-vault-transfer-modal-state)
+(def default-vault-transfer-modal-state transfer-state/default-vault-transfer-modal-state)
 (def vault-transfer-deposit-allowed? transfer-policy/vault-transfer-deposit-allowed?)
 (def normalize-vault-user-page-size ui-state/normalize-vault-user-page-size)
 (def normalize-vault-user-page ui-state/normalize-vault-user-page)

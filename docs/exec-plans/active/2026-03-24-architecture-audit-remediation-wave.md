@@ -18,7 +18,7 @@ After this remediation wave, the repository should be easier to reason about and
 - [x] (2026-03-25 08:59 EDT) Incorporated the user-provided implementation backlog into this plan, replacing the earlier high-level milestone outline with explicit backlog items `ARCH-01` through `SRP-06`, exact file moves, focused validation, and hard ordering rules.
 - [x] (2026-03-25 09:44 EDT) `ARCH-01` (`hyperopen-glb1.3`): added `/hyperopen/dev/check_namespace_sizes.clj`, `/hyperopen/dev/check_namespace_boundaries.clj`, both Babashka regression suites, `/hyperopen/dev/namespace_size_exceptions.edn`, `/hyperopen/dev/namespace_boundary_exceptions.edn`, package wiring, and the required architecture/quality/debt-doc updates. Validation passed with `npm run check`, `npm test`, and `npm run test:websocket` after installing repo dependencies with `npm ci` and moving one unrelated closed ExecPlan out of `/active/`. Closed `hyperopen-glb1.3` in `bd`.
 - [x] (2026-03-25 10:23 EDT) `DDD-01` (`hyperopen-glb1.1`): moved `/hyperopen/src/hyperopen/funding/domain/modal_state.cljs` to `/hyperopen/src/hyperopen/funding/application/modal_state.cljs`, updated `/hyperopen/src/hyperopen/funding/application/modal_actions.cljs` to use the new application owner, added `/hyperopen/test/hyperopen/funding/application/modal_state_test.cljs`, regenerated `/hyperopen/test/test_runner_generated.cljs`, and passed `npm test`, `npm run check`, and `npm run test:websocket`.
-- [ ] `DDD-02` (`hyperopen-glb1.1`): clean vault UI state out of `domain`.
+- [x] (2026-03-25 10:35 EDT) `DDD-02` (`hyperopen-glb1.1`): moved `/hyperopen/src/hyperopen/vaults/domain/ui_state.cljs` to `/hyperopen/src/hyperopen/vaults/application/ui_state.cljs`, created `/hyperopen/src/hyperopen/vaults/application/transfer_state.cljs`, removed modal defaults from `/hyperopen/src/hyperopen/vaults/domain/transfer_policy.cljs`, updated every listed caller plus the stable `hyperopen.vaults.actions/default-vault-transfer-modal-state` facade, added `/hyperopen/test/hyperopen/vaults/application/ui_state_test.cljs` and `/hyperopen/test/hyperopen/vaults/application/transfer_state_test.cljs`, regenerated `/hyperopen/test/test_runner_generated.cljs`, and re-passed `npm test`, `npm run check`, and `npm run test:websocket`.
 - [ ] `DDD-03` (`hyperopen-glb1.1`): split API-wallet UI and session-driven form state out of `domain`.
 - [ ] `DIP-01` (`hyperopen-glb1.4`): move generic helpers out of `views/**`.
 - [ ] `DIP-02` (`hyperopen-glb1.4`): remove the remaining non-view dependencies on `views/**`.
@@ -60,6 +60,9 @@ After this remediation wave, the repository should be easier to reason about and
 - Observation: the funding modal-state move was lower-risk than the audit prose implied because the misleading domain namespace only had one production caller.
   Evidence: before the move, `rg -n "funding\\.domain\\.modal-state|funding\\.application\\.modal-state" src test` showed `/hyperopen/src/hyperopen/funding/application/modal_actions.cljs` as the only production import of the old namespace.
 
+- Observation: the new namespace-size guardrail immediately shaped the DDD-02 test placement.
+  Evidence: the first `npm run check` after adding a facade regression to `/hyperopen/test/hyperopen/vaults/actions_test.cljs` failed with `[size-exception-exceeded] test/hyperopen/vaults/actions_test.cljs - namespace has 536 lines; exception allows at most 526`, so the regression was moved into the new focused `/hyperopen/test/hyperopen/vaults/application/transfer_state_test.cljs` instead of loosening the exception budget.
+
 ## Decision Log
 
 - Decision: adopt the user-provided backlog ordering as the execution contract for this wave.
@@ -98,11 +101,19 @@ After this remediation wave, the repository should be easier to reason about and
   Rationale: no production callers besides `modal_actions.cljs` depended on the old path, and keeping a stub under `domain/` would continue advertising the wrong owner for modal UI state.
   Date/Author: 2026-03-25 / Codex
 
+- Decision: keep `hyperopen.vaults.domain.transfer-policy/vault-transfer-preview` independent of the new application-owned transfer-state namespace by treating modal input as partial data instead of importing the application default back into `domain/`.
+  Rationale: DDD-02 is about semantic truthfulness, and reintroducing an application dependency into `domain/transfer_policy.cljs` would have preserved the same ownership lie under a different filename.
+  Date/Author: 2026-03-25 / Codex
+
+- Decision: satisfy the stable-facade regression for `hyperopen.vaults.actions/default-vault-transfer-modal-state` in the new focused transfer-state test instead of expanding `/hyperopen/test/hyperopen/vaults/actions_test.cljs` or raising its size exception.
+  Rationale: `ARCH-01` is already live, and bypassing the first size failure by widening the exception would undercut the point of landing the guardrail one ticket earlier.
+  Date/Author: 2026-03-25 / Codex
+
 ## Outcomes & Retrospective
 
-`ARCH-01` and `DDD-01` are now complete. The repository no longer relies on memory for the first architecture rules, and the funding bounded context no longer keeps modal UI state under a misleading `domain/` namespace. `npm run check` now enforces two concrete guardrails: oversized `.cljs` namespaces require a structured exception entry in `/hyperopen/dev/namespace_size_exceptions.edn`, and non-view imports of `hyperopen.views.*` require a structured exception entry in `/hyperopen/dev/namespace_boundary_exceptions.edn` unless the importer lives under `domain/`, which is now a hard failure.
+`ARCH-01`, `DDD-01`, and `DDD-02` are now complete. The repository no longer relies on memory for the first architecture rules, the funding bounded context no longer keeps modal UI state under a misleading `domain/` namespace, and the vaults bounded context no longer keeps list/detail UI state or transfer-modal defaults under `domain/`. `npm run check` now enforces two concrete guardrails: oversized `.cljs` namespaces require a structured exception entry in `/hyperopen/dev/namespace_size_exceptions.edn`, and non-view imports of `hyperopen.views.*` require a structured exception entry in `/hyperopen/dev/namespace_boundary_exceptions.edn` unless the importer lives under `domain/`, which is now a hard failure.
 
-The result reduced coordination complexity immediately. The repo still carries 85 size exceptions and 9 boundary exceptions, so the codebase is not yet simpler in shape overall, but the debt is now explicit, time-bounded, and enforced in CI instead of being hidden in prose. DDD-01 also removed one concrete semantic lie from the tree: funding modal defaults and normalization now live in `/application/`, where the rest of the modal orchestration already lives. The validation also surfaced one unrelated stale active ExecPlan, and moving that closed plan to `/completed/` made the docs gate honest again.
+The result reduced coordination complexity again. The repo still carries 85 size exceptions and 9 boundary exceptions, so the codebase is not yet simple in aggregate, but the debt is explicit, time-bounded, and enforced in CI instead of being hidden in prose. DDD-02 removed two more concrete semantic lies from the tree: `/hyperopen/src/hyperopen/vaults/domain/ui_state.cljs` is gone, and `/hyperopen/src/hyperopen/vaults/domain/transfer_policy.cljs` now contains transfer policy only. Application-owned callers, defaults, and view-model helpers now point at `/hyperopen/src/hyperopen/vaults/application/ui_state.cljs` and `/hyperopen/src/hyperopen/vaults/application/transfer_state.cljs`, which makes the ownership map easier for both humans and agents to trust. The same validation also proved the new guardrail is doing real work, because it rejected the first attempt to grow an already-exceptioned hotspot test and forced the coverage back into a smaller focused namespace.
 
 ## Context and Orientation
 
@@ -114,11 +125,8 @@ A "hub file" means a central assembly file that must be edited for many unrelate
 
 A "compatibility facade" means a stable public namespace that keeps existing callers working while delegating real behavior to smaller owner modules. This repo already does that successfully in several areas, including funding, runtime effect adapters, portfolio VM, vault actions, and the header view.
 
-The current misnamed or boundary-leaking files that motivate this plan are:
+The remaining misnamed or boundary-leaking files that still motivate the unfinished part of this plan are:
 
-- `/hyperopen/src/hyperopen/funding/domain/modal_state.cljs` (54 LOC), which still owns modal UI state such as `:open?`, search inputs, `:submitting?`, and `:error`.
-- `/hyperopen/src/hyperopen/vaults/domain/ui_state.cljs` (195 LOC), which still owns sort direction, page-size normalization, and chart-series selection.
-- `/hyperopen/src/hyperopen/vaults/domain/transfer_policy.cljs` (113 LOC), which mixes true transfer policy with `default-vault-transfer-modal-state`.
 - `/hyperopen/src/hyperopen/api_wallets/domain/policy.cljs` (216 LOC), which still depends on `hyperopen.wallet.agent-session` while also owning modal, generated-state, and raw form concerns.
 
 The strongest reverse imports from `views/**` that this plan must remove are:
@@ -869,3 +877,5 @@ Plan update note: 2026-03-25 08:59 EDT - Replaced the earlier high-level milesto
 Plan update note: 2026-03-25 09:44 EDT - Completed `ARCH-01` by adding namespace-size and namespace-boundary CI guardrails, seeding both exception registries from the live tree, wiring the new checks into `npm run check`, updating architecture/quality/debt docs, running `npm ci`, passing `npm run check`, `npm test`, and `npm run test:websocket`, and closing `hyperopen-glb1.3` in `bd`. Validation also exposed a stale closed active ExecPlan, which was moved to `/completed/` so docs governance stayed truthful.
 
 Plan update note: 2026-03-25 10:23 EDT - Completed `DDD-01` by moving funding modal state ownership from `/hyperopen/src/hyperopen/funding/domain/modal_state.cljs` to `/hyperopen/src/hyperopen/funding/application/modal_state.cljs`, updating the modal-actions facade, adding direct regression coverage, regenerating the test runner, and re-passing `npm test`, `npm run check`, and `npm run test:websocket`.
+
+Plan update note: 2026-03-25 10:35 EDT - Completed `DDD-02` by moving vault UI-state ownership from `/hyperopen/src/hyperopen/vaults/domain/ui_state.cljs` to `/hyperopen/src/hyperopen/vaults/application/ui_state.cljs`, extracting `/hyperopen/src/hyperopen/vaults/application/transfer_state.cljs`, removing transfer-modal defaults from `/hyperopen/src/hyperopen/vaults/domain/transfer_policy.cljs`, updating all listed callers, adding focused application-level regression coverage, regenerating the test runner, and re-passing `npm test`, `npm run check`, and `npm run test:websocket`. The first `npm run check` also caught an oversized existing hotspot test, so the new facade regression was relocated into the focused transfer-state test instead of widening the size exception.

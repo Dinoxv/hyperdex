@@ -22,16 +22,6 @@
       mode
       default-vault-transfer-mode)))
 
-(defn default-vault-transfer-modal-state
-  []
-  {:open? false
-   :mode default-vault-transfer-mode
-   :vault-address nil
-   :amount-input ""
-   :withdraw-all? false
-   :submitting? false
-   :error nil})
-
 (defn parse-usdc-micros
   ([value]
    (parse-usdc-micros value nil))
@@ -70,8 +60,7 @@
   ([state modal]
    (vault-transfer-preview {} state modal))
   ([{:keys [route-vault-address-fn]} state modal]
-   (let [modal* (merge (default-vault-transfer-modal-state)
-                       (if (map? modal) modal {}))
+   (let [modal* (if (map? modal) modal {})
          route-vault-address (when (fn? route-vault-address-fn)
                                (route-vault-address-fn state))
          vault-address (or (identity/normalize-vault-address (:vault-address modal*))
@@ -79,7 +68,7 @@
          mode (normalize-vault-transfer-mode (:mode modal*))
          withdraw-all? (and (= mode :withdraw)
                             (true? (:withdraw-all? modal*)))
-         amount-input (:amount-input modal*)
+         amount-input (or (:amount-input modal*) "")
          locale (get-in state [:ui :locale])
          amount-micros (if withdraw-all?
                          0

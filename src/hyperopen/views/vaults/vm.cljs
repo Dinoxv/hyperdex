@@ -1,6 +1,6 @@
 (ns hyperopen.views.vaults.vm
   (:require [clojure.string :as str]
-            [hyperopen.vaults.domain.ui-state :as vault-ui-state]
+            [hyperopen.vaults.application.ui-state :as vault-ui-state]
             [hyperopen.vaults.infrastructure.routes :as vault-routes]))
 
 (def ^:private day-ms

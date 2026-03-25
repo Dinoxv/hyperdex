@@ -2,6 +2,7 @@
   (:require [clojure.string :as str]
             [hyperopen.utils.formatting :as fmt]
             [hyperopen.vaults.adapters.webdata :as webdata-adapter]
+            [hyperopen.vaults.application.transfer-state :as transfer-state]
             [hyperopen.vaults.domain.identity :as vault-identity]
             [hyperopen.vaults.domain.transfer-policy :as vault-transfer-policy]))
 
@@ -169,7 +170,7 @@
         deposit-max-usdc (vault-transfer-deposit-max-usdc state wallet-webdata webdata)
         deposit-lockup-days (vault-deposit-lockup-days details vault-name*)
         raw-vault-transfer-modal (get-in state [:vaults-ui :vault-transfer-modal])
-        vault-transfer-modal* (merge (vault-transfer-policy/default-vault-transfer-modal-state)
+        vault-transfer-modal* (merge (transfer-state/default-vault-transfer-modal-state)
                                      (if (map? raw-vault-transfer-modal)
                                        raw-vault-transfer-modal
                                        {}))

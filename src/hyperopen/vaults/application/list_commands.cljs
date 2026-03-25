@@ -1,6 +1,6 @@
 (ns hyperopen.vaults.application.list-commands
   (:require [hyperopen.vaults.application.detail-commands :as detail-commands]
-            [hyperopen.vaults.domain.ui-state :as ui-state]))
+            [hyperopen.vaults.application.ui-state :as ui-state]))
 
 (def ^:private vault-detail-chart-hover-index-path
   [:vaults-ui :detail-chart-hover-index])

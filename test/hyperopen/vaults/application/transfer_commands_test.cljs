@@ -1,6 +1,34 @@
 (ns hyperopen.vaults.application.transfer-commands-test
   (:require [cljs.test :refer-macros [deftest is]]
-            [hyperopen.vaults.application.transfer-commands :as transfer-commands]))
+            [hyperopen.vaults.application.transfer-commands :as transfer-commands]
+            [hyperopen.vaults.application.transfer-state :as transfer-state]))
+
+(deftest close-vault-transfer-modal-resets-the-application-owned-modal-state-test
+  (is (= [[:effects/save
+           [:vaults-ui :vault-transfer-modal]
+           (transfer-state/default-vault-transfer-modal-state)]]
+         (transfer-commands/close-vault-transfer-modal
+          {:vaults-ui {:vault-transfer-modal {:open? true
+                                              :mode :withdraw
+                                              :vault-address "0x1234567890abcdef1234567890abcdef12345678"
+                                              :amount-input "10"
+                                              :withdraw-all? true
+                                              :submitting? true
+                                              :error "boom"}}}))))
+
+(deftest set-vault-transfer-amount-falls-back-to-default-modal-state-when-storage-is-malformed-test
+  (is (= [[:effects/save
+           [:vaults-ui :vault-transfer-modal]
+           {:open? false
+            :mode :deposit
+            :vault-address nil
+            :amount-input "2.5"
+            :withdraw-all? false
+            :submitting? false
+            :error nil}]]
+         (transfer-commands/set-vault-transfer-amount
+          {:vaults-ui {:vault-transfer-modal :not-a-map}}
+          "2.5"))))
 
 (deftest submit-vault-transfer-uses-route-fallback-preview-and-emits-submit-effect-test
   (let [vault-address "0x1234567890abcdef1234567890abcdef12345678"

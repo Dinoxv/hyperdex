@@ -1,6 +1,7 @@
 (ns hyperopen.vaults.application.transfer-commands
   (:require [clojure.string :as str]
             [hyperopen.account.context :as account-context]
+            [hyperopen.vaults.application.transfer-state :as transfer-state]
             [hyperopen.vaults.domain.identity :as identity]
             [hyperopen.vaults.domain.transfer-policy :as transfer-policy]))
 
@@ -9,7 +10,7 @@
 
 (defn- vault-transfer-modal
   [state]
-  (merge (transfer-policy/default-vault-transfer-modal-state)
+  (merge (transfer-state/default-vault-transfer-modal-state)
          (if (map? (get-in state vault-transfer-modal-path))
            (get-in state vault-transfer-modal-path)
            {})))
@@ -18,7 +19,7 @@
   [_state vault-address mode]
   (if-let [vault-address* (identity/normalize-vault-address vault-address)]
     [[:effects/save vault-transfer-modal-path
-      (assoc (transfer-policy/default-vault-transfer-modal-state)
+      (assoc (transfer-state/default-vault-transfer-modal-state)
              :open? true
              :mode (transfer-policy/normalize-vault-transfer-mode mode)
              :vault-address vault-address*)]]
@@ -27,7 +28,7 @@
 (defn close-vault-transfer-modal
   [_state]
   [[:effects/save vault-transfer-modal-path
-    (transfer-policy/default-vault-transfer-modal-state)]])
+    (transfer-state/default-vault-transfer-modal-state)]])
 
 (defn handle-vault-transfer-modal-keydown
   [state key]

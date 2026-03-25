@@ -1,7 +1,7 @@
 (ns hyperopen.vaults.infrastructure.preview-cache
   (:require [clojure.string :as str]
             [hyperopen.platform :as platform]
-            [hyperopen.vaults.domain.ui-state :as vault-ui-state]
+            [hyperopen.vaults.application.ui-state :as vault-ui-state]
             [hyperopen.views.vaults.vm :as vault-vm]))
 
 (def vault-startup-preview-storage-key

@@ -183,6 +183,8 @@
             [hyperopen.vaults.application.list-commands-test]
             [hyperopen.vaults.application.route-loading-test]
             [hyperopen.vaults.application.transfer-commands-test]
+            [hyperopen.vaults.application.transfer-state-test]
+            [hyperopen.vaults.application.ui-state-test]
             [hyperopen.vaults.detail.activity-test]
             [hyperopen.vaults.detail.benchmarks-test]
             [hyperopen.vaults.detail.metrics-bridge-test]
@@ -556,6 +558,8 @@
              'hyperopen.vaults.application.list-commands-test
              'hyperopen.vaults.application.route-loading-test
              'hyperopen.vaults.application.transfer-commands-test
+             'hyperopen.vaults.application.transfer-state-test
+             'hyperopen.vaults.application.ui-state-test
              'hyperopen.vaults.detail.activity-test
              'hyperopen.vaults.detail.benchmarks-test
              'hyperopen.vaults.detail.metrics-bridge-test

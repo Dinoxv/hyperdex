@@ -1,6 +1,6 @@
 (ns hyperopen.vaults.infrastructure.persistence
   (:require [hyperopen.platform :as platform]
-            [hyperopen.vaults.domain.ui-state :as ui-state]))
+            [hyperopen.vaults.application.ui-state :as ui-state]))
 
 (def ^:private vaults-snapshot-range-storage-key
   "vaults-snapshot-range")

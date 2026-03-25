@@ -3,8 +3,8 @@
             [hyperopen.account.context :as account-context]
             [hyperopen.api.promise-effects :as promise-effects]
             [hyperopen.api.trading :as trading-api]
+            [hyperopen.vaults.application.transfer-state :as vault-transfer-state]
             [hyperopen.vaults.domain.identity :as vault-identity]
-            [hyperopen.vaults.domain.transfer-policy :as vault-transfer-policy]
             [hyperopen.vaults.infrastructure.routes :as vault-routes]))
 
 (def ^:private funding-history-lookback-ms
@@ -418,7 +418,7 @@
          exchange-response-error fallback-exchange-response-error
          runtime-error-message fallback-runtime-error-message
          show-toast! (fn [_store _kind _message] nil)
-         default-vault-transfer-modal-state vault-transfer-policy/default-vault-transfer-modal-state}}]
+         default-vault-transfer-modal-state vault-transfer-state/default-vault-transfer-modal-state}}]
   (let [state @store
         spectate-mode-message (account-context/mutations-blocked-message state)
         address (get-in state [:wallet :address])
