@@ -80,7 +80,7 @@
         "scopeLabel": "Perps",
         "pnlPressed": "true",
         "balancesPressed": "true",
-        "performancePressed": "false",
+        "performancePressed": null,
         "depositPresent": true,
         "withdrawPresent": true
       }

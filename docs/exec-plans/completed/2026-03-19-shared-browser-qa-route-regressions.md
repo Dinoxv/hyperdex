@@ -25,7 +25,7 @@ This plan tracks the combined cleanup needed to get managed local browser QA gre
 - [x] (2026-03-20) Restored stable default height for the desktop trade account-table panel across standard tabs so chart/order-book alignment no longer shifts when switching between balances, positions, and history tabs.
 - [x] (2026-03-20) Diagnosed the remaining desktop trade layout regression from live browser evidence and two explorer audits: the chart shell was under-filling the top row, while the lower account panel still had competing row, panel, header, and viewport sizing contracts.
 - [x] (2026-03-20) Replaced the stale desktop row-class path with an explicit inline desktop grid contract so the lower account panel keeps a stable viewport-scaled height and the chart/order-book row no longer collapses toward content auto-height.
-- [ ] Re-run targeted scenarios, required repo gates, `qa:design-ui`, and `qa:nightly-ui` with `--manage-local-app`.
+- [x] (2026-03-25 14:40 EDT) Re-ran the governed managed-local validation path after aligning `/hyperopen/tools/browser-inspection/scenarios/portfolio-interaction-states.json` with the existing inactive-tab aria contract. `npx playwright test tools/playwright/test/portfolio-regressions.spec.mjs`, the targeted managed-local scenario bundle, `npm run qa:design-ui -- --targets trade-route,portfolio-route,vaults-route --manage-local-app`, `npm run qa:nightly-ui -- --allow-non-main --manage-local-app`, `npm run check`, `npm test`, and `npm run test:websocket` all passed. The nightly pass also wrote the durable summary note `/hyperopen/docs/qa/nightly-ui-report-2026-03-25.md`.
 
 ## Surprises & Discoveries
 
@@ -52,6 +52,9 @@ This plan tracks the combined cleanup needed to get managed local browser QA gre
 
 - Observation: `returns-benchmark-selector-model` currently includes `suggestions-open?` in its cache key, so simple focus/blur toggles rebuild the candidate list.
   Evidence: `/hyperopen/src/hyperopen/views/portfolio/vm/benchmarks.cljs`.
+
+- Observation: the remaining `portfolio-interaction-states` failure on 2026-03-25 was scenario drift, not a live `/portfolio` regression.
+  Evidence: `tmp/browser-inspection/scenario-2026-03-25T18-17-54-501Z-966fe9e3/scenarios/portfolio-interaction-states-desktop.json` failed with `result.performancePressed expected "false", got null`, `/hyperopen/tools/playwright/test/portfolio-regressions.spec.mjs` already enforced the inactive performance-tab contract as `.not.toHaveAttribute("aria-pressed", "true")`, and the route-smoke snapshot under `tmp/browser-inspection/scenario-2026-03-25T18-29-09-111Z-2d8afb27/portfolio-route-smoke/desktop/snapshot.json` still contained `account-info-tab-performance-metrics`.
 
 - Observation: the mobile `Account` footer surface is intentionally summary-only; the account-history tabs remain owned by the mobile market surfaces, so the governed `mobile-position-margin-presentation` scenario was still targeting the wrong surface after the March 9 parity change.
   Evidence: `/hyperopen/src/hyperopen/views/trade_view.cljs` renders `trade-mobile-account-summary-panel` for `:account` and keeps `trade-account-tables-panel` mounted only for market surfaces, while `/hyperopen/test/hyperopen/views/app_shell_spacing_test.cljs` asserts that `:account` does not show balances/open-orders/trade-history text.
@@ -104,16 +107,11 @@ This plan tracks the combined cleanup needed to get managed local browser QA gre
 
 ## Outcomes & Retrospective
 
-Work in progress. Success for this pass requires:
+Completed on 2026-03-25. Managed-local governed browser QA is green again for `/trade`, `/portfolio`, and `/vaults`.
 
-- managed local browser-inspection no longer treating `404` route URLs as healthy startup
-- targeted route-smoke, wallet, and asset-selector scenarios passing under `--manage-local-app`
-- mobile position-margin opening as a mounted sheet even when the card is collapsed
-- `/portfolio` `review-768` clearing `jank-perf`
-- required repo gates passing
-- the desktop trade chart fills the full top row with no blank gap above the account panel
-- the desktop account panel keeps one stable outer height and width while switching between balances, positions, open orders, TWAP, trade history, funding history, and order history
-- the desktop trade shell keeps the lower account panel near the Hyperliquid reference proportion instead of collapsing it toward content height as viewport height grows
+The final closure pass corrected one piece of scenario drift instead of application behavior: `/hyperopen/tools/browser-inspection/scenarios/portfolio-interaction-states.json` now matches the inactive-tab aria contract already enforced by `/hyperopen/tools/playwright/test/portfolio-regressions.spec.mjs`, where the inactive performance tab must be “not true” rather than literally `aria-pressed="false"`. After that alignment, the targeted scenario bundle `scenario-2026-03-25T18-29-09-111Z-2d8afb27` passed, the governed design review `design-review-2026-03-25T18-30-06-865Z-e543f593` passed across `375`, `768`, `1280`, and `1440`, and nightly UI QA `nightly-ui-qa-2026-03-25T18-32-55-494Z-86ee6cd1` passed with the durable report `/hyperopen/docs/qa/nightly-ui-report-2026-03-25.md`.
+
+Because browser-test tooling changed, the focused committed Playwright portfolio regression was rerun first and passed. The required repo gates also passed: `npm run check`, `npm test`, and `npm run test:websocket`. This plan is ready to move to `/completed/`, and `hyperopen-v7jc` is ready to close in `bd`.
 
 ## Context and Orientation
 
