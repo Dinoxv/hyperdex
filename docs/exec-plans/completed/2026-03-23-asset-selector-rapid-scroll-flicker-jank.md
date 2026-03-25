@@ -32,7 +32,7 @@ After this work, a user should be able to open the asset selector on `/trade`, f
 - [x] (2026-03-23 23:42Z) Re-ran the focused selector/trade-view tests, the committed asset-selector Playwright regression, a fresh bottom-up wheel probe, the full repo gates, and governed browser QA after the lazy-freeze follow-up.
 - [x] Refresh browser evidence after each experiment with a short trace or QA artifact and record whether the change reduced black flashes, reduced frozen scroll frames, both, or neither.
 - [x] Reduce or eliminate the remaining scroll-time work on the selector path without regressing reachability of the full market list.
-- [ ] Confirm the latest desktop full-render and bottom-edge reversal behavior on real manual hardware scroll and decide whether any remaining long-tail jank still justifies a chart/runtime-specific follow-up before moving this ExecPlan out of `active`.
+- [x] (2026-03-25 15:59 EDT) Confirmed the latest desktop full-render and bottom-edge reversal behavior on real manual hardware scroll: the user rapidly scrolled all the way down and all the way back up in a live browser session and reported no visible jank, no flickering, and no follow-up chart/runtime issue needed before closing this ExecPlan.
 
 ## Surprises & Discoveries
 
@@ -124,9 +124,9 @@ After this work, a user should be able to open the asset selector on `/trade`, f
 
 ## Outcomes & Retrospective
 
-Work in progress. The intended outcome is to remove visible black flashes and noticeable scroll freezes from the asset selector while preserving full-list reachability and keeping the selector implementation maintainable.
+The asset selector no longer exhibits the two user-visible failures that kept this plan open: blank or black flashes during deep desktop scroll, and sticky late reversal behavior when scrolling back up from the bottom edge. The final selector/runtime path now renders full rows for normal-sized desktop lists, keeps heavy desktop siblings frozen only through the short resume cooldown, avoids eager `scrollend` finalization, and freezes the selector owner’s active-context subscriptions instead of thrashing them to `#{}` at scroll boundaries. Deterministic browser and repo gates remained green through the final iterations, and the closeout manual desktop verification on 2026-03-25 confirmed that rapid hardware scrolling all the way down and back up now shows no visible jank and no flickering.
 
-The current state of the investigation suggests the remaining problem is not caused by missing rows or nested render errors. It is more likely caused by the interaction between scroll events, route-wide store writes, and deferred runtime updates. If the next experiments confirm that, the final implementation should simplify the scroll path rather than layering more throttles on top of it.
+No narrower follow-up issue is needed from this ticket. The remaining long-tail risk described in earlier probe notes did not reproduce in the final live manual pass, so the plan is complete for scope and can move out of `/active/`.
 
 ## Context and Orientation
 
@@ -250,3 +250,5 @@ No new external dependency is expected. The relevant internal seams are:
 The experiment loop should preserve public APIs unless browser evidence proves a contract change is required. Any follow-up that broadens scope should be called out in this plan before implementation.
 
 Plan revision note: 2026-03-23 17:45Z - Initial active ExecPlan created for `hyperopen-2614` after confirming the remaining asset-selector issue is a scroll-time flicker/jank regression and not the earlier blank-window bug.
+
+Plan revision note: 2026-03-25 15:59 EDT - Closeout manual desktop verification passed: the user rapidly scrolled the `/trade` asset selector all the way down and all the way back up in a live browser session, observed no jank and no flickering, and confirmed no further chart/runtime follow-up was needed. This satisfies the last unchecked acceptance item and closes the plan for scope.
