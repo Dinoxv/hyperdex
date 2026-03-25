@@ -130,10 +130,15 @@
             [hyperopen.route-modules-test]
             [hyperopen.router-test]
             [hyperopen.runtime.action-adapters-test]
+            [hyperopen.runtime.action-adapters.navigation-test]
+            [hyperopen.runtime.action-adapters.wallet-test]
+            [hyperopen.runtime.action-adapters.websocket-test]
+            [hyperopen.runtime.action-adapters.ws-diagnostics-test]
             [hyperopen.runtime.api-effects-test]
             [hyperopen.runtime.app-effects-test]
             [hyperopen.runtime.bootstrap-test]
             [hyperopen.runtime.collaborators-test]
+            [hyperopen.runtime.collaborators.action-maps-test]
             [hyperopen.runtime.effect-adapters.asset-selector-test]
             [hyperopen.runtime.effect-adapters.common-test]
             [hyperopen.runtime.effect-adapters.facade-contract-test]
@@ -509,10 +514,15 @@
              'hyperopen.route-modules-test
              'hyperopen.router-test
              'hyperopen.runtime.action-adapters-test
+             'hyperopen.runtime.action-adapters.navigation-test
+             'hyperopen.runtime.action-adapters.wallet-test
+             'hyperopen.runtime.action-adapters.websocket-test
+             'hyperopen.runtime.action-adapters.ws-diagnostics-test
              'hyperopen.runtime.api-effects-test
              'hyperopen.runtime.app-effects-test
              'hyperopen.runtime.bootstrap-test
              'hyperopen.runtime.collaborators-test
+             'hyperopen.runtime.collaborators.action-maps-test
              'hyperopen.runtime.effect-adapters.asset-selector-test
              'hyperopen.runtime.effect-adapters.common-test
              'hyperopen.runtime.effect-adapters.facade-contract-test
