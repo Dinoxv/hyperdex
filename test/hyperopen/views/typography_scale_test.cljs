@@ -154,7 +154,7 @@
         tailwind-config (read-text tailwind-config-path)
         header-source (read-text (join-path (project-root) "src" "hyperopen" "views" "header_view.cljs"))
         account-info-source (read-text (join-path (project-root) "src" "hyperopen" "views" "account_info_view.cljs"))
-        portfolio-source (read-text (join-path (project-root) "src" "hyperopen" "views" "portfolio_view.cljs"))
+        portfolio-format-source (read-text (join-path (project-root) "src" "hyperopen" "views" "portfolio" "format.cljs"))
         vault-chart-source (read-text (join-path (project-root) "src" "hyperopen" "views" "vaults" "detail" "chart_view.cljs"))]
     (testing "default stylesheet no longer defines the retired Splash font face"
       (is (not (re-find #"font-family:\s*\"Splash\"" styles-source)))
@@ -165,8 +165,8 @@
       (is (not (re-find #"font-splash" header-source))))
     (testing "canvas measurement paths use the shared UI font resolver instead of hard-coded Inter"
       (is (re-find #"fonts/canvas-font 12" account-info-source))
-      (is (re-find #"fonts/canvas-font 12" portfolio-source))
+      (is (re-find #"fonts/canvas-font 12" portfolio-format-source))
       (is (re-find #"fonts/canvas-font 12" vault-chart-source))
       (is (not (re-find #"Inter Variable" account-info-source)))
-      (is (not (re-find #"Inter Variable" portfolio-source)))
+      (is (not (re-find #"Inter Variable" portfolio-format-source)))
       (is (not (re-find #"Inter Variable" vault-chart-source))))))

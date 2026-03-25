@@ -250,6 +250,10 @@
             [hyperopen.views.leaderboard-view-test]
             [hyperopen.views.leaderboard.vm-test]
             [hyperopen.views.portfolio-view-test]
+            [hyperopen.views.portfolio.chart-view-test]
+            [hyperopen.views.portfolio.header-test]
+            [hyperopen.views.portfolio.performance-metrics-view-test]
+            [hyperopen.views.portfolio.summary-cards-test]
             [hyperopen.views.portfolio.vm-test]
             [hyperopen.views.portfolio.vm.benchmarks-helpers-test]
             [hyperopen.views.portfolio.vm.benchmarks-test]
@@ -634,6 +638,10 @@
              'hyperopen.views.leaderboard-view-test
              'hyperopen.views.leaderboard.vm-test
              'hyperopen.views.portfolio-view-test
+             'hyperopen.views.portfolio.chart-view-test
+             'hyperopen.views.portfolio.header-test
+             'hyperopen.views.portfolio.performance-metrics-view-test
+             'hyperopen.views.portfolio.summary-cards-test
              'hyperopen.views.portfolio.vm-test
              'hyperopen.views.portfolio.vm.benchmarks-helpers-test
              'hyperopen.views.portfolio.vm.benchmarks-test
