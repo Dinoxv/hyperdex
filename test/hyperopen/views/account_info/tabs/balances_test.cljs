@@ -473,6 +473,38 @@
     (is (contains? (hiccup/node-class-set transfer-label-node) "text-trading-text-secondary"))
     (is (nil? transfer-button-node))))
 
+(deftest balances-tab-content-read-only-mode-omits-mutation-columns-and-mobile-actions-test
+  (let [row (assoc fixtures/sample-balance-row
+                   :key "usdc"
+                   :coin "USDC"
+                   :selection-coin "USDC"
+                   :contract-id "0x1234567890abcdef1234567890abcdef12345678")
+        desktop-content (view/balances-tab-content [row]
+                                                   false
+                                                   fixtures/default-sort-state
+                                                   ""
+                                                   {:read-only? true})
+        desktop-header-strings (set (hiccup/collect-strings (hiccup/tab-header-node desktop-content)))
+        desktop-row (hiccup/first-viewport-row desktop-content)
+        desktop-row-buttons (hiccup/find-all-nodes desktop-row #(= :button (first %)))
+        desktop-row-cells (vec (hiccup/node-children desktop-row))
+        mobile-content (view/balances-tab-content [row]
+                                                  false
+                                                  fixtures/default-sort-state
+                                                  ""
+                                                  {:read-only? true
+                                                   :mobile-expanded-card {:balances "usdc"}})
+        mobile-card (hiccup/find-by-data-role mobile-content "mobile-balance-card-usdc")
+        mobile-strings (set (hiccup/collect-strings mobile-card))]
+    (is (not (contains? desktop-header-strings "Send")))
+    (is (not (contains? desktop-header-strings "Transfer")))
+    (is (not (contains? desktop-header-strings "Repay")))
+    (is (= 6 (count desktop-row-cells)))
+    (is (= 1 (count desktop-row-buttons)))
+    (is (contains? mobile-strings "Contract"))
+    (is (not (contains? mobile-strings "Send")))
+    (is (not (contains? mobile-strings "Transfer to Perps")))))
+
 (deftest balance-row-unified-available-balance-renders-dashed-tooltip-test
   (let [row-node (view/balance-row {:key "unified-usdc"
                                     :coin "USDC"

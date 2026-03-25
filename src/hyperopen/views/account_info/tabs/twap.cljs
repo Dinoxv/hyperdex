@@ -8,6 +8,10 @@
   {:grid-template-columns
    "minmax(110px,1fr) minmax(90px,0.9fr) minmax(110px,1fr) minmax(90px,0.85fr) minmax(150px,1.25fr) minmax(88px,0.72fr) minmax(150px,1.1fr) minmax(96px,0.8fr)"})
 
+(def ^:private active-read-only-grid-template-style
+  {:grid-template-columns
+   "minmax(110px,1fr) minmax(90px,0.9fr) minmax(110px,1fr) minmax(90px,0.85fr) minmax(150px,1.25fr) minmax(88px,0.72fr) minmax(150px,1.1fr)"})
+
 (def ^:private history-grid-template-style
   {:grid-template-columns
    "minmax(150px,1.2fr) minmax(110px,0.9fr) minmax(90px,0.82fr) minmax(100px,0.9fr) minmax(90px,0.82fr) minmax(110px,0.92fr) minmax(88px,0.72fr) minmax(88px,0.72fr) minmax(90px,0.82fr)"})
@@ -163,11 +167,13 @@
    "Terminate"])
 
 (defn- active-table
-  [rows]
+  [rows read-only?]
   (if (seq rows)
     (table/tab-table-content
      [:div {:class ["grid" "gap-2" "py-1" "px-3" "bg-base-200" "text-xs" "font-medium"]
-            :style active-grid-template-style}
+            :style (if read-only?
+                     active-read-only-grid-template-style
+                     active-grid-template-style)}
       [:div.text-left (table/non-sortable-header "Coin")]
       [:div.text-left (table/non-sortable-header "Size")]
       [:div.text-left (table/non-sortable-header "Executed Size")]
@@ -175,11 +181,14 @@
       [:div.text-left (table/non-sortable-header "Running Time and Total")]
       [:div.text-left (table/non-sortable-header "Reduce Only")]
       [:div.text-left (table/non-sortable-header "Creation Time")]
-      [:div.text-left (table/non-sortable-header "Terminate")]]
+      (when-not read-only?
+        [:div.text-left (table/non-sortable-header "Terminate")])]
      (for [row rows]
        ^{:key (str "twap-active-" (:twap-id row) "-" (:creation-time-ms row))}
        [:div {:class ["grid" "items-center" "gap-2" "py-px" "px-3" "hover:bg-base-300" "text-xs"]
-              :style active-grid-template-style}
+              :style (if read-only?
+                       active-read-only-grid-template-style
+                       active-grid-template-style)}
         [:div.text-left (coin-node (:coin row) (:side row))]
         [:div.text-left.num (format-size (:size row))]
         [:div.text-left.num (format-size (:executed-size row))]
@@ -187,7 +196,8 @@
         [:div.text-left.whitespace-nowrap (:running-label row)]
         [:div.text-left (yes-no (:reduce-only? row))]
         [:div.text-left.whitespace-nowrap (shared/format-open-orders-time (:creation-time-ms row))]
-        [:div.text-left (terminate-button row)]]))
+        (when-not read-only?
+          [:div.text-left (terminate-button row)])]))
     (empty-state "No active TWAPs")))
 
 (defn- history-table
@@ -229,8 +239,11 @@
            twap-active-rows
            twap-history-rows
            twap-fill-rows
-           twap-fill-state]}]
+           twap-fill-state
+           read-only?]}]
   (let [selected-subtab (or (:selected-subtab twap-state) :active)
+        read-only?* (or (true? (:read-only? twap-state))
+                        (true? read-only?))
         counts {:active (count (or twap-active-rows []))
                 :history (count (or twap-history-rows []))
                 :fill-history (count (or twap-fill-rows []))}]
@@ -243,4 +256,4 @@
         :fill-history (if (seq twap-fill-rows)
                         (trade-history-tab/trade-history-table twap-fill-rows twap-fill-state)
                         (empty-state "No TWAP slice fills"))
-        (active-table twap-active-rows))]]))
+        (active-table twap-active-rows read-only?*))]]))

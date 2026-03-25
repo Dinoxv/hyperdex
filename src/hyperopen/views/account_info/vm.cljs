@@ -288,8 +288,12 @@
                                         :filter-open? false}
                                        (get-in state [:account-info :trade-history] {}))
                                 (assoc :market-by-key market-by-key))
-        twap-state (merge {:selected-subtab :active}
-                          (get-in state [:account-info :twap] {}))
+        read-only? (account-context/inspected-account-read-only? state)
+        read-only-message (account-context/mutations-blocked-message state)
+        twap-state (cond-> (merge {:selected-subtab :active}
+                                  (get-in state [:account-info :twap] {}))
+                     true (assoc :read-only? read-only?)
+                     (seq read-only-message) (assoc :read-only-message read-only-message))
         twap-fill-state (-> (merge {:sort {:column "Time" :direction :desc}
                                     :direction-filter :all
                                     :coin-search ""
@@ -316,16 +320,20 @@
                     :balances (balance-tab-count webdata2 spot-data account)
                     :twap (count (or twap-states-source []))}
         open-orders-sort (get-in state [:account-info :open-orders-sort] {:column "Time" :direction :desc})
-        positions-state (merge {:direction-filter :all
-                                :coin-search ""
-                                :filter-open? false}
-                               (get-in state [:account-info :positions] {}))
-        open-orders-state (-> (merge {:direction-filter :all
-                                      :coin-search ""
-                                      :filter-open? false
-                                      :cancel-visible-confirmation (cancel-visible-confirmation/default-state)}
-                                     (get-in state [:account-info :open-orders] {}))
-                              (assoc :market-by-key market-by-key))
+        positions-state (cond-> (merge {:direction-filter :all
+                                        :coin-search ""
+                                        :filter-open? false}
+                                       (get-in state [:account-info :positions] {}))
+                          true (assoc :read-only? read-only?)
+                          (seq read-only-message) (assoc :read-only-message read-only-message))
+        open-orders-state (cond-> (-> (merge {:direction-filter :all
+                                              :coin-search ""
+                                              :filter-open? false
+                                              :cancel-visible-confirmation (cancel-visible-confirmation/default-state)}
+                                             (get-in state [:account-info :open-orders] {}))
+                                      (assoc :market-by-key market-by-key))
+                            true (assoc :read-only? read-only?)
+                            (seq read-only-message) (assoc :read-only-message read-only-message))
         websocket-health (get-in state [:websocket :health])
         effective-address (account-context/effective-account-address state)
         show-surface-freshness-cues?
@@ -347,6 +355,8 @@
      :loading? loading?
      :error error
      :mobile-expanded-card mobile-expanded-card
+     :read-only? read-only?
+     :read-only-message read-only-message
      :positions-sort positions-sort
      :balances-sort balances-sort
      :balances-coin-search balances-coin-search

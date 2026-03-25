@@ -264,6 +264,24 @@
 (def ^:private mobile-position-overlay-fallback-width-px 430)
 (def ^:private mobile-position-overlay-fallback-height-px 932)
 
+(def ^:private positions-read-only-grid-template-class
+  "grid-cols-[minmax(180px,2.15fr)_minmax(142px,1.34fr)_minmax(94px,0.9fr)_minmax(94px,0.9fr)_minmax(94px,0.9fr)_minmax(114px,1.06fr)_minmax(88px,0.82fr)_minmax(124px,1.08fr)_minmax(80px,0.78fr)_minmax(146px,1.06fr)]")
+
+(def ^:private positions-read-only-grid-min-width-class
+  "min-w-[1240px]")
+
+(defn- positions-grid-template-class
+  [read-only?]
+  (if read-only?
+    positions-read-only-grid-template-class
+    shared/positions-grid-template-class))
+
+(defn- positions-grid-min-width-class
+  [read-only?]
+  (if read-only?
+    positions-read-only-grid-min-width-class
+    shared/positions-grid-min-width-class))
+
 (defn- current-viewport-number
   [value fallback]
   (if (and (number? value)
@@ -360,7 +378,7 @@
    "gap-y-2"])
 
 (defn- position-row-from-vm
-  [row-vm tpsl-modal reduce-popover margin-modal]
+  [row-vm tpsl-modal reduce-popover margin-modal read-only?]
   (let [position-data (:row-data row-vm)
         pos (:position row-vm)
         side (:side row-vm)
@@ -381,127 +399,137 @@
         tpsl-copy (:tpsl-copy row-vm)
         row-key (:row-key row-vm)
         active-modal?
-        (and (position-tpsl/open? tpsl-modal)
+        (and (not read-only?)
+             (position-tpsl/open? tpsl-modal)
              (= row-key (:position-key tpsl-modal)))
         active-reduce-popover?
-        (and (position-reduce/open? reduce-popover)
+        (and (not read-only?)
+             (position-reduce/open? reduce-popover)
              (= row-key (:position-key reduce-popover)))
         active-margin-modal?
-        (and (position-margin/open? margin-modal)
+        (and (not read-only?)
+             (position-margin/open? margin-modal)
              (= row-key (:position-key margin-modal)))]
-    [:div {:class ["grid"
-                   shared/positions-grid-template-class
-                   "gap-2"
-                   "py-0"
-                   "pr-3"
-                   shared/positions-grid-min-width-class
-                   "hover:bg-base-300"
-                   "items-center"
-                   "text-sm"]}
-     [:div {:class ["flex" "min-w-0" "items-center" "gap-1.5" "self-stretch"]
-            :style coin-cell-style}
-      (shared/coin-select-control
-       (:coin pos)
-       [:span {:class ["flex" "w-full" "min-w-0" "items-center" "gap-1.5"]}
-        [:span {:class ["block" "min-w-0" "truncate" "font-medium" coin-tone-class]
-                :title coin-label}
-         coin-label]
-        (when (some? leverage)
-          [:span {:class chip-classes} (str leverage "x")])
-        (when dex-label
-          [:span {:class chip-classes} dex-label])]
-       {:extra-classes ["w-full" "justify-start" "overflow-hidden" "text-left"]})]
-     [:div {:class ["min-w-0" "truncate" "text-left" "font-semibold" "num" size-tone-class]
-            :title (:size-display row-vm)}
-      (:size-display row-vm)]
-     [:div.text-left.font-semibold.num
-      (if (number? position-value-num)
-        (str (shared/format-currency position-value-num) " USDC")
-        "--")]
-     [:div.text-left.font-semibold.num (shared/format-trade-price (:entry-price row-vm))]
-     [:div.text-left.font-semibold.num (:mark-price-display row-vm)]
-     [:div {:class ["text-left" "font-semibold" "num" (:pnl-color-class row-vm)]}
-      (format-pnl-inline (:pnl-num row-vm) (:pnl-percent row-vm))]
-     [:div.text-left.font-semibold.num
-      (explainable-value-node
-       (format-liquidation-price (:liq-price row-vm))
-       liq-explanation)]
-     [:div {:class ["text-left" "relative" "font-semibold" "num"]}
-      [:div {:class ["inline-flex" "items-center" "gap-0.5" "whitespace-nowrap"]}
-       [:span {:class ["inline-flex" "items-baseline" "gap-1" "whitespace-nowrap" "select-text"]}
-        [:span {:class ["num"]}
-         (str "$" (shared/format-currency margin))]
-        (when margin-mode-label
-          [:span {:class ["text-xs" "font-medium" "text-trading-text-secondary"]}
-           (str "(" margin-mode-label ")")])]
-       (when margin-editable?
-         (position-detail-edit-button
-          "Edit Margin"
-          [[:actions/open-position-margin-modal position-data :event.currentTarget/bounds]]
-          :data-position-margin-trigger))]
-      (when active-margin-modal?
-        (when (active-desktop-table-layout?)
-          (position-margin-modal/position-margin-modal-view margin-modal)))]
-     [:div.text-left.font-semibold.num
-      (explainable-value-node
-       [:span {:class [(:funding-tone-class row-vm) "num"]}
-        (if (number? display-funding)
-          (str "$" (shared/format-currency display-funding))
-          "--")]
-       funding-tooltip
-       {:underlined? false})]
-     [:div {:class ["text-left" "relative"]}
-      [:button {:class ["inline-flex"
-                        "w-full"
-                        "justify-start"
-                        "bg-transparent"
-                        "p-0"
-                        "font-semibold"
-                        "text-trading-green"
-                        "transition-colors"
-                        "focus:outline-none"
-                        "focus:ring-0"
-                        "focus:ring-offset-0"
-                        "focus:shadow-none"
-                        "focus-visible:outline-none"
-                        "focus-visible:ring-0"
-                        "focus-visible:ring-offset-0"
-                        "hover:text-[#7fffe4]"
-                        "focus-visible:text-[#7fffe4]"
-                        "whitespace-nowrap"]
-                :type "button"
-                :data-position-reduce-trigger "true"
-                :on {:click [[:actions/open-position-reduce-popover position-data :event.currentTarget/bounds]]}}
-       "Reduce"]
-      (when active-reduce-popover?
-        (when (active-desktop-table-layout?)
-          (position-reduce-popover/position-reduce-popover-view reduce-popover)))]
-     [:div {:class ["text-left" "relative"]}
-      [:div {:class ["inline-flex" "items-center" "gap-0.5" "whitespace-nowrap"]}
-       [:span {:class ["font-normal" "text-trading-text" "whitespace-nowrap" "select-text"]} tpsl-copy]
-      (position-detail-edit-button
-        "Edit TP/SL"
-        [[:actions/open-position-tpsl-modal position-data :event.currentTarget/bounds]]
-        :data-position-tpsl-trigger)]
-      (when active-modal?
-        (when (active-desktop-table-layout?)
-          (position-tpsl-modal/position-tpsl-modal-view tpsl-modal)))]]))
+    (into [:div {:class ["grid"
+                         (positions-grid-template-class read-only?)
+                         "gap-2"
+                         "py-0"
+                         "pr-3"
+                         (positions-grid-min-width-class read-only?)
+                         "hover:bg-base-300"
+                         "items-center"
+                         "text-sm"]}
+           [:div {:class ["flex" "min-w-0" "items-center" "gap-1.5" "self-stretch"]
+                  :style coin-cell-style}
+            (shared/coin-select-control
+             (:coin pos)
+             [:span {:class ["flex" "w-full" "min-w-0" "items-center" "gap-1.5"]}
+              [:span {:class ["block" "min-w-0" "truncate" "font-medium" coin-tone-class]
+                      :title coin-label}
+               coin-label]
+              (when (some? leverage)
+                [:span {:class chip-classes} (str leverage "x")])
+              (when dex-label
+                [:span {:class chip-classes} dex-label])]
+             {:extra-classes ["w-full" "justify-start" "overflow-hidden" "text-left"]})]
+           [:div {:class ["min-w-0" "truncate" "text-left" "font-semibold" "num" size-tone-class]
+                  :title (:size-display row-vm)}
+            (:size-display row-vm)]
+           [:div.text-left.font-semibold.num
+            (if (number? position-value-num)
+              (str (shared/format-currency position-value-num) " USDC")
+              "--")]
+           [:div.text-left.font-semibold.num (shared/format-trade-price (:entry-price row-vm))]
+           [:div.text-left.font-semibold.num (:mark-price-display row-vm)]
+           [:div {:class ["text-left" "font-semibold" "num" (:pnl-color-class row-vm)]}
+            (format-pnl-inline (:pnl-num row-vm) (:pnl-percent row-vm))]
+           [:div.text-left.font-semibold.num
+            (explainable-value-node
+             (format-liquidation-price (:liq-price row-vm))
+             liq-explanation)]
+           [:div {:class ["text-left" "relative" "font-semibold" "num"]}
+            [:div {:class ["inline-flex" "items-center" "gap-0.5" "whitespace-nowrap"]}
+             [:span {:class ["inline-flex" "items-baseline" "gap-1" "whitespace-nowrap" "select-text"]}
+              [:span {:class ["num"]}
+               (str "$" (shared/format-currency margin))]
+              (when margin-mode-label
+                [:span {:class ["text-xs" "font-medium" "text-trading-text-secondary"]}
+                 (str "(" margin-mode-label ")")])]
+             (when (and margin-editable?
+                        (not read-only?))
+               (position-detail-edit-button
+                "Edit Margin"
+                [[:actions/open-position-margin-modal position-data :event.currentTarget/bounds]]
+                :data-position-margin-trigger))]
+            (when active-margin-modal?
+              (when (active-desktop-table-layout?)
+                (position-margin-modal/position-margin-modal-view margin-modal)))]
+           [:div.text-left.font-semibold.num
+            (explainable-value-node
+             [:span {:class [(:funding-tone-class row-vm) "num"]}
+              (if (number? display-funding)
+                (str "$" (shared/format-currency display-funding))
+                "--")]
+             funding-tooltip
+             {:underlined? false})]]
+          (concat
+           (when-not read-only?
+             [[:div {:class ["text-left" "relative"]}
+               [:button {:class ["inline-flex"
+                                 "w-full"
+                                 "justify-start"
+                                 "bg-transparent"
+                                 "p-0"
+                                 "font-semibold"
+                                 "text-trading-green"
+                                 "transition-colors"
+                                 "focus:outline-none"
+                                 "focus:ring-0"
+                                 "focus:ring-offset-0"
+                                 "focus:shadow-none"
+                                 "focus-visible:outline-none"
+                                 "focus-visible:ring-0"
+                                 "focus-visible:ring-offset-0"
+                                 "hover:text-[#7fffe4]"
+                                 "focus-visible:text-[#7fffe4]"
+                                 "whitespace-nowrap"]
+                         :type "button"
+                         :data-position-reduce-trigger "true"
+                         :on {:click [[:actions/open-position-reduce-popover position-data :event.currentTarget/bounds]]}}
+                "Reduce"]
+               (when active-reduce-popover?
+                 (when (active-desktop-table-layout?)
+                   (position-reduce-popover/position-reduce-popover-view reduce-popover)))]] )
+           [[:div {:class ["text-left" "relative"]}
+             [:div {:class ["inline-flex" "items-center" "gap-0.5" "whitespace-nowrap"]}
+              [:span {:class ["font-normal" "text-trading-text" "whitespace-nowrap" "select-text"]} tpsl-copy]
+              (when-not read-only?
+                (position-detail-edit-button
+                 "Edit TP/SL"
+                 [[:actions/open-position-tpsl-modal position-data :event.currentTarget/bounds]]
+                 :data-position-tpsl-trigger))]
+             (when active-modal?
+               (when (active-desktop-table-layout?)
+                 (position-tpsl-modal/position-tpsl-modal-view tpsl-modal)))]]))))
 
 (defn position-row
   ([position-data]
-   (position-row position-data nil nil nil))
+   (position-row position-data nil nil nil false))
   ([position-data tpsl-modal]
-   (position-row position-data tpsl-modal nil nil))
+   (position-row position-data tpsl-modal nil nil false))
   ([position-data tpsl-modal reduce-popover]
-   (position-row position-data tpsl-modal reduce-popover nil))
+   (position-row position-data tpsl-modal reduce-popover nil false))
   ([position-data tpsl-modal reduce-popover margin-modal]
+   (position-row position-data tpsl-modal reduce-popover margin-modal false))
+  ([position-data tpsl-modal reduce-popover margin-modal read-only?]
    (position-row-from-vm (positions-vm/position-row-vm position-data)
                          tpsl-modal
                          reduce-popover
-                         margin-modal)))
+                         margin-modal
+                         read-only?)))
 
 (defn- mobile-position-card-from-vm
-  [expanded-row-id row-vm tpsl-modal reduce-popover margin-modal]
+  [expanded-row-id row-vm tpsl-modal reduce-popover margin-modal read-only?]
   (let [position-data (:row-data row-vm)
         pos (:position row-vm)
         side (:side row-vm)
@@ -547,7 +575,8 @@
                                    (position-value-copy position-value-num)
                                    {:value-classes ["num" "font-medium" "whitespace-nowrap"]})
          (mobile-cards/detail-item "Margin"
-                                   (if margin-editable?
+                                   (if (and margin-editable?
+                                            (not read-only?))
                                      (editable-mobile-margin-value
                                       (:margin row-vm)
                                       margin-mode-label
@@ -558,41 +587,45 @@
                                         position-data)
                                        :data-position-margin-trigger))
                                      (mobile-position-margin-value-node
-                                      (:margin row-vm)
-                                      margin-mode-label))
+                                     (:margin row-vm)
+                                     margin-mode-label))
                                    {:value-classes ["font-medium"]})
          (mobile-cards/detail-item "TP/SL"
-                                   (editable-mobile-detail-value
-                                    [:span {:class ["font-medium" "text-trading-text" "whitespace-nowrap"]}
-                                     (:tpsl-copy row-vm)]
-                                    (mobile-position-detail-edit-button
-                                     "Edit TP/SL"
-                                     (position-overlay-trigger
-                                      :actions/open-position-tpsl-modal
-                                      position-data)
-                                     :data-position-tpsl-trigger))
+                                   (if read-only?
+                                     [:span {:class ["font-medium" "text-trading-text" "whitespace-nowrap"]}
+                                      (:tpsl-copy row-vm)]
+                                     (editable-mobile-detail-value
+                                      [:span {:class ["font-medium" "text-trading-text" "whitespace-nowrap"]}
+                                       (:tpsl-copy row-vm)]
+                                      (mobile-position-detail-edit-button
+                                       "Edit TP/SL"
+                                       (position-overlay-trigger
+                                        :actions/open-position-tpsl-modal
+                                        position-data)
+                                       :data-position-tpsl-trigger)))
                                    {:value-classes ["font-medium"]})
          (mobile-cards/detail-item "Funding"
                                    (funding-value-node display-funding)
                                    {:value-classes ["font-medium" "whitespace-nowrap"]})])
-       [:div {:class ["border-t" "border-[#17313d]" "pt-2.5"]}
-        [:div {:class ["relative" "flex" "flex-wrap" "items-center" "gap-x-5" "gap-y-2"]}
-         (mobile-position-action-button
-          "Close"
-          (position-overlay-trigger
-           :actions/open-position-reduce-popover
-           position-data))
-         (when margin-editable?
+       (when-not read-only?
+         [:div {:class ["border-t" "border-[#17313d]" "pt-2.5"]}
+          [:div {:class ["relative" "flex" "flex-wrap" "items-center" "gap-x-5" "gap-y-2"]}
            (mobile-position-action-button
-            "Margin"
+            "Close"
             (position-overlay-trigger
-             :actions/open-position-margin-modal
-             position-data)))
-         (mobile-position-action-button
-          "TP/SL"
-          (position-overlay-trigger
-           :actions/open-position-tpsl-modal
-           position-data))]]]})))
+             :actions/open-position-reduce-popover
+             position-data))
+           (when margin-editable?
+             (mobile-position-action-button
+              "Margin"
+              (position-overlay-trigger
+               :actions/open-position-margin-modal
+               position-data)))
+           (mobile-position-action-button
+            "TP/SL"
+            (position-overlay-trigger
+             :actions/open-position-tpsl-modal
+             position-data))]])]})))
 
 (defn- active-position-key-visible?
   [visible-row-keys overlay]
@@ -607,8 +640,9 @@
     overlay))
 
 (defn- mobile-position-overlay-outlet
-  [visible-row-keys tpsl-modal reduce-popover margin-modal]
-  (when (active-card-layout?)
+  [visible-row-keys tpsl-modal reduce-popover margin-modal read-only?]
+  (when (and (active-card-layout?)
+             (not read-only?))
     (let [margin-modal* (ensure-active-layout-anchor margin-modal)
           reduce-popover* (ensure-active-layout-anchor reduce-popover)
           tpsl-modal* (ensure-active-layout-anchor tpsl-modal)]
@@ -654,39 +688,43 @@
 
 (defn position-table-header
   ([sort-state]
-   (position-table-header sort-state []))
+   (position-table-header sort-state false []))
   ([sort-state extra-classes]
-   [:div {:class (into ["grid"
-                        shared/positions-grid-template-class
-                        "gap-2"
-                        "py-1"
-                        "pr-3"
-                        shared/positions-grid-min-width-class
-                        "bg-base-200"]
-                       extra-classes)}
-    [:div.text-left.pl-3 (sortable-header "Coin" sort-state)]
-    [:div.text-left (sortable-header "Size" sort-state)]
-    [:div.text-left (sortable-header "Position Value" sort-state)]
-    [:div.text-left (sortable-header "Entry Price" sort-state)]
-    [:div.text-left (sortable-header "Mark Price" sort-state)]
-    [:div.text-left (sortable-header "PNL (ROE %)" sort-state pnl-header-explanation)]
-    [:div.text-left (sortable-header "Liq. Price" sort-state)]
-    [:div.text-left (sortable-header "Margin" sort-state margin-header-explanation)]
-    [:div.text-left (sortable-header "Funding" sort-state funding-header-explanation)]
-    [:div.text-left
-     [:button {:class (into ["w-full"
-                             "text-left"
-                             "focus:outline-none"
-                             "focus:ring-1"
-                             "focus:ring-[#8a96a6]/40"
-                             "focus:ring-offset-0"
-                             "focus:shadow-none"]
-                            (concat table/header-base-text-classes
-                                    table/sortable-header-interaction-classes))
-               :type "button"
-               :on {:click [[:actions/trigger-close-all-positions]]}}
-      "Close All"]]
-    [:div.text-left (table/non-sortable-header "TP/SL")]]))
+   (position-table-header sort-state false extra-classes))
+  ([sort-state read-only? extra-classes]
+   (into [:div {:class (into ["grid"
+                              (positions-grid-template-class read-only?)
+                              "gap-2"
+                              "py-1"
+                              "pr-3"
+                              (positions-grid-min-width-class read-only?)
+                              "bg-base-200"]
+                             extra-classes)}
+          [:div.text-left.pl-3 (sortable-header "Coin" sort-state)]
+          [:div.text-left (sortable-header "Size" sort-state)]
+          [:div.text-left (sortable-header "Position Value" sort-state)]
+          [:div.text-left (sortable-header "Entry Price" sort-state)]
+          [:div.text-left (sortable-header "Mark Price" sort-state)]
+          [:div.text-left (sortable-header "PNL (ROE %)" sort-state pnl-header-explanation)]
+          [:div.text-left (sortable-header "Liq. Price" sort-state)]
+          [:div.text-left (sortable-header "Margin" sort-state margin-header-explanation)]
+          [:div.text-left (sortable-header "Funding" sort-state funding-header-explanation)]]
+         (concat
+          (when-not read-only?
+            [[:div.text-left
+              [:button {:class (into ["w-full"
+                                      "text-left"
+                                      "focus:outline-none"
+                                      "focus:ring-1"
+                                      "focus:ring-[#8a96a6]/40"
+                                      "focus:ring-offset-0"
+                                      "focus:shadow-none"]
+                                     (concat table/header-base-text-classes
+                                             table/sortable-header-interaction-classes))
+                        :type "button"
+                        :on {:click [[:actions/trigger-close-all-positions]]}}
+               "Close All"]]])
+          [[:div.text-left (table/non-sortable-header "TP/SL")]]))))
 
 (defn positions-tab-content-from-rows
   [{:keys [positions
@@ -703,6 +741,7 @@
         sort-state* (or sort-state {:column nil :direction :asc})
         direction-filter (positions-direction-filter-key positions-state)
         coin-search (:coin-search positions-state "")
+        read-only? (true? (:read-only? positions-state))
         expanded-row-id (get-in positions-state [:mobile-expanded-card :positions])
         row-vms (positions-vm/position-row-vms positions*)
         filtered-row-vms (positions-vm/filter-row-vms row-vms direction-filter coin-search)
@@ -714,7 +753,7 @@
                                sorted-row-vms)]
     (if (seq sorted-row-vms)
       [:div {:class ["flex" "h-full" "min-h-0" "flex-col"]}
-       (position-table-header sort-state* ["hidden" "lg:grid"])
+       (position-table-header sort-state* read-only? ["hidden" "lg:grid"])
        (into [:div {:class ["hidden"
                             "lg:block"
                             "flex-1"
@@ -729,7 +768,8 @@
                     (position-row-from-vm row-vm
                                           tpsl-modal
                                           reduce-popover
-                                          margin-modal))
+                                          margin-modal
+                                          read-only?))
                   sorted-row-vms))
        (into [:div {:class ["lg:hidden"
                             "flex-1"
@@ -747,12 +787,14 @@
                                                   row-vm
                                                   tpsl-modal
                                                   reduce-popover
-                                                  margin-modal))
+                                                  margin-modal
+                                                  read-only?))
                   sorted-row-vms))
        (mobile-position-overlay-outlet visible-row-keys
                                        tpsl-modal
                                        reduce-popover
-                                       margin-modal)]
+                                       margin-modal
+                                       read-only?)]
       (empty-state (if (seq positions*)
                      "No matching positions"
                      "No active positions")))))

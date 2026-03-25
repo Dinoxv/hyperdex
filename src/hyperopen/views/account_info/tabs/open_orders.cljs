@@ -257,6 +257,9 @@
 (def ^:private open-orders-grid-template-class
   "grid-cols-[minmax(130px,1.4fr)_minmax(64px,0.64fr)_minmax(90px,1.15fr)_minmax(64px,0.68fr)_minmax(56px,0.58fr)_minmax(80px,0.8fr)_minmax(96px,1fr)_minmax(68px,0.72fr)_minmax(76px,0.82fr)_minmax(112px,1.15fr)_minmax(64px,0.72fr)_minmax(72px,0.74fr)]")
 
+(def ^:private open-orders-read-only-grid-template-class
+  "grid-cols-[minmax(130px,1.4fr)_minmax(64px,0.64fr)_minmax(90px,1.15fr)_minmax(64px,0.68fr)_minmax(56px,0.58fr)_minmax(80px,0.8fr)_minmax(96px,1fr)_minmax(68px,0.72fr)_minmax(76px,0.82fr)_minmax(112px,1.15fr)_minmax(64px,0.72fr)]")
+
 (def ^:private cancel-all-header-button-classes
   ["flex"
    "w-full"
@@ -459,12 +462,17 @@
    (let [direction-filter (open-orders-direction-filter-key open-orders-state)
          market-by-key (or (:market-by-key open-orders-state) {})
          coin-search (:coin-search open-orders-state "")
+         read-only? (true? (:read-only? open-orders-state))
+         grid-template-class (if read-only?
+                               open-orders-read-only-grid-template-class
+                               open-orders-grid-template-class)
          sorted (memoized-sorted-open-orders normalized direction-filter sort-state market-by-key coin-search)
-         confirmation-view (cancel-visible-open-orders-confirmation-view
-                            (:cancel-visible-confirmation open-orders-state))]
+         confirmation-view (when-not read-only?
+                             (cancel-visible-open-orders-confirmation-view
+                              (:cancel-visible-confirmation open-orders-state)))]
      (if (seq sorted)
        (table/tab-table-content
-        [:div {:class ["grid" "gap-2" "py-1" "px-3" "bg-base-200" "text-xs" "font-medium" open-orders-grid-template-class]}
+        [:div {:class ["grid" "gap-2" "py-1" "px-3" "bg-base-200" "text-xs" "font-medium" grid-template-class]}
          [:div.pr-2.text-left.whitespace-nowrap (sortable-open-orders-header "Time" sort-state)]
          [:div.pl-1.text-left (sortable-open-orders-header "Type" sort-state)]
          [:div.text-left (sortable-open-orders-header "Coin" sort-state)]
@@ -476,10 +484,11 @@
          [:div.text-left.whitespace-nowrap (table/non-sortable-header "Reduce Only")]
          [:div.text-left.whitespace-nowrap (table/non-sortable-header "Trigger Conditions")]
          [:div.text-left (table/non-sortable-header "TP/SL")]
-         [:div.text-left (cancel-all-header-button sorted)]]
+         (when-not read-only?
+           [:div.text-left (cancel-all-header-button sorted)])]
         (for [o sorted]
           ^{:key (str (:oid o) "-" (:coin o))}
-          [:div {:class ["grid" "items-center" "gap-2" "py-px" "px-3" "hover:bg-base-300" "text-xs" open-orders-grid-template-class]}
+          [:div {:class ["grid" "items-center" "gap-2" "py-px" "px-3" "hover:bg-base-300" "text-xs" grid-template-class]}
            [:div.pr-2.text-left.whitespace-nowrap (shared/format-open-orders-time (:time o))]
            [:div.pl-1.text-left (or (:type o) "Order")]
            [:div.text-left (open-orders-coin-node (:coin o) market-by-key (:side o))]
@@ -493,26 +502,27 @@
            [:div.text-left (if (:reduce-only o) "Yes" "No")]
            [:div.text-left (format-trigger-conditions o)]
            [:div.text-left (format-tp-sl o)]
-           [:div.text-left
-           [:button {:class ["inline-flex"
-                              "w-full"
-                              "justify-start"
-                              "bg-transparent"
-                              "p-0"
-                              "font-medium"
-                              "text-trading-text"
-                              "transition-colors"
-                              "focus:outline-none"
-                              "focus:ring-0"
-                              "focus:ring-offset-0"
-                              "focus:shadow-none"
-                              "focus-visible:outline-none"
-                              "focus-visible:ring-0"
-                              "focus-visible:ring-offset-0"
-                              "hover:text-trading-text"
-                              "whitespace-nowrap"]
-                      :on {:click [[:actions/cancel-order o]]}}
-             "Cancel"]]])
+           (when-not read-only?
+             [:div.text-left
+              [:button {:class ["inline-flex"
+                                "w-full"
+                                "justify-start"
+                                "bg-transparent"
+                                "p-0"
+                                "font-medium"
+                                "text-trading-text"
+                                "transition-colors"
+                                "focus:outline-none"
+                                "focus:ring-0"
+                                "focus:ring-offset-0"
+                                "focus:shadow-none"
+                                "focus-visible:outline-none"
+                                "focus-visible:ring-0"
+                                "focus-visible:ring-offset-0"
+                                "hover:text-trading-text"
+                                "whitespace-nowrap"]
+                        :on {:click [[:actions/cancel-order o]]}}
+               "Cancel"]])])
         confirmation-view)
        (if confirmation-view
          [:div {:class ["relative" "h-full"]}

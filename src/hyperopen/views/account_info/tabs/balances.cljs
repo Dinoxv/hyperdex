@@ -14,10 +14,35 @@
 (def ^:private balances-desktop-grid-template-class
   "grid-cols-[minmax(84px,0.78fr)_minmax(132px,0.98fr)_minmax(152px,1.08fr)_minmax(102px,0.74fr)_minmax(176px,1.28fr)_minmax(64px,0.4fr)_minmax(104px,0.56fr)_minmax(48px,0.2fr)_minmax(120px,0.64fr)]")
 
+(def ^:private balances-read-only-desktop-grid-template-class
+  "grid-cols-[minmax(84px,0.82fr)_minmax(132px,1.04fr)_minmax(152px,1.14fr)_minmax(102px,0.8fr)_minmax(176px,1.34fr)_minmax(120px,0.72fr)]")
+
 (defn- empty-state [message]
   [:div.flex.flex-col.items-center.justify-center.py-12.text-base-content
    [:div.text-lg.font-medium message]
    [:div.text-sm.opacity-70.mt-2 "No data available"]])
+
+(defn- desktop-grid-template-class
+  [read-only?]
+  (if read-only?
+    balances-read-only-desktop-grid-template-class
+    balances-desktop-grid-template-class))
+
+(defn- normalize-balances-options
+  [options]
+  (cond
+    (and (map? options)
+         (or (contains? options :mobile-expanded-card)
+             (contains? options :read-only?)
+             (contains? options :read-only-message)))
+    (merge {:mobile-expanded-card {}}
+           options)
+
+    (map? options)
+    {:mobile-expanded-card options}
+
+    :else
+    {:mobile-expanded-card {}}))
 
 (defn- unified-available-balance-tooltip-text [coin available-balance amount-decimals]
   (str (shared/format-balance-amount available-balance amount-decimals)
@@ -331,27 +356,32 @@
                   "text-trading-text-secondary"]}
    label])
 
-(defn balance-row [{:keys [coin
-                           selection-coin
-                           total-balance
-                           available-balance
-                           usdc-value
-                           pnl-value
-                           pnl-pct
-                           amount-decimals
-                           contract-id
-                           key
-                           transfer-disabled?
-                           available-balance-tooltip-position]}]
+(defn balance-row
+  ([row]
+   (balance-row row {}))
+  ([{:keys [coin
+            selection-coin
+            total-balance
+            available-balance
+            usdc-value
+            pnl-value
+            pnl-pct
+            amount-decimals
+            contract-id
+            key
+            transfer-disabled?
+            available-balance-tooltip-position]}
+    {:keys [read-only?]}]
   (let [coin-style (when-not (usdc-balance-row? {:coin coin})
                      {:color "rgb(151, 252, 228)"})
         selectable-coin (or selection-coin coin)
         {:keys [base-label prefix-label] :as coin-display} (balance-coin-display {:coin coin
                                                                                    :selection-coin selection-coin})
-        send-enabled?* (send-enabled? {:key key
-                                       :selection-coin selection-coin
-                                       :coin coin
-                                       :available-balance available-balance})
+        send-enabled?* (and (not read-only?)
+                            (send-enabled? {:key key
+                                            :selection-coin selection-coin
+                                            :coin coin
+                                            :available-balance available-balance}))
         send-action (when send-enabled?*
                       [:actions/open-funding-send-modal
                        (send-action-context {:coin coin
@@ -359,75 +389,81 @@
                                              :available-balance available-balance
                                              :amount-decimals amount-decimals})
                        :event.currentTarget/bounds])]
-    [:div {:class ["grid"
-                   balances-desktop-grid-template-class
-                   "gap-x-4"
-                   "items-center"
-                   "px-3"
-                   "py-px"
-                   "text-sm"
-                   "leading-4"
-                   "text-trading-text"
-                   "hover:bg-base-300"]}
-     (shared/coin-select-control selectable-coin
-                                 (balance-coin-node {:base-label base-label
-                                                     :prefix-label prefix-label})
-                                 {:style coin-style
-                                  :extra-classes ["w-full"
-                                                  "justify-start"
-                                                  "text-left"
-                                                  "font-semibold"
-                                                  "truncate"]})
-     (balance-amount-cell total-balance amount-decimals base-label)
-     [:div.text-left.font-semibold.num.whitespace-nowrap
-      (available-balance-value-node {:coin coin
-                                     :unit-label base-label
-                                     :available-balance available-balance
-                                     :amount-decimals amount-decimals
-                                     :transfer-disabled? transfer-disabled?
-                                     :tooltip-position available-balance-tooltip-position})]
-     [:div.text-left.font-semibold.num "$" (shared/format-currency usdc-value)]
-     [:div.text-left.font-medium.num.pr-4
-      (balance-pnl-node {:coin coin
-                         :selection-coin selection-coin
-                         :pnl-value pnl-value
-                         :pnl-pct pnl-pct
-                         :contract-id contract-id})]
-     [:div.pl-2.text-left
-      (if send-enabled?*
-        (balance-row-action-button "Send" send-action)
-        (balance-row-disabled-action "Send"))]
-     [:div.text-left
-      (if transfer-disabled?
-        [:span {:class ["text-xs" "text-trading-text-secondary"]} "Unified"]
-        (balance-row-action-button "Transfer"))]
-     [:div.text-left]
-     [:div.text-left
-      (balance-contract-node contract-id)]]))
+    (into [:div {:class ["grid"
+                         (desktop-grid-template-class read-only?)
+                         "gap-x-4"
+                         "items-center"
+                         "px-3"
+                         "py-px"
+                         "text-sm"
+                         "leading-4"
+                         "text-trading-text"
+                         "hover:bg-base-300"]}
+           (shared/coin-select-control selectable-coin
+                                       (balance-coin-node {:base-label base-label
+                                                           :prefix-label prefix-label})
+                                       {:style coin-style
+                                        :extra-classes ["w-full"
+                                                        "justify-start"
+                                                        "text-left"
+                                                        "font-semibold"
+                                                        "truncate"]})
+           (balance-amount-cell total-balance amount-decimals base-label)
+           [:div.text-left.font-semibold.num.whitespace-nowrap
+            (available-balance-value-node {:coin coin
+                                           :unit-label base-label
+                                           :available-balance available-balance
+                                           :amount-decimals amount-decimals
+                                           :transfer-disabled? transfer-disabled?
+                                           :tooltip-position available-balance-tooltip-position})]
+           [:div.text-left.font-semibold.num "$" (shared/format-currency usdc-value)]
+           [:div.text-left.font-medium.num.pr-4
+            (balance-pnl-node {:coin coin
+                               :selection-coin selection-coin
+                               :pnl-value pnl-value
+                               :pnl-pct pnl-pct
+                               :contract-id contract-id})]]
+          (concat
+           (when-not read-only?
+             [[:div.pl-2.text-left
+               (if send-enabled?*
+                 (balance-row-action-button "Send" send-action)
+                 (balance-row-disabled-action "Send"))]
+              [:div.text-left
+               (if transfer-disabled?
+                 [:span {:class ["text-xs" "text-trading-text-secondary"]} "Unified"]
+                 (balance-row-action-button "Transfer"))]
+              [:div.text-left]])
+           [[:div.text-left
+             (balance-contract-node contract-id)]])))))
 
 (defn balance-table-header
   ([sort-state]
-   (balance-table-header sort-state []))
+   (balance-table-header sort-state false []))
   ([sort-state extra-classes]
-   [:div {:class (into ["grid"
-                        balances-desktop-grid-template-class
-                        "gap-x-4"
-                        "py-1"
-                        "px-3"
-                        "bg-base-200"
-                        "text-sm"
-                        "font-medium"
-                        "text-trading-text"]
-                       extra-classes)}
-    [:div (sortable-balances-header "Coin" sort-state :left)]
-    [:div (sortable-balances-header "Total Balance" sort-state :left)]
-    [:div (sortable-balances-header "Available Balance" sort-state :left)]
-    [:div (sortable-balances-header "USDC Value" sort-state :left)]
-    [:div.pr-4 (sortable-balances-header "PNL (ROE %)" sort-state :left)]
-    [:div.pl-2 (table/non-sortable-header "Send" :left)]
-    [:div (table/non-sortable-header "Transfer" :left)]
-    [:div (table/non-sortable-header "Repay" :left)]
-    [:div (table/non-sortable-header "Contract" :left)]]))
+   (balance-table-header sort-state false extra-classes))
+  ([sort-state read-only? extra-classes]
+   (into [:div {:class (into ["grid"
+                              (desktop-grid-template-class read-only?)
+                              "gap-x-4"
+                              "py-1"
+                              "px-3"
+                              "bg-base-200"
+                              "text-sm"
+                              "font-medium"
+                              "text-trading-text"]
+                             extra-classes)}
+          [:div (sortable-balances-header "Coin" sort-state :left)]
+          [:div (sortable-balances-header "Total Balance" sort-state :left)]
+          [:div (sortable-balances-header "Available Balance" sort-state :left)]
+          [:div (sortable-balances-header "USDC Value" sort-state :left)]
+          [:div.pr-4 (sortable-balances-header "PNL (ROE %)" sort-state :left)]]
+         (concat
+          (when-not read-only?
+            [[:div.pl-2 (table/non-sortable-header "Send" :left)]
+             [:div (table/non-sortable-header "Transfer" :left)]
+             [:div (table/non-sortable-header "Repay" :left)]])
+          [[:div (table/non-sortable-header "Contract" :left)]]))))
 
 (defn- mobile-balance-coin-node [{:keys [coin selection-coin]}]
   (let [{:keys [base-label prefix-label]}
@@ -467,7 +503,7 @@
         label]
        [:span attrs label]))))
 
-(defn- mobile-balance-card [expanded-row-id row]
+(defn- mobile-balance-card [expanded-row-id row {:keys [read-only?]}]
   (let [{:keys [coin
                 key
                 selection-coin
@@ -484,10 +520,11 @@
         {:keys [base-label]} (shared/resolve-coin-display (or selection-coin coin) {})
         expanded? (= expanded-row-id row-id)
         transfer-enabled? (not transfer-disabled?)
-        send-enabled?* (send-enabled? {:key key
-                                       :selection-coin selection-coin
-                                       :coin coin
-                                       :available-balance available-balance})
+        send-enabled?* (and (not read-only?)
+                            (send-enabled? {:key key
+                                            :selection-coin selection-coin
+                                            :coin coin
+                                            :available-balance available-balance}))
         send-action (when send-enabled?*
                       [:actions/open-funding-send-modal
                        (send-action-context {:coin coin
@@ -547,18 +584,20 @@
                            (mobile-cards/detail-item "Contract"
                                                      contract-node
                                                      {:full-width? true}))])
-                       [:div {:class ["border-t" "border-[#17313d]" "pt-2.5"]}
-                        [:div {:class ["flex" "flex-wrap" "items-center" "gap-x-5" "gap-y-2"]}
-                         (mobile-balance-footer-action "Send" send-enabled?* send-action)
-                         (mobile-balance-footer-action "Transfer to Perps" transfer-enabled?)]]]})))
+                       (when-not read-only?
+                         [:div {:class ["border-t" "border-[#17313d]" "pt-2.5"]}
+                          [:div {:class ["flex" "flex-wrap" "items-center" "gap-x-5" "gap-y-2"]}
+                           (mobile-balance-footer-action "Send" send-enabled?* send-action)
+                           (mobile-balance-footer-action "Transfer to Perps" transfer-enabled?)]])]})))
 
 (defn balances-tab-content
   ([balance-rows hide-small? sort-state]
    (balances-tab-content balance-rows hide-small? sort-state "" {}))
   ([balance-rows hide-small? sort-state coin-search]
    (balances-tab-content balance-rows hide-small? sort-state coin-search {}))
-  ([balance-rows hide-small? sort-state coin-search mobile-expanded-card]
-   (let [rows* (or balance-rows [])
+  ([balance-rows hide-small? sort-state coin-search options]
+   (let [{:keys [mobile-expanded-card read-only?]} (normalize-balances-options options)
+         rows* (or balance-rows [])
          visible-rows (if hide-small?
                         (filter (fn [row]
                                   (>= (shared/parse-num (:usdc-value row)) 1))
@@ -573,7 +612,7 @@
          expanded-row-id (:balances mobile-expanded-card)]
      (if (seq search-filtered-rows)
        [:div {:class ["flex" "h-full" "min-h-0" "flex-col"]}
-        (balance-table-header sort-state ["hidden" "lg:grid"])
+        (balance-table-header sort-state read-only? ["hidden" "lg:grid"])
         (into [:div {:class ["hidden"
                              "lg:block"
                              "flex-1"
@@ -585,7 +624,8 @@
               (map-indexed (fn [idx row]
                              (let [tooltip-position (if (zero? idx) :bottom :top)]
                                ^{:key (:key row)}
-                               (balance-row (assoc row :available-balance-tooltip-position tooltip-position))))
+                               (balance-row (assoc row :available-balance-tooltip-position tooltip-position)
+                                            {:read-only? read-only?})))
                            sorted-rows))
         (into [:div {:class ["lg:hidden"
                              "flex-1"
@@ -600,6 +640,7 @@
                              (let [tooltip-position (if (zero? idx) :bottom :top)]
                                ^{:key (str "mobile-" (:key row))}
                                (mobile-balance-card expanded-row-id
-                                                    (assoc row :available-balance-tooltip-position tooltip-position))))
+                                                    (assoc row :available-balance-tooltip-position tooltip-position)
+                                                    {:read-only? read-only?})))
                            sorted-rows))]
        (empty-state "No balance data available")))))

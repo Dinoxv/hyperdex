@@ -660,12 +660,20 @@
     (empty-state (str (get labels tab-name (name tab-name)) " coming soon"))]))
 
 (def ^:private tab-renderers
-  {:balances (fn [{:keys [balance-rows hide-small? balances-sort balances-coin-search mobile-expanded-card]}]
+  {:balances (fn [{:keys [balance-rows
+                          hide-small?
+                          balances-sort
+                          balances-coin-search
+                          mobile-expanded-card
+                          read-only?
+                          read-only-message]}]
                (balances-tab-content balance-rows
                                      hide-small?
                                      balances-sort
                                      balances-coin-search
-                                     mobile-expanded-card))
+                                     {:mobile-expanded-card mobile-expanded-card
+                                      :read-only? read-only?
+                                      :read-only-message read-only-message}))
    :positions (fn [{:keys [positions
                            webdata2
                            positions-sort

@@ -106,6 +106,30 @@
                                                     :event.currentTarget/bounds]]
            (get-in cancel-button [1 :on :click])))))
 
+(deftest open-orders-tab-content-read-only-mode-omits-cancel-affordances-test
+  (let [row {:oid 101
+             :coin "BTC"
+             :side "B"
+             :sz "1.0"
+             :orig-sz "1.0"
+             :px "100.0"
+             :type "Limit"
+             :time 1700000000000
+             :reduce-only false
+             :is-trigger false
+             :trigger-condition nil
+             :is-position-tpsl false}
+        content (view/open-orders-tab-content [row]
+                                              {:column "Time" :direction :desc}
+                                              {:read-only? true})
+        header-strings (set (hiccup/collect-strings (hiccup/tab-header-node content)))
+        row-node (hiccup/first-viewport-row content)
+        row-strings (set (hiccup/collect-strings row-node))
+        row-buttons (hiccup/find-all-nodes row-node #(= :button (first %)))]
+    (is (not (contains? header-strings "Cancel All")))
+    (is (not (contains? row-strings "Cancel")))
+    (is (= 1 (count row-buttons)))))
+
 (deftest open-orders-cancel-visible-confirmation-renders-dismiss-and-submit-actions-test
   (let [btc-row {:oid 101
                  :coin "BTC"

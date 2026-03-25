@@ -4,6 +4,73 @@
             [hyperopen.views.account-info.test-support.hiccup :as hiccup]
             [hyperopen.views.account-info-view :as view]))
 
+(def ^:private spectate-address
+  "0x4444444444444444444444444444444444444444")
+
+(defn- spectate-account-info-state
+  [selected-tab]
+  (-> fixtures/sample-account-info-state
+      (assoc-in [:account-info :selected-tab] selected-tab)
+      (assoc :account {:mode :classic})
+      (assoc :account-context {:spectate-mode {:active? true
+                                               :address spectate-address}})))
+
+(defn- spectate-balances-state []
+  (-> (spectate-account-info-state :balances)
+      (assoc :asset-selector {:market-by-key {"spot:MEOW/USDC" {:coin "MEOW/USDC"
+                                                                :mark 0.02}}})
+      (assoc :spot {:meta {:tokens [{:index 0 :name "USDC" :weiDecimals 6}
+                                    {:index 1 :name "MEOW" :weiDecimals 6}]
+                           :universe [{:name "MEOW/USDC"
+                                       :tokens [1 0]
+                                       :index 0}]}
+                    :clearinghouse-state {:balances [{:coin "MEOW"
+                                                      :token 1
+                                                      :hold "0.0"
+                                                      :total "2.0"
+                                                      :entryNtl "0.03"}]}})))
+
+(defn- spectate-positions-state []
+  (-> (spectate-account-info-state :positions)
+      (assoc :webdata2 {:clearinghouseState {:assetPositions [fixtures/sample-position-data]}})))
+
+(defn- spectate-open-orders-state []
+  (-> (spectate-account-info-state :open-orders)
+      (assoc-in [:orders :open-orders]
+                [{:coin "BTC"
+                  :oid 101
+                  :side "B"
+                  :sz "1.0"
+                  :origSz "1.0"
+                  :limitPx "100.0"
+                  :orderType "Limit"
+                  :timestamp 1700000000000
+                  :reduceOnly false
+                  :isTrigger false
+                  :isPositionTpsl false}])
+      (assoc :asset-selector {:market-by-key {"perp:BTC" {:coin "BTC"
+                                                          :symbol "BTC"}}})))
+
+(defn- spectate-twap-state []
+  (-> (spectate-account-info-state :twap)
+      (assoc :orders {:open-orders []
+                      :open-orders-snapshot []
+                      :open-orders-snapshot-by-dex {}
+                      :order-history []
+                      :twap-states [[17 {:coin "xyz:CL"
+                                         :side "B"
+                                         :sz "1.0"
+                                         :executedSz "0.4"
+                                         :executedNtl "40.0"
+                                         :minutes 30
+                                         :timestamp 1700000000000
+                                         :reduceOnly false}]]})))
+
+(defn- button-with-text
+  [node text]
+  (hiccup/find-first-node node #(and (= :button (first %))
+                                     (contains? (hiccup/direct-texts %) text))))
+
 (deftest account-info-panel-keeps-a-stable-default-height-across-standard-tabs-test
   (let [balances-panel (view/account-info-panel fixtures/sample-account-info-state)
         positions-panel (view/account-info-panel (assoc-in fixtures/sample-account-info-state
@@ -67,3 +134,36 @@
     (is (contains? panel-classes "h-full"))
     (is (not (contains? panel-classes "h-96")))
     (is (not (contains? panel-classes "lg:h-[29rem]")))))
+
+(deftest account-info-panel-composes-spectate-read-only-state-into-shared-tab-content-test
+  (doseq [{:keys [label panel required-text forbidden-texts forbidden-buttons forbidden-aria-labels]}
+          [{:label "balances"
+            :panel (view/account-info-panel (spectate-balances-state))
+            :required-text "MEOW"
+            :forbidden-texts ["Send" "Transfer" "Repay"]}
+           {:label "positions"
+            :panel (view/account-info-panel (spectate-positions-state))
+            :required-text "HYPE"
+            :forbidden-texts ["Close All"]
+            :forbidden-buttons ["Reduce"]
+            :forbidden-aria-labels ["Edit Margin" "Edit TP/SL"]}
+           {:label "open orders"
+            :panel (view/account-info-panel (spectate-open-orders-state))
+            :required-text "BTC"
+            :forbidden-texts ["Cancel All"]
+            :forbidden-buttons ["Cancel"]}
+           {:label "twap"
+            :panel (view/account-info-panel (spectate-twap-state))
+            :required-text "Active (1)"
+            :forbidden-texts ["Terminate"]}]]
+    (let [strings (set (hiccup/collect-strings panel))]
+      (is (contains? strings required-text) label)
+      (doseq [forbidden-text forbidden-texts]
+        (is (not (contains? strings forbidden-text))
+            (str label " omits " forbidden-text)))
+      (doseq [forbidden-button forbidden-buttons]
+        (is (nil? (button-with-text panel forbidden-button))
+            (str label " omits button " forbidden-button)))
+      (doseq [aria-label forbidden-aria-labels]
+        (is (nil? (hiccup/find-first-node panel #(= aria-label (get-in % [1 :aria-label]))))
+            (str label " omits aria-label " aria-label))))))

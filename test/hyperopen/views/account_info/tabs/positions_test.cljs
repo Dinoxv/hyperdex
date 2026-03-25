@@ -707,6 +707,59 @@
     (is (contains? margin-strings "(Cross)"))
     (is (nil? action-button))))
 
+(deftest positions-tab-content-read-only-mode-omits-desktop-mutation-affordances-test
+  (let [row-data (fixtures/sample-position-row "xyz:NVDA" 10 "0.500")
+        content (render-positions-tab-from-rows [row-data]
+                                                fixtures/default-sort-state
+                                                nil
+                                                nil
+                                                nil
+                                                {:direction-filter :all
+                                                 :read-only? true})
+        header-strings (set (hiccup/collect-strings (hiccup/tab-header-node content)))
+        row-node (hiccup/first-viewport-row content)
+        row-cells (vec (hiccup/node-children row-node))
+        reduce-button (hiccup/find-first-node row-node #(and (= :button (first %))
+                                                             (contains? (hiccup/direct-texts %) "Reduce")))
+        margin-edit-button (hiccup/find-first-node row-node #(= "Edit Margin" (get-in % [1 :aria-label])))
+        tpsl-edit-button (hiccup/find-first-node row-node #(= "Edit TP/SL" (get-in % [1 :aria-label])))
+        row-buttons (hiccup/find-all-nodes row-node #(= :button (first %)))]
+    (is (not (contains? header-strings "Close All")))
+    (is (= 10 (count row-cells)))
+    (is (nil? reduce-button))
+    (is (nil? margin-edit-button))
+    (is (nil? tpsl-edit-button))
+    (is (= 1 (count row-buttons)))))
+
+(deftest positions-tab-content-read-only-mode-omits-mobile-mutation-affordances-test
+  (with-phone-viewport
+    (fn []
+      (let [row-data (fixtures/sample-position-row "xyz:NVDA" 10 "0.500")
+            row-id (view/position-unique-key row-data)
+            content (render-positions-tab-from-rows [row-data]
+                                                    fixtures/default-sort-state
+                                                    nil
+                                                    nil
+                                                    nil
+                                                    {:direction-filter :all
+                                                     :read-only? true
+                                                     :mobile-expanded-card {:positions row-id}})
+            expanded-card (hiccup/find-by-data-role content (str "mobile-position-card-" row-id))
+            margin-edit-button (hiccup/find-first-node expanded-card #(= "Edit Margin" (get-in % [1 :aria-label])))
+            tpsl-edit-button (hiccup/find-first-node expanded-card #(= "Edit TP/SL" (get-in % [1 :aria-label])))
+            close-button (hiccup/find-first-node expanded-card #(and (= :button (first %))
+                                                                     (contains? (hiccup/direct-texts %) "Close")))
+            margin-button (hiccup/find-first-node expanded-card #(and (= :button (first %))
+                                                                      (contains? (hiccup/direct-texts %) "Margin")))
+            tpsl-button (hiccup/find-first-node expanded-card #(and (= :button (first %))
+                                                                    (contains? (hiccup/direct-texts %) "TP/SL")))]
+        (is (contains? (set (hiccup/collect-strings expanded-card)) "TP/SL"))
+        (is (nil? margin-edit-button))
+        (is (nil? tpsl-edit-button))
+        (is (nil? close-button))
+        (is (nil? margin-button))
+        (is (nil? tpsl-button))))))
+
 (deftest positions-tab-content-mobile-cross-margin-card-omits-margin-actions-test
   (with-phone-viewport
     (fn []

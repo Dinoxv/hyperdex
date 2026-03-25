@@ -1,6 +1,7 @@
 (ns hyperopen.views.account-info.vm-test
   (:require [clojure.string :as str]
             [cljs.test :refer-macros [deftest is]]
+            [hyperopen.account.context :as account-context]
             [hyperopen.views.account-info.derived-cache :as derived-cache]
             [hyperopen.views.account-info.vm :as vm]))
 
@@ -80,6 +81,35 @@
     (is (= :short (get-in view-model [:positions-state :direction-filter])))
     (is (= "eth" (get-in view-model [:positions-state :coin-search])))
     (is (true? (get-in view-model [:positions-state :filter-open?])))))
+
+(deftest account-info-vm-projects-inspected-account-read-only-flags-into-shared-tab-state-test
+  (let [trader "0x1111111111111111111111111111111111111111"
+        spectate-address "0x2222222222222222222222222222222222222222"
+        base-state {:account-info {:selected-tab :positions}
+                    :webdata2 {:clearinghouseState {:assetPositions []}}
+                    :orders (base-orders)
+                    :spot {:meta nil
+                           :clearinghouse-state nil}
+                    :account {:mode :classic}
+                    :perp-dex-clearinghouse {}}
+        read-only-cases [{:label "trader route"
+                          :state (assoc base-state
+                                        :router {:path (str "/portfolio/trader/" trader)})
+                          :expected-message account-context/trader-portfolio-read-only-message}
+                         {:label "spectate mode"
+                          :state (assoc base-state
+                                        :account-context {:spectate-mode {:active? true
+                                                                          :address spectate-address}})
+                          :expected-message account-context/spectate-mode-read-only-message}]]
+    (doseq [{:keys [label state expected-message]} read-only-cases]
+      (let [view-model (vm/account-info-vm state)]
+        (is (true? (:read-only? view-model)) label)
+        (is (= expected-message
+               (:read-only-message view-model))
+            label)
+        (is (true? (get-in view-model [:positions-state :read-only?])) label)
+        (is (true? (get-in view-model [:open-orders-state :read-only?])) label)
+        (is (true? (get-in view-model [:twap-state :read-only?])) label)))))
 
 (deftest account-info-vm-computes-heavy-derivations-only-for-selected-tab-test
   (let [base-state {:account-info {}

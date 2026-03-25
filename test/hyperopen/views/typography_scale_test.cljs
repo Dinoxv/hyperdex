@@ -76,7 +76,7 @@
       (is (re-find #"\(def \^:private balances-desktop-grid-template-class\s+\"grid-cols-\["
                    balances-tab-source)))
     (testing "balance row wrapper includes text-sm for 12px baseline"
-      (is (re-find #"\[:div\s+\{:class\s+\[\"grid\"\s+balances-desktop-grid-template-class[\s\S]*?\"text-sm\""
+      (is (re-find #"\[:div\s+\{:class\s+\[\"grid\"\s+(?:\(desktop-grid-template-class read-only\?\)|balances-desktop-grid-template-class)[\s\S]*?\"text-sm\""
                    balances-tab-source)))))
 
 (deftest header-nav-link-css-uses-14px-and-600-weight-test

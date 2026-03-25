@@ -30,25 +30,33 @@
 (def ^:private action-items
   [{:label "Link Staking"
     :mobile-label "Staking"
+    :data-role "portfolio-action-link-staking"
     :action [:actions/navigate "/staking"]}
    {:label "Swap Stablecoins"
     :mobile-label "Swap"
+    :data-role "portfolio-action-swap-stablecoins"
     :action [:actions/navigate "/trade"]}
    {:label "Perps ↔ Spot"
     :mobile-label "Perp Spot"
+    :data-role "portfolio-action-perps-spot"
     :action [:actions/navigate "/trade"]}
    {:label "EVM ↔ Core"
     :mobile-label "EVM Core"
+    :data-role "portfolio-action-evm-core"
     :action [:actions/navigate "/trade"]}
    {:label "Portfolio Margin"
     :mobile-label "PM"
+    :data-role "portfolio-action-portfolio-margin"
     :action [:actions/navigate "/portfolio"]}
    {:label "Send"
+    :data-role "portfolio-action-send"
     :action [:actions/open-funding-transfer-modal :event.currentTarget/bounds]}
    {:label "Withdraw"
+    :data-role "portfolio-action-withdraw"
     :action [:actions/open-funding-withdraw-modal :event.currentTarget/bounds]}
    {:label "Deposit"
     :primary? true
+    :data-role "portfolio-action-deposit"
     :action [:actions/open-funding-deposit-modal :event.currentTarget/bounds]}])
 
 (defn- format-currency [value]
@@ -239,7 +247,7 @@
         gutter-width (+ widest-label-px axis-label-horizontal-padding-px)]
     (js/Math.ceil (max axis-label-min-gutter-width-px gutter-width))))
 
-(defn- action-button [{:keys [label mobile-label action primary?]}]
+(defn- action-button [{:keys [label mobile-label action primary? data-role]}]
   [:button {:type "button"
             :class (into ["btn"
                           "h-8"
@@ -258,6 +266,7 @@
                           "sm:text-xs"]
                          (when primary?
                            ["bg-[#1f5b55]" "text-trading-text" "hover:bg-[#267067]"]))
+            :data-role data-role
             :on {:click [action]}}
    [:span {:class ["sm:hidden"]} (or mobile-label label)]
    [:span {:class ["hidden" "sm:inline"]} label]])
@@ -417,6 +426,7 @@
                      "text-trading-text"
                      "hover:bg-base-200"]
              :aria-expanded (boolean open?)
+             :data-role (str data-role "-trigger")
              :on {:click [[toggle-action]]}}
     [:span label]
     [:svg {:class (into ["h-4" "w-4" "text-trading-text-secondary" "transition-transform"]
@@ -458,6 +468,8 @@
                              (if (= option-value value)
                                ["text-trading-text" "bg-base-200"]
                                ["text-trading-text-secondary"]))
+                :aria-pressed (= option-value value)
+                :data-role (str data-role "-option-" (name option-value))
                 :on {:click [[select-action option-value]]}}
        option-label])]])
 
