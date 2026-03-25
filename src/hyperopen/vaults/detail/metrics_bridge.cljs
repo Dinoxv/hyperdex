@@ -1,6 +1,6 @@
 (ns hyperopen.vaults.detail.metrics-bridge
   (:require [hyperopen.system :as system]
-            [hyperopen.views.portfolio.vm.metrics-bridge :as portfolio-metrics-bridge]))
+            [hyperopen.portfolio.application.metrics-bridge :as portfolio-metrics-bridge]))
 
 (def normalize-worker-metric-values
   portfolio-metrics-bridge/normalize-worker-metric-values)

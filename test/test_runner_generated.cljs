@@ -122,6 +122,7 @@
             [hyperopen.platform-test]
             [hyperopen.platform.indexed-db-test]
             [hyperopen.portfolio.actions-test]
+            [hyperopen.portfolio.application.metrics-bridge-test]
             [hyperopen.portfolio.metrics.builder-test]
             [hyperopen.portfolio.metrics.history-test]
             [hyperopen.portfolio.metrics.quantstats-parity-test]
@@ -185,6 +186,7 @@
             [hyperopen.vaults.actions-test]
             [hyperopen.vaults.adapters.webdata-test]
             [hyperopen.vaults.application.list-commands-test]
+            [hyperopen.vaults.application.list-vm-test]
             [hyperopen.vaults.application.route-loading-test]
             [hyperopen.vaults.application.transfer-commands-test]
             [hyperopen.vaults.application.transfer-state-test]
@@ -199,6 +201,7 @@
             [hyperopen.vaults.effects-test]
             [hyperopen.vaults.infrastructure.list-cache-test]
             [hyperopen.vaults.infrastructure.persistence-test]
+            [hyperopen.vaults.infrastructure.preview-cache-test]
             [hyperopen.vaults.infrastructure.routes-test]
             [hyperopen.views.account-equity-view-test]
             [hyperopen.views.account-info-view-test]
@@ -252,8 +255,6 @@
             [hyperopen.views.portfolio.vm.equity-helpers-test]
             [hyperopen.views.portfolio.vm.history-helpers-test]
             [hyperopen.views.portfolio.vm.history-test]
-            [hyperopen.views.portfolio.vm.metrics-bridge-helpers-test]
-            [hyperopen.views.portfolio.vm.metrics-bridge-test]
             [hyperopen.views.portfolio.vm.performance-helpers-test]
             [hyperopen.views.portfolio.vm.summary-helpers-test]
             [hyperopen.views.portfolio.vm.summary-test]
@@ -500,6 +501,7 @@
              'hyperopen.platform-test
              'hyperopen.platform.indexed-db-test
              'hyperopen.portfolio.actions-test
+             'hyperopen.portfolio.application.metrics-bridge-test
              'hyperopen.portfolio.metrics.builder-test
              'hyperopen.portfolio.metrics.history-test
              'hyperopen.portfolio.metrics.quantstats-parity-test
@@ -563,6 +565,7 @@
              'hyperopen.vaults.actions-test
              'hyperopen.vaults.adapters.webdata-test
              'hyperopen.vaults.application.list-commands-test
+             'hyperopen.vaults.application.list-vm-test
              'hyperopen.vaults.application.route-loading-test
              'hyperopen.vaults.application.transfer-commands-test
              'hyperopen.vaults.application.transfer-state-test
@@ -577,6 +580,7 @@
              'hyperopen.vaults.effects-test
              'hyperopen.vaults.infrastructure.list-cache-test
              'hyperopen.vaults.infrastructure.persistence-test
+             'hyperopen.vaults.infrastructure.preview-cache-test
              'hyperopen.vaults.infrastructure.routes-test
              'hyperopen.views.account-equity-view-test
              'hyperopen.views.account-info-view-test
@@ -630,8 +634,6 @@
              'hyperopen.views.portfolio.vm.equity-helpers-test
              'hyperopen.views.portfolio.vm.history-helpers-test
              'hyperopen.views.portfolio.vm.history-test
-             'hyperopen.views.portfolio.vm.metrics-bridge-helpers-test
-             'hyperopen.views.portfolio.vm.metrics-bridge-test
              'hyperopen.views.portfolio.vm.performance-helpers-test
              'hyperopen.views.portfolio.vm.summary-helpers-test
              'hyperopen.views.portfolio.vm.summary-test

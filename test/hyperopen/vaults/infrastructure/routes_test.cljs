@@ -18,4 +18,12 @@
          (routes/parse-vault-route "/vaults/not-an-address")))
   (is (= {:kind :other
           :path "/trade"}
-         (routes/parse-vault-route "/trade"))))
+         (routes/parse-vault-route "/trade")))
+  (is (true? (routes/vault-route? "/vaults?tab=all")))
+  (is (true? (routes/vault-route? "/vaults/0x1234567890abcdef1234567890abcdef12345678/")))
+  (is (false? (routes/vault-route? "/trade")))
+  (is (false? (routes/vault-detail-route? "/vaults")))
+  (is (true? (routes/vault-detail-route? "/vaults/0x1234567890abcdef1234567890abcdef12345678?tab=about")))
+  (is (= "0x1234567890abcdef1234567890abcdef12345678"
+         (routes/selected-vault-address "/vaults/0x1234567890abcdef1234567890abcdef12345678")))
+  (is (nil? (routes/selected-vault-address "/vaults/not-an-address"))))

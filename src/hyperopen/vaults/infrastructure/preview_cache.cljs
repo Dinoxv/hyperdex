@@ -1,8 +1,8 @@
 (ns hyperopen.vaults.infrastructure.preview-cache
   (:require [clojure.string :as str]
             [hyperopen.platform :as platform]
-            [hyperopen.vaults.application.ui-state :as vault-ui-state]
-            [hyperopen.views.vaults.vm :as vault-vm]))
+            [hyperopen.vaults.application.list-vm :as list-vm]
+            [hyperopen.vaults.application.ui-state :as vault-ui-state]))
 
 (def vault-startup-preview-storage-key
   "vault-startup-preview:v1")
@@ -125,7 +125,7 @@
 
 (defn build-vault-startup-preview-record
   [state]
-  (when-let [preview (vault-vm/build-startup-preview-record
+  (when-let [preview (list-vm/build-startup-preview-record
                       state
                       {:protocol-row-limit vault-startup-preview-protocol-row-limit
                        :user-row-limit vault-startup-preview-user-row-limit

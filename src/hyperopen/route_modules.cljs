@@ -7,7 +7,7 @@
             [hyperopen.portfolio.routes :as portfolio-routes]
             [hyperopen.router :as router]
             [hyperopen.staking.actions :as staking-actions]
-            [hyperopen.views.vaults.vm :as vault-vm]
+            [hyperopen.vaults.infrastructure.routes :as vault-routes]
             [shadow.loader :as loader]))
 
 (def ^:private module-name-by-id
@@ -47,8 +47,8 @@
       (funding-comparison-actions/funding-comparison-route? route) :funding-comparison
       (staking-actions/staking-route? route) :staking
       (api-wallets-actions/api-wallet-route? route) :api-wallets
-      (vault-vm/vault-detail-route? route) :vaults
-      (vault-vm/vault-route? route) :vaults
+      (vault-routes/vault-detail-route? route) :vaults
+      (vault-routes/vault-route? route) :vaults
       :else nil)))
 
 (defn resolved-route-view
@@ -119,7 +119,7 @@
   (when-let [module-id (route-module-id path)]
     (let [view (cached-or-exported-view module-id)]
       (case module-id
-        :vaults (if (vault-vm/vault-detail-route? path)
+        :vaults (if (vault-routes/vault-detail-route? path)
                   (when-let [detail-view (:detail view)]
                     (detail-view state))
                   (when-let [list-view (:list view)]

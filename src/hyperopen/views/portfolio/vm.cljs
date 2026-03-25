@@ -1,12 +1,12 @@
 (ns hyperopen.views.portfolio.vm
   (:require [hyperopen.domain.trading :as trading]
+            [hyperopen.portfolio.application.metrics-bridge :as vm-metrics-bridge]
             [hyperopen.portfolio.actions :as portfolio-actions]
             [hyperopen.views.chart.renderer :as chart-renderer]
             [hyperopen.views.portfolio.vm.benchmarks :as vm-benchmarks]
             [hyperopen.views.portfolio.vm.chart :as vm-chart]
             [hyperopen.views.portfolio.vm.chart-math :as vm-chart-math]
             [hyperopen.views.portfolio.vm.equity :as vm-equity]
-            [hyperopen.views.portfolio.vm.metrics-bridge :as vm-metrics-bridge]
             [hyperopen.views.portfolio.vm.performance :as vm-performance]
             [hyperopen.views.portfolio.vm.summary :as vm-summary]
             [hyperopen.views.portfolio.vm.volume :as vm-volume]

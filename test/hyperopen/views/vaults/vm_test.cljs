@@ -1,8 +1,9 @@
 (ns hyperopen.views.vaults.vm-test
   (:require [cljs.test :refer-macros [deftest is]]
+            [hyperopen.vaults.application.list-vm :as list-vm]
             [hyperopen.views.vaults.vm :as vm]))
 
-(def sample-state
+(def facade-state
   {:wallet {:address "0xabcdefabcdefabcdefabcdefabcdefabcdefabcd"}
    :vaults-ui {:search-query ""
                :filter-leading? true
@@ -55,210 +56,18 @@
                                  :is-closed? true
                                 :create-time-ms (- (.now js/Date) (* 1 24 60 60 1000))
                                 :snapshot-by-key {:month [0.03]}}
-                                {:name "Child Vault"
-                                 :vault-address "0x5555555555555555555555555555555555555555"
-                                 :leader "0x6666666666666666666666666666666666666666"
-                                 :tvl 777
-                                 :apr 0.22
-                                 :relationship {:type :child}
+                                {:name "Gamma"
+                                 :vault-address "0x3333333333333333333333333333333333333333"
+                                 :leader "0x4444444444444444444444444444444444444444"
+                                 :tvl 50
+                                 :apr 0.03
+                                 :relationship {:type :normal}
                                  :is-closed? false
-                                 :create-time-ms (- (.now js/Date) (* 4 24 60 60 1000))
-                                 :snapshot-by-key {:month [0.03]}}]}})
+                                 :create-time-ms 1699500000000
+                                 :snapshot-by-key {:month [0.01 0.02]}}]}})
 
-(def startup-preview-row
-  {:name "Preview Vault"
-   :vault-address "0x6666666666666666666666666666666666666666"
-   :leader "0x7777777777777777777777777777777777777777"
-   :tvl 42
-   :apr 15
-   :your-deposit 0
-   :age-days 2
-   :is-closed? false
-   :snapshot-series [8 16]})
-
-(def startup-preview-record
-  {:saved-at-ms 1700000000000
-   :snapshot-range :month
-   :wallet-address nil
-   :total-visible-tvl 42
-   :protocol-rows [startup-preview-row]
-   :user-rows []})
-
-(deftest vault-route-helper-parses-list-and-detail-routes-test
-  (is (true? (vm/vault-route? "/vaults")))
-  (is (false? (vm/vault-detail-route? "/vaults")))
-  (is (= "0x1234567890abcdef1234567890abcdef12345678"
-         (vm/selected-vault-address "/vaults/0x1234567890abcdef1234567890abcdef12345678")))
-  (is (false? (vm/vault-route? "/trade"))))
-
-(deftest snapshot-range-keys-normalizes-short-and-default-fallback-orders-test
-  (let [snapshot-range-keys @#'hyperopen.views.vaults.vm/snapshot-range-keys]
-    (is (= [:day :week :month :all-time]
-           (snapshot-range-keys :day)))
-    (is (= [:week :month :all-time :day]
-           (snapshot-range-keys :week)))
-    (is (= [:month :week :all-time :day]
-           (snapshot-range-keys "not-a-range")))
-    (is (= [:all-time :month :week :day]
-           (snapshot-range-keys :one-year)))))
-
-(deftest vault-list-vm-groups-filters-and-sorts-rows-test
-  (let [view-model (vm/vault-list-vm sample-state)]
-    (is (false? (:loading? view-model)))
-    (is (false? (:refreshing? view-model)))
-    (is (= 3 (:visible-count view-model)))
-    (is (= 250 (:total-visible-tvl view-model)))
-    (is (= ["Hyperliquidity Provider (HLP)"]
-           (mapv :name (:protocol-rows view-model))))
-    (is (= ["Beta" "Gamma"]
-           (mapv :name (:user-rows view-model))))
-    (is (= ["Beta" "Gamma"]
-           (mapv :name (:visible-user-rows view-model))))
-    (is (= 2 (get-in view-model [:user-pagination :total-rows])))
-    (is (= 10 (get-in view-model [:user-pagination :page-size])))
-    (is (= 1 (get-in view-model [:user-pagination :page])))
-    (is (= 1 (get-in view-model [:user-pagination :page-count])))
-    (is (= ["Beta" "Hyperliquidity Provider (HLP)" "Gamma"]
-           (mapv :name (:rows view-model)))))
-  (let [view-model (vm/vault-list-vm (assoc-in sample-state [:vaults-ui :search-query] "beta"))]
-    (is (= ["Beta"] (mapv :name (:rows view-model)))))
-  (let [view-model (vm/vault-list-vm (-> sample-state
-                                         (assoc-in [:vaults-ui :filter-leading?] false)
-                                         (assoc-in [:vaults-ui :filter-deposited?] false)
-                                         (assoc-in [:vaults-ui :filter-others?] true)))]
-    (is (= ["Gamma"] (mapv :name (:rows view-model)))))
-  (let [view-model (vm/vault-list-vm (assoc-in sample-state [:vaults-ui :filter-closed?] true))]
-    (is (= 4 (:visible-count view-model)))))
-
-(deftest vault-list-vm-paginates-user-vault-rows-test
-  (let [extra-user-rows [{:name "Delta"
-                          :vault-address "0x6666666666666666666666666666666666666666"
-                          :leader "0x7777777777777777777777777777777777777777"
-                          :tvl 60
-                          :apr 0.02
-                          :relationship {:type :normal}
-                          :is-closed? false
-                          :create-time-ms (- (.now js/Date) (* 6 24 60 60 1000))
-                          :snapshot-by-key {:month [0.02]}}
-                         {:name "Epsilon"
-                          :vault-address "0x7777777777777777777777777777777777777777"
-                          :leader "0x8888888888888888888888888888888888888888"
-                          :tvl 55
-                          :apr 0.01
-                          :relationship {:type :normal}
-                          :is-closed? false
-                          :create-time-ms (- (.now js/Date) (* 7 24 60 60 1000))
-                          :snapshot-by-key {:month [0.01]}}
-                         {:name "Zeta"
-                          :vault-address "0x8888888888888888888888888888888888888888"
-                          :leader "0x9999999999999999999999999999999999999999"
-                          :tvl 40
-                          :apr 0.03
-                          :relationship {:type :normal}
-                          :is-closed? false
-                          :create-time-ms (- (.now js/Date) (* 9 24 60 60 1000))
-                          :snapshot-by-key {:month [0.03]}}
-                         {:name "Eta"
-                          :vault-address "0x9999999999999999999999999999999999999999"
-                          :leader "0xaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
-                          :tvl 35
-                          :apr 0.04
-                          :relationship {:type :normal}
-                          :is-closed? false
-                          :create-time-ms (- (.now js/Date) (* 10 24 60 60 1000))
-                          :snapshot-by-key {:month [0.04]}}]
-        view-model (vm/vault-list-vm (-> sample-state
-                                         (assoc-in [:vaults :merged-index-rows]
-                                                   (into (get-in sample-state [:vaults :merged-index-rows])
-                                                         extra-user-rows))
-                                         (assoc-in [:vaults-ui :user-vaults-page-size] 5)
-                                         (assoc-in [:vaults-ui :user-vaults-page] 2)))]
-    (is (= 1 (count (:visible-user-rows view-model))))
-    (is (= 6 (get-in view-model [:user-pagination :total-rows])))
-    (is (= 2 (get-in view-model [:user-pagination :page-count])))
-    (is (= 2 (get-in view-model [:user-pagination :page])))))
-
-(deftest vault-list-vm-uses-snapshot-fallback-keys-for-extended-ranges-test
-  (let [view-model (vm/vault-list-vm (assoc-in sample-state [:vaults-ui :snapshot-range] :one-year))
-        beta-row (some #(when (= "Beta" (:name %))
-                          %)
-                       (:rows view-model))]
-    (is (= [5 9] (:snapshot-series beta-row))))
-  (let [state-with-all-time (assoc-in sample-state
-                                      [:vaults :merged-index-rows 1 :snapshot-by-key]
-                                      {:month [0.05 0.09]
-                                       :all-time [0.2 0.3]})
-        view-model (vm/vault-list-vm (assoc-in state-with-all-time [:vaults-ui :snapshot-range] :one-year))
-        beta-row (some #(when (= "Beta" (:name %))
-                          %)
-                       (:rows view-model))]
-    (is (= [20 30] (:snapshot-series beta-row)))))
-
-(deftest vault-list-vm-treats-startup-preview-as-visible-baseline-test
-  (let [preview-only-state (-> sample-state
-                               (assoc-in [:vaults :merged-index-rows] [])
-                               (assoc-in [:vaults :index-rows] [])
-                               (assoc-in [:vaults :startup-preview] startup-preview-record)
-                               (assoc-in [:vaults :loading :index?] true))
-        preview-only-model (vm/vault-list-vm preview-only-state)
-        live-preview-model (vm/vault-list-vm (assoc-in sample-state
-                                                       [:vaults :startup-preview]
-                                                       startup-preview-record))]
-    (is (= :startup-preview (get-in preview-only-model [:preview-state :source])))
-    (is (true? (get-in preview-only-model [:preview-state :previewing?])))
-    (is (true? (get-in preview-only-model [:preview-state :has-startup-preview?])))
-    (is (false? (get-in preview-only-model [:preview-state :has-live-rows?])))
-    (is (false? (:loading? preview-only-model)))
-    (is (true? (:refreshing? preview-only-model)))
-    (is (= ["Preview Vault"] (mapv :name (:rows preview-only-model))))
-    (is (= 42 (:total-visible-tvl preview-only-model)))
-    (is (= 1 (:visible-count preview-only-model)))
-    (is (= :live (get-in live-preview-model [:preview-state :source])))
-    (is (false? (get-in live-preview-model [:preview-state :previewing?])))))
-
-(deftest build-startup-preview-record-uses-startup-list-defaults-test
-  (let [preview-record (vm/build-startup-preview-record
-                        (-> sample-state
-                            (assoc-in [:vaults-ui :search-query] "beta")
-                            (assoc-in [:vaults-ui :filter-leading?] false)
-                            (assoc-in [:vaults-ui :filter-deposited?] false)
-                            (assoc-in [:vaults-ui :filter-others?] true)
-                            (assoc-in [:vaults-ui :user-vaults-page-size] 5)
-                            (assoc-in [:vaults-ui :user-vaults-page] 2))
-                        {:now-ms 1700000000000
-                         :protocol-row-limit 2
-                         :user-row-limit 2})]
-    (is (= 1700000000000 (:saved-at-ms preview-record)))
-    (is (= :month (:snapshot-range preview-record)))
-    (is (= ["Hyperliquidity Provider (HLP)"]
-           (mapv :name (:protocol-rows preview-record))))
-    (is (= ["Beta" "Gamma"]
-           (mapv :name (:user-rows preview-record))))
-    (is (= 250 (:total-visible-tvl preview-record)))))
-
-(deftest vault-list-vm-reuses-cache-for-unrelated-state-changes-test
-  (vm/reset-vault-list-vm-cache!)
-  (let [base-view-model (vm/vault-list-vm sample-state)
-        unrelated-state-model (vm/vault-list-vm (assoc sample-state
-                                                       :websocket {:health {:generated-at-ms 1234}}))
-        query-changed-model (vm/vault-list-vm (assoc-in sample-state [:vaults-ui :search-query] "beta"))
-        cloned-rows-model (vm/vault-list-vm (assoc-in sample-state
-                                                      [:vaults :merged-index-rows]
-                                                      (into [] (get-in sample-state [:vaults :merged-index-rows]))))]
-    (is (identical? base-view-model unrelated-state-model))
-    (is (not (identical? base-view-model query-changed-model)))
-    (is (not (identical? base-view-model cloned-rows-model)))))
-
-(deftest vault-list-vm-distinguishes-initial-loading-from-refreshing-test
-  (let [initial-loading (vm/vault-list-vm (-> sample-state
-                                              (assoc-in [:vaults :loading :index?] true)
-                                              (assoc-in [:vaults :merged-index-rows] [])))
-        refreshing (vm/vault-list-vm (assoc-in sample-state
-                                               [:vaults :loading :index?]
-                                               true))]
-    (is (true? (:loading? initial-loading)))
-    (is (false? (:refreshing? initial-loading)))
-    (is (= 0 (:visible-count initial-loading)))
-    (is (false? (:loading? refreshing)))
-    (is (true? (:refreshing? refreshing)))
-    (is (= 3 (:visible-count refreshing)))))
+(deftest vaults-vm-facade-delegates-to-application-list-vm-test
+  (is (= (list-vm/vault-list-vm facade-state {:now-ms 1700000000000})
+         (vm/vault-list-vm facade-state {:now-ms 1700000000000})))
+  (is (= (list-vm/build-startup-preview-record facade-state {:now-ms 1700000000000})
+         (vm/build-startup-preview-record facade-state {:now-ms 1700000000000}))))

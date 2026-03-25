@@ -1,6 +1,6 @@
 (ns hyperopen.views.portfolio.vm.performance
   (:require [hyperopen.portfolio.metrics :as portfolio-metrics]
-            [hyperopen.views.portfolio.vm.metrics-bridge :as vm-metrics-bridge]))
+            [hyperopen.portfolio.application.metrics-bridge :as vm-metrics-bridge]))
 
 (def ^:private performance-periods-per-year
   365)

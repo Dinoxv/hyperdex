@@ -39,3 +39,15 @@
          :vault-address (identity/normalize-vault-address raw-address)}
         {:kind :other
          :path path*}))))
+
+(defn vault-route?
+  [path]
+  (not= :other (:kind (parse-vault-route path))))
+
+(defn vault-detail-route?
+  [path]
+  (= :detail (:kind (parse-vault-route path))))
+
+(defn selected-vault-address
+  [path]
+  (:vault-address (parse-vault-route path)))
