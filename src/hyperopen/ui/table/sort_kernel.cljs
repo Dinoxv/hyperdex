@@ -1,4 +1,4 @@
-(ns hyperopen.views.account-info.sort-kernel)
+(ns hyperopen.ui.table.sort-kernel)
 
 (defn zero-accessor [_]
   0)

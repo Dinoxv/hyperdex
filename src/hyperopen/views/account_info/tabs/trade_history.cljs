@@ -1,11 +1,11 @@
 (ns hyperopen.views.account-info.tabs.trade-history
   (:require [clojure.string :as str]
+            [hyperopen.ui.table.sort-kernel :as sort-kernel]
             [hyperopen.views.account-info.cache-keys :as cache-keys]
             [hyperopen.views.account-info.history-pagination :as history-pagination]
             [hyperopen.views.account-info.mobile-cards :as mobile-cards]
             [hyperopen.views.account-info.projections :as projections]
             [hyperopen.views.account-info.shared :as shared]
-            [hyperopen.views.account-info.sort-kernel :as sort-kernel]
             [hyperopen.views.account-info.table :as table]
             [hyperopen.utils.formatting :as fmt]))
 

@@ -1,6 +1,6 @@
 (ns hyperopen.vaults.detail.activity
   (:require [clojure.string :as str]
-            [hyperopen.views.account-info.sort-kernel :as sort-kernel]))
+            [hyperopen.ui.table.sort-kernel :as sort-kernel]))
 
 (defn- non-blank-text
   [value]

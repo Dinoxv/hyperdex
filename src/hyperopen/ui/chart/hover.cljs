@@ -1,4 +1,4 @@
-(ns hyperopen.views.chart.hover)
+(ns hyperopen.ui.chart.hover)
 
 (defn- finite-number
   [value]

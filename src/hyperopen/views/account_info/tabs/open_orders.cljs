@@ -1,10 +1,10 @@
 (ns hyperopen.views.account-info.tabs.open-orders
   (:require [clojure.string :as str]
             [hyperopen.order.cancel-visible-confirmation :as cancel-visible-confirmation]
+            [hyperopen.ui.table.sort-kernel :as sort-kernel]
             [hyperopen.views.account-info.cache-keys :as cache-keys]
             [hyperopen.views.account-info.projections :as projections]
             [hyperopen.views.account-info.shared :as shared]
-            [hyperopen.views.account-info.sort-kernel :as sort-kernel]
             [hyperopen.views.account-info.table :as table]
             [hyperopen.views.ui.anchored-popover :as anchored-popover]))
 

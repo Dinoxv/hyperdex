@@ -1,6 +1,6 @@
 (ns hyperopen.vaults.application.detail-commands
   (:require [hyperopen.portfolio.actions :as portfolio-actions]
-            [hyperopen.views.chart.hover :as chart-hover]
+            [hyperopen.ui.chart.hover :as chart-hover]
             [hyperopen.vaults.detail.activity :as activity-model]
             [hyperopen.vaults.detail.types :as detail-types]
             [hyperopen.vaults.application.ui-state :as ui-state]))

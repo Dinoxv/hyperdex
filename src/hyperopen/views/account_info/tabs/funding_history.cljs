@@ -1,8 +1,8 @@
 (ns hyperopen.views.account-info.tabs.funding-history
   (:require [hyperopen.utils.formatting :as fmt]
+            [hyperopen.ui.table.sort-kernel :as sort-kernel]
             [hyperopen.views.account-info.history-pagination :as history-pagination]
             [hyperopen.views.account-info.shared :as shared]
-            [hyperopen.views.account-info.sort-kernel :as sort-kernel]
             [hyperopen.views.account-info.table :as table]))
 
 (def default-funding-history-sort

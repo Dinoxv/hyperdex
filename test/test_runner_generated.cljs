@@ -174,7 +174,9 @@
             [hyperopen.trade-modules-test]
             [hyperopen.trading.order-form-tpsl-policy-test]
             [hyperopen.trading.order-form-transitions-test]
+            [hyperopen.ui.chart.hover-test]
             [hyperopen.ui.preferences-test]
+            [hyperopen.ui.table.sort-kernel-test]
             [hyperopen.utils.data-normalization-test]
             [hyperopen.utils.formatting-test]
             [hyperopen.utils.hl-signing-test]
@@ -205,7 +207,6 @@
             [hyperopen.views.account-info.position-overlay-mobile-layout-test]
             [hyperopen.views.account-info.position-tpsl-modal-test]
             [hyperopen.views.account-info.projections-test]
-            [hyperopen.views.account-info.sort-kernel-test]
             [hyperopen.views.account-info.table-contract-test]
             [hyperopen.views.account-info.tabs.balances-test]
             [hyperopen.views.account-info.tabs.funding-history-test]
@@ -551,7 +552,9 @@
              'hyperopen.trade-modules-test
              'hyperopen.trading.order-form-tpsl-policy-test
              'hyperopen.trading.order-form-transitions-test
+             'hyperopen.ui.chart.hover-test
              'hyperopen.ui.preferences-test
+             'hyperopen.ui.table.sort-kernel-test
              'hyperopen.utils.data-normalization-test
              'hyperopen.utils.formatting-test
              'hyperopen.utils.hl-signing-test
@@ -582,7 +585,6 @@
              'hyperopen.views.account-info.position-overlay-mobile-layout-test
              'hyperopen.views.account-info.position-tpsl-modal-test
              'hyperopen.views.account-info.projections-test
-             'hyperopen.views.account-info.sort-kernel-test
              'hyperopen.views.account-info.table-contract-test
              'hyperopen.views.account-info.tabs.balances-test
              'hyperopen.views.account-info.tabs.funding-history-test

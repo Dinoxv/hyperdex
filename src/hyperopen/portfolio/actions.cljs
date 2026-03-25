@@ -1,7 +1,7 @@
 (ns hyperopen.portfolio.actions
   (:require [clojure.string :as str]
             [hyperopen.platform :as platform]
-            [hyperopen.views.chart.hover :as chart-hover]))
+            [hyperopen.ui.chart.hover :as chart-hover]))
 
 (def ^:private portfolio-summary-time-range-storage-key
   "portfolio-summary-time-range")
