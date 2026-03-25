@@ -1,7 +1,7 @@
 ---
 owner: architecture
 status: canonical
-last_reviewed: 2026-03-05
+last_reviewed: 2026-03-25
 review_cycle_days: 90
 source_of_truth: true
 ---
@@ -52,7 +52,8 @@ Dependency direction is intentional: domain -> application -> infrastructure. An
   and `/hyperopen/src/hyperopen/app/bootstrap.cljs` + `/hyperopen/src/hyperopen/runtime/bootstrap.cljs` + `/hyperopen/src/hyperopen/startup/watchers.cljs` (runtime bootstrap/watchers).
 - MUST NOT introduce delegation-only startup wrapper namespaces between `app/startup` and startup behavior owners; new startup boundaries require ADR + contract tests.
 - MUST add boundary contract tests for each new seam/module boundary.
-- MUST keep complexity bounded: new namespaces under 500 LOC and new functions under 80 LOC unless justified by an Architecture Decision Record.
+- MUST keep complexity bounded: new namespaces stay under 500 LOC and new functions stay under 80 LOC. Existing oversized namespaces must be tracked in `/hyperopen/dev/namespace_size_exceptions.edn` with `:path`, `:owner`, `:reason`, `:max-lines`, and `:retire-by`, and `npm run check` enforces that registry.
+- MUST keep reusable non-rendering helpers out of `/hyperopen/src/hyperopen/views/**`. Any namespace outside `/hyperopen/src/hyperopen/views/` that still imports `hyperopen.views.*` must be a time-bounded entry in `/hyperopen/dev/namespace_boundary_exceptions.edn`, and `domain/` namespaces must not depend on `hyperopen.views.*`.
 - MUST include invariant ownership notes in PR documentation for changed invariants.
 
 ## Browser Persistence Boundary Rules (MUST)

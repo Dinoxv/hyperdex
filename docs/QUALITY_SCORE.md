@@ -1,7 +1,7 @@
 ---
 owner: platform
 status: canonical
-last_reviewed: 2026-02-13
+last_reviewed: 2026-03-25
 review_cycle_days: 90
 source_of_truth: true
 ---
@@ -43,6 +43,7 @@ Track quality posture by product domain and architectural layer, including known
 - MUST validate new/changed signing vectors against at least one listed reference SDK; for high-risk or ambiguous cases, use at least two references.
 - MUST pass compile gates: `npx shadow-cljs compile app` and `npx shadow-cljs compile test`.
 - MUST keep websocket-focused tests independently runnable.
+- MUST keep architecture guardrail registries honest: no stale or expired entries in `/hyperopen/dev/namespace_size_exceptions.edn` or `/hyperopen/dev/namespace_boundary_exceptions.edn`, and no unregistered forbidden `hyperopen.views.*` imports outside `/hyperopen/src/hyperopen/views/`.
 
 ## TDD Workflow (MUST)
 - MUST follow Red -> Green -> Refactor for behavior changes.
@@ -62,6 +63,7 @@ Track quality posture by product domain and architectural layer, including known
 - MUST pass `npm test`.
 - MUST pass `npm run test:websocket`.
 - MUST keep `/hyperopen/.github/workflows/tests.yml` required in branch protection.
+- MUST retire namespace-size and namespace-boundary exceptions as soon as the owning file or import drops back within policy; exception registries are temporary debt, not a permanent allowlist.
 
 ## Refactor Completion Confidence Gate (Required)
 - Before declaring a refactor complete, MUST reach at least `84.7%` completion confidence.
@@ -83,6 +85,7 @@ Track quality posture by product domain and architectural layer, including known
 - `npm run check`
 - `npm test`
 - `npm run test:websocket`
+- `npm run check` now includes `lint:namespace-sizes` and `lint:namespace-boundaries`, plus their Babashka regression suites.
 
 ## Indicator Kernel Benchmark Governance
 - Benchmark trend snapshot source is `test/hyperopen/domain/trading/indicators/math_kernel_bench_baselines.cljs`.
