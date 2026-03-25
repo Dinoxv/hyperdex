@@ -16,7 +16,8 @@
     <link rel="stylesheet" href="/css/main.css" />
   </head>
   <body>
-    <div id="app" class="h-full">
+    <div id="app" class="h-full"></div>
+    <template id="boot-loading-shell-template">
       <div
         id="boot-loading-shell"
         class="h-full bg-base-100 text-trading-text"
@@ -30,16 +31,12 @@
             >
               <div class="space-y-1">
                 <div
-                  id="boot-loading-title"
                   class="text-sm font-semibold uppercase tracking-[0.12em] text-trading-text-secondary"
                 >
-                  Loading Route
+                  Loading Vaults
                 </div>
-                <p
-                  id="boot-loading-copy"
-                  class="text-sm text-trading-text-secondary"
-                >
-                  Preparing this screen...
+                <p class="text-sm text-trading-text-secondary">
+                  Preparing vault data and route surface...
                 </p>
               </div>
               <div class="flex items-center gap-2 text-xs text-trading-text-secondary">
@@ -54,7 +51,7 @@
                 <div class="space-y-3">
                   <div class="flex items-center gap-2 text-xs text-trading-text-secondary">
                     <span class="h-2 w-2 rounded-full bg-emerald-300 animate-pulse"></span>
-                    <span id="boot-loading-status">Loading workspace…</span>
+                    <span>Loading vault workspace...</span>
                   </div>
                   <div class="overflow-hidden rounded-lg border border-base-300/60">
                     <div class="border-b border-base-300/60 px-3 py-2">
@@ -93,28 +90,33 @@
           </div>
         </div>
       </div>
-    </div>
+    </template>
     <script>
       (function () {
         const manifestUrl = "/js/manifest.json";
         const defaultMainScriptUrl = "/js/main.js";
         const pathname = window.location.pathname || "/";
-        const bootTitle = document.getElementById("boot-loading-title");
-        const bootCopy = document.getElementById("boot-loading-copy");
-        const bootStatus = document.getElementById("boot-loading-status");
 
-        if (pathname.startsWith("/leaderboard")) {
-          bootTitle.textContent = "Loading Leaderboard";
-          bootCopy.textContent = "Preparing ranked trader data and exclusions...";
-          bootStatus.textContent = "Loading leaderboard workspace...";
-        } else if (pathname.startsWith("/vaults")) {
-          bootTitle.textContent = "Loading Vaults";
-          bootCopy.textContent = "Preparing vault data and route surface...";
-          bootStatus.textContent = "Loading vault workspace...";
-        } else if (pathname.startsWith("/portfolio")) {
-          bootTitle.textContent = "Loading Portfolio";
-          bootCopy.textContent = "Preparing account summary and charts...";
-          bootStatus.textContent = "Loading portfolio workspace...";
+        function normalizePath(path) {
+          if (typeof path !== "string" || path.length === 0) {
+            return "/";
+          }
+          const trimmed = path.replace(/\/+$/, "");
+          return trimmed.length === 0 ? "/" : trimmed;
+        }
+
+        function mountBootShell() {
+          if (normalizePath(pathname) !== "/vaults") {
+            return;
+          }
+
+          const appRoot = document.getElementById("app");
+          const template = document.getElementById("boot-loading-shell-template");
+          if (!appRoot || !(template instanceof HTMLTemplateElement)) {
+            return;
+          }
+
+          appRoot.replaceChildren(template.content.cloneNode(true));
         }
 
         function normalizeScriptUrl(outputName) {
@@ -160,6 +162,8 @@
           script.src = src;
           document.body.appendChild(script);
         }
+
+        mountBootShell();
 
         fetch(manifestUrl, { cache: "no-cache" })
           .then((response) => (response.ok ? response.json() : null))

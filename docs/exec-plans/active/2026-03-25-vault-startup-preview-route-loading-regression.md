@@ -25,7 +25,12 @@ The vault hard-reload preview work was meant to make `/vaults` feel faster on a 
 - [x] (2026-03-26 00:09Z) Added the second-round regression coverage in `/hyperopen/test/hyperopen/route_modules_test.cljs`, `/hyperopen/test/hyperopen/runtime/effect_adapters/vaults_test.cljs`, `/hyperopen/test/hyperopen/startup/init_test.cljs`, and `/hyperopen/test/hyperopen/views/vaults/startup_preview_test.cljs`, then regenerated `/hyperopen/test/test_runner_generated.cljs`.
 - [x] (2026-03-26 00:17Z) Captured a fresh post-fix trade trace at `/Users/barry/.codex/worktrees/d5eb/hyperopen/tmp/trade-startup-trace-2026-03-25-postfix.json` against `http://127.0.0.1:4201/trade` and confirmed `rg -n "hyperopen\\.(views\\.vaults\\.preview_shell|vaults\\.infrastructure\\.preview_cache|vaults\\.application\\.list_vm|views\\.vaults\\.list_view|views\\.vaults\\.detail_view)\\.js"` returns no matches.
 - [x] (2026-03-26 00:27Z) Re-ran the full required validation set after the route-module ownership refactor: `npm run test:playwright:smoke -- --grep "main route smoke"`, `npm test`, `npm run test:websocket`, and `npm run check`; all passed.
-- [ ] Confirm the user-managed `http://localhost:8083` runtime is restarted or rebuilt so follow-up manual traces and screenshots reflect the patched startup graph instead of the stale `preview_cache` import.
+- [x] (2026-03-26 00:43Z) Reproduced the user's remaining `/trade` flash on the current worktree and proved it was a separate pre-mount HTML loader, not a CLJS route view: a Playwright `waitUntil: "commit"` probe against `http://127.0.0.1:8081/trade` showed `"Loading Route / Preparing this screen... / Booting UI / Loading workspace…"` before `trade-root` existed, while `app-route-module-shell` was absent.
+- [x] (2026-03-26 00:47Z) Identified commit `1f8315d9ee1ec9825756f68913c7c5d9d16e0ff1` (`Show route loading shell before app boot`) as the remaining regression commit because it inserted the tracked pre-mount boot shell directly into `/hyperopen/resources/public/index.html`.
+- [x] (2026-03-26 00:52Z) Re-scoped the tracked app entrypoint in `/hyperopen/resources/public/index.html` so the boot shell is no longer rendered by default and is injected only for the exact `/vaults` list route; `/trade`, `/portfolio`, and vault detail now boot from an empty app root until the CLJS app mounts.
+- [x] (2026-03-26 00:54Z) Added browser regression coverage in `/hyperopen/tools/playwright/test/routes.smoke.spec.mjs` to prove `/trade` does not render the static boot loading shell on cold startup.
+- [x] (2026-03-26 01:04Z) Re-ran the required validation set after the static-entry fix: `npm run test:playwright:smoke -- --grep "main route smoke|trade cold startup"`, `npm test`, `npm run test:websocket`, and `npm run check`; all passed.
+- [ ] Confirm the user-managed browser session has picked up the updated tracked `resources/public/index.html` entrypoint and no longer shows the static boot shell on `/trade`.
 
 ## Surprises & Discoveries
 
@@ -55,6 +60,12 @@ The vault hard-reload preview work was meant to make `/vaults` feel faster on a 
 
 - Observation: the clean local post-fix trade trace and the user's failing trace came from different runtimes.
   Evidence: the failing follow-up trace references `http://localhost:8083/js/cljs-runtime/hyperopen.vaults.infrastructure.preview_cache.js`, while the clean post-fix trace at `/Users/barry/.codex/worktrees/d5eb/hyperopen/tmp/trade-startup-trace-2026-03-25-postfix.json` records `navigationStart` for `http://127.0.0.1:4201/trade` and the vault namespace grep returns exit code `1`.
+
+- Observation: after the vault namespace leak was fixed, `/trade` still flashed a loading skeleton before the app mounted because the tracked HTML entrypoint rendered one unconditionally.
+  Evidence: the Playwright cold-start probe at `http://127.0.0.1:8081/trade` showed `bootShellCount: 0` only after the fix; before that patch the same probe showed `visibleText: "Loading Route ... Booting UI ... Loading workspace…"` at `0-100 ms` while both `tradeRootCount` and `routeShellCount` were `0`.
+
+- Observation: the remaining visual flash was introduced by a different commit than the vault preview cache regression.
+  Evidence: `git log -S 'boot-loading-shell' --oneline -- resources/public/index.html` points to `1f8315d9ee1ec9825756f68913c7c5d9d16e0ff1` (`Show route loading shell before app boot`) from March 24, 2026.
 
 ## Decision Log
 
@@ -86,11 +97,17 @@ The vault hard-reload preview work was meant to make `/vaults` feel faster on a 
   Rationale: the patched worktree is validated and the local post-fix trade trace is clean, but the latest user-supplied trace still comes from a stale app runtime. Keeping one explicit unchecked follow-up item makes that external validation gap visible without pretending the stale trace is still evidence against the patched tree.
   Date/Author: 2026-03-26 / Codex
 
+- Decision: treat the March 24 tracked HTML boot shell as a separate regression seam and scope it only to the exact `/vaults` list route.
+  Rationale: the user's original report was about vault-style loading leaking onto routes that never owned it. Once the CLJS bundle leak was fixed, the remaining `/trade` flash still came from a table-shaped skeleton that existed before `main.js` ran at all. Leaving that shell in the tracked HTML for `/trade`, `/portfolio`, or vault detail would preserve the user-visible regression even though the bundle graph was clean.
+  Date/Author: 2026-03-26 / Codex
+
 ## Outcomes & Retrospective
 
 The implemented fix reduced overall complexity. The root app shell no longer owns a vault-only loading branch, the shared vault-index effect no longer writes vault preview data on routes that only need support data, the preview-cache namespace now owns a small storage projection instead of importing the full vault list model, and the remaining startup-preview restore or persist hooks now live behind the deferred `vaults_route` module instead of inside `main`. That is a cleaner match for the original intent: `/vaults` gets an optimization, while `/trade`, `/portfolio`, and `/vaults/:address` stay on their normal loading paths and their startup bundle no longer pulls in vault preview code.
 
-The performance evidence is now closed on the patched worktree. Route smoke, the required repository gates, and the fresh trade capture at `/Users/barry/.codex/worktrees/d5eb/hyperopen/tmp/trade-startup-trace-2026-03-25-postfix.json` all passed, and the vault namespace grep returns no matches for that trace. The remaining gap is environmental, not code-level: the user's long-running `localhost:8083` app instance needs to be restarted or rebuilt so its manual traces reflect the patched startup graph.
+The performance evidence is now closed on the patched worktree, and the visual contract is narrower again. Route smoke, the required repository gates, and the fresh trade capture at `/Users/barry/.codex/worktrees/d5eb/hyperopen/tmp/trade-startup-trace-2026-03-25-postfix.json` all passed, the vault namespace grep returns no matches for that trace, and a cold-start Playwright probe now shows `/trade` booting from an empty app root instead of the tracked HTML loading shell. The exact `/vaults` list route still retains the pre-mount shell as an intentional special case.
+
+The remaining gap is environmental, not code-level: the user's browser session still needs to load the updated tracked `resources/public/index.html` from the current app runtime before the manual `/trade` flash report can be considered closed.
 
 ## Context and Orientation
 
@@ -108,6 +125,8 @@ The user-supplied trace is `/Users/barry/Downloads/Trace-20260325T183405.json`. 
 
 The user's follow-up trace is `/Users/barry/Downloads/Trace-20260325T191051.json`. It still shows `hyperopen.vaults.infrastructure.preview_cache.js`, but only that namespace, and it points at `http://localhost:8083`. The fresh local post-fix trace captured in this session is `/Users/barry/.codex/worktrees/d5eb/hyperopen/tmp/trade-startup-trace-2026-03-25-postfix.json`; it targets `http://127.0.0.1:4201/trade` and contains none of the vault namespaces listed above.
 
+There was also a second tracked startup surface outside the CLJS bundle graph. Commit `1f8315d9ee1ec9825756f68913c7c5d9d16e0ff1` changed `/hyperopen/resources/public/index.html` so the browser renders a table-shaped `boot-loading-shell` before `main.js` mounts the app. That shell is part of the static HTML entrypoint, so it can flash on `/trade` even when the CLJS route logic is correct. The current fix restores the pre-March-24 behavior for `/trade`, `/portfolio`, and vault detail by leaving `#app` empty on those routes; only the exact `/vaults` list route now injects the boot shell from a hidden HTML template.
+
 ## Plan of Work
 
 The first edit restores the root shell contract. In `/hyperopen/src/hyperopen/views/app_view.cljs`, remove the vault preview import and the special unresolved `/vaults` branch so every unresolved deferred route falls back to the generic route loader again. Once that branch is gone, `/hyperopen/src/hyperopen/views/vaults/preview_shell.cljs` has no callers and should be deleted.
@@ -119,6 +138,8 @@ The third edit restores a lightweight startup dependency graph. In `/hyperopen/s
 The fourth edit updates tests and validations. `/hyperopen/test/hyperopen/views/app_view_test.cljs` must prove unresolved vault loads use the generic loader again. `/hyperopen/test/hyperopen/vaults/effects_preview_scope_test.cljs` must prove `/portfolio` and `/vaults/:address` do not persist startup preview state after vault-index fetch success. Existing preview-cache tests must still pass so the stored record shape remains stable.
 
 The fifth edit completes the startup graph separation. `/hyperopen/src/hyperopen/startup/init.cljs` should stop restoring vault startup preview from `main`, `/hyperopen/src/hyperopen/runtime/effect_adapters/vaults.cljs` should stop eagerly importing the preview-cache seam, `/hyperopen/src/hyperopen/views/vaults/startup_preview.cljs` should own the restore and persist helpers inside the deferred vault module, and `/hyperopen/src/hyperopen/route_modules.cljs` plus `/hyperopen/shadow-cljs.edn` should ensure those hooks only exist once `vaults_route` is loaded.
+
+The sixth edit re-scopes the tracked HTML entrypoint. `/hyperopen/resources/public/index.html` should stop shipping a rendered boot skeleton to every route. Instead, it should keep the boot shell inside a non-rendered HTML `<template>` and inject that shell only when `window.location.pathname` normalizes to the exact `/vaults` list route. `/trade`, `/portfolio`, and vault detail should start from an empty `#app` container again so they do not flash a table-shaped loading surface before the CLJS runtime mounts.
 
 ## Concrete Steps
 
@@ -148,7 +169,11 @@ From `/Users/barry/.codex/worktrees/d5eb/hyperopen`:
 
    Edit `/hyperopen/src/hyperopen/startup/init.cljs` to remove the hard-load preview restore from app startup. Add `/hyperopen/src/hyperopen/views/vaults/startup_preview.cljs` with the restore and persist helpers. Edit `/hyperopen/src/hyperopen/route_modules.cljs` to call the restore helper only after `vaults_route` is ready for the exact `/vaults` list route, edit `/hyperopen/src/hyperopen/runtime/effect_adapters/vaults.cljs` so persistence resolves through a dynamic route-module hook, and update `/hyperopen/shadow-cljs.edn` so the new startup preview namespace ships in `vaults_route`.
 
-6. Run the required validations and capture the clean trade trace.
+6. Re-scope the tracked HTML boot shell and add a cold-start browser regression.
+
+   Edit `/hyperopen/resources/public/index.html` so the boot shell lives in a hidden HTML template and is mounted only for the exact `/vaults` list route. Update `/hyperopen/tools/playwright/test/routes.smoke.spec.mjs` with a smoke assertion that `/trade` does not render `#boot-loading-shell` on cold startup before `trade-root` appears.
+
+7. Run the required validations and capture the clean trade trace.
 
        npm run test:playwright:smoke -- --grep "main route smoke"
        npm test
@@ -157,13 +182,13 @@ From `/Users/barry/.codex/worktrees/d5eb/hyperopen`:
        rg -n "hyperopen\\.(views\\.vaults\\.preview_shell|vaults\\.infrastructure\\.preview_cache|vaults\\.application\\.list_vm|views\\.vaults\\.list_view|views\\.vaults\\.detail_view)\\.js" /Users/barry/Downloads/Trace-20260325T191051.json
        rg -n "hyperopen\\.(views\\.vaults\\.preview_shell|vaults\\.infrastructure\\.preview_cache|vaults\\.application\\.list_vm|views\\.vaults\\.list_view|views\\.vaults\\.detail_view)\\.js" /Users/barry/.codex/worktrees/d5eb/hyperopen/tmp/trade-startup-trace-2026-03-25-postfix.json
 
-   Expect the smoke suite to pass all 10 route cases, the required repository gates to exit with code `0`, the user trace grep to match only `preview_cache.js` on the stale `localhost:8083` runtime, and the post-fix trace grep to return no matches.
+   Expect the smoke suite plus the new cold-start trade assertion to pass, the required repository gates to exit with code `0`, the user trace grep to match only `preview_cache.js` on the stale `localhost:8083` runtime, and the post-fix trace grep to return no matches.
 
 ## Validation and Acceptance
 
 Acceptance is both behavioral and performance-scoped.
 
-On `/trade`, unresolved route loading must never render vault preview content, and the startup graph should no longer depend on vault-only preview namespaces through either the root shell or any startup/runtime adapter that lives in `main`. The attached March 25 trace is the failing baseline. The follow-up March 25 user trace should still show only `preview_cache.js` when captured from the stale `localhost:8083` app, while the fresh post-fix trade trace from the patched tree must not contain any of the vault preview namespaces that appear in the baseline trace.
+On `/trade`, unresolved route loading must never render vault preview content, the startup graph should no longer depend on vault-only preview namespaces through either the root shell or any startup/runtime adapter that lives in `main`, and the tracked HTML entrypoint must not flash the table-shaped `boot-loading-shell` before `trade-root` mounts. The attached March 25 trace is the failing baseline for the bundle leak. The follow-up March 25 user trace should still show only `preview_cache.js` when captured from the stale `localhost:8083` app, while the fresh post-fix trade trace from the patched tree must not contain any of the vault preview namespaces that appear in the baseline trace.
 
 On `/portfolio` and `/vaults/:address`, successful vault-index support loads must not persist startup preview data. The new effect tests in `/hyperopen/test/hyperopen/vaults/effects_preview_scope_test.cljs` are the regression lock for that route scoping.
 
@@ -230,6 +255,15 @@ while
 
 returns no matches.
 
+Important third-round evidence captured in this session:
+
+    Playwright probe against http://127.0.0.1:8081/trade with waitUntil=commit
+
+returned:
+
+    before fix: "Loading Route / Preparing this screen... / Booting UI / Loading workspace…"
+    after fix: bootShellCount=0 at 0ms and 100ms, then tradeRootCount=1 by 250ms
+
 ## Interfaces and Dependencies
 
 No public API changes are planned. The important interfaces after this fix are:
@@ -241,7 +275,9 @@ No public API changes are planned. The important interfaces after this fix are:
 - `hyperopen.route-modules/route-ready?` and `hyperopen.route-modules/render-route-view` in `/hyperopen/src/hyperopen/route_modules.cljs`, which continue to own deferred route readiness and rendering once the route module is available.
 - `hyperopen.route-modules/load-route-module!` in `/hyperopen/src/hyperopen/route_modules.cljs`, which now also restores startup preview only after the vault module resolves for the exact `/vaults` list route.
 - `hyperopen.runtime.effect-adapters.vaults/persist-vault-startup-preview-record!` in `/hyperopen/src/hyperopen/runtime/effect_adapters/vaults.cljs`, which now resolves the vault-only persist hook dynamically so `main` no longer imports the preview-cache namespace.
+- The tracked browser entrypoint `/hyperopen/resources/public/index.html`, which now leaves `#app` empty by default and injects the boot shell only for the exact `/vaults` list route.
 
 Plan revision note: 2026-03-25 22:42Z - Created the active ExecPlan for `hyperopen-ta4x`, linked the user-reported regression to the March 25 trade trace, and anchored the first fix on the root app shell import leak from the March 21 vault preview commit.
 Plan revision note: 2026-03-25 23:36Z - Expanded the plan to include the full regression chain through the March 18 route-loading change, recorded the preview-persistence leak and startup dependency leak, and updated the implementation record to reflect the root-shell fix, route-gated persistence, lightweight preview-cache builder, new tests, and passing validations.
 Plan revision note: 2026-03-26 00:27Z - Updated the plan after the user's follow-up trace showed a remaining `preview_cache` import on a stale `localhost:8083` runtime, recorded the second-round fix that moved startup preview restore and persist behind `vaults_route`, and captured the clean post-fix trade trace from `http://127.0.0.1:4201/trade`.
+Plan revision note: 2026-03-26 01:04Z - Recorded the separate March 24 tracked-HTML boot-shell regression, narrowed that shell to the exact `/vaults` list route, and added the cold-start Playwright smoke that proves `/trade` no longer flashes the boot shell before `trade-root` mounts.

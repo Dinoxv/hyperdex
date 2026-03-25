@@ -27,6 +27,18 @@ test.describe("main route smoke @smoke", () => {
   }
 });
 
+test("trade cold startup does not render the static boot loading shell @smoke", async ({ page }) => {
+  await page.goto("/trade", { waitUntil: "commit" });
+  await page.waitForTimeout(100);
+  await expect(page.locator("#boot-loading-shell")).toHaveCount(0);
+  await expectOracle(
+    page,
+    "parity-element",
+    { present: true },
+    { args: { parityId: "trade-root" } }
+  );
+});
+
 test.describe("main route smoke mobile @smoke", () => {
   test.use(mobileViewport);
 
