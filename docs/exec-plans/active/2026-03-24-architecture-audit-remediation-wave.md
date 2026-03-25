@@ -17,7 +17,7 @@ After this remediation wave, the repository should be easier to reason about and
 - [x] (2026-03-24 21:34 EDT) Created and claimed `bd` epic `hyperopen-glb1` and created child tasks `hyperopen-glb1.1` through `hyperopen-glb1.6` so this plan has concrete execution tracking instead of a prose-only backlog.
 - [x] (2026-03-25 08:59 EDT) Incorporated the user-provided implementation backlog into this plan, replacing the earlier high-level milestone outline with explicit backlog items `ARCH-01` through `SRP-06`, exact file moves, focused validation, and hard ordering rules.
 - [x] (2026-03-25 09:44 EDT) `ARCH-01` (`hyperopen-glb1.3`): added `/hyperopen/dev/check_namespace_sizes.clj`, `/hyperopen/dev/check_namespace_boundaries.clj`, both Babashka regression suites, `/hyperopen/dev/namespace_size_exceptions.edn`, `/hyperopen/dev/namespace_boundary_exceptions.edn`, package wiring, and the required architecture/quality/debt-doc updates. Validation passed with `npm run check`, `npm test`, and `npm run test:websocket` after installing repo dependencies with `npm ci` and moving one unrelated closed ExecPlan out of `/active/`. Closed `hyperopen-glb1.3` in `bd`.
-- [ ] `DDD-01` (`hyperopen-glb1.1`): move funding modal state out of `domain`.
+- [x] (2026-03-25 10:23 EDT) `DDD-01` (`hyperopen-glb1.1`): moved `/hyperopen/src/hyperopen/funding/domain/modal_state.cljs` to `/hyperopen/src/hyperopen/funding/application/modal_state.cljs`, updated `/hyperopen/src/hyperopen/funding/application/modal_actions.cljs` to use the new application owner, added `/hyperopen/test/hyperopen/funding/application/modal_state_test.cljs`, regenerated `/hyperopen/test/test_runner_generated.cljs`, and passed `npm test`, `npm run check`, and `npm run test:websocket`.
 - [ ] `DDD-02` (`hyperopen-glb1.1`): clean vault UI state out of `domain`.
 - [ ] `DDD-03` (`hyperopen-glb1.1`): split API-wallet UI and session-driven form state out of `domain`.
 - [ ] `DIP-01` (`hyperopen-glb1.4`): move generic helpers out of `views/**`.
@@ -57,6 +57,9 @@ After this remediation wave, the repository should be easier to reason about and
 - Observation: `npm run check` was initially blocked by an unrelated stale active ExecPlan, not by the new guardrails.
   Evidence: `/hyperopen/dev/check_docs.clj` failed on `/hyperopen/docs/exec-plans/active/2026-03-24-portfolio-interaction-state-qa-blind-spots.md`, and `/usr/local/bin/bd show hyperopen-6len --json` confirmed the parent epic plus both child tasks were already closed before the file was moved to `/hyperopen/docs/exec-plans/completed/2026-03-24-portfolio-interaction-state-qa-blind-spots.md`.
 
+- Observation: the funding modal-state move was lower-risk than the audit prose implied because the misleading domain namespace only had one production caller.
+  Evidence: before the move, `rg -n "funding\\.domain\\.modal-state|funding\\.application\\.modal-state" src test` showed `/hyperopen/src/hyperopen/funding/application/modal_actions.cljs` as the only production import of the old namespace.
+
 ## Decision Log
 
 - Decision: adopt the user-provided backlog ordering as the execution contract for this wave.
@@ -91,11 +94,15 @@ After this remediation wave, the repository should be easier to reason about and
   Rationale: the current backlog already schedules the higher-value `DIP-01` and `DIP-02` removals, while these outer-boundary bridges need follow-up design work that would otherwise delay the first CI guardrail landing.
   Date/Author: 2026-03-25 / Codex
 
+- Decision: move the funding modal-state namespace outright to `application/` instead of leaving a compatibility alias under `domain/`.
+  Rationale: no production callers besides `modal_actions.cljs` depended on the old path, and keeping a stub under `domain/` would continue advertising the wrong owner for modal UI state.
+  Date/Author: 2026-03-25 / Codex
+
 ## Outcomes & Retrospective
 
-`ARCH-01` is now complete. No production runtime or view namespace moved yet, but the repository no longer relies on memory for these first architecture rules. `npm run check` now enforces two concrete guardrails: oversized `.cljs` namespaces require a structured exception entry in `/hyperopen/dev/namespace_size_exceptions.edn`, and non-view imports of `hyperopen.views.*` require a structured exception entry in `/hyperopen/dev/namespace_boundary_exceptions.edn` unless the importer lives under `domain/`, which is now a hard failure.
+`ARCH-01` and `DDD-01` are now complete. The repository no longer relies on memory for the first architecture rules, and the funding bounded context no longer keeps modal UI state under a misleading `domain/` namespace. `npm run check` now enforces two concrete guardrails: oversized `.cljs` namespaces require a structured exception entry in `/hyperopen/dev/namespace_size_exceptions.edn`, and non-view imports of `hyperopen.views.*` require a structured exception entry in `/hyperopen/dev/namespace_boundary_exceptions.edn` unless the importer lives under `domain/`, which is now a hard failure.
 
-The result reduced coordination complexity immediately. The repo still carries 85 size exceptions and 9 boundary exceptions, so the codebase is not yet simpler in shape, but the debt is now explicit, time-bounded, and enforced in CI instead of being hidden in prose. The validation also surfaced one unrelated stale active ExecPlan, and moving that closed plan to `/completed/` made the docs gate honest again.
+The result reduced coordination complexity immediately. The repo still carries 85 size exceptions and 9 boundary exceptions, so the codebase is not yet simpler in shape overall, but the debt is now explicit, time-bounded, and enforced in CI instead of being hidden in prose. DDD-01 also removed one concrete semantic lie from the tree: funding modal defaults and normalization now live in `/application/`, where the rest of the modal orchestration already lives. The validation also surfaced one unrelated stale active ExecPlan, and moving that closed plan to `/completed/` made the docs gate honest again.
 
 ## Context and Orientation
 
@@ -860,3 +867,5 @@ Stable structural rules that must hold at the end:
 Plan update note: 2026-03-25 08:59 EDT - Replaced the earlier high-level milestone outline with the user-provided backlog `ARCH-01` through `SRP-06`, including exact file moves, focused validations, hold conditions, global exit criteria, and explicit `bd` task mapping.
 
 Plan update note: 2026-03-25 09:44 EDT - Completed `ARCH-01` by adding namespace-size and namespace-boundary CI guardrails, seeding both exception registries from the live tree, wiring the new checks into `npm run check`, updating architecture/quality/debt docs, running `npm ci`, passing `npm run check`, `npm test`, and `npm run test:websocket`, and closing `hyperopen-glb1.3` in `bd`. Validation also exposed a stale closed active ExecPlan, which was moved to `/completed/` so docs governance stayed truthful.
+
+Plan update note: 2026-03-25 10:23 EDT - Completed `DDD-01` by moving funding modal state ownership from `/hyperopen/src/hyperopen/funding/domain/modal_state.cljs` to `/hyperopen/src/hyperopen/funding/application/modal_state.cljs`, updating the modal-actions facade, adding direct regression coverage, regenerating the test runner, and re-passing `npm test`, `npm run check`, and `npm run test:websocket`.

@@ -96,6 +96,7 @@
             [hyperopen.funding.application.hyperunit-query-test]
             [hyperopen.funding.application.hyperunit-submit-test]
             [hyperopen.funding.application.lifecycle-polling-test]
+            [hyperopen.funding.application.modal-state-test]
             [hyperopen.funding.application.modal-vm-test]
             [hyperopen.funding.application.submit-effects-test]
             [hyperopen.funding.effects-test]
@@ -468,6 +469,7 @@
              'hyperopen.funding.application.hyperunit-query-test
              'hyperopen.funding.application.hyperunit-submit-test
              'hyperopen.funding.application.lifecycle-polling-test
+             'hyperopen.funding.application.modal-state-test
              'hyperopen.funding.application.modal-vm-test
              'hyperopen.funding.application.submit-effects-test
              'hyperopen.funding.effects-test

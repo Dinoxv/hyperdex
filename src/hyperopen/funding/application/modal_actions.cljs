@@ -1,9 +1,9 @@
 (ns hyperopen.funding.application.modal-actions
   (:require [hyperopen.funding.application.modal-commands :as modal-commands]
+            [hyperopen.funding.application.modal-state :as modal-state]
             [hyperopen.funding.application.modal-vm :as modal-vm]
             [hyperopen.funding.domain.assets :as assets-domain]
             [hyperopen.funding.domain.lifecycle :as lifecycle-domain]
-            [hyperopen.funding.domain.modal-state :as modal-state-domain]
             [hyperopen.funding.domain.policy :as policy-domain]))
 
 (def ^:private funding-modal-path
@@ -55,7 +55,7 @@
 (def default-hyperunit-withdrawal-queue-state lifecycle-domain/default-hyperunit-withdrawal-queue-state)
 (def normalize-hyperunit-withdrawal-queue lifecycle-domain/normalize-hyperunit-withdrawal-queue)
 
-(def default-funding-modal-state modal-state-domain/default-funding-modal-state)
+(def default-funding-modal-state modal-state/default-funding-modal-state)
 
 (def normalize-deposit-asset-key assets-domain/normalize-deposit-asset-key)
 (def normalize-withdraw-asset-key assets-domain/normalize-withdraw-asset-key)
@@ -86,7 +86,7 @@
 
 (defn- modal-state
   [state]
-  (modal-state-domain/normalize-modal-state
+  (modal-state/normalize-modal-state
    {:stored-modal (get-in state funding-modal-path)
     :normalize-anchor-fn normalize-anchor}))
 

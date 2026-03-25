@@ -1,4 +1,4 @@
-(ns hyperopen.funding.domain.modal-state
+(ns hyperopen.funding.application.modal-state
   (:require [hyperopen.funding.domain.assets :as assets-domain]
             [hyperopen.funding.domain.policy :as policy-domain]
             [hyperopen.funding.domain.lifecycle :as lifecycle-domain]))
