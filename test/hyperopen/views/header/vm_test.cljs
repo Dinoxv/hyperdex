@@ -14,14 +14,14 @@
 
 (deftest header-vm-centralizes-route-aware-nav-state-test
   (let [funding-vm (vm/header-vm {:router {:path "/fundingComparison"}})
-        referrals-vm (vm/header-vm {:router {:path "/referrals"}})
+        leaderboard-vm (vm/header-vm {:router {:path "/leaderboard"}})
         api-vm (vm/header-vm {:router {:path "/API"}})]
-    (is (= [:trade :portfolio :funding :earn :vaults :staking :referrals :leaderboard]
+    (is (= [:trade :portfolio :funding :vaults :staking :leaderboard]
            (mapv :id (:desktop-nav-items funding-vm))))
     (is (true? (some->> (:desktop-nav-items funding-vm)
                         (some #(when (= :funding (:id %)) (:active? %))))))
-    (is (true? (some->> (get-in referrals-vm [:mobile-nav :secondary-items])
-                        (some #(when (= :referrals (:id %)) (:active? %))))))
+    (is (true? (some->> (get-in leaderboard-vm [:mobile-nav :secondary-items])
+                        (some #(when (= :leaderboard (:id %)) (:active? %))))))
     (is (= "header-more-link-api"
            (get-in api-vm [:more-nav :items 0 :more-data-role])))
     (is (true? (get-in api-vm [:more-nav :active?])))))

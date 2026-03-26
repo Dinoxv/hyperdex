@@ -27,6 +27,17 @@ test.describe("main route smoke @smoke", () => {
   }
 });
 
+test("trade desktop header omits dead Earn and Referrals links @smoke", async ({ page }) => {
+  await visitRoute(page, "/trade");
+
+  const headerNav = page.locator("[data-parity-id='header-nav']");
+
+  await expect(headerNav.getByRole("link", { name: "Trade", exact: true })).toBeVisible();
+  await expect(headerNav.getByRole("link", { name: "Vaults", exact: true })).toBeVisible();
+  await expect(headerNav.getByRole("link", { name: "Earn", exact: true })).toHaveCount(0);
+  await expect(headerNav.getByRole("link", { name: "Referrals", exact: true })).toHaveCount(0);
+});
+
 test("trade cold startup does not render the static boot loading shell @smoke", async ({ page }) => {
   await page.goto("/trade", { waitUntil: "commit" });
   await page.waitForTimeout(100);
@@ -53,6 +64,17 @@ test.describe("main route smoke mobile @smoke", () => {
       );
     });
   }
+
+  test("trade mobile header menu omits dead Earn and Referrals links @smoke", async ({ page }) => {
+    await visitRoute(page, "/trade");
+
+    await page.locator("[data-role='mobile-header-menu-trigger']").click();
+
+    await expect(page.locator("[data-role='mobile-header-menu-link-trade']")).toBeVisible();
+    await expect(page.locator("[data-role='mobile-header-menu-link-vaults']")).toBeVisible();
+    await expect(page.locator("[data-role='mobile-header-menu-link-earn']")).toHaveCount(0);
+    await expect(page.locator("[data-role='mobile-header-menu-link-referrals']")).toHaveCount(0);
+  });
 });
 
 test("leaderboard preferences persist across reload via IndexedDB @smoke", async ({ page }) => {

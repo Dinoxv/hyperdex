@@ -30,11 +30,6 @@
     :route funding-route
     :placements #{:desktop :mobile-primary}
     :active-fn funding-comparison-actions/funding-comparison-route?}
-   {:id :earn
-    :label "Earn"
-    :route "/earn"
-    :placements #{:desktop :mobile-secondary}
-    :active-fn #(exact-or-child-route? % "/earn")}
    {:id :vaults
     :label "Vaults"
     :route "/vaults"
@@ -45,11 +40,6 @@
     :route "/staking"
     :placements #{:desktop :mobile-secondary}
     :active-fn #(exact-or-child-route? % "/staking")}
-   {:id :referrals
-    :label "Referrals"
-    :route "/referrals"
-    :placements #{:desktop :mobile-secondary}
-    :active-fn #(exact-or-child-route? % "/referrals")}
    {:id :leaderboard
     :label "Leaderboard"
     :route "/leaderboard"

@@ -298,9 +298,7 @@
         portfolio-link (find-node-by-role view "mobile-header-menu-link-portfolio")
         funding-link (find-node-by-role view "mobile-header-menu-link-funding")
         vaults-link (find-node-by-role view "mobile-header-menu-link-vaults")
-        earn-link (find-node-by-role view "mobile-header-menu-link-earn")
         staking-link (find-node-by-role view "mobile-header-menu-link-staking")
-        referrals-link (find-node-by-role view "mobile-header-menu-link-referrals")
         leaderboard-link (find-node-by-role view "mobile-header-menu-link-leaderboard")
         spectate-link (find-node-by-role view "mobile-header-menu-spectate")
         layer-classes (set (class-values (get-in layer [1 :class])))
@@ -329,12 +327,8 @@
            (get-in funding-link [1 :on :click])))
     (is (= [[:actions/navigate-mobile-header-menu "/vaults"]]
            (get-in vaults-link [1 :on :click])))
-    (is (= [[:actions/navigate-mobile-header-menu "/earn"]]
-           (get-in earn-link [1 :on :click])))
     (is (= [[:actions/navigate-mobile-header-menu "/staking"]]
            (get-in staking-link [1 :on :click])))
-    (is (= [[:actions/navigate-mobile-header-menu "/referrals"]]
-           (get-in referrals-link [1 :on :click])))
     (is (= [[:actions/navigate-mobile-header-menu "/leaderboard"]]
            (get-in leaderboard-link [1 :on :click])))
     (is (= [[:actions/open-spectate-mode-mobile-header-menu
@@ -355,7 +349,9 @@
     (is (= 0 (:opacity panel-mounting)))
     (is (= "translateX(-18px)" (:transform panel-unmounting)))
     (is (= 0 (:opacity panel-unmounting)))
-    (is (contains? trade-classes "text-white"))))
+    (is (contains? trade-classes "text-white"))
+    (is (nil? (find-node-by-role view "mobile-header-menu-link-earn")))
+    (is (nil? (find-node-by-role view "mobile-header-menu-link-referrals")))))
 
 (deftest wallet-menu-renders-copy-and-disconnect-controls-test
   (let [view (header-view/header-view {:wallet {:connected? true
