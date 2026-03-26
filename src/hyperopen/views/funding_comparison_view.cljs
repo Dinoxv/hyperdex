@@ -1,5 +1,6 @@
 (ns hyperopen.views.funding-comparison-view
   (:require [clojure.string :as str]
+            [hyperopen.account.spectate-mode-links :as spectate-mode-links]
             [hyperopen.utils.formatting :as fmt]
             [hyperopen.views.funding-comparison.vm :as funding-vm]))
 
@@ -88,7 +89,8 @@
     [:span {:class ["text-trading-text-secondary"]} "--"]))
 
 (defn- funding-row
-  [{:keys [coin
+  [state
+   {:keys [coin
            hyperliquid
            binance
            bybit
@@ -103,9 +105,9 @@
                 "hover:bg-base-200/40"]
         :data-role "funding-comparison-row"}
    [:td {:class ["px-3" "py-2.5"]}
-    [:div {:class ["flex" "items-center" "gap-2"]}
-     (favorite-button row)
-     [:a {:href (str "/trade/" coin)
+     [:div {:class ["flex" "items-center" "gap-2"]}
+      (favorite-button row)
+     [:a {:href (spectate-mode-links/internal-route-href state (str "/trade/" coin))
           :class ["truncate"
                   "text-trading-text"
                   "hover:text-primary"]}
@@ -127,7 +129,8 @@
     (arb-cell bybit-hl-arb)]])
 
 (defn- mobile-row
-  [{:keys [coin open-interest hyperliquid binance bybit binance-hl-arb bybit-hl-arb] :as row}]
+  [state
+   {:keys [coin open-interest hyperliquid binance bybit binance-hl-arb bybit-hl-arb] :as row}]
   [:div {:class ["rounded-xl"
                  "border"
                  "border-base-300"
@@ -138,7 +141,7 @@
    [:div {:class ["flex" "items-center" "justify-between" "gap-2"]}
     [:div {:class ["flex" "items-center" "gap-2"]}
      (favorite-button row)
-     [:a {:href (str "/trade/" coin)
+     [:a {:href (spectate-mode-links/internal-route-href state (str "/trade/" coin))
           :class ["text-sm" "font-medium" "text-trading-text"]}
       coin]]
     [:div {:class ["num" "text-xs" "text-trading-text-secondary"]}
@@ -269,7 +272,7 @@
        (if (seq rows)
          (for [row rows]
            ^{:key (:coin row)}
-           (funding-row row))
+           (funding-row state row))
           [:tr {:data-role "funding-comparison-empty-row"}
            [:td {:col-span 7
                  :class ["px-3" "py-6" "text-center" "text-sm" "text-trading-text-secondary"]}
@@ -281,7 +284,7 @@
      (if (seq rows)
         (for [row rows]
           ^{:key (:coin row)}
-          (mobile-row row))
+          (mobile-row state row))
         [:div {:class ["rounded-xl" "border" "border-base-300" "bg-base-100" "p-3" "text-sm" "text-trading-text-secondary"]}
          (if loading?
            "Loading..."

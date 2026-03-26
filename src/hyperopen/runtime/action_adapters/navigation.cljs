@@ -1,6 +1,5 @@
 (ns hyperopen.runtime.action-adapters.navigation
-  (:require [hyperopen.account.context :as account-context]
-            [hyperopen.account.spectate-mode-links :as spectate-mode-links]
+  (:require [hyperopen.account.spectate-mode-links :as spectate-mode-links]
             [hyperopen.api-wallets.actions :as api-wallets-actions]
             [hyperopen.funding-comparison.actions :as funding-comparison-actions]
             [hyperopen.leaderboard.actions :as leaderboard-actions]
@@ -42,11 +41,7 @@
 
 (defn- navigation-browser-path
   [state normalized-path]
-  (spectate-mode-links/spectate-url-path
-   normalized-path
-   (when (and (account-context/spectate-mode-active? state)
-              (not (portfolio-routes/trader-portfolio-route? normalized-path)))
-     (account-context/spectate-address state))))
+  (spectate-mode-links/internal-route-href state normalized-path))
 
 (defn- trade-chart-module-effect
   [state normalized-path]

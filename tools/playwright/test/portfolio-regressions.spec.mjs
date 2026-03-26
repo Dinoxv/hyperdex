@@ -1,7 +1,8 @@
 import { expect, test } from "@playwright/test";
-import { debugCall, visitRoute, waitForIdle } from "../support/hyperopen.mjs";
+import { debugCall, dispatch, visitRoute, waitForIdle } from "../support/hyperopen.mjs";
 
 const TRADER_ADDRESS = "0x3333333333333333333333333333333333333333";
+const SPECTATE_ADDRESS = "0x162cc7c861ebd0c06b3d72319201150482518185";
 
 async function selectSummaryScope(page, scopeValue, expectedLabel) {
   const trigger = page.locator("[data-role='portfolio-summary-scope-selector-trigger']");
@@ -83,4 +84,36 @@ test("trader portfolio route stays read-only while reusing stable controls @regr
 
   await expect(page.locator("[data-role='portfolio-actions-row']")).toBeVisible();
   await expect(page.locator("[data-role='portfolio-action-deposit']")).toBeVisible();
+});
+
+test("spectate mode stays active when navigating from trade to portfolio via header nav @regression", async ({ page }) => {
+  await visitRoute(page, "/trade");
+  await dispatch(page, [":actions/start-spectate-mode", SPECTATE_ADDRESS]);
+  await waitForIdle(page, { quietMs: 150, timeoutMs: 4_000, pollMs: 50 });
+
+  const spectateBanner = page.locator("[data-role='spectate-mode-active-banner']");
+  const portfolioLink = page
+    .locator("[data-parity-id='header-nav']")
+    .getByRole("link", { name: "Portfolio", exact: true });
+
+  await expect(spectateBanner).toBeVisible();
+  await expect.poll(() => new URL(page.url()).searchParams.get("spectate")).toBe(SPECTATE_ADDRESS);
+  await expect(portfolioLink).toHaveAttribute("href", `/portfolio?spectate=${SPECTATE_ADDRESS}`);
+
+  await portfolioLink.click();
+  await waitForIdle(page, { quietMs: 150, timeoutMs: 4_000, pollMs: 50 });
+
+  await expect.poll(async () => {
+    const snapshot = await debugCall(page, "qaSnapshot");
+    return {
+      route: snapshot.route,
+      spectate: new URL(page.url()).searchParams.get("spectate")
+    };
+  }).toMatchObject({
+    route: "/portfolio",
+    spectate: SPECTATE_ADDRESS
+  });
+
+  await expect(spectateBanner).toBeVisible();
+  await expect(page.locator("[data-role='portfolio-actions-row']")).toBeVisible();
 });

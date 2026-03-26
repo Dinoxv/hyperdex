@@ -1,5 +1,6 @@
 (ns hyperopen.views.header.vm
   (:require [hyperopen.account.context :as account-context]
+            [hyperopen.account.spectate-mode-links :as spectate-mode-links]
             [hyperopen.trading-settings :as trading-settings]
             [hyperopen.views.header.nav :as nav]
             [hyperopen.wallet.agent-session :as agent-session]
@@ -17,10 +18,14 @@
 (def ^:private trading-settings-keydown-action
   [[:actions/handle-header-settings-keydown [:event/key]]])
 
+(defn- nav-href
+  [state route]
+  (spectate-mode-links/internal-route-href state route))
+
 (defn- with-desktop-action
-  [item]
+  [state item]
   (assoc item
-         :href (:route item)
+         :href (nav-href state (:route item))
          :action [[:actions/navigate (:route item)]]))
 
 (defn- with-mobile-action
@@ -28,14 +33,14 @@
   (assoc item :action [[:actions/navigate-mobile-header-menu (:route item)]]))
 
 (defn- with-more-action
-  [item]
+  [state item]
   (assoc item
-         :href (:route item)
+         :href (nav-href state (:route item))
          :action [[:actions/navigate (:route item)]]))
 
 (defn- desktop-nav-vm
-  [route]
-  (mapv with-desktop-action
+  [state route]
+  (mapv (partial with-desktop-action state)
         (nav/items-for-placement route :desktop)))
 
 (defn- mobile-nav-vm
@@ -46,8 +51,8 @@
                           (nav/items-for-placement route :mobile-secondary))})
 
 (defn- more-nav-vm
-  [route]
-  (let [items (mapv with-more-action
+  [state route]
+  (let [items (mapv (partial with-more-action state)
                     (nav/items-for-placement route :more))]
     {:menu-key (str "header-more-menu:" route)
      :active? (boolean (some :active? items))
@@ -218,9 +223,9 @@
         spectate-active? (account-context/spectate-mode-active? state)]
     {:route route
      :mobile-menu-open? (true? (get-in state [:header-ui :mobile-menu-open?]))
-     :desktop-nav-items (desktop-nav-vm route)
+     :desktop-nav-items (desktop-nav-vm state route)
      :mobile-nav (mobile-nav-vm route)
-     :more-nav (more-nav-vm route)
+     :more-nav (more-nav-vm state route)
      :spectate (spectate-vm spectate-active?)
      :wallet (wallet-vm state)
      :settings (settings-vm state)}))

@@ -83,3 +83,22 @@
            (get-in active-vm [:spectate :button-label])))
     (is (= "Spectate Mode is active. Click to manage the address you are viewing or stop spectating."
            (get-in active-vm [:spectate :tooltip-copy])))))
+
+(deftest header-vm-projects-spectate-aware-desktop-and-more-hrefs-test
+  (let [result (vm/header-vm {:router {:path "/trade"}
+                              :account-context {:spectate-mode {:active? true
+                                                                 :address connected-address
+                                                                 :started-at-ms 1}}})
+        portfolio-item (some #(when (= :portfolio (:id %)) %) (:desktop-nav-items result))
+        trade-item (some #(when (= :trade (:id %)) %) (:desktop-nav-items result))
+        more-api-item (first (get-in result [:more-nav :items]))]
+    (is (= "/portfolio?spectate=0x1234567890abcdef1234567890abcdef12345678"
+           (:href portfolio-item)))
+    (is (= "/trade?spectate=0x1234567890abcdef1234567890abcdef12345678"
+           (:href trade-item)))
+    (is (= "/API?spectate=0x1234567890abcdef1234567890abcdef12345678"
+           (:href more-api-item)))
+    (is (= [[:actions/navigate "/portfolio"]]
+           (:action portfolio-item)))
+    (is (= [[:actions/navigate "/API"]]
+           (:action more-api-item)))))

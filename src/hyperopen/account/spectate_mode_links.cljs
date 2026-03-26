@@ -1,6 +1,7 @@
 (ns hyperopen.account.spectate-mode-links
   (:require [clojure.string :as str]
             [hyperopen.account.context :as account-context]
+            [hyperopen.portfolio.routes :as portfolio-routes]
             [hyperopen.router :as router]))
 
 (def ^:private spectate-query-param
@@ -23,6 +24,23 @@
     (if address*
       (str path* "?" spectate-query-param "=" address*)
       path*)))
+
+(defn spectate-navigation-path
+  [path address]
+  (let [path* (router/normalize-path path)
+        address* (account-context/normalize-address address)]
+    (spectate-url-path
+     path*
+     (when (and address*
+                (not (portfolio-routes/trader-portfolio-route? path*)))
+       address*))))
+
+(defn internal-route-href
+  [state path]
+  (spectate-navigation-path
+   path
+   (when (account-context/spectate-mode-active? state)
+     (account-context/spectate-address state))))
 
 (defn- location-origin
   [location]

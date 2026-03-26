@@ -25,6 +25,34 @@
   (is (= "/portfolio"
          (spectate-mode-links/spectate-url-path "/portfolio?ignored=true" nil))))
 
+(deftest spectate-navigation-path-preserves-normal-routes-and-suppresses-trader-portfolio-route-test
+  (is (= "/portfolio?spectate=0xabcdefabcdefabcdefabcdefabcdefabcdefabcd"
+         (spectate-mode-links/spectate-navigation-path
+          "/portfolio"
+          "0xABCDEFABCDEFABCDEFABCDEFABCDEFABCDEFABCD")))
+  (is (= "/trade/ETH?spectate=0xabcdefabcdefabcdefabcdefabcdefabcdefabcd"
+         (spectate-mode-links/spectate-navigation-path
+          "/trade/ETH"
+          spectate-address)))
+  (is (= "/vaults/0x9999999999999999999999999999999999999999?spectate=0xabcdefabcdefabcdefabcdefabcdefabcdefabcd"
+         (spectate-mode-links/spectate-navigation-path
+          "/vaults/0x9999999999999999999999999999999999999999"
+          spectate-address)))
+  (is (= "/portfolio/trader/0x3333333333333333333333333333333333333333"
+         (spectate-mode-links/spectate-navigation-path
+          "/portfolio/trader/0x3333333333333333333333333333333333333333"
+          spectate-address))))
+
+(deftest internal-route-href-uses-active-spectate-state-only-test
+  (let [active-state {:account-context {:spectate-mode {:active? true
+                                                        :address spectate-address}}}
+        inactive-state {:account-context {:spectate-mode {:active? false
+                                                          :address spectate-address}}}]
+    (is (= "/portfolio?spectate=0xabcdefabcdefabcdefabcdefabcdefabcdefabcd"
+           (spectate-mode-links/internal-route-href active-state "/portfolio")))
+    (is (= "/portfolio"
+           (spectate-mode-links/internal-route-href inactive-state "/portfolio")))))
+
 (deftest spectate-url-builds-absolute-url-when-origin-is-available-test
   (is (= "https://app.hyperopen.test/trade?spectate=0xabcdefabcdefabcdefabcdefabcdefabcdefabcd"
          (spectate-mode-links/spectate-url

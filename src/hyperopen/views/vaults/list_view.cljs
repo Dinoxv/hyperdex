@@ -1,12 +1,12 @@
 (ns hyperopen.views.vaults.list-view
   (:require [clojure.string :as str]
+            [hyperopen.account.spectate-mode-links :as spectate-mode-links]
             [hyperopen.utils.formatting :as fmt]
             [hyperopen.wallet.core :as wallet]
             [hyperopen.views.vaults.vm :as vault-vm]))
 
 (def ^:private desktop-breakpoint-px
   1024)
-
 (def ^:private focus-visible-ring-classes
   ["focus:outline-none"
    "focus:ring-2"
@@ -23,7 +23,6 @@
   [value]
   (or (fmt/format-large-currency (if (number? value) value 0))
       "$0"))
-
 (defn- format-currency
   [value]
   (or (fmt/format-currency (if (number? value) value 0))
@@ -191,7 +190,6 @@
 (defn- vault-detail-route
   [vault-address]
   (str "/vaults/" vault-address))
-
 (defn- viewport-width-px []
   (let [width (some-> js/globalThis .-innerWidth)]
     (if (number? width)
@@ -253,7 +251,8 @@
              :vector-effect "non-scaling-stroke"}]]))
 
 (defn- vault-row
-  [{:keys [name vault-address leader apr tvl your-deposit age-days snapshot-series is-closed?]}]
+  [state
+   {:keys [name vault-address leader apr tvl your-deposit age-days snapshot-series is-closed?]}]
   [:tr {:class ["border-b"
                 "border-base-300/50"
                 "text-sm"
@@ -261,7 +260,7 @@
                 "hover:bg-base-200/50"]
         :data-role "vault-row"}
    [:td {:class ["px-3" "py-2.5"]}
-    [:a {:href (vault-detail-route vault-address)
+    [:a {:href (spectate-mode-links/internal-route-href state (vault-detail-route vault-address))
          :class (into ["block"
                        "w-full"
                        "text-left"]
@@ -295,8 +294,9 @@
     (snapshot-sparkline snapshot-series)]])
 
 (defn- mobile-vault-card
-  [{:keys [name vault-address leader apr tvl your-deposit age-days snapshot-series]}]
-  [:a {:href (vault-detail-route vault-address)
+  [state
+   {:keys [name vault-address leader apr tvl your-deposit age-days snapshot-series]}]
+  [:a {:href (spectate-mode-links/internal-route-href state (vault-detail-route vault-address))
        :data-role "vault-mobile-card"
        :class (into ["block"
                      "w-full"
@@ -533,7 +533,7 @@
            page-size)
       loading-skeleton-row-count)))
 
-(defn- section-table [label rows sort-state {:keys [loading? pagination desktop-layout?]}]
+(defn- section-table [state label rows sort-state {:keys [loading? pagination desktop-layout?]}]
   (let [loading-row-count (section-loading-row-count pagination)]
     [:section {:class ["space-y-2"]}
      [:h3 {:class ["text-sm" "font-normal" "text-trading-text"]} label]
@@ -568,7 +568,7 @@
             (seq rows)
             (for [row rows]
               ^{:key (str "vault-row-" (:vault-address row))}
-              (vault-row row))
+              (vault-row state row))
 
             :else
             [:tr
@@ -585,7 +585,7 @@
           (seq rows)
           (for [row rows]
             ^{:key (str "mobile-vault-row-" (:vault-address row))}
-            (mobile-vault-card row))
+            (mobile-vault-card state row))
 
           :else
           [:div {:class ["rounded-lg"
@@ -723,11 +723,11 @@
                                "md:p-3"]
                               (when loading?
                                 ["min-h-[24rem]" "md:min-h-[36rem]"]))}
-       (section-table "Protocol Vaults" protocol-rows sort {:loading? loading?
-                                                            :desktop-layout? desktop-layout?})
-       (section-table "User Vaults" visible-user-rows sort {:loading? loading?
-                                                            :pagination user-pagination
-                                                            :desktop-layout? desktop-layout?})
+       (section-table state "Protocol Vaults" protocol-rows sort {:loading? loading?
+                                                                  :desktop-layout? desktop-layout?})
+       (section-table state "User Vaults" visible-user-rows sort {:loading? loading?
+                                                                  :pagination user-pagination
+                                                                  :desktop-layout? desktop-layout?})
        [:div {:class ["text-right" "text-xs" "text-trading-text-secondary"]}
         (str (count protocol-rows) " protocol vaults | " (count user-rows) " user vaults")]]]]))
 
