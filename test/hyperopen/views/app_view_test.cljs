@@ -363,8 +363,9 @@
         rendered-strings (set (hiccup/collect-strings view-node))]
     (is (= 2 (count toast-nodes)))
     (is (= 2 (count dismiss-nodes)))
-    (is (every? #(contains? % "bg-[#081b24]/95") toast-class-sets))
-    (is (every? #(contains? % "border-[#1f4f4f]") toast-class-sets))
+    (is (every? #(contains? % "global-toast-surface") toast-class-sets))
+    (is (= ["success" "success"]
+           (mapv #(get-in % [1 :data-toast-kind]) toast-nodes)))
     (is (contains? rendered-strings "Bought 6 HYPE"))
     (is (contains? rendered-strings "Sold 1.25 SOL"))
     (is (contains? rendered-strings "At average price of $31.66667"))

@@ -199,6 +199,111 @@
     will-change: opacity, transform;
   }
 
+  @keyframes global-toast-enter {
+    from {
+      opacity: 0;
+      transform: translate3d(0, 10px, 0) scale(0.985);
+    }
+
+    to {
+      opacity: 1;
+      transform: translate3d(0, 0, 0) scale(1);
+    }
+  }
+
+  .global-toast-surface {
+    position: relative;
+    border: 1px solid rgb(52 78 89 / 0.9);
+    background:
+      radial-gradient(circle at top left, rgb(50 103 113 / 0.16), transparent 48%),
+      linear-gradient(135deg, rgb(6 24 31 / 0.98), rgb(10 35 43 / 0.98));
+    box-shadow:
+      0 20px 48px rgb(3 10 16 / 0.42),
+      0 0 0 1px rgb(206 233 229 / 0.05) inset;
+    backdrop-filter: blur(18px);
+    animation: global-toast-enter 180ms cubic-bezier(0.22, 1, 0.36, 1) both;
+    will-change: opacity, transform;
+  }
+
+  .global-toast-accent {
+    width: 3px;
+    align-self: stretch;
+    flex-shrink: 0;
+    border-radius: 999px;
+    background: linear-gradient(
+      180deg,
+      rgb(127 255 225 / 0.96) 0%,
+      rgb(66 212 193 / 0.82) 100%
+    );
+    box-shadow: 0 0 18px rgb(82 242 200 / 0.2);
+    opacity: 0;
+  }
+
+  .global-toast-icon-shell {
+    border: 1px solid rgb(93 130 142 / 0.48);
+    background: rgb(16 46 56 / 0.78);
+    color: rgb(142 255 225 / 0.96);
+    box-shadow: 0 10px 24px rgb(4 14 20 / 0.22);
+  }
+
+  .global-toast-dismiss {
+    color: rgb(140 165 178 / 0.88);
+    background: transparent;
+    transition:
+      color 140ms ease-out,
+      background-color 140ms ease-out,
+      transform 140ms ease-out;
+  }
+
+  .global-toast-dismiss:hover,
+  .global-toast-dismiss:focus-visible {
+    color: rgb(234 245 250 / 0.98);
+    background: rgb(240 248 252 / 0.08);
+    transform: translateY(-1px);
+  }
+
+  .global-toast-surface[data-toast-kind="success"] {
+    border-color: rgb(55 88 94 / 0.92);
+    background:
+      radial-gradient(circle at top left, rgb(61 179 170 / 0.16), transparent 48%),
+      linear-gradient(135deg, rgb(5 23 30 / 0.98), rgb(10 38 45 / 0.98));
+  }
+
+  .global-toast-surface[data-toast-kind="success"] .global-toast-icon-shell {
+    border-color: rgb(94 156 152 / 0.55);
+    background: rgb(11 55 58 / 0.76);
+    color: rgb(134 255 220 / 0.97);
+  }
+
+  .global-toast-surface[data-toast-kind="error"] {
+    border-color: rgb(106 67 75 / 0.94);
+    background:
+      radial-gradient(circle at top left, rgb(177 74 93 / 0.18), transparent 48%),
+      linear-gradient(135deg, rgb(24 16 23 / 0.98), rgb(45 24 31 / 0.98));
+  }
+
+  .global-toast-surface[data-toast-kind="error"] .global-toast-accent {
+    background: linear-gradient(
+      180deg,
+      rgb(255 163 183 / 0.95) 0%,
+      rgb(225 88 110 / 0.84) 100%
+    );
+    box-shadow: 0 0 18px rgb(225 88 110 / 0.2);
+    opacity: 1;
+  }
+
+  .global-toast-surface[data-toast-kind="error"] .global-toast-icon-shell {
+    border-color: rgb(161 100 114 / 0.55);
+    background: rgb(66 28 40 / 0.72);
+    color: rgb(255 202 214 / 0.96);
+  }
+
+  .global-toast-surface[data-toast-kind="info"] .global-toast-icon-shell {
+    border-color: rgb(96 129 152 / 0.52);
+    background: rgb(14 39 55 / 0.76);
+    color: rgb(155 220 255 / 0.95);
+  }
+
   @keyframes ui-loading-shimmer {
     from {
       background-position: 200% 0;
@@ -230,7 +335,11 @@
     details[open] > .ui-dropdown-panel[data-ui-native-details-panel="true"],
     .ui-confirmation-backdrop,
     .ui-confirmation-panel,
-    .ui-loading-shimmer {
+    .ui-loading-shimmer,
+    .global-toast-surface,
+    .global-toast-dismiss,
+    .global-toast-dismiss:hover,
+    .global-toast-dismiss:focus-visible {
       transition: none;
       animation: none;
       transform: none;

@@ -1,27 +1,12 @@
 (ns hyperopen.views.notifications-view
   (:require [clojure.string :as str]))
 
-(defn- toast-tone
+(defn- toast-kind-name
   [kind]
   (case kind
-    :success {:card ["border-[#1f4f4f]"
-                     "bg-[#081b24]/95"]
-              :icon ["text-[#52f2c8]"
-                     "border-[#52f2c8]/70"]
-              :headline ["text-[#f6fefd]"]
-              :subline ["text-[#9aa9bb]"]}
-    :error {:card ["border-[#7b3340]"
-                   "bg-[#081b24]/95"]
-            :icon ["text-error"
-                   "border-error/70"]
-            :headline ["text-[#ffe3e8]"]
-            :subline ["text-[#f2b8c3]"]}
-    {:card ["border-[#1f3b3c]"
-            "bg-[#081b24]/95"]
-     :icon ["text-info"
-            "border-info/70"]
-     :headline ["text-[#f6fefd]"]
-     :subline ["text-[#9aa9bb]"]}))
+    :success "success"
+    :error "error"
+    "info"))
 
 (defn- normalize-toast-text
   [value]
@@ -87,65 +72,65 @@
 (defn- toast-card
   [toast]
   (let [kind (or (:kind toast) :info)
-        tone (toast-tone kind)
         {:keys [headline subline]} (toast-display-lines toast)
-        toast-id (:id toast)]
+        toast-id (:id toast)
+        toast-kind (toast-kind-name kind)]
     (when (seq headline)
-      [:div {:class (into ["pointer-events-auto"
-                           "flex"
-                           "items-center"
-                           "gap-3"
-                           "rounded-[14px]"
-                           "border"
-                           "px-4"
-                           "py-3"
-                           "spectate-[0_14px_32px_rgba(7,12,22,0.42)]"
-                           "backdrop-blur-sm"]
-                          (:card tone))
+      [:div {:class ["global-toast-surface"
+                     "pointer-events-auto"
+                     "flex"
+                     "items-center"
+                     "gap-3"
+                     "overflow-hidden"
+                     "rounded-[16px]"
+                     "px-3.5"
+                     "py-3"]
              :role "status"
              :aria-live (if (= :error kind) "assertive" "polite")
+             :data-toast-kind toast-kind
              :data-role "global-toast"}
-       [:span {:class (into ["inline-flex"
-                             "h-5"
-                             "w-5"
-                             "shrink-0"
-                             "items-center"
-                             "justify-center"
-                             "rounded-full"
-                             "border"]
-                            (:icon tone))}
+       [:span {:class ["global-toast-accent"]
+               :aria-hidden true}]
+       [:span {:class ["global-toast-icon-shell"
+                       "inline-flex"
+                       "h-8"
+                       "w-8"
+                       "shrink-0"
+                       "items-center"
+                       "justify-center"
+                       "rounded-full"]}
         (toast-icon kind)]
        [:div {:class ["min-w-0" "flex-1"]}
-        [:p {:class (into ["truncate"
-                           "text-sm"
-                           "font-medium"
-                           "leading-5"]
-                          (:headline tone))}
+        [:p {:class ["truncate"
+                     "text-sm"
+                     "font-semibold"
+                     "leading-5"
+                     "tracking-[0.01em]"
+                     "text-[#f4fbff]"]}
          headline]
         (when (seq subline)
-          [:p {:class (into ["truncate"
-                             "text-sm"
-                             "leading-5"]
-                            (:subline tone))}
+          [:p {:class ["truncate"
+                       "pt-0.5"
+                       "text-[13px]"
+                       "leading-5"
+                       "text-[#a9bac6]"]}
            subline])]
-       [:button {:type "button"
-                 :class ["inline-flex"
-                         "h-7"
-                         "w-7"
-                         "shrink-0"
-                         "items-center"
-                         "justify-center"
-                         "rounded-md"
-                         "text-[#b7c4d3]"
-                         "transition-colors"
-                         "hover:text-[#e8eef6]"
-                         "focus:outline-none"
-                         "focus:ring-0"
-                         "focus:ring-offset-0"]
-                 :aria-label "Dismiss notification"
-                 :on {:click [[:actions/dismiss-order-feedback-toast toast-id]]}
-                 :data-role "global-toast-dismiss"}
-        (dismiss-icon)]])))
+       [:div {:class ["ml-1" "flex" "shrink-0" "items-center" "self-stretch"]}
+        [:button {:type "button"
+                  :class ["global-toast-dismiss"
+                          "inline-flex"
+                          "h-8"
+                          "w-8"
+                          "items-center"
+                          "justify-center"
+                          "rounded-full"
+                          "focus:outline-none"
+                          "focus:ring-0"
+                          "focus:ring-offset-0"]
+                  :aria-label "Dismiss notification"
+                  :on {:click [[:actions/dismiss-order-feedback-toast toast-id]]}
+                  :data-role "global-toast-dismiss"}
+         (dismiss-icon)]]])))
 
 (defn notifications-view
   [state]
