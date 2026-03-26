@@ -394,6 +394,7 @@
             [hyperopen.websocket.health-test]
             [hyperopen.websocket.infrastructure.runtime-effects-test]
             [hyperopen.websocket.infrastructure.transport-test]
+            [hyperopen.websocket.instrument-coverage-test]
             [hyperopen.websocket.interval-coverage-test]
             [hyperopen.websocket.market-projection-runtime-test]
             [hyperopen.websocket.migration-flags-test]
@@ -810,6 +811,7 @@
              'hyperopen.websocket.health-test
              'hyperopen.websocket.infrastructure.runtime-effects-test
              'hyperopen.websocket.infrastructure.transport-test
+             'hyperopen.websocket.instrument-coverage-test
              'hyperopen.websocket.interval-coverage-test
              'hyperopen.websocket.market-projection-runtime-test
              'hyperopen.websocket.migration-flags-test
