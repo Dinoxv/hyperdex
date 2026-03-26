@@ -153,7 +153,9 @@
             [hyperopen.runtime.effect-adapters.common-test]
             [hyperopen.runtime.effect-adapters.facade-contract-test]
             [hyperopen.runtime.effect-adapters.funding-test]
+            [hyperopen.runtime.effect-adapters.leaderboard-test]
             [hyperopen.runtime.effect-adapters.order-test]
+            [hyperopen.runtime.effect-adapters.staking-test]
             [hyperopen.runtime.effect-adapters.vaults-test]
             [hyperopen.runtime.effect-adapters.wallet-test]
             [hyperopen.runtime.effect-adapters.websocket-test]
@@ -567,7 +569,9 @@
              'hyperopen.runtime.effect-adapters.common-test
              'hyperopen.runtime.effect-adapters.facade-contract-test
              'hyperopen.runtime.effect-adapters.funding-test
+             'hyperopen.runtime.effect-adapters.leaderboard-test
              'hyperopen.runtime.effect-adapters.order-test
+             'hyperopen.runtime.effect-adapters.staking-test
              'hyperopen.runtime.effect-adapters.vaults-test
              'hyperopen.runtime.effect-adapters.wallet-test
              'hyperopen.runtime.effect-adapters.websocket-test
