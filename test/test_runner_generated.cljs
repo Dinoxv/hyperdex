@@ -184,6 +184,7 @@
             [hyperopen.state.trading.validation-and-scale-test]
             [hyperopen.system-test]
             [hyperopen.telemetry-test]
+            [hyperopen.telemetry.console-preload-debug-api-test]
             [hyperopen.telemetry.console-preload-test]
             [hyperopen.telemetry.console-preload.simulators-test]
             [hyperopen.telemetry.console-warning-test]
@@ -594,6 +595,7 @@
              'hyperopen.state.trading.validation-and-scale-test
              'hyperopen.system-test
              'hyperopen.telemetry-test
+             'hyperopen.telemetry.console-preload-debug-api-test
              'hyperopen.telemetry.console-preload-test
              'hyperopen.telemetry.console-preload.simulators-test
              'hyperopen.telemetry.console-warning-test
