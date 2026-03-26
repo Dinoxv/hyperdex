@@ -111,8 +111,8 @@
         (when (seq subline)
           [:p {:class ["truncate"
                        "pt-0.5"
-                       "text-[13px]"
-                       "leading-5"
+                       "text-xs"
+                       "leading-4"
                        "text-[#a9bac6]"]}
            subline])]
        [:div {:class ["ml-1" "flex" "shrink-0" "items-center" "self-stretch"]}
