@@ -29,6 +29,63 @@
                     (is false "Unexpected predicted fundings success-path error")
                     (done)))))))
 
+(deftest api-fetch-predicted-fundings-bypasses-route-gate-when-explicitly-disabled-test
+  (async done
+    (let [request-calls (atom [])
+          store (atom {:router {:path "/trade"}})]
+      (-> (effects/api-fetch-predicted-fundings!
+           {:store store
+            :request-predicted-fundings! (fn [opts]
+                                           (swap! request-calls conj opts)
+                                           (js/Promise.resolve [["ETH" []]]))
+            :begin-funding-comparison-load (fn [state]
+                                             (assoc state :loading? true))
+            :apply-funding-comparison-success (fn [state rows]
+                                                (assoc state :rows rows))
+            :apply-funding-comparison-error (fn [state err]
+                                              (assoc state :error err))
+            :opts {:skip-route-gate? true
+                   :priority :high
+                   :client-tag "test"}})
+          (.then (fn [rows]
+                   (is (= [["ETH" []]] rows))
+                   (is (= [{:priority :high
+                            :client-tag "test"}]
+                          @request-calls))
+                   (is (= true (:loading? @store)))
+                   (is (= [["ETH" []]] (:rows @store)))
+                   (done)))
+          (.catch (fn [err]
+                    (js/console.error err)
+                    (is false "Unexpected route-gate bypass error")
+                    (done)))))))
+
+(deftest api-fetch-predicted-fundings-defaults-options-to-empty-map-test
+  (async done
+    (let [request-calls (atom [])
+          store (atom {:router {:path "/funding-comparison"}})]
+      (-> (effects/api-fetch-predicted-fundings!
+           {:store store
+            :request-predicted-fundings! (fn [opts]
+                                           (swap! request-calls conj opts)
+                                           (js/Promise.resolve []))
+            :begin-funding-comparison-load (fn [state]
+                                             (assoc state :loading? true))
+            :apply-funding-comparison-success (fn [state rows]
+                                                (assoc state :rows rows))
+            :apply-funding-comparison-error (fn [state err]
+                                              (assoc state :error err))})
+          (.then (fn [rows]
+                   (is (= [] rows))
+                   (is (= [{}] @request-calls))
+                   (is (= true (:loading? @store)))
+                   (is (= [] (:rows @store)))
+                   (done)))
+          (.catch (fn [err]
+                    (js/console.error err)
+                    (is false "Unexpected default-options error")
+                    (done)))))))
+
 (deftest api-fetch-predicted-fundings-applies-error-projection-test
   (async done
     (let [store (atom {:router {:path "/funding-comparison"}})]
