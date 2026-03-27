@@ -231,12 +231,15 @@
     (testing (name id)
       (let [actual (commands/build-order-request context form)]
         (is (= expected actual))
-        (if (= :submit-ready contract)
+        (when (some? actual)
           (case (:type form)
             :scale (is (= expected
-                          (contracts/assert-scale-request! actual {:vector id})))
+                          (contracts/assert-scale-request! actual {:vector id
+                                                                   :contract contract})))
             :twap (is (= expected
-                         (contracts/assert-twap-request! actual {:vector id}))))
+                         (contracts/assert-twap-request! actual {:vector id
+                                                                 :contract contract})))))
+        (when (and (= :raw-builder contract) (nil? expected))
           (is (nil? actual)))))))
 
 (deftest build-order-request-includes-update-leverage-pre-action-test

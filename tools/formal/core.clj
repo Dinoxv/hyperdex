@@ -15,8 +15,10 @@
                              :target-source "target/formal/order-request-standard-vectors.cljs"
                              :committed-source "test/hyperopen/formal/order_request_standard_vectors.cljs"}
    "order-request-advanced" {:lean-module "Hyperopen.Formal.OrderRequest.Advanced"
-                             :status "bootstrap"
-                             :manifest "generated/order-request-advanced.edn"}})
+                             :status "modeled"
+                             :manifest "generated/order-request-advanced.edn"
+                             :target-source "target/formal/order-request-advanced-vectors.cljs"
+                             :committed-source "test/hyperopen/formal/order_request_advanced_vectors.cljs"}})
 
 (def ^:private install-message
   (str "Lean 4 is required for the formal toolchain.\n"

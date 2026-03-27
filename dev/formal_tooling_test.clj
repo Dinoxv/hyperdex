@@ -21,14 +21,22 @@
    :target-source "target/formal/order-request-standard-vectors.cljs"
    :committed-source "test/hyperopen/formal/order_request_standard_vectors.cljs"})
 
-(def advanced-bootstrap-surface
+(def advanced-surface
   {:id "order-request-advanced"
    :lean-module "Hyperopen.Formal.OrderRequest.Advanced"
+   :status "modeled"
+   :manifest "generated/order-request-advanced.edn"
+   :target-source "target/formal/order-request-advanced-vectors.cljs"
+   :committed-source "test/hyperopen/formal/order_request_advanced_vectors.cljs"})
+
+(def bootstrap-test-surface
+  {:id "bootstrap-test"
+   :lean-module "Hyperopen.Formal.Bootstrap"
    :status "bootstrap"
-   :manifest "generated/order-request-advanced.edn"})
+   :manifest "generated/bootstrap-test.edn"})
 
 (def modeled-surfaces
-  [vault-surface standard-surface])
+  [vault-surface standard-surface advanced-surface])
 
 (defn delete-recursive!
   [file]
@@ -57,8 +65,8 @@
          (#'formal/manifest-content vault-surface)))
   (is (= "{:surface \"order-request-standard\" :module \"Hyperopen.Formal.OrderRequest.Standard\" :status \"modeled\"}\n"
          (#'formal/manifest-content standard-surface)))
-  (is (= "{:surface \"order-request-advanced\" :module \"Hyperopen.Formal.OrderRequest.Advanced\" :status \"bootstrap\"}\n"
-         (#'formal/manifest-content advanced-bootstrap-surface))))
+  (is (= "{:surface \"order-request-advanced\" :module \"Hyperopen.Formal.OrderRequest.Advanced\" :status \"modeled\"}\n"
+         (#'formal/manifest-content advanced-surface))))
 
 (deftest sync-generated-source-copies-transient-export-into-committed-namespace-test
   (doseq [{:keys [target-source committed-source] :as surface} modeled-surfaces]
@@ -83,8 +91,8 @@
                (#'formal/verify-generated-source! surface))))))))
 
 (deftest bootstrap-surface-skips-generated-source-checks-test
-  (is (nil? (#'formal/verify-generated-source! advanced-bootstrap-surface)))
-  (is (nil? (#'formal/sync-generated-source! advanced-bootstrap-surface))))
+  (is (nil? (#'formal/verify-generated-source! bootstrap-test-surface)))
+  (is (nil? (#'formal/sync-generated-source! bootstrap-test-surface))))
 
 (deftest run-sync-and-verify-support-modeled-generated-source-artifacts-test
   (doseq [{:keys [id target-source committed-source lean-module] :as surface} modeled-surfaces]
