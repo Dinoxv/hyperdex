@@ -267,16 +267,17 @@
                  0
                  (/ (* start-weight (- skew* 1.0)) (dec n)))
           raw-weights (map (fn [idx]
-                             (let [raw (+ start-weight (* step idx))]
-                               (if (and (number? raw)
-                                        (js/isFinite raw)
-                                        (>= raw 0))
-                                 raw
-                                 0)))
+                             (+ start-weight (* step idx)))
                            (range n))
-          total (reduce + raw-weights)]
+          safe-weights (when (every? (fn [raw]
+                                       (and (number? raw)
+                                            (js/isFinite raw)))
+                                     raw-weights)
+                         (map #(max 0 %) raw-weights))
+          total (when (seq safe-weights)
+                  (reduce + safe-weights))]
       (if (and (number? total) (js/isFinite total) (pos? total))
-        (map #(/ % total) raw-weights)
+        (map #(/ % total) safe-weights)
         (repeat n (/ 1 n))))))
 
 (defn scale-order-legs

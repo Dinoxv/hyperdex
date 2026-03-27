@@ -183,6 +183,11 @@
   (let [weights (vec (trading/scale-weights 4 0))]
     (is (every? #(approx= 0.25 %) weights))))
 
+(deftest scale-weights-invalid-numeric-skew-fails-closed-to-uniform-weights-test
+  (let [weights (vec (trading/scale-weights 4 js/NaN))]
+    (is (every? #(approx= 0.25 %) weights))
+    (is (approx= 1 (reduce + weights)))))
+
 (deftest scale-weights-pins-expected-shape-for-skewed-ladders-test
   (let [weights (vec (trading/scale-weights 4 2.0))]
     (is (approx= 0.1666666667 (nth weights 0)))

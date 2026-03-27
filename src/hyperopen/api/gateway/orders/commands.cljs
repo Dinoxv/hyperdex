@@ -105,16 +105,24 @@
                       (positive-number? price)
                       (positive-number? trigger)))})
 
+(def ^:private order-wire-values-valid-checks
+  {:limit (fn [{:keys [price-text]}]
+            (seq price-text))
+   :market (fn [{:keys [price-text]}]
+             (seq price-text))
+   :stop-market (fn [{:keys [trigger-text]}]
+                  (seq trigger-text))
+   :stop-limit (fn [{:keys [price-text trigger-text]}]
+                 (and (seq price-text) (seq trigger-text)))
+   :take-market (fn [{:keys [trigger-text]}]
+                  (seq trigger-text))
+   :take-limit (fn [{:keys [price-text trigger-text]}]
+                 (and (seq price-text) (seq trigger-text)))})
+
 (defn- order-wire-values-valid?
-  [order-type {:keys [price-text trigger-text]}]
-  (case order-type
-    :limit (seq price-text)
-    :market (seq price-text)
-    :stop-market (seq trigger-text)
-    :stop-limit (and (seq price-text) (seq trigger-text))
-    :take-market (seq trigger-text)
-    :take-limit (and (seq price-text) (seq trigger-text))
-    true))
+  [order-type wire-values]
+  (when-let [check (get order-wire-values-valid-checks order-type)]
+    (check wire-values)))
 
 (def ^:private standard-order-shape-builders
   {:limit (fn [base-order {:keys [post-only tif]}]
