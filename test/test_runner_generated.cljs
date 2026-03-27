@@ -371,6 +371,7 @@
             [hyperopen.websocket.application.runtime-engine-test]
             [hyperopen.websocket.application.runtime-reducer-test]
             [hyperopen.websocket.application.runtime-test]
+            [hyperopen.websocket.application.runtime-tla-conformance-test]
             [hyperopen.websocket.asset-selector-coverage-test]
             [hyperopen.websocket.candles-test]
             [hyperopen.websocket.client-test]
@@ -791,6 +792,7 @@
              'hyperopen.websocket.application.runtime-engine-test
              'hyperopen.websocket.application.runtime-reducer-test
              'hyperopen.websocket.application.runtime-test
+             'hyperopen.websocket.application.runtime-tla-conformance-test
              'hyperopen.websocket.asset-selector-coverage-test
              'hyperopen.websocket.candles-test
              'hyperopen.websocket.client-test

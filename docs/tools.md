@@ -24,7 +24,8 @@ Use this file as the single starting point for what actions this repo provides t
 10. For multi-agent role, artifact, and gate rules, use `/hyperopen/docs/MULTI_AGENT.md` and the manager under `/hyperopen/tools/multi-agent/`.
 11. For issue tracking and session handoff rules, use `/hyperopen/docs/WORK_TRACKING.md`.
 12. For Lean-backed formal-tool commands, use `npm run formal:verify -- --surface <vault-transfer|order-request-standard|order-request-advanced>` and `npm run formal:sync -- --surface <surface>`.
-13. For exact browser inspection command syntax, see:
+13. For websocket TLA+ model-checking, use `npm run tla:verify -- --spec websocket-runtime`.
+14. For exact browser inspection command syntax, see:
    - `/hyperopen/tools/browser-inspection/src/cli.mjs`
    - `/hyperopen/tools/browser-inspection/src/mcp_server.mjs`
 
@@ -41,6 +42,7 @@ Use this file as the single starting point for what actions this repo provides t
 | `npm run test:crap` | Fast Babashka tests for CRAP-tool parsing and report math | Before changing the CRAP analyzer/reporter |
 | `npm run test:mutation` | Fast Babashka tests for the mutation tool | Before changing `/hyperopen/tools/mutate/**` |
 | `npm run test:formal-tooling` | Fast Babashka tests for the formal wrapper and generated-source checks | Before changing `/hyperopen/tools/formal/**` |
+| `npm run test:tla-tooling` | Fast Babashka tests for the websocket TLA+ wrapper and TLC output-root guarantees | Before changing `/hyperopen/tools/tla.clj` or the websocket TLA wrapper contract |
 | `npm run lint:delimiters -- --changed` | Fast Clojure/CLJS reader preflight on changed files | Before `npm test`, `npm run test:websocket`, or manual `shadow-cljs` compiles after syntax-heavy edits |
 | `npm run test:websocket` | Websocket-only suite | Websocket runtime/API changes |
 | `npm run mutate:nightly` | Rebuild coverage, run the configured nightly mutation sweep, and write aggregate summaries under `target/mutation/nightly/**` | Overnight hotspot sweeps or local batch mutation audits |
@@ -59,6 +61,7 @@ Use this file as the single starting point for what actions this repo provides t
 | `bb tools/mutate_nightly.clj` | Run the checked-in nightly mutation target list serially and aggregate markdown/JSON summaries | Overnight mutation sweeps, regression spotting, or local ranking of weak modules |
 | `npm run formal:verify -- --surface vault-transfer` | Build the Lean workspace, check the selected formal surface manifest, and for modeled surfaces confirm the checked-in generated source is current | After changing formal tooling, proof models, or generated formal vectors |
 | `npm run formal:sync -- --surface vault-transfer` | Regenerate the deterministic formal manifest and, for modeled surfaces, refresh the checked-in generated vector namespace | When you need to refresh manifests or generated formal vectors after a proof/model update |
+| `npm run tla:verify -- --spec websocket-runtime` | Run TLC against the bounded websocket runtime model and write transient artifacts under `/hyperopen/target/tla/**` | After changing `/hyperopen/spec/tla/**`, websocket TLA tooling, or reducer invariants mirrored in the model |
 | `npm run browser:inspect -- --url <url> --target <label>` | One-off parity capture | Visual/runtime parity evidence and smoke checks |
 | `npm run browser:compare` | One-off compare capture | Compare two targets (Hyperliquid vs local) |
 | `npm run qa:design-ui` | Run the design-system browser QA contract | Required evidence-backed conformance review for UI-facing changes |
@@ -86,6 +89,8 @@ Current surface state:
 - `order-request-advanced`: modeled; emits transient generated source under `/hyperopen/target/formal/` and syncs the checked-in bridge under `/hyperopen/test/hyperopen/formal/order_request_advanced_vectors.cljs`
 
 The generated manifests live under `/hyperopen/tools/formal/generated/`, transient generated source lives under `/hyperopen/target/formal/`, and the Lean workspace lives under `/hyperopen/tools/formal/lean/`.
+
+The websocket runtime TLA+ track is separate on purpose. Use `tools/tla.clj` and `npm run tla:verify -- --spec websocket-runtime` for TLC runs against `/hyperopen/spec/tla/websocket_runtime.tla`. The wrapper looks for `TLA2TOOLS_JAR` first and `/hyperopen/tools/tla/vendor/tla2tools.jar` second, and it writes TLC artifacts only under `/hyperopen/target/tla/**`.
 
 ## 2) Local Clojure navigation and analysis
 

@@ -41,10 +41,13 @@
 
 - Use websocket-focused suites first:
   `npm run test:websocket`
+- Use the bounded websocket safety model when reducer invariants or reconnect/queue/coalescing rules change:
+  `npm run tla:verify -- --spec websocket-runtime`
 - Key namespaces:
   `hyperopen.websocket.application.runtime-test`,
   `hyperopen.websocket.application.runtime-engine-test`,
   `hyperopen.websocket.application.runtime-reducer-test`,
+  `hyperopen.websocket.application.runtime-tla-conformance-test`,
   `hyperopen.websocket.infrastructure.runtime-effects-test`,
   `hyperopen.websocket.client-test`,
   `hyperopen.websocket.user-runtime.subscriptions-test`,
