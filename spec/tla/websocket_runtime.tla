@@ -5,6 +5,7 @@ CONSTANTS MaxQueueSize,
           MaxSocketId,
           MaxCounter,
           MaxSeq,
+          MaxSteps,
           SubOrder1,
           SubOrder2,
           SubOrder3,
@@ -24,7 +25,13 @@ SubOrder == <<SubOrder1, SubOrder2, SubOrder3>>
 RawMessageIds == {RawMessageA, RawMessageB}
 CoalesceKeys == {CoalesceKeyA, CoalesceKeyB}
 SUBS == {SubOrder[i] : i \in 1..Len(SubOrder)}
+MarketSubs == {SubOrder1, SubOrder3}
+LosslessSubs == SUBS \ MarketSubs
 SeqDomain == 1..MaxSeq
+
+MarketKeyForSub(sub) ==
+  CASE sub = SubOrder1 -> CoalesceKeyA
+    [] sub = SubOrder3 -> CoalesceKeyB
 
 SubscribeMsg(sub) == [kind |-> "subscribe", sub |-> sub, id |-> None]
 UnsubscribeMsg(sub) == [kind |-> "unsubscribe", sub |-> sub, id |-> None]
@@ -76,6 +83,7 @@ InitRuntime ==
 
 VARIABLES runtime,
           prevRuntime,
+          stepCount,
           lastAction,
           lastTimerSet,
           lastTimerCleared,
@@ -87,6 +95,7 @@ VARIABLES runtime,
 vars ==
   <<runtime,
     prevRuntime,
+    stepCount,
     lastAction,
     lastTimerSet,
     lastTimerCleared,
@@ -109,6 +118,13 @@ HasPending(pending) ==
 
 PendingCount(pending) ==
   Cardinality({key \in CoalesceKeys : pending[key] # NoSeq})
+
+HasStaleSocket(rt) ==
+  /\ rt.socketId > 0
+  /\ (rt.activeSocketId = NoSocket \/ rt.activeSocketId < rt.socketId)
+
+CanAdvance ==
+  stepCount < MaxSteps
 
 CanConnect(rt) ==
   /\ rt.wsConfigured
@@ -208,6 +224,7 @@ TypeRuntime(rt) ==
 Init ==
   /\ runtime = InitRuntime
   /\ prevRuntime = InitRuntime
+  /\ stepCount = 0
   /\ lastAction = "init"
   /\ lastTimerSet = {}
   /\ lastTimerCleared = {}
@@ -229,8 +246,11 @@ InitConnection ==
         (IF startWatchdog THEN {"watchdog"} ELSE {})
           \cup
         (IF startHealth THEN {"health-tick"} ELSE {})
-  IN /\ runtime' = nextRuntime
+  IN /\ CanAdvance
+     /\ ~runtime.wsConfigured
+     /\ runtime' = nextRuntime
      /\ prevRuntime' = runtime
+     /\ stepCount' = stepCount + 1
      /\ lastAction' = "init_connection"
      /\ lastTimerSet' = timerSet
      /\ lastTimerCleared' = {}
@@ -259,8 +279,18 @@ Disconnect ==
            !.status = "disconnected",
            !.activeSocketId = NoSocket,
            !.nextRetryAt = None]
-  IN /\ runtime' = nextRuntime
+  IN /\ CanAdvance
+     /\ (runtime.wsConfigured
+         \/ runtime.activeSocketId # NoSocket
+         \/ runtime.status # "disconnected"
+         \/ runtime.retryTimerActive
+         \/ runtime.watchdogActive
+         \/ runtime.healthTickActive
+         \/ runtime.marketFlushActive
+         \/ HasPending(runtime.marketPending))
+     /\ runtime' = nextRuntime
      /\ prevRuntime' = runtime
+     /\ stepCount' = stepCount + 1
      /\ lastAction' = "disconnect"
      /\ lastTimerSet' = {}
      /\ lastTimerCleared' = cleared
@@ -286,8 +316,16 @@ ForceReconnect ==
       base2 == IF startHealth THEN [base1 EXCEPT !.healthTickActive = TRUE] ELSE base1
       nextRuntime == EnsureConnect(base2)
       timerSet == IF startHealth THEN {"health-tick"} ELSE {}
-  IN /\ runtime' = nextRuntime
+  IN /\ CanAdvance
+     /\ runtime.wsConfigured
+     /\ (runtime.activeSocketId # NoSocket
+         \/ runtime.status \in {"connected", "connecting", "reconnecting"}
+         \/ runtime.retryTimerActive
+         \/ runtime.marketFlushActive
+         \/ HasPending(runtime.marketPending))
+     /\ runtime' = nextRuntime
      /\ prevRuntime' = runtime
+     /\ stepCount' = stepCount + 1
      /\ lastAction' = "force_reconnect"
      /\ lastTimerSet' = timerSet
      /\ lastTimerCleared' = cleared
@@ -306,8 +344,13 @@ SendSubscribe(sub) ==
                   !.streams = nextStreams]
       base2 == IF immediate THEN base1 ELSE [base1 EXCEPT !.queue = BoundedAppend(base1.queue, data)]
       nextRuntime == IF immediate THEN base2 ELSE EnsureConnect(base2)
-  IN /\ runtime' = nextRuntime
+  IN /\ CanAdvance
+     /\ runtime.wsConfigured
+     /\ (sub \notin runtime.desiredSubscriptions
+         \/ runtime.streams[sub].seqGapDetected)
+     /\ runtime' = nextRuntime
      /\ prevRuntime' = runtime
+     /\ stepCount' = stepCount + 1
      /\ lastAction' = "send_subscribe"
      /\ lastTimerSet' = {}
      /\ lastTimerCleared' = {}
@@ -326,8 +369,12 @@ SendUnsubscribe(sub) ==
                   !.streams = nextStreams]
       base2 == IF immediate THEN base1 ELSE [base1 EXCEPT !.queue = BoundedAppend(base1.queue, data)]
       nextRuntime == IF immediate THEN base2 ELSE EnsureConnect(base2)
-  IN /\ runtime' = nextRuntime
+  IN /\ CanAdvance
+     /\ runtime.wsConfigured
+     /\ sub \in runtime.desiredSubscriptions
+     /\ runtime' = nextRuntime
      /\ prevRuntime' = runtime
+     /\ stepCount' = stepCount + 1
      /\ lastAction' = "send_unsubscribe"
      /\ lastTimerSet' = {}
      /\ lastTimerCleared' = {}
@@ -341,8 +388,11 @@ SendRaw(rawId) ==
       immediate == runtime.status = "connected" /\ runtime.activeSocketId # NoSocket
       base1 == IF immediate THEN runtime ELSE [runtime EXCEPT !.queue = BoundedAppend(runtime.queue, data)]
       nextRuntime == IF immediate THEN base1 ELSE EnsureConnect(base1)
-  IN /\ runtime' = nextRuntime
+  IN /\ CanAdvance
+     /\ runtime.wsConfigured
+     /\ runtime' = nextRuntime
      /\ prevRuntime' = runtime
+     /\ stepCount' = stepCount + 1
      /\ lastAction' = "send_raw"
      /\ lastTimerSet' = {}
      /\ lastTimerCleared' = {}
@@ -362,10 +412,12 @@ ActiveSocketOpen ==
            !.status = "connected",
            !.attempt = 0,
            !.queue = <<>>]
-  IN /\ runtime.activeSocketId # NoSocket
+  IN /\ CanAdvance
+     /\ runtime.activeSocketId # NoSocket
      /\ runtime.status \in {"connecting", "reconnecting"}
      /\ runtime' = nextRuntime
      /\ prevRuntime' = runtime
+     /\ stepCount' = stepCount + 1
      /\ lastAction' = "socket_open_active"
      /\ lastTimerSet' = {}
      /\ lastTimerCleared' = clearedRetry
@@ -375,9 +427,11 @@ ActiveSocketOpen ==
      /\ lastTeardownSocketId' = NoSocket
 
 StaleSocketOpen ==
-  /\ runtime.socketId > 0
+  /\ CanAdvance
+  /\ HasStaleSocket(runtime)
   /\ runtime' = runtime
   /\ prevRuntime' = runtime
+  /\ stepCount' = stepCount + 1
   /\ lastAction' = "stale_socket_open"
   /\ lastTimerSet' = {}
   /\ lastTimerCleared' = {}
@@ -411,9 +465,11 @@ ActiveSocketClose ==
         IF runtime.intentionalClose \/ ~runtime.wsConfigured \/ ~runtime.online
           THEN {}
           ELSE {"retry"}
-  IN /\ runtime.activeSocketId # NoSocket
+  IN /\ CanAdvance
+     /\ runtime.activeSocketId # NoSocket
      /\ runtime' = nextRuntime
      /\ prevRuntime' = runtime
+     /\ stepCount' = stepCount + 1
      /\ lastAction' = "socket_close_active"
      /\ lastTimerSet' = timerSet
      /\ lastTimerCleared' = cleared
@@ -423,9 +479,11 @@ ActiveSocketClose ==
      /\ lastTeardownSocketId' = runtime.activeSocketId
 
 StaleSocketClose ==
-  /\ runtime.socketId > 0
+  /\ CanAdvance
+  /\ HasStaleSocket(runtime)
   /\ runtime' = runtime
   /\ prevRuntime' = runtime
+  /\ stepCount' = stepCount + 1
   /\ lastAction' = "stale_socket_close"
   /\ lastTimerSet' = {}
   /\ lastTimerCleared' = {}
@@ -436,8 +494,11 @@ StaleSocketClose ==
 
 LifecycleOnline ==
   LET nextRuntime == EnsureConnect([runtime EXCEPT !.online = TRUE])
-  IN /\ runtime' = nextRuntime
+  IN /\ CanAdvance
+     /\ ~runtime.online
+     /\ runtime' = nextRuntime
      /\ prevRuntime' = runtime
+     /\ stepCount' = stepCount + 1
      /\ lastAction' = "lifecycle_online"
      /\ lastTimerSet' = {}
      /\ lastTimerCleared' = {}
@@ -460,8 +521,11 @@ LifecycleOffline ==
            !.nextRetryAt = None,
            !.marketFlushActive = FALSE,
            !.marketPending = EmptyPending]
-  IN /\ runtime' = nextRuntime
+  IN /\ CanAdvance
+     /\ runtime.online
+     /\ runtime' = nextRuntime
      /\ prevRuntime' = runtime
+     /\ stepCount' = stepCount + 1
      /\ lastAction' = "lifecycle_offline"
      /\ lastTimerSet' = {}
      /\ lastTimerCleared' = cleared
@@ -472,8 +536,11 @@ LifecycleOffline ==
 
 LifecycleVisible ==
   LET nextRuntime == EnsureConnect([runtime EXCEPT !.hidden = FALSE])
-  IN /\ runtime' = nextRuntime
+  IN /\ CanAdvance
+     /\ runtime.hidden
+     /\ runtime' = nextRuntime
      /\ prevRuntime' = runtime
+     /\ stepCount' = stepCount + 1
      /\ lastAction' = "lifecycle_visible"
      /\ lastTimerSet' = {}
      /\ lastTimerCleared' = {}
@@ -483,8 +550,11 @@ LifecycleVisible ==
      /\ lastTeardownSocketId' = NoSocket
 
 LifecycleHidden ==
+  /\ CanAdvance
+  /\ ~runtime.hidden
   /\ runtime' = [runtime EXCEPT !.hidden = TRUE]
   /\ prevRuntime' = runtime
+  /\ stepCount' = stepCount + 1
   /\ lastAction' = "lifecycle_hidden"
   /\ lastTimerSet' = {}
   /\ lastTimerCleared' = {}
@@ -498,9 +568,11 @@ RetryTimerFired ==
                   !.retryTimerActive = FALSE,
                   !.nextRetryAt = None]
       nextRuntime == EnsureConnect(base1)
-  IN /\ runtime.retryTimerActive
+  IN /\ CanAdvance
+     /\ runtime.retryTimerActive
      /\ runtime' = nextRuntime
      /\ prevRuntime' = runtime
+     /\ stepCount' = stepCount + 1
      /\ lastAction' = "retry_timer_fired"
      /\ lastTimerSet' = {}
      /\ lastTimerCleared' = {"retry"}
@@ -523,9 +595,15 @@ ActiveDecodedMarket(sub, key, seq) ==
            !.marketFlushActive = TRUE,
            !.metrics = nextMetrics]
       timerSet == IF runtime.marketFlushActive THEN {} ELSE {"market-flush"}
-  IN /\ runtime.activeSocketId # NoSocket
+  IN /\ CanAdvance
+     /\ runtime.activeSocketId # NoSocket
+     /\ runtime.status = "connected"
+     /\ sub \in MarketSubs
+     /\ key = MarketKeyForSub(sub)
+     /\ runtime.streams[sub].subscribed
      /\ runtime' = nextRuntime
      /\ prevRuntime' = runtime
+     /\ stepCount' = stepCount + 1
      /\ lastAction' = "decoded_market"
      /\ lastTimerSet' = timerSet
      /\ lastTimerCleared' = {}
@@ -543,9 +621,14 @@ ActiveDecodedLossless(sub, seq) ==
         [runtime EXCEPT
            !.streams = nextStreams,
            !.metrics = nextMetrics]
-  IN /\ runtime.activeSocketId # NoSocket
+  IN /\ CanAdvance
+     /\ runtime.activeSocketId # NoSocket
+     /\ runtime.status = "connected"
+     /\ sub \in LosslessSubs
+     /\ runtime.streams[sub].subscribed
      /\ runtime' = nextRuntime
      /\ prevRuntime' = runtime
+     /\ stepCount' = stepCount + 1
      /\ lastAction' = "decoded_lossless"
      /\ lastTimerSet' = {}
      /\ lastTimerCleared' = {}
@@ -555,9 +638,11 @@ ActiveDecodedLossless(sub, seq) ==
      /\ lastTeardownSocketId' = NoSocket
 
 StaleDecoded ==
-  /\ runtime.socketId > 0
+  /\ CanAdvance
+  /\ HasStaleSocket(runtime)
   /\ runtime' = runtime
   /\ prevRuntime' = runtime
+  /\ stepCount' = stepCount + 1
   /\ lastAction' = "stale_decoded"
   /\ lastTimerSet' = {}
   /\ lastTimerCleared' = {}
@@ -576,9 +661,11 @@ MarketFlushTimerFired ==
            !.marketPending = EmptyPending,
            !.marketFlushActive = FALSE,
            !.metrics = nextMetrics]
-  IN /\ runtime.marketFlushActive
+  IN /\ CanAdvance
+     /\ runtime.marketFlushActive
      /\ runtime' = nextRuntime
      /\ prevRuntime' = runtime
+     /\ stepCount' = stepCount + 1
      /\ lastAction' = "timer_market_flush"
      /\ lastTimerSet' = {}
      /\ lastTimerCleared' = {}
@@ -592,9 +679,12 @@ ActiveParseError ==
         [runtime.metrics EXCEPT
            !.ingressParseErrors = Bump(runtime.metrics.ingressParseErrors)]
       nextRuntime == [runtime EXCEPT !.metrics = nextMetrics]
-  IN /\ runtime.activeSocketId # NoSocket
+  IN /\ CanAdvance
+     /\ runtime.activeSocketId # NoSocket
+     /\ runtime.status = "connected"
      /\ runtime' = nextRuntime
      /\ prevRuntime' = runtime
+     /\ stepCount' = stepCount + 1
      /\ lastAction' = "parse_error_active"
      /\ lastTimerSet' = {}
      /\ lastTimerCleared' = {}
@@ -604,9 +694,11 @@ ActiveParseError ==
      /\ lastTeardownSocketId' = NoSocket
 
 StaleParseError ==
-  /\ runtime.socketId > 0
+  /\ CanAdvance
+  /\ HasStaleSocket(runtime)
   /\ runtime' = runtime
   /\ prevRuntime' = runtime
+  /\ stepCount' = stepCount + 1
   /\ lastAction' = "stale_parse_error"
   /\ lastTimerSet' = {}
   /\ lastTimerCleared' = {}
@@ -615,7 +707,7 @@ StaleParseError ==
   /\ lastTouchedSeq' = NoSeq
   /\ lastTeardownSocketId' = NoSocket
 
-Next ==
+CoreNext ==
   \/ InitConnection
   \/ \E sub \in SUBS : SendSubscribe(sub)
   \/ \E sub \in SUBS : SendUnsubscribe(sub)
@@ -638,14 +730,115 @@ Next ==
   \/ Disconnect
   \/ ForceReconnect
 
+Next ==
+  CoreNext
+
 Spec == Init /\ [][Next]_vars
 
+ConnectLivenessRuntime ==
+  [InitRuntime EXCEPT
+     !.wsConfigured = TRUE,
+     !.status = "reconnecting",
+     !.retryTimerActive = TRUE,
+     !.nextRetryAt = "scheduled",
+     !.attempt = 1]
+
+FlushLivenessRuntime ==
+  [InitRuntime EXCEPT
+     !.wsConfigured = TRUE,
+     !.status = "connected",
+     !.socketId = 1,
+     !.activeSocketId = 1,
+     !.marketFlushActive = TRUE,
+     !.marketPending[CoalesceKeyA] = 1]
+
+ConnectLivenessInit ==
+  /\ runtime = ConnectLivenessRuntime
+  /\ prevRuntime = ConnectLivenessRuntime
+  /\ stepCount = 0
+  /\ lastAction = "init"
+  /\ lastTimerSet = {}
+  /\ lastTimerCleared = {}
+  /\ lastSendBatch = <<>>
+  /\ lastTouchedSub = None
+  /\ lastTouchedSeq = NoSeq
+  /\ lastTeardownSocketId = NoSocket
+
+FlushLivenessInit ==
+  /\ runtime = FlushLivenessRuntime
+  /\ prevRuntime = FlushLivenessRuntime
+  /\ stepCount = 0
+  /\ lastAction = "init"
+  /\ lastTimerSet = {}
+  /\ lastTimerCleared = {}
+  /\ lastSendBatch = <<>>
+  /\ lastTouchedSub = None
+  /\ lastTouchedSeq = NoSeq
+  /\ lastTeardownSocketId = NoSocket
+
+LivenessInit ==
+  \/ ConnectLivenessInit
+  \/ FlushLivenessInit
+
+LivenessNext ==
+  \/ RetryTimerFired
+  \/ MarketFlushTimerFired
+
+LivenessSpec ==
+  /\ LivenessInit
+  /\ [][LivenessNext]_vars
+  /\ WF_vars(RetryTimerFired)
+  /\ WF_vars(MarketFlushTimerFired)
+
+ConnectReady ==
+  /\ runtime.wsConfigured
+  /\ runtime.online
+  /\ ~runtime.intentionalClose
+  /\ runtime.activeSocketId = NoSocket
+  /\ runtime.retryTimerActive
+
+ConnectInFlight ==
+  /\ runtime.activeSocketId # NoSocket
+  /\ runtime.status \in {"connecting", "reconnecting", "connected"}
+
+FlushReady ==
+  /\ runtime.marketFlushActive
+  /\ HasPending(runtime.marketPending)
+
+FlushCleared ==
+  /\ ~runtime.marketFlushActive
+  /\ ~HasPending(runtime.marketPending)
+
+ConnectEventually ==
+  ConnectReady ~> ConnectInFlight
+
+MarketFlushEventually ==
+  FlushReady ~> FlushCleared
+
+LivenessView ==
+  [status |-> runtime.status,
+   socketId |-> runtime.socketId,
+   activeSocketId |-> runtime.activeSocketId,
+   online |-> runtime.online,
+   hidden |-> runtime.hidden,
+   intentionalClose |-> runtime.intentionalClose,
+   retryTimerActive |-> runtime.retryTimerActive,
+   marketFlushActive |-> runtime.marketFlushActive,
+   marketPending |-> runtime.marketPending,
+   wsConfigured |-> runtime.wsConfigured,
+   stepCount |-> stepCount]
+
 StateConstraint ==
-  runtime.socketId <= MaxSocketId
+  /\ runtime.socketId <= MaxSocketId
+  /\ Cardinality(runtime.desiredSubscriptions) <= 2
+  /\ PendingCount(runtime.marketPending) <= 1
+  /\ runtime.attempt <= 1
+  /\ stepCount <= MaxSteps
 
 TypeOk ==
   /\ TypeRuntime(runtime)
   /\ TypeRuntime(prevRuntime)
+  /\ stepCount \in 0..MaxSteps
   /\ lastAction \in
        {"init",
         "init_connection",

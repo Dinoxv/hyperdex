@@ -8,13 +8,17 @@
 (def ^:private supported-specs
   {"websocket-runtime" {:module-name "websocket_runtime"
                         :spec-file "spec/tla/websocket_runtime.tla"
-                        :config-file "spec/tla/websocket_runtime.cfg"}})
+                        :config-file "spec/tla/websocket_runtime.cfg"}
+   "websocket-runtime-liveness" {:module-name "websocket_runtime"
+                                 :spec-file "spec/tla/websocket_runtime.tla"
+                                 :config-file "spec/tla/websocket_runtime_liveness.cfg"}})
 
 (defn- usage
   []
   (str "Usage: bb tools/tla.clj verify --spec websocket-runtime\n"
        "Examples:\n"
        "  bb tools/tla.clj verify --spec websocket-runtime\n"
+       "  bb tools/tla.clj verify --spec websocket-runtime-liveness\n"
        "  npm run tla:verify -- --spec websocket-runtime\n"
        "Notes:\n"
        "  - Set `TLA2TOOLS_JAR` to a local `tla2tools.jar`, or place the jar at\n"

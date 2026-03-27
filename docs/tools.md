@@ -24,7 +24,7 @@ Use this file as the single starting point for what actions this repo provides t
 10. For multi-agent role, artifact, and gate rules, use `/hyperopen/docs/MULTI_AGENT.md` and the manager under `/hyperopen/tools/multi-agent/`.
 11. For issue tracking and session handoff rules, use `/hyperopen/docs/WORK_TRACKING.md`.
 12. For Lean-backed formal-tool commands, use `npm run formal:verify -- --surface <vault-transfer|order-request-standard|order-request-advanced>` and `npm run formal:sync -- --surface <surface>`.
-13. For websocket TLA+ model-checking, use `npm run tla:verify -- --spec websocket-runtime`.
+13. For websocket TLA+ model-checking, use `npm run tla:verify -- --spec websocket-runtime` for the bounded safety pass and `npm run tla:verify -- --spec websocket-runtime-liveness` for the focused liveness pass.
 14. For exact browser inspection command syntax, see:
    - `/hyperopen/tools/browser-inspection/src/cli.mjs`
    - `/hyperopen/tools/browser-inspection/src/mcp_server.mjs`
@@ -61,7 +61,8 @@ Use this file as the single starting point for what actions this repo provides t
 | `bb tools/mutate_nightly.clj` | Run the checked-in nightly mutation target list serially and aggregate markdown/JSON summaries | Overnight mutation sweeps, regression spotting, or local ranking of weak modules |
 | `npm run formal:verify -- --surface vault-transfer` | Build the Lean workspace, check the selected formal surface manifest, and for modeled surfaces confirm the checked-in generated source is current | After changing formal tooling, proof models, or generated formal vectors |
 | `npm run formal:sync -- --surface vault-transfer` | Regenerate the deterministic formal manifest and, for modeled surfaces, refresh the checked-in generated vector namespace | When you need to refresh manifests or generated formal vectors after a proof/model update |
-| `npm run tla:verify -- --spec websocket-runtime` | Run TLC against the bounded websocket runtime model and write transient artifacts under `/hyperopen/target/tla/**` | After changing `/hyperopen/spec/tla/**`, websocket TLA tooling, or reducer invariants mirrored in the model |
+| `npm run tla:verify -- --spec websocket-runtime` | Run TLC against the bounded websocket runtime safety model and write transient artifacts under `/hyperopen/target/tla/**` | After changing `/hyperopen/spec/tla/**`, websocket TLA tooling, or reducer invariants mirrored in the safety model |
+| `npm run tla:verify -- --spec websocket-runtime-liveness` | Run TLC against the focused websocket runtime liveness model/config and write transient artifacts under `/hyperopen/target/tla/**` | After changing websocket reconnect or market-flush eventuality assumptions encoded in the TLA+ model |
 | `npm run browser:inspect -- --url <url> --target <label>` | One-off parity capture | Visual/runtime parity evidence and smoke checks |
 | `npm run browser:compare` | One-off compare capture | Compare two targets (Hyperliquid vs local) |
 | `npm run qa:design-ui` | Run the design-system browser QA contract | Required evidence-backed conformance review for UI-facing changes |
@@ -90,7 +91,7 @@ Current surface state:
 
 The generated manifests live under `/hyperopen/tools/formal/generated/`, transient generated source lives under `/hyperopen/target/formal/`, and the Lean workspace lives under `/hyperopen/tools/formal/lean/`.
 
-The websocket runtime TLA+ track is separate on purpose. Use `tools/tla.clj` and `npm run tla:verify -- --spec websocket-runtime` for TLC runs against `/hyperopen/spec/tla/websocket_runtime.tla`. The wrapper looks for `TLA2TOOLS_JAR` first and `/hyperopen/tools/tla/vendor/tla2tools.jar` second, and it writes TLC artifacts only under `/hyperopen/target/tla/**`.
+The websocket runtime TLA+ track is separate on purpose. Use `tools/tla.clj`, `npm run tla:verify -- --spec websocket-runtime`, and `npm run tla:verify -- --spec websocket-runtime-liveness` for TLC runs against `/hyperopen/spec/tla/websocket_runtime.tla`. The wrapper looks for `TLA2TOOLS_JAR` first and `/hyperopen/tools/tla/vendor/tla2tools.jar` second, and it writes TLC artifacts only under `/hyperopen/target/tla/**`.
 
 ## 2) Local Clojure navigation and analysis
 

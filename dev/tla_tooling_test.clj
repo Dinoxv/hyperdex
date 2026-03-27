@@ -11,6 +11,12 @@
    :spec-file "spec/tla/websocket_runtime.tla"
    :config-file "spec/tla/websocket_runtime.cfg"})
 
+(def websocket-liveness-spec
+  {:id "websocket-runtime-liveness"
+   :module-name "websocket_runtime"
+   :spec-file "spec/tla/websocket_runtime.tla"
+   :config-file "spec/tla/websocket_runtime_liveness.cfg"})
+
 (defn delete-recursive!
   [file]
   (when (.exists file)
@@ -37,6 +43,9 @@
   (is (= {:command "verify"
           :spec websocket-spec}
          (#'tla/parse-args ["verify" "--spec" "websocket-runtime"])))
+  (is (= {:command "verify"
+          :spec websocket-liveness-spec}
+         (#'tla/parse-args ["verify" "--spec" "websocket-runtime-liveness"])))
   (is (thrown-with-msg?
        Exception
        #"Unsupported spec: unknown-spec"
@@ -71,6 +80,7 @@
     (fn [root]
       (write-file! root "spec/tla/websocket_runtime.tla" "---- MODULE websocket_runtime ----")
       (write-file! root "spec/tla/websocket_runtime.cfg" "SPECIFICATION Spec")
+      (write-file! root "spec/tla/websocket_runtime_liveness.cfg" "SPECIFICATION LivenessSpec")
       (write-file! root "tools/tla/vendor/tla2tools.jar" "jar")
       (let [invocation (atom nil)]
         (with-redefs [tools.tla/repo-root (constantly (io/file root))

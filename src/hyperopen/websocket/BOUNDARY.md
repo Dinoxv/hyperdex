@@ -43,6 +43,8 @@
   `npm run test:websocket`
 - Use the bounded websocket safety model when reducer invariants or reconnect/queue/coalescing rules change:
   `npm run tla:verify -- --spec websocket-runtime`
+- Use the focused websocket liveness pass when connect-eventuality or market-flush eventuality assumptions change:
+  `npm run tla:verify -- --spec websocket-runtime-liveness`
 - Key namespaces:
   `hyperopen.websocket.application.runtime-test`,
   `hyperopen.websocket.application.runtime-engine-test`,

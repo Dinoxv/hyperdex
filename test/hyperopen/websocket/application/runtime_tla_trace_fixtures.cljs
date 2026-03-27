@@ -73,6 +73,147 @@
                                       {:socket-id 10
                                        :at-ms 700})]})
 
+;; Reduced from a local headless-browser `HYPEROPEN_DEBUG.flightRecording()` capture
+;; on 2026-03-27 after loading `/trade` against the compiled app and waiting for the
+;; initial websocket startup path to reach `:evt/socket-open`.
+(def browser-startup-recording
+  {:session {:metadata {:initial-state (initial-state)
+                        :capture-source :hyperopen-debug-flight-recording
+                        :capture-date "2026-03-27"}}
+   :events [{:seq 1
+             :kind :runtime/msg
+             :at-ms 1774626671971
+             :payload {:msg-type :cmd/init-connection
+                       :msg (model/make-runtime-msg :cmd/init-connection
+                                                    1774626671971
+                                                    {:ws-url "wss://api.hyperliquid.xyz/ws"})}}
+            {:seq 2
+             :kind :runtime/msg
+             :at-ms 1774626671971
+             :payload {:msg-type :cmd/register-handler
+                       :msg (model/make-runtime-msg :cmd/register-handler
+                                                    1774626671971
+                                                    {:topic "activeAssetCtx"})}}
+            {:seq 3
+             :kind :runtime/msg
+             :at-ms 1774626671971
+             :payload {:msg-type :cmd/register-handler
+                       :msg (model/make-runtime-msg :cmd/register-handler
+                                                    1774626671971
+                                                    {:topic "candle"})}}
+            {:seq 4
+             :kind :runtime/msg
+             :at-ms 1774626671971
+             :payload {:msg-type :cmd/register-handler
+                       :msg (model/make-runtime-msg :cmd/register-handler
+                                                    1774626671971
+                                                    {:topic "l2Book"})}}
+            {:seq 5
+             :kind :runtime/msg
+             :at-ms 1774626671971
+             :payload {:msg-type :cmd/register-handler
+                       :msg (model/make-runtime-msg :cmd/register-handler
+                                                    1774626671971
+                                                    {:topic "trades"})}}
+            {:seq 6
+             :kind :runtime/msg
+             :at-ms 1774626671971
+             :payload {:msg-type :cmd/register-handler
+                       :msg (model/make-runtime-msg :cmd/register-handler
+                                                    1774626671971
+                                                    {:topic "openOrders"})}}
+            {:seq 7
+             :kind :runtime/msg
+             :at-ms 1774626671971
+             :payload {:msg-type :cmd/register-handler
+                       :msg (model/make-runtime-msg :cmd/register-handler
+                                                    1774626671971
+                                                    {:topic "twapStates"})}}
+            {:seq 8
+             :kind :runtime/msg
+             :at-ms 1774626671971
+             :payload {:msg-type :cmd/register-handler
+                       :msg (model/make-runtime-msg :cmd/register-handler
+                                                    1774626671971
+                                                    {:topic "userFills"})}}
+            {:seq 9
+             :kind :runtime/msg
+             :at-ms 1774626671971
+             :payload {:msg-type :cmd/register-handler
+                       :msg (model/make-runtime-msg :cmd/register-handler
+                                                    1774626671971
+                                                    {:topic "userFundings"})}}
+            {:seq 10
+             :kind :runtime/msg
+             :at-ms 1774626671971
+             :payload {:msg-type :cmd/register-handler
+                       :msg (model/make-runtime-msg :cmd/register-handler
+                                                    1774626671971
+                                                    {:topic "userTwapHistory"})}}
+            {:seq 11
+             :kind :runtime/msg
+             :at-ms 1774626671971
+             :payload {:msg-type :cmd/register-handler
+                       :msg (model/make-runtime-msg :cmd/register-handler
+                                                    1774626671971
+                                                    {:topic "userTwapSliceFills"})}}
+            {:seq 12
+             :kind :runtime/msg
+             :at-ms 1774626671971
+             :payload {:msg-type :cmd/register-handler
+                       :msg (model/make-runtime-msg :cmd/register-handler
+                                                    1774626671971
+                                                    {:topic "userNonFundingLedgerUpdates"})}}
+            {:seq 13
+             :kind :runtime/msg
+             :at-ms 1774626671971
+             :payload {:msg-type :cmd/register-handler
+                       :msg (model/make-runtime-msg :cmd/register-handler
+                                                    1774626671971
+                                                    {:topic "clearinghouseState"})}}
+            {:seq 14
+             :kind :runtime/msg
+             :at-ms 1774626671972
+             :payload {:msg-type :cmd/register-handler
+                       :msg (model/make-runtime-msg :cmd/register-handler
+                                                    1774626671972
+                                                    {:topic "webData2"})}}
+            {:seq 15
+             :kind :runtime/msg
+             :at-ms 1774626671974
+             :payload {:msg-type :cmd/send-message
+                       :msg (model/make-runtime-msg :cmd/send-message
+                                                    1774626671974
+                                                    {:data {:method "subscribe"
+                                                            :subscription {:type "activeAssetCtx"
+                                                                           :coin "BTC"}}})}}
+            {:seq 16
+             :kind :runtime/msg
+             :at-ms 1774626671974
+             :payload {:msg-type :cmd/send-message
+                       :msg (model/make-runtime-msg :cmd/send-message
+                                                    1774626671974
+                                                    {:data {:method "subscribe"
+                                                            :subscription {:type "l2Book"
+                                                                           :coin "BTC"}}})}}
+            {:seq 17
+             :kind :runtime/msg
+             :at-ms 1774626671974
+             :payload {:msg-type :cmd/send-message
+                       :msg (model/make-runtime-msg :cmd/send-message
+                                                    1774626671974
+                                                    {:data {:method "subscribe"
+                                                            :subscription {:type "trades"
+                                                                           :coin "BTC"}}})}}
+            {:seq 18
+             :kind :runtime/msg
+             :at-ms 1774626672380
+             :payload {:msg-type :evt/socket-open
+                       :msg (model/make-runtime-msg :evt/socket-open
+                                                    1774626672380
+                                                    {:socket-id 1
+                                                     :at-ms 1774626672380})}}]})
+
 (def force-reconnect-trace
   {:initial-state (-> (initial-state)
                       (assoc :status :connected
@@ -144,3 +285,21 @@
                 {:method "subscribe"
                  :subscription subscription})))
     (:queue replay-order-state))))
+
+(def browser-startup-subscriptions
+  [{:type "activeAssetCtx" :coin "BTC"}
+   {:type "l2Book" :coin "BTC"}
+   {:type "trades" :coin "BTC"}])
+
+(def expected-browser-startup-replay-order
+  (vec
+   (concat
+    (->> browser-startup-subscriptions
+         (sort-by model/subscription-key)
+         (map (fn [subscription]
+                {:method "subscribe"
+                 :subscription subscription})))
+    (mapv (fn [subscription]
+            {:method "subscribe"
+             :subscription subscription})
+          browser-startup-subscriptions))))
