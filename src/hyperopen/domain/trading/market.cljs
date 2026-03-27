@@ -153,25 +153,21 @@
        (= value (js/Math.trunc value))))
 
 (defn- truncate-to-decimals [value decimals]
-  (let [safe-decimals (-> (or decimals 0)
+  (let [safe-decimals (-> decimals
                           (max 0)
                           int)
         factor (js/Math.pow 10 safe-decimals)]
     (/ (js/Math.floor (* value factor)) factor)))
 
 (defn- truncate-to-significant-figures [value significant-figures]
-  (let [safe-significant-figures (-> (or significant-figures 1)
-                                     (max 1)
-                                     int)]
-    (if (finite-positive-number? value)
-      (let [magnitude (js/Math.floor (/ (js/Math.log value)
-                                        (js/Math.log 10)))
-            shift (- (inc magnitude) safe-significant-figures)]
-        (if (<= shift 0)
-          (truncate-to-decimals value (- shift))
-          (let [factor (js/Math.pow 10 shift)]
-            (* (js/Math.floor (/ value factor)) factor))))
-      0)))
+  (let [safe-significant-figures (int significant-figures)
+        magnitude (js/Math.floor (/ (js/Math.log value)
+                                    (js/Math.log 10)))
+        shift (- (inc magnitude) safe-significant-figures)]
+    (if (neg? shift)
+      (truncate-to-decimals value (- shift))
+      (let [factor (js/Math.pow 10 shift)]
+        (* (js/Math.floor (/ value factor)) factor)))))
 
 (defn canonical-order-price-string
   "Format order prices according to Hyperliquid tick+sig-fig constraints."

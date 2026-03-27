@@ -281,6 +281,32 @@
     (is (= false (:isCross pre-action)))
     (is (= 11 (:leverage pre-action)))))
 
+(deftest build-order-request-respects-string-only-isolated-market-flags-test
+  (let [string-true-context (assoc command-context
+                                   :market {:market-type :perp
+                                            :szDecimals 4
+                                            :onlyIsolated "true"})
+        string-false-context (assoc command-context
+                                    :market {:market-type :perp
+                                             :szDecimals 4
+                                             :onlyIsolated " false "})
+        isolated-request (commands/build-order-request string-true-context {:type :limit
+                                                                            :side :buy
+                                                                            :size "1"
+                                                                            :price "100"
+                                                                            :ui-leverage 8
+                                                                            :margin-mode :cross})
+        cross-request (commands/build-order-request string-false-context {:type :limit
+                                                                          :side :buy
+                                                                          :size "1"
+                                                                          :price "100"
+                                                                          :ui-leverage 8
+                                                                          :margin-mode :cross})
+        isolated-action (first (:pre-actions isolated-request))
+        cross-action (first (:pre-actions cross-request))]
+    (is (= false (:isCross isolated-action)))
+    (is (= true (:isCross cross-action)))))
+
 (deftest build-order-request-infers-perp-leverage-pre-action-when-market-type-metadata-is-missing-test
   (let [context-without-market-type {:active-asset "BTC"
                                      :asset-idx 5
@@ -297,6 +323,18 @@
     (is (= true (:isCross pre-action)))
     (is (= 9 (:leverage pre-action)))))
 
+(deftest build-order-request-clamps-small-positive-leverage-to-one-test
+  (let [request (commands/build-order-request command-context {:type :limit
+                                                               :side :buy
+                                                               :size "1"
+                                                               :price "100"
+                                                               :ui-leverage 0.4
+                                                               :margin-mode :cross})
+        pre-action (first (:pre-actions request))]
+    (is (= "updateLeverage" (:type pre-action)))
+    (is (= 1 (:leverage pre-action)))
+    (is (= true (:isCross pre-action)))))
+
 (deftest build-order-request-omits-leverage-pre-action-for-spot-like-instrument-with-missing-market-type-test
   (let [spot-like-context {:active-asset "ETH/USDC"
                            :asset-idx 12
@@ -308,6 +346,21 @@
                                                                  :price "100"
                                                                  :ui-leverage 7
                                                                  :margin-mode :cross})]
+    (is (map? request))
+    (is (nil? (:pre-actions request)))))
+
+(deftest build-order-request-explicit-spot-market-type-overrides-perp-name-heuristic-test
+  (let [explicit-spot-context {:active-asset "BTC"
+                               :asset-idx 12
+                               :market {:market-type :spot
+                                        :coin "BTC"
+                                        :szDecimals 4}}
+        request (commands/build-order-request explicit-spot-context {:type :limit
+                                                                     :side :buy
+                                                                     :size "1"
+                                                                     :price "100"
+                                                                     :ui-leverage 5
+                                                                     :margin-mode :cross})]
     (is (map? request))
     (is (nil? (:pre-actions request)))))
 

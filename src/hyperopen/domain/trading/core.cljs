@@ -201,10 +201,10 @@
 (defn floor-size-to-decimals [size sz-decimals]
   (if (and (number? size)
            (not (js/isNaN size))
-           (js/isFinite size)
-           (>= size 0))
-    (let [factor (js/Math.pow 10 (normalize-scale-sz-decimals sz-decimals))]
-      (/ (js/Math.floor (* size factor)) factor))
+           (js/isFinite size))
+    (let [safe-size (max 0 size)
+          factor (js/Math.pow 10 (normalize-scale-sz-decimals sz-decimals))]
+      (/ (js/Math.floor (* safe-size factor)) factor))
     0))
 
 (defn normalize-order-type [order-type]
@@ -260,24 +260,24 @@
 
 (defn scale-weights [count skew]
   (let [n (max 1 (int count))]
-    (if (= n 1)
-      [1]
-      (let [normalized-skew (normalize-scale-skew-number skew)
-            skew* (if (<= normalized-skew 0) 1.0 normalized-skew)
-            start-weight (/ 2.0 (* n (+ 1.0 skew*)))
-            step (/ (* start-weight (- skew* 1.0)) (dec n))
-            raw-weights (map (fn [idx]
-                               (let [raw (+ start-weight (* step idx))]
-                                 (if (and (number? raw)
-                                          (js/isFinite raw)
-                                          (>= raw 0))
-                                   raw
-                                   0)))
-                             (range n))
-            total (reduce + raw-weights)]
-        (if (and (number? total) (js/isFinite total) (pos? total))
-          (map #(/ % total) raw-weights)
-          (repeat n (/ 1 n)))))))
+    (let [normalized-skew (normalize-scale-skew-number skew)
+          skew* (if (<= normalized-skew 0) 1.0 normalized-skew)
+          start-weight (/ 2.0 (* n (+ 1.0 skew*)))
+          step (if (= n 1)
+                 0
+                 (/ (* start-weight (- skew* 1.0)) (dec n)))
+          raw-weights (map (fn [idx]
+                             (let [raw (+ start-weight (* step idx))]
+                               (if (and (number? raw)
+                                        (js/isFinite raw)
+                                        (>= raw 0))
+                                 raw
+                                 0)))
+                           (range n))
+          total (reduce + raw-weights)]
+      (if (and (number? total) (js/isFinite total) (pos? total))
+        (map #(/ % total) raw-weights)
+        (repeat n (/ 1 n))))))
 
 (defn scale-order-legs
   "Build deterministic scale ladder legs as [{:price p :size s}] or nil when inputs are incomplete."

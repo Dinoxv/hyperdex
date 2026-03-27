@@ -297,6 +297,20 @@
     (is (= "0.00002" (trading/base-size-string state 0.0000285)))
     (is (nil? (trading/base-size-string state 0.0000099)))))
 
+(deftest canonical-order-price-string-respects-zero-decimal-price-markets-test
+  (let [context {:active-asset "BTC"
+                 :market {:market-type :perp
+                          :szDecimals 6}}]
+    (is (= "123"
+           (trading-domain/canonical-order-price-string context 123.9876)))))
+
+(deftest canonical-order-price-string-truncates-large-prices-by-significant-figures-test
+  (let [context {:active-asset "BTC"
+                 :market {:market-type :perp
+                          :szDecimals 0}}]
+    (is (= "123450"
+           (trading-domain/canonical-order-price-string context 123456.789)))))
+
 (deftest available-to-trade-withdrawable-precedence-and-dex-isolation-test
   (testing "classic mode uses withdrawable as the canonical available balance when present"
     (let [state (assoc-in base-state [:webdata2 :clearinghouseState :withdrawable] "170.58")]
@@ -333,6 +347,27 @@
     (let [state {:active-market {:coin "BTC" :dex "dex-missing"}
                  :perp-dex-clearinghouse {}
                  :webdata2 {:clearinghouseState {:withdrawable "975.90"}}}]
+      (is (= 0 (trading/available-to-trade state))))))
+
+(deftest available-to-trade-derives-and-clamps-unified-spot-usdc-balance-test
+  (testing "unified mode derives available balance from total minus hold when direct availability is missing"
+    (let [state (-> base-state
+                    (assoc :account {:mode :unified})
+                    (assoc-in [:spot :clearinghouse-state :balances]
+                              [{:coin "USDC"
+                                :total "12.5"
+                                :hold "2.25"}])
+                    (assoc-in [:webdata2 :clearinghouseState :withdrawable] "0.03"))]
+      (is (approx= 10.25 (trading/available-to-trade state)))))
+
+  (testing "unified mode clamps negative derived spot availability to zero"
+    (let [state (-> base-state
+                    (assoc :account {:mode :unified})
+                    (assoc-in [:spot :clearinghouse-state :balances]
+                              [{:coin "USDC"
+                                :total "1.5"
+                                :hold "3.0"}])
+                    (assoc-in [:webdata2 :clearinghouseState :withdrawable] "170.58"))]
       (is (= 0 (trading/available-to-trade state))))))
 
 (deftest mid-price-summary-determinism-and-fallback-test

@@ -1,5 +1,6 @@
 (ns hyperopen.state.trading.validation-and-scale-test
   (:require [cljs.test :refer-macros [deftest is testing]]
+            [hyperopen.domain.trading.core :as trading-core]
             [hyperopen.formal.order-request-advanced-vectors :as advanced-vectors]
             [hyperopen.state.trading :as trading]
             [hyperopen.state.trading.test-support :as support]))
@@ -173,6 +174,38 @@
 (deftest scale-weights-uniform-when-skew-is-one-test
   (let [weights (vec (trading/scale-weights 7 1.0))]
     (is (every? #(approx= (first weights) %) weights))))
+
+(deftest scale-weights-single-leg-falls-back-to-unit-weight-test
+  (is (= [1] (vec (trading/scale-weights 1 2.0))))
+  (is (= [1] (vec (trading/scale-weights 0 2.0)))))
+
+(deftest scale-weights-zero-skew-falls-back-to-uniform-weights-test
+  (let [weights (vec (trading/scale-weights 4 0))]
+    (is (every? #(approx= 0.25 %) weights))))
+
+(deftest scale-weights-pins-expected-shape-for-skewed-ladders-test
+  (let [weights (vec (trading/scale-weights 4 2.0))]
+    (is (approx= 0.1666666667 (nth weights 0)))
+    (is (approx= 0.3333333333 (nth weights 3)))))
+
+(deftest split-twap-total-minutes-defaults-nil-to-zero-test
+  (is (= {:hours 0 :minutes 0}
+         (trading/split-twap-total-minutes nil))))
+
+(deftest twap-total-minutes-hours-branch-defaults-missing-fields-to-zero-test
+  (is (= 0 (trading/twap-total-minutes {:hours nil :minutes nil}))))
+
+(deftest valid-twap-runtime-includes-min-and-max-boundaries-test
+  (is (true? (trading/valid-twap-runtime? trading/twap-min-runtime-minutes)))
+  (is (true? (trading/valid-twap-runtime? trading/twap-max-runtime-minutes))))
+
+(deftest normalize-scale-sz-decimals-clamps-negatives-to-zero-test
+  (is (= 0 (trading-core/normalize-scale-sz-decimals -3))))
+
+(deftest floor-size-to-decimals-fails-closed-for-invalid-or-negative-sizes-test
+  (is (= 0 (trading-core/floor-size-to-decimals -1 4)))
+  (is (= 0 (trading-core/floor-size-to-decimals js/NaN 4)))
+  (is (= 0 (trading-core/floor-size-to-decimals nil 4))))
 
 (deftest scale-weights-skew-direction-test
   (let [skew-to-end (vec (trading/scale-weights 4 2.0))
