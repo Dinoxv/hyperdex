@@ -16,6 +16,7 @@ Supported surfaces are:
 - `vault-transfer`
 - `order-request-standard`
 - `order-request-advanced`
+- `trading-submit-policy`
 
 ## What It Does
 
@@ -30,6 +31,7 @@ Current surface state:
 - `vault-transfer`: modeled, emits `target/formal/vault-transfer-vectors.cljs`, and syncs `test/hyperopen/formal/vault_transfer_vectors.cljs`
 - `order-request-standard`: modeled, emits `target/formal/order-request-standard-vectors.cljs`, and syncs `test/hyperopen/formal/order_request_standard_vectors.cljs`
 - `order-request-advanced`: modeled, emits `target/formal/order-request-advanced-vectors.cljs`, and syncs `test/hyperopen/formal/order_request_advanced_vectors.cljs`
+- `trading-submit-policy`: modeled, emits `target/formal/trading-submit-policy-vectors.cljs`, and syncs `test/hyperopen/formal/trading_submit_policy_vectors.cljs`
 
 ## Layout
 

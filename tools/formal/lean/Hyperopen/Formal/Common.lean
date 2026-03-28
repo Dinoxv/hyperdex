@@ -4,6 +4,7 @@ inductive Surface where
   | vaultTransfer
   | orderRequestStandard
   | orderRequestAdvanced
+  | tradingSubmitPolicy
   deriving Repr, DecidableEq, Inhabited
 
 inductive Command where
@@ -31,16 +32,19 @@ def surfaceId : Surface → String
   | .vaultTransfer => "vault-transfer"
   | .orderRequestStandard => "order-request-standard"
   | .orderRequestAdvanced => "order-request-advanced"
+  | .tradingSubmitPolicy => "trading-submit-policy"
 
 def surfaceModuleName : Surface → String
   | .vaultTransfer => "Hyperopen.Formal.VaultTransfer"
   | .orderRequestStandard => "Hyperopen.Formal.OrderRequest.Standard"
   | .orderRequestAdvanced => "Hyperopen.Formal.OrderRequest.Advanced"
+  | .tradingSubmitPolicy => "Hyperopen.Formal.TradingSubmitPolicy"
 
 def surfaceStatus : Surface → String
   | .vaultTransfer => "modeled"
   | .orderRequestStandard => "modeled"
   | .orderRequestAdvanced => "modeled"
+  | .tradingSubmitPolicy => "modeled"
 
 def surfaceManifestPath : Surface → String :=
   fun surface => "../generated/" ++ surfaceId surface ++ ".edn"
@@ -49,6 +53,7 @@ def surfaceGeneratedSourcePath? : Surface → Option String
   | .vaultTransfer => some "../../../target/formal/vault-transfer-vectors.cljs"
   | .orderRequestStandard => some "../../../target/formal/order-request-standard-vectors.cljs"
   | .orderRequestAdvanced => some "../../../target/formal/order-request-advanced-vectors.cljs"
+  | .tradingSubmitPolicy => some "../../../target/formal/trading-submit-policy-vectors.cljs"
 
 def surfaceManifest : Surface → String :=
   fun surface =>
@@ -59,6 +64,7 @@ def parseSurface? : String → Option Surface
   | "vault-transfer" => some .vaultTransfer
   | "order-request-standard" => some .orderRequestStandard
   | "order-request-advanced" => some .orderRequestAdvanced
+  | "trading-submit-policy" => some .tradingSubmitPolicy
   | _ => none
 
 def commandId : Command → String
@@ -71,7 +77,7 @@ def parseCommand? : String → Option Command
   | _ => none
 
 def usage : String :=
-  "Usage: formal <verify|sync> --surface <vault-transfer|order-request-standard|order-request-advanced>"
+  "Usage: formal <verify|sync> --surface <vault-transfer|order-request-standard|order-request-advanced|trading-submit-policy>"
 
 def parseInvocation : List String → Except String Invocation
   | [] => Except.error usage
@@ -168,4 +174,8 @@ theorem parseSurface?_standard :
 
 theorem parseCommand?_verify :
     parseCommand? "verify" = some Command.verify := by
+  rfl
+
+theorem parseSurface?_tradingSubmitPolicy :
+    parseSurface? "trading-submit-policy" = some Surface.tradingSubmitPolicy := by
   rfl

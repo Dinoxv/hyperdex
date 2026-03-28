@@ -5,7 +5,8 @@
             [hyperopen.domain.trading :as trading-domain]
             [hyperopen.state.trading.order-form-key-policy :as order-form-key-policy]
             [hyperopen.state.trading.fee-context :as trading-fee-context]
-            [hyperopen.trading.order-form-state :as order-form-state]))
+            [hyperopen.trading.order-form-state :as order-form-state]
+            [hyperopen.trading.submit-policy :as trading-submit-policy]))
 
 (def order-types trading-domain/order-types)
 (def order-type-spec trading-domain/order-type-spec)
@@ -186,51 +187,13 @@
   (trading-domain/market-identity {:active-asset (:active-asset state)
                                    :market (:active-market state)}))
 
-(def ^:private isolated-only-margin-modes
-  #{:no-cross :strict-isolated})
-
-(defn- parse-optional-boolean
-  [value]
-  (cond
-    (boolean? value) value
-    (string? value) (= "true" (some-> value str/trim str/lower-case))
-    :else nil))
-
-(defn- normalize-market-margin-mode
-  [value]
-  (let [token (cond
-                (keyword? value) (name value)
-                (string? value) value
-                :else nil)
-        normalized (some-> token
-                          str/trim
-                          str/lower-case
-                          (str/replace #"[_-]" ""))]
-    (case normalized
-      "normal" :normal
-      "nocross" :no-cross
-      "strictisolated" :strict-isolated
-      nil)))
-
 (defn cross-margin-allowed?
   [state]
-  (let [market (or (:active-market state) {})
-        only-isolated? (parse-optional-boolean
-                        (or (:only-isolated? market)
-                            (:onlyIsolated market)))
-        margin-mode (normalize-market-margin-mode
-                     (or (:margin-mode market)
-                         (:marginMode market)))]
-    (not (or (true? only-isolated?)
-             (contains? isolated-only-margin-modes margin-mode)))))
+  (trading-submit-policy/cross-margin-allowed? (:active-market state)))
 
 (defn effective-margin-mode
   [state mode]
-  (let [normalized (normalize-margin-mode mode)]
-    (if (and (= normalized :cross)
-             (not (cross-margin-allowed? state)))
-      :isolated
-      normalized)))
+  (trading-submit-policy/effective-margin-mode (:active-market state) mode))
 
 (defn- active-clearinghouse-state [state]
   (let [dex (get-in state [:active-market :dex])]
@@ -520,19 +483,8 @@
    {:form prepared-form
     :market-price-missing? boolean}"
   [state form]
-  (let [normalized-form (normalize-order-form state form)
-        market-form (when (= :market (:type normalized-form))
-                      (apply-market-price state normalized-form))
-        form-with-market (or market-form normalized-form)
-        form* (if (and (limit-like-type? (:type form-with-market))
-                       (str/blank? (:price form-with-market)))
-                (if-let [fallback-price (effective-limit-price-string state form-with-market)]
-                  (assoc form-with-market :price fallback-price)
-                  form-with-market)
-                form-with-market)]
-    {:form form*
-     :market-price-missing? (and (= :market (:type normalized-form))
-                                 (nil? market-form))}))
+  (trading-submit-policy/prepare-order-form-for-submit (trading-context state)
+                                                       (normalize-order-form state form)))
 
 (defn submit-policy
   "Return deterministic submit policy for order-form view and submit action.
@@ -556,54 +508,18 @@
          submitting? (if (contains? options :submitting?)
                        submitting?
                        (:submitting? runtime))
-         submit-prep (prepare-order-form-for-submit state form)
-         prepared-form (:form submit-prep)
-         market-price-missing? (:market-price-missing? submit-prep)
+         context (trading-context state)
          identity (market-identity state)
-         spectate-mode-message (account-context/mutations-blocked-message state)
-         spot? (:spot? identity)
-         errors (validate-order-form state prepared-form)
-         required-fields (submit-required-fields errors)
-         request (when (= mode :submit)
-                   (build-order-request state prepared-form))
-         reason (case mode
-                 :submit
-                 (cond
-                    (seq spectate-mode-message) :spectate-mode-read-only
-                    spot? :spot-read-only
-                    market-price-missing? :market-price-missing
-                    (seq errors) :validation-errors
-                    (nil? request) :request-unavailable
-                    (false? agent-ready?) :agent-not-ready
-                    :else nil)
-
-                 :view
-                 (cond
-                    submitting? :submitting
-                    (seq spectate-mode-message) :spectate-mode-read-only
-                    spot? :spot-read-only
-                    market-price-missing? :market-price-missing
-                    (seq errors) :validation-errors
-                    :else nil)
-
-                  nil)
-         error-message (case reason
-                         :spectate-mode-read-only spectate-mode-message
-                         :spot-read-only "Spot trading is not supported yet."
-                         :market-price-missing "Market price unavailable. Load order book first."
-                         :validation-errors (validation-error-message (first errors))
-                         :request-unavailable "Select an asset and ensure market data is loaded."
-                         :agent-not-ready "Enable trading before submitting orders."
-                         nil)]
-     {:form prepared-form
-      :request request
-      :errors errors
-      :required-fields required-fields
-      :market-price-missing? market-price-missing?
-      :identity identity
-      :reason reason
-      :disabled? (boolean reason)
-      :error-message error-message})))
+         normalized-form (normalize-order-form state form)]
+     (trading-submit-policy/submit-policy
+      {:trading-context context
+       :identity identity
+       :spectate-mode-message (account-context/mutations-blocked-message state)
+       :request-builder (partial order-commands/build-order-request context)}
+      normalized-form
+      {:mode mode
+       :submitting? submitting?
+       :agent-ready? agent-ready?}))))
 
 (defn build-order-request [state form]
   (order-commands/build-order-request (trading-context state) form))

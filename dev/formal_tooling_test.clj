@@ -29,6 +29,14 @@
    :target-source "target/formal/order-request-advanced-vectors.cljs"
    :committed-source "test/hyperopen/formal/order_request_advanced_vectors.cljs"})
 
+(def trading-submit-policy-surface
+  {:id "trading-submit-policy"
+   :lean-module "Hyperopen.Formal.TradingSubmitPolicy"
+   :status "modeled"
+   :manifest "generated/trading-submit-policy.edn"
+   :target-source "target/formal/trading-submit-policy-vectors.cljs"
+   :committed-source "test/hyperopen/formal/trading_submit_policy_vectors.cljs"})
+
 (def bootstrap-test-surface
   {:id "bootstrap-test"
    :lean-module "Hyperopen.Formal.Bootstrap"
@@ -36,7 +44,7 @@
    :manifest "generated/bootstrap-test.edn"})
 
 (def modeled-surfaces
-  [vault-surface standard-surface advanced-surface])
+  [vault-surface standard-surface advanced-surface trading-submit-policy-surface])
 
 (defn delete-recursive!
   [file]
@@ -66,7 +74,9 @@
   (is (= "{:surface \"order-request-standard\" :module \"Hyperopen.Formal.OrderRequest.Standard\" :status \"modeled\"}\n"
          (#'formal/manifest-content standard-surface)))
   (is (= "{:surface \"order-request-advanced\" :module \"Hyperopen.Formal.OrderRequest.Advanced\" :status \"modeled\"}\n"
-         (#'formal/manifest-content advanced-surface))))
+         (#'formal/manifest-content advanced-surface)))
+  (is (= "{:surface \"trading-submit-policy\" :module \"Hyperopen.Formal.TradingSubmitPolicy\" :status \"modeled\"}\n"
+         (#'formal/manifest-content trading-submit-policy-surface))))
 
 (deftest sync-generated-source-copies-transient-export-into-committed-namespace-test
   (doseq [{:keys [target-source committed-source] :as surface} modeled-surfaces]

@@ -12,6 +12,8 @@
   Canonical deterministic field transitions and cross-field synchronization.
 - `hyperopen.trading.order-form-tpsl-policy`
   Canonical TP/SL conversion, trigger, and unit policy.
+- `hyperopen.trading.submit-policy`
+  Canonical pure submit preparation, validation orchestration, and reason policy.
 - `hyperopen.trading.order-form-application`
   The grouped context seam consumed by trade VM and views.
 - `hyperopen.trading.order-type-registry`
@@ -52,6 +54,8 @@
   `hyperopen.trading.order-form-transitions`
 - New TP/SL conversion, offset, or readiness rule:
   `hyperopen.trading.order-form-tpsl-policy`
+- New pure submit gating, prepared-form policy, or reason precedence rule:
+  `hyperopen.trading.submit-policy`
 - New grouped VM-facing projection of existing order-form state:
   `hyperopen.trading.order-form-application`
 - New order-type capability or rendering flag:

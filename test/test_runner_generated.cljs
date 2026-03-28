@@ -188,6 +188,7 @@
             [hyperopen.state.trading.order-form-key-policy-test]
             [hyperopen.state.trading.order-form-state-test]
             [hyperopen.state.trading.order-request-test]
+            [hyperopen.state.trading.submit-policy-formal-conformance-test]
             [hyperopen.state.trading.validation-and-scale-test]
             [hyperopen.system-test]
             [hyperopen.telemetry-test]
@@ -609,6 +610,7 @@
              'hyperopen.state.trading.order-form-key-policy-test
              'hyperopen.state.trading.order-form-state-test
              'hyperopen.state.trading.order-request-test
+             'hyperopen.state.trading.submit-policy-formal-conformance-test
              'hyperopen.state.trading.validation-and-scale-test
              'hyperopen.system-test
              'hyperopen.telemetry-test

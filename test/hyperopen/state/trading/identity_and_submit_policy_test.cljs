@@ -270,3 +270,27 @@
       (is (false? (:market-price-missing? prepared)))
       (is (order-request-contracts/order-request-valid? request))
       (is (= "123.45" (get-in request [:action :orders 0 :p]))))))
+
+(deftest prepare-order-form-for-submit-uses-limit-fallback-when-price-is-blank-test
+  (let [form (assoc (trading/default-order-form)
+                    :type :limit
+                    :side :buy
+                    :size "1"
+                    :price "")
+        prepared (trading/prepare-order-form-for-submit base-state form)]
+    (is (false? (:market-price-missing? prepared)))
+    (is (= "100" (get-in prepared [:form :price])))))
+
+(deftest prepare-order-form-for-submit-leaves-limit-price-blank-when-no-fallback-exists-test
+  (let [state {:active-asset "BTC"
+               :active-market {}
+               :orderbooks {}
+               :webdata2 {}}
+        form (assoc (trading/default-order-form)
+                    :type :limit
+                    :side :buy
+                    :size "1"
+                    :price "")
+        prepared (trading/prepare-order-form-for-submit state form)]
+    (is (false? (:market-price-missing? prepared)))
+    (is (= "" (get-in prepared [:form :price])))))

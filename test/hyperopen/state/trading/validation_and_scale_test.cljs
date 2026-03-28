@@ -34,6 +34,26 @@
                       :price "")]
       (is (empty? (trading/validate-order-form form)))))
 
+  (testing "take-limit requires both price and trigger"
+    (let [form (assoc (trading/default-order-form)
+                      :size "1"
+                      :type :take-limit
+                      :price ""
+                      :trigger-px "")
+          errors (trading/validate-order-form form)]
+      (is (= [:order/price-required :order/trigger-required]
+             (mapv :code errors)))))
+
+  (testing "take-market requires trigger but not price"
+    (let [form (assoc (trading/default-order-form)
+                      :size "1"
+                      :type :take-market
+                      :price ""
+                      :trigger-px "")
+          errors (trading/validate-order-form form)]
+      (is (= [:order/trigger-required]
+             (mapv :code errors)))))
+
   (testing "twap runtime must be between 5 minutes and 24 hours"
     (let [too-short (assoc (trading/default-order-form)
                            :size "1"
@@ -58,6 +78,19 @@
       (is (= #{:twap/suborder-notional-too-small}
              (validation-codes (trading/validate-order-form support/base-state too-small))))
       (is (empty? (trading/validate-order-form support/base-state valid))))))
+
+(deftest enabled-tpsl-legs-require-their-own-triggers-test
+  (let [form (assoc (trading/default-order-form)
+                    :type :limit
+                    :size "1"
+                    :price "100"
+                    :tp {:enabled? true}
+                    :sl {:enabled? true})
+        errors (trading/validate-order-form form)]
+    (is (= [:tpsl/tp-trigger-required :tpsl/sl-trigger-required]
+           (mapv :code errors)))
+    (is (= ["TP Trigger" "SL Trigger"]
+           (trading/submit-required-fields errors)))))
 
 (deftest positive-required-fields-reject-zero-boundary-test
   (testing "size zero remains invalid"
