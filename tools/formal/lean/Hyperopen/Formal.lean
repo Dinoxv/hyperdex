@@ -4,6 +4,7 @@ import Hyperopen.Formal.VaultTransfer
 import Hyperopen.Formal.OrderRequest.Standard
 import Hyperopen.Formal.OrderRequest.Advanced
 import Hyperopen.Formal.TradingSubmitPolicy
+import Hyperopen.Formal.OrderFormOwnership
 
 namespace Hyperopen.Formal
 
@@ -13,6 +14,7 @@ def runVerify : Surface → IO Unit
   | .orderRequestAdvanced => OrderRequest.Advanced.verify
   | .effectOrderContract => EffectOrderContract.verify
   | .tradingSubmitPolicy => TradingSubmitPolicy.verify
+  | .orderFormOwnership => OrderFormOwnership.verify
 
 def runSync : Surface → IO Unit
   | .vaultTransfer => VaultTransfer.sync
@@ -20,6 +22,7 @@ def runSync : Surface → IO Unit
   | .orderRequestAdvanced => OrderRequest.Advanced.sync
   | .effectOrderContract => EffectOrderContract.sync
   | .tradingSubmitPolicy => TradingSubmitPolicy.sync
+  | .orderFormOwnership => OrderFormOwnership.sync
 
 def runInvocation : Invocation → IO Unit
   | {command := .verify, surface} => runVerify surface

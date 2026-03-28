@@ -45,6 +45,14 @@
    :target-source "target/formal/trading-submit-policy-vectors.cljs"
    :committed-source "test/hyperopen/formal/trading_submit_policy_vectors.cljs"})
 
+(def order-form-ownership-surface
+  {:id "order-form-ownership"
+   :lean-module "Hyperopen.Formal.OrderFormOwnership"
+   :status "modeled"
+   :manifest "generated/order-form-ownership.edn"
+   :target-source "target/formal/order-form-ownership-vectors.cljs"
+   :committed-source "test/hyperopen/formal/order_form_ownership_vectors.cljs"})
+
 (def bootstrap-test-surface
   {:id "bootstrap-test"
    :lean-module "Hyperopen.Formal.Bootstrap"
@@ -56,7 +64,8 @@
    standard-surface
    advanced-surface
    effect-order-contract-surface
-   trading-submit-policy-surface])
+   trading-submit-policy-surface
+   order-form-ownership-surface])
 
 (defn delete-recursive!
   [file]
@@ -90,7 +99,9 @@
   (is (= "{:surface \"effect-order-contract\" :module \"Hyperopen.Formal.EffectOrderContract\" :status \"modeled\"}\n"
          (#'formal/manifest-content effect-order-contract-surface)))
   (is (= "{:surface \"trading-submit-policy\" :module \"Hyperopen.Formal.TradingSubmitPolicy\" :status \"modeled\"}\n"
-         (#'formal/manifest-content trading-submit-policy-surface))))
+         (#'formal/manifest-content trading-submit-policy-surface)))
+  (is (= "{:surface \"order-form-ownership\" :module \"Hyperopen.Formal.OrderFormOwnership\" :status \"modeled\"}\n"
+         (#'formal/manifest-content order-form-ownership-surface))))
 
 (deftest sync-generated-source-copies-transient-export-into-committed-namespace-test
   (doseq [{:keys [target-source committed-source] :as surface} modeled-surfaces]

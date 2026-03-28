@@ -6,6 +6,7 @@ inductive Surface where
   | orderRequestAdvanced
   | effectOrderContract
   | tradingSubmitPolicy
+  | orderFormOwnership
   deriving Repr, DecidableEq, Inhabited
 
 inductive Command where
@@ -35,6 +36,7 @@ def surfaceId : Surface → String
   | .orderRequestAdvanced => "order-request-advanced"
   | .effectOrderContract => "effect-order-contract"
   | .tradingSubmitPolicy => "trading-submit-policy"
+  | .orderFormOwnership => "order-form-ownership"
 
 def surfaceModuleName : Surface → String
   | .vaultTransfer => "Hyperopen.Formal.VaultTransfer"
@@ -42,6 +44,7 @@ def surfaceModuleName : Surface → String
   | .orderRequestAdvanced => "Hyperopen.Formal.OrderRequest.Advanced"
   | .effectOrderContract => "Hyperopen.Formal.EffectOrderContract"
   | .tradingSubmitPolicy => "Hyperopen.Formal.TradingSubmitPolicy"
+  | .orderFormOwnership => "Hyperopen.Formal.OrderFormOwnership"
 
 def surfaceStatus : Surface → String
   | .vaultTransfer => "modeled"
@@ -49,6 +52,7 @@ def surfaceStatus : Surface → String
   | .orderRequestAdvanced => "modeled"
   | .effectOrderContract => "modeled"
   | .tradingSubmitPolicy => "modeled"
+  | .orderFormOwnership => "modeled"
 
 def surfaceManifestPath : Surface → String :=
   fun surface => "../generated/" ++ surfaceId surface ++ ".edn"
@@ -59,6 +63,7 @@ def surfaceGeneratedSourcePath? : Surface → Option String
   | .orderRequestAdvanced => some "../../../target/formal/order-request-advanced-vectors.cljs"
   | .effectOrderContract => some "../../../target/formal/effect-order-contract-vectors.cljs"
   | .tradingSubmitPolicy => some "../../../target/formal/trading-submit-policy-vectors.cljs"
+  | .orderFormOwnership => some "../../../target/formal/order-form-ownership-vectors.cljs"
 
 def surfaceManifest : Surface → String :=
   fun surface =>
@@ -71,6 +76,7 @@ def parseSurface? : String → Option Surface
   | "order-request-advanced" => some .orderRequestAdvanced
   | "effect-order-contract" => some .effectOrderContract
   | "trading-submit-policy" => some .tradingSubmitPolicy
+  | "order-form-ownership" => some .orderFormOwnership
   | _ => none
 
 def commandId : Command → String
@@ -83,7 +89,7 @@ def parseCommand? : String → Option Command
   | _ => none
 
 def usage : String :=
-  "Usage: formal <verify|sync> --surface <vault-transfer|order-request-standard|order-request-advanced|effect-order-contract|trading-submit-policy>"
+  "Usage: formal <verify|sync> --surface <vault-transfer|order-request-standard|order-request-advanced|effect-order-contract|trading-submit-policy|order-form-ownership>"
 
 def parseInvocation : List String → Except String Invocation
   | [] => Except.error usage
@@ -188,4 +194,8 @@ theorem parseCommand?_verify :
 
 theorem parseSurface?_tradingSubmitPolicy :
     parseSurface? "trading-submit-policy" = some Surface.tradingSubmitPolicy := by
+  rfl
+
+theorem parseSurface?_orderFormOwnership :
+    parseSurface? "order-form-ownership" = some Surface.orderFormOwnership := by
   rfl

@@ -2,6 +2,7 @@
   (:require [clojure.string :as str]
             [hyperopen.state.trading.order-form-key-policy :as order-form-key-policy]
             [hyperopen.state.trading :as trading]
+            [hyperopen.trading.order-form-ownership :as ownership]
             [hyperopen.utils.parse :as parse-utils]
             [hyperopen.trading.order-form-tpsl-policy :as tpsl-policy]))
 
@@ -23,26 +24,7 @@
 (declare current-ui-leverage
          current-leverage-draft)
 
-(defn- enforce-field-ownership
-  [state transition]
-  (if-not (map? transition)
-    transition
-    (let [order-form (:order-form transition)
-          order-form-ui (:order-form-ui transition)
-          order-form-runtime (:order-form-runtime transition)
-          persisted-form (when (map? order-form)
-                           (trading/persist-order-form order-form))
-          persisted-ui (when (or (map? order-form-ui)
-                                 (map? order-form))
-                         (let [working-form (or order-form (trading/order-form-draft state))
-                               merged-ui (merge (trading/order-form-ui-state state)
-                                                (or order-form-ui {})
-                                                (trading/order-form-ui-overrides-from-form order-form))]
-                           (trading/effective-order-form-ui working-form merged-ui)))]
-      (cond-> {}
-        (map? persisted-form) (assoc :order-form persisted-form)
-        (map? persisted-ui) (assoc :order-form-ui persisted-ui)
-        (map? order-form-runtime) (assoc :order-form-runtime order-form-runtime)))))
+(def enforce-field-ownership ownership/enforce-field-ownership)
 
 (defn- size-input-mode [form]
   (trading/normalize-size-input-mode (:size-input-mode form)))

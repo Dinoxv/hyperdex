@@ -101,6 +101,29 @@
     (is (true? (:tpsl-panel-open? normalized-ui)))
     (is (true? (:tpsl-unit-dropdown-open? normalized-ui)))))
 
+(deftest effective-order-form-ui-closes-non-limit-controls-and-scale-tpsl-test
+  (let [form (assoc (trading/default-order-form)
+                    :type :scale
+                    :ui-leverage 27
+                    :size-input-mode :base
+                    :size-input-source :percent)
+        ui (assoc (trading/default-order-form-ui)
+                  :entry-mode :limit
+                  :ui-leverage 31
+                  :leverage-draft 29
+                  :price-input-focused? true
+                  :tif-dropdown-open? true
+                  :tpsl-panel-open? true
+                  :tpsl-unit-dropdown-open? true)
+        effective (trading/effective-order-form-ui form ui)]
+    (is (= :pro (:entry-mode effective)))
+    (is (= 27 (:ui-leverage effective)))
+    (is (= 29 (:leverage-draft effective)))
+    (is (false? (:price-input-focused? effective)))
+    (is (false? (:tif-dropdown-open? effective)))
+    (is (false? (:tpsl-panel-open? effective)))
+    (is (false? (:tpsl-unit-dropdown-open? effective)))))
+
 (deftest normalize-order-form-ui-normalizes-margin-mode-values-test
   (let [isolated-ui (trading/normalize-order-form-ui {:margin-mode "ISOLATED"})
         invalid-ui (trading/normalize-order-form-ui {:margin-mode :unknown})]

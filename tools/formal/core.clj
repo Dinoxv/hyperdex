@@ -28,7 +28,12 @@
                             :status "modeled"
                             :manifest "generated/trading-submit-policy.edn"
                             :target-source "target/formal/trading-submit-policy-vectors.cljs"
-                            :committed-source "test/hyperopen/formal/trading_submit_policy_vectors.cljs"}})
+                            :committed-source "test/hyperopen/formal/trading_submit_policy_vectors.cljs"}
+   "order-form-ownership" {:lean-module "Hyperopen.Formal.OrderFormOwnership"
+                           :status "modeled"
+                           :manifest "generated/order-form-ownership.edn"
+                           :target-source "target/formal/order-form-ownership-vectors.cljs"
+                           :committed-source "test/hyperopen/formal/order_form_ownership_vectors.cljs"}})
 
 (def ^:private install-message
   (str "Lean 4 is required for the formal toolchain.\n"
@@ -38,12 +43,13 @@
 
 (defn- usage
   []
-  (str "Usage: bb tools/formal.clj <verify|sync> --surface <vault-transfer|order-request-standard|order-request-advanced|effect-order-contract|trading-submit-policy>\n"
+  (str "Usage: bb tools/formal.clj <verify|sync> --surface <vault-transfer|order-request-standard|order-request-advanced|effect-order-contract|trading-submit-policy|order-form-ownership>\n"
        "Examples:\n"
        "  bb tools/formal.clj verify --surface vault-transfer\n"
        "  bb tools/formal.clj sync --surface order-request-standard\n"
        "  bb tools/formal.clj verify --surface effect-order-contract\n"
        "  bb tools/formal.clj verify --surface trading-submit-policy\n"
+       "  bb tools/formal.clj verify --surface order-form-ownership\n"
        "Notes:\n"
        "  - `verify` builds the Lean workspace and checks the selected surface manifest.\n"
        "  - modeled surfaces also verify any checked-in generated source files.\n"
