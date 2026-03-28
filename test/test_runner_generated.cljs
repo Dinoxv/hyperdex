@@ -159,6 +159,8 @@
             [hyperopen.runtime.effect-adapters.vaults-test]
             [hyperopen.runtime.effect-adapters.wallet-test]
             [hyperopen.runtime.effect-adapters.websocket-test]
+            [hyperopen.runtime.effect-order-contract-formal-conformance-test]
+            [hyperopen.runtime.effect-order-contract-test]
             [hyperopen.runtime.registry-composition-test]
             [hyperopen.runtime.state-test]
             [hyperopen.runtime.validation-test]
@@ -581,6 +583,8 @@
              'hyperopen.runtime.effect-adapters.vaults-test
              'hyperopen.runtime.effect-adapters.wallet-test
              'hyperopen.runtime.effect-adapters.websocket-test
+             'hyperopen.runtime.effect-order-contract-formal-conformance-test
+             'hyperopen.runtime.effect-order-contract-test
              'hyperopen.runtime.registry-composition-test
              'hyperopen.runtime.state-test
              'hyperopen.runtime.validation-test

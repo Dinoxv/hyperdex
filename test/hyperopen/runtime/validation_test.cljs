@@ -67,6 +67,18 @@
            #"rule=heavy-before-projection-phase"
            (wrapped {} "SPY"))))))
 
+(deftest wrap-action-handler-rejects-phase-order-regression-for-covered-action-test
+  (with-redefs [validation/validation-enabled? (constantly true)]
+    (let [wrapped (validation/wrap-action-handler :actions/select-portfolio-returns-benchmark
+                                                  (fn [_state coin]
+                                                    [[:effects/save [:portfolio-ui :returns-benchmark-coin] coin]
+                                                     [:effects/fetch-candle-snapshot :coin coin :interval :1h :bars 800]
+                                                     [:effects/local-storage-set "portfolio-returns-benchmark" coin]]))]
+      (is (thrown-with-msg?
+           js/Error
+           #"rule=phase-order-regression"
+           (wrapped {} "SPY"))))))
+
 (deftest wrap-action-handler-rejects-duplicate-heavy-effects-for-covered-action-test
   (with-redefs [validation/validation-enabled? (constantly true)]
     (let [wrapped (validation/wrap-action-handler :actions/select-orderbook-price-aggregation
@@ -78,6 +90,19 @@
            js/Error
            #"rule=duplicate-heavy-effect"
            (wrapped {} "BTC"))))))
+
+(deftest wrap-action-handler-allows-duplicate-heavy-effects-when-policy-permits-test
+  (with-redefs [validation/validation-enabled? (constantly true)]
+    (let [wrapped (validation/wrap-action-handler :actions/select-portfolio-summary-time-range
+                                                  (fn [_state timeframe]
+                                                    [[:effects/save [:portfolio-ui :summary-time-range] timeframe]
+                                                     [:effects/fetch-candle-snapshot :interval :1h]
+                                                     [:effects/fetch-candle-snapshot :interval :1h]]))
+          effects (wrapped {} :1w)]
+      (is (= [[:effects/save [:portfolio-ui :summary-time-range] :1w]
+              [:effects/fetch-candle-snapshot :interval :1h]
+              [:effects/fetch-candle-snapshot :interval :1h]]
+             effects)))))
 
 (deftest wrap-action-handler-does-not-apply-order-contract-to-uncovered-actions-test
   (with-redefs [validation/validation-enabled? (constantly true)]
@@ -125,3 +150,24 @@
         (is (= 1 (:heavy-effect-count trace)))
         (is (true? (:projection-before-heavy trace)))
         (is (true? (:phase-order-valid trace)))))))
+
+(deftest wrap-action-handler-records-invalid-phase-order-in-debug-trace-when-validation-disabled-test
+  (with-redefs [validation/validation-enabled? (constantly false)]
+    (validation/clear-debug-action-effect-traces!)
+    (let [wrapped (validation/wrap-action-handler
+                   :actions/select-portfolio-returns-benchmark
+                   (fn [_state]
+                     [[:effects/save [:portfolio-ui :returns-benchmark-coin] "SPY"]
+                      [:effects/fetch-candle-snapshot :coin "SPY" :interval :1h :bars 800]
+                      [:effects/local-storage-set "portfolio-returns-benchmark" "SPY"]]))
+          effects (wrapped {})]
+      (is (= [[:effects/save [:portfolio-ui :returns-benchmark-coin] "SPY"]
+              [:effects/fetch-candle-snapshot :coin "SPY" :interval :1h :bars 800]
+              [:effects/local-storage-set "portfolio-returns-benchmark" "SPY"]]
+             effects))
+      (let [trace (last (validation/debug-action-effect-traces-snapshot))]
+        (is (= :actions/select-portfolio-returns-benchmark (:action-id trace)))
+        (is (true? (:projection-before-heavy trace)))
+        (is (false? (:phase-order-valid trace)))
+        (is (= [:projection :heavy-io :persistence]
+               (:phases trace)))))))

@@ -19,6 +19,11 @@
                              :manifest "generated/order-request-advanced.edn"
                              :target-source "target/formal/order-request-advanced-vectors.cljs"
                              :committed-source "test/hyperopen/formal/order_request_advanced_vectors.cljs"}
+   "effect-order-contract" {:lean-module "Hyperopen.Formal.EffectOrderContract"
+                            :status "modeled"
+                            :manifest "generated/effect-order-contract.edn"
+                            :target-source "target/formal/effect-order-contract-vectors.cljs"
+                            :committed-source "test/hyperopen/formal/effect_order_contract_vectors.cljs"}
    "trading-submit-policy" {:lean-module "Hyperopen.Formal.TradingSubmitPolicy"
                             :status "modeled"
                             :manifest "generated/trading-submit-policy.edn"
@@ -33,10 +38,11 @@
 
 (defn- usage
   []
-  (str "Usage: bb tools/formal.clj <verify|sync> --surface <vault-transfer|order-request-standard|order-request-advanced|trading-submit-policy>\n"
+  (str "Usage: bb tools/formal.clj <verify|sync> --surface <vault-transfer|order-request-standard|order-request-advanced|effect-order-contract|trading-submit-policy>\n"
        "Examples:\n"
        "  bb tools/formal.clj verify --surface vault-transfer\n"
        "  bb tools/formal.clj sync --surface order-request-standard\n"
+       "  bb tools/formal.clj verify --surface effect-order-contract\n"
        "  bb tools/formal.clj verify --surface trading-submit-policy\n"
        "Notes:\n"
        "  - `verify` builds the Lean workspace and checks the selected surface manifest.\n"

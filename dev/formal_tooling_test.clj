@@ -29,6 +29,14 @@
    :target-source "target/formal/order-request-advanced-vectors.cljs"
    :committed-source "test/hyperopen/formal/order_request_advanced_vectors.cljs"})
 
+(def effect-order-contract-surface
+  {:id "effect-order-contract"
+   :lean-module "Hyperopen.Formal.EffectOrderContract"
+   :status "modeled"
+   :manifest "generated/effect-order-contract.edn"
+   :target-source "target/formal/effect-order-contract-vectors.cljs"
+   :committed-source "test/hyperopen/formal/effect_order_contract_vectors.cljs"})
+
 (def trading-submit-policy-surface
   {:id "trading-submit-policy"
    :lean-module "Hyperopen.Formal.TradingSubmitPolicy"
@@ -44,7 +52,11 @@
    :manifest "generated/bootstrap-test.edn"})
 
 (def modeled-surfaces
-  [vault-surface standard-surface advanced-surface trading-submit-policy-surface])
+  [vault-surface
+   standard-surface
+   advanced-surface
+   effect-order-contract-surface
+   trading-submit-policy-surface])
 
 (defn delete-recursive!
   [file]
@@ -75,6 +87,8 @@
          (#'formal/manifest-content standard-surface)))
   (is (= "{:surface \"order-request-advanced\" :module \"Hyperopen.Formal.OrderRequest.Advanced\" :status \"modeled\"}\n"
          (#'formal/manifest-content advanced-surface)))
+  (is (= "{:surface \"effect-order-contract\" :module \"Hyperopen.Formal.EffectOrderContract\" :status \"modeled\"}\n"
+         (#'formal/manifest-content effect-order-contract-surface)))
   (is (= "{:surface \"trading-submit-policy\" :module \"Hyperopen.Formal.TradingSubmitPolicy\" :status \"modeled\"}\n"
          (#'formal/manifest-content trading-submit-policy-surface))))
 

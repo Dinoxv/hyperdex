@@ -23,7 +23,7 @@ Use this file as the single starting point for what actions this repo provides t
 9. For interactive feature, bug, and UI orchestration, invoke `$feature-flow`, `$bug-flow`, or `$ui-flow` explicitly.
 10. For multi-agent role, artifact, and gate rules, use `/hyperopen/docs/MULTI_AGENT.md` and the manager under `/hyperopen/tools/multi-agent/`.
 11. For issue tracking and session handoff rules, use `/hyperopen/docs/WORK_TRACKING.md`.
-12. For Lean-backed formal-tool commands, use `npm run formal:verify -- --surface <vault-transfer|order-request-standard|order-request-advanced|trading-submit-policy>` and `npm run formal:sync -- --surface <surface>`.
+12. For Lean-backed formal-tool commands, use `npm run formal:verify -- --surface <vault-transfer|order-request-standard|order-request-advanced|effect-order-contract|trading-submit-policy>` and `npm run formal:sync -- --surface <surface>`.
 13. For websocket TLA+ model-checking, use `npm run tla:verify -- --spec websocket-runtime` for the bounded safety pass and `npm run tla:verify -- --spec websocket-runtime-liveness` for the focused liveness pass.
 14. For exact browser inspection command syntax, see:
    - `/hyperopen/tools/browser-inspection/src/cli.mjs`

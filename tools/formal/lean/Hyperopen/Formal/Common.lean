@@ -4,6 +4,7 @@ inductive Surface where
   | vaultTransfer
   | orderRequestStandard
   | orderRequestAdvanced
+  | effectOrderContract
   | tradingSubmitPolicy
   deriving Repr, DecidableEq, Inhabited
 
@@ -32,18 +33,21 @@ def surfaceId : Surface → String
   | .vaultTransfer => "vault-transfer"
   | .orderRequestStandard => "order-request-standard"
   | .orderRequestAdvanced => "order-request-advanced"
+  | .effectOrderContract => "effect-order-contract"
   | .tradingSubmitPolicy => "trading-submit-policy"
 
 def surfaceModuleName : Surface → String
   | .vaultTransfer => "Hyperopen.Formal.VaultTransfer"
   | .orderRequestStandard => "Hyperopen.Formal.OrderRequest.Standard"
   | .orderRequestAdvanced => "Hyperopen.Formal.OrderRequest.Advanced"
+  | .effectOrderContract => "Hyperopen.Formal.EffectOrderContract"
   | .tradingSubmitPolicy => "Hyperopen.Formal.TradingSubmitPolicy"
 
 def surfaceStatus : Surface → String
   | .vaultTransfer => "modeled"
   | .orderRequestStandard => "modeled"
   | .orderRequestAdvanced => "modeled"
+  | .effectOrderContract => "modeled"
   | .tradingSubmitPolicy => "modeled"
 
 def surfaceManifestPath : Surface → String :=
@@ -53,6 +57,7 @@ def surfaceGeneratedSourcePath? : Surface → Option String
   | .vaultTransfer => some "../../../target/formal/vault-transfer-vectors.cljs"
   | .orderRequestStandard => some "../../../target/formal/order-request-standard-vectors.cljs"
   | .orderRequestAdvanced => some "../../../target/formal/order-request-advanced-vectors.cljs"
+  | .effectOrderContract => some "../../../target/formal/effect-order-contract-vectors.cljs"
   | .tradingSubmitPolicy => some "../../../target/formal/trading-submit-policy-vectors.cljs"
 
 def surfaceManifest : Surface → String :=
@@ -64,6 +69,7 @@ def parseSurface? : String → Option Surface
   | "vault-transfer" => some .vaultTransfer
   | "order-request-standard" => some .orderRequestStandard
   | "order-request-advanced" => some .orderRequestAdvanced
+  | "effect-order-contract" => some .effectOrderContract
   | "trading-submit-policy" => some .tradingSubmitPolicy
   | _ => none
 
@@ -77,7 +83,7 @@ def parseCommand? : String → Option Command
   | _ => none
 
 def usage : String :=
-  "Usage: formal <verify|sync> --surface <vault-transfer|order-request-standard|order-request-advanced|trading-submit-policy>"
+  "Usage: formal <verify|sync> --surface <vault-transfer|order-request-standard|order-request-advanced|effect-order-contract|trading-submit-policy>"
 
 def parseInvocation : List String → Except String Invocation
   | [] => Except.error usage
@@ -170,6 +176,10 @@ theorem parseSurface?_vaultTransfer :
 
 theorem parseSurface?_standard :
     parseSurface? "order-request-standard" = some Surface.orderRequestStandard := by
+  rfl
+
+theorem parseSurface?_effectOrderContract :
+    parseSurface? "effect-order-contract" = some Surface.effectOrderContract := by
   rfl
 
 theorem parseCommand?_verify :
