@@ -97,7 +97,7 @@ Current surface state:
 
 The generated manifests live under `/hyperopen/tools/formal/generated/`, transient generated source lives under `/hyperopen/target/formal/`, and the Lean workspace lives under `/hyperopen/spec/lean/`.
 
-The websocket runtime TLA+ track is separate on purpose. Use `tools/tla.clj`, `npm run tla:verify -- --spec websocket-runtime`, and `npm run tla:verify -- --spec websocket-runtime-liveness` for TLC runs against `/hyperopen/spec/tla/websocket_runtime.tla`. The wrapper looks for `TLA2TOOLS_JAR` first and `/hyperopen/tools/tla/vendor/tla2tools.jar` second, and it writes TLC artifacts only under `/hyperopen/target/tla/**`.
+The websocket runtime TLA+ track is separate on purpose. Use `tools/tla.clj`, `npm run tla:verify -- --spec websocket-runtime`, and `npm run tla:verify -- --spec websocket-runtime-liveness` for TLC runs against `/hyperopen/spec/tla/websocket_runtime.tla`. The wrapper looks for `TLA2TOOLS_JAR` first and `/hyperopen/tools/tla/vendor/tla2tools.jar` second, and it writes TLC artifacts only under `/hyperopen/target/tla/**`. Fresh clones do not need the jar for normal repo gates; only the explicit `npm run tla:verify ...` command requires it.
 
 ## 2) Local Clojure navigation and analysis
 
