@@ -129,6 +129,53 @@
   (is (nil? (#'formal/verify-generated-source! bootstrap-test-surface)))
   (is (nil? (#'formal/sync-generated-source! bootstrap-test-surface))))
 
+(deftest lean-root-points-at-spec-lean-even-when-historical-root-exists-test
+  (with-temp-root
+    (fn [root]
+      (write-file! root "spec/lean/lakefile.toml" "preferred")
+      (write-file! root "tools/formal/lean/lakefile.toml" "historical")
+      (with-redefs [tools.formal.core/repo-root (constantly (io/file root))]
+        (is (= (.getCanonicalPath (io/file root "spec" "lean"))
+               (.getCanonicalPath ^java.io.File (#'formal/lean-root))))))))
+
+(deftest build-and-entrypoint-run-from-spec-lean-root-even-when-historical-root-exists-test
+  (with-temp-root
+    (fn [root]
+      (write-file! root "spec/lean/lakefile.toml" "preferred")
+      (write-file! root "tools/formal/lean/lakefile.toml" "historical")
+      (let [preferred-root (.getCanonicalPath (io/file root "spec" "lean"))
+            invocations (atom [])]
+        (with-redefs [tools.formal.core/repo-root (constantly (io/file root))
+                      tools.formal.core/run-command (fn [command args {:keys [dir]}]
+                                                      (swap! invocations conj {:command command
+                                                                               :args args
+                                                                               :dir (.getCanonicalPath ^java.io.File dir)})
+                                                      {:exit 0
+                                                       :output ""})]
+          (#'formal/build-lean-workspace!)
+          (#'formal/run-lean-entrypoint! "verify" "vault-transfer")
+          (is (= [preferred-root preferred-root]
+                 (mapv :dir @invocations))))))))
+
+(deftest missing-spec-lean-does-not-fall-back-to-historical-root-test
+  (with-temp-root
+    (fn [root]
+      (write-file! root "tools/formal/lean/lakefile.toml" "historical")
+      (let [attempted-dirs (atom [])]
+        (with-redefs [tools.formal.core/repo-root (constantly (io/file root))
+                      tools.formal.core/run-command (fn [_command _args {:keys [dir]}]
+                                                      (swap! attempted-dirs conj {:path (.getCanonicalPath ^java.io.File dir)
+                                                                                  :exists (.exists ^java.io.File dir)})
+                                                      {:exit 1
+                                                       :output "missing spec root"})]
+          (is (thrown-with-msg?
+               Exception
+               #"Lean build failed\."
+               (#'formal/build-lean-workspace!)))
+          (is (= [{:path (.getCanonicalPath (io/file root "spec" "lean"))
+                   :exists false}]
+                 @attempted-dirs)))))))
+
 (deftest run-sync-and-verify-support-modeled-generated-source-artifacts-test
   (doseq [{:keys [id target-source committed-source lean-module] :as surface} modeled-surfaces]
     (with-temp-root

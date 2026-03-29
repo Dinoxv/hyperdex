@@ -1,6 +1,6 @@
 # Formal Tooling
 
-This directory holds the repo-local formal-verification workspace for Hyperopen.
+This directory holds the repo-local formal-verification wrapper and generated artifacts for Hyperopen.
 
 ## Commands
 
@@ -22,7 +22,7 @@ Supported surfaces are:
 
 ## What It Does
 
-- `verify` builds the Lean 4 workspace in `tools/formal/lean/` and checks the selected surface manifest.
+- `verify` builds the Lean 4 workspace in `spec/lean/` and checks the selected surface manifest.
 - For modeled surfaces, `verify` also regenerates transient output under `target/formal/` and fails if the checked-in generated namespace is stale.
 - `sync` refreshes the deterministic manifest for the selected surface under `tools/formal/generated/`.
 - For modeled surfaces, `sync` also copies the transient generated namespace into the checked-in `test/hyperopen/formal/*.cljs` bridge.
@@ -41,6 +41,8 @@ Current surface state:
 
 - `tools/formal.clj` is the repo-local entry point.
 - `tools/formal/core.clj` implements argument parsing and Lean process management.
-- `tools/formal/lean/` is the Lean 4 workspace for the proof entrypoints.
+- `spec/lean/` is the Lean 4 workspace for the proof entrypoints.
 - `tools/formal/generated/` holds the committed surface manifests used by `verify`.
 - `target/formal/` holds transient generated source during verify and sync runs.
+
+Historical note: completed ExecPlans written before the `spec/lean` migration may still reference `tools/formal/lean/**` paths.

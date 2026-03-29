@@ -1,29 +1,7 @@
-import Hyperopen.Formal.Common
-import Hyperopen.Formal.EffectOrderContract
-import Hyperopen.Formal.VaultTransfer
-import Hyperopen.Formal.OrderRequest.Standard
-import Hyperopen.Formal.OrderRequest.Advanced
-import Hyperopen.Formal.TradingSubmitPolicy
-import Hyperopen.Formal.OrderFormOwnership
+/- Historical redirect stub.
 
-namespace Hyperopen.Formal
+The live Lean dispatcher moved to:
+`/hyperopen/spec/lean/Hyperopen/Formal.lean`
 
-def runVerify : Surface → IO Unit
-  | .vaultTransfer => VaultTransfer.verify
-  | .orderRequestStandard => OrderRequest.Standard.verify
-  | .orderRequestAdvanced => OrderRequest.Advanced.verify
-  | .effectOrderContract => EffectOrderContract.verify
-  | .tradingSubmitPolicy => TradingSubmitPolicy.verify
-  | .orderFormOwnership => OrderFormOwnership.verify
-
-def runSync : Surface → IO Unit
-  | .vaultTransfer => VaultTransfer.sync
-  | .orderRequestStandard => OrderRequest.Standard.sync
-  | .orderRequestAdvanced => OrderRequest.Advanced.sync
-  | .effectOrderContract => EffectOrderContract.sync
-  | .tradingSubmitPolicy => TradingSubmitPolicy.sync
-  | .orderFormOwnership => OrderFormOwnership.sync
-
-def runInvocation : Invocation → IO Unit
-  | {command := .verify, surface} => runVerify surface
-  | {command := .sync, surface} => runSync surface
+This file remains only so historical ExecPlan links continue to resolve.
+-/

@@ -73,7 +73,7 @@
 
 (defn- lean-root
   []
-  (io/file (formal-root) "lean"))
+  (io/file (repo-root) "spec" "lean"))
 
 (defn- generated-root
   []

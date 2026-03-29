@@ -1,10 +1,7 @@
-import Hyperopen.Formal.Common
+/- Historical redirect stub.
 
-namespace Hyperopen.Formal.OrderRequest
+The live OrderRequest Common proof module moved to:
+`/hyperopen/spec/lean/Hyperopen/Formal/OrderRequest/Common.lean`
 
-open Hyperopen.Formal
-
-def familyName : String := "order-request"
-
-theorem familyName_spec : familyName = "order-request" := by
-  rfl
+This file remains only so historical ExecPlan links continue to resolve.
+-/

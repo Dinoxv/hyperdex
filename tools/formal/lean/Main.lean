@@ -1,16 +1,7 @@
-import Hyperopen.Formal
+/- Historical redirect stub.
 
-open Hyperopen.Formal
+The live Lean entrypoint moved to:
+`/hyperopen/spec/lean/Main.lean`
 
-def main (args : List String) : IO UInt32 := do
-  match parseInvocation args with
-  | .ok invocation =>
-      try
-        runInvocation invocation
-        return 0
-      catch err =>
-        IO.eprintln s!"{err}"
-        return 1
-  | .error message =>
-      IO.eprintln message
-      return 1
+This file remains only so historical ExecPlan links continue to resolve.
+-/
