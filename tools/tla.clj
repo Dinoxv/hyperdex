@@ -21,6 +21,8 @@
        "  bb tools/tla.clj verify --spec websocket-runtime-liveness\n"
        "  npm run tla:verify -- --spec websocket-runtime\n"
        "Notes:\n"
+       "  - TLC verification is optional; normal repo gates run `npm run test:tla-tooling`,\n"
+       "    not `npm run tla:verify`.\n"
        "  - Set `TLA2TOOLS_JAR` to a local `tla2tools.jar`, or place the jar at\n"
        "    `tools/tla/vendor/tla2tools.jar`.\n"
        "  - TLC metadata and logs are written only under `target/tla/<spec-id>/`.\n"))
@@ -151,6 +153,7 @@
          " -> <unset>")
        "\n"
        "  repo-local fallback -> " vendor-path "\n"
+       "Normal repo gates do not require this jar; only explicit `npm run tla:verify` runs do.\n"
        "Repair:\n"
        "  - export TLA2TOOLS_JAR=/absolute/path/to/tla2tools.jar\n"
        "  - or place the jar at tools/tla/vendor/tla2tools.jar\n"

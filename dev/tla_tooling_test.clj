@@ -58,7 +58,7 @@
                     tools.tla/env (constantly nil)]
         (is (thrown-with-msg?
              Exception
-             #"TLA2TOOLS_JAR=.*tools/tla/vendor/tla2tools.jar|TLA2TOOLS_JAR"
+             #"Normal repo gates do not require this jar|TLA2TOOLS_JAR=.*tools/tla/vendor/tla2tools.jar|TLA2TOOLS_JAR"
              (#'tla/ensure-tla-tools-jar!)))))))
 
 (deftest ensure-tla-tools-jar-prefers-env-then-vendor-test

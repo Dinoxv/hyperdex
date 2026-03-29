@@ -24,7 +24,7 @@ Use this file as the single starting point for what actions this repo provides t
 10. For multi-agent role, artifact, and gate rules, use `/hyperopen/docs/MULTI_AGENT.md` and the manager under `/hyperopen/tools/multi-agent/`.
 11. For issue tracking and session handoff rules, use `/hyperopen/docs/WORK_TRACKING.md`.
 12. For Lean-backed formal-tool commands, use `npm run formal:verify -- --surface <vault-transfer|order-request-standard|order-request-advanced|effect-order-contract|trading-submit-policy|order-form-ownership>` and `npm run formal:sync -- --surface <surface>`.
-13. For websocket TLA+ model-checking, use `npm run tla:verify -- --spec websocket-runtime` for the bounded safety pass and `npm run tla:verify -- --spec websocket-runtime-liveness` for the focused liveness pass.
+13. For optional websocket TLA+ model-checking, use `npm run tla:verify -- --spec websocket-runtime` for the bounded safety pass and `npm run tla:verify -- --spec websocket-runtime-liveness` for the focused liveness pass.
 14. For exact browser inspection command syntax, see:
    - `/hyperopen/tools/browser-inspection/src/cli.mjs`
    - `/hyperopen/tools/browser-inspection/src/mcp_server.mjs`
@@ -97,7 +97,7 @@ Current surface state:
 
 The generated manifests live under `/hyperopen/tools/formal/generated/`, transient generated source lives under `/hyperopen/target/formal/`, and the Lean workspace lives under `/hyperopen/spec/lean/`.
 
-The websocket runtime TLA+ track is separate on purpose. Use `tools/tla.clj`, `npm run tla:verify -- --spec websocket-runtime`, and `npm run tla:verify -- --spec websocket-runtime-liveness` for TLC runs against `/hyperopen/spec/tla/websocket_runtime.tla`. The wrapper looks for `TLA2TOOLS_JAR` first and `/hyperopen/tools/tla/vendor/tla2tools.jar` second, and it writes TLC artifacts only under `/hyperopen/target/tla/**`. Fresh clones do not need the jar for normal repo gates; only the explicit `npm run tla:verify ...` command requires it.
+The websocket runtime TLA+ track is separate on purpose. TLC runs are optional and are not part of the normal repo gates; `npm run check` only runs `npm run test:tla-tooling`. Use `tools/tla.clj`, `npm run tla:verify -- --spec websocket-runtime`, and `npm run tla:verify -- --spec websocket-runtime-liveness` for TLC runs against `/hyperopen/spec/tla/websocket_runtime.tla`. The wrapper looks for `TLA2TOOLS_JAR` first and `/hyperopen/tools/tla/vendor/tla2tools.jar` second, fails fast with repair guidance if neither exists, and writes TLC artifacts only under `/hyperopen/target/tla/**`.
 
 ## 2) Local Clojure navigation and analysis
 
