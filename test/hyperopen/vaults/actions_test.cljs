@@ -44,7 +44,9 @@
           [:effects/api-fetch-vault-details "0x1234567890abcdef1234567890abcdef12345678" "0xabcdefabcdefabcdefabcdefabcdefabcdefabcd"]
           [:effects/api-fetch-vault-webdata2 "0x1234567890abcdef1234567890abcdef12345678"]]
          (actions/load-vault-route
-          {:wallet {:address "0xabcdefabcdefabcdefabcdefabcdefabcdefabcd"}}
+          {:wallet {:address "0xabcdefabcdefabcdefabcdefabcdefabcdefabcd"}
+           :vaults {:merged-index-rows [{:vault-address "0x1234567890abcdef1234567890abcdef12345678"
+                                         :tvl 1}]}}
           "/vaults/0x1234567890abcdef1234567890abcdef12345678")))
   (is (= []
          (actions/load-vault-route

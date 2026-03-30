@@ -51,11 +51,22 @@
     [[:effects/api-fetch-user-vault-equities viewer-address]]
     []))
 
+(defn- current-vault-metadata-effects
+  [state vault-address]
+  (let [vault-address* (identity/normalize-vault-address vault-address)]
+    (if (and vault-address*
+             (not (identity/merged-vault-row state vault-address*)))
+      [[:effects/api-fetch-vault-index-with-cache]
+       [:effects/api-fetch-vault-summaries]]
+      [])))
+
 (defn- detail-route-support-effects
-  [state]
+  [state vault-address]
   (into []
-        (concat (user-vault-equity-effects state)
-                (detail-commands/ensure-vault-detail-vault-benchmark-effects state))))
+        (distinct
+         (concat (user-vault-equity-effects state)
+                 (current-vault-metadata-effects state vault-address)
+                 (detail-commands/ensure-vault-detail-vault-benchmark-effects state)))))
 
 (defn- portfolio-route-support-effects
   [state]
@@ -92,7 +103,7 @@
       :detail
       (projection-first-effects
        (into (maybe-prepend-list-loading-effect
-              (detail-route-support-effects state))
+              (detail-route-support-effects state vault-address))
              (load-vault-detail state vault-address)))
 
       :other

@@ -321,6 +321,8 @@
                    (is (= "0xvault" (:vault-address details)))
                    (is (= "0xleader" (:leader details)))
                    (is (= "hello" (:description details)))
+                   (is (nil? (:tvl details)))
+                   (is (nil? (:tvl-raw details)))
                    (is (= {:day {:accountValue "10"}
                            :all-time {:accountValue "20"}}
                           (:portfolio details)))
@@ -333,6 +335,20 @@
                    (is (= 2 (:followers-count details)))
                    (is (true? (:allow-deposits? details)))
                    (is (false? (:always-close-on-withdraw? details)))
+                   (done)))
+          (.catch (async-support/unexpected-error done))))))
+
+(deftest request-vault-details-parses-tvl-when-payload-includes-it-test
+  (async done
+    (let [post-info! (api-stubs/post-info-stub
+                      (atom [])
+                      {:name "Vault Detail"
+                       :vaultAddress "0xVaUlT"
+                       :tvl "321.5"})]
+      (-> (vaults/request-vault-details! post-info! "0xVaUlT" {})
+          (.then (fn [details]
+                   (is (= 321.5 (:tvl details)))
+                   (is (= "321.5" (:tvl-raw details)))
                    (done)))
           (.catch (async-support/unexpected-error done))))))
 

@@ -121,6 +121,124 @@ test("vault detail 429 retries stop after returning to trade @regression", async
   await expect(vaultWebDataRequests).toBe(webDataRequestsAfterLeave);
 });
 
+test("vault detail hero TVL bootstraps from list metadata when vaultDetails omits tvl @regression", async ({ page }) => {
+  const vaultAddress = "0x61b1cf5c2d7c4bf6d5db14f36651b2242e7cba0a";
+  let vaultIndexRequests = 0;
+  let vaultSummariesRequests = 0;
+
+  await page.route("https://stats-data.hyperliquid.xyz/Mainnet/vaults", async route => {
+    vaultIndexRequests += 1;
+    await route.fulfill({
+      status: 200,
+      contentType: "application/json",
+      body: JSON.stringify([
+        {
+          apr: "0.12",
+          summary: {
+            name: "OnlyShorts",
+            vaultAddress,
+            leader: "0xabcdefabcdefabcdefabcdefabcdefabcdefabcd",
+            tvl: "321.5",
+            isClosed: false,
+            relationship: { type: "normal" },
+            createTimeMillis: "1700"
+          }
+        }
+      ])
+    });
+  });
+
+  await page.route("https://api.hyperliquid.xyz/info", async route => {
+    const payload = JSON.parse(route.request().postData() || "{}");
+    const requestType = payload?.type;
+    const requestVaultAddress = String(
+      payload?.vaultAddress || payload?.user || ""
+    ).toLowerCase();
+
+    if (requestType === "vaultSummaries") {
+      vaultSummariesRequests += 1;
+      await route.fulfill({
+        status: 200,
+        contentType: "application/json",
+        body: JSON.stringify([])
+      });
+      return;
+    }
+
+    if (
+      requestType === "vaultDetails" &&
+      requestVaultAddress === vaultAddress
+    ) {
+      await route.fulfill({
+        status: 200,
+        contentType: "application/json",
+        body: JSON.stringify({
+          name: "OnlyShorts",
+          vaultAddress,
+          leader: "0xabcdefabcdefabcdefabcdefabcdefabcdefabcd",
+          description: "Regression fixture",
+          apr: "0.12",
+          portfolio: [
+            [
+              "month",
+              {
+                accountValueHistory: [
+                  [1, 100],
+                  [2, 110]
+                ],
+                pnlHistory: [
+                  [1, 0],
+                  [2, 10]
+                ]
+              }
+            ]
+          ],
+          followers: [],
+          relationship: { type: "normal" },
+          allowDeposits: false,
+          alwaysCloseOnWithdraw: false
+        })
+      });
+      return;
+    }
+
+    if (
+      requestType === "webData2" &&
+      requestVaultAddress === vaultAddress
+    ) {
+      await route.fulfill({
+        status: 200,
+        contentType: "application/json",
+        body: JSON.stringify({})
+      });
+      return;
+    }
+
+    await route.continue();
+  });
+
+  await visitRoute(page, `/vaults/${vaultAddress}`);
+  await expectOracle(
+    page,
+    "parity-element",
+    { present: true },
+    { args: { parityId: "vault-detail-root" } }
+  );
+
+  await expect
+    .poll(() => vaultIndexRequests, { timeout: 10_000 })
+    .toBeGreaterThanOrEqual(1);
+  await expect
+    .poll(() => vaultSummariesRequests, { timeout: 10_000 })
+    .toBeGreaterThanOrEqual(1);
+  await expect(page.getByRole("heading", { name: "OnlyShorts" })).toBeVisible();
+  const tvlCard = page
+    .getByText("TVL", { exact: true })
+    .locator("xpath=ancestor::div[contains(@class, 'rounded-xl')][1]");
+  await expect(tvlCard).toContainText("$321.50");
+  await expect(tvlCard).not.toContainText("$0.00");
+});
+
 test("asset selector favorite toggle keeps dropdown open @regression", async ({ page }) => {
   await visitRoute(page, "/trade");
 

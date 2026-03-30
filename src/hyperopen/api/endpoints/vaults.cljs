@@ -519,6 +519,8 @@
          :vault-address vault-address
          :leader (normalize-address (:leader payload))
          :description (or (non-blank-text (:description payload)) "")
+         :tvl (parse-optional-num (:tvl payload))
+         :tvl-raw (:tvl payload)
          :portfolio (account-endpoints/normalize-portfolio-summary (:portfolio payload))
          :apr (or (parse-optional-num (:apr payload)) 0)
          :follower-state (normalize-follower-state (:followerState payload))
