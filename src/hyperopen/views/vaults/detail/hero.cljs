@@ -114,7 +114,7 @@
                                                       :deposit]})]]
      [:div {:class ["mt-4" "grid" "grid-cols-2" "gap-2.5" "lg:mt-5" "lg:gap-3" "xl:grid-cols-4"]}
       (metric-card {:label "TVL"
-                    :value (vf/format-currency (:tvl metrics) {:missing "$0.00"})})
+                    :value (vf/format-currency (:tvl metrics))})
       (metric-card {:label "Past Month Return"
                     :value (vf/format-percent month-return {:signed? false
                                                             :decimals 2})

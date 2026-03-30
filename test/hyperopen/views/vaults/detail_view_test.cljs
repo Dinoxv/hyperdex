@@ -268,6 +268,18 @@
     (is (contains? text "Loading vault name"))
     (is (not (contains? text vault-address)))))
 
+(deftest vault-detail-view-leaves-tvl-missing-instead-of-rendering-zero-when-summary-row-has-not-loaded-test
+  (let [vault-address "0x1234567890abcdef1234567890abcdef12345678"
+        state (-> sample-state
+                  (assoc-in [:vaults-ui :detail-loading?] true)
+                  (assoc-in [:vaults :merged-index-rows] [])
+                  (update-in [:vaults :details-by-address vault-address] dissoc :tvl))
+        view (vault-detail-view/vault-detail-view state)
+        text (set (collect-strings view))]
+    (is (contains? text "TVL"))
+    (is (contains? text "—"))
+    (is (not (contains? text "$0.00")))))
+
 (deftest vault-detail-view-renders-returns-benchmark-controls-and-performance-metrics-panel-test
   (let [returns-state (assoc-in sample-state [:vaults-ui :detail-chart-series] :returns)
         returns-view (vault-detail-view/vault-detail-view returns-state)

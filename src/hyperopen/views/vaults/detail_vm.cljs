@@ -427,8 +427,7 @@
 (defn- detail-metrics-context
   [state details row user-equity viewer-follower]
   (let [tvl (or (optional-number (:tvl details))
-                (optional-number (:tvl row))
-                0)
+                (optional-number (:tvl row)))
         apr (or (optional-number (:apr details))
                 (optional-number (:apr row)))
         return-for-range (fn [snapshot-range]

@@ -258,6 +258,18 @@
                     first
                     :count)))))
 
+(deftest vault-detail-vm-uses-details-tvl-when-merged-index-row-is-absent-test
+  (let [state (-> sample-state
+                  (assoc-in [:vaults :details-by-address "0x1234567890abcdef1234567890abcdef12345678" :tvl] 321.5)
+                  (assoc-in [:vaults :merged-index-rows] []))
+        vm (detail-vm/vault-detail-vm state)]
+    (is (= 321.5 (get-in vm [:metrics :tvl])))))
+
+(deftest vault-detail-vm-leaves-tvl-missing-when-detail-and-summary-sources-are-both-absent-test
+  (let [state (assoc-in sample-state [:vaults :merged-index-rows] [])
+        vm (detail-vm/vault-detail-vm state)]
+    (is (nil? (get-in vm [:metrics :tvl])))))
+
 (deftest vault-detail-vm-leaves-month-return-missing-when-summary-and-snapshot-are-both-absent-test
   (let [state (-> sample-state
                   (assoc-in [:vaults :details-by-address "0x1234567890abcdef1234567890abcdef12345678" :apr] 0.21)
