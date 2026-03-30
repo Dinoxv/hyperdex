@@ -166,7 +166,7 @@
                       "first:pt-0"]
               :data-role data-role}
     [:div {:class ["flex" "items-center" "gap-2" "pb-1"]}
-     [:div {:class ["h-px" "w-3" "bg-[#50d2c1]/85"]}]
+     [:div {:class ["h-[2px]" "w-[10px]" "rounded-[1px]" "bg-[#62ded0]"]}]
      [:div {:class ["text-[0.58rem]"
                     "font-semibold"
                     "uppercase"
@@ -210,11 +210,11 @@
                        "rounded-[10px]"
                        "border"
                        "border-[#333c42]"
-                       "bg-[#1f262b]"
+                       "bg-[#18252a]"
                        "text-[#99a4ab]"
                        "transition-colors"
                        "hover:border-[#50d2c1]/45"
-                       "hover:bg-[#252d32]"
+                       "hover:bg-[#1e2c31]"
                        "hover:text-white"]
                :aria-label "Close trading settings"
                :data-role "trading-settings-close"
@@ -287,7 +287,7 @@
                         "rounded-[15px]"
                         "border"
                         "border-[#384046]"
-                        "bg-[#1c2328]"
+                        "bg-[#132026]"
                         "shadow-[inset_0_1px_0_rgba(255,255,255,0.04),0_18px_34px_rgba(0,0,0,0.34),0_2px_6px_rgba(0,0,0,0.2)]"
                         "md:block"]
                 :role "dialog"
@@ -315,7 +315,7 @@
                         "rounded-[16px]"
                         "border"
                         "border-[#384046]"
-                        "bg-[#1c2328]"
+                        "bg-[#132026]"
                         "shadow-[inset_0_1px_0_rgba(255,255,255,0.04),0_18px_34px_rgba(0,0,0,0.34),0_2px_6px_rgba(0,0,0,0.2)]"
                         "md:hidden"]
                 :role "dialog"
