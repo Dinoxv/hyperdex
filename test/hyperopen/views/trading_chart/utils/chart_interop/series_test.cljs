@@ -350,6 +350,9 @@
                :add-series (fn [_kind options & _]
                              (swap! add-calls conj (js->clj options :keywordize-keys true))
                              #js {}))
+        resolved-line (series/resolve-chart-type :line)
+        resolved-candlestick (series/resolve-chart-type :candlestick)
+        resolved-unknown (series/resolve-chart-type :unknown)
         columns (vec (series/transform-main-series-data candles :histogram))
         columns-direct (vec (series/transform-main-series-data candles :columns))
         fallback (vec (series/transform-main-series-data candles :unknown))
@@ -357,8 +360,11 @@
                                                         {:time 2 :value 2.5}]
                                                        :line))
         ohlc-prices (vec (series/extract-series-prices candles :unknown))]
-    (is (map? (series/resolve-chart-type :line)))
-    (is (map? (series/resolve-chart-type :unknown)))
+    (is (= #{:add :transform :prices}
+           (set (keys resolved-line))))
+    (is (= #{:add :transform :prices}
+           (set (keys resolved-unknown))))
+    (is (= resolved-candlestick resolved-unknown))
     (is (= columns-direct columns))
     (is (= [{:time 1 :value 11 :color "#26a69a"}
             {:time 2 :value 12 :color "#26a69a"}]
