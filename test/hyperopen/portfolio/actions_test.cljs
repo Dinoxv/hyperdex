@@ -167,12 +167,28 @@
          (actions/set-portfolio-account-info-tab {} "performanceMetrics")))
   (is (= [[:effects/save
            [:portfolio-ui :account-info-tab]
+           :performance-metrics]]
+         (actions/set-portfolio-account-info-tab {} " performanceMetric ")))
+  (is (= [[:effects/save
+           [:portfolio-ui :account-info-tab]
            :deposits-withdrawals]]
          (actions/set-portfolio-account-info-tab {} "depositsWithdrawals")))
   (is (= [[:effects/save
            [:portfolio-ui :account-info-tab]
            :open-orders]]
          (actions/set-portfolio-account-info-tab {} "openOrders")))
+  (is (= [[:effects/save
+           [:portfolio-ui :account-info-tab]
+           :trade-history]]
+         (actions/set-portfolio-account-info-tab {} "tradeHistory")))
+  (is (= [[:effects/save
+           [:portfolio-ui :account-info-tab]
+           :funding-history]]
+         (actions/set-portfolio-account-info-tab {} "fundingHistory")))
+  (is (= [[:effects/save
+           [:portfolio-ui :account-info-tab]
+           :order-history]]
+         (actions/set-portfolio-account-info-tab {} "orderHistory")))
   (is (= [[:effects/save
            [:portfolio-ui :account-info-tab]
            :performance-metrics]]

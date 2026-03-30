@@ -8,17 +8,14 @@
   ["fail" "error" "revert" "cancel" "refund" "drop"])
 
 (def ^:private hyperunit-explorer-tx-base-by-chain
-  {"arbitrum" "https://arbiscan.io/tx/"
-   "bitcoin" "https://mempool.space/tx/"
-   "ethereum" "https://etherscan.io/tx/"
-   "solana" "https://solscan.io/tx/"})
+  {"arbitrum" "https://arbiscan.io/tx/" "bitcoin" "https://mempool.space/tx/"
+   "ethereum" "https://etherscan.io/tx/" "solana" "https://solscan.io/tx/"})
 
 (def ^:private hyperliquid-explorer-tx-base-url
   "https://app.hyperliquid.xyz/explorer/tx/")
 
 (def ^:private chain-fee-format-by-chain
-  {"bitcoin" {:symbol "BTC" :decimals 8}
-   "ethereum" {:symbol "ETH" :decimals 18}
+  {"bitcoin" {:symbol "BTC" :decimals 8} "ethereum" {:symbol "ETH" :decimals 18}
    "solana" {:symbol "SOL" :decimals 9}})
 
 (defn non-blank-text
@@ -63,9 +60,7 @@
                (re-matches #"^0x[0-9a-f]{40}$" text))
       text)))
 
-(defn normalize-withdraw-destination
-  [value]
-  (non-blank-text value))
+(defn normalize-withdraw-destination [value] (non-blank-text value))
 
 (defn normalize-mode
   [value]
@@ -133,23 +128,27 @@
   [value]
   (some-> value str str/trim str/upper-case))
 
+(defn- direct-balance-row-available
+  [row]
+  (or (parse-num (:available row))
+      (parse-num (:availableBalance row))
+      (parse-num (:free row))))
+
+(defn- derived-balance-row-available
+  [row]
+  (let [total (or (parse-num (:total row))
+                  (parse-num (:totalBalance row)))
+        hold (parse-num (:hold row))]
+    (when (finite-number? total)
+      (if (finite-number? hold)
+        (- total hold)
+        total))))
+
 (defn- balance-row-available
   [row]
   (when (map? row)
-    (let [available-direct (or (parse-num (:available row))
-                               (parse-num (:availableBalance row))
-                               (parse-num (:free row)))
-          total (or (parse-num (:total row))
-                    (parse-num (:totalBalance row)))
-          hold (parse-num (:hold row))
-          derived (cond
-                    (finite-number? total)
-                    (if (finite-number? hold)
-                      (- total hold)
-                      total)
-
-                    :else nil)
-          available (or available-direct derived)]
+    (let [available (or (direct-balance-row-available row)
+                        (derived-balance-row-available row))]
       (when (finite-number? available)
         (max 0 available)))))
 

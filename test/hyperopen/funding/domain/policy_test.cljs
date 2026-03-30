@@ -11,6 +11,47 @@
                                    :marginSummary {:accountValue "20"
                                                    :totalMarginUsed "11.5"}}}})
 
+(deftest direct-balance-row-available-prefers-supported-direct-fields-test
+  (let [direct-balance-row-available @#'hyperopen.funding.domain.policy/direct-balance-row-available]
+    (is (= 10.5
+           (direct-balance-row-available {:available "10.5"
+                                          :availableBalance "9"
+                                          :free "8"})))
+    (is (= 8
+           (direct-balance-row-available {:availableBalance "8"
+                                          :free "7"})))
+    (is (= 7
+           (direct-balance-row-available {:free "7"})))
+    (is (nil? (direct-balance-row-available {:available "NaN"
+                                             :availableBalance nil
+                                             :free ""})))))
+
+(deftest derived-balance-row-available-uses-total-minus-hold-when-needed-test
+  (let [derived-balance-row-available @#'hyperopen.funding.domain.policy/derived-balance-row-available]
+    (is (= 6
+           (derived-balance-row-available {:total "10"
+                                           :hold "4"})))
+    (is (= 12
+           (derived-balance-row-available {:totalBalance "12"})))
+    (is (= -2
+           (derived-balance-row-available {:total "5"
+                                           :hold "7"})))
+    (is (nil? (derived-balance-row-available {:hold "2"})))))
+
+(deftest balance-row-available-wraps-direct-and-derived-values-test
+  (let [balance-row-available @#'hyperopen.funding.domain.policy/balance-row-available]
+    (is (= 10.5
+           (balance-row-available {:available "10.5"
+                                   :availableBalance "9"
+                                   :free "8"
+                                   :total "100"
+                                   :hold "50"})))
+    (is (= 0
+           (balance-row-available {:total "5"
+                                   :hold "7"})))
+    (is (nil? (balance-row-available {:available "NaN"})))
+    (is (nil? (balance-row-available nil)))))
+
 (deftest withdraw-preview-validates-standard-destination-and-balance-test
   (is (= {:ok? false
           :display-message "Enter a valid destination address."}

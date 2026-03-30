@@ -131,6 +131,173 @@
     {:pair-node pair-node
      :value-node value-node}))
 
+(defn- legend-document
+  [document]
+  (or document (aget js/globalThis "document")))
+
+(defn- ensure-container-position!
+  [container]
+  (let [container-style (.-style container)]
+    (when (or (not (.-position container-style))
+              (= (.-position container-style) "static"))
+      (set! (.-position container-style) "relative"))))
+
+(defn- legend-formatters
+  [{:keys [format-price format-delta format-pct]}]
+  {:format-price (or format-price
+                     (fn [price]
+                       (when (number? price)
+                         (fmt/format-trade-price-plain price))))
+   :format-delta (or format-delta
+                     (fn [delta]
+                       (when (number? delta)
+                         (let [formatted (fmt/format-trade-price-delta delta)]
+                           (if (>= delta 0) (str "+" formatted) formatted)))))
+   :format-pct (or format-pct
+                   (fn [pct]
+                     (when (number? pct)
+                       (let [formatted (.toFixed pct 2)]
+                         (if (>= pct 0) (str "+" formatted "%") (str formatted "%"))))))})
+
+(defn- legend-market-status-state
+  [market-open?]
+  (if market-open?
+    {:label "Market open"
+     :color "#00c278"
+     :box-shadow "0 0 0 4px rgba(0,194,120,0.16), 0 0 12px rgba(0,194,120,0.28)"}
+    {:label "Market closed"
+     :color "#6b7280"
+     :box-shadow "0 0 0 4px rgba(107,114,128,0.12), 0 0 10px rgba(107,114,128,0.18)"}))
+
+(defn- legend-set-metric-colors!
+  [open-pair-node high-pair-node low-pair-node close-pair-node color]
+  (doseq [pair-node [open-pair-node high-pair-node low-pair-node close-pair-node]]
+    (set! (.-color (.-style pair-node)) color)))
+
+(defn- legend-render-empty-values!
+  [nodes]
+  (let [{:keys [open-node high-node low-node close-node delta-node
+                open-pair-node high-pair-node low-pair-node close-pair-node]} nodes]
+    (set! (.-textContent open-node) "--")
+    (set! (.-textContent high-node) "--")
+    (set! (.-textContent low-node) "--")
+    (set! (.-textContent close-node) "--")
+    (legend-set-metric-colors! open-pair-node high-pair-node low-pair-node close-pair-node
+                               "#9ca3af")
+    (set! (.-textContent delta-node) "-- (--)")
+    (set! (.-color (.-style delta-node)) "#9ca3af")))
+
+(defn- legend-render-candle-values!
+  [nodes entry formatters]
+  (let [{:keys [open-node high-node low-node close-node delta-node
+                open-pair-node high-pair-node low-pair-node close-pair-node]} nodes
+        {:keys [format-price format-delta format-pct]} formatters
+        c (:candle entry)
+        baseline (or (:prev-close entry) (:open c))
+        close (:close c)
+        delta (when (and close baseline) (- close baseline))
+        pct (when (and delta baseline (not= baseline 0)) (* 100 (/ delta baseline)))
+        delta-color (cond
+                      (nil? delta) "#9ca3af"
+                      (>= delta 0) "#10b981"
+                      :else "#ef4444")]
+    (set! (.-textContent open-node) (or (format-price (:open c)) "--"))
+    (set! (.-textContent high-node) (or (format-price (:high c)) "--"))
+    (set! (.-textContent low-node) (or (format-price (:low c)) "--"))
+    (set! (.-textContent close-node) (or (format-price (:close c)) "--"))
+    (legend-set-metric-colors! open-pair-node high-pair-node low-pair-node close-pair-node
+                               delta-color)
+    (set! (.-textContent delta-node)
+          (str (or (format-delta delta) "--")
+               " ("
+               (or (format-pct pct) "--")
+               ")"))
+    (set! (.-color (.-style delta-node)) delta-color)))
+
+(defn- legend-render-state!
+  [nodes state entry formatters]
+  (let [{:keys [header-text market-open?]} @state
+        {:keys [label color box-shadow]} (legend-market-status-state market-open?)]
+    (set! (.-textContent (:header-text-node nodes)) header-text)
+    (set! (.-backgroundColor (.-style (:market-status-node nodes))) color)
+    (set! (.-boxShadow (.-style (:market-status-node nodes))) box-shadow)
+    (.setAttribute (:market-status-node nodes) "aria-label" label)
+    (.setAttribute (:market-status-node nodes) "title" label)
+    (if (and entry (:candle entry))
+      (legend-render-candle-values! nodes entry formatters)
+      (legend-render-empty-values! nodes))))
+
+(defn- legend-render-entry
+  [state param]
+  (let [{:keys [candle-lookup latest-entry]} @state
+        lookup-key (when (and param (some? (.-time param)))
+                     (normalize-time-key (.-time param)))
+        entry (when lookup-key
+                (get candle-lookup lookup-key))]
+    (or entry latest-entry)))
+
+(defn- create-legend-dom!
+  [document container]
+  (let [legend (let [doc document]
+                 (.createElement doc "div"))
+        legend-font-family (chart-options/resolve-chart-font-family)
+        header-row (let [doc document]
+                     (.createElement doc "div"))
+        header-text-node (let [doc document]
+                           (.createElement doc "span"))
+        market-status-node (let [doc document]
+                             (.createElement doc "span"))
+        values-row (let [doc document]
+                     (.createElement doc "div"))
+        open-value (create-value-node! document values-row "O")
+        high-value (create-value-node! document values-row "H")
+        low-value (create-value-node! document values-row "L")
+        close-value (create-value-node! document values-row "C")
+        delta-node (let [doc document]
+                     (.createElement doc "span"))]
+    (set! (.-cssText (.-style legend))
+          (str "position:absolute;left:12px;top:8px;z-index:100;"
+               "font-size:12px;font-family:" legend-font-family ";"
+               "font-variant-numeric:tabular-nums lining-nums;"
+               "font-feature-settings:'tnum' 1,'lnum' 1;"
+               "line-height:1.2;font-weight:500;color:#ffffff;"
+               "padding:4px 0;display:flex;align-items:center;gap:10px;"
+               "max-width:calc(100% - 24px);white-space:nowrap;pointer-events:none;overflow:hidden;"))
+    (set! (.-cssText (.-style header-row))
+          "display:flex;align-items:center;gap:8px;font-weight:600;min-width:0;flex:0 1 auto;")
+    (set! (.-cssText (.-style header-text-node))
+          "color:#d1d5db;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;")
+    (set! (.-cssText (.-style market-status-node))
+          "display:inline-block;width:8px;height:8px;border-radius:9999px;flex:0 0 auto;")
+    (set! (.-backgroundColor (.-style market-status-node)) "#00c278")
+    (set! (.-boxShadow (.-style market-status-node))
+          "0 0 0 4px rgba(0,194,120,0.16), 0 0 12px rgba(0,194,120,0.28)")
+    (.setAttribute market-status-node "data-role" "chart-market-status")
+    (.setAttribute market-status-node "role" "img")
+    (.setAttribute market-status-node "aria-label" "Market open")
+    (.setAttribute market-status-node "title" "Market open")
+    (.appendChild header-row header-text-node)
+    (.appendChild header-row market-status-node)
+    (set! (.-cssText (.-style values-row))
+          "display:flex;align-items:center;gap:8px;flex:0 0 auto;")
+    (set! (.-cssText (.-style delta-node)) "color:#9ca3af;font-weight:600;flex:0 0 auto;")
+    (.appendChild values-row delta-node)
+    (.appendChild legend header-row)
+    (.appendChild legend values-row)
+    (.appendChild container legend)
+    {:legend legend
+     :header-text-node header-text-node
+     :market-status-node market-status-node
+     :delta-node delta-node
+     :open-node (:value-node open-value)
+     :open-pair-node (:pair-node open-value)
+     :high-node (:value-node high-value)
+     :high-pair-node (:pair-node high-value)
+     :low-node (:value-node low-value)
+     :low-pair-node (:pair-node low-value)
+     :close-node (:value-node close-value)
+     :close-pair-node (:pair-node close-value)}))
+
 (defn create-legend!
   "Create legend element that adapts to different chart types."
   ([container chart legend-meta]
@@ -139,146 +306,30 @@
                                         format-price
                                         format-delta
                                         format-pct]}]
-   (let [global-document (aget js/globalThis "document")
-         document* (or document global-document)]
+   (let [document* (legend-document document)]
      (when-not document*
        (throw (js/Error. "Legend rendering requires a DOM document.")))
-     (let [container-style (.-style container)]
-       (when (or (not (.-position container-style))
-                 (= (.-position container-style) "static"))
-         (set! (.-position container-style) "relative")))
-     (let [legend (let [doc document*]
-                    (.createElement doc "div"))
-           legend-font-family (chart-options/resolve-chart-font-family)
-           header-row (let [doc document*]
-                        (.createElement doc "div"))
-           header-text-node (let [doc document*]
-                              (.createElement doc "span"))
-           market-status-node (let [doc document*]
-                                (.createElement doc "span"))
-           values-row (let [doc document*]
-                        (.createElement doc "div"))
-           open-value (create-value-node! document* values-row "O")
-           open-node (:value-node open-value)
-           open-pair-node (:pair-node open-value)
-           high-value (create-value-node! document* values-row "H")
-           high-node (:value-node high-value)
-           high-pair-node (:pair-node high-value)
-           low-value (create-value-node! document* values-row "L")
-           low-node (:value-node low-value)
-           low-pair-node (:pair-node low-value)
-           close-value (create-value-node! document* values-row "C")
-           close-node (:value-node close-value)
-           close-pair-node (:pair-node close-value)
-           delta-node (let [doc document*]
-                        (.createElement doc "span"))]
-       (set! (.-cssText (.-style legend))
-             (str "position:absolute;left:12px;top:8px;z-index:100;"
-                  "font-size:12px;font-family:" legend-font-family ";"
-                  "font-variant-numeric:tabular-nums lining-nums;"
-                  "font-feature-settings:'tnum' 1,'lnum' 1;"
-                  "line-height:1.2;font-weight:500;color:#ffffff;"
-                  "padding:4px 0;display:flex;align-items:center;gap:10px;"
-                  "max-width:calc(100% - 24px);white-space:nowrap;pointer-events:none;overflow:hidden;"))
-       (set! (.-cssText (.-style header-row))
-             "display:flex;align-items:center;gap:8px;font-weight:600;min-width:0;flex:0 1 auto;")
-       (set! (.-cssText (.-style header-text-node))
-             "color:#d1d5db;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;")
-        (set! (.-cssText (.-style market-status-node))
-             "display:inline-block;width:8px;height:8px;border-radius:9999px;flex:0 0 auto;")
-        (set! (.-backgroundColor (.-style market-status-node)) "#00c278")
-       (set! (.-boxShadow (.-style market-status-node))
-             "0 0 0 4px rgba(0,194,120,0.16), 0 0 12px rgba(0,194,120,0.28)")
-       (.setAttribute market-status-node "data-role" "chart-market-status")
-       (.setAttribute market-status-node "role" "img")
-       (.setAttribute market-status-node "aria-label" "Market open")
-       (.setAttribute market-status-node "title" "Market open")
-       (.appendChild header-row header-text-node)
-       (.appendChild header-row market-status-node)
-       (set! (.-cssText (.-style values-row))
-             "display:flex;align-items:center;gap:8px;flex:0 0 auto;")
-       (set! (.-cssText (.-style delta-node)) "color:#9ca3af;font-weight:600;flex:0 0 auto;")
-       (.appendChild values-row delta-node)
-       (.appendChild legend header-row)
-       (.appendChild legend values-row)
-       (.appendChild container legend)
-       (let [state (atom (build-legend-state nil legend-meta))
-             format-price* (or format-price
-                               (fn [price]
-                                 (when (number? price)
-                                   (fmt/format-trade-price-plain price))))
-             format-delta* (or format-delta
-                               (fn [delta]
-                                 (when (number? delta)
-                                   (let [formatted (fmt/format-trade-price-delta delta)]
-                                     (if (>= delta 0) (str "+" formatted) formatted)))))
-             format-pct* (or format-pct
-                             (fn [pct]
-                               (when (number? pct)
-                                 (let [formatted (.toFixed pct 2)]
-                                   (if (>= pct 0) (str "+" formatted "%") (str formatted "%"))))))
-             render-legend! (fn [entry]
-                              (let [{:keys [header-text market-open?]} @state
-                                    session-label (if market-open? "Market open" "Market closed")
-                                    session-color (if market-open? "#00c278" "#6b7280")
-                                    metric-color (fn [color]
-                                                   (set! (.-color (.-style open-pair-node)) color)
-                                                   (set! (.-color (.-style high-pair-node)) color)
-                                                   (set! (.-color (.-style low-pair-node)) color)
-                                                   (set! (.-color (.-style close-pair-node)) color))]
-                                (set! (.-textContent header-text-node) header-text)
-                                (set! (.-backgroundColor (.-style market-status-node)) session-color)
-                                (set! (.-boxShadow (.-style market-status-node))
-                                      (if market-open?
-                                        "0 0 0 4px rgba(0,194,120,0.16), 0 0 12px rgba(0,194,120,0.28)"
-                                        "0 0 0 4px rgba(107,114,128,0.12), 0 0 10px rgba(107,114,128,0.18)"))
-                                (.setAttribute market-status-node "aria-label" session-label)
-                                (.setAttribute market-status-node "title" session-label)
-                                (if (and entry (:candle entry))
-                                  (let [c (:candle entry)
-                                        baseline (or (:prev-close entry) (:open c))
-                                        close (:close c)
-                                        delta (when (and close baseline) (- close baseline))
-                                        pct (when (and delta baseline (not= baseline 0)) (* 100 (/ delta baseline)))
-                                        delta-color (cond
-                                                      (nil? delta) "#9ca3af"
-                                                      (>= delta 0) "#10b981"
-                                                      :else "#ef4444")]
-                                    (set! (.-textContent open-node) (or (format-price* (:open c)) "--"))
-                                    (set! (.-textContent high-node) (or (format-price* (:high c)) "--"))
-                                    (set! (.-textContent low-node) (or (format-price* (:low c)) "--"))
-                                    (set! (.-textContent close-node) (or (format-price* (:close c)) "--"))
-                                    (metric-color delta-color)
-                                    (set! (.-textContent delta-node)
-                                          (str (or (format-delta* delta) "--")
-                                               " ("
-                                               (or (format-pct* pct) "--")
-                                               ")"))
-                                    (set! (.-color (.-style delta-node)) delta-color))
-                                  (do
-                                    (set! (.-textContent open-node) "--")
-                                    (set! (.-textContent high-node) "--")
-                                    (set! (.-textContent low-node) "--")
-                                    (set! (.-textContent close-node) "--")
-                                    (metric-color "#9ca3af")
-                                    (set! (.-textContent delta-node) "-- (--)")
-                                    (set! (.-color (.-style delta-node)) "#9ca3af")))))
-             update-legend (fn [param]
-                             (let [{:keys [candle-lookup latest-entry]} @state
-                                   lookup-key (when (and param (some? (.-time param)))
-                                                (normalize-time-key (.-time param)))
-                                   entry (when lookup-key
-                                           (get candle-lookup lookup-key))]
-                               (render-legend! (or entry latest-entry))))
-             update! (fn [new-meta]
-                       (swap! state build-legend-state new-meta)
-                       (update-legend nil))
-             destroy! (fn []
-                        (try
-                          (.unsubscribeCrosshairMove ^js chart update-legend)
-                          (catch :default _ nil))
-                        (when (.-parentNode legend)
-                          (.removeChild (.-parentNode legend) legend)))]
-         (.subscribeCrosshairMove ^js chart update-legend)
-         (update-legend nil)
-         #js {:update update! :destroy destroy!})))))
+     (ensure-container-position! container)
+     (let [nodes (create-legend-dom! document* container)
+           state (atom (build-legend-state nil legend-meta))
+           formatters (legend-formatters {:format-price format-price
+                                          :format-delta format-delta
+                                          :format-pct format-pct})
+           update-legend (fn [param]
+                           (legend-render-state! nodes
+                                                 state
+                                                 (legend-render-entry state param)
+                                                 formatters))
+           update! (fn [new-meta]
+                     (swap! state build-legend-state new-meta)
+                     (update-legend nil))
+           destroy! (fn []
+                      (try
+                        (.unsubscribeCrosshairMove ^js chart update-legend)
+                        (catch :default _ nil))
+                      (when (.-parentNode (:legend nodes))
+                        (.removeChild (.-parentNode (:legend nodes))
+                                      (:legend nodes))))]
+       (.subscribeCrosshairMove ^js chart update-legend)
+       (update-legend nil)
+       #js {:update update! :destroy destroy!}))))

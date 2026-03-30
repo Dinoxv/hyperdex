@@ -1,5 +1,5 @@
 (ns hyperopen.leaderboard.cache
-  (:require [clojure.string :as str]
+  (:require [hyperopen.leaderboard.normalization :as normalization]
             [hyperopen.platform :as platform]
             [hyperopen.platform.indexed-db :as indexed-db]))
 
@@ -12,30 +12,11 @@
 (def leaderboard-cache-ttl-ms
   (* 60 60 1000))
 
-(def ^:private known-window-keys
-  #{:day :week :month :all-time})
-
 (defn- ->promise
   [result]
   (if (instance? js/Promise result)
     result
     (js/Promise.resolve result)))
-
-(defn- non-blank-text
-  [value]
-  (let [text (some-> value str str/trim)]
-    (when (seq text)
-      text)))
-
-(defn- parse-optional-num
-  [value]
-  (let [num (cond
-              (number? value) value
-              (string? value) (js/Number (str/trim value))
-              :else js/NaN)]
-    (when (and (number? num)
-               (js/isFinite num))
-      num)))
 
 (defn- parse-saved-at-ms
   [value]
@@ -47,93 +28,19 @@
                (js/isFinite candidate))
       (max 0 (js/Math.floor candidate)))))
 
-(defn- normalize-address
-  [value]
-  (some-> value non-blank-text str/lower-case))
-
-(defn- normalize-window-key
-  [value]
-  (let [token (cond
-                (keyword? value) value
-                (string? value) (-> value
-                                    str/trim
-                                    str/lower-case
-                                    (str/replace #"[^a-z0-9]+" "-")
-                                    keyword)
-                :else nil)
-        normalized (case token
-                     :alltime :all-time
-                     :all :all-time
-                     token)]
-    (when (contains? known-window-keys normalized)
-      normalized)))
-
-(defn- normalize-window-performance
-  [payload]
-  (if (map? payload)
-    (reduce-kv (fn [acc metric value]
-                 (let [metric* (case metric
-                                 :pnl :pnl
-                                 :roi :roi
-                                 :volume :volume
-                                 :vlm :volume
-                                 nil)
-                       value* (parse-optional-num value)]
-                   (if (and metric* (number? value*))
-                     (assoc acc metric* value*)
-                     acc)))
-               {:pnl 0
-                :roi 0
-                :volume 0}
-               payload)
-    {:pnl 0
-     :roi 0
-     :volume 0}))
-
-(defn- normalize-window-performances
-  [payload]
-  (let [defaults {:day {:pnl 0 :roi 0 :volume 0}
-                  :week {:pnl 0 :roi 0 :volume 0}
-                  :month {:pnl 0 :roi 0 :volume 0}
-                  :all-time {:pnl 0 :roi 0 :volume 0}}]
-    (cond
-      (map? payload)
-      (reduce-kv (fn [acc window-key value]
-                   (if-let [window-key* (normalize-window-key window-key)]
-                     (assoc acc window-key* (normalize-window-performance value))
-                     acc))
-                 defaults
-                 payload)
-
-      (sequential? payload)
-      (reduce (fn [acc entry]
-                (if (and (vector? entry)
-                         (= 2 (count entry)))
-                  (let [[window-key value] entry
-                        window-key* (normalize-window-key window-key)]
-                    (if window-key*
-                      (assoc acc window-key* (normalize-window-performance value))
-                      acc))
-                  acc))
-              defaults
-              payload)
-
-      :else
-      defaults)))
-
 (defn- normalize-leaderboard-cache-row
   [row]
   (when (map? row)
-    (when-let [eth-address (or (normalize-address (:eth-address row))
-                               (normalize-address (:ethAddress row)))]
+    (when-let [eth-address (or (normalization/normalize-address (:eth-address row))
+                               (normalization/normalize-address (:ethAddress row)))]
       {:eth-address eth-address
-       :account-value (or (parse-optional-num (or (:account-value row)
-                                                  (:accountValue row)))
+       :account-value (or (normalization/parse-optional-num (or (:account-value row)
+                                                                (:accountValue row)))
                           0)
-       :display-name (or (non-blank-text (:display-name row))
-                         (non-blank-text (:displayName row)))
-       :prize (or (parse-optional-num (:prize row)) 0)
-       :window-performances (normalize-window-performances
+       :display-name (or (normalization/non-blank-text (:display-name row))
+                         (normalization/non-blank-text (:displayName row)))
+       :prize (or (normalization/parse-optional-num (:prize row)) 0)
+       :window-performances (normalization/normalize-window-performances
                              (or (:window-performances row)
                                  (:windowPerformances row)))})))
 
@@ -152,7 +59,7 @@
                   (sequential? addresses) addresses
                   :else [])]
     (reduce (fn [acc address]
-              (if-let [address* (normalize-address address)]
+              (if-let [address* (normalization/normalize-address address)]
                 (if (some #(= % address*) acc)
                   acc
                   (conj acc address*))
@@ -167,7 +74,7 @@
           raw-rows (:rows raw)]
       (when (and (some? saved-at-ms)
                  (sequential? raw-rows))
-        {:id (or (non-blank-text (:id raw))
+        {:id (or (normalization/non-blank-text (:id raw))
                  leaderboard-cache-id)
          :version (or (parse-saved-at-ms (:version raw))
                       leaderboard-cache-version)

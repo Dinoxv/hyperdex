@@ -55,6 +55,26 @@
       (finally
         (aset js/globalThis "document" original-document)))))
 
+(deftest legend-formatters-use-overrides-and-default-formatting-branches-test
+  (let [legend-formatters @#'hyperopen.views.trading-chart.utils.chart-interop.legend/legend-formatters
+        custom-price (fn [_] "custom-price")
+        custom-delta (fn [_] "custom-delta")
+        custom-pct (fn [_] "custom-pct")
+        provided (legend-formatters {:format-price custom-price
+                                     :format-delta custom-delta
+                                     :format-pct custom-pct})
+        defaulted (legend-formatters {})]
+    (is (identical? custom-price (:format-price provided)))
+    (is (identical? custom-delta (:format-delta provided)))
+    (is (identical? custom-pct (:format-pct provided)))
+    (is (string? ((:format-price defaulted) 123.45)))
+    (is (str/starts-with? ((:format-delta defaulted) 2.5) "+"))
+    (is (str/includes? ((:format-delta defaulted) -1.5) "-"))
+    (is (= nil ((:format-delta defaulted) nil)))
+    (is (= "+2.50%" ((:format-pct defaulted) 2.5)))
+    (is (= "-2.50%" ((:format-pct defaulted) -2.5)))
+    (is (= nil ((:format-pct defaulted) nil)))))
+
 (deftest legend-supports-time-lookups-update-and-destroy-cleanup-test
   (let [document (fake-dom/make-fake-document)
         container (fake-dom/make-fake-element "div")
@@ -100,20 +120,31 @@
       (is (= "#00c278" (.-backgroundColor (.-style market-status-node))))
       (is (= "Market open" (aget market-status-node "aria-label")))
       (is (= "#ef4444" (.-color (.-style delta-node)))))
-    (@crosshair-handler* #js {:time :no-match})
-    (let [text (str/join " " (fake-dom/collect-text-content (aget (.-children container) 0)))]
-      (is (str/includes? text "$95")))
     (.update ^js legend-control {:symbol "SOL"
                                  :timeframe-label "1H"
                                  :venue "Alt"
-                                 :market-open? false})
+                                 :market-open? false
+                                 :candle-data [{:time 1700000200
+                                                :open 200
+                                                :high 210
+                                                :low 190
+                                                :close 205}]})
     (let [legend-node (aget (.-children container) 0)
           market-status-node (fake-dom/find-dom-node legend-node #(= "chart-market-status" (aget % "data-role")))
           text (str/join " " (fake-dom/collect-text-content legend-node))]
       (is (str/includes? text "SOL · 1H · Alt"))
+      (is (str/includes? text "$205"))
       (is (= "#6b7280" (.-backgroundColor (.-style market-status-node))))
       (is (= "Market closed" (aget market-status-node "aria-label")))
-      (is (str/includes? text "-- (--)")))
+      (is (str/includes? text "d5"))
+      (is (str/includes? text "p2.5")))
+    (@crosshair-handler* #js {:time 1700000100})
+    (let [text (str/join " " (fake-dom/collect-text-content (aget (.-children container) 0)))]
+      (is (str/includes? text "$205"))
+      (is (not (str/includes? text "$95"))))
+    (@crosshair-handler* #js {:time 1700000200})
+    (let [text (str/join " " (fake-dom/collect-text-content (aget (.-children container) 0)))]
+      (is (str/includes? text "$205")))
     (.destroy ^js legend-control)
     (is (identical? @crosshair-handler* @unsubscribed-handler*))
     (is (zero? (alength (.-children container))))))

@@ -21,6 +21,7 @@
             [hyperopen.api.default-test]
             [hyperopen.api.endpoints.account-test]
             [hyperopen.api.endpoints.funding-hyperunit-test]
+            [hyperopen.api.endpoints.leaderboard-test]
             [hyperopen.api.endpoints.market-test]
             [hyperopen.api.endpoints.orders-test]
             [hyperopen.api.endpoints.vaults-test]
@@ -124,6 +125,7 @@
             [hyperopen.leaderboard.actions-test]
             [hyperopen.leaderboard.cache-test]
             [hyperopen.leaderboard.effects-test]
+            [hyperopen.leaderboard.normalization-test]
             [hyperopen.leaderboard.preferences-test]
             [hyperopen.order.feedback-runtime-test]
             [hyperopen.orderbook.actions-test]
@@ -300,6 +302,7 @@
             [hyperopen.views.portfolio.vm.volume-helpers-test]
             [hyperopen.views.portfolio.vm.volume-test]
             [hyperopen.views.staking-view-test]
+            [hyperopen.views.trade-view.layout-state-test]
             [hyperopen.views.trade-view.layout-test]
             [hyperopen.views.trade-view.loading-shell-test]
             [hyperopen.views.trade-view.mobile-surface-test]
@@ -446,6 +449,7 @@
              'hyperopen.api.default-test
              'hyperopen.api.endpoints.account-test
              'hyperopen.api.endpoints.funding-hyperunit-test
+             'hyperopen.api.endpoints.leaderboard-test
              'hyperopen.api.endpoints.market-test
              'hyperopen.api.endpoints.orders-test
              'hyperopen.api.endpoints.vaults-test
@@ -549,6 +553,7 @@
              'hyperopen.leaderboard.actions-test
              'hyperopen.leaderboard.cache-test
              'hyperopen.leaderboard.effects-test
+             'hyperopen.leaderboard.normalization-test
              'hyperopen.leaderboard.preferences-test
              'hyperopen.order.feedback-runtime-test
              'hyperopen.orderbook.actions-test
@@ -725,6 +730,7 @@
              'hyperopen.views.portfolio.vm.volume-helpers-test
              'hyperopen.views.portfolio.vm.volume-test
              'hyperopen.views.staking-view-test
+             'hyperopen.views.trade-view.layout-state-test
              'hyperopen.views.trade-view.layout-test
              'hyperopen.views.trade-view.loading-shell-test
              'hyperopen.views.trade-view.mobile-surface-test

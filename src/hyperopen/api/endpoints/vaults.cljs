@@ -124,53 +124,39 @@
 
     :else nil))
 
+(def ^:private snapshot-key-alias-groups
+  {:day #{"day"}
+   :week #{"week"}
+   :month #{"month"}
+   :three-month #{"3m" "3-m" "3month" "3-month" "threemonth" "three-month" "three-months" "quarter"}
+   :six-month #{"6m" "6-m" "6month" "6-month" "sixmonth" "six-month" "six-months" "halfyear" "half-year"}
+   :one-year #{"1y" "1-y" "1year" "1-year" "oneyear" "one-year" "one-years" "year"}
+   :two-year #{"2y" "2-y" "2year" "2-year" "twoyear" "two-year" "two-years"}
+   :all-time #{"alltime" "all-time"}})
+
+(def ^:private snapshot-key-by-token
+  (reduce-kv (fn [acc snapshot-key aliases]
+               (reduce (fn [next-acc alias]
+                         (assoc next-acc alias snapshot-key))
+                       acc
+                       aliases))
+             {}
+             snapshot-key-alias-groups))
+
+(defn- normalize-snapshot-token
+  [value]
+  (some-> value
+          non-blank-text
+          (str/replace #"([a-z0-9])([A-Z])" "$1-$2")
+          str/lower-case
+          (str/replace #"[^a-z0-9]+" "-")
+          (str/replace #"(^-+)|(-+$)" "")))
+
 (defn- normalize-snapshot-key
   [value]
-  (let [token (some-> value
-                      non-blank-text
-                      (str/replace #"([a-z0-9])([A-Z])" "$1-$2")
-                      str/lower-case
-                      (str/replace #"[^a-z0-9]+" "-")
-                      (str/replace #"(^-+)|(-+$)" ""))]
-    (case token
-      "day" :day
-      "week" :week
-      "month" :month
-      "3m" :three-month
-      "3-m" :three-month
-      "3month" :three-month
-      "3-month" :three-month
-      "threemonth" :three-month
-      "three-month" :three-month
-      "three-months" :three-month
-      "quarter" :three-month
-      "6m" :six-month
-      "6-m" :six-month
-      "6month" :six-month
-      "6-month" :six-month
-      "sixmonth" :six-month
-      "six-month" :six-month
-      "six-months" :six-month
-      "halfyear" :six-month
-      "half-year" :six-month
-      "1y" :one-year
-      "1-y" :one-year
-      "1year" :one-year
-      "1-year" :one-year
-      "oneyear" :one-year
-      "one-year" :one-year
-      "one-years" :one-year
-      "year" :one-year
-      "2y" :two-year
-      "2-y" :two-year
-      "2year" :two-year
-      "2-year" :two-year
-      "twoyear" :two-year
-      "two-year" :two-year
-      "two-years" :two-year
-      "alltime" :all-time
-      "all-time" :all-time
-      nil)))
+  (some-> value
+          normalize-snapshot-token
+          snapshot-key-by-token))
 
 (defn- normalize-pnl-values
   [values]

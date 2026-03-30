@@ -21,6 +21,37 @@
 (def ^:private summary-time-range-options
   #{:day :week :month :three-month :six-month :one-year :two-year :all-time})
 
+(def ^:private summary-time-range-aliases
+  {:alltime :all-time
+   :3m :three-month
+   :3-m :three-month
+   :3month :three-month
+   :3-month :three-month
+   :threemonth :three-month
+   :three-month :three-month
+   :quarter :three-month
+   :6m :six-month
+   :6-m :six-month
+   :6month :six-month
+   :6-month :six-month
+   :sixmonth :six-month
+   :six-month :six-month
+   :halfyear :six-month
+   :half-year :six-month
+   :1y :one-year
+   :1-y :one-year
+   :1year :one-year
+   :1-year :one-year
+   :oneyear :one-year
+   :one-year :one-year
+   :year :one-year
+   :2y :two-year
+   :2-y :two-year
+   :2year :two-year
+   :2-year :two-year
+   :twoyear :two-year
+   :two-year :two-year})
+
 (def ^:private returns-benchmark-candle-request-by-summary-time-range
   {:day {:interval :5m
          :bars 400}
@@ -56,6 +87,16 @@
     :funding-history
     :order-history})
 
+(def ^:private account-info-tab-aliases
+  {:performancemetrics :performance-metrics
+   :performancemetric :performance-metrics
+   :performance :performance-metrics
+   :depositswithdrawals :deposits-withdrawals
+   :openorders :open-orders
+   :tradehistory :trade-history
+   :fundinghistory :funding-history
+   :orderhistory :order-history})
+
 (def ^:private chart-hover-index-path
   [:portfolio-ui :chart-hover-index])
 
@@ -85,37 +126,7 @@
 (defn normalize-summary-time-range
   [value]
   (let [token (normalize-keyword-like value)
-        normalized (case token
-                     :alltime :all-time
-                     :3m :three-month
-                     :3-m :three-month
-                     :3month :three-month
-                     :3-month :three-month
-                     :threemonth :three-month
-                     :three-month :three-month
-                     :quarter :three-month
-                     :6m :six-month
-                     :6-m :six-month
-                     :6month :six-month
-                     :6-month :six-month
-                     :sixmonth :six-month
-                     :six-month :six-month
-                     :halfyear :six-month
-                     :half-year :six-month
-                     :1y :one-year
-                     :1-y :one-year
-                     :1year :one-year
-                     :1-year :one-year
-                     :oneyear :one-year
-                     :one-year :one-year
-                     :year :one-year
-                     :2y :two-year
-                     :2-y :two-year
-                     :2year :two-year
-                     :2-year :two-year
-                     :twoyear :two-year
-                     :two-year :two-year
-                     token)]
+        normalized (get summary-time-range-aliases token token)]
     (if (contains? summary-time-range-options normalized)
       normalized
       default-summary-time-range)))
@@ -135,17 +146,7 @@
 (defn normalize-portfolio-account-info-tab
   [value]
   (let [token (normalize-keyword-like value)
-        normalized (case token
-                     :performancemetrics :performance-metrics
-                     :performancemetric :performance-metrics
-                     :performance :performance-metrics
-                     :depositswithdrawals :deposits-withdrawals
-                     :deposits-withdrawals :deposits-withdrawals
-                     :openorders :open-orders
-                     :tradehistory :trade-history
-                     :fundinghistory :funding-history
-                     :orderhistory :order-history
-                     token)]
+        normalized (get account-info-tab-aliases token token)]
     (if (contains? account-info-tab-options normalized)
       normalized
       default-account-info-tab)))

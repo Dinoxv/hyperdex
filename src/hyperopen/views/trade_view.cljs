@@ -1,6 +1,5 @@
 (ns hyperopen.views.trade-view
-  (:require [hyperopen.trade.layout-actions :as trade-layout-actions]
-            [hyperopen.trade-modules :as trade-modules]
+  (:require [hyperopen.trade-modules :as trade-modules]
             [hyperopen.views.active-asset.vm :as active-asset-vm]
             [hyperopen.views.active-asset-view :as active-asset-view]
             [hyperopen.views.asset-selector-view :as asset-selector-view]
@@ -8,21 +7,13 @@
             [hyperopen.views.l2-orderbook-view :as l2-orderbook-view]
             [hyperopen.views.account-info-view :as account-info-view]
             [hyperopen.views.account-equity-view :as account-equity-view]
-            [hyperopen.views.trade.order-form-view :as order-form-view]))
+            [hyperopen.views.trade.order-form-view :as order-form-view]
+            [hyperopen.views.trade-view.layout-state :as layout-state]))
 
 (def ^:private trade-mobile-surfaces
   [[:chart "Chart"]
    [:orderbook "Order Book"]
    [:trades "Trades"]])
-
-(def ^:private desktop-breakpoint-px
-  1024)
-
-(def ^:private desktop-account-panel-height
-  "clamp(21rem, 38vh, 29rem)")
-
-(def ^:private desktop-chart-row-min-height
-  "27.75rem")
 
 (def ^:private trade-chart-view-base-state-keys
   [:active-asset
@@ -173,19 +164,7 @@
 (defonce ^:private frozen-order-form-view-state* (atom nil))
 
 (defn- viewport-width-px []
-  (let [width (some-> js/globalThis .-innerWidth)]
-    (if (number? width)
-      width
-      desktop-breakpoint-px)))
-
-(defn- desktop-trade-layout? []
-  (>= (viewport-width-px) desktop-breakpoint-px))
-
-(defn- desktop-trade-grid-style
-  [desktop-layout?]
-  (when desktop-layout?
-    {:grid-template-rows (str "minmax(" desktop-chart-row-min-height ", 1fr) "
-                              desktop-account-panel-height)}))
+  (some-> js/globalThis .-innerWidth))
 
 (defn- mobile-surface-button
   [selected-surface [surface-id label]]
@@ -405,49 +384,43 @@
                      :on {:click [[:actions/navigate route {:replace? true}]]}}
             "Retry"])]]]]]))
 
-(defn trade-view [state]
+(defn- trade-view-layout-context
+  [state]
   (let [funding-tooltip-open? (true? (active-asset-vm/active-asset-funding-tooltip-open? state))
-        active-asset (:active-asset state)
+        layout (layout-state/trade-layout-state state
+                                               (viewport-width-px)
+                                               funding-tooltip-open?)]
+    {:desktop-layout? (:desktop-layout? layout)
+     :funding-tooltip-open? funding-tooltip-open?
+     :mobile-surface (:mobile-surface layout)
+     :layout layout}))
+
+(defn- trade-view-panel-context
+  [state {:keys [desktop-layout? layout mobile-surface]}]
+  (let [active-asset (:active-asset state)
         orderbook-data (when active-asset (get-in state [:orderbooks active-asset]))
-        mobile-surface (trade-layout-actions/normalize-trade-mobile-surface
-                         (get-in state [:trade-ui :mobile-surface]))
-        desktop-layout? (desktop-trade-layout?)
-        mobile-market-surface? (contains? trade-layout-actions/market-mobile-surfaces
-                                          mobile-surface)
-        mobile-account-surface? (= mobile-surface :account)
-        mobile-orderbook-surface? (contains? #{:orderbook :trades} mobile-surface)
-        chart-panel-visible? (or desktop-layout? (= mobile-surface :chart))
-        orderbook-panel-visible? (or desktop-layout? mobile-orderbook-surface?)
-        order-entry-panel-visible? (or desktop-layout? (= mobile-surface :ticket))
-        account-panel-visible? (or desktop-layout? mobile-market-surface?)
-        mobile-account-summary-visible? (and (not desktop-layout?)
-                                             mobile-account-surface?)
-        show-mobile-active-asset? (and (not desktop-layout?)
-                                       (not mobile-account-surface?))
         freeze-heavy-panels? (freeze-heavy-trade-panels? state desktop-layout?)
         active-asset-panel-state (selector-scroll-snapshot
-                                   frozen-active-asset-view-state*
-                                   freeze-heavy-panels?
-                                   #(active-asset-view-state state))
-        trade-chart-panel-state (selector-scroll-snapshot
-                                  frozen-trade-chart-view-state*
+                                  frozen-active-asset-view-state*
                                   freeze-heavy-panels?
-                                  #(trade-chart-view-state state))
+                                  #(active-asset-view-state state))
+        trade-chart-panel-state (selector-scroll-snapshot
+                                 frozen-trade-chart-view-state*
+                                 freeze-heavy-panels?
+                                 #(trade-chart-view-state state))
         account-info-panel-state (selector-scroll-snapshot
-                                   frozen-account-info-view-state*
-                                   freeze-heavy-panels?
-                                   #(account-info-view-state state))
+                                  frozen-account-info-view-state*
+                                  freeze-heavy-panels?
+                                  #(account-info-view-state state))
         account-equity-panel-state (selector-scroll-snapshot
-                                     frozen-account-equity-view-state*
-                                     freeze-heavy-panels?
-                                     #(account-equity-view-state state))
-        show-equity-surface? (or desktop-layout?
-                                 mobile-account-summary-visible?)
+                                    frozen-account-equity-view-state*
+                                    freeze-heavy-panels?
+                                    #(account-equity-view-state state))
         show-surface-freshness-cues? (surface-freshness-cues-enabled? state)
         websocket-health (get-in state [:websocket :health])
-        equity-metrics (when show-equity-surface?
+        equity-metrics (when (:show-equity-surface? layout)
                          (render-account-equity-metrics-state account-equity-panel-state))
-        orderbook-view-state (selector-scroll-snapshot
+        orderbook-panel-state (selector-scroll-snapshot
                                frozen-orderbook-view-state*
                                freeze-heavy-panels?
                                #(orderbook-view-state state
@@ -456,9 +429,128 @@
                                                      show-surface-freshness-cues?
                                                      websocket-health))
         order-form-panel-state (selector-scroll-snapshot
-                                 frozen-order-form-view-state*
-                                 freeze-heavy-panels?
-                                 #(order-form-view-state state))]
+                                frozen-order-form-view-state*
+                                freeze-heavy-panels?
+                                #(order-form-view-state state))]
+    {:active-asset-panel-state active-asset-panel-state
+     :trade-chart-panel-state trade-chart-panel-state
+     :account-info-panel-state account-info-panel-state
+     :account-equity-panel-state account-equity-panel-state
+     :equity-metrics equity-metrics
+     :orderbook-panel-state orderbook-panel-state
+     :order-form-panel-state order-form-panel-state
+     :mobile-orderbook-panel-state (mobile-orderbook-view-state orderbook-panel-state mobile-surface)}))
+
+(defn- render-mobile-active-asset-strip
+  [state {:keys [layout]}]
+  [:div {:class (:mobile-active-asset-strip-classes layout)
+         :data-parity-id "trade-mobile-active-asset-strip"}
+   (when (:show-mobile-active-asset? layout)
+     (render-active-asset-panel state))])
+
+(defn- render-mobile-surface-tabs
+  [mobile-surface {:keys [layout]}]
+  [:div {:class (:mobile-surface-tabs-classes layout)
+         :data-parity-id "trade-mobile-surface-tabs"}
+   [:div {:class ["flex" "items-center" "gap-0"]}
+    (for [[surface-id _label :as surface] trade-mobile-surfaces]
+      ^{:key (str "trade-mobile-surface-" (name surface-id))}
+      (mobile-surface-button mobile-surface surface))]])
+
+(defn- render-trade-chart-panel
+  [desktop-layout?
+   {:keys [layout]}
+   {:keys [active-asset-panel-state trade-chart-panel-state]}]
+  [:div {:class (:chart-panel-classes layout)
+         :data-parity-id "trade-chart-panel"}
+   [:div {:class (:desktop-active-asset-shell-classes layout)}
+    (when desktop-layout?
+      (render-active-asset-panel-state active-asset-panel-state))]
+   (when (:chart-panel-visible? layout)
+     [:div {:class ["overflow-hidden" "flex-1" "min-h-0" "min-w-0"]}
+      (trade-chart-panel-content-state trade-chart-panel-state)])])
+
+(defn- render-orderbook-panel-shell
+  [desktop-layout?
+   {:keys [layout]}
+   {:keys [orderbook-panel-state mobile-orderbook-panel-state]}]
+  [:div {:class (:orderbook-panel-classes layout)
+         :data-parity-id "trade-orderbook-panel"}
+   [:div {:class ["h-full" "min-h-0" "lg:hidden"]}
+    (when (and (:orderbook-panel-visible? layout)
+               (not desktop-layout?))
+      (render-orderbook-panel mobile-orderbook-panel-state))]
+   [:div {:class ["hidden" "h-full" "min-h-0" "lg:block"]}
+    (when (and (:orderbook-panel-visible? layout)
+               desktop-layout?)
+      (render-orderbook-panel orderbook-panel-state))]])
+
+(defn- render-order-entry-panel-shell
+  [desktop-layout?
+   {:keys [layout]}
+   {:keys [account-equity-panel-state equity-metrics order-form-panel-state]}]
+  [:div {:class (:order-entry-panel-classes layout)
+         :data-parity-id funding-modal-positioning/trade-order-entry-panel-parity-id}
+   (when (:order-entry-panel-visible? layout)
+     (render-order-form-panel order-form-panel-state))
+   [:div {:class ["hidden" "border-t" "border-base-300" "lg:block"]
+          :data-parity-id "trade-desktop-account-equity-panel"}
+    (when (and desktop-layout?
+               (:order-entry-panel-visible? layout))
+      (render-account-equity-panel-state account-equity-panel-state equity-metrics {}))]])
+
+(defn- render-account-panel-shell
+  [state
+   desktop-layout?
+   {:keys [layout]}
+   {:keys [account-info-panel-state]}]
+  [:div {:class (:account-panel-classes layout)
+         :data-parity-id "trade-account-tables-panel"}
+   [:div {:class ["w-full" "lg:hidden"]
+          :data-parity-id "trade-mobile-account-panel"}
+    (when (and (:account-panel-visible? layout)
+               (not desktop-layout?))
+      (render-account-info-panel state))]
+   [:div {:class ["hidden" "w-full" "min-h-0" "lg:flex"]
+          :data-parity-id "trade-desktop-account-panel"}
+    (when (and (:account-panel-visible? layout)
+               desktop-layout?)
+      (render-account-info-panel-state account-info-panel-state
+                                       {:default-panel-classes ["h-full"]}))]])
+
+(defn- render-mobile-account-summary
+  [state {:keys [layout]} {:keys [equity-metrics]}]
+  (when (:mobile-account-summary-visible? layout)
+    [:div {:class (:mobile-account-summary-classes layout)
+           :data-parity-id "trade-mobile-account-summary-panel"}
+     (mobile-account-surface state equity-metrics)]))
+
+(defn- render-trade-grid
+  [state
+   {:keys [desktop-layout? layout] :as layout-context}
+   panel-context]
+  [:div {:class ["relative" "flex-1" "min-h-0"]}
+   [:div {:class ["hidden" "xl:block" "absolute" "top-0" "bottom-0" "right-[320px]" "w-px" "bg-base-300" "pointer-events-none" "z-10"]}]
+   [:div {:class ["grid"
+                  "h-full"
+                  "min-h-0"
+                  "grid-cols-1"
+                  "gap-x-0" "gap-y-0"
+                  "bg-base-100"
+                  "items-stretch"
+                  "lg:h-full"
+                  "lg:grid-cols-[minmax(0,1fr)_320px]"
+                  "xl:grid-cols-[minmax(0,1fr)_280px_320px]"]
+          :style (:grid-style layout)}
+    (render-trade-chart-panel desktop-layout? layout-context panel-context)
+    (render-orderbook-panel-shell desktop-layout? layout-context panel-context)
+    (render-order-entry-panel-shell desktop-layout? layout-context panel-context)
+    (render-account-panel-shell state desktop-layout? layout-context panel-context)]
+   (render-mobile-account-summary state layout-context panel-context)])
+
+(defn trade-view [state]
+  (let [{:keys [mobile-surface] :as layout-context} (trade-view-layout-context state)
+        panel-context (trade-view-panel-context state layout-context)]
     [:div {:class ["flex-1" "flex" "flex-col" "min-h-0" "overflow-hidden"]
            :data-parity-id "trade-root"}
      [:div {:class ["w-full"
@@ -472,148 +564,6 @@
                     "scrollbar-hide"
                     "overflow-y-auto"]
             :data-role "trade-scroll-shell"}
-      [:div {:class (into ["lg:hidden" "border-b" "border-base-300" "bg-base-200"]
-                          (concat
-                           (when funding-tooltip-open?
-                             ["relative" "z-[160]" "overflow-visible"])
-                           (when mobile-account-surface?
-                             ["hidden"])))
-             :data-parity-id "trade-mobile-active-asset-strip"}
-       (when show-mobile-active-asset?
-         (render-active-asset-panel state))]
-      [:div {:class (into ["lg:hidden" "border-b" "border-base-300" "bg-base-200/70" "px-3"]
-                          (when mobile-account-surface?
-                            ["hidden"]))
-             :data-parity-id "trade-mobile-surface-tabs"}
-       [:div {:class ["flex" "items-center" "gap-0"]}
-        (for [[surface-id _label :as surface] trade-mobile-surfaces]
-          ^{:key (str "trade-mobile-surface-" (name surface-id))}
-          (mobile-surface-button mobile-surface surface))]]
-      [:div {:class ["relative" "flex-1" "min-h-0"]}
-       [:div {:class ["hidden" "xl:block" "absolute" "top-0" "bottom-0" "right-[320px]" "w-px" "bg-base-300" "pointer-events-none" "z-10"]}]
-       [:div {:class ["grid"
-                      "h-full"
-                      "min-h-0"
-                      "grid-cols-1"
-                      "gap-x-0" "gap-y-0"
-                      "bg-base-100"
-                      "items-stretch"
-                      "lg:h-full"
-                      "lg:grid-cols-[minmax(0,1fr)_320px]"
-                      "xl:grid-cols-[minmax(0,1fr)_280px_320px]"]
-               :style (desktop-trade-grid-style desktop-layout?)}
-        [:div {:class (into [(if (= mobile-surface :chart) "flex" "hidden")
-                             "bg-base-100"
-                             "flex-col"
-                             "min-h-0"
-                             "min-w-0"]
-                            (concat
-                             (if funding-tooltip-open?
-                               ["relative" "z-[160]" "overflow-visible"]
-                               ["overflow-hidden"])
-                             ["lg:flex"
-                              "lg:row-start-1"
-                              "lg:col-start-1"
-                              "lg:border-r"
-                              "lg:border-base-300"]))
-               :data-parity-id "trade-chart-panel"}
-         [:div {:class (into ["hidden" "lg:block"]
-                             (when funding-tooltip-open?
-                               ["relative" "z-[160]" "overflow-visible"]))}
-         (when desktop-layout?
-            (render-active-asset-panel-state active-asset-panel-state))]
-         (when chart-panel-visible?
-           [:div {:class ["overflow-hidden" "flex-1" "min-h-0" "min-w-0"]}
-            (trade-chart-panel-content-state trade-chart-panel-state)])]
-
-        [:div {:class (into [(if mobile-orderbook-surface? "block" "hidden")
-                             "bg-base-100"
-                             "w-full"
-                             "h-[320px]"
-                             "min-h-[320px]"
-                             "overflow-hidden"]
-                            ["sm:h-[360px]"
-                             "sm:min-h-[360px]"
-                             "lg:block"
-                             "lg:h-full"
-                             "lg:min-h-0"
-                             "lg:col-start-2"
-                             "lg:row-start-2"
-                             "lg:border-l"
-                             "lg:border-t"
-                             "lg:border-base-300"
-                             "xl:col-start-2"
-                             "xl:row-start-1"
-                             "xl:border-t-0"])
-               :data-parity-id "trade-orderbook-panel"}
-         [:div {:class ["h-full" "min-h-0" "lg:hidden"]}
-          (when (and orderbook-panel-visible?
-                     (not desktop-layout?))
-            (render-orderbook-panel
-             (mobile-orderbook-view-state orderbook-view-state mobile-surface)))]
-         [:div {:class ["hidden" "h-full" "min-h-0" "lg:block"]}
-          (when (and orderbook-panel-visible?
-                     desktop-layout?)
-            (render-orderbook-panel orderbook-view-state))]]
-
-        [:div {:class (into [(if (= mobile-surface :ticket) "flex" "hidden")
-                             "bg-base-100"
-                             "overflow-visible"
-                             "flex-col"
-                             "min-h-0"]
-                            ["lg:flex"
-                             "lg:col-start-2"
-                             "lg:row-start-1"
-                             "lg:border-l"
-                             "lg:border-base-300"
-                             "xl:col-start-3"
-                             "xl:row-span-2"])
-               :data-parity-id funding-modal-positioning/trade-order-entry-panel-parity-id}
-         (when order-entry-panel-visible?
-           (render-order-form-panel order-form-panel-state))
-         [:div {:class ["hidden" "border-t" "border-base-300" "lg:block"]
-                :data-parity-id "trade-desktop-account-equity-panel"}
-          (when (and desktop-layout?
-                     order-entry-panel-visible?)
-            (render-account-equity-panel-state account-equity-panel-state equity-metrics {}))]]
-
-        [:div {:class (into [(if (= mobile-surface :account)
-                               "hidden"
-                               (if mobile-market-surface? "flex" "hidden"))
-                             "bg-base-100"
-                             "border-t"
-                             "border-base-300"
-                             "flex-col"
-                             "min-h-0"
-                             "overflow-hidden"]
-                            ["lg:flex"
-                             "lg:col-start-1"
-                             "lg:row-start-2"
-                             "lg:h-full"
-                             "xl:col-start-1"
-                             "xl:col-span-2"])
-               :data-parity-id "trade-account-tables-panel"}
-         [:div {:class ["w-full" "lg:hidden"]
-                :data-parity-id "trade-mobile-account-panel"}
-          (when (and account-panel-visible?
-                     (not desktop-layout?))
-            (render-account-info-panel state))]
-         [:div {:class ["hidden" "w-full" "min-h-0" "lg:flex"]
-                :data-parity-id "trade-desktop-account-panel"}
-          (when (and account-panel-visible?
-                     desktop-layout?)
-            (render-account-info-panel-state account-info-panel-state {:default-panel-classes ["h-full"]}))]]]
-
-       (when mobile-account-summary-visible?
-         [:div {:class ["absolute"
-                        "inset-0"
-                        "z-20"
-                        "bg-base-100"
-                        "border-t"
-                        "border-base-300"
-                        "flex"
-                        "flex-col"
-                        "min-h-0"
-                        "lg:hidden"]
-                :data-parity-id "trade-mobile-account-summary-panel"}
-          (mobile-account-surface state equity-metrics)])]]]))
+      (render-mobile-active-asset-strip state layout-context)
+      (render-mobile-surface-tabs mobile-surface layout-context)
+      (render-trade-grid state layout-context panel-context)]]))

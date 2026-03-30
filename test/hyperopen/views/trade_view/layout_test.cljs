@@ -1,5 +1,6 @@
 (ns hyperopen.views.trade-view.layout-test
   (:require [cljs.test :refer-macros [deftest is]]
+            [hyperopen.views.trade-view.layout-state :as layout-state]
             [hyperopen.views.trade-view :as trade-view]
             [hyperopen.views.trade.test-support :as support]))
 
@@ -110,3 +111,39 @@
     (is (contains? orderbook-classes "sm:min-h-[360px]"))
     (is (contains? orderbook-classes "lg:h-full"))
     (is (contains? orderbook-classes "lg:min-h-0"))))
+
+(deftest trade-view-layout-state-desktop-boundary-test
+  (is (false? (layout-state/desktop-layout? 1023)))
+  (is (layout-state/desktop-layout? 1024)))
+
+(deftest trade-view-layout-state-derives-visibility-and-grid-contracts-test
+  (let [mobile-state (assoc-in (support/base-state) [:trade-ui :mobile-surface] :account)
+        mobile-layout (layout-state/trade-layout-state mobile-state 430 true)
+        desktop-state (assoc-in (support/base-state) [:trade-ui :mobile-surface] :chart)
+        desktop-layout (layout-state/trade-layout-state desktop-state 1280 false)]
+    (is (= :account (:mobile-surface mobile-layout)))
+    (is (false? (:desktop-layout? mobile-layout)))
+    (is (:mobile-account-surface? mobile-layout))
+    (is (:mobile-account-summary-visible? mobile-layout))
+    (is (contains? (set (:mobile-active-asset-strip-classes mobile-layout)) "hidden"))
+    (is (contains? (set (:mobile-surface-tabs-classes mobile-layout)) "hidden"))
+    (is (= ["absolute"
+            "inset-0"
+            "z-20"
+            "bg-base-100"
+            "border-t"
+            "border-base-300"
+            "flex"
+            "flex-col"
+            "min-h-0"
+            "lg:hidden"]
+           (:mobile-account-summary-classes mobile-layout)))
+    (is (= :chart (:mobile-surface desktop-layout)))
+    (is (layout-state/desktop-layout? 1280))
+    (is (:desktop-layout? desktop-layout))
+    (is (:show-equity-surface? desktop-layout))
+    (is (:chart-panel-visible? desktop-layout))
+    (is (= "minmax(27.75rem, 1fr) clamp(21rem, 38vh, 29rem)"
+           (:grid-template-rows (:grid-style desktop-layout))))
+    (is (contains? (set (:chart-panel-classes desktop-layout)) "lg:row-start-1"))
+    (is (contains? (set (:account-panel-classes desktop-layout)) "xl:col-span-2"))))

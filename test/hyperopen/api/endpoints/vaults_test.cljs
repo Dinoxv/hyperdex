@@ -30,6 +30,20 @@
        :status 304
        :headers (response-headers headers)})
 
+(deftest normalize-snapshot-key-supports-supported-aliases-test
+  (let [normalize-snapshot-key @#'hyperopen.api.endpoints.vaults/normalize-snapshot-key]
+    (is (= :day (normalize-snapshot-key " day ")))
+    (is (= :week (normalize-snapshot-key "Week")))
+    (is (= :month (normalize-snapshot-key "month")))
+    (is (= :three-month (normalize-snapshot-key "3M")))
+    (is (= :three-month (normalize-snapshot-key "quarter")))
+    (is (= :six-month (normalize-snapshot-key "half-year")))
+    (is (= :one-year (normalize-snapshot-key "1Y")))
+    (is (= :two-year (normalize-snapshot-key "2year")))
+    (is (= :all-time (normalize-snapshot-key "allTime")))
+    (is (nil? (normalize-snapshot-key "unknown")))
+    (is (nil? (normalize-snapshot-key nil)))))
+
 (deftest request-vault-index-response-normalizes-shape-and-preserves-validators-test
   (async done
     (let [calls (atom [])
