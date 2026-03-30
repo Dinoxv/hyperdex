@@ -3,17 +3,17 @@
             [hyperopen.views.header.icons :as icons]))
 
 (defn- trading-settings-icon-shell
-  [kind active?]
-  [:div {:class ["flex"
-                 "h-4.5"
-                 "w-4.5"
-                 "shrink-0"
-                 "items-center"
-                 "justify-center"
-                 (if active?
-                   "text-[#92a1a6]"
-                   "text-[#738088]")]}
-   (icons/trading-settings-row-icon kind active?)])
+  [data-role kind active?]
+  (when kind
+    [:div {:class ["flex"
+                   "h-4.5"
+                   "w-4.5"
+                   "shrink-0"
+                   "items-center"
+                   "justify-center"
+                   "pt-0.5"]
+           :data-role data-role}
+     (icons/trading-settings-row-icon kind active?)]))
 
 (defn- trading-settings-toggle
   [{:keys [aria-label checked? on-change]}]
@@ -76,17 +76,25 @@
                    "items-start"
                    "justify-between"
                    "gap-3"
-                   "rounded-[10px]"
-                   "border"
-                   "border-[#2f383d]"
-                   "bg-[#1d2429]"
-                   "px-3.5"
-                   "py-3.5"]
+                   "rounded-r-[8px]"
+                   "border-l-2"
+                   "border-[#2d7468]"
+                   "bg-[#182126]/70"
+                   "pl-3.5"
+                   "pr-3"
+                   "py-3"]
            :data-role "trading-settings-storage-mode-confirmation"}
      [:div {:class ["min-w-0" "space-y-1"]}
-      [:div {:class ["text-[0.82rem]" "font-semibold" "tracking-[-0.01em]" "text-white"]}
+      [:div {:class ["text-[0.76rem]"
+                     "font-semibold"
+                     "uppercase"
+                     "tracking-[0.12em]"
+                     "text-[#eef5f4]"]}
        title]
-      [:p {:class ["text-[0.74rem]" "leading-[1.45]" "text-[#94a0a5]"]}
+      [:p {:class ["max-w-[19rem]"
+                   "text-[0.72rem]"
+                   "leading-[1.45]"
+                   "text-[#94a0a5]"]}
        body]]
      [:div {:class ["flex" "shrink-0" "gap-2"]}
       [:button {:type "button"
@@ -96,8 +104,10 @@
                         "bg-transparent"
                         "px-3"
                         "py-1.5"
-                        "text-[0.8rem]"
+                        "text-[0.74rem]"
                         "font-medium"
+                        "uppercase"
+                        "tracking-[0.08em]"
                         "text-[#d9dfe4]"
                         "transition-colors"
                         "hover:bg-[#262e33]"
@@ -111,8 +121,10 @@
                         "bg-[#123d37]"
                         "px-3"
                         "py-1.5"
-                        "text-[0.8rem]"
-                        "font-medium"
+                        "text-[0.74rem]"
+                        "font-semibold"
+                        "uppercase"
+                        "tracking-[0.08em]"
                         "text-[#d8f5f0]"
                         "transition-colors"
                         "hover:bg-[#195047]"]
@@ -121,54 +133,53 @@
 
 (defn- trading-settings-row
   [{:keys [aria-label checked? confirmation data-role helper-copy icon-kind on-change title]}]
-  [:div {:class ["py-3"]
-         :data-role data-role}
-   [:div {:class ["flex" "items-start" "gap-3"]}
-    (trading-settings-icon-shell icon-kind checked?)
-    [:div {:class ["min-w-0" "flex-1" "space-y-1"]}
-     [:div {:class ["text-[0.93rem]"
-                    "font-semibold"
-                    "leading-5"
-                    "tracking-[-0.012em]"
-                    "text-white"]}
-      title]
-     [:p {:class ["max-w-[15.75rem]"
-                  "text-[0.74rem]"
-                  "leading-[1.45]"
-                  "text-[#94a0a5]"]}
-      helper-copy]]
-    [:div {:class ["flex" "shrink-0" "items-start" "pt-0.5"]}
-     (trading-settings-toggle {:aria-label aria-label
-                               :checked? checked?
-                               :on-change on-change})]]
-   (confirmation-strip confirmation)])
+  (let [has-icon? (some? icon-kind)]
+    [:div {:class ["py-3"]
+           :data-role data-role}
+     [:div {:class ["flex" "items-start" (if has-icon? "gap-3" "gap-0")]}
+      (trading-settings-icon-shell (str data-role "-icon") icon-kind checked?)
+      [:div {:class ["min-w-0" "flex-1" "space-y-1"]}
+       [:div {:class ["text-[0.88rem]"
+                      "font-semibold"
+                      "leading-5"
+                      "tracking-[0.015em]"
+                      "text-[#eef3f2]"]}
+        title]
+       [:p {:class ["max-w-[16rem]"
+                    "text-[0.72rem]"
+                    "leading-[1.5]"
+                    "text-[#8f9aa2]"]}
+        helper-copy]]
+      [:div {:class ["flex" "shrink-0" "items-start" "pt-0.5"]}
+       (trading-settings-toggle {:aria-label aria-label
+                                 :checked? checked?
+                                 :on-change on-change})]]
+     (confirmation-strip confirmation)]))
 
 (defn- trading-settings-section
   [{:keys [data-role rows title]}]
   (into
-   [:section {:class ["rounded-[12px]"
-                      "border"
-                      "border-[#2d353b]"
-                      "bg-[#20272c]"]
+   [:section {:class ["border-t"
+                      "border-[#2b3337]"
+                      "pt-4"
+                      "first:border-t-0"
+                      "first:pt-0"]
               :data-role data-role}
-    [:div {:class ["px-4"
-                   "pb-1"
-                   "pt-3.5"
-                   "text-[0.64rem]"
-                   "font-semibold"
-                   "uppercase"
-                   "tracking-[0.18em]"
-                   "text-[#7f8a90]"]}
-     title]
-    [:div {:class ["px-4" "pb-1"]}]]
+    [:div {:class ["flex" "items-center" "gap-2" "pb-1"]}
+     [:div {:class ["h-px" "w-3" "bg-[#50d2c1]/85"]}]
+     [:div {:class ["text-[0.58rem]"
+                    "font-semibold"
+                    "uppercase"
+                    "tracking-[0.24em]"
+                    "text-[#8fa7a5]"]}
+      title]]]
    (mapcat (fn [[index row]]
              (cond-> []
                (pos? index)
-               (conj [:div {:class ["mx-4" "h-px" "bg-[#31383d]"]}])
+               (conj [:div {:class ["h-px" "bg-[#242c31]"]}])
 
                :always
-               (conj [:div {:class ["px-4"]}
-                      (trading-settings-row row)])))
+               (conj (trading-settings-row row))))
            (map-indexed vector rows))))
 
 (defn- trading-settings-content
@@ -181,12 +192,13 @@
                    "inset-x-4"
                    "top-0"
                    "h-px"
-                   "bg-[linear-gradient(90deg,rgba(80,210,193,0),rgba(80,210,193,0.55),rgba(80,210,193,0))]"]}]
+                   "bg-[linear-gradient(90deg,rgba(80,210,193,0),rgba(80,210,193,0.82),rgba(80,210,193,0))]"]}]
     [:div {:class ["flex" "items-center" "justify-between" "gap-4"]}
-     [:h3 {:class ["text-[0.98rem]"
+     [:h3 {:class ["text-[0.84rem]"
                    "font-semibold"
-                   "tracking-[-0.015em]"
-                   "text-white"]
+                   "uppercase"
+                   "tracking-[0.12em]"
+                   "text-[#f1f7f6]"]
            :data-role "trading-settings-title"}
       title]
      [:button {:type "button"
@@ -201,7 +213,7 @@
                        "bg-[#1f262b]"
                        "text-[#99a4ab]"
                        "transition-colors"
-                       "hover:border-[#3f494f]"
+                       "hover:border-[#50d2c1]/45"
                        "hover:bg-[#252d32]"
                        "hover:text-white"]
                :aria-label "Close trading settings"
@@ -209,20 +221,18 @@
                :on {:click close-actions}}
       (icons/close-icon {:class ["h-4.5" "w-4.5"]})]]
     [:div {:class ["mt-3" "h-px" "bg-[#2c3439]"]}]]
-   [:div {:class ["overflow-y-auto" "px-3" "pb-3" "pt-2"]}
-    [:div {:class ["space-y-2.5"]}
+   [:div {:class ["overflow-y-auto" "px-4" "pb-3" "pt-2"]}
+    [:div {:class ["space-y-0"]}
      (for [{:keys [id] :as section} sections]
        ^{:key (str "settings-section:" (name id))}
        (trading-settings-section section))
      [:div {:class ["border-t"
                     "border-[#2c3439]"
-                    "px-1"
-                    "pt-3"]}
-      [:div {:class ["px-3"
-                     "pb-1"
-                     "text-[0.72rem]"
+                    "pt-3.5"]}
+      [:div {:class ["text-[0.7rem]"
                      "leading-[1.45]"
-                     "text-[#879399]"]
+                     "tracking-[0.02em]"
+                     "text-[#839097]"]
              :data-role "trading-settings-footer-note"}
        footer-note]]]]])
 

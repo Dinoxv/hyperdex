@@ -179,14 +179,14 @@
                                 "Confirm open orders"
                                 "Ask before sending a new order from the trade form."
                                 (trading-settings/confirm-open-orders? state)
-                                :confirm-open-orders
+                                nil
                                 [[:actions/set-confirm-open-orders-enabled
                                   (not (trading-settings/confirm-open-orders? state))]])
                   (settings-row :confirm-close-position
                                 "Confirm close position"
                                 "Ask before submitting from the close-position popover."
                                 (trading-settings/confirm-close-position? state)
-                                :confirm-close-position
+                                nil
                                 [[:actions/set-confirm-close-position-enabled
                                   (not (trading-settings/confirm-close-position? state))]])])
                 (settings-section

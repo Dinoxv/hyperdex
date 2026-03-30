@@ -12,34 +12,27 @@
     (vector? node)
     (or (when (pred node) node)
         (some #(find-node pred %) (rest node)))
-
     (seq? node)
     (some #(find-node pred %) node)
-
     :else nil))
-
 (defn- find-node-by-role [node role]
   (find-node #(and (vector? %)
                    (= role (get-in % [1 :data-role])))
              node))
-
 (defn- collect-strings [node]
   (cond
     (string? node) [node]
     (vector? node) (mapcat collect-strings (rest node))
     (seq? node) (mapcat collect-strings node)
     :else []))
-
 (defn- class-values [class-attr]
   (cond
     (nil? class-attr) []
     (string? class-attr) (remove str/blank? (str/split class-attr #"\s+"))
     (sequential? class-attr) (mapcat class-values class-attr)
     :else []))
-
 (defn- class-token-set [node]
   (set (class-values (get-in node [1 :class]))))
-
 (defn- ordered-settings-sections
   [node]
   (->> (tree-seq coll? seq node)
@@ -51,7 +44,6 @@
                    "trading-settings-display-section"} %))
        distinct
        vec))
-
 (def connected-address
   "0x1234567890abcdef1234567890abcdef12345678")
 
@@ -139,6 +131,9 @@
         display-section (find-node-by-role view "trading-settings-display-section")
         confirm-open-orders-row (find-node-by-role view "trading-settings-confirm-open-orders-row")
         confirm-close-position-row (find-node-by-role view "trading-settings-confirm-close-position-row")
+        confirm-open-orders-icon (find-node-by-role view "trading-settings-confirm-open-orders-row-icon")
+        confirm-close-position-icon (find-node-by-role view "trading-settings-confirm-close-position-row-icon")
+        storage-icon (find-node-by-role view "trading-settings-storage-mode-row-icon")
         storage-row (find-node-by-role view "trading-settings-storage-mode-row")
         fill-alerts-row (find-node-by-role view "trading-settings-fill-alerts-row")
         footer-note (find-node-by-role view "trading-settings-footer-note")
@@ -168,8 +163,8 @@
     (is (contains? panel-classes "rounded-[15px]"))
     (is (contains? panel-classes "bg-[#1c2328]"))
     (is (contains? sheet-classes "bg-[#1c2328]"))
-    (is (contains? session-section-classes "rounded-[12px]"))
-    (is (contains? session-section-classes "bg-[#20272c]"))
+    (is (contains? session-section-classes "border-t"))
+    (is (contains? session-section-classes "first:border-t-0"))
     (is (= "top right" (:transform-origin panel-style)))
     (is (= "translateY(-8px) scale(0.97)" (:transform panel-mounting)))
     (is (= 0 (:opacity panel-mounting)))
@@ -178,9 +173,13 @@
     (is (contains? (set (collect-strings title)) "Trading settings"))
     (is (some? confirm-open-orders-row))
     (is (some? confirm-close-position-row))
+    (is (nil? confirm-open-orders-icon))
+    (is (nil? confirm-close-position-icon))
+    (is (some? storage-icon))
     (is (some? storage-row))
     (is (some? fill-alerts-row))
     (is (some? footer-note))
+    (is (some? (find-node #(contains? (class-token-set %) "bg-[#50d2c1]/85") session-section)))
     (is (nil? (find-node #(contains? (class-token-set %) "hover:bg-[#20262b]") storage-row)))
     (is (nil? (find-node #(contains? (class-token-set %) "rounded-[9px]") storage-row)))
     (is (contains? all-text "Confirm open orders"))
