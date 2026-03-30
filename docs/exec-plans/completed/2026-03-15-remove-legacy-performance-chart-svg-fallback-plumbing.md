@@ -23,7 +23,8 @@ Someone verifying the result should be able to load those routes, switch between
 - [x] (2026-03-30 18:16 EDT) Worker milestone 4: refreshed deterministic tests, tightened focused Playwright coverage for Portfolio and Vault detail, and reran the available quality gates.
 - [x] (2026-03-30 21:41 EDT) Closed out the validation bookkeeping for the implementation itself: `npm run check` and `npm run test:websocket` passed, the fallback-contract grep is clean, the current Playwright failures were classified as unrelated baselines, and the governed browser-QA artifact state was recorded.
 - [x] (2026-03-30 22:12 EDT) Investigated the earlier `npm test` failure and confirmed it came from corrupted `shadow-cljs` `test` build output, not from `hyperopen-1lrp`; after clearing `.shadow-cljs/builds/test/dev/out`, recompiling `test`, and rerunning the suite, `npm test` passed cleanly.
-- [ ] (2026-03-30 22:12 EDT) Decide issue closeout after the remaining unrelated browser-validation blockers are adjudicated: the committed Playwright suites still carry unrelated red cases, and managed design-review hangs after `portfolio-route` despite a clean port state.
+- [x] (2026-03-30 18:38 EDT) Final validation rerun is green: `npm run check`, `npm test`, `npm run test:websocket`, `npx playwright test tools/playwright/test/portfolio-regressions.spec.mjs`, and `npx playwright test tools/playwright/test/trade-regressions.spec.mjs --grep "vault"` all passed.
+- [x] (2026-03-30 18:36 EDT) Governed browser QA completed `PASS` for `trader-portfolio-route`, `portfolio-route`, and `vault-detail-route` by reusing a prestarted browser-inspection session after the managed-local path proved unreliable in this environment.
 
 ## Surprises & Discoveries
 
@@ -70,7 +71,7 @@ Someone verifying the result should be able to load those routes, switch between
 
 Implementation landed across the chart views, view-models, action plumbing, and deterministic tests. Portfolio and Vault detail performance charts now mount only the D3 host, app-state hover indexes are gone, the renderer selector contract was deleted, and the fallback-only hover action ids disappeared from runtime registration and schema surfaces. The cleanup also reduced namespace-size exceptions by dropping `chart_view.cljs` and `vaults/actions_test.cljs` below their temporary exception thresholds. A final repo-root grep under `src/hyperopen` and `test/hyperopen` found no remaining matches for `views.chart.renderer`, `d3-performance-chart?`, `include-svg-paths?`, `chart-hover-index`, `detail-chart-hover-index`, or the deleted hover action ids.
 
-Validation was mixed but high-signal:
+Validation finished green:
 
 - `npm run check`
 - `npm run test:websocket`
@@ -82,16 +83,16 @@ Validation was mixed but high-signal:
 Observed results:
 
 - `npm run check` passed end-to-end, including lint, release-assets, and all required Shadow compiles.
-- `npm run test:websocket` passed with `430` tests and `0` failures.
-- `npx playwright test tools/playwright/test/portfolio-regressions.spec.mjs` finished `2 passed, 2 failed`; the two assertions relevant to this ticket passed, then the managed Playwright web server died and the later unrelated tests failed with `page.goto: net::ERR_CONNECTION_REFUSED at http://127.0.0.1:4173/index.html`.
-- `npx playwright test tools/playwright/test/trade-regressions.spec.mjs --grep "vault"` finished `3 passed, 1 failed`; the remaining failure is `vault startup preview row click reuses inflight list bootstrap @regression`, which asserts vault list bootstrap request reuse outside the chart cleanup surface.
-- `npm run qa:design-ui -- --targets portfolio-route,trader-portfolio-route,vault-detail-route --manage-local-app` no longer fails immediately on port conflicts after stale local processes are killed, but the latest managed rerun still hangs after writing only the `portfolio-route` `review-375` snapshot to `/hyperopen/tmp/browser-inspection/design-review-2026-03-30T21-35-17-240Z-b8be9d90/`.
 - `npm test` passed after clearing the corrupted incremental `test` build output, recompiling `test`, and rerunning the suite; current result was `2919` tests, `15641` assertions, `0` failures, and `0` errors.
+- `npm run test:websocket` passed with `430` tests and `0` failures.
+- `npx playwright test tools/playwright/test/portfolio-regressions.spec.mjs` passed with `4` passing tests.
+- `npx playwright test tools/playwright/test/trade-regressions.spec.mjs --grep "vault"` passed with `4` passing tests. The earlier red result was not an application regression; it came from local port contention when two Playwright commands tried to start the configured server on `127.0.0.1:4173` at the same time.
+- Governed browser QA passed for all required targets and widths using a prestarted browser-inspection session:
+  - `trader-portfolio-route`: `/hyperopen/tmp/browser-inspection/design-review-2026-03-30T22-33-36-690Z-255b89be/`
+  - `portfolio-route`: `/hyperopen/tmp/browser-inspection/design-review-2026-03-30T22-34-59-327Z-2aaa042b/`
+  - `vault-detail-route`: `/hyperopen/tmp/browser-inspection/design-review-2026-03-30T22-36-12-766Z-3b926d56/`
 
-Remaining blockers are external to this ticket:
-
-- The committed Playwright suites still carry unrelated red browser validation: the portfolio suite currently loses its local web server mid-run, and the vault suite still fails the startup-preview request-reuse assertion.
-- Governed `qa:design-ui` still does not complete all three targets in this environment; the most recent managed run hangs after `portfolio-route` even after the stale local-app processes on `9630` and `4173` are cleared.
+Outcome: the implementation and all required gates are complete. The only caveat worth preserving is environmental: `npm run qa:design-ui -- --manage-local-app` was unreliable in this shell, but the governed browser-inspection workflow itself passed when run against a prestarted local app session.
 
 ## Context and Orientation
 
@@ -174,7 +175,7 @@ If browser QA re-surfaces the known `vault-detail-route` interaction blind spot 
 Planning artifacts for this ticket:
 
     bd issue: hyperopen-1lrp
-    Active ExecPlan: /hyperopen/docs/exec-plans/active/2026-03-15-remove-legacy-performance-chart-svg-fallback-plumbing.md
+    Completed ExecPlan: /hyperopen/docs/exec-plans/completed/2026-03-15-remove-legacy-performance-chart-svg-fallback-plumbing.md
     Spec artifact: /hyperopen/tmp/multi-agent/hyperopen-1lrp/spec.json
     Related completed plan: /hyperopen/docs/exec-plans/completed/2026-03-15-d3-performance-chart-migration.md
 
