@@ -23,8 +23,7 @@ After this change, hovering the shared performance charts on `/portfolio` and Va
 - [x] (2026-03-16 01:25Z) Added lazy extra-tab rendering support to account-info and switched Portfolio extra tabs to lazy renderers.
 - [x] (2026-03-16 01:37Z) Added regression coverage and ran `npm run check`, `npm test`, and `npm run test:websocket`.
 - [x] (2026-03-16 01:38Z) Closed `hyperopen-kvtj` and prepared this plan for `/hyperopen/docs/exec-plans/completed/`.
-- [ ] Re-profile `/portfolio` and Vault detail with selected benchmarks and record the result here.
-  Follow-up: tracked separately in `hyperopen-atw0`.
+- [x] (2026-03-30 22:18 EDT) Re-profiled populated `/portfolio` and Vault detail hover interactions, recorded the measured outcome, and split the remaining non-tooltip perf debt into follow-up issue `hyperopen-mceo`.
 
 ## Surprises & Discoveries
 
@@ -58,7 +57,15 @@ After this change, hovering the shared performance charts on `/portfolio` and Va
 
 Implementation is complete for the code path changes: the shared tooltip now moves with transform-only updates, both benchmark selector surfaces cache vault and candidate models, Portfolio and Vault detail route models cache their expensive derivations, Vault detail performance metrics now reuse a worker-backed async seam, and Portfolio extra tabs render lazily. Validation gates passed via `npm test`, `npm run test:websocket`, and `npm run check`.
 
-Fresh Chromium reprofiling was not run in this session. That acceptance item is tracked as follow-up issue `hyperopen-atw0`.
+Fresh browser reprofiling is now complete. On 2026-03-30 EDT, a Playwright-driven hover trace against the local app on `http://localhost:8081` exercised the populated Portfolio route in spectate mode (`/portfolio?spectate=0x162cc7c861ebd0c06b3d72319201150482518185`) and a live Vault detail route (`/vaults/0xdfc24b077bc1425ad1dea75bcb6f8158e10df303`) with the returns chart selected.
+
+Results were mixed but useful:
+
+- The shared tooltip itself no longer appeared as the dominant layout-shift source during hover. In the populated Portfolio trace, sampled `LayoutShift` sources pointed at route-shell containers and small value spans instead of the shared tooltip root, which is consistent with the transform-only tooltip change landing correctly.
+- Hover settle remained fast once the chart responded. The sampled hover-line / tooltip mutation p95 was about `7.4ms` on populated Portfolio and `0.5ms` on Vault detail, with max sampled settle times of `33ms` and `52.4ms` respectively.
+- Residual live-route work still exists during the hover window. The same trace window recorded non-zero layout-shift totals and long tasks (`maxLongTaskMs` about `312ms` on populated Portfolio and `439ms` on Vault detail), so the broader acceptance target for “no post-load hover-window FunctionCall over 50ms” is not satisfied yet.
+
+Follow-up issue `hyperopen-mceo` now tracks that remaining non-tooltip hover-window perf debt. The original tooltip-jank follow-up `hyperopen-atw0` is satisfied because the requested reprofiling was completed and the result is now recorded here.
 
 ## Context and Orientation
 
