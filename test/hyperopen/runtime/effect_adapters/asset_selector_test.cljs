@@ -24,7 +24,7 @@
                   (fn [opts]
                     (reset! captured opts))]
       (effect-adapters/queue-asset-icon-status nil store {:market-key "perp:BTC"
-                                                           :status :loaded})
+                                                           :icon-status :loaded})
       (is (= :raf-id ((:schedule-animation-frame! @captured) (fn [] nil))))
       (is (fn? (:flush-queued-asset-icon-statuses! @captured))))))
 

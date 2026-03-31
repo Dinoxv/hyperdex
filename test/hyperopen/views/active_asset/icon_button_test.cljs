@@ -56,6 +56,7 @@
         classes (set (support/class-values (:class attrs)))
         icon-layer (first (support/find-nodes-with-style-key icon-node :background-image))
         background-image (get-in icon-layer [1 :style :background-image])
+        on-map (:on attrs)
         strings (set (support/collect-strings icon-node))]
     (is (some? img-node))
     (is (not (contains? strings "BTC")))
@@ -63,6 +64,10 @@
     (is (contains? classes "opacity-0"))
     (is (= "url('https://app.hyperliquid.xyz/coins/BTC.svg')"
            background-image))
+    (is (= [[:actions/mark-loaded-asset-icon "perp:BTC"]]
+           (:load on-map)))
+    (is (= [[:actions/mark-missing-asset-icon "perp:BTC"]]
+           (:error on-map)))
     (is (fn? (:replicant/on-render attrs)))))
 
 (deftest asset-icon-probe-hook-dispatches-loaded-for-complete-images-test
@@ -73,6 +78,7 @@
                 :market-type :perp}
         icon-node (icon-button/asset-button market false #{} #{})
         probe-attrs (-> icon-node support/find-img-nodes first second)
+        probe-keys (vec (keys probe-attrs))
         on-render (:replicant/on-render probe-attrs)
         remembered (atom nil)
         dispatched (atom [])
@@ -87,14 +93,14 @@
                   :replicant/node node
                   :replicant/remember (fn [memory]
                                         (reset! remembered memory))}))
-    (is (contains? @listeners "load"))
-    (is (contains? @listeners "error"))
     (is (= [[:actions/mark-loaded-asset-icon "perp:BTC"]]
            @dispatched))
     (is (= #{} (get-in @store [:asset-selector :loaded-icons])))
     (is (= #{} (get-in @store [:asset-selector :missing-icons])))
-    (is (= "https://app.hyperliquid.xyz/coins/BTC.svg"
-           (:src @remembered)))))
+    (is (some? (:status* @remembered)))
+    (is (< (.indexOf probe-keys :on)
+           (.indexOf probe-keys :src)))
+    (is (empty? @listeners))))
 
 (deftest asset-icon-probe-hook-dispatches-missing-for-complete-broken-images-test
   (let [market {:key "perp:BTC"
@@ -104,6 +110,7 @@
                 :market-type :perp}
         icon-node (icon-button/asset-button market false #{} #{})
         probe-attrs (-> icon-node support/find-img-nodes first second)
+        probe-keys (vec (keys probe-attrs))
         on-render (:replicant/on-render probe-attrs)
         dispatched (atom [])
         store (atom {:asset-selector {:loaded-icons #{}
@@ -119,7 +126,41 @@
     (is (= [[:actions/mark-missing-asset-icon "perp:BTC"]]
            @dispatched))
     (is (= #{} (get-in @store [:asset-selector :loaded-icons])))
-    (is (= #{} (get-in @store [:asset-selector :missing-icons])))))
+    (is (= #{} (get-in @store [:asset-selector :missing-icons])))
+    (is (< (.indexOf probe-keys :on)
+           (.indexOf probe-keys :src)))))
+
+(deftest asset-icon-probe-hook-dispatches-loaded-when-update-sees-already-complete-image-test
+  (let [market {:key "perp:BTC"
+                :coin "BTC"
+                :symbol "BTC-USDC"
+                :base "BTC"
+                :market-type :perp}
+        icon-node (icon-button/asset-button market false #{} #{})
+        probe-attrs (-> icon-node support/find-img-nodes first second)
+        on-render (:replicant/on-render probe-attrs)
+        remembered (atom nil)
+        dispatched (atom [])
+        store (atom {:asset-selector {:loaded-icons #{}
+                                      :missing-icons #{}}})
+        {node :node} (support/fake-image-node {:complete? false
+                                               :natural-width 0})]
+    (with-redefs [app-system/store store
+                  nxr/dispatch (fn [_ _ actions]
+                                 (swap! dispatched conj actions))]
+      (on-render {:replicant/life-cycle :replicant.life-cycle/mount
+                  :replicant/node node
+                  :replicant/remember (fn [memory]
+                                        (reset! remembered memory))})
+      (aset node "complete" true)
+      (aset node "naturalWidth" 48)
+      (on-render {:replicant/life-cycle :replicant.life-cycle/update
+                  :replicant/node node
+                  :replicant/memory @remembered
+                  :replicant/remember (fn [memory]
+                                        (reset! remembered memory))}))
+    (is (= [[[:actions/mark-loaded-asset-icon "perp:BTC"]]]
+           @dispatched))))
 
 (deftest asset-icon-renders-visible-image-when-icon-is-marked-loaded-test
   (let [market {:key "perp:BTC"
@@ -131,6 +172,7 @@
         img-nodes (support/find-img-nodes icon-node)
         img-node (first img-nodes)
         attrs (second img-node)
+        attr-keys (vec (keys attrs))
         classes (set (support/class-values (:class attrs)))
         strings (set (support/collect-strings icon-node))]
     (is (= 1 (count img-nodes)))
@@ -140,6 +182,8 @@
     (is (not (contains? classes "bg-white")))
     (is (not (contains? classes "opacity-0")))
     (is (not (contains? strings "BTC")))
+    (is (< (.indexOf attr-keys :on)
+           (.indexOf attr-keys :src)))
     (is (empty? (support/find-nodes-with-style-key icon-node :background-image)))))
 
 (deftest asset-icon-falls-back-to-monogram-when-icon-is-known-missing-test

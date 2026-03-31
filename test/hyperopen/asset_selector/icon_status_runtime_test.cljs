@@ -37,9 +37,9 @@
                                                         (flush! runtime-store
                                                                 pending-statuses
                                                                 flush-handle))}))]
-    (queue! {:market-key "perp:BTC" :status :loaded})
-    (queue! {:market-key "perp:BTC" :status :missing})
-    (queue! {:market-key "perp:ETH" :status :loaded})
+    (queue! {:market-key "perp:BTC" :icon-status :loaded})
+    (queue! {:market-key "perp:BTC" :icon-status :missing})
+    (queue! {:market-key "perp:ETH" :icon-status :loaded})
     (is (fn? @scheduled-callback))
     (@scheduled-callback)
     (is (= #{"perp:ETH"} (get-in @store [:asset-selector :loaded-icons])))
@@ -55,7 +55,7 @@
         scheduled? (atom false)]
     (icon-status-runtime/queue-asset-icon-status!
      {:store store
-      :payload {:market-key nil :status :loaded}
+      :payload {:market-key nil :icon-status :loaded}
       :pending-statuses pending-statuses
       :flush-handle flush-handle
       :schedule-animation-frame! (fn [_]
@@ -75,7 +75,7 @@
     (icon-status-runtime/queue-asset-icon-status!
      {:store store
       :runtime runtime
-      :payload {:market-key "perp:BTC" :status :loaded}
+      :payload {:market-key "perp:BTC" :icon-status :loaded}
       :schedule-animation-frame! (fn [f]
                                    (reset! scheduled-callback f)
                                    :raf-id)

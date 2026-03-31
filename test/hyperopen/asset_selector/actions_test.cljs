@@ -462,7 +462,7 @@
                              :missing-icons #{}}}
            "perp:BTC")))
   (is (= [[:effects/queue-asset-icon-status {:market-key "perp:BTC"
-                                             :status :loaded}]]
+                                             :icon-status :loaded}]]
          (actions/mark-loaded-asset-icon
            {:asset-selector {:loaded-icons #{}
                              :missing-icons #{"perp:BTC"}}}
@@ -473,7 +473,7 @@
                              :missing-icons #{"perp:BTC"}}}
            "perp:BTC")))
   (is (= [[:effects/queue-asset-icon-status {:market-key "perp:BTC"
-                                             :status :missing}]]
+                                             :icon-status :missing}]]
          (actions/mark-missing-asset-icon
            {:asset-selector {:loaded-icons #{"perp:BTC"}
                              :missing-icons #{}}}

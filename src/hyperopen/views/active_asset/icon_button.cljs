@@ -91,46 +91,21 @@
       (reset! status* status)
       (nxr/dispatch app-system/store nil [action]))))
 
-(defn attach-asset-icon-probe [market-key icon-src]
+(defn- icon-status-handlers [market-key]
+  (when (seq market-key)
+    {:load [[:actions/mark-loaded-asset-icon market-key]]
+     :error [[:actions/mark-missing-asset-icon market-key]]}))
+
+(defn attach-asset-icon-probe [market-key _icon-src]
   (fn [{:keys [:replicant/life-cycle :replicant/node :replicant/memory :replicant/remember]}]
-    (cond
-      (= life-cycle :replicant.life-cycle/unmount)
-      (when-let [dispose (:dispose memory)]
-        (dispose))
-
-      (contains? #{:replicant.life-cycle/mount
-                   :replicant.life-cycle/update}
-                 life-cycle)
-      (when (seq icon-src)
-        (let [{previous-src :src
-               previous-dispose :dispose
-               status* :status*} (or memory {})
-              status* (or status* (atom nil))
-              listeners-current? (and (some? previous-dispose)
-                                      (= previous-src icon-src))
-              remember! (fn [dispose]
-                          (remember {:src icon-src
-                                     :dispose dispose
-                                     :status* status*}))]
-          (when (and previous-dispose
-                     (not= previous-src icon-src))
-            (previous-dispose))
-          (when-not listeners-current?
-            (let [on-load (fn [_]
-                            (dispatch-icon-status! market-key :loaded status*))
-                  on-error (fn [_]
-                             (dispatch-icon-status! market-key :missing status*))
-                  dispose (fn []
-                            (.removeEventListener node "load" on-load)
-                            (.removeEventListener node "error" on-error))]
-              (.addEventListener node "load" on-load)
-              (.addEventListener node "error" on-error)
-              (remember! dispose)))
-          (when-let [status (mounted-image-status node)]
-            (dispatch-icon-status! market-key status status*))))
-
-      :else
-      nil)))
+    (when (contains? #{:replicant.life-cycle/mount
+                       :replicant.life-cycle/update}
+                     life-cycle)
+      (let [status* (or (:status* memory) (atom nil))]
+        (when (ifn? remember)
+          (remember {:status* status*}))
+        (when-let [status (mounted-image-status node)]
+          (dispatch-icon-status! market-key status status*))))))
 
 (defn asset-button [market dropdown-visible? missing-icons loaded-icons]
   (let [coin (:coin market)
@@ -167,11 +142,10 @@
      [:div {:class ["relative" "h-5" "w-5" "shrink-0" "overflow-hidden" "rounded-full"]}
       (if show-loaded-icon?
         [:img {:class ["block" "h-5" "w-5" "object-contain" "pointer-events-none"]
+               :on (icon-status-handlers market-key)
                :src icon-src
                :alt ""
-               :aria-hidden true
-               :on {:load [[:actions/mark-loaded-asset-icon market-key]]
-                    :error [[:actions/mark-missing-asset-icon market-key]]}}]
+               :aria-hidden true}]
         [:div {:class ["flex"
                        "h-5"
                        "w-5"
@@ -210,6 +184,7 @@
                        "object-contain"
                        "opacity-0"
                        "pointer-events-none"]
+               :on (icon-status-handlers market-key)
                :src icon-src
                :alt ""
                :aria-hidden true

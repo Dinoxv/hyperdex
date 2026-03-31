@@ -35,12 +35,13 @@
            flush-handle
            schedule-animation-frame!
            flush-queued-asset-icon-statuses!]}]
-  (let [{:keys [market-key status]} (or payload {})]
+  (let [{:keys [market-key icon-status status]} (or payload {})
+        status* (or icon-status status)]
     (when (and (seq market-key)
-               (contains? #{:loaded :missing} status))
+               (contains? #{:loaded :missing} status*))
       (if runtime
-        (swap! runtime assoc-in [:asset-icons :pending market-key] status)
-        (swap! pending-statuses assoc market-key status))
+        (swap! runtime assoc-in [:asset-icons :pending market-key] status*)
+        (swap! pending-statuses assoc market-key status*))
       (let [current-handle (if runtime
                              (get-in @runtime [:asset-icons :flush-handle])
                              @flush-handle)]

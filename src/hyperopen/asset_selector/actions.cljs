@@ -554,7 +554,7 @@
     (let [{:keys [changed?]} (apply-asset-icon-status-updates state {market-key :loaded})]
       (if changed?
         [[:effects/queue-asset-icon-status {:market-key market-key
-                                            :status :loaded}]]
+                                            :icon-status :loaded}]]
         []))))
 
 (defn mark-missing-asset-icon
@@ -564,7 +564,7 @@
     (let [{:keys [changed?]} (apply-asset-icon-status-updates state {market-key :missing})]
       (if changed?
         [[:effects/queue-asset-icon-status {:market-key market-key
-                                            :status :missing}]]
+                                            :icon-status :missing}]]
         []))))
 
 (defn set-funding-tooltip-visible

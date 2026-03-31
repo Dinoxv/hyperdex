@@ -20,7 +20,7 @@
                                 :missing-icons #{"perp:BTC"}}}
         effects (core/mark-loaded-asset-icon state "perp:BTC")]
     (is (= [[:effects/queue-asset-icon-status {:market-key "perp:BTC"
-                                               :status :loaded}]]
+                                               :icon-status :loaded}]]
            effects))))
 
 (deftest mark-loaded-asset-icon-noop-when-key-already-loaded-and-not-missing-test
@@ -34,7 +34,7 @@
                                 :missing-icons #{}}}
         effects (core/mark-missing-asset-icon state "perp:BTC")]
     (is (= [[:effects/queue-asset-icon-status {:market-key "perp:BTC"
-                                               :status :missing}]]
+                                               :icon-status :missing}]]
            effects))))
 
 (deftest mark-missing-asset-icon-noop-when-key-already-missing-and-not-loaded-test
@@ -62,9 +62,9 @@
     (with-redefs [effect-adapters/schedule-animation-frame! (fn [f]
                                                                (reset! scheduled-callback f)
                                                                :raf-id)]
-      (core/queue-asset-icon-status nil store {:market-key "perp:BTC" :status :loaded})
-      (core/queue-asset-icon-status nil store {:market-key "perp:BTC" :status :missing})
-      (core/queue-asset-icon-status nil store {:market-key "perp:ETH" :status :loaded})
+      (core/queue-asset-icon-status nil store {:market-key "perp:BTC" :icon-status :loaded})
+      (core/queue-asset-icon-status nil store {:market-key "perp:BTC" :icon-status :missing})
+      (core/queue-asset-icon-status nil store {:market-key "perp:ETH" :icon-status :loaded})
       (is (fn? @scheduled-callback))
       (@scheduled-callback)
       (is (= #{"perp:ETH"} (get-in @store [:asset-selector :loaded-icons])))

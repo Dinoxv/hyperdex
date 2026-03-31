@@ -38,6 +38,32 @@ test("asset selector opens and selects ETH @regression", async ({ page }) => {
   );
 });
 
+test("active asset icon promotes BTC into loaded-icons after probe load @regression", async ({ page }) => {
+  await page.route("https://app.hyperliquid.xyz/coins/BTC.svg", async route => {
+    await route.fulfill({
+      status: 200,
+      contentType: "image/svg+xml",
+      body: "<svg xmlns=\"http://www.w3.org/2000/svg\" width=\"16\" height=\"16\"><rect width=\"16\" height=\"16\" fill=\"#f7931a\"/></svg>"
+    });
+  });
+
+  await visitRoute(page, "/trade");
+
+  await expect
+    .poll(async () => {
+      const snapshot = await debugCall(page, "snapshot");
+      return snapshot["app-state"]?.["asset-selector"]?.["loaded-icons"] || [];
+    }, { timeout: 10_000 })
+    .toContain("perp:BTC");
+
+  await expect
+    .poll(async () => {
+      const snapshot = await debugCall(page, "snapshot");
+      return snapshot["app-state"]?.["asset-selector"]?.["missing-icons"] || [];
+    }, { timeout: 10_000 })
+    .toEqual([]);
+});
+
 test("vault detail 429 retries stop after returning to trade @regression", async ({ page }) => {
   const vaultAddress = "0x61b1cf5c2d7c4bf6d5db14f36651b2242e7cba0a";
   let vaultDetailsRequests = 0;
