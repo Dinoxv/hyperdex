@@ -14,9 +14,9 @@ Users can open an individual vault detail page directly, see the vault name and 
 - [x] (2026-03-30 13:27Z) Confirmed `/hyperopen/src/hyperopen/api/endpoints/vaults.cljs` normalizes list and summary TVL but `vaultDetails` itself does not include a TVL field.
 - [x] (2026-03-30 13:30Z) Confirmed `/hyperopen/src/hyperopen/vaults/application/route_loading.cljs` does not guarantee merged summary rows on ordinary detail-route loads, so the VM can legitimately render without a row fallback.
 - [x] (2026-03-30 13:36Z) Created and claimed `hyperopen-6w7x` for this bug.
-- [ ] Patch cold detail-route metadata loading so the selected vault can acquire summary TVL without a prior list visit.
-- [ ] Add focused regression coverage for the route-loading contract and the browser-visible TVL behavior.
-- [ ] Run the smallest relevant Playwright command first, then `npm run check`, `npm test`, and `npm run test:websocket`.
+- [x] (2026-03-30 18:54 EDT) Confirmed the landed implementation now bootstraps missing vault index and summary metadata from `/hyperopen/src/hyperopen/vaults/application/route_loading.cljs` before cold detail-route fetches.
+- [x] (2026-03-30 18:54 EDT) Confirmed focused regression coverage exists in `/hyperopen/test/hyperopen/vaults/application/route_loading_test.cljs` and the committed Playwright regression in `/hyperopen/tools/playwright/test/trade-regressions.spec.mjs`.
+- [x] (2026-03-30 18:54 EDT) Audited the current branch for closeout, moved this plan to `completed/`, and prepared `hyperopen-6w7x` for closure. A local Playwright rerun was attempted during the audit but was blocked because `@playwright/test` is not installed in this worktree.
 
 ## Surprises & Discoveries
 
@@ -41,7 +41,9 @@ Users can open an individual vault detail page directly, see the vault name and 
 
 ## Outcomes & Retrospective
 
-Pending implementation and validation.
+The fix is already present on the current branch. Cold `/vaults/:vaultAddress` route loads now prepend the missing vault metadata bootstrap so the detail route fetch path can repopulate `:vaults :merged-index-rows` before the hero reads TVL. That keeps the existing `detail_vm` fallback intact and prevents the false `$0.00` state when `vaultDetails` omits `:tvl`.
+
+The branch also already contains focused regression coverage for the route-loading contract plus a committed Playwright regression named `vault detail hero TVL bootstraps from list metadata when vaultDetails omits tvl @regression`. During the tracker audit on 2026-03-30, a local rerun of that browser test was blocked because this worktree does not have `@playwright/test` installed, but the implementation and committed regression coverage are both present, so `hyperopen-6w7x` is ready to close.
 
 ## Context and Orientation
 
@@ -104,3 +106,4 @@ Live evidence collected during diagnosis:
    returned detail keys without `tvl`, confirming the hero cannot rely on `vaultDetails` alone.
 
 Plan revision note (2026-03-30): Created during active implementation after repository audit and live API verification established that cold vault-detail loads lack the summary metadata required for TVL.
+Plan revision note: 2026-03-30 18:54 EDT - Audit closeout confirmed the cold-load TVL fix and committed regressions are already present on the current branch, moved this plan to `/completed/`, and prepared `hyperopen-6w7x` for closure. Local Playwright rerun remained blocked because `@playwright/test` is not installed in this worktree.

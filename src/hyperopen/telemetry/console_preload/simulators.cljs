@@ -1,6 +1,5 @@
 (ns hyperopen.telemetry.console-preload.simulators
   (:require [clojure.string :as str]
-            [hyperopen.api.default :as default-api]
             [hyperopen.api.trading :as trading-api]
             [hyperopen.runtime.validation :as runtime-validation]
             [hyperopen.system :as app-system]
@@ -298,18 +297,6 @@
   (trading-api/clear-debug-exchange-simulator!)
   true)
 
-(defn install-account-request-simulator!
-  [config]
-  (clj->js (default-api/install-account-request-simulator! config)))
-
-(defn clear-account-request-simulator!
-  []
-  (default-api/clear-account-request-simulator!))
-
-(defn account-request-simulator-snapshot
-  []
-  (clj->js (default-api/account-request-simulator-snapshot)))
-
 (defn seed-funding-tooltip-fixture!
   ([] (seed-funding-tooltip-fixture! nil))
   ([config]
@@ -374,7 +361,6 @@
   (runtime-validation/clear-debug-action-effect-traces!)
   (set-wallet-connected-handler-mode! "passthrough")
   (clear-wallet-simulator!)
-  (clear-account-request-simulator!)
   (clear-exchange-simulator!)
   (telemetry/clear-events!)
   (ws-client/clear-flight-recording!)

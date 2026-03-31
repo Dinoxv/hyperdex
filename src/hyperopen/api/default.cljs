@@ -1,6 +1,5 @@
 (ns hyperopen.api.default
-  (:require [clojure.string :as str]
-            [hyperopen.api.compat :as api-compat]
+  (:require [hyperopen.api.compat :as api-compat]
             [hyperopen.api.gateway.account :as account-gateway]
             [hyperopen.api.gateway.funding-hyperunit :as funding-hyperunit-gateway]
             [hyperopen.api.gateway.leaderboard :as leaderboard-gateway]
@@ -25,24 +24,6 @@
 (defonce ^:private api-facade-state
   (atom {:service (make-default-api-service)}))
 
-(def ^:private staking-account-request-type-keys
-  ["validatorSummaries"
-   "delegatorSummary"
-   "delegations"
-   "delegatorRewards"
-   "delegatorHistory"
-   "spotClearinghouseState"])
-
-(def ^:private address-scoped-staking-account-request-types
-  #{"delegatorSummary"
-    "delegations"
-    "delegatorRewards"
-    "delegatorHistory"
-    "spotClearinghouseState"})
-
-(defonce ^:private account-request-simulator-state
-  (atom nil))
-
 (declare request-spot-clearinghouse-state!)
 (declare request-extra-agents!)
 (declare request-leaderboard!)
@@ -58,90 +39,6 @@
 
 (defn- now-ms []
   (platform/now-ms))
-
-(defn- js-plain-object?
-  [value]
-  (instance? js/Object value))
-
-(defn- simulator-config-map
-  [config]
-  (cond
-    (map? config) config
-    (js-plain-object? config) (js->clj config :keywordize-keys true)
-    :else {}))
-
-(defn- normalize-address
-  [value]
-  (some-> value str str/trim str/lower-case not-empty))
-
-(defn- normalize-simulator-value
-  [value]
-  (cond
-    (js-plain-object? value) (js->clj value :keywordize-keys true)
-    (array? value) (mapv normalize-simulator-value (array-seq value))
-    (vector? value) (mapv normalize-simulator-value value)
-    (sequential? value) (mapv normalize-simulator-value value)
-    (map? value) (into {}
-                      (map (fn [[k v]]
-                             [k (normalize-simulator-value v)]))
-                      value)
-    :else value))
-
-(defn- normalize-account-request-simulator-entry
-  [entry]
-  (let [entry* (normalize-simulator-value entry)
-        reject-message (some-> (or (:reject-message entry*)
-                                   (:rejectMessage entry*))
-                               str
-                               str/trim
-                               not-empty)
-        queued-responses (some-> (:responses entry*)
-                                 normalize-simulator-value
-                                 vec)
-        configured-user (normalize-address (:user entry*))]
-    (cond-> {}
-      configured-user (assoc :user configured-user)
-      reject-message (assoc :reject-message reject-message)
-      (some? queued-responses) (assoc :responses queued-responses)
-      (and (nil? queued-responses)
-           (nil? reject-message))
-      (assoc :response entry*))))
-
-(defn- normalize-account-request-simulator-config
-  [config]
-  (let [config* (simulator-config-map config)]
-    {:default-user (normalize-address (or (:default-user config*)
-                                          (:defaultUser config*)))
-     :entries (into {}
-                    (keep (fn [request-type]
-                            (when (contains? config* (keyword request-type))
-                              [request-type
-                               (normalize-account-request-simulator-entry
-                                (get config* (keyword request-type)))])))
-                    staking-account-request-type-keys)}))
-
-(defn account-request-simulator-snapshot
-  []
-  (let [{:keys [default-user entries]} @account-request-simulator-state]
-    {:installed (boolean @account-request-simulator-state)
-     :defaultUser default-user
-     :configuredTypes (->> entries keys sort vec)
-     :queuedResponseCounts (into {}
-                                (map (fn [[request-type entry]]
-                                       [request-type
-                                        (count (:responses entry))]))
-                                entries)}))
-
-(defn install-account-request-simulator!
-  [config]
-  (let [config* (normalize-account-request-simulator-config config)]
-    (reset! account-request-simulator-state config*)
-    (account-request-simulator-snapshot)))
-
-(defn clear-account-request-simulator!
-  []
-  (reset! account-request-simulator-state nil)
-  true)
 
 (defn- active-api-service
   []
@@ -192,72 +89,13 @@
   []
   (api-service/reset-service! (active-api-service)))
 
-(defn- request-body-map
-  [body]
-  (cond
-    (map? body) body
-    (js-plain-object? body) (js->clj body :keywordize-keys true)
-    :else {}))
-
-(defn- body-field
-  [body key]
-  (or (get body key)
-      (get body (keyword key))))
-
-(defn- address-scoped-staking-request?
-  [request-type]
-  (contains? address-scoped-staking-account-request-types request-type))
-
-(defn- matching-account-request-simulator-entry
-  [body]
-  (let [body* (request-body-map body)
-        request-type (some-> (body-field body* "type") str str/trim not-empty)
-        requested-user (normalize-address (body-field body* "user"))
-        {:keys [default-user entries] :as state} @account-request-simulator-state
-        entry (get entries request-type)
-        expected-user (or (:user entry) default-user)]
-    (when (and state
-               entry
-               (or (not (address-scoped-staking-request? request-type))
-                   (and expected-user
-                        (= expected-user requested-user))))
-      [request-type entry])))
-
-(defn- consume-account-request-simulator-response!
-  [request-type entry]
-  (if (contains? entry :responses)
-    (let [next-response (atom nil)]
-      (swap! account-request-simulator-state
-             (fn [state]
-               (if-let [responses (seq (get-in state [:entries request-type :responses]))]
-                 (do
-                   (reset! next-response (first responses))
-                   (assoc-in state
-                             [:entries request-type :responses]
-                             (vec (rest responses))))
-                 state)))
-      @next-response)
-    (:response entry)))
-
-(defn- simulated-account-request-promise
-  [body]
-  (when-let [[request-type entry] (matching-account-request-simulator-entry body)]
-    (if-let [reject-message (:reject-message entry)]
-      (js/Promise.reject (js/Error. reject-message))
-      (when (or (contains? entry :response)
-                (seq (:responses entry)))
-        (js/Promise.resolve
-         (consume-account-request-simulator-response! request-type entry))))))
-
 (defn- post-info!
   ([body]
    (post-info! body {}))
   ([body opts]
-   (or (simulated-account-request-promise body)
-       (api-service/request-info! (active-api-service) body opts)))
+   (api-service/request-info! (active-api-service) body opts))
   ([body opts attempt]
-   (or (simulated-account-request-promise body)
-       (api-service/request-info! (active-api-service) body opts attempt))))
+   (api-service/request-info! (active-api-service) body opts attempt)))
 
 (defn request-asset-contexts!
   ([] (request-asset-contexts! {}))
