@@ -89,8 +89,12 @@ npm run build
 The release-ready static artifact is generated at `out/release-public`. Smoke-test locally with:
 
 ```bash
-npx serve -s out/release-public -l 8082
+PLAYWRIGHT_STATIC_ROOT=out/release-public node tools/playwright/static_server.mjs
+# then, in another shell:
+npm run test:playwright:smoke
 ```
+
+This uses the repo's Pages-style static server instead of SPA-forcing `serve -s`, so `/robots.txt`, `/sitemap.xml`, and route directories like `/trade` are exercised the same way the release artifact is meant to be served.
 
 </details>
 
