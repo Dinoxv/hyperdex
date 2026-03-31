@@ -103,9 +103,9 @@
            (:href portfolio-item)))
     (is (= "/trade?spectate=0x1234567890abcdef1234567890abcdef12345678"
            (:href trade-item)))
-    (is (= "/API?spectate=0x1234567890abcdef1234567890abcdef12345678"
+    (is (= "/api?spectate=0x1234567890abcdef1234567890abcdef12345678"
            (:href more-api-item)))
     (is (= [[:actions/navigate "/portfolio"]]
            (:action portfolio-item)))
-    (is (= [[:actions/navigate "/API"]]
+    (is (= [[:actions/navigate "/api"]]
            (:action more-api-item)))))

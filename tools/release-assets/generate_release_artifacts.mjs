@@ -3,6 +3,19 @@ import fs from "node:fs/promises";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 
+import {
+  ROBOTS_FILE_PATH,
+  SITE_METADATA_FILE_PATH,
+  SITEMAP_FILE_PATH,
+  RELEASE_SEO_PLACEHOLDER,
+  buildReleaseSeoHeadMarkup,
+  buildRobotsTxt,
+  buildSiteMetadata,
+  buildSitemapXml,
+  normalizeCanonicalOrigin,
+  publicPathToRelativePath
+} from "./site_metadata.mjs";
+
 export const DEFAULT_SOURCE_ROOT = path.resolve("resources/public");
 export const DEFAULT_OUTPUT_ROOT = path.resolve("out/release-public");
 export const APP_INDEX_PATH = "index.html";
@@ -10,7 +23,6 @@ export const APP_CSS_PATH = path.join("css", "main.css");
 export const APP_CSS_HREF = "/css/main.css";
 const JS_DIR = "js";
 const FONTS_DIR = "fonts";
-const OPTIONAL_ROOT_FILES = ["sw.js", "favicon.ico"];
 const REQUIRED_JS_METADATA_FILES = ["module-loader.json"];
 const REQUIRED_WORKER_FILES = ["portfolio_worker.js", "vault_detail_worker.js"];
 
@@ -29,11 +41,15 @@ export function fingerprintFileName(fileName, fingerprint) {
   return `${baseName}.${fingerprint}${extension}`;
 }
 
-export function rewriteAppIndexHtml(indexHtml, { cssHref, mainScriptHref }) {
+export function rewriteAppIndexHtml(indexHtml, {
+  cssHref,
+  mainScriptHref,
+  releaseSeoHeadMarkup
+}) {
   const stylesheetPattern =
     /<link\b[^>]*href=["']\/css\/main\.css["'][^>]*>/;
   const bootstrapScriptPattern =
-    /<script>\s*\(function \(\) \{[\s\S]*?fetch\(manifestUrl, \{ cache: "no-cache" \}\)[\s\S]*?<\/script>/;
+    /<script>\s*\(function \(\) \{(?:(?!<\/script>)[\s\S])*?const manifestUrl = ["']\/js\/manifest\.json["'];(?:(?!<\/script>)[\s\S])*?const defaultMainScriptUrl = ["']\/js\/main\.js["'];(?:(?!<\/script>)[\s\S])*?fetch\(manifestUrl, \{ cache: "no-cache" \}\)(?:(?!<\/script>)[\s\S])*?<\/script>/;
 
   if (!stylesheetPattern.test(indexHtml)) {
     throw new Error("Expected app index.html to contain the default stylesheet link.");
@@ -43,11 +59,18 @@ export function rewriteAppIndexHtml(indexHtml, { cssHref, mainScriptHref }) {
     throw new Error("Expected app index.html to contain the dynamic main script bootstrap.");
   }
 
+  if (!indexHtml.includes(RELEASE_SEO_PLACEHOLDER)) {
+    throw new Error(
+      `Expected app index.html to contain the release SEO placeholder: ${RELEASE_SEO_PLACEHOLDER}`
+    );
+  }
+
   return indexHtml
     .replace(
       stylesheetPattern,
       `<link rel="stylesheet" href="${cssHref}" />`
     )
+    .replace(RELEASE_SEO_PLACEHOLDER, releaseSeoHeadMarkup)
     .replace(
       bootstrapScriptPattern,
       `<script defer src="${mainScriptHref}"></script>`
@@ -127,6 +150,7 @@ export function collectReleaseJavaScriptFiles({ manifest, moduleLoader }) {
 export async function generateReleaseArtifacts({
   sourceRoot = DEFAULT_SOURCE_ROOT,
   outputRoot = DEFAULT_OUTPUT_ROOT,
+  canonicalOrigin = process.env.HYPEROPEN_SITE_ORIGIN,
 } = {}) {
   const manifestPath = path.join(sourceRoot, JS_DIR, "manifest.json");
   const moduleLoaderPath = path.join(sourceRoot, JS_DIR, "module-loader.json");
@@ -150,19 +174,37 @@ export async function generateReleaseArtifacts({
   await fs.writeFile(outputFingerprintPath, cssContent);
 
   const sourceIndexHtml = await fs.readFile(path.join(sourceRoot, APP_INDEX_PATH), "utf8");
+  const siteMetadata = buildSiteMetadata({
+    canonicalOrigin: normalizeCanonicalOrigin(canonicalOrigin),
+    indexHtml: sourceIndexHtml,
+  });
+  const releaseSeoHeadMarkup = buildReleaseSeoHeadMarkup(siteMetadata);
   const rewrittenIndexHtml = rewriteAppIndexHtml(sourceIndexHtml, {
     cssHref: `/css/${cssFileName}`,
     mainScriptHref: `/js/${mainModule["output-name"]}`,
+    releaseSeoHeadMarkup,
   });
   await fs.writeFile(path.join(outputRoot, APP_INDEX_PATH), rewrittenIndexHtml);
+  await fs.writeFile(
+    path.join(outputRoot, SITE_METADATA_FILE_PATH),
+    `${JSON.stringify(siteMetadata, null, 2)}\n`
+  );
+  await fs.writeFile(path.join(outputRoot, ROBOTS_FILE_PATH), `${buildRobotsTxt(siteMetadata)}\n`);
+  await fs.writeFile(path.join(outputRoot, SITEMAP_FILE_PATH), `${buildSitemapXml(siteMetadata)}\n`);
 
   const fontsSourcePath = path.join(sourceRoot, FONTS_DIR);
   if (await pathExists(fontsSourcePath)) {
     await fs.cp(fontsSourcePath, path.join(outputRoot, FONTS_DIR), { recursive: true });
   }
 
-  for (const relativePath of OPTIONAL_ROOT_FILES) {
-    await copyFileIntoRoot(sourceRoot, outputRoot, relativePath);
+  const copiedRootAssetPaths = [];
+  for (const publicPath of siteMetadata.rootAssetPaths) {
+    const relativePath = publicPathToRelativePath(publicPath);
+    const copied = await copyFileIntoRoot(sourceRoot, outputRoot, relativePath);
+    if (!copied) {
+      throw new Error(`Expected release root asset to exist: ${relativePath}`);
+    }
+    copiedRootAssetPaths.push(relativePath);
   }
 
   const releaseJavaScriptFiles = collectReleaseJavaScriptFiles({ manifest, moduleLoader });
@@ -182,7 +224,9 @@ export async function generateReleaseArtifacts({
     cssHref: `/css/${cssFileName}`,
     mainScriptHref: `/js/${mainModule["output-name"]}`,
     outputIndexPath,
+    copiedRootAssetPaths: copiedRootAssetPaths.sort(),
     releaseJavaScriptFiles,
+    siteMetadata,
   };
 }
 

@@ -523,7 +523,7 @@
     (is (contains? panel-classes "ui-dropdown-panel"))
     (is (= "true" (get-in panel [1 :data-ui-native-details-panel])))
     (is (contains? api-classes "bg-[#123a36]"))
-    (is (= [[:actions/navigate "/API"]]
+    (is (= [[:actions/navigate "/api"]]
            (get-in api-link [1 :on :click])))))
 
 (deftest header-view-uses-app-shell-gutter-test

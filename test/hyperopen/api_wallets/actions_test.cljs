@@ -23,8 +23,13 @@
         value))))
 
 (deftest parse-api-wallet-route-supports-uppercase-and-lowercase-test
-  (is (= :page (:kind (actions/parse-api-wallet-route "/API"))))
-  (is (= :page (:kind (actions/parse-api-wallet-route "/api?tab=test"))))
+  (is (= "/api" actions/canonical-route))
+  (is (= {:kind :page
+          :path "/api"}
+         (actions/parse-api-wallet-route "/API")))
+  (is (= {:kind :page
+          :path "/api"}
+         (actions/parse-api-wallet-route "/api?tab=test")))
   (is (= :other (:kind (actions/parse-api-wallet-route "/trade")))))
 
 (deftest parse-api-wallet-route-normalizes-trailing-slashes-and-non-string-input-test

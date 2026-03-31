@@ -5,7 +5,7 @@
             [hyperopen.api-wallets.application.ui-state :as ui-state]))
 
 (def canonical-route
-  "/API")
+  "/api")
 
 (def ^:private api-wallet-route-kinds
   #{"/api"})
@@ -37,7 +37,7 @@
         path-lower (str/lower-case path*)]
     (if (contains? api-wallet-route-kinds path-lower)
       {:kind :page
-       :path path*}
+       :path canonical-route}
       {:kind :other
        :path path*})))
 
