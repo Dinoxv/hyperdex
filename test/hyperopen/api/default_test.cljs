@@ -1,6 +1,6 @@
 (ns hyperopen.api.default-test
   (:require-macros [hyperopen.test-support.redefs :refer [with-direct-redefs]])
-  (:require [cljs.test :refer-macros [deftest is use-fixtures]]
+  (:require [cljs.test :refer-macros [async deftest is use-fixtures]]
             [hyperopen.api.compat :as api-compat]
             [hyperopen.api.default :as api]
             [hyperopen.api.endpoints.orders :as order-endpoints]
@@ -10,13 +10,16 @@
             [hyperopen.api.gateway.vaults :as vault-gateway]
             [hyperopen.api.instance :as api-instance]
             [hyperopen.api.service :as api-service]
-            [hyperopen.platform :as platform]))
+            [hyperopen.platform :as platform]
+            [hyperopen.telemetry.console-preload :as console-preload]))
 
 (use-fixtures
   :each
   {:before (fn []
-             (api/reset-api-service!))
+             (api/reset-api-service!)
+             (api/clear-account-request-simulator!))
    :after (fn []
+            (api/clear-account-request-simulator!)
             (api/reset-api-service!))})
 
 (deftest default-api-public-wrappers-delegate-test
@@ -395,3 +398,47 @@
       (is (some #(= :request-predicted-fundings (first %)) @calls))
       (is (some #(= :build-market-state (first %)) @calls))
       (is (some #(= :fetch-perp-dex-clearinghouse-states (first %)) @calls)))))
+
+(deftest staking-account-request-simulator-only-intercepts-matching-address-scoped-requests-test
+  (async done
+    (let [good-address "0x1111111111111111111111111111111111111111"
+          wrong-address "0x2222222222222222222222222222222222222222"
+          api* (@#'console-preload/debug-api)
+          install! (aget api* "installAccountRequestSimulator")
+          clear! (aget api* "clearAccountRequestSimulator")
+          matching-entry @#'api/matching-account-request-simulator-entry
+          simulated-request @#'api/simulated-account-request-promise]
+      (-> (if (fn? install!)
+            (js/Promise.resolve
+             (install! #js {:defaultUser good-address
+                            :delegatorSummary #js {:delegated 12.5
+                                                   :undelegated 3}}))
+            (js/Promise.resolve nil))
+          (.then (fn [_]
+                   (is (= ["delegatorSummary"
+                           {:response {:delegated 12.5
+                                       :undelegated 3}}]
+                          (matching-entry {"type" "delegatorSummary"
+                                           "user" good-address})))
+                   (is (nil? (matching-entry {"type" "delegatorSummary"
+                                              "user" wrong-address})))
+                   (is (nil? (matching-entry {"type" "userAbstraction"
+                                              "user" good-address})))
+                   (simulated-request {"type" "delegatorSummary"
+                                       "user" good-address})))
+          (.then (fn [response]
+                   (is (= {:delegated 12.5
+                           :undelegated 3}
+                          response))
+                   (is (nil? (simulated-request {"type" "delegatorSummary"
+                                                 "user" wrong-address})))
+                   (is (nil? (simulated-request {"type" "userAbstraction"
+                                                 "user" good-address})))
+                   (when (fn? clear!)
+                     (clear!))
+                   (done)))
+          (.catch (fn [err]
+                    (when (fn? clear!)
+                      (clear!))
+                    (is false (str "Unexpected error: " err))
+                    (done)))))))

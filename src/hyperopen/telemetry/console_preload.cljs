@@ -335,6 +335,32 @@
      :duplicateHeavyEffectIds []
      :effectIds []}))
 
+(defn- staking-oracle
+  []
+  (let [state @app-system/store
+        staking (get state :staking {})
+        loading (get staking :loading {})]
+    {:route (get-in state [:router :path])
+     :connected (boolean (get-in state [:wallet :connected?]))
+     :address (get-in state [:wallet :address])
+     :activeTab (value->name-string (get-in state [:staking-ui :active-tab]))
+     :validatorCount (count (or (:validator-summaries staking) []))
+     :delegationCount (count (or (:delegations staking) []))
+     :rewardCount (count (or (:rewards staking) []))
+     :historyCount (count (or (:history staking) []))
+     :connectButtonPresent (pos? (count (selector-nodes "[data-role='staking-establish-connection']")))
+     :transferButtonPresent (pos? (count (selector-nodes "[data-role='staking-action-transfer-button']")))
+     :unstakeButtonPresent (pos? (count (selector-nodes "[data-role='staking-action-unstake-button']")))
+     :stakeButtonPresent (pos? (count (selector-nodes "[data-role='staking-action-stake-button']")))
+     :balancePanelPresent (pos? (count (selector-nodes "[data-role='staking-balance-panel']")))
+     :validatorTablePresent (pos? (count (selector-nodes "[data-role='staking-validator-table']")))
+     :validatorRowCount (count (selector-nodes "[data-role='staking-validator-row']"))
+     :loading {:validatorSummaries (boolean (:validator-summaries loading))
+               :delegatorSummary (boolean (:delegator-summary loading))
+               :delegations (boolean (:delegations loading))
+               :rewards (boolean (:rewards loading))
+               :history (boolean (:history loading))}}))
+
 (defn- named-oracle
   [name args]
   (let [name* (some-> name str str/lower-case)]
@@ -347,6 +373,7 @@
       "asset-selector" (asset-selector-oracle)
       "order-form" (order-form-oracle)
       "first-position" (first-position-oracle)
+      "staking" (staking-oracle)
       "position-overlay" (position-overlay-oracle args)
       "effect-order" (effect-order-oracle args)
       (throw (js/Error. (str "Unknown QA oracle: " name))))))
@@ -355,10 +382,17 @@
   []
   (let [state @app-system/store
         wallet (wallet-status-oracle)
-        funding (funding-modal-oracle)]
+        funding (funding-modal-oracle)
+        staking (staking-oracle)]
     {:route (get-in state [:router :path])
      :wallet wallet
      :funding funding
+     :staking {:activeTab (:activeTab staking)
+               :validatorCount (:validatorCount staking)
+               :delegationCount (:delegationCount staking)
+               :rewardCount (:rewardCount staking)
+               :historyCount (:historyCount staking)
+               :loading (:loading staking)}
      :trade-mobile-surface (get-in state [:trade-ui :mobile-surface])
      :account-tab (get-in state [:account-info :selected-tab])
      :action-trace-count (count (runtime-validation/debug-action-effect-traces-snapshot))
@@ -433,6 +467,7 @@
      :activeAsset (:active-asset state)
      :wallet (wallet-status-oracle)
      :funding (funding-modal-oracle)
+     :staking (staking-oracle)
      :accountSurface (account-surface-oracle)
      :assetSelector (asset-selector-oracle)
      :orderForm (order-form-oracle)
@@ -514,8 +549,11 @@
        :seedFundingTooltipFixture simulators/seed-funding-tooltip-fixture!
        :setWalletConnectedHandlerMode simulators/set-wallet-connected-handler-mode!
        :installWalletSimulator simulators/install-wallet-simulator!
+       :installAccountRequestSimulator simulators/install-account-request-simulator!
+       :accountRequestSimulatorSnapshot simulators/account-request-simulator-snapshot
        :walletSimulatorEmit simulators/emit-wallet-simulator!
        :clearWalletSimulator simulators/clear-wallet-simulator!
+       :clearAccountRequestSimulator simulators/clear-account-request-simulator!
        :installExchangeSimulator simulators/install-exchange-simulator!
        :clearExchangeSimulator simulators/clear-exchange-simulator!
        :flightRecording (fn []

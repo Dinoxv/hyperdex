@@ -221,6 +221,75 @@
          #"Unknown QA oracle"
          (oracle! "not-real" #js {})))))
 
+(deftest staking-oracle-reports-populated-route-state-test
+  (let [orig-document (.-document js/globalThis)
+        had-document? (has-own? js/globalThis "document")
+        store (atom {:router {:path "/staking"}
+                     :wallet {:connected? true
+                              :address "0x1111111111111111111111111111111111111111"}
+                     :staking-ui {:active-tab :staking-reward-history}
+                     :staking {:validator-summaries [{:validator "0xaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"}]
+                               :delegations [{:validator "0xaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+                                              :amount 12}]
+                               :delegator-summary {:delegated 12
+                                                   :undelegated 3}
+                               :rewards [{:time-ms 1700000000000
+                                          :source :alpha
+                                          :total-amount 1.5}]
+                               :history [{:time-ms 1700000001000
+                                          :hash "0xdeadbeef"
+                                          :delta {:kind :deposit
+                                                  :amount 2.5}}]
+                               :loading {:validator-summaries false
+                                         :delegator-summary false
+                                         :delegations false
+                                         :rewards false
+                                         :history false}}})
+        api (@#'console-preload/debug-api)
+        oracle! (aget api "oracle")
+        document (js-obj
+                  "querySelectorAll"
+                  (fn [selector]
+                    (cond
+                      (= selector "[data-parity-id=\"staking-root\"]") #js [#js {}]
+                      (= selector "[data-role='staking-establish-connection']") #js []
+                      (= selector "[data-role='staking-action-transfer-button']") #js [#js {}]
+                      (= selector "[data-role='staking-action-unstake-button']") #js [#js {}]
+                      (= selector "[data-role='staking-action-stake-button']") #js [#js {}]
+                      (= selector "[data-role='staking-balance-panel']") #js [#js {}]
+                      (= selector "[data-role='staking-validator-table']") #js [#js {}]
+                      (= selector "[data-role='staking-validator-row']") #js [#js {}]
+                      :else #js [])))]
+    (try
+      (set! (.-document js/globalThis) document)
+      (with-redefs [app-system/store store]
+        (let [staking (js->clj (oracle! "staking" #js {}) :keywordize-keys true)]
+          (is (= {:route "/staking"
+                  :connected true
+                  :address "0x1111111111111111111111111111111111111111"
+                  :activeTab "staking-reward-history"
+                  :validatorCount 1
+                  :delegationCount 1
+                  :rewardCount 1
+                  :historyCount 1
+                  :connectButtonPresent false
+                  :transferButtonPresent true
+                  :unstakeButtonPresent true
+                  :stakeButtonPresent true
+                  :balancePanelPresent true
+                  :validatorTablePresent true
+                  :validatorRowCount 1
+                  :loading {:validatorSummaries false
+                            :delegatorSummary false
+                            :delegations false
+                            :rewards false
+                            :history false}}
+                 staking))))
+      (finally
+        (if had-document?
+          (set! (.-document js/globalThis) orig-document)
+          (js-delete js/globalThis "document"))))))
+
 (deftest snapshot-and-download-api-cover-json-output-and-delegate-hooks-test
   (let [orig-document (.-document js/globalThis)
         had-document? (has-own? js/globalThis "document")

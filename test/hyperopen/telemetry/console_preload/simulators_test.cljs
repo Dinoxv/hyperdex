@@ -1,8 +1,11 @@
 (ns hyperopen.telemetry.console-preload.simulators-test
   (:require [cljs.test :refer-macros [async deftest is testing]]
+            [hyperopen.api.default :as api]
+            [hyperopen.api.service :as api-service]
             [hyperopen.api.trading :as trading-api]
             [hyperopen.runtime.validation :as runtime-validation]
             [hyperopen.telemetry :as telemetry]
+            [hyperopen.telemetry.console-preload :as console-preload]
             [hyperopen.telemetry.console-preload.simulators :as simulators]
             [hyperopen.test-support.async :as async-support]
             [hyperopen.wallet.core :as wallet-core]
@@ -32,11 +35,23 @@
     (simulators/set-wallet-connected-handler-mode! "passthrough")
     (catch :default _ nil))
   (simulators/clear-wallet-simulator!)
+  (simulators/clear-account-request-simulator!)
   (simulators/clear-exchange-simulator!)
+  (api/reset-api-service!)
   (wallet-core/clear-provider-override!)
   (wallet-core/reset-provider-listener-state!)
   (wallet-core/clear-on-connected-handler!)
   (restore-browser-state! browser-state))
+
+(defn- install-stub-api-service!
+  [request-info!]
+  (api/install-api-service!
+   (api-service/make-service
+    {:info-client-instance
+     {:request-info! request-info!
+      :get-request-stats (fn [] {})
+      :reset! (fn [] nil)}
+     :log-fn (fn [& _] nil)})))
 
 (defn- install-provider!
   ([config]
@@ -343,3 +358,158 @@
           (is (false? (:installed (@#'simulators/wallet-simulator-state-snapshot))))))
       (finally
         (cleanup-simulator-state! browser-state)))))
+
+(deftest account-request-simulator-drives-the-six-staking-loaded-request-kinds-test
+  (async done
+    (let [address "0x1111111111111111111111111111111111111111"
+          service (api-service/make-service
+                   {:info-client-instance
+                    {:request-info! (fn [& _]
+                                      (js/Promise.resolve nil))
+                     :get-request-stats (fn [] {})
+                     :reset! (fn [] nil)}
+                    :log-fn (fn [& _] nil)})
+          api* (@#'console-preload/debug-api)
+          install! (aget api* "installAccountRequestSimulator")
+          clear! (aget api* "clearAccountRequestSimulator")]
+      (api/install-api-service! service)
+      (-> (if (fn? install!)
+            (js/Promise.resolve
+             (install! #js {:defaultUser address
+                            :validatorSummaries #js [#js {:validator "0xaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+                                                          :name "Alpha"
+                                                          :description "Alpha validator"
+                                                          :stake 100
+                                                          :isActive true
+                                                          :isJailed false
+                                                          :commission 0.01
+                                                          :stats #js {:week #js {:uptimeFraction 0.99
+                                                                                 :predictedApr 0.14
+                                                                                 :sampleCount 7}}}]
+                            :delegatorSummary #js {:delegated 12
+                                                   :undelegated 3
+                                                   :totalPendingWithdrawal 1
+                                                   :nPendingWithdrawals 2}
+                            :delegations #js [#js {:validator "0xaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+                                                   :amount 12
+                                                   :lockedUntilTimestamp 1700000000000}]
+                            :delegatorRewards #js [#js {:time 1700000000000
+                                                        :source "alpha"
+                                                        :totalAmount 1.5}]
+                            :delegatorHistory #js [#js {:time 1700000001000
+                                                        :hash "0xdeadbeef"
+                                                        :delta #js {:cDeposit #js {:amount 2.5}}}]
+                            :spotClearinghouseState #js {:balances #js [#js {:coin "HYPE"
+                                                                             :total "3.25"}]}}))
+            (js/Promise.resolve nil))
+          (.then (fn [_]
+                   (js/Promise.all
+                    #js [(api/request-staking-validator-summaries!)
+                         (api/request-staking-delegator-summary! address)
+                         (api/request-staking-delegations! address)
+                         (api/request-staking-delegator-rewards! address)
+                         (api/request-staking-delegator-history! address)
+                         (api/request-spot-clearinghouse-state! address)])))
+          (.then (fn [results]
+                   (let [[validators summary delegations rewards history spot-state]
+                         (js->clj results :keywordize-keys true)]
+                     (is (= 1 (count validators)))
+                     (is (= "Alpha" (get-in validators [0 :name])))
+                     (is (= {:delegated 12
+                             :undelegated 3
+                             :total-pending-withdrawal 1
+                             :pending-withdrawals 2}
+                            summary))
+                     (is (= [{:validator "0xaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+                              :amount 12
+                              :locked-until-timestamp 1700000000000}]
+                            delegations))
+                     (is (= [{:time-ms 1700000000000
+                              :source :alpha
+                              :total-amount 1.5}]
+                            rewards))
+                     (is (= [{:time-ms 1700000001000
+                              :hash "0xdeadbeef"
+                              :delta {:kind :deposit
+                                      :amount 2.5}}]
+                            history))
+                     (is (= {:balances [{:coin "HYPE"
+                                         :total "3.25"}]}
+                            spot-state))
+                     (when (fn? clear!)
+                       (clear!))
+                     (api/reset-api-service!)
+                     (done))))
+          (.catch (fn [err]
+                    (when (fn? clear!)
+                      (clear!))
+                    (api/reset-api-service!)
+                    ((async-support/unexpected-error done) err)))))))
+
+(deftest account-request-simulator-queue-rejections-and-qa-reset-clear-the-loaded-state-seam-test
+  (async done
+    (let [address "0x1111111111111111111111111111111111111111"
+          live-history [{:time 1700000099999
+                         :hash "0xlive"
+                         :delta {:withdrawal {:amount 9
+                                              :phase "pending"}}}]
+          service (api-service/make-service
+                   {:info-client-instance
+                    {:request-info! (fn [body _opts]
+                                      (case (get body "type")
+                                        "delegatorHistory" (js/Promise.resolve live-history)
+                                        "delegatorRewards" (js/Promise.resolve [])
+                                        (js/Promise.resolve nil)))
+                     :get-request-stats (fn [] {})
+                     :reset! (fn [] nil)}
+                    :log-fn (fn [& _] nil)})
+          api* (@#'console-preload/debug-api)
+          install! (aget api* "installAccountRequestSimulator")]
+      (api/install-api-service! service)
+      (-> (if (fn? install!)
+            (js/Promise.resolve
+             (install! #js {:defaultUser address
+                            :delegatorHistory #js {:responses #js [#js [#js {:time 1700000000000
+                                                                             :hash "0xfirst"
+                                                                             :delta #js {:cDeposit #js {:amount 1}}}]
+                                                                    #js [#js {:time 1700000005000
+                                                                             :hash "0xsecond"
+                                                                             :delta #js {:cWithdraw #js {:amount 2}}}]]}
+                            :delegatorRewards #js {:rejectMessage "simulated rewards failure"}}))
+            (js/Promise.resolve nil))
+          (.then (fn [_]
+                   (api/request-staking-delegator-history! address)))
+          (.then (fn [first-history]
+                   (is (= [{:time-ms 1700000000000
+                            :hash "0xfirst"
+                            :delta {:kind :deposit
+                                    :amount 1}}]
+                          first-history))
+                   (api/request-staking-delegator-history! address)))
+          (.then (fn [second-history]
+                   (is (= [{:time-ms 1700000005000
+                            :hash "0xsecond"
+                            :delta {:kind :withdraw
+                                    :amount 2}}]
+                          second-history))
+                   (-> (api/request-staking-delegator-rewards! address)
+                       (.then (fn [_]
+                                (is false "Expected delegator rewards to reject from simulated failure")
+                                nil))
+                       (.catch (fn [err]
+                                 (is (= "simulated rewards failure" (.-message err))))))))
+          (.then (fn [_]
+                   (simulators/qa-reset!)
+                   (api/request-staking-delegator-history! address)))
+          (.then (fn [history-after-reset]
+                   (is (= [{:time-ms 1700000099999
+                            :hash "0xlive"
+                            :delta {:kind :withdrawal
+                                    :amount 9
+                                    :phase :pending}}]
+                          history-after-reset))
+                   (api/reset-api-service!)
+                   (done)))
+          (.catch (fn [err]
+                    (api/reset-api-service!)
+                    ((async-support/unexpected-error done) err)))))))

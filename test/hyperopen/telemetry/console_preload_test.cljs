@@ -1,6 +1,8 @@
 (ns hyperopen.telemetry.console-preload-test
   (:require [cljs.test :refer-macros [async deftest is testing]]
             [nexus.registry :as nxr]
+            [hyperopen.api.default :as api]
+            [hyperopen.api.service :as api-service]
             [hyperopen.funding.actions :as funding-actions]
             [hyperopen.system :as app-system]
             [hyperopen.telemetry.console-preload :as console-preload]
@@ -73,6 +75,8 @@
     (is (fn? (aget api "qaReset")))
     (is (fn? (aget api "setWalletConnectedHandlerMode")))
     (is (fn? (aget api "installWalletSimulator")))
+    (is (fn? (aget api "installAccountRequestSimulator")))
+    (is (fn? (aget api "clearAccountRequestSimulator")))
     (is (fn? (aget api "installExchangeSimulator")))))
 
 (deftest dispatch-many-normalizes-keyword-like-args-before-dispatch-test
@@ -272,3 +276,49 @@
       (finally
         (wallet-core/clear-on-connected-handler!)
         (set-mode! "passthrough")))))
+
+(deftest qa-reset-clears-the-account-request-simulator-installed-through-the-debug-api-test
+  (async done
+    (let [address "0x1111111111111111111111111111111111111111"
+          service (api-service/make-service
+                   {:info-client-instance
+                    {:request-info! (fn [body _opts]
+                                      (case (get body "type")
+                                        "delegatorSummary" (js/Promise.resolve {:delegated 99
+                                                                                :undelegated 1})
+                                        (js/Promise.resolve nil)))
+                     :get-request-stats (fn [] {})
+                     :reset! (fn [] nil)}
+                    :log-fn (fn [& _] nil)})
+          api* (@#'console-preload/debug-api)
+          install! (aget api* "installAccountRequestSimulator")
+          qa-reset! (aget api* "qaReset")]
+      (api/install-api-service! service)
+      (-> (if (fn? install!)
+            (js/Promise.resolve
+             (install! #js {:defaultUser address
+                            :delegatorSummary #js {:delegated 4
+                                                   :undelegated 2}}))
+            (js/Promise.resolve nil))
+          (.then (fn [_]
+                   (api/request-staking-delegator-summary! address)))
+          (.then (fn [summary]
+                   (is (= {:delegated 4
+                           :undelegated 2
+                           :total-pending-withdrawal nil
+                           :pending-withdrawals nil}
+                          summary))
+                   (qa-reset!)
+                   (api/request-staking-delegator-summary! address)))
+          (.then (fn [summary]
+                   (is (= {:delegated 99
+                           :undelegated 1
+                           :total-pending-withdrawal nil
+                           :pending-withdrawals nil}
+                          summary))
+                   (api/reset-api-service!)
+                   (done)))
+          (.catch (fn [err]
+                    (api/reset-api-service!)
+                    (is false (str "Unexpected error: " err))
+                    (done)))))))
