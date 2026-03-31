@@ -249,7 +249,7 @@
                              [[[:vaults-ui :detail-returns-benchmark-coins] next-coins]
                               [[:vaults-ui :detail-returns-benchmark-coin] (first next-coins)]
                               [[:vaults-ui :detail-returns-benchmark-search] ""]
-                              [[:vaults-ui :detail-returns-benchmark-suggestions-open?] true]]]
+                              [[:vaults-ui :detail-returns-benchmark-suggestions-open?] false]]]
           candle-effects (if (and (not already-selected?)
                                   (vault-detail-benchmark-fetch-enabled? deps state))
                            (vault-detail-returns-benchmark-fetch-effects

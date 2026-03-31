@@ -4,7 +4,7 @@ This ExecPlan is a living document. The sections `Progress`, `Surprises & Discov
 
 This document is maintained in accordance with `/hyperopen/.agents/PLANS.md`.
 
-Related `bd` issue: `hyperopen-mceo` ("Investigate residual non-tooltip long tasks and layout shifts during shared chart hover"), in progress.
+Related `bd` issue: `hyperopen-mceo` ("Investigate residual non-tooltip long tasks and layout shifts during shared chart hover"), ready to close after this plan archival.
 
 ## Purpose / Big Picture
 
@@ -19,7 +19,10 @@ After this change, hovering the shared performance charts on populated `/portfol
 - [x] (2026-03-31 13:04 EDT) Implemented route-local hover freezing for shared chart surfaces by tracking hovered surfaces in the D3 runtime and reusing cached Portfolio and Vault detail route sections while hover is active.
 - [x] (2026-03-31 13:32 EDT) Added focused regression coverage for the new hover-freeze behavior plus hover-state cleanup fixtures in the existing route-view suites.
 - [x] (2026-03-31 13:43 EDT) Ran the smallest relevant Playwright checks plus `npm run check`, `npm test`, and `npm run test:websocket`.
-- [ ] Rerun the deterministic hover-profile harness after the code change and record a fresh post-fix artifact path for populated `/portfolio` and Vault detail.
+- [x] (2026-03-31 13:25 EDT) Promoted the hover-profile harness into tracked repo tooling and added per-step logging, timeouts, and failure artifacts so the trace no longer hangs silently.
+- [x] (2026-03-31 13:29 EDT) Identified the remaining hover failure as a benchmark-suggestion overlay bug, not residual route jank: selecting a returns benchmark incorrectly reopened the suggestion menu and covered the right side of the chart.
+- [x] (2026-03-31 13:31 EDT) Closed the benchmark suggestion overlay on selection for both Portfolio and Vault detail and updated the existing action-level regression expectations.
+- [x] (2026-03-31 13:39 EDT) Re-ran the deterministic hover-profile harness and recorded a clean post-fix artifact for both populated `/portfolio` and Vault detail.
 
 ## Surprises & Discoveries
 
@@ -38,6 +41,12 @@ After this change, hovering the shared performance charts on populated `/portfol
 - Observation: the local post-fix profiling harness did not complete cleanly in this session.
   Evidence: `HYPEROPEN_POST_IDLE_SETTLE_MS=5000 node tmp/browser-inspection/mceo-hover-profile.mjs` remained hung for over a minute without producing a new artifact directory and had to be terminated.
 
+- Observation: the apparent residual settle failure was caused by the benchmark suggestion overlay stealing pointer hit-testing on the chart's right half.
+  Evidence: an element hit-test probe found `portfolio-returns-benchmark-suggestion-SOL` under right-side chart coordinates after benchmark selection, while the hover line remained stuck at its initial x-position and the tooltip was hidden. The action layer in `/hyperopen/src/hyperopen/portfolio/actions.cljs` and `/hyperopen/src/hyperopen/vaults/application/detail_commands.cljs` reopened `*-returns-benchmark-suggestions-open?` on selection instead of closing it.
+
+- Observation: once the benchmark overlay bug was fixed, the fresh deterministic profile met the bead's thresholds on both routes.
+  Evidence: `/hyperopen/tmp/browser-inspection/mceo-hover-profile-1774963460815/profile.json` reports Portfolio settle `p95 ≈ 0.10ms`, Vault settle `p95 ≈ 0.10ms`, zero hover-window long tasks on both routes, and zero settle timeouts.
+
 ## Decision Log
 
 - Decision: treat `hyperopen-mceo` as a new residual-perf task, not as a reopening of the tooltip implementation issue.
@@ -52,19 +61,38 @@ After this change, hovering the shared performance charts on populated `/portfol
   Rationale: the code path and deterministic browser regressions now pass, but this bead's acceptance criteria are performance thresholds, so it should not be closed on static reasoning alone after the local profiling harness hung.
   Date/Author: 2026-03-31 / Codex
 
+- Decision: fix the benchmark-selection overlay before attempting deeper hover-runtime or VM changes.
+  Rationale: the fresh hit-test probe showed the chart was being occluded by UI state reopened on selection, so the remaining failure was a routing-of-input bug rather than another expensive render path.
+  Date/Author: 2026-03-31 / Codex
+
+- Decision: close `hyperopen-mceo` after archiving this plan.
+  Rationale: the new tracked profiler completed successfully, both routes met the hover settle and long-task thresholds, and the relevant browser and repo validation gates passed after the overlay fix.
+  Date/Author: 2026-03-31 / Codex
+
 ## Outcomes & Retrospective
 
 The route-level mitigation is now in place: shared chart surfaces mark hover-active state in the D3 runtime, and both `/portfolio` and Vault detail reuse their last non-hover route shell while hover remains active on the same route. Deterministic coverage now asserts that Portfolio chart-tab state and Vault detail hero content remain frozen until hover clears.
+
+The final user-facing fix was smaller than expected: benchmark selection was leaving the suggestions overlay open above the chart surface. Closing that menu on selection restored the full hoverable plot area, after which the tracked profiler reported clean settle timings and zero hover-window long tasks.
 
 Browser verification and repo validation are green:
 
 - `npx playwright test tools/playwright/test/portfolio-regressions.spec.mjs --grep "portfolio route exposes deterministic interaction states"`
 - `npx playwright test tools/playwright/test/trade-regressions.spec.mjs --grep "vault position coin jumps to the trade route market"`
+- `HYPEROPEN_POST_IDLE_SETTLE_MS=1000 HYPEROPEN_STEP_TIMEOUT_MS=8000 HYPEROPEN_TRACE_TIMEOUT_MS=30000 npm run browser:profile:mceo`
 - `npm run check`
 - `npm test`
 - `npm run test:websocket`
 
-What remains is fresh performance evidence. The local `mceo-hover-profile.mjs` rerun hung instead of producing a new artifact, so the code change is validated functionally but not yet reprofiled against the bead thresholds in this session.
+Fresh performance evidence is now recorded at:
+
+- `/hyperopen/tmp/browser-inspection/mceo-hover-profile-1774963460815/profile.json`
+
+Key measurements from that artifact:
+
+- populated Portfolio hover settle `p95 ≈ 0.10ms`, `max ≈ 0.60ms`, `timeoutCount = 0`, `maxLongTaskMs = 0`
+- Vault detail hover settle `p95 ≈ 0.10ms`, `max ≈ 0.10ms`, `timeoutCount = 0`, `maxLongTaskMs = 0`
+- remaining layout shifts are tiny numeric-span updates (`CLS`-style totals `≈ 0.000028` on Portfolio and `≈ 0.000015` on Vault detail), not blocking hover-window work
 
 ## Context and Orientation
 
@@ -147,3 +175,4 @@ This work should continue to use the existing shared chart runtime in `/hyperope
 
 Plan revision note: 2026-03-31 12:13 EDT - Initial active ExecPlan created after claiming `hyperopen-mceo`, confirming the residual non-tooltip hover-window perf debt from the March 30 repro, and separating this work from the already-completed tooltip follow-up.
 Plan revision note: 2026-03-31 13:48 EDT - Recorded the landed hover-freeze route-isolation path, deterministic regression coverage, green validation gates, and the fact that the local post-fix profiling harness hung before producing a fresh artifact, so `hyperopen-mceo` remains open pending reprofiling.
+Plan revision note: 2026-03-31 13:42 EDT - Promoted the profiler into tracked tooling, found the benchmark selector overlay occluding the chart, closed that overlay on selection, and recorded a clean post-fix artifact that satisfies the bead thresholds.

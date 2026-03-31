@@ -214,7 +214,7 @@
            [[[:portfolio-ui :returns-benchmark-coins] ["SPY" "QQQ"]]
             [[:portfolio-ui :returns-benchmark-coin] "SPY"]
             [[:portfolio-ui :returns-benchmark-search] ""]
-            [[:portfolio-ui :returns-benchmark-suggestions-open?] true]]]
+            [[:portfolio-ui :returns-benchmark-suggestions-open?] false]]]
           [:effects/fetch-candle-snapshot :coin "QQQ" :interval :1d :bars 5000]]
          (actions/select-portfolio-returns-benchmark
           {:portfolio-ui {:summary-time-range :all-time
@@ -224,7 +224,7 @@
            [[[:portfolio-ui :returns-benchmark-coins] ["SPY"]]
             [[:portfolio-ui :returns-benchmark-coin] "SPY"]
             [[:portfolio-ui :returns-benchmark-search] ""]
-            [[:portfolio-ui :returns-benchmark-suggestions-open?] true]]]]
+            [[:portfolio-ui :returns-benchmark-suggestions-open?] false]]]]
          (actions/select-portfolio-returns-benchmark
           {:portfolio-ui {:summary-time-range :month
                           :returns-benchmark-coins ["SPY"]}}
@@ -233,7 +233,7 @@
            [[[:portfolio-ui :returns-benchmark-coins] ["SPY"]]
             [[:portfolio-ui :returns-benchmark-coin] "SPY"]
             [[:portfolio-ui :returns-benchmark-search] ""]
-            [[:portfolio-ui :returns-benchmark-suggestions-open?] true]]]]
+            [[:portfolio-ui :returns-benchmark-suggestions-open?] false]]]]
          (actions/select-portfolio-returns-benchmark
           {:portfolio-ui {:summary-time-range :all-time
                           :returns-benchmark-coin "SPY"}}
@@ -242,7 +242,7 @@
            [[[:portfolio-ui :returns-benchmark-coins] ["vault:0x1234567890abcdef1234567890abcdef12345678"]]
             [[:portfolio-ui :returns-benchmark-coin] "vault:0x1234567890abcdef1234567890abcdef12345678"]
             [[:portfolio-ui :returns-benchmark-search] ""]
-            [[:portfolio-ui :returns-benchmark-suggestions-open?] true]]]
+            [[:portfolio-ui :returns-benchmark-suggestions-open?] false]]]
           [:effects/api-fetch-vault-benchmark-details "0x1234567890abcdef1234567890abcdef12345678"]]
          (actions/select-portfolio-returns-benchmark
           {:portfolio-ui {:summary-time-range :all-time
@@ -286,7 +286,7 @@
            [[[:portfolio-ui :returns-benchmark-coins] ["SPY"]]
             [[:portfolio-ui :returns-benchmark-coin] "SPY"]
             [[:portfolio-ui :returns-benchmark-search] ""]
-            [[:portfolio-ui :returns-benchmark-suggestions-open?] true]]]
+            [[:portfolio-ui :returns-benchmark-suggestions-open?] false]]]
           [:effects/fetch-candle-snapshot :coin "SPY" :interval :15m :bars 800]]
          (actions/handle-portfolio-returns-benchmark-search-keydown
           {:portfolio-ui {:summary-time-range :week}}
@@ -296,7 +296,7 @@
            [[[:portfolio-ui :returns-benchmark-coins] ["vault:0x1234567890abcdef1234567890abcdef12345678"]]
             [[:portfolio-ui :returns-benchmark-coin] "vault:0x1234567890abcdef1234567890abcdef12345678"]
             [[:portfolio-ui :returns-benchmark-search] ""]
-            [[:portfolio-ui :returns-benchmark-suggestions-open?] true]]]
+            [[:portfolio-ui :returns-benchmark-suggestions-open?] false]]]
           [:effects/api-fetch-vault-benchmark-details "0x1234567890abcdef1234567890abcdef12345678"]]
          (actions/handle-portfolio-returns-benchmark-search-keydown
           {:portfolio-ui {:summary-time-range :week}}

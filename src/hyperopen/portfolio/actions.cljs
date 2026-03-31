@@ -371,7 +371,7 @@
                              [[[:portfolio-ui :returns-benchmark-coins] next-coins]
                               [[:portfolio-ui :returns-benchmark-coin] (first next-coins)]
                               [[:portfolio-ui :returns-benchmark-search] ""]
-                              [[:portfolio-ui :returns-benchmark-suggestions-open?] true]]]
+                              [[:portfolio-ui :returns-benchmark-suggestions-open?] false]]]
           candle-effects (if already-selected?
                            []
                            (returns-benchmark-fetch-effects summary-time-range [coin]))

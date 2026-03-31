@@ -240,7 +240,7 @@
   (is (= [[:effects/save-many [[[:vaults-ui :detail-returns-benchmark-coins] ["ETH"]]
                                [[:vaults-ui :detail-returns-benchmark-coin] "ETH"]
                                [[:vaults-ui :detail-returns-benchmark-search] ""]
-                               [[:vaults-ui :detail-returns-benchmark-suggestions-open?] true]]]
+                               [[:vaults-ui :detail-returns-benchmark-suggestions-open?] false]]]
           [:effects/fetch-candle-snapshot :coin "ETH" :interval :1h :bars 800 :detail-route-vault-address "0x1234567890abcdef1234567890abcdef12345678"]]
          (actions/select-vault-detail-returns-benchmark {:vaults-ui {:snapshot-range :month
                                                                      :detail-chart-series :returns
@@ -250,7 +250,7 @@
   (is (= [[:effects/save-many [[[:vaults-ui :detail-returns-benchmark-coins] ["vault:0x1234567890abcdef1234567890abcdef12345678"]]
                                [[:vaults-ui :detail-returns-benchmark-coin] "vault:0x1234567890abcdef1234567890abcdef12345678"]
                                [[:vaults-ui :detail-returns-benchmark-search] ""]
-                               [[:vaults-ui :detail-returns-benchmark-suggestions-open?] true]]]
+                               [[:vaults-ui :detail-returns-benchmark-suggestions-open?] false]]]
           [:effects/api-fetch-vault-benchmark-details "0x1234567890abcdef1234567890abcdef12345678"]]
          (actions/select-vault-detail-returns-benchmark {:vaults-ui {:snapshot-range :month
                                                                      :detail-chart-series :returns
