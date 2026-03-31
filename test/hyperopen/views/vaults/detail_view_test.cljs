@@ -1,7 +1,14 @@
 (ns hyperopen.views.vaults.detail-view-test
   (:require [clojure.string :as str]
-            [cljs.test :refer-macros [deftest is]]
+            [cljs.test :refer-macros [deftest is use-fixtures]]
+            [hyperopen.views.chart.d3.hover-state :as chart-hover-state]
             [hyperopen.views.vaults.detail-view :as vault-detail-view]))
+
+(use-fixtures :each
+  (fn [f]
+    (chart-hover-state/clear-hover-state!)
+    (f)
+    (chart-hover-state/clear-hover-state!)))
 
 (defn- node-children [node]
   (if (map? (second node))

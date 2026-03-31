@@ -1,11 +1,18 @@
 (ns hyperopen.views.portfolio-view-test
   (:require [clojure.string :as str]
-            [cljs.test :refer-macros [deftest is]]
+            [cljs.test :refer-macros [deftest is use-fixtures]]
             [hyperopen.views.account-info.test-support.fixtures :as fixtures]
             [hyperopen.views.account-info-view :as account-info-view]
+            [hyperopen.views.chart.d3.hover-state :as chart-hover-state]
             [hyperopen.views.portfolio.vm :as portfolio-vm]
             [hyperopen.views.portfolio-view :as portfolio-view]
             [hyperopen.views.trading-chart.test-support.fake-dom :as fake-dom]))
+
+(use-fixtures :each
+  (fn [f]
+    (chart-hover-state/clear-hover-state!)
+    (f)
+    (chart-hover-state/clear-hover-state!)))
 
 (defn- node-children [node]
   (if (map? (second node))

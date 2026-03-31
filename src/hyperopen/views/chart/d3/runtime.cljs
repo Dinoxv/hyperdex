@@ -1,8 +1,8 @@
 (ns hyperopen.views.chart.d3.runtime
   (:require ["d3-shape" :as d3-shape]
             [clojure.string :as str]
+            [hyperopen.views.chart.d3.hover-state :as hover-state]
             [hyperopen.views.chart.d3.model :as model]))
-
 (def ^:private svg-namespace
   "http://www.w3.org/2000/svg")
 
@@ -114,13 +114,10 @@
   [runtime]
   @(:spec* runtime))
 
-(defn- current-size
-  [runtime]
-  @(:size* runtime))
-
-(defn- current-tooltip-models
-  [runtime]
-  @(:tooltip-models* runtime))
+(defn- current-size [runtime] @(:size* runtime))
+(defn- current-tooltip-models [runtime] @(:tooltip-models* runtime))
+(defn- mark-surface-hover-active! [runtime active?]
+  (hover-state/set-surface-hover-active! (get-in (current-spec runtime) [:surface]) active?))
 
 (defn spec-update-key
   [spec]
@@ -429,6 +426,7 @@
   (cancel-animation-frame @(:frame-id* runtime))
   (reset! (:frame-id* runtime) nil)
   (reset! (:pointer-x* runtime) nil)
+  (mark-surface-hover-active! runtime false)
   (hide-hover! runtime))
 
 (defn- update-tooltip-content!
@@ -498,6 +496,7 @@
   [runtime event]
   (when-let [pointer-x (local-pointer-x runtime event)]
     (reset! (:pointer-x* runtime) pointer-x)
+    (mark-surface-hover-active! runtime true)
     (schedule-hover-frame! runtime)))
 
 (defn- create-runtime
@@ -671,6 +670,7 @@
   [runtime]
   (when runtime
     (cancel-animation-frame @(:frame-id* runtime))
+    (mark-surface-hover-active! runtime false)
     (when-let [listeners (:listeners runtime)]
       (when-let [host (:host runtime)]
         (when-let [pointerenter (:pointerenter listeners)]

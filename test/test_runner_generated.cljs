@@ -280,6 +280,7 @@
             [hyperopen.views.l2-orderbook-view-test]
             [hyperopen.views.leaderboard-view-test]
             [hyperopen.views.leaderboard.vm-test]
+            [hyperopen.views.portfolio-view-hover-freeze-test]
             [hyperopen.views.portfolio-view-test]
             [hyperopen.views.portfolio.chart-view-test]
             [hyperopen.views.portfolio.header-test]
@@ -348,6 +349,7 @@
             [hyperopen.views.typography-scale-test]
             [hyperopen.views.ui.anchored-popover-test]
             [hyperopen.views.ui.funding-modal-positioning-test]
+            [hyperopen.views.vaults.detail-view-hover-freeze-test]
             [hyperopen.views.vaults.detail-view-test]
             [hyperopen.views.vaults.detail-vm-test]
             [hyperopen.views.vaults.detail.activity-test]
@@ -707,6 +709,7 @@
              'hyperopen.views.l2-orderbook-view-test
              'hyperopen.views.leaderboard-view-test
              'hyperopen.views.leaderboard.vm-test
+             'hyperopen.views.portfolio-view-hover-freeze-test
              'hyperopen.views.portfolio-view-test
              'hyperopen.views.portfolio.chart-view-test
              'hyperopen.views.portfolio.header-test
@@ -775,6 +778,7 @@
              'hyperopen.views.typography-scale-test
              'hyperopen.views.ui.anchored-popover-test
              'hyperopen.views.ui.funding-modal-positioning-test
+             'hyperopen.views.vaults.detail-view-hover-freeze-test
              'hyperopen.views.vaults.detail-view-test
              'hyperopen.views.vaults.detail-vm-test
              'hyperopen.views.vaults.detail.activity-test

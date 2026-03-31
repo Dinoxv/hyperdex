@@ -1,10 +1,14 @@
 (ns hyperopen.views.vaults.detail-view
   (:require [hyperopen.views.vaults.detail.activity :as activity]
             [hyperopen.views.vaults.detail.chart-view :as chart]
+            [hyperopen.views.chart.d3.hover-state :as chart-hover-state]
             [hyperopen.views.vaults.detail.hero :as hero]
             [hyperopen.views.vaults.detail.panels :as panels]
             [hyperopen.views.vaults.detail.transfer-modal :as transfer-modal]
             [hyperopen.views.vaults.detail-vm :as detail-vm]))
+
+(defonce ^:private vault-detail-view-cache
+  (atom nil))
 
 (defn- background-status-banner [{:keys [visible? title detail items]}]
   (when visible?
@@ -46,7 +50,18 @@
 
 (defn vault-detail-view
   [state]
-  (let [{:keys [kind
+  (let [route (get-in state [:router :path])
+        hover-active? (chart-hover-state/surface-hover-active? :vaults)
+        cached-entry @vault-detail-view-cache
+        vm (if (and hover-active?
+                    (= route (:route cached-entry))
+                    (map? (:vm cached-entry)))
+             (:vm cached-entry)
+             (let [next-vm (detail-vm/vault-detail-vm state)]
+               (reset! vault-detail-view-cache {:route route
+                                               :vm next-vm})
+               next-vm))
+        {:keys [kind
                 invalid-address?
                 loading?
                 background-status
@@ -54,7 +69,7 @@
                 tabs
                 selected-tab
                 vault-transfer
-                chart] :as vm} (detail-vm/vault-detail-vm state)
+                chart]} vm
         vault-transfer* (or vault-transfer {})]
     [:div
      {:class ["flex-1"
