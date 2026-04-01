@@ -29,6 +29,20 @@
 
 (declare begin-liquidation-drag!)
 
+(def ^:dynamic *schedule-overlay-repaint-frame!*
+  (fn [callback]
+    (if-let [raf (some-> js/globalThis (aget "requestAnimationFrame"))]
+      (raf callback)
+      (do
+        (callback)
+        nil))))
+
+(def ^:dynamic *cancel-overlay-repaint-frame!*
+  (fn [frame-id]
+    (when-let [cancel-frame (and frame-id
+                                 (some-> js/globalThis (aget "cancelAnimationFrame")))]
+      (cancel-frame frame-id))))
+
 (defn- overlay-state
   [chart-obj]
   (if chart-obj
@@ -675,6 +689,32 @@
 
 (declare render-overlays!)
 
+(defn- cancel-scheduled-repaint!
+  [chart-obj]
+  (let [{:keys [repaint-frame-id] :as state} (overlay-state chart-obj)]
+    (when repaint-frame-id
+      (*cancel-overlay-repaint-frame!* repaint-frame-id)
+      (set-overlay-state! chart-obj (dissoc state :repaint-frame-id)))))
+
+(defn- schedule-overlay-repaint!
+  [chart-obj]
+  (let [{:keys [repaint-frame-id]} (overlay-state chart-obj)]
+    (when-not repaint-frame-id
+      (let [frame-id* (volatile! nil)
+            callback (fn []
+                       (let [frame-id @frame-id*
+                             {:keys [repaint-frame-id] :as state} (overlay-state chart-obj)]
+                         (when (or (nil? frame-id)
+                                   (= frame-id repaint-frame-id))
+                           (when frame-id
+                             (set-overlay-state! chart-obj (dissoc state :repaint-frame-id)))
+                           (render-overlays! chart-obj))))
+            frame-id (*schedule-overlay-repaint-frame!* callback)]
+        (vreset! frame-id* frame-id)
+        (when frame-id
+          (set-overlay-state! chart-obj
+                              (assoc (overlay-state chart-obj) :repaint-frame-id frame-id)))))))
+
 (defn- teardown-subscription!
   [{:keys [time-scale main-series repaint]}]
   (when repaint
@@ -687,7 +727,7 @@
   [chart-obj chart main-series]
   (let [time-scale (invoke-method chart "timeScale")
         repaint (fn [_]
-                  (render-overlays! chart-obj))]
+                  (schedule-overlay-repaint! chart-obj))]
     (invoke-method time-scale "subscribeVisibleTimeRangeChange" repaint)
     (invoke-method time-scale "subscribeVisibleLogicalRangeChange" repaint)
     (invoke-method time-scale "subscribeSizeChange" repaint)
@@ -909,6 +949,7 @@
   [chart-obj]
   (when chart-obj
     (let [{:keys [root subscription] :as state} (overlay-state chart-obj)]
+      (cancel-scheduled-repaint! chart-obj)
       (teardown-subscription! subscription)
       (teardown-drag-listeners! state)
       (when root
@@ -961,6 +1002,7 @@
            (if unchanged-inputs?
              state
              (do
+               (cancel-scheduled-repaint! chart-obj)
                (set-overlay-state!
                 chart-obj
                 (cond-> (assoc state

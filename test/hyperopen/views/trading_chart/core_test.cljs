@@ -550,6 +550,7 @@
         legend-creations (atom [])
         restore-calls (atom [])
         persistence-calls (atom [])
+        baseline-sync-calls (atom [])
         remove-series-calls (atom [])
         remove-chart-calls (atom 0)
         set-visible-range-calls (atom [])
@@ -570,12 +571,13 @@
               *indicator-creations* indicator-creations
               *legend-creations* legend-creations
               *restore-calls* restore-calls
-              *persistence-calls* persistence-calls]
+              *persistence-calls* persistence-calls
+              *baseline-sync-calls* baseline-sync-calls]
       (with-redefs [chart-interop/create-chart-with-volume-and-series! stub-create-chart-with-volume-and-series!
                     chart-interop/create-chart-with-indicators! stub-create-chart-with-indicators!
                     chart-interop/create-legend! stub-create-legend!
                     chart-interop/set-main-series-markers! noop-2
-                    chart-interop/sync-baseline-base-value-subscription! noop-2
+                    chart-interop/sync-baseline-base-value-subscription! stub-sync-baseline-base-value-subscription!
                     chart-interop/sync-position-overlays! noop-4
                     chart-interop/sync-open-order-overlays! noop-4
                     chart-interop/sync-volume-indicator-overlay! noop-4
@@ -595,6 +597,7 @@
     (is (true? (:visible-range-restore-tried? (chart-runtime/get-state node))))
     (is (true? (:visible-range-persistence-subscribed? (chart-runtime/get-state node))))
     (is (empty? @set-visible-range-calls))
+    (is (= 1 (count @baseline-sync-calls)))
     (chart-runtime/clear-state! node)))
 
 (deftest chart-canvas-mount-uses-indicator-chart-creation-when-derived-indicators-exist-test
@@ -699,7 +702,7 @@
     (is (= [visible-range] @set-visible-range-calls))
     (is (= :area (:chart-type (chart-runtime/get-state node))))
     (is (= new-main-series (.-mainSeries ^js (:chart-obj (chart-runtime/get-state node)))))
-    (is (= 3 (count @baseline-sync-calls)))
+    (is (= 1 (count @baseline-sync-calls)))
     (chart-runtime/clear-state! node)))
 
 (deftest chart-canvas-update-restores-and-subscribes-visible-range-only-once-test
@@ -738,6 +741,198 @@
     (is (= 1 @restore-calls))
     (is (= 1 @persistence-calls))
     (chart-runtime/clear-state! node)))
+
+(deftest chart-canvas-defers-decoration-pass-into-scheduled-frame-test
+  (let [node (doto #js {}
+               (aset "querySelectorAll" (fn [_selector] #js [])))
+        candle-data [{:time 1700000000 :open 100 :high 101 :low 99 :close 100 :volume 10}]
+        legend-meta {:symbol "BTC"
+                     :timeframe-label "1D"
+                     :venue "Hyperopen"
+                     :candle-data candle-data}
+        chart (fake-chart (fake-time-scale nil (atom [])) (atom []) (atom 0))
+        chart-obj (fake-chart-obj {:chart chart
+                                   :main-series #js {:id "main"}
+                                   :volume-series #js {:id "volume"}
+                                   :indicator-series #js []})
+        legend-control (doto #js {}
+                         (aset "update" (fn [_] nil))
+                         (aset "destroy" (fn [] nil)))
+        scheduled-frame* (atom nil)
+        decoration-calls* (atom [])
+        record-markers! (expose-arity!
+                         (fn [_ _]
+                           (swap! decoration-calls* conj :markers))
+                         2)
+        record-position! (expose-arity!
+                          (fn [_ _ _ _]
+                            (swap! decoration-calls* conj :position))
+                          4)
+        record-open-orders! (expose-arity!
+                             (fn [_ _ _ _]
+                               (swap! decoration-calls* conj :open-orders))
+                             4)
+        record-volume! (expose-arity!
+                        (fn [_ _ _ _]
+                          (swap! decoration-calls* conj :volume))
+                        4)
+        record-navigation! (expose-arity!
+                            (fn [_ _ _ _]
+                              (swap! decoration-calls* conj :navigation))
+                            4)]
+    (binding [*chart-obj* chart-obj
+              *legend-control* legend-control]
+      (with-redefs [chart-interop/create-chart-with-volume-and-series! stub-create-chart-with-volume-and-series!
+                    chart-interop/create-legend! stub-create-legend!
+                    chart-interop/set-main-series-markers! record-markers!
+                    chart-interop/sync-baseline-base-value-subscription! noop-2
+                    chart-interop/sync-position-overlays! record-position!
+                    chart-interop/sync-open-order-overlays! record-open-orders!
+                    chart-interop/sync-volume-indicator-overlay! record-volume!
+                    chart-interop/sync-chart-navigation-overlay! record-navigation!
+                    chart-interop/apply-default-visible-range! noop-2
+                    chart-interop/apply-persisted-visible-range! stub-apply-persisted-visible-range!
+                    chart-interop/subscribe-visible-range-persistence! stub-subscribe-visible-range-persistence!]
+        (binding [chart-core/*schedule-chart-decoration-frame!*
+                  (fn [callback]
+                    (reset! scheduled-frame* callback)
+                    :frame-1)
+                  chart-core/*cancel-chart-decoration-frame!* (fn [_] nil)]
+          (render-chart-canvas! (chart-core/chart-canvas candle-data :candlestick {} legend-meta :1d {})
+                                :replicant.life-cycle/mount
+                                node)
+          (is (empty? @decoration-calls*))
+          (is (= :frame-1 (:decoration-frame-id (chart-runtime/get-state node))))
+          (is (false? (:chart-accessibility-applied? (chart-runtime/get-state node))))
+          (@scheduled-frame* 16)
+          (is (= [:markers :position :open-orders :volume :navigation] @decoration-calls*))
+          (is (nil? (:decoration-frame-id (chart-runtime/get-state node))))
+          (is (true? (:chart-accessibility-applied? (chart-runtime/get-state node)))))))
+    (chart-runtime/clear-state! node)))
+
+(deftest chart-canvas-reuses-main-series-marker-vector-identity-for-stable-inputs-test
+  (let [node #js {}
+        candle-data [{:time 1700000000 :open 100 :high 101 :low 99 :close 100 :volume 10}]
+        legend-meta {:symbol "BTC"
+                     :timeframe-label "1D"
+                     :venue "Hyperopen"
+                     :candle-data candle-data}
+        indicator-markers [{:time 1700000000 :position "aboveBar" :shape "circle" :color "#22ab94"}]
+        fill-markers [{:time 1700000060 :position "belowBar" :shape "circle" :color "#f7525f"}]
+        entry-marker {:time 1700000000 :position "inBar" :shape "square" :color "#eab308"}
+        chart-runtime-options {:fill-markers fill-markers
+                               :position-overlay {:entry-marker entry-marker}
+                               :indicator-runtime-ready? true}
+        chart (fake-chart (fake-time-scale nil (atom [])) (atom []) (atom 0))
+        chart-obj (fake-chart-obj {:chart chart
+                                   :main-series #js {:id "main"}
+                                   :volume-series #js {:id "volume"}
+                                   :indicator-series #js []})
+        marker-args* (atom [])
+        record-markers! (expose-arity!
+                         (fn [_chart-obj markers]
+                           (swap! marker-args* conj markers))
+                         2)]
+    (binding [*chart-obj* chart-obj
+              *legend-control* #js {:update (fn [_] nil)
+                                    :destroy (fn [] nil)}]
+      (with-redefs [derived-cache/memoized-indicator-outputs
+                    (fn [& _]
+                      {:indicators-data []
+                       :indicator-series []
+                       :indicator-markers indicator-markers})
+                    chart-interop/create-chart-with-volume-and-series! stub-create-chart-with-volume-and-series!
+                    chart-interop/create-legend! fresh-legend-control
+                    chart-interop/set-main-series-markers! record-markers!
+                    chart-interop/sync-baseline-base-value-subscription! noop-2
+                    chart-interop/sync-position-overlays! noop-4
+                    chart-interop/sync-open-order-overlays! noop-4
+                    chart-interop/sync-volume-indicator-overlay! noop-4
+                    chart-interop/sync-chart-navigation-overlay! noop-4
+                    chart-interop/apply-default-visible-range! noop-2
+                    chart-interop/apply-persisted-visible-range! stub-apply-persisted-visible-range!
+                    chart-interop/subscribe-visible-range-persistence! stub-subscribe-visible-range-persistence!
+                    chart-interop/set-series-data! noop-4
+                    chart-interop/set-volume-data! noop-2]
+        (binding [chart-core/*schedule-chart-decoration-frame!*
+                  (fn [callback]
+                    (callback 0)
+                    nil)]
+          (let [canvas (chart-core/chart-canvas candle-data
+                                                :candlestick
+                                                {:sma {:period 20}}
+                                                legend-meta
+                                                :1d
+                                                chart-runtime-options)]
+            (render-chart-canvas! canvas :replicant.life-cycle/mount node)
+            (render-chart-canvas! canvas :replicant.life-cycle/update node)))))
+    (is (= 2 (count @marker-args*)))
+    (is (identical? (first @marker-args*)
+                    (second @marker-args*)))
+    (chart-runtime/clear-state! node)))
+
+(deftest chart-canvas-unmount-cancels-pending-decoration-frame-test
+  (let [node #js {}
+        candle-data [{:time 1700000000 :open 100 :high 101 :low 99 :close 100 :volume 10}]
+        legend-meta {:symbol "BTC"
+                     :timeframe-label "1D"
+                     :venue "Hyperopen"
+                     :candle-data candle-data}
+        chart (fake-chart (fake-time-scale nil (atom [])) (atom []) (atom 0))
+        chart-obj (fake-chart-obj {:chart chart
+                                   :main-series #js {:id "main"}
+                                   :volume-series #js {:id "volume"}
+                                   :indicator-series #js []})
+        legend-control (doto #js {}
+                         (aset "update" (fn [_] nil))
+                         (aset "destroy" (fn [] nil)))
+        canceled-frame-ids* (atom [])
+        decoration-calls* (atom [])
+        record-markers! (expose-arity!
+                         (fn [_ _]
+                           (swap! decoration-calls* conj :markers))
+                         2)
+        record-position! (expose-arity!
+                          (fn [_ _ _ _]
+                            (swap! decoration-calls* conj :position))
+                          4)
+        record-open-orders! (expose-arity!
+                             (fn [_ _ _ _]
+                               (swap! decoration-calls* conj :open-orders))
+                             4)
+        record-volume! (expose-arity!
+                        (fn [_ _ _ _]
+                          (swap! decoration-calls* conj :volume))
+                        4)
+        record-navigation! (expose-arity!
+                            (fn [_ _ _ _]
+                              (swap! decoration-calls* conj :navigation))
+                            4)]
+    (binding [*chart-obj* chart-obj
+              *legend-control* legend-control]
+      (with-redefs [chart-interop/create-chart-with-volume-and-series! stub-create-chart-with-volume-and-series!
+                    chart-interop/create-legend! stub-create-legend!
+                    chart-interop/set-main-series-markers! record-markers!
+                    chart-interop/sync-baseline-base-value-subscription! noop-2
+                    chart-interop/sync-position-overlays! record-position!
+                    chart-interop/sync-open-order-overlays! record-open-orders!
+                    chart-interop/sync-volume-indicator-overlay! record-volume!
+                    chart-interop/sync-chart-navigation-overlay! record-navigation!
+                    chart-interop/apply-default-visible-range! noop-2
+                    chart-interop/apply-persisted-visible-range! stub-apply-persisted-visible-range!
+                    chart-interop/subscribe-visible-range-persistence! stub-subscribe-visible-range-persistence!]
+        (binding [chart-core/*schedule-chart-decoration-frame!*
+                  (fn [_callback]
+                    :frame-2)
+                  chart-core/*cancel-chart-decoration-frame!*
+                  (fn [frame-id]
+                    (swap! canceled-frame-ids* conj frame-id))]
+          (let [canvas (chart-core/chart-canvas candle-data :candlestick {} legend-meta :1d {})]
+            (render-chart-canvas! canvas :replicant.life-cycle/mount node)
+            (render-chart-canvas! canvas :replicant.life-cycle/unmount node))
+          (is (= [:frame-2] @canceled-frame-ids*))
+          (is (empty? @decoration-calls*))
+          (is (= {} (chart-runtime/get-state node))))))))
 
 (deftest chart-canvas-unmount-cleans-up-runtime-artifacts-in-order-test
   (let [node #js {}

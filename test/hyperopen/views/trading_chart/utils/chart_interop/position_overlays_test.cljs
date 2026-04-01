@@ -268,6 +268,53 @@
         (is (not= liq-top-before liq-top-after))))
     (position-overlays/clear-position-overlays! chart-obj)))
 
+(deftest position-overlays-coalesces-subscription-repaints-per-frame-test
+  (let [{:keys [chart-obj document container subscription-callbacks*]}
+        (build-chart-fixture {})
+        overlay {:side :short
+                 :entry-price 100
+                 :unrealized-pnl -2.5
+                 :abs-size 1.5
+                 :liquidation-price 130
+                 :entry-time 1700000000
+                 :entry-time-ms 1700000000000
+                 :latest-time 1700003600}
+        render-calls* (atom 0)
+        next-frame-id* (atom 0)
+        scheduled-frame* (atom nil)]
+    (with-redefs [position-overlays/render-overlays! (fn [_]
+                                                       (swap! render-calls* inc))
+                  position-overlays/*schedule-overlay-repaint-frame!* (fn [callback]
+                                                                        (let [frame-id (swap! next-frame-id* inc)
+                                                                              wrapped (fn []
+                                                                                        (reset! scheduled-frame* nil)
+                                                                                        (callback))]
+                                                                          (reset! scheduled-frame* {:id frame-id
+                                                                                                    :callback wrapped})
+                                                                          frame-id))
+                  position-overlays/*cancel-overlay-repaint-frame!* (fn [frame-id]
+                                                                      (when (= frame-id (:id @scheduled-frame*))
+                                                                        (reset! scheduled-frame* nil)))]
+      (position-overlays/sync-position-overlays!
+       chart-obj
+       container
+       overlay
+       {:document document
+        :format-price (fn [price _raw]
+                        (str price))
+        :format-size (fn [size]
+                       (str size))})
+      (is (= 1 @render-calls*))
+      ((get @subscription-callbacks* :visible-time-range) nil)
+      ((get @subscription-callbacks* :size-change) nil)
+      ((get @subscription-callbacks* :data-changed) nil)
+      (is (= 1 (:id @scheduled-frame*)))
+      (is (= 1 @render-calls*))
+      ((:callback @scheduled-frame*))
+      (is (= 2 @render-calls*))
+      (is (nil? @scheduled-frame*))
+      (position-overlays/clear-position-overlays! chart-obj))))
+
 (deftest position-overlays-sync-patches-retained-nodes-in-place-test
   (let [{:keys [chart-obj document container]}
         (build-chart-fixture {})

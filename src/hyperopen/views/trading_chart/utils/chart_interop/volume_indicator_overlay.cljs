@@ -410,8 +410,6 @@
       (when crosshair-handler
         (invoke-method chart "unsubscribeCrosshairMove" crosshair-handler))
       (when pane-handler
-        (invoke-method time-scale "unsubscribeVisibleTimeRangeChange" pane-handler)
-        (invoke-method time-scale "unsubscribeVisibleLogicalRangeChange" pane-handler)
         (invoke-method time-scale "unsubscribeSizeChange" pane-handler)))))
 
 (defn- subscribe-overlay!
@@ -432,8 +430,6 @@
             (when (and root chart)
               (set-overlay-position! root chart volume-pane-index))))]
     (invoke-method chart "subscribeCrosshairMove" crosshair-handler)
-    (invoke-method time-scale "subscribeVisibleTimeRangeChange" pane-handler)
-    (invoke-method time-scale "subscribeVisibleLogicalRangeChange" pane-handler)
     (invoke-method time-scale "subscribeSizeChange" pane-handler)
     {:chart chart
      :time-scale time-scale

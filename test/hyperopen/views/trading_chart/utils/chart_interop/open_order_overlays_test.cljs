@@ -2,6 +2,7 @@
   (:require [clojure.string :as str]
             [cljs.test :refer-macros [deftest is]]
             [hyperopen.views.trading-chart.utils.chart-interop :as chart-interop]
+            [hyperopen.views.trading-chart.utils.chart-interop.open-order-overlays :as open-order-overlays]
             [hyperopen.views.trading-chart.test-support.fake-dom :as fake-dom]))
 
 (deftest open-order-overlays-render-lines-and-inline-cancel-test
@@ -282,3 +283,56 @@
           text (str/join " " (fake-dom/collect-text-content row))]
       (is (str/includes? text "Limit 2.5 @ $14")))
     (chart-interop/clear-open-order-overlays! chart-obj)))
+
+(deftest open-order-overlays-coalesces-subscription-repaints-per-frame-test
+  (let [document (fake-dom/make-fake-document)
+        container (fake-dom/make-fake-element "div")
+        subscription-callbacks* (atom {})
+        subscribe-fn (fn [k]
+                       (fn [callback]
+                         (swap! subscription-callbacks* assoc k callback)))
+        time-scale #js {:subscribeVisibleTimeRangeChange (subscribe-fn :visible-time-range)
+                        :unsubscribeVisibleTimeRangeChange (fn [_] nil)
+                        :subscribeVisibleLogicalRangeChange (subscribe-fn :visible-logical-range)
+                        :unsubscribeVisibleLogicalRangeChange (fn [_] nil)
+                        :subscribeSizeChange (subscribe-fn :size-change)
+                        :unsubscribeSizeChange (fn [_] nil)}
+        main-series #js {:priceToCoordinate (fn [price]
+                                              (* 2 price))
+                         :subscribeDataChanged (subscribe-fn :data-changed)
+                         :unsubscribeDataChanged (fn [_] nil)}
+        chart #js {:timeScale (fn [] time-scale)}
+        chart-obj #js {:chart chart
+                       :mainSeries main-series}
+        orders [{:coin "SOL" :oid 201 :side "B" :type "limit" :sz "1.0" :px "10"}]
+        render-calls* (atom 0)
+        next-frame-id* (atom 0)
+        scheduled-frame* (atom nil)]
+    (with-redefs [open-order-overlays/render-overlays! (fn [_]
+                                                         (swap! render-calls* inc))
+                  open-order-overlays/*schedule-overlay-repaint-frame!* (fn [callback]
+                                                                          (let [frame-id (swap! next-frame-id* inc)
+                                                                                wrapped (fn []
+                                                                                          (reset! scheduled-frame* nil)
+                                                                                          (callback))]
+                                                                            (reset! scheduled-frame* {:id frame-id
+                                                                                                      :callback wrapped})
+                                                                            frame-id))
+                  open-order-overlays/*cancel-overlay-repaint-frame!* (fn [frame-id]
+                                                                        (when (= frame-id (:id @scheduled-frame*))
+                                                                          (reset! scheduled-frame* nil)))]
+      (open-order-overlays/sync-open-order-overlays!
+       chart-obj
+       container
+       orders
+       {:document document})
+      (is (= 1 @render-calls*))
+      ((get @subscription-callbacks* :visible-logical-range) nil)
+      ((get @subscription-callbacks* :size-change) nil)
+      ((get @subscription-callbacks* :data-changed) nil)
+      (is (= 1 (:id @scheduled-frame*)))
+      (is (= 1 @render-calls*))
+      ((:callback @scheduled-frame*))
+      (is (= 2 @render-calls*))
+      (is (nil? @scheduled-frame*))
+      (open-order-overlays/clear-open-order-overlays! chart-obj))))

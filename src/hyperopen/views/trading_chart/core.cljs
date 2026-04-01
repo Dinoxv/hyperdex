@@ -20,6 +20,21 @@
 ;; Main timeframes for quick access buttons
 (def main-timeframes [:5m :1h :1d])
 
+(def ^:dynamic *schedule-chart-decoration-frame!*
+  (fn [callback]
+    (if-let [request-animation-frame (some-> js/globalThis
+                                             (aget "requestAnimationFrame"))]
+      (request-animation-frame callback)
+      (do
+        (callback 0)
+        nil))))
+
+(def ^:dynamic *cancel-chart-decoration-frame!*
+  (fn [frame-id]
+    (when-let [cancel-animation-frame (some-> js/globalThis
+                                              (aget "cancelAnimationFrame"))]
+      (cancel-animation-frame frame-id))))
+
 (defn- preferred-orders-value
   [state k]
   (if (contains? (or (:orders state) {}) k)
@@ -29,7 +44,8 @@
 (declare dispatch-chart-cancel-order!
          dispatch-hide-volume-indicator!
          dispatch-chart-liquidation-drag-margin-preview!
-         dispatch-chart-liquidation-drag-margin-confirm!)
+         dispatch-chart-liquidation-drag-margin-confirm!
+         apply-chart-accessibility!)
 
 (defn- memoize-last
   [f]
@@ -126,6 +142,20 @@
    (fn [dispatch-fn]
      (fn []
        (dispatch-hide-volume-indicator! dispatch-fn)))))
+
+(def ^:private memoized-main-series-markers
+  (memoize-last
+   (fn [indicator-markers fill-markers entry-marker]
+     (let [base-markers (cond
+                          (vector? indicator-markers) indicator-markers
+                          (sequential? indicator-markers) (vec indicator-markers)
+                          :else [])
+           fill-markers* (cond
+                           (vector? fill-markers) fill-markers
+                           (sequential? fill-markers) (vec fill-markers)
+                           :else [])]
+       (cond-> (into base-markers fill-markers*)
+         (map? entry-marker) (conj entry-marker))))))
 
 (def ^:private memoized-chart-runtime-options
   (memoize-last
@@ -250,7 +280,6 @@
   [node chart-obj candle-data chart-type main-series-markers position-overlay position-overlay-deps
    open-order-overlays overlay-deps volume-indicator-deps]
   (ci/set-main-series-markers! chart-obj main-series-markers)
-  (ci/sync-baseline-base-value-subscription! chart-obj chart-type)
   (ci/sync-position-overlays! chart-obj node position-overlay position-overlay-deps)
   (ci/sync-open-order-overlays! chart-obj node open-order-overlays overlay-deps)
   (ci/sync-volume-indicator-overlay! chart-obj node candle-data volume-indicator-deps)
@@ -261,11 +290,60 @@
   (chart-runtime/set-state! node {:chart-obj chart-obj
                                   :legend-control legend-control
                                   :chart-type chart-type
+                                  :chart-accessibility-applied? false
+                                  :decoration-frame-id nil
+                                  :pending-decoration-context nil
                                   :visible-range-restore-tried? false
                                   :visible-range-restore-token 0
                                   :visible-range-interaction-epoch 0
                                   :visible-range-persistence-subscribed? false
                                   :visible-range-cleanup nil}))
+
+(defn- run-chart-decoration-pass!
+  [node {:keys [candle-data chart-type main-series-markers position-overlay position-overlay-deps
+                open-order-overlays overlay-deps volume-indicator-deps]}]
+  (let [{:keys [chart-obj chart-accessibility-applied?]} (chart-runtime/get-state node)]
+    (when chart-obj
+      (apply-chart-decorations! node
+                                chart-obj
+                                candle-data
+                                chart-type
+                                main-series-markers
+                                position-overlay
+                                position-overlay-deps
+                                open-order-overlays
+                                overlay-deps
+                                volume-indicator-deps)
+      (when-not chart-accessibility-applied?
+        (apply-chart-accessibility! node)
+        (chart-runtime/assoc-state! node :chart-accessibility-applied? true)))))
+
+(defn- flush-pending-chart-decoration-pass!
+  [node]
+  (let [{:keys [pending-decoration-context]} (chart-runtime/get-state node)]
+    (chart-runtime/update-state! node dissoc :decoration-frame-id :pending-decoration-context)
+    (when pending-decoration-context
+      (run-chart-decoration-pass! node pending-decoration-context))))
+
+(defn- clear-pending-chart-decoration-pass!
+  [node]
+  (let [{:keys [decoration-frame-id]} (chart-runtime/get-state node)]
+    (when decoration-frame-id
+      (*cancel-chart-decoration-frame!* decoration-frame-id))
+    (chart-runtime/update-state! node dissoc :decoration-frame-id :pending-decoration-context)))
+
+(defn- schedule-chart-decoration-pass!
+  [node context]
+  (when node
+    (chart-runtime/assoc-state! node :pending-decoration-context context)
+    (when-not (:decoration-frame-id (chart-runtime/get-state node))
+      (chart-runtime/assoc-state!
+       node
+       :decoration-frame-id
+       (*schedule-chart-decoration-frame!*
+        (fn [_]
+          (flush-pending-chart-decoration-pass! node)))))))
+
 (defn- apply-chart-accessibility!
   [node]
   (when (and node
@@ -283,18 +361,17 @@
   (let [chart-obj (chart-obj-with-series node candle-data chart-type indicators-data series-options volume-visible?)
         chart (.-chart chart-obj)
         legend-control (ci/create-legend! node chart legend-meta legend-deps)]
-    (apply-chart-decorations! node
-                              chart-obj
-                              candle-data
-                              chart-type
-                              main-series-markers
-                              position-overlay
-                              position-overlay-deps
-                              open-order-overlays
-                              overlay-deps
-                              volume-indicator-deps)
-    (apply-chart-accessibility! node)
     (initialize-chart-runtime-state! node chart-obj legend-control chart-type)
+    (ci/sync-baseline-base-value-subscription! chart-obj chart-type)
+    (schedule-chart-decoration-pass! node
+                                     {:candle-data candle-data
+                                      :chart-type chart-type
+                                      :main-series-markers main-series-markers
+                                      :position-overlay position-overlay
+                                      :position-overlay-deps position-overlay-deps
+                                      :open-order-overlays open-order-overlays
+                                      :overlay-deps overlay-deps
+                                      :volume-indicator-deps volume-indicator-deps})
     (ensure-visible-range-lifecycle! node chart candle-data selected-timeframe persistence-deps)))
 
 (defn- swap-main-series!
@@ -309,7 +386,6 @@
         (catch :default _ nil)))
     (set! (.-mainSeries ^js chart-obj) new-series)
     (ci/set-series-data! new-series candle-data chart-type series-options)
-    (ci/sync-baseline-base-value-subscription! chart-obj chart-type)
     (when visible-range
       (try
         (.setVisibleLogicalRange ^js time-scale visible-range)
@@ -351,17 +427,15 @@
     (when chart
       (ensure-visible-range-lifecycle! node chart candle-data selected-timeframe persistence-deps))
     (when chart-obj
-      (apply-chart-decorations! node
-                                chart-obj
-                                candle-data
-                                chart-type
-                                main-series-markers
-                                position-overlay
-                                position-overlay-deps
-                                open-order-overlays
-                                overlay-deps
-                                volume-indicator-deps)
-      (apply-chart-accessibility! node))
+      (schedule-chart-decoration-pass! node
+                                       {:candle-data candle-data
+                                        :chart-type chart-type
+                                        :main-series-markers main-series-markers
+                                        :position-overlay position-overlay
+                                        :position-overlay-deps position-overlay-deps
+                                        :open-order-overlays open-order-overlays
+                                        :overlay-deps overlay-deps
+                                        :volume-indicator-deps volume-indicator-deps}))
     (sync-indicator-series! chart-obj indicator-series-data)
     (when legend-control
       (.update ^js legend-control legend-meta))
@@ -372,6 +446,7 @@
   [node]
   (let [{:keys [chart-obj legend-control visible-range-cleanup]} (chart-runtime/get-state node)
         chart (when chart-obj (.-chart ^js chart-obj))]
+    (clear-pending-chart-decoration-pass! node)
     (when legend-control
       (.destroy ^js legend-control))
     (ci/clear-open-order-overlays! chart-obj)
@@ -549,20 +624,6 @@
   [value]
   (fmt/format-fixed-number value 2))
 
-(defn- merge-main-series-markers
-  [indicator-markers fill-markers position-overlay]
-  (let [base-markers (cond
-                       (vector? indicator-markers) indicator-markers
-                       (sequential? indicator-markers) (vec indicator-markers)
-                       :else [])
-        fill-markers* (cond
-                        (vector? fill-markers) fill-markers
-                        (sequential? fill-markers) (vec fill-markers)
-                        :else [])
-        entry-marker (:entry-marker position-overlay)]
-    (cond-> (into base-markers fill-markers*)
-      (map? entry-marker) (conj entry-marker))))
-
 ;; Top menu component with timeframe selection and bars indicator
 (defn chart-top-menu [state]
   (let [timeframes-dropdown-visible (get-in state [:chart-options :timeframes-dropdown-visible])
@@ -670,7 +731,9 @@
          persistence-deps (:persistence-deps chart-runtime-options)
          volume-visible? (boolean (get chart-runtime-options :volume-visible? true))
          on-hide-volume-indicator (:on-hide-volume-indicator chart-runtime-options)
-         main-series-markers (merge-main-series-markers indicator-markers fill-markers position-overlay)
+         main-series-markers (memoized-main-series-markers indicator-markers
+                                                           fill-markers
+                                                           (:entry-marker position-overlay))
          overlay-deps {:on-cancel-order on-cancel-order
                        :format-price fmt/format-trade-price-plain
                        :format-size format-chart-overlay-size}

@@ -10,17 +10,9 @@
                              1 36
                              2 48})
         crosshair-handler* (atom nil)
-        pane-time-handler* (atom nil)
-        pane-logical-handler* (atom nil)
         pane-size-handler* (atom nil)
         remove-calls* (atom 0)
-        time-scale #js {:subscribeVisibleTimeRangeChange (fn [handler]
-                                                           (reset! pane-time-handler* handler))
-                        :unsubscribeVisibleTimeRangeChange (fn [_] nil)
-                        :subscribeVisibleLogicalRangeChange (fn [handler]
-                                                              (reset! pane-logical-handler* handler))
-                        :unsubscribeVisibleLogicalRangeChange (fn [_] nil)
-                        :subscribeSizeChange (fn [handler]
+        time-scale #js {:subscribeSizeChange (fn [handler]
                                                (reset! pane-size-handler* handler))
                         :unsubscribeSizeChange (fn [_] nil)}
         chart #js {:timeScale (fn []
@@ -68,8 +60,6 @@
       (is (= "3.2K" (.-textContent value-node)))
       (is (= "#f7525f" (.-color (.-style value-node))))
       (is (fn? @crosshair-handler*))
-      (is (fn? @pane-time-handler*))
-      (is (fn? @pane-logical-handler*))
       (is (fn? @pane-size-handler*))
       (is (nil? (.-display (.-style controls))))
       (is (= "none" (.-boxShadow (.-style panel))))
@@ -94,8 +84,6 @@
                              2 50})
       (@pane-size-handler* #js {})
       (is (= "78px" (.-top (.-style root))))
-      (@pane-time-handler* #js {})
-      (@pane-logical-handler* #js {})
       (fake-dom/click-dom-node! settings-button)
       (fake-dom/click-dom-node! remove-button)
       (is (= 1 @remove-calls*)))))
@@ -104,15 +92,7 @@
   (let [document (fake-dom/make-fake-document)
         container (fake-dom/make-fake-element "div")
         make-chart! (fn [events*]
-                      (let [time-scale #js {:subscribeVisibleTimeRangeChange (fn [handler]
-                                                                               (swap! events* conj [:sub :time-range handler]))
-                                            :unsubscribeVisibleTimeRangeChange (fn [handler]
-                                                                                 (swap! events* conj [:unsub :time-range handler]))
-                                            :subscribeVisibleLogicalRangeChange (fn [handler]
-                                                                                  (swap! events* conj [:sub :logical-range handler]))
-                                            :unsubscribeVisibleLogicalRangeChange (fn [handler]
-                                                                                    (swap! events* conj [:unsub :logical-range handler]))
-                                            :subscribeSizeChange (fn [handler]
+                      (let [time-scale #js {:subscribeSizeChange (fn [handler]
                                                                    (swap! events* conj [:sub :size handler]))
                                             :unsubscribeSizeChange (fn [handler]
                                                                     (swap! events* conj [:unsub :size handler]))}]
@@ -146,9 +126,9 @@
      candles
      {:document document})
     (is (some #(= [:unsub :crosshair] (subvec % 0 2)) @events-a*))
-    (is (some #(= [:unsub :time-range] (subvec % 0 2)) @events-a*))
+    (is (some #(= [:unsub :size] (subvec % 0 2)) @events-a*))
     (is (some #(= [:sub :crosshair] (subvec % 0 2)) @events-b*))
-    (is (some #(= [:sub :time-range] (subvec % 0 2)) @events-b*))
+    (is (some #(= [:sub :size] (subvec % 0 2)) @events-b*))
     (set! (.-volumeSeries chart-obj) nil)
     (volume-indicator-overlay/sync-volume-indicator-overlay!
      chart-obj
@@ -159,6 +139,7 @@
     (is (= {} (@#'hyperopen.views.trading-chart.utils.chart-interop.volume-indicator-overlay/overlay-state
                chart-obj)))
     (is (some #(= [:unsub :crosshair] (subvec % 0 2)) @events-b*))
+    (is (some #(= [:unsub :size] (subvec % 0 2)) @events-b*))
     (is (nil? (volume-indicator-overlay/clear-volume-indicator-overlay! nil)))))
 
 (deftest volume-indicator-overlay-private-formatting-and-time-normalization-branches-test

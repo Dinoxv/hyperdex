@@ -28,6 +28,9 @@ After this work, the default desktop trade load should remain visually fast whil
 - [x] (2026-04-01 18:24Z) Moved agent keygen and exchange-signing helpers behind a dedicated `trading_crypto` browser module, rewired wallet and trading callers to lazy-load that module, and added cold-path tests for lazy load, rejection, and export coverage.
 - [x] (2026-04-01 18:24Z) Re-ran targeted `/trade` Playwright smoke, `npm run check`, `npm test`, `npm run test:websocket`, and a fresh local startup profile showing the crypto chunk stays off the default cold route while the blocking proxy dropped to `189ms`.
 - [x] (2026-04-01 20:46Z) Split indicator runtime into a dedicated `trading_indicators` browser module, moved indicator metadata to a lightweight catalog, deferred indicator-runtime loading to indicator-specific actions and startup guards, and re-ran targeted `/trade` Playwright smoke plus the required repo gates.
+- [x] (2026-04-02 01:15Z) Deferred chart-decoration and accessibility work off the immediate mount/update path, memoized main-series marker merges, and reduced redundant baseline-sync churn inside `/hyperopen/src/hyperopen/views/trading_chart/core.cljs`.
+- [x] (2026-04-02 01:16Z) Narrowed the volume overlay to pane-size subscriptions only and coalesced position/open-order overlay repaint subscriptions into one scheduled frame, then added focused regression coverage for the new scheduling and subscription contracts.
+- [x] (2026-04-02 01:16Z) Re-ran targeted `/trade` Playwright smoke, `npm test`, `npm run test:websocket`, `npm run check`, and two follow-up local startup profiles, with the latest profile returning to `blockingTimeProxyMs 189` and `maxSingleBlockingTaskMs 239`.
 - [ ] Finish Milestone 0 baseline capture by storing the built asset-size snapshot, governed browser QA evidence, and consolidated notes under one dedicated `tmp/` artifact root.
 - [ ] Continue Milestone 1 by deferring or splitting additional noncritical desktop trade surfaces beyond the chart and wallet crypto path.
 - [ ] Reduce chart startup and overlay main-thread work so the trade route stops producing the current long-task and forced-reflow pattern.
@@ -75,6 +78,9 @@ After this work, the default desktop trade load should remain visually fast whil
 - Observation: the indicator-runtime split successfully moved `indicatorts` off the cold route, but the first two local startup profiles after the split did not beat the best prior crypto-split profile.
   Evidence: after the new `trading_indicators` module landed, `out/release-public/js/trade_chart.js` no longer contained `indicatorts`, `out/release-public/js/trading_indicators.js` did contain it, and the cold route fetched only `main.js`, `trade_chart.js`, and `main.css`; however `tmp/browser-inspection/trade-startup-profile-2026-04-01T20-45-19-135Z-8cf28a28/profile.json` and `tmp/browser-inspection/trade-startup-profile-2026-04-01T20-45-48-552Z-5493d97b/profile.json` recorded `blockingTimeProxyMs` of `214` and `200` respectively versus the earlier `189` best run.
 
+- Observation: deferring chart decorations alone was not enough to move the local startup trace, but overlay subscription coalescing and narrower pane subscriptions were enough to bring the latest local profile back to the earlier best result.
+  Evidence: the first chart-core cleanup profile at `tmp/browser-inspection/trade-startup-profile-2026-04-01T21-06-41-081Z-90058123/profile.json` recorded `201/251`, while the later overlay-focused profile at `tmp/browser-inspection/trade-startup-profile-2026-04-01T21-14-43-253Z-36c8550d/profile.json` recorded `blockingTimeProxyMs 189` and `maxSingleBlockingTaskMs 239`.
+
 ## Decision Log
 
 - Decision: use `/trade` as the local benchmark route even though the public audit URL is `/`.
@@ -116,6 +122,10 @@ After this work, the default desktop trade load should remain visually fast whil
 - Decision: keep the indicator-runtime split even though the first local startup profiles stayed slightly above the best crypto-split baseline.
   Rationale: the split moved `indicatorts` and runtime-only indicator calculation code out of the cold route entirely, which is a direct match for the Milestone 1 payload objective and reduces default-route shipped/evaluated code even if the remaining long task now appears dominated by chart mount work rather than indicator parsing.
   Date/Author: 2026-04-01 / Codex
+
+- Decision: keep chart-overlay repaint batching and the narrower volume-overlay subscription surface even though the first chart-core deferral pass alone was mostly neutral.
+  Rationale: the overlay-focused follow-up preserved visible behavior under deterministic tests and restored the local startup profile to the earlier `189/239` best result, which makes it a justifiable Milestone 2 cut instead of speculative cleanup.
+  Date/Author: 2026-04-02 / Codex
 
 ## Outcomes & Retrospective
 
