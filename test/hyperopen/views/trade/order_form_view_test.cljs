@@ -23,7 +23,7 @@
         trigger (find-first-node view-node
                                  (fn [node]
                                    (let [attrs (when (map? (second node)) (second node))]
-                                     (= "Margin mode" (:aria-label attrs)))))
+                                     (re-find #"^Margin mode:" (or (:aria-label attrs) "")))))
         trigger-strings (set (collect-strings trigger))]
     (is (contains? trigger-strings "Isolated"))
     (is (not (contains? trigger-strings "Cross")))))

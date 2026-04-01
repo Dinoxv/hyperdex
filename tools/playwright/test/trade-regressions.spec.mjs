@@ -38,6 +38,37 @@ test("asset selector opens and selects ETH @regression", async ({ page }) => {
   );
 });
 
+test("trade route preserves core accessibility affordances @regression", async ({ page }) => {
+  await page.goto("/trade", { waitUntil: "commit" });
+
+  await expect(page.locator('[data-parity-id="trade-root"]')).toBeVisible();
+  await expect(page.locator('main[data-parity-id="app-main"]')).toHaveCount(1);
+  await expect(page.getByRole("button", { name: "Connect Wallet" })).toBeVisible();
+
+  const midButton = page.getByRole("button", { name: "Set order price to mid" });
+  await expect(midButton).toBeVisible();
+  const midButtonBox = await midButton.boundingBox();
+  expect(midButtonBox?.width ?? 0).toBeGreaterThanOrEqual(24);
+  expect(midButtonBox?.height ?? 0).toBeGreaterThanOrEqual(24);
+
+  await expect(
+    page.getByRole("slider", { name: "Order size percentage slider" })
+  ).toBeVisible();
+  await expect(
+    page.getByRole("textbox", { name: "Order size percentage input" })
+  ).toBeVisible();
+
+  await expect(
+    page.locator('button[aria-haspopup="listbox"]').filter({ hasText: "Cross" }).first()
+  ).toHaveAttribute("aria-label", "Margin mode: Cross");
+  await expect(
+    page.locator('button[aria-haspopup="listbox"]').filter({ hasText: "USDC" }).first()
+  ).toHaveAttribute("aria-label", "Size unit: USDC");
+  await expect(
+    page.locator('button[aria-haspopup="listbox"]').filter({ hasText: "GTC" }).first()
+  ).toHaveAttribute("aria-label", "Time in force: GTC");
+});
+
 test("active asset icon promotes BTC into loaded-icons after probe load @regression", async ({ page }) => {
   await page.route("https://app.hyperliquid.xyz/coins/BTC.svg", async route => {
     await route.fulfill({

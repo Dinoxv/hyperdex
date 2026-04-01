@@ -153,8 +153,9 @@
            :data-parity-id "app-root"}
      (header-view/header-view state)
      (spectate-mode-banner state)
-     [:div {:class app-main-classes
-            :data-parity-id "app-main"}
+     [:main {:class app-main-classes
+             :id "main-content"
+             :data-parity-id "app-main"}
       (cond
         trade-route? (trade-view/trade-view state)
         (and deferred-route?

@@ -161,7 +161,7 @@
                      label-max-width
                      "truncate"
                      "text-sm"
-                     "text-gray-500"]}
+                     "text-trading-text-secondary"]}
       placeholder]
      [:input input-attrs]
      (when accessory
@@ -240,7 +240,7 @@
      [:span {:class ["shrink-0"
                      "whitespace-nowrap"
                      "text-xs"
-                     "text-gray-500"]}
+                     "text-trading-text-secondary"]}
       display-label]
      [:input input-attrs]
      (when accessory

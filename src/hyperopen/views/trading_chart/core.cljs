@@ -263,6 +263,14 @@
                                   :visible-range-interaction-epoch 0
                                   :visible-range-persistence-subscribed? false
                                   :visible-range-cleanup nil}))
+(defn- apply-chart-accessibility!
+  [node]
+  (when (and node
+             (fn? (.-querySelectorAll node)))
+    (doseq [element (array-seq (js/Array.from (.querySelectorAll node ".tv-lightweight-charts table, .tv-lightweight-charts tr, .tv-lightweight-charts td")))]
+      (.setAttribute element "aria-hidden" "true")
+      (when (= "TABLE" (.-tagName element))
+        (.setAttribute element "role" "presentation")))))
 
 (defn- mount-chart!
   [node {:keys [candle-data chart-type indicators-data legend-meta legend-deps series-options
@@ -282,6 +290,7 @@
                               open-order-overlays
                               overlay-deps
                               volume-indicator-deps)
+    (apply-chart-accessibility! node)
     (initialize-chart-runtime-state! node chart-obj legend-control chart-type)
     (ensure-visible-range-lifecycle! node chart candle-data selected-timeframe persistence-deps)))
 
@@ -348,7 +357,8 @@
                                 position-overlay-deps
                                 open-order-overlays
                                 overlay-deps
-                                volume-indicator-deps))
+                                volume-indicator-deps)
+      (apply-chart-accessibility! node))
     (sync-indicator-series! chart-obj indicator-series-data)
     (when legend-control
       (.update ^js legend-control legend-meta))
@@ -672,6 +682,10 @@
                          (or (:market-open? legend-meta) true)
                          "-"
                          volume-visible?)
+         chart-accessible-label (str (or (:symbol legend-meta) "Asset")
+                                     " price chart, "
+                                     (or (:timeframe-label legend-meta) "selected")
+                                     " timeframe")
          on-render (chart-canvas-on-render {:candle-data candle-data
                                             :chart-type chart-type
                                             :indicators-data indicators-data
@@ -690,6 +704,8 @@
                                             :volume-indicator-deps volume-indicator-deps})]
      [:div {:class ["w-full" "min-w-0" "relative" "flex-1" "min-h-[360px]" "overflow-hidden" "bg-base-100" "trading-chart-host"]
             :data-parity-id "chart-canvas"
+            :role "region"
+            :aria-label chart-accessible-label
             :replicant/key (str "chart-" (hash active-indicators) "-" legend-key "-" volume-visible?)
             :replicant/on-render on-render}])))
 

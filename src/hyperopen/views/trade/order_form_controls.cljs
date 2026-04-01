@@ -5,7 +5,20 @@
 (defn- price-context-accessory [{:keys [label mid-available?]} on-set-to-mid]
   [:button {:type "button"
             :disabled (not mid-available?)
-            :class (into ["text-xs" "font-semibold" "transition-colors"]
+            :aria-label "Set order price to mid"
+            :class (into ["inline-flex"
+                          "min-h-6"
+                          "min-w-6"
+                          "items-center"
+                          "justify-center"
+                          "rounded"
+                          "px-1"
+                          "text-xs"
+                          "font-semibold"
+                          "transition-colors"
+                          "focus:outline-none"
+                          "focus:ring-0"
+                          "focus:ring-offset-0"]
                          (if mid-available?
                            ["text-primary" "cursor-pointer" "hover:text-primary/80"]
                            ["text-gray-500" "cursor-default"]))
@@ -116,7 +129,7 @@
                        "focus:ring-0"
                        "focus:ring-offset-0"
                        "focus:shadow-none"]
-               :aria-label "Margin mode"
+               :aria-label (str "Margin mode: " (margin-mode-label margin-mode))
                :aria-haspopup "listbox"
                :aria-expanded (boolean dropdown-open?)
                :style (when dropdown-open?
@@ -200,7 +213,7 @@
                        "focus:ring-0"
                        "focus:ring-offset-0"
                        "focus:shadow-none"]
-               :aria-label "Size unit"
+               :aria-label (str "Size unit: " selected-label)
                :aria-haspopup "listbox"
                :aria-expanded (boolean dropdown-open?)
                :style (when dropdown-open?
@@ -296,7 +309,7 @@
                        "focus:ring-0"
                        "focus:ring-offset-0"
                        "focus:shadow-none"]
-               :aria-label "Adjust leverage"
+               :aria-label (str "Adjust leverage: " displayed-leverage "x")
                :aria-haspopup "dialog"
                :aria-expanded (boolean popover-open?)
                :style (when popover-open?
@@ -482,6 +495,7 @@
               :min 0
               :max 100
               :step 1
+              :aria-label "Order size percentage slider"
               :style {:--order-size-slider-progress (str size-percent "%")}
               :value size-percent
               :on {:input (:on-change-percent size-handlers)}}]
@@ -530,6 +544,7 @@
               :type "text"
               :inputmode "numeric"
               :pattern "[0-9]*"
+              :aria-label "Order size percentage input"
               :value display-size-percent
               :on {:input (:on-change-percent size-handlers)}}]
      [:span {:class ["pointer-events-none"

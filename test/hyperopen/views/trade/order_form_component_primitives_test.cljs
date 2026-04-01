@@ -120,7 +120,7 @@
         input-classes (set (:class input-attrs))
         label-node (first (filter #(and (= :span (first %))
                                         (contains? (set (get-in % [1 :class]))
-                                                   "text-gray-500"))
+                                                   "text-trading-text-secondary"))
                                   (collect-nodes-by-tag node :span)))
         wrapper-classes (-> (collect-nodes-by-tag node :div)
                             first
@@ -147,7 +147,7 @@
                      :short-label "TP"])
         label-node (first (filter #(and (= :span (first %))
                                         (contains? (set (get-in % [1 :class]))
-                                                   "text-gray-500"))
+                                                   "text-trading-text-secondary"))
                                   (collect-nodes-by-tag node :span)))]
     (is (= "TP" (last label-node)))))
 

@@ -142,9 +142,9 @@
 (defn- connect-wallet-button
   [{:keys [connect-action connecting?]}]
   (into
-   [:button {:class ["bg-teal-600"
-                     "hover:bg-teal-700"
-                     "text-teal-100"
+   [:button {:class ["bg-teal-700"
+                     "hover:bg-teal-800"
+                     "text-white"
                      "inline-flex"
                      "h-9"
                      "items-center"

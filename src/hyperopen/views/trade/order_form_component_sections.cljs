@@ -195,7 +195,7 @@
                          "focus:ring-0"
                          "focus:ring-offset-0"
                          "focus:shadow-none"]
-                 :aria-label "TP/SL gain-loss unit"
+                 :aria-label (str "TP/SL gain-loss unit: " selected-label)
                  :aria-haspopup "listbox"
                  :aria-expanded open?
                  :title (tpsl-policy/unit-menu-label selected-unit)
@@ -368,7 +368,7 @@
                        "focus:ring-0"
                        "focus:ring-offset-0"
                        "focus:shadow-none"]
-               :aria-label "Time in force"
+               :aria-label (str "Time in force: " selected-label)
                :aria-haspopup "listbox"
                :aria-expanded open?
                :style (when open?

@@ -23,7 +23,7 @@
   [message]
   [:div.flex.flex-col.items-center.justify-center.py-12.text-base-content
    [:div.text-lg.font-medium message]
-   [:div.text-sm.opacity-70.mt-2 "No data available"]])
+   [:div {:class ["mt-2" "text-sm" "text-trading-text-secondary"]} "No data available"]])
 
 (defn- format-size
   [value]

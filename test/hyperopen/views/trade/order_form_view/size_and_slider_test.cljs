@@ -177,7 +177,7 @@
                                       (fn [node]
                                         (let [attrs (when (map? (second node)) (second node))]
                                           (and (= :button (first node))
-                                               (= "Size unit" (:aria-label attrs))))))
+                                               (re-find #"^Size unit:" (or (:aria-label attrs) ""))))))
         option-buttons (find-all-nodes view-node
                                        (fn [node]
                                          (and (= :button (first node))
@@ -205,7 +205,7 @@
                                         (fn [node]
                                           (let [attrs (when (map? (second node)) (second node))]
                                             (and (= :button (first node))
-                                                 (= "Size unit" (:aria-label attrs))))))
+                                                 (re-find #"^Size unit:" (or (:aria-label attrs) ""))))))
         overlay-button (find-first-node open-view
                                         (fn [node]
                                           (let [attrs (when (map? (second node)) (second node))]
@@ -244,7 +244,7 @@
                                         (fn [node]
                                           (let [attrs (when (map? (second node)) (second node))]
                                             (and (= :button (first node))
-                                                 (= "Margin mode" (:aria-label attrs))))))
+                                                 (re-find #"^Margin mode:" (or (:aria-label attrs) ""))))))
         overlay-button (find-first-node open-view
                                         (fn [node]
                                           (let [attrs (when (map? (second node)) (second node))]
@@ -304,7 +304,7 @@
                                         (fn [node]
                                           (let [attrs (when (map? (second node)) (second node))]
                                             (and (= :button (first node))
-                                                 (= "Margin mode" (:aria-label attrs))))))
+                                                 (re-find #"^Margin mode:" (or (:aria-label attrs) ""))))))
         option-buttons (find-all-nodes view-node
                                        (fn [node]
                                          (and (= :button (first node))
@@ -326,7 +326,7 @@
                                         (fn [node]
                                           (let [attrs (when (map? (second node)) (second node))]
                                             (and (= :button (first node))
-                                                 (= "Adjust leverage" (:aria-label attrs))))))
+                                                 (re-find #"^Adjust leverage:" (or (:aria-label attrs) ""))))))
         overlay-button (find-first-node open-view
                                         (fn [node]
                                           (let [attrs (when (map? (second node)) (second node))]

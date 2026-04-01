@@ -160,8 +160,8 @@
         tif-trigger (find-first-node view-node
                                      (fn [candidate]
                                        (and (= :button (first candidate))
-                                            (= "Time in force"
-                                               (get-in candidate [1 :aria-label])))))]
+                                            (re-find #"^Time in force:"
+                                                     (or (get-in candidate [1 :aria-label]) "")))))]
     (is (= [[:actions/toggle-tif-dropdown]]
            (get-in tif-trigger [1 :on :click])))
     (is (= [[:actions/handle-tif-dropdown-keydown [:event/key]]]
@@ -277,8 +277,8 @@
         unit-triggers (find-all-nodes view-node
                                       (fn [candidate]
                                         (and (= :button (first candidate))
-                                             (= "TP/SL gain-loss unit"
-                                                (get-in candidate [1 :aria-label])))))
+                                             (re-find #"^TP/SL gain-loss unit:"
+                                                      (or (get-in candidate [1 :aria-label]) "")))))
         native-selects (find-all-nodes view-node
                                        (fn [candidate]
                                          (= :select (first candidate))))]

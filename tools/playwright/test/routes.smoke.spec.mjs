@@ -51,6 +51,25 @@ test("trade cold startup does not render the static boot loading shell @smoke", 
   );
 });
 
+test("trade route exposes score-bearing accessibility hooks @smoke", async ({ page }) => {
+  await page.goto("/trade", { waitUntil: "commit" });
+
+  await expect(page.locator("[data-parity-id='trade-root']")).toBeVisible();
+  await expect(page.locator("main#main-content")).toBeVisible();
+  await expect(page.locator("[data-parity-id='order-form']")).toBeVisible();
+  await expect(page.locator(".order-size-slider")).toHaveAttribute("aria-label", "Order size percentage slider");
+  await expect(page.locator(".order-size-percent-input")).toHaveAttribute("aria-label", "Order size percentage input");
+  await expect(
+    page.getByRole("button", { name: /margin mode: (cross|isolated)/i }).first()
+  ).toBeVisible();
+  await expect(
+    page.getByRole("button", { name: /adjust leverage: \d+x/i }).first()
+  ).toBeVisible();
+  await expect(
+    page.getByRole("button", { name: /time in force: [a-z]+/i }).first()
+  ).toBeVisible();
+});
+
 test.describe("main route smoke mobile @smoke", () => {
   test.use(mobileViewport);
 

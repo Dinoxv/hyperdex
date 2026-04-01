@@ -115,7 +115,7 @@
                                                            [[:actions/close-tpsl-unit-dropdown]
                                                             [:actions/update-order-form [:tpsl :unit] unit]])})
         labels (set (collect-strings node))
-        unit-triggers (filter #(= "TP/SL gain-loss unit" (get-in % [1 :aria-label]))
+        unit-triggers (filter #(re-find #"^TP/SL gain-loss unit:" (or (get-in % [1 :aria-label]) ""))
                               (collect-nodes-by-tag node :button))
         tp-price-input (input-node-by-aria-label node "TP Price")
         gain-input (input-node-by-aria-label node "Gain")
@@ -209,7 +209,7 @@
                                                             [[:actions/close-tif-dropdown]
                                                              [:actions/update-order-form [:tif] tif]])})
         button-nodes (collect-nodes-by-tag node :button)
-        trigger (first (filter #(= "Time in force" (get-in % [1 :aria-label])) button-nodes))
+        trigger (first (filter #(re-find #"^Time in force:" (or (get-in % [1 :aria-label]) "")) button-nodes))
         chevron (first (collect-nodes-by-tag node :svg))
         menu (first (filter #(= "TIF options" (get-in % [1 :aria-label]))
                             (collect-nodes-by-tag node :div)))]

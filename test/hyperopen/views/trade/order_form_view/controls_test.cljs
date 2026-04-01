@@ -47,7 +47,7 @@
                                     (:size (handlers/build-handlers)))
         trigger (find-first-node size-row
                                  (fn [node]
-                                   (= "Size unit" (get-in node [1 :aria-label]))))
+                                   (re-find #"^Size unit:" (or (get-in node [1 :aria-label]) ""))))
         option-buttons (find-all-nodes size-row
                                        (fn [node]
                                          (= :actions/set-order-size-input-mode
