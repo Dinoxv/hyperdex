@@ -87,12 +87,18 @@
   }
 
   .asset-selector-search-input:hover,
-  .asset-selector-search-input:focus,
-  .asset-selector-search-input:focus-visible {
+  .asset-selector-search-input:focus {
     outline: none;
-    box-shadow: none;
     border-color: #9aa3a4;
     background: transparent;
+  }
+
+  .asset-selector-search-input:focus-visible {
+    outline: none;
+    border-color: #66e3c5;
+    background: transparent;
+    box-shadow: 0 0 0 1px rgb(102 227 197 / 0.38),
+      0 0 0 4px rgb(102 227 197 / 0.12);
   }
 
   .asset-selector-search-input::placeholder {

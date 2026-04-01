@@ -38,6 +38,51 @@ test("asset selector opens and selects ETH @regression", async ({ page }) => {
   );
 });
 
+test("asset selector focuses search input and keyboard-navigates rows @regression", async ({ page }) => {
+  await visitRoute(page, "/trade");
+
+  await dispatch(page, [":actions/toggle-asset-dropdown", ":asset-selector"]);
+  await waitForIdle(page, { quietMs: 150, timeoutMs: 4_000, pollMs: 50 });
+  await expectOracle(page, "asset-selector", {
+    visibleDropdown: "asset-selector",
+    desktopPresent: true
+  });
+
+  const searchInput = page.locator('[aria-label="Search assets"]');
+  const highlightedRow = () =>
+    page.locator('[data-role="asset-selector-row"][data-row-state="highlighted"]').first();
+  const highlightedSymbol = async () =>
+    (await highlightedRow().locator(".truncate").first().textContent())?.trim();
+  const highlightedMarketKey = async () =>
+    (await debugCall(page, "snapshot"))["app-state"]?.["asset-selector"]?.["highlighted-market-key"] ?? null;
+
+  await expect(searchInput).toBeFocused();
+
+  await page.keyboard.press("ArrowDown");
+  await expect.poll(highlightedMarketKey, { timeout: 5_000 }).not.toBeNull();
+  await expect(highlightedRow()).toBeVisible();
+  const firstHighlightedSymbol = await highlightedSymbol();
+
+  await page.keyboard.press("ArrowDown");
+  await expect(highlightedRow()).toBeVisible();
+  const secondHighlightedSymbol = await highlightedSymbol();
+  expect(secondHighlightedSymbol).not.toEqual(firstHighlightedSymbol);
+
+  await page.keyboard.press("ArrowUp");
+  await expect
+    .poll(highlightedSymbol, {
+      timeout: 5_000
+    })
+    .toBe(firstHighlightedSymbol);
+
+  await page.keyboard.press("Enter");
+  await waitForIdle(page, { quietMs: 300, timeoutMs: 7_000, pollMs: 50 });
+  await expectOracle(page, "asset-selector", {
+    visibleDropdown: null,
+    activeAsset: "ETH"
+  });
+});
+
 test("trade route preserves core accessibility affordances @regression", async ({ page }) => {
   await page.goto("/trade", { waitUntil: "commit" });
 

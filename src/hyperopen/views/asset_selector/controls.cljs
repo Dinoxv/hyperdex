@@ -1,4 +1,48 @@
-(ns hyperopen.views.asset-selector.controls)
+(ns hyperopen.views.asset-selector.controls
+  (:require [clojure.string :as str]
+            [hyperopen.platform :as platform]
+            [hyperopen.system :as app-system]
+            [nexus.registry :as nxr]))
+
+(def ^:private selector-navigation-keys
+  #{"ArrowDown" "ArrowUp" "Enter" "Escape"})
+
+(defn- search-input-mount-focus!
+  [{:keys [:replicant/life-cycle :replicant/node]}]
+  (when (= :replicant.life-cycle/mount life-cycle)
+    (platform/queue-microtask!
+     (fn []
+       (when (and node
+                  (.-isConnected node)
+                  (fn? (.-focus node)))
+         (.focus node)
+         (when (fn? (.-select node))
+           (.select node)))))))
+
+(defn- search-input-shortcut-handler
+  [market-keys]
+  (fn [event]
+    (let [key (some-> event .-key)
+          meta-key? (true? (some-> event .-metaKey))
+          ctrl-key? (true? (some-> event .-ctrlKey))
+          normalized-key (some-> key str str/lower-case)
+          favorite-shortcut? (and (or meta-key? ctrl-key?)
+                                  (= normalized-key "s"))
+          handled-shortcut? (or (contains? selector-navigation-keys key)
+                                favorite-shortcut?)]
+      (when handled-shortcut?
+        (when (fn? (.-preventDefault event))
+          (.preventDefault event))
+        (when (fn? (.-stopPropagation event))
+          (.stopPropagation event))
+        (when app-system/store
+          (nxr/dispatch app-system/store
+                        nil
+                        [[:actions/handle-asset-selector-shortcut
+                          key
+                          meta-key?
+                          ctrl-key?
+                          market-keys]]))))))
 
 (def ^:private tooltip-panel-position-classes
   {"top" ["bottom-full" "left-1/2" "transform" "-translate-x-1/2" "mb-2"]
@@ -62,7 +106,10 @@
      :on {:click [[:actions/set-asset-selector-favorites-only true]]}}
     "Favs"]])
 
-(defn search-controls [search-term strict? favorites-only?]
+(defn search-controls
+  ([search-term strict? favorites-only?]
+   (search-controls search-term strict? favorites-only? nil))
+  ([search-term strict? favorites-only? market-keys]
   [:div.flex.items-center.gap-2.mb-4
    [:div.relative.flex-1
     [:input
@@ -77,14 +124,16 @@
       :type "text"
       :placeholder "Search"
       :aria-label "Search assets"
+      :replicant/on-render search-input-mount-focus!
       :value search-term
-      :on {:input [[:actions/update-asset-search [:event.target/value]]]}}]
+      :on {:input [[:actions/update-asset-search [:event.target/value]]]
+           :keydown (search-input-shortcut-handler market-keys)}}]
     [:div.absolute.inset-y-0.right-0.flex.items-center.pr-3
      [:svg.w-4.h-4.text-gray-400 {:fill "none" :stroke "currentColor" :viewBox "0 0 24 24"}
       [:path {:stroke-linecap "round" :stroke-linejoin "round" :stroke-width 2 :d "m21 21-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"}]]]]
    [:div.flex.items-center.gap-2
     (toggle-button "Strict" strict? [[:actions/toggle-asset-selector-strict]])
-    (segmented-control favorites-only?)]])
+    (segmented-control favorites-only?)]]))
 
 (defn tab-button [label active? tab-key]
   [:button.px-2.py-1.text-xs.font-medium.rounded-md.transition-colors
