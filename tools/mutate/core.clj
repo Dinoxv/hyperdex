@@ -13,8 +13,8 @@
 (defn suite-command
   [suite]
   (case suite
-    :test "npx shadow-cljs compile test && node out/test.js"
-    :ws-test "npx shadow-cljs compile ws-test && node out/ws-test.js"))
+    :test "npx shadow-cljs --force-spawn compile test && node out/test.js"
+    :ws-test "npx shadow-cljs --force-spawn compile ws-test && node out/ws-test.js"))
 
 (defn clean-suite-command
   [suite]
@@ -25,8 +25,8 @@
 (defn suite-compile-command
   [suite]
   (case suite
-    :test "npx shadow-cljs compile test"
-    :ws-test "npx shadow-cljs compile ws-test"))
+    :test "npx shadow-cljs --force-spawn compile test"
+    :ws-test "npx shadow-cljs --force-spawn compile ws-test"))
 
 (defn clean-suite-compile-command
   [suite]

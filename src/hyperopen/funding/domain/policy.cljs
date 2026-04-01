@@ -232,8 +232,7 @@
 (defn- withdrawable-usdc
   [state]
   (max 0 (or (unified-spot-usdc-available state)
-             (perps-withdrawable state)
-             0)))
+             (perps-withdrawable state))))
 
 (defn- withdraw-available-amount
   [state asset]
@@ -402,16 +401,12 @@
         {:keys [decimals]} (get chain-fee-format-by-chain chain*)
         decimals* (or decimals 0)
         parsed-number (fee-value->number value)
-        raw-text (when (string? value) (non-blank-text value))
-        integer-text? (and (string? raw-text)
-                           (re-matches #"^\d+$" raw-text))
-        integer-like? (or integer-text?
-                          (integer-like-number? parsed-number))]
+        integer-like? (integer-like-number? parsed-number)]
     (cond
       (nil? parsed-number)
       nil
 
-      (and (> decimals* 0) integer-like?)
+      integer-like?
       (/ parsed-number (js/Math.pow 10 decimals*))
 
       :else

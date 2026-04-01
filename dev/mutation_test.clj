@@ -151,10 +151,11 @@
   (with-temp-root
     (fn [root]
       (write-file! root "src/hyperopen/sample/policy.cljs" sample-source)
-      (let [backup-path (fs/backup-path root "src/hyperopen/sample/policy.cljs")
+      (let [module "src/hyperopen/sample/policy.cljs"
+            backup-path (fs/backup-path root module)
             module-path (str (io/file root "src/hyperopen/sample/policy.cljs"))]
         (spit backup-path "(ns hyperopen.sample.policy)\n(defn restored [] :ok)\n")
-        (is (true? (fs/restore-stale-backup! root "src/hyperopen/sample/policy.cljs")))
+        (is (= module (fs/restore-stale-backup! root module)))
         (is (.contains (slurp module-path) "restored"))
         (is (false? (.exists (io/file backup-path))))))))
 
@@ -194,7 +195,21 @@
                                (swap! calls conj {:command command
                                                   :timeout-ms timeout-ms})
                                (cond
-                                 (= command "npx shadow-cljs compile test && node out/test.js")
+                                 (= command "rm -rf .shadow-cljs/builds/test out/test.js && npx shadow-cljs --force-spawn compile test && node out/test.js")
+                                 {:command command
+                                  :exit 0
+                                  :timeout? false
+                                  :elapsed-ms 20
+                                  :output ""}
+
+                                 (= command "rm -rf .shadow-cljs/builds/test out/test.js && npx shadow-cljs --force-spawn compile test")
+                                 {:command command
+                                  :exit 0
+                                  :timeout? false
+                                  :elapsed-ms 5
+                                  :output ""}
+
+                                 (= command "npx shadow-cljs --force-spawn compile test && node out/test.js")
                                  (if timeout-ms
                                    {:command command
                                     :exit 1

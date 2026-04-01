@@ -586,7 +586,7 @@
     (is (= ["0x1" "0x2"]
            (mapv :vault-address merged)))))
 
-(deftest merge-vault-index-with-summaries-replaces-equal-age-duplicate-addresses-test
+(deftest merge-vault-index-with-summaries-preserves-first-equal-age-duplicate-address-test
   (let [merged (vaults/merge-vault-index-with-summaries
                 [{:summary {:vaultAddress "0x1"
                             :name "Vault One"
@@ -600,7 +600,7 @@
                 [])]
     (is (= ["0x1" "0x2"]
            (mapv :vault-address merged)))
-    (is (= "Vault Two Equal"
+    (is (= "Vault Two Old"
            (:name (second merged))))
     (is (= 200
            (:create-time-ms (second merged))))))

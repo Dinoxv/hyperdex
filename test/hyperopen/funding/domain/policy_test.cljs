@@ -137,7 +137,10 @@
                                :webdata2 {:clearinghouseState {:withdrawable "4"}}})))
     (is (= 4
            (withdrawable-usdc {:spot {:clearinghouse-state {:balances []}}
-                               :webdata2 {:clearinghouseState {:withdrawable "4"}}})))))
+                               :webdata2 {:clearinghouseState {:withdrawable "4"}}})))
+    (is (= 0
+           (withdrawable-usdc {:spot {:clearinghouse-state {:balances []}}
+                               :webdata2 {:clearinghouseState {}}})))))
 
 (deftest withdraw-available-amount-handles-nil-usdc-and-spot-assets-test
   (let [withdraw-available-amount @#'hyperopen.funding.domain.policy/withdraw-available-amount
@@ -156,7 +159,19 @@
            (withdraw-available-amount state {:key :usdc})))
     (is (= 1.25
            (withdraw-available-amount state {:key :btc
-                                             :symbol "BTC"})))))
+                                             :symbol "BTC"})))
+    (is (= 0
+           (withdraw-available-amount state {:key :eth
+                                             :symbol "ETH"})))))
+
+(deftest withdraw-available-list-display-hides-zeroish-values-test
+  (let [withdraw-available-list-display @#'hyperopen.funding.domain.policy/withdraw-available-list-display]
+    (is (= "-"
+           (withdraw-available-list-display nil)))
+    (is (= "-"
+           (withdraw-available-list-display 0)))
+    (is (= "1.25"
+           (withdraw-available-list-display 1.25)))))
 
 (deftest withdraw-assets-filtered-and-selected-asset-helpers-honor-search-and-fallbacks-test
   (with-redefs [assets-domain/withdraw-assets
@@ -216,6 +231,35 @@
                                   {:amount-input "1.5"
                                    :to-perp? true}))))
 
+(deftest transfer-preview-covers-unavailable-and-boundary-amount-branches-test
+  (with-redefs [policy/transfer-max-amount (constantly js/NaN)]
+    (is (= {:ok? false
+            :display-message "Unable to determine transfer balance."}
+           (policy/transfer-preview {}
+                                    {:amount-input "1"
+                                     :to-perp? true}))))
+  (let [state {:spot {:clearinghouse-state {:balances [{:coin "USDC"
+                                                        :available "1"
+                                                        :total "1"
+                                                        :hold "0"}]}}}]
+    (is (= {:ok? false
+            :display-message "Enter an amount greater than 0."}
+           (policy/transfer-preview state
+                                    {:amount-input "0"
+                                     :to-perp? true})))
+    (is (= {:ok? true
+            :request {:action {:type "usdClassTransfer"
+                               :amount "1"
+                               :toPerp true}}}
+           (policy/transfer-preview state
+                                    {:amount-input "1"
+                                     :to-perp? true})))
+    (is (= {:ok? false
+            :display-message "Amount exceeds available balance."}
+           (policy/transfer-preview state
+                                    {:amount-input "1.000001"
+                                     :to-perp? true})))))
+
 (deftest send-preview-covers-token-destination-balance-and-success-branches-test
   (is (= {:ok? false
           :display-message "Select an asset to send."}
@@ -253,6 +297,38 @@
                                :amount-input "1.5"
                                :destination-input "0x1234567890abcdef1234567890abcdef12345678"
                                :send-max-amount 10}))))
+
+(deftest send-preview-covers-unavailable-and-boundary-balance-branches-test
+  (is (= {:ok? false
+          :display-message "Unable to determine sendable balance."}
+         (policy/send-preview {}
+                              {:send-token "BTC"
+                               :send-symbol "BTC"
+                               :amount-input "1"
+                               :destination-input "0x1234567890abcdef1234567890abcdef12345678"
+                               :send-max-amount nil})))
+  (is (= {:ok? true
+          :request {:action {:type "sendAsset"
+                             :destination "0x1234567890abcdef1234567890abcdef12345678"
+                             :sourceDex "spot"
+                             :destinationDex "spot"
+                             :token "BTC"
+                             :amount "1"
+                             :fromSubAccount ""}}}
+         (policy/send-preview {}
+                              {:send-token "BTC"
+                               :send-symbol "Bitcoin"
+                               :amount-input "1"
+                               :destination-input "0x1234567890abcdef1234567890abcdef12345678"
+                               :send-max-amount 1})))
+  (is (= {:ok? false
+          :display-message "Amount exceeds available balance."}
+         (policy/send-preview {}
+                              {:send-token "BTC"
+                               :send-symbol "Bitcoin"
+                               :amount-input "1.000001"
+                               :destination-input "0x1234567890abcdef1234567890abcdef12345678"
+                               :send-max-amount 1}))))
 
 (deftest withdraw-preview-enforces-minimum-amount-for-hyperunit-assets-test
   (with-redefs [assets-domain/withdraw-assets
@@ -405,6 +481,40 @@
                                    {:deposit-step :amount-entry
                                     :deposit-selected-asset-key :bridge2
                                     :amount-input "10"})))))
+
+(deftest hyperunit-lifecycle-recovery-hint-uses-direction-specific-defaults-test
+  (is (= "Verify the destination address and network, then submit a new withdrawal."
+         (policy/hyperunit-lifecycle-recovery-hint {:direction :withdraw
+                                                    :state "failed"})))
+  (is (= "Verify the source transfer network and amount, then generate a new deposit address."
+         (policy/hyperunit-lifecycle-recovery-hint {:direction :deposit
+                                                    :state "failed"}))))
+
+(deftest estimate-fee-display-normalizes-chain-units-and-fallbacks-test
+  (is (= "100"
+         (policy/estimate-fee-display "100" "unknown")))
+  (is (= "1 BTC"
+         (policy/estimate-fee-display "100000000" "bitcoin")))
+  (is (= "1.23456789 BTC"
+         (policy/estimate-fee-display 1.23456789 "bitcoin"))))
+
+(deftest usdc-formatters-clamp-invalid-or-negative-values-to-zero-test
+  (is (= "0.00"
+         (policy/format-usdc-display nil)))
+  (is (= "0.00"
+         (policy/format-usdc-display "bad")))
+  (is (= "0.00"
+         (policy/format-usdc-display -3.5)))
+  (is (= "12.50"
+         (policy/format-usdc-display "12.5")))
+  (is (= "0"
+         (policy/format-usdc-input nil)))
+  (is (= "0"
+         (policy/format-usdc-input "bad")))
+  (is (= "0"
+         (policy/format-usdc-input -3.5)))
+  (is (= "12.5"
+         (policy/format-usdc-input "12.5"))))
 
 (deftest preview-returns-unavailable-for-unknown-mode-test
   (is (= {:ok? false
