@@ -239,6 +239,9 @@
       ((:on-route-change @captured-router-opts) "/trade")
       (is (= []
              @dispatch-calls))
+      (is (nil? (get-in @store [:trade-ui :desktop-secondary-panels-ready?])))
+      ((:mark-post-render-trade-secondary-panels-ready! @captured-init-deps) store)
+      (is (true? (get-in @store [:trade-ui :desktop-secondary-panels-ready?])))
       ((:load-post-render-route-effects! @captured-init-deps) store))
     (is (= [[store [[:effects/load-trade-chart-module]]]]
            @dispatch-calls))))

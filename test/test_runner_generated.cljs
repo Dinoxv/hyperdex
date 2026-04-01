@@ -307,6 +307,7 @@
             [hyperopen.views.trade-view.loading-shell-test]
             [hyperopen.views.trade-view.mobile-surface-test]
             [hyperopen.views.trade-view.render-cache-test]
+            [hyperopen.views.trade-view.startup-defer-test]
             [hyperopen.views.trade.order-form-commands-test]
             [hyperopen.views.trade.order-form-component-primitives-test]
             [hyperopen.views.trade.order-form-component-sections-test]
@@ -736,6 +737,7 @@
              'hyperopen.views.trade-view.loading-shell-test
              'hyperopen.views.trade-view.mobile-surface-test
              'hyperopen.views.trade-view.render-cache-test
+             'hyperopen.views.trade-view.startup-defer-test
              'hyperopen.views.trade.order-form-commands-test
              'hyperopen.views.trade.order-form-component-primitives-test
              'hyperopen.views.trade.order-form-component-sections-test

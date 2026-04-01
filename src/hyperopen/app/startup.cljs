@@ -163,6 +163,10 @@
            (not (trade-modules/trade-chart-loading? state)))
       (conj [:effects/load-trade-chart-module]))))
 
+(defn- mark-post-render-trade-secondary-panels-ready!
+  [store]
+  (swap! store assoc-in [:trade-ui :desktop-secondary-panels-ready?] true))
+
 (defn init!
   [system]
   (let [base-deps (startup-base-deps system)]
@@ -217,6 +221,9 @@
                                              :dispatch! (:dispatch! base-deps)}))
        :register-icon-service-worker! (fn []
                                         (register-icon-service-worker! system))
+       :mark-post-render-trade-secondary-panels-ready! (fn [startup-store]
+                                                         (mark-post-render-trade-secondary-panels-ready!
+                                                          startup-store))
        :initialize-remote-data-streams! (fn []
                                           (initialize-remote-data-streams! system))
        :load-post-render-route-effects! (fn [startup-store]

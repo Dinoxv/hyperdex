@@ -395,11 +395,41 @@
      :mobile-surface (:mobile-surface layout)
      :layout layout}))
 
+(defn- desktop-secondary-panels-ready?
+  [state desktop-layout?]
+  (or (not desktop-layout?)
+      (not= false (get-in state [:trade-ui :desktop-secondary-panels-ready?]))))
+
+(defn- desktop-secondary-panel-placeholder
+  [title data-role & {:keys [fill-height?]
+                      :or {fill-height? false}}]
+  [:div {:class (into ["w-full"
+                       "min-h-0"
+                       "overflow-hidden"
+                       "bg-base-100"
+                       "p-3"
+                       "space-y-3"]
+                      (cond
+                        fill-height?
+                        ["h-full"]
+
+                        :else
+                        ["min-h-[9rem]"]))
+         :data-role data-role}
+   [:div {:class ["text-sm" "font-semibold" "text-trading-text-secondary"]}
+    title]
+   [:div {:class ["space-y-2"]}
+    [:div {:class ["h-3" "w-28" "rounded" "bg-base-300/60"]}]
+    [:div {:class ["h-3" "w-full" "rounded" "bg-base-300/50"]}]
+    [:div {:class ["h-3" "w-5/6" "rounded" "bg-base-300/40"]}]
+    [:div {:class ["h-3" "w-2/3" "rounded" "bg-base-300/30"]}]]])
+
 (defn- trade-view-panel-context
   [state {:keys [desktop-layout? layout mobile-surface]}]
   (let [active-asset (:active-asset state)
         orderbook-data (when active-asset (get-in state [:orderbooks active-asset]))
         freeze-heavy-panels? (freeze-heavy-trade-panels? state desktop-layout?)
+        desktop-secondary-panels-ready?* (desktop-secondary-panels-ready? state desktop-layout?)
         active-asset-panel-state (selector-scroll-snapshot
                                   frozen-active-asset-view-state*
                                   freeze-heavy-panels?
@@ -408,17 +438,21 @@
                                  frozen-trade-chart-view-state*
                                  freeze-heavy-panels?
                                  #(trade-chart-view-state state))
-        account-info-panel-state (selector-scroll-snapshot
-                                  frozen-account-info-view-state*
-                                  freeze-heavy-panels?
-                                  #(account-info-view-state state))
-        account-equity-panel-state (selector-scroll-snapshot
-                                    frozen-account-equity-view-state*
-                                    freeze-heavy-panels?
-                                    #(account-equity-view-state state))
+        account-info-panel-state (when desktop-secondary-panels-ready?*
+                                  (selector-scroll-snapshot
+                                   frozen-account-info-view-state*
+                                   freeze-heavy-panels?
+                                   #(account-info-view-state state)))
+        account-equity-panel-state (when (and (:show-equity-surface? layout)
+                                              desktop-secondary-panels-ready?*)
+                                    (selector-scroll-snapshot
+                                     frozen-account-equity-view-state*
+                                     freeze-heavy-panels?
+                                     #(account-equity-view-state state)))
         show-surface-freshness-cues? (surface-freshness-cues-enabled? state)
         websocket-health (get-in state [:websocket :health])
-        equity-metrics (when (:show-equity-surface? layout)
+        equity-metrics (when (and (:show-equity-surface? layout)
+                                  desktop-secondary-panels-ready?*)
                          (render-account-equity-metrics-state account-equity-panel-state))
         orderbook-panel-state (selector-scroll-snapshot
                                frozen-orderbook-view-state*
@@ -434,12 +468,14 @@
                                 #(order-form-view-state state))]
     {:active-asset-panel-state active-asset-panel-state
      :trade-chart-panel-state trade-chart-panel-state
+     :desktop-secondary-panels-ready? desktop-secondary-panels-ready?*
      :account-info-panel-state account-info-panel-state
      :account-equity-panel-state account-equity-panel-state
      :equity-metrics equity-metrics
      :orderbook-panel-state orderbook-panel-state
      :order-form-panel-state order-form-panel-state
-     :mobile-orderbook-panel-state (mobile-orderbook-view-state orderbook-panel-state mobile-surface)}))
+     :mobile-orderbook-panel-state (when-not desktop-layout?
+                                    (mobile-orderbook-view-state orderbook-panel-state mobile-surface))}))
 
 (defn- render-mobile-active-asset-strip
   [state {:keys [layout]}]
@@ -488,22 +524,28 @@
 (defn- render-order-entry-panel-shell
   [desktop-layout?
    {:keys [layout]}
-   {:keys [account-equity-panel-state equity-metrics order-form-panel-state]}]
+   {:keys [account-equity-panel-state
+           desktop-secondary-panels-ready?
+           equity-metrics
+           order-form-panel-state]}]
   [:div {:class (:order-entry-panel-classes layout)
          :data-parity-id funding-modal-positioning/trade-order-entry-panel-parity-id}
    (when (:order-entry-panel-visible? layout)
      (render-order-form-panel order-form-panel-state))
    [:div {:class ["hidden" "border-t" "border-base-300" "lg:block"]
           :data-parity-id "trade-desktop-account-equity-panel"}
-    (when (and desktop-layout?
-               (:order-entry-panel-visible? layout))
-      (render-account-equity-panel-state account-equity-panel-state equity-metrics {}))]])
+     (when (and desktop-layout?
+                (:order-entry-panel-visible? layout))
+      (if desktop-secondary-panels-ready?
+        (render-account-equity-panel-state account-equity-panel-state equity-metrics {})
+        (desktop-secondary-panel-placeholder "Account Equity"
+                                             "trade-desktop-account-equity-placeholder")))]])
 
 (defn- render-account-panel-shell
   [state
    desktop-layout?
    {:keys [layout]}
-   {:keys [account-info-panel-state]}]
+   {:keys [account-info-panel-state desktop-secondary-panels-ready?]}]
   [:div {:class (:account-panel-classes layout)
          :data-parity-id "trade-account-tables-panel"}
    [:div {:class ["w-full" "lg:hidden"]
@@ -515,8 +557,12 @@
           :data-parity-id "trade-desktop-account-panel"}
     (when (and (:account-panel-visible? layout)
                desktop-layout?)
-      (render-account-info-panel-state account-info-panel-state
-                                       {:default-panel-classes ["h-full"]}))]])
+      (if desktop-secondary-panels-ready?
+        (render-account-info-panel-state account-info-panel-state
+                                         {:default-panel-classes ["h-full"]})
+        (desktop-secondary-panel-placeholder "Account"
+                                             "trade-desktop-account-panel-placeholder"
+                                             :fill-height? true)))]])
 
 (defn- render-mobile-account-summary
   [state {:keys [layout]} {:keys [equity-metrics]}]

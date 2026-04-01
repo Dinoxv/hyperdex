@@ -84,6 +84,7 @@
            install-asset-selector-shortcuts!
            install-position-tpsl-clickaway!
            register-icon-service-worker!
+           mark-post-render-trade-secondary-panels-ready!
            initialize-remote-data-streams!
            load-post-render-route-effects!
            kick-render!
@@ -108,11 +109,14 @@
             (install-position-tpsl-clickaway!))
           ;; Register icon cache service worker for cross-reload symbol icon caching.
           (register-icon-service-worker!)
-          ;; Initialize remote data streams.
-          (initialize-remote-data-streams!)
+          ;; Reveal lower desktop trade surfaces after the first paint has landed.
+          (when (fn? mark-post-render-trade-secondary-panels-ready!)
+            (mark-post-render-trade-secondary-panels-ready! store))
           ;; Defer route-specific heavyweight work until after the initial shell paint.
           (when (fn? load-post-render-route-effects!)
-            (load-post-render-route-effects! store)))]
+            (load-post-render-route-effects! store))
+          ;; Initialize remote data streams.
+          (initialize-remote-data-streams!))]
     ;; Ensure first render is enqueued before expensive subscriptions/fetch startup work.
     (if (fn? schedule-post-render-startup!)
       (schedule-post-render-startup! post-render-startup!)
