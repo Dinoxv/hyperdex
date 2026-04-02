@@ -163,6 +163,7 @@
             [hyperopen.runtime.effect-adapters.staking-test]
             [hyperopen.runtime.effect-adapters.vaults-test]
             [hyperopen.runtime.effect-adapters.wallet-test]
+            [hyperopen.runtime.effect-adapters.websocket-health-test]
             [hyperopen.runtime.effect-adapters.websocket-test]
             [hyperopen.runtime.effect-order-contract-formal-conformance-test]
             [hyperopen.runtime.effect-order-contract-test]
@@ -600,6 +601,7 @@
              'hyperopen.runtime.effect-adapters.staking-test
              'hyperopen.runtime.effect-adapters.vaults-test
              'hyperopen.runtime.effect-adapters.wallet-test
+             'hyperopen.runtime.effect-adapters.websocket-health-test
              'hyperopen.runtime.effect-adapters.websocket-test
              'hyperopen.runtime.effect-order-contract-formal-conformance-test
              'hyperopen.runtime.effect-order-contract-test
