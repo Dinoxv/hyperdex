@@ -27,16 +27,17 @@
           fetch-fn (fn [url init]
                      (swap! calls conj [url init])
                      (js/Promise.resolve
-                      {:leaderboardRows [{:ethAddress "0xABC"
-                                         :accountValue "12.5"
-                                         :displayName "Desk"
-                                         :prize "3"
-                                         :windowPerformances [["month" {:pnl "2"
-                                                                        :roi "0.1"
-                                                                        :vlm "9"}]
-                                                              ["allTime" {:pnl "-5"
-                                                                          :roi "0.2"
-                                                                          :volume "4"}]]}]}))]
+                      (ok-response
+                       {:leaderboardRows [{:ethAddress "0xABC"
+                                           :accountValue "12.5"
+                                           :displayName "Desk"
+                                           :prize "3"
+                                           :windowPerformances [["month" {:pnl "2"
+                                                                          :roi "0.1"
+                                                                          :vlm "9"}]
+                                                                ["allTime" {:pnl "-5"
+                                                                            :roi "0.2"
+                                                                            :volume "4"}]]}]})))]
       (-> (leaderboard/request-leaderboard! fetch-fn "https://leaderboard.test" {:fetch-opts {:cache "no-store"}})
           (.then (fn [rows]
                    (let [[called-url init] (first @calls)]
@@ -52,6 +53,29 @@
                                                   :week {:pnl 0 :roi 0 :volume 0}
                                                   :month {:pnl 2 :roi 0.1 :volume 9}
                                                   :all-time {:pnl -5 :roi 0.2 :volume 4}}}]
+                          rows))
+                   (done)))
+          (.catch (async-support/unexpected-error done))))))
+
+(deftest request-leaderboard-normalizes-direct-payload-response-test
+  (async done
+    (let [fetch-fn (fn [_url _init]
+                     (js/Promise.resolve
+                      {:leaderboardRows [{:ethAddress "0xABC"
+                                         :accountValue "12"
+                                         :displayName "Desk"
+                                         :prize "3"
+                                         :windowPerformances []}]}))]
+      (-> (leaderboard/request-leaderboard! fetch-fn "https://leaderboard.test" {})
+          (.then (fn [rows]
+                   (is (= [{:eth-address "0xabc"
+                            :account-value 12
+                            :display-name "Desk"
+                            :prize 3
+                            :window-performances {:day {:pnl 0 :roi 0 :volume 0}
+                                                  :week {:pnl 0 :roi 0 :volume 0}
+                                                  :month {:pnl 0 :roi 0 :volume 0}
+                                                  :all-time {:pnl 0 :roi 0 :volume 0}}}]
                           rows))
                    (done)))
           (.catch (async-support/unexpected-error done))))))

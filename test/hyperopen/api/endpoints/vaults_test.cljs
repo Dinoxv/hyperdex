@@ -416,6 +416,8 @@
         sample-snapshot-preview-series @#'hyperopen.api.endpoints.vaults/sample-snapshot-preview-series]
     (is (= 4000
            (normalize-vault-snapshot-return 2000 50)))
+    (is (= 1000
+           (normalize-vault-snapshot-return 1000 50)))
     (is (= 100
            (normalize-vault-snapshot-return 1 10)))
     (is (= 50
@@ -425,6 +427,9 @@
     (is (nil? (normalize-vault-snapshot-return "bad" 10)))
     (is (= [0 1 2 3 4 5 6 7]
            (sample-snapshot-preview-series (range 8))))
+    (let [values-at-limit [0 1 2 3 4 5 6 7]]
+      (is (identical? values-at-limit
+                      (sample-snapshot-preview-series values-at-limit))))
     (is (= 8
            (count (sample-snapshot-preview-series (range 10)))))
     (is (= [0 1 3 4 5 6 8 9]
@@ -488,6 +493,10 @@
                                       :vaultEquity "2.5"
                                       :daysFollowing "8"
                                       :vaultEntryTime nil})))
+    (is (= 0
+           (followers-count nil [])))
+    (is (= 0
+           (followers-count "bad" [])))
     (is (= 3 (followers-count "3" [])))
     (is (= 2 (followers-count nil [{:user "0x1"} {:user "0x2"}])))
     (is (= {:name "Vault Detail"

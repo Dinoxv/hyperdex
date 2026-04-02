@@ -194,9 +194,7 @@
       :else
       (let [last-idx (dec value-count)
             slot-count (dec snapshot-preview-point-limit)
-            step (if (pos? slot-count)
-                   (/ last-idx slot-count)
-                   0)]
+            step (/ last-idx slot-count)]
         (mapv (fn [idx]
                 (let [value-idx (if (= idx slot-count)
                                   last-idx

@@ -307,6 +307,22 @@
                                :amount-input "1"
                                :destination-input "0x1234567890abcdef1234567890abcdef12345678"
                                :send-max-amount nil})))
+  (is (= {:ok? false
+          :display-message "Enter a valid amount."}
+         (policy/send-preview {}
+                              {:send-token "BTC"
+                               :send-symbol "Bitcoin"
+                               :amount-input "bad"
+                               :destination-input "0x1234567890abcdef1234567890abcdef12345678"
+                               :send-max-amount 1})))
+  (is (= {:ok? false
+          :display-message "Enter an amount greater than 0."}
+         (policy/send-preview {}
+                              {:send-token "BTC"
+                               :send-symbol "Bitcoin"
+                               :amount-input "0"
+                               :destination-input "0x1234567890abcdef1234567890abcdef12345678"
+                               :send-max-amount 1})))
   (is (= {:ok? true
           :request {:action {:type "sendAsset"
                              :destination "0x1234567890abcdef1234567890abcdef12345678"
@@ -349,6 +365,23 @@
                                      :destination-input "bc1qexamplexyz0p4y0p4y0p4y0p4y0p4y0p4y0p"
                                      :amount-input "0.0001"})))))
 
+(deftest withdraw-preview-error-helper-allows-zero-and-exact-minimum-boundaries-test
+  (let [withdraw-preview-error @#'hyperopen.funding.domain.policy/withdraw-preview-error
+        base-input {:selected-asset {:symbol "BTC"}
+                    :destination "bc1qexamplexyz0p4y0p4y0p4y0p4y0p4y0p4y0p"
+                    :destination-chain "bitcoin"
+                    :max-amount 10}]
+    (is (nil? (withdraw-preview-error (assoc base-input
+                                             :amount 1
+                                             :max-amount 1
+                                             :min-amount 0))))
+    (is (nil? (withdraw-preview-error (assoc base-input
+                                             :amount -1
+                                             :min-amount 0))))
+    (is (nil? (withdraw-preview-error (assoc base-input
+                                             :amount 0.0003
+                                             :min-amount 0.0003))))))
+
 (deftest deposit-preview-covers-step-validation-and-branch-coverage-test
   (with-redefs [assets-domain/deposit-asset
                 (fn [_state modal]
@@ -384,10 +417,14 @@
                                               :hyperunit-source-chain nil
                                               :network "Bitcoin"
                                               :minimum 0.0003}
-                    :unimplemented {:key :doge
+                    :unimplemented {:key :unimplemented
                                      :symbol "DOGE"
                                      :flow-kind :route
                                      :minimum 1}
+                    :unsupported-flow {:key :sol
+                                       :symbol "SOL"
+                                       :flow-kind :manual
+                                       :minimum 1}
                     nil))
                 assets-domain/deposit-asset-implemented?
                 (fn [asset]
@@ -404,7 +441,7 @@
                                     :deposit-selected-asset-key :missing
                                     :amount-input "1"})))
     (is (= {:ok? false
-            :display-message "DOGE route deposits are not implemented yet in Hyperopen."}
+            :display-message "DOGE deposits are not implemented yet in Hyperopen."}
            (policy/deposit-preview (base-state)
                                    {:deposit-step :amount-entry
                                     :deposit-selected-asset-key :unimplemented
@@ -441,6 +478,12 @@
            (policy/deposit-preview (base-state)
                                    {:deposit-step :amount-entry
                                     :deposit-selected-asset-key :route-usdt
+                                    :amount-input "1"})))
+    (is (= {:ok? false
+            :display-message "Minimum deposit is 5 USDT."}
+           (policy/deposit-preview (base-state)
+                                   {:deposit-step :amount-entry
+                                    :deposit-selected-asset-key :route-usdt
                                     :amount-input "4"})))
     (is (= {:ok? false
             :display-message "Maximum deposit is 1000000 USDH."}
@@ -448,12 +491,36 @@
                                    {:deposit-step :amount-entry
                                     :deposit-selected-asset-key :route-usdh
                                     :amount-input "1000001"})))
+    (is (= {:ok? true
+            :request {:action {:type "acrossUsdcToUsdhDeposit"
+                               :asset "usdh"
+                               :amount "1000000"
+                               :chainId assets-domain/deposit-chain-id-mainnet}}}
+           (policy/deposit-preview (base-state)
+                                   {:deposit-step :amount-entry
+                                    :deposit-selected-asset-key :route-usdh
+                                    :amount-input "1000000"})))
     (is (= {:ok? false
             :display-message "FOO route deposits are not implemented yet in Hyperopen."}
            (policy/deposit-preview (base-state)
                                    {:deposit-step :amount-entry
                                     :deposit-selected-asset-key :route-other
                                     :amount-input "10"})))
+    (is (= {:ok? false
+            :display-message "Deposit flow unavailable."}
+           (policy/deposit-preview (base-state)
+                                   {:deposit-step :amount-entry
+                                    :deposit-selected-asset-key :unsupported-flow
+                                    :amount-input "10"})))
+    (is (= {:ok? true
+            :request {:action {:type "lifiUsdtToUsdcBridge2Deposit"
+                               :asset "usdt"
+                               :amount "5"
+                               :chainId assets-domain/deposit-chain-id-mainnet}}}
+           (policy/deposit-preview (base-state)
+                                   {:deposit-step :amount-entry
+                                    :deposit-selected-asset-key :route-usdt
+                                    :amount-input "5"})))
     (is (= {:ok? true
             :request {:action {:type "lifiUsdtToUsdcBridge2Deposit"
                                :asset "usdt"
@@ -472,6 +539,21 @@
                                    {:deposit-step :amount-entry
                                     :deposit-selected-asset-key :route-usdh
                                     :amount-input "10"})))
+    (is (= {:ok? false
+            :display-message "Enter an amount greater than 0."}
+           (policy/deposit-preview (base-state)
+                                   {:deposit-step :amount-entry
+                                    :deposit-selected-asset-key :bridge2
+                                    :amount-input "0"})))
+    (is (= {:ok? true
+            :request {:action {:type "bridge2Deposit"
+                               :asset "usdc"
+                               :amount "5"
+                               :chainId assets-domain/deposit-chain-id-mainnet}}}
+           (policy/deposit-preview (base-state)
+                                   {:deposit-step :amount-entry
+                                    :deposit-selected-asset-key :bridge2
+                                    :amount-input "5"})))
     (is (= {:ok? true
             :request {:action {:type "bridge2Deposit"
                                :asset "usdc"
