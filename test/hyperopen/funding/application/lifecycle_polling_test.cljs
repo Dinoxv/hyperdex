@@ -368,6 +368,41 @@
          (done))
        20))))
 
+(deftest start-hyperunit-lifecycle-polling-passes-addresses-to-select-operation-by-direction-test
+  (async done
+    (let [withdraw-opts (atom nil)
+          deposit-opts (atom nil)]
+      (lifecycle-polling/start-hyperunit-lifecycle-polling!
+       (base-poll-opts {:direction :withdraw
+                        :request-hyperunit-operations! (fn [_opts]
+                                                         (js/Promise.resolve {:operations [{:operation-id "op-1"}]}))
+                        :select-operation (fn [_operations opts]
+                                            (reset! withdraw-opts opts)
+                                            nil)
+                        :set-timeout-fn (fn [_f _delay-ms] nil)}))
+      (lifecycle-polling/start-hyperunit-lifecycle-polling!
+       (base-poll-opts {:direction :deposit
+                        :request-hyperunit-operations! (fn [_opts]
+                                                         (js/Promise.resolve {:operations [{:operation-id "op-2"}]}))
+                        :select-operation (fn [_operations opts]
+                                            (reset! deposit-opts opts)
+                                            nil)
+                        :set-timeout-fn (fn [_f _delay-ms] nil)}))
+      (js/setTimeout
+       (fn []
+         (is (= {:asset-key :btc
+                 :protocol-address "bc1qprotocol"
+                 :source-address "0xabc"
+                 :destination-address "0xdestination"}
+                @withdraw-opts))
+         (is (= {:asset-key :btc
+                 :protocol-address "bc1qprotocol"
+                 :source-address nil
+                 :destination-address "0xabc"}
+                @deposit-opts))
+         (done))
+       0))))
+
 (deftest start-hyperunit-lifecycle-polling-withdraw-pending-refreshes-queue-and-schedules-next-poll-test
   (async done
     (let [store (base-poll-store :withdraw)
@@ -421,6 +456,32 @@
                  :retained true
                  :direction :deposit
                  :asset-key :btc
+                 :last-updated-ms 1700000000000
+                 :error "boom"}
+                (get-in @store [:funding-ui :modal :hyperunit-lifecycle])))
+         (is (= [3333] @scheduled-delays))
+         (done))
+       0))))
+
+(deftest start-hyperunit-lifecycle-polling-error-path-replaces-non-map-previous-lifecycle-test
+  (async done
+    (let [store (atom {:funding-ui {:modal (assoc (effects-support/seed-modal :deposit)
+                                                  :hyperunit-lifecycle :stale-state)}})
+          scheduled-delays (atom [])]
+      (lifecycle-polling/start-hyperunit-lifecycle-polling!
+       (base-poll-opts {:direction :deposit
+                        :store store
+                        :request-hyperunit-operations! (fn [_opts]
+                                                         (js/Promise.reject (js/Error. "boom")))
+                        :set-timeout-fn (fn [_f delay-ms]
+                                          (swap! scheduled-delays conj delay-ms))
+                        :default-poll-delay-ms 3333}))
+      (js/setTimeout
+       (fn []
+         (is (= {:direction :deposit
+                 :asset-key :btc
+                 :state :awaiting
+                 :status :pending
                  :last-updated-ms 1700000000000
                  :error "boom"}
                 (get-in @store [:funding-ui :modal :hyperunit-lifecycle])))
@@ -607,70 +668,128 @@
     (is (false? (get-in (first @calls) [:transition-loading?])))
     (is (= :btc (get-in (first @calls) [:expected-asset-key])))))
 
-(deftest select-polled-operation-passes-source-and-destination-addresses-by-direction-test
-  (let [select-polled-operation @#'hyperopen.funding.application.lifecycle-polling/select-polled-operation
-        calls (atom [])]
-    (is (= {:ops [{:operation-id "op-1"}]
-            :opts {:asset-key :btc
-                   :protocol-address "bc1qprotocol"
-                   :source-address "0xowner"
-                   :destination-address "bc1qdestination"}}
-           (select-polled-operation {:select-operation (fn [operations opts]
-                                                         (swap! calls conj [operations opts])
-                                                         {:ops operations
-                                                          :opts opts})
-                                      :direction :withdraw
-                                      :asset-key :btc
-                                      :protocol-address "bc1qprotocol"
-                                      :destination-address "bc1qdestination"
-                                      :wallet-address "0xowner"}
-                                     {:operations [{:operation-id "op-1"}]})))
-    (is (= {:ops [{:operation-id "op-2"}]
-            :opts {:asset-key :btc
-                   :protocol-address "bc1qprotocol"
-                   :source-address nil
-                   :destination-address "0xowner"}}
-           (select-polled-operation {:select-operation (fn [operations opts]
-                                                         (swap! calls conj [operations opts])
-                                                         {:ops operations
-                                                          :opts opts})
-                                      :direction :deposit
-                                      :asset-key :btc
-                                      :protocol-address "bc1qprotocol"
-                                      :destination-address "bc1qdestination"
-                                      :wallet-address "0xowner"}
-                                     {:operations [{:operation-id "op-2"}]})))
-    (is (= 2 (count @calls)))))
+(deftest handle-poll-success-passes-direction-specific-addresses-to-select-operation-test
+  (let [handle-poll-success! @#'hyperopen.funding.application.lifecycle-polling/handle-poll-success!
+        select-calls (atom [])
+        update-calls (atom [])
+        schedule-calls (atom [])]
+    (doseq [[direction expected-source expected-destination operation-id]
+            [[:withdraw "0xowner" "bc1qdestination" "op-withdraw"]
+             [:deposit nil "0xowner" "op-deposit"]]]
+      (handle-poll-success!
+       {:select-operation (fn [operations opts]
+                            (swap! select-calls conj [direction operations opts])
+                            {:operation-id operation-id
+                             :state-key :pending
+                             :status :pending})
+        :direction direction
+        :asset-key :btc
+        :protocol-address "bc1qprotocol"
+        :destination-address "bc1qdestination"
+        :wallet-address "0xowner"
+        :operation->lifecycle (fn [operation direction* asset-key* now-ms]
+                                {:operation-id (:operation-id operation)
+                                 :direction direction*
+                                 :asset-key asset-key*
+                                 :state (:state-key operation)
+                                 :status (:status operation)
+                                 :last-updated-ms now-ms})
+        :awaiting-lifecycle (fn [_direction _asset-key _now-ms]
+                              (throw (js/Error. "expected operation to be selected")))
+        :should-continue? (fn [] true)
+        :now-ms!* (fn [] 1700000001234)
+        :update-lifecycle! (fn [lifecycle]
+                             (swap! update-calls conj [direction lifecycle]))
+        :refresh-withdraw-queue! (fn [] nil)
+        :hyperunit-lifecycle-terminal? (fn [_lifecycle] false)
+        :clear-lifecycle-poll-token! (fn [_poll-key _token]
+                                       (throw (js/Error. "should not clear token for pending lifecycle")))
+        :poll-key :poll-key
+        :token :token
+        :notify-terminal! (fn [_lifecycle]
+                            (throw (js/Error. "should not notify terminal for pending lifecycle")))
+        :lifecycle-next-delay-ms (fn [_now-ms _lifecycle] 2500)
+        :schedule-next! (fn [delay-ms poll-fn]
+                          (swap! schedule-calls conj [direction delay-ms (fn? poll-fn)]))
+        :poll! (fn [] nil)}
+       {:operations [{:operation-id operation-id}]})
+      (let [[_direction _operations opts] (last @select-calls)
+            [_updated-direction lifecycle] (last @update-calls)
+            [_scheduled-direction delay-ms poll-fn?] (last @schedule-calls)]
+        (is (= expected-source
+               (:source-address opts)))
+        (is (= expected-destination
+               (:destination-address opts)))
+        (is (= direction
+               _updated-direction))
+        (is (= direction
+               (:direction lifecycle)))
+        (is (= :btc
+               (:asset-key lifecycle)))
+        (is (= 1700000001234
+               (:last-updated-ms lifecycle)))
+        (is (= 2500 delay-ms))
+        (is (true? poll-fn?))))
+    (is (= 2 (count @select-calls)))
+    (is (= 2 (count @update-calls)))
+    (is (= 2 (count @schedule-calls)))))
 
-(deftest error-poll-lifecycle-preserves-previous-fields-and-adds-error-context-test
-  (let [error-poll-lifecycle @#'hyperopen.funding.application.lifecycle-polling/error-poll-lifecycle
-        store (atom {:funding-ui {:modal {:hyperunit-lifecycle {:operation-id "prev-op"
-                                                                :state :pending
-                                                                :status :pending
-                                                                :retained true}}}})
-        lifecycle (error-poll-lifecycle {:store store
-                                         :direction :deposit
-                                         :asset-key :btc
-                                         :awaiting-lifecycle (fn [direction asset-key now-ms]
-                                                               {:direction direction
-                                                                :asset-key asset-key
-                                                                :state :awaiting
-                                                                :status :pending
-                                                                :last-updated-ms now-ms
-                                                                :fallback true})
-                                         :non-blank-text (fn [value]
-                                                           (when-let [text (some-> value str .trim)]
-                                                             (when (seq text)
-                                                               text)))}
-                                        (js/Error. "boom")
-                                        1700000001234)]
-    (is (= {:operation-id "prev-op"
-            :state :pending
-            :status :pending
-            :retained true
-            :direction :deposit
-            :asset-key :btc
-            :last-updated-ms 1700000001234
-            :fallback true
-            :error "boom"}
-           lifecycle))))
+(deftest handle-poll-error-preserves-map-previous-state-and-drops-non-map-previous-state-test
+  (let [handle-poll-error! @#'hyperopen.funding.application.lifecycle-polling/handle-poll-error!
+        update-calls (atom [])
+        schedule-calls (atom [])]
+    (doseq [[label previous preserve?]
+            [[:map {:operation-id "prev-op"
+                    :state :pending
+                    :status :pending
+                    :retained true} true]
+             [:non-map :not-a-map false]]]
+      (let [store (atom {:funding-ui {:modal {:hyperunit-lifecycle previous}}})]
+        (handle-poll-error!
+         {:store store
+          :direction :deposit
+          :asset-key :btc
+          :awaiting-lifecycle (fn [direction asset-key now-ms]
+                                {:direction direction
+                                 :asset-key asset-key
+                                 :state :awaiting
+                                 :status :pending
+                                 :last-updated-ms now-ms
+                                 :fallback true})
+          :non-blank-text (fn [value]
+                            (when-let [text (some-> value str .trim)]
+                              (when (seq text)
+                                text)))
+          :should-continue? (fn [] true)
+          :now-ms!* (fn [] 1700000001234)
+          :update-lifecycle! (fn [lifecycle]
+                               (swap! update-calls conj [label lifecycle]))
+          :refresh-withdraw-queue! (fn [] nil)
+          :default-poll-delay-ms 3333
+          :schedule-next! (fn [delay-ms poll-fn]
+                            (swap! schedule-calls conj [label delay-ms (fn? poll-fn)]))
+          :poll! (fn [] nil)}
+         (js/Error. "boom"))
+        (let [[_label lifecycle] (last @update-calls)
+              [_scheduled-label delay-ms poll-fn?] (last @schedule-calls)]
+          (is (= :deposit
+                 (:direction lifecycle)))
+          (is (= :btc
+                 (:asset-key lifecycle)))
+          (is (= 1700000001234
+                 (:last-updated-ms lifecycle)))
+          (is (= "boom"
+                 (:error lifecycle)))
+          (is (= 3333 delay-ms))
+          (is (true? poll-fn?))
+          (if preserve?
+            (do
+              (is (= "prev-op"
+                     (:operation-id lifecycle)))
+              (is (= true
+                     (:retained lifecycle))))
+            (do
+              (is (nil? (:operation-id lifecycle)))
+              (is (nil? (:retained lifecycle))))))))
+    (is (= 2 (count @update-calls)))
+    (is (= 2 (count @schedule-calls)))))

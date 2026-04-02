@@ -61,14 +61,17 @@
            protocol-address
            destination-address
            wallet-address]} response]
-  (select-operation (:operations (or response {}))
-                    {:asset-key asset-key
-                     :protocol-address protocol-address
-                     :source-address (when (= direction :withdraw)
-                                       wallet-address)
-                     :destination-address (if (= direction :withdraw)
-                                            destination-address
-                                            wallet-address)}))
+  (let [source-address (if (= direction :withdraw)
+                         wallet-address
+                         nil)
+        destination-address* (if (= direction :withdraw)
+                               destination-address
+                               wallet-address)]
+    (select-operation (:operations (or response {}))
+                      {:asset-key asset-key
+                       :protocol-address protocol-address
+                       :source-address source-address
+                       :destination-address destination-address*})))
 
 (defn- successful-poll-lifecycle
   [{:keys [direction
