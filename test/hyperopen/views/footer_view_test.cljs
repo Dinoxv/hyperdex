@@ -121,15 +121,6 @@
   (and (keyword? node)
        (str/starts-with? (name node) "button")))
 
-(defn- footer-link-nodes [node]
-  (let [links ["Docs" "Support" "Terms" "Privacy Policy"]]
-    (keep (fn [label]
-            (find-node #(and (vector? %)
-                             (= :a (first %))
-                             (= label (last %)))
-                       node))
-          links)))
-
 (defn- base-health []
   {:generated-at-ms 10000
    :transport {:state :connected
@@ -767,15 +758,14 @@
     (is (contains? classes "z-[260]"))
     (is (not (contains? classes "z-40")))))
 
-(deftest footer-links-use-standard-white-12px-typography-test
+(deftest footer-hides-text-links-when-no-footer-links-are-configured-test
   (let [view (footer-view/footer-view (base-state))
-        links (footer-link-nodes view)]
-    (is (= 4 (count links)))
-    (doseq [link links]
-      (let [classes (set (class-values (get-in link [1 :class])))]
-        (is (contains? classes "text-sm"))
-        (is (contains? classes "text-trading-text"))
-        (is (not (contains? classes "opacity-70")))))))
+        utility-links (find-node-by-data-role view "footer-utility-links")
+        text-links (find-node-by-data-role utility-links "footer-text-links")
+        divider (find-node-by-data-role utility-links "footer-links-divider")]
+    (is (some? utility-links))
+    (is (nil? text-links))
+    (is (nil? divider))))
 
 (deftest footer-social-icons-render-inline-current-color-svgs-in-utility-cluster-test
   (let [view (footer-view/footer-view (base-state))
