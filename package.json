@@ -18,6 +18,7 @@
     "test:runner:generate": "node tools/generate-test-runner.mjs",
     "test": "npm run test:runner:generate && npx shadow-cljs --force-spawn compile test && node out/test.js",
     "test:ci": "npm run check && npm test",
+    "gates": "node tools/run_gates_summary.mjs",
     "test:crap": "bb -m dev.crap-test",
     "test:mutation": "bb -m dev.mutation-test",
     "test:formal-tooling": "bb -m dev.formal-tooling-test",
