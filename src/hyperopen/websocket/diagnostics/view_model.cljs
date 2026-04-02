@@ -9,10 +9,7 @@
   25)
 
 (def footer-links
-  [{:label "Docs" :href "#"}
-   {:label "Support" :href "#"}
-   {:label "Terms" :href "#"}
-   {:label "Privacy Policy" :href "#"}])
+  [])
 
 (def ^:private reset-button-catalog
   [{:id :market_data

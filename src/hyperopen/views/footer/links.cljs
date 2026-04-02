@@ -20,6 +20,16 @@
    "justify-center"
    "text-trading-text"])
 
+(def ^:private social-link-anchor-classes
+  ["inline-flex"
+   "h-6"
+   "w-6"
+   "items-center"
+   "justify-center"
+   "text-trading-text"
+   "transition-colors"
+   "hover:text-primary"])
+
 (def ^:private social-link-icon-classes
   ["h-4"
    "w-4"
@@ -54,23 +64,33 @@
   []
   [:div {:class social-link-group-classes
          :data-role "footer-social-links"}
-   [:span {:class social-link-shell-classes}
+   [:a {:class social-link-anchor-classes
+        :href "https://t.me/hyperopen"
+        :target "_blank"
+        :rel "noreferrer"
+        :aria-label "Telegram"}
     (social-icon "footer-social-telegram" "Telegram" telegram-icon)]
-   [:span {:class social-link-shell-classes}
+   [:a {:class social-link-anchor-classes
+        :href "https://github.com/thegeronimo/hyperopen"
+        :target "_blank"
+        :rel "noreferrer"
+        :aria-label "GitHub"}
     (social-icon "footer-social-github" "GitHub" github-icon)]])
 
 (defn render
   [links]
   [:div {:class footer-utility-link-classes
          :data-role "footer-utility-links"}
-   [:div {:class footer-text-link-classes
-          :data-role "footer-text-links"}
-    (for [{:keys [label href]} links]
-      ^{:key label}
-      [:a {:class footer-link-classes
-           :href href}
-       label])]
-   [:span {:class ["h-3" "w-px" "bg-base-content/15"]
-           :data-role "footer-links-divider"
-           :aria-hidden true}]
+   (when (seq links)
+     [:<>
+      [:div {:class footer-text-link-classes
+             :data-role "footer-text-links"}
+       (for [{:keys [label href]} links]
+         ^{:key label}
+         [:a {:class footer-link-classes
+              :href href}
+          label])]
+      [:span {:class ["h-3" "w-px" "bg-base-content/15"]
+              :data-role "footer-links-divider"
+              :aria-hidden true}]])
    (render-social-icons)])
