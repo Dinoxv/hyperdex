@@ -37,10 +37,13 @@ After this work, the default desktop trade load should remain visually fast whil
 - [x] (2026-04-02 02:17Z) Captured a fresh governed `/trade` browser QA PASS at `tmp/browser-inspection/design-review-2026-04-01T22-15-00-677Z-f868d411/` across `375`, `768`, `1280`, and `1440`, with all six required passes marked `PASS`.
 - [x] (2026-04-02 02:18Z) Consolidated the Milestone 0 evidence into `tmp/trade-startup-tbt-2026-04-01/README.md`, recording the deployed PageSpeed baseline, current release asset sizes, fresh release-backed startup profile references, and governed QA artifact pointers.
 - [x] (2026-04-02 02:24Z) Re-ran the broader committed Playwright smoke suite with `npm run test:playwright:smoke`; all `24` smoke checks passed on the current worktree.
+- [x] (2026-04-02 01:34Z) Updated the trade-chart loading shell to mirror the resolved chart toolbar structure more closely, keeping the canvas host unchanged while replacing the simplified shell header with segmented timeframe, divider, chart-type, and indicators placeholders.
+- [x] (2026-04-02 01:34Z) Removed the footer connection meter's color-transition classes so websocket status changes no longer animate `color`-driven classes that PageSpeed flags as non-composited.
+- [x] (2026-04-02 01:45Z) Re-ran targeted `/trade` Playwright smoke, `npm test`, `npm run test:websocket`, `npm run check`, `npm run qa:design-ui -- --targets trade-route --manage-local-app`, and `npm run browser:cleanup`; the fresh design-review artifact is `tmp/browser-inspection/design-review-2026-04-02T01-33-47-037Z-3820990c/`.
 - [x] Finish Milestone 0 baseline capture by storing the built asset-size snapshot, governed browser QA evidence, and consolidated notes under one dedicated `tmp/` artifact root.
 - [x] Continue Milestone 1 by deferring or splitting additional noncritical desktop trade surfaces beyond the chart and wallet crypto path.
 - [x] Reduce chart startup and overlay main-thread work so the trade route stops producing the current long-task and forced-reflow pattern.
-- [ ] Eliminate the remaining low-risk layout-shift and animation noise on the trade shell without regressing design-system behavior.
+- [x] Eliminate the remaining low-risk layout-shift and animation noise on the trade shell without regressing design-system behavior.
 - [ ] Capture a fresh deployed PageSpeed desktop report and broader post-change signoff evidence before closing `hyperopen-k47v`.
 
 ## Surprises & Discoveries
@@ -96,6 +99,12 @@ After this work, the default desktop trade load should remain visually fast whil
 - Observation: the current worktree already clears the governed trade-route browser-QA matrix after the startup and overlay cuts.
   Evidence: `tmp/browser-inspection/design-review-2026-04-01T22-15-00-677Z-f868d411/summary.json` recorded `PASS` for visual, native-control, styling-consistency, interaction, layout-regression, and jank/perf at widths `375`, `768`, `1280`, and `1440`.
 
+- Observation: the chart loading shell did not need a broader canvas rewrite; the meaningful parity gap was in the toolbar anatomy.
+  Evidence: `/hyperopen/src/hyperopen/views/trade_view.cljs` already used the same `trading-chart-host` and `min-h-[360px]` shell host as `/hyperopen/src/hyperopen/views/trading_chart/core.cljs`, while the shell header still used a simplified `justify-between` row without the live toolbar’s divider and control sections.
+
+- Observation: removing the footer meter's color-transition classes did not produce any governed browser-QA regressions on the `/trade` route.
+  Evidence: after the connection-meter cleanup landed, `tmp/browser-inspection/design-review-2026-04-02T01-33-47-037Z-3820990c/summary.json` still recorded `PASS` for visual, styling-consistency, interaction, and jank/perf across all required widths.
+
 ## Decision Log
 
 - Decision: use `/trade` as the local benchmark route even though the public audit URL is `/`.
@@ -150,11 +159,19 @@ After this work, the default desktop trade load should remain visually fast whil
   Rationale: the control is invisible on cold startup, so binding only lightweight container listeners on the cold path preserves visible behavior while removing unnecessary DOM work from the initial chart-mount burst.
   Date/Author: 2026-04-02 / Codex
 
+- Decision: keep the chart loading shell’s canvas host unchanged and only bring the shell toolbar into closer parity with the resolved chart toolbar.
+  Rationale: the host geometry already matched the resolved chart surface closely enough; the remaining avoidable movement came from the simplified shell header rather than from the chart canvas box.
+  Date/Author: 2026-04-02 / Codex
+
+- Decision: remove the footer connection meter’s color-transition classes instead of replacing them with another animation primitive.
+  Rationale: the meter represents websocket state, not deliberate UI choreography, so instant tone changes are acceptable and lower risk than preserving a tiny color animation that still trips the audit.
+  Date/Author: 2026-04-02 / Codex
+
 ## Outcomes & Retrospective
 
-Six implementation waves have landed and the plan has now materially reduced the local release-backed startup workload on the default desktop trade route. The current result is a narrower startup path on the default desktop trade route: the initial router bootstrap no longer loads the trade chart module before first paint, wallet-session startup no longer imports agent keygen or address-derivation crypto by default, exchange-signing helpers now live in a separate `trading_crypto` browser module that is not fetched on the cold route, indicator runtime and `indicatorts` now live in a dedicated `trading_indicators` chunk that also stays off the cold route, the lower desktop account surfaces stay behind stable placeholders until the post-render startup phase marks them ready, the order form no longer computes hidden TP/SL, TWAP, or scale-preview work on the cold desktop path, the chart overlay subscriptions now coalesce duplicate repaint events instead of re-running the same overlay work multiple times per startup burst, and the chart navigation overlay no longer builds its DOM subtree or document keyboard listener on cold mount. The repository gates remain green after those changes, the governed trade-route browser QA matrix now passes on the current worktree, and the best fresh release-backed local profiles are now `tmp/browser-inspection/trade-startup-profile-2026-04-01T22-08-11-569Z-c86ac31f/` and `tmp/browser-inspection/trade-startup-profile-2026-04-01T22-08-33-496Z-8de4bdac/`, which recorded `blockingTimeProxyMs` / `maxSingleBlockingTaskMs` of `48/98` and `43/93` respectively, with `tradeRootVisibleMs` around `265ms`.
+Seven implementation waves have landed and the plan has now materially reduced the local release-backed startup workload on the default desktop trade route while also closing the low-risk polish items. The current result is a narrower startup path on the default desktop trade route: the initial router bootstrap no longer loads the trade chart module before first paint, wallet-session startup no longer imports agent keygen or address-derivation crypto by default, exchange-signing helpers now live in a separate `trading_crypto` browser module that is not fetched on the cold route, indicator runtime and `indicatorts` now live in a dedicated `trading_indicators` chunk that also stays off the cold route, the lower desktop account surfaces stay behind stable placeholders until the post-render startup phase marks them ready, the order form no longer computes hidden TP/SL, TWAP, or scale-preview work on the cold desktop path, the chart overlay subscriptions now coalesce duplicate repaint events instead of re-running the same overlay work multiple times per startup burst, the chart navigation overlay no longer builds its DOM subtree or document keyboard listener on cold mount, the trade-chart loading shell now mirrors the live toolbar structure more closely, and the footer connection meter no longer animates color transitions that PageSpeed flags as non-composited. The repository gates remain green after those changes, the governed trade-route browser QA matrix still passes on the current worktree, and the best fresh release-backed local profiles remain `tmp/browser-inspection/trade-startup-profile-2026-04-01T22-08-11-569Z-c86ac31f/` and `tmp/browser-inspection/trade-startup-profile-2026-04-01T22-08-33-496Z-8de4bdac/`, which recorded `blockingTimeProxyMs` / `maxSingleBlockingTaskMs` of `48/98` and `43/93` respectively, with `tradeRootVisibleMs` around `265ms`.
 
-This plan remains active because the remaining work has shifted from local CPU cutting to polish and deployment closure. Milestone 0 now has a dedicated artifact root at `tmp/trade-startup-tbt-2026-04-01/README.md`, the local Milestone 2 threshold is comfortably met on fresh release assets, the governed `/trade` browser QA matrix is already green, and the broader committed smoke suite now passes on the current worktree. The remaining high-value work is therefore narrower: decide whether the low-risk shell-polish items in Milestone 3 are still worth landing, and capture a fresh deployed PageSpeed desktop report before closing `hyperopen-k47v`.
+This plan remains active because the remaining work has shifted almost entirely to deployment proof. Milestone 0 now has a dedicated artifact root at `tmp/trade-startup-tbt-2026-04-01/README.md`, the local Milestone 2 threshold is comfortably met on fresh release assets, Milestone 3 is now complete, the governed `/trade` browser QA matrix is green on a fresh post-polish run, and the broader committed smoke suite still passes. The remaining required work is now singular: capture a fresh deployed PageSpeed desktop report and record the final live metrics before closing `hyperopen-k47v`.
 
 ## Context and Orientation
 

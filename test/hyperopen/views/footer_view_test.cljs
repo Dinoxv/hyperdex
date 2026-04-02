@@ -202,15 +202,21 @@
 (deftest status-meter-button-has-no-border-or-shaded-background-test
   (let [view (footer-view/footer-view (base-state))
         pill (find-pill view)
-        classes (set (class-values (get-in pill [1 :class])))]
+        first-bar (find-node-by-data-role pill "footer-connection-meter-bar")
+        classes (set (class-values (get-in pill [1 :class])))
+        bar-classes (set (class-values (get-in first-bar [1 :class])))]
     (is (some? pill))
+    (is (some? first-bar))
     (is (not (contains? classes "border")))
     (is (not (contains? classes "border-success/50")))
     (is (not (contains? classes "border-warning/50")))
     (is (not (contains? classes "border-error/50")))
     (is (not (contains? classes "bg-success/10")))
     (is (not (contains? classes "bg-warning/10")))
-    (is (not (contains? classes "bg-error/10")))))
+    (is (not (contains? classes "bg-error/10")))
+    (is (not (contains? classes "transition-colors")))
+    (is (not (contains? bar-classes "transition-colors")))
+    (is (not (contains? bar-classes "duration-150")))))
 
 (deftest status-meter-button-bottom-aligns-label-with-bars-test
   (let [view (footer-view/footer-view (base-state))

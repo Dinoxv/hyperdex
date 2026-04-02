@@ -25,8 +25,7 @@
        [:span {:class (into ["block"
                              "w-[3px]"
                              "rounded-sm"
-                             "transition-colors"
-                             "duration-150"]
+                             ]
                             (if active?
                               [bar-active-class]
                               ["bg-base-300/70"]))
@@ -47,7 +46,6 @@
                       "py-1"
                       "text-xs"
                       "font-medium"
-                      "transition-colors"
                       "focus:outline-none"
                       "focus:ring-0"
                       "focus:ring-offset-0"
