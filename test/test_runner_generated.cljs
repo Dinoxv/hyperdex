@@ -24,6 +24,7 @@
             [hyperopen.api.endpoints.leaderboard-test]
             [hyperopen.api.endpoints.market-test]
             [hyperopen.api.endpoints.orders-test]
+            [hyperopen.api.endpoints.vaults-helpers-test]
             [hyperopen.api.endpoints.vaults-test]
             [hyperopen.api.errors-test]
             [hyperopen.api.facade-runtime-test]
@@ -100,6 +101,7 @@
             [hyperopen.funding.application.hyperunit-query-test]
             [hyperopen.funding.application.hyperunit-submit-test]
             [hyperopen.funding.application.lifecycle-polling-test]
+            [hyperopen.funding.application.lifecycle-polling.internal-test]
             [hyperopen.funding.application.modal-state-test]
             [hyperopen.funding.application.modal-vm-test]
             [hyperopen.funding.application.modal-vm.amounts-test]
@@ -109,6 +111,7 @@
             [hyperopen.funding.application.modal-vm.models-test]
             [hyperopen.funding.application.modal-vm.presentation-test]
             [hyperopen.funding.application.submit-effects-test]
+            [hyperopen.funding.domain.policy-preview-test]
             [hyperopen.funding.domain.policy-test]
             [hyperopen.funding.effects-api-wrappers-test]
             [hyperopen.funding.effects-test]
@@ -458,6 +461,7 @@
              'hyperopen.api.endpoints.leaderboard-test
              'hyperopen.api.endpoints.market-test
              'hyperopen.api.endpoints.orders-test
+             'hyperopen.api.endpoints.vaults-helpers-test
              'hyperopen.api.endpoints.vaults-test
              'hyperopen.api.errors-test
              'hyperopen.api.facade-runtime-test
@@ -534,6 +538,7 @@
              'hyperopen.funding.application.hyperunit-query-test
              'hyperopen.funding.application.hyperunit-submit-test
              'hyperopen.funding.application.lifecycle-polling-test
+             'hyperopen.funding.application.lifecycle-polling.internal-test
              'hyperopen.funding.application.modal-state-test
              'hyperopen.funding.application.modal-vm-test
              'hyperopen.funding.application.modal-vm.amounts-test
@@ -543,6 +548,7 @@
              'hyperopen.funding.application.modal-vm.models-test
              'hyperopen.funding.application.modal-vm.presentation-test
              'hyperopen.funding.application.submit-effects-test
+             'hyperopen.funding.domain.policy-preview-test
              'hyperopen.funding.domain.policy-test
              'hyperopen.funding.effects-api-wrappers-test
              'hyperopen.funding.effects-test
