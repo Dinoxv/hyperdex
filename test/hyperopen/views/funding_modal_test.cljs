@@ -456,6 +456,8 @@
         (is (contains? (set (get-in modal-node [1 :class])) "rounded-t-[22px]"))
         (is (contains? (set (get-in modal-node [1 :class])) "bg-[#06131a]"))
         (is (= "true" (get-in modal-node [1 :data-funding-mobile-sheet-surface])))
+        (is (= "funding-modal-title" (get-in modal-node [1 :aria-labelledby])))
+        (is (fn? (get-in modal-node [1 :replicant/on-render])))
         (is (some? send-step))
         (is (some? destination-input))
         (is (some? amount-input))

@@ -1,5 +1,6 @@
 (ns hyperopen.funding.application.modal-vm-test
   (:require [cljs.test :refer-macros [deftest is]]
+            [hyperopen.funding.contracts :as contracts]
             [hyperopen.funding.application.modal-vm :as modal-vm]
             [hyperopen.funding.application.modal-vm.test-support :as support]))
 
@@ -127,3 +128,93 @@
            (get-in view-model [:deposit :flow :unsupported-detail])))
     (is (= "Deposit unavailable"
            (get-in view-model [:deposit :actions :submit-label])))))
+
+(deftest funding-modal-view-model-contract-covers-supported-content-kinds-test
+  (let [unsupported-asset (support/deposit-asset :flow-kind :route
+                                                 :implemented? false)
+        btc-asset (support/withdraw-asset :key :btc
+                                          :symbol "BTC"
+                                          :flow-kind :hyperunit-address
+                                          :source-chain "bitcoin"
+                                          :min 0.0003
+                                          :max 1.25)
+        cases [{:name "deposit/select"
+                :expected-kind :deposit/select
+                :state (support/base-state {:modal {:deposit-step :asset-select}
+                                            :deposit-asset nil
+                                            :preview-result {:ok? false
+                                                             :display-message "Select an asset."}})}
+               {:name "deposit/address"
+                :expected-kind :deposit/address
+                :state (support/base-state {:modal {:deposit-generated-asset-key :btc
+                                                    :deposit-generated-address "bc1generated"
+                                                    :deposit-generated-signatures ["sig-a"]}})}
+               {:name "deposit/unavailable"
+                :expected-kind :deposit/unavailable
+                :state (support/base-state {:deposit-assets [unsupported-asset]
+                                            :deposit-asset unsupported-asset
+                                            :preview-result {:ok? false
+                                                             :display-message "Deposit routing unavailable."}})}
+               {:name "send/form"
+                :expected-kind :send/form
+                :state (support/base-state {:modal {:mode :send
+                                                    :send-token "USDC"
+                                                    :send-symbol "USDC"
+                                                    :send-max-amount 12.5
+                                                    :send-max-display "12.500000"
+                                                    :send-max-input "12.500000"
+                                                    :amount-input ""
+                                                    :destination-input ""}})}
+               {:name "transfer/form"
+                :expected-kind :transfer/form
+                :state (support/base-state {:modal {:mode :transfer
+                                                    :to-perp? false
+                                                    :amount-input "12"}})}
+               {:name "withdraw/select"
+                :expected-kind :withdraw/select
+                :state (support/base-state {:modal {:mode :withdraw
+                                                    :withdraw-step :asset-select
+                                                    :withdraw-search-input "bt"}
+                                            :withdraw-assets [(assoc (support/withdraw-asset :key :usdc
+                                                                                              :symbol "USDC"
+                                                                                              :flow-kind :evm-address
+                                                                                              :max 360.793551)
+                                                                     :available-display "360.793551"
+                                                                     :available-detail-display "360.793551")
+                                                             (assoc btc-asset
+                                                                    :available-display "1.25"
+                                                                    :available-detail-display "1.25")]
+                                            :withdraw-asset btc-asset})}
+               {:name "withdraw/detail"
+                :expected-kind :withdraw/detail
+                :state (support/base-state {:modal {:mode :withdraw
+                                                    :withdraw-step :amount-entry
+                                                    :withdraw-selected-asset-key :btc
+                                                    :amount-input "0.25"
+                                                    :destination-input "bc1qexample"
+                                                    :hyperunit-lifecycle {:direction :withdraw
+                                                                          :asset-key :btc
+                                                                          :state :failed
+                                                                          :status :terminal
+                                                                          :position-in-withdraw-queue 4
+                                                                          :destination-tx-hash "tx-123"
+                                                                          :recovery-hint "Retry from the activity panel."}
+                                                    :hyperunit-fee-estimate {:status :ready
+                                                                             :by-chain {"bitcoin" {:withdrawal-eta "~20 mins"
+                                                                                                   :withdrawal-fee "0.00001"}}}
+                                                    :hyperunit-withdrawal-queue {:status :ready
+                                                                                 :by-chain {"bitcoin" {:withdrawal-queue-length 9
+                                                                                                       :last-withdraw-queue-operation-tx-id
+                                                                                                       "queue-123"}}}}
+                                            :withdraw-assets [btc-asset]
+                                            :withdraw-asset btc-asset})}
+               {:name "legacy"
+                :expected-kind :unsupported/workflow
+                :state (support/base-state {:modal {:mode :legacy
+                                                    :legacy-kind :bridge}})}]]
+    (doseq [{:keys [name expected-kind state]} cases]
+      (let [view-model (modal-vm/funding-modal-view-model (support/base-deps) state)]
+        (is (contracts/funding-modal-vm-valid? view-model)
+            (str "contract failed for " name))
+        (is (= expected-kind (get-in view-model [:content :kind]))
+            (str "unexpected content kind for " name))))))

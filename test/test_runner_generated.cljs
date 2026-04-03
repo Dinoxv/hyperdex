@@ -284,6 +284,7 @@
             [hyperopen.views.footer-view-test]
             [hyperopen.views.funding-comparison-view-test]
             [hyperopen.views.funding-comparison.vm-test]
+            [hyperopen.views.funding-modal-accessibility-test]
             [hyperopen.views.funding-modal-test]
             [hyperopen.views.header-view-test]
             [hyperopen.views.header.vm-test]
@@ -360,6 +361,7 @@
             [hyperopen.views.trading-chart.utils.position-overlay-model-test]
             [hyperopen.views.typography-scale-test]
             [hyperopen.views.ui.anchored-popover-test]
+            [hyperopen.views.ui.dialog-focus-test]
             [hyperopen.views.ui.funding-modal-positioning-test]
             [hyperopen.views.vaults.detail-view-hover-freeze-test]
             [hyperopen.views.vaults.detail-view-test]
@@ -725,6 +727,7 @@
              'hyperopen.views.footer-view-test
              'hyperopen.views.funding-comparison-view-test
              'hyperopen.views.funding-comparison.vm-test
+             'hyperopen.views.funding-modal-accessibility-test
              'hyperopen.views.funding-modal-test
              'hyperopen.views.header-view-test
              'hyperopen.views.header.vm-test
@@ -801,6 +804,7 @@
              'hyperopen.views.trading-chart.utils.position-overlay-model-test
              'hyperopen.views.typography-scale-test
              'hyperopen.views.ui.anchored-popover-test
+             'hyperopen.views.ui.dialog-focus-test
              'hyperopen.views.ui.funding-modal-positioning-test
              'hyperopen.views.vaults.detail-view-hover-freeze-test
              'hyperopen.views.vaults.detail-view-test

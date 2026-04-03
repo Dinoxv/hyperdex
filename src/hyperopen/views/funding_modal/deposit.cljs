@@ -28,7 +28,11 @@
   [:div {:class ["space-y-3"] :data-role "funding-deposit-select-step"}
    [:p {:class ["text-sm" "leading-6" "text-[#8fa7ae]"]}
     "Deposit funds to start trading immediately. You can withdraw at any time."]
+   [:label {:for "funding-deposit-search-input"
+            :class ["sr-only"]}
+    "Search deposit assets"]
    [:input {:type "text"
+            :id "funding-deposit-search-input"
             :placeholder (:placeholder search)
             :value (:value search)
             :class ["w-full"
@@ -138,7 +142,8 @@
       (str "From the " (:network selected-asset) " network")]
      (shared/deposit-asset-card selected-asset)
      [:div {:class ["space-y-1.5"]}
-      [:label {:class ["block" "text-xs" "text-[#7e94a0]"]}
+      [:label {:for "funding-deposit-amount-input"
+               :class ["block" "text-xs" "text-[#7e94a0]"]}
        "Amount"]
       [:div {:class ["flex"
                      "items-center"
@@ -175,6 +180,7 @@
                  :on {:click [[:actions/set-funding-deposit-amount-to-minimum]]}}
         "MIN"]
        [:input {:type "text"
+                :id "funding-deposit-amount-input"
                 :inputmode "decimal"
                 :placeholder (str (:minimum-value amount))
                 :disabled submitting?

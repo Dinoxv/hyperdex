@@ -35,9 +35,11 @@
    [:p {:class ["text-sm" "leading-6" "text-[#8fa7ae]"]}
     "Send tokens to another account on the Hyperliquid L1."]
    [:div {:class ["space-y-2"]}
-    [:label {:class ["block" "text-xs" "uppercase" "tracking-[0.08em]" "text-[#8ea4ab]"]}
-     "Destination"]
+    [:label {:for "funding-send-destination-input"
+             :class ["block" "text-xs" "uppercase" "tracking-[0.08em]" "text-[#8ea4ab]"]}
+      "Destination"]
     [:input {:type "text"
+             :id "funding-send-destination-input"
              :placeholder "0x..."
              :disabled (get-in actions [:submitting?])
              :value (:value destination)
@@ -77,6 +79,7 @@
       "Asset"]
      (send-asset-field asset)]]
    (shared/amount-input-field {:label "Amount"
+                               :input-id "funding-send-amount-input-field"
                                :value (:value amount)
                                :placeholder "Enter amount"
                                :disabled? (get-in actions [:submitting?])

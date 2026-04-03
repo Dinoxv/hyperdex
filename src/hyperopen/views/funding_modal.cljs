@@ -4,8 +4,34 @@
             [hyperopen.views.funding-modal.send :as send]
             [hyperopen.views.funding-modal.transfer :as transfer]
             [hyperopen.views.funding-modal.withdraw :as withdraw]
+            [hyperopen.views.ui.dialog-focus :as dialog-focus]
             [hyperopen.views.ui.funding-modal-positioning
              :as funding-modal-positioning]))
+
+(def ^:private funding-modal-title-id
+  "funding-modal-title")
+
+(def ^:private funding-modal-focus-on-render-default
+  (dialog-focus/dialog-focus-on-render))
+
+(def ^:private funding-modal-focus-on-render-by-mode
+  {:deposit (dialog-focus/dialog-focus-on-render
+             {:restore-selector (str "[data-role=\""
+                                     funding-modal-positioning/deposit-action-data-role
+                                     "\"]")})
+   :transfer (dialog-focus/dialog-focus-on-render
+              {:restore-selector (str "[data-role=\""
+                                      funding-modal-positioning/transfer-action-data-role
+                                      "\"]")})
+   :withdraw (dialog-focus/dialog-focus-on-render
+              {:restore-selector (str "[data-role=\""
+                                      funding-modal-positioning/withdraw-action-data-role
+                                      "\"]")})})
+
+(defn- funding-modal-focus-on-render
+  [mode]
+  (or (get funding-modal-focus-on-render-by-mode mode)
+      funding-modal-focus-on-render-default))
 
 (defn- legacy-content
   [{:keys [message]}]
@@ -82,12 +108,15 @@
                     popover-style
                     sheet-style]}
             (funding-modal-positioning/resolve-modal-layout modal)
+            focus-on-render (funding-modal-focus-on-render (:mode modal))
             panel-children
             [[:div {:class ["flex" "items-center" "justify-between"]}
-              [:h2 {:class ["text-lg" "font-semibold" "text-[#e5eef1]"]}
+              [:h2 {:id funding-modal-title-id
+                    :class ["text-lg" "font-semibold" "text-[#e5eef1]"]}
                (:title modal)]
               [:button {:type "button"
                         :aria-label "Close funding dialog"
+                        :data-role "funding-modal-close"
                         :class (into ["h-8"
                                       "w-8"
                                       "leading-none"
@@ -160,11 +189,12 @@
                                                        :opacity 0}}
                         :role "dialog"
                         :aria-modal true
-                        :aria-label (:title modal)
+                        :aria-labelledby funding-modal-title-id
                         :tab-index 0
                         :data-role "funding-modal"
                         :data-parity-id "funding-modal-mobile"
                         :data-funding-mobile-sheet-surface "true"
+                        :replicant/on-render focus-on-render
                         :on {:keydown [[:actions/handle-funding-modal-keydown
                                         [:event/key]]]}}]
                  (keep identity panel-children))]
@@ -193,10 +223,11 @@
                           :style (or popover-style)
                           :role "dialog"
                           :aria-modal true
-                          :aria-label (:title modal)
+                          :aria-labelledby funding-modal-title-id
                           :tab-index 0
                           :data-role "funding-modal"
                           :data-parity-id "funding-modal-desktop"
+                          :replicant/on-render focus-on-render
                           :on {:keydown [[:actions/handle-funding-modal-keydown
                                           [:event/key]]]}}]
                  (keep identity panel-children))])))))

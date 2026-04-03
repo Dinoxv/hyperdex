@@ -20,6 +20,7 @@
               :on {:click [[:actions/set-funding-transfer-direction false]]}}
      "Perps -> Spot"]]
    (shared/amount-input-field {:label "Amount (USDC)"
+                               :input-id "funding-transfer-amount-input-field"
                                :value (:value amount)
                                :placeholder "Enter amount"
                                :disabled? (get-in actions [:submitting?])

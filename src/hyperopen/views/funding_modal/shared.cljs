@@ -272,6 +272,7 @@
 
 (defn amount-input-field
   [{:keys [label
+           input-id
            value
            placeholder
            disabled?
@@ -283,7 +284,8 @@
            data-role]}]
   [:div {:class ["space-y-2"]}
    [:div {:class ["flex" "items-center" "justify-between" "gap-2"]}
-    [:label {:class ["block" "text-xs" "uppercase" "tracking-[0.08em]" "text-[#8ea4ab]"]}
+    [:label {:for input-id
+             :class ["block" "text-xs" "uppercase" "tracking-[0.08em]" "text-[#8ea4ab]"]}
      label]
     (when (and max-action (seq max-label))
       [:button {:type "button"
@@ -303,6 +305,7 @@
                   "py-2"
                   "gap-2"]}
     [:input {:type "text"
+             :id input-id
              :inputmode "decimal"
              :placeholder placeholder
              :disabled disabled?
@@ -326,7 +329,8 @@
       [:span {:class ["text-sm" "text-[#7e95a0]"]} suffix])]])
 
 (defn withdraw-amount-input-field
-  [{:keys [value
+  [{:keys [input-id
+           value
            placeholder
            disabled?
            input-action
@@ -334,7 +338,8 @@
            suffix
            data-role]}]
   [:div {:class ["space-y-2"]}
-   [:label {:class ["block" "text-xs" "uppercase" "tracking-[0.08em]" "text-[#8ea4ab]"]}
+   [:label {:for input-id
+            :class ["block" "text-xs" "uppercase" "tracking-[0.08em]" "text-[#8ea4ab]"]}
     "Amount"]
    [:div {:class ["flex"
                   "items-center"
@@ -369,11 +374,12 @@
                         "text-[#e6eef2]"
                         "hover:border-[#607487]"])
               :on {:click [[max-action]]}}
-     "MAX"]
-    [:input {:type "text"
-             :inputmode "decimal"
-             :placeholder placeholder
-             :disabled disabled?
+       "MAX"]
+       [:input {:type "text"
+                :id input-id
+                :inputmode "decimal"
+                :placeholder placeholder
+                :disabled disabled?
              :value (format-grouped-amount-input value)
              :class ["flex-1"
                      "bg-transparent"

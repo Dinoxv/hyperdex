@@ -31,7 +31,11 @@
   [:div {:class ["space-y-3"] :data-role "funding-withdraw-select-step"}
    [:p {:class ["text-sm" "leading-6" "text-[#8fa7ae]"]}
     "Withdraw funds from your Hyperliquid account. You can deposit at any time."]
+   [:label {:for "funding-withdraw-search-input"
+            :class ["sr-only"]}
+    "Search withdraw assets"]
    [:input {:type "text"
+            :id "funding-withdraw-search-input"
             :placeholder (:placeholder search)
             :value (:value search)
             :class ["w-full"
@@ -109,9 +113,11 @@
 (defn- withdraw-destination-field
   [selected-asset flow destination submitting?]
   [:div {:class ["space-y-2"]}
-   [:label {:class ["block" "text-xs" "uppercase" "tracking-[0.08em]" "text-[#8ea4ab]"]}
+   [:label {:for "funding-withdraw-destination-input"
+            :class ["block" "text-xs" "uppercase" "tracking-[0.08em]" "text-[#8ea4ab]"]}
     (withdraw-destination-label selected-asset flow)]
    [:input {:type "text"
+            :id "funding-withdraw-destination-input"
             :placeholder (withdraw-destination-placeholder selected-asset flow)
             :disabled submitting?
             :value (:value destination)
@@ -226,7 +232,8 @@
       (str "To the " (:network selected-asset) " network")]
      (withdraw-asset-selector selected-asset)
      (withdraw-destination-field selected-asset flow destination submitting?)
-     (shared/withdraw-amount-input-field {:value (:value amount)
+     (shared/withdraw-amount-input-field {:input-id "funding-withdraw-amount-input"
+                                          :value (:value amount)
                                           :placeholder "Enter amount"
                                           :disabled? submitting?
                                           :input-action :actions/enter-funding-withdraw-amount

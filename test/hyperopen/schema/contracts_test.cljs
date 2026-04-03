@@ -1,5 +1,8 @@
 (ns hyperopen.schema.contracts-test
   (:require [cljs.test :refer-macros [deftest is]]
+            [hyperopen.funding.application.modal-vm :as funding-modal-vm]
+            [hyperopen.funding.application.modal-vm.test-support :as funding-support]
+            [hyperopen.schema.funding-modal-contracts :as funding-modal-contracts]
             [hyperopen.schema.order-form-contracts :as order-form-contracts]))
 
 (deftest order-form-vm-schema-contracts-test
@@ -81,3 +84,57 @@
          js/Error
          #"order-form transition schema validation failed"
          (order-form-contracts/assert-order-form-transition! invalid-transition {:phase :test})))))
+
+(deftest funding-modal-vm-schema-contracts-test
+  (let [btc-asset (funding-support/withdraw-asset :key :btc
+                                                  :symbol "BTC"
+                                                  :name "Bitcoin"
+                                                  :network "Bitcoin"
+                                                  :flow-kind :hyperunit-address
+                                                  :hyperunit-source-chain "bitcoin"
+                                                  :min 0.0003
+                                                  :max 1.25
+                                                  :available-amount 1.25
+                                                  :available-display "1.25"
+                                                  :available-detail-display "1.25")
+        valid-vm (funding-modal-vm/funding-modal-view-model
+                  (funding-support/base-deps)
+                  (funding-support/base-state {:modal {:mode :withdraw
+                                                      :withdraw-step :amount-entry
+                                                      :withdraw-selected-asset-key :btc
+                                                      :amount-input "0.25"
+                                                      :destination-input "bc1qexample"
+                                                      :hyperunit-lifecycle {:direction :withdraw
+                                                                            :asset-key :btc
+                                                                            :state :failed
+                                                                            :status :terminal
+                                                                            :position-in-withdraw-queue 4
+                                                                            :destination-tx-hash "tx-123"
+                                                                            :recovery-hint "Retry from the activity panel."}
+                                                      :hyperunit-withdrawal-queue {:status :ready
+                                                                                   :by-chain {"bitcoin" {:withdrawal-queue-length 9
+                                                                                                         :last-withdraw-queue-operation-tx-id
+                                                                                                         "queue-123"}}}}
+                                               :withdraw-assets [btc-asset]
+                                               :withdraw-asset btc-asset}))
+        invalid-vm (assoc valid-vm :unknown true)
+        invalid-asset-vm (assoc-in valid-vm [:deposit :assets 0 :unexpected] true)
+        invalid-raw-lifecycle-vm (assoc-in valid-vm [:hyperunit-lifecycle :unexpected] true)
+        invalid-queue-vm (assoc-in valid-vm [:hyperunit-withdrawal-queue :by-chain "bitcoin" :unexpected] true)
+        invalid-panel-lifecycle-vm (assoc-in valid-vm [:withdraw :lifecycle :unexpected] true)]
+    (is (true? (funding-modal-contracts/funding-modal-vm-valid? valid-vm)))
+    (is (false? (funding-modal-contracts/funding-modal-vm-valid? invalid-vm)))
+    (is (false? (funding-modal-contracts/funding-modal-vm-valid? invalid-asset-vm)))
+    (is (false? (funding-modal-contracts/funding-modal-vm-valid? invalid-raw-lifecycle-vm)))
+    (is (false? (funding-modal-contracts/funding-modal-vm-valid? invalid-queue-vm)))
+    (is (false? (funding-modal-contracts/funding-modal-vm-valid? invalid-panel-lifecycle-vm)))
+    (is (= valid-vm
+           (funding-modal-contracts/assert-funding-modal-vm! valid-vm {:phase :test})))
+    (is (thrown-with-msg?
+         js/Error
+         #"funding modal VM schema validation failed"
+         (funding-modal-contracts/assert-funding-modal-vm! invalid-vm {:phase :test})))
+    (is (thrown-with-msg?
+         js/Error
+         #"funding modal VM schema validation failed"
+         (funding-modal-contracts/assert-funding-modal-vm! invalid-panel-lifecycle-vm {:phase :test})))))

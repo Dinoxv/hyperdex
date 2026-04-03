@@ -1,11 +1,23 @@
 (ns hyperopen.views.workbench-render-seams-test
   (:require [cljs.test :refer-macros [deftest is]]
+            [clojure.walk :as walk]
             [hyperopen.funding.actions :as funding-actions]
             [hyperopen.views.funding-modal :as funding-modal]
             [hyperopen.views.trade.order-form-handlers :as order-form-handlers]
             [hyperopen.views.trade.order-form-vm :as order-form-vm]
             [hyperopen.views.trade.order-form.test-support :refer [base-state]]
             [hyperopen.views.trade.order-form-view :as order-form-view]))
+
+(defn- normalize-hiccup-for-seam-comparison
+  [node]
+  (walk/postwalk
+   (fn [value]
+     (if (map? value)
+       (cond-> value
+         (fn? (:replicant/on-render value))
+         (assoc :replicant/on-render ::on-render))
+       value))
+   node))
 
 (defn- funding-state
   []
@@ -42,4 +54,5 @@
         via-wrapper (funding-modal/funding-modal-view state)
         via-seam (funding-modal/render-funding-modal
                   (funding-actions/funding-modal-view-model state))]
-    (is (= via-wrapper via-seam))))
+    (is (= (normalize-hiccup-for-seam-comparison via-wrapper)
+           (normalize-hiccup-for-seam-comparison via-seam)))))

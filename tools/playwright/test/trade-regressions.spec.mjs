@@ -845,6 +845,40 @@ test("funding modal deposit flow selects USDC @regression", async ({ page }) => 
   });
 });
 
+test("funding modal accessibility keeps focus in dialog and exposes labels @regression", async ({ page }) => {
+  await visitRoute(page, "/trade");
+
+  const openButton = page.locator('[data-role="funding-action-deposit"]');
+  await expect(openButton).toBeVisible();
+  await page.evaluate(() => {
+    const button = document.querySelector('[data-role="funding-action-deposit"]');
+    button?.focus();
+    button?.click();
+  });
+  await waitForIdle(page, { quietMs: 150, timeoutMs: 3_000, pollMs: 50 });
+
+  const dialog = page.locator('[data-role="funding-modal"]');
+  const closeButton = page.locator('[data-role="funding-modal-close"]');
+
+  await expect(dialog).toHaveAttribute("aria-labelledby", "funding-modal-title");
+  await expect(page.locator("#funding-modal-title")).toHaveText("Deposit");
+  await expect(page.getByLabel("Search deposit assets")).toBeVisible();
+  await expect(closeButton).toBeFocused();
+
+  await page.keyboard.press("Shift+Tab");
+  await expect
+    .poll(async () =>
+      dialog.evaluate((element) => element.contains(document.activeElement))
+    )
+    .toBe(true);
+
+  await dispatch(page, [":actions/select-funding-deposit-asset", "usdc"]);
+  await waitForIdle(page, { quietMs: 150, timeoutMs: 3_000, pollMs: 50 });
+
+  await expect(page.getByLabel("Amount")).toBeVisible();
+  await expect(dialog).toHaveAttribute("aria-labelledby", "funding-modal-title");
+});
+
 test("funding tooltip transitions from live position to hypothetical estimate @regression", async ({ page }) => {
   const livePosition = {
     coin: "BTC",
