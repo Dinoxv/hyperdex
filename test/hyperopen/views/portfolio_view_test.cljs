@@ -334,15 +334,15 @@
            (get-in (get portfolio-action-buttons "portfolio-action-portfolio-margin") [1 :on :click])))
     (is (= [[:actions/open-funding-transfer-modal
              :event.currentTarget/bounds
-             :event.currentTarget/data-role]]
+             "portfolio-action-send"]]
            (get-in (get portfolio-action-buttons "portfolio-action-send") [1 :on :click])))
     (is (= [[:actions/open-funding-withdraw-modal
              :event.currentTarget/bounds
-             :event.currentTarget/data-role]]
+             "portfolio-action-withdraw"]]
            (get-in (get portfolio-action-buttons "portfolio-action-withdraw") [1 :on :click])))
     (is (= [[:actions/open-funding-deposit-modal
              :event.currentTarget/bounds
-             :event.currentTarget/data-role]]
+             "portfolio-action-deposit"]]
            (get-in (get portfolio-action-buttons "portfolio-action-deposit") [1 :on :click])))
     (is (= "Performance Metrics" (first portfolio-tab-labels)))
     (is (str/starts-with? (or (second portfolio-tab-labels) "") "Balances"))
@@ -621,17 +621,17 @@
         deposit-button (find-first-node view-node
                                         #(= [[:actions/open-funding-deposit-modal
                                                :event.currentTarget/bounds
-                                               :event.currentTarget/data-role]]
+                                               "portfolio-action-deposit"]]
                                             (get-in % [1 :on :click])))
         transfer-button (find-first-node view-node
                                          #(= [[:actions/open-funding-transfer-modal
                                                 :event.currentTarget/bounds
-                                                :event.currentTarget/data-role]]
+                                                "portfolio-action-send"]]
                                              (get-in % [1 :on :click])))
         withdraw-button (find-first-node view-node
                                          #(= [[:actions/open-funding-withdraw-modal
                                                 :event.currentTarget/bounds
-                                                :event.currentTarget/data-role]]
+                                                "portfolio-action-withdraw"]]
                                              (get-in % [1 :on :click])))]
     (is (some? deposit-button))
     (is (some? transfer-button))

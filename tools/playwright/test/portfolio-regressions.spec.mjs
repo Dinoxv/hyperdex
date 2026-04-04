@@ -1,5 +1,12 @@
 import { expect, test } from "@playwright/test";
-import { debugCall, dispatch, sourceRectForLocator, visitRoute, waitForIdle } from "../support/hyperopen.mjs";
+import {
+  debugCall,
+  dispatch,
+  expectOracle,
+  sourceRectForLocator,
+  visitRoute,
+  waitForIdle
+} from "../support/hyperopen.mjs";
 
 const TRADER_ADDRESS = "0x3333333333333333333333333333333333333333";
 const SPECTATE_ADDRESS = "0x162cc7c861ebd0c06b3d72319201150482518185";
@@ -72,6 +79,46 @@ test("portfolio funding modal restores opener focus on close @regression", async
 
   await expect(dialog).toBeHidden();
   await expect(openButton).toBeFocused();
+});
+
+test("portfolio funding openers launch the funding modal on real click @regression", async ({ page }) => {
+  await visitRoute(page, "/portfolio");
+
+  for (const [dataRole, title] of [
+    ["portfolio-action-deposit", "Deposit"],
+    ["portfolio-action-send", "Perps <-> Spot"],
+    ["portfolio-action-withdraw", "Withdraw"]
+  ]) {
+    const openButton = page.locator(`[data-role='${dataRole}']`);
+
+    await expect(openButton).toBeVisible();
+    await openButton.click();
+    await waitForIdle(page, { quietMs: 150, timeoutMs: 3_000, pollMs: 50 });
+    await expectOracle(page, "funding-modal", { open: true, title });
+
+    await page.locator("[data-role='funding-modal-close']").click();
+    await waitForIdle(page, { quietMs: 150, timeoutMs: 3_000, pollMs: 50 });
+    await expectOracle(page, "funding-modal", { open: false });
+  }
+
+  await selectAccountTab(page, "deposits-withdrawals");
+
+  for (const [dataRole, title] of [
+    ["portfolio-funding-action-deposit", "Deposit"],
+    ["portfolio-funding-action-transfer", "Perps <-> Spot"],
+    ["portfolio-funding-action-withdraw", "Withdraw"]
+  ]) {
+    const openButton = page.locator(`[data-role='${dataRole}']`);
+
+    await expect(openButton).toBeVisible();
+    await openButton.click();
+    await waitForIdle(page, { quietMs: 150, timeoutMs: 3_000, pollMs: 50 });
+    await expectOracle(page, "funding-modal", { open: true, title });
+
+    await page.locator("[data-role='funding-modal-close']").click();
+    await waitForIdle(page, { quietMs: 150, timeoutMs: 3_000, pollMs: 50 });
+    await expectOracle(page, "funding-modal", { open: false });
+  }
 });
 
 test("trader portfolio route stays read-only while reusing stable controls @regression", async ({ page }) => {

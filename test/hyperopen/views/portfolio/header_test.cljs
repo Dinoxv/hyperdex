@@ -20,15 +20,15 @@
            (get-in link-staking [1 :on :click])))
     (is (= [[:actions/open-funding-transfer-modal
              :event.currentTarget/bounds
-             :event.currentTarget/data-role]]
+             "portfolio-action-send"]]
            (get-in send [1 :on :click])))
     (is (= [[:actions/open-funding-withdraw-modal
              :event.currentTarget/bounds
-             :event.currentTarget/data-role]]
+             "portfolio-action-withdraw"]]
            (get-in withdraw [1 :on :click])))
     (is (= [[:actions/open-funding-deposit-modal
              :event.currentTarget/bounds
-             :event.currentTarget/data-role]]
+             "portfolio-action-deposit"]]
            (get-in deposit [1 :on :click])))))
 
 (deftest header-actions-add-focus-return-hook-for-matching-funding-button-test

@@ -163,20 +163,20 @@
                            :data-role funding-modal-positioning/deposit-action-data-role
                            :action [:actions/open-funding-deposit-modal
                                     :event.currentTarget/bounds
-                                    :event.currentTarget/data-role]})
+                                    funding-modal-positioning/deposit-action-data-role]})
    [:div.grid.grid-cols-2.gap-2.5
     (funding-action-button {:label "Perps <-> Spot"
                             :focus-request focus-request
                             :data-role funding-modal-positioning/transfer-action-data-role
                             :action [:actions/open-funding-transfer-modal
                                      :event.currentTarget/bounds
-                                     :event.currentTarget/data-role]})
+                                     funding-modal-positioning/transfer-action-data-role]})
     (funding-action-button {:label "Withdraw"
                             :focus-request focus-request
                             :data-role funding-modal-positioning/withdraw-action-data-role
                             :action [:actions/open-funding-withdraw-modal
                                      :event.currentTarget/bounds
-                                     :event.currentTarget/data-role]})]]))
+                                     funding-modal-positioning/withdraw-action-data-role]})]]))
 
 (defn funding-actions-view
   ([state]

@@ -846,6 +846,27 @@ test("funding modal deposit flow selects USDC @regression", async ({ page }) => 
   });
 });
 
+test("trade funding openers launch the funding modal on real click @regression", async ({ page }) => {
+  await visitRoute(page, "/trade");
+
+  for (const [dataRole, title] of [
+    ["funding-action-deposit", "Deposit"],
+    ["funding-action-transfer", "Perps <-> Spot"],
+    ["funding-action-withdraw", "Withdraw"]
+  ]) {
+    const openButton = page.locator(`[data-role='${dataRole}']`);
+
+    await expect(openButton).toBeVisible();
+    await openButton.click();
+    await waitForIdle(page, { quietMs: 150, timeoutMs: 3_000, pollMs: 50 });
+    await expectOracle(page, "funding-modal", { open: true, title });
+
+    await page.locator("[data-role='funding-modal-close']").click();
+    await waitForIdle(page, { quietMs: 150, timeoutMs: 3_000, pollMs: 50 });
+    await expectOracle(page, "funding-modal", { open: false });
+  }
+});
+
 test("funding modal accessibility keeps focus in dialog, restores opener focus, and exposes labels @regression", async ({ page }) => {
   await visitRoute(page, "/trade");
 

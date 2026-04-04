@@ -62,21 +62,21 @@
                                       :data-role portfolio-card-deposit-action-data-role
                                       :action [:actions/open-funding-deposit-modal
                                                :event.currentTarget/bounds
-                                               :event.currentTarget/data-role]
+                                               portfolio-card-deposit-action-data-role]
                                       :primary? true})
      (portfolio-header/action-button {:label "Withdraw"
                                       :focus-request focus-request
                                       :data-role portfolio-card-withdraw-action-data-role
                                       :action [:actions/open-funding-withdraw-modal
                                                :event.currentTarget/bounds
-                                               :event.currentTarget/data-role]})
+                                               portfolio-card-withdraw-action-data-role]})
      (portfolio-header/action-button {:label "Transfer"
                                       :mobile-label "Transfer"
                                       :focus-request focus-request
                                       :data-role portfolio-card-transfer-action-data-role
                                       :action [:actions/open-funding-transfer-modal
                                                :event.currentTarget/bounds
-                                               :event.currentTarget/data-role]})]
+                                               portfolio-card-transfer-action-data-role]})]
     [:div {:class ["grid" "gap-3" "text-sm" "text-trading-text-secondary" "sm:grid-cols-2"]}
      [:div {:class ["rounded-lg" "border" "border-base-300" "bg-base-100/90" "px-3" "py-3"]}
       "Deposit and withdraw flows stay anchored to the same funding modals used from trade."]

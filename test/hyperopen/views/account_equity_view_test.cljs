@@ -223,15 +223,15 @@
                                                           (:data-role (node-attrs %))))]
     (is (= [[:actions/open-funding-deposit-modal
              :event.currentTarget/bounds
-             :event.currentTarget/data-role]]
+             "funding-action-deposit"]]
            (get-in deposit-button [1 :on :click])))
     (is (= [[:actions/open-funding-transfer-modal
              :event.currentTarget/bounds
-             :event.currentTarget/data-role]]
+             "funding-action-transfer"]]
            (get-in transfer-button [1 :on :click])))
     (is (= [[:actions/open-funding-withdraw-modal
              :event.currentTarget/bounds
-             :event.currentTarget/data-role]]
+             "funding-action-withdraw"]]
            (get-in withdraw-button [1 :on :click])))))
 
 (deftest funding-actions-view-adds-focus-return-hook-for-matching-button-test

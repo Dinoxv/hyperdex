@@ -29,18 +29,18 @@
     :data-role "portfolio-action-send"
     :action [:actions/open-funding-transfer-modal
              :event.currentTarget/bounds
-             :event.currentTarget/data-role]}
+             "portfolio-action-send"]}
    {:label "Withdraw"
     :data-role "portfolio-action-withdraw"
     :action [:actions/open-funding-withdraw-modal
              :event.currentTarget/bounds
-             :event.currentTarget/data-role]}
+             "portfolio-action-withdraw"]}
    {:label "Deposit"
     :primary? true
     :data-role "portfolio-action-deposit"
     :action [:actions/open-funding-deposit-modal
              :event.currentTarget/bounds
-             :event.currentTarget/data-role]}])
+             "portfolio-action-deposit"]}])
 
 (defn action-button [{:keys [label mobile-label action primary? data-role focus-request]}]
   [:button (merge
