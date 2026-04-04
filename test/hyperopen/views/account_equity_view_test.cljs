@@ -54,6 +54,13 @@
 
     :else nil))
 
+(defn- collect-strings [node]
+  (cond
+    (string? node) [node]
+    (vector? node) (mapcat collect-strings (node-children node))
+    (seq? node) (mapcat collect-strings node)
+    :else []))
+
 (defn- first-index-where
   [xs pred]
   (first (keep-indexed (fn [idx x]
@@ -73,6 +80,29 @@
   (or (string? value)
       (keyword? value)
       (number? value)))
+
+(defn- disconnected-cleared-account-equity-state []
+  {:wallet {:connected? false
+            :address nil}
+   :webdata2 nil
+   :spot {:meta nil
+          :clearinghouse-state nil}
+   :account {:mode :classic
+             :abstraction-raw nil}
+   :perp-dex-clearinghouse {}
+   :orders {:open-orders []
+            :open-orders-hydrated? false
+            :open-orders-snapshot []
+            :open-orders-snapshot-by-dex {}
+            :fills []
+            :fundings-raw []
+            :fundings []
+            :order-history []
+            :ledger []
+            :twap-states []
+            :twap-history []
+            :twap-slice-fills []
+            :pending-cancel-oids nil}})
 
 (deftest account-equity-heading-and-label-contrast-test
   (let [view-node (view/account-equity-view {:webdata2 {}
@@ -212,6 +242,20 @@
         root-classes (node-class-set view-node)]
     (is (contains? root-classes "w-full"))
     (is (not (contains? root-classes "h-full")))))
+
+(deftest account-equity-metrics-and-view-render-placeholders-after-account-reset-test
+  (let [state (disconnected-cleared-account-equity-state)
+        metrics (view/account-equity-metrics state)
+        view-node (view/account-equity-view state)
+        strings (set (collect-strings view-node))]
+    (is (nil? (:spot-equity metrics)))
+    (is (nil? (:perps-value metrics)))
+    (is (nil? (:account-value-display metrics)))
+    (is (nil? (:base-balance metrics)))
+    (is (= "--" (get-in metrics [:pnl-info :text])))
+    (is (contains? strings "Account Equity"))
+    (is (some? (find-first-node view-node #(contains? (direct-texts %) "Account Value"))))
+    (is (>= (count (filter #(= "--" %) (collect-strings view-node))) 4))))
 
 (deftest funding-actions-view-exposes-anchor-aware-funding-actions-test
   (let [actions-node (view/funding-actions-view {})

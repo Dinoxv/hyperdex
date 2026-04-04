@@ -9,6 +9,145 @@ import {
   waitForIdle
 } from "../support/hyperopen.mjs";
 
+const SPECTATE_ADDRESS = "0x162cc7c861ebd0c06b3d72319201150482518185";
+
+async function selectAccountTab(page, tabValue) {
+  const tab = page.locator(`[data-role='account-info-tab-${tabValue}']`);
+  await tab.click();
+  await waitForIdle(page, { quietMs: 150, timeoutMs: 4_000, pollMs: 50 });
+  await expect(tab).toHaveAttribute("aria-pressed", "true");
+}
+
+async function seedDisconnectedSpectateAccountState(page) {
+  await page.evaluate(() => {
+    const c = globalThis.cljs?.core;
+    const store = globalThis.hyperopen?.system?.store;
+
+    if (!c || !store) {
+      throw new Error("Hyperopen store or cljs core unavailable");
+    }
+
+    const keyword = c.keyword;
+    const kwPath = (...segments) =>
+      c.PersistentVector.fromArray(segments.map((segment) => keyword(segment)), true);
+    const opts = c.PersistentArrayMap.fromArray([keyword("keywordize-keys"), true], true);
+    const nextWebdata2 = c.js__GT_clj(
+      {
+        clearinghouseState: {
+          marginSummary: {
+            accountValue: "4708974.9",
+            totalNtlPos: "6398054.11",
+            totalRawUsd: "6392466.23",
+            totalMarginUsed: "63387.27"
+          },
+          crossMarginSummary: {
+            accountValue: "4708974.9",
+            totalNtlPos: "6398054.11",
+            totalRawUsd: "6392466.23",
+            totalMarginUsed: "63387.27"
+          },
+          crossMaintenanceMarginUsed: "63387.27",
+          withdrawable: "4234255.18",
+          assetPositions: [
+            {
+              position: {
+                coin: "BTC",
+                szi: "0.99455",
+                positionValue: "67250.5",
+                entryPx: "67000",
+                markPx: "67251",
+                unrealizedPnl: "309",
+                returnOnEquity: "0.0046",
+                liquidationPx: "4671.46",
+                leverage: { value: 0.31 },
+                marginUsed: "1000",
+                cumFunding: { sinceOpen: "0" }
+              }
+            }
+          ]
+        }
+      },
+      opts
+    );
+    const nextSpot = c.js__GT_clj(
+      {
+        balances: [
+          {
+            coin: "USDC",
+            hold: "0",
+            total: "4465534.37",
+            entryNtl: "4465534.37"
+          }
+        ]
+      },
+      opts
+    );
+    const nextOrders = c.js__GT_clj(
+      {
+        "open-orders": [
+          {
+            coin: "BTC",
+            oid: 101,
+            side: "B",
+            sz: "1.0",
+            origSz: "1.0",
+            limitPx: "65000",
+            orderType: "Limit",
+            timestamp: 1700000000000,
+            reduceOnly: false,
+            isTrigger: false,
+            isPositionTpsl: false
+          }
+        ],
+        "open-orders-hydrated?": true,
+        "open-orders-snapshot": [
+          {
+            coin: "BTC",
+            oid: 101,
+            side: "B",
+            sz: "1.0",
+            origSz: "1.0",
+            limitPx: "65000",
+            orderType: "Limit",
+            timestamp: 1700000000000,
+            reduceOnly: false,
+            isTrigger: false,
+            isPositionTpsl: false
+          }
+        ],
+        "open-orders-snapshot-by-dex": {},
+        fills: [
+          {
+            coin: "BTC",
+            tid: 77
+          }
+        ],
+        "fundings-raw": [],
+        fundings: [],
+        "order-history": [],
+        ledger: [],
+        "twap-states": [],
+        "twap-history": [],
+        "twap-slice-fills": [],
+        "pending-cancel-oids": null
+      },
+      opts
+    );
+    const nextState = c.deref(store);
+    const seededState = c.assoc_in(
+      c.assoc_in(
+        c.assoc_in(nextState, kwPath("webdata2"), nextWebdata2),
+        kwPath("spot", "clearinghouse-state"),
+        nextSpot
+      ),
+      kwPath("orders"),
+      nextOrders
+    );
+
+    c.reset_BANG_(store, seededState);
+  });
+}
+
 function buildCachedAssetSelectorMarkets(count = 240) {
   const baseMarkets = [
     {
@@ -127,6 +266,46 @@ test("asset selector opens and selects ETH @regression", async ({ page }) => {
     },
     { args: { actionId: ":actions/select-asset" } }
   );
+});
+
+test("disconnected stop spectate clears stale account surfaces @regression", async ({ page }) => {
+  await visitRoute(page, "/trade");
+  await dispatch(page, [":actions/start-spectate-mode", SPECTATE_ADDRESS]);
+  await waitForIdle(page, { quietMs: 150, timeoutMs: 4_000, pollMs: 50 });
+  await seedDisconnectedSpectateAccountState(page);
+  await waitForIdle(page, { quietMs: 200, timeoutMs: 4_000, pollMs: 50 });
+
+  await expect(page.locator("[data-role='spectate-mode-active-banner']")).toBeVisible();
+  await expect.poll(() => new URL(page.url()).searchParams.get("spectate")).toBe(SPECTATE_ADDRESS);
+  await expect.poll(async () => {
+    const snapshot = await debugCall(page, "snapshot");
+    const appState = snapshot["app-state"] || {};
+    return {
+      spectateActive: appState["account-context"]?.["spectate-mode"]?.["active?"] ?? null,
+      spectateAddress: appState["account-context"]?.["spectate-mode"]?.["address"] ?? null,
+      webdata2Present: Boolean(appState["webdata2"]),
+      spotClearinghousePresent: Boolean(appState["spot"]?.["clearinghouse-state"])
+    };
+  }).toMatchObject({
+    spectateActive: true,
+    spectateAddress: SPECTATE_ADDRESS,
+    webdata2Present: true,
+    spotClearinghousePresent: true
+  });
+
+  await page.locator("[data-role='spectate-mode-banner-stop']").click();
+  await waitForIdle(page, { quietMs: 200, timeoutMs: 6_000, pollMs: 50 });
+
+  await expect.poll(() => new URL(page.url()).searchParams.get("spectate")).toBe(null);
+
+  await selectAccountTab(page, "balances");
+  await expect(page.getByText("No balance data available")).toBeVisible();
+
+  await selectAccountTab(page, "positions");
+  await expect(page.getByText("No active positions")).toBeVisible();
+
+  await selectAccountTab(page, "open-orders");
+  await expect(page.getByText("No open orders")).toBeVisible();
 });
 
 test("asset selector focuses search input and keyboard-navigates rows @regression", async ({ page }) => {

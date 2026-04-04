@@ -66,6 +66,32 @@
                                          :timestamp 1700000000000
                                          :reduceOnly false}]]})))
 
+(defn- disconnected-cleared-account-info-state
+  [selected-tab]
+  (-> fixtures/sample-account-info-state
+      (assoc-in [:account-info :selected-tab] selected-tab)
+      (assoc :wallet {:connected? false
+                      :address nil}
+             :webdata2 nil
+             :spot {:meta nil
+                    :clearinghouse-state nil}
+             :account {:mode :classic
+                       :abstraction-raw nil}
+             :perp-dex-clearinghouse {}
+             :orders {:open-orders []
+                      :open-orders-hydrated? false
+                      :open-orders-snapshot []
+                      :open-orders-snapshot-by-dex {}
+                      :fills []
+                      :fundings-raw []
+                      :fundings []
+                      :order-history []
+                      :ledger []
+                      :twap-states []
+                      :twap-history []
+                      :twap-slice-fills []
+                      :pending-cancel-oids nil})))
+
 (defn- button-with-text
   [node text]
   (hiccup/find-first-node node #(and (= :button (first %))
@@ -167,3 +193,17 @@
       (doseq [aria-label forbidden-aria-labels]
         (is (nil? (hiccup/find-first-node panel #(= aria-label (get-in % [1 :aria-label]))))
             (str label " omits aria-label " aria-label))))))
+
+(deftest account-info-panel-renders-empty-disconnected-surfaces-after-account-reset-test
+  (doseq [{:keys [label selected-tab expected-text]} [{:label "balances"
+                                                       :selected-tab :balances
+                                                       :expected-text "No balance data available"}
+                                                      {:label "positions"
+                                                       :selected-tab :positions
+                                                       :expected-text "No active positions"}
+                                                      {:label "open orders"
+                                                       :selected-tab :open-orders
+                                                       :expected-text "No open orders"}]]
+    (let [panel (view/account-info-panel (disconnected-cleared-account-info-state selected-tab))
+          strings (set (hiccup/collect-strings panel))]
+      (is (contains? strings expected-text) label))))

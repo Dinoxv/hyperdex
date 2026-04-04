@@ -521,12 +521,26 @@
 (deftest bootstrap-account-data-covers-nil-repeat-success-and-error-branches-test
   (async done
     (let [store (atom {:wallet {:address "0xaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"}
+                      :webdata2 {:clearinghouseState {:assetPositions [{:position {:coin "BTC"}}]}
+                                 :open-orders [{:coin "BTC" :oid 91}]
+                                 :fills [{:tid 77}]
+                                 :fundings [{:id "fund-1"}]
+                                 :fundings-raw [{:id "fund-1"}]}
                       :account-info {:selected-tab :balances
+                                     :funding-history {:loading? true
+                                                       :error "stale"}
                                      :order-history {:request-id 0}}
-                      :orders {:open-orders-snapshot-by-dex {"dex-old" [1]}
+                      :orders {:open-orders [{:coin "BTC" :oid 92}]
+                               :open-orders-snapshot [{:coin "BTC" :oid 93}]
+                               :open-orders-snapshot-by-dex {"dex-old" [1]}
+                               :fills [{:tid 78}]
                                :fundings-raw [1]
                                :fundings [1]
-                               :order-history [1]}
+                               :order-history [1]
+                               :twap-states [{:coin "BTC"}]
+                               :twap-history [{:time 123}]
+                               :twap-slice-fills [{:tid 79}]
+                               :pending-cancel-oids #{11}}
                       :perp-dex-clearinghouse {"dex-old" {:positions [1]}}})
           startup-runtime-atom (atom {:bootstrapped-address nil})
           stage-a-calls (atom [])
@@ -580,12 +594,23 @@
                    (:end-time-ms fundings-opts))))
          (is (= [["0xaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa" ["dex-a" "dex-b"]]] @stage-b-calls))
          (is (= "0xaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa" (:bootstrapped-address @startup-runtime-atom)))
+         (is (nil? (:webdata2 @store)))
+         (is (= [] (get-in @store [:orders :open-orders])))
          (is (= false (get-in @store [:orders :open-orders-hydrated?])))
+         (is (= [] (get-in @store [:orders :open-orders-snapshot])))
          (is (= 1 (get-in @store [:account-info :order-history :request-id])))
          (is (= {} (get-in @store [:orders :open-orders-snapshot-by-dex])))
+         (is (= [] (get-in @store [:orders :fills])))
          (is (= [] (get-in @store [:orders :fundings-raw])))
          (is (= [] (get-in @store [:orders :fundings])))
          (is (= [] (get-in @store [:orders :order-history])))
+         (is (= [] (get-in @store [:orders :twap-states])))
+         (is (= [] (get-in @store [:orders :twap-history])))
+         (is (= [] (get-in @store [:orders :twap-slice-fills])))
+         (is (nil? (get-in @store [:orders :pending-cancel-oids])))
+         (is (nil? (get-in @store [:spot :clearinghouse-state])))
+         (is (= false (get-in @store [:account-info :funding-history :loading?])))
+         (is (nil? (get-in @store [:account-info :funding-history :error])))
          (startup-runtime/bootstrap-account-data! (assoc deps :address "0xaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"))
          (js/setTimeout
          (fn []
@@ -863,13 +888,27 @@
        0))))
 
 (deftest install-address-handlers-covers-bootstrap-and-clear-branches-test
-  (let [store (atom {:account-info {:order-history {:request-id 7
+  (let [store (atom {:webdata2 {:clearinghouseState {:assetPositions [{:position {:coin "BTC"}}]}
+                                :open-orders [{:coin "BTC" :oid 11}]
+                                :fills [{:tid 21}]
+                                :fundings [{:id "fund-1"}]
+                                :fundings-raw [{:id "fund-1"}]}
+                     :account-info {:funding-history {:loading? true
+                                                      :error "stale-funding"}
+                                    :order-history {:request-id 7
                                                     :loading? true
                                                     :error "stale"}}
-                     :orders {:open-orders-snapshot-by-dex {"dex-a" [{}]}
+                     :orders {:open-orders [{:coin "BTC" :oid 12}]
+                              :open-orders-snapshot [{:coin "BTC" :oid 13}]
+                              :open-orders-snapshot-by-dex {"dex-a" [{}]}
+                              :fills [{:tid 22}]
                               :fundings-raw [1]
                               :fundings [2]
-                              :order-history [3]}
+                              :order-history [3]
+                              :twap-states [{:coin "BTC"}]
+                              :twap-history [{:time 1000}]
+                              :twap-slice-fills [{:tid 23}]
+                              :pending-cancel-oids #{12}}
                      :perp-dex-clearinghouse {"dex-a" {:assetPositions []}}
                      :portfolio {:summary-by-key {:day {:vlm 10}}
                                  :user-fees {:dailyUserVlm [[0 1]]}
@@ -915,19 +954,29 @@
     (is (= 1 (count @init-calls)))
     (is (= 2 (count @handler-calls)))
     (is (= 1 @sync-calls))
-    (let [address-handler (last @handler-calls)]
+      (let [address-handler (last @handler-calls)]
       ((:on-change address-handler) "0xaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa")
       (is (= ["0xaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"] @bootstrap-calls))
       ((:on-change address-handler) nil)
       (is (nil? (:bootstrapped-address @startup-runtime-atom)))
+      (is (nil? (:webdata2 @store)))
+      (is (= [] (get-in @store [:orders :open-orders])))
       (is (= false (get-in @store [:orders :open-orders-hydrated?])))
+      (is (= [] (get-in @store [:orders :open-orders-snapshot])))
       (is (= {} (get-in @store [:orders :open-orders-snapshot-by-dex])))
+      (is (= [] (get-in @store [:orders :fills])))
       (is (= [] (get-in @store [:orders :fundings-raw])))
       (is (= [] (get-in @store [:orders :fundings])))
       (is (= [] (get-in @store [:orders :order-history])))
+      (is (= [] (get-in @store [:orders :twap-states])))
+      (is (= [] (get-in @store [:orders :twap-history])))
+      (is (= [] (get-in @store [:orders :twap-slice-fills])))
+      (is (nil? (get-in @store [:orders :pending-cancel-oids])))
       (is (= 8 (get-in @store [:account-info :order-history :request-id])))
       (is (false? (get-in @store [:account-info :order-history :loading?])))
       (is (nil? (get-in @store [:account-info :order-history :error])))
+      (is (false? (get-in @store [:account-info :funding-history :loading?])))
+      (is (nil? (get-in @store [:account-info :funding-history :error])))
       (is (= {} (get-in @store [:perp-dex-clearinghouse])))
       (is (nil? (get-in @store [:spot :clearinghouse-state])))
       (is (= {} (get-in @store [:portfolio :summary-by-key])))
