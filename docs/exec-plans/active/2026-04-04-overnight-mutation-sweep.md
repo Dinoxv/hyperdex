@@ -49,6 +49,12 @@ The visible proof will be a fresh mutation summary under `/hyperopen/target/muta
 - [x] (2026-04-05 12:50 EDT) Completed another narrowed rerun for `websocket/orderbook_policy.cljs` at `/hyperopen/target/mutation/reports/2026-04-05T16-50-30.925640Z-src-hyperopen-websocket-orderbook_policy.cljs.edn`: both line-`141` mutation sites were killed cleanly (`2/2`) with `0` survivors.
 - [ ] (2026-04-05 12:50 EDT) Attempted the next `funding/domain/policy.cljs` sidecar fallback on line `39`, but the clean `test` baseline failed before mutation execution and no report artifact was produced.
 - [x] (2026-04-05 12:52 EDT) Completed another narrowed rerun for `websocket/orderbook_policy.cljs` at `/hyperopen/target/mutation/reports/2026-04-05T16-52-30.365349Z-src-hyperopen-websocket-orderbook_policy.cljs.edn`: line `142` was killed cleanly (`1/1`) with `0` survivors.
+- [x] (2026-04-05 13:02 EDT) Completed another narrowed rerun for `websocket/orderbook_policy.cljs` at `/hyperopen/target/mutation/reports/2026-04-05T17-02-43.460632Z-src-hyperopen-websocket-orderbook_policy.cljs.edn`: line `146` was killed cleanly (`1/1`) with `0` survivors, and the post-run compiled-artifact restore failed without leaving tracked diffs.
+- [x] (2026-04-05 13:02 EDT) Completed the next sidecar rerun for `funding/domain/policy.cljs` at `/hyperopen/target/mutation/reports/2026-04-05T17-02-27.056138Z-src-hyperopen-funding-domain-policy.cljs.edn`: line `39` was killed cleanly (`1/1`) with `0` survivors after the runner first restored a stale `websocket/orderbook_policy.cljs` backup.
+- [x] (2026-04-05 13:05 EDT) Completed the next rerun for `api/endpoints/vaults.cljs` at `/hyperopen/target/mutation/reports/2026-04-05T17-05-53.513119Z-src-hyperopen-api-endpoints-vaults.cljs.edn`: line `19` was killed cleanly (`1/1`) with `0` survivors after stale-backup cleanup, which closes the previously blocked fallback line for this module.
+- [x] (2026-04-05 13:08 EDT) Completed another narrowed rerun for `websocket/orderbook_policy.cljs` at `/hyperopen/target/mutation/reports/2026-04-05T17-08-53.784208Z-src-hyperopen-websocket-orderbook_policy.cljs.edn`: both line-`151` mutation sites were killed cleanly (`2/2`) with `0` survivors.
+- [x] (2026-04-05 13:10 EDT) Completed another narrowed rerun for `websocket/orderbook_policy.cljs` at `/hyperopen/target/mutation/reports/2026-04-05T17-10-34.034841Z-src-hyperopen-websocket-orderbook_policy.cljs.edn`: line `152` was killed cleanly (`1/1`) with `0` survivors.
+- [x] (2026-04-05 13:12 EDT) Completed another narrowed rerun for `websocket/orderbook_policy.cljs` at `/hyperopen/target/mutation/reports/2026-04-05T17-12-25.082242Z-src-hyperopen-websocket-orderbook_policy.cljs.edn`: line `156` was killed cleanly (`1/1`) with `0` survivors.
 - [ ] Run the expanded overnight mutation sweep, inspect the summary, and rank any surviving or uncovered modules by urgency. In progress: after the nightly wrapper repeatedly died before summary emission, the live overnight execution moved first to the detached sequential driver `/hyperopen/target/mutation/nightly/overnight_direct_2026_04_04.sh` and then to the safer bounded slice driver `/hyperopen/target/mutation/nightly/run_remaining_slices_2026_04_05.sh` for the three large blocked modules.
 - [ ] Fix the resulting survivors or uncovered sites with the smallest defensible changes, preferring test-only closures unless a mutant exposes dead or misleading production behavior.
 - [ ] Re-run focused mutation slices for touched modules and then re-run `npm run check`, `npm test`, and `npm run test:websocket`.
@@ -112,6 +118,15 @@ The visible proof will be a fresh mutation summary under `/hyperopen/target/muta
 
 - Observation: `funding/domain/policy.cljs` is partially runnable under narrowed sidecar execution, but later lines can still fail in the clean `test` baseline before any mutant runs.
   Evidence: `/hyperopen/target/mutation/reports/2026-04-05T16-46-24.044317Z-src-hyperopen-funding-domain-policy.cljs.edn` killed line `24` cleanly at `1/1`, while `bb tools/mutate.clj --format json --module src/hyperopen/funding/domain/policy.cljs --lines 39 --timeout-factor 20` later exited with `Baseline failed for suite test.` and produced no report artifact.
+
+- Observation: stale backup restoration is the strongest current explanation for the previously intermittent `funding/domain/policy.cljs` baseline failure.
+  Evidence: the later successful rerun at `/hyperopen/target/mutation/reports/2026-04-05T17-02-27.056138Z-src-hyperopen-funding-domain-policy.cljs.edn` killed line `39` cleanly, and the runner printed `Restored stale backup for src/hyperopen/websocket/orderbook_policy.cljs.` before that run completed.
+
+- Observation: `api/endpoints/vaults.cljs` line `19` is not a persistent baseline blocker; the successful rerun requires both `:test` and `:ws-test`, and the real instability is stale-backup / cleanup handling around the mutation process.
+  Evidence: `/hyperopen/target/mutation/reports/2026-04-05T17-05-53.513119Z-src-hyperopen-api-endpoints-vaults.cljs.edn` records both baseline suites, `1/1` killed, and `0` survivors for line `19`, while the earlier stuck rerun left `target/mutation/backups/src/hyperopen/api/endpoints/vaults.cljs.bak` behind until it was manually removed.
+
+- Observation: the narrowed `orderbook_policy` fallback continues to clear the remaining queue, but post-run restore fragility has now repeated on more than one line.
+  Evidence: `/hyperopen/target/mutation/reports/2026-04-05T17-02-43.460632Z-src-hyperopen-websocket-orderbook_policy.cljs.edn` killed line `146`, `/hyperopen/target/mutation/reports/2026-04-05T17-08-53.784208Z-src-hyperopen-websocket-orderbook_policy.cljs.edn` killed both sites on line `151`, `/hyperopen/target/mutation/reports/2026-04-05T17-10-34.034841Z-src-hyperopen-websocket-orderbook_policy.cljs.edn` killed line `152`, and `/hyperopen/target/mutation/reports/2026-04-05T17-12-25.082242Z-src-hyperopen-websocket-orderbook_policy.cljs.edn` killed line `156`; the line-`146` run emitted the same `Failed to restore compiled artifacts for suite test.` message previously seen on line `135`, but the worktree remained clean after cleanup.
 
 ## Decision Log
 
@@ -268,6 +283,12 @@ Current setup evidence:
       target/mutation/reports/2026-04-05T16-48-09.998386Z-src-hyperopen-websocket-orderbook_policy.cljs.edn
       target/mutation/reports/2026-04-05T16-50-30.925640Z-src-hyperopen-websocket-orderbook_policy.cljs.edn
       target/mutation/reports/2026-04-05T16-52-30.365349Z-src-hyperopen-websocket-orderbook_policy.cljs.edn
+      target/mutation/reports/2026-04-05T17-02-27.056138Z-src-hyperopen-funding-domain-policy.cljs.edn
+      target/mutation/reports/2026-04-05T17-02-43.460632Z-src-hyperopen-websocket-orderbook_policy.cljs.edn
+      target/mutation/reports/2026-04-05T17-05-53.513119Z-src-hyperopen-api-endpoints-vaults.cljs.edn
+      target/mutation/reports/2026-04-05T17-08-53.784208Z-src-hyperopen-websocket-orderbook_policy.cljs.edn
+      target/mutation/reports/2026-04-05T17-10-34.034841Z-src-hyperopen-websocket-orderbook_policy.cljs.edn
+      target/mutation/reports/2026-04-05T17-12-25.082242Z-src-hyperopen-websocket-orderbook_policy.cljs.edn
 
 ## Interfaces and Dependencies
 
@@ -299,3 +320,5 @@ Plan update note (2026-04-05 12:30 EDT): updated the plan after the manual `ws-t
 Plan update note (2026-04-05 12:37 EDT): updated the plan after line `131` also completed cleanly, which confirms the manual `ws-test` reset kept `orderbook_policy` runnable even though it did not unblock `api/endpoints/vaults.cljs`.
 Plan update note (2026-04-05 12:46 EDT): updated the plan after lines `134` and `135` also completed cleanly, and after the sidecar closed `funding/domain/policy.cljs` line `24`, which showed the funding module can still make forward progress under narrowed execution.
 Plan update note (2026-04-05 12:52 EDT): updated the plan after lines `138`, `141`, and `142` all completed cleanly for `orderbook_policy`, while the follow-up sidecar probe for funding line `39` failed in the clean `test` baseline before mutant execution.
+Plan update note (2026-04-05 13:05 EDT): updated the plan after the previously blocked fallback lines for `funding/domain/policy.cljs` (`39`) and `api/endpoints/vaults.cljs` (`19`) both completed cleanly, which points back to stale-backup contamination rather than a stable baseline regression in either module.
+Plan update note (2026-04-05 13:12 EDT): updated the plan after `orderbook_policy` lines `146`, `151`, `152`, and `156` also completed cleanly, while the repeated post-run restore warning on line `146` reinforced that cleanup fragility remains the main tool risk on this namespace.
