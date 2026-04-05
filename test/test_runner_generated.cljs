@@ -54,6 +54,7 @@
             [hyperopen.api.trading.sign-and-submit-test]
             [hyperopen.app.effects-test]
             [hyperopen.app.startup-test]
+            [hyperopen.asset-selector.actions-property-test]
             [hyperopen.asset-selector.actions-test]
             [hyperopen.asset-selector.active-market-cache-test]
             [hyperopen.asset-selector.funding-drafts-test]
@@ -502,6 +503,7 @@
              'hyperopen.api.trading.sign-and-submit-test
              'hyperopen.app.effects-test
              'hyperopen.app.startup-test
+             'hyperopen.asset-selector.actions-property-test
              'hyperopen.asset-selector.actions-test
              'hyperopen.asset-selector.active-market-cache-test
              'hyperopen.asset-selector.funding-drafts-test
