@@ -25,6 +25,10 @@ The visible proof will be a fresh mutation summary under `/hyperopen/target/muta
 - [x] (2026-04-05 10:50 EDT) Completed the `api/endpoints/leaderboard.cljs` live rerun at `/hyperopen/target/mutation/reports/2026-04-05T14-50-52.698033Z-src-hyperopen-api-endpoints-leaderboard.cljs.edn`: `5/5` killed, `0` survivors, `0` uncovered.
 - [x] (2026-04-05 10:58 EDT) Completed the `funding/application/lifecycle_polling.cljs` live rerun at `/hyperopen/target/mutation/reports/2026-04-05T14-58-52.829644Z-src-hyperopen-funding-application-lifecycle_polling.cljs.edn`: `18/18` killed, `0` survivors, `0` uncovered.
 - [x] (2026-04-05 11:31 EDT) Completed a focused benchmark rerun for `websocket/orderbook_policy.cljs` at `/hyperopen/target/mutation/reports/2026-04-05T15-31-14.614703Z-src-hyperopen-websocket-orderbook_policy.cljs.edn`: line `11` killed cleanly in `88.25s`, which confirmed the module is slow but executable when left uninterrupted.
+- [x] (2026-04-05 11:47 EDT) Completed the first bounded `websocket/orderbook_policy.cljs` slice at `/hyperopen/target/mutation/reports/2026-04-05T15-47-42.038973Z-src-hyperopen-websocket-orderbook_policy.cljs.edn`: `13/13` killed, `0` survivors, `0` uncovered, and the tree remained clean with no leftover backup artifacts.
+- [x] (2026-04-05 11:56 EDT) Completed the first narrowed single-line fallback rerun for `websocket/orderbook_policy.cljs` at `/hyperopen/target/mutation/reports/2026-04-05T15-56-34.163367Z-src-hyperopen-websocket-orderbook_policy.cljs.edn`: line `97` killed cleanly with `0` survivors, which confirms the worker can keep draining the remaining orderbook lines one at a time when wider slices misbehave.
+- [x] (2026-04-05 12:00 EDT) Completed another narrowed rerun for `websocket/orderbook_policy.cljs` at `/hyperopen/target/mutation/reports/2026-04-05T16-00-05.357311Z-src-hyperopen-websocket-orderbook_policy.cljs.edn`: both mutation sites on line `98` were killed cleanly (`2/2`) with `0` survivors.
+- [x] (2026-04-05 12:01 EDT) Completed another narrowed rerun for `websocket/orderbook_policy.cljs` at `/hyperopen/target/mutation/reports/2026-04-05T16-01-57.030203Z-src-hyperopen-websocket-orderbook_policy.cljs.edn`: line `96` was killed cleanly (`1/1`) with `0` survivors.
 - [ ] Run the expanded overnight mutation sweep, inspect the summary, and rank any surviving or uncovered modules by urgency. In progress: after the nightly wrapper repeatedly died before summary emission, the live overnight execution moved first to the detached sequential driver `/hyperopen/target/mutation/nightly/overnight_direct_2026_04_04.sh` and then to the safer bounded slice driver `/hyperopen/target/mutation/nightly/run_remaining_slices_2026_04_05.sh` for the three large blocked modules.
 - [ ] Fix the resulting survivors or uncovered sites with the smallest defensible changes, preferring test-only closures unless a mutant exposes dead or misleading production behavior.
 - [ ] Re-run focused mutation slices for touched modules and then re-run `npm run check`, `npm test`, and `npm run test:websocket`.
@@ -58,6 +62,15 @@ The visible proof will be a fresh mutation summary under `/hyperopen/target/muta
 
 - Observation: `websocket/orderbook_policy.cljs` is not inherently deadlocked; it is just expensive because every covered mutation line currently requires both the main `test` suite and `ws-test`.
   Evidence: the focused line-11 rerun finished cleanly at `/hyperopen/target/mutation/reports/2026-04-05T15-31-14.614703Z-src-hyperopen-websocket-orderbook_policy.cljs.edn`, and a direct coverage partition check showed all `51/51` covered orderbook mutation sites mapped to `[:test :ws-test]`.
+
+- Observation: the bounded-slice fallback is working in practice for the remaining orderbook module.
+  Evidence: `/hyperopen/target/mutation/reports/2026-04-05T15-47-42.038973Z-src-hyperopen-websocket-orderbook_policy.cljs.edn` completed the first twelve-line slice plus the dual-site line `78` at `13/13` killed with no survivors and no stale backups left on disk afterward.
+
+- Observation: when a wider follow-up slice misbehaves, the mutation tool can still make forward progress on the same module with narrowed single-line reruns.
+  Evidence: `/hyperopen/target/mutation/reports/2026-04-05T15-56-34.163367Z-src-hyperopen-websocket-orderbook_policy.cljs.edn` cleared line `97` at `1/1` killed immediately after the second twelve-line batch proved unstable, and the worktree returned to a clean tracked state afterward.
+
+- Observation: the narrowed fallback is consistently clearing adjacent remaining orderbook lines without leaving tracked source dirty.
+  Evidence: `/hyperopen/target/mutation/reports/2026-04-05T16-00-05.357311Z-src-hyperopen-websocket-orderbook_policy.cljs.edn` killed the two sites on line `98`, `/hyperopen/target/mutation/reports/2026-04-05T16-01-57.030203Z-src-hyperopen-websocket-orderbook_policy.cljs.edn` killed line `96`, and the only live residue afterward was the expected `.bak` file from the next active narrowed rerun on line `108`.
 
 - Observation: the practical risk on the remaining large modules is interruption recovery, not confirmed survivors.
   Evidence: interrupted reruns restored stale backups into tracked source for `/hyperopen/src/hyperopen/websocket/orderbook_policy.cljs`, `/hyperopen/src/hyperopen/api/endpoints/vaults.cljs`, and `/hyperopen/src/hyperopen/funding/domain/policy.cljs`; each tracked diff was restored, and the replacement slice driver now aborts on any leftover dirty file or backup artifact.
@@ -196,6 +209,10 @@ Current setup evidence:
       target/mutation/reports/2026-04-05T14-50-52.698033Z-src-hyperopen-api-endpoints-leaderboard.cljs.edn
       target/mutation/reports/2026-04-05T14-58-52.829644Z-src-hyperopen-funding-application-lifecycle_polling.cljs.edn
       target/mutation/reports/2026-04-05T15-31-14.614703Z-src-hyperopen-websocket-orderbook_policy.cljs.edn
+      target/mutation/reports/2026-04-05T15-47-42.038973Z-src-hyperopen-websocket-orderbook_policy.cljs.edn
+      target/mutation/reports/2026-04-05T15-56-34.163367Z-src-hyperopen-websocket-orderbook_policy.cljs.edn
+      target/mutation/reports/2026-04-05T16-00-05.357311Z-src-hyperopen-websocket-orderbook_policy.cljs.edn
+      target/mutation/reports/2026-04-05T16-01-57.030203Z-src-hyperopen-websocket-orderbook_policy.cljs.edn
 
 ## Interfaces and Dependencies
 
@@ -216,3 +233,6 @@ Plan update note (2026-04-05 03:49Z): updated the plan after the nightly wrapper
 Plan update note (2026-04-05 10:20 EDT): updated the plan after four direct live mutation reruns completed cleanly with zero survivors on the smaller and medium-sized modules, which clears the path to focus the remaining work on the historically volatile larger targets.
 Plan update note (2026-04-05 10:47 EDT): updated the plan after `api/trading.cljs` also completed a full live rerun at `54/54` killed, which removes the main survivor-risk namespace cited by the March 31 mutation follow-up plan.
 Plan update note (2026-04-05 11:31 EDT): updated the plan after confirming `websocket/orderbook_policy.cljs` can complete a focused live rerun when left uninterrupted, then switched the remaining large-module work to a bounded slice driver that verifies the tree stays clean after each batch.
+Plan update note (2026-04-05 11:47 EDT): updated the plan after the first full `orderbook_policy` slice completed cleanly at `13/13` killed, which validates the slice-by-slice execution strategy for the remaining large modules.
+Plan update note (2026-04-05 11:56 EDT): updated the plan after narrowed single-line rerun `97` also completed cleanly, which establishes a reliable fallback path for the remaining orderbook lines when a larger batch exits inconsistently.
+Plan update note (2026-04-05 12:01 EDT): updated the plan after narrowed reruns for lines `98` and `96` both completed cleanly, which keeps the remaining orderbook queue moving even while the worker holds the next active `.bak` for line `108`.
