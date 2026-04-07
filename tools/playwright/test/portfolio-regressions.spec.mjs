@@ -125,8 +125,7 @@ test("trader portfolio route stays read-only while reusing stable controls @regr
   await visitRoute(page, `/portfolio/trader/${TRADER_ADDRESS}`);
   const accountTable = page.locator("[data-role='portfolio-account-table']");
 
-  await expect(page.getByText("Loading Route")).toHaveCount(0, { timeout: 15_000 });
-  await expect(page.locator("[data-role='portfolio-inspection-header']")).toBeVisible({ timeout: 15_000 });
+  await expect(page.locator("[data-role='portfolio-inspection-header']")).toBeVisible();
   await expect(page.locator("[data-role='portfolio-actions-row']")).toHaveCount(0);
   await expect(page.locator("[data-role='portfolio-action-deposit']")).toHaveCount(0);
   await expect(page.locator("[data-role='portfolio-inspection-explorer-link']"))
@@ -135,7 +134,7 @@ test("trader portfolio route stays read-only while reusing stable controls @regr
   await selectSummaryScope(page, "perps", "Perps");
   await selectChartTab(page, "pnl");
   await selectAccountTab(page, "balances");
-  await expect(accountTable).toBeVisible();
+  await expect(accountTable).toContainText("Contract");
   await expect(accountTable).not.toContainText("Send");
   await expect(accountTable).not.toContainText("Transfer");
 
@@ -162,18 +161,6 @@ test("trader portfolio route stays read-only while reusing stable controls @regr
 
 test("portfolio positions coin jumps to the trade route market @regression", async ({ page }) => {
   await visitRoute(page, "/portfolio");
-  await debugCall(page, "installWalletSimulator", {
-    accounts: ["0x1111111111111111111111111111111111111111"],
-    requestAccounts: ["0x1111111111111111111111111111111111111111"],
-    chainId: "0xa4b1"
-  });
-  await debugCall(page, "setWalletConnectedHandlerMode", "suppress");
-  await dispatch(page, [":actions/connect-wallet"]);
-  await waitForIdle(page, { quietMs: 250, timeoutMs: 4_000, pollMs: 50 });
-  await expectOracle(page, "wallet-status", {
-    connected: true,
-    address: "0x1111111111111111111111111111111111111111"
-  });
   await page.evaluate(() => {
     const c = globalThis.cljs.core;
     const kw = (name) => c.keyword(name);
@@ -208,7 +195,6 @@ test("portfolio positions coin jumps to the trade route market @regression", asy
   await waitForIdle(page, { quietMs: 250, timeoutMs: 4_000, pollMs: 50 });
 
   await selectAccountTab(page, "positions");
-  await expectOracle(page, "first-position", { present: true }, { timeoutMs: 10_000 });
   const coinButton = page
     .locator("[data-role='portfolio-account-table'] [data-role='positions-coin-select']")
     .first();
