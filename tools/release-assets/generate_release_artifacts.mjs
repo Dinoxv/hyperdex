@@ -213,6 +213,34 @@ function isFingerprintedReleaseJavaScriptFile(fileName) {
   return path.posix.basename(fileName).split(".").length >= 3;
 }
 
+const SHADOW_LOADER_EVAL_RUNTIME_PATTERN =
+  /var\s+([A-Za-z_$][A-Za-z0-9_$]*)=new Tca;\1\.pk=!0;/;
+const SHADOW_LOADER_SCRIPT_TAG_RUNTIME_PATTERN =
+  /var\s+([A-Za-z_$][A-Za-z0-9_$]*)=new Tca;\1\.tk=!0;/;
+
+export function rewriteMainModuleLoaderRuntime(mainModuleSource) {
+  if (typeof mainModuleSource !== "string") {
+    throw new Error("Expected the main module source to be a string.");
+  }
+
+  if (SHADOW_LOADER_SCRIPT_TAG_RUNTIME_PATTERN.test(mainModuleSource)) {
+    return mainModuleSource;
+  }
+
+  const rewrittenSource = mainModuleSource.replace(
+    SHADOW_LOADER_EVAL_RUNTIME_PATTERN,
+    (_match, loaderVar) => `var ${loaderVar}=new Tca;${loaderVar}.tk=!0;`
+  );
+
+  if (rewrittenSource === mainModuleSource) {
+    throw new Error(
+      "Expected the main module to contain the shadow-cljs eval-based loader runtime."
+    );
+  }
+
+  return rewrittenSource;
+}
+
 export async function generateReleaseArtifacts({
   sourceRoot = DEFAULT_SOURCE_ROOT,
   outputRoot = DEFAULT_OUTPUT_ROOT,
@@ -294,10 +322,23 @@ export async function generateReleaseArtifacts({
   const releaseJavaScriptFiles = collectReleaseJavaScriptFiles({ manifest, moduleLoader });
   for (const fileName of releaseJavaScriptFiles) {
     const relativePath = path.join(JS_DIR, fileName);
-    const copied = await copyFileIntoRoot(sourceRoot, outputRoot, relativePath);
-    if (!copied) {
+    const sourcePath = path.join(sourceRoot, relativePath);
+    if (!(await pathExists(sourcePath))) {
       throw new Error(`Expected release asset to exist: ${relativePath}`);
     }
+
+    const destinationPath = path.join(outputRoot, relativePath);
+    await fs.mkdir(path.dirname(destinationPath), { recursive: true });
+
+    if (fileName === mainModule["output-name"]) {
+      const rewrittenMainModule = rewriteMainModuleLoaderRuntime(
+        await fs.readFile(sourcePath, "utf8")
+      );
+      await fs.writeFile(destinationPath, rewrittenMainModule);
+      continue;
+    }
+
+    await fs.copyFile(sourcePath, destinationPath);
   }
 
   const immutableAssetPaths = [

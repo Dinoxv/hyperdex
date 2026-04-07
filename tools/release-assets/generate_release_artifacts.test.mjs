@@ -24,6 +24,7 @@ import {
   generateReleaseArtifacts,
   hashContent,
   normalizeModuleUriToRelativeJsPath,
+  rewriteMainModuleLoaderRuntime,
   rewriteAppIndexHtml,
   routePathToOutputHtmlPath,
 } from "./generate_release_artifacts.mjs";
@@ -56,6 +57,12 @@ const STATIC_ROUTE_PATHS = [
 const STATIC_ROUTE_HTML_FILES = STATIC_ROUTE_PATHS.map((routePath) =>
   routePathToOutputHtmlPath(routePath)
 ).sort();
+const SAMPLE_MAIN_RELEASE_BUNDLE = [
+  "function boot() { return true; }",
+  "var loaderManager=new Tca;loaderManager.pk=!0;",
+  "boot();",
+  "",
+].join("\n");
 
 function buildSampleIndexHtml() {
   return `<!DOCTYPE html>
@@ -162,7 +169,7 @@ async function writeReleaseFixture(sourceRoot, { missingRelativePaths = [] } = {
   await writeFixtureFile(
     sourceRoot,
     path.join("js", "main.HASH.js"),
-    "console.log('main');\n",
+    SAMPLE_MAIN_RELEASE_BUNDLE,
     missing
   );
   await writeFixtureFile(
@@ -297,6 +304,13 @@ test("collectReleaseJavaScriptFiles keeps only explicit release assets", () => {
     "trade_chart.HASH.js",
     "vault_detail_worker.js",
   ]);
+});
+
+test("rewriteMainModuleLoaderRuntime switches shadow-cljs release loading to script tags", () => {
+  const rewritten = rewriteMainModuleLoaderRuntime(SAMPLE_MAIN_RELEASE_BUNDLE);
+
+  assert.match(rewritten, /var loaderManager=new Tca;loaderManager\.tk=!0;/);
+  assert.doesNotMatch(rewritten, /loaderManager\.pk=!0/);
 });
 
 test("normalizeModuleUriToRelativeJsPath preserves nested js paths and strips query strings", () => {
@@ -444,7 +458,8 @@ test("generateReleaseArtifacts assembles deterministic route-specific release pa
   assert.doesNotMatch(generatedApi, /\/API/);
 
   assert.equal(generatedCss, "body { color: white; }\n");
-  assert.equal(copiedMain, "console.log('main');\n");
+  assert.match(copiedMain, /var loaderManager=new Tca;loaderManager\.tk=!0;/);
+  assert.doesNotMatch(copiedMain, /loaderManager\.pk=!0/);
   assert.equal(copiedFont, "font");
   assert.match(routeMetadataScript, /const metadata = \{/);
   assert.match(routeMetadataScript, /window\.addEventListener\("popstate", syncMetadata\)/);
@@ -552,6 +567,20 @@ test("generateReleaseArtifacts fails closed when a required release asset is mis
   await assert.rejects(
     generateReleaseArtifacts({ sourceRoot, outputRoot }),
     /Expected release asset to exist: js\/portfolio_worker\.js/
+  );
+});
+
+test("generateReleaseArtifacts fails closed when the main module loader runtime is not rewritable", async () => {
+  const tempRoot = await fs.mkdtemp(path.join(os.tmpdir(), "hyperopen-release-assets-loader-"));
+  const sourceRoot = path.join(tempRoot, "source");
+  const outputRoot = path.join(tempRoot, "output");
+
+  await writeReleaseFixture(sourceRoot);
+  await fs.writeFile(path.join(sourceRoot, "js", "main.HASH.js"), "console.log('main');\n");
+
+  await assert.rejects(
+    generateReleaseArtifacts({ sourceRoot, outputRoot }),
+    /Expected the main module to contain the shadow-cljs eval-based loader runtime/
   );
 });
 
