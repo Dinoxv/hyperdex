@@ -157,3 +157,17 @@
        [:circle {:cx "10" :cy "8.8" :r "1.35" :stroke-width "1.6"}]]
 
       nil)))
+
+(defn info-icon
+  [attrs]
+  [:svg (merge {:viewBox "0 0 20 20"
+                :fill "none"
+                :stroke "currentColor"}
+               attrs)
+   [:circle {:cx "10" :cy "10" :r "6.35" :stroke-width "1.45"}]
+   [:path {:d "M10 8v4"
+           :stroke-width "1.55"
+           :stroke-linecap "round"}]
+   [:circle {:cx "10" :cy "5.9" :r "0.85"
+             :fill "currentColor"
+             :stroke "none"}]])

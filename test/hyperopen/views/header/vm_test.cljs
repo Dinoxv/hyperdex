@@ -91,8 +91,10 @@
     (is (false? (:disabled? passkey-row)))
     (is (= [[:actions/request-agent-local-protection-mode-change :plain]]
            (:on-change passkey-row)))
-    (is (= "Require one passkey unlock after restart. Turning this off stores the trading key unencrypted in local storage."
-           (:helper-copy passkey-row)))))
+    (is (nil? (:confirmation passkey-row)))
+    (is (nil? (:helper-copy passkey-row)))
+    (is (= "Trading stays remembered on this device, but you will need one passkey unlock after a browser restart before orders can be signed again."
+           (:tooltip passkey-row)))))
 
 (deftest header-vm-projects-spectate-copy-from-state-test
   (let [inactive-vm (vm/header-vm {})

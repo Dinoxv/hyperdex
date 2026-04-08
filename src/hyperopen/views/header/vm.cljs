@@ -154,33 +154,15 @@
 
       nil)
 
-    :agent-local-protection-mode
-    (case (some-> (:next-mode confirmation)
-                  agent-session/normalize-local-protection-mode)
-      :passkey
-      {:title "Lock trading with a passkey?"
-       :body "Stores the remembered session in a passkey-locked blob and will require Enable Trading again."
-       :confirm-label "Change"
-       :cancel-action [[:actions/cancel-agent-local-protection-mode-change]]
-       :confirm-action [[:actions/confirm-agent-local-protection-mode-change]]}
-
-      :plain
-      {:title "Store trading key unencrypted?"
-       :body "Turns off passkey locking, stores the trading key in local storage, and will require Enable Trading again."
-       :confirm-label "Change"
-       :cancel-action [[:actions/cancel-agent-local-protection-mode-change]]
-       :confirm-action [[:actions/confirm-agent-local-protection-mode-change]]}
-
-      nil)
-
     nil))
 
 (defn- settings-row
-  [id title helper-copy checked? icon-kind on-change & {:keys [confirmation disabled?]}]
+  [id title helper-copy checked? icon-kind on-change & {:keys [confirmation disabled? tooltip]}]
   {:id id
    :data-role (str "trading-settings-" (name id) "-row")
    :title title
    :helper-copy helper-copy
+   :tooltip tooltip
    :checked? checked?
    :disabled? disabled?
    :icon-kind icon-kind
@@ -235,20 +217,18 @@
                                   (not passkey-capable?)
                                   "This browser does not support passkey-locked trading."
 
-                                  passkey-enabled?
-                                  "Require one passkey unlock after restart. Turning this off stores the trading key unencrypted in local storage."
-
-                                :else
-                                  "Keep zero-click resume by storing the trading key unencrypted in local storage, or turn this on for a passkey unlock after restart.")
+                                  :else nil)
                                 passkey-enabled?
                                 nil
                                 [[:actions/request-agent-local-protection-mode-change
                                   (if passkey-enabled? :plain :passkey)]]
+                                :tooltip (when (and remember-session?
+                                                    passkey-capable?)
+                                           (if passkey-enabled?
+                                             "Trading stays remembered on this device, but you will need one passkey unlock after a browser restart before orders can be signed again."
+                                             "Protect the remembered trading session with a passkey so the key is not resumed automatically after a browser restart."))
                                 :disabled? (or (not remember-session?)
-                                               (not passkey-capable?))
-                                :confirmation (when (= :agent-local-protection-mode
-                                                       (get-in state [:header-ui :settings-confirmation :kind]))
-                                                confirmation))])
+                                               (not passkey-capable?)))])
                 (settings-section
                  :confirmations
                  "Confirmations"

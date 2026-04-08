@@ -67,9 +67,76 @@
                          "transition-transform"
                          "duration-200"
                          "peer-disabled:opacity-60"]
-                        (if checked?
+                         (if checked?
                           ["translate-x-[18px]" "bg-[#7ce7d7]"]
                           ["translate-x-0" "bg-[#79828b]"]))}]])
+
+(defn- row-tooltip
+  [{:keys [body data-role title]}]
+  (when (seq body)
+    [:div {:class ["group/tooltip"
+                   "relative"
+                   "inline-flex"
+                   "items-center"
+                   "align-middle"]}
+     [:button {:type "button"
+               :class ["inline-flex"
+                       "h-4"
+                       "w-4"
+                       "items-center"
+                       "justify-center"
+                       "rounded-full"
+                       "text-[#7f9198]"
+                       "transition-colors"
+                       "hover:text-[#c8d5d6]"
+                       "focus-visible:outline-none"
+                       "focus-visible:text-[#dff2ef]"]
+               :aria-label title
+               :data-role (str data-role "-tooltip-trigger")}
+      (icons/info-icon {:class ["h-3.5" "w-3.5"]})]
+     [:div {:class ["pointer-events-none"
+                    "absolute"
+                    "bottom-[calc(100%+9px)]"
+                    "right-0"
+                    "z-20"
+                    "w-[220px]"
+                    "rounded-[10px]"
+                    "border"
+                    "border-[#2f3a40]"
+                    "bg-[#162127]"
+                    "px-3"
+                    "py-2.5"
+                    "text-[0.69rem]"
+                    "leading-[1.45]"
+                    "text-[#d7e1e3]"
+                    "opacity-0"
+                    "shadow-[0_18px_50px_rgba(0,0,0,0.38)]"
+                    "transition-all"
+                    "duration-150"
+                    "translate-y-1"
+                    "group-hover/tooltip:translate-y-0"
+                    "group-hover/tooltip:opacity-100"
+                    "group-focus-within/tooltip:translate-y-0"
+                    "group-focus-within/tooltip:opacity-100"]
+            :role "tooltip"
+            :data-role (str data-role "-tooltip")}
+      body]
+     [:div {:class ["pointer-events-none"
+                    "absolute"
+                    "bottom-[calc(100%+4px)]"
+                    "right-[5px]"
+                    "h-2.5"
+                    "w-2.5"
+                    "rotate-45"
+                    "border-b"
+                    "border-r"
+                    "border-[#2f3a40]"
+                    "bg-[#162127]"
+                    "opacity-0"
+                    "transition-opacity"
+                    "duration-150"
+                    "group-hover/tooltip:opacity-100"
+                    "group-focus-within/tooltip:opacity-100"]}]]))
 
 (defn- confirmation-strip
   [{:keys [body cancel-action confirm-action confirm-label title]}]
@@ -135,7 +202,7 @@
        confirm-label]]]))
 
 (defn- trading-settings-row
-  [{:keys [aria-label checked? confirmation data-role disabled? helper-copy icon-kind on-change title]}]
+  [{:keys [aria-label checked? confirmation data-role disabled? helper-copy icon-kind on-change title tooltip]}]
   (let [has-icon? (some? icon-kind)]
     [:div {:class ["py-3"]
            :data-role data-role}
@@ -144,17 +211,22 @@
                            ["opacity-60"]))}
       (trading-settings-icon-shell (str data-role "-icon") icon-kind checked?)
       [:div {:class ["min-w-0" "flex-1" "space-y-1"]}
-       [:div {:class ["text-[0.88rem]"
-                      "font-semibold"
-                      "leading-5"
-                      "tracking-[0.015em]"
-                      "text-[#eef3f2]"]}
-        title]
-       [:p {:class ["max-w-[16rem]"
-                    "text-[0.72rem]"
-                    "leading-[1.5]"
-                    "text-[#8f9aa2]"]}
-        helper-copy]]
+       [:div {:class ["flex" "items-center" "gap-1.5"]}
+        [:div {:class ["text-[0.88rem]"
+                       "font-semibold"
+                       "leading-5"
+                       "tracking-[0.015em]"
+                       "text-[#eef3f2]"]}
+         title]
+        (row-tooltip {:title (str title " details")
+                      :body tooltip
+                      :data-role data-role})]
+       (when (seq helper-copy)
+         [:p {:class ["max-w-[16rem]"
+                      "text-[0.72rem]"
+                      "leading-[1.5]"
+                      "text-[#8f9aa2]"]}
+          helper-copy])]
       [:div {:class ["flex" "shrink-0" "items-start" "pt-0.5"]}
        (trading-settings-toggle {:aria-label aria-label
                                  :checked? checked?
@@ -289,7 +361,7 @@
                         "w-[328px]"
                         "max-h-[70vh]"
                         "max-w-[calc(100vw-1.5rem)]"
-                        "overflow-hidden"
+                        "overflow-visible"
                         "rounded-[15px]"
                         "border"
                         "border-[#384046]"
@@ -317,7 +389,7 @@
                         "bottom-3"
                         "z-[285]"
                         "max-h-[76vh]"
-                        "overflow-hidden"
+                        "overflow-visible"
                         "rounded-[16px]"
                         "border"
                         "border-[#384046]"

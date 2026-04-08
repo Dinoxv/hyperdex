@@ -23,11 +23,10 @@
         (seq? node) (mapcat collect-strings node)
         :else []))
 (defn- class-values [class-attr]
-  (cond
-    (nil? class-attr) []
-    (string? class-attr) (remove str/blank? (str/split class-attr #"\s+"))
-    (sequential? class-attr) (mapcat class-values class-attr)
-    :else []))
+  (cond (nil? class-attr) []
+        (string? class-attr) (remove str/blank? (str/split class-attr #"\s+"))
+        (sequential? class-attr) (mapcat class-values class-attr)
+        :else []))
 (defn- class-token-set [node] (set (class-values (get-in node [1 :class]))))
 (defn- ordered-settings-sections [node]
   (->> (tree-seq coll? seq node)
@@ -40,7 +39,6 @@
        distinct
        vec))
 (def connected-address "0x1234567890abcdef1234567890abcdef12345678")
-
 (deftest connected-header-shows-address-dropdown-and-hides-legacy-controls-test
   (let [view (header-view/header-view {:wallet {:connected? true
                                                  :address connected-address}})
@@ -156,7 +154,9 @@
     (is (contains? panel-classes "w-[328px]"))
     (is (contains? panel-classes "rounded-[15px]"))
     (is (contains? panel-classes "bg-[#132026]"))
+    (is (contains? panel-classes "overflow-visible"))
     (is (contains? sheet-classes "bg-[#132026]"))
+    (is (contains? sheet-classes "overflow-visible"))
     (is (contains? session-section-classes "border-t"))
     (is (contains? session-section-classes "first:border-t-0"))
     (is (= "top right" (:transform-origin panel-style)))
