@@ -9,7 +9,7 @@
   []
   (resolve 'hyperopen.startup.restore/restore-trading-settings!))
 
-(deftest restore-agent-storage-mode-uses-session-default-for-missing-preference-test
+(deftest restore-agent-storage-mode-uses-local-default-for-missing-preference-test
   (let [store (atom {})
         defaults (atom [])]
     (with-redefs [agent-session/load-storage-mode-preference
@@ -17,10 +17,10 @@
                     ([] :local)
                     ([missing-default]
                      (swap! defaults conj missing-default)
-                     :session))]
+                     :local))]
       (startup-restore/restore-agent-storage-mode! store)
-      (is (= [:session] @defaults))
-      (is (= :session (get-in @store [:wallet :agent :storage-mode]))))))
+      (is (= [:local] @defaults))
+      (is (= :local (get-in @store [:wallet :agent :storage-mode]))))))
 
 (deftest restore-agent-storage-mode-preserves-existing-stored-choice-test
   (let [store (atom {})]

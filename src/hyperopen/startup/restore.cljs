@@ -12,7 +12,7 @@
 
 (defn restore-agent-storage-mode!
   [store]
-  (let [storage-mode (agent-session/load-storage-mode-preference :session)
+  (let [storage-mode (agent-session/load-storage-mode-preference :local)
         local-protection-mode (agent-session/load-local-protection-mode-preference :plain)]
     (swap! store
            (fn [state]

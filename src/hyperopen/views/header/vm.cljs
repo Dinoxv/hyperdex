@@ -113,7 +113,7 @@
   [state]
   (if-some [storage-mode (get-in state [:wallet :agent :storage-mode])]
     (agent-session/normalize-storage-mode storage-mode)
-    :session))
+    :local))
 
 (defn- remember-trading-session?
   [state]

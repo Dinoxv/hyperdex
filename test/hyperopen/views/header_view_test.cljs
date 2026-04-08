@@ -16,25 +16,20 @@
     (some #(find-node pred %) node)
     :else nil))
 (defn- find-node-by-role [node role]
-  (find-node #(and (vector? %)
-                   (= role (get-in % [1 :data-role])))
-             node))
+  (find-node #(and (vector? %) (= role (get-in % [1 :data-role]))) node))
 (defn- collect-strings [node]
-  (cond
-    (string? node) [node]
-    (vector? node) (mapcat collect-strings (rest node))
-    (seq? node) (mapcat collect-strings node)
-    :else []))
+  (cond (string? node) [node]
+        (vector? node) (mapcat collect-strings (rest node))
+        (seq? node) (mapcat collect-strings node)
+        :else []))
 (defn- class-values [class-attr]
   (cond
     (nil? class-attr) []
     (string? class-attr) (remove str/blank? (str/split class-attr #"\s+"))
     (sequential? class-attr) (mapcat class-values class-attr)
     :else []))
-(defn- class-token-set [node]
-  (set (class-values (get-in node [1 :class]))))
-(defn- ordered-settings-sections
-  [node]
+(defn- class-token-set [node] (set (class-values (get-in node [1 :class]))))
+(defn- ordered-settings-sections [node]
   (->> (tree-seq coll? seq node)
        (filter vector?)
        (keep #(get-in % [1 :data-role]))
@@ -44,8 +39,7 @@
                    "trading-settings-display-section"} %))
        distinct
        vec))
-(def connected-address
-  "0x1234567890abcdef1234567890abcdef12345678")
+(def connected-address "0x1234567890abcdef1234567890abcdef12345678")
 
 (deftest connected-header-shows-address-dropdown-and-hides-legacy-controls-test
   (let [view (header-view/header-view {:wallet {:connected? true
@@ -238,15 +232,21 @@
     (is (not (contains? all-text "Chart")))
     (is (not (contains? all-text "Active Asset")))))
 
-(deftest header-renders-session-default-when-storage-mode-is-missing-test
+(deftest header-renders-remembered-session-default-when-storage-mode-is-missing-test
   (let [view (header-view/header-view {:wallet {:connected? false}
                                        :router {:path "/trade"}
                                        :header-ui {:settings-open? true
                                                    :settings-confirmation nil}
                                        :trading-settings {:fill-alerts-enabled? true}})
+        storage-row (find-node-by-role view "trading-settings-storage-mode-row")
+        storage-toggle (find-node #(and (vector? %) (= :input (first %))
+                                        (= "checkbox" (get-in % [1 :type])))
+                                  storage-row)
         all-text (set (collect-strings view))]
     (is (contains? all-text "Remember session"))
+    (is (= true (get-in storage-toggle [1 :checked])))
     (is (contains? all-text "Fill alerts"))
+    (is (not (contains? all-text "Available when Remember session is on.")))
     (is (not (contains? all-text "This session")))
     (is (not (contains? all-text "This device")))))
 

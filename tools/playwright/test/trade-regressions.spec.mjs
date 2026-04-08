@@ -1483,26 +1483,8 @@ test("trading settings session toggles gate passkey lock behind remembered sessi
   const passkeyToggleLabel = passkeyRow.locator("label").first();
   const passkeyToggleInput = passkeyRow.locator('input[type="checkbox"]').first();
 
-  await expect(rememberToggleInput).not.toBeChecked();
-  await expect(passkeyToggleInput).toBeDisabled();
-
-  await rememberToggleLabel.click();
-  await waitForIdle(page, { quietMs: 250, timeoutMs: 4_000, pollMs: 50 });
-  await expect(
-    rememberRow.locator('[data-role="trading-settings-storage-mode-confirmation"]').first()
-  ).toBeVisible();
-  await rememberRow.getByRole("button", { name: "Change" }).first().click();
-  await waitForIdle(page, { quietMs: 250, timeoutMs: 4_000, pollMs: 50 });
-
-  await page.locator('[data-role="header-settings-button"]').click();
-  await waitForIdle(page, { quietMs: 250, timeoutMs: 4_000, pollMs: 50 });
   await expect(rememberToggleInput).toBeChecked();
   await expect(passkeyToggleInput).toBeEnabled();
-  await expect
-    .poll(() => page.evaluate(() => localStorage.getItem("hyperopen:agent-storage-mode:v1")), {
-      timeout: 4_000
-    })
-    .toBe("local");
 
   await passkeyToggleLabel.click();
   await waitForIdle(page, { quietMs: 250, timeoutMs: 4_000, pollMs: 50 });
