@@ -3,7 +3,7 @@
             [hyperopen.views.header.icons :as icons]))
 
 (defn- trading-settings-icon-shell
-  [data-role kind active?]
+  [data-role kind active? disabled?]
   (when kind
     [:div {:class ["flex"
                    "h-4.5"
@@ -11,7 +11,9 @@
                    "shrink-0"
                    "items-center"
                    "justify-center"
-                   "pt-0.5"]
+                   "pt-0.5"
+                   (when disabled?
+                     "opacity-60")]
            :data-role data-role}
      (icons/trading-settings-row-icon kind active?)]))
 
@@ -214,30 +216,32 @@
         has-icon? (some? icon-kind)]
     [:div {:class ["py-3.5"]
            :data-role data-role}
-     [:div {:class (into ["flex"
-                          (if has-helper-copy? "items-start" "items-center")
-                          (if has-icon? "gap-3.5" "gap-0")]
-                         (when disabled?
-                           ["opacity-60"]))}
-      (trading-settings-icon-shell (str data-role "-icon") icon-kind checked?)
+     [:div {:class ["flex"
+                    (if has-helper-copy? "items-start" "items-center")
+                    (if has-icon? "gap-3.5" "gap-0")]}
+      (trading-settings-icon-shell (str data-role "-icon") icon-kind checked? disabled?)
       [:div {:class (into ["min-w-0" "flex-1"]
                           (when has-helper-copy?
                             ["space-y-1.5"]))}
        [:div {:class ["flex" "items-center" "gap-1.5" "pr-2"]}
-        [:div {:class ["text-[0.88rem]"
-                       "font-semibold"
-                       "leading-5"
-                       "tracking-[0.015em]"
-                       "text-[#eef3f2]"]}
+        [:div {:class (into ["text-[0.88rem]"
+                             "font-semibold"
+                             "leading-5"
+                             "tracking-[0.015em]"
+                             "text-[#eef3f2]"]
+                            (when disabled?
+                              ["opacity-60"]))}
          title]
         (row-tooltip {:title (str title " details")
                       :body tooltip
                       :data-role data-role})]
        (when has-helper-copy?
-         [:p {:class ["max-w-[16rem]"
-                      "text-[0.72rem]"
-                      "leading-[1.5]"
-                      "text-[#8f9aa2]"]}
+         [:p {:class (into ["max-w-[16rem]"
+                            "text-[0.72rem]"
+                            "leading-[1.5]"
+                            "text-[#8f9aa2]"]
+                           (when disabled?
+                             ["opacity-75"]))}
           helper-copy])]
       [:div {:class (into ["flex" "shrink-0"]
                           (if has-helper-copy?
