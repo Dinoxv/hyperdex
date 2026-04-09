@@ -314,7 +314,7 @@
                :on {:click close-actions}}
       (icons/close-icon {:class ["h-4.5" "w-4.5"]})]]
     [:div {:class ["mt-3" "h-px" "bg-[#2c3439]"]}]]
-   [:div {:class ["overflow-y-auto" "overscroll-contain" "px-4" "pb-4" "pt-2.5"]}
+   [:div {:class ["overflow-visible" "px-4" "pb-4" "pt-2.5"]}
     [:div {:class ["space-y-0"]}
      (for [{:keys [id] :as section} sections]
        ^{:key (str "settings-section:" (name id))}

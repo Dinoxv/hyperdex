@@ -53,7 +53,7 @@
     (is (contains? (set (collect-strings tooltip))
                    "Protect the remembered trading session with a passkey so the key is not resumed automatically after a browser restart."))))
 
-(deftest header-renders-unlock-first-helper-when-passkey-downgrade-is-disabled-test
+(deftest header-renders-passkey-disabled-state-as-tooltip-copy-test
   (let [view (header-view/header-view {:wallet {:connected? false
                                                 :agent {:status :locked
                                                         :storage-mode :local
@@ -65,11 +65,17 @@
                                        :trading-settings {:fill-alerts-enabled? true}})
         passkey-row (find-node-by-role view "trading-settings-local-protection-mode-row")
         tooltip-trigger (find-node-by-role view "trading-settings-local-protection-mode-row-tooltip-trigger")
-        row-text (set (collect-strings passkey-row))]
+        tooltip (find-node-by-role view "trading-settings-local-protection-mode-row-tooltip")
+        inline-helper-copy? (some? (find-node (fn [node]
+                                                (contains? (class-token-set node) "max-w-[16rem]"))
+                                              passkey-row))]
     (is (some? passkey-row))
-    (is (nil? tooltip-trigger))
-    (is (contains? row-text "Lock trading with passkey"))
-    (is (contains? row-text "Unlock trading before turning off passkey protection."))))
+    (is (some? tooltip-trigger))
+    (is (some? tooltip))
+    (is (false? inline-helper-copy?))
+    (is (contains? (set (collect-strings passkey-row)) "Lock trading with passkey"))
+    (is (contains? (set (collect-strings tooltip))
+                   "Unlock trading before turning off passkey protection."))))
 
 (deftest header-renders-standard-settings-as-tooltip-rows-without-inline-helper-copy-test
   (let [view (header-view/header-view {:wallet {:connected? false

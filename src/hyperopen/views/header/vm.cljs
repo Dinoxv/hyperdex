@@ -150,6 +150,16 @@
     :else
     nil))
 
+(defn- passkey-toggle-tooltip-copy
+  [remember-session? passkey-capable? passkey-enabled? agent-status]
+  (or (passkey-toggle-helper-copy remember-session?
+                                  passkey-capable?
+                                  passkey-enabled?
+                                  agent-status)
+      (if passkey-enabled?
+        "Trading stays remembered on this device, but you will need one passkey unlock after a browser restart before orders can be signed again."
+        "Protect the remembered trading session with a passkey so the key is not resumed automatically after a browser restart.")))
+
 (defn- passkey-toggle-disabled?
   [remember-session? passkey-capable? passkey-enabled? agent-status]
   (boolean
@@ -246,17 +256,15 @@
                                                 confirmation))
                   (settings-row :local-protection-mode
                                 "Lock trading with passkey"
-                                passkey-helper-copy
+                                nil
                                 passkey-enabled?
                                 nil
                                 [[:actions/request-agent-local-protection-mode-change
                                   (if passkey-enabled? :plain :passkey)]]
-                                :tooltip (when (and remember-session?
-                                                    passkey-capable?
-                                                    (nil? passkey-helper-copy))
-                                           (if passkey-enabled?
-                                             "Trading stays remembered on this device, but you will need one passkey unlock after a browser restart before orders can be signed again."
-                                             "Protect the remembered trading session with a passkey so the key is not resumed automatically after a browser restart."))
+                                :tooltip (passkey-toggle-tooltip-copy remember-session?
+                                                                      passkey-capable?
+                                                                      passkey-enabled?
+                                                                      agent-status)
                                 :disabled? passkey-disabled?)])
                 (settings-section
                  :confirmations

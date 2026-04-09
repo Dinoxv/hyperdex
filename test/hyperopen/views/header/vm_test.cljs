@@ -107,9 +107,9 @@
         passkey-row (row-by-id sections :session :local-protection-mode)]
     (is (true? (:checked? passkey-row)))
     (is (true? (:disabled? passkey-row)))
+    (is (nil? (:helper-copy passkey-row)))
     (is (= "Unlock trading before turning off passkey protection."
-           (:helper-copy passkey-row)))
-    (is (nil? (:tooltip passkey-row)))))
+           (:tooltip passkey-row)))))
 
 (deftest header-vm-projects-spectate-copy-from-state-test
   (let [inactive-vm (vm/header-vm {})
