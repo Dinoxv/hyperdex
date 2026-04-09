@@ -310,6 +310,45 @@
       :session (.-sessionStorage global)
       nil)))
 
+(defn- floor-when-number
+  [value]
+  (when (number? value)
+    (js/Math.floor value)))
+
+(defn- present-string
+  [value]
+  (when (and (string? value)
+             (seq value))
+    value))
+
+(defn- trimmed-string
+  [value]
+  (some-> value str str/trim not-empty))
+
+(defn- sanitize-passkey-transports
+  [transports]
+  (some->> transports
+           (keep trimmed-string)
+           vec
+           not-empty))
+
+(defn- sanitize-passkey-version
+  [version]
+  (or (floor-when-number version)
+      1))
+
+(defn- required-passkey-fields
+  [metadata]
+  (let [agent-address (present-string (:agent-address metadata))
+        credential-id (present-string (:credential-id metadata))
+        prf-salt (trimmed-string (:prf-salt metadata))]
+    (when (and agent-address
+               credential-id
+               prf-salt)
+      {:agent-address agent-address
+       :credential-id credential-id
+       :prf-salt prf-salt})))
+
 (defn- sanitize-agent-session
   [session]
   (let [agent-address (:agent-address session)
@@ -327,34 +366,17 @@
 
 (defn- sanitize-passkey-session-metadata
   [metadata]
-  (let [agent-address (:agent-address metadata)
-        credential-id (:credential-id metadata)
-        prf-salt (some-> (:prf-salt metadata) str str/trim not-empty)
-        device-label (normalize-device-label (:device-label metadata))
-        transports (some->> (:transports metadata)
-                            (keep #(some-> % str str/trim not-empty))
-                            vec
-                            not-empty)
-        last-approved-at (:last-approved-at metadata)
-        nonce-cursor (:nonce-cursor metadata)
-        saved-at-ms (:saved-at-ms metadata)
-        version (:version metadata)]
-    (when (and (string? agent-address)
-               (seq agent-address)
-               (string? credential-id)
-               (seq credential-id)
-               (seq prf-salt))
-      {:version (or (when (number? version)
-                      (js/Math.floor version))
-                    1)
-       :agent-address agent-address
-       :credential-id credential-id
-       :prf-salt prf-salt
-       :device-label device-label
-       :transports transports
-       :last-approved-at (when (number? last-approved-at) (js/Math.floor last-approved-at))
-       :nonce-cursor (when (number? nonce-cursor) (js/Math.floor nonce-cursor))
-       :saved-at-ms (when (number? saved-at-ms) (js/Math.floor saved-at-ms))})))
+  (when-let [{:keys [agent-address credential-id prf-salt]}
+             (required-passkey-fields metadata)]
+    {:version (sanitize-passkey-version (:version metadata))
+     :agent-address agent-address
+     :credential-id credential-id
+     :prf-salt prf-salt
+     :device-label (normalize-device-label (:device-label metadata))
+     :transports (sanitize-passkey-transports (:transports metadata))
+     :last-approved-at (floor-when-number (:last-approved-at metadata))
+     :nonce-cursor (floor-when-number (:nonce-cursor metadata))
+     :saved-at-ms (floor-when-number (:saved-at-ms metadata))}))
 
 (defn persist-agent-session!
   [storage wallet-address session]

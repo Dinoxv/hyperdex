@@ -2,7 +2,8 @@
   (:require [cljs.test :refer-macros [async deftest is]]
             [clojure.string :as str]
             [hyperopen.wallet.agent-runtime :as agent-runtime]
-            [hyperopen.wallet.agent-session :as agent-session]))
+            [hyperopen.wallet.agent-session :as agent-session]
+            [hyperopen.test-support.async :as async-support]))
 
 (defn- fake-storage []
   (let [store (atom {})]
@@ -10,6 +11,10 @@
          :getItem (fn [k] (get @store (str k)))
          :removeItem (fn [k] (swap! store dissoc (str k)))
          :clear (fn [] (reset! store {}))}))
+
+(defn- next-tick!
+  [f]
+  (js/setTimeout f 0))
 
 (deftest set-agent-storage-mode-clears-sessions-and-resets-agent-state-test
   (let [cleared (atom [])
@@ -224,6 +229,199 @@
     (is (= :passkey (get-in @store [:wallet :agent :local-protection-mode])))
     (is (= "Unlock trading before turning off passkey protection."
            (get-in @store [:wallet :agent :error])))))
+
+(deftest set-agent-local-protection-mode-errors-when-ready-plain-session-is-missing-test
+  (let [persisted-modes (atom [])
+        store (atom {:wallet {:address "0xabc"
+                              :agent {:status :ready
+                                      :storage-mode :local
+                                      :local-protection-mode :plain
+                                      :agent-address "0xagent"}}})]
+    (agent-runtime/set-agent-local-protection-mode!
+     {:store store
+      :local-protection-mode :passkey
+      :normalize-local-protection-mode identity
+      :normalize-storage-mode identity
+      :load-unlocked-session (fn [_] nil)
+      :load-agent-session-by-mode (fn [_ _] nil)
+      :persist-local-protection-mode-preference! (fn [mode]
+                                                   (swap! persisted-modes conj mode)
+                                                   true)
+      :missing-session-error "missing session"})
+    (is (empty? @persisted-modes))
+    (is (= :ready (get-in @store [:wallet :agent :status])))
+    (is (= "missing session" (get-in @store [:wallet :agent :error])))))
+
+(deftest set-agent-local-protection-mode-surfaces-passkey-metadata-persist-failure-test
+  (async done
+    (let [deleted-addresses (atom [])
+          store (atom {:wallet {:address "0xabc"
+                                :agent {:status :ready
+                                        :storage-mode :local
+                                        :local-protection-mode :plain
+                                        :agent-address "0xagent"
+                                        :last-approved-at 42
+                                        :nonce-cursor 84}}})]
+      (agent-runtime/set-agent-local-protection-mode!
+       {:store store
+        :local-protection-mode :passkey
+        :normalize-local-protection-mode identity
+        :normalize-storage-mode identity
+        :load-agent-session-by-mode (fn [_address _mode]
+                                      {:agent-address "0xagent"
+                                       :private-key "0xpriv"
+                                       :last-approved-at 42
+                                       :nonce-cursor 84})
+        :create-locked-session! (fn [_]
+                                  (js/Promise.resolve
+                                   {:metadata {:agent-address "0xagent"
+                                               :credential-id "cred"
+                                               :prf-salt "salt"
+                                               :last-approved-at 42
+                                               :nonce-cursor 84}
+                                    :session {:agent-address "0xagent"
+                                              :private-key "0xpriv"
+                                              :last-approved-at 42
+                                              :nonce-cursor 84}}))
+        :persist-passkey-session-metadata! (fn [_ _] false)
+        :delete-locked-session! (fn [address]
+                                  (swap! deleted-addresses conj address)
+                                  (js/Promise.resolve true))
+        :persist-local-protection-mode-preference! (fn [_] true)
+        :persist-session-error "persist failed"
+        :missing-session-error "missing session"})
+      (next-tick!
+       (fn []
+         (try
+           (is (= ["0xabc"] @deleted-addresses))
+           (is (= :ready (get-in @store [:wallet :agent :status])))
+           (is (= :plain (get-in @store [:wallet :agent :local-protection-mode])))
+           (is (= "persist failed" (get-in @store [:wallet :agent :error])))
+           (finally
+             (done))))))))
+
+(deftest set-agent-local-protection-mode-surfaces-plain-session-persist-failure-when-disabling-passkey-test
+  (let [store (atom {:wallet {:address "0xabc"
+                              :agent {:status :ready
+                                      :storage-mode :local
+                                      :local-protection-mode :passkey
+                                      :agent-address "0xagent"
+                                      :last-approved-at 42
+                                      :nonce-cursor 84}}})]
+    (agent-runtime/set-agent-local-protection-mode!
+     {:store store
+      :local-protection-mode :plain
+      :normalize-local-protection-mode identity
+      :normalize-storage-mode identity
+      :load-unlocked-session (fn [_address]
+                               {:agent-address "0xagent"
+                                :private-key "0xpriv"
+                                :last-approved-at 42
+                                :nonce-cursor 84})
+      :persist-agent-session-by-mode! (fn [& _] false)
+      :persist-session-error "persist failed"
+      :missing-session-error "missing session"})
+    (is (= :ready (get-in @store [:wallet :agent :status])))
+    (is (= :passkey (get-in @store [:wallet :agent :local-protection-mode])))
+    (is (= "persist failed" (get-in @store [:wallet :agent :error])))))
+
+(deftest unlock-agent-trading-guard-rails-test
+  (let [missing-wallet-store (atom {:wallet {:address nil
+                                             :agent {:status :locked
+                                                     :storage-mode :local
+                                                     :local-protection-mode :passkey}}})
+        plain-store (atom {:wallet {:address "0xabc"
+                                    :agent {:status :locked
+                                            :storage-mode :local
+                                            :local-protection-mode :plain}}})
+        missing-metadata-store (atom {:wallet {:address "0xabc"
+                                               :agent {:status :locked
+                                                       :storage-mode :local
+                                                       :local-protection-mode :passkey}}})]
+    (agent-runtime/unlock-agent-trading!
+     {:store missing-wallet-store
+      :normalize-storage-mode identity
+      :normalize-local-protection-mode identity})
+    (is (= :locked (get-in @missing-wallet-store [:wallet :agent :status])))
+    (is (= "Connect your wallet before unlocking trading."
+           (get-in @missing-wallet-store [:wallet :agent :error])))
+
+    (agent-runtime/unlock-agent-trading!
+     {:store plain-store
+      :normalize-storage-mode identity
+      :normalize-local-protection-mode identity})
+    (is (= :error (get-in @plain-store [:wallet :agent :status])))
+    (is (= "Trading unlock is available only for remembered passkey sessions."
+           (get-in @plain-store [:wallet :agent :error])))
+
+    (agent-runtime/unlock-agent-trading!
+     {:store missing-metadata-store
+      :normalize-storage-mode identity
+      :normalize-local-protection-mode identity
+      :load-passkey-session-metadata (fn [_] nil)})
+    (is (= :error (get-in @missing-metadata-store [:wallet :agent :status])))
+    (is (= "Enable Trading before unlocking."
+           (get-in @missing-metadata-store [:wallet :agent :error])))))
+
+(deftest unlock-agent-trading-restores-ready-state-on-success-test
+  (async done
+    (let [store (atom {:wallet {:address "0xabc"
+                                :agent {:status :locked
+                                        :storage-mode :local
+                                        :local-protection-mode :passkey
+                                        :recovery-modal-open? true}}})
+          metadata {:agent-address "0xagent"
+                    :credential-id "cred"
+                    :prf-salt "salt"
+                    :last-approved-at 42
+                    :nonce-cursor 84}]
+      (-> (agent-runtime/unlock-agent-trading!
+           {:store store
+            :normalize-storage-mode identity
+            :normalize-local-protection-mode identity
+            :load-passkey-session-metadata (fn [_] metadata)
+            :unlock-locked-session! (fn [_]
+                                      (js/Promise.resolve {:agent-address "0xagent"
+                                                           :private-key "0xpriv"}))
+            :runtime-error-message (fn [err] (str err))})
+          (.then
+           (fn [_]
+             (is (= :ready (get-in @store [:wallet :agent :status])))
+             (is (= "0xagent" (get-in @store [:wallet :agent :agent-address])))
+             (is (= 42 (get-in @store [:wallet :agent :last-approved-at])))
+             (is (= 84 (get-in @store [:wallet :agent :nonce-cursor])))
+             (is (false? (get-in @store [:wallet :agent :recovery-modal-open?])))
+             (done)))
+          (.catch (async-support/unexpected-error done))))))
+
+(deftest unlock-agent-trading-keeps-locked-state-and-message-on-failure-test
+  (async done
+    (let [store (atom {:wallet {:address "0xabc"
+                                :agent {:status :unlocking
+                                        :storage-mode :local
+                                        :local-protection-mode :passkey}}})
+          metadata {:agent-address "0xagent"
+                    :credential-id "cred"
+                    :prf-salt "salt"
+                    :last-approved-at 42
+                    :nonce-cursor 84}]
+      (-> (agent-runtime/unlock-agent-trading!
+           {:store store
+            :normalize-storage-mode identity
+            :normalize-local-protection-mode identity
+            :load-passkey-session-metadata (fn [_] metadata)
+            :unlock-locked-session! (fn [_]
+                                      (js/Promise.reject
+                                       (doto (js/Error. "bad unlock")
+                                         (aset "__hyperopenKnownMessage" true))))
+            :runtime-error-message (fn [_] "runtime fallback")})
+          (.then
+           (fn [_]
+             (is (= :locked (get-in @store [:wallet :agent :status])))
+             (is (= "0xagent" (get-in @store [:wallet :agent :agent-address])))
+             (is (= "bad unlock" (get-in @store [:wallet :agent :error])))
+             (done)))
+          (.catch (async-support/unexpected-error done))))))
 
 (deftest enable-agent-trading-sets-error-when-wallet-missing-test
   (let [store (atom {:wallet {:address nil

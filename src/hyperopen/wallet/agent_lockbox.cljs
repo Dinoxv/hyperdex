@@ -162,19 +162,101 @@
            (subs wallet-address* (- (count wallet-address*) 4)))
       wallet-address*)))
 
+(defn- lockable-session
+  [session]
+  (let [{:keys [agent-address last-approved-at nonce-cursor private-key]} session]
+    (when (and (string? agent-address)
+               (seq agent-address)
+               (string? private-key)
+               (seq private-key))
+      {:agent-address agent-address
+       :last-approved-at last-approved-at
+       :nonce-cursor nonce-cursor
+       :private-key private-key})))
+
+(defn- credential-user-name
+  [wallet-address]
+  (str "hyperopen-trading:" wallet-address))
+
+(defn- create-passkey-request
+  [wallet-address prf-salt]
+  (let [user-name (credential-user-name wallet-address)]
+    {:display-name (str "Hyperopen Trading " (short-wallet-label wallet-address))
+     :prf-salt prf-salt
+     :timeout-ms lockbox-timeout-ms
+     :user-id-bytes (webauthn/utf8-bytes user-name)
+     :user-name user-name}))
+
+(defn- blank-credential-id?
+  [credential-id]
+  (not (seq (some-> credential-id str str/trim))))
+
+(defn- ensure-credential-id!
+  [credential-id]
+  (if (blank-credential-id? credential-id)
+    (rejection "Unable to create a passkey credential for trading unlock.")
+    (js/Promise.resolve credential-id)))
+
+(defn- locked-session-metadata
+  [session credential-id prf-salt saved-at-ms]
+  {:record-version lockbox-version
+   :record-kind :locked
+   :agent-address (:agent-address session)
+   :credential-id credential-id
+   :prf-salt (webauthn/bytes->base64url prf-salt)
+   :last-approved-at (:last-approved-at session)
+   :nonce-cursor (:nonce-cursor session)
+   :saved-at-ms saved-at-ms})
+
+(defn- persist-lockbox-record!
+  [wallet-address saved-at-ms lockbox-record]
+  (-> (indexed-db/put-json!
+       indexed-db/agent-locked-session-store
+       wallet-address
+       (assoc lockbox-record
+              :saved-at-ms saved-at-ms))
+      (.then
+       (fn [persisted?]
+         (if persisted?
+           lockbox-record
+           (js/Promise.reject
+            (js/Error.
+             "Unable to persist the passkey trading lockbox.")))))))
+
+(defn- create-lockbox-from-credential!
+  [wallet-address session saved-at-ms prf-salt {:keys [credential-id prf-first]}]
+  (-> (ensure-credential-id! credential-id)
+      (.then
+       (fn [_]
+         (-> (resolve-prf-output! credential-id prf-salt prf-first)
+             (.then
+              (fn [prf-output]
+                (-> (encrypt-private-key! wallet-address
+                                          (:private-key session)
+                                          prf-output)
+                    (.then
+                     (fn [lockbox-record]
+                       (-> (persist-lockbox-record! wallet-address
+                                                    saved-at-ms
+                                                    lockbox-record)
+                           (.then
+                            (fn [_]
+                              {:metadata (locked-session-metadata session
+                                                                  credential-id
+                                                                  prf-salt
+                                                                  saved-at-ms)
+                               :session session})))))))))))))
+
 (defn create-locked-session!
   [{:keys [now-ms-fn session wallet-address]
     :or {now-ms-fn #(.now js/Date)}}]
   (let [wallet-address* (normalized-cache-key wallet-address)
-        {:keys [agent-address last-approved-at nonce-cursor private-key]} session]
+        session* (lockable-session session)]
     (cond
       (not (seq wallet-address*))
       (rejection "Connect your wallet before enabling passkey lock.")
 
-      (not (and (string? agent-address)
-                (seq agent-address)
-                (string? private-key)
-                (seq private-key)))
+      (nil? session*)
       (rejection "Trading session data is unavailable for passkey lock.")
 
       (not (passkey-lock-supported?))
@@ -182,62 +264,63 @@
 
       :else
       (let [prf-salt (webauthn/random-bytes 32)
-            credential-user-name (str "hyperopen-trading:" wallet-address*)
             saved-at-ms (js/Math.floor (now-ms-fn))]
         (-> (webauthn/create-passkey-credential!
-             {:display-name (str "Hyperopen Trading " (short-wallet-label wallet-address*))
-              :prf-salt prf-salt
-              :timeout-ms lockbox-timeout-ms
-              :user-id-bytes (webauthn/utf8-bytes credential-user-name)
-              :user-name credential-user-name})
+             (create-passkey-request wallet-address* prf-salt))
             (.then
-             (fn [{:keys [credential-id prf-first]}]
-               (if-not (seq (some-> credential-id str str/trim))
-                 (js/Promise.reject
-                  (js/Error. "Unable to create a passkey credential for trading unlock."))
-                 (-> (resolve-prf-output! credential-id prf-salt prf-first)
-                     (.then
-                      (fn [prf-output]
-                        (-> (encrypt-private-key! wallet-address* private-key prf-output)
-                            (.then
-                             (fn [lockbox-record]
-                               (-> (indexed-db/put-json!
-                                    indexed-db/agent-locked-session-store
-                                    wallet-address*
-                                    (assoc lockbox-record
-                                           :saved-at-ms saved-at-ms))
-                                   (.then
-                                    (fn [persisted?]
-                                      (if persisted?
-                                        {:metadata {:record-version lockbox-version
-                                                    :record-kind :locked
-                                                    :agent-address agent-address
-                                                    :credential-id credential-id
-                                                    :prf-salt (webauthn/bytes->base64url prf-salt)
-                                                    :last-approved-at last-approved-at
-                                                    :nonce-cursor nonce-cursor
-                                                    :saved-at-ms saved-at-ms}
-                                         :session session}
-                                        (js/Promise.reject
-                                         (js/Error.
-                                          "Unable to persist the passkey trading lockbox."))))))))))))))))))))
+             (fn [credential]
+               (create-lockbox-from-credential! wallet-address*
+                                                session*
+                                                saved-at-ms
+                                                prf-salt
+                                                credential))))))))
 
-(defn unlock-locked-session!
-  [{:keys [metadata wallet-address]}]
+(defn- valid-unlock-request
+  [wallet-address metadata]
   (let [wallet-address* (normalized-cache-key wallet-address)
         credential-id (some-> (:credential-id metadata) str str/trim)
         prf-salt (webauthn/base64url->bytes (:prf-salt metadata))]
     (cond
       (not (seq wallet-address*))
-      (rejection "Connect your wallet before unlocking trading.")
+      {:error "Connect your wallet before unlocking trading."}
 
       (not (seq credential-id))
-      (rejection "Passkey credential data is unavailable.")
+      {:error "Passkey credential data is unavailable."}
 
       (nil? prf-salt)
-      (rejection "Passkey lockbox data is unavailable.")
+      {:error "Passkey lockbox data is unavailable."}
 
       :else
+      {:wallet-address wallet-address*
+       :credential-id credential-id
+       :prf-salt prf-salt})))
+
+(defn- load-lockbox-record!
+  [wallet-address]
+  (-> (indexed-db/get-json!
+       indexed-db/agent-locked-session-store
+       wallet-address)
+      (.then
+       (fn [lockbox-record]
+         (if (map? lockbox-record)
+           lockbox-record
+           (js/Promise.reject
+            (js/Error. "No passkey lockbox was found for this wallet.")))))))
+
+(defn- unlocked-session
+  [metadata private-key]
+  {:agent-address (:agent-address metadata)
+   :private-key private-key
+   :last-approved-at (:last-approved-at metadata)
+   :nonce-cursor (:nonce-cursor metadata)})
+
+(defn unlock-locked-session!
+  [{:keys [metadata wallet-address]}]
+  (let [{:keys [credential-id error prf-salt wallet-address]
+         :as unlock-request}
+        (valid-unlock-request wallet-address metadata)]
+    (if error
+      (rejection error)
       (-> (webauthn/eval-prf! {:credential-id credential-id
                                :prf-salt prf-salt
                                :timeout-ms lockbox-timeout-ms})
@@ -246,25 +329,17 @@
              (if-not (valid-byte-source? prf-first)
                (js/Promise.reject
                 (js/Error. "Unable to derive the passkey trading unlock secret."))
-               (-> (indexed-db/get-json!
-                    indexed-db/agent-locked-session-store
-                    wallet-address*)
+               (-> (load-lockbox-record! wallet-address)
                    (.then
                     (fn [lockbox-record]
-                      (if-not (map? lockbox-record)
-                        (js/Promise.reject
-                         (js/Error. "No passkey lockbox was found for this wallet."))
-                        (-> (decrypt-private-key! wallet-address*
-                                                  prf-first
-                                                  lockbox-record)
-                            (.then
-                             (fn [private-key]
-                               (let [session {:agent-address (:agent-address metadata)
-                                              :private-key private-key
-                                              :last-approved-at (:last-approved-at metadata)
-                                              :nonce-cursor (:nonce-cursor metadata)}]
-                                 (cache-unlocked-session! wallet-address* session)
-                                 session)))))))))))))))
+                      (-> (decrypt-private-key! wallet-address
+                                                prf-first
+                                                lockbox-record)
+                          (.then
+                           (fn [private-key]
+                             (let [session (unlocked-session metadata private-key)]
+                               (cache-unlocked-session! wallet-address session)
+                               session))))))))))))))
 
 (defn delete-locked-session!
   [wallet-address]

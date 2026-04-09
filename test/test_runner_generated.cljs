@@ -389,6 +389,7 @@
             [hyperopen.wallet.actions-test]
             [hyperopen.wallet.address-watcher-lifecycle-test]
             [hyperopen.wallet.address-watcher-test]
+            [hyperopen.wallet.agent-lockbox-test]
             [hyperopen.wallet.agent-runtime-test]
             [hyperopen.wallet.agent-session-test]
             [hyperopen.wallet.connection-runtime-test]
@@ -844,6 +845,7 @@
              'hyperopen.wallet.actions-test
              'hyperopen.wallet.address-watcher-lifecycle-test
              'hyperopen.wallet.address-watcher-test
+             'hyperopen.wallet.agent-lockbox-test
              'hyperopen.wallet.agent-runtime-test
              'hyperopen.wallet.agent-session-test
              'hyperopen.wallet.connection-runtime-test

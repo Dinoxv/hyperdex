@@ -81,6 +81,16 @@
       (.setItem storage "hyperopen:agent-storage-mode:v1" "unknown")
       (is (= :local (agent-session/load-storage-mode-preference))))))
 
+(deftest local-protection-mode-preference-roundtrip-and-normalization-test
+  (with-test-local-storage
+    (fn [storage]
+      (is (= :plain (agent-session/load-local-protection-mode-preference)))
+      (is (true? (agent-session/persist-local-protection-mode-preference! :passkey)))
+      (is (= "passkey" (.getItem storage "hyperopen:agent-local-protection-mode:v1")))
+      (is (= :passkey (agent-session/load-local-protection-mode-preference)))
+      (.setItem storage "hyperopen:agent-local-protection-mode:v1" "nope")
+      (is (= :plain (agent-session/load-local-protection-mode-preference))))))
+
 (deftest device-label-normalization-and-migration-test
   (with-test-local-storage
     (fn [storage]
@@ -143,6 +153,84 @@
            (agent-session/load-agent-session storage wallet-address)))
     (agent-session/clear-agent-session! storage wallet-address)
     (is (nil? (agent-session/load-agent-session storage wallet-address)))))
+
+(deftest passkey-session-metadata-roundtrip-and-snapshot-selection-test
+  (with-test-storages
+    (fn [{:keys [local session]}]
+      (let [metadata {:agent-address "0x9999999999999999999999999999999999999999"
+                      :credential-id " cred "
+                      :prf-salt " salt "
+                      :device-label " Hyperopen Device 72905e "
+                      :transports ["internal" "  " nil "usb"]
+                      :last-approved-at 1700000002222.9
+                      :nonce-cursor 1700000003333.4
+                      :saved-at-ms 1700000004444.8}
+            normalized {:version 1
+                        :agent-address "0x9999999999999999999999999999999999999999"
+                        :credential-id " cred "
+                        :prf-salt "salt"
+                        :device-label "Hyperopen 72905e"
+                        :transports ["internal" "usb"]
+                        :last-approved-at 1700000002222
+                        :nonce-cursor 1700000003333
+                        :saved-at-ms 1700000004444}
+            passkey-key (agent-session/passkey-session-metadata-key wallet-address)]
+        (is (= normalized
+               (@#'hyperopen.wallet.agent-session/sanitize-passkey-session-metadata metadata)))
+        (is (nil? (@#'hyperopen.wallet.agent-session/sanitize-passkey-session-metadata
+                   {:agent-address ""
+                    :credential-id "cred"
+                    :prf-salt "salt"})))
+        (is (nil? (@#'hyperopen.wallet.agent-session/sanitize-passkey-session-metadata
+                   {:agent-address "0x9999999999999999999999999999999999999999"
+                    :credential-id ""
+                    :prf-salt "salt"})))
+        (is (nil? (@#'hyperopen.wallet.agent-session/sanitize-passkey-session-metadata
+                   {:agent-address "0x9999999999999999999999999999999999999999"
+                    :credential-id "cred"
+                    :prf-salt " "})))
+        (is (true? (agent-session/persist-passkey-session-metadata! wallet-address metadata)))
+        (is (= normalized
+               (agent-session/load-passkey-session-metadata wallet-address)))
+        (.setItem local passkey-key "{")
+        (is (nil? (agent-session/load-passkey-session-metadata wallet-address)))
+        (.setItem local passkey-key (js/JSON.stringify (clj->js metadata)))
+        (is (= {:version 1
+                :agent-address "0x9999999999999999999999999999999999999999"
+                :credential-id " cred "
+                :prf-salt "salt"
+                :device-label "Hyperopen 72905e"
+                :transports ["internal" "usb"]
+                :last-approved-at 1700000002222
+                :nonce-cursor 1700000003333
+                :saved-at-ms 1700000004444
+                :persisted-kind :locked
+                :storage-mode :local
+                :local-protection-mode :passkey}
+               (agent-session/load-persisted-agent-session-snapshot wallet-address
+                                                                    :local
+                                                                    :passkey)))
+        (is (true? (agent-session/persist-agent-session-by-mode! wallet-address
+                                                                 :session
+                                                                 {:agent-address "0x9999999999999999999999999999999999999999"
+                                                                  :private-key "0xaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+                                                                  :last-approved-at 1700000005555
+                                                                  :nonce-cursor 1700000006666})))
+        (is (= {:agent-address "0x9999999999999999999999999999999999999999"
+                :private-key "0xaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+                :last-approved-at 1700000005555
+                :nonce-cursor 1700000006666
+                :persisted-kind :raw
+                :storage-mode :session
+                :local-protection-mode :plain}
+               (agent-session/load-persisted-agent-session-snapshot wallet-address
+                                                                    :session
+                                                                    :plain)))
+        (agent-session/clear-persisted-agent-session! wallet-address :local :passkey)
+        (is (nil? (.getItem local passkey-key)))
+        (agent-session/clear-all-agent-persistence! wallet-address)
+        (is (nil? (.getItem local passkey-key)))
+        (is (nil? (.getItem session (agent-session/session-storage-key wallet-address))))))))
 
 (deftest signature-chain-id-and-storage-mode-normalization-helpers-test
   (is (= "0xa4b1" (agent-session/default-signature-chain-id-for-environment true)))
