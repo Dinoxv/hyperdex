@@ -36,9 +36,10 @@ After Browser MCP exploration stabilizes a flow, convert that stable local path 
 ## Exact Commands
 
 - Install Playwright browsers once: `npm run test:playwright:install`
-- Run the quick local smoke suite: `npm run test:playwright:smoke`
+- Run the quick local interactive smoke suite against the dev app build: `npm run test:playwright:smoke`
+- Run the release-artifact SEO smoke suite against `out/release-public`: `npm run test:playwright:seo`
 - Run Playwright headed with one worker: `npm run test:playwright:headed`
-- Run the full committed Playwright suite: `npm run test:playwright:ci`
+- Run the full committed Playwright suite, including the release-only SEO smoke: `npm run test:playwright:ci`
 - Start the Browser MCP server: `npm run browser:mcp`
 - Stop all tracked browser-inspection sessions: `npm run browser:cleanup`
 - Run governed design review: `npm run qa:design-ui -- --targets trade-route --manage-local-app`
@@ -70,6 +71,8 @@ The committed Playwright suite covers these stable local flows:
 
 These tests intentionally reuse the existing `HYPEROPEN_DEBUG` bridge, simulator helpers, and `data-parity-id` or `data-role` anchors instead of adding a second browser-only app API.
 
+The interactive suite runs against the dev app build because the bridge only exists in `goog.DEBUG` mode. The release-only SEO smoke stays separate so it can validate the generated `out/release-public` artifact, route metadata, and deployment-style cache headers without breaking bridge-based tests.
+
 ## Browser MCP Flows That Remain Exploratory
 
 These workflows stay on the Browser MCP side and are not replaced by Playwright:
@@ -82,7 +85,8 @@ These workflows stay on the Browser MCP side and are not replaced by Playwright:
 
 ## Key Files
 
-- Playwright config: `/hyperopen/playwright.config.mjs`
+- Interactive Playwright config: `/hyperopen/playwright.config.mjs`
+- Release SEO Playwright config: `/hyperopen/playwright.release.config.mjs`
 - Playwright helpers and tests: `/hyperopen/tools/playwright/**`
 - Browser MCP config and server registration: `/hyperopen/.codex/config.toml`
 - Browser-inspection tooling: `/hyperopen/tools/browser-inspection/**`

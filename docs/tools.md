@@ -36,9 +36,10 @@ Use this file as the single starting point for what actions this repo provides t
 | `npm run check` | Lint, docs checks, and compile app/test builds | Before finishing code changes |
 | `npm test` | Full test suite | Regular validation and regression confidence |
 | `npm run test:playwright:install` | Install Chromium for the Playwright suite | First-time local browser-test setup |
-| `npm run test:playwright:smoke` | Run the quick committed Playwright smoke suite | Fast local browser regression check before broader gates |
+| `npm run test:playwright:smoke` | Run the quick committed interactive Playwright smoke suite | Fast local browser regression check against the dev app build before broader gates |
+| `npm run test:playwright:seo` | Run the release-artifact SEO smoke suite | Validate `out/release-public`, route metadata, and deployment-style cache headers |
 | `npm run test:playwright:headed` | Run Playwright headed with one worker | Local browser-flow debugging with the committed suite |
-| `npm run test:playwright:ci` | Run the full committed Playwright suite in CI mode | CI-safe browser regression coverage or a full local browser pass |
+| `npm run test:playwright:ci` | Run the full committed Playwright suite in CI mode | CI-safe browser regression coverage across the dev-backed interactive suite plus the release-only SEO smoke |
 | `npm run test:crap` | Fast Babashka tests for CRAP-tool parsing and report math | Before changing the CRAP analyzer/reporter |
 | `npm run test:mutation` | Fast Babashka tests for the mutation tool | Before changing `/hyperopen/tools/mutate/**` |
 | `npm run test:formal-tooling` | Fast Babashka tests for the formal wrapper and generated-source checks | Before changing `/hyperopen/tools/formal/**` |
@@ -274,7 +275,8 @@ Register once in Codex once and then call MCP tools directly:
 
 - Scripted command surface: `/hyperopen/package.json`
 - Browser-testing routing doc: `/hyperopen/docs/BROWSER_TESTING.md`
-- Playwright config: `/hyperopen/playwright.config.mjs`
+- Interactive Playwright config: `/hyperopen/playwright.config.mjs`
+- Release SEO Playwright config: `/hyperopen/playwright.release.config.mjs`
 - Playwright helpers and tests: `/hyperopen/tools/playwright/**`
 - Multi-agent manager: `/hyperopen/tools/multi-agent/src/cli.mjs`
 - Multi-agent policy: `/hyperopen/docs/MULTI_AGENT.md`

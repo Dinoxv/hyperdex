@@ -214,9 +214,9 @@ function isFingerprintedReleaseJavaScriptFile(fileName) {
 }
 
 const SHADOW_LOADER_EVAL_RUNTIME_PATTERN =
-  /var\s+([A-Za-z_$][A-Za-z0-9_$]*)=new Tca;\1\.pk=!0;/;
+  /var\s+([A-Za-z_$][A-Za-z0-9_$]*)=new\s+([A-Za-z_$][A-Za-z0-9_$]*);\1\.pk=!0;/;
 const SHADOW_LOADER_SCRIPT_TAG_RUNTIME_PATTERN =
-  /var\s+([A-Za-z_$][A-Za-z0-9_$]*)=new Tca;\1\.tk=!0;/;
+  /var\s+([A-Za-z_$][A-Za-z0-9_$]*)=new\s+([A-Za-z_$][A-Za-z0-9_$]*);\1\.tk=!0;/;
 
 export function rewriteMainModuleLoaderRuntime(mainModuleSource) {
   if (typeof mainModuleSource !== "string") {
@@ -229,7 +229,7 @@ export function rewriteMainModuleLoaderRuntime(mainModuleSource) {
 
   const rewrittenSource = mainModuleSource.replace(
     SHADOW_LOADER_EVAL_RUNTIME_PATTERN,
-    (_match, loaderVar) => `var ${loaderVar}=new Tca;${loaderVar}.tk=!0;`
+    (_match, loaderVar, loaderCtor) => `var ${loaderVar}=new ${loaderCtor};${loaderVar}.tk=!0;`
   );
 
   if (rewrittenSource === mainModuleSource) {

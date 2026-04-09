@@ -313,6 +313,15 @@ test("rewriteMainModuleLoaderRuntime switches shadow-cljs release loading to scr
   assert.doesNotMatch(rewritten, /loaderManager\.pk=!0/);
 });
 
+test("rewriteMainModuleLoaderRuntime tolerates constructor minification changes", () => {
+  const rewritten = rewriteMainModuleLoaderRuntime(
+    "var loaderManager=new Uca;loaderManager.pk=!0;\n"
+  );
+
+  assert.match(rewritten, /var loaderManager=new Uca;loaderManager\.tk=!0;/);
+  assert.doesNotMatch(rewritten, /loaderManager\.pk=!0/);
+});
+
 test("normalizeModuleUriToRelativeJsPath preserves nested js paths and strips query strings", () => {
   assert.equal(
     normalizeModuleUriToRelativeJsPath("/js/chunks/trade_chart.HASH.js?v=1"),

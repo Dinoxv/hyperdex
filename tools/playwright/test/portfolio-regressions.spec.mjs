@@ -161,6 +161,9 @@ test("trader portfolio route stays read-only while reusing stable controls @regr
 
 test("portfolio positions coin jumps to the trade route market @regression", async ({ page }) => {
   await visitRoute(page, "/portfolio");
+  await dispatch(page, [":actions/start-spectate-mode", SPECTATE_ADDRESS]);
+  await waitForIdle(page, { quietMs: 150, timeoutMs: 4_000, pollMs: 50 });
+
   await page.evaluate(() => {
     const c = globalThis.cljs.core;
     const kw = (name) => c.keyword(name);
@@ -184,9 +187,8 @@ test("portfolio positions coin jumps to the trade route market @regression", asy
         ]
       }
     };
-    const state = c.deref(globalThis.hyperopen.system.store);
     const nextState = c.assoc_in(
-      state,
+      c.deref(globalThis.hyperopen.system.store),
       c.PersistentVector.fromArray([kw("webdata2")], true),
       c.js__GT_clj(payload, opts)
     );

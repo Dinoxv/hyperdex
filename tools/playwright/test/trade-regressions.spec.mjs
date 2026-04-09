@@ -172,6 +172,26 @@ async function readSpectateLifecycleProbe(page) {
   });
 }
 
+async function freezeAccountSurfaceSync(page, address) {
+  await page.evaluate((nextAddress) => {
+    const store = globalThis.hyperopen?.system?.store;
+    const addressWatcher = globalThis.hyperopen?.wallet?.address_watcher;
+    const webdata2 = globalThis.hyperopen?.websocket?.webdata2;
+    const userSubscriptions = globalThis.hyperopen?.websocket?.user_runtime?.subscriptions;
+
+    if (!store || !addressWatcher || !webdata2 || !userSubscriptions) {
+      throw new Error("Hyperopen account sync runtime unavailable");
+    }
+
+    addressWatcher.stop_watching_BANG_(store);
+    addressWatcher.remove_handler_BANG_("webdata2-subscription-handler");
+    addressWatcher.remove_handler_BANG_("user-ws-subscription-handler");
+    addressWatcher.remove_handler_BANG_("startup-account-bootstrap-handler");
+    webdata2.unsubscribe_webdata2_BANG_(nextAddress);
+    userSubscriptions.unsubscribe_user_BANG_(nextAddress);
+  }, address);
+}
+
 function buildCachedAssetSelectorMarkets(count = 240) {
   const baseMarkets = [
     {
@@ -368,6 +388,47 @@ async function seedRememberedTradingSession(page, options = {}) {
   );
 }
 
+async function seedReadyTradingSession(page, options = {}) {
+  await seedRememberedTradingSession(page, {
+    status: "ready",
+    localProtectionMode: "plain",
+    passkeySupported: false,
+    ...options
+  });
+}
+
+async function mockExchangeSuccess(page) {
+  const exchangeActionTypes = [];
+
+  await page.route("https://api.hyperliquid.xyz/exchange", async (route) => {
+    if (route.request().method() !== "POST") {
+      await route.continue();
+      return;
+    }
+
+    const postData = route.request().postData();
+    let payload = null;
+
+    try {
+      payload = postData ? JSON.parse(postData) : null;
+    } catch (_error) {
+      payload = null;
+    }
+
+    if (typeof payload?.action?.type === "string") {
+      exchangeActionTypes.push(payload.action.type);
+    }
+
+    await route.fulfill({
+      status: 200,
+      contentType: "application/json",
+      body: JSON.stringify({ status: "ok" })
+    });
+  });
+
+  return exchangeActionTypes;
+}
+
 async function installPasskeyLockboxMock(page) {
   await page.evaluate(() => {
     const c = globalThis.cljs?.core;
@@ -527,12 +588,30 @@ test("asset selector focuses search input and keyboard-navigates rows @regressio
       timeout: 5_000
     })
     .toBe(firstHighlightedSymbol);
+  const selectedAsset = await page.evaluate(() => {
+    const c = globalThis.cljs?.core;
+    const store = globalThis.hyperopen?.system?.store;
+
+    if (!c || !store) {
+      throw new Error("Hyperopen store or cljs core unavailable");
+    }
+
+    const keyword = c.keyword;
+    const kwPath = (...segments) =>
+      c.PersistentVector.fromArray(segments.map((segment) => keyword(segment)), true);
+    const state = c.deref(store);
+    const highlightedMarketKey = c.get_in(state, kwPath("asset-selector", "highlighted-market-key"));
+
+    return highlightedMarketKey
+      ? String(highlightedMarketKey).replace(/^[^:]+:/, "")
+      : null;
+  });
 
   await page.keyboard.press("Enter");
   await waitForIdle(page, { quietMs: 300, timeoutMs: 7_000, pollMs: 50 });
   await expectOracle(page, "asset-selector", {
     visibleDropdown: null,
-    activeAsset: "ETH"
+    activeAsset: selectedAsset
   });
 });
 
@@ -1282,14 +1361,21 @@ test("funding tooltip transitions from live position to hypothetical estimate @r
   };
   const livePositionValue = Number(livePosition.positionValue).toFixed(2);
 
+  await seedAssetSelectorMarketsCache(page);
   await visitRoute(page, "/trade/BTC");
+  await dispatch(page, [":actions/start-spectate-mode", SPECTATE_ADDRESS]);
+  await waitForIdle(page, { quietMs: 800, timeoutMs: 12_000, pollMs: 50 });
+  await freezeAccountSurfaceSync(page, SPECTATE_ADDRESS);
   await debugCall(page, "seedFundingTooltipFixture", {
     coin: "BTC",
     mark: 107.7426,
     oracle: 107.61,
     fundingRate: 0.00015
   });
-  await page.evaluate((position) => {
+  await dispatch(page, [":actions/reset-funding-hypothetical-position", "BTC"]);
+  await waitForIdle(page, { quietMs: 250, timeoutMs: 6_000, pollMs: 50 });
+
+  await page.evaluate(({ position }) => {
     const c = globalThis.cljs?.core;
     const store = globalThis.hyperopen?.system?.store;
 
@@ -1298,6 +1384,8 @@ test("funding tooltip transitions from live position to hypothetical estimate @r
     }
 
     const keyword = c.keyword;
+    const kwPath = (...segments) =>
+      c.PersistentVector.fromArray(segments.map((segment) => keyword(segment)), true);
     const opts = c.PersistentArrayMap.fromArray([keyword("keywordize-keys"), true], true);
     const nextWebdata2 = c.js__GT_clj(
       {
@@ -1307,16 +1395,28 @@ test("funding tooltip transitions from live position to hypothetical estimate @r
       },
       opts
     );
-    const nextState = c.assoc_in(
-      c.deref(store),
-      c.PersistentVector.fromArray([keyword("webdata2")], true),
-      nextWebdata2
+    let nextState = c.deref(store);
+    const btcPerpMarket = c.PersistentArrayMap.fromArray(
+      [
+        keyword("key"), "perp:BTC",
+        keyword("coin"), "BTC",
+        keyword("symbol"), "BTC",
+        keyword("market-type"), keyword("perp"),
+        keyword("mark"), 107.7426,
+        keyword("markRaw"), 107.7426,
+        keyword("fundingRate"), 0.00015,
+        keyword("szDecimals"), 4,
+        keyword("maxLeverage"), 20
+      ],
+      true
     );
 
+    nextState = c.assoc_in(nextState, kwPath("active-asset"), "BTC");
+    nextState = c.assoc_in(nextState, kwPath("active-market"), btcPerpMarket);
+    nextState = c.assoc_in(nextState, kwPath("webdata2"), nextWebdata2);
+
     c.reset_BANG_(store, nextState);
-  }, livePosition);
-  await dispatch(page, [":actions/reset-funding-hypothetical-position", "BTC"]);
-  await waitForIdle(page, { quietMs: 250, timeoutMs: 6_000, pollMs: 50 });
+  }, { position: livePosition });
 
   const tooltipTrigger = page.locator('[data-role="active-asset-funding-trigger"]');
   await expect(tooltipTrigger).toHaveCount(1);
@@ -1358,6 +1458,7 @@ test("funding tooltip transitions from live position to hypothetical estimate @r
 
 test("wallet connect and enable trading stays deterministic @regression", async ({ page }) => {
   await visitRoute(page, "/trade");
+  const exchangeActionTypes = await mockExchangeSuccess(page);
 
   await debugCall(page, "installWalletSimulator", {
     accounts: ["0x1111111111111111111111111111111111111111"],
@@ -1365,9 +1466,6 @@ test("wallet connect and enable trading stays deterministic @regression", async 
     chainId: "0xa4b1"
   });
   await debugCall(page, "setWalletConnectedHandlerMode", "suppress");
-  await debugCall(page, "installExchangeSimulator", {
-    approveAgent: { responses: [{ status: "ok" }] }
-  });
 
   await dispatch(page, [":actions/connect-wallet"]);
   await waitForIdle(page, { quietMs: 250, timeoutMs: 4_000, pollMs: 50 });
@@ -1384,6 +1482,7 @@ test("wallet connect and enable trading stays deterministic @regression", async 
     agentStatus: "ready",
     agentError: null
   });
+  expect(exchangeActionTypes).toContain("approveAgent");
   await expectOracle(
     page,
     "effect-order",
@@ -1483,25 +1582,8 @@ test("order submit confirmation renders in-app instead of opening a browser dial
     await dialog.dismiss();
   });
 
-  await debugCall(page, "installWalletSimulator", {
-    accounts: ["0x1111111111111111111111111111111111111111"],
-    requestAccounts: ["0x1111111111111111111111111111111111111111"],
-    chainId: "0xa4b1"
-  });
-  await debugCall(page, "setWalletConnectedHandlerMode", "suppress");
-  await debugCall(page, "installExchangeSimulator", {
-    approveAgent: { responses: [{ status: "ok" }] }
-  });
-
-  await dispatch(page, [":actions/connect-wallet"]);
+  await seedReadyTradingSession(page);
   await waitForIdle(page, { quietMs: 250, timeoutMs: 4_000, pollMs: 50 });
-  await dispatch(page, [":actions/enable-agent-trading"]);
-  await waitForIdle(page, { quietMs: 250, timeoutMs: 5_000, pollMs: 50 });
-  await expectOracle(page, "wallet-status", {
-    connected: true,
-    agentStatus: "ready",
-    agentError: null
-  });
 
   await dispatch(page, [":actions/select-order-entry-mode", ":limit"]);
   await waitForIdle(page, { quietMs: 100, timeoutMs: 2_000, pollMs: 50 });
