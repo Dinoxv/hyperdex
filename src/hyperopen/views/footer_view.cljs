@@ -45,12 +45,13 @@
              :diagnostics-timeline-limit diagnostics-timeline-limit
              :network-hint (browser-network-hint)})
         diagnostics-open? (:diagnostics-open? vm)
-        footer-z-class (if diagnostics-open? "z-[260]" "z-40")]
+        footer-z-class (if diagnostics-open? "z-[260]" "z-[170]")]
     [:footer {:class ["fixed"
                       "inset-x-0"
                       "bottom-0"
                       footer-z-class
                       "isolate"
+                      "overflow-visible"
                       "w-full"
                       "shrink-0"
                       "bg-base-200"
@@ -58,7 +59,7 @@
                       "border-base-300"]
               :data-parity-id "footer"}
      (mobile-nav/render (:mobile-nav vm))
-     [:div {:class ["hidden" "lg:block" "w-full" "app-shell-gutter" "py-2" "relative"]}
+     [:div {:class ["hidden" "lg:block" "w-full" "app-shell-gutter" "py-2" "relative" "overflow-visible"]}
       (when-let [banner (:banner vm)]
         [:div {:class (into ["mb-2"
                              "rounded"
@@ -69,9 +70,10 @@
                              "font-medium"]
                             (diagnostics-drawer/banner-classes (:tone banner)))}
          (:message banner)])
-      [:div {:class ["flex" "justify-between" "items-center"]}
+      [:div {:class ["relative" "flex" "justify-between" "items-center" "overflow-visible"]}
        [:div {:class ["flex" "items-center"]}
         (connection-meter/render (:connection-meter vm))]
-       (footer-links/render (:footer-links vm))]
+       (footer-links/render {:links (:footer-links vm)
+                             :build-id (app-build-id)})]
       (when-let [diagnostics (:diagnostics vm)]
         (diagnostics-drawer/render diagnostics))]]))

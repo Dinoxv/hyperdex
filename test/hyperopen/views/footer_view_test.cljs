@@ -742,7 +742,7 @@
     (is (contains? classes "fixed"))
     (is (contains? classes "inset-x-0"))
     (is (contains? classes "bottom-0"))
-    (is (contains? classes "z-40"))
+    (is (contains? classes "z-[170]"))
     (is (contains? classes "bg-base-200"))
     (is (contains? classes "isolate"))))
 
@@ -756,7 +756,7 @@
   (let [view (footer-view/footer-view (assoc-in (base-state) [:websocket-ui :diagnostics-open?] true))
         classes (root-class-set view)]
     (is (contains? classes "z-[260]"))
-    (is (not (contains? classes "z-40")))))
+    (is (not (contains? classes "z-[170]")))))
 
 (deftest footer-hides-text-links-when-no-footer-links-are-configured-test
   (let [view (footer-view/footer-view (base-state))
@@ -803,6 +803,6 @@
     (is (hiccup/contains-class? view-node "fixed"))
     (is (hiccup/contains-class? view-node "inset-x-0"))
     (is (hiccup/contains-class? view-node "bottom-0"))
-    (is (hiccup/contains-class? view-node "z-40"))
+    (is (hiccup/contains-class? view-node "z-[170]"))
     (is (hiccup/contains-class? view-node "bg-base-200"))
     (is (hiccup/contains-class? view-node "isolate"))))

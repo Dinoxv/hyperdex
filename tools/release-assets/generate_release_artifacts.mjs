@@ -1,4 +1,5 @@
 import crypto from "node:crypto";
+import { execFileSync } from "node:child_process";
 import fs from "node:fs/promises";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
@@ -241,6 +242,25 @@ export function rewriteMainModuleLoaderRuntime(mainModuleSource) {
   return rewrittenSource;
 }
 
+export function resolveReleaseBuildId() {
+  const envBuildId =
+    typeof process.env.HYPEROPEN_BUILD_ID === "string"
+      ? process.env.HYPEROPEN_BUILD_ID.trim()
+      : "";
+  if (envBuildId) {
+    return envBuildId;
+  }
+
+  try {
+    return execFileSync("git", ["rev-parse", "HEAD"], {
+      encoding: "utf8",
+      stdio: ["ignore", "pipe", "ignore"],
+    }).trim();
+  } catch (_error) {
+    return null;
+  }
+}
+
 export async function generateReleaseArtifacts({
   sourceRoot = DEFAULT_SOURCE_ROOT,
   outputRoot = DEFAULT_OUTPUT_ROOT,
@@ -271,6 +291,7 @@ export async function generateReleaseArtifacts({
   const siteMetadata = buildSiteMetadata({
     canonicalOrigin: normalizeCanonicalOrigin(canonicalOrigin),
     indexHtml: sourceIndexHtml,
+    buildId: resolveReleaseBuildId(),
   });
   const releaseMetadataScriptSource = buildReleaseMetadataSyncScript(siteMetadata);
   const releaseMetadataScriptOutputPath = path.join(outputRoot, RELEASE_ROUTE_METADATA_SCRIPT_PATH);

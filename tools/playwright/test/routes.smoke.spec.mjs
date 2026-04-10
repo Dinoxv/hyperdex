@@ -145,6 +145,30 @@ test("trade cold startup does not render the static boot loading shell @smoke", 
   );
 });
 
+test("trade footer shows the short build id when the dev build-id asset is present @smoke", async ({ page }) => {
+  await visitRoute(page, "/trade");
+
+  const buildId = page.locator("[data-role='footer-build-id']");
+  const tooltip = page.locator("[data-role='footer-build-id-tooltip']");
+  const tooltipValue = page.locator("[data-role='footer-build-id-tooltip-value']");
+
+  await expect(buildId).toBeVisible();
+  await expect(buildId).toHaveText(/^[0-9a-f]{7}$/);
+  await expect(buildId).not.toHaveAttribute("title", /.+/);
+  await buildId.hover();
+  await expect(tooltip).toBeVisible();
+  await expect(tooltip).toContainText("Build");
+  await expect(tooltip).toContainText(/[0-9a-f]{40}/);
+  await expect(tooltipValue).toHaveCSS("white-space", "nowrap");
+
+  const tooltipBox = await tooltip.boundingBox();
+  const viewport = page.viewportSize();
+  expect(tooltipBox).not.toBeNull();
+  expect(viewport).not.toBeNull();
+  expect(tooltipBox.x).toBeGreaterThanOrEqual(0);
+  expect(tooltipBox.x + tooltipBox.width).toBeLessThanOrEqual(viewport.width);
+});
+
 test("trade route exposes score-bearing accessibility hooks @smoke", async ({ page }) => {
   await page.goto("/trade", { waitUntil: "commit" });
 

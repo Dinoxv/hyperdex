@@ -269,12 +269,15 @@ export function collectReleaseRootAssetPublicPaths(indexHtml) {
   ].sort();
 }
 
-export function buildSiteMetadata({ canonicalOrigin, indexHtml }) {
+export function buildSiteMetadata({ canonicalOrigin, indexHtml, buildId = null }) {
   const origin = normalizeCanonicalOrigin(canonicalOrigin);
+  const normalizedBuildId =
+    typeof buildId === "string" && buildId.trim().length > 0 ? buildId.trim() : null;
 
   return {
     siteName: "Hyperopen",
     origin,
+    buildId: normalizedBuildId,
     routes: PUBLIC_ROUTE_METADATA.map((route) => ({
       ...validateRouteMetadata(route),
       path: normalizePublicPath(route.path),
@@ -334,6 +337,11 @@ export function buildReleaseMetadataSyncScript(siteMetadata) {
     "",
     "(function () {",
     `  const metadata = ${metadataJson};`,
+    "  const buildId = typeof metadata.buildId === \"string\" ? metadata.buildId.trim() : \"\";",
+    "  if (buildId) {",
+    "    globalThis.HYPEROPEN_BUILD_ID = buildId;",
+    "  }",
+    "",
     "  const origin = typeof metadata.origin === \"string\" ? metadata.origin : \"\";",
     "  const routes = Array.isArray(metadata.routes) ? metadata.routes : [];",
     "  if (!origin || routes.length === 0) {",

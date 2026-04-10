@@ -24,10 +24,12 @@ import {
   generateReleaseArtifacts,
   hashContent,
   normalizeModuleUriToRelativeJsPath,
+  resolveReleaseBuildId,
   rewriteMainModuleLoaderRuntime,
   rewriteAppIndexHtml,
   routePathToOutputHtmlPath,
 } from "./generate_release_artifacts.mjs";
+import { writeBuildIdFile } from "./write_build_id_file.mjs";
 
 const SAMPLE_CANONICAL_ORIGIN = "https://app.hyperopen.example";
 const SAMPLE_ROUTE_TITLE = "Trade perpetuals on Hyperliquid with an open-source client";
@@ -341,6 +343,44 @@ test("buildSiteMetadata keeps /api lowercase in the generated metadata", () => {
   assert.ok(!metadata.routes.some((route) => route.path === "/API"));
 });
 
+test("buildSiteMetadata preserves a non-empty release build id", () => {
+  const metadata = buildSiteMetadata({
+    canonicalOrigin: SAMPLE_CANONICAL_ORIGIN,
+    indexHtml: buildSampleIndexHtml(),
+    buildId: "abc123def456",
+  });
+
+  assert.equal(metadata.buildId, "abc123def456");
+});
+
+test("resolveReleaseBuildId prefers the environment override", () => {
+  const previousBuildId = process.env.HYPEROPEN_BUILD_ID;
+  process.env.HYPEROPEN_BUILD_ID = "env-build-id";
+
+  try {
+    assert.equal(resolveReleaseBuildId(), "env-build-id");
+  } finally {
+    if (previousBuildId === undefined) {
+      delete process.env.HYPEROPEN_BUILD_ID;
+    } else {
+      process.env.HYPEROPEN_BUILD_ID = previousBuildId;
+    }
+  }
+});
+
+test("writeBuildIdFile writes the resolved build id to a public text asset", async () => {
+  const tempRoot = await fs.mkdtemp(path.join(os.tmpdir(), "hyperopen-build-id-"));
+  const outputPath = path.join(tempRoot, "build-id.txt");
+
+  const result = await writeBuildIdFile({
+    outputPath,
+    buildId: "10666e2abcdef",
+  });
+
+  assert.equal(result.buildId, "10666e2abcdef");
+  assert.equal(await fs.readFile(outputPath, "utf8"), "10666e2abcdef\n");
+});
+
 test("generateReleaseArtifacts assembles deterministic route-specific release pages", async () => {
   const tempRoot = await fs.mkdtemp(path.join(os.tmpdir(), "hyperopen-release-assets-"));
   const sourceRoot = path.join(tempRoot, "source");
@@ -471,6 +511,7 @@ test("generateReleaseArtifacts assembles deterministic route-specific release pa
   assert.doesNotMatch(copiedMain, /loaderManager\.pk=!0/);
   assert.equal(copiedFont, "font");
   assert.match(routeMetadataScript, /const metadata = \{/);
+  assert.match(routeMetadataScript, /globalThis\.HYPEROPEN_BUILD_ID = buildId;/);
   assert.match(routeMetadataScript, /window\.addEventListener\("popstate", syncMetadata\)/);
 
   assert.equal(

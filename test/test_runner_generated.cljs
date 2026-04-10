@@ -289,6 +289,7 @@
             [hyperopen.views.chart.d3.model-test]
             [hyperopen.views.chart.d3.runtime-test]
             [hyperopen.views.chart.tooltip-core-test]
+            [hyperopen.views.footer-build-id-test]
             [hyperopen.views.footer-view-test]
             [hyperopen.views.funding-comparison-view-test]
             [hyperopen.views.funding-comparison.vm-test]
@@ -745,6 +746,7 @@
              'hyperopen.views.chart.d3.model-test
              'hyperopen.views.chart.d3.runtime-test
              'hyperopen.views.chart.tooltip-core-test
+             'hyperopen.views.footer-build-id-test
              'hyperopen.views.footer-view-test
              'hyperopen.views.funding-comparison-view-test
              'hyperopen.views.funding-comparison.vm-test
