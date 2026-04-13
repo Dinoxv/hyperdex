@@ -16,7 +16,8 @@
   (let [store (atom {:active-asset "BTC"})
         runtime (atom {:startup {}})
         captured-init-deps (atom nil)
-        summary-calls (atom [])]
+        summary-calls (atom [])
+        yield-calls (atom 0)]
     (with-redefs [startup-collaborators/startup-base-deps
                   (fn [deps]
                     (merge
@@ -30,7 +31,11 @@
                     (reset! captured-init-deps deps))
                   startup-runtime/schedule-startup-summary-log!
                   (fn [deps]
-                    (swap! summary-calls conj deps))]
+                    (swap! summary-calls conj deps))
+                  startup-runtime/yield-to-main!
+                  (fn []
+                    (swap! yield-calls inc)
+                    :yielded)]
       (app-startup/init! {:runtime runtime
                           :store store})
       (is (map? @captured-init-deps))
@@ -38,7 +43,10 @@
                       (:default-startup-runtime-state @captured-init-deps)))
       ((:schedule-startup-summary-log! @captured-init-deps))
       (is (= [runtime-state/startup-summary-delay-ms]
-             (map :delay-ms @summary-calls))))))
+             (map :delay-ms @summary-calls)))
+      (is (= :yielded
+             ((:yield-to-main! @captured-init-deps))))
+      (is (= 1 @yield-calls)))))
 
 (deftest init-passes-trading-settings-restore-hook-into-startup-init-test
   (let [store (atom {})

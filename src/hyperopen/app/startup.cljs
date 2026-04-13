@@ -36,6 +36,10 @@
   [f]
   (startup-runtime-lib/schedule-post-render-startup! f))
 
+(defn yield-to-main!
+  []
+  (startup-runtime-lib/yield-to-main!))
+
 (defn startup-base-deps
   [{:keys [runtime store api]}]
   (startup-collaborators/startup-base-deps
@@ -282,6 +286,7 @@
                                                 effects (post-render-route-effects @startup-store path)]
                                             (when (seq effects)
                                               (nxr/dispatch startup-store nil effects))))
+       :yield-to-main! yield-to-main!
        :schedule-post-render-startup! schedule-post-render-startup!
        :kick-render! (fn [runtime-store]
                        (swap! runtime-store identity))}))))

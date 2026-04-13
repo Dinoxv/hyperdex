@@ -64,6 +64,41 @@
                    (startup-runtime/schedule-idle-or-timeout! 77 (fn [] nil))))
             (is (= [77] @fallback-calls))))))))
 
+(deftest yield-to-main-prefers-scheduler-yield-and-falls-back-to-timeout-test
+  (async done
+    (let [yield-calls (atom 0)
+          fallback-delays (atom [])
+          fail! (fn [label err]
+                  (is false (str label err))
+                  (done))]
+      (with-global-property
+        "scheduler"
+        #js {:yield (fn []
+                      (swap! yield-calls inc)
+                      (js/Promise.resolve :yielded))}
+        (fn []
+          (-> (startup-runtime/yield-to-main!)
+              (.then
+               (fn [result]
+                 (is (= :yielded result))
+                 (is (= 1 @yield-calls))
+                 (with-global-property
+                   "scheduler"
+                   #js {}
+                   (fn []
+                     (with-redefs [platform/set-timeout! (fn [f delay-ms]
+                                                           (swap! fallback-delays conj delay-ms)
+                                                           (f)
+                                                           :timeout-id)]
+                       (-> (startup-runtime/yield-to-main!)
+                           (.then (fn [_]
+                                    (is (= [0] @fallback-delays))
+                                    (done)))
+                           (.catch (fn [err]
+                                     (fail! "Unexpected fallback yield error: " err)))))))))
+              (.catch (fn [err]
+                        (fail! "Unexpected scheduler yield error: " err)))))))))
+
 (deftest schedule-startup-summary-log-covers-idempotent-and-runtime-fallback-branches-test
   (let [store (atom {:websocket {:status :connected}
                     :asset-selector {:loading? false
@@ -991,77 +1026,6 @@
               :abstraction-raw nil}
              (:account @store))))))
 
-(deftest install-address-handlers-dispatches-portfolio-chart-bootstrap-on-portfolio-route-test
-  (let [store (atom {:router {:path "/portfolio"}
-                     :portfolio-ui {:chart-tab :returns}})
-        dispatch-calls (atom [])
-        handlers (atom [])]
-    (startup-runtime/install-address-handlers!
-     {:store store
-      :bootstrap-account-data! (fn [_new-address] nil)
-      :init-with-webdata2! (fn [_store _subscribe-fn _unsubscribe-fn] nil)
-      :add-handler! (fn [handler]
-                      (swap! handlers conj handler))
-      :sync-current-address! (fn [_store] nil)
-      :create-user-handler (fn [_subscribe-fn _unsubscribe-fn]
-                             {:kind :user-handler})
-      :subscribe-user! (fn [& _] nil)
-      :unsubscribe-user! (fn [& _] nil)
-      :subscribe-webdata2! (fn [& _] nil)
-      :unsubscribe-webdata2! (fn [& _] nil)
-      :dispatch! (fn [store-arg _ctx effects]
-                   (swap! dispatch-calls conj [store-arg effects]))
-      :address-handler-reify (fn [on-change handler-name]
-                               {:kind :address-handler
-                                :name handler-name
-                                :on-change on-change})
-      :address-handler-name "startup-account-bootstrap-handler"})
-    (let [address-handler (last @handlers)]
-      ((:on-change address-handler) "0xaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa")
-      (is (= [[store [[:actions/load-leaderboard-route "/portfolio"]]]
-              [store [[:actions/load-vault-route "/portfolio"]]]
-              [store [[:actions/load-funding-comparison-route "/portfolio"]]]
-              [store [[:actions/load-staking-route "/portfolio"]]]
-              [store [[:actions/load-api-wallet-route "/portfolio"]]]
-              [store [[:actions/select-portfolio-chart-tab :returns]]]]
-             @dispatch-calls)))))
-
-(deftest install-address-handlers-dispatches-portfolio-chart-bootstrap-on-trader-portfolio-route-test
-  (let [route "/portfolio/trader/0xaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
-        store (atom {:router {:path route}
-                     :portfolio-ui {:chart-tab :returns}})
-        dispatch-calls (atom [])
-        handlers (atom [])]
-    (startup-runtime/install-address-handlers!
-     {:store store
-      :bootstrap-account-data! (fn [_new-address] nil)
-      :init-with-webdata2! (fn [_store _subscribe-fn _unsubscribe-fn] nil)
-      :add-handler! (fn [handler]
-                      (swap! handlers conj handler))
-      :sync-current-address! (fn [_store] nil)
-      :create-user-handler (fn [_subscribe-fn _unsubscribe-fn]
-                             {:kind :user-handler})
-      :subscribe-user! (fn [& _] nil)
-      :unsubscribe-user! (fn [& _] nil)
-      :subscribe-webdata2! (fn [& _] nil)
-      :unsubscribe-webdata2! (fn [& _] nil)
-      :dispatch! (fn [store-arg _ctx effects]
-                   (swap! dispatch-calls conj [store-arg effects]))
-      :address-handler-reify (fn [on-change handler-name]
-                               {:kind :address-handler
-                                :name handler-name
-                                :on-change on-change})
-      :address-handler-name "startup-account-bootstrap-handler"})
-    (let [address-handler (last @handlers)]
-      ((:on-change address-handler) "0xaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa")
-      (is (= [[store [[:actions/load-leaderboard-route route]]]
-              [store [[:actions/load-vault-route route]]]
-              [store [[:actions/load-funding-comparison-route route]]]
-              [store [[:actions/load-staking-route route]]]
-              [store [[:actions/load-api-wallet-route route]]]
-              [store [[:actions/select-portfolio-chart-tab :returns]]]]
-             @dispatch-calls)))))
-
 (deftest reload-address-handlers-replaces-startup-owned-handlers-without-syncing-current-address-test
   (let [store (atom {:wallet {:address "0xaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"}})
         stop-calls (atom [])
@@ -1105,7 +1069,8 @@
   (async done
     (let [mark-calls (atom [])
           deferred-callbacks (atom [])
-          deps {:store (atom {:active-asset "BTC"})
+          deps {:store (atom {:active-asset "BTC"
+                              :router {:path "/trade"}})
                 :ws-url "wss://example.test/ws"
                 :log-fn (fn [& _] nil)
                 :init-connection! (fn [url]
@@ -1135,19 +1100,29 @@
       (is (some #(= [:init-connection "wss://example.test/ws"] %) @mark-calls))
       (is (some #{:init-candles} @mark-calls))
       (is (some #(= [:dispatch [[:actions/subscribe-to-asset "BTC"]]] %) @mark-calls))
-      (is (some #(= [:dispatch [[:actions/load-leaderboard-route "/trade"]]] %) @mark-calls))
-      (is (some #(= [:dispatch [[:actions/load-vault-route "/trade"]]] %) @mark-calls))
-      (is (some #(= [:dispatch [[:actions/load-funding-comparison-route "/trade"]]] %) @mark-calls))
-      (is (some #(= [:dispatch [[:actions/load-staking-route "/trade"]]] %) @mark-calls))
-      (is (some #(= [:dispatch [[:actions/load-api-wallet-route "/trade"]]] %) @mark-calls))
-      (swap! (:store deps) assoc :active-asset nil)
+      (is (not-any? (fn [entry]
+                      (and (vector? entry)
+                           (= :dispatch (first entry))
+                           (let [effects (second entry)]
+                             (and (vector? effects)
+                                  (vector? (first effects))
+                                  (contains? #{:actions/load-leaderboard-route
+                                               :actions/load-vault-route
+                                               :actions/load-funding-comparison-route
+                                               :actions/load-staking-route
+                                               :actions/load-api-wallet-route}
+                                             (ffirst effects))))))
+                    @mark-calls))
+      (swap! (:store deps) assoc
+             :active-asset nil
+             :router {:path "/leaderboard"})
       (startup-runtime/initialize-remote-data-streams! deps)
       (is (= 1 (count (filter #(= [:dispatch [[:actions/subscribe-to-asset "BTC"]]] %) @mark-calls))))
-      (is (= 2 (count (filter #(= [:dispatch [[:actions/load-leaderboard-route "/trade"]]] %) @mark-calls))))
-      (is (= 2 (count (filter #(= [:dispatch [[:actions/load-vault-route "/trade"]]] %) @mark-calls))))
-      (is (= 2 (count (filter #(= [:dispatch [[:actions/load-funding-comparison-route "/trade"]]] %) @mark-calls))))
-      (is (= 2 (count (filter #(= [:dispatch [[:actions/load-staking-route "/trade"]]] %) @mark-calls))))
-      (is (= 2 (count (filter #(= [:dispatch [[:actions/load-api-wallet-route "/trade"]]] %) @mark-calls))))
+      (is (= 1 (count (filter #(= [:dispatch [[:actions/load-leaderboard-route "/leaderboard"]]] %) @mark-calls))))
+      (is (zero? (count (filter #(= [:dispatch [[:actions/load-vault-route "/leaderboard"]]] %) @mark-calls))))
+      (is (zero? (count (filter #(= [:dispatch [[:actions/load-funding-comparison-route "/leaderboard"]]] %) @mark-calls))))
+      (is (zero? (count (filter #(= [:dispatch [[:actions/load-staking-route "/leaderboard"]]] %) @mark-calls))))
+      (is (zero? (count (filter #(= [:dispatch [[:actions/load-api-wallet-route "/leaderboard"]]] %) @mark-calls))))
       (is (= 2 (count (filter #{:schedule-deferred} @mark-calls))))
       (let [critical-context-fetches (atom [])
             bootstrap-selector-fetches (atom [])

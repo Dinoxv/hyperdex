@@ -1,24 +1,21 @@
 (ns hyperopen.startup.runtime
   (:require [clojure.string :as str]
+            [goog.object :as gobj]
             [hyperopen.account.surface-service :as account-surface-service]
             [hyperopen.account.context :as account-context]
             [hyperopen.api.info-client :as info-client]
             [hyperopen.platform :as platform]
-            [hyperopen.portfolio.routes :as portfolio-routes]
+            [hyperopen.startup.route-refresh :as route-refresh]
             [hyperopen.wallet.address-watcher :as address-watcher]))
-
 (defn default-startup-runtime-state
   []
   {:deferred-scheduled? false
    :bootstrapped-address nil
    :summary-logged? false})
-
 (def default-address-handler-name
   "startup-account-bootstrap-handler")
-
 (def ^:private default-user-handler-name
   "user-ws-subscription-handler")
-
 (def ^:private default-webdata2-handler-name
   "webdata2-subscription-handler")
 
@@ -45,6 +42,25 @@
   [f]
   ;; Yield one macrotask so browser can paint before startup fetch/subscription work.
   (platform/set-timeout! f 0))
+
+(defn yield-to-main!
+  []
+  (let [scheduler-object (some-> (when (exists? js/globalThis) js/globalThis)
+                                 (.-scheduler))
+        yield-fn (some-> scheduler-object (gobj/get "yield"))
+        timeout-fallback (fn []
+                           (js/Promise.
+                            (fn [resolve _reject]
+                              (platform/set-timeout!
+                               (fn []
+                                 (resolve nil))
+                               0))))]
+    (if (fn? yield-fn)
+      (try
+        (.call yield-fn scheduler-object)
+        (catch :default _
+          (timeout-fallback)))
+      (timeout-fallback))))
 
 (defn reify-address-handler
   [on-address-changed-fn handler-name]
@@ -394,6 +410,14 @@
         :resolve-current-address account-context/effective-account-address
         :log-fn log-fn})))))
 
+(defn- refresh-current-route!
+  [store dispatch! new-address]
+  (when (fn? dispatch!)
+    (when-let [effects (seq (route-refresh/current-route-refresh-effects
+                             @store
+                             new-address))]
+      (dispatch! store nil effects))))
+
 (defn install-address-handlers!
   [{:keys [store
            bootstrap-account-data!
@@ -431,19 +455,7 @@
       (if new-address
         (bootstrap-account-data! new-address)
         (clear-disconnected-account-state! deps))
-      (when (fn? dispatch!)
-        (let [route (or (get-in @store [:router :path])
-                        "/trade")]
-          (dispatch! store nil [[:actions/load-leaderboard-route route]])
-          (dispatch! store nil [[:actions/load-vault-route route]])
-          (dispatch! store nil [[:actions/load-funding-comparison-route route]])
-          (dispatch! store nil [[:actions/load-staking-route route]])
-          (dispatch! store nil [[:actions/load-api-wallet-route route]])
-          (when (and new-address
-                     (portfolio-routes/portfolio-route? route))
-            ;; Ensure returns benchmark candles load on initial portfolio view entry.
-            (dispatch! store nil [[:actions/select-portfolio-chart-tab
-                                   (get-in @store [:portfolio-ui :chart-tab])]])))))
+      (refresh-current-route! store dispatch! new-address))
     address-handler-name))
   ;; Ensure already-connected wallets are handled after handlers are in place.
   (when sync-current-address-on-install?
@@ -536,21 +548,8 @@
   ;; Ensure active-asset market streams are requested on startup.
   (when-let [asset (:active-asset @store)]
     (dispatch! store nil [[:actions/subscribe-to-asset asset]]))
-  (dispatch! store nil [[:actions/load-leaderboard-route
-                         (or (get-in @store [:router :path])
-                             "/trade")]])
-  (dispatch! store nil [[:actions/load-vault-route
-                         (or (get-in @store [:router :path])
-                             "/trade")]])
-  (dispatch! store nil [[:actions/load-funding-comparison-route
-                         (or (get-in @store [:router :path])
-                             "/trade")]])
-  (dispatch! store nil [[:actions/load-staking-route
-                         (or (get-in @store [:router :path])
-                             "/trade")]])
-  (dispatch! store nil [[:actions/load-api-wallet-route
-                         (or (get-in @store [:router :path])
-                             "/trade")]])
+  ;; Keep startup route refreshes scoped to the actual current route only.
+  (refresh-current-route! store dispatch! nil)
   (install-address-handlers!)
   ;; Keep startup scoped to the active trade route. Full selector-market expansion
   ;; off the critical path, but restore the prefetch as deferred idle work so the
