@@ -1,13 +1,30 @@
-(ns hyperopen.portfolio.metrics.parsing)
+(ns hyperopen.portfolio.metrics.parsing
+  (:require [clojure.string :as str]))
+
+(def ^:private numeric-string-pattern
+  #"^[+-]?(?:(?:\d+(?:\.\d*)?)|(?:\.\d+))(?:[eE][+-]?\d+)?$")
+
+(defn- parse-numeric-string
+  [value]
+  (let [trimmed (some-> value str/trim)]
+    (when (and (seq trimmed)
+               (re-matches numeric-string-pattern trimmed))
+      (let [num (js/parseFloat trimmed)]
+        (when (and (number? num)
+                   (js/isFinite num))
+          num)))))
 
 (defn optional-number [value]
-  (let [num (cond
-              (number? value) value
-              (string? value) (js/parseFloat value)
-              :else js/NaN)]
-    (when (and (number? num)
-               (not (js/isNaN num)))
-      num)))
+  (cond
+    (and (number? value)
+         (js/isFinite value))
+    value
+
+    (string? value)
+    (parse-numeric-string value)
+
+    :else
+    nil))
 
 (defn finite-number? [value]
   (and (number? value)

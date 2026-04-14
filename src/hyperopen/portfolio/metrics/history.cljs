@@ -1,78 +1,31 @@
 (ns hyperopen.portfolio.metrics.history
-  (:require [clojure.string :as str]
-            [hyperopen.portfolio.metrics.parsing :as parsing]))
+  (:require [hyperopen.portfolio.metrics.normalization :as normalization]))
 
-(def day-ms (* 24 60 60 1000))
+(def day-ms normalization/day-ms)
 (def ms-per-year (* 365.2425 24 60 60 1000))
 (def epsilon 1e-12)
 
-(defn optional-number [value] (parsing/optional-number value))
-(defn finite-number? [value] (parsing/finite-number? value))
-(defn history-point-value [row] (parsing/history-point-value row))
-(defn history-point-time-ms [row] (parsing/history-point-time-ms row))
-(defn day-string-from-ms [time-ms] (parsing/day-string-from-ms time-ms))
-(defn parse-day-ms [day] (parsing/parse-day-ms day))
+(defn optional-number [value] (normalization/optional-number value))
+(defn finite-number? [value] (normalization/finite-number? value))
+(defn history-point-value [row] (normalization/history-point-value row))
+(defn history-point-time-ms [row] (normalization/history-point-time-ms row))
+(defn day-string-from-ms [time-ms] (normalization/day-string-from-ms time-ms))
+(defn parse-day-ms [day] (normalization/parse-day-ms day))
+(defn history-points [rows] (normalization/history-points rows))
+(defn dedupe-history-points-by-time [points] (normalization/dedupe-history-points-by-time points))
+(defn aligned-account-pnl-points [summary] (normalization/aligned-account-pnl-points summary))
+(defn normalize-daily-rows [rows] (normalization/normalize-daily-rows rows))
+(defn normalize-cumulative-percent-rows [rows] (normalization/normalize-cumulative-percent-rows rows))
 
-(defn clamp-near-zero [value]
+(defn clamp-near-zero
+  [value]
   (if (< (js/Math.abs value) epsilon)
     0
     value))
 
-(defn history-points
-  [rows]
-  (->> (or rows [])
-       (keep (fn [row]
-               (let [time-ms (history-point-time-ms row)
-                     value (history-point-value row)]
-                 (when (and (finite-number? time-ms)
-                            (finite-number? value))
-                   {:time-ms time-ms
-                    :value value}))))
-       (sort-by :time-ms)
-       vec))
-
-(defn dedupe-history-points-by-time
-  [points]
-  (reduce (fn [acc {:keys [time-ms] :as point}]
-            (if (and (seq acc)
-                     (= (:time-ms (peek acc)) time-ms))
-              (conj (pop acc) point)
-              (conj acc point)))
-          []
-          points))
-
-(defn aligned-account-pnl-points
-  [summary]
-  (let [account-points (-> (:accountValueHistory summary)
-                           history-points
-                           dedupe-history-points-by-time)
-        pnl-by-time (->> (:pnlHistory summary)
-                         history-points
-                         dedupe-history-points-by-time
-                         (map (juxt :time-ms :value))
-                         (into {}))]
-    (->> account-points
-         (keep (fn [{:keys [time-ms value]}]
-                 (when-let [pnl-value (get pnl-by-time time-ms)]
-                   {:time-ms time-ms
-                    :account-value value
-                    :pnl-value pnl-value})))
-         vec)))
-
-(defn- first-positive-account-index
-  [points]
-  (first (keep-indexed (fn [idx {:keys [account-value]}]
-                         (when (pos? account-value)
-                           idx))
-                       points)))
-
 (defn- anchored-account-pnl-points
   [summary]
-  (let [points (aligned-account-pnl-points summary)
-        anchor-index (first-positive-account-index points)]
-    (if (some? anchor-index)
-      (subvec points anchor-index)
-      [])))
+  (normalization/anchored-account-pnl-points summary))
 
 (defn- implied-cash-flow
   [previous current]
@@ -175,16 +128,7 @@
 
 (defn cumulative-percent-rows->interval-returns
   [cumulative-percent-rows]
-  (let [rows (->> (or cumulative-percent-rows [])
-                  (keep (fn [row]
-                          (let [time-ms (history-point-time-ms row)
-                                value (history-point-value row)]
-                            (when (and (number? time-ms)
-                                       (finite-number? value))
-                              {:time-ms time-ms
-                               :value value}))))
-                  (sort-by :time-ms)
-                  vec)
+  (let [rows (normalize-cumulative-percent-rows cumulative-percent-rows)
         count* (count rows)]
     (if (< count* 2)
       []
@@ -194,12 +138,12 @@
         (if (>= idx count*)
           output
           (let [current (nth rows idx)
-                previous-ratio (/ (:value previous) 100)
-                current-ratio (/ (:value current) 100)
-                denominator (+ 1 previous-ratio)
-                period-return (if (and (finite-number? denominator)
-                                       (pos? denominator))
-                                (- (/ (+ 1 current-ratio) denominator) 1)
+                prev-factor (:factor previous)
+                curr-factor (:factor current)
+                period-return (if (and (finite-number? prev-factor)
+                                       (finite-number? curr-factor)
+                                       (pos? prev-factor))
+                                (- (/ curr-factor prev-factor) 1)
                                 0)
                 period-return* (if (finite-number? period-return)
                                  period-return
@@ -241,56 +185,11 @@
   [state summary summary-scope]
   (daily-compounded-returns (returns-history-rows state summary summary-scope)))
 
-(defn normalize-daily-rows
-  [rows]
-  (->> (or rows [])
-       (keep (fn [row]
-               (let [return (or (optional-number (:return row))
-                                (history-point-value row))
-                     time-ms (or (optional-number (:time-ms row))
-                                 (history-point-time-ms row))
-                     day (or (some-> (:day row) str str/trim)
-                             (when (number? time-ms)
-                               (day-string-from-ms time-ms)))]
-                 (when (and (finite-number? return)
-                            (number? time-ms)
-                            (seq day))
-                   {:day day
-                    :time-ms time-ms
-                    :return return}))))
-       (sort-by :time-ms)
-       vec))
-
 (defn returns-values
   [daily-rows]
   (->> daily-rows
        (map :return)
        (filter finite-number?)
-       vec))
-
-(defn normalize-cumulative-percent-rows
-  [rows]
-  (->> (or rows [])
-       (keep (fn [row]
-               (let [time-ms (history-point-time-ms row)
-                     percent (history-point-value row)
-                     factor (when (finite-number? percent)
-                              (+ 1 (/ percent 100)))]
-                 (when (and (number? time-ms)
-                            (finite-number? percent)
-                            (finite-number? factor)
-                            (pos? factor))
-                   {:time-ms time-ms
-                    :percent percent
-                    :factor factor}))))
-       (sort-by :time-ms)
-       (reduce (fn [acc row]
-                 (if (and (seq acc)
-                          (= (:time-ms (peek acc))
-                             (:time-ms row)))
-                   (conj (pop acc) row)
-                   (conj acc row)))
-               [])
        vec))
 
 (defn daily-rows->cumulative-percent-rows

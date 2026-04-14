@@ -6,6 +6,7 @@ inductive Surface where
   | orderRequestAdvanced
   | effectOrderContract
   | portfolioReturnsEstimator
+  | portfolioReturnsNormalization
   | tradingSubmitPolicy
   | orderFormOwnership
   deriving Repr, DecidableEq, Inhabited
@@ -38,6 +39,7 @@ def surfaceId : Surface → String
   | .orderRequestAdvanced => "order-request-advanced"
   | .effectOrderContract => "effect-order-contract"
   | .portfolioReturnsEstimator => "portfolio-returns-estimator"
+  | .portfolioReturnsNormalization => "portfolio-returns-normalization"
   | .tradingSubmitPolicy => "trading-submit-policy"
   | .orderFormOwnership => "order-form-ownership"
 
@@ -47,6 +49,7 @@ def surfaceModuleName : Surface → String
   | .orderRequestAdvanced => "Hyperopen.Formal.OrderRequest.Advanced"
   | .effectOrderContract => "Hyperopen.Formal.EffectOrderContract"
   | .portfolioReturnsEstimator => "Hyperopen.Formal.PortfolioReturnsEstimator"
+  | .portfolioReturnsNormalization => "Hyperopen.Formal.PortfolioReturnsNormalization"
   | .tradingSubmitPolicy => "Hyperopen.Formal.TradingSubmitPolicy"
   | .orderFormOwnership => "Hyperopen.Formal.OrderFormOwnership"
 
@@ -56,6 +59,7 @@ def surfaceStatus : Surface → String
   | .orderRequestAdvanced => "modeled"
   | .effectOrderContract => "modeled"
   | .portfolioReturnsEstimator => "modeled"
+  | .portfolioReturnsNormalization => "modeled"
   | .tradingSubmitPolicy => "modeled"
   | .orderFormOwnership => "modeled"
 
@@ -68,6 +72,7 @@ def surfaceGeneratedSourcePath? : Surface → Option String
   | .orderRequestAdvanced => some "../../target/formal/order-request-advanced-vectors.cljs"
   | .effectOrderContract => some "../../target/formal/effect-order-contract-vectors.cljs"
   | .portfolioReturnsEstimator => some "../../target/formal/portfolio-returns-estimator-vectors.cljs"
+  | .portfolioReturnsNormalization => some "../../target/formal/portfolio-returns-normalization-vectors.cljs"
   | .tradingSubmitPolicy => some "../../target/formal/trading-submit-policy-vectors.cljs"
   | .orderFormOwnership => some "../../target/formal/order-form-ownership-vectors.cljs"
 
@@ -82,6 +87,7 @@ def parseSurface? : String → Option Surface
   | "order-request-advanced" => some .orderRequestAdvanced
   | "effect-order-contract" => some .effectOrderContract
   | "portfolio-returns-estimator" => some .portfolioReturnsEstimator
+  | "portfolio-returns-normalization" => some .portfolioReturnsNormalization
   | "trading-submit-policy" => some .tradingSubmitPolicy
   | "order-form-ownership" => some .orderFormOwnership
   | _ => none
@@ -96,7 +102,7 @@ def parseCommand? : String → Option Command
   | _ => none
 
 def usage : String :=
-  "Usage: formal <verify|sync> --surface <vault-transfer|order-request-standard|order-request-advanced|effect-order-contract|portfolio-returns-estimator|trading-submit-policy|order-form-ownership>"
+  "Usage: formal <verify|sync> --surface <vault-transfer|order-request-standard|order-request-advanced|effect-order-contract|portfolio-returns-estimator|portfolio-returns-normalization|trading-submit-policy|order-form-ownership>"
 
 def parseInvocation : List String → Except String Invocation
   | [] => Except.error usage
@@ -198,6 +204,10 @@ theorem parseSurface?_effectOrderContract :
 
 theorem parseSurface?_portfolioReturnsEstimator :
     parseSurface? "portfolio-returns-estimator" = some Surface.portfolioReturnsEstimator := by
+  rfl
+
+theorem parseSurface?_portfolioReturnsNormalization :
+    parseSurface? "portfolio-returns-normalization" = some Surface.portfolioReturnsNormalization := by
   rfl
 
 theorem parseCommand?_verify :

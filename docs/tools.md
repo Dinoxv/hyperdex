@@ -23,7 +23,7 @@ Use this file as the single starting point for what actions this repo provides t
 9. For interactive feature, bug, and UI orchestration, invoke `$feature-flow`, `$bug-flow`, or `$ui-flow` explicitly.
 10. For multi-agent role, artifact, and gate rules, use `/hyperopen/docs/MULTI_AGENT.md` and the manager under `/hyperopen/tools/multi-agent/`.
 11. For issue tracking and session handoff rules, use `/hyperopen/docs/WORK_TRACKING.md`.
-12. For Lean-backed formal-tool commands, use `npm run formal:verify -- --surface <vault-transfer|order-request-standard|order-request-advanced|effect-order-contract|portfolio-returns-estimator|trading-submit-policy|order-form-ownership>` and `npm run formal:sync -- --surface <surface>`.
+12. For Lean-backed formal-tool commands, use `npm run formal:verify -- --surface <vault-transfer|order-request-standard|order-request-advanced|effect-order-contract|portfolio-returns-estimator|portfolio-returns-normalization|trading-submit-policy|order-form-ownership>` and `npm run formal:sync -- --surface <surface>`.
 13. For optional websocket TLA+ model-checking, use `npm run tla:verify -- --spec websocket-runtime` for the bounded safety pass and `npm run tla:verify -- --spec websocket-runtime-liveness` for the focused liveness pass.
 14. For exact browser inspection command syntax, see:
    - `/hyperopen/tools/browser-inspection/src/cli.mjs`
@@ -87,6 +87,7 @@ Supported surfaces:
 - `order-request-advanced`
 - `effect-order-contract`
 - `portfolio-returns-estimator`
+- `portfolio-returns-normalization`
 - `trading-submit-policy`
 - `order-form-ownership`
 
@@ -97,6 +98,7 @@ Current surface state:
 - `order-request-advanced`: modeled; emits transient generated source under `/hyperopen/target/formal/` and syncs the checked-in bridge under `/hyperopen/test/hyperopen/formal/order_request_advanced_vectors.cljs`
 - `effect-order-contract`: modeled; emits transient generated source under `/hyperopen/target/formal/` and syncs the checked-in bridge under `/hyperopen/test/hyperopen/formal/effect_order_contract_vectors.cljs`
 - `portfolio-returns-estimator`: modeled; emits transient generated source under `/hyperopen/target/formal/` and syncs the checked-in bridge under `/hyperopen/test/hyperopen/formal/portfolio_returns_estimator_vectors.cljs`
+- `portfolio-returns-normalization`: modeled; emits transient generated source under `/hyperopen/target/formal/` and syncs the checked-in bridge under `/hyperopen/test/hyperopen/formal/portfolio_returns_normalization_vectors.cljs`
 - `trading-submit-policy`: modeled; emits transient generated source under `/hyperopen/target/formal/` and syncs the checked-in bridge under `/hyperopen/test/hyperopen/formal/trading_submit_policy_vectors.cljs`
 - `order-form-ownership`: modeled; emits transient generated source under `/hyperopen/target/formal/` and syncs the checked-in bridge under `/hyperopen/test/hyperopen/formal/order_form_ownership_vectors.cljs`
 
