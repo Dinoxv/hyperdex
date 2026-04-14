@@ -1,11 +1,7 @@
 (ns hyperopen.views.account-info.tabs.order-history-test
-  (:require [clojure.string :as str]
-            [cljs.test :refer-macros [deftest is testing use-fixtures]]
-            [hyperopen.test-support.hiccup-selectors :as selectors]
-            [hyperopen.views.account-info.test-support.fixtures :as fixtures]
+  (:require [cljs.test :refer-macros [deftest is use-fixtures]]
             [hyperopen.views.account-info.test-support.hiccup :as hiccup]
-            [hyperopen.views.account-info.tabs.order-history :as order-history-tab]
-            [hyperopen.views.account-info-view :as view]))
+            [hyperopen.views.account-info.tabs.order-history :as order-history-tab]))
 
 (defn- reset-order-history-sort-cache-fixture
   [f]
@@ -16,103 +12,13 @@
 (use-fixtures :each reset-order-history-sort-cache-fixture)
 
 (deftest order-history-sortable-header-uses-secondary-text-hover-and-action-test
-  (let [header-node (view/sortable-order-history-header "Time" {:column "Time" :direction :asc})
+  (let [header-node (order-history-tab/sortable-order-history-header "Time" {:column "Time" :direction :asc})
         sort-icon-node (second (vec (hiccup/node-children header-node)))]
     (is (contains? (hiccup/node-class-set header-node) "text-trading-text-secondary"))
     (is (contains? (hiccup/node-class-set header-node) "hover:text-trading-text"))
     (is (= [[:actions/sort-order-history "Time"]]
            (get-in header-node [1 :on :click])))
     (is (= "↑" (last sort-icon-node)))))
-
-(deftest order-history-tab-content-memoizes-normalize-sort-and-index-by-input-signatures-test
-  (let [raw-rows [{:order {:coin "ETH"
-                           :oid 1
-                           :side "B"
-                           :origSz "1.0"
-                           :remainingSz "0.0"
-                           :limitPx "100"
-                           :orderType "Limit"
-                           :isTrigger false
-                           :isPositionTpsl false
-                           :timestamp 1700000000000}
-                   :status "filled"
-                   :statusTimestamp 1700000000000}]
-        normalized-row {:time-ms 1700000000000
-                        :type "Limit"
-                        :coin "ETH"
-                        :side "B"
-                        :size 1
-                        :filled-size 1
-                        :order-value 100
-                        :px "100"
-                        :status-key :filled
-                        :status-label "Filled"
-                        :oid "1"}
-        table-state {:sort {:column "Time" :direction :desc}
-                     :status-filter :all
-                     :loading? false
-                     :market-by-key {}}
-        equivalent-market (into {} (:market-by-key table-state))
-        changed-market {"spot:ETH/USDC" {:coin "spot:ETH/USDC"
-                                         :symbol "ETH/USDC"}}
-        normalize-calls (atom 0)
-        sort-calls (atom 0)
-        index-calls (atom 0)
-        original-index-builder @#'order-history-tab/*build-order-history-coin-search-index*]
-    (order-history-tab/reset-order-history-sort-cache!)
-    (with-redefs [order-history-tab/normalized-order-history
-                  (fn [_rows]
-                    (swap! normalize-calls inc)
-                    [normalized-row])
-                  order-history-tab/sort-order-history-by-column
-                  (fn [rows _column _direction]
-                    (swap! sort-calls inc)
-                    rows)
-                  order-history-tab/*build-order-history-coin-search-index*
-                  (fn [rows market-by-key]
-                    (swap! index-calls inc)
-                    (original-index-builder rows market-by-key))]
-      (view/order-history-tab-content raw-rows table-state)
-      (view/order-history-tab-content raw-rows table-state)
-      (is (= 1 @normalize-calls))
-      (is (= 1 @sort-calls))
-      (is (= 1 @index-calls))
-
-      (let [asc-state (assoc-in table-state [:sort :direction] :asc)]
-        (view/order-history-tab-content raw-rows asc-state)
-        (view/order-history-tab-content raw-rows asc-state)
-        (is (= 2 @normalize-calls))
-        (is (= 2 @sort-calls))
-        (is (= 2 @index-calls))
-
-        (view/order-history-tab-content raw-rows (assoc asc-state :coin-search "et"))
-        (view/order-history-tab-content raw-rows (assoc asc-state :coin-search "et"))
-        (is (= 2 @normalize-calls))
-        (is (= 2 @sort-calls))
-        (is (= 2 @index-calls))
-
-        (let [churned-rows (into [] raw-rows)]
-          (view/order-history-tab-content churned-rows asc-state)
-          (view/order-history-tab-content churned-rows asc-state)
-          (is (= 2 @normalize-calls))
-          (is (= 2 @sort-calls))
-          (is (= 2 @index-calls)))
-
-        (view/order-history-tab-content raw-rows (assoc asc-state :market-by-key equivalent-market))
-        (is (= 2 @normalize-calls))
-        (is (= 2 @sort-calls))
-        (is (= 2 @index-calls))
-
-        (view/order-history-tab-content raw-rows (assoc asc-state :market-by-key changed-market))
-        (is (= 2 @normalize-calls))
-        (is (= 2 @sort-calls))
-        (is (= 3 @index-calls))
-
-        (let [changed-rows (assoc-in (into [] raw-rows) [0 :order :limitPx] "101")]
-          (view/order-history-tab-content changed-rows asc-state)
-          (is (= 3 @normalize-calls))
-          (is (= 3 @sort-calls))
-          (is (= 4 @index-calls)))))))
 
 (deftest order-history-content-renders-hyperliquid-columns-and-values-test
   (let [rows [{:order {:coin "xyz:NVDA"
@@ -139,9 +45,9 @@
                        :timestamp 1700000000000}
                :status "canceled"
                :statusTimestamp 1699999999000}]
-        content (view/order-history-tab-content rows {:sort {:column "Time" :direction :desc}
-                                                      :status-filter :all
-                                                      :loading? false})
+        content (order-history-tab/order-history-tab-content rows {:sort {:column "Time" :direction :desc}
+                                                                   :status-filter :all
+                                                                   :loading? false})
         strings (set (hiccup/collect-strings content))]
     (is (some? (hiccup/find-first-node content #(contains? (hiccup/direct-texts %) "Filled Size"))))
     (is (some? (hiccup/find-first-node content #(contains? (hiccup/direct-texts %) "Trigger Conditions"))))
@@ -173,9 +79,9 @@
                        :timestamp 1700000000000}
                :status "reduceonlycanceled"
                :statusTimestamp 1699999999000}]
-        content (@#'view/order-history-table rows {:sort {:column "Time" :direction :desc}
-                                                   :status-filter :all
-                                                   :loading? false})
+        content (order-history-tab/order-history-table rows {:sort {:column "Time" :direction :desc}
+                                                             :status-filter :all
+                                                             :loading? false})
         row-node (hiccup/first-viewport-row content)
         cells (vec (hiccup/node-children row-node))
         direction-cell (nth cells 3)
@@ -231,9 +137,9 @@
                        :timestamp 1700000000000}
                :status "filled"
                :statusTimestamp 1700000000000}]
-        content (@#'view/order-history-table rows {:sort {:column "Time" :direction :desc}
-                                                   :status-filter :all
-                                                   :loading? false})
+        content (order-history-tab/order-history-table rows {:sort {:column "Time" :direction :desc}
+                                                             :status-filter :all
+                                                             :loading? false})
         viewport (hiccup/tab-rows-viewport-node content)
         rendered-rows (vec (hiccup/node-children viewport))
         row-strings (set (hiccup/collect-strings (first rendered-rows)))
@@ -268,15 +174,15 @@
                        :timestamp 1700000000000}
                :status "canceled"
                :statusTimestamp 1699999999000}]
-        content (view/order-history-tab-content rows {:sort {:column "Time" :direction :desc}
-                                                      :status-filter :all
-                                                      :loading? false})
+        content (order-history-tab/order-history-tab-content rows {:sort {:column "Time" :direction :desc}
+                                                                   :status-filter :all
+                                                                   :loading? false})
         long-coin-base (hiccup/find-first-node content #(and (= :span (first %))
-                                                      (contains? (hiccup/node-class-set %) "whitespace-nowrap")
-                                                      (contains? (hiccup/direct-texts %) "NVDA")))
+                                                             (contains? (hiccup/node-class-set %) "whitespace-nowrap")
+                                                             (contains? (hiccup/direct-texts %) "NVDA")))
         sell-coin-base (hiccup/find-first-node content #(and (= :span (first %))
-                                                      (contains? (hiccup/node-class-set %) "whitespace-nowrap")
-                                                      (contains? (hiccup/direct-texts %) "PUMP")))]
+                                                             (contains? (hiccup/node-class-set %) "whitespace-nowrap")
+                                                             (contains? (hiccup/direct-texts %) "PUMP")))]
     (is (some? long-coin-base))
     (is (some? sell-coin-base))
     (is (contains? (hiccup/node-class-set long-coin-base) "font-semibold"))
@@ -299,9 +205,9 @@
                        :timestamp 1700000000000}
                :status "filled"
                :statusTimestamp 1700000000500}]
-        content (@#'view/order-history-table rows {:sort {:column "Time" :direction :desc}
-                                                   :status-filter :all
-                                                   :loading? false})
+        content (order-history-tab/order-history-table rows {:sort {:column "Time" :direction :desc}
+                                                             :status-filter :all
+                                                             :loading? false})
         header-node (hiccup/tab-header-node content)
         row-node (hiccup/first-viewport-row content)
         coin-cell (nth (vec (hiccup/node-children row-node)) 2)
@@ -332,9 +238,9 @@
                        :timestamp 1700000000000}
                :status "filled"
                :statusTimestamp 1700000000500}]
-        content (@#'view/order-history-table rows {:sort {:column "Time" :direction :desc}
-                                                   :status-filter :all
-                                                   :loading? false})
+        content (order-history-tab/order-history-table rows {:sort {:column "Time" :direction :desc}
+                                                             :status-filter :all
+                                                             :loading? false})
         header-node (hiccup/tab-header-node content)
         row-node (hiccup/first-viewport-row content)
         header-cells (vec (hiccup/node-children header-node))
@@ -361,9 +267,9 @@
                        :timestamp 1700000000000}
                :status "filled"
                :statusTimestamp 1700000000500}]
-        content (@#'view/order-history-table rows {:sort {:column "Time" :direction :desc}
-                                                   :status-filter :all
-                                                   :loading? false})
+        content (order-history-tab/order-history-table rows {:sort {:column "Time" :direction :desc}
+                                                             :status-filter :all
+                                                             :loading? false})
         row-node (hiccup/first-viewport-row content)
         coin-cell (nth (vec (hiccup/node-children row-node)) 2)
         coin-button (hiccup/find-first-node coin-cell #(= :button (first %)))]
@@ -385,19 +291,19 @@
                        :timestamp 1700000000000}
                :status "filled"
                :statusTimestamp 1700000005000}]
-        content (view/order-history-tab-content rows {:sort {:column "Time" :direction :desc}
-                                                      :status-filter :all
-                                                      :loading? false
-                                                      :market-by-key {"spot:@230" {:coin "@230"
-                                                                                    :symbol "SOL/USDC"
-                                                                                    :base "SOL"
-                                                                                    :market-type :spot}}})
+        content (order-history-tab/order-history-tab-content rows {:sort {:column "Time" :direction :desc}
+                                                                   :status-filter :all
+                                                                   :loading? false
+                                                                   :market-by-key {"spot:@230" {:coin "@230"
+                                                                                                :symbol "SOL/USDC"
+                                                                                                :base "SOL"
+                                                                                                :market-type :spot}}})
         strings (set (hiccup/collect-strings content))]
     (is (contains? strings "SOL"))
     (is (not (contains? strings "@230")))))
 
 (deftest order-history-formatting-distinguishes-market-price-and-filled-size-placeholder-test
-  (let [market-row (view/normalize-order-history-row
+  (let [market-row (order-history-tab/normalize-order-history-row
                     {:order {:coin "NVDA"
                              :oid 1
                              :side "B"
@@ -407,7 +313,7 @@
                              :orderType "Market"}
                      :status "filled"
                      :statusTimestamp 1700000000000})
-        unfilled-limit-row (view/normalize-order-history-row
+        unfilled-limit-row (order-history-tab/normalize-order-history-row
                             {:order {:coin "PUMP"
                                      :oid 2
                                      :side "A"
@@ -417,7 +323,7 @@
                                      :orderType "Limit"}
                              :status "open"
                              :statusTimestamp 1700000000100})
-        filled-row-with-sz-fallback (view/normalize-order-history-row
+        filled-row-with-sz-fallback (order-history-tab/normalize-order-history-row
                                      {:order {:coin "PUMP"
                                               :oid 3
                                               :side "A"
@@ -426,15 +332,15 @@
                                               :limitPx "0.001772"
                                               :orderType "Limit"}
                                       :status "filled"
-                             :statusTimestamp 1700000000100})]
-    (is (= "Market" (@#'view/format-order-history-price market-row)))
-    (is (= "--" (@#'view/format-order-history-filled-size (:filled-size unfilled-limit-row))))
-    (is (= "11,273" (@#'view/format-order-history-filled-size (:filled-size filled-row-with-sz-fallback))))
-    (is (= "No" (@#'view/format-order-history-reduce-only (assoc market-row :reduce-only false))))
-    (is (= "N/A" (@#'view/format-order-history-trigger market-row)))))
+                                      :statusTimestamp 1700000000100})]
+    (is (= "Market" (order-history-tab/format-order-history-price market-row)))
+    (is (= "--" (order-history-tab/format-order-history-filled-size (:filled-size unfilled-limit-row))))
+    (is (= "11,273" (order-history-tab/format-order-history-filled-size (:filled-size filled-row-with-sz-fallback))))
+    (is (= "No" (order-history-tab/format-order-history-reduce-only (assoc market-row :reduce-only false))))
+    (is (= "N/A" (order-history-tab/format-order-history-trigger market-row)))))
 
 (deftest order-history-normalize-row-supports-top-level-history-shapes-test
-  (let [row (view/normalize-order-history-row
+  (let [row (order-history-tab/normalize-order-history-row
              {:coin "ETH"
               :orderId "abc-123"
               :side "A"
@@ -448,282 +354,5 @@
     (is (= "ETH" (:coin row)))
     (is (= "abc-123" (:oid row)))
     (is (= "close long" (:direction row)))
-    (is (= "Yes" (@#'view/format-order-history-reduce-only row)))
-    (is (= "2.5" (@#'view/format-order-history-filled-size (:filled-size row))))))
-
-(deftest order-history-direction-label-prefers-explicit-text-and-reduce-only-fallbacks-test
-  (is (= "Open Short"
-         (@#'order-history-tab/order-history-direction-label
-          {:direction "open short"
-           :side "B"
-           :reduce-only true})))
-  (is (= "Close Short"
-         (@#'order-history-tab/order-history-direction-label
-          {:side "B"
-           :reduce-only true})))
-  (is (= "Close Long"
-         (@#'order-history-tab/order-history-direction-label
-          {:side "A"
-           :reduce-only true})))
-  (is (= "Long"
-         (@#'order-history-tab/order-history-direction-label
-          {:side "B"
-           :reduce-only false}))))
-
-(deftest order-history-direction-class-infers-buy-sell-and-neutral-tones-test
-  (is (= "text-success"
-         (@#'order-history-tab/order-history-direction-class {:side "B"})))
-  (is (= "text-error"
-         (@#'order-history-tab/order-history-direction-class {:side "S"})))
-  (is (= "text-success"
-         (@#'order-history-tab/order-history-direction-class
-          {:direction "buy"})))
-  (is (= "text-error"
-         (@#'order-history-tab/order-history-direction-class
-          {:direction "close long"})))
-  (is (= "text-success"
-         (@#'order-history-tab/order-history-direction-class
-          {:direction "Market Order Liquidation: Close Short"})))
-  (is (= "text-base-content"
-         (@#'order-history-tab/order-history-direction-class
-          {:direction "hold"}))))
-
-(deftest sort-order-history-by-column-is-deterministic-on-ties-test
-  (let [rows (view/normalized-order-history
-              [{:order {:coin "BTC" :oid "2" :side "B" :origSz "1.0" :remainingSz "0.0" :limitPx "1.0"}
-                :status "filled"
-                :statusTimestamp 2000}
-               {:order {:coin "BTC" :oid "1" :side "B" :origSz "1.0" :remainingSz "0.0" :limitPx "1.0"}
-                :status "filled"
-                :statusTimestamp 2000}])
-        time-asc (view/sort-order-history-by-column rows "Time" :asc)
-        oid-desc (view/sort-order-history-by-column rows "Order ID" :desc)]
-    (is (= ["1" "2"] (mapv (comp str :oid) time-asc)))
-    (is (= ["2" "1"] (mapv (comp str :oid) oid-desc)))))
-
-(deftest sort-order-history-by-column-supports-derived-order-history-columns-test
-  (let [rows [{:id :alpha
-               :time-ms 200
-               :type "Market"
-               :coin "BTC"
-               :direction "close long"
-               :size-num 1
-               :filled-size 0
-               :order-value 0
-               :market? true
-               :reduce-only nil
-               :is-trigger false
-               :is-position-tpsl false
-               :status-label "Rejected"
-               :oid "beta"}
-              {:id :beta
-               :time-ms 100
-               :type "Limit"
-               :coin "ETH"
-               :direction "buy"
-               :size-num 2
-               :filled-size 1
-               :order-value 50
-               :market? false
-               :px "25"
-               :reduce-only false
-               :is-trigger true
-               :trigger-condition "Above"
-               :trigger-px "30"
-               :is-position-tpsl true
-               :status-label "Filled"
-               :oid "12"}
-              {:id :gamma
-               :time-ms 150
-               :type "Stop Market"
-               :coin "ADA"
-               :side "B"
-               :size-num 3
-               :filled-size 2
-               :order-value 75
-               :market? false
-               :px "24"
-               :reduce-only true
-               :is-trigger true
-               :trigger-condition "Below"
-               :trigger-px "10"
-               :is-position-tpsl false
-               :status-label "Canceled"
-               :oid "3"}]
-        column-cases [["Direction" :asc [:beta :alpha :gamma]]
-                      ["Price" :asc [:alpha :gamma :beta]]
-                      ["Reduce Only" :asc [:alpha :beta :gamma]]
-                      ["Trigger Conditions" :asc [:alpha :gamma :beta]]
-                      ["TP/SL" :asc [:gamma :alpha :beta]]
-                      ["Status" :asc [:gamma :beta :alpha]]
-                      ["Order ID" :asc [:gamma :beta :alpha]]]]
-    (doseq [[column direction expected-order] column-cases]
-      (is (= expected-order
-             (mapv :id (view/sort-order-history-by-column rows column direction)))
-          (str "Unexpected order for column " column)))))
-
-(deftest order-history-direction-filter-controls-and-filtering-test
-  (let [rows [{:order {:coin "NVDA"
-                       :oid 1
-                       :side "B"
-                       :origSz "1.0"
-                       :remainingSz "0.0"
-                       :limitPx "0"
-                       :orderType "Market"}
-               :status "filled"
-               :statusTimestamp 1700000000000}
-              {:order {:coin "PUMP"
-                       :oid 2
-                       :side "A"
-                       :origSz "1.0"
-                       :remainingSz "0.0"
-                       :limitPx "0.001"
-                       :orderType "Limit"}
-               :status "canceled"
-               :statusTimestamp 1699999999000}]
-        filtered-content (view/order-history-tab-content rows {:sort {:column "Time" :direction :desc}
-                                                               :status-filter :long
-                                                               :loading? false})
-        filtered-strings (set (hiccup/collect-strings filtered-content))
-        panel-state (-> fixtures/sample-account-info-state
-                        (assoc-in [:account-info :selected-tab] :order-history)
-                        (assoc-in [:account-info :order-history]
-                                  {:sort {:column "Time" :direction :desc}
-                                   :status-filter :short
-                                   :filter-open? true
-                                   :loading? false
-                                   :error nil
-                                   :request-id 1})
-                        (assoc-in [:orders :order-history] rows))
-        panel (view/account-info-panel panel-state)
-        filter-button (hiccup/find-first-node panel #(and (contains? (hiccup/direct-texts %) "Short")
-                                                           (= [[:actions/toggle-order-history-filter-open]]
-                                                              (get-in % [1 :on :click]))))
-        short-option (hiccup/find-first-node panel #(and (contains? (hiccup/direct-texts %) "Short")
-                                                          (= [[:actions/set-order-history-status-filter :short]]
-                                                              (get-in % [1 :on :click]))))]
-    (is (contains? filtered-strings "NVDA"))
-    (is (not (contains? filtered-strings "PUMP")))
-    (is (some? filter-button))
-    (is (some? short-option))
-    (is (= [[:actions/toggle-order-history-filter-open]]
-           (get-in filter-button [1 :on :click])))
-    (is (= [[:actions/set-order-history-status-filter :short]]
-           (get-in short-option [1 :on :click])))))
-
-(deftest order-history-filters-by-fuzzy-coin-search-test
-  (let [rows [{:order {:coin "xyz:NVDA"
-                       :oid 1
-                       :side "B"
-                       :origSz "1.0"
-                       :remainingSz "0.0"
-                       :limitPx "0"
-                       :orderType "Market"
-                       :timestamp 1700000000000}
-               :status "filled"
-               :statusTimestamp 1700000000000}
-              {:order {:coin "@230"
-                       :oid 2
-                       :side "A"
-                       :origSz "1.0"
-                       :remainingSz "0.0"
-                       :limitPx "0.001"
-                       :orderType "Limit"
-                       :timestamp 1699999999000}
-               :status "filled"
-               :statusTimestamp 1699999999000}]
-        market-by-key {"spot:@230" {:coin "@230"
-                                     :symbol "SOL/USDC"
-                                     :base "SOL"
-                                     :market-type :spot}}
-        nv-content (view/order-history-tab-content rows {:sort {:column "Time" :direction :desc}
-                                                         :status-filter :all
-                                                         :coin-search "nd"
-                                                         :loading? false
-                                                         :market-by-key market-by-key})
-        sol-content (view/order-history-tab-content rows {:sort {:column "Time" :direction :desc}
-                                                          :status-filter :all
-                                                          :coin-search "sl"
-                                                          :loading? false
-                                                          :market-by-key market-by-key})
-        nv-strings (set (hiccup/collect-strings nv-content))
-        sol-strings (set (hiccup/collect-strings sol-content))]
-    (is (contains? nv-strings "NVDA"))
-    (is (not (contains? nv-strings "SOL")))
-    (is (contains? sol-strings "SOL"))
-    (is (not (contains? sol-strings "NVDA")))))
-
-(deftest order-history-pagination-renders-only-current-page-rows-test
-  (let [rows (mapv fixtures/order-history-row (range 55))
-        content (@#'view/order-history-table rows {:sort {:column "Time" :direction :desc}
-                                                   :status-filter :all
-                                                   :page-size 25
-                                                   :page 2
-                                                   :page-input "2"
-                                                   :loading? false})
-        viewport (hiccup/tab-rows-viewport-node content)
-        rendered-rows (vec (hiccup/node-children viewport))
-        all-strings (set (hiccup/collect-strings content))]
-    (is (= 25 (count rendered-rows)))
-    (is (contains? all-strings "Page 2 of 3"))
-    (is (contains? all-strings "Total: 55"))))
-
-(deftest order-history-pagination-controls-disable-prev-next-at-edges-test
-  (let [rows (mapv fixtures/order-history-row (range 51))
-        first-page (@#'view/order-history-table rows {:sort {:column "Time" :direction :desc}
-                                                      :status-filter :all
-                                                      :page-size 25
-                                                      :page 1
-                                                      :page-input "1"
-                                                      :loading? false})
-        first-prev (hiccup/find-first-node first-page selectors/prev-button-predicate)
-        first-next (hiccup/find-first-node first-page selectors/next-button-predicate)
-        last-page (@#'view/order-history-table rows {:sort {:column "Time" :direction :desc}
-                                                     :status-filter :all
-                                                     :page-size 25
-                                                     :page 3
-                                                     :page-input "3"
-                                                     :loading? false})
-        last-prev (hiccup/find-first-node last-page selectors/prev-button-predicate)
-        last-next (hiccup/find-first-node last-page selectors/next-button-predicate)]
-    (is (= true (get-in first-prev [1 :disabled])))
-    (is (not= true (get-in first-next [1 :disabled])))
-    (is (not= true (get-in last-prev [1 :disabled])))
-    (is (= true (get-in last-next [1 :disabled])))))
-
-(deftest order-history-pagination-controls-wire-actions-test
-  (let [rows (mapv fixtures/order-history-row (range 12))
-        content (@#'view/order-history-table rows {:sort {:column "Time" :direction :desc}
-                                                   :status-filter :all
-                                                   :page-size 25
-                                                   :page 1
-                                                   :page-input "4"
-                                                   :loading? false})
-        page-size-select (hiccup/find-first-node content (selectors/select-id-predicate "order-history-page-size"))
-        jump-input (hiccup/find-first-node content (selectors/input-id-predicate "order-history-page-input"))
-        go-button (hiccup/find-first-node content selectors/go-button-predicate)]
-    (is (= [[:actions/set-order-history-page-size [:event.target/value]]]
-           (get-in page-size-select [1 :on :change])))
-    (is (= [[:actions/set-order-history-page-input [:event.target/value]]]
-           (get-in jump-input [1 :on :input])))
-    (is (= [[:actions/set-order-history-page-input [:event.target/value]]]
-           (get-in jump-input [1 :on :change])))
-    (is (= [[:actions/handle-order-history-page-input-keydown [:event/key] 1]]
-           (get-in jump-input [1 :on :keydown])))
-    (is (= [[:actions/apply-order-history-page-input 1]]
-           (get-in go-button [1 :on :click])))))
-
-(deftest order-history-pagination-clamps-page-when-data-shrinks-test
-  (let [rows (mapv fixtures/order-history-row (range 10))
-        content (@#'view/order-history-table rows {:sort {:column "Time" :direction :desc}
-                                                   :status-filter :all
-                                                   :page-size 25
-                                                   :page 4
-                                                   :page-input "4"
-                                                   :loading? false})
-        viewport (hiccup/tab-rows-viewport-node content)
-        jump-input (hiccup/find-first-node content (selectors/input-id-predicate "order-history-page-input"))
-        all-strings (set (hiccup/collect-strings content))]
-    (is (= 10 (count (vec (hiccup/node-children viewport)))))
-    (is (contains? all-strings "Page 1 of 1"))
-    (is (= "1" (get-in jump-input [1 :value])))))
+    (is (= "Yes" (order-history-tab/format-order-history-reduce-only row)))
+    (is (= "2.5" (order-history-tab/format-order-history-filled-size (:filled-size row))))))

@@ -24,8 +24,12 @@ After this work, the Account Info UI must behave exactly the same for users, but
 - [x] (2026-04-14 00:50Z) Milestone 3: extracted shared tab metadata and tab-strip/header-action ownership into `/hyperopen/src/hyperopen/views/account_info/tab_registry.cljs` and `/hyperopen/src/hyperopen/views/account_info/tab_actions.cljs`, shrank `/hyperopen/src/hyperopen/views/account_info_view.cljs` to `356` lines, and removed the root view exception. Compatibility forwards that are still consumed by non-positions tests remain intentionally in place for now.
 - [x] (2026-04-14 01:35Z) Milestone 4a: split `/hyperopen/src/hyperopen/views/account_info/tabs/balances.cljs` into focused `shared`, `desktop`, and `mobile` owners, moved the positions-oriented projection helpers into `/hyperopen/src/hyperopen/views/account_info/projections/positions.cljs`, replaced `/hyperopen/test/hyperopen/views/account_info/tabs/balances_test.cljs` with focused suites under `/hyperopen/test/hyperopen/views/account_info/tabs/balances/`, and removed the resolved `balances`, `projections/balances`, and `balances_test` exceptions.
 - [x] (2026-04-14 01:35Z) Milestone 4b: split `/hyperopen/src/hyperopen/views/account_info/tabs/open_orders.cljs` by extracting sort/filter/cache ownership into `/hyperopen/src/hyperopen/views/account_info/tabs/open_orders/sorting.cljs`, moved order-history normalization into `/hyperopen/src/hyperopen/views/account_info/projections/order_history.cljs`, replaced the oversized open-orders test with focused content/sorting/projection suites under `/hyperopen/test/hyperopen/views/account_info/tabs/open_orders/`, and removed the resolved `open_orders`, `projections/orders`, and `open_orders_test` exceptions.
-- [ ] Milestone 4 remaining: retire the remaining oversized account-info exceptions in priority order: `tabs/trade_history`, `position_tpsl_modal`, then the remaining oversized tests (`order_history_test`, `trade_history_test`).
-- [ ] Milestone 5: run the required repo gates plus governed browser validation, remove stale exception entries, and update the retrospective with the final complexity outcome.
+- [x] (2026-04-14 01:54Z) Milestone 4c: split `/hyperopen/src/hyperopen/views/account_info/tabs/trade_history.cljs` by extracting sort/filter/search/cache and derived row semantics into `/hyperopen/src/hyperopen/views/account_info/tabs/trade_history/shared.cljs`, replaced `/hyperopen/test/hyperopen/views/account_info/tabs/trade_history_test.cljs` with focused suites under `/hyperopen/test/hyperopen/views/account_info/tabs/trade_history/`, and removed the resolved `trade_history` source/test exceptions after the facade dropped to `398` lines and the largest remaining trade-history test owner dropped to `393` lines.
+- [x] (2026-04-14 02:04Z) Milestone 4d: split `/hyperopen/src/hyperopen/views/account_info/position_tpsl_modal.cljs` into the new internal owners `/hyperopen/src/hyperopen/views/account_info/position_tpsl_modal/fields.cljs` and `/hyperopen/src/hyperopen/views/account_info/position_tpsl_modal/layout.cljs`, replaced `/hyperopen/test/hyperopen/views/account_info/tabs/order_history_test.cljs` with focused suites under `/hyperopen/test/hyperopen/views/account_info/tabs/order_history/`, moved those assertions to direct `order-history` imports, and removed the resolved `position_tpsl_modal` and `order_history_test` exceptions after the modal facade dropped to `221` lines and the largest remaining order-history test owner dropped to `358` lines.
+- [x] Milestone 4 complete: all targeted account-info source and test exceptions from this plan have been retired from `/hyperopen/dev/namespace_size_exceptions.edn`.
+- [x] (2026-04-14 01:57Z) Validation for the completed trade-history slice passed: `npm run lint:namespace-sizes` and `npm test`.
+- [x] (2026-04-14 01:58Z) Reviewer pass on the trade-history slice found no correctness or missing-test issues after code-level review of the split source/tests.
+- [x] (2026-04-14 02:07Z) Milestone 5: final validation passed for the full account-info wave: `npm run lint:namespace-sizes`, `npm run test:playwright:smoke`, `npm run qa:design-ui -- --targets trade-route --manage-local-app`, `npm run browser:cleanup`, `npm run check`, `npm test`, and `npm run test:websocket`.
 - [x] (2026-04-14 00:50Z) Validation for the completed first slice passed: `npm run test:playwright:smoke`, `npm run qa:design-ui -- --targets trade-route --manage-local-app`, `npm run browser:cleanup`, `npm run check`, `npm test`, `npm run test:websocket`, and `npm run lint:namespace-sizes`. `npm ci` was required first because this worktree did not yet have `node_modules/`.
 - [x] (2026-04-14 01:35Z) Validation for the balances + open-orders slice passed: `npm run lint:namespace-sizes`, `npm test`, `npm run test:websocket`, `npm run check`, `npm run test:playwright:smoke`, `npm run qa:design-ui -- --targets trade-route --manage-local-app`, and `npm run browser:cleanup`.
 
@@ -55,6 +59,12 @@ After this work, the Account Info UI must behave exactly the same for users, but
 - Observation: the balances mobile split initially regressed expansion-state identity because row ids were no longer trimmed before comparing against persisted `:mobile-expanded-card` state.
   Evidence: the reviewer found the mismatch between `/hyperopen/src/hyperopen/views/account_info/tabs/balances/mobile.cljs` and `/hyperopen/src/hyperopen/account/history/surface_actions.cljs`; restoring `str/trim` and adding a direct mobile-card test fixed the issue before the full gate stack.
 
+- Observation: the trade-history owner had the same high-value seam as open-orders: its volatile row semantics, search indexing, and sort-cache invalidation logic were already grouped tightly enough to move behind a shared facade without perturbing the table/mobile renderers.
+  Evidence: extracting `/hyperopen/src/hyperopen/views/account_info/tabs/trade_history/shared.cljs` dropped `/hyperopen/src/hyperopen/views/account_info/tabs/trade_history.cljs` from `643` lines to `398`, while the focused suites under `/hyperopen/test/hyperopen/views/account_info/tabs/trade_history/` kept cache and pagination coverage off the route shell.
+
+- Observation: the last two oversized owners were low-blast-radius cleanups once the earlier tab pattern existed. `position_tpsl_modal.cljs` had a natural split between reusable field widgets and placement math, while `order_history_test.cljs` was oversized mainly because tab-unit assertions had never been peeled off into focused suites.
+  Evidence: extracting `/hyperopen/src/hyperopen/views/account_info/position_tpsl_modal/fields.cljs` and `/hyperopen/src/hyperopen/views/account_info/position_tpsl_modal/layout.cljs` dropped the modal facade to `221` lines, and replacing `/hyperopen/test/hyperopen/views/account_info/tabs/order_history_test.cljs` with focused suites under `/hyperopen/test/hyperopen/views/account_info/tabs/order_history/` dropped the largest remaining order-history test owner to `358` lines.
+
 ## Decision Log
 
 - Decision: start with `Positions`, then tighten `account_info_view`, then retire the remaining tab and projection exceptions.
@@ -79,11 +89,11 @@ After this work, the Account Info UI must behave exactly the same for users, but
 
 ## Outcomes & Retrospective
 
-The first execution slice landed successfully. The `Positions` owner is now a thin facade over focused internal desktop/mobile/shared/layout namespaces, the oversized `positions` test owner was replaced by smaller direct-import suites, and the route-facing `account_info_view` shell dropped under the repository threshold after the tab-registry and tab-action extraction. The resolved exception entries were removed from `/hyperopen/dev/namespace_size_exceptions.edn`.
+The full execution wave landed successfully. `positions`, `account_info_view`, `balances`, `open_orders`, `trade_history`, `position_tpsl_modal`, and the oversized paired tab suites were all split into smaller owners without changing the Account Info user path. Every targeted account-info entry was removed from `/hyperopen/dev/namespace_size_exceptions.edn`, and the governed browser plus repo validation stack stayed green at the end of the wave.
 
-Actual complexity outcome so far: reduced. The mixed shell and positions responsibilities that previously lived in three oversized owners now sit in nine smaller namespaces, all below the `500` line limit, while preserving the public entry points and action ids.
+Actual complexity outcome: reduced. The old high-churn account-info surfaces now live behind thin facades plus focused internal owners and direct-import test suites, with every targeted file under the repository `500` line limit. The largest remaining files in this area are now normal-sized owners rather than registry exceptions.
 
-Main remaining risk: the root compatibility forwards are still needed by `/hyperopen/test/hyperopen/views/account_info/table_contract_test.cljs` and `/hyperopen/test/hyperopen/views/account_info/tabs/balances_test.cljs`, so the next cleanup wave must migrate those tests before deleting the forwards. The remaining oversized account-info family (`balances`, `open_orders`, `trade_history`, projections, and modal/test follow-ons) is still active and should be handled as Milestone 4 rather than folded silently into this completed slice.
+Residual risk: low. Root compatibility forwards still exist for some non-oversized whole-surface tests and should be removed only in a later cleanup that migrates those remaining callers. That is now optional follow-on cleanup rather than exception debt blocking this wave.
 
 ## Context and Orientation
 
@@ -91,18 +101,9 @@ In this plan, a “size exception” means one entry in `/hyperopen/dev/namespac
 
 The Account Info surface is the lower account-history panel used across trade and portfolio-style routes. The route-facing shell lives in `/hyperopen/src/hyperopen/views/account_info_view.cljs`. It renders the tab strip, header actions, panel sizing, loading/error handling, and dispatch to each tab renderer. The main oversized tab owners live under `/hyperopen/src/hyperopen/views/account_info/tabs/**`, and the data-preparation owners live under `/hyperopen/src/hyperopen/views/account_info/projections/**`.
 
-Remaining oversized account-info entries from `/hyperopen/dev/namespace_size_exceptions.edn` after the first slice are:
+Remaining oversized account-info entries from `/hyperopen/dev/namespace_size_exceptions.edn` after Milestone `4d` are:
 
-- `/hyperopen/src/hyperopen/views/account_info/tabs/balances.cljs` at `646` lines.
-- `/hyperopen/src/hyperopen/views/account_info/tabs/open_orders.cljs` at `531` lines.
-- `/hyperopen/src/hyperopen/views/account_info/tabs/trade_history.cljs` at `643` lines.
-- `/hyperopen/src/hyperopen/views/account_info/projections/balances.cljs` at `534` lines.
-- `/hyperopen/src/hyperopen/views/account_info/projections/orders.cljs` at `581` lines.
-- `/hyperopen/src/hyperopen/views/account_info/position_tpsl_modal.cljs` at `618` lines.
-- `/hyperopen/test/hyperopen/views/account_info/tabs/balances_test.cljs` at `742` lines.
-- `/hyperopen/test/hyperopen/views/account_info/tabs/open_orders_test.cljs` at `663` lines.
-- `/hyperopen/test/hyperopen/views/account_info/tabs/order_history_test.cljs` at `729` lines.
-- `/hyperopen/test/hyperopen/views/account_info/tabs/trade_history_test.cljs` at `772` lines.
+- None. Every account-info path targeted by this plan is now below the repository limit and removed from the exception registry.
 
 The first slice centers on these files:
 

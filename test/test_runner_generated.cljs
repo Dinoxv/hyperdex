@@ -273,11 +273,15 @@
             [hyperopen.views.account-info.tabs.open-orders.projection-test]
             [hyperopen.views.account-info.tabs.open-orders.sorting-test]
             [hyperopen.views.account-info.tabs.order-history-test]
+            [hyperopen.views.account-info.tabs.order-history.sorting-test]
+            [hyperopen.views.account-info.tabs.order-history.table-test]
             [hyperopen.views.account-info.tabs.positions.content-test]
             [hyperopen.views.account-info.tabs.positions.desktop-actions-test]
             [hyperopen.views.account-info.tabs.positions.desktop-render-test]
             [hyperopen.views.account-info.tabs.positions.mobile-test]
             [hyperopen.views.account-info.tabs.trade-history-test]
+            [hyperopen.views.account-info.tabs.trade-history.sorting-test]
+            [hyperopen.views.account-info.tabs.trade-history.table-test]
             [hyperopen.views.account-info.tabs.twap-test]
             [hyperopen.views.account-info.vm-test]
             [hyperopen.views.active-asset-view-test]
@@ -741,11 +745,15 @@
              'hyperopen.views.account-info.tabs.open-orders.projection-test
              'hyperopen.views.account-info.tabs.open-orders.sorting-test
              'hyperopen.views.account-info.tabs.order-history-test
+             'hyperopen.views.account-info.tabs.order-history.sorting-test
+             'hyperopen.views.account-info.tabs.order-history.table-test
              'hyperopen.views.account-info.tabs.positions.content-test
              'hyperopen.views.account-info.tabs.positions.desktop-actions-test
              'hyperopen.views.account-info.tabs.positions.desktop-render-test
              'hyperopen.views.account-info.tabs.positions.mobile-test
              'hyperopen.views.account-info.tabs.trade-history-test
+             'hyperopen.views.account-info.tabs.trade-history.sorting-test
+             'hyperopen.views.account-info.tabs.trade-history.table-test
              'hyperopen.views.account-info.tabs.twap-test
              'hyperopen.views.account-info.vm-test
              'hyperopen.views.active-asset-view-test
