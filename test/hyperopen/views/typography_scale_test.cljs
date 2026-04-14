@@ -65,13 +65,13 @@
                                  violations))))))
 
 (deftest balances-tab-uses-12px-typography-for-toggle-and-rows-test
-  (let [account-info-path (join-path (project-root) "src" "hyperopen" "views" "account_info_view.cljs")
+  (let [account-info-actions-path (join-path (project-root) "src" "hyperopen" "views" "account_info" "tab_actions.cljs")
         balances-tab-path (join-path (project-root) "src" "hyperopen" "views" "account_info" "tabs" "balances.cljs")
-        account-info-source (read-text account-info-path)
+        account-info-actions-source (read-text account-info-actions-path)
         balances-tab-source (read-text balances-tab-path)]
     (testing "hide small balances label uses text-sm"
       (is (re-find #"\[:label\.text-sm\.text-trading-text(?:\.[A-Za-z0-9_-]+)*\s+\{:for \"hide-small-balances\"\}\s+\"Hide Small Balances\"\]"
-                   account-info-source)))
+                   account-info-actions-source)))
     (testing "balance desktop grid declares the dedicated parity template"
       (is (re-find #"\(def \^:private balances-desktop-grid-template-class\s+\"grid-cols-\["
                    balances-tab-source)))
@@ -153,7 +153,7 @@
         tailwind-config-path (join-path (project-root) "tailwind.config.js")
         tailwind-config (read-text tailwind-config-path)
         header-source (read-text (join-path (project-root) "src" "hyperopen" "views" "header_view.cljs"))
-        account-info-source (read-text (join-path (project-root) "src" "hyperopen" "views" "account_info_view.cljs"))
+        account-info-actions-source (read-text (join-path (project-root) "src" "hyperopen" "views" "account_info" "tab_actions.cljs"))
         portfolio-format-source (read-text (join-path (project-root) "src" "hyperopen" "views" "portfolio" "format.cljs"))
         vault-chart-source (read-text (join-path (project-root) "src" "hyperopen" "views" "vaults" "detail" "chart_view.cljs"))]
     (testing "default stylesheet no longer defines the retired Splash font face"
@@ -164,9 +164,9 @@
     (testing "header no longer uses the retired font-splash utility"
       (is (not (re-find #"font-splash" header-source))))
     (testing "canvas measurement paths use the shared UI font resolver instead of hard-coded Inter"
-      (is (re-find #"fonts/canvas-font 12" account-info-source))
+      (is (re-find #"fonts/canvas-font 12" account-info-actions-source))
       (is (re-find #"fonts/canvas-font 12" portfolio-format-source))
       (is (re-find #"fonts/canvas-font 12" vault-chart-source))
-      (is (not (re-find #"Inter Variable" account-info-source)))
+      (is (not (re-find #"Inter Variable" account-info-actions-source)))
       (is (not (re-find #"Inter Variable" portfolio-format-source)))
       (is (not (re-find #"Inter Variable" vault-chart-source))))))

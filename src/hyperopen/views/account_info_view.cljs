@@ -1,6 +1,7 @@
 (ns hyperopen.views.account-info-view
-  (:require [hyperopen.ui.fonts :as fonts]
-            [hyperopen.views.account-info.shared :as shared]
+  (:require [hyperopen.views.account-info.shared :as shared]
+            [hyperopen.views.account-info.tab-actions :as tab-actions]
+            [hyperopen.views.account-info.tab-registry :as tab-registry]
             [hyperopen.views.account-info.table :as account-table]
             [hyperopen.views.account-info.vm :as account-info-vm]
             [hyperopen.views.account-info.tabs.balances :as balances-tab]
@@ -11,530 +12,20 @@
             [hyperopen.views.account-info.tabs.twap :as twap-tab]
             [hyperopen.views.account-info.tabs.trade-history :as trade-history-tab]))
 
-(def ^:private base-tab-definitions
-  (array-map
-   :balances {:label "Balances"}
-   :positions {:label "Positions"}
-   :open-orders {:label "Open Orders"}
-   :twap {:label "TWAP"}
-   :trade-history {:label "Trade History"}
-   :funding-history {:label "Funding History"}
-   :order-history {:label "Order History"}))
-
-(def available-tabs
-  (vec (keys base-tab-definitions)))
-
-(def tab-labels
-  (into {}
-        (map (fn [[tab {:keys [label]}]]
-               [tab label]))
-        base-tab-definitions))
-
-(defn- normalize-panel-classes [panel-classes]
-  (let [classes* (->> (or panel-classes [])
-                      (filter string?)
-                      vec)]
-    (when (seq classes*)
-      classes*)))
-
-(defn- normalize-extra-tab [{:keys [id label] :as tab}]
-  (when (and (keyword? id)
-             (string? label)
-             (seq label))
-    {:id id
-     :label label
-     :content (:content tab)
-     :render (:render tab)
-     :panel-classes (normalize-panel-classes (:panel-classes tab))
-     :panel-style (when (map? (:panel-style tab))
-                    (:panel-style tab))}))
-
-(defn- normalized-extra-tabs [extra-tabs]
-  (->> (or extra-tabs [])
-       (keep normalize-extra-tab)
-       vec))
-
-(defn- apply-tab-label-overrides [tab-definitions label-overrides]
-  (reduce-kv (fn [acc tab label]
-               (if (and (keyword? tab)
-                        (string? label)
-                        (seq label)
-                        (contains? acc tab))
-                 (assoc-in acc [tab :label] label)
-                 acc))
-             tab-definitions
-             (or label-overrides {})))
-
-(defn- merged-tab-definitions [extra-tabs label-overrides]
-  (let [extra-tabs* (normalized-extra-tabs extra-tabs)
-        extra-tab-ids (set (map :id extra-tabs*))
-        base-tab-pairs (remove (fn [[tab _]]
-                                 (contains? extra-tab-ids tab))
-                               base-tab-definitions)]
-    (apply-tab-label-overrides
-     (into (array-map)
-           (concat (map (fn [{:keys [id label]}]
-                          [id {:label label}])
-                        extra-tabs*)
-                   base-tab-pairs))
-     label-overrides)))
-
-(defn- ordered-tab-ids [tab-definitions tab-order]
-  (let [tabs* (vec (keys tab-definitions))
-        ordered-prefix (->> (or tab-order [])
-                            (filter #(contains? tab-definitions %))
-                            distinct
-                            vec)
-        ordered-set (set ordered-prefix)]
-    (into ordered-prefix
-          (remove ordered-set tabs*))))
-
-(defn- available-tabs-for [extra-tabs tab-order label-overrides]
-  (ordered-tab-ids (merged-tab-definitions extra-tabs label-overrides)
-                   tab-order))
-
-(defn- tab-labels-for [extra-tabs label-overrides]
-  (into {}
-        (map (fn [[tab {:keys [label]}]]
-               [tab label]))
-        (merged-tab-definitions extra-tabs label-overrides)))
-
-(defn tab-label
-  ([tab counts]
-   (tab-label tab counts tab-labels))
-  ([tab counts labels]
-   (let [base (get labels tab (name tab))
-         count (get counts tab)]
-     (cond
-       (and (contains? #{:positions :open-orders :twap} tab)
-            (number? count)
-            (pos? count))
-       (str base " (" count ")")
-
-       (and (contains? #{:positions :open-orders :twap} tab)
-            (number? count))
-       base
-
-       (and (= tab :balances) (number? count))
-       (str base " (" count ")")
-
-       :else base))))
-
-(defn- freshness-cue-text-classes [tone]
-  (case tone
-    :success ["text-xs" "font-medium" "text-success" "tracking-wide"]
-    :warning ["text-xs" "font-medium" "text-warning" "tracking-wide"]
-    ["text-xs" "font-medium" "text-base-content/70" "tracking-wide"]))
-
-(def ^:private account-tab-horizontal-padding-px
-  10)
-
-(def ^:private account-tab-fallback-char-width-px
-  6.4)
-
-(def ^:private account-tab-measure-context
-  (delay
-    (when (and (exists? js/document)
-               (some? js/document))
-      (let [canvas (.createElement js/document "canvas")]
-        (.getContext canvas "2d")))))
-
-(defn- account-tab-width-px [label]
-  (let [context @account-tab-measure-context
-        label-width (if context
-                      (do
-                        ;; Match the compact 12px tab label metrics used by the tab strip.
-                        (set! (.-font context) (fonts/canvas-font 12))
-                        (-> context
-                            (.measureText (or label ""))
-                            .-width))
-                      (* account-tab-fallback-char-width-px
-                         (count (or label ""))))]
-    (+ label-width (* 2 account-tab-horizontal-padding-px))))
-
-(defn- format-px [value]
-  (let [safe-value (double (or value 0))]
-    (str (.toFixed safe-value 3) "px")))
-
-(defn- account-tab-strip-style [tabs counts labels selected-tab]
-  (let [tab-labels* (mapv #(tab-label % counts labels) tabs)
-        widths (mapv account-tab-width-px tab-labels*)
-        active-index (or (first (keep-indexed (fn [idx tab]
-                                                (when (= tab selected-tab)
-                                                  idx))
-                                              tabs))
-                         0)
-        left (reduce + 0 (take active-index widths))
-        width (or (nth widths active-index nil) 0)]
-    {:--account-info-tab-indicator-left (format-px left)
-     :--account-info-tab-indicator-width (format-px width)}))
-
-(defn- funding-history-header-actions []
-  [:div {:class ["ml-auto" "flex" "items-center" "justify-end" "gap-2" "px-4" "py-2" "md:min-h-12" "md:py-0"]
-         :data-role "account-info-tab-actions-shell"}
-   [:button {:class ["btn" "btn-xs" "btn-spectate" "font-normal" "text-trading-text" "hover:bg-base-100" "hover:text-trading-text"]
-             :on {:click [[:actions/toggle-funding-history-filter-open]]}}
-    "Filter"]
-   [:button {:class ["btn" "btn-xs" "btn-spectate" "font-normal" "text-trading-text" "hover:bg-base-100" "hover:text-trading-text"]
-             :on {:click [[:actions/view-all-funding-history]]}}
-    "View All"]
-   [:button {:class ["btn" "btn-xs" "btn-spectate" "font-normal" "text-trading-green" "hover:bg-base-100" "hover:text-trading-green"]
-             :on {:click [[:actions/export-funding-history-csv]]}}
-    "Export as CSV"]])
-
-(def order-history-status-options
-  order-history-tab/order-history-status-options)
-
-(def order-history-status-labels
-  order-history-tab/order-history-status-labels)
-
-(defn- order-history-status-filter-key [order-history-state]
-  (order-history-tab/order-history-status-filter-key order-history-state))
-
-(defn- chevron-caret-icon [open?]
-  [:svg {:class (into ["ml-1" "h-3" "w-3" "shrink-0" "opacity-70" "transition-transform"]
-                      (if open?
-                        ["rotate-180"]
-                        ["rotate-0"]))
-         :viewBox "0 0 12 12"
-         :aria-hidden true}
-   [:path {:d "M3 4.5L6 7.5L9 4.5"
-           :fill "none"
-           :stroke "currentColor"
-           :stroke-width "1.5"
-           :stroke-linecap "round"
-           :stroke-linejoin "round"}]])
-
-(def ^:private filter-trigger-button-classes
-  ["btn"
-   "btn-xs"
-   "btn-spectate"
-   "font-normal"
-   "text-trading-text"
-   "hover:bg-base-100"
-   "hover:text-trading-text"
-   "focus:outline-none"
-   "focus:ring-0"
-   "focus:ring-offset-0"
-   "focus:shadow-none"
-   "focus-visible:outline-none"
-   "focus-visible:ring-0"
-   "focus-visible:ring-offset-0"
-   "focus-visible:spectate-none"])
-
-(def ^:private coin-search-input-classes
-  ["asset-selector-search-input"
-   "h-8"
-   "w-32"
-   "pr-2"
-   "pl-8"
-   "text-xs"
-   "transition-colors"
-   "duration-200"
-   "focus:outline-none"
-   "focus:ring-0"])
-
 (def ^:private account-tab-default-panel-classes
   ["h-96" "lg:h-[29rem]"])
 
-(def ^:private account-tab-header-shell-classes
-  ["border-b"
-   "border-base-300"
-   "bg-base-200"
-   "flex"
-   "flex-col"
-   "justify-between"
-   "md:flex-row"
-   "md:items-stretch"
-   "md:min-h-12"])
+(def available-tabs
+  tab-registry/available-tabs)
 
-(def ^:private account-tab-strip-viewport-classes
-  ["overflow-x-auto"
-   "scrollbar-hide"
-   "border-b"
-   "border-base-300"
-   "min-w-0"
-   "md:flex"
-   "md:flex-1"
-   "md:self-stretch"
-   "md:items-center"
-   "md:min-h-12"
-   "md:border-b-0"])
+(def tab-labels
+  tab-registry/tab-labels)
 
-(def ^:private account-tab-empty-actions-shell-classes
-  ["hidden"
-   "md:flex"
-   "md:min-h-12"
-   "md:items-center"
-   "md:justify-end"
-   "md:px-4"])
+(def tab-label
+  tab-registry/tab-label)
 
-(defn- search-icon []
-  [:svg {:class ["h-3.5" "w-3.5"]
-         :fill "none"
-         :stroke "currentColor"
-         :viewBox "0 0 24 24"
-         :aria-hidden true}
-  [:path {:stroke-linecap "round"
-          :stroke-linejoin "round"
-          :stroke-width "2"
-          :d "m21 21-6-6m2-5a7 7 0 1 1-14 0 7 7 0 0 1 14 0z"}]])
-
-(defn- empty-tab-actions-shell []
-  [:div {:class account-tab-empty-actions-shell-classes
-         :data-role "account-info-tab-actions-shell"}])
-
-(defn- account-info-coin-search-control
-  [tab search-value]
-  [:label {:class ["relative" "inline-flex" "items-center"]}
-   [:span {:class ["sr-only"]} "Search coins"]
-   [:span {:class ["pointer-events-none" "absolute" "left-2.5" "text-trading-text-secondary"]}
-    (search-icon)]
-   [:input {:class coin-search-input-classes
-            :type "search"
-            :placeholder "Coins..."
-            :aria-label "Search coins"
-            :autocomplete "off"
-            :spellcheck false
-            :value (or search-value "")
-            :on {:input [[:actions/set-account-info-coin-search tab [:event.target/value]]]}}]])
-
-(defn- order-history-header-actions [order-history-state]
-  (let [filter-open? (boolean (:filter-open? order-history-state))
-        status-filter (order-history-status-filter-key order-history-state)
-        status-label (get order-history-status-labels status-filter "All")
-        coin-search (:coin-search order-history-state "")]
-    [:div {:class ["ml-auto" "relative" "flex" "items-center" "justify-end" "gap-2" "px-4" "py-2" "md:min-h-12" "md:py-0"]
-           :data-role "account-info-tab-actions-shell"}
-     (account-info-coin-search-control :order-history coin-search)
-     [:button {:class filter-trigger-button-classes
-               :style {:--btn-focus-scale "1"}
-               :on {:click [[:actions/toggle-order-history-filter-open]]}}
-      status-label
-      (chevron-caret-icon filter-open?)]
-     (when filter-open?
-       [:div {:class ["absolute" "right-4" "top-full" "z-20" "mt-1" "w-32" "overflow-hidden" "rounded-md" "border" "border-base-300" "bg-base-100" "spectate-lg"]}
-        (for [[option-key option-label] order-history-status-options]
-          ^{:key (name option-key)}
-          [:button {:class (into ["flex" "w-full" "items-center" "justify-between" "px-3" "py-2" "text-xs" "transition-colors"]
-                                 (if (= status-filter option-key)
-                                   ["bg-base-200" "text-trading-text"]
-                                   ["text-trading-text-secondary" "hover:bg-base-200" "hover:text-trading-text"]))
-                    :on {:click [[:actions/set-order-history-status-filter option-key]]}}
-           option-label
-           (when (= status-filter option-key)
-             [:span {:class ["text-trading-text"]} "*"])])])]))
-
-(def positions-direction-filter-options
-  positions-tab/positions-direction-filter-options)
-
-(def positions-direction-filter-labels
-  positions-tab/positions-direction-filter-labels)
-
-(defn- positions-direction-filter-key [positions-state]
-  (positions-tab/positions-direction-filter-key positions-state))
-
-(defn- positions-header-actions [positions-state freshness-cue]
-  (let [filter-open? (boolean (:filter-open? positions-state))
-        direction-filter (positions-direction-filter-key positions-state)
-        direction-label (get positions-direction-filter-labels direction-filter "All")
-        coin-search (:coin-search positions-state "")]
-    [:div {:class ["ml-auto" "relative" "flex" "items-center" "justify-end" "gap-2" "px-4" "py-2" "md:min-h-12" "md:py-0"]
-           :data-role "account-info-tab-actions-shell"}
-     (when (map? freshness-cue)
-       [:div {:class ["px-1" "py-1"]
-              :data-role "account-tab-freshness-cue"}
-        [:span {:class (freshness-cue-text-classes (:tone freshness-cue))}
-         (:text freshness-cue)]])
-     (account-info-coin-search-control :positions coin-search)
-     [:button {:class filter-trigger-button-classes
-               :style {:--btn-focus-scale "1"}
-               :on {:click [[:actions/toggle-positions-direction-filter-open]]}}
-      direction-label
-      (chevron-caret-icon filter-open?)]
-     (when filter-open?
-       [:div {:class ["absolute" "right-4" "top-full" "z-20" "mt-1" "w-32" "overflow-hidden" "rounded-md" "border" "border-base-300" "bg-base-100" "spectate-lg"]}
-        (for [[option-key option-label] positions-direction-filter-options]
-          ^{:key (name option-key)}
-          [:button {:class (into ["flex" "w-full" "items-center" "justify-between" "px-3" "py-2" "text-xs" "transition-colors"]
-                                 (if (= direction-filter option-key)
-                                   ["bg-base-200" "text-trading-text"]
-                                   ["text-trading-text-secondary" "hover:bg-base-200" "hover:text-trading-text"]))
-                    :on {:click [[:actions/set-positions-direction-filter option-key]]}}
-           option-label
-           (when (= direction-filter option-key)
-             [:span {:class ["text-trading-text"]} "*"])])])]))
-
-(def open-orders-direction-filter-options
-  open-orders-tab/open-orders-direction-filter-options)
-
-(def open-orders-direction-filter-labels
-  open-orders-tab/open-orders-direction-filter-labels)
-
-(defn- open-orders-direction-filter-key [open-orders-state]
-  (open-orders-tab/open-orders-direction-filter-key open-orders-state))
-
-(defn- balances-header-actions [hide-small? coin-search]
-  [:div {:class ["ml-auto" "relative" "flex" "items-center" "justify-end" "gap-3" "px-4" "py-2" "md:min-h-12" "md:py-0"]
-         :data-role "account-info-tab-actions-shell"}
-   (account-info-coin-search-control :balances coin-search)
-   [:div {:class ["flex" "items-center" "space-x-2"]}
-    [:input
-     {:type "checkbox"
-      :id "hide-small-balances"
-      :class ["h-4"
-              "w-4"
-              "rounded-[3px]"
-              "border"
-              "border-base-300"
-              "bg-transparent"
-              "trade-toggle-checkbox"
-              "transition-colors"
-              "focus:outline-none"
-              "focus:ring-0"
-              "focus:ring-offset-0"
-              "focus:shadow-none"]
-      :checked (boolean hide-small?)
-      :on {:change [[:actions/set-hide-small-balances :event.target/checked]]}}]
-    [:label.text-sm.text-trading-text.cursor-pointer.select-none
-     {:for "hide-small-balances"}
-     "Hide Small Balances"]]])
-
-(defn- open-orders-header-actions [open-orders-state freshness-cue]
-  (let [filter-open? (boolean (:filter-open? open-orders-state))
-        direction-filter (open-orders-direction-filter-key open-orders-state)
-        direction-label (get open-orders-direction-filter-labels direction-filter "All")
-        coin-search (:coin-search open-orders-state "")]
-    [:div {:class ["ml-auto" "relative" "flex" "items-center" "justify-end" "gap-2" "px-4" "py-2" "md:min-h-12" "md:py-0"]
-           :data-role "account-info-tab-actions-shell"}
-     (when (map? freshness-cue)
-       [:div {:class ["px-1" "py-1"]
-              :data-role "account-tab-freshness-cue"}
-        [:span {:class (freshness-cue-text-classes (:tone freshness-cue))}
-         (:text freshness-cue)]])
-     (account-info-coin-search-control :open-orders coin-search)
-     [:button {:class filter-trigger-button-classes
-               :style {:--btn-focus-scale "1"}
-               :on {:click [[:actions/toggle-open-orders-direction-filter-open]]}}
-      direction-label
-      (chevron-caret-icon filter-open?)]
-     (when filter-open?
-       [:div {:class ["absolute" "right-4" "top-full" "z-20" "mt-1" "w-32" "overflow-hidden" "rounded-md" "border" "border-base-300" "bg-base-100" "spectate-lg"]}
-        (for [[option-key option-label] open-orders-direction-filter-options]
-          ^{:key (name option-key)}
-          [:button {:class (into ["flex" "w-full" "items-center" "justify-between" "px-3" "py-2" "text-xs" "transition-colors"]
-                                 (if (= direction-filter option-key)
-                                   ["bg-base-200" "text-trading-text"]
-                                   ["text-trading-text-secondary" "hover:bg-base-200" "hover:text-trading-text"]))
-                    :on {:click [[:actions/set-open-orders-direction-filter option-key]]}}
-           option-label
-           (when (= direction-filter option-key)
-             [:span {:class ["text-trading-text"]} "*"])])])]))
-
-(def trade-history-direction-filter-options
-  trade-history-tab/trade-history-direction-filter-options)
-
-(def trade-history-direction-filter-labels
-  trade-history-tab/trade-history-direction-filter-labels)
-
-(defn- trade-history-direction-filter-key [trade-history-state]
-  (trade-history-tab/trade-history-direction-filter-key trade-history-state))
-
-(defn- trade-history-header-actions [trade-history-state]
-  (let [filter-open? (boolean (:filter-open? trade-history-state))
-        direction-filter (trade-history-direction-filter-key trade-history-state)
-        direction-label (get trade-history-direction-filter-labels direction-filter "All")
-        coin-search (:coin-search trade-history-state "")]
-    [:div {:class ["ml-auto" "relative" "flex" "items-center" "justify-end" "gap-2" "px-4" "py-2" "md:min-h-12" "md:py-0"]
-           :data-role "account-info-tab-actions-shell"}
-     (account-info-coin-search-control :trade-history coin-search)
-     [:button {:class filter-trigger-button-classes
-               :style {:--btn-focus-scale "1"}
-               :on {:click [[:actions/toggle-trade-history-direction-filter-open]]}}
-      direction-label
-      (chevron-caret-icon filter-open?)]
-     (when filter-open?
-       [:div {:class ["absolute" "right-4" "top-full" "z-20" "mt-1" "w-32" "overflow-hidden" "rounded-md" "border" "border-base-300" "bg-base-100" "spectate-lg"]}
-        (for [[option-key option-label] trade-history-direction-filter-options]
-          ^{:key (name option-key)}
-          [:button {:class (into ["flex" "w-full" "items-center" "justify-between" "px-3" "py-2" "text-xs" "transition-colors"]
-                                 (if (= direction-filter option-key)
-                                   ["bg-base-200" "text-trading-text"]
-                                   ["text-trading-text-secondary" "hover:bg-base-200" "hover:text-trading-text"]))
-                    :on {:click [[:actions/set-trade-history-direction-filter option-key]]}}
-           option-label
-           (when (= direction-filter option-key)
-             [:span {:class ["text-trading-text"]} "*"])])])]))
-
-(defn tab-navigation
-  ([selected-tab counts hide-small? funding-history-state]
-   (tab-navigation selected-tab counts hide-small? funding-history-state {} {} {} {} nil "" {}))
-  ([selected-tab counts hide-small? funding-history-state order-history-state]
-   (tab-navigation selected-tab counts hide-small? funding-history-state {} order-history-state {} {} nil "" {}))
-  ([selected-tab counts hide-small? funding-history-state order-history-state freshness-cues]
-   (tab-navigation selected-tab counts hide-small? funding-history-state {} order-history-state {} {} freshness-cues "" {}))
-  ([selected-tab counts hide-small? funding-history-state order-history-state open-orders-state freshness-cues]
-   (tab-navigation selected-tab counts hide-small? funding-history-state {} order-history-state {} open-orders-state freshness-cues "" {}))
-  ([selected-tab counts hide-small? funding-history-state trade-history-state order-history-state open-orders-state freshness-cues]
-   (tab-navigation selected-tab counts hide-small? funding-history-state trade-history-state order-history-state {} open-orders-state freshness-cues "" {}))
-  ([selected-tab counts hide-small? _funding-history-state trade-history-state order-history-state positions-state open-orders-state freshness-cues]
-   (tab-navigation selected-tab counts hide-small? _funding-history-state trade-history-state order-history-state positions-state open-orders-state freshness-cues "" {}))
-  ([selected-tab counts hide-small? _funding-history-state trade-history-state order-history-state positions-state open-orders-state freshness-cues balances-coin-search]
-   (tab-navigation selected-tab counts hide-small? _funding-history-state trade-history-state order-history-state positions-state open-orders-state freshness-cues balances-coin-search {}))
-  ([selected-tab counts hide-small? _funding-history-state trade-history-state order-history-state positions-state open-orders-state freshness-cues balances-coin-search {:keys [extra-tabs
-                                                                                                                                                                                tab-click-actions-by-tab
-                                                                                                                                                                                tab-label-overrides
-                                                                                                                                                                                tab-order]
-                                                                                                                                                                         :or {extra-tabs []
-                                                                                                                                                                              tab-click-actions-by-tab {}
-                                                                                                                                                                              tab-label-overrides {}
-                                                                                                                                                                              tab-order []}}]
-   (let [tab-labels* (tab-labels-for extra-tabs tab-label-overrides)
-         tabs* (available-tabs-for extra-tabs tab-order tab-label-overrides)
-         actions-node (case selected-tab
-                        :balances
-                        (balances-header-actions hide-small? balances-coin-search)
-
-                        :funding-history
-                        (funding-history-header-actions)
-
-                        :order-history
-                        (order-history-header-actions order-history-state)
-
-                        :trade-history
-                        (trade-history-header-actions trade-history-state)
-
-                        :positions
-                        (positions-header-actions positions-state
-                                                  (get freshness-cues :positions))
-
-                        :open-orders
-                        (open-orders-header-actions open-orders-state
-                                                    (get freshness-cues :open-orders))
-
-                        nil)]
-     [:div {:class account-tab-header-shell-classes}
-      [:div {:class account-tab-strip-viewport-classes}
-       [:div {:class ["account-info-tab-strip"]
-              :data-role "account-info-tab-strip"
-              :style (account-tab-strip-style tabs* counts tab-labels* selected-tab)}
-        [:div {:class ["account-info-tab-indicator"]
-               :data-role "account-info-tab-indicator"
-               :aria-hidden true}]
-        (for [tab tabs*]
-          [:button {:key (name tab)
-                    :type "button"
-                    :aria-pressed (= selected-tab tab)
-                    :data-role (str "account-info-tab-" (name tab))
-                    :class (into ["account-info-tab-button"]
-                                 (if (= selected-tab tab)
-                                   ["account-info-tab-button-active"]
-                                   ["account-info-tab-button-inactive"]))
-                    :on {:click (or (get tab-click-actions-by-tab tab)
-                                    [[:actions/select-account-info-tab tab]])}}
-           (tab-label tab counts tab-labels*)])]]
-      (or actions-node
-          (empty-tab-actions-shell))])))
+(def tab-navigation
+  tab-actions/tab-navigation)
 
 (defn loading-spinner []
   [:div.flex.justify-center.items-center.py-8
@@ -652,7 +143,7 @@
 
 (defn placeholder-tab-content
   ([tab-name]
-   (placeholder-tab-content tab-name tab-labels))
+   (placeholder-tab-content tab-name tab-registry/tab-labels))
   ([tab-name labels]
    [:div.p-4
     [:div.text-lg.font-medium.mb-4 (get labels tab-name (name tab-name))]
@@ -716,7 +207,7 @@
 (defn- extra-tab-renderers [extra-tabs]
   (reduce (fn [acc {:keys [id content render]}]
             (if (keyword? id)
-              (cond
+          (cond
                 (fn? render)
                 (assoc acc id render)
 
@@ -727,7 +218,7 @@
                 :else acc)
               acc))
           {}
-          (normalized-extra-tabs extra-tabs)))
+          (tab-registry/normalized-extra-tabs extra-tabs)))
 
 (defn tab-content
   ([view-model]
@@ -787,7 +278,7 @@
                 tab-label-overrides {}
                 tab-order []}}]
    (let [view-model (account-info-vm/account-info-vm state)
-         extra-tabs* (normalized-extra-tabs extra-tabs)
+         extra-tabs* (tab-registry/normalized-extra-tabs extra-tabs)
          {:keys [selected-tab
                  tab-counts
                  hide-small?
@@ -800,7 +291,7 @@
                  freshness-cues
                  error
                  loading?]} view-model
-         available-tabs* (available-tabs-for extra-tabs* tab-order tab-label-overrides)
+         available-tabs* (tab-registry/available-tabs-for extra-tabs* tab-order tab-label-overrides)
          fallback-selected-tab (if (some #(= % default-selected-tab) available-tabs*)
                                  default-selected-tab
                                  (or (first available-tabs*)
@@ -832,20 +323,20 @@
                          panel-shell-classes)
             :style panel-shell-style
             :data-parity-id "account-tables"}
-      (tab-navigation selected-tab*
-                      tab-counts
-                      hide-small?
-                      funding-history-state
-                      trade-history-state
-                      order-history-state
-                      positions-state
-                      open-orders-state
-                      freshness-cues
-                      balances-coin-search
-                      {:extra-tabs extra-tabs
-                       :tab-click-actions-by-tab tab-click-actions-by-tab
-                       :tab-label-overrides tab-label-overrides
-                       :tab-order tab-order})
+      (tab-actions/tab-navigation selected-tab*
+                                  tab-counts
+                                  hide-small?
+                                  funding-history-state
+                                  trade-history-state
+                                  order-history-state
+                                  positions-state
+                                  open-orders-state
+                                  freshness-cues
+                                  balances-coin-search
+                                  {:extra-tabs extra-tabs
+                                   :tab-click-actions-by-tab tab-click-actions-by-tab
+                                   :tab-label-overrides tab-label-overrides
+                                   :tab-order tab-order})
       [:div {:class ["flex-1" "min-h-0" "min-w-0" "overflow-hidden"]}
        (cond
          (and (nil? selected-extra-renderer) error)

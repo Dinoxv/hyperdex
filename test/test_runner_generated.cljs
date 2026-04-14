@@ -268,7 +268,10 @@
             [hyperopen.views.account-info.tabs.funding-history-test]
             [hyperopen.views.account-info.tabs.open-orders-test]
             [hyperopen.views.account-info.tabs.order-history-test]
-            [hyperopen.views.account-info.tabs.positions-test]
+            [hyperopen.views.account-info.tabs.positions.content-test]
+            [hyperopen.views.account-info.tabs.positions.desktop-actions-test]
+            [hyperopen.views.account-info.tabs.positions.desktop-render-test]
+            [hyperopen.views.account-info.tabs.positions.mobile-test]
             [hyperopen.views.account-info.tabs.trade-history-test]
             [hyperopen.views.account-info.tabs.twap-test]
             [hyperopen.views.account-info.vm-test]
@@ -728,7 +731,10 @@
              'hyperopen.views.account-info.tabs.funding-history-test
              'hyperopen.views.account-info.tabs.open-orders-test
              'hyperopen.views.account-info.tabs.order-history-test
-             'hyperopen.views.account-info.tabs.positions-test
+             'hyperopen.views.account-info.tabs.positions.content-test
+             'hyperopen.views.account-info.tabs.positions.desktop-actions-test
+             'hyperopen.views.account-info.tabs.positions.desktop-render-test
+             'hyperopen.views.account-info.tabs.positions.mobile-test
              'hyperopen.views.account-info.tabs.trade-history-test
              'hyperopen.views.account-info.tabs.twap-test
              'hyperopen.views.account-info.vm-test
