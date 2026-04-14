@@ -5,6 +5,7 @@ inductive Surface where
   | orderRequestStandard
   | orderRequestAdvanced
   | effectOrderContract
+  | portfolioReturnsEstimator
   | tradingSubmitPolicy
   | orderFormOwnership
   deriving Repr, DecidableEq, Inhabited
@@ -23,6 +24,7 @@ inductive Clj where
   | nil
   | bool (value : Bool)
   | nat (value : Nat)
+  | int (value : Int)
   | str (value : String)
   | keyword (value : String)
   | symbol (value : String)
@@ -35,6 +37,7 @@ def surfaceId : Surface → String
   | .orderRequestStandard => "order-request-standard"
   | .orderRequestAdvanced => "order-request-advanced"
   | .effectOrderContract => "effect-order-contract"
+  | .portfolioReturnsEstimator => "portfolio-returns-estimator"
   | .tradingSubmitPolicy => "trading-submit-policy"
   | .orderFormOwnership => "order-form-ownership"
 
@@ -43,6 +46,7 @@ def surfaceModuleName : Surface → String
   | .orderRequestStandard => "Hyperopen.Formal.OrderRequest.Standard"
   | .orderRequestAdvanced => "Hyperopen.Formal.OrderRequest.Advanced"
   | .effectOrderContract => "Hyperopen.Formal.EffectOrderContract"
+  | .portfolioReturnsEstimator => "Hyperopen.Formal.PortfolioReturnsEstimator"
   | .tradingSubmitPolicy => "Hyperopen.Formal.TradingSubmitPolicy"
   | .orderFormOwnership => "Hyperopen.Formal.OrderFormOwnership"
 
@@ -51,6 +55,7 @@ def surfaceStatus : Surface → String
   | .orderRequestStandard => "modeled"
   | .orderRequestAdvanced => "modeled"
   | .effectOrderContract => "modeled"
+  | .portfolioReturnsEstimator => "modeled"
   | .tradingSubmitPolicy => "modeled"
   | .orderFormOwnership => "modeled"
 
@@ -62,6 +67,7 @@ def surfaceGeneratedSourcePath? : Surface → Option String
   | .orderRequestStandard => some "../../target/formal/order-request-standard-vectors.cljs"
   | .orderRequestAdvanced => some "../../target/formal/order-request-advanced-vectors.cljs"
   | .effectOrderContract => some "../../target/formal/effect-order-contract-vectors.cljs"
+  | .portfolioReturnsEstimator => some "../../target/formal/portfolio-returns-estimator-vectors.cljs"
   | .tradingSubmitPolicy => some "../../target/formal/trading-submit-policy-vectors.cljs"
   | .orderFormOwnership => some "../../target/formal/order-form-ownership-vectors.cljs"
 
@@ -75,6 +81,7 @@ def parseSurface? : String → Option Surface
   | "order-request-standard" => some .orderRequestStandard
   | "order-request-advanced" => some .orderRequestAdvanced
   | "effect-order-contract" => some .effectOrderContract
+  | "portfolio-returns-estimator" => some .portfolioReturnsEstimator
   | "trading-submit-policy" => some .tradingSubmitPolicy
   | "order-form-ownership" => some .orderFormOwnership
   | _ => none
@@ -89,7 +96,7 @@ def parseCommand? : String → Option Command
   | _ => none
 
 def usage : String :=
-  "Usage: formal <verify|sync> --surface <vault-transfer|order-request-standard|order-request-advanced|effect-order-contract|trading-submit-policy|order-form-ownership>"
+  "Usage: formal <verify|sync> --surface <vault-transfer|order-request-standard|order-request-advanced|effect-order-contract|portfolio-returns-estimator|trading-submit-policy|order-form-ownership>"
 
 def parseInvocation : List String → Except String Invocation
   | [] => Except.error usage
@@ -143,6 +150,7 @@ partial def renderClj : Clj → String
   | .bool true => "true"
   | .bool false => "false"
   | .nat value => toString value
+  | .int value => toString value
   | .str value => "\"" ++ escapeString value ++ "\""
   | .keyword value => ":" ++ value
   | .symbol value => value
@@ -186,6 +194,10 @@ theorem parseSurface?_standard :
 
 theorem parseSurface?_effectOrderContract :
     parseSurface? "effect-order-contract" = some Surface.effectOrderContract := by
+  rfl
+
+theorem parseSurface?_portfolioReturnsEstimator :
+    parseSurface? "portfolio-returns-estimator" = some Surface.portfolioReturnsEstimator := by
   rfl
 
 theorem parseCommand?_verify :

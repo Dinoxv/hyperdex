@@ -17,6 +17,7 @@ Supported surfaces are:
 - `order-request-standard`
 - `order-request-advanced`
 - `effect-order-contract`
+- `portfolio-returns-estimator`
 - `trading-submit-policy`
 - `order-form-ownership`
 
@@ -34,6 +35,7 @@ Current surface state:
 - `order-request-standard`: modeled, emits `target/formal/order-request-standard-vectors.cljs`, and syncs `test/hyperopen/formal/order_request_standard_vectors.cljs`
 - `order-request-advanced`: modeled, emits `target/formal/order-request-advanced-vectors.cljs`, and syncs `test/hyperopen/formal/order_request_advanced_vectors.cljs`
 - `effect-order-contract`: modeled, emits `target/formal/effect-order-contract-vectors.cljs`, and syncs `test/hyperopen/formal/effect_order_contract_vectors.cljs`
+- `portfolio-returns-estimator`: modeled, emits `target/formal/portfolio-returns-estimator-vectors.cljs`, and syncs `test/hyperopen/formal/portfolio_returns_estimator_vectors.cljs`
 - `trading-submit-policy`: modeled, emits `target/formal/trading-submit-policy-vectors.cljs`, and syncs `test/hyperopen/formal/trading_submit_policy_vectors.cljs`
 - `order-form-ownership`: modeled, emits `target/formal/order-form-ownership-vectors.cljs`, and syncs `test/hyperopen/formal/order_form_ownership_vectors.cljs`
 

@@ -37,6 +37,14 @@
    :target-source "target/formal/effect-order-contract-vectors.cljs"
    :committed-source "test/hyperopen/formal/effect_order_contract_vectors.cljs"})
 
+(def portfolio-returns-estimator-surface
+  {:id "portfolio-returns-estimator"
+   :lean-module "Hyperopen.Formal.PortfolioReturnsEstimator"
+   :status "modeled"
+   :manifest "generated/portfolio-returns-estimator.edn"
+   :target-source "target/formal/portfolio-returns-estimator-vectors.cljs"
+   :committed-source "test/hyperopen/formal/portfolio_returns_estimator_vectors.cljs"})
+
 (def trading-submit-policy-surface
   {:id "trading-submit-policy"
    :lean-module "Hyperopen.Formal.TradingSubmitPolicy"
@@ -64,6 +72,7 @@
    standard-surface
    advanced-surface
    effect-order-contract-surface
+   portfolio-returns-estimator-surface
    trading-submit-policy-surface
    order-form-ownership-surface])
 
@@ -98,6 +107,8 @@
          (#'formal/manifest-content advanced-surface)))
   (is (= "{:surface \"effect-order-contract\" :module \"Hyperopen.Formal.EffectOrderContract\" :status \"modeled\"}\n"
          (#'formal/manifest-content effect-order-contract-surface)))
+  (is (= "{:surface \"portfolio-returns-estimator\" :module \"Hyperopen.Formal.PortfolioReturnsEstimator\" :status \"modeled\"}\n"
+         (#'formal/manifest-content portfolio-returns-estimator-surface)))
   (is (= "{:surface \"trading-submit-policy\" :module \"Hyperopen.Formal.TradingSubmitPolicy\" :status \"modeled\"}\n"
          (#'formal/manifest-content trading-submit-policy-surface)))
   (is (= "{:surface \"order-form-ownership\" :module \"Hyperopen.Formal.OrderFormOwnership\" :status \"modeled\"}\n"

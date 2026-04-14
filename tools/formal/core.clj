@@ -24,6 +24,11 @@
                             :manifest "generated/effect-order-contract.edn"
                             :target-source "target/formal/effect-order-contract-vectors.cljs"
                             :committed-source "test/hyperopen/formal/effect_order_contract_vectors.cljs"}
+   "portfolio-returns-estimator" {:lean-module "Hyperopen.Formal.PortfolioReturnsEstimator"
+                                  :status "modeled"
+                                  :manifest "generated/portfolio-returns-estimator.edn"
+                                  :target-source "target/formal/portfolio-returns-estimator-vectors.cljs"
+                                  :committed-source "test/hyperopen/formal/portfolio_returns_estimator_vectors.cljs"}
    "trading-submit-policy" {:lean-module "Hyperopen.Formal.TradingSubmitPolicy"
                             :status "modeled"
                             :manifest "generated/trading-submit-policy.edn"
@@ -43,11 +48,12 @@
 
 (defn- usage
   []
-  (str "Usage: bb tools/formal.clj <verify|sync> --surface <vault-transfer|order-request-standard|order-request-advanced|effect-order-contract|trading-submit-policy|order-form-ownership>\n"
+  (str "Usage: bb tools/formal.clj <verify|sync> --surface <vault-transfer|order-request-standard|order-request-advanced|effect-order-contract|portfolio-returns-estimator|trading-submit-policy|order-form-ownership>\n"
        "Examples:\n"
        "  bb tools/formal.clj verify --surface vault-transfer\n"
        "  bb tools/formal.clj sync --surface order-request-standard\n"
        "  bb tools/formal.clj verify --surface effect-order-contract\n"
+       "  bb tools/formal.clj verify --surface portfolio-returns-estimator\n"
        "  bb tools/formal.clj verify --surface trading-submit-policy\n"
        "  bb tools/formal.clj verify --surface order-form-ownership\n"
        "Notes:\n"

@@ -106,17 +106,32 @@
              (pos? previous-account-value))
     (/ delta-pnl previous-account-value)))
 
+(defn- indeterminate-cash-flow?
+  [previous current implied-cash-flow*]
+  (let [previous-account-value (:account-value previous)
+        flow-ratio (cash-flow-ratio previous-account-value implied-cash-flow*)]
+    (or (not (finite-number? flow-ratio))
+        (and (pos? implied-cash-flow*)
+             (> (:account-value current)
+                (:account-value previous))
+             (>= flow-ratio 0.5)))))
+
 (defn- bounded-period-return
   [previous current]
   (let [previous-account-value (:account-value previous)
         delta-pnl (- (:pnl-value current)
                      (:pnl-value previous))
         implied-cash-flow* (implied-cash-flow previous current)
-        period-return (or (modified-dietz-return delta-pnl
-                                                 previous-account-value
-                                                 implied-cash-flow*)
-                          (fallback-period-return delta-pnl previous-account-value)
-                          0)]
+        period-return (cond
+                        (indeterminate-cash-flow? previous current implied-cash-flow*)
+                        0
+
+                        :else
+                        (or (modified-dietz-return delta-pnl
+                                                   previous-account-value
+                                                   implied-cash-flow*)
+                            (fallback-period-return delta-pnl previous-account-value)
+                            0))]
     (if (finite-number? period-return)
       (max -0.999999 period-return)
       0)))

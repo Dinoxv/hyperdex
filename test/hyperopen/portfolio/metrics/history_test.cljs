@@ -91,6 +91,56 @@
     (is (approx= 0 (second (first rows)) 1e-12))
     (is (approx= -99.9999 (second (second rows)) 1e-9))))
 
+(deftest returns-history-rows-neutralizes-large-implied-cash-flow-intervals-test
+  (let [summary {:accountValueHistory [[1 1000]
+                                       [2 60001000]
+                                       [3 63001000]]
+                 :pnlHistory [[1 0]
+                              [2 -100]
+                              [3 2999900]]}
+        rows (metrics/returns-history-rows {} summary :all)
+        values (mapv second rows)]
+    (is (= [1 2 3]
+           (mapv first rows)))
+    (is (approx= 0 (nth values 0) 1e-12))
+    (is (approx= 0 (nth values 1) 1e-12))
+    (is (approx= 4.999916668055526 (nth values 2) 1e-9))))
+
+(deftest returns-history-rows-last-write-wins-for-duplicate-timestamps-test
+  (let [summary {:accountValueHistory [[1 100]
+                                       [2 120]
+                                       [2 130]
+                                       [3 143]]
+                 :pnlHistory [[1 0]
+                              [2 10]
+                              [2 15]
+                              [3 28]]}
+        rows (metrics/returns-history-rows {} summary :all)
+        values (mapv second rows)]
+    (is (= [1 2 3]
+           (mapv first rows)))
+    (is (approx= 0 (nth values 0) 1e-12))
+    (is (approx= 13.953488372093023 (nth values 1) 1e-12))
+    (is (approx= 25.348837209302324 (nth values 2) 1e-12))))
+
+(deftest returns-history-rows-neutralizes-consecutive-large-positive-rebases-test
+  (let [summary {:accountValueHistory [[1 100]
+                                       [2 1100]
+                                       [3 2100]
+                                       [4 2310]]
+                 :pnlHistory [[1 0]
+                              [2 0]
+                              [3 0]
+                              [4 210]]}
+        rows (metrics/returns-history-rows {} summary :all)
+        values (mapv second rows)]
+    (is (= [1 2 3 4]
+           (mapv first rows)))
+    (is (approx= 0 (nth values 0) 1e-12))
+    (is (approx= 0 (nth values 1) 1e-12))
+    (is (approx= 0 (nth values 2) 1e-12))
+    (is (approx= 10 (nth values 3) 1e-12))))
+
 (deftest daily-compounded-returns-builds-canonical-daily-series-test
   (let [rows [[1000 0]
               [2000 10]

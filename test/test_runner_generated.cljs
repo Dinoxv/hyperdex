@@ -146,6 +146,8 @@
             [hyperopen.portfolio.actions-test]
             [hyperopen.portfolio.application.metrics-bridge-test]
             [hyperopen.portfolio.metrics.builder-test]
+            [hyperopen.portfolio.metrics.history-formal-conformance-test]
+            [hyperopen.portfolio.metrics.history-simulator-test]
             [hyperopen.portfolio.metrics.history-test]
             [hyperopen.portfolio.metrics.quantstats-parity-test]
             [hyperopen.registry.runtime-test]
@@ -618,6 +620,8 @@
              'hyperopen.portfolio.actions-test
              'hyperopen.portfolio.application.metrics-bridge-test
              'hyperopen.portfolio.metrics.builder-test
+             'hyperopen.portfolio.metrics.history-formal-conformance-test
+             'hyperopen.portfolio.metrics.history-simulator-test
              'hyperopen.portfolio.metrics.history-test
              'hyperopen.portfolio.metrics.quantstats-parity-test
              'hyperopen.registry.runtime-test

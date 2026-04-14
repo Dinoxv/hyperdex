@@ -1,5 +1,6 @@
 import Hyperopen.Formal.Common
 import Hyperopen.Formal.EffectOrderContract
+import Hyperopen.Formal.PortfolioReturnsEstimator
 import Hyperopen.Formal.VaultTransfer
 import Hyperopen.Formal.OrderRequest.Standard
 import Hyperopen.Formal.OrderRequest.Advanced
@@ -13,6 +14,7 @@ def runVerify : Surface → IO Unit
   | .orderRequestStandard => OrderRequest.Standard.verify
   | .orderRequestAdvanced => OrderRequest.Advanced.verify
   | .effectOrderContract => EffectOrderContract.verify
+  | .portfolioReturnsEstimator => PortfolioReturnsEstimator.verify
   | .tradingSubmitPolicy => TradingSubmitPolicy.verify
   | .orderFormOwnership => OrderFormOwnership.verify
 
@@ -21,6 +23,7 @@ def runSync : Surface → IO Unit
   | .orderRequestStandard => OrderRequest.Standard.sync
   | .orderRequestAdvanced => OrderRequest.Advanced.sync
   | .effectOrderContract => EffectOrderContract.sync
+  | .portfolioReturnsEstimator => PortfolioReturnsEstimator.sync
   | .tradingSubmitPolicy => TradingSubmitPolicy.sync
   | .orderFormOwnership => OrderFormOwnership.sync
 
