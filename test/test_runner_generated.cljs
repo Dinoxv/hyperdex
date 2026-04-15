@@ -406,6 +406,7 @@
             [hyperopen.views.vaults.detail.panels-test]
             [hyperopen.views.vaults.detail.transfer-modal-test]
             [hyperopen.views.vaults.list-view-test]
+            [hyperopen.views.vaults.route-shell-test]
             [hyperopen.views.vaults.startup-preview-test]
             [hyperopen.views.vaults.vm-test]
             [hyperopen.views.workbench-render-seams-test]
@@ -885,6 +886,7 @@
              'hyperopen.views.vaults.detail.panels-test
              'hyperopen.views.vaults.detail.transfer-modal-test
              'hyperopen.views.vaults.list-view-test
+             'hyperopen.views.vaults.route-shell-test
              'hyperopen.views.vaults.startup-preview-test
              'hyperopen.views.vaults.vm-test
              'hyperopen.views.workbench-render-seams-test

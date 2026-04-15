@@ -230,54 +230,84 @@
      [:div {:class ["pt-1"]}
       (snapshot-sparkline snapshot-series)]]))
 
+(def ^:private preview-empty-message
+  "No cached vaults available.")
+
+(defn- preview-row-key
+  [row]
+  (str "vault-route-shell-row-" (:vault-address row)))
+
+(defn- preview-rows
+  [rows render-row]
+  (for [row rows]
+    ^{:key (preview-row-key row)}
+    (render-row row)))
+
+(defn- preview-desktop-empty-row
+  []
+  [:tr
+   [:td {:col-span 7
+         :class ["px-3" "py-6" "text-center" "text-sm" "text-trading-text-secondary"]}
+    preview-empty-message]])
+
+(defn- preview-mobile-empty-state
+  []
+  [:div {:class ["rounded-lg"
+                 "border"
+                 "border-base-300"
+                 "bg-base-200/60"
+                 "px-3"
+                 "py-4"
+                 "text-center"
+                 "text-sm"
+                 "text-trading-text-secondary"]}
+   preview-empty-message])
+
+(defn- preview-table-head
+  []
+  [:thead
+   [:tr {:class ["border-b" "border-base-300/70"]}
+    [:th {:class ["px-3" "py-2" "text-left" "text-xs" "font-normal" "text-trading-text-secondary"]} "Vault"]
+    [:th {:class ["px-3" "py-2" "text-left" "text-xs" "font-normal" "text-trading-text-secondary"]} "Leader"]
+    [:th {:class ["px-3" "py-2" "text-left" "text-xs" "font-normal" "text-trading-text-secondary"]} "APR"]
+    [:th {:class ["px-3" "py-2" "text-left" "text-xs" "font-normal" "text-trading-text-secondary"]} "TVL"]
+    [:th {:class ["px-3" "py-2" "text-left" "text-xs" "font-normal" "text-trading-text-secondary"]} "Your Deposit"]
+    [:th {:class ["px-3" "py-2" "text-left" "text-xs" "font-normal" "text-trading-text-secondary"]} "Age"]
+    [:th {:class ["px-3" "py-2" "text-right" "text-xs" "font-normal" "text-trading-text-secondary"]} "Snapshot"]]])
+
+(defn- preview-desktop-content
+  [rows]
+  [:div {:class ["overflow-x-auto"]}
+   [:table {:class ["w-full" "border-collapse"]}
+    [:colgroup
+     [:col {:style {:width "24%"}}]
+     [:col {:style {:width "16%"}}]
+     [:col {:style {:width "12%"}}]
+     [:col {:style {:width "12%"}}]
+     [:col {:style {:width "12%"}}]
+     [:col {:style {:width "12%"}}]
+     [:col {:style {:width "12%"}}]]
+    (preview-table-head)
+    [:tbody
+     (if (seq rows)
+       (preview-rows rows preview-desktop-row)
+       (preview-desktop-empty-row))]]])
+
+(defn- preview-mobile-content
+  [rows]
+  [:div {:class ["space-y-2"]}
+   (if (seq rows)
+     (preview-rows rows preview-mobile-card)
+     (preview-mobile-empty-state))])
+
 (defn- preview-section
   [label rows desktop-layout?]
   [:section {:class ["space-y-2"]}
    [:h3 {:class ["text-sm" "font-normal" "text-trading-text"]} label]
-   (if desktop-layout?
-     [:div {:class ["overflow-x-auto"]}
-      [:table {:class ["w-full" "border-collapse"]}
-       [:colgroup
-        [:col {:style {:width "24%"}}]
-        [:col {:style {:width "16%"}}]
-        [:col {:style {:width "12%"}}]
-        [:col {:style {:width "12%"}}]
-        [:col {:style {:width "12%"}}]
-        [:col {:style {:width "12%"}}]
-        [:col {:style {:width "12%"}}]]
-       [:thead
-        [:tr {:class ["border-b" "border-base-300/70"]}
-         [:th {:class ["px-3" "py-2" "text-left" "text-xs" "font-normal" "text-trading-text-secondary"]} "Vault"]
-         [:th {:class ["px-3" "py-2" "text-left" "text-xs" "font-normal" "text-trading-text-secondary"]} "Leader"]
-         [:th {:class ["px-3" "py-2" "text-left" "text-xs" "font-normal" "text-trading-text-secondary"]} "APR"]
-         [:th {:class ["px-3" "py-2" "text-left" "text-xs" "font-normal" "text-trading-text-secondary"]} "TVL"]
-         [:th {:class ["px-3" "py-2" "text-left" "text-xs" "font-normal" "text-trading-text-secondary"]} "Your Deposit"]
-         [:th {:class ["px-3" "py-2" "text-left" "text-xs" "font-normal" "text-trading-text-secondary"]} "Age"]
-         [:th {:class ["px-3" "py-2" "text-right" "text-xs" "font-normal" "text-trading-text-secondary"]} "Snapshot"]]]
-       [:tbody
-        (if (seq rows)
-          (for [row rows]
-            ^{:key (str "vault-route-shell-row-" (:vault-address row))}
-            (preview-desktop-row row))
-          [:tr
-           [:td {:col-span 7
-                 :class ["px-3" "py-6" "text-center" "text-sm" "text-trading-text-secondary"]}
-            "No cached vaults available."]])]]]
-     [:div {:class ["space-y-2"]}
-      (if (seq rows)
-        (for [row rows]
-          ^{:key (str "vault-route-shell-row-" (:vault-address row))}
-          (preview-mobile-card row))
-        [:div {:class ["rounded-lg"
-                       "border"
-                       "border-base-300"
-                       "bg-base-200/60"
-                       "px-3"
-                       "py-4"
-                       "text-center"
-                       "text-sm"
-                       "text-trading-text-secondary"]}
-         "No cached vaults available."])])])
+   ((if desktop-layout?
+      preview-desktop-content
+      preview-mobile-content)
+    rows)])
 
 (defn- loading-section
   [label desktop-layout?]
