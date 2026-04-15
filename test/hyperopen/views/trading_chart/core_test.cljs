@@ -282,6 +282,8 @@
     (is (contains? classes "min-w-0"))
     (is (contains? classes "overflow-hidden"))
     (is (contains? classes "trading-chart-host"))
+    (is (= "trading-chart-canvas" (get-in canvas [1 :data-role])))
+    (is (= 0 (get-in canvas [1 :tabindex])))
     (is (not (contains? bg-colors "rgb(30, 41, 55)")))))
 
 (deftest trading-chart-view-clips-chart-panel-overflow-test
@@ -964,6 +966,8 @@
                                                           (swap! order-calls conj :clear-position-overlays))
                   chart-interop/clear-volume-indicator-overlay! (fn [_]
                                                                   (swap! order-calls conj :clear-volume-overlay))
+                  chart-interop/clear-chart-context-menu-overlay! (fn [_]
+                                                                    (swap! order-calls conj :clear-context-menu-overlay))
                   chart-interop/clear-chart-navigation-overlay! (fn [_]
                                                                   (swap! order-calls conj :clear-navigation-overlay))
                   chart-interop/clear-baseline-base-value-subscription! (fn [_]
@@ -980,6 +984,7 @@
             :clear-open-orders
             :clear-position-overlays
             :clear-volume-overlay
+            :clear-context-menu-overlay
             :clear-navigation-overlay
             :clear-baseline
             :visible-range-cleanup]

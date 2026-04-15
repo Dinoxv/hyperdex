@@ -3,6 +3,7 @@
             [hyperopen.schema.chart-interop-contracts :as chart-contracts]
             [hyperopen.views.trading-chart.utils.chart-interop :as chart-interop]
             [hyperopen.views.trading-chart.utils.chart-interop.baseline :as baseline]
+            [hyperopen.views.trading-chart.utils.chart-interop.chart-context-menu-overlay :as chart-context-menu-overlay]
             [hyperopen.views.trading-chart.utils.chart-interop.chart-navigation-overlay :as chart-navigation-overlay]
             [hyperopen.views.trading-chart.utils.chart-interop.indicators :as indicator-interop]
             [hyperopen.views.trading-chart.utils.chart-interop.position-overlays :as position-overlays]
@@ -205,6 +206,33 @@
              (chart-interop/sync-chart-navigation-overlay! chart-obj container candles)))
       (is (= :cleared
              (chart-interop/clear-chart-navigation-overlay! chart-obj))))
+    (is (= 2 (count @sync-calls)))
+    (is (= [chart-obj] @clear-calls))))
+
+(deftest chart-context-menu-overlay-wrapper-delegates-to-overlay-module-test
+  (let [sync-calls (atom [])
+        clear-calls (atom [])
+        chart-obj #js {:chart #js {}
+                       :mainSeries #js {}}
+        container (fake-dom/make-fake-element "div")
+        candles [{:time 1 :open 10 :high 11 :low 9 :close 10.5 :volume 42}]
+        opts {:context-key "BTC::1d"}]
+    (with-redefs [chart-context-menu-overlay/sync-chart-context-menu-overlay! (fn
+                                                                                ([chart* container* candles*]
+                                                                                 (swap! sync-calls conj [chart* container* candles* nil])
+                                                                                 :synced)
+                                                                                ([chart* container* candles* opts*]
+                                                                                 (swap! sync-calls conj [chart* container* candles* opts*])
+                                                                                 :synced))
+                  chart-context-menu-overlay/clear-chart-context-menu-overlay! (fn [chart*]
+                                                                                 (swap! clear-calls conj chart*)
+                                                                                 :cleared)]
+      (is (= :synced
+             (chart-interop/sync-chart-context-menu-overlay! chart-obj container candles opts)))
+      (is (= :synced
+             (chart-interop/sync-chart-context-menu-overlay! chart-obj container candles)))
+      (is (= :cleared
+             (chart-interop/clear-chart-context-menu-overlay! chart-obj))))
     (is (= 2 (count @sync-calls)))
     (is (= [chart-obj] @clear-calls))))
 

@@ -2,6 +2,7 @@
   (:require ["lightweight-charts" :refer [createChart HistogramSeries]]
             [hyperopen.schema.chart-interop-contracts :as chart-contracts]
             [hyperopen.views.trading-chart.utils.chart-interop.baseline :as baseline]
+            [hyperopen.views.trading-chart.utils.chart-interop.chart-context-menu-overlay :as chart-context-menu-overlay]
             [hyperopen.views.trading-chart.utils.chart-interop.chart-navigation-overlay :as chart-navigation-overlay]
             [hyperopen.views.trading-chart.utils.chart-interop.indicators :as indicator-interop]
             [hyperopen.views.trading-chart.utils.chart-interop.legend :as legend]
@@ -283,6 +284,18 @@
   "Clear bottom chart navigation controls and event listeners."
   [chart-obj]
   (chart-navigation-overlay/clear-chart-navigation-overlay! chart-obj))
+
+(defn sync-chart-context-menu-overlay!
+  "Attach/update the chart right-click context menu overlay."
+  ([chart-obj container candles]
+   (sync-chart-context-menu-overlay! chart-obj container candles {}))
+  ([chart-obj container candles opts]
+   (chart-context-menu-overlay/sync-chart-context-menu-overlay! chart-obj container candles opts)))
+
+(defn clear-chart-context-menu-overlay!
+  "Clear chart right-click context menu overlay and listeners."
+  [chart-obj]
+  (chart-context-menu-overlay/clear-chart-context-menu-overlay! chart-obj))
 
 (defn- create-volume-series!
   [chart pane-index]

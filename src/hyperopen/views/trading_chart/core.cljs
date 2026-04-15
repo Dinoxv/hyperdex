@@ -278,11 +278,19 @@
 
 (defn- apply-chart-decorations!
   [node chart-obj candle-data chart-type main-series-markers position-overlay position-overlay-deps
-   open-order-overlays overlay-deps volume-indicator-deps]
+   open-order-overlays overlay-deps volume-indicator-deps context-menu-deps]
   (ci/set-main-series-markers! chart-obj main-series-markers)
   (ci/sync-position-overlays! chart-obj node position-overlay position-overlay-deps)
   (ci/sync-open-order-overlays! chart-obj node open-order-overlays overlay-deps)
   (ci/sync-volume-indicator-overlay! chart-obj node candle-data volume-indicator-deps)
+  (ci/sync-chart-context-menu-overlay! chart-obj
+                                       node
+                                       candle-data
+                                       (assoc context-menu-deps
+                                              :on-reset #(reset-visible-range!
+                                                           node
+                                                           (.-chart ^js chart-obj)
+                                                           candle-data)))
   (sync-navigation-overlay! node chart-obj candle-data))
 
 (defn- initialize-chart-runtime-state!
@@ -301,7 +309,7 @@
 
 (defn- run-chart-decoration-pass!
   [node {:keys [candle-data chart-type main-series-markers position-overlay position-overlay-deps
-                open-order-overlays overlay-deps volume-indicator-deps]}]
+                open-order-overlays overlay-deps volume-indicator-deps context-menu-deps]}]
   (let [{:keys [chart-obj chart-accessibility-applied?]} (chart-runtime/get-state node)]
     (when chart-obj
       (apply-chart-decorations! node
@@ -313,7 +321,8 @@
                                 position-overlay-deps
                                 open-order-overlays
                                 overlay-deps
-                                volume-indicator-deps)
+                                volume-indicator-deps
+                                context-menu-deps)
       (when-not chart-accessibility-applied?
         (apply-chart-accessibility! node)
         (chart-runtime/assoc-state! node :chart-accessibility-applied? true)))))
@@ -357,7 +366,7 @@
   [node {:keys [candle-data chart-type indicators-data legend-meta legend-deps series-options
                 volume-visible? main-series-markers position-overlay position-overlay-deps
                 open-order-overlays overlay-deps volume-indicator-deps selected-timeframe
-                persistence-deps]}]
+                persistence-deps context-menu-deps]}]
   (let [chart-obj (chart-obj-with-series node candle-data chart-type indicators-data series-options volume-visible?)
         chart (.-chart chart-obj)
         legend-control (ci/create-legend! node chart legend-meta legend-deps)]
@@ -371,7 +380,8 @@
                                       :position-overlay-deps position-overlay-deps
                                       :open-order-overlays open-order-overlays
                                       :overlay-deps overlay-deps
-                                      :volume-indicator-deps volume-indicator-deps})
+                                      :volume-indicator-deps volume-indicator-deps
+                                      :context-menu-deps context-menu-deps})
     (ensure-visible-range-lifecycle! node chart candle-data selected-timeframe persistence-deps)))
 
 (defn- swap-main-series!
@@ -414,7 +424,7 @@
 (defn- update-chart!
   [node {:keys [candle-data chart-type indicator-series-data main-series-markers position-overlay
                 position-overlay-deps open-order-overlays overlay-deps volume-indicator-deps
-                legend-meta selected-timeframe persistence-deps series-options]}]
+                legend-meta selected-timeframe persistence-deps series-options context-menu-deps]}]
   (let [runtime-state (chart-runtime/get-state node)
         chart-obj (:chart-obj runtime-state)
         legend-control (:legend-control runtime-state)
@@ -435,7 +445,8 @@
                                         :position-overlay-deps position-overlay-deps
                                         :open-order-overlays open-order-overlays
                                         :overlay-deps overlay-deps
-                                        :volume-indicator-deps volume-indicator-deps}))
+                                        :volume-indicator-deps volume-indicator-deps
+                                        :context-menu-deps context-menu-deps}))
     (sync-indicator-series! chart-obj indicator-series-data)
     (when legend-control
       (.update ^js legend-control legend-meta))
@@ -452,6 +463,7 @@
     (ci/clear-open-order-overlays! chart-obj)
     (ci/clear-position-overlays! chart-obj)
     (ci/clear-volume-indicator-overlay! chart-obj)
+    (ci/clear-chart-context-menu-overlay! chart-obj)
     (ci/clear-chart-navigation-overlay! chart-obj)
     (ci/clear-baseline-base-value-subscription! chart-obj)
     (when visible-range-cleanup
@@ -742,6 +754,10 @@
                                 :on-liquidation-drag-preview on-liquidation-drag-preview
                                 :on-liquidation-drag-confirm on-liquidation-drag-confirm}
          volume-indicator-deps {:on-remove on-hide-volume-indicator}
+         context-menu-deps {:format-price fmt/format-trade-price-plain
+                            :context-key (str (or (:symbol legend-meta) "")
+                                              "::"
+                                              (name selected-timeframe))}
          legend-key (str (or (:symbol legend-meta) "")
                          "-"
                          (or (:timeframe-label legend-meta) "")
@@ -770,11 +786,14 @@
                                             :position-overlay-deps position-overlay-deps
                                             :open-order-overlays open-order-overlays
                                             :overlay-deps overlay-deps
-                                            :volume-indicator-deps volume-indicator-deps})]
+                                            :volume-indicator-deps volume-indicator-deps
+                                            :context-menu-deps context-menu-deps})]
      [:div {:class ["w-full" "min-w-0" "relative" "flex-1" "min-h-[360px]" "overflow-hidden" "bg-base-100" "trading-chart-host"]
             :data-parity-id "chart-canvas"
+            :data-role "trading-chart-canvas"
             :role "region"
             :aria-label chart-accessible-label
+            :tabindex 0
             :replicant/key (str "chart-" (hash active-indicators) "-" legend-key "-" volume-visible?)
             :replicant/on-render on-render}])))
 

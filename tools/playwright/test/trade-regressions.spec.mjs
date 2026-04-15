@@ -709,6 +709,80 @@ test("trade route preserves core accessibility affordances @regression", async (
   ).toHaveAttribute("aria-label", "Time in force: GTC");
 });
 
+test("trade chart right-click opens the custom context menu @regression", async ({ page }) => {
+  await page.goto("/trade", { waitUntil: "commit" });
+  await expect(page.locator('[data-parity-id="trade-root"]')).toBeVisible();
+  await expect
+    .poll(
+      () =>
+        page.evaluate(
+          () =>
+            Boolean(
+              globalThis.hyperopen?.system?.store &&
+                typeof globalThis.hyperopen?.trade_modules?.load_trade_chart_module_BANG_ === "function"
+            )
+        ),
+      { timeout: 20_000 }
+    )
+    .toBe(true);
+  await page.evaluate(async () => {
+    const store = globalThis.hyperopen?.system?.store;
+    const tradeModules = globalThis.hyperopen?.trade_modules;
+
+    if (!store || typeof tradeModules?.load_trade_chart_module_BANG_ !== "function") {
+      throw new Error("Trade chart module loader unavailable");
+    }
+
+    await tradeModules.load_trade_chart_module_BANG_(store);
+  });
+  await expect(page.getByText("Loading Chart")).toBeHidden({ timeout: 20_000 });
+
+  const chartCanvas = page.locator('[data-parity-id="chart-canvas"]');
+  await expect(chartCanvas).toBeVisible();
+
+  const chartBox = await chartCanvas.boundingBox();
+  if (!chartBox) {
+    throw new Error("Trading chart canvas bounding box unavailable");
+  }
+
+  await chartCanvas.click({
+    button: "right",
+    position: {
+      x: Math.max(24, Math.floor(chartBox.width / 2)),
+      y: Math.max(24, Math.floor(chartBox.height / 2))
+    }
+  });
+
+  const contextMenu = page.locator('[data-role="chart-context-menu"]');
+  await expect(contextMenu).toBeVisible();
+  await expect(page.locator('[data-role="chart-context-menu-reset"]')).toHaveText("Reset chart view");
+  await expect(page.locator('[data-role="chart-context-menu-copy"]')).toContainText("Copy price");
+
+  await page.keyboard.press("Escape");
+  await expect(contextMenu).toBeHidden();
+
+  await chartCanvas.focus();
+  await page.keyboard.press("Shift+F10");
+  await expect(contextMenu).toBeVisible();
+  const resetItem = page.locator('[data-role="chart-context-menu-reset"]');
+  const copyItem = page.locator('[data-role="chart-context-menu-copy"]');
+  await expect(resetItem).toBeFocused();
+  await expect(copyItem).toBeVisible();
+  await page.keyboard.press("ArrowDown");
+  await expect
+    .poll(async () => {
+      if (await copyItem.isDisabled()) {
+        return await resetItem.evaluate(node => node === document.activeElement ? "reset" : "other");
+      }
+
+      return await copyItem.evaluate(node => node === document.activeElement ? "copy" : "other");
+    })
+    .toMatch(/reset|copy/);
+
+  await page.mouse.click(Math.max(4, chartBox.x - 2), Math.max(4, chartBox.y - 2));
+  await expect(contextMenu).toBeHidden();
+});
+
 test("active asset icon promotes BTC into loaded-icons after probe load @regression", async ({ page }) => {
   await page.route("https://app.hyperliquid.xyz/coins/BTC.svg", async route => {
     await route.fulfill({
