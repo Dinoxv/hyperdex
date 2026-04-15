@@ -1,6 +1,7 @@
 (ns hyperopen.account.history.position-tpsl-test
   (:require [cljs.test :refer-macros [deftest is testing]]
             [hyperopen.account.history.position-tpsl :as position-tpsl]
+            [hyperopen.account.history.position-tpsl-state :as position-tpsl-state]
             [hyperopen.views.account-info.test-support.fixtures :as fixtures]))
 
 (deftest from-position-row-derives-modal-context-test
@@ -252,6 +253,21 @@
     (is (= {:left 12.5
             :top 24}
            (:anchor modal)))))
+
+(deftest normalize-pnl-input-mode-supports-canonical-legacy-and-default-values-test
+  (testing "canonical values round-trip"
+    (is (= :usd (position-tpsl-state/normalize-pnl-input-mode :usd)))
+    (is (= :roe-percent (position-tpsl-state/normalize-pnl-input-mode :roe-percent)))
+    (is (= :position-percent (position-tpsl-state/normalize-pnl-input-mode :position-percent))))
+  (testing "string and legacy aliases normalize to current modes"
+    (is (= :usd (position-tpsl-state/normalize-pnl-input-mode " USD ")))
+    (is (= :roe-percent (position-tpsl-state/normalize-pnl-input-mode :percent)))
+    (is (= :roe-percent (position-tpsl-state/normalize-pnl-input-mode "roe")))
+    (is (= :position-percent (position-tpsl-state/normalize-pnl-input-mode " position "))))
+  (testing "unsupported inputs fall back to usd"
+    (is (= :usd (position-tpsl-state/normalize-pnl-input-mode nil)))
+    (is (= :usd (position-tpsl-state/normalize-pnl-input-mode "")))
+    (is (= :usd (position-tpsl-state/normalize-pnl-input-mode :unknown)))))
 
 (deftest position-tpsl-facade-behavior-is-deterministic-for-identical-inputs-test
   (let [base-modal (-> (position-tpsl/from-position-row

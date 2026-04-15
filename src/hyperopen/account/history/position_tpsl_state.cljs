@@ -63,20 +63,25 @@
   (boolean value))
 
 (def ^:private pnl-input-mode-default :usd)
+(def ^:private valid-pnl-input-modes
+  #{:usd :roe-percent :position-percent})
+(def ^:private legacy-pnl-input-mode-aliases
+  ;; Historical compatibility: older modes represented ROE% or position%.
+  {:percent :roe-percent
+   :roe :roe-percent
+   :position :position-percent})
+
+(defn- pnl-input-mode-candidate [value]
+  (cond
+    (keyword? value) value
+    (string? value) (keyword (str/lower-case (str/trim value)))
+    :else nil))
 
 (defn normalize-pnl-input-mode [value]
-  (let [as-keyword (cond
-                     (keyword? value) value
-                     (string? value) (keyword (str/lower-case (str/trim value)))
-                     :else nil)]
-    (case as-keyword
-      :usd :usd
-      :roe-percent :roe-percent
-      :position-percent :position-percent
-      ;; Legacy compatibility: historical :percent mode represented ROE%.
-      :percent :roe-percent
-      :roe :roe-percent
-      :position :position-percent
+  (let [candidate (pnl-input-mode-candidate value)
+        normalized (get legacy-pnl-input-mode-aliases candidate candidate)]
+    (if (contains? valid-pnl-input-modes normalized)
+      normalized
       pnl-input-mode-default)))
 
 (defn percent-pnl-input-mode?
