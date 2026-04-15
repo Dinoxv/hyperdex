@@ -1,5 +1,6 @@
 (ns hyperopen.views.portfolio.vm.summary
   (:require [clojure.string :as str]
+            [hyperopen.portfolio.metrics.history :as portfolio-history]
             [hyperopen.views.portfolio.vm.history :as vm-history]))
 
 (def ^:private base-summary-range-order
@@ -119,6 +120,12 @@
   [scope]
   (scoped-summary-key scope :all-time))
 
+(defn all-time-summary-key
+  [scope]
+  (scope-all-time-key scope))
+
+(declare selected-summary-context)
+
 (defn- derived-summary-cutoff-ms
   [summary-time-range end-time-ms]
   (when (derivable-summary-ranges summary-time-range)
@@ -144,7 +151,115 @@
             {:accountValueHistory account-window
              :pnlHistory pnl-window*}))))))
 
-(declare selected-summary-context)
+(defn- aligned-summary-points
+  [summary]
+  (vec (portfolio-history/aligned-account-pnl-points summary)))
+
+(defn- points-end-time-ms
+  [points]
+  (some-> points last :time-ms))
+
+(defn- summary-time-range-token
+  [time-range]
+  (base-summary-key time-range))
+
+(defn- bounded-returns-window
+  [points cutoff-ms]
+  (let [points* (vec (or points []))]
+    (if (number? cutoff-ms)
+      (let [anchor-point (last (filter (fn [{:keys [time-ms]}]
+                                         (and (number? time-ms)
+                                              (<= time-ms cutoff-ms)))
+                                       points*))
+            points-in-window (vec (filter (fn [{:keys [time-ms]}]
+                                            (and (number? time-ms)
+                                                 (> time-ms cutoff-ms)))
+                                          points*))
+            window-points (cond
+                            anchor-point
+                            (into [{:time-ms cutoff-ms
+                                    :account-value (:account-value anchor-point)
+                                    :pnl-value (:pnl-value anchor-point)}]
+                                  points-in-window)
+
+                            :else
+                            points-in-window)]
+        {:points window-points
+         :cutoff-ms cutoff-ms
+         :complete-window? (some? anchor-point)})
+      {:points points*
+       :cutoff-ms nil
+       :complete-window? (seq points*)})))
+
+(defn- points->returns-summary
+  [points]
+  (when-let [base-pnl (some-> points first :pnl-value)]
+    {:accountValueHistory (mapv (fn [{:keys [time-ms account-value]}]
+                                  [time-ms account-value])
+                                points)
+     :pnlHistory (mapv (fn [{:keys [time-ms pnl-value]}]
+                         [time-ms (- pnl-value base-pnl)])
+                       points)}))
+
+(defn returns-history-context
+  ([summary-by-key scope time-range]
+   (returns-history-context summary-by-key
+                            scope
+                            time-range
+                            (selected-summary-context summary-by-key scope time-range)))
+  ([summary-by-key scope time-range summary-context]
+   (let [summary-by-key* (normalize-summary-by-key summary-by-key)
+         requested-range (summary-time-range-token time-range)
+         selected-entry (:entry summary-context)
+         selected-points (aligned-summary-points selected-entry)
+         selected-end-time-ms (points-end-time-ms selected-points)
+         all-time-key (scope-all-time-key scope)
+         all-time-entry (get summary-by-key* all-time-key)
+         all-time-points (aligned-summary-points all-time-entry)
+         all-time-end-time-ms (points-end-time-ms all-time-points)
+         all-time-usable? (and (not= requested-range :all-time)
+                               (seq all-time-points)
+                               (or (nil? selected-end-time-ms)
+                                   (>= all-time-end-time-ms selected-end-time-ms)))
+         source-points (if all-time-usable?
+                         all-time-points
+                         selected-points)
+         effective-range (if all-time-usable?
+                           requested-range
+                           (vm-history/benchmark-time-range requested-range
+                                                            (:effective-key summary-context)))
+         cutoff-ms (let [end-time-ms (points-end-time-ms source-points)]
+                     (when (and (number? end-time-ms)
+                                (not= effective-range :all-time))
+                       (vm-history/summary-window-cutoff-ms effective-range end-time-ms)))
+         {:keys [points complete-window?] :as window-context}
+         (bounded-returns-window source-points cutoff-ms)
+         summary (points->returns-summary points)
+         first-time-ms (some-> points first :time-ms)
+         last-time-ms (some-> points last :time-ms)
+         window-start-ms (or first-time-ms cutoff-ms)
+         source (cond
+                  all-time-usable? :windowed-all-time
+                  (seq points) (if (number? cutoff-ms)
+                                 :windowed-selected
+                                 :selected-summary)
+                  :else :empty)]
+     {:summary summary
+      :requested-range requested-range
+      :effective-range effective-range
+      :source-key (if all-time-usable?
+                    all-time-key
+                    (:source-key summary-context))
+      :source source
+      :cutoff-ms (:cutoff-ms window-context)
+      :window-start-ms window-start-ms
+      :window-end-ms last-time-ms
+      :first-time-ms first-time-ms
+      :last-time-ms last-time-ms
+      :point-count (count points)
+      :complete-window? (boolean (and (seq points)
+                                      complete-window?))
+      :has-data? (boolean (seq points))})))
 
 (defn selected-summary-entry
   [summary-by-key scope time-range]

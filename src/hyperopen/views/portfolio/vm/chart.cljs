@@ -82,6 +82,8 @@
         axis-kind (vm-chart-math/chart-axis-kind selected-tab)
         strategy-cumulative-rows (or (:strategy-cumulative-rows benchmark-context)
                                      [])
+        strategy-window (or (:strategy-window benchmark-context)
+                            {})
         benchmark-cumulative-rows-by-coin (or (:benchmark-cumulative-rows-by-coin benchmark-context)
                                               {})
         strategy-points (if (= selected-tab :returns)
@@ -140,8 +142,9 @@
       :tabs constants/chart-tab-options
       :points strategy-points
       :series series
-      :benchmark-selected? (and (= selected-tab :returns)
+     :benchmark-selected? (and (= selected-tab :returns)
                                 (seq selected-benchmark-coins))
+      :strategy-window strategy-window
       :y-ticks (if domain
                  (vm-chart-math/chart-y-ticks domain)
                  chart-empty-y-ticks)

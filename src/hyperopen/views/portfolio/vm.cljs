@@ -192,6 +192,14 @@
          (:source-key summary-context)
          (:source summary-context)]))
 
+(defn- benchmark-summary-source-version
+  [summary-by-key summary-context summary-scope summary-time-range]
+  (let [all-time-entry (get summary-by-key
+                            (vm-summary/all-time-summary-key summary-scope))]
+    (hash [(summary-context-source-version summary-context)
+           summary-time-range
+           (summary-entry-source-version all-time-entry)])))
+
 (defn- metrics-request-signature
   [summary-time-range selected-benchmark-coins strategy-source-version benchmark-source-version-map]
   (vm-metrics-bridge/metrics-request-signature summary-time-range
@@ -200,8 +208,11 @@
                                                benchmark-source-version-map))
 
 (defn- benchmark-computation-context
-  [state summary-context summary-scope summary-time-range returns-benchmark-selector]
-  (let [summary-source-version (summary-context-source-version summary-context)
+  [state summary-by-key summary-context summary-scope summary-time-range returns-benchmark-selector]
+  (let [summary-source-version (benchmark-summary-source-version summary-by-key
+                                                                 summary-context
+                                                                 summary-scope
+                                                                 summary-time-range)
         selected-benchmark-coins (vec (or (:selected-coins returns-benchmark-selector)
                                           []))
         candles (get state :candles)
@@ -289,6 +300,7 @@
                                           []))
         benchmark-labels (selected-benchmark-labels returns-benchmark-selector)
         strategy-source-version (:strategy-source-version benchmark-context)
+        strategy-window-version (hash (:strategy-window benchmark-context))
         benchmark-source-version-map (:benchmark-source-version-map benchmark-context)
         cache @chart-model-cache]
     (if (and (map? cache)
@@ -299,6 +311,7 @@
              (= selected-benchmark-coins (:selected-benchmark-coins cache))
              (= benchmark-labels (:benchmark-labels cache))
              (= strategy-source-version (:strategy-source-version cache))
+             (= strategy-window-version (:strategy-window-version cache))
              (= benchmark-source-version-map (:benchmark-source-version-map cache)))
       (:model cache)
       (let [model (vm-chart/build-chart-model state
@@ -314,7 +327,8 @@
                                    :selected-benchmark-coins selected-benchmark-coins
                                    :benchmark-labels benchmark-labels
                                    :strategy-source-version strategy-source-version
-                                    :benchmark-source-version-map benchmark-source-version-map
+                                   :strategy-window-version strategy-window-version
+                                   :benchmark-source-version-map benchmark-source-version-map
                                    :model model})
         model))))
 
@@ -362,6 +376,7 @@
                  fees-default)
         returns-benchmark-selector (returns-benchmark-selector-model state)
         benchmark-context (benchmark-computation-context state
+                                                         summary-by-key
                                                          summary-context
                                                          summary-scope
                                                          summary-time-range

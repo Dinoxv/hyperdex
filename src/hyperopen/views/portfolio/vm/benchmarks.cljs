@@ -4,6 +4,7 @@
             [hyperopen.portfolio.metrics :as portfolio-metrics]
             [hyperopen.vaults.detail.performance :as vault-performance]
             [hyperopen.views.portfolio.vm.history :as vm-history]
+            [hyperopen.views.portfolio.vm.summary :as vm-summary]
             [hyperopen.views.portfolio.vm.utils :as vm-utils]))
 
 (def ^:private vault-benchmark-prefix
@@ -522,11 +523,15 @@
                           summary-context-or-entry
                           {:entry summary-context-or-entry
                            :effective-key summary-time-range})
-        summary-entry (:entry summary-context)
-        summary-time-range* (vm-history/benchmark-time-range summary-time-range
-                                                             (:effective-key summary-context))
+        summary-by-key (get-in state [:portfolio :summary-by-key])
+        returns-history-context (vm-summary/returns-history-context summary-by-key
+                                                                    summary-scope
+                                                                    summary-time-range
+                                                                    summary-context)
+        strategy-summary (:summary returns-history-context)
+        summary-time-range* (:effective-range returns-history-context)
         strategy-cumulative-rows (portfolio-metrics/returns-history-rows state
-                                                                          summary-entry
+                                                                          strategy-summary
                                                                           summary-scope)
         strategy-time-points (vm-history/cumulative-return-time-points strategy-cumulative-rows)
         end-time-ms (some-> strategy-cumulative-rows last first)
@@ -544,6 +549,7 @@
         benchmark-source-version-map (benchmark-source-version-by-coin benchmark-cumulative-rows-by-coin
                                                                        selected-benchmark-coins)]
     {:strategy-cumulative-rows strategy-cumulative-rows
+     :strategy-window returns-history-context
      :benchmark-cumulative-rows-by-coin benchmark-cumulative-rows-by-coin
      :strategy-source-version strategy-source-version
      :benchmark-source-version-map benchmark-source-version-map}))

@@ -119,3 +119,42 @@
     (is (= derived selected))
     (is (= 5 (vm-summary/pnl-delta drawdown-summary)))
     (is (approx= 0.15 (vm-summary/max-drawdown-ratio drawdown-summary)))))
+
+(deftest returns-history-context-prefers-all-time-when-it-can-reconstruct-a-bounded-window-test
+  (let [t0 (.getTime (js/Date. "2025-04-14T00:00:00.000Z"))
+        t1 (.getTime (js/Date. "2025-07-14T00:00:00.000Z"))
+        t2 (.getTime (js/Date. "2025-10-14T00:00:00.000Z"))
+        t3 (.getTime (js/Date. "2026-01-14T00:00:00.000Z"))
+        t4 (.getTime (js/Date. "2026-04-14T00:00:00.000Z"))
+        full-summary {:pnlHistory [[t0 0] [t1 10] [t2 20] [t3 30] [t4 40]]
+                      :accountValueHistory [[t0 100] [t1 110] [t2 120] [t3 130] [t4 140]]}
+        tail-summary {:pnlHistory [[t3 30] [t4 40]]
+                      :accountValueHistory [[t3 130] [t4 140]]}
+        context (vm-summary/returns-history-context {:one-year tail-summary
+                                                     :all-time full-summary}
+                                                    :all
+                                                    :one-year)]
+    (is (= :windowed-all-time (:source context)))
+    (is (= :one-year (:effective-range context)))
+    (is (= :all-time (:source-key context)))
+    (is (true? (:complete-window? context)))
+    (is (= [t0 t1 t2 t3 t4]
+           (mapv first (get-in context [:summary :accountValueHistory]))))
+    (is (= [t0 t1 t2 t3 t4]
+           (mapv first (get-in context [:summary :pnlHistory]))))))
+
+(deftest returns-history-context-flags-incomplete-bounded-windows-when-no-earlier-point-exists-test
+  (let [t0 (.getTime (js/Date. "2025-04-14T00:00:00.000Z"))
+        t3 (.getTime (js/Date. "2026-01-14T00:00:00.000Z"))
+        t4 (.getTime (js/Date. "2026-04-14T00:00:00.000Z"))
+        tail-summary {:pnlHistory [[t3 30] [t4 40]]
+                      :accountValueHistory [[t3 130] [t4 140]]}
+        context (vm-summary/returns-history-context {:one-year tail-summary}
+                                                    :all
+                                                    :one-year)]
+    (is (= :windowed-selected (:source context)))
+    (is (false? (:complete-window? context)))
+    (is (= t0 (:cutoff-ms context)))
+    (is (= t3 (:window-start-ms context)))
+    (is (= [t3 t4]
+           (mapv first (get-in context [:summary :accountValueHistory]))))))

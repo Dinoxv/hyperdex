@@ -248,47 +248,55 @@
         t2 (+ t1 (* 24 60 60 1000))
         vault-address "0xaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
         vault-ref (str "vault:" vault-address)
-        benchmark-summary {:summary-id :peer-vault-month}
+        strategy-summary {:pnlHistory [[t0 0]
+                                       [t1 10]
+                                       [t2 20]]
+                          :accountValueHistory [[t0 100]
+                                                [t1 110]
+                                                [t2 120]]}
+        benchmark-summary {:pnlHistory [[t0 0]
+                                        [t1 5]
+                                        [t2 15]]
+                           :accountValueHistory [[t0 100]
+                                                 [t1 105]
+                                                 [t2 115]]}
         state {:candles {"SPY" {:1h [{:t t0 :c 50}
                                      {:t t1 :c 55}
                                      {:t t2 :c 60}]}}
+               :portfolio {:summary-by-key {:month strategy-summary}}
                :vaults {:benchmark-details-by-address
                         {vault-address {:portfolio {:month benchmark-summary}}}}}
         selector {:selected-coins ["SPY" vault-ref]
                   :label-by-coin {"SPY" "SPY (HL SPOT)"
                                   vault-ref "Peer Vault (VAULT)"}}]
-    (with-redefs [portfolio-metrics/returns-history-rows (fn [_state summary _scope]
-                                                           (cond
-                                                             (= summary {:dummy true})
-                                                             [[t0 0]
-                                                              [t1 10]
-                                                              [t2 20]]
-
-                                                             (= summary benchmark-summary)
-                                                             [[t0 0]
-                                                              [t1 5]
-                                                              [t2 15]]
-
-                                                             :else
-                                                             []))]
-      (let [context (vm-benchmarks/benchmark-computation-context state
-                                                                 {:dummy true}
-                                                                 :all
-                                                                 :month
-                                                                 selector)]
-        (is (= [[t0 0] [t1 10] [t2 20]]
-               (:strategy-cumulative-rows context)))
-        (is (every? true?
-                    (map approx=
-                         [0 10 20]
-                         (mapv second (get (:benchmark-cumulative-rows-by-coin context) "SPY")))))
-        (is (every? true?
-                    (map approx=
-                         [0 5 15]
-                         (mapv second (get (:benchmark-cumulative-rows-by-coin context) vault-ref)))))
-        (is (number? (:strategy-source-version context)))
-        (is (number? (get (:benchmark-source-version-map context) "SPY")))
-        (is (number? (get (:benchmark-source-version-map context) vault-ref)))))))
+    (let [context (vm-benchmarks/benchmark-computation-context state
+                                                               strategy-summary
+                                                               :all
+                                                               :month
+                                                               selector)]
+      (is (= [t0 t1 t2]
+             (mapv first (:strategy-cumulative-rows context))))
+      (is (every? true?
+                  (map approx=
+                       [0 10 20]
+                       (mapv second (:strategy-cumulative-rows context)))))
+      (is (every? true?
+                  (map approx=
+                       [0 10 20]
+                       (mapv second (get (:benchmark-cumulative-rows-by-coin context) "SPY")))))
+      (is (every? true?
+                  (map approx=
+                       [0 5 15]
+                       (mapv second (get (:benchmark-cumulative-rows-by-coin context) vault-ref)))))
+      (is (= {:point-count 3
+              :first-time-ms t0
+              :last-time-ms t2
+              :complete-window? false}
+             (select-keys (:strategy-window context)
+                          [:point-count :first-time-ms :last-time-ms :complete-window?])))
+      (is (number? (:strategy-source-version context)))
+      (is (number? (get (:benchmark-source-version-map context) "SPY")))
+      (is (number? (get (:benchmark-source-version-map context) vault-ref))))))
 
 (deftest benchmark-computation-context-keeps-dense-market-benchmark-rows-on-candle-timestamps-test
   (let [c0 1704067200000
