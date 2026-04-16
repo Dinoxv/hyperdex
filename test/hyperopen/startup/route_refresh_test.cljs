@@ -55,3 +55,17 @@
             {:router {:path "/portfolio"}
              :portfolio-ui {:chart-tab :returns}}
             nil)))))
+
+(deftest current-route-refresh-effects-loads-portfolio-vault-benchmark-support-test
+  (let [address "0xaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+        benchmark-address "0xdfc24b077bc1425ad1dea75bcb6f8158e10df303"
+        state {:router {:path "/portfolio"}
+               :portfolio-ui {:chart-tab :returns
+                              :returns-benchmark-coins ["BTC"
+                                                        "HYPE"
+                                                        (str "vault:" benchmark-address)]}}]
+    (is (= [[:actions/load-vault-route "/portfolio"]]
+           (route-refresh/current-route-refresh-effects state nil)))
+    (is (= [[:actions/load-vault-route "/portfolio"]
+            [:actions/select-portfolio-chart-tab :returns]]
+           (route-refresh/current-route-refresh-effects state address)))))

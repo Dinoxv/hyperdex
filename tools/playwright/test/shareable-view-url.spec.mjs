@@ -9,13 +9,14 @@ import {
 
 const TRADER_ADDRESS = "0x3333333333333333333333333333333333333333";
 const VAULT_ADDRESS = "0x1234567890abcdef1234567890abcdef12345678";
+const BENCHMARK_VAULT_ADDRESS = "0xdfc24b077bc1425ad1dea75bcb6f8158e10df303";
 const LEADER_ADDRESS = "0xabcdefabcdefabcdefabcdefabcdefabcdefabcd";
 const SPECTATE_ADDRESS = "0x162cc7c861ebd0c06b3d72319201150482518185";
 
-function vaultDetailsFixture() {
+function vaultDetailsFixture(vaultAddress = VAULT_ADDRESS) {
   return {
     name: "Shareable URL Vault",
-    vaultAddress: VAULT_ADDRESS,
+    vaultAddress,
     leader: LEADER_ADDRESS,
     description: "Deterministic shareable URL fixture",
     tvl: "321.5",
@@ -36,7 +37,7 @@ function vaultDetailsFixture() {
   };
 }
 
-async function stubVaultRequests(page) {
+async function stubVaultRequests(page, { onInfoPayload } = {}) {
   await page.route("https://stats-data.hyperliquid.xyz/Mainnet/vaults", async (route) => {
     await route.fulfill({
       status: 200,
@@ -60,6 +61,7 @@ async function stubVaultRequests(page) {
 
   await page.route("https://api.hyperliquid.xyz/info", async (route) => {
     const payload = JSON.parse(route.request().postData() || "{}");
+    onInfoPayload?.(payload);
     const requestType = payload?.type;
 
     if (requestType === "vaultSummaries") {
@@ -84,7 +86,7 @@ async function stubVaultRequests(page) {
       await route.fulfill({
         status: 200,
         contentType: "application/json",
-        body: JSON.stringify(vaultDetailsFixture())
+        body: JSON.stringify(vaultDetailsFixture(payload?.vaultAddress || VAULT_ADDRESS))
       });
       return;
     }
@@ -206,6 +208,36 @@ test("portfolio view changes replace the URL and restore from a fresh shared lin
   } finally {
     await context.close();
   }
+});
+
+test("portfolio shared links hydrate vault benchmark details on cold load @regression", async ({ page }) => {
+  const vaultDetailRequests = [];
+  await stubVaultRequests(page, {
+    onInfoPayload(payload) {
+      if (
+        payload?.type === "vaultDetails" &&
+        String(payload?.vaultAddress || "").toLowerCase() === BENCHMARK_VAULT_ADDRESS
+      ) {
+        vaultDetailRequests.push(payload);
+      }
+    }
+  });
+
+  await page.goto(
+    `/portfolio?range=1y&scope=all&chart=returns&bench=BTC&bench=HYPE&bench=vault%3A${BENCHMARK_VAULT_ADDRESS}&tab=performance-metrics`,
+    { waitUntil: "commit" }
+  );
+  await waitForDebugBridge(page);
+  await waitForIdle(page, { quietMs: 200, timeoutMs: 8_000, pollMs: 50 });
+
+  await expect
+    .poll(() => vaultDetailRequests.length, { timeout: 10_000 })
+    .toBeGreaterThan(0);
+  await expectAppState(
+    page,
+    ["vaults", "benchmark-details-by-address", BENCHMARK_VAULT_ADDRESS, "name"],
+    "Shareable URL Vault"
+  );
 });
 
 test("trader portfolio keeps the address path while serializing portfolio view state @regression", async ({ page, browser }) => {
