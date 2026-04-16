@@ -213,7 +213,7 @@
    :actions/load-vault-detail
    {:required-phase-order [:projection :persistence :heavy-io]
     :require-projection-before-heavy? true
-    :allow-duplicate-heavy-effects? false
+    :allow-duplicate-heavy-effects? true
     :heavy-effect-ids #{:effects/api-fetch-vault-details
                         :effects/api-fetch-vault-webdata2
                         :effects/api-fetch-vault-fills
@@ -224,7 +224,7 @@
    :actions/load-vault-route
    {:required-phase-order [:projection :persistence :heavy-io]
     :require-projection-before-heavy? true
-    :allow-duplicate-heavy-effects? false
+    :allow-duplicate-heavy-effects? true
     :heavy-effect-ids #{:effects/api-fetch-vault-index
                         :effects/api-fetch-vault-index-with-cache
                         :effects/api-fetch-vault-summaries

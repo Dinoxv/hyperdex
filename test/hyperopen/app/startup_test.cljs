@@ -293,6 +293,51 @@
     (is (= [[store [[:effects/load-route-module "/portfolio"]]]]
            @dispatch-calls))))
 
+(deftest init-route-change-loads-route-data-after-query-restore-test
+  (let [vault-path "/vaults/0x07fd993f0fa3a185f7207adccd29f7a87404689d"
+        store (atom {:router {:path "/trade"}})
+        runtime (atom {})
+        captured-init-deps (atom nil)
+        captured-router-opts (atom nil)
+        dispatch-calls (atom [])]
+    (with-redefs [startup-collaborators/startup-base-deps
+                  (fn [deps]
+                    (merge
+                     {:store (:store deps)
+                      :runtime (:runtime deps)
+                      :dispatch! (fn [& _] nil)
+                      :log-fn (fn [& _] nil)}
+                     deps))
+                  startup-init/init!
+                  (fn [deps]
+                    (reset! captured-init-deps deps))
+                  route-modules/route-module-id
+                  (fn [path]
+                    (when (= path vault-path)
+                      :vault-detail))
+                  route-query-state/restore-current-route-query-state!
+                  (fn [store-arg]
+                    (swap! store-arg assoc-in
+                           [:vaults-ui :detail-returns-benchmark-coins]
+                           ["BTC"
+                            "vault:0xdfc24b077bc1425ad1dea75bcb6f8158e10df303"]))
+                  router/init!
+                  (fn
+                    ([_store]
+                     nil)
+                    ([_store opts]
+                     (reset! captured-router-opts opts)))
+                  nxr/dispatch
+                  (fn [store-arg _ctx effects]
+                    (swap! dispatch-calls conj [store-arg effects]))]
+      (app-startup/init! {:runtime runtime
+                          :store store})
+      ((:init-router! @captured-init-deps) store)
+      ((:on-route-change @captured-router-opts) vault-path))
+    (is (= [[store [[:effects/load-route-module vault-path]
+                    [:actions/load-vault-route vault-path]]]]
+           @dispatch-calls))))
+
 (deftest init-defers-initial-trade-chart-module-loading-until-post-render-startup-test
   (let [store (atom {:router {:path "/portfolio"}})
         runtime (atom {})

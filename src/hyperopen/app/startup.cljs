@@ -15,6 +15,7 @@
             [hyperopen.runtime.state :as runtime-state]
             [hyperopen.startup.collaborators :as startup-collaborators]
             [hyperopen.startup.init :as startup-init]
+            [hyperopen.startup.route-refresh :as route-refresh]
             [hyperopen.startup.restore :as startup-restore]
             [hyperopen.startup.runtime :as startup-runtime-lib]
             [hyperopen.trade-modules :as trade-modules]
@@ -168,23 +169,25 @@
                        defer-trading-indicators?]
                 :or {defer-trade-chart? false
                      defer-trading-indicators? false}}]
-   (let [normalized-path (router/normalize-path path)]
-     (cond-> []
-       (some? (route-modules/route-module-id normalized-path))
-       (conj [:effects/load-route-module normalized-path])
+   (let [normalized-path (router/normalize-path path)
+         state* (assoc-in state [:router :path] normalized-path)]
+     (into (cond-> []
+             (some? (route-modules/route-module-id normalized-path))
+             (conj [:effects/load-route-module normalized-path])
 
-       (and (not defer-trade-chart?)
-            (router/trade-route? normalized-path)
-            (not (trade-modules/trade-chart-ready? state))
-            (not (trade-modules/trade-chart-loading? state)))
-       (conj [:effects/load-trade-chart-module])
+             (and (not defer-trade-chart?)
+                  (router/trade-route? normalized-path)
+                  (not (trade-modules/trade-chart-ready? state))
+                  (not (trade-modules/trade-chart-loading? state)))
+             (conj [:effects/load-trade-chart-module])
 
-       (and (not defer-trading-indicators?)
-            (router/trade-route? normalized-path)
-            (seq (get-in state [:chart-options :active-indicators]))
-            (not (trading-indicators-modules/trading-indicators-ready? state))
-            (not (trading-indicators-modules/trading-indicators-loading? state)))
-       (conj [:effects/load-trading-indicators-module])))))
+             (and (not defer-trading-indicators?)
+                  (router/trade-route? normalized-path)
+                  (seq (get-in state [:chart-options :active-indicators]))
+                  (not (trading-indicators-modules/trading-indicators-ready? state))
+                  (not (trading-indicators-modules/trading-indicators-loading? state)))
+             (conj [:effects/load-trading-indicators-module]))
+           (route-refresh/current-route-refresh-effects state* nil)))))
 
 (defn- post-render-route-effects
   [state path]

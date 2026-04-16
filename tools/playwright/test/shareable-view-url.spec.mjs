@@ -9,7 +9,9 @@ import {
 
 const TRADER_ADDRESS = "0x3333333333333333333333333333333333333333";
 const VAULT_ADDRESS = "0x1234567890abcdef1234567890abcdef12345678";
+const SHARED_DETAIL_VAULT_ADDRESS = "0x07fd993f0fa3a185f7207adccd29f7a87404689d";
 const BENCHMARK_VAULT_ADDRESS = "0xdfc24b077bc1425ad1dea75bcb6f8158e10df303";
+const SECOND_BENCHMARK_VAULT_ADDRESS = "0x1e37a337ed460039d1b15bd3bc489de789768d5e";
 const LEADER_ADDRESS = "0xabcdefabcdefabcdefabcdefabcdefabcdefabcd";
 const SPECTATE_ADDRESS = "0x162cc7c861ebd0c06b3d72319201150482518185";
 
@@ -359,4 +361,43 @@ test("vault detail chart and activity state replace the URL and restore from a f
   } finally {
     await context.close();
   }
+});
+
+test("vault detail shared links hydrate multiple vault benchmarks on cold load @regression", async ({ page }) => {
+  const vaultDetailAddresses = [];
+  await stubVaultRequests(page, {
+    onInfoPayload(payload) {
+      if (payload?.type === "vaultDetails") {
+        vaultDetailAddresses.push(String(payload?.vaultAddress || "").toLowerCase());
+      }
+    }
+  });
+
+  await page.goto(
+    `/vaults/${SHARED_DETAIL_VAULT_ADDRESS}?range=1y&chart=returns&bench=BTC&bench=vault%3A${BENCHMARK_VAULT_ADDRESS}&bench=vault%3A${SECOND_BENCHMARK_VAULT_ADDRESS}&tab=about&activity=performance-metrics&side=all`,
+    { waitUntil: "commit" }
+  );
+  await waitForDebugBridge(page);
+  await waitForIdle(page, { quietMs: 200, timeoutMs: 8_000, pollMs: 50 });
+
+  await expect
+    .poll(
+      () => new Set(vaultDetailAddresses),
+      { timeout: 10_000 }
+    )
+    .toEqual(new Set([
+      SHARED_DETAIL_VAULT_ADDRESS,
+      BENCHMARK_VAULT_ADDRESS,
+      SECOND_BENCHMARK_VAULT_ADDRESS
+    ]));
+  await expectAppState(page, ["vaults-ui", "snapshot-range"], "one-year");
+  await expectAppState(page, ["vaults-ui", "detail-chart-series"], "returns");
+  await expectAppState(page, ["vaults-ui", "detail-tab"], "about");
+  await expectAppState(page, ["vaults-ui", "detail-activity-tab"], "performance-metrics");
+  await expectAppState(page, ["vaults-ui", "detail-activity-direction-filter"], "all");
+  await expectAppState(page, ["vaults-ui", "detail-returns-benchmark-coins"], [
+    "BTC",
+    `vault:${BENCHMARK_VAULT_ADDRESS}`,
+    `vault:${SECOND_BENCHMARK_VAULT_ADDRESS}`
+  ]);
 });
