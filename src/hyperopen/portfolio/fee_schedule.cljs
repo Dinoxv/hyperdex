@@ -154,15 +154,15 @@
    {:value :tier-1
     :label "Tier 1"
     :description ">0.5% 14d weighted maker volume = -0.001% maker fee"
-    :maker-rate -0.001}
+    :maker-adjustment -0.001}
    {:value :tier-2
     :label "Tier 2"
     :description ">1.5% 14d weighted maker volume = -0.002% maker fee"
-    :maker-rate -0.002}
+    :maker-adjustment -0.002}
    {:value :tier-3
     :label "Tier 3"
     :description ">3.0% 14d weighted maker volume = -0.003% maker fee"
-    :maker-rate -0.003}])
+    :maker-adjustment -0.003}])
 
 (defn normalize-referral-discount
   [value]
@@ -196,6 +196,9 @@
    {:taker 0.035 :maker 0}
    {:taker 0.030 :maker 0}
    {:taker 0.025 :maker 0}])
+
+(def ^:private display-zero-epsilon
+  0.0000001)
 
 (defn- finite-number?
   [value]
@@ -341,7 +344,10 @@
 
 (defn- format-rate
   [rate]
-  (let [rate* (if (finite-number? rate) rate 0)]
+  (let [rate* (if (finite-number? rate) rate 0)
+        rate* (if (< (js/Math.abs rate*) display-zero-epsilon)
+                0
+                rate*)]
     (if (zero? rate*)
       "0%"
       (str (trim-rate-decimals (.toFixed rate* 4)) "%"))))
@@ -366,9 +372,9 @@
   (or (:discount (get (option-by-value options) selected-value))
       0))
 
-(defn- option-maker-rate
+(defn- option-maker-adjustment
   [selected-value]
-  (:maker-rate (get (option-by-value maker-rebate-tier-options) selected-value)))
+  (:maker-adjustment (get (option-by-value maker-rebate-tier-options) selected-value)))
 
 (defn- apply-staking-tier
   [staking-tier row]
@@ -377,10 +383,10 @@
         (update :taker positive-fee-discount discount)
         (update :maker positive-fee-discount discount))))
 
-(defn- apply-maker-rebate-tier
+(defn- apply-maker-rebate-adjustment
   [maker-rebate-tier row]
-  (if-let [maker-rate (option-maker-rate maker-rebate-tier)]
-    (assoc row :maker maker-rate)
+  (if-let [maker-adjustment (option-maker-adjustment maker-rebate-tier)]
+    (update row :maker + maker-adjustment)
     row))
 
 (defn- apply-referral-discount
@@ -427,9 +433,9 @@
      (mapv (fn [index row]
              (let [row* (->> row
                              (apply-staking-tier staking-tier*)
-                             (apply-maker-rebate-tier maker-rebate-tier*)
                              (apply-market-type market-type* active-context)
-                             (apply-referral-discount referral-discount*))]
+                             (apply-referral-discount referral-discount*)
+                             (apply-maker-rebate-adjustment maker-rebate-tier*))]
                {:tier (str index)
                 :volume (nth volume-thresholds index)
                 :taker (format-rate (:taker row*))
@@ -503,9 +509,9 @@
     (if (and (finite-number? maker-rate)
              (neg? maker-rate))
       (let [maker-pct (* 100 maker-rate)]
-        (or (some (fn [{:keys [value maker-rate]}]
-                    (when (and maker-rate
-                               (approx= maker-pct maker-rate))
+        (or (some (fn [{:keys [value maker-adjustment]}]
+                    (when (and maker-adjustment
+                               (approx= maker-pct maker-adjustment))
                       value))
                   maker-rebate-tier-options)
             :none))

@@ -109,7 +109,7 @@
                    {:active-fee-context {:deployer-fee-scale 0.5}}))))))
 
 (deftest fee-schedule-rows-apply-selected-discount-scenarios-test
-  (testing "referral and staking reduce positive perps fees while maker rebate overrides maker fee"
+  (testing "referral and staking reduce positive perps fees before maker rebate adjustment"
     (let [rows (fee-schedule/fee-schedule-rows
                 :perps
                 {:referral-discount :referral-4
@@ -118,9 +118,16 @@
       (is (= {:tier "0"
               :volume "<= $5M"
               :taker "0.0259%"
-              :maker "-0.002%"}
+              :maker "0.0066%"}
              (first rows)))
-      (is (= "-0.002%" (:maker (last rows))))))
+      (is (= ["0.0066%"
+              "0.0049%"
+              "0.0026%"
+              "0.0003%"
+              "-0.002%"
+              "-0.002%"
+              "-0.002%"]
+             (mapv :maker rows)))))
   (testing "spot stable-pair and aligned-quote scaling applies after selected discounts"
     (let [rows (fee-schedule/fee-schedule-rows
                 :spot-aligned-stable-pair
@@ -131,17 +138,48 @@
               :taker "0.0102%"
               :maker "0.0073%"}
              (first rows)))))
-  (testing "aligned quote improves selected negative maker rebate"
+  (testing "maker rebate adjusts each spot schedule row after market scaling"
     (let [rows (fee-schedule/fee-schedule-rows
                 :spot-aligned-stable-pair
                 {:maker-rebate-tier :tier-1})]
-      (is (= "-0.0003%" (:maker (first rows))))))
-  (testing "HIP-3 aligned quote improves selected negative maker rebate using deployer share"
+      (is (= ["0.007%"
+              "0.005%"
+              "0.003%"
+              "0.001%"
+              "-0.001%"
+              "-0.001%"
+              "-0.001%"]
+             (mapv :maker rows)))))
+  (testing "maker rebate adjusts each HIP-3 growth aligned row after market scaling"
     (let [rows (fee-schedule/fee-schedule-rows
                 :hip3-perps-growth-mode-aligned-quote
-                {:maker-rebate-tier :tier-1
-                 :active-fee-context {:deployer-fee-scale 0.5}})]
-      (is (= "-0.0001%" (:maker (first rows)))))))
+                {:maker-rebate-tier :tier-2})]
+      (is (= ["0.001%"
+              "0.0004%"
+              "-0.0004%"
+              "-0.0012%"
+              "-0.002%"
+              "-0.002%"
+              "-0.002%"]
+             (mapv :maker rows)))))
+  (testing "maker rebate can cross from exact positive fee to zero"
+    (let [rows (fee-schedule/fee-schedule-rows
+                :hip3-perps-growth-mode-aligned-quote
+                {:maker-rebate-tier :tier-3})]
+      (is (= "0%" (:maker (first rows))))))
+  (testing "diamond staking and tier three rebate preserve core perps row shape"
+    (let [rows (fee-schedule/fee-schedule-rows
+                :perps
+                {:staking-tier :diamond
+                 :maker-rebate-tier :tier-3})]
+      (is (= ["0.006%"
+              "0.0042%"
+              "0.0018%"
+              "-0.0006%"
+              "-0.003%"
+              "-0.003%"
+              "-0.003%"]
+             (mapv :maker rows))))))
 
 (deftest fee-schedule-model-describes-disconnected-and-connected-status-test
   (let [disconnected (fee-schedule/fee-schedule-model
@@ -228,13 +266,13 @@
       (is (= :tier-2 (get-in connected [:maker-rebate :selected-value])))
       (is (true? (get-in connected [:maker-rebate :dropdown-open?])))
       (is (= "0.0389%" (get-in connected [:rows 0 :taker])))
-      (is (= "-0.002%" (get-in connected [:rows 0 :maker]))))
+      (is (= "0.011%" (get-in connected [:rows 0 :maker]))))
     (testing "local what-if overrides beat current wallet defaults"
       (is (= :none (get-in overridden [:referral :selected-value])))
       (is (= :diamond (get-in overridden [:staking :selected-value])))
       (is (= :tier-3 (get-in overridden [:maker-rebate :selected-value])))
       (is (= "0.027%" (get-in overridden [:rows 0 :taker])))
-      (is (= "-0.003%" (get-in overridden [:rows 0 :maker]))))
+      (is (= "0.006%" (get-in overridden [:rows 0 :maker]))))
     (testing "HIP-3 selection without active market context uses default deployer scale"
       (is (= :hip3-perps (:selected-market-type hip3-default)))
       (is (= "HIP-3 Perps" (:selected-market-label hip3-default)))

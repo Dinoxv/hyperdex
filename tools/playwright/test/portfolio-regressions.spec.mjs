@@ -559,7 +559,7 @@ test("portfolio fee schedule opens, switches market type, and restores focus @re
   await makerRebateTierTwoOption.click();
   await waitForIdle(page, { quietMs: 150, timeoutMs: 3_000, pollMs: 50 });
   await expect(makerRebateTrigger).toContainText("Tier 2");
-  await expect(tierZero).toContainText("-0.002%");
+  await expect(tierZero).toContainText("0.0066%");
 
   await marketTrigger.click();
   await expect(stableAlignedOption).toBeVisible();
@@ -568,7 +568,7 @@ test("portfolio fee schedule opens, switches market type, and restores focus @re
 
   await expect(marketTrigger).toContainText("Spot + Aligned Quote + Stable Pair");
   await expect(tierZero).toContainText("0.0065%");
-  await expect(tierZero).toContainText("-0.0006%");
+  await expect(tierZero).toContainText("0.0026%");
 
   await closeButton.click();
   await waitForIdle(page, { quietMs: 150, timeoutMs: 3_000, pollMs: 50 });
