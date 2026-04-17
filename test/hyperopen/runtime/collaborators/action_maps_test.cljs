@@ -33,6 +33,18 @@
                     (get-in deps [:chart :toggle-portfolio-summary-scope-dropdown])))
     (is (identical? portfolio-actions/toggle-portfolio-performance-metrics-time-range-dropdown
                     (get-in deps [:chart :toggle-portfolio-performance-metrics-time-range-dropdown])))
+    (is (identical? portfolio-actions/open-portfolio-fee-schedule
+                    (get-in deps [:chart :open-portfolio-fee-schedule])))
+    (is (identical? portfolio-actions/close-portfolio-fee-schedule
+                    (get-in deps [:chart :close-portfolio-fee-schedule])))
+    (is (identical? portfolio-actions/select-portfolio-fee-schedule-referral-discount
+                    (get-in deps [:chart :select-portfolio-fee-schedule-referral-discount])))
+    (is (identical? portfolio-actions/select-portfolio-fee-schedule-staking-tier
+                    (get-in deps [:chart :select-portfolio-fee-schedule-staking-tier])))
+    (is (identical? portfolio-actions/select-portfolio-fee-schedule-maker-rebate-tier
+                    (get-in deps [:chart :select-portfolio-fee-schedule-maker-rebate-tier])))
+    (is (identical? portfolio-actions/select-portfolio-fee-schedule-market-type
+                    (get-in deps [:chart :select-portfolio-fee-schedule-market-type])))
     (is (identical? portfolio-actions/select-portfolio-chart-tab
                     (get-in deps [:chart :select-portfolio-chart-tab])))
     (is (identical? portfolio-actions/set-portfolio-account-info-tab

@@ -148,6 +148,7 @@
             [hyperopen.platform.webauthn-test]
             [hyperopen.portfolio.actions-test]
             [hyperopen.portfolio.application.metrics-bridge-test]
+            [hyperopen.portfolio.fee-schedule-test]
             [hyperopen.portfolio.metrics.builder-test]
             [hyperopen.portfolio.metrics.history-formal-conformance-test]
             [hyperopen.portfolio.metrics.history-normalization-test]
@@ -329,9 +330,11 @@
             [hyperopen.views.l2-orderbook-view-test]
             [hyperopen.views.leaderboard-view-test]
             [hyperopen.views.leaderboard.vm-test]
+            [hyperopen.views.portfolio-view-fee-schedule-test]
             [hyperopen.views.portfolio-view-hover-freeze-test]
             [hyperopen.views.portfolio-view-test]
             [hyperopen.views.portfolio.chart-view-test]
+            [hyperopen.views.portfolio.fee-schedule-test]
             [hyperopen.views.portfolio.header-test]
             [hyperopen.views.portfolio.performance-metrics-view-test]
             [hyperopen.views.portfolio.summary-cards-test]
@@ -638,6 +641,7 @@
              'hyperopen.platform.webauthn-test
              'hyperopen.portfolio.actions-test
              'hyperopen.portfolio.application.metrics-bridge-test
+             'hyperopen.portfolio.fee-schedule-test
              'hyperopen.portfolio.metrics.builder-test
              'hyperopen.portfolio.metrics.history-formal-conformance-test
              'hyperopen.portfolio.metrics.history-normalization-test
@@ -819,9 +823,11 @@
              'hyperopen.views.l2-orderbook-view-test
              'hyperopen.views.leaderboard-view-test
              'hyperopen.views.leaderboard.vm-test
+             'hyperopen.views.portfolio-view-fee-schedule-test
              'hyperopen.views.portfolio-view-hover-freeze-test
              'hyperopen.views.portfolio-view-test
              'hyperopen.views.portfolio.chart-view-test
+             'hyperopen.views.portfolio.fee-schedule-test
              'hyperopen.views.portfolio.header-test
              'hyperopen.views.portfolio.performance-metrics-view-test
              'hyperopen.views.portfolio.summary-cards-test

@@ -90,6 +90,178 @@
   (is (= []
          (actions/handle-portfolio-volume-history-keydown {} "Enter"))))
 
+(deftest portfolio-fee-schedule-actions-batch-modal-and-selector-state-test
+  (is (= [[:effects/save-many [[[:portfolio-ui :fee-schedule-open?] true]
+                               [[:portfolio-ui :fee-schedule-anchor] nil]
+                               [[:portfolio-ui :fee-schedule-referral-discount] nil]
+                               [[:portfolio-ui :fee-schedule-staking-tier] nil]
+                               [[:portfolio-ui :fee-schedule-maker-rebate-tier] nil]
+                               [[:portfolio-ui :fee-schedule-referral-dropdown-open?] false]
+                               [[:portfolio-ui :fee-schedule-staking-dropdown-open?] false]
+                               [[:portfolio-ui :fee-schedule-maker-rebate-dropdown-open?] false]
+                               [[:portfolio-ui :fee-schedule-market-dropdown-open?] false]
+                               [[:portfolio-ui :summary-scope-dropdown-open?] false]
+                               [[:portfolio-ui :summary-time-range-dropdown-open?] false]
+                               [[:portfolio-ui :performance-metrics-time-range-dropdown-open?] false]]]]
+         (actions/open-portfolio-fee-schedule
+          {:portfolio-ui {:summary-scope-dropdown-open? true
+                          :summary-time-range-dropdown-open? true
+                          :performance-metrics-time-range-dropdown-open? true
+                          :fee-schedule-referral-dropdown-open? true
+                          :fee-schedule-staking-dropdown-open? true
+                          :fee-schedule-maker-rebate-dropdown-open? true
+                          :fee-schedule-market-dropdown-open? true}})))
+  (is (= [[:effects/save-many [[[:portfolio-ui :fee-schedule-open?] false]
+                               [[:portfolio-ui :fee-schedule-anchor] nil]
+                               [[:portfolio-ui :fee-schedule-referral-dropdown-open?] false]
+                               [[:portfolio-ui :fee-schedule-staking-dropdown-open?] false]
+                               [[:portfolio-ui :fee-schedule-maker-rebate-dropdown-open?] false]
+                               [[:portfolio-ui :fee-schedule-market-dropdown-open?] false]]]
+          [:effects/restore-dialog-focus]]
+         (actions/close-portfolio-fee-schedule
+          {:portfolio-ui {:fee-schedule-open? true
+                          :fee-schedule-referral-dropdown-open? true
+                          :fee-schedule-staking-dropdown-open? true
+                          :fee-schedule-maker-rebate-dropdown-open? true
+                          :fee-schedule-market-dropdown-open? true}})))
+  (is (= [[:effects/save-many [[[:portfolio-ui :fee-schedule-open?] true]
+                               [[:portfolio-ui :fee-schedule-referral-dropdown-open?] true]
+                               [[:portfolio-ui :fee-schedule-staking-dropdown-open?] false]
+                               [[:portfolio-ui :fee-schedule-maker-rebate-dropdown-open?] false]
+                               [[:portfolio-ui :fee-schedule-market-dropdown-open?] false]]]]
+         (actions/toggle-portfolio-fee-schedule-referral-dropdown
+          {:portfolio-ui {:fee-schedule-open? true
+                          :fee-schedule-referral-dropdown-open? false
+                          :fee-schedule-staking-dropdown-open? true
+                          :fee-schedule-maker-rebate-dropdown-open? true
+                          :fee-schedule-market-dropdown-open? true}})))
+  (is (= [[:effects/save-many [[[:portfolio-ui :fee-schedule-open?] true]
+                               [[:portfolio-ui :fee-schedule-referral-dropdown-open?] false]
+                               [[:portfolio-ui :fee-schedule-staking-dropdown-open?] true]
+                               [[:portfolio-ui :fee-schedule-maker-rebate-dropdown-open?] false]
+                               [[:portfolio-ui :fee-schedule-market-dropdown-open?] false]]]]
+         (actions/toggle-portfolio-fee-schedule-staking-dropdown
+          {:portfolio-ui {:fee-schedule-open? true
+                          :fee-schedule-referral-dropdown-open? true
+                          :fee-schedule-staking-dropdown-open? false
+                          :fee-schedule-maker-rebate-dropdown-open? true
+                          :fee-schedule-market-dropdown-open? true}})))
+  (is (= [[:effects/save-many [[[:portfolio-ui :fee-schedule-open?] true]
+                               [[:portfolio-ui :fee-schedule-referral-dropdown-open?] false]
+                               [[:portfolio-ui :fee-schedule-staking-dropdown-open?] false]
+                               [[:portfolio-ui :fee-schedule-maker-rebate-dropdown-open?] true]
+                               [[:portfolio-ui :fee-schedule-market-dropdown-open?] false]]]]
+         (actions/toggle-portfolio-fee-schedule-maker-rebate-dropdown
+          {:portfolio-ui {:fee-schedule-open? true
+                          :fee-schedule-referral-dropdown-open? true
+                          :fee-schedule-staking-dropdown-open? true
+                          :fee-schedule-maker-rebate-dropdown-open? false
+                          :fee-schedule-market-dropdown-open? true}})))
+  (is (= [[:effects/save-many [[[:portfolio-ui :fee-schedule-open?] true]
+                               [[:portfolio-ui :fee-schedule-referral-dropdown-open?] false]
+                               [[:portfolio-ui :fee-schedule-staking-dropdown-open?] false]
+                               [[:portfolio-ui :fee-schedule-maker-rebate-dropdown-open?] false]
+                               [[:portfolio-ui :fee-schedule-market-dropdown-open?] true]]]]
+         (actions/toggle-portfolio-fee-schedule-market-dropdown
+          {:portfolio-ui {:fee-schedule-open? true
+                          :fee-schedule-referral-dropdown-open? true
+                          :fee-schedule-staking-dropdown-open? true
+                          :fee-schedule-maker-rebate-dropdown-open? true
+                          :fee-schedule-market-dropdown-open? false}})))
+  (is (= [[:effects/save-many [[[:portfolio-ui :fee-schedule-open?] true]
+                               [[:portfolio-ui :fee-schedule-referral-dropdown-open?] false]
+                               [[:portfolio-ui :fee-schedule-staking-dropdown-open?] false]
+                               [[:portfolio-ui :fee-schedule-maker-rebate-dropdown-open?] false]
+                               [[:portfolio-ui :fee-schedule-market-dropdown-open?] false]]]]
+         (actions/toggle-portfolio-fee-schedule-market-dropdown
+          {:portfolio-ui {:fee-schedule-open? true
+                          :fee-schedule-referral-dropdown-open? true
+                          :fee-schedule-staking-dropdown-open? true
+                          :fee-schedule-maker-rebate-dropdown-open? true
+                          :fee-schedule-market-dropdown-open? true}})))
+  (is (= [[:effects/save-many [[[:portfolio-ui :fee-schedule-referral-discount] :referral-4]
+                               [[:portfolio-ui :fee-schedule-referral-dropdown-open?] false]
+                               [[:portfolio-ui :fee-schedule-staking-dropdown-open?] false]
+                               [[:portfolio-ui :fee-schedule-maker-rebate-dropdown-open?] false]
+                               [[:portfolio-ui :fee-schedule-market-dropdown-open?] false]]]]
+         (actions/select-portfolio-fee-schedule-referral-discount
+          {}
+          "4%")))
+  (is (= [[:effects/save-many [[[:portfolio-ui :fee-schedule-staking-tier] :diamond]
+                               [[:portfolio-ui :fee-schedule-referral-dropdown-open?] false]
+                               [[:portfolio-ui :fee-schedule-staking-dropdown-open?] false]
+                               [[:portfolio-ui :fee-schedule-maker-rebate-dropdown-open?] false]
+                               [[:portfolio-ui :fee-schedule-market-dropdown-open?] false]]]]
+         (actions/select-portfolio-fee-schedule-staking-tier
+          {}
+          "Diamond")))
+  (is (= [[:effects/save-many [[[:portfolio-ui :fee-schedule-maker-rebate-tier] :tier-2]
+                               [[:portfolio-ui :fee-schedule-referral-dropdown-open?] false]
+                               [[:portfolio-ui :fee-schedule-staking-dropdown-open?] false]
+                               [[:portfolio-ui :fee-schedule-maker-rebate-dropdown-open?] false]
+                               [[:portfolio-ui :fee-schedule-market-dropdown-open?] false]]]]
+         (actions/select-portfolio-fee-schedule-maker-rebate-tier
+          {}
+          "tier2")))
+  (is (= [[:effects/save-many [[[:portfolio-ui :fee-schedule-market-type]
+                                :spot-aligned-stable-pair]
+                               [[:portfolio-ui :fee-schedule-referral-dropdown-open?] false]
+                               [[:portfolio-ui :fee-schedule-staking-dropdown-open?] false]
+                               [[:portfolio-ui :fee-schedule-maker-rebate-dropdown-open?] false]
+                               [[:portfolio-ui :fee-schedule-market-dropdown-open?] false]]]]
+         (actions/select-portfolio-fee-schedule-market-type
+          {}
+          "spotAlignedStablePair")))
+  (is (= [[:effects/save-many [[[:portfolio-ui :fee-schedule-market-type]
+                                :hip3-perps-growth-mode]
+                               [[:portfolio-ui :fee-schedule-referral-dropdown-open?] false]
+                               [[:portfolio-ui :fee-schedule-staking-dropdown-open?] false]
+                               [[:portfolio-ui :fee-schedule-maker-rebate-dropdown-open?] false]
+                               [[:portfolio-ui :fee-schedule-market-dropdown-open?] false]]]]
+         (actions/select-portfolio-fee-schedule-market-type
+          {}
+          "HIP-3 Perps + Growth mode")))
+  (is (= [[:effects/save-many [[[:portfolio-ui :fee-schedule-open?] false]
+                               [[:portfolio-ui :fee-schedule-anchor] nil]
+                               [[:portfolio-ui :fee-schedule-referral-dropdown-open?] false]
+                               [[:portfolio-ui :fee-schedule-staking-dropdown-open?] false]
+                               [[:portfolio-ui :fee-schedule-maker-rebate-dropdown-open?] false]
+                               [[:portfolio-ui :fee-schedule-market-dropdown-open?] false]]]
+          [:effects/restore-dialog-focus]]
+         (actions/handle-portfolio-fee-schedule-keydown {} "Escape")))
+  (is (= [] (actions/handle-portfolio-fee-schedule-keydown {} "Enter"))))
+
+(deftest open-portfolio-fee-schedule-normalizes-anchor-bounds-test
+  (let [anchor {:left "24"
+                :right 190
+                :top "220"
+                :bottom 248
+                :width 166
+                :height "28"
+                :viewportWidth 900
+                :viewportHeight "700"}]
+    (is (= [[:effects/save-many [[[:portfolio-ui :fee-schedule-open?] true]
+                                 [[:portfolio-ui :fee-schedule-anchor]
+                                  {:left 24
+                                   :right 190
+                                   :top 220
+                                   :bottom 248
+                                   :width 166
+                                   :height 28
+                                   :viewport-width 900
+                                   :viewport-height 700}]
+                                 [[:portfolio-ui :fee-schedule-referral-discount] nil]
+                                 [[:portfolio-ui :fee-schedule-staking-tier] nil]
+                                 [[:portfolio-ui :fee-schedule-maker-rebate-tier] nil]
+                                 [[:portfolio-ui :fee-schedule-referral-dropdown-open?] false]
+                                 [[:portfolio-ui :fee-schedule-staking-dropdown-open?] false]
+                                 [[:portfolio-ui :fee-schedule-maker-rebate-dropdown-open?] false]
+                                 [[:portfolio-ui :fee-schedule-market-dropdown-open?] false]
+                                 [[:portfolio-ui :summary-scope-dropdown-open?] false]
+                                 [[:portfolio-ui :summary-time-range-dropdown-open?] false]
+                                 [[:portfolio-ui :performance-metrics-time-range-dropdown-open?] false]]]]
+           (actions/open-portfolio-fee-schedule {} anchor)))))
+
 (deftest select-portfolio-summary-scope-normalizes-and-closes-dropdowns-test
   (is (= [[:effects/save-many [[[:portfolio-ui :summary-scope] :perps]
                                [[:portfolio-ui :summary-scope-dropdown-open?] false]

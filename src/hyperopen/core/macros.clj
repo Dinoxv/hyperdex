@@ -121,6 +121,17 @@
     select-portfolio-summary-scope
     toggle-portfolio-summary-time-range-dropdown
     toggle-portfolio-performance-metrics-time-range-dropdown
+    open-portfolio-fee-schedule
+    close-portfolio-fee-schedule
+    toggle-portfolio-fee-schedule-referral-dropdown
+    toggle-portfolio-fee-schedule-staking-dropdown
+    toggle-portfolio-fee-schedule-maker-rebate-dropdown
+    toggle-portfolio-fee-schedule-market-dropdown
+    select-portfolio-fee-schedule-referral-discount
+    select-portfolio-fee-schedule-staking-tier
+    select-portfolio-fee-schedule-maker-rebate-tier
+    select-portfolio-fee-schedule-market-type
+    handle-portfolio-fee-schedule-keydown
     select-portfolio-summary-time-range
     select-portfolio-chart-tab
     set-portfolio-returns-benchmark-search

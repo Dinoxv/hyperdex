@@ -157,7 +157,17 @@
    :summary-time-range-dropdown-open? false
    :performance-metrics-time-range-dropdown-open? false
    :volume-history-open? false
-   :volume-history-anchor nil})
+   :volume-history-anchor nil
+   :fee-schedule-open? false
+   :fee-schedule-anchor nil
+   :fee-schedule-referral-discount nil
+   :fee-schedule-staking-tier nil
+   :fee-schedule-maker-rebate-tier nil
+   :fee-schedule-referral-dropdown-open? false
+   :fee-schedule-staking-dropdown-open? false
+   :fee-schedule-maker-rebate-dropdown-open? false
+   :fee-schedule-market-type :perps
+   :fee-schedule-market-dropdown-open? false})
 
 (defn default-portfolio-state
   []

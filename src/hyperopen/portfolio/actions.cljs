@@ -1,5 +1,6 @@
 (ns hyperopen.portfolio.actions
   (:require [clojure.string :as str]
+            [hyperopen.portfolio.fee-schedule :as fee-schedule]
             [hyperopen.platform :as platform]))
 
 (def ^:private portfolio-summary-time-range-storage-key
@@ -284,6 +285,16 @@
 (def ^:private anchor-keys
   [:left :right :top :bottom :width :height :viewport-width :viewport-height])
 
+(def ^:private fee-schedule-anchor-candidate-keys-by-key
+  {:left [:left "left"]
+   :right [:right "right"]
+   :top [:top "top"]
+   :bottom [:bottom "bottom"]
+   :width [:width "width"]
+   :height [:height "height"]
+   :viewport-width [:viewport-width :viewportWidth "viewport-width" "viewportWidth"]
+   :viewport-height [:viewport-height :viewportHeight "viewport-height" "viewportHeight"]})
+
 (defn- parse-anchor-number
   [value]
   (cond
@@ -292,11 +303,11 @@
       value)
 
     (string? value)
-    (let [text (str/trim value)
-          parsed (js/parseFloat text)]
-      (when (and (seq text)
-                 (not (js/isNaN parsed)))
-        parsed))
+    (let [text (str/trim value)]
+      (when (seq text)
+        (let [parsed (js/Number text)]
+          (when-not (js/isNaN parsed)
+            parsed))))
 
     :else
     nil))
@@ -316,6 +327,37 @@
                                anchor-keys)]
         (when (seq normalized)
           normalized)))))
+
+(defn- normalize-fee-schedule-anchor
+  [anchor]
+  (let [anchor* (cond
+                  (map? anchor) anchor
+                  (some? anchor) (js->clj anchor :keywordize-keys true)
+                  :else nil)]
+    (when (map? anchor*)
+      (let [normalized (reduce (fn [acc [normalized-key candidate-keys]]
+                                 (if-let [num (some #(parse-anchor-number (get anchor* %))
+                                                    candidate-keys)]
+                                   (assoc acc normalized-key num)
+                                   acc))
+                               {}
+                               fee-schedule-anchor-candidate-keys-by-key)]
+        (when (seq normalized)
+          normalized)))))
+
+(defn- fee-schedule-selector-path-values
+  [open-dropdown]
+  [[[:portfolio-ui :fee-schedule-referral-dropdown-open?] (= open-dropdown :referral)]
+   [[:portfolio-ui :fee-schedule-staking-dropdown-open?] (= open-dropdown :staking)]
+   [[:portfolio-ui :fee-schedule-maker-rebate-dropdown-open?] (= open-dropdown :maker-rebate)]
+   [[:portfolio-ui :fee-schedule-market-dropdown-open?] (= open-dropdown :market)]])
+
+(defn- fee-schedule-selector-projection-effect
+  ([open-dropdown]
+   (fee-schedule-selector-projection-effect open-dropdown []))
+  ([open-dropdown extra-path-values]
+   [:effects/save-many (into (vec extra-path-values)
+                             (fee-schedule-selector-path-values open-dropdown))]))
 
 (defn toggle-portfolio-summary-scope-dropdown
   [state]
@@ -352,6 +394,90 @@
   [state key]
   (if (= key "Escape")
     (close-portfolio-volume-history state)
+    []))
+
+(defn open-portfolio-fee-schedule
+  ([state]
+   (open-portfolio-fee-schedule state nil))
+  ([_state anchor]
+   [[:effects/save-many
+     [[[:portfolio-ui :fee-schedule-open?] true]
+      [[:portfolio-ui :fee-schedule-anchor] (normalize-fee-schedule-anchor anchor)]
+      [[:portfolio-ui :fee-schedule-referral-discount] nil]
+      [[:portfolio-ui :fee-schedule-staking-tier] nil]
+      [[:portfolio-ui :fee-schedule-maker-rebate-tier] nil]
+      [[:portfolio-ui :fee-schedule-referral-dropdown-open?] false]
+      [[:portfolio-ui :fee-schedule-staking-dropdown-open?] false]
+      [[:portfolio-ui :fee-schedule-maker-rebate-dropdown-open?] false]
+      [[:portfolio-ui :fee-schedule-market-dropdown-open?] false]
+      [[:portfolio-ui :summary-scope-dropdown-open?] false]
+      [[:portfolio-ui :summary-time-range-dropdown-open?] false]
+      [[:portfolio-ui :performance-metrics-time-range-dropdown-open?] false]]]]))
+
+(defn close-portfolio-fee-schedule
+  [_state]
+  [(fee-schedule-selector-projection-effect
+    nil
+    [[[:portfolio-ui :fee-schedule-open?] false]
+     [[:portfolio-ui :fee-schedule-anchor] nil]])
+   [:effects/restore-dialog-focus]])
+
+(defn toggle-portfolio-fee-schedule-referral-dropdown
+  [state]
+  (let [current-visible? (boolean (get-in state [:portfolio-ui :fee-schedule-referral-dropdown-open?]))
+        open-dropdown (when-not current-visible? :referral)]
+    [(fee-schedule-selector-projection-effect open-dropdown [[[:portfolio-ui :fee-schedule-open?] true]])]))
+
+(defn toggle-portfolio-fee-schedule-staking-dropdown
+  [state]
+  (let [current-visible? (boolean (get-in state [:portfolio-ui :fee-schedule-staking-dropdown-open?]))
+        open-dropdown (when-not current-visible? :staking)]
+    [(fee-schedule-selector-projection-effect open-dropdown [[[:portfolio-ui :fee-schedule-open?] true]])]))
+
+(defn toggle-portfolio-fee-schedule-maker-rebate-dropdown
+  [state]
+  (let [current-visible? (boolean (get-in state [:portfolio-ui :fee-schedule-maker-rebate-dropdown-open?]))
+        open-dropdown (when-not current-visible? :maker-rebate)]
+    [(fee-schedule-selector-projection-effect open-dropdown [[[:portfolio-ui :fee-schedule-open?] true]])]))
+
+(defn toggle-portfolio-fee-schedule-market-dropdown
+  [state]
+  (let [current-visible? (boolean (get-in state [:portfolio-ui :fee-schedule-market-dropdown-open?]))
+        open-dropdown (when-not current-visible? :market)]
+    [(fee-schedule-selector-projection-effect open-dropdown [[[:portfolio-ui :fee-schedule-open?] true]])]))
+
+(defn select-portfolio-fee-schedule-referral-discount
+  [_state referral-discount]
+  [(fee-schedule-selector-projection-effect
+    nil
+    [[[:portfolio-ui :fee-schedule-referral-discount]
+      (fee-schedule/normalize-referral-discount referral-discount)]])])
+
+(defn select-portfolio-fee-schedule-staking-tier
+  [_state staking-tier]
+  [(fee-schedule-selector-projection-effect
+    nil
+    [[[:portfolio-ui :fee-schedule-staking-tier]
+      (fee-schedule/normalize-staking-tier staking-tier)]])])
+
+(defn select-portfolio-fee-schedule-maker-rebate-tier
+  [_state maker-rebate-tier]
+  [(fee-schedule-selector-projection-effect
+    nil
+    [[[:portfolio-ui :fee-schedule-maker-rebate-tier]
+      (fee-schedule/normalize-maker-rebate-tier maker-rebate-tier)]])])
+
+(defn select-portfolio-fee-schedule-market-type
+  [_state market-type]
+  [(fee-schedule-selector-projection-effect
+    nil
+    [[[:portfolio-ui :fee-schedule-market-type]
+      (fee-schedule/normalize-market-type market-type)]])])
+
+(defn handle-portfolio-fee-schedule-keydown
+  [state key]
+  (if (= "Escape" key)
+    (close-portfolio-fee-schedule state)
     []))
 
 (defn select-portfolio-summary-scope

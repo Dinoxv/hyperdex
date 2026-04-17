@@ -158,6 +158,17 @@
    :actions/select-portfolio-summary-scope ::common/keyword-or-string-args
    :actions/toggle-portfolio-summary-time-range-dropdown ::common/no-args
    :actions/toggle-portfolio-performance-metrics-time-range-dropdown ::common/no-args
+   :actions/open-portfolio-fee-schedule ::common/no-args
+   :actions/close-portfolio-fee-schedule ::common/no-args
+   :actions/toggle-portfolio-fee-schedule-referral-dropdown ::common/no-args
+   :actions/toggle-portfolio-fee-schedule-staking-dropdown ::common/no-args
+   :actions/toggle-portfolio-fee-schedule-maker-rebate-dropdown ::common/no-args
+   :actions/toggle-portfolio-fee-schedule-market-dropdown ::common/no-args
+   :actions/select-portfolio-fee-schedule-referral-discount ::common/keyword-or-string-args
+   :actions/select-portfolio-fee-schedule-staking-tier ::common/keyword-or-string-args
+   :actions/select-portfolio-fee-schedule-maker-rebate-tier ::common/keyword-or-string-args
+   :actions/select-portfolio-fee-schedule-market-type ::common/keyword-or-string-args
+   :actions/handle-portfolio-fee-schedule-keydown ::common/key-args
    :actions/select-portfolio-summary-time-range ::common/keyword-or-string-args
    :actions/select-portfolio-chart-tab ::common/keyword-or-string-args
    :actions/set-portfolio-account-info-tab ::common/tab-args

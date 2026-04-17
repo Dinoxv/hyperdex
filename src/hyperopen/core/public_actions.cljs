@@ -153,6 +153,39 @@
 (def toggle-portfolio-performance-metrics-time-range-dropdown
   portfolio-actions/toggle-portfolio-performance-metrics-time-range-dropdown)
 
+(def open-portfolio-fee-schedule
+  portfolio-actions/open-portfolio-fee-schedule)
+
+(def close-portfolio-fee-schedule
+  portfolio-actions/close-portfolio-fee-schedule)
+
+(def toggle-portfolio-fee-schedule-referral-dropdown
+  portfolio-actions/toggle-portfolio-fee-schedule-referral-dropdown)
+
+(def toggle-portfolio-fee-schedule-staking-dropdown
+  portfolio-actions/toggle-portfolio-fee-schedule-staking-dropdown)
+
+(def toggle-portfolio-fee-schedule-maker-rebate-dropdown
+  portfolio-actions/toggle-portfolio-fee-schedule-maker-rebate-dropdown)
+
+(def toggle-portfolio-fee-schedule-market-dropdown
+  portfolio-actions/toggle-portfolio-fee-schedule-market-dropdown)
+
+(def select-portfolio-fee-schedule-referral-discount
+  portfolio-actions/select-portfolio-fee-schedule-referral-discount)
+
+(def select-portfolio-fee-schedule-staking-tier
+  portfolio-actions/select-portfolio-fee-schedule-staking-tier)
+
+(def select-portfolio-fee-schedule-maker-rebate-tier
+  portfolio-actions/select-portfolio-fee-schedule-maker-rebate-tier)
+
+(def select-portfolio-fee-schedule-market-type
+  portfolio-actions/select-portfolio-fee-schedule-market-type)
+
+(def handle-portfolio-fee-schedule-keydown
+  portfolio-actions/handle-portfolio-fee-schedule-keydown)
+
 (def select-portfolio-summary-time-range
   portfolio-actions/select-portfolio-summary-time-range)
 

@@ -388,6 +388,139 @@ test("portfolio funding openers launch the funding modal on real click @regressi
   }
 });
 
+test("portfolio fee schedule opens, switches market type, and restores focus @regression", async ({ page }) => {
+  await page.setViewportSize({ width: 552, height: 690 });
+  await visitRoute(page, "/portfolio");
+
+  const trigger = page.locator("[data-role='portfolio-fee-schedule-trigger']");
+  const dialog = page.locator("[data-role='portfolio-fee-schedule-dialog']");
+  const referralTrigger = page.locator("[data-role='portfolio-fee-schedule-referral-trigger']");
+  const referralDiscountOption = page.locator("[data-role='portfolio-fee-schedule-referral-option-referral-4']");
+  const stakingTrigger = page.locator("[data-role='portfolio-fee-schedule-staking-trigger']");
+  const stakingDiamondOption = page.locator("[data-role='portfolio-fee-schedule-staking-option-diamond']");
+  const makerRebateTrigger = page.locator("[data-role='portfolio-fee-schedule-maker-rebate-trigger']");
+  const makerRebateTierTwoOption = page.locator("[data-role='portfolio-fee-schedule-maker-rebate-option-tier-2']");
+  const marketTrigger = page.locator("[data-role='portfolio-fee-schedule-market-trigger']");
+  const stableAlignedOption = page.locator(
+    "[data-role='portfolio-fee-schedule-market-option-spot-aligned-stable-pair']"
+  );
+  const tierZero = page.locator("[data-role='portfolio-fee-schedule-tier-0']");
+  const closeButton = page.locator("[data-role='portfolio-fee-schedule-close']");
+
+  await expect(trigger).toBeVisible();
+  await expect(trigger).toHaveAttribute("aria-expanded", "false");
+
+  await trigger.click();
+  await waitForIdle(page, { quietMs: 150, timeoutMs: 3_000, pollMs: 50 });
+
+  await expect(dialog).toBeVisible();
+  await expect(trigger).toHaveAttribute("aria-expanded", "true");
+  await expect.poll(async () =>
+    page.evaluate(() => {
+      const dialogNode = document.querySelector("[data-role='portfolio-fee-schedule-dialog']");
+      const overlayNode = document.querySelector("[data-role='portfolio-fee-schedule-overlay']");
+      if (!dialogNode || !overlayNode) {
+        return {
+          fitsVertically: false,
+          noVerticalScroll: false,
+          noPageHorizontalOverflow: false,
+          usesReferenceYellow: true
+        };
+      }
+
+      const rect = dialogNode.getBoundingClientRect();
+      const classes = Array.from(overlayNode.querySelectorAll("*"))
+        .map((node) => node.getAttribute("class") || "")
+        .join(" ");
+
+      return {
+        fitsVertically: rect.top >= 0 && rect.bottom <= window.innerHeight,
+        noVerticalScroll: dialogNode.scrollHeight <= dialogNode.clientHeight + 1,
+        noPageHorizontalOverflow: document.documentElement.scrollWidth <= document.documentElement.clientWidth + 1,
+        usesReferenceYellow: classes.includes("#f4c430") || classes.includes("#ffe08a") || classes.includes("text-yellow")
+      };
+    })
+  ).toMatchObject({
+    fitsVertically: true,
+    noVerticalScroll: true,
+    noPageHorizontalOverflow: true,
+    usesReferenceYellow: false
+  });
+  await expect(tierZero).toContainText("0.045%");
+  await expect(tierZero).toContainText("0.015%");
+
+  await referralTrigger.click();
+  await expect(referralDiscountOption).toBeVisible();
+  await referralDiscountOption.click();
+  await waitForIdle(page, { quietMs: 150, timeoutMs: 3_000, pollMs: 50 });
+  await expect(referralTrigger).toContainText("4%");
+  await expect(tierZero).toContainText("0.0432%");
+  await expect(tierZero).toContainText("0.0144%");
+
+  await stakingTrigger.click();
+  await expect(stakingDiamondOption).toBeVisible();
+  const stakingDiamondBeforeHover = await stakingDiamondOption.evaluate((node) => {
+    const rect = node.getBoundingClientRect();
+    return {
+      backgroundColor: window.getComputedStyle(node).backgroundColor,
+      compactRow: rect.height <= 30
+    };
+  });
+  expect(stakingDiamondBeforeHover.compactRow).toBe(true);
+  await stakingDiamondOption.hover();
+  await expect.poll(async () =>
+    stakingDiamondOption.evaluate((node) => {
+      const rect = node.getBoundingClientRect();
+      return {
+        backgroundColor: window.getComputedStyle(node).backgroundColor,
+        compactRow: rect.height <= 30
+      };
+    })
+  ).toMatchObject({
+    compactRow: true
+  });
+  const stakingDiamondAfterHoverBackground = await stakingDiamondOption.evaluate((node) =>
+    window.getComputedStyle(node).backgroundColor
+  );
+  expect(stakingDiamondAfterHoverBackground).not.toBe(stakingDiamondBeforeHover.backgroundColor);
+  await stakingDiamondOption.click();
+  await waitForIdle(page, { quietMs: 150, timeoutMs: 3_000, pollMs: 50 });
+  await expect(stakingTrigger).toContainText("Diamond");
+  await expect(tierZero).toContainText("0.0259%");
+  await expect(tierZero).toContainText("0.0086%");
+
+  await makerRebateTrigger.click();
+  await expect(makerRebateTierTwoOption).toBeVisible();
+  await makerRebateTierTwoOption.click();
+  await waitForIdle(page, { quietMs: 150, timeoutMs: 3_000, pollMs: 50 });
+  await expect(makerRebateTrigger).toContainText("Tier 2");
+  await expect(tierZero).toContainText("-0.002%");
+
+  await marketTrigger.click();
+  await expect(stableAlignedOption).toBeVisible();
+  await stableAlignedOption.click();
+  await waitForIdle(page, { quietMs: 150, timeoutMs: 3_000, pollMs: 50 });
+
+  await expect(marketTrigger).toContainText("Spot + Aligned Quote + Stable Pair");
+  await expect(tierZero).toContainText("0.0065%");
+  await expect(tierZero).toContainText("-0.0006%");
+
+  await closeButton.click();
+  await waitForIdle(page, { quietMs: 150, timeoutMs: 3_000, pollMs: 50 });
+
+  await expect(dialog).toHaveCount(0);
+  await expect(trigger).toHaveAttribute("aria-expanded", "false");
+  await expect(trigger).toBeFocused();
+
+  await trigger.click();
+  await expect(dialog).toBeVisible();
+  await page.keyboard.press("Escape");
+  await waitForIdle(page, { quietMs: 150, timeoutMs: 3_000, pollMs: 50 });
+
+  await expect(dialog).toHaveCount(0);
+  await expect(trigger).toBeFocused();
+});
+
 test("trader portfolio route stays read-only while reusing stable controls @regression", async ({ page }) => {
   await visitRoute(page, `/portfolio/trader/${TRADER_ADDRESS}`);
   const accountTable = page.locator("[data-role='portfolio-account-table']");

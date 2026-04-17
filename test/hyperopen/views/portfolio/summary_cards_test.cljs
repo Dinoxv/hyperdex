@@ -55,12 +55,19 @@
 (deftest metric-cards-render-stable-volume-and-fee-copy-test
   (let [view (summary-cards/metric-cards {:volume-14d-usd 0
                                           :fees {:taker 0.45
-                                                 :maker 0.15}})
+                                                 :maker 0.15}
+                                          :fee-schedule {:open? true}})
         volume-card (hiccup/find-by-data-role view "portfolio-14d-volume-card")
         fees-card (hiccup/find-by-data-role view "portfolio-fees-card")
+        fee-schedule-trigger (hiccup/find-by-data-role view "portfolio-fee-schedule-trigger")
         all-text (set (hiccup/collect-strings view))]
     (is (some? volume-card))
     (is (some? fees-card))
+    (is (= "button" (get-in fee-schedule-trigger [1 :type])))
+    (is (= "dialog" (get-in fee-schedule-trigger [1 :aria-haspopup])))
+    (is (= "true" (get-in fee-schedule-trigger [1 :aria-expanded])))
+    (is (= [[:actions/open-portfolio-fee-schedule]]
+           (get-in fee-schedule-trigger [1 :on :click])))
     (is (contains? all-text "14 Day Volume"))
     (is (some #(re-find #"^\$0(?:\.0)?$" %) all-text))
     (is (contains? all-text "Fees (Taker / Maker)"))

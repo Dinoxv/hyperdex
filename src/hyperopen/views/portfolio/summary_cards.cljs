@@ -126,8 +126,9 @@
       (when (:show-staking-account? summary)
         (summary-row "Staking Account" (portfolio-format/format-hype (:staking-account-hype summary))))])))
 
-(defn metric-cards [{:keys [volume-14d-usd fees]}]
-  [:div {:class ["grid" "grid-cols-2" "gap-3" "lg:grid-cols-1"]}
+(defn metric-cards [{:keys [volume-14d-usd fees fee-schedule]}]
+  (let [fee-schedule-open? (if (:open? fee-schedule) "true" "false")]
+    [:div {:class ["grid" "grid-cols-2" "gap-3" "lg:grid-cols-1"]}
    (section-card
     "portfolio-14d-volume-card"
     [:div {:class ["space-y-2.5" "px-3" "py-3" "sm:px-4"]}
@@ -151,5 +152,10 @@
        "Perps"]]
      [:div {:class ["num" "text-2xl" "font-medium" "leading-tight" "text-trading-text" "sm:text-4xl"]}
       (str (portfolio-format/format-fee-pct (:taker fees)) " / " (portfolio-format/format-fee-pct (:maker fees)))]
-     [:button {:class ["btn" "btn-xs" "btn-spectate" "justify-start" "px-0" "text-xs" "text-trading-green" "hover:bg-transparent" "sm:text-xs"]}
-      "View Fee Schedule"]])])
+     [:button {:type "button"
+               :class ["btn" "btn-xs" "btn-spectate" "justify-start" "px-0" "text-xs" "text-trading-green" "hover:bg-transparent" "sm:text-xs"]
+               :aria-haspopup "dialog"
+               :aria-expanded fee-schedule-open?
+               :data-role "portfolio-fee-schedule-trigger"
+               :on {:click [[:actions/open-portfolio-fee-schedule]]}}
+      "View Fee Schedule"]])]))
