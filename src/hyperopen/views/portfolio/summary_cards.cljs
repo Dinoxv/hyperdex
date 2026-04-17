@@ -138,7 +138,8 @@
      [:button {:type "button"
                :class ["btn" "btn-xs" "btn-spectate" "justify-start" "px-0" "text-xs" "text-trading-green" "hover:bg-transparent" "sm:text-xs"]
                :data-role "portfolio-volume-history-trigger"
-               :on {:click [[:actions/open-portfolio-volume-history]]}}
+               :on {:click [[:actions/open-portfolio-volume-history
+                              :event.currentTarget/bounds]]}}
       "View Volume"]])
    (section-card
     "portfolio-fees-card"

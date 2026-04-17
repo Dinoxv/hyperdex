@@ -102,6 +102,11 @@
           :actions/open-portfolio-volume-history
           []
           {:phase :test})))
+  (is (= [{:left 10 :right 20 :top 30}]
+         (contracts/assert-action-args!
+          :actions/open-portfolio-volume-history
+          [{:left 10 :right 20 :top 30}]
+          {:phase :test})))
   (is (= []
          (contracts/assert-action-args!
           :actions/close-portfolio-volume-history

@@ -131,6 +131,7 @@
                 :weighted-maker-volume (sum-history-values completed-rows :weighted-maker-volume)
                 :weighted-taker-volume (sum-history-values completed-rows :weighted-taker-volume)}]
     {:open? (true? (get-in state [:portfolio-ui :volume-history-open?]))
+     :anchor (get-in state [:portfolio-ui :volume-history-anchor])
      :loading? (true? (get-in state [:portfolio :user-fees-loading?]))
      :error (get-in state [:portfolio :user-fees-error])
      :rows [(assoc totals

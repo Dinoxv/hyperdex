@@ -281,6 +281,42 @@
    [:effects/save-many (into (vec extra-path-values)
                              (selector-visibility-path-values open-dropdown))]))
 
+(def ^:private anchor-keys
+  [:left :right :top :bottom :width :height :viewport-width :viewport-height])
+
+(defn- parse-anchor-number
+  [value]
+  (cond
+    (number? value)
+    (when-not (js/isNaN value)
+      value)
+
+    (string? value)
+    (let [text (str/trim value)
+          parsed (js/parseFloat text)]
+      (when (and (seq text)
+                 (not (js/isNaN parsed)))
+        parsed))
+
+    :else
+    nil))
+
+(defn- normalize-anchor
+  [anchor]
+  (let [anchor* (cond
+                  (map? anchor) anchor
+                  (some? anchor) (js->clj anchor :keywordize-keys true)
+                  :else nil)]
+    (when (map? anchor*)
+      (let [normalized (reduce (fn [acc k]
+                                 (if-let [num (parse-anchor-number (get anchor* k))]
+                                   (assoc acc k num)
+                                   acc))
+                               {}
+                               anchor-keys)]
+        (when (seq normalized)
+          normalized)))))
+
 (defn toggle-portfolio-summary-scope-dropdown
   [state]
   (let [current-visible? (boolean (get-in state [:portfolio-ui :summary-scope-dropdown-open?]))
@@ -300,12 +336,17 @@
     [(selector-projection-effect open-dropdown)]))
 
 (defn open-portfolio-volume-history
-  [_state]
-  [(selector-projection-effect nil [[[:portfolio-ui :volume-history-open?] true]])])
+  ([state]
+   (open-portfolio-volume-history state nil))
+  ([_state trigger-bounds]
+   [(selector-projection-effect nil [[[:portfolio-ui :volume-history-open?] true]
+                                     [[:portfolio-ui :volume-history-anchor]
+                                      (normalize-anchor trigger-bounds)]])]))
 
 (defn close-portfolio-volume-history
   [_state]
-  [[:effects/save [:portfolio-ui :volume-history-open?] false]])
+  [[:effects/save-many [[[:portfolio-ui :volume-history-open?] false]
+                        [[:portfolio-ui :volume-history-anchor] nil]]]])
 
 (defn handle-portfolio-volume-history-keydown
   [state key]

@@ -57,6 +57,9 @@
 (s/def ::spectate-mode-open-args
   (s/or :none ::common/no-args
         :anchor-only (s/tuple any?)))
+(s/def ::portfolio-volume-history-open-args
+  (s/or :none ::common/no-args
+        :anchor-only (s/tuple any?)))
 (s/def ::staking-action-popover-open-args
   (s/or :kind-only (s/tuple (s/or :keyword keyword?
                                    :string string?))
@@ -164,7 +167,7 @@
    :actions/remove-portfolio-returns-benchmark ::common/coin-args
    :actions/handle-portfolio-returns-benchmark-search-keydown ::common/keydown-with-optional-coin-args
    :actions/clear-portfolio-returns-benchmark ::common/no-args
-   :actions/open-portfolio-volume-history ::common/no-args
+   :actions/open-portfolio-volume-history ::portfolio-volume-history-open-args
    :actions/close-portfolio-volume-history ::common/no-args
    :actions/handle-portfolio-volume-history-keydown ::common/single-input-args
    :actions/toggle-orderbook-size-unit-dropdown ::common/no-args

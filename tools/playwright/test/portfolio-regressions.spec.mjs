@@ -76,28 +76,37 @@ test("portfolio route exposes deterministic interaction states @regression", asy
     .not.toHaveAttribute("aria-pressed", "true");
 });
 
-test("portfolio volume history opens and closes from the metric card @regression", async ({ page }) => {
+test("portfolio volume history opens near the metric card trigger @regression", async ({ page }) => {
   await page.setViewportSize({ width: 375, height: 812 });
   await visitRoute(page, "/portfolio");
 
   const trigger = page.locator("[data-role='portfolio-volume-history-trigger']");
-  const dialog = page.locator("[data-role='portfolio-volume-history-dialog']");
+  const popover = page.locator("[data-role='portfolio-volume-history-popover']");
   const closeButton = page.locator("[data-role='portfolio-volume-history-close']");
   const tableFrame = page.locator("[data-role='portfolio-volume-history-table-frame']");
 
-  await expect(dialog).toHaveCount(0);
+  await expect(popover).toHaveCount(0);
   await expect(trigger).toBeVisible();
   await trigger.click();
   await waitForIdle(page, { quietMs: 150, timeoutMs: 3_000, pollMs: 50 });
 
-  await expect(dialog).toBeVisible();
-  await expect(dialog).toContainText("Your Volume History");
-  await expect(dialog).toContainText("Exchange Volume");
-  await expect(dialog).toContainText("Your Weighted Maker Volume");
-  await expect(dialog).toContainText("Your Weighted Taker Volume");
+  await expect(popover).toBeVisible();
+  await expect(popover).toContainText("Your Volume History");
+  await expect(popover).toContainText("Exchange Volume");
+  await expect(popover).toContainText("Your Weighted Maker Volume");
+  await expect(popover).toContainText("Your Weighted Taker Volume");
+  await expect(popover).not.toContainText("Dates do not include the current day");
   await expect(page.locator("[data-role='portfolio-volume-history-total-row']"))
     .toContainText("Total");
   await expect(tableFrame).toBeVisible();
+  await expect.poll(async () => (
+    await page.evaluate(() => {
+      const triggerEl = document.querySelector("[data-role='portfolio-volume-history-trigger']");
+      const popoverEl = document.querySelector("[data-role='portfolio-volume-history-popover']");
+      if (!triggerEl || !popoverEl) return Number.POSITIVE_INFINITY;
+      return Math.abs(popoverEl.getBoundingClientRect().top - triggerEl.getBoundingClientRect().top);
+    })
+  )).toBeLessThan(96);
   await expect.poll(async () => (
     await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)
   )).toBe(true);
@@ -107,14 +116,14 @@ test("portfolio volume history opens and closes from the metric card @regression
 
   await closeButton.click();
   await waitForIdle(page, { quietMs: 150, timeoutMs: 3_000, pollMs: 50 });
-  await expect(dialog).toHaveCount(0);
+  await expect(popover).toHaveCount(0);
 
   await trigger.click();
   await waitForIdle(page, { quietMs: 150, timeoutMs: 3_000, pollMs: 50 });
-  await expect(dialog).toBeVisible();
+  await expect(popover).toBeVisible();
   await page.keyboard.press("Escape");
   await waitForIdle(page, { quietMs: 150, timeoutMs: 3_000, pollMs: 50 });
-  await expect(dialog).toHaveCount(0);
+  await expect(popover).toHaveCount(0);
 });
 
 test("portfolio funding modal restores opener focus on close @regression", async ({ page }) => {

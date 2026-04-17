@@ -156,7 +156,8 @@
    :summary-scope-dropdown-open? false
    :summary-time-range-dropdown-open? false
    :performance-metrics-time-range-dropdown-open? false
-   :volume-history-open? false})
+   :volume-history-open? false
+   :volume-history-anchor nil})
 
 (defn default-portfolio-state
   []

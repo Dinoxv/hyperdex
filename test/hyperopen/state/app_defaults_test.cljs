@@ -45,6 +45,7 @@
     (is (= false (get-in state [:portfolio-ui :returns-benchmark-suggestions-open?])))
     (is (= false (get-in state [:portfolio-ui :performance-metrics-time-range-dropdown-open?])))
     (is (= false (get-in state [:portfolio-ui :volume-history-open?])))
+    (is (nil? (get-in state [:portfolio-ui :volume-history-anchor])))
     (is (= "" (get-in state [:vaults-ui :search-query])))
     (is (= true (get-in state [:vaults-ui :filter-leading?])))
     (is (= true (get-in state [:vaults-ui :filter-deposited?])))

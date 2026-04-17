@@ -6,7 +6,7 @@
             [hyperopen.views.portfolio.chart-view :as chart-view]
             [hyperopen.views.portfolio.header :as portfolio-header]
             [hyperopen.views.portfolio.summary-cards :as summary-cards]
-            [hyperopen.views.portfolio.volume-history-modal :as volume-history-modal]
+            [hyperopen.views.portfolio.volume-history-popover :as volume-history-popover]
             [hyperopen.views.portfolio.vm :as portfolio-vm]))
 
 (defonce ^:private portfolio-view-cache
@@ -35,8 +35,8 @@
       (account-info-view/account-info-view
        state
        (account-tabs/account-info-options state view-model trader-portfolio-route?))]
-     :volume-history-modal
-     (volume-history-modal/volume-history-modal (:volume-history view-model))}))
+     :volume-history-popover
+     (volume-history-popover/volume-history-popover (:volume-history view-model))}))
 
 (defn portfolio-view [state]
   (let [route (get-in state [:router :path])
@@ -66,7 +66,7 @@
      (:background-status sections)
      (:summary-grid sections)
      (:account-table sections)
-     (:volume-history-modal sections)]))
+     (:volume-history-popover sections)]))
 
 (defn ^:export route-view
   [state]

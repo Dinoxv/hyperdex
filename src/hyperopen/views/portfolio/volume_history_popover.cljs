@@ -1,6 +1,16 @@
-(ns hyperopen.views.portfolio.volume-history-modal
+(ns hyperopen.views.portfolio.volume-history-popover
   (:require [hyperopen.views.portfolio.format :as portfolio-format]
+            [hyperopen.views.ui.anchored-popover :as anchored-popover]
             [hyperopen.views.ui.dialog-focus :as dialog-focus]))
+
+(def ^:private preferred-width-px
+  560)
+
+(def ^:private estimated-height-px
+  260)
+
+(def ^:private trigger-selector
+  "[data-role='portfolio-volume-history-trigger']")
 
 (def ^:private focus-on-render
   (dialog-focus/dialog-focus-on-render
@@ -73,7 +83,36 @@
     :else
     nil))
 
-(defn volume-history-modal [{:keys [open? rows] :as model}]
+(defn- trigger-anchor-bounds
+  []
+  (let [document* (some-> js/globalThis .-document)
+        target (some-> document* (.querySelector trigger-selector))]
+    (when (and target (fn? (.-getBoundingClientRect target)))
+      (let [rect (.getBoundingClientRect target)]
+        {:left (.-left rect)
+         :right (.-right rect)
+         :top (.-top rect)
+         :bottom (.-bottom rect)
+         :width (.-width rect)
+         :height (.-height rect)
+         :viewport-width (some-> js/globalThis .-innerWidth)
+         :viewport-height (some-> js/globalThis .-innerHeight)}))))
+
+(defn- popover-style
+  [anchor]
+  (let [anchor* (if (anchored-popover/complete-anchor? anchor)
+                  anchor
+                  (trigger-anchor-bounds))]
+    (if (anchored-popover/complete-anchor? anchor*)
+      (anchored-popover/anchored-popover-layout-style
+       {:anchor anchor*
+        :preferred-width-px preferred-width-px
+        :estimated-height-px estimated-height-px})
+      {:left "12px"
+       :top "12px"
+       :width "min(calc(100vw - 24px), 560px)"})))
+
+(defn volume-history-popover [{:keys [anchor open? rows] :as model}]
   (when open?
     (let [row-models (if (seq rows)
                        rows
@@ -82,17 +121,16 @@
                          :exchange-volume 0
                          :weighted-maker-volume 0
                          :weighted-taker-volume 0}])]
-      [:div {:class ["fixed" "inset-0" "z-[90]" "flex" "items-start" "justify-center" "px-3" "py-6" "sm:items-center" "sm:p-4"]
+      [:div {:class ["fixed" "inset-0" "z-[90]" "pointer-events-none"]
              :data-role "portfolio-volume-history-layer"}
        [:button {:type "button"
-                 :class ["absolute" "inset-0" "bg-black/65" "backdrop-blur-[1px]"]
+                 :class ["absolute" "inset-0" "pointer-events-auto" "bg-transparent"]
                  :aria-label "Close volume history"
                  :data-role "portfolio-volume-history-backdrop"
                  :on {:click [[:actions/close-portfolio-volume-history]]}}]
-       [:section {:class ["relative"
+       [:section {:class ["absolute"
                           "z-[91]"
-                          "w-full"
-                          "max-w-2xl"
+                          "pointer-events-auto"
                           "rounded-lg"
                           "border"
                           "border-base-300"
@@ -101,11 +139,11 @@
                           "shadow-2xl"
                           "outline-none"
                           "sm:p-5"]
+                  :style (popover-style anchor)
                   :role "dialog"
-                  :aria-modal true
                   :aria-labelledby "portfolio-volume-history-title"
                   :tab-index 0
-                  :data-role "portfolio-volume-history-dialog"
+                  :data-role "portfolio-volume-history-popover"
                   :replicant/on-render focus-on-render
                   :on {:keydown [[:actions/handle-portfolio-volume-history-keydown [:event/key]]]}}
         [:div {:class ["mb-4" "flex" "items-start" "justify-between" "gap-3"]}
@@ -145,7 +183,4 @@
           (into [:tbody]
                 (for [{:keys [id] :as row} row-models]
                   ^{:key (name (or id :total))}
-                  (total-row row)))]]
-        [:p {:class ["mt-3" "text-xs" "leading-relaxed" "text-trading-text-secondary"]
-             :data-role "portfolio-volume-history-note"}
-         "Dates do not include the current day. Perps and spot volume count together toward fee tiers; spot volume counts double."]]])))
+                  (total-row row)))]]]])))

@@ -1,4 +1,4 @@
-(ns hyperopen.views.portfolio.volume-history-modal-test
+(ns hyperopen.views.portfolio.volume-history-popover-test
   (:require [clojure.string :as str]
             [cljs.test :refer-macros [deftest is use-fixtures]]
             [hyperopen.views.chart.d3.hover-state :as chart-hover-state]
@@ -46,7 +46,8 @@
                   :chart-tab :account-value
                   :summary-scope-dropdown-open? false
                   :summary-time-range-dropdown-open? false
-                  :performance-metrics-time-range-dropdown-open? false}
+                  :performance-metrics-time-range-dropdown-open? false
+                  :volume-history-anchor nil}
    :portfolio {:summary-by-key {:month {:pnlHistory [[1 10] [2 15]]
                                         :accountValueHistory [[1 100] [2 100]]
                                         :vlm 2255561.85}}
@@ -77,15 +78,27 @@
           :clearinghouse-state nil}
    :perp-dex-clearinghouse {}})
 
-(deftest portfolio-volume-history-button-opens-readable-modal-test
+(def ^:private sample-anchor
+  {:left 100
+   :right 160
+   :top 240
+   :bottom 264
+   :width 60
+   :height 24
+   :viewport-width 800
+   :viewport-height 700})
+
+(deftest portfolio-volume-history-button-opens-anchored-popover-test
   (let [closed-view-node (portfolio-view/portfolio-view sample-state)
         closed-button (button-with-text closed-view-node "View Volume")
-        closed-dialog (find-first-node closed-view-node #(= "portfolio-volume-history-dialog"
-                                                            (get-in % [1 :data-role])))
-        open-state (assoc-in sample-state [:portfolio-ui :volume-history-open?] true)
+        closed-popover (find-first-node closed-view-node #(= "portfolio-volume-history-popover"
+                                                             (get-in % [1 :data-role])))
+        open-state (-> sample-state
+                       (assoc-in [:portfolio-ui :volume-history-open?] true)
+                       (assoc-in [:portfolio-ui :volume-history-anchor] sample-anchor))
         open-view-node (portfolio-view/portfolio-view open-state)
-        dialog (find-first-node open-view-node #(= "portfolio-volume-history-dialog"
-                                                   (get-in % [1 :data-role])))
+        popover (find-first-node open-view-node #(= "portfolio-volume-history-popover"
+                                                    (get-in % [1 :data-role])))
         backdrop (find-first-node open-view-node #(= "portfolio-volume-history-backdrop"
                                                      (get-in % [1 :data-role])))
         close-button (find-first-node open-view-node #(= "portfolio-volume-history-close"
@@ -94,17 +107,23 @@
                                                   (get-in % [1 :data-role])))
         table-frame (find-first-node open-view-node #(= "portfolio-volume-history-table-frame"
                                                         (get-in % [1 :data-role])))
+        note (find-first-node open-view-node #(= "portfolio-volume-history-note"
+                                                 (get-in % [1 :data-role])))
         total-row (find-first-node open-view-node #(= "portfolio-volume-history-total-row"
                                                       (get-in % [1 :data-role])))
-        all-text (set (collect-strings dialog))]
-    (is (= [[:actions/open-portfolio-volume-history]]
+        all-text (set (collect-strings popover))]
+    (is (= [[:actions/open-portfolio-volume-history :event.currentTarget/bounds]]
            (get-in closed-button [1 :on :click])))
-    (is (nil? closed-dialog))
-    (is (some? dialog))
-    (is (= "dialog" (get-in dialog [1 :role])))
-    (is (= true (get-in dialog [1 :aria-modal])))
+    (is (nil? closed-popover))
+    (is (some? popover))
+    (is (= "dialog" (get-in popover [1 :role])))
+    (is (nil? (get-in popover [1 :aria-modal])))
+    (is (= {:left "170px"
+            :top "220px"
+            :width "560px"}
+           (get-in popover [1 :style])))
     (is (= [[:actions/handle-portfolio-volume-history-keydown [:event/key]]]
-           (get-in dialog [1 :on :keydown])))
+           (get-in popover [1 :on :keydown])))
     (is (= [[:actions/close-portfolio-volume-history]]
            (get-in backdrop [1 :on :click])))
     (is (= [[:actions/close-portfolio-volume-history]]
@@ -112,6 +131,7 @@
     (is (some? table))
     (is (some? table-frame))
     (is (some? total-row))
+    (is (nil? note))
     (is (contains? all-text "Your Volume History"))
     (is (contains? all-text "Date (UTC)"))
     (is (contains? all-text "Exchange Volume"))
@@ -121,15 +141,17 @@
     (is (contains? all-text "$100.00"))
     (is (contains? all-text "$30.00"))
     (is (contains? all-text "$70.00"))
-    (is (some #(str/includes? % "Dates do not include the current day")
-              all-text))))
+    (is (not-any? #(str/includes? % "Dates do not include the current day")
+                  all-text))))
 
-(deftest portfolio-volume-history-cache-does-not-retain-open-modal-after-close-test
+(deftest portfolio-volume-history-cache-does-not-retain-open-popover-after-close-test
   (chart-hover-state/set-surface-hover-active! :portfolio true)
   (let [open-view-node (portfolio-view/portfolio-view
-                        (assoc-in sample-state [:portfolio-ui :volume-history-open?] true))
+                        (-> sample-state
+                            (assoc-in [:portfolio-ui :volume-history-open?] true)
+                            (assoc-in [:portfolio-ui :volume-history-anchor] sample-anchor)))
         closed-view-node (portfolio-view/portfolio-view sample-state)]
-    (is (some? (find-first-node open-view-node #(= "portfolio-volume-history-dialog"
+    (is (some? (find-first-node open-view-node #(= "portfolio-volume-history-popover"
                                                    (get-in % [1 :data-role])))))
-    (is (nil? (find-first-node closed-view-node #(= "portfolio-volume-history-dialog"
+    (is (nil? (find-first-node closed-view-node #(= "portfolio-volume-history-popover"
                                                     (get-in % [1 :data-role])))))))
