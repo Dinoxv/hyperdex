@@ -505,6 +505,16 @@ async function seedReadyTradingSession(page, options = {}) {
   });
 }
 
+async function setTradingConfirmations(page, { openOrders, closePosition } = {}) {
+  if (typeof openOrders === "boolean") {
+    await dispatch(page, [":actions/set-confirm-open-orders-enabled", openOrders]);
+  }
+  if (typeof closePosition === "boolean") {
+    await dispatch(page, [":actions/set-confirm-close-position-enabled", closePosition]);
+  }
+  await waitForIdle(page, { quietMs: 150, timeoutMs: 4_000, pollMs: 50 });
+}
+
 async function mockExchangeSuccess(page) {
   const exchangeActionTypes = [];
 
@@ -1838,6 +1848,7 @@ test("order submit confirmation renders in-app instead of opening a browser dial
   });
 
   await seedReadyTradingSession(page);
+  await setTradingConfirmations(page, { openOrders: true });
   await waitForIdle(page, { quietMs: 250, timeoutMs: 4_000, pollMs: 50 });
 
   await dispatch(page, [":actions/select-order-entry-mode", ":limit"]);
@@ -1878,6 +1889,7 @@ test("trading settings confirmation toggles respond to visible switch clicks @re
   page
 }) => {
   await visitRoute(page, "/trade");
+  await setTradingConfirmations(page, { openOrders: true, closePosition: true });
 
   await page.locator('[data-role="header-settings-button"]').click();
   await waitForIdle(page, { quietMs: 250, timeoutMs: 4_000, pollMs: 50 });
@@ -2046,6 +2058,7 @@ test("ready remembered session keeps submit usable after enabling passkey lock @
     localProtectionMode: "plain",
     passkeySupported: true
   });
+  await setTradingConfirmations(page, { openOrders: true });
 
   await page.locator('[data-role="header-settings-button"]').click();
   await waitForIdle(page, { quietMs: 250, timeoutMs: 4_000, pollMs: 50 });

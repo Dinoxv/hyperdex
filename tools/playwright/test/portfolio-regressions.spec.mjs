@@ -199,6 +199,7 @@ test("portfolio positions coin jumps to the trade route market @regression", asy
   await selectAccountTab(page, "positions");
   const coinButton = page
     .locator("[data-role='portfolio-account-table'] [data-role='positions-coin-select']")
+    .filter({ hasText: "HYPE" })
     .first();
 
   await expect(coinButton).toBeVisible();
