@@ -301,6 +301,8 @@
    :actions/toggle-order-tpsl-panel ::common/no-args
    :actions/update-order-form (s/tuple ::common/state-path any?)
    :actions/dismiss-order-feedback-toast ::common/optional-string-args
+   :actions/expand-order-feedback-toast ::common/optional-string-args
+   :actions/collapse-order-feedback-toast ::common/optional-string-args
    :actions/dismiss-order-submission-confirmation ::common/no-args
    :actions/handle-order-submission-confirmation-keydown ::common/key-args
    :actions/confirm-order-submission ::common/no-args

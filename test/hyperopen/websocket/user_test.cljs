@@ -223,10 +223,9 @@
                         :sz "2.00"
                         :px "33.00"
                         :time 1001}]}})
-      (is (= "Bought 6 HYPE"
-             (get-in @store [:ui :toast :headline])))
-      (is (= "At average price of $31.66667"
-             (get-in @store [:ui :toast :subline])))
+      (is (= {:variant :stack :headline "2 fills" :subline "HYPE"}
+             (select-keys (get-in @store [:ui :toast])
+                          [:variant :headline :subline])))
       (is (= 1 (count (get-in @store [:ui :toasts]))))
 
       ((get @handlers "userFills")
@@ -238,12 +237,12 @@
                         :sz "1.25"
                         :px "90.79"
                         :time 1002}]}})
-      (is (= "Sold 1.25 SOL"
-             (get-in @store [:ui :toast :headline])))
-      (is (= 2 (count (get-in @store [:ui :toasts]))))
-      (is (= ["Bought 6 HYPE"
-              "Sold 1.25 SOL"]
-             (mapv :headline (get-in @store [:ui :toasts])))))))
+      (is (= 1 (count (get-in @store [:ui :toasts]))))
+      (is (= [{:variant :stack
+               :headline "3 fills"
+               :subline "SOL, HYPE"}]
+             (mapv #(select-keys % [:variant :headline :subline])
+                   (get-in @store [:ui :toasts])))))))
 
 (deftest user-ledger-incremental-triggers-account-surface-refresh-test
   (let [store (doto (make-store)

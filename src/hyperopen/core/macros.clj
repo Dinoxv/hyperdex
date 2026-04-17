@@ -210,6 +210,8 @@
     toggle-order-tpsl-panel
     update-order-form
     dismiss-order-feedback-toast
+    expand-order-feedback-toast
+    collapse-order-feedback-toast
     dismiss-order-submission-confirmation
     handle-order-submission-confirmation-keydown
     confirm-order-submission

@@ -125,6 +125,8 @@
    [:actions/set-position-margin-amount-to-max :set-position-margin-amount-to-max]
    [:actions/submit-position-margin-update :submit-position-margin-update]
    [:actions/dismiss-order-feedback-toast :dismiss-order-feedback-toast]
+   [:actions/expand-order-feedback-toast :expand-order-feedback-toast]
+   [:actions/collapse-order-feedback-toast :collapse-order-feedback-toast]
    [:actions/dismiss-order-submission-confirmation :dismiss-order-submission-confirmation]
    [:actions/handle-order-submission-confirmation-keydown :handle-order-submission-confirmation-keydown]
    [:actions/confirm-order-submission :confirm-order-submission]

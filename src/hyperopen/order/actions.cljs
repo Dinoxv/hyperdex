@@ -219,6 +219,27 @@
     [[:effects/save-many [[[:ui :toasts] remaining-toasts]
                           [[:ui :toast] latest-toast]]]]))
 
+(defn- set-order-feedback-toast-expanded
+  [state toast-id expanded?]
+  (let [current-toasts (current-order-feedback-toasts state)
+        next-toasts (mapv (fn [toast]
+                            (if (= toast-id (:id toast))
+                              (assoc toast :expanded? expanded?)
+                              toast))
+                          current-toasts)
+        latest-toast (some-> (peek next-toasts)
+                             (dissoc :id))]
+    [[:effects/save-many [[[:ui :toasts] next-toasts]
+                          [[:ui :toast] latest-toast]]]]))
+
+(defn expand-order-feedback-toast
+  [state toast-id]
+  (set-order-feedback-toast-expanded state toast-id true))
+
+(defn collapse-order-feedback-toast
+  [state toast-id]
+  (set-order-feedback-toast-expanded state toast-id false))
+
 (defn- open-enable-trading-recovery-effects
   [error-message]
   [[:effects/save-many [[[:order-form-runtime :error] nil]

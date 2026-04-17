@@ -149,12 +149,20 @@
      store
      :success
      {:headline "Bought 8.56 HYPE"
-      :subline "At average price of $31.969"}
+      :subline "At average price of $31.969"
+      :toast-surface :trade-confirmation
+      :variant :pill
+      :fills [{:id "fill-1"}]}
      schedule-fn)
     (is (= "Bought 8.56 HYPE"
            (get-in @store [:ui :toast :headline])))
     (is (= "At average price of $31.969"
            (get-in @store [:ui :toast :subline])))
+    (is (= {:toast-surface :trade-confirmation
+            :variant :pill
+            :fills [{:id "fill-1"}]}
+           (select-keys (get-in @store [:ui :toast])
+                        [:toast-surface :variant :fills])))
     (is (= 2 (count @schedule-calls)))
 
     (feedback-runtime/show-order-feedback-toast! store :error "   " schedule-fn)

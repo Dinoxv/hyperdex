@@ -444,6 +444,12 @@
 (def dismiss-order-feedback-toast
   order-actions/dismiss-order-feedback-toast)
 
+(def expand-order-feedback-toast
+  order-actions/expand-order-feedback-toast)
+
+(def collapse-order-feedback-toast
+  order-actions/collapse-order-feedback-toast)
+
 (def dismiss-order-submission-confirmation
   order-actions/dismiss-order-submission-confirmation)
 

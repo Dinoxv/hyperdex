@@ -29,46 +29,107 @@
            (vec (fill-runtime/novel-fills existing incoming))))))
 
 (deftest fill-toast-payloads-group-by-coin-and-side-test
-  (is (= [{:headline "Bought 6 HYPE"
-           :message "Bought 6 HYPE"
-           :subline "At average price of $31.66667"}
-          {:headline "Sold 1.25 SOL"
-           :message "Sold 1.25 SOL"
-           :subline "At average price of $90.79"}]
-         (fill-runtime/fill-toast-payloads
-          [{:tid 10
-            :coin "HYPE"
-            :side "B"
-            :sz "4.00"
-            :px "31.00"}
-           {:tid 11
-            :coin "HYPE"
-            :side "B"
-            :sz "2.00"
-            :px "33.00"}
-           {:tid 12
-            :coin "SOL"
-            :side "A"
-            :sz "1.25"
-            :px "90.79"}]))))
+  (let [payloads (fill-runtime/fill-toast-payloads
+                  [{:tid 10
+                    :coin "HYPE"
+                    :side "B"
+                    :sz "4.00"
+                    :px "31.00"}
+                   {:tid 11
+                    :coin "HYPE"
+                    :side "B"
+                    :sz "2.00"
+                    :px "33.00"}
+                   {:tid 12
+                    :coin "SOL"
+                    :side "A"
+                    :sz "1.25"
+                    :px "90.79"}])
+        payload (first payloads)]
+    (is (= 1 (count payloads)))
+    (is (= {:toast-surface :trade-confirmation
+            :variant :stack
+            :headline "3 fills"
+            :message "3 fills"
+            :subline "HYPE, SOL"}
+           (select-keys payload [:toast-surface :variant :headline :message :subline])))
+    (is (= #{[:buy "HYPE" 4 31]
+             [:buy "HYPE" 2 33]
+             [:sell "SOL" 1.25 90.79]}
+           (set (map (juxt :side :symbol :qty :price) (:fills payload)))))))
 
 (deftest fill-toast-payloads-resolve-raw-market-ids-through-market-state-test
   (let [market-by-key {"spot:@107" {:coin "@107"
                                     :market-type :spot
                                     :symbol "AAPL/USDC"
                                     :base "AAPL"
-                                    :quote "USDC"}}]
-    (is (= [{:headline "Bought 1 AAPL"
-             :message "Bought 1 AAPL"}]
-           (fill-runtime/fill-toast-payloads
-            [{:coin "@107"
-              :side "B"
-              :sz "1"}]
-            market-by-key)))
+                                    :quote "USDC"}}
+        payload (first (fill-runtime/fill-toast-payloads
+                        [{:coin "@107"
+                          :side "B"
+                          :sz "1"
+                          :px "100"}]
+                        market-by-key))]
+    (is (= {:toast-surface :trade-confirmation
+            :variant :pill
+            :headline "Bought 1 AAPL"
+            :message "Bought 1 AAPL"}
+           (select-keys payload [:toast-surface :variant :headline :message])))
+    (is (= "AAPL"
+           (:symbol (first (:fills payload)))))
     (is (= [{:message "Order filled: AAPL."}]
            (fill-runtime/fill-toast-payloads
             [{:coin "@107"}]
             market-by-key)))))
+
+(deftest fill-toast-payloads-classify-trade-confirmation-variants-test
+  (let [ordinary [{:tid 1
+                   :coin "HYPE"
+                   :side "B"
+                   :sz "0.26"
+                   :px "44.273"
+                   :time 1800000000000
+                   :orderType "limit"}]
+        market [{:tid 2
+                 :coin "HYPE"
+                 :side "B"
+                 :sz "4.23"
+                 :px "44.265"
+                 :time 1800000000100
+                 :orderType "market"}]
+        stack [{:tid 3 :coin "HYPE" :side "B" :sz "0.25" :px "44.20" :time 1800000000200}
+               {:tid 4 :coin "HYPE" :side "B" :sz "0.30" :px "44.30" :time 1800000003400}
+               {:tid 5 :coin "SOL" :side "A" :sz "1.00" :px "198.10" :time 1800000006100}]
+        consolidated [{:tid 6 :coin "HYPE" :side "B" :sz "0.25" :px "44.20" :time 1800000010000}
+                      {:tid 7 :coin "HYPE" :side "B" :sz "0.30" :px "44.30" :time 1800000013300}
+                      {:tid 8 :coin "HYPE" :side "B" :sz "0.20" :px "44.24" :time 1800000016600}
+                      {:tid 9 :coin "HYPE" :side "B" :sz "0.28" :px "44.29" :time 1800000019900}]
+        high-slippage [{:tid 10
+                        :coin "BTC"
+                        :side "A"
+                        :sz "0.05"
+                        :px "65124"
+                        :time 1800000020000
+                        :slippagePct "0.42"}]]
+    (is (= :pill (:variant (first (fill-runtime/fill-toast-payloads ordinary)))))
+    (is (= {:id "1"
+            :side :buy
+            :symbol "HYPE"
+            :price 44.273
+            :qty 0.26
+            :orderType "limit"
+            :ts 1800000000000}
+           (select-keys (first (:fills (first (fill-runtime/fill-toast-payloads ordinary))))
+                        [:id :side :symbol :price :qty :orderType :ts])))
+    (is (= :detailed (:variant (first (fill-runtime/fill-toast-payloads market)))))
+    (is (= :stack (:variant (first (fill-runtime/fill-toast-payloads stack)))))
+    (is (= :consolidated (:variant (first (fill-runtime/fill-toast-payloads consolidated)))))
+    (is (= :detailed (:variant (first (fill-runtime/fill-toast-payloads high-slippage)))))
+    (is (every? #(= :trade-confirmation (:toast-surface %))
+                (map first [(fill-runtime/fill-toast-payloads ordinary)
+                            (fill-runtime/fill-toast-payloads market)
+                            (fill-runtime/fill-toast-payloads stack)
+                            (fill-runtime/fill-toast-payloads consolidated)])))))
 
 (deftest fill-identity-and-novel-fills-cover-direct-id-and-unkeyed-rows-test
   (let [fill-identity @#'fill-runtime/fill-identity]
@@ -106,35 +167,58 @@
     (is (nil? (normalize-fill-side {:direction "hold"})))
     (is (= {:coin "BTC"
             :display-coin "BTC"
+            :id "BTC-buy-na-3-42000.5"
             :side :buy
             :size 3
-            :price 42000.5}
+            :qty 3
+            :symbol "BTC"
+            :price 42000.5
+            :orderType "limit"
+            :ts 0
+            :slippagePct nil}
            (normalized-fill-row {:symbol " btc "
                                  :direction "close short"
                                  :filledSz "-3"
                                  :avgPx "42000.5"})))
     (is (= {:coin "SOL"
             :display-coin "SOL"
+            :id "SOL-sell-na-2.5-22.5"
             :side :sell
             :size 2.5
-            :price nil}
+            :qty 2.5
+            :symbol "SOL"
+            :price 22.5
+            :orderType "limit"
+            :ts 0
+            :slippagePct nil}
            (normalized-fill-row {:asset " sol "
                                  :side "SHORT"
-                                 :filled "2.5"})))
+                                 :filled "2.5"
+                                 :price "22.50"})))
+    (is (nil? (normalized-fill-row {:asset " sol "
+                                    :side "SHORT"
+                                    :filled "2.5"})))
     (is (nil? (normalized-fill-row {:coin "SOL"
                                     :side "B"
                                     :sz "0"})))
-    (is (= [{:headline "Bought 3 BTC"
-             :message "Bought 3 BTC"}
-            {:headline "Sold 2.5 SOL"
-             :message "Sold 2.5 SOL"}]
-           (fill-runtime/fill-toast-payloads
-            [{:symbol " btc "
-              :direction "close short"
-              :filledSz "-3"}
-             {:asset " sol "
-              :side "SHORT"
-              :filled "2.5"}])))
+    (let [payload (first (fill-runtime/fill-toast-payloads
+                          [{:symbol " btc "
+                            :direction "close short"
+                            :filledSz "-3"
+                            :avgPx "42000.5"}
+                           {:asset " sol "
+                            :side "SHORT"
+                            :filled "2.5"
+                            :price "22.50"}]))]
+      (is (= {:toast-surface :trade-confirmation
+              :variant :stack
+              :headline "2 fills"
+              :message "2 fills"
+              :subline "BTC, SOL"}
+             (select-keys payload [:toast-surface :variant :headline :message :subline])))
+      (is (= #{[:buy "BTC" 3 42000.5]
+               [:sell "SOL" 2.5 22.5]}
+             (set (map (juxt :side :symbol :qty :price) (:fills payload))))))
     (is (= [{:message "Order filled: SOL."}]
            (fill-runtime/fill-toast-payloads
             [{:asset " SOL "}])))
@@ -206,14 +290,17 @@
          :px "31.25"}
         {:asset "btc"
          :direction "close short"
-         :filledSz "-2"}])
-      (is (= 2 (count (get-in @store [:ui :toasts]))))
-      (is (= ["Bought 1.5 HYPE"
-              "Bought 2 BTC"]
-             (mapv :headline (get-in @store [:ui :toasts]))))
+         :filledSz "-2"
+         :avgPx "42000.5"}])
+      (is (= 1 (count (get-in @store [:ui :toasts]))))
+      (is (= [{:variant :stack
+               :headline "2 fills"
+               :subline "HYPE, BTC"}]
+             (mapv #(select-keys % [:variant :headline :subline])
+                   (get-in @store [:ui :toasts]))))
       (is (= runtime-state/order-feedback-toast-duration-ms
              (second (last @captured-timeouts))))
-      (is (= #{:timeout-1 :timeout-2}
+      (is (= #{:timeout-1}
              (set (vals (get-in @runtime [:timeouts :order-toast])))))
       (doseq [[callback _ms _timeout-id] @captured-timeouts]
         (callback))
@@ -241,9 +328,12 @@
        store
        [{:coin "@107"
          :side "B"
-         :sz "1.5"}])
-      (is (= ["Bought 1.5 AAPL"]
-             (mapv :headline (get-in @store [:ui :toasts])))))))
+         :sz "1.5"
+         :px "12.50"}])
+      (is (= [{:variant :pill
+               :headline "Bought 1.5 AAPL"}]
+             (mapv #(select-keys % [:variant :headline])
+                   (get-in @store [:ui :toasts])))))))
 
 (deftest show-user-fill-toast-respects-fill-alert-preference-test
   (let [runtime (atom (runtime-state/default-runtime-state))
@@ -266,11 +356,14 @@
          :px "31.25"}
         {:asset "btc"
          :direction "close short"
-         :filledSz "-2"}])
-      (is (= 2 (count @toast-calls)))
-      (is (= ["Bought 1.5 HYPE"
-              "Bought 2 BTC"]
-             (mapv #(get-in % [2 :headline]) @toast-calls)))
+         :filledSz "-2"
+         :avgPx "42000.5"}])
+      (is (= 1 (count @toast-calls)))
+      (is (= [{:variant :stack
+               :headline "2 fills"
+               :subline "HYPE, BTC"}]
+             (mapv #(select-keys (nth % 2) [:variant :headline :subline])
+                   @toast-calls)))
       (reset! toast-calls [])
       (fill-runtime/show-user-fill-toast!
        disabled-store

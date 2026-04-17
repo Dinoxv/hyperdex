@@ -1,5 +1,6 @@
 (ns hyperopen.views.notifications-view
-  (:require [clojure.string :as str]))
+  (:require [clojure.string :as str]
+            [hyperopen.views.trade-confirmation-toasts :as trade-toasts]))
 
 (defn- toast-kind-name
   [kind]
@@ -69,7 +70,7 @@
    [:path {:stroke-linecap "round"
            :d "M6 6l8 8M14 6l-8 8"}]])
 
-(defn- toast-card
+(defn- generic-toast-card
   [toast]
   (let [kind (or (:kind toast) :info)
         {:keys [headline subline]} (toast-display-lines toast)
@@ -132,6 +133,34 @@
                   :data-role "global-toast-dismiss"}
          (dismiss-icon)]]])))
 
+(defn- trade-toast-options
+  [toast]
+  (let [toast-id (:id toast)]
+    {:on-dismiss [[:actions/dismiss-order-feedback-toast toast-id]]
+     :on-expand [[:actions/expand-order-feedback-toast toast-id]]
+     :on-collapse [[:actions/collapse-order-feedback-toast toast-id]]}))
+
+(defn- trade-confirmation-toast-card
+  [toast]
+  (let [fills (vec (or (:fills toast) []))
+        options (trade-toast-options toast)
+        single-fill (first fills)]
+    (when (seq fills)
+      (if (:expanded? toast)
+        (trade-toasts/BlotterCard fills options)
+        (case (:variant toast)
+          :detailed (trade-toasts/DetailedToast single-fill options)
+          :stack (trade-toasts/ToastStack fills options)
+          :consolidated (trade-toasts/ConsolidatedToast fills options)
+          :pill (trade-toasts/PillToast single-fill options)
+          (generic-toast-card toast))))))
+
+(defn- toast-card
+  [toast]
+  (if (= :trade-confirmation (:toast-surface toast))
+    (trade-confirmation-toast-card toast)
+    (generic-toast-card toast)))
+
 (defn notifications-view
   [state]
   (let [toasts (->> (toast-entries state)
@@ -144,8 +173,10 @@
                            "bottom-16"
                            "z-[280]"
                            "flex"
-                           "w-[min(22rem,calc(100vw-1.5rem))]"
+                           "w-[min(24rem,calc(100vw-1.5rem))]"
                            "flex-col"
                            "gap-2.5"]
+                   :role "status"
+                   :aria-live "polite"
                    :data-role "global-toast-region"}]
             toasts))))

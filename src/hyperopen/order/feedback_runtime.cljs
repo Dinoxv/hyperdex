@@ -18,7 +18,7 @@
                        headline
                        subline)]
       (when message*
-        (cond-> {:message message*}
+        (cond-> (assoc message :message message*)
           headline (assoc :headline headline)
           subline (assoc :subline subline))))
     (when-let [message* (normalize-toast-text message)]

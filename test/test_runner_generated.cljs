@@ -330,6 +330,7 @@
             [hyperopen.views.l2-orderbook-view-test]
             [hyperopen.views.leaderboard-view-test]
             [hyperopen.views.leaderboard.vm-test]
+            [hyperopen.views.notifications-view-trade-confirmation-test]
             [hyperopen.views.portfolio-view-fee-schedule-test]
             [hyperopen.views.portfolio-view-hover-freeze-test]
             [hyperopen.views.portfolio-view-test]
@@ -823,6 +824,7 @@
              'hyperopen.views.l2-orderbook-view-test
              'hyperopen.views.leaderboard-view-test
              'hyperopen.views.leaderboard.vm-test
+             'hyperopen.views.notifications-view-trade-confirmation-test
              'hyperopen.views.portfolio-view-fee-schedule-test
              'hyperopen.views.portfolio-view-hover-freeze-test
              'hyperopen.views.portfolio-view-test
