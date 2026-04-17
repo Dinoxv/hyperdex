@@ -9,27 +9,12 @@
     :mobile-label "Staking"
     :data-role "portfolio-action-link-staking"
     :action [:actions/navigate "/staking"]}
-   {:label "Swap Stablecoins"
-    :mobile-label "Swap"
-    :data-role "portfolio-action-swap-stablecoins"
-    :action [:actions/navigate "/trade"]}
    {:label "Perps ↔ Spot"
     :mobile-label "Perp Spot"
     :data-role "portfolio-action-perps-spot"
-    :action [:actions/navigate "/trade"]}
-   {:label "EVM ↔ Core"
-    :mobile-label "EVM Core"
-    :data-role "portfolio-action-evm-core"
-    :action [:actions/navigate "/trade"]}
-   {:label "Portfolio Margin"
-    :mobile-label "PM"
-    :data-role "portfolio-action-portfolio-margin"
-    :action [:actions/navigate "/portfolio"]}
-   {:label "Send"
-    :data-role "portfolio-action-send"
     :action [:actions/open-funding-transfer-modal
              :event.currentTarget/bounds
-             "portfolio-action-send"]}
+             "portfolio-action-perps-spot"]}
    {:label "Withdraw"
     :data-role "portfolio-action-withdraw"
     :action [:actions/open-funding-withdraw-modal

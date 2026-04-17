@@ -267,14 +267,16 @@
         portfolio-tab-labels (mapv #(first (collect-strings %)) portfolio-tab-buttons)
         portfolio-action-buttons (into {}
                                       (for [role ["portfolio-action-link-staking"
-                                                  "portfolio-action-swap-stablecoins"
                                                   "portfolio-action-perps-spot"
-                                                  "portfolio-action-evm-core"
-                                                  "portfolio-action-portfolio-margin"
-                                                  "portfolio-action-send"
                                                   "portfolio-action-withdraw"
                                                   "portfolio-action-deposit"]]
                                         [role (find-first-node view-node #(= role (get-in % [1 :data-role])))]))
+        removed-portfolio-action-buttons (into {}
+                                               (for [role ["portfolio-action-swap-stablecoins"
+                                                           "portfolio-action-evm-core"
+                                                           "portfolio-action-portfolio-margin"
+                                                           "portfolio-action-send"]]
+                                                 [role (find-first-node view-node #(= role (get-in % [1 :data-role])))]))
         account-tables-panel (find-first-node view-node #(= "account-tables" (get-in % [1 :data-parity-id])))
         balances-account-tables-panel (find-first-node balances-view-node #(= "account-tables" (get-in % [1 :data-parity-id])))
         performance-metrics-card (find-first-node view-node #(= "portfolio-performance-metrics-card" (get-in % [1 :data-role])))
@@ -322,20 +324,13 @@
     (is (some? performance-tab-button))
     (is (some? balances-tab-button))
     (is (every? some? (vals portfolio-action-buttons)))
+    (is (every? nil? (vals removed-portfolio-action-buttons)))
     (is (= [[:actions/navigate "/staking"]]
            (get-in (get portfolio-action-buttons "portfolio-action-link-staking") [1 :on :click])))
-    (is (= [[:actions/navigate "/trade"]]
-           (get-in (get portfolio-action-buttons "portfolio-action-swap-stablecoins") [1 :on :click])))
-    (is (= [[:actions/navigate "/trade"]]
-           (get-in (get portfolio-action-buttons "portfolio-action-perps-spot") [1 :on :click])))
-    (is (= [[:actions/navigate "/trade"]]
-           (get-in (get portfolio-action-buttons "portfolio-action-evm-core") [1 :on :click])))
-    (is (= [[:actions/navigate "/portfolio"]]
-           (get-in (get portfolio-action-buttons "portfolio-action-portfolio-margin") [1 :on :click])))
     (is (= [[:actions/open-funding-transfer-modal
              :event.currentTarget/bounds
-             "portfolio-action-send"]]
-           (get-in (get portfolio-action-buttons "portfolio-action-send") [1 :on :click])))
+             "portfolio-action-perps-spot"]]
+           (get-in (get portfolio-action-buttons "portfolio-action-perps-spot") [1 :on :click])))
     (is (= [[:actions/open-funding-withdraw-modal
              :event.currentTarget/bounds
              "portfolio-action-withdraw"]]
@@ -626,7 +621,7 @@
         transfer-button (find-first-node view-node
                                          #(= [[:actions/open-funding-transfer-modal
                                                 :event.currentTarget/bounds
-                                                "portfolio-action-send"]]
+                                                "portfolio-action-perps-spot"]]
                                              (get-in % [1 :on :click])))
         withdraw-button (find-first-node view-node
                                          #(= [[:actions/open-funding-withdraw-modal

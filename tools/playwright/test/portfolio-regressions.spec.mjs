@@ -44,8 +44,13 @@ test("portfolio route exposes deterministic interaction states @regression", asy
   await visitRoute(page, "/portfolio");
 
   await expect(page.locator("[data-role='portfolio-actions-row']")).toBeVisible();
+  await expect(page.locator("[data-role='portfolio-action-perps-spot']")).toBeVisible();
   await expect(page.locator("[data-role='portfolio-action-deposit']")).toBeVisible();
   await expect(page.locator("[data-role='portfolio-action-withdraw']")).toBeVisible();
+  await expect(page.locator("[data-role='portfolio-action-swap-stablecoins']")).toHaveCount(0);
+  await expect(page.locator("[data-role='portfolio-action-evm-core']")).toHaveCount(0);
+  await expect(page.locator("[data-role='portfolio-action-portfolio-margin']")).toHaveCount(0);
+  await expect(page.locator("[data-role='portfolio-action-send']")).toHaveCount(0);
 
   await selectSummaryScope(page, "perps", "Perps");
   await selectChartTab(page, "pnl");
@@ -86,7 +91,7 @@ test("portfolio funding openers launch the funding modal on real click @regressi
 
   for (const [dataRole, title] of [
     ["portfolio-action-deposit", "Deposit"],
-    ["portfolio-action-send", "Perps <-> Spot"],
+    ["portfolio-action-perps-spot", "Perps <-> Spot"],
     ["portfolio-action-withdraw", "Withdraw"]
   ]) {
     const openButton = page.locator(`[data-role='${dataRole}']`);

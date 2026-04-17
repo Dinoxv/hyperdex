@@ -132,12 +132,12 @@
         original-get-computed-style (.-getComputedStyle js/globalThis)
         document #js {}
         body-node (:node (make-focus-node document))
-        header-opener (make-focus-node document {:data-role "portfolio-action-send"})
+        header-opener (make-focus-node document {:data-role "portfolio-action-perps-spot"})
         replacement-opener (make-focus-node document {:data-role "portfolio-funding-action-transfer"})
         first-focusable (make-focus-node document)
         {:keys [node]} (make-dialog-node document [(:node first-focusable)])
         queried-selectors* (atom [])
-        combined-selector "[data-role=\"funding-action-transfer\"], [data-role=\"portfolio-action-send\"], [data-role=\"portfolio-funding-action-transfer\"]"]
+        combined-selector "[data-role=\"funding-action-transfer\"], [data-role=\"portfolio-action-perps-spot\"], [data-role=\"portfolio-funding-action-transfer\"]"]
     (set! (.-body document) body-node)
     (set! (.-activeElement document) (:node header-opener))
     (aset document
@@ -145,8 +145,8 @@
           (fn [selector]
             (swap! queried-selectors* conj selector)
             (case selector
-              "[data-role=\"portfolio-action-send\"]" nil
-              "[data-role=\"funding-action-transfer\"], [data-role=\"portfolio-action-send\"], [data-role=\"portfolio-funding-action-transfer\"]"
+              "[data-role=\"portfolio-action-perps-spot\"]" nil
+              "[data-role=\"funding-action-transfer\"], [data-role=\"portfolio-action-perps-spot\"], [data-role=\"portfolio-funding-action-transfer\"]"
               (:node replacement-opener)
               nil)))
     (set! (.-document js/globalThis) document)
@@ -164,7 +164,7 @@
         (dialog-focus/restore-remembered-focus!)
         (is (= 1 @(-> replacement-opener :focus-calls)))
         (is (= (:node replacement-opener) (.-activeElement document)))
-        (is (= ["[data-role=\"portfolio-action-send\"]"
+        (is (= ["[data-role=\"portfolio-action-perps-spot\"]"
                 combined-selector]
                @queried-selectors*)))
       (finally

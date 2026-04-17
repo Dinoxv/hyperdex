@@ -15,7 +15,7 @@
   "portfolio-action-deposit")
 
 (def ^:private portfolio-header-transfer-action-data-role
-  "portfolio-action-send")
+  "portfolio-action-perps-spot")
 
 (def ^:private portfolio-header-withdraw-action-data-role
   "portfolio-action-withdraw")

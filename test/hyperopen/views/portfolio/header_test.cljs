@@ -6,22 +6,22 @@
 (def ^:private trader-route-address
   "0x3333333333333333333333333333333333333333")
 
-(deftest header-actions-renders-all-portfolio-action-buttons-test
+(deftest header-actions-renders-implemented-portfolio-action-buttons-test
   (let [view (header/header-actions {})
         actions-row (hiccup/find-by-data-role view "portfolio-actions-row")
         action-buttons (hiccup/find-all-nodes actions-row #(= :button (first %)))
         link-staking (hiccup/find-by-data-role view "portfolio-action-link-staking")
-        send (hiccup/find-by-data-role view "portfolio-action-send")
+        perps-spot (hiccup/find-by-data-role view "portfolio-action-perps-spot")
         withdraw (hiccup/find-by-data-role view "portfolio-action-withdraw")
         deposit (hiccup/find-by-data-role view "portfolio-action-deposit")]
     (is (contains? (set (hiccup/collect-strings view)) "Portfolio"))
-    (is (= 8 (count action-buttons)))
+    (is (= 4 (count action-buttons)))
     (is (= [[:actions/navigate "/staking"]]
            (get-in link-staking [1 :on :click])))
     (is (= [[:actions/open-funding-transfer-modal
              :event.currentTarget/bounds
-             "portfolio-action-send"]]
-           (get-in send [1 :on :click])))
+             "portfolio-action-perps-spot"]]
+           (get-in perps-spot [1 :on :click])))
     (is (= [[:actions/open-funding-withdraw-modal
              :event.currentTarget/bounds
              "portfolio-action-withdraw"]]
@@ -29,17 +29,22 @@
     (is (= [[:actions/open-funding-deposit-modal
              :event.currentTarget/bounds
              "portfolio-action-deposit"]]
-           (get-in deposit [1 :on :click])))))
+           (get-in deposit [1 :on :click])))
+    (doseq [unimplemented-role ["portfolio-action-swap-stablecoins"
+                                "portfolio-action-evm-core"
+                                "portfolio-action-portfolio-margin"
+                                "portfolio-action-send"]]
+      (is (nil? (hiccup/find-by-data-role view unimplemented-role))))))
 
 (deftest header-actions-add-focus-return-hook-for-matching-funding-button-test
   (let [view (header/header-actions {:funding-ui {:modal {:focus-return-data-role "portfolio-action-deposit"
                                                           :focus-return-token 5}}})
         deposit (hiccup/find-by-data-role view "portfolio-action-deposit")
-        send (hiccup/find-by-data-role view "portfolio-action-send")]
+        perps-spot (hiccup/find-by-data-role view "portfolio-action-perps-spot")]
     (is (fn? (get-in deposit [1 :replicant/on-render])))
     (is (= "focus-return:portfolio-action-deposit:5:true"
            (get-in deposit [1 :replicant/key])))
-    (is (nil? (get-in send [1 :replicant/on-render])))))
+    (is (nil? (get-in perps-spot [1 :replicant/on-render])))))
 
 (deftest portfolio-inspection-header-renders-read-only-trader-contract-test
   (let [view (header/portfolio-inspection-header
