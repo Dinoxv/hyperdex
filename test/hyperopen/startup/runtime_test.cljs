@@ -359,6 +359,34 @@
             :dispatch! dispatch!})
           (is (= 1 (count @removed-handlers))))))))
 
+(deftest install-position-tpsl-clickaway-dismisses-expanded-trade-blotter-on-outside-click-test
+  (let [registered-handlers (atom {})
+        dispatch-calls (atom [])
+        store (atom {:ui {:toasts [{:id "trade-blotter"
+                                    :toast-surface :trade-confirmation
+                                    :expanded? true}
+                                   {:id "regular-toast" :message "Order placed"}]}})
+        dispatch! (fn [store-arg _ctx effects]
+                    (swap! dispatch-calls conj {:store store-arg :effects effects}))
+        inside-blotter-target #js {:closest (fn [selector]
+                                              (when (= selector "[data-trade-blotter-surface='true']") #js {}))}
+        outside-target #js {:closest (fn [_selector] nil)}]
+    (with-global-property
+      "window"
+      #js {:addEventListener (fn [event-name handler] (swap! registered-handlers assoc event-name handler))
+           :removeEventListener (fn [_event-name _handler] nil)}
+      (fn []
+        (startup-runtime/install-position-tpsl-clickaway!
+         {:store store
+          :dispatch! dispatch!})
+        (let [mousedown-handler (get @registered-handlers "mousedown")]
+          (is (fn? mousedown-handler))
+          (mousedown-handler #js {:target inside-blotter-target})
+          (is (empty? @dispatch-calls))
+          (mousedown-handler #js {:target outside-target})
+          (is (= [[:actions/dismiss-order-feedback-toast "trade-blotter"]]
+                 (-> @dispatch-calls first :effects))))))))
+
 (deftest stage-b-account-bootstrap-covers-shape-guard-and-empty-dex-branches-test
   (let [timeouts (atom [])
         open-orders-calls (atom [])

@@ -90,6 +90,8 @@
     (is (some? blotter-node))
     (is (contains? (hiccup/node-class-set blotter-node) "o-blotter"))
     (is (contains? (hiccup/node-class-set blotter-node) "pointer-events-auto"))
+    (is (= "true"
+           (get-in blotter-node [1 :data-trade-blotter-surface])))
     (is (contains? rendered-strings "Activity · 4 fills"))
     (is (re-find #"Bought\s+0\.55\s+HYPE" rendered-text))
     (is (re-find #"Sold\s+3\s+SOL" rendered-text))

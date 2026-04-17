@@ -311,17 +311,22 @@
       (fn? (some-> target .-parentElement .-closest)) (.-parentElement target)
       :else nil)))
 
-(defn- within-position-overlay-surface?
-  [target]
-  (boolean
-   (or (some-> target (.closest "[data-position-tpsl-surface='true']"))
-       (some-> target (.closest "[data-position-tpsl-trigger='true']"))
-       (some-> target (.closest "[data-position-reduce-surface='true']"))
-       (some-> target (.closest "[data-position-reduce-trigger='true']"))
-       (some-> target (.closest "[data-position-margin-surface='true']"))
-       (some-> target (.closest "[data-position-margin-trigger='true']"))
-       (some-> target (.closest "[data-spectate-mode-surface='true']"))
-       (some-> target (.closest "[data-spectate-mode-trigger='true']")))))
+(def ^:private clickaway-surface-selectors
+  ["[data-position-tpsl-surface='true']" "[data-position-tpsl-trigger='true']"
+   "[data-position-reduce-surface='true']" "[data-position-reduce-trigger='true']"
+   "[data-position-margin-surface='true']" "[data-position-margin-trigger='true']"
+   "[data-spectate-mode-surface='true']" "[data-spectate-mode-trigger='true']"
+   "[data-trade-blotter-surface='true']"])
+
+(defn- within-position-overlay-surface? [target]
+  (boolean (some #(some-> target (.closest %)) clickaway-surface-selectors)))
+
+(defn- expanded-trade-blotter-toast-id
+  [state]
+  (some (fn [{:keys [expanded? id toast-surface]}]
+          (when (and id (true? expanded?) (= :trade-confirmation toast-surface))
+            id))
+        (get-in state [:ui :toasts])))
 
 (defn install-position-tpsl-clickaway!
   [{:keys [store dispatch!]}]
@@ -340,7 +345,8 @@
                             reduce-open? (true? (get-in @store [:positions-ui :reduce-popover :open?]))
                             margin-open? (true? (get-in @store [:positions-ui :margin-modal :open?]))
                             spectate-mode-open? (true? (get-in @store [:account-context :spectate-ui :modal-open?]))
-                            any-open? (or tpsl-open? reduce-open? margin-open? spectate-mode-open?)]
+                            trade-blotter-id (expanded-trade-blotter-toast-id @store)
+                            any-open? (or tpsl-open? reduce-open? margin-open? spectate-mode-open? trade-blotter-id)]
                         (when any-open?
                           (let [target (event-target-with-closest event)]
                             (when-not (within-position-overlay-surface? target)
@@ -348,7 +354,8 @@
                                                     tpsl-open? (conj [:actions/close-position-tpsl-modal])
                                                     reduce-open? (conj [:actions/close-position-reduce-popover])
                                                     margin-open? (conj [:actions/close-position-margin-modal])
-                                                    spectate-mode-open? (conj [:actions/close-spectate-mode-modal]))]
+                                                    spectate-mode-open? (conj [:actions/close-spectate-mode-modal])
+                                                    trade-blotter-id (conj [:actions/dismiss-order-feedback-toast trade-blotter-id]))]
                                 (when (seq close-actions)
                                   (dispatch! store nil close-actions))))))))]
         (.addEventListener window-object "mousedown" handler)

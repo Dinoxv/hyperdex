@@ -322,6 +322,7 @@
                            0
                            fills)]
        [:div {:class ["o-blotter" "pointer-events-auto"]
+              :data-trade-blotter-surface "true"
               :data-role "BlotterCard"}
         [:div {:class ["o-blotter-head"]}
          [:div {:class ["o-blotter-title"]}
