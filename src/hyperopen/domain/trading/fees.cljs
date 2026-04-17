@@ -99,6 +99,51 @@
      :adjustment-c adjustment-c
      :growth-scale growth-scale}))
 
+(defn adjust-percentage-rates
+  "Apply protocol market modifiers to percentage-unit fee rates.
+   Input and output rates use display percentage units, e.g. 0.045 means 0.045%."
+  [{:keys [taker maker]}
+   {:keys [market-type
+           stable-pair?
+           deployer-fee-scale
+           growth-mode?
+           extra-adjustment?]}]
+  (let [spot? (spot-market? market-type)
+        perp? (= :perp (normalize-market-type market-type))
+        stable-factor (if (and spot? stable-pair?)
+                        stable-pair-fee-multiplier
+                        1)
+        {:keys [maker-positive-scale adjustment-c growth-scale]}
+        (if perp?
+          (perp-fee-factors {:deployer-fee-scale deployer-fee-scale
+                             :growth-mode? (boolean growth-mode?)})
+          {:maker-positive-scale 1
+           :adjustment-c 0
+           :growth-scale 1})
+        taker* (* (or (parse-rate taker) 0)
+                  stable-factor
+                  maker-positive-scale
+                  growth-scale)
+        maker* (* (or (parse-rate maker) 0)
+                  stable-factor
+                  growth-scale)
+        maker-effective (if (pos? maker*)
+                          (* maker* maker-positive-scale)
+                          (* maker*
+                             (if extra-adjustment?
+                               (+ (* special-adjustment-rebate-multiplier
+                                     (- 1 adjustment-c))
+                                  adjustment-c)
+                               1)))
+        taker-effective (if extra-adjustment?
+                          (* taker*
+                             (+ (* special-adjustment-taker-multiplier
+                                   (- 1 adjustment-c))
+                                adjustment-c))
+                          taker*)]
+    {:taker taker-effective
+     :maker maker-effective}))
+
 (defn quote-fees
   [user-fees {:keys [market-type
                      stable-pair?
@@ -106,41 +151,20 @@
                      growth-mode?
                      extra-adjustment?]}]
   (let [spot? (spot-market? market-type)
-        perp? (= :perp (normalize-market-type market-type))
         effective-rates (referral-adjusted-rates user-fees spot?)
         baseline* (baseline-rates user-fees spot?)]
     (when (and effective-rates baseline*)
       (let [{:keys [cross-rate add-rate]} baseline*
-            stable-factor (if (and spot? stable-pair?)
-                            stable-pair-fee-multiplier
-                            1)
-            {:keys [maker-positive-scale adjustment-c growth-scale]}
-            (if perp?
-              (perp-fee-factors {:deployer-fee-scale deployer-fee-scale
-                                 :growth-mode? (boolean growth-mode?)})
-              {:maker-positive-scale 1
-               :adjustment-c 0
-               :growth-scale 1})
-            maker-raw (* 100 (:add-rate effective-rates) stable-factor growth-scale)
-            maker-effective (if (pos? maker-raw)
-                              (* maker-raw maker-positive-scale)
-                              (* maker-raw
-                                 (if extra-adjustment?
-                                   (+ (* special-adjustment-rebate-multiplier
-                                         (- 1 adjustment-c))
-                                      adjustment-c)
-                                   1)))
-            taker-raw (* 100
-                         (:cross-rate effective-rates)
-                         stable-factor
-                         maker-positive-scale
-                         growth-scale)
-            taker-effective (if extra-adjustment?
-                              (* taker-raw
-                                 (+ (* special-adjustment-taker-multiplier
-                                       (- 1 adjustment-c))
-                                    adjustment-c))
-                              taker-raw)
+            effective (adjust-percentage-rates
+                       {:taker (* 100 (:cross-rate effective-rates))
+                        :maker (* 100 (:add-rate effective-rates))}
+                       {:market-type market-type
+                        :stable-pair? stable-pair?
+                        :deployer-fee-scale deployer-fee-scale
+                        :growth-mode? growth-mode?
+                        :extra-adjustment? extra-adjustment?})
+            taker-effective (:taker effective)
+            maker-effective (:maker effective)
             baseline-taker (* 100 cross-rate)
             baseline-maker (* 100 add-rate)]
         (when (and (finite-number? maker-effective)

@@ -1,19 +1,40 @@
 (ns hyperopen.portfolio.fee-schedule
-  (:require [clojure.string :as str]))
+  (:require [clojure.string :as str]
+            [hyperopen.domain.trading.fees :as trading-fees]))
 
 (def default-market-type :perps)
 
 (def market-type-options
-  [{:value :perps
-    :label "Perps"}
-   {:value :spot
+  [{:value :spot
     :label "Spot"}
-   {:value :spot-stable-pair
-    :label "Spot + Stable Pair"}
    {:value :spot-aligned-quote
     :label "Spot + Aligned Quote"}
+   {:value :spot-stable-pair
+    :label "Spot + Stable Pair"}
    {:value :spot-aligned-stable-pair
-    :label "Spot + Aligned Quote + Stable Pair"}])
+    :label "Spot + Aligned Quote + Stable Pair"}
+   {:value :perps
+    :label "Core Perps"}
+   {:value :hip3-perps
+    :label "HIP-3 Perps"}
+   {:value :hip3-perps-growth-mode
+    :label "HIP-3 Perps + Growth mode"}
+   {:value :hip3-perps-aligned-quote
+    :label "HIP-3 Perps + Aligned Quote"}
+   {:value :hip3-perps-growth-mode-aligned-quote
+    :label "HIP-3 Perps + Growth mode + Aligned Quote"}])
+
+(def ^:private hip3-market-types
+  #{:hip3-perps
+    :hip3-perps-growth-mode
+    :hip3-perps-aligned-quote
+    :hip3-perps-growth-mode-aligned-quote})
+
+(def ^:private aligned-quote-symbols
+  #{"HORSE"
+    "USDH"
+    "USDL"
+    "USDZZ"})
 
 (def ^:private market-type-by-key
   (into {}
@@ -29,13 +50,14 @@
           (str/replace #"[^a-z0-9]" "")))
 
 (def ^:private market-type-aliases
-  (reduce (fn [aliases {:keys [value label]}]
-            (assoc aliases
-                   (normalize-token value) value
-                   (normalize-token (name value)) value
-                   (normalize-token label) value))
-          {}
-          market-type-options))
+  (-> (reduce (fn [aliases {:keys [value label]}]
+                (assoc aliases
+                       (normalize-token value) value
+                       (normalize-token (name value)) value
+                       (normalize-token label) value))
+              {}
+              market-type-options)
+      (assoc (normalize-token "Perps") :perps)))
 
 (defn- option-by-value
   [options]
@@ -187,6 +209,124 @@
     (when (finite-number? num)
       num)))
 
+(defn- normalized-market-type
+  [value]
+  (cond
+    (keyword? value) value
+    (string? value) (let [normalized (some-> value str/trim str/lower-case)]
+                      (when (seq normalized)
+                        (keyword normalized)))
+    :else nil))
+
+(defn- hip3-market-type?
+  [market-type]
+  (contains? hip3-market-types (normalize-market-type market-type)))
+
+(defn- growth-mode-enabled?
+  [value]
+  (or (= true value)
+      (= :enabled value)
+      (= "enabled" (some-> value str str/trim str/lower-case))))
+
+(defn- aligned-quote?
+  [market]
+  (if (contains? market :special-quote-fee-adjustment?)
+    (boolean (:special-quote-fee-adjustment? market))
+    (contains? aligned-quote-symbols
+               (some-> (:quote market) str str/trim str/upper-case))))
+
+(defn- active-growth-mode?
+  [market]
+  (if (contains? market :growth-mode?)
+    (boolean (:growth-mode? market))
+    (growth-mode-enabled? (:growthMode market))))
+
+(defn- namespaced-symbol
+  [value]
+  (let [text (some-> value str str/trim)]
+    (when (seq text)
+      (let [without-namespace (if (str/includes? text ":")
+                                (second (str/split text #":" 2))
+                                text)]
+        (first (str/split without-namespace #"/" 2))))))
+
+(defn- active-market-symbol
+  [state market]
+  (or (namespaced-symbol (:base market))
+      (namespaced-symbol (:coin market))
+      (namespaced-symbol (:active-asset state))))
+
+(defn- active-market-scenario
+  [market]
+  (let [market-type (normalized-market-type (:market-type market))
+        hip3? (and (= :perp market-type)
+                   (seq (some-> (:dex market) str str/trim)))
+        growth? (active-growth-mode? market)
+        aligned? (aligned-quote? market)]
+    (cond
+      (= :spot market-type)
+      (cond
+        (and (:stable-pair? market) aligned?) :spot-aligned-stable-pair
+        (:stable-pair? market) :spot-stable-pair
+        aligned? :spot-aligned-quote
+        :else :spot)
+
+      hip3?
+      (cond
+        (and growth? aligned?) :hip3-perps-growth-mode-aligned-quote
+        growth? :hip3-perps-growth-mode
+        aligned? :hip3-perps-aligned-quote
+        :else :hip3-perps)
+
+      (= :perp market-type)
+      :perps
+
+      :else nil)))
+
+(defn- active-fee-context
+  [state]
+  (let [market (or (:active-market state) {})
+        dex (some-> (:dex market) str str/trim)
+        deployer-fee-scale (optional-number
+                            (get-in state
+                                    [:perp-dex-fee-config-by-name dex :deployer-fee-scale]))
+        active-scenario (active-market-scenario market)
+        hip3-active? (hip3-market-type? active-scenario)]
+    {:active-market-type active-scenario
+     :active-market-symbol (active-market-symbol state market)
+     :deployer-fee-scale deployer-fee-scale
+     :hip3-context-available? (and hip3-active?
+                                   (finite-number? deployer-fee-scale))}))
+
+(defn- market-type-growth-mode?
+  [market-type]
+  (contains? #{:hip3-perps-growth-mode
+               :hip3-perps-growth-mode-aligned-quote}
+             (normalize-market-type market-type)))
+
+(defn- market-type-aligned-quote?
+  [market-type]
+  (contains? #{:spot-aligned-quote
+               :spot-aligned-stable-pair
+               :hip3-perps-aligned-quote
+               :hip3-perps-growth-mode-aligned-quote}
+             (normalize-market-type market-type)))
+
+(defn- market-type-stable-pair?
+  [market-type]
+  (contains? #{:spot-stable-pair
+               :spot-aligned-stable-pair}
+             (normalize-market-type market-type)))
+
+(defn- available-market-type
+  [market-type active-context]
+  (let [market-type* (normalize-market-type market-type)]
+    (if (and (hip3-market-type? market-type*)
+             (not (or (:hip3-context-available? active-context)
+                      (finite-number? (:deployer-fee-scale active-context)))))
+      :perps
+      market-type*)))
+
 (defn- trim-rate-decimals
   [text]
   (let [[whole decimals] (str/split text #"\.")]
@@ -251,48 +391,43 @@
         (update :maker positive-fee-discount discount))))
 
 (defn- apply-market-type
-  [market-type row]
-  (case (normalize-market-type market-type)
-    :perps row
-    :spot row
-    :spot-stable-pair
-    (-> row
-        (update :taker * 0.2)
-        (update :maker * 0.2))
-    :spot-aligned-quote
-    (-> row
-        (update :taker * 0.8)
-        (update :maker (fn [maker]
-                         (if (neg? maker)
-                           (* maker 1.5)
-                           maker))))
-    :spot-aligned-stable-pair
-    (-> row
-        (update :taker * 0.16)
-        (update :maker (fn [maker]
-                         (if (neg? maker)
-                           (* maker 0.3)
-                           (* maker 0.2)))))
-    row))
+  [market-type active-context row]
+  (let [market-type* (available-market-type market-type active-context)
+        spot? (contains? #{:spot
+                           :spot-stable-pair
+                           :spot-aligned-quote
+                           :spot-aligned-stable-pair}
+                         market-type*)]
+    (trading-fees/adjust-percentage-rates
+     row
+     {:market-type (if spot? :spot :perp)
+      :stable-pair? (market-type-stable-pair? market-type*)
+      :deployer-fee-scale (when (hip3-market-type? market-type*)
+                            (:deployer-fee-scale active-context))
+      :growth-mode? (market-type-growth-mode? market-type*)
+      :extra-adjustment? (market-type-aligned-quote? market-type*)})))
 
 (defn fee-schedule-rows
   ([market-type]
    (fee-schedule-rows market-type {}))
   ([market-type {:keys [referral-discount
                         staking-tier
-                        maker-rebate-tier]}]
-   (let [market-type* (normalize-market-type market-type)
+                        maker-rebate-tier
+                        active-fee-context]}]
+   (let [active-context (or active-fee-context {})
+         market-type* (available-market-type market-type active-context)
          referral-discount* (normalize-referral-discount referral-discount)
          staking-tier* (normalize-staking-tier staking-tier)
          maker-rebate-tier* (normalize-maker-rebate-tier maker-rebate-tier)
-         base-rates (if (= :perps market-type*)
+         base-rates (if (or (= :perps market-type*)
+                            (hip3-market-type? market-type*))
                       perps-rates
                       spot-rates)]
      (mapv (fn [index row]
              (let [row* (->> row
                              (apply-staking-tier staking-tier*)
                              (apply-maker-rebate-tier maker-rebate-tier*)
-                             (apply-market-type market-type*)
+                             (apply-market-type market-type* active-context)
                              (apply-referral-discount referral-discount*))]
                {:tier (str index)
                 :volume (nth volume-thresholds index)
@@ -307,7 +442,24 @@
               (when (= value market-type)
                 label))
             market-type-options)
-      "Perps"))
+      "Core Perps"))
+
+(defn- decorate-market-options
+  [active-context selected-value]
+  (let [active-market-type (:active-market-type active-context)
+        active-market-symbol (:active-market-symbol active-context)
+        hip3-available? (:hip3-context-available? active-context)]
+    (mapv (fn [{:keys [value] :as option}]
+            (cond-> (assoc option :selected? (= value selected-value))
+              (and (hip3-market-type? value) (not hip3-available?))
+              (assoc :disabled? true
+                     :helper "Select an HIP-3 market to preview deployer fees")
+
+              (and (= value active-market-type)
+                   (seq active-market-symbol))
+              (assoc :current? true
+                     :current-label (str "Active market: " active-market-symbol))))
+          market-type-options)))
 
 (defn- wallet-connected?
   [state]
@@ -364,7 +516,7 @@
       :none)))
 
 (def rate-note
-  "* Rates reflect selected referral, staking, and maker rebate scenarios; HIP-3 deployer adjustments not included")
+  "* Rates reflect selected referral, staking, maker rebate, market type, and available HIP-3 deployer context")
 
 (def documentation-url
   "https://hyperliquid.gitbook.io/hyperliquid-docs/trading/fees")
@@ -454,9 +606,11 @@
 
 (defn fee-schedule-model
   [state]
-  (let [market-type (normalize-market-type
+  (let [active-context (active-fee-context state)
+        market-type (available-market-type
                      (get-in state [:portfolio-ui :fee-schedule-market-type]
-                             default-market-type))
+                             default-market-type)
+                     active-context)
         connected? (wallet-connected? state)
         user-fees (get-in state [:portfolio :user-fees])
         current-referral (if connected?
@@ -482,14 +636,15 @@
                                               current-maker-rebate)
         scenario {:referral-discount selected-referral
                   :staking-tier selected-staking
-                  :maker-rebate-tier selected-maker-rebate}]
+                  :maker-rebate-tier selected-maker-rebate
+                  :active-fee-context active-context}]
     {:open? (boolean (get-in state [:portfolio-ui :fee-schedule-open?]))
      :anchor (get-in state [:portfolio-ui :fee-schedule-anchor])
      :title "Fee Schedule"
      :selected-market-type market-type
      :selected-market-label (market-type-label market-type)
      :market-dropdown-open? (boolean (get-in state [:portfolio-ui :fee-schedule-market-dropdown-open?]))
-     :market-options market-type-options
+     :market-options (decorate-market-options active-context market-type)
      :referral (referral-control state connected? current-referral selected-referral)
      :staking (staking-control state connected? current-staking selected-staking)
      :maker-rebate (maker-rebate-control state connected? current-maker-rebate selected-maker-rebate)

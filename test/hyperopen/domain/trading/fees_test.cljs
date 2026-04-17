@@ -27,6 +27,44 @@
     (is (approx= 0.04 (get-in quote [:baseline :taker])))
     (is (approx= 0.016 (get-in quote [:baseline :maker])))))
 
+(deftest adjust-percentage-rates-applies-protocol-market-modifiers-test
+  (testing "HIP-3 deployer fee scale below one"
+    (let [rates (fees/adjust-percentage-rates
+                 {:taker 0.045 :maker 0.015}
+                 {:market-type :perp
+                  :deployer-fee-scale 0.5
+                  :growth-mode? false
+                  :extra-adjustment? false})]
+      (is (approx= 0.0675 (:taker rates)))
+      (is (approx= 0.0225 (:maker rates)))))
+  (testing "HIP-3 growth mode and aligned quote"
+    (let [rates (fees/adjust-percentage-rates
+                 {:taker 0.045 :maker 0.015}
+                 {:market-type :perp
+                  :deployer-fee-scale 0.5
+                  :growth-mode? true
+                  :extra-adjustment? true})]
+      (is (approx= 0.00585 (:taker rates)))
+      (is (approx= 0.00225 (:maker rates)))))
+  (testing "aligned quote improves HIP-3 negative maker rebates"
+    (let [rates (fees/adjust-percentage-rates
+                 {:taker 0.045 :maker -0.001}
+                 {:market-type :perp
+                  :deployer-fee-scale 0.5
+                  :growth-mode? true
+                  :extra-adjustment? true})]
+      (is (approx= 0.00585 (:taker rates)))
+      (is (approx= -0.0001333333 (:maker rates)))))
+  (testing "HIP-3 deployer fee scale at or above one uses the doubled scale branch"
+    (let [rates (fees/adjust-percentage-rates
+                 {:taker 0.045 :maker 0.015}
+                 {:market-type :perp
+                  :deployer-fee-scale 1.2
+                  :growth-mode? true
+                  :extra-adjustment? false})]
+      (is (approx= 0.0108 (:taker rates)))
+      (is (approx= 0.0036 (:maker rates))))))
+
 (deftest quote-fees-applies-perp-growth-and-special-adjustment-test
   (testing "positive maker fees scale with deployer and growth multipliers"
     (let [quote (fees/quote-fees {:userCrossRate 0.0005

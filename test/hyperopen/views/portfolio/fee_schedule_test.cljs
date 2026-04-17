@@ -13,12 +13,30 @@
             :viewport-width 900
             :viewport-height 900}
    :selected-market-type :perps
-   :selected-market-label "Perps"
+   :selected-market-label "Core Perps"
    :market-dropdown-open? true
-   :market-options [{:value :perps
-                     :label "Perps"}
+   :market-options [{:value :spot
+                     :label "Spot"}
+                    {:value :spot-aligned-quote
+                     :label "Spot + Aligned Quote"}
+                    {:value :spot-stable-pair
+                     :label "Spot + Stable Pair"}
                     {:value :spot-aligned-stable-pair
-                     :label "Spot + Aligned Quote + Stable Pair"}]
+                     :label "Spot + Aligned Quote + Stable Pair"}
+                    {:value :perps
+                     :label "Core Perps"}
+                    {:value :hip3-perps
+                     :label "HIP-3 Perps"
+                     :disabled? true
+                     :helper "Select an HIP-3 market to preview deployer fees"}
+                    {:value :hip3-perps-growth-mode
+                     :label "HIP-3 Perps + Growth mode"
+                     :current? true
+                     :current-label "Active market: WTIOIL"}
+                    {:value :hip3-perps-aligned-quote
+                     :label "HIP-3 Perps + Aligned Quote"}
+                    {:value :hip3-perps-growth-mode-aligned-quote
+                     :label "HIP-3 Perps + Growth mode + Aligned Quote"}]
    :referral {:label "Referral Status"
               :value "No referral discount"
               :helper "Wallet not connected"
@@ -111,6 +129,12 @@
         stable-option (hiccup/find-by-data-role
                        view
                        "portfolio-fee-schedule-market-option-spot-aligned-stable-pair")
+        hip3-disabled-option (hiccup/find-by-data-role
+                              view
+                              "portfolio-fee-schedule-market-option-hip3-perps")
+        hip3-growth-option (hiccup/find-by-data-role
+                            view
+                            "portfolio-fee-schedule-market-option-hip3-perps-growth-mode")
         docs-link (hiccup/find-by-data-role view "portfolio-fee-schedule-docs-link")
         all-text (set (hiccup/collect-strings view))]
     (is (some? overlay))
@@ -156,6 +180,15 @@
     (is (= [[:actions/select-portfolio-fee-schedule-market-type
               :spot-aligned-stable-pair]]
            (get-in stable-option [1 :on :click])))
+    (is (= "true" (get-in hip3-disabled-option [1 :aria-disabled])))
+    (is (nil? (get-in hip3-disabled-option [1 :on :click])))
+    (is (contains? (set (hiccup/collect-strings hip3-disabled-option))
+                   "Select an HIP-3 market to preview deployer fees"))
+    (is (= [[:actions/select-portfolio-fee-schedule-market-type
+              :hip3-perps-growth-mode]]
+           (get-in hip3-growth-option [1 :on :click])))
+    (is (contains? (set (hiccup/collect-strings hip3-growth-option))
+                   "Active market: WTIOIL"))
     (is (= "https://hyperliquid.gitbook.io/hyperliquid-docs/trading/fees"
            (get-in docs-link [1 :href])))
     (is (= "_blank" (get-in docs-link [1 :target])))
@@ -171,6 +204,8 @@
     (is (contains? all-text "Current wallet maker rebate"))
     (is (contains? all-text "Taker*"))
     (is (contains? all-text "Maker*"))
+    (is (contains? all-text "Core Perps"))
+    (is (contains? all-text "HIP-3 Perps + Growth mode + Aligned Quote"))
     (is (contains? all-text "0.045%"))
     (is (contains? all-text "0.015%"))
     (is (not-any? #(or (str/includes? % "#f4c430")

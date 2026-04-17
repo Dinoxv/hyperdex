@@ -401,6 +401,21 @@ test("portfolio fee schedule opens, switches market type, and restores focus @re
   const makerRebateTrigger = page.locator("[data-role='portfolio-fee-schedule-maker-rebate-trigger']");
   const makerRebateTierTwoOption = page.locator("[data-role='portfolio-fee-schedule-maker-rebate-option-tier-2']");
   const marketTrigger = page.locator("[data-role='portfolio-fee-schedule-market-trigger']");
+  const marketOptionRoles = [
+    "portfolio-fee-schedule-market-option-spot",
+    "portfolio-fee-schedule-market-option-spot-aligned-quote",
+    "portfolio-fee-schedule-market-option-spot-stable-pair",
+    "portfolio-fee-schedule-market-option-spot-aligned-stable-pair",
+    "portfolio-fee-schedule-market-option-perps",
+    "portfolio-fee-schedule-market-option-hip3-perps",
+    "portfolio-fee-schedule-market-option-hip3-perps-growth-mode",
+    "portfolio-fee-schedule-market-option-hip3-perps-aligned-quote",
+    "portfolio-fee-schedule-market-option-hip3-perps-growth-mode-aligned-quote"
+  ];
+  const hip3PerpsOption = page.locator("[data-role='portfolio-fee-schedule-market-option-hip3-perps']");
+  const hip3GrowthOption = page.locator(
+    "[data-role='portfolio-fee-schedule-market-option-hip3-perps-growth-mode']"
+  );
   const stableAlignedOption = page.locator(
     "[data-role='portfolio-fee-schedule-market-option-spot-aligned-stable-pair']"
   );
@@ -479,6 +494,16 @@ test("portfolio fee schedule opens, switches market type, and restores focus @re
   await expect(tierZero).toContainText("0.045%");
   await expect(tierZero).toContainText("0.015%");
 
+  await marketTrigger.click();
+  for (const role of marketOptionRoles) {
+    await expect(page.locator(`[data-role='${role}']`)).toBeVisible();
+  }
+  await expect(marketTrigger).toContainText("Core Perps");
+  await expect(hip3PerpsOption).toHaveAttribute("aria-disabled", "true");
+  await expect(hip3PerpsOption).toContainText("Select an HIP-3 market to preview deployer fees");
+  await marketTrigger.click();
+  await expect(marketTrigger).toHaveAttribute("aria-expanded", "false");
+
   await referralTrigger.click();
   await expect(referralDiscountOption).toBeVisible();
   await referralDiscountOption.click();
@@ -542,8 +567,57 @@ test("portfolio fee schedule opens, switches market type, and restores focus @re
   await expect(trigger).toHaveAttribute("aria-expanded", "false");
   await expect(trigger).toBeFocused();
 
+  await page.evaluate(() => {
+    const c = globalThis.cljs?.core;
+    const store = globalThis.hyperopen?.system?.store;
+
+    if (!c || !store) {
+      throw new Error("Hyperopen store or cljs core unavailable");
+    }
+
+    const keyword = c.keyword;
+    const kwPath = (...segments) =>
+      c.PersistentVector.fromArray(segments.map((segment) => keyword(segment)), true);
+    const activeMarket = c.PersistentArrayMap.fromArray(
+      [
+        keyword("coin"), "testdex:WTIOIL",
+        keyword("key"), "perp:testdex:WTIOIL",
+        keyword("base"), "WTIOIL",
+        keyword("quote"), "USDC",
+        keyword("symbol"), "WTIOIL-USDC",
+        keyword("market-type"), keyword("perp"),
+        keyword("dex"), "testdex",
+        keyword("hip3?"), true,
+        keyword("growth-mode?"), true
+      ],
+      true
+    );
+    const feeConfig = c.PersistentArrayMap.fromArray(
+      [
+        "testdex",
+        c.PersistentArrayMap.fromArray([keyword("deployer-fee-scale"), 0.5], true)
+      ],
+      true
+    );
+    let nextState = c.deref(store);
+    nextState = c.assoc_in(nextState, kwPath("active-asset"), "testdex:WTIOIL");
+    nextState = c.assoc_in(nextState, kwPath("active-market"), activeMarket);
+    nextState = c.assoc_in(nextState, kwPath("perp-dex-fee-config-by-name"), feeConfig);
+    c.reset_BANG_(store, nextState);
+  });
+  await waitForIdle(page, { quietMs: 150, timeoutMs: 3_000, pollMs: 50 });
+
   await trigger.click();
   await expect(dialog).toBeVisible();
+  await marketTrigger.click();
+  await expect(hip3GrowthOption).toBeVisible();
+  await expect(hip3GrowthOption).not.toHaveAttribute("aria-disabled", "true");
+  await expect(hip3GrowthOption).toContainText("Active market: WTIOIL");
+  await hip3GrowthOption.click();
+  await waitForIdle(page, { quietMs: 150, timeoutMs: 3_000, pollMs: 50 });
+  await expect(marketTrigger).toContainText("HIP-3 Perps + Growth mode");
+  await expect(tierZero).toContainText("0.0068%");
+  await expect(tierZero).toContainText("0.0023%");
   await page.keyboard.press("Escape");
   await waitForIdle(page, { quietMs: 150, timeoutMs: 3_000, pollMs: 50 });
 

@@ -76,6 +76,10 @@ The feature matters because the portfolio route already displays the user's curr
   Rationale: those features require market-specific context or mutation flows that do not exist in the portfolio fee card. The popover should explain the current static schedule and user status, not become a fee-management workflow.
   Date/Author: 2026-04-17 / Codex
 
+- Decision: supersede the HIP-3 fee-schedule non-goal through the follow-up volume-tier implementation plan.
+  Rationale: the later plan `/Users/barry/.codex/worktrees/09e3/hyperopen/docs/exec-plans/completed/2026-04-17-portfolio-fee-schedule-volume-tier-options.md` added active-market deployer-fee context, HIP-3 growth-mode variants, aligned-quote HIP-3 variants, and the full volume-tier dropdown without adding mutation flows.
+  Date/Author: 2026-04-17 / Codex
+
 ## Outcomes & Retrospective
 
 Implementation is complete. The change adds one focused pure model namespace and one focused popover view namespace, with route-local state and actions rather than a new global popover subsystem. UI complexity increased modestly because the portfolio fee card now has a real disclosure flow, but the popover stays outside the chart-hover cached sections and uses the existing dialog focus helper, so the interaction remains localized.

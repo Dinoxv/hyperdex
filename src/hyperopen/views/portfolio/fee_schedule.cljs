@@ -117,8 +117,9 @@
                       :staking "portfolio-fee-schedule-staking"
                       :maker-rebate "portfolio-fee-schedule-maker-rebate"
                       :market "portfolio-fee-schedule-market")
-        menu-max-height (if (= kind :staking)
-                          "max-h-56"
+        menu-max-height (case kind
+                          :staking "max-h-56"
+                          :market "max-h-72"
                           "max-h-44")]
     [:section {:class ["space-y-1"]
                :data-role role-prefix}
@@ -175,45 +176,53 @@
                             ["pointer-events-none" "opacity-0" "scale-y-95" "-translate-y-1"]))
              :style {:transition "all 80ms ease-in-out"}
              :data-role (str role-prefix "-menu")}
-       (for [{:keys [value label description selected? current? current-label]} options]
+       (for [{:keys [value label description helper selected? current? current-label disabled?]} options]
          ^{:key (role-value value)}
-         [:button {:type "button"
-                   :class (into ["flex"
-                                 "h-7"
-                                 "w-full"
-                                 "items-center"
-                                 "gap-2"
-                                 "overflow-hidden"
-                                 "px-3"
-                                 "text-left"
-                                 "text-xs"
-                                 "transition-colors"
-                                 "hover:bg-base-300"
-                                 "hover:text-trading-text"
-                                 "focus-visible:bg-base-300"
-                                 "focus-visible:text-trading-text"
-                                 "focus:outline-none"
-                                 "focus:ring-0"
-                                 "focus:ring-offset-0"]
-                                (if (= value selected-value)
-                                  ["bg-base-200" "text-trading-text"]
-                                  ["text-trading-text-secondary"]))
-                   :aria-pressed (= value selected-value)
-                   :data-role (str role-prefix "-option-" (role-value value))
-                   :on {:click [[(select-action kind) value]]}}
+         [:button (cond-> {:type "button"
+                           :class (into ["flex"
+                                         "h-7"
+                                         "w-full"
+                                         "items-center"
+                                         "gap-2"
+                                         "overflow-hidden"
+                                         "px-3"
+                                         "text-left"
+                                         "text-xs"
+                                         "transition-colors"
+                                         "focus:outline-none"
+                                         "focus:ring-0"
+                                         "focus:ring-offset-0"]
+                                        (concat
+                                         (if disabled?
+                                           ["cursor-not-allowed" "opacity-60"]
+                                           ["hover:bg-base-300"
+                                            "hover:text-trading-text"
+                                            "focus-visible:bg-base-300"
+                                            "focus-visible:text-trading-text"])
+                                         (if (= value selected-value)
+                                           ["bg-base-200" "text-trading-text"]
+                                           ["text-trading-text-secondary"])))
+                           :aria-pressed (= value selected-value)
+                           :data-role (str role-prefix "-option-" (role-value value))}
+                    disabled?
+                    (assoc :aria-disabled "true"
+                           :tab-index -1)
+
+                    (not disabled?)
+                    (assoc :on {:click [[(select-action kind) value]]}))
           [:span {:class ["shrink-0"
                           "font-medium"
                           (if selected?
                             "text-trading-green"
                             "text-trading-text")]}
            label]
-          (when description
+          (when (or description helper)
             [:span {:class ["min-w-0"
                             "flex-1"
                             "truncate"
                             "text-xs"
                             "text-trading-text-secondary"]}
-             description])
+             (or description helper)])
           (when current?
             [:span {:class ["ml-auto"
                             "shrink-0"
