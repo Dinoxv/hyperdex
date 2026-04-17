@@ -9,6 +9,7 @@
             [hyperopen.account.history.position-tpsl-test]
             [hyperopen.account.lifecycle-invariants-test]
             [hyperopen.account.lifecycle-transitions-test]
+            [hyperopen.account.spectate-mode-actions-search-test]
             [hyperopen.account.spectate-mode-actions-test]
             [hyperopen.account.spectate-mode-links-test]
             [hyperopen.account.surface-policy-test]
@@ -153,6 +154,7 @@
             [hyperopen.portfolio.metrics.parsing-test]
             [hyperopen.portfolio.metrics.quantstats-parity-test]
             [hyperopen.portfolio.query-state-test]
+            [hyperopen.portfolio.worker-test]
             [hyperopen.registry.runtime-test]
             [hyperopen.route-modules-test]
             [hyperopen.route-query-state-test]
@@ -191,6 +193,7 @@
             [hyperopen.schema.contracts-test]
             [hyperopen.schema.contracts.action-args-test]
             [hyperopen.schema.contracts.assertions-test]
+            [hyperopen.schema.contracts.common-test]
             [hyperopen.schema.contracts.effect-args-test]
             [hyperopen.schema.contracts.state-test]
             [hyperopen.schema.order-form-command-catalog-test]
@@ -295,6 +298,7 @@
             [hyperopen.views.active-asset.funding-tooltip-model-test]
             [hyperopen.views.active-asset.funding-tooltip-popover-test]
             [hyperopen.views.active-asset.icon-button-test]
+            [hyperopen.views.active-asset.row-helpers-test]
             [hyperopen.views.active-asset.row-test]
             [hyperopen.views.active-asset.vm-test]
             [hyperopen.views.agent-trading-recovery-modal-test]
@@ -492,6 +496,7 @@
              'hyperopen.account.history.position-tpsl-test
              'hyperopen.account.lifecycle-invariants-test
              'hyperopen.account.lifecycle-transitions-test
+             'hyperopen.account.spectate-mode-actions-search-test
              'hyperopen.account.spectate-mode-actions-test
              'hyperopen.account.spectate-mode-links-test
              'hyperopen.account.surface-policy-test
@@ -636,6 +641,7 @@
              'hyperopen.portfolio.metrics.parsing-test
              'hyperopen.portfolio.metrics.quantstats-parity-test
              'hyperopen.portfolio.query-state-test
+             'hyperopen.portfolio.worker-test
              'hyperopen.registry.runtime-test
              'hyperopen.route-modules-test
              'hyperopen.route-query-state-test
@@ -674,6 +680,7 @@
              'hyperopen.schema.contracts-test
              'hyperopen.schema.contracts.action-args-test
              'hyperopen.schema.contracts.assertions-test
+             'hyperopen.schema.contracts.common-test
              'hyperopen.schema.contracts.effect-args-test
              'hyperopen.schema.contracts.state-test
              'hyperopen.schema.order-form-command-catalog-test
@@ -778,6 +785,7 @@
              'hyperopen.views.active-asset.funding-tooltip-model-test
              'hyperopen.views.active-asset.funding-tooltip-popover-test
              'hyperopen.views.active-asset.icon-button-test
+             'hyperopen.views.active-asset.row-helpers-test
              'hyperopen.views.active-asset.row-test
              'hyperopen.views.active-asset.vm-test
              'hyperopen.views.agent-trading-recovery-modal-test

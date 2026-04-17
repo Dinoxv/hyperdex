@@ -15,6 +15,48 @@
   (is (= :roe-percent (policy/normalize-unit false)))
   (is (= :usd (policy/normalize-unit :unknown))))
 
+(deftest offset-input-ready-requires-unit-specific-inputs-test
+  (is (true?
+       (policy/offset-input-ready? {:unit :usd
+                                    :baseline 100
+                                    :size 2
+                                    :leverage nil})))
+  (is (false?
+       (policy/offset-input-ready? {:unit :usd
+                                    :baseline 100
+                                    :size nil
+                                    :leverage 20})))
+  (is (true?
+       (policy/offset-input-ready? {:unit :roe-percent
+                                    :baseline 100
+                                    :size nil
+                                    :leverage 20})))
+  (is (false?
+       (policy/offset-input-ready? {:unit :roe-percent
+                                    :baseline 100
+                                    :size 2
+                                    :leverage nil})))
+  (is (true?
+       (policy/offset-input-ready? {:unit :position-percent
+                                    :baseline 100
+                                    :size nil
+                                    :leverage nil})))
+  (is (false?
+       (policy/offset-input-ready? {:unit :position-percent
+                                    :baseline nil
+                                    :size 2
+                                    :leverage 20})))
+  (is (true?
+       (policy/offset-input-ready? {:unit :unknown
+                                    :baseline 100
+                                    :size 2
+                                    :leverage nil})))
+  (is (false?
+       (policy/offset-input-ready? {:unit :unknown
+                                    :baseline 100
+                                    :size nil
+                                    :leverage nil}))))
+
 (deftest tpsl-offset-display-and-trigger-conversion-usd-mode-test
   (is (= "20"
          (policy/offset-display-from-trigger {:trigger "110"

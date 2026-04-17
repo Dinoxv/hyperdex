@@ -44,6 +44,14 @@
        "    2 :two\n"
        "    :many))\n"))
 
+(def sample-aliased-keyword-source
+  (str "(ns sample.uses-alias\n"
+       "  (:require [sample.common :as common]))\n\n"
+       "(defn tagged-value\n"
+       "  []\n"
+       "  {::local-value 0\n"
+       "   ::common/value 1})\n"))
+
 (def sample-lcov
   (str "TN:\n"
        "SF:.shadow-cljs/builds/test/dev/out/cljs-runtime/sample/core.cljs\n"
@@ -97,6 +105,23 @@
        "LH:6\n"
        "end_of_record\n"))
 
+(def sample-function-hit-zero-lines-lcov
+  (str "TN:\n"
+       "SF:.shadow-cljs/builds/test/dev/out/cljs-runtime/sample/source_map.cljs\n"
+       "FN:3,sample$source_map$mapped_zero_lines\n"
+       "FNDA:2,sample$source_map$mapped_zero_lines\n"
+       "FN:8,sample$source_map$partial_lines\n"
+       "FNDA:2,sample$source_map$partial_lines\n"
+       "DA:3,0\n"
+       "DA:4,0\n"
+       "DA:5,0\n"
+       "DA:8,1\n"
+       "DA:9,0\n"
+       "DA:10,0\n"
+       "LF:6\n"
+       "LH:1\n"
+       "end_of_record\n"))
+
 (defn delete-recursive!
   [file]
   (when (.exists file)
@@ -141,6 +166,33 @@
         (is (= 3 (:complexity (get by-name "sample.core/overloaded"))))
         (is (= 3 (:complexity (get by-name "sample.core/classify[:num]"))))))))
 
+(deftest complexity-analyzer-resolves-ns-aliases-for-auto-resolved-keywords
+  (with-temp-root
+    (fn [root]
+      (write-file! root "src/sample/uses_alias.cljs" sample-aliased-keyword-source)
+      (let [records (complexity/analyze-file root (str (io/file root "src/sample/uses_alias.cljs")))]
+        (is (= ["sample.uses-alias/tagged-value"]
+               (mapv :display-name records)))))))
+
+(deftest analyzer-reports-parser-errors-without-throwable-messages
+  (with-temp-root
+    (fn [root]
+      (write-file! root "src/sample/broken.cljs" "(ns sample.broken)\n")
+      (write-file! root "coverage/lcov.info" "")
+      (with-redefs [complexity/analyze-file (fn [& _args]
+                                              (throw (NullPointerException.)))]
+        (let [report (analyzer/build-report {:root root
+                                             :scope "src"
+                                             :module nil
+                                             :coverage-file "coverage/lcov.info"
+                                             :build :merged
+                                             :top-functions 3
+                                             :top-modules 2
+                                             :threshold 30.0})]
+          (is (= [{:file "src/sample/broken.cljs"
+                   :error "java.lang.NullPointerException"}]
+                 (:parse-errors report))))))))
+
 (deftest lcov-reader-merges-test-and-ws-test-without-double-counting-lines
   (with-temp-root
     (fn [root]
@@ -160,6 +212,22 @@
                      (coverage/function-coverage merged {:file "src/sample/core.cljs"
                                                          :line 7
                                                          :end-line 13})))))))
+
+(deftest function-coverage-trusts-function-hits-when-source-mapped-lines-are-zero
+  (with-temp-root
+    (fn [root]
+      (write-file! root "src/sample/source_map.cljs" sample-source)
+      (write-file! root "coverage/lcov.info" sample-function-hit-zero-lines-lcov)
+      (let [records (coverage/read-lcov root "coverage/lcov.info")
+            merged (coverage/merge-file-coverage records {:build :merged})]
+        (is (approx= 1.0
+                     (coverage/function-coverage merged {:file "src/sample/source_map.cljs"
+                                                         :line 3
+                                                         :end-line 5})))
+        (is (approx= (/ 1.0 3.0)
+                     (coverage/function-coverage merged {:file "src/sample/source_map.cljs"
+                                                         :line 8
+                                                         :end-line 10})))))))
 
 (deftest analyzer-builds-sorted-report-and-json-output
   (with-temp-root

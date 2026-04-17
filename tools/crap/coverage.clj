@@ -156,6 +156,10 @@
        (filter (fn [[line _]]
                  (<= start-line line end-line)))))
 
+(defn function-hit-covered?
+  [function-lines line]
+  (pos? (get function-lines line 0)))
+
 (defn function-coverage
   [coverage-by-file {:keys [file line end-line]}]
   (let [{:keys [lines function-lines]} (get coverage-by-file file)
@@ -163,6 +167,7 @@
         total (count relevant)
         covered (count (filter (comp pos? val) relevant))]
     (cond
-      (pos? total) (/ covered (double total))
-      (pos? (get function-lines line 0)) 1.0
+      (and (pos? total) (pos? covered)) (/ covered (double total))
+      (function-hit-covered? function-lines line) 1.0
+      (pos? total) 0.0
       :else 0.0)))

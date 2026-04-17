@@ -191,7 +191,7 @@
              (nil? @render-limit-sync-timeout*)
              app-system/store)
     (reset! render-limit-sync-timeout*
-            (js/setTimeout
+            (asset-list-set-timeout!
               (fn []
                 (reset! render-limit-sync-timeout* nil)
                 (when (asset-list-render-limit-sync-required? props)

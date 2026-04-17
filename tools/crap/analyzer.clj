@@ -44,6 +44,12 @@
          sort
          vec)))
 
+(defn throwable-message
+  [^Throwable t]
+  (or (.getMessage t)
+      (some-> t class .getName)
+      (str t)))
+
 (defn load-source-file
   [root file]
   (try
@@ -51,7 +57,7 @@
      :records (complexity/analyze-file root file)}
     (catch Throwable t
       {:file file
-       :error (.getMessage t)})))
+       :error (throwable-message t)})))
 
 (defn crap-score
   [complexity coverage]

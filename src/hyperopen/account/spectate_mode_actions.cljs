@@ -95,17 +95,30 @@
     account-context/spectate-watchlist-storage-key
     watchlist*]])
 
-(defn open-spectate-mode-modal
-  [state & [trigger-bounds]]
+(defn- modal-search-value
+  [state active-address]
+  (or active-address
+      (search-value state)
+      ""))
+
+(defn- modal-label-value
+  [state active-entry]
+  (or (:label active-entry)
+      (label-value state)
+      ""))
+
+(defn- spectate-mode-modal-prefill
+  [state]
   (let [watchlist* (watchlist state)
         active-address (account-context/spectate-address state)
-        active-entry (account-context/watchlist-entry-by-address watchlist* active-address)
-        search* (or active-address
-                    (search-value state)
-                    "")
-        label* (or (:label active-entry)
-                   (label-value state)
-                   "")
+        active-entry (account-context/watchlist-entry-by-address watchlist* active-address)]
+    {:search (modal-search-value state active-address)
+     :label (modal-label-value state active-entry)}))
+
+(defn open-spectate-mode-modal
+  [state & [trigger-bounds]]
+  (let [{search* :search
+         label* :label} (spectate-mode-modal-prefill state)
         anchor* (normalize-anchor trigger-bounds)]
     [[:effects/save-many [[[:account-context :spectate-ui :modal-open?] true]
                           [[:account-context :spectate-ui :anchor] anchor*]

@@ -146,7 +146,7 @@
          js/Error
          #"action payload"
          (contracts/assert-action-args! :actions/next-order-history-page
-                                        ["12"]
+                                        ["12.5"]
                                         ctx)))
 
     (is (= [12]

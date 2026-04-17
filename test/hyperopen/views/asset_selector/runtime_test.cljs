@@ -295,6 +295,41 @@
           (is (identical? (:on-scroll mount-memory)
                           (:on-scroll @remembered*))))))))
 
+(deftest schedule-asset-list-render-limit-sync-uses-injected-timeout-test
+  (let [required-assets #js [{:key "perp:T0"} {:key "perp:T1"} {:key "perp:T2"}]
+        stale-assets #js [{:key "perp:S0"} {:key "perp:S1"} {:key "perp:S2"}]
+        timeout* (atom nil)
+        timeouts* (atom [])
+        dispatches* (atom [])
+        expected-dispatch [{:store :asset-selector-runtime/store :event nil
+                            :actions [[:actions/show-all-asset-selector-markets]]}]
+        original-store app-system/store
+        original-dispatch nxr/dispatch]
+    (set! app-system/store :asset-selector-runtime/store)
+    (set! nxr/dispatch (fn [store event actions] (swap! dispatches* conj {:store store :event event :actions actions})))
+    (try
+      (with-redefs [runtime/asset-list-set-timeout!
+                    (fn [f delay-ms]
+                      (let [timeout-handle (keyword (str "render-limit-timeout-" (count @timeouts*)))]
+                        (swap! timeouts* conj {:fn f :delay-ms delay-ms :handle timeout-handle}) timeout-handle))]
+        (runtime/schedule-asset-list-render-limit-sync! {:assets required-assets :render-limit 1} timeout*)
+        (runtime/schedule-asset-list-render-limit-sync! {:assets required-assets :render-limit 1} timeout*)
+        (is (= [{:delay-ms 0 :handle :render-limit-timeout-0}]
+               (mapv #(select-keys % [:delay-ms :handle]) @timeouts*)))
+        (is (= :render-limit-timeout-0 @timeout*))
+        (when-let [callback (:fn (first @timeouts*))] (callback))
+        (is (nil? @timeout*))
+        (is (= expected-dispatch @dispatches*))
+        (runtime/schedule-asset-list-render-limit-sync! {:assets stale-assets :render-limit 1} timeout*)
+        (set! (.-length stale-assets) 1)
+        (when-let [callback (:fn (second @timeouts*))] (callback))
+        (is (nil? @timeout*))
+        (is (= expected-dispatch @dispatches*)))
+      (finally
+        (when-let [timeout @timeout*] (runtime/asset-list-clear-timeout! timeout) (reset! timeout* nil))
+        (set! nxr/dispatch original-dispatch)
+        (set! app-system/store original-store)))))
+
 (deftest asset-list-runtime-delays-live-market-subscription-resume-until-post-settle-timeout-test
   (let [assets (vec (for [n (range 60)]
                       {:key (str "perp:T" n)

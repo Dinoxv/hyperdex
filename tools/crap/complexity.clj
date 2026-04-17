@@ -7,6 +7,7 @@
   {:all true
    :features #{:cljs}
    :auto-resolve {:current 'user}
+   :auto-resolve-ns true
    :current 'user
    :readers {'js identity
              'inst identity

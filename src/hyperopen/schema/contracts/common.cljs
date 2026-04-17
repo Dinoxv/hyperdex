@@ -26,13 +26,15 @@
   (cond
     (integer? value) value
     (and (number? value)
-         (not (js/isNaN value))
+         (js/isFinite value)
          (= value (js/Math.floor value)))
     value
     (string? value)
     (let [text (str/trim value)]
-      (when (re-matches #"[+-]?\\d+" text)
-        (js/parseInt text 10)))
+      (when (re-matches #"^[+-]?\d+$" text)
+        (let [parsed (js/parseInt text 10)]
+          (when (js/isFinite parsed)
+            parsed))))
     :else nil))
 
 (defn parse-number-value
