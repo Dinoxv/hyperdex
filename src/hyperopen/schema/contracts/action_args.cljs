@@ -164,6 +164,9 @@
    :actions/remove-portfolio-returns-benchmark ::common/coin-args
    :actions/handle-portfolio-returns-benchmark-search-keydown ::common/keydown-with-optional-coin-args
    :actions/clear-portfolio-returns-benchmark ::common/no-args
+   :actions/open-portfolio-volume-history ::common/no-args
+   :actions/close-portfolio-volume-history ::common/no-args
+   :actions/handle-portfolio-volume-history-keydown ::common/single-input-args
    :actions/toggle-orderbook-size-unit-dropdown ::common/no-args
    :actions/select-orderbook-size-unit ::common/keyword-or-string-args
    :actions/toggle-orderbook-price-aggregation-dropdown ::common/no-args

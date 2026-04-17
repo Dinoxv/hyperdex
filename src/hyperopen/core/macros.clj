@@ -129,6 +129,9 @@
     remove-portfolio-returns-benchmark
     handle-portfolio-returns-benchmark-search-keydown
     clear-portfolio-returns-benchmark
+    open-portfolio-volume-history
+    close-portfolio-volume-history
+    handle-portfolio-volume-history-keydown
     toggle-orderbook-size-unit-dropdown
     select-orderbook-size-unit
     toggle-orderbook-price-aggregation-dropdown

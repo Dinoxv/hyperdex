@@ -61,6 +61,9 @@
 (defn volume-14d-usd [state]
   (vm-volume/volume-14d-usd state))
 
+(defn volume-history-model [state]
+  (vm-volume/volume-history-model state))
+
 (defn- selector-option-label [options selected-value]
   (or (some (fn [{:keys [value label]}]
               (when (= value selected-value)
@@ -393,6 +396,7 @@
                            benchmark-context)]
     {:volume-14d-usd volume-14d
      :fees fees
+     :volume-history (vm-volume/volume-history-model state)
      :background-status (background-status-model state
                                                 chart
                                                 returns-benchmark-selector

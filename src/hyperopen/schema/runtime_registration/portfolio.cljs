@@ -16,4 +16,7 @@
    [:actions/select-portfolio-returns-benchmark :select-portfolio-returns-benchmark]
    [:actions/remove-portfolio-returns-benchmark :remove-portfolio-returns-benchmark]
    [:actions/handle-portfolio-returns-benchmark-search-keydown :handle-portfolio-returns-benchmark-search-keydown]
-   [:actions/clear-portfolio-returns-benchmark :clear-portfolio-returns-benchmark]])
+   [:actions/clear-portfolio-returns-benchmark :clear-portfolio-returns-benchmark]
+   [:actions/open-portfolio-volume-history :open-portfolio-volume-history]
+   [:actions/close-portfolio-volume-history :close-portfolio-volume-history]
+   [:actions/handle-portfolio-volume-history-keydown :handle-portfolio-volume-history-keydown]])

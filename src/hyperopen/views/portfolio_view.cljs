@@ -6,6 +6,7 @@
             [hyperopen.views.portfolio.chart-view :as chart-view]
             [hyperopen.views.portfolio.header :as portfolio-header]
             [hyperopen.views.portfolio.summary-cards :as summary-cards]
+            [hyperopen.views.portfolio.volume-history-modal :as volume-history-modal]
             [hyperopen.views.portfolio.vm :as portfolio-vm]))
 
 (defonce ^:private portfolio-view-cache
@@ -33,18 +34,24 @@
             :data-role "portfolio-account-table"}
       (account-info-view/account-info-view
        state
-       (account-tabs/account-info-options state view-model trader-portfolio-route?))]}))
+       (account-tabs/account-info-options state view-model trader-portfolio-route?))]
+     :volume-history-modal
+     (volume-history-modal/volume-history-modal (:volume-history view-model))}))
 
 (defn portfolio-view [state]
   (let [route (get-in state [:router :path])
         hover-active? (chart-hover-state/surface-hover-active? :portfolio)
+        volume-history-open? (true? (get-in state [:portfolio-ui :volume-history-open?]))
         cached-entry @portfolio-view-cache
         sections (if (and hover-active?
+                          (not volume-history-open?)
+                          (false? (:volume-history-open? cached-entry))
                           (= route (:route cached-entry))
                           (map? (:sections cached-entry)))
                    (:sections cached-entry)
                    (let [next-sections (build-portfolio-view-sections state)]
                      (reset! portfolio-view-cache {:route route
+                                                  :volume-history-open? volume-history-open?
                                                   :sections next-sections})
                      next-sections))]
     [:div {:class ["w-full"
@@ -58,7 +65,8 @@
      (:header sections)
      (:background-status sections)
      (:summary-grid sections)
-     (:account-table sections)]))
+     (:account-table sections)
+     (:volume-history-modal sections)]))
 
 (defn ^:export route-view
   [state]

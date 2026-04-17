@@ -180,6 +180,15 @@
 (def clear-portfolio-returns-benchmark
   portfolio-actions/clear-portfolio-returns-benchmark)
 
+(def open-portfolio-volume-history
+  portfolio-actions/open-portfolio-volume-history)
+
+(def close-portfolio-volume-history
+  portfolio-actions/close-portfolio-volume-history)
+
+(def handle-portfolio-volume-history-keydown
+  portfolio-actions/handle-portfolio-volume-history-keydown)
+
 (def toggle-orderbook-size-unit-dropdown
   orderbook-actions/toggle-orderbook-size-unit-dropdown)
 

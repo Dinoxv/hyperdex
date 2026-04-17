@@ -28,6 +28,9 @@
    :handle-portfolio-returns-benchmark-search-keydown
    portfolio-actions/handle-portfolio-returns-benchmark-search-keydown
    :clear-portfolio-returns-benchmark portfolio-actions/clear-portfolio-returns-benchmark
+   :open-portfolio-volume-history portfolio-actions/open-portfolio-volume-history
+   :close-portfolio-volume-history portfolio-actions/close-portfolio-volume-history
+   :handle-portfolio-volume-history-keydown portfolio-actions/handle-portfolio-volume-history-keydown
    :toggle-orderbook-size-unit-dropdown orderbook-actions/toggle-orderbook-size-unit-dropdown
    :select-orderbook-size-unit orderbook-actions/select-orderbook-size-unit
    :toggle-orderbook-price-aggregation-dropdown

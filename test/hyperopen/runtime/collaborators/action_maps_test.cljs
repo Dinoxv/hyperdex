@@ -41,6 +41,10 @@
                     (get-in deps [:chart :select-portfolio-returns-benchmark])))
     (is (identical? portfolio-actions/clear-portfolio-returns-benchmark
                     (get-in deps [:chart :clear-portfolio-returns-benchmark])))
+    (is (identical? portfolio-actions/open-portfolio-volume-history
+                    (get-in deps [:chart :open-portfolio-volume-history])))
+    (is (identical? portfolio-actions/close-portfolio-volume-history
+                    (get-in deps [:chart :close-portfolio-volume-history])))
     (is (identical? chart-settings/hide-volume-indicator
                     (get-in deps [:chart :hide-volume-indicator])))
     (is (identical? account-history-actions/select-account-info-tab

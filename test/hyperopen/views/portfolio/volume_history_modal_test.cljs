@@ -1,0 +1,135 @@
+(ns hyperopen.views.portfolio.volume-history-modal-test
+  (:require [clojure.string :as str]
+            [cljs.test :refer-macros [deftest is use-fixtures]]
+            [hyperopen.views.chart.d3.hover-state :as chart-hover-state]
+            [hyperopen.views.portfolio-view :as portfolio-view]))
+
+(use-fixtures :each
+  (fn [f]
+    (chart-hover-state/clear-hover-state!)
+    (f)
+    (chart-hover-state/clear-hover-state!)))
+
+(defn- node-children [node]
+  (if (map? (second node))
+    (drop 2 node)
+    (drop 1 node)))
+
+(defn- find-first-node [node pred]
+  (cond
+    (vector? node)
+    (let [children (node-children node)]
+      (or (when (pred node) node)
+          (some #(find-first-node % pred) children)))
+
+    (seq? node)
+    (some #(find-first-node % pred) node)
+
+    :else nil))
+
+(defn- collect-strings [node]
+  (cond
+    (string? node) [node]
+    (vector? node) (mapcat collect-strings (node-children node))
+    (seq? node) (mapcat collect-strings node)
+    :else []))
+
+(defn- button-with-text [node text]
+  (find-first-node node #(and (= :button (first %))
+                              (contains? (set (collect-strings %)) text))))
+
+(def ^:private sample-state
+  {:account {:mode :classic}
+   :router {:path "/portfolio"}
+   :portfolio-ui {:summary-scope :all
+                  :summary-time-range :month
+                  :chart-tab :account-value
+                  :summary-scope-dropdown-open? false
+                  :summary-time-range-dropdown-open? false
+                  :performance-metrics-time-range-dropdown-open? false}
+   :portfolio {:summary-by-key {:month {:pnlHistory [[1 10] [2 15]]
+                                        :accountValueHistory [[1 100] [2 100]]
+                                        :vlm 2255561.85}}
+               :user-fees {:userCrossRate 0.00045
+                           :userAddRate 0.00015
+                           :dailyUserVlm [{:exchange 100
+                                           :userCross 70
+                                           :userAdd 30}
+                                          {:exchange 50
+                                           :userCross 20
+                                           :userAdd 10}]}}
+   :account-info {:selected-tab :balances
+                  :loading false
+                  :error nil
+                  :hide-small-balances? false
+                  :balances-sort {:column nil :direction :asc}
+                  :positions-sort {:column nil :direction :asc}
+                  :open-orders-sort {:column "Time" :direction :desc}}
+   :orders {:open-orders []
+            :open-orders-snapshot []
+            :open-orders-snapshot-by-dex {}
+            :fills []
+            :fundings []
+            :order-history []}
+   :webdata2 {}
+   :borrow-lend {:total-supplied-usd 0}
+   :spot {:meta nil
+          :clearinghouse-state nil}
+   :perp-dex-clearinghouse {}})
+
+(deftest portfolio-volume-history-button-opens-readable-modal-test
+  (let [closed-view-node (portfolio-view/portfolio-view sample-state)
+        closed-button (button-with-text closed-view-node "View Volume")
+        closed-dialog (find-first-node closed-view-node #(= "portfolio-volume-history-dialog"
+                                                            (get-in % [1 :data-role])))
+        open-state (assoc-in sample-state [:portfolio-ui :volume-history-open?] true)
+        open-view-node (portfolio-view/portfolio-view open-state)
+        dialog (find-first-node open-view-node #(= "portfolio-volume-history-dialog"
+                                                   (get-in % [1 :data-role])))
+        backdrop (find-first-node open-view-node #(= "portfolio-volume-history-backdrop"
+                                                     (get-in % [1 :data-role])))
+        close-button (find-first-node open-view-node #(= "portfolio-volume-history-close"
+                                                         (get-in % [1 :data-role])))
+        table (find-first-node open-view-node #(= "portfolio-volume-history-table"
+                                                  (get-in % [1 :data-role])))
+        table-frame (find-first-node open-view-node #(= "portfolio-volume-history-table-frame"
+                                                        (get-in % [1 :data-role])))
+        total-row (find-first-node open-view-node #(= "portfolio-volume-history-total-row"
+                                                      (get-in % [1 :data-role])))
+        all-text (set (collect-strings dialog))]
+    (is (= [[:actions/open-portfolio-volume-history]]
+           (get-in closed-button [1 :on :click])))
+    (is (nil? closed-dialog))
+    (is (some? dialog))
+    (is (= "dialog" (get-in dialog [1 :role])))
+    (is (= true (get-in dialog [1 :aria-modal])))
+    (is (= [[:actions/handle-portfolio-volume-history-keydown [:event/key]]]
+           (get-in dialog [1 :on :keydown])))
+    (is (= [[:actions/close-portfolio-volume-history]]
+           (get-in backdrop [1 :on :click])))
+    (is (= [[:actions/close-portfolio-volume-history]]
+           (get-in close-button [1 :on :click])))
+    (is (some? table))
+    (is (some? table-frame))
+    (is (some? total-row))
+    (is (contains? all-text "Your Volume History"))
+    (is (contains? all-text "Date (UTC)"))
+    (is (contains? all-text "Exchange Volume"))
+    (is (contains? all-text "Your Weighted Maker Volume"))
+    (is (contains? all-text "Your Weighted Taker Volume"))
+    (is (contains? all-text "Total"))
+    (is (contains? all-text "$100.00"))
+    (is (contains? all-text "$30.00"))
+    (is (contains? all-text "$70.00"))
+    (is (some #(str/includes? % "Dates do not include the current day")
+              all-text))))
+
+(deftest portfolio-volume-history-cache-does-not-retain-open-modal-after-close-test
+  (chart-hover-state/set-surface-hover-active! :portfolio true)
+  (let [open-view-node (portfolio-view/portfolio-view
+                        (assoc-in sample-state [:portfolio-ui :volume-history-open?] true))
+        closed-view-node (portfolio-view/portfolio-view sample-state)]
+    (is (some? (find-first-node open-view-node #(= "portfolio-volume-history-dialog"
+                                                   (get-in % [1 :data-role])))))
+    (is (nil? (find-first-node closed-view-node #(= "portfolio-volume-history-dialog"
+                                                    (get-in % [1 :data-role])))))))

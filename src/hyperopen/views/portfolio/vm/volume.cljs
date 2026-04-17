@@ -62,13 +62,35 @@
       rows
       [])))
 
+(defn- first-present
+  [row keys]
+  (some (fn [k]
+          (let [value (get row k)]
+            (when (some? value)
+              value)))
+        keys))
+
+(defn- row-number
+  [row keys fallback]
+  (cond
+    (map? row)
+    (number-or-zero (first-present row keys))
+
+    (and (sequential? row)
+         (number? fallback)
+         (< fallback (count row)))
+    (number-or-zero (nth row fallback))
+
+    :else
+    0))
+
 (defn daily-user-vlm-row-volume
   [row]
   (cond
     (map? row)
-    (let [exchange (optional-number (:exchange row))
-          user-cross (optional-number (:userCross row))
-          user-add (optional-number (:userAdd row))]
+    (let [exchange (optional-number (first-present row [:exchange :exchange-volume]))
+          user-cross (optional-number (first-present row [:userCross :user-cross :user_cross]))
+          user-add (optional-number (first-present row [:userAdd :user-add :user_add]))]
       (if (or (number? user-cross)
               (number? user-add))
         (+ (or user-cross 0)
@@ -82,14 +104,48 @@
     :else
     0))
 
-(defn volume-14d-usd-from-user-fees
+(defn- completed-daily-user-vlm-rows
   [state]
   (let [rows (daily-user-vlm-rows state)]
-    (when (seq rows)
+    (if (seq rows)
+      (butlast rows)
+      [])))
+
+(defn- volume-history-row-values
+  [row]
+  {:exchange-volume (row-number row [:exchange :exchange-volume] 1)
+   :weighted-maker-volume (row-number row [:userAdd :user-add :user_add] 3)
+   :weighted-taker-volume (row-number row [:userCross :user-cross :user_cross] 2)})
+
+(defn- sum-history-values
+  [rows value-key]
+  (reduce (fn [acc row]
+            (+ acc (get (volume-history-row-values row) value-key 0)))
+          0
+          rows))
+
+(defn volume-history-model
+  [state]
+  (let [completed-rows (completed-daily-user-vlm-rows state)
+        totals {:exchange-volume (sum-history-values completed-rows :exchange-volume)
+                :weighted-maker-volume (sum-history-values completed-rows :weighted-maker-volume)
+                :weighted-taker-volume (sum-history-values completed-rows :weighted-taker-volume)}]
+    {:open? (true? (get-in state [:portfolio-ui :volume-history-open?]))
+     :loading? (true? (get-in state [:portfolio :user-fees-loading?]))
+     :error (get-in state [:portfolio :user-fees-error])
+     :rows [(assoc totals
+                   :id :total
+                   :date-label "Total")]
+     :totals totals}))
+
+(defn volume-14d-usd-from-user-fees
+  [state]
+  (let [rows (completed-daily-user-vlm-rows state)]
+    (when (seq (daily-user-vlm-rows state))
       (reduce (fn [acc row]
                 (+ acc (daily-user-vlm-row-volume row)))
               0
-              (butlast rows)))))
+              rows))))
 
 (defn fees-from-user-fees
   [user-fees]

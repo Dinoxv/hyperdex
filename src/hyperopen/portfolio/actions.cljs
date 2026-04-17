@@ -299,6 +299,20 @@
         open-dropdown (when-not current-visible? :performance-metrics-time-range)]
     [(selector-projection-effect open-dropdown)]))
 
+(defn open-portfolio-volume-history
+  [_state]
+  [(selector-projection-effect nil [[[:portfolio-ui :volume-history-open?] true]])])
+
+(defn close-portfolio-volume-history
+  [_state]
+  [[:effects/save [:portfolio-ui :volume-history-open?] false]])
+
+(defn handle-portfolio-volume-history-keydown
+  [state key]
+  (if (= key "Escape")
+    (close-portfolio-volume-history state)
+    []))
+
 (defn select-portfolio-summary-scope
   [_state scope]
   [(selector-projection-effect nil [[[:portfolio-ui :summary-scope]

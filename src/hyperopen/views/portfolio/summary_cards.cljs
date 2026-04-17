@@ -135,7 +135,10 @@
       "14 Day Volume"]
      [:div {:class ["num" "text-2xl" "font-medium" "text-trading-text" "sm:text-4xl"]}
       (portfolio-format/format-compact-currency volume-14d-usd)]
-     [:button {:class ["btn" "btn-xs" "btn-spectate" "justify-start" "px-0" "text-xs" "text-trading-green" "hover:bg-transparent" "sm:text-xs"]}
+     [:button {:type "button"
+               :class ["btn" "btn-xs" "btn-spectate" "justify-start" "px-0" "text-xs" "text-trading-green" "hover:bg-transparent" "sm:text-xs"]
+               :data-role "portfolio-volume-history-trigger"
+               :on {:click [[:actions/open-portfolio-volume-history]]}}
       "View Volume"]])
    (section-card
     "portfolio-fees-card"

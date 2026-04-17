@@ -54,6 +54,22 @@
                           :summary-time-range-dropdown-open? false
                           :performance-metrics-time-range-dropdown-open? true}}))))
 
+(deftest portfolio-volume-history-modal-actions-open-close-and-escape-test
+  (is (= [[:effects/save-many [[[:portfolio-ui :volume-history-open?] true]
+                               [[:portfolio-ui :summary-scope-dropdown-open?] false]
+                               [[:portfolio-ui :summary-time-range-dropdown-open?] false]
+                               [[:portfolio-ui :performance-metrics-time-range-dropdown-open?] false]]]]
+         (actions/open-portfolio-volume-history
+          {:portfolio-ui {:summary-scope-dropdown-open? true
+                          :summary-time-range-dropdown-open? true
+                          :performance-metrics-time-range-dropdown-open? true}})))
+  (is (= [[:effects/save [:portfolio-ui :volume-history-open?] false]]
+         (actions/close-portfolio-volume-history {})))
+  (is (= [[:effects/save [:portfolio-ui :volume-history-open?] false]]
+         (actions/handle-portfolio-volume-history-keydown {} "Escape")))
+  (is (= []
+         (actions/handle-portfolio-volume-history-keydown {} "Enter"))))
+
 (deftest select-portfolio-summary-scope-normalizes-and-closes-dropdowns-test
   (is (= [[:effects/save-many [[[:portfolio-ui :summary-scope] :perps]
                                [[:portfolio-ui :summary-scope-dropdown-open?] false]

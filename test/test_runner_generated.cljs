@@ -350,6 +350,7 @@
             [hyperopen.views.portfolio.vm.summary-test]
             [hyperopen.views.portfolio.vm.volume-helpers-test]
             [hyperopen.views.portfolio.vm.volume-test]
+            [hyperopen.views.portfolio.volume-history-modal-test]
             [hyperopen.views.staking-view-test]
             [hyperopen.views.trade-view.layout-state-test]
             [hyperopen.views.trade-view.layout-test]
@@ -838,6 +839,7 @@
              'hyperopen.views.portfolio.vm.summary-test
              'hyperopen.views.portfolio.vm.volume-helpers-test
              'hyperopen.views.portfolio.vm.volume-test
+             'hyperopen.views.portfolio.volume-history-modal-test
              'hyperopen.views.staking-view-test
              'hyperopen.views.trade-view.layout-state-test
              'hyperopen.views.trade-view.layout-test

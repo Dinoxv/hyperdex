@@ -96,6 +96,30 @@
           []
           {:phase :test}))))
 
+(deftest assert-action-args-validates-portfolio-volume-history-actions-test
+  (is (= []
+         (contracts/assert-action-args!
+          :actions/open-portfolio-volume-history
+          []
+          {:phase :test})))
+  (is (= []
+         (contracts/assert-action-args!
+          :actions/close-portfolio-volume-history
+          []
+          {:phase :test})))
+  (is (= ["Escape"]
+         (contracts/assert-action-args!
+          :actions/handle-portfolio-volume-history-keydown
+          ["Escape"]
+          {:phase :test})))
+  (is (thrown-with-msg?
+       js/Error
+       #"action payload"
+       (contracts/assert-action-args!
+        :actions/handle-portfolio-volume-history-keydown
+        []
+        {:phase :test}))))
+
 (deftest assert-action-args-accepts-order-submission-confirmation-actions-test
   (is (= []
          (contracts/assert-action-args!
