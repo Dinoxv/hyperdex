@@ -1,5 +1,6 @@
 (ns hyperopen.views.portfolio.vm.volume
-  (:require [hyperopen.views.account-info.projections :as projections]
+  (:require [hyperopen.account.context :as account-context]
+            [hyperopen.views.account-info.projections :as projections]
             [hyperopen.views.portfolio.vm.constants :as constants]))
 
 (defn- optional-number
@@ -54,10 +55,25 @@
             0
             recent-values)))
 
+(defn- user-fees-loaded-for-current-account?
+  [state]
+  (let [effective-address (account-context/effective-account-address state)
+        loaded-for-address (account-context/normalize-address
+                            (get-in state [:portfolio :user-fees-loaded-for-address]))]
+    (or (nil? effective-address)
+        (nil? loaded-for-address)
+        (= effective-address loaded-for-address))))
+
+(defn- current-account-user-fees
+  [state]
+  (when (user-fees-loaded-for-current-account? state)
+    (get-in state [:portfolio :user-fees])))
+
 (defn daily-user-vlm-rows
   [state]
-  (let [rows (or (get-in state [:portfolio :user-fees :dailyUserVlm])
-                 (get-in state [:portfolio :user-fees :daily-user-vlm]))]
+  (let [user-fees (current-account-user-fees state)
+        rows (or (:dailyUserVlm user-fees)
+                 (:daily-user-vlm user-fees))]
     (if (sequential? rows)
       rows
       [])))
@@ -108,7 +124,7 @@
   [state]
   (let [rows (daily-user-vlm-rows state)]
     (if (seq rows)
-      (butlast rows)
+      (take-last 14 (butlast rows))
       [])))
 
 (defn- volume-history-row-values
@@ -117,6 +133,59 @@
    :weighted-maker-volume (row-number row [:userAdd :user-add :user_add] 3)
    :weighted-taker-volume (row-number row [:userCross :user-cross :user_cross] 2)})
 
+(def ^:private utc-weekday-labels
+  ["Sun." "Mon." "Tue." "Wed." "Thu." "Fri." "Sat."])
+
+(def ^:private utc-month-labels
+  ["Jan." "Feb." "Mar." "Apr." "May." "Jun."
+   "Jul." "Aug." "Sep." "Oct." "Nov." "Dec."])
+
+(defn- row-date-value
+  [row]
+  (cond
+    (map? row)
+    (first-present row [:date :day :time :time-ms :timestamp :t])
+
+    (and (sequential? row)
+         (seq row))
+    (first row)
+
+    :else
+    nil))
+
+(defn- js-date-from-value
+  [value]
+  (let [date (cond
+               (instance? js/Date value) value
+               (or (number? value)
+                   (string? value)) (js/Date. value)
+               :else nil)]
+    (when (and date
+               (not (js/isNaN (.getTime date))))
+      date)))
+
+(defn- format-volume-history-date
+  [value fallback-label]
+  (if-let [date (js-date-from-value value)]
+    (str (get utc-weekday-labels (.getUTCDay date))
+         " "
+         (.getUTCDate date)
+         ". "
+         (get utc-month-labels (.getUTCMonth date))
+         " "
+         (.getUTCFullYear date))
+    (or (when (string? value) value)
+        fallback-label)))
+
+(defn- volume-history-row-model
+  [index row]
+  (let [date-value (row-date-value row)
+        fallback-label (str "Day " (inc index))]
+    (assoc (volume-history-row-values row)
+           :id (or (some-> date-value str)
+                   (str "day-" index))
+           :date-label (format-volume-history-date date-value fallback-label))))
+
 (defn- sum-history-values
   [rows value-key]
   (reduce (fn [acc row]
@@ -124,20 +193,32 @@
           0
           rows))
 
+(defn- maker-volume-share-pct
+  [{:keys [exchange-volume weighted-maker-volume]}]
+  (let [exchange (if (number? exchange-volume) exchange-volume 0)
+        maker (if (number? weighted-maker-volume) weighted-maker-volume 0)]
+    (if (pos? exchange)
+      (* 100 (/ maker exchange))
+      0)))
+
 (defn volume-history-model
   [state]
   (let [completed-rows (completed-daily-user-vlm-rows state)
         totals {:exchange-volume (sum-history-values completed-rows :exchange-volume)
                 :weighted-maker-volume (sum-history-values completed-rows :weighted-maker-volume)
-                :weighted-taker-volume (sum-history-values completed-rows :weighted-taker-volume)}]
+                :weighted-taker-volume (sum-history-values completed-rows :weighted-taker-volume)}
+        day-rows (map-indexed volume-history-row-model (reverse completed-rows))]
     {:open? (true? (get-in state [:portfolio-ui :volume-history-open?]))
      :anchor (get-in state [:portfolio-ui :volume-history-anchor])
      :loading? (true? (get-in state [:portfolio :user-fees-loading?]))
      :error (get-in state [:portfolio :user-fees-error])
-     :rows [(assoc totals
-                   :id :total
-                   :date-label "Total")]
-     :totals totals}))
+     :rows (conj (vec day-rows)
+                 (assoc totals
+                        :id :total
+                        :date-label "Total"
+                        :total? true))
+     :totals totals
+     :maker-volume-share-pct (maker-volume-share-pct totals)}))
 
 (defn volume-14d-usd-from-user-fees
   [state]

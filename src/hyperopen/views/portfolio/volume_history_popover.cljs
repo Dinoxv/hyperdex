@@ -4,10 +4,10 @@
             [hyperopen.views.ui.dialog-focus :as dialog-focus]))
 
 (def ^:private preferred-width-px
-  560)
+  520)
 
 (def ^:private estimated-height-px
-  260)
+  560)
 
 (def ^:private trigger-selector
   "[data-role='portfolio-volume-history-trigger']")
@@ -27,30 +27,60 @@
            :stroke-width 2
            :d "M6 18 18 6M6 6l12 12"}]])
 
-(defn- formatted-volume [value]
-  (portfolio-format/format-currency value))
+(defn- compact-volume [value decimals]
+  (let [n (if (number? value) value 0)
+        magnitude (js/Math.abs n)
+        sign (if (neg? n) "-" "")]
+    (cond
+      (>= magnitude 1000000000)
+      (str sign "$" (.toFixed (/ magnitude 1000000000) decimals) "b")
 
-(defn- volume-cell [value]
-  [:td {:class ["px-2" "py-2.5" "text-left" "align-middle" "sm:px-3"]}
-   [:span {:class ["num" "text-xs" "font-medium" "tabular-nums" "text-trading-green" "sm:text-sm"]
-           :style {:overflow-wrap "anywhere"}}
-    (formatted-volume value)]])
+      (>= magnitude 1000000)
+      (str sign "$" (.toFixed (/ magnitude 1000000) decimals) "m")
 
-(defn- total-row [{:keys [date-label
-                          exchange-volume
-                          weighted-maker-volume
-                          weighted-taker-volume]}]
-  [:tr {:data-role "portfolio-volume-history-total-row"}
-   [:td {:class ["px-2" "py-2.5" "text-left" "align-middle" "text-xs" "font-medium" "text-trading-green" "sm:px-3" "sm:text-sm"]
-         :style {:overflow-wrap "anywhere"}}
+      (>= magnitude 1000)
+      (str sign "$" (.toFixed (/ magnitude 1000) decimals) "k")
+
+      :else
+      (portfolio-format/format-currency n))))
+
+(defn- formatted-volume [value total?]
+  (compact-volume value 2))
+
+(defn- volume-cell [role value total?]
+  [:td {:class (cond-> ["px-1.5" "py-1" "text-right" "align-middle" "sm:px-2.5"]
+                 total? (conj "sticky" "bottom-0" "z-10" "bg-base-200"))
+        :data-role role}
+   [:span {:class (cond-> ["num" "text-xs" "font-medium" "tabular-nums" "whitespace-nowrap" "sm:text-sm"]
+                    total? (conj "text-trading-green")
+                    (not total?) (conj "text-trading-text")
+                    true (conj "leading-tight"))}
+    (formatted-volume value total?)]])
+
+(defn- history-row [{:keys [date-label
+                            exchange-volume
+                            weighted-maker-volume
+                            weighted-taker-volume
+                            total?]}]
+  [:tr {:class (cond-> ["border-t" "border-base-300/70" "leading-4"]
+                 total? (conj "bg-base-200/70"))
+        :data-role (if total?
+                     "portfolio-volume-history-total-row"
+                     "portfolio-volume-history-day-row")}
+   [:td {:class (cond-> ["px-1.5" "py-1" "text-left" "align-middle" "text-xs" "font-medium" "leading-tight" "sm:px-2.5" "sm:text-sm"]
+                  total? (conj "text-trading-green")
+                  total? (conj "sticky" "bottom-0" "z-10" "bg-base-200")
+                  (not total?) (conj "text-trading-text"))
+         :style {:overflow-wrap "break-word"}}
     (or date-label "Total")]
-   (volume-cell exchange-volume)
-   (volume-cell weighted-maker-volume)
-   (volume-cell weighted-taker-volume)])
+   (volume-cell "portfolio-volume-history-cell-exchange" exchange-volume total?)
+   (volume-cell "portfolio-volume-history-cell-maker" weighted-maker-volume total?)
+   (volume-cell "portfolio-volume-history-cell-taker" weighted-taker-volume total?)])
 
-(defn- header-cell [label]
-  [:th {:class ["px-2" "py-2.5" "font-normal" "leading-snug" "sm:px-3"]
-        :style {:overflow-wrap "anywhere"}}
+(defn- header-cell [role align-class label]
+  [:th {:class ["px-1.5" "py-1.5" "font-normal" "leading-snug" "sm:px-2.5" align-class]
+        :data-role role
+        :style {:overflow-wrap "break-word"}}
    label])
 
 (defn- status-message [{:keys [loading? error]}]
@@ -110,14 +140,22 @@
         :estimated-height-px estimated-height-px})
       {:left "12px"
        :top "12px"
-       :width "min(calc(100vw - 24px), 560px)"})))
+       :width "min(calc(100vw - 24px), 520px)"})))
 
-(defn volume-history-popover [{:keys [anchor open? rows] :as model}]
+(defn- maker-share-footer
+  [maker-volume-share-pct]
+  [:p {:class ["mt-3" "text-xs" "text-trading-text-secondary" "sm:text-sm"]
+       :data-role "portfolio-volume-history-maker-share"}
+   (str "Your 14 day maker volume share is "
+        (portfolio-format/format-percent maker-volume-share-pct))])
+
+(defn volume-history-popover [{:keys [anchor open? rows maker-volume-share-pct] :as model}]
   (when open?
     (let [row-models (if (seq rows)
                        rows
                        [{:id :total
                          :date-label "Total"
+                         :total? true
                          :exchange-volume 0
                          :weighted-maker-volume 0
                          :weighted-taker-volume 0}])]
@@ -135,11 +173,13 @@
                           "border"
                           "border-base-300"
                           "bg-base-100"
-                          "p-4"
                           "shadow-2xl"
                           "outline-none"
+                          "p-4"
                           "sm:p-5"]
-                  :style (popover-style anchor)
+                  :style (merge (popover-style anchor)
+                                {:max-height "calc(100vh - 72px)"
+                                 :overflow-y "auto"})
                   :role "dialog"
                   :aria-labelledby "portfolio-volume-history-title"
                   :tab-index 0
@@ -169,18 +209,29 @@
                    :on {:click [[:actions/close-portfolio-volume-history]]}}
           (close-icon)]]
         (status-message model)
-        [:div {:class ["overflow-hidden" "rounded-md" "border" "border-base-300" "bg-base-200/45"]
+        [:div {:class ["overflow-auto"
+                       "rounded-md"
+                       "border"
+                       "border-base-300"
+                       "bg-base-200/45"
+                       "max-h-[390px]"
+                       "md:max-h-[540px]"]
                :data-role "portfolio-volume-history-table-frame"}
-         [:table {:class ["w-full" "table-fixed" "border-collapse"]
-                  :style {:table-layout "fixed"}
+         [:table {:class ["w-full" "border-collapse"]
                   :data-role "portfolio-volume-history-table"}
+          [:colgroup
+           [:col {:style {:width "30%"}}]
+           [:col {:style {:width "22%"}}]
+           [:col {:style {:width "24%"}}]
+           [:col {:style {:width "24%"}}]]
           [:thead
            [:tr {:class ["text-left" "text-xs" "font-normal" "text-trading-text-secondary"]}
-            (header-cell "Date (UTC)")
-            (header-cell "Exchange Volume")
-            (header-cell "Your Weighted Maker Volume")
-            (header-cell "Your Weighted Taker Volume")]]
+            (header-cell "portfolio-volume-history-header-date" "text-left" "Date (UTC)")
+            (header-cell "portfolio-volume-history-header-exchange" "text-right" "Exchange Volume")
+            (header-cell "portfolio-volume-history-header-maker" "text-right" "Your Weighted Maker Volume")
+            (header-cell "portfolio-volume-history-header-taker" "text-right" "Your Weighted Taker Volume")]]
           (into [:tbody]
                 (for [{:keys [id] :as row} row-models]
                   ^{:key (name (or id :total))}
-                  (total-row row)))]]]])))
+                  (history-row row)))]]
+        (maker-share-footer maker-volume-share-pct)]])))

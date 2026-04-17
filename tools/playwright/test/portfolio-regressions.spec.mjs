@@ -10,6 +10,100 @@ import {
 
 const TRADER_ADDRESS = "0x3333333333333333333333333333333333333333";
 const SPECTATE_ADDRESS = "0x162cc7c861ebd0c06b3d72319201150482518185";
+const VOLUME_HISTORY_FIXTURE = {
+  dailyUserVlm: [
+    {
+      date: "2026-04-03",
+      exchange: 2_655_076_900.23,
+      userCross: 130_550_000,
+      userAdd: 219_830_000
+    },
+    {
+      date: "2026-04-04",
+      exchange: 1_346_037_058.89,
+      userCross: 66_210_000,
+      userAdd: 121_590_000
+    },
+    {
+      date: "2026-04-05",
+      exchange: 2_709_694_881.11,
+      userCross: 140_640_000,
+      userAdd: 245_600_000
+    },
+    {
+      date: "2026-04-06",
+      exchange: 5_184_032_316.32,
+      userCross: 275_420_000,
+      userAdd: 468_930_000
+    },
+    {
+      date: "2026-04-07",
+      exchange: 7_395_657_172.08,
+      userCross: 425_220_000,
+      userAdd: 593_900_000
+    },
+    {
+      date: "2026-04-08",
+      exchange: 6_112_033_361.92,
+      userCross: 322_570_000,
+      userAdd: 459_100_000
+    },
+    {
+      date: "2026-04-09",
+      exchange: 5_818_326_367.93,
+      userCross: 315_080_000,
+      userAdd: 416_950_000
+    },
+    {
+      date: "2026-04-10",
+      exchange: 4_455_513_989.13,
+      userCross: 287_960_000,
+      userAdd: 386_750_000
+    },
+    {
+      date: "2026-04-11",
+      exchange: 2_510_109_441.87,
+      userCross: 196_400_000,
+      userAdd: 201_910_000
+    },
+    {
+      date: "2026-04-12",
+      exchange: 3_910_442_359.76,
+      userCross: 298_760_000,
+      userAdd: 227_500_000
+    },
+    {
+      date: "2026-04-13",
+      exchange: 5_852_384_179.01,
+      userCross: 420_570_000,
+      userAdd: 448_150_000
+    },
+    {
+      date: "2026-04-14",
+      exchange: 6_280_954_566.8,
+      userCross: 393_030_000,
+      userAdd: 429_830_000
+    },
+    {
+      date: "2026-04-15",
+      exchange: 4_531_036_402.43,
+      userCross: 296_770_000,
+      userAdd: 322_300_000
+    },
+    {
+      date: "2026-04-16",
+      exchange: 5_729_184_977.88,
+      userCross: 294_100_000,
+      userAdd: 375_590_000
+    },
+    {
+      date: "2026-04-17",
+      exchange: 5_009_186_442.41,
+      userCross: 1,
+      userAdd: 1
+    }
+  ]
+};
 
 async function selectSummaryScope(page, scopeValue, expectedLabel) {
   const trigger = page.locator("[data-role='portfolio-summary-scope-selector-trigger']");
@@ -56,6 +150,59 @@ async function expectFundingPopoverAnchoredLeftOfTrigger(page, trigger) {
   expect(Math.abs(modalBox.y - Math.max(12, triggerBox.y - 20))).toBeLessThanOrEqual(8);
 }
 
+async function seedPortfolioVolumeHistory(page) {
+  await page.evaluate((payload) => {
+    const c = globalThis.cljs.core;
+    const kw = (name) => c.keyword(name);
+    const opts = c.PersistentArrayMap.fromArray([kw("keywordize-keys"), true], true);
+    const walletAddress = "0xaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa";
+    const stateWithWallet = c.assoc_in(
+      c.deref(globalThis.hyperopen.system.store),
+      c.PersistentVector.fromArray([kw("wallet"), kw("address")], true),
+      walletAddress
+    );
+    const stateWithUserFees = c.assoc_in(
+      stateWithWallet,
+      c.PersistentVector.fromArray([kw("portfolio"), kw("user-fees")], true),
+      c.js__GT_clj(payload, opts)
+    );
+    const nextState = c.assoc_in(
+      stateWithUserFees,
+      c.PersistentVector.fromArray([kw("portfolio"), kw("user-fees-loaded-for-address")], true),
+      walletAddress
+    );
+    c.reset_BANG_(globalThis.hyperopen.system.store, nextState);
+  }, VOLUME_HISTORY_FIXTURE);
+  await waitForIdle(page, { quietMs: 150, timeoutMs: 4_000, pollMs: 50 });
+}
+
+async function stubPortfolioUserFees(page, observedRequests = []) {
+  await page.route("**/info", async (route) => {
+    const request = route.request();
+    if (request.method() === "POST") {
+      try {
+        const payload = request.postDataJSON();
+        if (payload?.type === "userFees") {
+          observedRequests.push(payload);
+          await route.fulfill({
+            status: 200,
+            contentType: "application/json",
+            body: JSON.stringify(VOLUME_HISTORY_FIXTURE)
+          });
+          return;
+        }
+      } catch {
+        // Let non-JSON info requests follow the normal route.
+      }
+    }
+    await route.continue();
+  });
+}
+
+async function unroutePortfolioUserFees(page) {
+  await page.unroute("**/info");
+}
+
 test("portfolio route exposes deterministic interaction states @regression", async ({ page }) => {
   await visitRoute(page, "/portfolio");
 
@@ -78,7 +225,9 @@ test("portfolio route exposes deterministic interaction states @regression", asy
 
 test("portfolio volume history opens near the metric card trigger @regression", async ({ page }) => {
   await page.setViewportSize({ width: 375, height: 812 });
+  await stubPortfolioUserFees(page);
   await visitRoute(page, "/portfolio");
+  await seedPortfolioVolumeHistory(page);
 
   const trigger = page.locator("[data-role='portfolio-volume-history-trigger']");
   const popover = page.locator("[data-role='portfolio-volume-history-popover']");
@@ -95,6 +244,14 @@ test("portfolio volume history opens near the metric card trigger @regression", 
   await expect(popover).toContainText("Exchange Volume");
   await expect(popover).toContainText("Your Weighted Maker Volume");
   await expect(popover).toContainText("Your Weighted Taker Volume");
+  await expect(popover).toContainText("Thu. 16. Apr. 2026");
+  await expect(popover).toContainText("Fri. 3. Apr. 2026");
+  await expect(page.locator("[data-role='portfolio-volume-history-day-row']")).toHaveCount(14);
+  await expect(popover).toContainText("$5.73b");
+  await expect(popover).toContainText("$375.59m");
+  await expect(popover).toContainText("$64.49b");
+  await expect(popover).toContainText("$4.92b");
+  await expect(popover).toContainText("Your 14 day maker volume share is 7.63%");
   await expect(popover).not.toContainText("Dates do not include the current day");
   await expect(page.locator("[data-role='portfolio-volume-history-total-row']"))
     .toContainText("Total");
@@ -124,6 +281,42 @@ test("portfolio volume history opens near the metric card trigger @regression", 
   await page.keyboard.press("Escape");
   await waitForIdle(page, { quietMs: 150, timeoutMs: 3_000, pollMs: 50 });
   await expect(popover).toHaveCount(0);
+  await unroutePortfolioUserFees(page);
+});
+
+test("portfolio volume history follows the spectated account user fees @regression", async ({ page }) => {
+  const observedUserFeesRequests = [];
+  await stubPortfolioUserFees(page, observedUserFeesRequests);
+  await visitRoute(page, `/portfolio?spectate=${SPECTATE_ADDRESS}`);
+
+  await expect(page.locator("[data-role='spectate-mode-active-banner']")).toBeVisible();
+  await expect.poll(() => observedUserFeesRequests.map((request) => request.user))
+    .toContain(SPECTATE_ADDRESS);
+  await expect.poll(async () => page.evaluate(() => {
+    const c = globalThis.cljs.core;
+    const kw = (name) => c.keyword(name);
+    return c.get_in(
+      c.deref(globalThis.hyperopen.system.store),
+      c.PersistentVector.fromArray([kw("portfolio"), kw("user-fees-loaded-for-address")], true)
+    );
+  })).toBe(SPECTATE_ADDRESS);
+
+  const trigger = page.locator("[data-role='portfolio-volume-history-trigger']");
+  const popover = page.locator("[data-role='portfolio-volume-history-popover']");
+  await trigger.click();
+  await waitForIdle(page, { quietMs: 150, timeoutMs: 3_000, pollMs: 50 });
+
+  await expect(popover).toBeVisible();
+  await expect(page.locator("[data-role='portfolio-volume-history-day-row']")).toHaveCount(14);
+  await expect(popover).toContainText("Thu. 16. Apr. 2026");
+  await expect(popover).toContainText("$5.73b");
+  await expect(popover).toContainText("$375.59m");
+  await expect(popover).toContainText("$294.10m");
+  await expect(popover).toContainText("$64.49b");
+  await expect(popover).toContainText("$4.92b");
+  await expect(popover).toContainText("$3.86b");
+  await expect(popover).toContainText("Your 14 day maker volume share is 7.63%");
+  await unroutePortfolioUserFees(page);
 });
 
 test("portfolio funding modal restores opener focus on close @regression", async ({ page }) => {

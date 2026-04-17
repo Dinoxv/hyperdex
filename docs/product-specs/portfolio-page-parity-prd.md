@@ -94,6 +94,10 @@ Primary sections in order:
 ### FR-3 KPI Summary Cards
 
 1. Card A (`14 Day Volume`) MUST show a computed USD-like volume value with fallback.
+   - `View Volume` MUST open a nearby popover listing the last 14 completed daily volume rows, newest first.
+   - The volume history popover MUST include `Date (UTC)`, exchange volume, weighted maker volume, weighted taker volume, a highlighted total row, and footer copy of the form `Your 14 day maker volume share is X.XX%`.
+   - The maker volume share MUST be computed as `total weighted maker volume / total exchange volume * 100`, with a safe `0.00%` fallback when exchange volume is zero.
+   - In spectate mode, the volume card and popover MUST use the spectated account's `userFees` payload, not the connected wallet or a previously loaded account.
 2. Card B (`Fees (Taker / Maker)`) MUST show taker/maker values with fallback defaults.
 3. Card C (`Perps + Spot + Vaults` summary) MUST show at least:
    - PNL
@@ -142,6 +146,10 @@ Use existing state inputs only in Phase 1:
 
 Phase 1 metric derivations:
 1. `14 Day Volume`: derive from available fills/trade history in state; fallback `0`.
+   - Volume history rows derive from `:portfolio :user-fees :dailyUserVlm` or normalized `:daily-user-vlm`, excluding the current in-progress day when present.
+   - Volume history totals and maker share derive from the same 14 completed rows shown in the popover.
+   - `userFees` MUST be requested for `account-context/effective-account-address`, including `?spectate=<address>` routes, and stored with the address it was loaded for.
+   - Portfolio volume history MUST ignore `userFees` when `:portfolio :user-fees-loaded-for-address` does not match the current effective account.
 2. `Fees`: use trading defaults (`taker 0.045`, `maker 0.015`) when account-tier data is unavailable.
 3. `Total Equity`: derive from existing account equity logic/projections.
 4. `Spot/Perps/Earn` values: derive from existing account projection helpers where possible.
