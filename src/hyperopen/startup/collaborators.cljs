@@ -270,17 +270,19 @@
      (let [requested-address (normalize-address address)]
        (if-not requested-address
          (js/Promise.resolve nil)
-         (do
-           (swap! store api-projections/begin-user-fees-load)
-           (-> (request-user-fees! address opts)
-               (.then (apply-success-and-return-when-current
+        (do
+          (swap! store api-projections/begin-user-fees-load requested-address)
+          (-> (request-user-fees! address opts)
+              (.then (apply-success-and-return-when-current
+                      store
+                      requested-address
+                      api-projections/apply-user-fees-success
+                      requested-address))
+              (.catch (apply-error-and-reject-when-current
                        store
                        requested-address
-                       api-projections/apply-user-fees-success))
-               (.catch (apply-error-and-reject-when-current
-                        store
-                        requested-address
-                        api-projections/apply-user-fees-error)))))))))
+                       api-projections/apply-user-fees-error
+                       requested-address)))))))))
 
 (defn- ensure-perp-dexs!
   ([api-ops store]

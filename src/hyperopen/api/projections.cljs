@@ -112,25 +112,39 @@
         (assoc-in [:portfolio :error] message))))
 
 (defn begin-user-fees-load
-  [state]
-  (-> state
-      (assoc-in [:portfolio :user-fees-loading?] true)
-      (assoc-in [:portfolio :user-fees-error] nil)))
+  ([state]
+   (begin-user-fees-load state nil))
+  ([state address]
+   (-> state
+       (assoc-in [:portfolio :user-fees-loading?] true)
+       (assoc-in [:portfolio :user-fees-loading-for-address]
+                 (account-context/normalize-address address))
+       (assoc-in [:portfolio :user-fees-error] nil))))
 
 (defn apply-user-fees-success
-  [state payload]
-  (-> state
-      (assoc-in [:portfolio :user-fees] payload)
-      (assoc-in [:portfolio :user-fees-loading?] false)
-      (assoc-in [:portfolio :user-fees-error] nil)
-      (assoc-in [:portfolio :user-fees-loaded-at-ms] (.now js/Date))))
+  ([state payload]
+   (apply-user-fees-success state nil payload))
+  ([state address payload]
+   (-> state
+       (assoc-in [:portfolio :user-fees] payload)
+       (assoc-in [:portfolio :user-fees-loading?] false)
+       (assoc-in [:portfolio :user-fees-loading-for-address] nil)
+       (assoc-in [:portfolio :user-fees-error] nil)
+       (assoc-in [:portfolio :user-fees-loaded-at-ms] (.now js/Date))
+       (assoc-in [:portfolio :user-fees-loaded-for-address]
+                 (account-context/normalize-address address)))))
 
 (defn apply-user-fees-error
-  [state err]
-  (let [{:keys [message]} (normalized-error err)]
-    (-> state
-        (assoc-in [:portfolio :user-fees-loading?] false)
-        (assoc-in [:portfolio :user-fees-error] message))))
+  ([state err]
+   (apply-user-fees-error state nil err))
+  ([state address err]
+   (let [{:keys [message]} (normalized-error err)]
+     (-> state
+         (assoc-in [:portfolio :user-fees-loading?] false)
+         (assoc-in [:portfolio :user-fees-loading-for-address] nil)
+         (assoc-in [:portfolio :user-fees-error] message)
+         (assoc-in [:portfolio :user-fees-error-for-address]
+                   (account-context/normalize-address address))))))
 
 (defn begin-asset-selector-load
   [state phase]

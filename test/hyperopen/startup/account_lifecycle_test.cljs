@@ -48,15 +48,18 @@
    :perp-dex-clearinghouse-error-category :stale
    :portfolio {:summary-by-key {:day {:pnl 10}}
                :user-fees {:dailyUserVlm [[0 1]]}
-               :ledger-updates [{:delta 1}]
-               :loading? true
-               :user-fees-loading? true
-               :error "stale-portfolio-error"
-               :user-fees-error "stale-user-fees-error"
-               :ledger-error "stale-ledger-error"
-               :loaded-at-ms 1700000000001
-               :user-fees-loaded-at-ms 1700000000002
-               :ledger-loaded-at-ms 1700000000003}
+	               :ledger-updates [{:delta 1}]
+	               :loading? true
+	               :user-fees-loading? true
+	               :user-fees-loading-for-address address
+	               :error "stale-portfolio-error"
+	               :user-fees-error "stale-user-fees-error"
+	               :user-fees-error-for-address address
+	               :ledger-error "stale-ledger-error"
+	               :loaded-at-ms 1700000000001
+	               :user-fees-loaded-at-ms 1700000000002
+	               :user-fees-loaded-for-address address
+	               :ledger-loaded-at-ms 1700000000003}
    :account {:mode :unified
              :abstraction-raw "raw"}})
 

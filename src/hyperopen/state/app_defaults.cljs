@@ -166,11 +166,14 @@
    :ledger-updates []
    :loading? false
    :user-fees-loading? false
+   :user-fees-loading-for-address nil
    :error nil
    :user-fees-error nil
+   :user-fees-error-for-address nil
    :ledger-error nil
    :loaded-at-ms nil
    :user-fees-loaded-at-ms nil
+   :user-fees-loaded-for-address nil
    :ledger-loaded-at-ms nil})
 
 (defn default-vaults-ui-state

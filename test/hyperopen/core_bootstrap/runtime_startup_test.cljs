@@ -239,12 +239,15 @@
                           :perp-dex-clearinghouse {"dex-a" {:assetPositions []}}
                           :portfolio {:summary-by-key {:day {:vlm 1}}
                                       :user-fees {:dailyUserVlm [[0 1]]}
-                                      :loading? true
-                                      :user-fees-loading? true
-                                      :error "portfolio-error"
-                                      :user-fees-error "user-fees-error"
-                                      :loaded-at-ms 1
-                                      :user-fees-loaded-at-ms 2}
+	                                      :loading? true
+	                                      :user-fees-loading? true
+	                                      :user-fees-loading-for-address "0xabc"
+	                                      :error "portfolio-error"
+	                                      :user-fees-error "user-fees-error"
+	                                      :user-fees-error-for-address "0xabc"
+	                                      :loaded-at-ms 1
+	                                      :user-fees-loaded-at-ms 2
+	                                      :user-fees-loaded-for-address "0xabc"}
                           :spot {:clearinghouse-state {:time 1}}
                           :account {:mode :unified
                                     :abstraction-raw "unifiedAccount"}})]
@@ -269,8 +272,11 @@
         (is (= {} (get-in @test-store [:portfolio :summary-by-key])))
         (is (nil? (get-in @test-store [:portfolio :user-fees])))
         (is (false? (get-in @test-store [:portfolio :loading?])))
-        (is (false? (get-in @test-store [:portfolio :user-fees-loading?])))
-        (is (nil? (get-in @test-store [:portfolio :error])))
-        (is (nil? (get-in @test-store [:portfolio :user-fees-error])))
-        (is (nil? (get-in @test-store [:portfolio :loaded-at-ms])))
-        (is (nil? (get-in @test-store [:portfolio :user-fees-loaded-at-ms])))))))
+	        (is (false? (get-in @test-store [:portfolio :user-fees-loading?])))
+	        (is (nil? (get-in @test-store [:portfolio :user-fees-loading-for-address])))
+	        (is (nil? (get-in @test-store [:portfolio :error])))
+	        (is (nil? (get-in @test-store [:portfolio :user-fees-error])))
+	        (is (nil? (get-in @test-store [:portfolio :user-fees-error-for-address])))
+	        (is (nil? (get-in @test-store [:portfolio :loaded-at-ms])))
+	        (is (nil? (get-in @test-store [:portfolio :user-fees-loaded-at-ms])))
+	        (is (nil? (get-in @test-store [:portfolio :user-fees-loaded-for-address])))))))
