@@ -12,7 +12,8 @@
     (is (= {:open? true
             :mode :deposit
             :title "Deposit BTC"
-            :anchor nil}
+            :anchor nil
+            :opener-data-role nil}
            (:modal view-model)))
     (is (= {:kind :deposit/address} (:content view-model)))
     (is (= {:message nil

@@ -16,6 +16,13 @@
     (is (= "bc1generated"
            (get-in view-model [:deposit :flow :generated-address])))))
 
+(deftest funding-modal-view-model-exposes-opener-data-role-for-positioning-test
+  (let [state (support/base-state {:modal {:anchor nil
+                                           :opener-data-role "portfolio-action-deposit"}})
+        view-model (modal-vm/funding-modal-view-model (support/base-deps) state)]
+    (is (= "portfolio-action-deposit"
+           (get-in view-model [:modal :opener-data-role])))))
+
 (deftest funding-modal-view-model-hides-preview-feedback-before-deposit-amount-entry-test
   (let [state (support/base-state {:modal {:deposit-step :asset-select}
                                    :deposit-asset nil

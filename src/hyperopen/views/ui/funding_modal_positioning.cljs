@@ -47,7 +47,8 @@
 
 (defn- data-role-selector
   [data-role]
-  (str "[data-role='" data-role "']"))
+  (when (and (string? data-role) (seq data-role))
+    (str "[data-role='" data-role "']")))
 
 (defn- parity-id-selector
   [parity-id]
@@ -60,6 +61,10 @@
   [mode]
   (some-> (get fallback-anchor-data-role-by-mode mode)
           data-role-selector))
+
+(defn- opener-anchor-selector
+  [modal]
+  (data-role-selector (:opener-data-role modal)))
 
 (defn- anchor-number
   [anchor k default]
@@ -138,8 +143,10 @@
   [modal]
   (let [stored-anchor (if (map? (:anchor modal)) (:anchor modal) {})
         fallback-anchor (when-not (anchored-popover/complete-anchor? stored-anchor)
-                          (element-anchor-bounds
-                           (fallback-anchor-selector (:mode modal))))
+                          (or (element-anchor-bounds
+                               (opener-anchor-selector modal))
+                              (element-anchor-bounds
+                               (fallback-anchor-selector (:mode modal)))))
         anchor (-> (or fallback-anchor stored-anchor)
                    align-anchor-to-trade-order-entry-divider)
         mobile-sheet? (mobile-sheet-layout? (:mode modal) anchor)

@@ -59,6 +59,7 @@
      :send-max-input (string-value (:send-max-input modal))
      :withdraw-generated-address (non-blank-text (:withdraw-generated-address modal))
      :anchor (:anchor modal)
+     :opener-data-role (:opener-data-role modal)
      :error (:error modal)
      :submitting? (true? (:submitting? modal))
      :legacy-kind (modal-legacy-kind modal)

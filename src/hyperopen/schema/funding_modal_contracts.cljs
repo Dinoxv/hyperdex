@@ -72,7 +72,7 @@
     :legacy})
 
 (def ^:private required-modal-keys
-  #{:open? :mode :title :anchor})
+  #{:open? :mode :title :anchor :opener-data-role})
 
 (def ^:private required-content-keys
   #{:kind})
@@ -464,13 +464,13 @@
 (s/def :funding-modal-vm.modal/mode (s/nilable keyword?))
 (s/def :funding-modal-vm.modal/title string?)
 (s/def :funding-modal-vm.modal/anchor :funding-modal-vm/anchor)
+(s/def :funding-modal-vm.modal/opener-data-role (s/nilable string?))
 (s/def :funding-modal-vm/modal
-  (s/and
-   (s/keys :req-un [:funding-modal-vm.modal/open?
-                    :funding-modal-vm.modal/mode
-                    :funding-modal-vm.modal/title
-                    :funding-modal-vm.modal/anchor])
-   #(exact-keys? % required-modal-keys)))
+  (s/and (s/keys :req-un [:funding-modal-vm.modal/open?
+                          :funding-modal-vm.modal/mode
+                          :funding-modal-vm.modal/title
+                          :funding-modal-vm.modal/anchor :funding-modal-vm.modal/opener-data-role])
+         #(exact-keys? % required-modal-keys)))
 
 (s/def :funding-modal-vm.content/kind keyword?)
 (s/def :funding-modal-vm/content

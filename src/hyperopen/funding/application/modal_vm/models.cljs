@@ -2,11 +2,12 @@
   (:require [hyperopen.funding.application.modal-vm.presentation :as presentation]))
 
 (defn- modal-model
-  [{:keys [open? mode title anchor]}]
+  [{:keys [open? mode title anchor opener-data-role]}]
   {:open? open?
    :mode mode
    :title title
-   :anchor anchor})
+   :anchor anchor
+   :opener-data-role opener-data-role})
 
 (defn- deposit-model
   [{:keys [deposit-step

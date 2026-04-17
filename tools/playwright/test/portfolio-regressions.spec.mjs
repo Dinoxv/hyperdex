@@ -40,6 +40,22 @@ async function selectAccountTab(page, tabValue) {
   await expect(tab).toHaveAttribute("aria-pressed", "true");
 }
 
+async function expectFundingPopoverAnchoredLeftOfTrigger(page, trigger) {
+  const modal = page.locator("[data-role='funding-modal']");
+  const [triggerBox, modalBox] = await Promise.all([
+    trigger.boundingBox(),
+    modal.boundingBox()
+  ]);
+
+  expect(triggerBox).not.toBeNull();
+  expect(modalBox).not.toBeNull();
+
+  const horizontalGap = triggerBox.x - (modalBox.x + modalBox.width);
+  expect(horizontalGap).toBeGreaterThanOrEqual(4);
+  expect(horizontalGap).toBeLessThanOrEqual(16);
+  expect(Math.abs(modalBox.y - Math.max(12, triggerBox.y - 20))).toBeLessThanOrEqual(8);
+}
+
 test("portfolio route exposes deterministic interaction states @regression", async ({ page }) => {
   await visitRoute(page, "/portfolio");
 
@@ -100,6 +116,9 @@ test("portfolio funding openers launch the funding modal on real click @regressi
     await openButton.click();
     await waitForIdle(page, { quietMs: 150, timeoutMs: 3_000, pollMs: 50 });
     await expectOracle(page, "funding-modal", { open: true, title });
+    if (dataRole === "portfolio-action-deposit" || dataRole === "portfolio-action-withdraw") {
+      await expectFundingPopoverAnchoredLeftOfTrigger(page, openButton);
+    }
 
     await page.locator("[data-role='funding-modal-close']").click();
     await waitForIdle(page, { quietMs: 150, timeoutMs: 3_000, pollMs: 50 });
