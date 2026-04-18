@@ -63,7 +63,33 @@
          :class ["h-[18px]" "w-[18px]" "text-white"]}
    [:path {:fill-rule "evenodd"
            :clip-rule "evenodd"
-           :d "M11.49 3.17c-.38-1.56-2.6-1.56-2.98 0a1.532 1.532 0 01-2.286.948c-1.372-.836-2.942.734-2.106 2.106.54.886.061 2.042-.947 2.287-1.561.379-1.561 2.6 0 2.978a1.532 1.532 0 01.947 2.287c-.836 1.372.734 2.942 2.106 2.106a1.532 1.532 0 012.287.947c.379 1.561 2.6 1.561 2.978 0a1.533 1.533 0 012.287-.947c1.372.836 2.942-.734 2.106-2.106a1.533 1.533 0 01.947-2.287c1.561-.379 1.561-2.6 0-2.978a1.532 1.532 0 01-.947-2.287c.836-1.372-.734-2.942-2.106-2.106a1.532 1.532 0 01-2.287-.947zM10 13a3 3 0 100-6 3 3 0 000 6z"}]])
+             :d "M11.49 3.17c-.38-1.56-2.6-1.56-2.98 0a1.532 1.532 0 01-2.286.948c-1.372-.836-2.942.734-2.106 2.106.54.886.061 2.042-.947 2.287-1.561.379-1.561 2.6 0 2.978a1.532 1.532 0 01.947 2.287c-.836 1.372.734 2.942 2.106 2.106a1.532 1.532 0 012.287.947c.379 1.561 2.6 1.561 2.978 0a1.533 1.533 0 012.287-.947c1.372.836 2.942-.734 2.106-2.106a1.533 1.533 0 01.947-2.287c1.561-.379 1.561-2.6 0-2.978a1.532 1.532 0 01-.947-2.287c.836-1.372-.734-2.942-2.106-2.106a1.532 1.532 0 01-2.287-.947zM10 13a3 3 0 100-6 3 3 0 000 6z"}]])
+
+(defn gear-line-icon
+  [attrs]
+  [:svg (merge {:viewBox "0 0 14 14"
+                :fill "none"
+                :aria-hidden "true"}
+               attrs)
+   [:circle {:cx "7" :cy "7" :r "2.3"
+             :stroke "currentColor" :stroke-width "1.2"}]
+   [:path {:d "M7 1 V3 M7 11 V13 M1 7 H3 M11 7 H13 M2.8 2.8 L4.2 4.2 M9.8 9.8 L11.2 11.2 M2.8 11.2 L4.2 9.8 M9.8 4.2 L11.2 2.8"
+           :stroke "currentColor"
+           :stroke-width "1.2"
+           :stroke-linecap "round"}]])
+
+(defn device-icon
+  [attrs]
+  [:svg (merge {:viewBox "0 0 14 14"
+                :fill "none"
+                :aria-hidden "true"}
+               attrs)
+   [:rect {:x "2" :y "2.5" :width "10" :height "7" :rx "1"
+           :stroke "currentColor" :stroke-width "1.1"}]
+   [:path {:d "M5 12 H9 M4.5 9.5 V12 M9.5 9.5 V12"
+           :stroke "currentColor"
+           :stroke-width "1.1"
+           :stroke-linecap "round"}]])
 
 (defn close-icon
   [attrs]
@@ -78,83 +104,83 @@
 
 (defn trading-settings-row-icon
   [kind active?]
-  (let [icon-classes (into ["h-5" "w-5" "shrink-0"]
+  (let [icon-classes (into ["h-3.5" "w-3.5" "shrink-0"]
                            (if active?
-                             ["text-[#9ba4ac]"]
-                             ["text-[#7f8991]"]))]
+                             ["text-[#2dd4bf]"]
+                             ["text-[#2dd4bf]"]))]
     (case kind
       :session
-      [:svg {:viewBox "0 0 20 20"
+      [:svg {:viewBox "0 0 14 14"
              :fill "none"
              :stroke "currentColor"
              :class icon-classes}
-       [:circle {:cx "10" :cy "10" :r "6.5" :stroke-width "1.7"}]
-       [:path {:d "M10 6.7v3.5l2.4 1.4"
-               :stroke-width "1.7"
+       [:circle {:cx "7" :cy "7" :r "5.3" :stroke-width "1.1"}]
+       [:path {:d "M7 4 V7 L9 8.5"
+               :stroke-width "1.3"
                :stroke-linecap "round"
                :stroke-linejoin "round"}]]
 
       :alerts
-      [:svg {:viewBox "0 0 20 20"
+      [:svg {:viewBox "0 0 14 14"
              :fill "none"
              :stroke "currentColor"
              :class icon-classes}
-       [:path {:d "M10 4.4a3 3 0 0 0-3 3v1.1c0 .9-.24 1.8-.7 2.56L5.15 13h9.7l-1.15-1.94A4.94 4.94 0 0 1 13 8.5V7.4a3 3 0 0 0-3-3Z"
-               :stroke-width "1.6"
-               :stroke-linecap "round"
+       [:path {:d "M3.5 10 V6.5 A3.5 3.5 0 0 1 10.5 6.5 V10 L11.5 11 H2.5 Z"
+               :stroke-width "1.1"
                :stroke-linejoin "round"}]
-       [:path {:d "M8.5 14.55a1.7 1.7 0 0 0 3 0"
-               :stroke-width "1.6"
-               :stroke-linecap "round"}]]
+       [:path {:d "M5.5 12 A1.5 1.5 0 0 0 8.5 12"
+               :stroke-width "1.1"}]]
 
-      :confirm-open-orders
-      [:svg {:viewBox "0 0 20 20"
+      :confirm
+      [:svg {:viewBox "0 0 14 14"
              :fill "none"
              :stroke "currentColor"
              :class icon-classes}
-       [:circle {:cx "10" :cy "10" :r "6.7" :stroke-width "1.65"}]
-       [:path {:d "M7.3 10.1 9 11.8l3.7-3.8"
-               :stroke-width "1.7"
+       [:path {:d "M2 7 L5.5 10.5 L12 3.5"
+               :stroke-width "1.4"
                :stroke-linecap "round"
                :stroke-linejoin "round"}]]
 
-      :confirm-close-position
-      [:svg {:viewBox "0 0 20 20"
+      :sound
+      [:svg {:viewBox "0 0 14 14"
              :fill "none"
              :stroke "currentColor"
              :class icon-classes}
-       [:circle {:cx "10" :cy "10" :r "6.7" :stroke-width "1.65"}]
-       [:path {:d "M7.6 7.6 12.4 12.4"
-               :stroke-width "1.7"
-               :stroke-linecap "round"}]
-       [:path {:d "M12.4 7.6 7.6 12.4"
-               :stroke-width "1.7"
+       [:path {:d "M2.5 5.5 V8.5 H5 L8.5 11 V3 L5 5.5 Z"
+               :stroke-width "1.1"
+               :stroke-linejoin "round"}]
+       [:path {:d "M10.5 5 A3 3 0 0 1 10.5 9"
+               :stroke-width "1.1"
                :stroke-linecap "round"}]]
 
-      :animate-orderbook
-      [:svg {:viewBox "0 0 20 20"
+      :book
+      [:svg {:viewBox "0 0 14 14"
              :fill "none"
              :stroke "currentColor"
              :class icon-classes}
-       [:path {:d "M3.75 13.5h3.15l2.05-5.2 2.8 7 2.1-4.05h2.4"
-               :stroke-width "1.75"
-               :stroke-linecap "round"
-               :stroke-linejoin "round"}]
-       [:path {:d "M14.9 5.2h1.9v1.9"
-               :stroke-width "1.75"
-               :stroke-linecap "round"
+       [:rect {:x "2" :y "2.5" :width "10" :height "9" :rx "1"
+               :stroke-width "1.1"}]
+       [:path {:d "M2 5.5 H12 M2 8.5 H12"
+               :stroke-width "1.1"}]]
+
+      :marker
+      [:svg {:viewBox "0 0 14 14"
+             :fill "none"
+             :stroke "currentColor"
+             :class icon-classes}
+       [:path {:d "M7 2 L11.5 7 L7 12 L2.5 7 Z"
+               :stroke-width "1.1"
                :stroke-linejoin "round"}]]
 
-      :fill-markers
-      [:svg {:viewBox "0 0 20 20"
+      :key
+      [:svg {:viewBox "0 0 14 14"
              :fill "none"
              :stroke "currentColor"
              :class icon-classes}
-       [:path {:d "M10 16.1s4.2-4.15 4.2-7.2A4.2 4.2 0 0 0 5.8 8.9c0 3.05 4.2 7.2 4.2 7.2Z"
-               :stroke-width "1.65"
-               :stroke-linecap "round"
-               :stroke-linejoin "round"}]
-       [:circle {:cx "10" :cy "8.8" :r "1.35" :stroke-width "1.6"}]]
+       [:circle {:cx "4" :cy "10" :r "2.3" :stroke-width "1.1"}]
+       [:path {:d "M5.6 8.4 L12 2 M9.5 4.5 L11 6 M10.5 3.5 L12 5"
+               :stroke-width "1.1"
+               :stroke-linecap "round"}]]
 
       nil)))
 

@@ -10,7 +10,7 @@
   "spectate-mode-open-tooltip")
 
 (def ^:private trading-settings-footer-copy
-  "Applies only to this browser on this device.")
+  "These settings live on this device only.")
 
 (def ^:private trading-settings-close-actions
   [[:actions/close-header-settings]])
@@ -193,11 +193,12 @@
     nil))
 
 (defn- settings-row
-  [id title helper-copy checked? icon-kind on-change & {:keys [confirmation disabled? tooltip]}]
+  [id title hint checked? icon-kind on-change & {:keys [confirmation disabled? tooltip]}]
   {:id id
    :data-role (str "trading-settings-" (name id) "-row")
    :title title
-   :helper-copy helper-copy
+   :hint hint
+   :helper-copy nil
    :tooltip tooltip
    :checked? checked?
    :disabled? disabled?
@@ -207,9 +208,10 @@
    :confirmation confirmation})
 
 (defn- settings-section
-  [id title rows]
+  [id title hint rows]
   {:id id
    :title title
+   :hint hint
    :data-role (str "trading-settings-" (name id) "-section")
    :rows rows})
 
@@ -235,17 +237,86 @@
                        (true? (get-in state [:header-ui :settings-open?]))
                        ":"
                        (true? (get-in state [:header-ui :settings-return-focus?])))
-     :trigger-action [[:actions/open-header-settings]]
-     :title "Trading settings"
+     :trigger-action (if (true? (get-in state [:header-ui :settings-open?]))
+                       [[:actions/close-header-settings]]
+                       [[:actions/open-header-settings]])
+     :title "Trading Settings"
      :close-actions trading-settings-close-actions
      :keydown-action trading-settings-keydown-action
      :footer-note trading-settings-footer-copy
      :sections [(settings-section
+                 :confirmations
+                 "Confirmations"
+                 "Ask before you trade"
+                 [(settings-row :confirm-open-orders
+                                "Confirm open orders"
+                                "Show a preview before placing."
+                                (trading-settings/confirm-open-orders? state)
+                                :confirm
+                                [[:actions/set-confirm-open-orders-enabled
+                                  (not (trading-settings/confirm-open-orders? state))]]
+                                :tooltip "Ask before sending a new order from the trade form.")
+                  (settings-row :confirm-close-position
+                                "Confirm close position"
+                                "Show a preview before closing."
+                                (trading-settings/confirm-close-position? state)
+                                :confirm
+                                [[:actions/set-confirm-close-position-enabled
+                                  (not (trading-settings/confirm-close-position? state))]]
+                                :tooltip "Ask before submitting from the close-position popover.")
+                  (settings-row :confirm-market-orders
+                                "Confirm market orders"
+                                "Also ask when placing market orders."
+                                (trading-settings/confirm-market-orders? state)
+                                :confirm
+                                [[:actions/set-confirm-market-orders-enabled
+                                  (not (trading-settings/confirm-market-orders? state))]])])
+                (settings-section
+                 :alerts
+                 "Alerts"
+                 "Feedback when fills land"
+                 [(settings-row :fill-alerts
+                                "Fill alerts"
+                                "Toast when any order fills."
+                                (trading-settings/fill-alerts-enabled? state)
+                                :alerts
+                                [[:actions/set-fill-alerts-enabled
+                                  (not (trading-settings/fill-alerts-enabled? state))]]
+                                :tooltip "Show fill alerts while Hyperopen is open.")
+                  (settings-row :sound-on-fill
+                                "Sound on fill"
+                                "Plays a short chime on fill."
+                                (trading-settings/sound-on-fill? state)
+                                :sound
+                                [[:actions/set-sound-on-fill-enabled
+                                  (not (trading-settings/sound-on-fill? state))]])])
+                (settings-section
+                 :display
+                 "Display"
+                 "Visual chrome"
+                 [(settings-row :animate-orderbook
+                                "Animate order book"
+                                "Animate row changes in the book."
+                                (trading-settings/animate-orderbook? state)
+                                :book
+                                [[:actions/set-animate-orderbook-enabled
+                                  (not (trading-settings/animate-orderbook? state))]]
+                                :tooltip "Smooth bid and ask depth changes as the book updates.")
+                  (settings-row :fill-markers
+                                "Fill markers"
+                                "Show your fills on the price chart."
+                                (trading-settings/show-fill-markers? state)
+                                :marker
+                                [[:actions/set-fill-markers-enabled
+                                  (not (trading-settings/show-fill-markers? state))]]
+                                :tooltip "Show buy and sell markers for the active asset on the chart.")])
+                (settings-section
                  :session
                  "Session"
+                 "Sign-in behavior"
                  [(settings-row :storage-mode
                                 "Remember session"
-                                nil
+                                "Stay signed in across browser restarts."
                                 remember-session?
                                 :session
                                 [[:actions/request-agent-storage-mode-change
@@ -256,65 +327,16 @@
                                                 confirmation))
                   (settings-row :local-protection-mode
                                 "Lock trading with passkey"
-                                nil
+                                "Require passkey for sensitive actions."
                                 passkey-enabled?
-                                nil
+                                :key
                                 [[:actions/request-agent-local-protection-mode-change
                                   (if passkey-enabled? :plain :passkey)]]
                                 :tooltip (passkey-toggle-tooltip-copy remember-session?
                                                                       passkey-capable?
                                                                       passkey-enabled?
                                                                       agent-status)
-                                :disabled? passkey-disabled?)])
-                (settings-section
-                 :confirmations
-                 "Confirmations"
-                 [(settings-row :confirm-open-orders
-                                "Confirm open orders"
-                                nil
-                                (trading-settings/confirm-open-orders? state)
-                                nil
-                                [[:actions/set-confirm-open-orders-enabled
-                                  (not (trading-settings/confirm-open-orders? state))]]
-                                :tooltip "Ask before sending a new order from the trade form.")
-                  (settings-row :confirm-close-position
-                                "Confirm close position"
-                                nil
-                                (trading-settings/confirm-close-position? state)
-                                nil
-                                [[:actions/set-confirm-close-position-enabled
-                                  (not (trading-settings/confirm-close-position? state))]]
-                                :tooltip "Ask before submitting from the close-position popover.")])
-                (settings-section
-                 :alerts
-                 "Alerts"
-                 [(settings-row :fill-alerts
-                                "Fill alerts"
-                                nil
-                                (trading-settings/fill-alerts-enabled? state)
-                                :alerts
-                                [[:actions/set-fill-alerts-enabled
-                                  (not (trading-settings/fill-alerts-enabled? state))]]
-                                :tooltip "Show fill alerts while Hyperopen is open.")])
-                (settings-section
-                 :display
-                 "Display"
-                 [(settings-row :animate-orderbook
-                                "Animate order book"
-                                nil
-                                (trading-settings/animate-orderbook? state)
-                                :animate-orderbook
-                                [[:actions/set-animate-orderbook-enabled
-                                  (not (trading-settings/animate-orderbook? state))]]
-                                :tooltip "Smooth bid and ask depth changes as the book updates.")
-                  (settings-row :fill-markers
-                                "Fill markers"
-                                nil
-                                (trading-settings/show-fill-markers? state)
-                                :fill-markers
-                                [[:actions/set-fill-markers-enabled
-                                  (not (trading-settings/show-fill-markers? state))]]
-                                :tooltip "Show buy and sell markers for the active asset on the chart.")])]}))
+                                :disabled? passkey-disabled?)])]}))
 
 (defn header-vm
   [state]

@@ -213,7 +213,9 @@
         (is (= true (get-in @store [:trading-settings :animate-orderbook?])))
         (is (= false (get-in @store [:trading-settings :show-fill-markers?])))
         (is (= false (get-in @store [:trading-settings :confirm-open-orders?])))
-        (is (= false (get-in @store [:trading-settings :confirm-close-position?])))))))
+        (is (= false (get-in @store [:trading-settings :confirm-close-position?])))
+        (is (= true (get-in @store [:trading-settings :confirm-market-orders?])))
+        (is (= false (get-in @store [:trading-settings :sound-on-fill?])))))))
 
 (deftest restore-trading-settings-valid-storage-restores-phase-1-5-settings-test
   (let [store (atom {})

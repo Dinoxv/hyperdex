@@ -119,6 +119,10 @@
   [state enabled?]
   (persist-trading-settings state {:fill-alerts-enabled? (boolean enabled?)}))
 
+(defn set-sound-on-fill-enabled
+  [state enabled?]
+  (persist-trading-settings state {:sound-on-fill? (boolean enabled?)}))
+
 (defn set-animate-orderbook-enabled
   [state enabled?]
   (persist-trading-settings state {:animate-orderbook? (boolean enabled?)}))
@@ -134,6 +138,10 @@
 (defn set-confirm-close-position-enabled
   [state enabled?]
   (persist-trading-settings state {:confirm-close-position? (boolean enabled?)}))
+
+(defn set-confirm-market-orders-enabled
+  [state enabled?]
+  (persist-trading-settings state {:confirm-market-orders? (boolean enabled?)}))
 
 (defn navigate-mobile-header-menu
   [state path]

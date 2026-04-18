@@ -1,4 +1,5 @@
-(ns hyperopen.views.footer.diagnostics-drawer)
+(ns hyperopen.views.footer.diagnostics-drawer
+  (:require [hyperopen.views.ui.toggle :as toggle]))
 
 (def ^:private banner-tone-classes
   {:warning ["border-warning/40" "bg-warning/10" "text-warning"]
@@ -91,14 +92,10 @@
    [:div {:class ["hx-toggle-text"]}
     [:div {:class ["hx-toggle-title"]} "Show freshness labels"]
     [:div {:class ["hx-toggle-sub"]} "Adds small Updated Ns ago tags across trading views."]]
-   [:button {:type "button"
-             :class ["hx-toggle" (when checked? "on")]
-             :role "switch"
-             :aria-checked (if checked? "true" "false")
-             :aria-label "Show freshness labels"
-             :data-role "surface-freshness-toggle"
-             :on {:click [[:actions/toggle-show-surface-freshness-cues]]}}
-    [:span {:class ["hx-toggle-knob"]}]]])
+   (toggle/toggle {:on? (boolean checked?)
+                   :aria-label "Show freshness labels"
+                   :data-role "surface-freshness-toggle"
+                   :on-change [[:actions/toggle-show-surface-freshness-cues]]})])
 
 (defn- counter-row
   [{:keys [label value]}]

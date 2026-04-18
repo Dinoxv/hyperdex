@@ -62,10 +62,14 @@
         session-row (row-by-id sections :session :storage-mode)
         open-orders-row (row-by-id sections :confirmations :confirm-open-orders)
         close-position-row (row-by-id sections :confirmations :confirm-close-position)
+        market-orders-row (row-by-id sections :confirmations :confirm-market-orders)
+        sound-row (row-by-id sections :alerts :sound-on-fill)
         fill-markers-row (row-by-id sections :display :fill-markers)]
-    (is (= [:session :confirmations :alerts :display]
+    (is (= [:confirmations :alerts :display :session]
            (mapv :id sections)))
     (is (= "trading-settings-storage-mode-row" (:data-role session-row)))
+    (is (= "These settings live on this device only."
+           (get-in result [:settings :footer-note])))
     (is (= "Remember session on this device?"
            (get-in session-row [:confirmation :title])))
     (is (= "Changes trading persistence on this device and will require Enable Trading again."
@@ -77,6 +81,14 @@
            (:on-change open-orders-row)))
     (is (= [[:actions/set-confirm-close-position-enabled true]]
            (:on-change close-position-row)))
+    (is (= "Confirm market orders" (:title market-orders-row)))
+    (is (true? (:checked? market-orders-row)))
+    (is (= [[:actions/set-confirm-market-orders-enabled false]]
+           (:on-change market-orders-row)))
+    (is (= "Sound on fill" (:title sound-row)))
+    (is (false? (:checked? sound-row)))
+    (is (= [[:actions/set-sound-on-fill-enabled true]]
+           (:on-change sound-row)))
     (is (= "Fill markers" (:title fill-markers-row)))))
 
 (deftest header-vm-projects-passkey-session-toggle-when-remembered-session-is-enabled-test

@@ -1956,32 +1956,33 @@ test("trading settings confirmation toggles respond to visible switch clicks @re
 
   const openToggleLabel = page
     .locator(
-      '[data-role="trading-settings-panel"] [data-role="trading-settings-confirm-open-orders-row"] label'
+      '[data-role="trading-settings-panel"] [data-role="trading-settings-confirm-open-orders-row-toggle"]'
     )
     .first();
   const openToggleInput = page
     .locator(
-      '[data-role="trading-settings-panel"] [data-role="trading-settings-confirm-open-orders-row"] input[type="checkbox"]'
+      '[data-role="trading-settings-panel"] [data-role="trading-settings-confirm-open-orders-row-toggle"]'
     )
     .first();
   const closeToggleLabel = page
     .locator(
-      '[data-role="trading-settings-panel"] [data-role="trading-settings-confirm-close-position-row"] label'
+      '[data-role="trading-settings-panel"] [data-role="trading-settings-confirm-close-position-row-toggle"]'
     )
     .first();
   const closeToggleInput = page
     .locator(
-      '[data-role="trading-settings-panel"] [data-role="trading-settings-confirm-close-position-row"] input[type="checkbox"]'
+      '[data-role="trading-settings-panel"] [data-role="trading-settings-confirm-close-position-row-toggle"]'
     )
     .first();
 
-  await expect(openToggleInput).toBeChecked();
-  await expect(closeToggleInput).toBeChecked();
+  await expect(openToggleInput).toHaveAttribute("role", "switch");
+  await expect(openToggleInput).toHaveAttribute("aria-checked", "true");
+  await expect(closeToggleInput).toHaveAttribute("aria-checked", "true");
 
   await openToggleLabel.click();
   await waitForIdle(page, { quietMs: 250, timeoutMs: 4_000, pollMs: 50 });
 
-  await expect(openToggleInput).not.toBeChecked();
+  await expect(openToggleInput).toHaveAttribute("aria-checked", "false");
   await expect
     .poll(
       async () =>
@@ -1993,7 +1994,7 @@ test("trading settings confirmation toggles respond to visible switch clicks @re
   await closeToggleLabel.click();
   await waitForIdle(page, { quietMs: 250, timeoutMs: 4_000, pollMs: 50 });
 
-  await expect(closeToggleInput).not.toBeChecked();
+  await expect(closeToggleInput).toHaveAttribute("aria-checked", "false");
   await expect
     .poll(
       async () =>
@@ -2016,7 +2017,7 @@ test("trading settings confirmation toggles respond to visible switch clicks @re
     });
 });
 
-test("trading settings renders compact tooltip rows without clipping @regression", async ({
+test("trading settings renders compact popover rows without clipping @regression", async ({
   page
 }) => {
   await visitRoute(page, "/trade");
@@ -2024,9 +2025,7 @@ test("trading settings renders compact tooltip rows without clipping @regression
   await page.locator('[data-role="header-settings-button"]').click();
   await waitForIdle(page, { quietMs: 250, timeoutMs: 4_000, pollMs: 50 });
 
-  const settingsSurface = page.locator(
-    '[data-role="trading-settings-panel"]:visible, [data-role="trading-settings-sheet"]:visible'
-  );
+  const settingsSurface = page.locator('[data-role="trading-settings-panel"]:visible');
   const desktopPanel = page.locator('[data-role="trading-settings-panel"]:visible');
   const rememberRow = settingsSurface.locator('[data-role="trading-settings-storage-mode-row"]').first();
   const openOrdersRow = settingsSurface
@@ -2036,22 +2035,21 @@ test("trading settings renders compact tooltip rows without clipping @regression
 
   if ((await desktopPanel.count()) > 0) {
     const bounds = await desktopPanel.boundingBox();
-    expect(bounds?.width ?? 0).toBeGreaterThanOrEqual(360);
+    expect(Math.round(bounds?.width ?? 0)).toBe(400);
+    expect(Math.round((bounds?.x ?? 0) + (bounds?.width ?? 0))).toBeGreaterThanOrEqual(1260);
+    expect(Math.round(bounds?.y ?? 0)).toBe(56);
   }
 
-  await expect(
-    settingsSurface.locator('[data-role="trading-settings-storage-mode-row-tooltip-trigger"]').first()
-  ).toBeVisible();
-  await expect(
-    settingsSurface.locator('[data-role="trading-settings-confirm-open-orders-row-tooltip-trigger"]').first()
-  ).toBeVisible();
-  await expect(
-    settingsSurface.locator('[data-role="trading-settings-fill-markers-row-tooltip-trigger"]').first()
-  ).toBeVisible();
+  await expect(settingsSurface).toHaveAttribute("role", "dialog");
+  await expect(settingsSurface).toHaveAttribute("aria-label", "Trading settings");
+  await expect(settingsSurface).toContainText(", to open · esc to close");
+  await expect(settingsSurface).toContainText("These settings live on this device only.");
+  await expect(settingsSurface.locator('[data-role="trading-settings-confirm-market-orders-row"]')).toBeVisible();
+  await expect(settingsSurface.locator('[data-role="trading-settings-sound-on-fill-row"]')).toBeVisible();
   await expect(settingsSurface.locator('[data-role="trading-settings-footer-note"]').first()).toBeVisible();
-  await expect(rememberRow.locator("p")).toHaveCount(0);
-  await expect(openOrdersRow.locator("p")).toHaveCount(0);
-  await expect(fillMarkersRow.locator("p")).toHaveCount(0);
+  await expect(rememberRow).toContainText("Stay signed in across browser restarts.");
+  await expect(openOrdersRow).toContainText("Show a preview before placing.");
+  await expect(fillMarkersRow).toContainText("Show your fills on the price chart.");
 });
 
 test("trading settings session toggles gate passkey lock behind remembered sessions @regression", async ({
@@ -2082,24 +2080,25 @@ test("trading settings session toggles gate passkey lock behind remembered sessi
   await page.locator('[data-role="header-settings-button"]').click();
   await waitForIdle(page, { quietMs: 250, timeoutMs: 4_000, pollMs: 50 });
 
-  const settingsSurface = page.locator(
-    '[data-role="trading-settings-panel"]:visible, [data-role="trading-settings-sheet"]:visible'
-  );
+  const settingsSurface = page.locator('[data-role="trading-settings-panel"]:visible');
   const rememberRow = settingsSurface.locator('[data-role="trading-settings-storage-mode-row"]').first();
-  const rememberToggleLabel = rememberRow.locator("label").first();
-  const rememberToggleInput = rememberRow.locator('input[type="checkbox"]').first();
+  const rememberToggleInput = rememberRow
+    .locator('[data-role="trading-settings-storage-mode-row-toggle"]')
+    .first();
   const passkeyRow = settingsSurface
     .locator('[data-role="trading-settings-local-protection-mode-row"]')
     .first();
-  const passkeyToggleLabel = passkeyRow.locator("label").first();
-  const passkeyToggleInput = passkeyRow.locator('input[type="checkbox"]').first();
+  const passkeyToggleLabel = passkeyRow
+    .locator('[data-role="trading-settings-local-protection-mode-row-toggle"]')
+    .first();
+  const passkeyToggleInput = passkeyToggleLabel;
 
-  await expect(rememberToggleInput).toBeChecked();
+  await expect(rememberToggleInput).toHaveAttribute("aria-checked", "true");
   await expect(passkeyToggleInput).toBeEnabled();
 
   await passkeyToggleLabel.click();
   await waitForIdle(page, { quietMs: 250, timeoutMs: 4_000, pollMs: 50 });
-  await expect(passkeyToggleInput).toBeChecked();
+  await expect(passkeyToggleInput).toHaveAttribute("aria-checked", "true");
   await expect
     .poll(
       () => page.evaluate(() => localStorage.getItem("hyperopen:agent-local-protection-mode:v1")),
@@ -2123,20 +2122,20 @@ test("ready remembered session keeps submit usable after enabling passkey lock @
   await page.locator('[data-role="header-settings-button"]').click();
   await waitForIdle(page, { quietMs: 250, timeoutMs: 4_000, pollMs: 50 });
 
-  const settingsSurface = page.locator(
-    '[data-role="trading-settings-panel"]:visible, [data-role="trading-settings-sheet"]:visible'
-  );
+  const settingsSurface = page.locator('[data-role="trading-settings-panel"]:visible');
   const passkeyRow = settingsSurface
     .locator('[data-role="trading-settings-local-protection-mode-row"]')
     .first();
-  const passkeyToggleLabel = passkeyRow.locator("label").first();
-  const passkeyToggleInput = passkeyRow.locator('input[type="checkbox"]').first();
+  const passkeyToggleLabel = passkeyRow
+    .locator('[data-role="trading-settings-local-protection-mode-row-toggle"]')
+    .first();
+  const passkeyToggleInput = passkeyToggleLabel;
 
   await expect(passkeyToggleInput).toBeEnabled();
   await passkeyToggleLabel.click();
   await waitForIdle(page, { quietMs: 250, timeoutMs: 4_000, pollMs: 50 });
 
-  await expect(passkeyToggleInput).toBeChecked();
+  await expect(passkeyToggleInput).toHaveAttribute("aria-checked", "true");
   await expectOracle(page, "wallet-status", {
     connected: true,
     agentStatus: "ready",
@@ -2194,16 +2193,16 @@ test("locked remembered passkey session disables downgrade until unlock @regress
   await page.locator('[data-role="header-settings-button"]').click();
   await waitForIdle(page, { quietMs: 250, timeoutMs: 4_000, pollMs: 50 });
 
-  const settingsSurface = page.locator(
-    '[data-role="trading-settings-panel"]:visible, [data-role="trading-settings-sheet"]:visible'
-  );
+  const settingsSurface = page.locator('[data-role="trading-settings-panel"]:visible');
   const passkeyRow = settingsSurface
     .locator('[data-role="trading-settings-local-protection-mode-row"]')
     .first();
-  const passkeyToggleInput = passkeyRow.locator('input[type="checkbox"]').first();
+  const passkeyToggleInput = passkeyRow
+    .locator('[data-role="trading-settings-local-protection-mode-row-toggle"]')
+    .first();
 
   await expect(passkeyToggleInput).toBeDisabled();
-  await expect(passkeyRow).toContainText("Unlock trading before turning off passkey protection.");
+  await expect(passkeyRow).toContainText("Require passkey for sensitive actions.");
   await expect
     .poll(
       () => page.evaluate(() => localStorage.getItem("hyperopen:agent-local-protection-mode:v1")),

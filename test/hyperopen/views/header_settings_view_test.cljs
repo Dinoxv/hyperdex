@@ -31,7 +31,7 @@
 (defn- class-token-set [node]
   (set (class-values (get-in node [1 :class]))))
 
-(deftest header-renders-passkey-row-tooltip-instead-of-inline-helper-copy-when-available-test
+(deftest header-renders-passkey-row-with-inline-popover-hint-test
   (let [view (header-view/header-view {:wallet {:connected? false
                                                 :agent {:storage-mode :local
                                                         :status :ready
@@ -42,16 +42,11 @@
                                                    :settings-confirmation nil}
                                        :trading-settings {:fill-alerts-enabled? true}})
         passkey-row (find-node-by-role view "trading-settings-local-protection-mode-row")
-        tooltip-trigger (find-node-by-role view "trading-settings-local-protection-mode-row-tooltip-trigger")
-        tooltip (find-node-by-role view "trading-settings-local-protection-mode-row-tooltip")
         row-text (set (collect-strings passkey-row))]
     (is (some? passkey-row))
-    (is (some? tooltip-trigger))
-    (is (some? tooltip))
     (is (contains? row-text "Lock trading with passkey"))
-    (is (not (contains? row-text "Add a passkey unlock after restart.")))
-    (is (contains? (set (collect-strings tooltip))
-                   "Protect the remembered trading session with a passkey so the key is not resumed automatically after a browser restart."))))
+    (is (contains? row-text "Require passkey for sensitive actions."))
+    (is (nil? (find-node-by-role view "trading-settings-local-protection-mode-row-tooltip-trigger")))))
 
 (deftest header-renders-passkey-disabled-state-as-tooltip-copy-test
   (let [view (header-view/header-view {:wallet {:connected? false
@@ -64,20 +59,13 @@
                                                    :settings-confirmation nil}
                                        :trading-settings {:fill-alerts-enabled? true}})
         passkey-row (find-node-by-role view "trading-settings-local-protection-mode-row")
-        tooltip-trigger (find-node-by-role view "trading-settings-local-protection-mode-row-tooltip-trigger")
-        tooltip (find-node-by-role view "trading-settings-local-protection-mode-row-tooltip")
-        inline-helper-copy? (some? (find-node (fn [node]
-                                                (contains? (class-token-set node) "max-w-[16rem]"))
-                                              passkey-row))]
+        row-text (set (collect-strings passkey-row))]
     (is (some? passkey-row))
-    (is (some? tooltip-trigger))
-    (is (some? tooltip))
-    (is (false? inline-helper-copy?))
-    (is (contains? (set (collect-strings passkey-row)) "Lock trading with passkey"))
-    (is (contains? (set (collect-strings tooltip))
-                   "Unlock trading before turning off passkey protection."))))
+    (is (contains? row-text "Lock trading with passkey"))
+    (is (contains? row-text "Require passkey for sensitive actions."))
+    (is (contains? (class-token-set passkey-row) "is-disabled"))))
 
-(deftest header-renders-standard-settings-as-tooltip-rows-without-inline-helper-copy-test
+(deftest header-renders-standard-settings-as-compact-hint-rows-test
   (let [view (header-view/header-view {:wallet {:connected? false
                                                 :agent {:storage-mode :local}}
                                        :router {:path "/trade"}
@@ -92,25 +80,18 @@
         open-orders-row (find-node-by-role view "trading-settings-confirm-open-orders-row")
         close-position-row (find-node-by-role view "trading-settings-confirm-close-position-row")
         fill-alerts-row (find-node-by-role view "trading-settings-fill-alerts-row")
+        sound-row (find-node-by-role view "trading-settings-sound-on-fill-row")
         animate-orderbook-row (find-node-by-role view "trading-settings-animate-orderbook-row")
-        fill-markers-row (find-node-by-role view "trading-settings-fill-markers-row")
-        inline-helper-copy? #(some? (find-node (fn [node]
-                                                 (contains? (class-token-set node) "max-w-[16rem]"))
-                                               %))]
-    (is (some? (find-node-by-role view "trading-settings-storage-mode-row-tooltip-trigger")))
-    (is (some? (find-node-by-role view "trading-settings-confirm-open-orders-row-tooltip-trigger")))
-    (is (some? (find-node-by-role view "trading-settings-confirm-close-position-row-tooltip-trigger")))
-    (is (some? (find-node-by-role view "trading-settings-fill-alerts-row-tooltip-trigger")))
-    (is (some? (find-node-by-role view "trading-settings-animate-orderbook-row-tooltip-trigger")))
-    (is (some? (find-node-by-role view "trading-settings-fill-markers-row-tooltip-trigger")))
-    (is (false? (inline-helper-copy? remember-row)))
-    (is (false? (inline-helper-copy? open-orders-row)))
-    (is (false? (inline-helper-copy? close-position-row)))
-    (is (false? (inline-helper-copy? fill-alerts-row)))
-    (is (false? (inline-helper-copy? animate-orderbook-row)))
-    (is (false? (inline-helper-copy? fill-markers-row)))))
+        fill-markers-row (find-node-by-role view "trading-settings-fill-markers-row")]
+    (is (contains? (set (collect-strings remember-row)) "Stay signed in across browser restarts."))
+    (is (contains? (set (collect-strings open-orders-row)) "Show a preview before placing."))
+    (is (contains? (set (collect-strings close-position-row)) "Show a preview before closing."))
+    (is (contains? (set (collect-strings fill-alerts-row)) "Toast when any order fills."))
+    (is (contains? (set (collect-strings sound-row)) "Plays a short chime on fill."))
+    (is (contains? (set (collect-strings animate-orderbook-row)) "Animate row changes in the book."))
+    (is (contains? (set (collect-strings fill-markers-row)) "Show your fills on the price chart."))))
 
-(deftest header-renders-standard-settings-tooltip-copy-test
+(deftest header-renders-group-kickers-and-right-aligned-hints-test
   (let [view (header-view/header-view {:wallet {:connected? false
                                                 :agent {:storage-mode :local}}
                                        :router {:path "/trade"}
@@ -121,15 +102,11 @@
                                                           :show-fill-markers? false
                                                           :confirm-open-orders? true
                                                           :confirm-close-position? false}})]
-    (is (contains? (set (collect-strings (find-node-by-role view "trading-settings-storage-mode-row-tooltip")))
-                   "Keep trading enabled across browser restarts on this device."))
-    (is (contains? (set (collect-strings (find-node-by-role view "trading-settings-confirm-open-orders-row-tooltip")))
-                   "Ask before sending a new order from the trade form."))
-    (is (contains? (set (collect-strings (find-node-by-role view "trading-settings-confirm-close-position-row-tooltip")))
-                   "Ask before submitting from the close-position popover."))
-    (is (contains? (set (collect-strings (find-node-by-role view "trading-settings-fill-alerts-row-tooltip")))
-                   "Show fill alerts while Hyperopen is open."))
-    (is (contains? (set (collect-strings (find-node-by-role view "trading-settings-animate-orderbook-row-tooltip")))
-                   "Smooth bid and ask depth changes as the book updates."))
-    (is (contains? (set (collect-strings (find-node-by-role view "trading-settings-fill-markers-row-tooltip")))
-                   "Show buy and sell markers for the active asset on the chart."))))
+    (is (contains? (set (collect-strings (find-node-by-role view "trading-settings-confirmations-section")))
+                   "Ask before you trade"))
+    (is (contains? (set (collect-strings (find-node-by-role view "trading-settings-alerts-section")))
+                   "Feedback when fills land"))
+    (is (contains? (set (collect-strings (find-node-by-role view "trading-settings-display-section")))
+                   "Visual chrome"))
+    (is (contains? (set (collect-strings (find-node-by-role view "trading-settings-session-section")))
+                   "Sign-in behavior"))))

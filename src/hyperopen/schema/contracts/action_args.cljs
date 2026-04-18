@@ -91,10 +91,12 @@
    :actions/cancel-agent-local-protection-mode-change ::common/no-args
    :actions/confirm-agent-local-protection-mode-change ::common/no-args
    :actions/set-fill-alerts-enabled ::common/boolean-args
+   :actions/set-sound-on-fill-enabled ::common/boolean-args
    :actions/set-animate-orderbook-enabled ::common/boolean-args
    :actions/set-fill-markers-enabled ::common/boolean-args
    :actions/set-confirm-open-orders-enabled ::common/boolean-args
    :actions/set-confirm-close-position-enabled ::common/boolean-args
+   :actions/set-confirm-market-orders-enabled ::common/boolean-args
    :actions/navigate-mobile-header-menu ::common/path-args
    :actions/open-spectate-mode-mobile-header-menu ::spectate-mode-open-args
    :actions/open-spectate-mode-modal ::spectate-mode-open-args

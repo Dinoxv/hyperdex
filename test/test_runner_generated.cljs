@@ -409,6 +409,7 @@
             [hyperopen.views.ui.anchored-popover-test]
             [hyperopen.views.ui.dialog-focus-test]
             [hyperopen.views.ui.funding-modal-positioning-test]
+            [hyperopen.views.ui.toggle-test]
             [hyperopen.views.vaults.detail-view-hover-freeze-test]
             [hyperopen.views.vaults.detail-view-test]
             [hyperopen.views.vaults.detail-vm-returns-chart-test]
@@ -904,6 +905,7 @@
              'hyperopen.views.ui.anchored-popover-test
              'hyperopen.views.ui.dialog-focus-test
              'hyperopen.views.ui.funding-modal-positioning-test
+             'hyperopen.views.ui.toggle-test
              'hyperopen.views.vaults.detail-view-hover-freeze-test
              'hyperopen.views.vaults.detail-view-test
              'hyperopen.views.vaults.detail-vm-returns-chart-test

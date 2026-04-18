@@ -6,19 +6,23 @@
 
 (def default-state
   {:fill-alerts-enabled? true
+   :sound-on-fill? false
    :animate-orderbook? true
    :show-fill-markers? false
    :confirm-open-orders? false
-   :confirm-close-position? false})
+   :confirm-close-position? false
+   :confirm-market-orders? true})
 
 (defn normalize-state
   [value]
   (let [settings (if (map? value) value {})]
     {:fill-alerts-enabled? (not (false? (:fill-alerts-enabled? settings)))
+     :sound-on-fill? (true? (:sound-on-fill? settings))
      :animate-orderbook? (not (false? (:animate-orderbook? settings)))
      :show-fill-markers? (true? (:show-fill-markers? settings))
      :confirm-open-orders? (true? (:confirm-open-orders? settings))
-     :confirm-close-position? (true? (:confirm-close-position? settings))}))
+     :confirm-close-position? (true? (:confirm-close-position? settings))
+     :confirm-market-orders? (not (false? (:confirm-market-orders? settings)))}))
 
 (defn restore-state
   []
@@ -38,6 +42,10 @@
   [state]
   (:fill-alerts-enabled? (state-settings state)))
 
+(defn sound-on-fill?
+  [state]
+  (:sound-on-fill? (state-settings state)))
+
 (defn animate-orderbook?
   [state]
   (:animate-orderbook? (state-settings state)))
@@ -53,3 +61,7 @@
 (defn confirm-close-position?
   [state]
   (:confirm-close-position? (state-settings state)))
+
+(defn confirm-market-orders?
+  [state]
+  (:confirm-market-orders? (state-settings state)))

@@ -18,10 +18,12 @@
    :confirm-agent-local-protection-mode-change
    header-actions/confirm-agent-local-protection-mode-change
    :set-fill-alerts-enabled header-actions/set-fill-alerts-enabled
+   :set-sound-on-fill-enabled header-actions/set-sound-on-fill-enabled
    :set-animate-orderbook-enabled header-actions/set-animate-orderbook-enabled
    :set-fill-markers-enabled header-actions/set-fill-markers-enabled
    :set-confirm-open-orders-enabled header-actions/set-confirm-open-orders-enabled
    :set-confirm-close-position-enabled header-actions/set-confirm-close-position-enabled
+   :set-confirm-market-orders-enabled header-actions/set-confirm-market-orders-enabled
    :navigate-mobile-header-menu header-actions/navigate-mobile-header-menu
    :open-spectate-mode-mobile-header-menu header-actions/open-spectate-mode-mobile-header-menu
    :open-spectate-mode-modal spectate-mode-actions/open-spectate-mode-modal

@@ -15,7 +15,9 @@
    'set-animate-orderbook-enabled (resolve 'hyperopen.header.actions/set-animate-orderbook-enabled)
    'set-fill-markers-enabled (resolve 'hyperopen.header.actions/set-fill-markers-enabled)
    'set-confirm-open-orders-enabled (resolve 'hyperopen.header.actions/set-confirm-open-orders-enabled)
-   'set-confirm-close-position-enabled (resolve 'hyperopen.header.actions/set-confirm-close-position-enabled)})
+   'set-confirm-close-position-enabled (resolve 'hyperopen.header.actions/set-confirm-close-position-enabled)
+   'set-confirm-market-orders-enabled (resolve 'hyperopen.header.actions/set-confirm-market-orders-enabled)
+   'set-sound-on-fill-enabled (resolve 'hyperopen.header.actions/set-sound-on-fill-enabled)})
 
 (defn- resolve-action
   [sym]
@@ -147,29 +149,39 @@
         fill-markers-action (resolve-action 'set-fill-markers-enabled)
         confirm-open-action (resolve-action 'set-confirm-open-orders-enabled)
         confirm-close-action (resolve-action 'set-confirm-close-position-enabled)
+        confirm-market-action (resolve-action 'set-confirm-market-orders-enabled)
+        sound-action (resolve-action 'set-sound-on-fill-enabled)
         base-state {:trading-settings {:fill-alerts-enabled? true
                                        :animate-orderbook? true
                                        :show-fill-markers? false
                                        :confirm-open-orders? true
-                                       :confirm-close-position? true}}]
+                                       :confirm-close-position? true
+                                       :confirm-market-orders? true
+                                       :sound-on-fill? false}}]
     (is (some? fill-alerts-action))
     (is (some? animate-action))
     (is (some? fill-markers-action))
     (is (some? confirm-open-action))
     (is (some? confirm-close-action))
+    (is (some? confirm-market-action))
+    (is (some? sound-action))
     (when fill-alerts-action
       (is (= [[:effects/save [:trading-settings]
                {:fill-alerts-enabled? false
                 :animate-orderbook? true
                 :show-fill-markers? false
                 :confirm-open-orders? true
-                :confirm-close-position? true}]
+                :confirm-close-position? true
+                :confirm-market-orders? true
+                :sound-on-fill? false}]
               [:effects/local-storage-set-json trading-settings/storage-key
                {:fill-alerts-enabled? false
                 :animate-orderbook? true
                 :show-fill-markers? false
                 :confirm-open-orders? true
-                :confirm-close-position? true}]]
+                :confirm-close-position? true
+                :confirm-market-orders? true
+                :sound-on-fill? false}]]
              (fill-alerts-action base-state false))))
     (when animate-action
       (is (= [[:effects/save [:trading-settings]
@@ -177,13 +189,17 @@
                 :animate-orderbook? false
                 :show-fill-markers? false
                 :confirm-open-orders? true
-                :confirm-close-position? true}]
+                :confirm-close-position? true
+                :confirm-market-orders? true
+                :sound-on-fill? false}]
               [:effects/local-storage-set-json trading-settings/storage-key
                {:fill-alerts-enabled? true
                 :animate-orderbook? false
                 :show-fill-markers? false
                 :confirm-open-orders? true
-                :confirm-close-position? true}]]
+                :confirm-close-position? true
+                :confirm-market-orders? true
+                :sound-on-fill? false}]]
              (animate-action base-state false))))
     (when fill-markers-action
       (is (= [[:effects/save [:trading-settings]
@@ -191,13 +207,17 @@
                 :animate-orderbook? true
                 :show-fill-markers? true
                 :confirm-open-orders? true
-                :confirm-close-position? true}]
+                :confirm-close-position? true
+                :confirm-market-orders? true
+                :sound-on-fill? false}]
               [:effects/local-storage-set-json trading-settings/storage-key
                {:fill-alerts-enabled? true
                 :animate-orderbook? true
                 :show-fill-markers? true
                 :confirm-open-orders? true
-                :confirm-close-position? true}]]
+                :confirm-close-position? true
+                :confirm-market-orders? true
+                :sound-on-fill? false}]]
              (fill-markers-action base-state true))))
     (when confirm-open-action
       (is (= [[:effects/save [:trading-settings]
@@ -205,13 +225,17 @@
                 :animate-orderbook? true
                 :show-fill-markers? false
                 :confirm-open-orders? false
-                :confirm-close-position? true}]
+                :confirm-close-position? true
+                :confirm-market-orders? true
+                :sound-on-fill? false}]
               [:effects/local-storage-set-json trading-settings/storage-key
                {:fill-alerts-enabled? true
                 :animate-orderbook? true
                 :show-fill-markers? false
                 :confirm-open-orders? false
-                :confirm-close-position? true}]]
+                :confirm-close-position? true
+                :confirm-market-orders? true
+                :sound-on-fill? false}]]
              (confirm-open-action base-state false))))
     (when confirm-close-action
       (is (= [[:effects/save [:trading-settings]
@@ -219,11 +243,51 @@
                 :animate-orderbook? true
                 :show-fill-markers? false
                 :confirm-open-orders? true
-                :confirm-close-position? false}]
+                :confirm-close-position? false
+                :confirm-market-orders? true
+                :sound-on-fill? false}]
               [:effects/local-storage-set-json trading-settings/storage-key
                {:fill-alerts-enabled? true
                 :animate-orderbook? true
                 :show-fill-markers? false
                 :confirm-open-orders? true
-                :confirm-close-position? false}]]
-             (confirm-close-action base-state false))))))
+                :confirm-close-position? false
+                :confirm-market-orders? true
+                :sound-on-fill? false}]]
+             (confirm-close-action base-state false))))
+    (when confirm-market-action
+      (is (= [[:effects/save [:trading-settings]
+               {:fill-alerts-enabled? true
+                :animate-orderbook? true
+                :show-fill-markers? false
+                :confirm-open-orders? true
+                :confirm-close-position? true
+                :confirm-market-orders? false
+                :sound-on-fill? false}]
+              [:effects/local-storage-set-json trading-settings/storage-key
+               {:fill-alerts-enabled? true
+                :animate-orderbook? true
+                :show-fill-markers? false
+                :confirm-open-orders? true
+                :confirm-close-position? true
+                :confirm-market-orders? false
+                :sound-on-fill? false}]]
+             (confirm-market-action base-state false))))
+    (when sound-action
+      (is (= [[:effects/save [:trading-settings]
+               {:fill-alerts-enabled? true
+                :animate-orderbook? true
+                :show-fill-markers? false
+                :confirm-open-orders? true
+                :confirm-close-position? true
+                :confirm-market-orders? true
+                :sound-on-fill? true}]
+              [:effects/local-storage-set-json trading-settings/storage-key
+               {:fill-alerts-enabled? true
+                :animate-orderbook? true
+                :show-fill-markers? false
+                :confirm-open-orders? true
+                :confirm-close-position? true
+                :confirm-market-orders? true
+                :sound-on-fill? true}]]
+             (sound-action base-state true))))))
