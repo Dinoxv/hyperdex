@@ -1,9 +1,6 @@
 (ns hyperopen.views.footer.build-badge
   (:require [clojure.string :as str]))
 
-(def ^:private fresh-window-ms
-  (* 6 60 60 1000))
-
 (defn- non-blank
   [value]
   (let [text (some-> value str str/trim)]
@@ -83,11 +80,6 @@
         :else
         (str (js/Math.floor (/ elapsed-s 86400)) "d ago")))
     "unknown"))
-
-(defn- fresh?
-  [now-ms deployed-at]
-  (when-let [deployed-ms (date-ms deployed-at)]
-    (< (- now-ms deployed-ms) fresh-window-ms)))
 
 (defn- build-copy-payload
   [{:keys [sha env region deployed-at branch message]}]
@@ -215,7 +207,6 @@
   [{:keys [build now-ms]}]
   (when-let [{:keys [sha short env deployed-at] :as build*} build]
     (let [popover-id (str "footer-build-popover-" short)
-          live? (fresh? now-ms deployed-at)
           copy-payload (build-copy-payload build*)]
       [:span {:class ["o-build-shell"]
               :data-role "footer-build-id-shell"
@@ -240,14 +231,7 @@
          [:span {:class ["o-bp-env" "o-mono" (str "env-" env)]
                  :data-role "footer-build-env"}
           [:span {:class ["dot"]}]
-          env]
-         (if live?
-           [:span {:class ["o-bp-fresh"]
-                   :data-role "footer-build-freshness"}
-            "live"]
-           [:span {:class ["c-stale" "o-mono"]
-                   :data-role "footer-build-freshness"}
-            "stale"])]
+          env]]
         [:div {:class ["c-sha" "o-mono"]
                :title sha
                :data-role "footer-build-sha"}

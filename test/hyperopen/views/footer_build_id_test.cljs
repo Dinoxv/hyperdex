@@ -75,6 +75,7 @@
             build-id-node (find-node-by-data-role utility-links "footer-build-id")
             tooltip-node (find-node-by-data-role utility-links "footer-build-id-tooltip")
             sha-node (find-node-by-data-role tooltip-node "footer-build-sha")
+            freshness-node (find-node-by-data-role tooltip-node "footer-build-freshness")
             copy-node (find-node-by-data-role tooltip-node "footer-build-copy")
             commit-link-node (find-node-by-data-role tooltip-node "footer-build-commit-link")]
         (is (some? utility-links))
@@ -84,6 +85,7 @@
         (is (nil? (get-in build-id-node [1 :title])))
         (is (= "tooltip" (get-in tooltip-node [1 :role])))
         (is (= "999fe1a1234567890" (get-in sha-node [1 :title])))
+        (is (nil? freshness-node))
         (is (= "Copy build info" (get-in copy-node [1 :aria-label])))
         (is (nil? commit-link-node))
         (is (str/includes? (node-text tooltip-node) "dev"))
@@ -106,6 +108,7 @@
             env-node (find-node-by-data-role tooltip-node "footer-build-env")
             sha-node (find-node-by-data-role tooltip-node "footer-build-sha")
             deployed-node (find-node-by-data-role tooltip-node "footer-build-deployed")
+            freshness-node (find-node-by-data-role tooltip-node "footer-build-freshness")
             copy-node (find-node-by-data-role tooltip-node "footer-build-copy")
             commit-link-node (find-node-by-data-role tooltip-node "footer-build-commit-link")]
         (is (= "f18fbc2" (node-text build-id-node)))
@@ -114,6 +117,7 @@
         (is (= "prod" (str/lower-case (node-text env-node))))
         (is (= "f18fbc2a3b00e4e324b39796ffdc1a9cd9cff7e619c" (get-in sha-node [1 :title])))
         (is (str/includes? (node-text deployed-node) "DEPLOYED"))
+        (is (nil? freshness-node))
         (is (= "Copy build info" (get-in copy-node [1 :aria-label])))
         (is (str/includes? (get-in copy-node [1 :data-copy-payload])
                            "Build: f18fbc2a3b00e4e324b39796ffdc1a9cd9cff7e619c"))

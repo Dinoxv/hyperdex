@@ -163,6 +163,7 @@ test("trade footer shows the condensed build badge when the dev build asset is p
   const buildId = page.locator("[data-role='footer-build-id']");
   const tooltip = page.locator("[data-role='footer-build-id-tooltip']");
   const envPill = page.locator("[data-role='footer-build-env']");
+  const freshness = page.locator("[data-role='footer-build-freshness']");
   const sha = page.locator("[data-role='footer-build-sha']");
   const deployed = page.locator("[data-role='footer-build-deployed']");
   const copy = page.locator("[data-role='footer-build-copy']");
@@ -175,6 +176,7 @@ test("trade footer shows the condensed build badge when the dev build asset is p
   await expect(tooltip).toBeVisible();
   await expect(tooltip).toHaveCSS("width", "280px");
   await expect(envPill).toHaveText(/^(prod|staging|dev)$/);
+  await expect(freshness).toHaveCount(0);
   await expect(sha).toHaveAttribute("title", /^[0-9a-f]{40}$/);
   await expect(sha).toHaveCSS("white-space", "nowrap");
   await expect(deployed).toContainText("DEPLOYED");
