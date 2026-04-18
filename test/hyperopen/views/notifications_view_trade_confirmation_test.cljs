@@ -5,14 +5,16 @@
             [hyperopen.views.notifications-view :as notifications-view]))
 
 (defn- fill-prop
-  [id side symbol qty price ts]
+  ([id side symbol qty price ts]
+   (fill-prop id side symbol qty price ts "limit"))
+  ([id side symbol qty price ts order-type]
   {:id id
    :side side
    :symbol symbol
    :qty qty
    :price price
-   :orderType "limit"
-   :ts ts})
+   :orderType order-type
+   :ts ts}))
 
 (deftest notifications-view-renders-trade-confirmation-toast-variants-test
   (let [fills [(fill-prop "fill-1" :buy "HYPE" 0.25 44.20 1800000000000)
@@ -102,6 +104,39 @@
     (is (= :a (first history-link)))
     (is (= "/portfolio?tab=order-history"
            (get-in history-link [1 :href])))))
+
+(deftest expanded-trade-confirmation-blotter-footer-describes-grouped-fill-rate-test
+  (let [fills [(fill-prop "fill-1" :buy "HYPE" 0.25 44.20 1800000000000)
+               (fill-prop "fill-2" :buy "HYPE" 0.30 44.30 1800000003300)
+               (fill-prop "fill-3" :sell "SOL" 1.00 198.10 1800000006600)
+               (fill-prop "fill-4" :sell "SOL" 2.00 198.20 1800000009900)]
+        view-node (notifications-view/notifications-view
+                   {:ui {:toasts [{:id "blotter"
+                                   :kind :success
+                                   :toast-surface :trade-confirmation
+                                   :variant :stack
+                                   :expanded? true
+                                   :fills fills}]}})
+        blotter-node (hiccup/find-by-data-role view-node "BlotterCard")
+        rendered-strings (set (hiccup/collect-strings blotter-node))]
+    (is (contains? rendered-strings "Grouped fills · avg 0.3 fills/sec"))
+    (is (not (contains? rendered-strings "TWAP · avg 1.2 fills/sec")))))
+
+(deftest expanded-trade-confirmation-blotter-footer-describes-twap-fill-rate-test
+  (let [fills [(fill-prop "fill-1" :buy "HYPE" 0.25 44.20 1800000000000 "twap")
+               (fill-prop "fill-2" :buy "HYPE" 0.30 44.30 1800000001000 "twap")
+               (fill-prop "fill-3" :buy "HYPE" 0.40 44.40 1800000002000 "twap")
+               (fill-prop "fill-4" :buy "HYPE" 0.50 44.50 1800000003000 "twap")]
+        view-node (notifications-view/notifications-view
+                   {:ui {:toasts [{:id "blotter"
+                                   :kind :success
+                                   :toast-surface :trade-confirmation
+                                   :variant :consolidated
+                                   :expanded? true
+                                   :fills fills}]}})
+        blotter-node (hiccup/find-by-data-role view-node "BlotterCard")
+        rendered-strings (set (hiccup/collect-strings blotter-node))]
+    (is (contains? rendered-strings "TWAP · avg 1.0 fills/sec"))))
 
 (deftest expanded-trade-confirmation-blotter-history-link-preserves-spectate-address-test
   (let [spectate-address "0xabcdefabcdefabcdefabcdefabcdefabcdefabcd"

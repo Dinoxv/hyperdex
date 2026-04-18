@@ -309,6 +309,55 @@
          [:span (str "+ " overflow-count " more")]
          [:span]]]))))
 
+(defn- twap-fill?
+  [fill]
+  (boolean
+   (some-> (:orderType fill)
+           str
+           str/trim
+           str/lower-case
+           (str/includes? "twap"))))
+
+(defn- blotter-execution-label
+  [fills]
+  (let [twap-count (count (filter twap-fill? fills))
+        fill-count (count fills)]
+    (cond
+      (and (pos? fill-count)
+           (= fill-count twap-count)) "TWAP"
+      (pos? twap-count) "Mixed execution"
+      :else "Grouped fills")))
+
+(defn- fill-rate-per-second
+  [fills]
+  (let [times (->> fills
+                   (map :ts)
+                   (keep finite-number)
+                   sort
+                   vec)
+        elapsed-ms (when (>= (count times) 2)
+                     (- (peek times) (first times)))]
+    (when (and (number? elapsed-ms)
+               (pos? elapsed-ms))
+      (/ (dec (count times))
+         (/ elapsed-ms 1000)))))
+
+(defn- fill-rate-text
+  [fills]
+  (if-let [rate (fill-rate-per-second fills)]
+    (str "avg "
+         (or (fmt/format-intl-number rate {:minimumFractionDigits 1
+                                           :maximumFractionDigits 1})
+             (fmt/safe-to-fixed rate 1))
+         " fills/sec")
+    "timing unavailable"))
+
+(defn- blotter-footer-text
+  [fills]
+  (str (blotter-execution-label fills)
+       " · "
+       (fill-rate-text fills)))
+
 (defn BlotterCard
   ([fills]
    (BlotterCard fills {}))
@@ -362,7 +411,7 @@
            (into [:div {:class ["o-bg-fills"]}]
                  (blotter-fill-rows group))])
         [:div {:class ["o-blotter-foot"]}
-         [:span "TWAP · avg 1.2 fills/sec"]
+         [:span (blotter-footer-text fills)]
          [:a {:href (or history-href "/portfolio?tab=order-history")
               :class ["link"]
               :data-role "trade-toast-view-full-history"}

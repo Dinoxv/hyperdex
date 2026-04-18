@@ -860,8 +860,11 @@ test("expanded trade blotter full history opens spectated portfolio order histor
   await waitForIdle(page, { quietMs: 150, timeoutMs: 4_000, pollMs: 50 });
   await seedExpandedTradeBlotterToast(page);
 
+  const blotter = page.locator("[data-role='BlotterCard']");
   const historyLink = page.locator("[data-role='trade-toast-view-full-history']");
 
+  await expect(blotter).toContainText("Grouped fills · avg 0.3 fills/sec");
+  await expect(blotter).not.toContainText("TWAP · avg 1.2 fills/sec");
   await expect(historyLink).toBeVisible();
   await expect(historyLink).toHaveAttribute(
     "href",
