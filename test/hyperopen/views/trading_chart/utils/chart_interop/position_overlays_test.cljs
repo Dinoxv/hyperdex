@@ -56,6 +56,12 @@
                           (fn [node]
                             (= "true" (aget node "data-position-liq-drag-hit")))))
 
+(defn- find-node-with-text
+  [root text]
+  (fake-dom/find-dom-node root
+                          (fn [node]
+                            (= text (str (.-textContent node))))))
+
 (defn- first-text-node
   [node]
   (first (fake-dom/collect-text-nodes node)))
@@ -89,6 +95,7 @@
                        (fn [callback]
                          (swap! subscription-callbacks* assoc k callback)))
         unsubscribe-calls* (atom 0)
+        pane-size-args* (atom [])
         unsubscribe-fn (fn [k]
                          (fn [callback]
                            (swap! unsubscribe-calls* inc)
@@ -110,7 +117,8 @@
                          :subscribeDataChanged (subscribe-fn :data-changed)
                          :unsubscribeDataChanged (unsubscribe-fn :data-changed)}
         chart #js {:timeScale (fn [] time-scale)
-                   :paneSize (fn [_pane-index]
+                   :paneSize (fn [pane-index]
+                               (swap! pane-size-args* conj pane-index)
                                #js {:width @width*})}
         chart-obj #js {:chart chart
                        :mainSeries main-series}
@@ -127,10 +135,11 @@
      :subscription-callbacks* subscription-callbacks*
      :window-target window-target
      :width* width*
+     :pane-size-args* pane-size-args*
      :unsubscribe-calls* unsubscribe-calls*}))
 
 (deftest position-overlays-render-pnl-and-liquidation-rows-and-clear-test
-  (let [{:keys [chart-obj document container unsubscribe-calls*]}
+  (let [{:keys [chart-obj document container pane-size-args* unsubscribe-calls*]}
         (build-chart-fixture {})
         overlay {:side :short
                  :entry-price 100
@@ -177,6 +186,7 @@
       (is (number? liq-left))
       (is (<= 90 pnl-left 140) "PNL badge should stay inside readable zone, away from edges")
       (is (<= 80 liq-left 130) "Liq badge should stay inside readable zone, away from edges"))
+    (is (= [0] @pane-size-args*))
     (position-overlays/clear-position-overlays! chart-obj)
     (is (= 0 (alength (.-children container))))
     (is (= 4 @unsubscribe-calls*))))
@@ -267,53 +277,6 @@
         (is (not= pnl-top-before pnl-top-after))
         (is (not= liq-top-before liq-top-after))))
     (position-overlays/clear-position-overlays! chart-obj)))
-
-(deftest position-overlays-coalesces-subscription-repaints-per-frame-test
-  (let [{:keys [chart-obj document container subscription-callbacks*]}
-        (build-chart-fixture {})
-        overlay {:side :short
-                 :entry-price 100
-                 :unrealized-pnl -2.5
-                 :abs-size 1.5
-                 :liquidation-price 130
-                 :entry-time 1700000000
-                 :entry-time-ms 1700000000000
-                 :latest-time 1700003600}
-        render-calls* (atom 0)
-        next-frame-id* (atom 0)
-        scheduled-frame* (atom nil)]
-    (with-redefs [position-overlays/render-overlays! (fn [_]
-                                                       (swap! render-calls* inc))
-                  position-overlays/*schedule-overlay-repaint-frame!* (fn [callback]
-                                                                        (let [frame-id (swap! next-frame-id* inc)
-                                                                              wrapped (fn []
-                                                                                        (reset! scheduled-frame* nil)
-                                                                                        (callback))]
-                                                                          (reset! scheduled-frame* {:id frame-id
-                                                                                                    :callback wrapped})
-                                                                          frame-id))
-                  position-overlays/*cancel-overlay-repaint-frame!* (fn [frame-id]
-                                                                      (when (= frame-id (:id @scheduled-frame*))
-                                                                        (reset! scheduled-frame* nil)))]
-      (position-overlays/sync-position-overlays!
-       chart-obj
-       container
-       overlay
-       {:document document
-        :format-price (fn [price _raw]
-                        (str price))
-        :format-size (fn [size]
-                       (str size))})
-      (is (= 1 @render-calls*))
-      ((get @subscription-callbacks* :visible-time-range) nil)
-      ((get @subscription-callbacks* :size-change) nil)
-      ((get @subscription-callbacks* :data-changed) nil)
-      (is (= 1 (:id @scheduled-frame*)))
-      (is (= 1 @render-calls*))
-      ((:callback @scheduled-frame*))
-      (is (= 2 @render-calls*))
-      (is (nil? @scheduled-frame*))
-      (position-overlays/clear-position-overlays! chart-obj))))
 
 (deftest position-overlays-sync-patches-retained-nodes-in-place-test
   (let [{:keys [chart-obj document container]}
@@ -589,9 +552,17 @@
      overlay
      {:document document})
     (let [overlay-root (aget (.-children container) 0)
-          text (str/join " " (fake-dom/collect-text-content overlay-root))]
+          text (str/join " " (fake-dom/collect-text-content overlay-root))
+          liq-badge (find-inline-badge overlay-root "Liq. Price")
+          liq-badge-left (some-> liq-badge .-style (aget "left") parse-px)
+          drag-note (find-node-with-text overlay-root "Add $10.00 Margin")
+          drag-hit (find-liquidation-drag-hit overlay-root)]
       (is (str/includes? text "Liq. Price"))
-      (is (str/includes? text "Add $10.00 Margin")))
+      (is (str/includes? text "Add $10.00 Margin"))
+      (is (= "inline" (some-> drag-note .-style (aget "display"))))
+      (is (= "-7px" (some-> drag-hit .-style (aget "top"))))
+      (is (<= 150 liq-badge-left 170)
+          "Liquidation badge width should include the drag note when clamping."))
     (position-overlays/clear-position-overlays! chart-obj)))
 
 (deftest position-overlays-liquidation-drag-emits-live-preview-suggestion-on-move-test

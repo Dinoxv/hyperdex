@@ -356,26 +356,27 @@
              state
              (do
                (cancel-scheduled-repaint! chart-obj)
-               (support/set-overlay-state!
-                chart-obj
-                (cond-> (assoc state
-                               :root root
-                               :chart chart
-                               :main-series main-series
-                               :overlay-ref overlay-ref
-                               :overlay (assoc overlay-ref
-                                               :document document*
-                                               :window window*
-                                               :format-price format-price
-                                               :format-size format-size)
-                               :document document*
-                               :window window*
-                               :format-price format-price
-                               :format-size format-size
-                               :on-liquidation-drag-preview on-liquidation-drag-preview
-                               :on-liquidation-drag-confirm on-liquidation-drag-confirm
-                               :subscription next-subscription)
-                  (not (identical? document* (get-in state [:overlay-dom :document])))
-                  (dissoc :overlay-dom :rendered-overlay)))
+               (let [state-after-cancel (support/overlay-state chart-obj)]
+                 (support/set-overlay-state!
+                  chart-obj
+                  (cond-> (assoc state-after-cancel
+                                 :root root
+                                 :chart chart
+                                 :main-series main-series
+                                 :overlay-ref overlay-ref
+                                 :overlay (assoc overlay-ref
+                                                 :document document*
+                                                 :window window*
+                                                 :format-price format-price
+                                                 :format-size format-size)
+                                 :document document*
+                                 :window window*
+                                 :format-price format-price
+                                 :format-size format-size
+                                 :on-liquidation-drag-preview on-liquidation-drag-preview
+                                 :on-liquidation-drag-confirm on-liquidation-drag-confirm
+                                 :subscription next-subscription)
+                    (not (identical? document* (get-in state [:overlay-dom :document])))
+                    (dissoc :overlay-dom :rendered-overlay))))
                (render-overlays! chart-obj))))
          (clear-position-overlays! chart-obj))))))
