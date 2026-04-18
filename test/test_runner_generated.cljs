@@ -395,6 +395,7 @@
             [hyperopen.views.trading-chart.utils.chart-interop.legend-test]
             [hyperopen.views.trading-chart.utils.chart-interop.markers-test]
             [hyperopen.views.trading-chart.utils.chart-interop.open-order-overlays-test]
+            [hyperopen.views.trading-chart.utils.chart-interop.position-overlays-drag-test]
             [hyperopen.views.trading-chart.utils.chart-interop.position-overlays-test]
             [hyperopen.views.trading-chart.utils.chart-interop.price-format-test]
             [hyperopen.views.trading-chart.utils.chart-interop.series-test]
@@ -891,6 +892,7 @@
              'hyperopen.views.trading-chart.utils.chart-interop.legend-test
              'hyperopen.views.trading-chart.utils.chart-interop.markers-test
              'hyperopen.views.trading-chart.utils.chart-interop.open-order-overlays-test
+             'hyperopen.views.trading-chart.utils.chart-interop.position-overlays-drag-test
              'hyperopen.views.trading-chart.utils.chart-interop.position-overlays-test
              'hyperopen.views.trading-chart.utils.chart-interop.price-format-test
              'hyperopen.views.trading-chart.utils.chart-interop.series-test
