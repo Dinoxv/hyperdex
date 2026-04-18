@@ -114,6 +114,9 @@
 
 (def close-ws-diagnostics ws-diagnostics-adapters/close-ws-diagnostics)
 
+(def handle-ws-diagnostics-keydown
+  ws-diagnostics-adapters/handle-ws-diagnostics-keydown)
+
 (def toggle-ws-diagnostics-sensitive
   ws-diagnostics-adapters/toggle-ws-diagnostics-sensitive)
 

@@ -35,6 +35,14 @@
       (is (effect-extractors/phase-order-valid? effects reconnect-heavy-effect-ids))
       (is (empty? (effect-extractors/duplicate-heavy-effect-ids effects reconnect-heavy-effect-ids))))))
 
+(deftest handle-ws-diagnostics-keydown-closes-only-on-escape-test
+  (is (= [[:effects/save-many [[[:websocket-ui :diagnostics-open?] false]
+                               [[:websocket-ui :reveal-sensitive?] false]
+                               [[:websocket-ui :copy-status] nil]]]]
+         (diagnostics-actions/handle-ws-diagnostics-keydown {} "Escape")))
+  (is (= []
+         (diagnostics-actions/handle-ws-diagnostics-keydown {} "Enter"))))
+
 (deftest ws-diagnostics-reset-subscriptions-skips-when-blocked-test
   (let [deps {:effective-now-ms (fn [generated-at-ms] generated-at-ms)}
         blocked-state {:websocket-ui {:reset-in-progress? false

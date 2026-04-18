@@ -16,6 +16,12 @@
                         [[:websocket-ui :reveal-sensitive?] false]
                         [[:websocket-ui :copy-status] nil]]]])
 
+(defn handle-ws-diagnostics-keydown
+  [state key]
+  (if (= key "Escape")
+    (close-ws-diagnostics state)
+    []))
+
 (defn toggle-ws-diagnostics-sensitive
   [state]
   (if (boolean (get-in state [:websocket-ui :reveal-sensitive?]))

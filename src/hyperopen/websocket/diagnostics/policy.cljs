@@ -334,7 +334,9 @@
          score (max 0 (- meter-score-max penalty))
          active-bars (penalty->active-bars penalty)
          label (catalog/meter-status-label status)
-         bar-count meter-bars-total]
+         bar-count meter-bars-total
+         latency-ms (or (:rtt network-hint)
+                        (transport-last-recv-age-ms (:generated-at-ms health) health))]
      {:source source
       :source-label (catalog/source-label source)
       :status status
@@ -342,6 +344,8 @@
       :active-bars active-bars
       :bar-count bar-count
       :label label
+      :latency-label (when (number? latency-ms)
+                       (str (round-int latency-ms) "ms"))
       :penalty penalty
       :score score
       :tone (connection-meter-tone status active-bars)

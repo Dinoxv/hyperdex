@@ -119,6 +119,7 @@
    :actions/reconnect-websocket ::common/no-args
    :actions/toggle-ws-diagnostics ::common/no-args
    :actions/close-ws-diagnostics ::common/no-args
+   :actions/handle-ws-diagnostics-keydown ::common/key-args
    :actions/toggle-ws-diagnostics-sensitive ::common/no-args
    :actions/ws-diagnostics-reconnect-now ::common/no-args
    :actions/ws-diagnostics-copy ::common/no-args

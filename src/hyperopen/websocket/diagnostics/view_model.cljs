@@ -5,54 +5,8 @@
             [hyperopen.websocket.diagnostics.policy :as policy]
             [hyperopen.websocket.diagnostics-sanitize :as diagnostics-sanitize]))
 
-(def ^:private market-flush-table-row-limit
-  25)
-
 (def footer-links
   [])
-
-(def ^:private reset-button-catalog
-  [{:id :market_data
-    :idle-label "Reset market subs"
-    :tooltip "Unsubscribe and resubscribe active market-data streams only. Use this when order book or trades look stuck."
-    :click-action [[:actions/ws-diagnostics-reset-market-subscriptions]]}
-   {:id :orders_oms
-    :idle-label "Reset OMS subs"
-    :tooltip "Unsubscribe and resubscribe active Orders/OMS streams only, without forcing a full websocket reconnect."
-    :click-action [[:actions/ws-diagnostics-reset-orders-subscriptions]]}
-   {:id :all
-    :idle-label "Reset all subs"
-    :tooltip "Run both market-data and Orders/OMS subscription resets in one pass, without a full reconnect."
-    :click-action [[:actions/ws-diagnostics-reset-all-subscriptions]]}])
-
-(def ^:private market-metrics
-  [{:id :pending-count
-    :label "Pending"
-    :tooltip "Current number of coalesced keys waiting for the next frame flush."
-    :value-fn (fn [store] (or (:pending-count store) 0))}
-   {:id :max-pending-depth
-    :label "Max pending"
-    :tooltip "Highest pending queue depth observed for this store since runtime reset."
-    :value-fn (fn [store] (or (:max-pending-depth store) 0))}
-   {:id :overwrite-total
-    :label "Overwrites"
-    :tooltip "Total queued updates that replaced an existing coalesce key before a flush."
-    :value-fn (fn [store] (or (:overwrite-total store) 0))}
-   {:id :p95-flush-duration-ms
-    :label "P95 flush"
-    :tooltip "95th percentile flush duration from the bounded recent flush sample window."
-    :value-fn (fn [store] (:p95-flush-duration-ms store))
-    :format :ms}
-   {:id :last-flush-duration-ms
-    :label "Last flush"
-    :tooltip "Duration of the most recent flush for this store."
-    :value-fn (fn [store] (:last-flush-duration-ms store))
-    :format :ms}
-   {:id :last-queue-wait-ms
-    :label "Last queue wait"
-    :tooltip "Time between frame scheduling and flush start for the most recent flush."
-    :value-fn (fn [store] (:last-queue-wait-ms store))
-    :format :ms}])
 
 (defn format-age-ms
   [age-ms]
@@ -71,18 +25,6 @@
           seconds (quot (mod age-ms 60000) 1000)]
       (str minutes "m " seconds "s"))))
 
-(defn format-ms
-  [value]
-  (if (number? value)
-    (str (js/Math.round value) " ms")
-    "n/a"))
-
-(defn threshold-label
-  [stale-threshold-ms]
-  (if (number? stale-threshold-ms)
-    (str stale-threshold-ms " ms")
-    "n/a"))
-
 (defn- display-value
   [reveal-sensitive? value]
   (if reveal-sensitive?
@@ -95,29 +37,6 @@
     (if (str/blank? text)
       fallback
       text)))
-
-(defn- transport-state-label
-  [transport-state]
-  (catalog/status-token-label transport-state))
-
-(defn- format-last-close
-  [health]
-  (let [close-info (get-in health [:transport :last-close])
-        generated-at-ms (:generated-at-ms health)]
-    (if (map? close-info)
-      (let [code (or (:code close-info) "n/a")
-            reason (or (:reason close-info) "n/a")
-            at-ms (:at-ms close-info)
-            close-age-ms (when (and (number? generated-at-ms) (number? at-ms))
-                           (max 0 (- generated-at-ms at-ms)))]
-        (str code
-             " / "
-             reason
-             " / "
-             (if (number? close-age-ms)
-               (str (format-age-ms close-age-ms) " ago")
-               "n/a")))
-      "n/a")))
 
 (defn- timeline-rows
   [timeline limit now-ms reveal-sensitive?]
@@ -135,26 +54,163 @@
                   :details-text (when (map? details*)
                                   (pr-str details*))})))))
 
-(defn- group-health-rows
-  [health]
-  (mapv (fn [group]
-          (let [status (catalog/normalize-status
-                        (get-in health [:groups group :worst-status]))]
-            {:key (name group)
-             :label (catalog/group-title group)
-             :status status
-             :status-label (catalog/status-label status)
-             :tone (catalog/status-tone status)}))
-        catalog/group-order))
-
 (defn- stream-sort-key
   [{:keys [group topic sub-key]}]
   [(catalog/group-rank (or group :account))
    (str topic)
    (pr-str sub-key)])
 
-(defn- stream-group-models
-  [health now-ms reveal-sensitive?]
+(def ^:private state-copy
+  {:online {:title "Everything is live"
+            :reason "All data is streaming normally."}
+   :delayed {:title "Market data is behind"
+             :reason "One live stream is approaching its stale threshold. We'll refresh it automatically."}
+   :partial {:title "Some streams are lagging"
+             :reason "Order updates are live, but some data streams have gone quiet. Trading is still safe."}
+   :reconnecting {:title "Reconnecting..."
+                  :reason "Attempting to restore the data connection. Your open orders are safe on the exchange."}
+   :offline {:title "Disconnected"
+             :reason "We couldn't reach HyperOpen servers. Check your network, then reconnect."}})
+
+(def ^:private group-display-labels
+  {:orders_oms "Orders"
+   :market_data "Market data"
+   :account "Account"})
+
+(defn- display-group-label
+  [group]
+  (get group-display-labels group (catalog/group-title group)))
+
+(defn- popover-state
+  [health meter]
+  (let [status (catalog/normalize-status (:status meter))
+        transport-state (get-in health [:transport :state])
+        transport-freshness (catalog/normalize-status
+                             (get-in health [:transport :freshness]))
+        active-bars (:active-bars meter)]
+    (cond
+      (or (= :reconnecting status)
+          (= :reconnecting transport-freshness)
+          (contains? #{:connecting :reconnecting} transport-state))
+      :reconnecting
+
+      (or (= :offline status)
+          (= :unknown status)
+          (= :offline transport-freshness)
+          (= :disconnected transport-state)
+          (zero? (or active-bars 0)))
+      :offline
+
+      (and (= :delayed status)
+           (<= (or active-bars 0) 2))
+      :partial
+
+      (= :delayed status)
+      :delayed
+
+      :else
+      :online)))
+
+(defn- status->group-state
+  [popover-state status]
+  (let [status* (catalog/normalize-status status)]
+    (cond
+      (or (= :offline popover-state)
+          (= :reconnecting popover-state)
+          (contains? #{:offline :reconnecting :unknown} status*))
+      :offline
+
+      (= :delayed status*)
+      :delayed
+
+      :else
+      :live)))
+
+(defn- display-topic
+  [topic]
+  (case (some-> topic str str/lower-case)
+    "l2book" "Order book"
+    "trades" "Trades"
+    "openorders" "Open orders"
+    "userfills" "Fills"
+    "clearinghousestate" "Account state"
+    (display-string topic "Unknown stream")))
+
+(defn- stream-key-text
+  [sub-key]
+  (let [parts (if (sequential? sub-key)
+                (rest sub-key)
+                [sub-key])]
+    (or (some (fn [part]
+                (let [text (display-string part "")]
+                  (when-not (str/blank? text)
+                    text)))
+              parts)
+        "n/a")))
+
+(defn- stream-detail
+  [{:keys [display-topic age-text]}]
+  (str display-topic " is " age-text " behind"))
+
+(defn- delayed-group-detail
+  [streams]
+  (if-let [stream (first (filter #(= :delayed (:status %)) streams))]
+    (stream-detail stream)
+    "Streams are behind"))
+
+(defn- group-detail
+  [popover-state group group-state streams]
+  (case group-state
+    :offline (if (= :reconnecting popover-state) "Waiting" "Disconnected")
+    :delayed (delayed-group-detail streams)
+    :live (if (= :market_data group) "Streaming" "Updates on activity")
+    "Updates on activity"))
+
+(defn- group-models
+  [health popover-state stream-groups]
+  (let [streams-by-group (into {}
+                               (map (juxt :group :streams))
+                               stream-groups)]
+    (mapv (fn [group]
+            (let [status (catalog/normalize-status
+                          (get-in health [:groups group :worst-status]))
+                  state* (status->group-state popover-state status)]
+              {:key (name group)
+               :group group
+               :label (display-group-label group)
+               :state state*
+               :status-label (case state*
+                               :offline "Offline"
+                               :delayed "Delayed"
+                               "Live")
+               :detail (group-detail popover-state
+                                      group
+                                      state*
+                                      (get streams-by-group group []))}))
+          catalog/group-order)))
+
+(defn- popover-last-update-label
+  [health now-ms]
+  (let [age-ms (policy/transport-last-recv-age-ms now-ms health)]
+    (str (format-age-ms age-ms) " ago")))
+
+(defn- summary-counter-rows
+  [state]
+  (let [reset-counts (merge {:market_data 0 :orders_oms 0 :all 0}
+                            (get-in state [:websocket-ui :reset-counts]))]
+    [{:label "Reconnect count"
+      :value (str (or (get-in state [:websocket-ui :reconnect-count]) 0))}
+     {:label "Reset count"
+      :value (str (get reset-counts :market_data 0)
+                  " / "
+                  (get reset-counts :orders_oms 0)
+                  " / "
+                  (get reset-counts :all 0))}
+     {:label "Auto-recover count"
+      :value (str (or (get-in state [:websocket-ui :auto-recover-count]) 0))}]))
+
+(defn- popover-stream-groups
+  [health now-ms]
   (let [rows (->> (get health :streams {})
                   (map (fn [[sub-key stream]]
                          (assoc stream :sub-key sub-key)))
@@ -168,168 +224,39 @@
          (mapv (fn [[group streams]]
                  {:key (name group)
                   :group group
-                  :title (catalog/group-title group)
+                  :title (display-group-label group)
                   :count (count streams)
-                  :streams (mapv (fn [{:keys [sub-key
-                                              topic
-                                              status
-                                              last-payload-at-ms
-                                              stale-threshold-ms
-                                              descriptor
-                                              last-seq
-                                              seq-gap-detected?
-                                              seq-gap-count
-                                              last-gap]}]
-                                   (let [status* (catalog/normalize-status status)
-                                         sub-key* (display-value reveal-sensitive? sub-key)
-                                         age-ms (policy/stream-age-ms now-ms {:last-payload-at-ms last-payload-at-ms})
-                                         descriptor* (display-value reveal-sensitive? descriptor)
-                                         last-gap* (display-value reveal-sensitive? last-gap)]
-                                     {:key (str topic "|" (pr-str sub-key))
-                                      :topic (or topic "unknown")
-                                      :status status*
-                                      :status-label (catalog/status-label status*)
-                                      :tone (catalog/status-tone status*)
-                                      :age-text (format-age-ms age-ms)
-                                      :threshold-text (threshold-label stale-threshold-ms)
-                                      :sequence-text (if (number? last-seq) (str last-seq) "n/a")
-                                      :gap-text (if seq-gap-detected?
-                                                  (str "yes (" (or seq-gap-count 0) ")")
-                                                  "no")
-                                      :last-gap-text (when (map? last-gap*)
-                                                       (pr-str last-gap*))
-                                      :subscription-text (pr-str sub-key*)
-                                      :descriptor-text (pr-str descriptor*)}))
-                                 streams)})))))
-
-(defn- market-store-models
-  [market-projection reveal-sensitive?]
-  (let [stores (->> (:stores market-projection)
-                    (sort-by (comp str :store-id))
-                    vec)
-        flush-events-by-store (group-by :store-id (vec (or (:flush-events market-projection) [])))]
-    (mapv (fn [store-summary]
-            (let [store-id* (display-value reveal-sensitive? (:store-id store-summary))
-                  store-id-text (display-string store-id* "n/a")
-                  store-events (get flush-events-by-store (:store-id store-summary))
-                  durations (mapv :flush-duration-ms store-events)]
-              {:key (str "market-store|" (:store-id store-summary))
-               :store-id-text store-id-text
-               :store-id-title store-id-text
-               :flush-count (or (:flush-count store-summary) 0)
-               :metrics (mapv (fn [{:keys [id label tooltip value-fn format]}]
-                                (let [raw-value (value-fn store-summary)
-                                      value-text (case format
-                                                   :ms (format-ms raw-value)
-                                                   (str raw-value))]
-                                  {:key (name id)
-                                   :label label
-                                   :tooltip tooltip
-                                   :value-text value-text}))
-                              market-metrics)
-               :durations durations
-               :p95-flush-duration-ms (:p95-flush-duration-ms store-summary)
-               :sample-count (count durations)}))
-          stores)))
-
-(defn- recent-flush-rows
-  [market-projection now-ms reveal-sensitive?]
-  (->> (vec (or (:flush-events market-projection) []))
-       (sort-by (fn [entry] (or (:seq entry) 0)))
-       (take-last market-flush-table-row-limit)
-       reverse
-       (mapv (fn [entry]
-               (let [event-at-ms (:at-ms entry)
-                     age-ms (when (and (number? now-ms) (number? event-at-ms))
-                              (max 0 (- now-ms event-at-ms)))
-                     store-id* (display-value reveal-sensitive? (:store-id entry))
-                     store-id-text (display-string store-id* "n/a")]
-                 {:key (str "market-flush|" (or (:seq entry)
-                                               (:at-ms entry)
-                                               (:store-id entry)))
-                  :age-text (format-age-ms age-ms)
-                  :store-id-text store-id-text
-                  :store-id-title store-id-text
-                  :pending-count (or (:pending-count entry) 0)
-                  :overwrite-count (or (:overwrite-count entry) 0)
-                  :flush-duration-text (format-ms (:flush-duration-ms entry))
-                  :queue-wait-text (format-ms (:queue-wait-ms entry))})))))
-
-(defn- market-projection-model
-  [health now-ms reveal-sensitive?]
-  (let [market-projection (or (:market-projection health) {})
-        stores (market-store-models market-projection reveal-sensitive?)
-        flush-rows (recent-flush-rows market-projection now-ms reveal-sensitive?)]
-    {:stores stores
-     :flush-rows flush-rows
-     :flush-count (count flush-rows)
-     :empty? (empty? stores)}))
-
-(defn- summary-rows
-  [state app-version build-id]
-  (let [reset-counts (merge {:market_data 0 :orders_oms 0 :all 0}
-                            (get-in state [:websocket-ui :reset-counts]))]
-    [{:label "App version"
-      :value (or app-version "n/a")}
-     {:label "Build id"
-      :value (or build-id "n/a")}
-     {:label "Reconnect count"
-      :value (str (or (get-in state [:websocket-ui :reconnect-count]) 0))}
-     {:label "Reset count (market/oms/all)"
-      :value (str (get reset-counts :market_data 0)
-                  "/"
-                  (get reset-counts :orders_oms 0)
-                  "/"
-                  (get reset-counts :all 0))}
-     {:label "Auto-recover count"
-      :value (str (or (get-in state [:websocket-ui :auto-recover-count]) 0))}]))
-
-(defn- connection-meter-summary
-  [meter]
-  {:rows [{:label "Status"
-           :value (:label meter)}
-          {:label "Source"
-           :value (:source-label meter)}
-          {:label "Bars"
-           :value (str (:active-bars meter) "/" (:bar-count meter))}
-          {:label "Score"
-           :value (str (:score meter) "/100")}
-          {:label "Penalty"
-           :value (str (:penalty meter))}]
-   :breakdown (mapv (fn [{:keys [id label penalty detail]}]
-                      {:key (name id)
-                       :label label
-                       :penalty-text (str penalty)
-                       :detail detail})
-                    (:breakdown meter))})
-
-(defn- transport-rows
-  [health now-ms]
-  [{:label "State"
-    :value (transport-state-label (get-in health [:transport :state]))}
-   {:label "Freshness"
-    :value (catalog/status-label (get-in health [:transport :freshness]))}
-   {:label "Expected traffic"
-    :value (if (get-in health [:transport :expected-traffic?]) "yes" "no")}
-   {:label "Last message age"
-    :value (format-age-ms (policy/transport-last-recv-age-ms now-ms health))}
-   {:label "Reconnect attempts"
-    :value (str (or (get-in health [:transport :attempt]) 0))}
-   {:label "Last close"
-    :value (format-last-close health)
-    :class ["ml-3" "text-right"]}])
-
-(defn- reset-buttons
-  [reset-availability]
-  (mapv (fn [{:keys [id idle-label tooltip click-action]}]
-          {:key (name id)
-           :label (if (= "Reset" (:label reset-availability))
-                    idle-label
-                    (:label reset-availability))
-           :tooltip tooltip
-           :disabled? (:disabled? reset-availability)
-           :click-action click-action})
-        reset-button-catalog))
+                  :streams
+                  (mapv (fn [{:keys [sub-key topic status last-payload-at-ms]}]
+                          (let [status* (catalog/normalize-status status)
+                                age-ms (policy/stream-age-ms
+                                        now-ms
+                                        {:last-payload-at-ms last-payload-at-ms})]
+                            {:key (str topic "|" (pr-str sub-key))
+                             :topic (or topic "unknown")
+                             :display-topic (display-topic topic)
+                             :stream-key-text (stream-key-text (display-value false sub-key))
+                             :status status*
+                             :state (case status*
+                                      :offline :offline
+                                      :reconnecting :offline
+                                      :delayed :delayed
+                                      :event-driven :event
+                                      :idle :event
+                                      :live :live
+                                      :unknown :offline
+                                      :live)
+                             :status-label (case status*
+                                             :offline "Off"
+                                             :reconnecting "Off"
+                                             :delayed "Delayed"
+                                             :event-driven "Waiting"
+                                             :idle "Waiting"
+                                             :live "Live"
+                                             :unknown "Off"
+                                             "Live")
+                             :age-text (format-age-ms age-ms)}))
+                        streams)})))))
 
 (defn- diagnostics-model
   [state health meter {:keys [app-version
@@ -338,26 +265,32 @@
                               display-now-ms
                               effective-now-ms]}]
   (let [timeline (vec (get-in state [:websocket-ui :diagnostics-timeline] []))
-        reveal-sensitive? (boolean (get-in state [:websocket-ui :reveal-sensitive?] false))
+        reveal-sensitive? false
         copy-status (get-in state [:websocket-ui :copy-status])
         reconnect-availability (policy/reconnect-availability state health effective-now-ms)
-        reset-availability (policy/reset-availability state health effective-now-ms)]
-    {:reconnect-control reconnect-availability
-     :reset-buttons (reset-buttons reset-availability)
-     :reveal-sensitive? reveal-sensitive?
+        state* (popover-state health meter)
+        stream-groups (popover-stream-groups health display-now-ms)
+        copy (get state-copy state*)]
+    {:state state*
+     :tone (case state*
+             :online :ok
+             :offline :err
+             :warn)
+     :title (:title copy)
+     :reason (:reason copy)
+     :last-update-label (popover-last-update-label health display-now-ms)
+     :developer-open? (not= :online state*)
+     :reconnect-control reconnect-availability
      :show-surface-freshness-cues?
      (boolean (get-in state [:websocket-ui :show-surface-freshness-cues?] false))
      :copy-status (when copy-status
                     {:kind (:kind copy-status)
                      :message (:message copy-status)
                      :fallback-json (:fallback-json copy-status)})
-     :summary-rows (summary-rows state app-version build-id)
-     :connection-meter (connection-meter-summary meter)
+     :counter-rows (summary-counter-rows state)
      :timeline (timeline-rows timeline diagnostics-timeline-limit display-now-ms reveal-sensitive?)
-     :transport-rows (transport-rows health display-now-ms)
-     :group-health (group-health-rows health)
-     :stream-groups (stream-group-models health display-now-ms reveal-sensitive?)
-     :market-projection (market-projection-model health display-now-ms reveal-sensitive?)}))
+     :groups (group-models health state* stream-groups)
+     :stream-groups stream-groups}))
 
 (defn- mobile-nav-model
   [state]
@@ -426,7 +359,7 @@
                                            :display-now-ms display-now-ms
                                            :effective-now-ms effective-now-ms}))]
      (cond-> {:diagnostics-open? diagnostics-open?
-              :connection-meter meter
+              :connection-meter (assoc meter :diagnostics-open? diagnostics-open?)
               :mobile-nav (mobile-nav-model state)
               :footer-links footer-links}
        banner

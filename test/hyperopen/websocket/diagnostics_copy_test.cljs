@@ -48,6 +48,38 @@
              (done))))
        0))))
 
+(deftest copy-websocket-diagnostics-success-schedules-brief-inline-feedback-test
+  (async done
+    (let [scheduled (atom nil)
+          statuses (atom [])
+          store (atom {:websocket {:health {:generated-at-ms 1700000000000}}
+                       :websocket-ui {:copy-status nil}})
+          clipboard #js {:writeText (fn [_]
+                                      (js/Promise.resolve true))}]
+      (diagnostics-copy/copy-websocket-diagnostics!
+       {:store store
+        :diagnostics-copy-payload (fn [_ _] {:kind "payload"})
+        :sanitize-value (fn [_ payload] payload)
+        :set-copy-status! (record-copy-status! statuses)
+        :copy-success-status (fn [_] {:kind :success})
+        :copy-error-status (fn [_ diagnostics-json]
+                             {:kind :error
+                              :fallback-json diagnostics-json})
+        :log-fn (fn [& _] nil)
+        :clipboard clipboard
+        :schedule-copy-status-clear! (fn [clear-fn delay-ms]
+                                       (reset! scheduled delay-ms)
+                                       (clear-fn))})
+      (js/setTimeout
+       (fn []
+         (try
+           (is (= 1400 @scheduled))
+           (is (= [nil {:kind :success} nil] @statuses))
+           (is (nil? (get-in @store [:websocket-ui :copy-status])))
+           (finally
+             (done))))
+       0))))
+
 (deftest copy-websocket-diagnostics-uses-error-status-when-clipboard-unavailable-test
   (let [statuses (atom [])
         logs (atom [])

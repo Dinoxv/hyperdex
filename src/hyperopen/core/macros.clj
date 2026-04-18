@@ -63,6 +63,7 @@
     reconnect-websocket-action
     toggle-ws-diagnostics
     close-ws-diagnostics
+    handle-ws-diagnostics-keydown
     toggle-ws-diagnostics-sensitive
     ws-diagnostics-reconnect-now
     ws-diagnostics-copy

@@ -106,9 +106,8 @@
 
 (defn- find-surface-freshness-toggle [view]
   (find-node #(and (vector? %)
-                   (= :input (first %))
-                   (= [[:actions/toggle-show-surface-freshness-cues]]
-                      (get-in % [1 :on :click])))
+                   (= "surface-freshness-toggle"
+                      (get-in % [1 :data-role])))
              view))
 
 (defn- find-node-by-data-role
@@ -188,7 +187,8 @@
   (let [view (footer-view/footer-view (base-state))
         pill (find-pill view)]
     (is (some? pill))
-    (is (= "Online" (node-text pill)))))
+    (is (str/includes? (node-text pill) "Online"))
+    (is (str/includes? (node-text pill) "500ms"))))
 
 (deftest status-meter-button-has-no-border-or-shaded-background-test
   (let [view (footer-view/footer-view (base-state))
@@ -242,10 +242,11 @@
     (fn []
       (let [view (footer-view/footer-view (base-state))
             pill (find-pill view)]
-        (is (= "Online" (node-text pill)))
+        (is (str/includes? (node-text pill) "Online"))
+        (is (str/includes? (node-text pill) "450ms"))
         (is (= 3 (meter-active-bar-count view)))))))
 
-(deftest diagnostics-drawer-surfaces-browser-network-penalty-breakdown-test
+(deftest diagnostics-popover-keeps-network-penalty-out-of-visible-ui-test
   (with-browser-connection
     #js {:effectiveType "3g"
          :rtt 450
@@ -254,9 +255,9 @@
     (fn []
       (let [view (footer-view/footer-view (assoc-in (base-state) [:websocket-ui :diagnostics-open?] true))
             text (node-text view)]
-        (is (str/includes? text "Browser network hint"))
-        (is (str/includes? text "3g"))
-        (is (str/includes? text "20"))))))
+        (is (not (str/includes? text "Browser network hint")))
+        (is (not (str/includes? text "Score")))
+        (is (not (str/includes? text "Penalty")))))))
 
 (deftest status-meter-degrades-for-live-headroom-before-delayed-threshold-test
   (let [state (-> (base-state)
@@ -266,7 +267,7 @@
                   (assoc-in [:websocket :health :streams ["trades" "BTC" nil nil nil] :stale-threshold-ms] 8000))
         view (footer-view/footer-view state)
         pill (find-pill view)]
-    (is (= "Online" (node-text pill)))
+    (is (str/includes? (node-text pill) "Online"))
     (is (= 3 (meter-active-bar-count view)))))
 
 (deftest status-meter-degrades-in-steps-for-slight-versus-severe-delay-test
@@ -310,7 +311,7 @@
     (is (> (meter-active-bar-count slight-view)
            (meter-active-bar-count severe-view)))))
 
-(deftest diagnostics-drawer-renders-surface-freshness-toggle-test
+(deftest diagnostics-popover-renders-surface-freshness-toggle-test
   (let [off-view (footer-view/footer-view (base-state))
         off-toggle (find-surface-freshness-toggle off-view)
         on-view (footer-view/footer-view (-> (base-state)
@@ -319,7 +320,10 @@
         on-toggle (find-surface-freshness-toggle on-view)]
     (is (nil? off-toggle))
     (is (some? on-toggle))
-    (is (true? (boolean (get-in on-toggle [1 :checked]))))))
+    (is (= "switch" (get-in on-toggle [1 :role])))
+    (is (= "true" (get-in on-toggle [1 :aria-checked])))
+    (is (= [[:actions/toggle-show-surface-freshness-cues]]
+           (get-in on-toggle [1 :on :click])))))
 
 (deftest footer-renders-mobile-bottom-nav-actions-test
   (let [view (footer-view/footer-view (assoc (base-state)
@@ -368,209 +372,42 @@
     (is (contains? markets-classes "text-[#61e6cf]"))
     (is (not (contains? trade-classes "text-[#61e6cf]")))))
 
-(deftest diagnostics-drawer-renders-only-when-open-test
+(deftest diagnostics-popover-renders-only-when-open-test
   (let [closed-view (footer-view/footer-view (base-state))
-        open-view (footer-view/footer-view (assoc-in (base-state) [:websocket-ui :diagnostics-open?] true))]
+        open-view (footer-view/footer-view (assoc-in (base-state) [:websocket-ui :diagnostics-open?] true))
+        popover (find-node-by-data-role open-view "connection-diagnostics-popover")
+        backdrop (find-node-by-data-role open-view "connection-diagnostics-backdrop")]
     (is (nil? (find-node #(and (vector? %)
-                               (= :h2 (first %))
-                               (= "Connection diagnostics" (last %)))
+                               (= "connection-diagnostics-popover"
+                                  (get-in % [1 :data-role])))
                          closed-view)))
-    (is (some? (find-node #(and (vector? %)
-                                (= :h2 (first %))
-                                (= "Connection diagnostics" (last %)))
-                          open-view)))
-    (is (some? (find-node #(and (vector? %)
-                                (= :h3 (first %))
-                                (= "Transport" (last %)))
-                          open-view)))
-    (is (some? (find-node #(and (vector? %)
-                                (= :h3 (first %))
-                                (= "Group health" (last %)))
-                          open-view)))
-    (is (some? (find-node #(and (vector? %)
-                                (= :h3 (first %))
-                                (= "Streams" (last %)))
-                          open-view)))
-    (is (pos? (count-nodes #(and (vector? %) (= :details (first %))) open-view)))))
+    (is (some? popover))
+    (is (= :div (first popover)))
+    (is (= "dialog" (get-in popover [1 :role])))
+    (is (= "Connection status" (get-in popover [1 :aria-label])))
+    (is (= [[:actions/handle-ws-diagnostics-keydown [:event/key]]]
+           (get-in popover [1 :on :keydown])))
+    (is (some? backdrop))
+    (is (= [[:actions/close-ws-diagnostics]]
+           (get-in backdrop [1 :on :click])))))
 
-(deftest diagnostics-drawer-renders-market-projection-empty-state-test
+(deftest diagnostics-popover-prioritizes-trader-comprehension-test
   (let [view (footer-view/footer-view (assoc-in (base-state) [:websocket-ui :diagnostics-open?] true))
         text (node-text view)]
-    (is (str/includes? text "Market projection"))
-    (is (str/includes? text "No market projection telemetry yet."))
-    (is (str/includes? text "No flush events recorded in the telemetry ring."))))
+    (is (str/includes? text "Everything is live"))
+    (is (str/includes? text "All data is streaming normally."))
+    (is (str/includes? text "Orders"))
+    (is (str/includes? text "Market data"))
+    (is (str/includes? text "Account"))
+    (is (str/includes? text "Show freshness labels"))
+    (is (str/includes? text "Developer details"))
+    (is (not (str/includes? text "Build id")))
+    (is (not (str/includes? text "Reveal sensitive")))
+    (is (not (str/includes? text "Market projection")))
+    (is (not (str/includes? text "Recent flushes")))
+    (is (not (str/includes? text "Transport")))))
 
-(deftest diagnostics-drawer-renders-market-projection-cards-and-flush-rows-test
-  (let [state (-> (base-state)
-                  (assoc-in [:websocket-ui :diagnostics-open?] true)
-                  (assoc-in [:websocket :health :market-projection]
-                            {:stores [{:store-id "app-store"
-                                       :pending-count 0
-                                       :queued-total 12
-                                       :overwrite-total 3
-                                       :flush-count 4
-                                       :max-pending-depth 5
-                                       :p95-flush-duration-ms 12
-                                       :last-flush-duration-ms 8
-                                       :last-queue-wait-ms 3}]
-                             :flush-events [{:seq 101
-                                             :at-ms 9800
-                                             :store-id "app-store"
-                                             :pending-count 2
-                                             :overwrite-count 1
-                                             :flush-duration-ms 8
-                                             :queue-wait-ms 3}
-                                            {:seq 102
-                                             :at-ms 9900
-                                             :store-id "app-store"
-                                             :pending-count 1
-                                             :overwrite-count 0
-                                             :flush-duration-ms 5
-                                             :queue-wait-ms 2}]}))
-        view (footer-view/footer-view state)
-        text (node-text view)]
-    (is (str/includes? text "Market projection"))
-    (is (str/includes? text "app-store"))
-    (is (str/includes? text "P95 flush"))
-    (is (str/includes? text "12 ms"))
-    (is (str/includes? text "Recent flushes (2)"))
-    (is (str/includes? text "Flush"))
-    (is (str/includes? text "Queue wait"))
-    (is (str/includes? text "8 ms"))
-    (is (str/includes? text "5 ms"))))
-
-(deftest diagnostics-drawer-market-projection-cards-use-full-width-layout-test
-  (let [state (-> (base-state)
-                  (assoc-in [:websocket-ui :diagnostics-open?] true)
-                  (assoc-in [:websocket :health :market-projection]
-                            {:stores [{:store-id "app-store"
-                                       :pending-count 0
-                                       :queued-total 1
-                                       :overwrite-total 0
-                                       :flush-count 1
-                                       :max-pending-depth 1
-                                       :p95-flush-duration-ms 6
-                                       :last-flush-duration-ms 6
-                                       :last-queue-wait-ms 2}]
-                             :flush-events []}))
-        view (footer-view/footer-view state)
-        cards-container (find-node #(and (vector? %)
-                                         (= :div (first %))
-                                         (contains? (set (class-values (get-in % [1 :class])))
-                                                    "grid-cols-1")
-                                         (contains? (set (class-values (get-in % [1 :class])))
-                                                    "gap-2")
-                                         (not (contains? (set (class-values (get-in % [1 :class])))
-                                                         "sm:grid-cols-2")))
-                                   view)]
-    (is (some? cards-container))))
-
-(deftest diagnostics-drawer-market-projection-metrics-expose-tooltips-test
-  (let [state (-> (base-state)
-                  (assoc-in [:websocket-ui :diagnostics-open?] true)
-                  (assoc-in [:websocket :health :market-projection]
-                            {:stores [{:store-id "app-store"
-                                       :pending-count 0
-                                       :queued-total 1
-                                       :overwrite-total 0
-                                       :flush-count 1
-                                       :max-pending-depth 1
-                                       :p95-flush-duration-ms 6
-                                       :last-flush-duration-ms 6
-                                       :last-queue-wait-ms 2}]
-                             :flush-events [{:seq 1
-                                             :at-ms 9900
-                                             :store-id "app-store"
-                                             :pending-count 1
-                                             :overwrite-count 0
-                                             :flush-duration-ms 6
-                                             :queue-wait-ms 2}]}))
-        view (footer-view/footer-view state)
-        p95-label (find-node #(and (vector? %)
-                                   (= :span (first %))
-                                   (= "P95 flush" (last %))
-                                   (string? (get-in % [1 :title])))
-                             view)
-        queue-wait-label (find-node #(and (vector? %)
-                                          (= :span (first %))
-                                          (= "Last queue wait" (last %))
-                                          (string? (get-in % [1 :title])))
-                                    view)]
-    (is (some? p95-label))
-    (is (str/includes? (get-in p95-label [1 :title]) "95th percentile flush duration"))
-    (is (some? queue-wait-label))
-    (is (str/includes? (get-in queue-wait-label [1 :title]) "frame scheduling"))))
-
-(deftest diagnostics-drawer-market-projection-store-cell-exposes-full-store-tooltip-test
-  (let [full-store-id "market-projection/store-1234567890abcdefghijklmnopqrstuvwxyz"
-        state (-> (base-state)
-                  (assoc-in [:websocket-ui :diagnostics-open?] true)
-                  (assoc-in [:websocket :health :market-projection]
-                            {:stores [{:store-id full-store-id
-                                       :pending-count 0
-                                       :queued-total 1
-                                       :overwrite-total 0
-                                       :flush-count 1
-                                       :max-pending-depth 1
-                                       :p95-flush-duration-ms 6
-                                       :last-flush-duration-ms 6
-                                       :last-queue-wait-ms 2}]
-                             :flush-events [{:seq 1
-                                             :at-ms 9900
-                                             :store-id full-store-id
-                                             :pending-count 1
-                                             :overwrite-count 0
-                                             :flush-duration-ms 6
-                                             :queue-wait-ms 2}]}))
-        view (footer-view/footer-view state)
-        store-label (find-node #(and (vector? %)
-                                     (= :span (first %))
-                                     (= full-store-id (get-in % [1 :title])))
-                               view)
-        tooltip-node (find-node #(and (vector? %)
-                                      (= :div (first %))
-                                      (str/includes? (node-text %) full-store-id)
-                                      (contains? (set (class-values (get-in % [1 :class])))
-                                                 "group-hover:opacity-100"))
-                                view)]
-    (is (some? store-label))
-    (is (= full-store-id (get-in store-label [1 :title])))
-    (is (some? tooltip-node))))
-
-(deftest diagnostics-drawer-renders-recent-flushes-after-streams-section-test
-  (let [state (-> (base-state)
-                  (assoc-in [:websocket-ui :diagnostics-open?] true)
-                  (assoc-in [:websocket :health :market-projection]
-                            {:stores [{:store-id "app-store"
-                                       :pending-count 0
-                                       :queued-total 1
-                                       :overwrite-total 0
-                                       :flush-count 1
-                                       :max-pending-depth 1
-                                       :p95-flush-duration-ms 6
-                                       :last-flush-duration-ms 6
-                                       :last-queue-wait-ms 2}]
-                             :flush-events [{:seq 1
-                                             :at-ms 9900
-                                             :store-id "app-store"
-                                             :pending-count 1
-                                             :overwrite-count 0
-                                             :flush-duration-ms 6
-                                             :queue-wait-ms 2}]}))
-        view (footer-view/footer-view state)
-        text (node-text view)
-        streams-idx (str/index-of text "Streams")
-        recent-flushes-idx (str/index-of text "Recent flushes (")]
-    (is (number? streams-idx))
-    (is (number? recent-flushes-idx))
-    (is (< streams-idx recent-flushes-idx))))
-
-(deftest diagnostics-drawer-renders-configured-app-version-test
-  (let [view (footer-view/footer-view (assoc-in (base-state) [:websocket-ui :diagnostics-open?] true))]
-    (is (str/includes? (node-text view)
-                       (str "App version " (:app-version app-config/config))))))
-
-(deftest diagnostics-drawer-stream-ages-update-from-snapshot-test
+(deftest diagnostics-popover-stream-ages-update-from-snapshot-test
   (let [view-a (footer-view/footer-view (-> (base-state)
                                             (assoc-in [:websocket-ui :diagnostics-open?] true)
                                             (assoc-in [:websocket :health :streams ["trades" "BTC" nil nil nil] :last-payload-at-ms] 5000)))
@@ -580,47 +417,29 @@
                                             (assoc-in [:websocket :health :streams ["trades" "BTC" nil nil nil] :last-payload-at-ms] 5000)))
         text-a (node-text view-a)
         text-b (node-text view-b)]
-    (is (str/includes? text-a "Age: 5s | Threshold: 10000 ms"))
-    (is (str/includes? text-b "Age: 6s | Threshold: 10000 ms"))))
+    (is (str/includes? text-a "5s"))
+    (is (str/includes? text-b "6s"))
+    (is (not (str/includes? text-a "Threshold")))))
 
 (deftest diagnostics-actions-dispatch-correct-events-test
-  (let [view (footer-view/footer-view (assoc-in (base-state) [:websocket-ui :diagnostics-open?] true))
-        reconnect-btn (find-node #(and (vector? %)
-                                       (button-tag? (first %))
-                                       (= "Reconnect now" (last %)))
-                                 view)
+  (let [view (footer-view/footer-view (-> (base-state)
+                                          (assoc-in [:websocket-ui :diagnostics-open?] true)
+                                          (assoc-in [:websocket :health :groups :market_data :worst-status] :delayed)))
+        close-btn (find-node-by-data-role view "connection-diagnostics-close")
+        reconnect-btn (find-node-by-data-role view "connection-diagnostics-reconnect")
         copy-btn (find-node #(and (vector? %)
                                   (button-tag? (first %))
-                                  (= "Copy diagnostics" (last %)))
-                            view)
-        reset-market-btn (find-node #(and (vector? %)
-                                          (button-tag? (first %))
-                                          (= "Reset market subs" (last %)))
-                                    view)
-        reset-oms-btn (find-node #(and (vector? %)
-                                       (button-tag? (first %))
-                                       (= "Reset OMS subs" (last %)))
-                                 view)
-        reset-all-btn (find-node #(and (vector? %)
-                                       (button-tag? (first %))
-                                       (= "Reset all subs" (last %)))
-                                 view)]
+                                  (str/includes? (node-text %) "Copy diagnostics"))
+                            view)]
+    (is (= [[:actions/close-ws-diagnostics]]
+           (get-in close-btn [1 :on :click])))
     (is (= [[:actions/ws-diagnostics-reconnect-now]]
            (get-in reconnect-btn [1 :on :click])))
     (is (= [[:actions/ws-diagnostics-copy]]
            (get-in copy-btn [1 :on :click])))
-    (is (= [[:actions/ws-diagnostics-reset-market-subscriptions]]
-           (get-in reset-market-btn [1 :on :click])))
-    (is (= "Unsubscribe and resubscribe active market-data streams only. Use this when order book or trades look stuck."
-           (get-in reset-market-btn [1 :title])))
-    (is (= [[:actions/ws-diagnostics-reset-orders-subscriptions]]
-           (get-in reset-oms-btn [1 :on :click])))
-    (is (= "Unsubscribe and resubscribe active Orders/OMS streams only, without forcing a full websocket reconnect."
-           (get-in reset-oms-btn [1 :title])))
-    (is (= [[:actions/ws-diagnostics-reset-all-subscriptions]]
-           (get-in reset-all-btn [1 :on :click])))
-    (is (= "Run both market-data and Orders/OMS subscription resets in one pass, without a full reconnect."
-           (get-in reset-all-btn [1 :title])))))
+    (is (not (str/includes? (node-text view) "Reset market streams")))
+    (is (not (str/includes? (node-text view) "Reset Orders streams")))
+    (is (not (str/includes? (node-text view) "Reset all streams")))))
 
 (deftest diagnostics-masks-addresses-by-default-test
   (let [address "0x1234567890abcdef1234567890abcdef12345678"
@@ -639,84 +458,107 @@
     (is (not (str/includes? text address)))
     (is (str/includes? text "0x1234...45678"))))
 
-(deftest diagnostics-reveal-toggle-dispatches-action-test
+(deftest diagnostics-does-not-render-sensitive-reveal-toggle-test
   (let [view (footer-view/footer-view (assoc-in (base-state) [:websocket-ui :diagnostics-open?] true))
         reveal-btn (find-node #(and (vector? %)
                                     (button-tag? (first %))
                                     (= "Reveal sensitive" (last %)))
                               view)]
-    (is (= [[:actions/toggle-ws-diagnostics-sensitive]]
-           (get-in reveal-btn [1 :on :click])))))
+    (is (nil? reveal-btn))))
 
-(deftest diagnostics-na-status-renders-neutral-chip-test
+(deftest diagnostics-event-driven-status-uses-trader-language-test
   (let [view (footer-view/footer-view (assoc-in (base-state) [:websocket-ui :diagnostics-open?] true))
         chip (find-node #(and (vector? %)
                               (= :span (first %))
-                              (str/includes? (node-text %) "EVENT-DRIVEN"))
+                              (str/includes? (node-text %) "Live"))
                         view)
         classes (set (class-values (get-in chip [1 :class])))]
-    (is (contains? classes "border-base-300"))
-    (is (contains? classes "text-base-content/70"))
-    (is (not (contains? classes "border-error/50")))))
+    (is (some? chip))
+    (is (contains? classes "hx-group-chip"))
+    (is (str/includes? (node-text view) "Updates on activity"))
+    (is (not (str/includes? (node-text view) "EVENT-DRIVEN")))))
 
 (deftest reconnect-button-disabled-when-reconnecting-or-cooldown-active-test
   (let [reconnecting-view (footer-view/footer-view
                             (-> (base-state)
                                 (assoc-in [:websocket-ui :diagnostics-open?] true)
                                 (assoc-in [:websocket :health :transport :state] :reconnecting)))
-        reconnecting-btn (find-node #(and (vector? %)
-                                          (button-tag? (first %))
-                                          (= "Reconnecting..." (last %)))
-                                    reconnecting-view)
+        reconnecting-btn (find-node-by-data-role reconnecting-view "connection-diagnostics-reconnect")
         cooldown-view (footer-view/footer-view
                         (-> (base-state)
                             (assoc-in [:websocket-ui :diagnostics-open?] true)
+                            (assoc-in [:websocket :health :groups :market_data :worst-status] :delayed)
                             (assoc-in [:websocket-ui :reconnect-cooldown-until-ms] 12000)))
-        cooldown-btn (find-node #(and (vector? %)
-                                      (button-tag? (first %))
-                                      (str/includes? (node-text %) "Reconnect in"))
-                                cooldown-view)]
+        cooldown-btn (find-node-by-data-role cooldown-view "connection-diagnostics-reconnect")]
     (is (true? (get-in reconnecting-btn [1 :disabled])))
     (is (true? (get-in cooldown-btn [1 :disabled])))))
 
-(deftest reset-buttons-disabled-when-reset-blocked-test
-  (let [in-progress-view (footer-view/footer-view
-                           (-> (base-state)
-                               (assoc-in [:websocket-ui :diagnostics-open?] true)
-                               (assoc-in [:websocket-ui :reset-in-progress?] true)))
-        in-progress-btn (find-node #(and (vector? %)
-                                         (button-tag? (first %))
-                                         (= "Resetting..." (last %)))
-                                   in-progress-view)
-        cooldown-view (footer-view/footer-view
-                        (-> (base-state)
-                            (assoc-in [:websocket-ui :diagnostics-open?] true)
-                            (assoc-in [:websocket-ui :reset-cooldown-until-ms] 12000)))
-        cooldown-btn (find-node #(and (vector? %)
-                                      (button-tag? (first %))
-                                      (str/includes? (node-text %) "Reset in"))
-                                cooldown-view)]
-    (is (true? (get-in in-progress-btn [1 :disabled])))
-    (is (true? (get-in cooldown-btn [1 :disabled])))))
-
-(deftest diagnostics-copy-feedback-renders-status-and-fallback-json-test
+(deftest diagnostics-copy-feedback-renders-inline-success-and-fallback-json-test
   (let [view (footer-view/footer-view
                (-> (base-state)
                    (assoc-in [:websocket-ui :diagnostics-open?] true)
                    (assoc-in [:websocket-ui :copy-status]
-                             {:kind :error
-                              :message "Couldn't access clipboard. Copy the redacted JSON below."
-                              :fallback-json "{\"redacted\":true}"})))
-        text (node-text view)]
-    (is (str/includes? text "Couldn't access clipboard. Copy the redacted JSON below."))
-    (is (str/includes? text "{\"redacted\":true}"))))
+                             {:kind :success
+                              :message "Copied (redacted)"})))
+        error-view (footer-view/footer-view
+                    (-> (base-state)
+                        (assoc-in [:websocket-ui :diagnostics-open?] true)
+                        (assoc-in [:websocket-ui :copy-status]
+                                  {:kind :error
+                                   :message "Couldn't access clipboard. Copy the redacted JSON below."
+                                   :fallback-json "{\"redacted\":true}"})))
+        error-text (node-text error-view)
+        copy-btn (find-node #(and (vector? %)
+                                  (button-tag? (first %))
+                                  (str/includes? (node-text %) "Copied"))
+                            view)]
+    (is (str/includes? (node-text copy-btn) "✓"))
+    (is (str/includes? error-text "Couldn't access clipboard. Copy the redacted JSON below."))
+    (is (str/includes? error-text "{\"redacted\":true}"))))
 
-(deftest diagnostics-transport-section-uses-single-last-close-row-test
-  (let [view (footer-view/footer-view (assoc-in (base-state) [:websocket-ui :diagnostics-open?] true))
+(deftest diagnostics-reconnecting-copy-and-reconnect-buttons-show-loading-state-test
+  (let [view (footer-view/footer-view
+              (-> (base-state)
+                  (assoc-in [:websocket-ui :diagnostics-open?] true)
+                  (assoc-in [:websocket :health :transport :state] :reconnecting)
+                  (assoc-in [:websocket :health :transport :freshness] :reconnecting)))
+        text (node-text view)
+        reconnect-btn (find-node-by-data-role view "connection-diagnostics-reconnect")
+        spinner (find-node-by-data-role reconnect-btn "connection-diagnostics-reconnect-spinner")]
+    (is (str/includes? text "Reconnecting"))
+    (is (str/includes? text "Your open orders are safe on the exchange"))
+    (is (true? (get-in reconnect-btn [1 :disabled])))
+    (is (some? spinner))))
+
+(deftest diagnostics-removes-developer-only-tables-from-visible-ui-test
+  (let [view (footer-view/footer-view
+               (-> (base-state)
+                   (assoc-in [:websocket-ui :copy-status]
+                             nil)
+                   (assoc-in [:websocket-ui :diagnostics-open?] true)
+                   (assoc-in [:websocket :health :market-projection]
+                             {:stores [{:store-id "app-store"
+                                        :pending-count 0
+                                        :queued-total 1
+                                        :overwrite-total 0
+                                        :flush-count 1
+                                        :max-pending-depth 1
+                                        :p95-flush-duration-ms 6
+                                        :last-flush-duration-ms 6
+                                        :last-queue-wait-ms 2}]
+                              :flush-events [{:seq 1
+                                              :at-ms 9900
+                                              :store-id "app-store"
+                                              :pending-count 1
+                                              :overwrite-count 0
+                                              :flush-duration-ms 6
+                                              :queue-wait-ms 2}]})))
         text (node-text view)]
-    (is (str/includes? text "Last close"))
-    (is (not (str/includes? text "Last close code")))
-    (is (not (str/includes? text "Last close reason")))))
+    (is (not (str/includes? text "app-store")))
+    (is (not (str/includes? text "P95 flush")))
+    (is (not (str/includes? text "Queue wait")))
+    (is (not (str/includes? text "Last close")))
+    (is (not (str/includes? text "Descriptor")))))
 
 (deftest persistent-banner-rules-test
   (let [orders-offline-view (footer-view/footer-view

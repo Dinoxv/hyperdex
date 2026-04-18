@@ -17,6 +17,7 @@
             action-adapters/set-agent-local-protection-mode-action}
    :diagnostics {:toggle-ws-diagnostics action-adapters/toggle-ws-diagnostics
                  :close-ws-diagnostics action-adapters/close-ws-diagnostics
+                 :handle-ws-diagnostics-keydown action-adapters/handle-ws-diagnostics-keydown
                  :toggle-ws-diagnostics-sensitive action-adapters/toggle-ws-diagnostics-sensitive
                  :ws-diagnostics-reconnect-now action-adapters/ws-diagnostics-reconnect-now
                  :ws-diagnostics-copy action-adapters/ws-diagnostics-copy

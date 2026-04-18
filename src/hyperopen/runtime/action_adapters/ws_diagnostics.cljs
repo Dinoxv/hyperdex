@@ -17,6 +17,10 @@
   [_]
   (diagnostics-actions/close-ws-diagnostics nil))
 
+(defn handle-ws-diagnostics-keydown
+  [_ key]
+  (diagnostics-actions/handle-ws-diagnostics-keydown nil key))
+
 (def toggle-ws-diagnostics-sensitive
   diagnostics-actions/toggle-ws-diagnostics-sensitive)
 

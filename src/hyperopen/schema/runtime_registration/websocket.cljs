@@ -25,6 +25,7 @@
    [:actions/reconnect-websocket :reconnect-websocket-action]
    [:actions/toggle-ws-diagnostics :toggle-ws-diagnostics]
    [:actions/close-ws-diagnostics :close-ws-diagnostics]
+   [:actions/handle-ws-diagnostics-keydown :handle-ws-diagnostics-keydown]
    [:actions/toggle-ws-diagnostics-sensitive :toggle-ws-diagnostics-sensitive]
    [:actions/ws-diagnostics-reconnect-now :ws-diagnostics-reconnect-now]
    [:actions/ws-diagnostics-copy :ws-diagnostics-copy]
