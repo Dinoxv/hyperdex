@@ -315,7 +315,8 @@
    :nonce-cursor (:nonce-cursor metadata)})
 
 (defn unlock-locked-session!
-  [{:keys [metadata wallet-address]}]
+  [{:keys [cache-session? metadata wallet-address]
+    :or {cache-session? true}}]
   (let [{:keys [credential-id error prf-salt wallet-address]
          :as unlock-request}
         (valid-unlock-request wallet-address metadata)]
@@ -338,7 +339,8 @@
                           (.then
                            (fn [private-key]
                              (let [session (unlocked-session metadata private-key)]
-                               (cache-unlocked-session! wallet-address session)
+                               (when cache-session?
+                                 (cache-unlocked-session! wallet-address session))
                                session))))))))))))))
 
 (defn delete-locked-session!

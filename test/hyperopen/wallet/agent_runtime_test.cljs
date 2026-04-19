@@ -16,6 +16,17 @@
   [f]
   (js/setTimeout f 0))
 
+(deftest agent-runtime-public-facade-exports-stable-functions-test
+  (doseq [[label public-fn] [["exchange-response-error" agent-runtime/exchange-response-error]
+                             ["runtime-error-message" agent-runtime/runtime-error-message]
+                             ["set-agent-storage-mode!" agent-runtime/set-agent-storage-mode!]
+                             ["set-agent-local-protection-mode!" agent-runtime/set-agent-local-protection-mode!]
+                             ["approve-agent-request!" agent-runtime/approve-agent-request!]
+                             ["enable-agent-trading!" agent-runtime/enable-agent-trading!]
+                             ["unlock-agent-trading!" agent-runtime/unlock-agent-trading!]
+                             ["lock-agent-trading!" agent-runtime/lock-agent-trading!]]]
+    (is (fn? public-fn) (str label " remains exported by the public facade"))))
+
 (deftest set-agent-storage-mode-clears-sessions-and-resets-agent-state-test
   (let [cleared (atom [])
         persisted-modes (atom [])

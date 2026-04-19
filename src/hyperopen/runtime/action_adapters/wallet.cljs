@@ -72,6 +72,8 @@
               :format-agent-name-with-valid-until agent-session/format-agent-name-with-valid-until
               :approve-agent! trading-api/approve-agent!
               :persist-agent-session-by-mode! agent-session/persist-agent-session-by-mode!
+              :clear-agent-session-by-mode! agent-session/clear-agent-session-by-mode!
+              :clear-unlocked-session! agent-lockbox/clear-unlocked-session!
               :runtime-error-message agent-runtime/runtime-error-message
               :exchange-response-error agent-runtime/exchange-response-error}))]
     (if-let [crypto (trading-crypto-modules/resolved-trading-crypto)]
@@ -101,7 +103,10 @@
     :normalize-storage-mode agent-session/normalize-storage-mode
     :normalize-local-protection-mode agent-session/normalize-local-protection-mode
     :load-passkey-session-metadata agent-session/load-passkey-session-metadata
-    :unlock-locked-session! agent-lockbox/unlock-locked-session!
+    :unlock-locked-session! (fn [opts]
+                              (agent-lockbox/unlock-locked-session!
+                               (assoc opts :cache-session? false)))
+    :cache-unlocked-session! agent-lockbox/cache-unlocked-session!
     :runtime-error-message agent-runtime/runtime-error-message}))
 
 (defn unlock-agent-trading-action
