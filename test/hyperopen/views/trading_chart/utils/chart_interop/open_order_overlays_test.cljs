@@ -230,6 +230,78 @@
                       (aget (.-children overlay-root) 0))))
     (chart-interop/clear-open-order-overlays! chart-obj)))
 
+(deftest open-order-overlays-retained-row-updates-cancel-handler-and-order-test
+  (let [document (fake-dom/make-fake-document)
+        container (fake-dom/make-fake-element "div")
+        subscribe-fn (fn [_] nil)
+        time-scale #js {:subscribeVisibleTimeRangeChange subscribe-fn
+                        :unsubscribeVisibleTimeRangeChange subscribe-fn
+                        :subscribeVisibleLogicalRangeChange subscribe-fn
+                        :unsubscribeVisibleLogicalRangeChange subscribe-fn
+                        :subscribeSizeChange subscribe-fn
+                        :unsubscribeSizeChange subscribe-fn}
+        chart #js {:timeScale (fn [] time-scale)
+                   :subscribeCrosshairMove subscribe-fn
+                   :unsubscribeCrosshairMove subscribe-fn
+                   :subscribeClick subscribe-fn
+                   :unsubscribeClick subscribe-fn}
+        main-series #js {:priceToCoordinate (fn [price]
+                                              (* 2 price))
+                         :subscribeDataChanged subscribe-fn
+                         :unsubscribeDataChanged subscribe-fn}
+        chart-obj #js {:chart chart
+                       :mainSeries main-series}
+        first-canceled* (atom [])
+        second-canceled* (atom [])
+        first-order {:coin "SOL"
+                     :oid 301
+                     :side "B"
+                     :type "limit"
+                     :sz "1.00"
+                     :px "60.0"}
+        second-order {:coin "SOL"
+                      :oid 301
+                      :side "B"
+                      :type "limit"
+                      :sz "2.50"
+                      :px "62.25"}
+        format-price (fn [price _raw] (str "P" price))
+        format-size (fn [size] (str "S" size))]
+    (chart-interop/sync-open-order-overlays!
+     chart-obj
+     container
+     [first-order]
+     {:document document
+      :on-cancel-order (fn [order]
+                         (swap! first-canceled* conj order))
+      :format-price format-price
+      :format-size format-size})
+    (let [overlay-root (aget (.-children container) 0)
+          row (aget (.-children overlay-root) 0)
+          cancel-button (fake-dom/find-dom-node row
+                                                #(= "button" (some-> (.-tagName %) str/lower-case)))]
+      (is (some? cancel-button))
+      (chart-interop/sync-open-order-overlays!
+       chart-obj
+       container
+       [second-order]
+       {:document document
+        :on-cancel-order (fn [order]
+                           (swap! second-canceled* conj order))
+        :format-price format-price
+        :format-size format-size})
+      (let [text (str/join " " (fake-dom/collect-text-content row))]
+        (is (identical? row (aget (.-children overlay-root) 0)))
+        (is (identical? cancel-button
+                        (fake-dom/find-dom-node row
+                                                #(= "button" (some-> (.-tagName %) str/lower-case)))))
+        (is (str/includes? text "Limit S2.50 @ $P62.25"))
+        (is (not (str/includes? text "Limit S1.00 @ $P60.0"))))
+      (fake-dom/click-dom-node! cancel-button))
+    (is (= [] @first-canceled*))
+    (is (= [second-order] @second-canceled*))
+    (chart-interop/clear-open-order-overlays! chart-obj)))
+
 (deftest open-order-overlays-repaint-retains-row-dom-on-visible-range-change-test
   (let [document (fake-dom/make-fake-document)
         container (fake-dom/make-fake-element "div")
