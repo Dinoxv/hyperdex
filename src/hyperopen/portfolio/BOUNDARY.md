@@ -36,6 +36,9 @@
 
 - Key namespaces:
   `hyperopen.portfolio.actions-test`,
+  `hyperopen.portfolio.benchmark-actions-test`,
+  `hyperopen.portfolio.fee-schedule-test`,
+  `hyperopen.portfolio.fee-context-test`,
   `hyperopen.portfolio.application.metrics-bridge-test`,
   `hyperopen.portfolio.metrics.builder-test`,
   `hyperopen.portfolio.metrics.history-test`,
