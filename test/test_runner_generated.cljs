@@ -434,6 +434,8 @@
             [hyperopen.views.vaults.detail-vm-returns-chart-test]
             [hyperopen.views.vaults.detail-vm-test]
             [hyperopen.views.vaults.detail.activity-test]
+            [hyperopen.views.vaults.detail.activity.performance-metrics-test]
+            [hyperopen.views.vaults.detail.activity.tables-test]
             [hyperopen.views.vaults.detail.chart-test]
             [hyperopen.views.vaults.detail.chart-tooltip-test]
             [hyperopen.views.vaults.detail.chart-view-test]
@@ -951,6 +953,8 @@
              'hyperopen.views.vaults.detail-vm-returns-chart-test
              'hyperopen.views.vaults.detail-vm-test
              'hyperopen.views.vaults.detail.activity-test
+             'hyperopen.views.vaults.detail.activity.performance-metrics-test
+             'hyperopen.views.vaults.detail.activity.tables-test
              'hyperopen.views.vaults.detail.chart-test
              'hyperopen.views.vaults.detail.chart-tooltip-test
              'hyperopen.views.vaults.detail.chart-view-test
