@@ -423,7 +423,10 @@
                                               :grouping "na"}})
     (is (false? (get-in @store [:order-form-runtime :submitting?])))
     (is (nil? (get-in @store [:order-form-runtime :error])))
-    (is (= [[[:actions/unlock-agent-trading]]]
+    (is (= [[[:actions/unlock-agent-trading
+              {:after-success-actions
+               [[:actions/submit-unlocked-order-request
+                 {:action {:type "order" :orders [] :grouping "na"}}]]}]]]
            @dispatched))
     (is (nil? (get-in @store [:ui :toast])))))
 

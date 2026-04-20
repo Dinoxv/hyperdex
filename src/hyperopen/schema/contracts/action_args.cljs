@@ -69,6 +69,26 @@
         :kind-and-anchor (s/tuple (s/or :keyword keyword?
                                         :string string?)
                                   any?)))
+(s/def ::api-submit-request (s/keys :req-un [::common/action]))
+(s/def ::submit-unlocked-order-request-args
+  (s/or :request-only (s/tuple ::api-submit-request)
+        :request-and-path-values (s/tuple ::api-submit-request ::common/path-values)))
+
+(defn- action-request?
+  [value]
+  (and (vector? value)
+       (keyword? (first value))
+       (= "actions" (namespace (first value)))))
+
+(defn- unlock-agent-trading-args?
+  [args]
+  (or (empty? args)
+      (and (= 1 (count args))
+           (let [{:keys [after-success-actions] :as payload} (first args)]
+             (and (map? payload)
+                  (every? #{:after-success-actions} (keys payload))
+                  (vector? after-success-actions)
+                  (every? action-request? after-success-actions))))))
 
 (s/def ::action-id (s/and keyword?
                           #(= "actions" (namespace %))))
@@ -112,7 +132,7 @@
    :actions/copy-spectate-mode-watchlist-link ::common/address-args
    :actions/start-spectate-mode-watchlist-address ::common/address-args
    :actions/enable-agent-trading ::common/no-args
-   :actions/unlock-agent-trading ::common/no-args
+   :actions/unlock-agent-trading unlock-agent-trading-args?
    :actions/close-agent-recovery-modal ::common/no-args
    :actions/set-agent-storage-mode ::common/set-agent-storage-mode-args
    :actions/set-agent-local-protection-mode ::common/set-agent-local-protection-mode-args
@@ -309,6 +329,7 @@
    :actions/handle-order-submission-confirmation-keydown ::common/key-args
    :actions/confirm-order-submission ::common/no-args
    :actions/submit-order ::common/no-args
+   :actions/submit-unlocked-order-request ::submit-unlocked-order-request-args
    :actions/confirm-cancel-visible-open-orders ::confirm-cancel-visible-open-orders-args
    :actions/close-cancel-visible-open-orders-confirmation ::common/no-args
    :actions/handle-cancel-visible-open-orders-confirmation-keydown ::common/key-args

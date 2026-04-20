@@ -71,6 +71,17 @@
     (is (= [:effects/unlock-agent-trading]
            io-effect))))
 
+(deftest unlock-agent-trading-action-forwards-after-success-actions-test
+  (let [state {:wallet {:connected? true
+                        :address "0xabc"
+                        :agent {:status :locked}}}
+        payload {:after-success-actions [[:actions/submit-unlocked-order-request
+                                          {:action {:type "order"}}]]}]
+    (is (= [[:effects/save-many [[[:wallet :agent :status] :unlocking]
+                                 [[:wallet :agent :error] nil]]]
+            [:effects/unlock-agent-trading payload]]
+           (wallet-actions/unlock-agent-trading-action state payload)))))
+
 (deftest copy-wallet-address-action-emits-address-payload-test
   (is (= [[:effects/copy-wallet-address "0xabc"]]
          (wallet-actions/copy-wallet-address-action {:wallet {:address "0xabc"}})))

@@ -260,12 +260,32 @@
     :unlocking "Awaiting passkey before submitting orders."
     submit-message))
 
+(defn submit-unlocked-order-request
+  ([_state request]
+   (submit-unlocked-order-request _state request nil))
+  ([_state request path-values]
+   (cond-> []
+     (seq path-values) (conj [:effects/save-many path-values])
+     (map? request) (conj [:effects/api-submit-order request]))))
+
+(defn- unlock-after-success-payload
+  [actions]
+  (when (seq actions)
+    {:after-success-actions (vec actions)}))
+
+(defn- unlock-agent-trading-effect
+  [after-success-actions]
+  (let [payload (unlock-after-success-payload after-success-actions)]
+    (cond-> [:effects/unlock-agent-trading]
+      payload (conj payload))))
+
 (defn- locked-submit-effects
-  []
+  [request path-values]
   [[:effects/save-many [[[:order-form-runtime :error] nil]
                         [[:wallet :agent :status] :unlocking]
                         [[:wallet :agent :error] nil]]]
-   [:effects/unlock-agent-trading]])
+   (unlock-agent-trading-effect
+    [[:actions/submit-unlocked-order-request request path-values]])])
 
 (def ^:private confirm-open-order-message
   "Submit this order?\n\nDisable open-order confirmation in Trading settings if you prefer one-click submits.")
@@ -322,7 +342,12 @@
       (if (= :ready agent-status)
         []
         (case agent-status
-          :locked (locked-submit-effects)
+          :locked (let [persisted-form (trading/persist-order-form form)
+                        persisted-ui (next-order-form-ui-state state form nil)
+                        path-values [[[:order-form-runtime :error] nil]
+                                     [[:order-form] persisted-form]
+                                     [[:order-form-ui] persisted-ui]]]
+                    (locked-submit-effects request path-values))
           :unlocking [[:effects/save [:order-form-runtime :error] error-message]]
           (open-enable-trading-recovery-effects error-message)))
 

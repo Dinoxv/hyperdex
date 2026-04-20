@@ -1,5 +1,6 @@
 (ns hyperopen.runtime.effect-adapters.wallet
-  (:require [hyperopen.account.spectate-mode-links :as spectate-mode-links]
+  (:require [nexus.registry :as nxr]
+            [hyperopen.account.spectate-mode-links :as spectate-mode-links]
             [hyperopen.platform :as platform]
             [hyperopen.runtime.state :as runtime-state]
             [hyperopen.telemetry :as telemetry]
@@ -64,18 +65,38 @@
     :missing-session-error "Trading session data is unavailable. Enable Trading again."
     :unlock-required-error "Unlock trading before turning off passkey protection."}))
 
+(defn- promise-like?
+  [value]
+  (and value
+       (fn? (.-then value))))
+
+(defn- dispatch-after-success-actions!
+  [store actions]
+  (when (and (seq actions)
+             (= :ready (get-in @store [:wallet :agent :status])))
+    (nxr/dispatch store nil (vec actions))))
+
 (defn unlock-agent-trading
-  [_ store]
-  (agent-runtime/unlock-agent-trading!
-   {:store store
-    :normalize-storage-mode agent-session/normalize-storage-mode
-    :normalize-local-protection-mode agent-session/normalize-local-protection-mode
-    :load-passkey-session-metadata agent-session/load-passkey-session-metadata
-    :unlock-locked-session! (fn [opts]
-                              (agent-lockbox/unlock-locked-session!
-                               (assoc opts :cache-session? false)))
-    :cache-unlocked-session! agent-lockbox/cache-unlocked-session!
-    :runtime-error-message agent-runtime/runtime-error-message}))
+  ([_ store]
+   (unlock-agent-trading nil store nil))
+  ([_ store payload]
+   (let [after-success-actions (:after-success-actions payload)
+         unlock-result (agent-runtime/unlock-agent-trading!
+                        {:store store
+                         :normalize-storage-mode agent-session/normalize-storage-mode
+                         :normalize-local-protection-mode agent-session/normalize-local-protection-mode
+                         :load-passkey-session-metadata agent-session/load-passkey-session-metadata
+                         :unlock-locked-session! (fn [opts]
+                                                   (agent-lockbox/unlock-locked-session!
+                                                    (assoc opts :cache-session? false)))
+                         :cache-unlocked-session! agent-lockbox/cache-unlocked-session!
+                         :runtime-error-message agent-runtime/runtime-error-message})]
+     (if (promise-like? unlock-result)
+       (-> unlock-result
+           (.then (fn [result]
+                    (dispatch-after-success-actions! store after-success-actions)
+                    result)))
+       unlock-result))))
 
 (defn- set-wallet-copy-feedback!
   [store kind message]

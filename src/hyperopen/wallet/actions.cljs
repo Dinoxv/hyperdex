@@ -38,15 +38,18 @@
       [[:effects/set-agent-storage-mode next-mode]])))
 
 (defn unlock-agent-trading-action
-  [state]
-  (let [wallet-address (get-in state [:wallet :address])
-        connected? (boolean (get-in state [:wallet :connected?]))]
-    (if (and connected? (seq wallet-address))
-      [[:effects/save-many [[[:wallet :agent :status] :unlocking]
-                            [[:wallet :agent :error] nil]]]
-       [:effects/unlock-agent-trading]]
-      [[:effects/save-many [[[:wallet :agent :status] :locked]
-                            [[:wallet :agent :error] "Connect your wallet before unlocking trading."]]]])))
+  ([state]
+   (unlock-agent-trading-action state nil))
+  ([state payload]
+   (let [wallet-address (get-in state [:wallet :address])
+         connected? (boolean (get-in state [:wallet :connected?]))]
+     (if (and connected? (seq wallet-address))
+       [[:effects/save-many [[[:wallet :agent :status] :unlocking]
+                             [[:wallet :agent :error] nil]]]
+        (cond-> [:effects/unlock-agent-trading]
+          (map? payload) (conj payload))]
+       [[:effects/save-many [[[:wallet :agent :status] :locked]
+                             [[:wallet :agent :error] "Connect your wallet before unlocking trading."]]]]))))
 
 (defn set-agent-local-protection-mode-action
   [state local-protection-mode normalize-local-protection-mode]

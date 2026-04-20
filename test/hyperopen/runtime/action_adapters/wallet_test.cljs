@@ -17,6 +17,16 @@
       (wallet-adapters/enable-agent-trading nil (atom {}) {}))
     (is (= 4242 @captured-now-ms))))
 
+(deftest unlock-agent-trading-action-forwards-continuation-payload-test
+  (let [state {:wallet {:connected? true
+                        :address "0xabc"}}
+        payload {:after-success-actions [[:actions/submit-unlocked-order-request
+                                          {:action {:type "order"}}]]}]
+    (is (= [[:effects/save-many [[[:wallet :agent :status] :unlocking]
+                                  [[:wallet :agent :error] nil]]]
+            [:effects/unlock-agent-trading payload]]
+           (wallet-adapters/unlock-agent-trading-action state payload)))))
+
 (deftest handle-wallet-connected-refreshes-vault-route-when-active-test
   (let [dispatch-calls (atom [])]
     (with-redefs [wallet-connection-runtime/handle-wallet-connected!

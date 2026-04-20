@@ -110,8 +110,10 @@
     :runtime-error-message agent-runtime/runtime-error-message}))
 
 (defn unlock-agent-trading-action
-  [state]
-  (wallet-actions/unlock-agent-trading-action state))
+  ([state]
+   (wallet-actions/unlock-agent-trading-action state))
+  ([state payload]
+   (wallet-actions/unlock-agent-trading-action state payload)))
 
 (defn set-agent-local-protection-mode-action
   [state local-protection-mode]

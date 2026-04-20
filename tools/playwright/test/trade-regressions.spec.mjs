@@ -597,16 +597,38 @@ async function installPasskeyLockboxMock(page) {
   });
 }
 
-async function installPasskeyUnlockMock(page) {
-  await page.evaluate(() => {
+async function installPasskeyUnlockMock(page, options = {}) {
+  const {
+    privateKey = "0xaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+  } = options;
+
+  await page.evaluate(({ privateKey: nextPrivateKey }) => {
+    const c = globalThis.cljs?.core;
     const lockbox = globalThis.hyperopen?.wallet?.agent_lockbox;
 
-    if (!lockbox) {
+    if (!c || !lockbox) {
       throw new Error("Hyperopen passkey lockbox namespace unavailable");
     }
 
-    lockbox.unlock_locked_session_BANG_ = () => Promise.resolve(true);
-  });
+    const keyword = c.keyword;
+    const opts = c.PersistentArrayMap.fromArray([keyword("keywordize-keys"), true], true);
+    const getValue = (value, key) => c.get(value, keyword(key));
+
+    lockbox.unlock_locked_session_BANG_ = (args) => {
+      const metadata = getValue(args, "metadata");
+      return Promise.resolve(
+        c.js__GT_clj(
+          {
+            "agent-address": getValue(metadata, "agent-address"),
+            "private-key": nextPrivateKey,
+            "last-approved-at": getValue(metadata, "last-approved-at"),
+            "nonce-cursor": getValue(metadata, "nonce-cursor")
+          },
+          opts
+        )
+      );
+    };
+  }, { privateKey });
 }
 
 async function seedBrowserTitleActiveAsset(page, mark) {
@@ -2236,10 +2258,17 @@ test("locked remembered passkey session disables downgrade until unlock @regress
     .toBe("passkey");
 });
 
-test("locked remembered passkey session submit triggers unlock flow instead of recovery @regression", async ({
+test("locked remembered passkey session submit unlocks and submits original order @regression", async ({
   page
 }) => {
   await visitRoute(page, "/trade");
+  await debugCall(page, "installExchangeSimulator", {
+    signedActions: {
+      default: {
+        responses: [{ status: "ok" }, { status: "ok" }, { status: "ok" }, { status: "ok" }]
+      }
+    }
+  });
   await installPasskeyUnlockMock(page);
   await seedRememberedTradingSession(page, {
     status: "locked",
@@ -2270,4 +2299,18 @@ test("locked remembered passkey session submit triggers unlock flow instead of r
     runtimeError: null
   });
   await expect(page.locator('[data-role="order-submit-confirmation-dialog"]')).toHaveCount(0);
+
+  await expect
+    .poll(
+      async () => {
+        const exchangeSnapshot = await debugCall(page, "exchangeSimulatorSnapshot");
+        return exchangeSnapshot.calls.flatMap((call) =>
+          (call.paths ?? [])
+            .filter((path) => Array.isArray(path) && path[0] === "signedActions")
+            .map((path) => path[1])
+        );
+      },
+      { timeout: 10_000 }
+    )
+    .toEqual(expect.arrayContaining(["updateLeverage", "order"]));
 });

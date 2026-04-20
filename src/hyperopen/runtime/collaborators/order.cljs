@@ -43,6 +43,7 @@
    order-actions/handle-order-submission-confirmation-keydown
    :confirm-order-submission order-actions/confirm-order-submission
    :submit-order order-actions/submit-order
+   :submit-unlocked-order-request order-actions/submit-unlocked-order-request
    :confirm-cancel-visible-open-orders order-actions/confirm-cancel-visible-open-orders
    :close-cancel-visible-open-orders-confirmation
    order-actions/close-cancel-visible-open-orders-confirmation
