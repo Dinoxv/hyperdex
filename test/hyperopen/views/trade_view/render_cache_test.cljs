@@ -10,6 +10,18 @@
             [hyperopen.views.trade-view :as trade-view]
             [hyperopen.views.trade.test-support :as support]))
 
+(defn- account-surface-export-resolver
+  []
+  (support/account-surface-export-resolver
+   {:account-info-view (fn [& args]
+                         (apply account-info-view/account-info-view args))
+    :account-equity-metrics (fn [state]
+                              (account-equity-view/account-equity-metrics state))
+    :account-equity-view (fn [& args]
+                           (apply account-equity-view/account-equity-view args))
+    :funding-actions-view (fn [& args]
+                            (apply account-equity-view/funding-actions-view args))}))
+
 (deftest trade-view-active-asset-panel-memoization-ignores-closed-selector-bookkeeping-test
   (let [active-asset-calls (atom 0)
         state-a (support/active-asset-state)
@@ -58,7 +70,8 @@
     (support/with-viewport-width
       430
       (fn []
-        (with-redefs [account-equity-view/account-equity-metrics (fn [_state]
+        (with-redefs [hyperopen.surface-modules/resolved-surface-export (account-surface-export-resolver)
+                      account-equity-view/account-equity-metrics (fn [_state]
                                                                    (swap! metrics-calls inc)
                                                                    stub-metrics)
                       account-equity-view/account-equity-view (fn
@@ -97,7 +110,8 @@
             account-info-calls (atom 0)
             equity-metrics-calls (atom 0)
             account-equity-calls (atom 0)]
-        (with-redefs [active-asset-view/active-asset-view (fn [_state]
+        (with-redefs [hyperopen.surface-modules/resolved-surface-export (account-surface-export-resolver)
+                      active-asset-view/active-asset-view (fn [_state]
                                                             (swap! active-asset-calls inc)
                                                             [:div {:data-role "stub-active-asset"}])
                       trade-modules/render-trade-chart-view (fn [_state]
@@ -162,7 +176,8 @@
             state-b (assoc state-a
                            :orderbooks {"BTC" {:bids [{:px "98.5" :sz "2.5"}]
                                                :asks [{:px "101.5" :sz "1.5"}]}})]
-        (with-redefs [active-asset-view/active-asset-view (fn [_state]
+        (with-redefs [hyperopen.surface-modules/resolved-surface-export (account-surface-export-resolver)
+                      active-asset-view/active-asset-view (fn [_state]
                                                             (swap! active-asset-calls inc)
                                                             [:div {:data-role "stub-active-asset"}])
                       trade-modules/render-trade-chart-view (fn [_state]
@@ -219,7 +234,8 @@
             state-b (assoc-in state-a
                               [:websocket :health :generated-at-ms]
                               6000)]
-        (with-redefs [active-asset-view/active-asset-view (fn [_state]
+        (with-redefs [hyperopen.surface-modules/resolved-surface-export (account-surface-export-resolver)
+                      active-asset-view/active-asset-view (fn [_state]
                                                             (swap! active-asset-calls inc)
                                                             [:div {:data-role "stub-active-asset"}])
                       trade-modules/render-trade-chart-view (fn [_state]
@@ -274,7 +290,8 @@
                                                    :asks [{:px "101.5" :sz "1.5"}]}})
                         (assoc-in [:active-assets :contexts "BTC" :mark] 64125.0)
                         (assoc-in [:active-assets :contexts "BTC" :change24h] 1600.0))]
-        (with-redefs [asset-selector-view/asset-list-freeze-active? (fn []
+        (with-redefs [hyperopen.surface-modules/resolved-surface-export (account-surface-export-resolver)
+                      asset-selector-view/asset-list-freeze-active? (fn []
                                                                       @scroll-active?*)
                       l2-orderbook-view/l2-orderbook-view (fn [_state]
                                                             (swap! orderbook-calls inc)
@@ -336,7 +353,8 @@
                         (assoc-in [:asset-selector :market-by-key "perp:ETH" :mark] 3300.0)
                         (assoc-in [:websocket :health :generated-at-ms] 6000)
                         (assoc-in [:webdata2 :updated-at] 1234))]
-        (with-redefs [asset-selector-view/asset-list-freeze-active? (fn []
+        (with-redefs [hyperopen.surface-modules/resolved-surface-export (account-surface-export-resolver)
+                      asset-selector-view/asset-list-freeze-active? (fn []
                                                                       @scroll-active?*)
                       trade-modules/render-trade-chart-view (fn [_state]
                                                               (swap! chart-calls inc)

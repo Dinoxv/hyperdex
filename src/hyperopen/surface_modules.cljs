@@ -5,15 +5,25 @@
 
 (def ^:private module-name-by-id
   {:funding-modal "funding_modal"
-   :spectate-mode-modal "spectate_mode_modal"})
+   :spectate-mode-modal "spectate_mode_modal"
+   :account-surfaces "account_surfaces"})
 
-(def ^:private exported-view-path-by-id
-  {:funding-modal ["hyperopen" "views" "funding_modal_module" "funding_modal_view"]
-   :spectate-mode-modal ["hyperopen" "views" "spectate_mode_modal_module" "spectate_mode_modal_view"]})
+(def ^:private primary-export-id-by-id
+  {:funding-modal :view
+   :spectate-mode-modal :view
+   :account-surfaces :account-info-view})
 
-(defonce ^:private resolved-surface-views (atom {}))
+(def ^:private exported-paths-by-id
+  {:funding-modal {:view ["hyperopen" "views" "funding_modal_module" "funding_modal_view"]}
+   :spectate-mode-modal {:view ["hyperopen" "views" "spectate_mode_modal_module" "spectate_mode_modal_view"]}
+   :account-surfaces {:account-info-view ["hyperopen" "views" "account_surfaces_module" "account_info_view"]
+                      :account-equity-view ["hyperopen" "views" "account_surfaces_module" "account_equity_view"]
+                      :account-equity-metrics ["hyperopen" "views" "account_surfaces_module" "account_equity_metrics"]
+                      :funding-actions-view ["hyperopen" "views" "account_surfaces_module" "funding_actions_view"]}})
 
-(declare resolve-module-view)
+(defonce ^:private resolved-surface-exports (atom {}))
+
+(declare cached-or-exported-export)
 
 (defn default-state
   []
@@ -28,7 +38,11 @@
 
 (defn resolved-surface-view
   [surface-id]
-  (get @resolved-surface-views (surface-module-id surface-id)))
+  (cached-or-exported-export surface-id :view))
+
+(defn resolved-surface-export
+  [surface-id export-id]
+  (cached-or-exported-export surface-id export-id))
 
 (defn- resolve-exported-view
   [path-segments]
@@ -40,33 +54,38 @@
             root
             path-segments)))
 
-(defn- resolve-module-view
-  [surface-id]
+(defn- resolve-module-export
+  [surface-id export-id]
   (when-let [module-id (surface-module-id surface-id)]
-    (resolve-exported-view (get exported-view-path-by-id module-id))))
+    (when-let [path-segments (get-in exported-paths-by-id [module-id export-id])]
+      (resolve-exported-view path-segments))))
 
-(defn- cached-or-exported-view
-  [surface-id]
+(defn- cached-or-exported-export
+  [surface-id export-id]
   (when-let [module-id (surface-module-id surface-id)]
-    (let [cached-view (resolved-surface-view module-id)]
+    (let [cached-export (get-in @resolved-surface-exports [module-id export-id])]
       (cond
-        (fn? cached-view)
-        cached-view
+        (fn? cached-export)
+        cached-export
 
-        (some? cached-view)
+        (some? cached-export)
         (do
-          (swap! resolved-surface-views dissoc module-id)
+          (swap! resolved-surface-exports update module-id dissoc export-id)
           nil)
 
         :else
-        (when-let [resolved-view (resolve-module-view module-id)]
-          (when (fn? resolved-view)
-            (swap! resolved-surface-views assoc module-id resolved-view)
-            resolved-view))))))
+        (when-let [resolved-export (resolve-module-export module-id export-id)]
+          (when (fn? resolved-export)
+            (swap! resolved-surface-exports assoc-in [module-id export-id] resolved-export)
+            resolved-export))))))
+
+(defn- primary-export-id
+  [surface-id]
+  (get primary-export-id-by-id (surface-module-id surface-id) :view))
 
 (defn surface-ready?
   [_state surface-id]
-  (some? (cached-or-exported-view surface-id)))
+  (some? (cached-or-exported-export surface-id (primary-export-id surface-id))))
 
 (defn surface-loading?
   [state surface-id]
@@ -79,7 +98,7 @@
 
 (defn render-surface-view
   [state surface-id]
-  (when-let [view (cached-or-exported-view surface-id)]
+  (when-let [view (cached-or-exported-export surface-id :view)]
     (view state)))
 
 (defn mark-surface-module-loading
@@ -112,27 +131,31 @@
 (defn load-surface-module!
   [store surface-id]
   (if-let [module-id (surface-module-id surface-id)]
-    (if-let [existing-view (cached-or-exported-view module-id)]
+    (if-let [existing-export (cached-or-exported-export module-id (primary-export-id module-id))]
       (do
         (swap! store mark-surface-module-loaded module-id)
-        (js/Promise.resolve existing-view))
+        (js/Promise.resolve existing-export))
       (let [module-name (get module-name-by-id module-id)
-            resolve-loaded-view!
+            primary-export-id* (primary-export-id module-id)
+            resolve-loaded-export!
             (fn []
-              (let [resolved-view (resolve-module-view module-id)]
-                (when-not (fn? resolved-view)
+              (let [resolved-export (resolve-module-export module-id primary-export-id*)]
+                (when-not (fn? resolved-export)
                   (throw (js/Error.
-                          (str "Loaded surface module without exported view: " module-id))))
-                (swap! resolved-surface-views assoc module-id resolved-view)
+                          (str "Loaded surface module without exported function: "
+                               module-id
+                               "/"
+                               primary-export-id*))))
+                (swap! resolved-surface-exports assoc-in [module-id primary-export-id*] resolved-export)
                 (swap! store mark-surface-module-loaded module-id)
-                resolved-view))]
+                resolved-export))]
         (swap! store mark-surface-module-loading module-id)
         (try
           (if (loader/loaded? module-name)
-            (js/Promise.resolve (resolve-loaded-view!))
+            (js/Promise.resolve (resolve-loaded-export!))
             (-> (loader/load module-name)
                 (.then (fn [_]
-                         (resolve-loaded-view!)))
+                         (resolve-loaded-export!)))
                 (.catch (fn [err]
                           (swap! store mark-surface-module-failed module-id err)
                           (js/Promise.reject err)))))

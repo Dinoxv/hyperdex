@@ -5,6 +5,7 @@
             [hyperopen.route-query-state :as route-query-state]
             [hyperopen.route-modules :as route-modules]
             [hyperopen.router :as router]
+            [hyperopen.surface-modules :as surface-modules]
             [hyperopen.trade-modules :as trade-modules]
             [hyperopen.trading-indicators-modules :as trading-indicators-modules]
             [hyperopen.runtime.state :as runtime-state]
@@ -361,6 +362,10 @@
                   (constantly false)
                   trade-modules/trade-chart-loading?
                   (constantly false)
+                  surface-modules/surface-ready?
+                  (constantly false)
+                  surface-modules/surface-loading?
+                  (constantly false)
                   router/init!
                   (fn
                     ([_store]
@@ -381,7 +386,8 @@
       ((:mark-post-render-trade-secondary-panels-ready! @captured-init-deps) store)
       (is (true? (get-in @store [:trade-ui :desktop-secondary-panels-ready?])))
       ((:load-post-render-route-effects! @captured-init-deps) store))
-    (is (= [[store [[:effects/load-trade-chart-module]]]]
+    (is (= [[store [[:effects/load-trade-chart-module]
+                    [:effects/load-surface-module :account-surfaces]]]]
            @dispatch-calls))))
 
 (deftest init-loads-trading-indicators-post-render-when-active-indicators-are-restored-test
@@ -409,6 +415,10 @@
                   (constantly false)
                   trading-indicators-modules/trading-indicators-loading?
                   (constantly false)
+                  surface-modules/surface-ready?
+                  (constantly false)
+                  surface-modules/surface-loading?
+                  (constantly false)
                   nxr/dispatch
                   (fn [store-arg _ctx effects]
                     (swap! dispatch-calls conj [store-arg effects]))]
@@ -416,5 +426,6 @@
                           :store store})
       ((:load-post-render-route-effects! @captured-init-deps) store))
     (is (= [[store [[:effects/load-trade-chart-module]
-                    [:effects/load-trading-indicators-module]]]]
+                    [:effects/load-trading-indicators-module]
+                    [:effects/load-surface-module :account-surfaces]]]]
            @dispatch-calls))))

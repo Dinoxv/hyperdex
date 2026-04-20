@@ -1,12 +1,11 @@
 (ns hyperopen.views.trade-view
-  (:require [hyperopen.trade-modules :as trade-modules]
+  (:require [hyperopen.surface-modules :as surface-modules]
+            [hyperopen.trade-modules :as trade-modules]
             [hyperopen.views.active-asset.vm :as active-asset-vm]
             [hyperopen.views.active-asset-view :as active-asset-view]
             [hyperopen.views.asset-selector-view :as asset-selector-view]
             [hyperopen.views.ui.funding-modal-positioning :as funding-modal-positioning]
             [hyperopen.views.l2-orderbook-view :as l2-orderbook-view]
-            [hyperopen.views.account-info-view :as account-info-view]
-            [hyperopen.views.account-equity-view :as account-equity-view]
             [hyperopen.views.trade.order-form-view :as order-form-view]
             [hyperopen.views.trade-view.layout-state :as layout-state]))
 
@@ -63,6 +62,7 @@
 
 (declare trade-chart-loading-shell)
 (declare render-active-asset-panel-state
+         desktop-secondary-panel-placeholder
          render-account-info-panel-state
          render-account-equity-panel-state
          render-account-equity-metrics-state
@@ -121,6 +121,10 @@
 (defn- order-form-view-state
   [state]
   (select-view-state state order-form-view-state-keys))
+
+(defn- account-surface-export
+  [export-id]
+  (surface-modules/resolved-surface-export :account-surfaces export-id))
 
 (def ^:private memoized-active-asset-view
   (memoize-last (fn [render-fn state]
@@ -211,9 +215,10 @@
 
 (defn- render-account-info-panel-state
   [view-state opts]
-  (memoized-account-info-view account-info-view/account-info-view
-                              view-state
-                              opts))
+  (when-let [render-fn (account-surface-export :account-info-view)]
+    (memoized-account-info-view render-fn
+                                view-state
+                                opts)))
 
 (defn- render-account-equity-panel
   [state equity-metrics opts]
@@ -223,9 +228,10 @@
 
 (defn- render-account-equity-panel-state
   [view-state equity-metrics opts]
-  (memoized-account-equity-view account-equity-view/account-equity-view
-                                view-state
-                                (assoc opts :metrics equity-metrics)))
+  (when-let [render-fn (account-surface-export :account-equity-view)]
+    (memoized-account-equity-view render-fn
+                                  view-state
+                                  (assoc opts :metrics equity-metrics))))
 
 (defn- render-account-equity-metrics
   [state]
@@ -233,8 +239,9 @@
 
 (defn- render-account-equity-metrics-state
   [view-state]
-  (memoized-account-equity-metrics account-equity-view/account-equity-metrics
-                                   view-state))
+  (when-let [metrics-fn (account-surface-export :account-equity-metrics)]
+    (memoized-account-equity-metrics metrics-fn
+                                     view-state)))
 
 (defn- trade-chart-panel-content
   [state]
@@ -289,21 +296,30 @@
    :loading (and active-asset (nil? orderbook-data))})
 
 (defn- mobile-account-surface [state equity-metrics]
-  [:div {:class ["flex" "h-full" "min-h-0" "flex-col" "bg-base-100"]
-         :data-parity-id "trade-mobile-account-surface"}
-  (render-account-equity-panel state equity-metrics {:fill-height? false
-                                                     :show-funding-actions? false})
-   (account-equity-view/funding-actions-view
-    state
-    {:container-classes ["mt-auto"
-                         "border-t"
-                         "border-base-300"
-                         "bg-base-100"
-                         "px-3"
-                         "pt-2"
-                         "pb-1.5"
-                         "space-y-2"]
-     :data-parity-id "trade-mobile-account-actions"})])
+  (let [account-equity-panel (render-account-equity-panel state
+                                                          equity-metrics
+                                                          {:fill-height? false
+                                                           :show-funding-actions? false})
+        funding-actions-view (account-surface-export :funding-actions-view)]
+    (if (and account-equity-panel
+             (fn? funding-actions-view))
+      [:div {:class ["flex" "h-full" "min-h-0" "flex-col" "bg-base-100"]
+             :data-parity-id "trade-mobile-account-surface"}
+       account-equity-panel
+       (funding-actions-view
+        state
+        {:container-classes ["mt-auto"
+                             "border-t"
+                             "border-base-300"
+                             "bg-base-100"
+                             "px-3"
+                             "pt-2"
+                             "pb-1.5"
+                             "space-y-2"]
+         :data-parity-id "trade-mobile-account-actions"})]
+      (desktop-secondary-panel-placeholder "Account"
+                                           "trade-mobile-account-surface-placeholder"
+                                           :fill-height? true))))
 
 (defn- trade-chart-loading-shell
   [state]
@@ -574,7 +590,9 @@
      (when (and desktop-layout?
                 (:order-entry-panel-visible? layout))
       (if desktop-secondary-panels-ready?
-        (render-account-equity-panel-state account-equity-panel-state equity-metrics {})
+        (or (render-account-equity-panel-state account-equity-panel-state equity-metrics {})
+            (desktop-secondary-panel-placeholder "Account Equity"
+                                                 "trade-desktop-account-equity-placeholder"))
         (desktop-secondary-panel-placeholder "Account Equity"
                                              "trade-desktop-account-equity-placeholder")))]])
 
@@ -589,14 +607,20 @@
           :data-parity-id "trade-mobile-account-panel"}
     (when (and (:account-panel-visible? layout)
                (not desktop-layout?))
-      (render-account-info-panel state))]
+      (or (render-account-info-panel state)
+          (desktop-secondary-panel-placeholder "Account"
+                                               "trade-mobile-account-panel-placeholder"
+                                               :fill-height? true)))]
    [:div {:class ["hidden" "w-full" "min-h-0" "lg:flex"]
           :data-parity-id "trade-desktop-account-panel"}
     (when (and (:account-panel-visible? layout)
                desktop-layout?)
       (if desktop-secondary-panels-ready?
-        (render-account-info-panel-state account-info-panel-state
-                                         {:default-panel-classes ["h-full"]})
+        (or (render-account-info-panel-state account-info-panel-state
+                                             {:default-panel-classes ["h-full"]})
+            (desktop-secondary-panel-placeholder "Account"
+                                                 "trade-desktop-account-panel-placeholder"
+                                                 :fill-height? true))
         (desktop-secondary-panel-placeholder "Account"
                                              "trade-desktop-account-panel-placeholder"
                                              :fill-height? true)))]])

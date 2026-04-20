@@ -1,5 +1,6 @@
 (ns hyperopen.views.trade.test-support
-  (:require [hyperopen.state.trading :as trading]
+  (:require [hyperopen.surface-modules :as surface-modules]
+            [hyperopen.state.trading :as trading]
             [hyperopen.test-support.hiccup :as hiccup]
             [hyperopen.views.active-asset.test-support :as active-asset-support]))
 
@@ -141,3 +142,15 @@
 (defn with-visible-funding-tooltip
   [state coin]
   (active-asset-support/with-visible-funding-tooltip state coin))
+
+(defn account-surface-export-resolver
+  [exports]
+  (fn [surface-id export-id]
+    (when (= :account-surfaces surface-id)
+      (get exports export-id))))
+
+(defn with-account-surface-exports
+  [exports f]
+  (with-redefs [surface-modules/resolved-surface-export
+                (account-surface-export-resolver exports)]
+    (f)))

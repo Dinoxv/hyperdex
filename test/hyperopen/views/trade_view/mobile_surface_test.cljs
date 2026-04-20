@@ -1,6 +1,8 @@
 (ns hyperopen.views.trade-view.mobile-surface-test
   (:require [clojure.string :as str]
             [cljs.test :refer-macros [deftest is]]
+            [hyperopen.views.account-equity-view :as account-equity-view]
+            [hyperopen.views.account-info-view :as account-info-view]
             [hyperopen.views.trade-view :as trade-view]
             [hyperopen.views.trade.test-support :as support]))
 
@@ -48,7 +50,13 @@
   (support/with-viewport-width
     430
     (fn []
-      (let [chart-view (trade-view/trade-view (support/base-state))
+      (support/with-account-surface-exports
+       {:account-info-view account-info-view/account-info-view
+        :account-equity-metrics account-equity-view/account-equity-metrics
+        :account-equity-view account-equity-view/account-equity-view
+        :funding-actions-view account-equity-view/funding-actions-view}
+       (fn []
+        (let [chart-view (trade-view/trade-view (support/base-state))
             chart-account-panel (support/find-by-parity-id chart-view "trade-account-tables-panel")
             chart-classes (support/node-class-set chart-account-panel)
             chart-account-text (set (support/collect-strings chart-account-panel))
@@ -115,7 +123,7 @@
         (is (contains? account-mobile-text "Withdraw"))
         (is (not (some #(str/starts-with? % "Balances") account-mobile-text)))
         (is (not (some #(str/starts-with? % "Open Orders") account-mobile-text)))
-        (is (not (contains? account-mobile-text "Trade History")))))))
+        (is (not (contains? account-mobile-text "Trade History")))))))))
 
 (deftest trade-view-primary-mobile-tabs-route-to-market-surfaces-test
   (let [view-node (trade-view/trade-view (support/base-state))
@@ -168,7 +176,26 @@
             account-info-calls (atom 0)
             equity-metrics-calls (atom 0)
             account-equity-calls (atom 0)]
-        (with-redefs [hyperopen.views.active-asset-view/active-asset-view (fn [_state]
+        (with-redefs [hyperopen.surface-modules/resolved-surface-export
+                      (support/account-surface-export-resolver
+                       {:account-info-view (fn
+                                             ([_state]
+                                              (swap! account-info-calls inc)
+                                              [:div {:data-role "stub-account-info"}])
+                                             ([_state _options]
+                                              (swap! account-info-calls inc)
+                                              [:div {:data-role "stub-account-info"}]))
+                        :account-equity-metrics (fn [_state]
+                                                  (swap! equity-metrics-calls inc)
+                                                  {:account-value-display 12})
+                        :account-equity-view (fn
+                                               ([_state]
+                                                (swap! account-equity-calls inc)
+                                                [:div {:data-role "stub-account-equity"}])
+                                               ([_state _opts]
+                                                (swap! account-equity-calls inc)
+                                                [:div {:data-role "stub-account-equity"}]))})
+                      hyperopen.views.active-asset-view/active-asset-view (fn [_state]
                                                                             (swap! active-asset-calls inc)
                                                                             [:div {:data-role "stub-active-asset"}])
                       hyperopen.trade-modules/render-trade-chart-view (fn [_state]

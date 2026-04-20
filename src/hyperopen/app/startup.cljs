@@ -10,6 +10,7 @@
             [hyperopen.route-query-state :as route-query-state]
             [hyperopen.route-modules :as route-modules]
             [hyperopen.router :as router]
+            [hyperopen.surface-modules :as surface-modules]
             [hyperopen.runtime.action-adapters :as runtime-action-adapters]
             [hyperopen.runtime.effect-adapters :as runtime-effect-adapters]
             [hyperopen.runtime.state :as runtime-state]
@@ -166,9 +167,11 @@
   ([state path]
    (route-change-effects state path {}))
   ([state path {:keys [defer-trade-chart?
-                       defer-trading-indicators?]
+                       defer-trading-indicators?
+                       defer-account-surfaces?]
                 :or {defer-trade-chart? false
-                     defer-trading-indicators? false}}]
+                     defer-trading-indicators? false
+                     defer-account-surfaces? false}}]
    (let [normalized-path (router/normalize-path path)
          state* (assoc-in state [:router :path] normalized-path)]
      (into (cond-> []
@@ -186,7 +189,13 @@
                   (seq (get-in state [:chart-options :active-indicators]))
                   (not (trading-indicators-modules/trading-indicators-ready? state))
                   (not (trading-indicators-modules/trading-indicators-loading? state)))
-             (conj [:effects/load-trading-indicators-module]))
+             (conj [:effects/load-trading-indicators-module])
+
+             (and (not defer-account-surfaces?)
+                  (router/trade-route? normalized-path)
+                  (not (surface-modules/surface-ready? state :account-surfaces))
+                  (not (surface-modules/surface-loading? state :account-surfaces)))
+             (conj [:effects/load-surface-module :account-surfaces]))
            (route-refresh/current-route-refresh-effects state* nil)))))
 
 (defn- post-render-route-effects
@@ -202,7 +211,12 @@
            (seq (get-in state [:chart-options :active-indicators]))
            (not (trading-indicators-modules/trading-indicators-ready? state))
            (not (trading-indicators-modules/trading-indicators-loading? state)))
-      (conj [:effects/load-trading-indicators-module]))))
+      (conj [:effects/load-trading-indicators-module])
+
+      (and (router/trade-route? normalized-path)
+           (not (surface-modules/surface-ready? state :account-surfaces))
+           (not (surface-modules/surface-loading? state :account-surfaces)))
+      (conj [:effects/load-surface-module :account-surfaces]))))
 
 (defn- mark-post-render-trade-secondary-panels-ready!
   [store]
@@ -218,7 +232,8 @@
                      @startup-store
                      path
                      {:defer-trade-chart? @defer-initial-trade-module-loads?*
-                      :defer-trading-indicators? @defer-initial-trade-module-loads?*})]
+                      :defer-trading-indicators? @defer-initial-trade-module-loads?*
+                      :defer-account-surfaces? @defer-initial-trade-module-loads?*})]
         (reset! defer-initial-trade-module-loads?* false)
         (when (seq effects)
           (nxr/dispatch startup-store nil effects))))))

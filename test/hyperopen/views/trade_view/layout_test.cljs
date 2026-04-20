@@ -1,5 +1,6 @@
 (ns hyperopen.views.trade-view.layout-test
   (:require [cljs.test :refer-macros [deftest is]]
+            [hyperopen.views.account-info-view :as account-info-view]
             [hyperopen.views.trade-view.layout-state :as layout-state]
             [hyperopen.views.trade-view :as trade-view]
             [hyperopen.views.trade.test-support :as support]))
@@ -82,14 +83,17 @@
                        :trade-history
                        :funding-history
                        :order-history]
-        account-table-nodes (mapv (fn [tab]
-                                    (support/find-by-parity-id
-                                     (trade-view/trade-view
-                                      (assoc-in (support/base-state)
-                                                [:account-info :selected-tab]
-                                                tab))
-                                     "account-tables"))
-                                  standard-tabs)
+        account-table-nodes (support/with-account-surface-exports
+                              {:account-info-view account-info-view/account-info-view}
+                              (fn []
+                                (mapv (fn [tab]
+                                        (support/find-by-parity-id
+                                         (trade-view/trade-view
+                                          (assoc-in (support/base-state)
+                                                    [:account-info :selected-tab]
+                                                    tab))
+                                         "account-tables"))
+                                      standard-tabs)))
         class-sets (mapv support/node-class-set account-table-nodes)
         reference-classes (first class-sets)]
     (is (every? some? account-table-nodes))
