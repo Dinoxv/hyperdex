@@ -292,6 +292,10 @@
     (trading-api/set-debug-exchange-simulator! config*)
     (clj->js (trading-api/debug-exchange-simulator-snapshot))))
 
+(defn exchange-simulator-snapshot
+  []
+  (clj->js (trading-api/debug-exchange-simulator-snapshot)))
+
 (defn clear-exchange-simulator!
   []
   (trading-api/clear-debug-exchange-simulator!)

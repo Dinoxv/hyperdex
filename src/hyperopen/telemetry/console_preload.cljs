@@ -498,8 +498,7 @@
        :snapshotJson snapshot-json
        :qaSnapshotJson qa-snapshot-json
        :downloadSnapshot download-snapshot!
-       :registeredActionIds (fn []
-                              (clj->js (registered-action-id-strings)))
+       :registeredActionIds #(clj->js (registered-action-id-strings))
        :dispatch dispatch-debug-action!
        :dispatchMany dispatch-debug-actions!
        :waitForIdle wait-for-idle
@@ -517,6 +516,7 @@
        :walletSimulatorEmit simulators/emit-wallet-simulator!
        :clearWalletSimulator simulators/clear-wallet-simulator!
        :installExchangeSimulator simulators/install-exchange-simulator!
+       :exchangeSimulatorSnapshot simulators/exchange-simulator-snapshot
        :clearExchangeSimulator simulators/clear-exchange-simulator!
        :flightRecording (fn []
                           (clj->js (ws-client/get-flight-recording)))

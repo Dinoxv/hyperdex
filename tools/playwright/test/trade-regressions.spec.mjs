@@ -346,7 +346,52 @@ async function seedFundingTooltipLivePositionState(
   await dispatch(page, [":actions/reset-funding-hypothetical-position", position.coin]);
   await waitForIdle(page, { quietMs: 250, timeoutMs: 6_000, pollMs: 50 });
 
-  await page.evaluate(({ nextPosition, nextMark, nextFundingRate }) => {
+  const applySeed = async () => {
+    await page.evaluate(({ nextPosition, nextMark, nextFundingRate }) => {
+      const c = globalThis.cljs?.core;
+      const store = globalThis.hyperopen?.system?.store;
+
+      if (!c || !store) {
+        throw new Error("Hyperopen store or cljs core unavailable");
+      }
+
+      const keyword = c.keyword;
+      const kwPath = (...segments) =>
+        c.PersistentVector.fromArray(segments.map((segment) => keyword(segment)), true);
+      const opts = c.PersistentArrayMap.fromArray([keyword("keywordize-keys"), true], true);
+      const nextWebdata2 = c.js__GT_clj(
+        {
+          clearinghouseState: {
+            assetPositions: [nextPosition]
+          }
+        },
+        opts
+      );
+      let nextState = c.deref(store);
+      const nextMarket = c.PersistentArrayMap.fromArray(
+        [
+          keyword("key"), `perp:${nextPosition.coin}`,
+          keyword("coin"), nextPosition.coin,
+          keyword("symbol"), nextPosition.coin,
+          keyword("market-type"), keyword("perp"),
+          keyword("mark"), nextMark,
+          keyword("markRaw"), nextMark,
+          keyword("fundingRate"), nextFundingRate,
+          keyword("szDecimals"), 4,
+          keyword("maxLeverage"), 20
+        ],
+        true
+      );
+
+      nextState = c.assoc_in(nextState, kwPath("active-asset"), nextPosition.coin);
+      nextState = c.assoc_in(nextState, kwPath("active-market"), nextMarket);
+      nextState = c.assoc_in(nextState, kwPath("webdata2"), nextWebdata2);
+
+      c.reset_BANG_(store, nextState);
+    }, { nextPosition: position, nextMark: mark, nextFundingRate: fundingRate });
+  };
+
+  const livePositionIsSeeded = async () => page.evaluate(({ coin, szi }) => {
     const c = globalThis.cljs?.core;
     const store = globalThis.hyperopen?.system?.store;
 
@@ -355,39 +400,30 @@ async function seedFundingTooltipLivePositionState(
     }
 
     const keyword = c.keyword;
-    const kwPath = (...segments) =>
-      c.PersistentVector.fromArray(segments.map((segment) => keyword(segment)), true);
-    const opts = c.PersistentArrayMap.fromArray([keyword("keywordize-keys"), true], true);
-    const nextWebdata2 = c.js__GT_clj(
-      {
-        clearinghouseState: {
-          assetPositions: [nextPosition]
-        }
-      },
-      opts
-    );
-    let nextState = c.deref(store);
-    const nextMarket = c.PersistentArrayMap.fromArray(
-      [
-        keyword("key"), `perp:${nextPosition.coin}`,
-        keyword("coin"), nextPosition.coin,
-        keyword("symbol"), nextPosition.coin,
-        keyword("market-type"), keyword("perp"),
-        keyword("mark"), nextMark,
-        keyword("markRaw"), nextMark,
-        keyword("fundingRate"), nextFundingRate,
-        keyword("szDecimals"), 4,
-        keyword("maxLeverage"), 20
-      ],
-      true
-    );
+    const state = c.deref(store);
+    const webdata2 = c.get(state, keyword("webdata2"));
+    const clearinghouseState = c.get(webdata2, keyword("clearinghouseState"));
+    const assetPositions = c.clj__GT_js(
+      c.get(clearinghouseState, keyword("assetPositions"))
+    ) || [];
+    const matchingPosition = assetPositions.find((entry) => {
+      const nextPosition = entry?.position ?? entry;
+      return nextPosition?.coin === coin && String(nextPosition?.szi) === String(szi);
+    });
 
-    nextState = c.assoc_in(nextState, kwPath("active-asset"), nextPosition.coin);
-    nextState = c.assoc_in(nextState, kwPath("active-market"), nextMarket);
-    nextState = c.assoc_in(nextState, kwPath("webdata2"), nextWebdata2);
+    return Boolean(matchingPosition);
+  }, { coin: position.coin, szi: position.szi });
 
-    c.reset_BANG_(store, nextState);
-  }, { nextPosition: position, nextMark: mark, nextFundingRate: fundingRate });
+  for (let attempt = 0; attempt < 3; attempt += 1) {
+    await applySeed();
+    await waitForIdle(page, { quietMs: 350, timeoutMs: 6_000, pollMs: 50 });
+
+    if (await livePositionIsSeeded()) {
+      return;
+    }
+  }
+
+  throw new Error(`Unable to stabilize funding tooltip live position for ${position.coin}`);
 }
 
 async function seedRememberedTradingSession(page, options = {}) {
@@ -513,38 +549,6 @@ async function setTradingConfirmations(page, { openOrders, closePosition } = {})
     await dispatch(page, [":actions/set-confirm-close-position-enabled", closePosition]);
   }
   await waitForIdle(page, { quietMs: 150, timeoutMs: 4_000, pollMs: 50 });
-}
-
-async function mockExchangeSuccess(page) {
-  const exchangeActionTypes = [];
-
-  await page.route("https://api.hyperliquid.xyz/exchange", async (route) => {
-    if (route.request().method() !== "POST") {
-      await route.continue();
-      return;
-    }
-
-    const postData = route.request().postData();
-    let payload = null;
-
-    try {
-      payload = postData ? JSON.parse(postData) : null;
-    } catch (_error) {
-      payload = null;
-    }
-
-    if (typeof payload?.action?.type === "string") {
-      exchangeActionTypes.push(payload.action.type);
-    }
-
-    await route.fulfill({
-      status: 200,
-      contentType: "application/json",
-      body: JSON.stringify({ status: "ok" })
-    });
-  });
-
-  return exchangeActionTypes;
 }
 
 async function installPasskeyLockboxMock(page) {
@@ -1783,7 +1787,10 @@ test.describe("funding tooltip mobile presentation @mobile", () => {
 
 test("wallet connect and enable trading stays deterministic @regression", async ({ page }) => {
   await visitRoute(page, "/trade");
-  const exchangeActionTypes = await mockExchangeSuccess(page);
+
+  await debugCall(page, "installExchangeSimulator", {
+    approveAgent: { responses: [{ status: "ok" }] }
+  });
 
   await debugCall(page, "installWalletSimulator", {
     accounts: ["0x1111111111111111111111111111111111111111"],
@@ -1807,7 +1814,20 @@ test("wallet connect and enable trading stays deterministic @regression", async 
     agentStatus: "ready",
     agentError: null
   });
-  expect(exchangeActionTypes).toContain("approveAgent");
+  const exchangeSnapshot = await debugCall(page, "exchangeSimulatorSnapshot");
+  expect(exchangeSnapshot.calls).toEqual(
+    expect.arrayContaining([
+      expect.objectContaining({
+        matchedPath: ["approveAgent"],
+        responseStatus: "ok"
+      }),
+      expect.objectContaining({
+        matchedPath: ["signedActions", "scheduleCancel"],
+        responseStatus: "ok",
+        defaulted: true
+      })
+    ])
+  );
   await expectOracle(
     page,
     "effect-order",

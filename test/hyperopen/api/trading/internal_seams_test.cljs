@@ -56,12 +56,53 @@
   (try
     (let [payload {:signedActions {:default {:responses [{:status "ok"}]}}}]
       (is (true? (trading/set-debug-exchange-simulator! payload)))
-      (is (= payload
+      (is (= {:installed true
+              :config payload
+              :calls []}
              (trading/debug-exchange-simulator-snapshot)))
       (is (true? (trading/clear-debug-exchange-simulator!)))
       (is (nil? (trading/debug-exchange-simulator-snapshot))))
     (finally
       (trading/clear-debug-exchange-simulator!))))
+
+(deftest debug-exchange-simulator-snapshot-records-approve-agent-consumption-test
+  (async done
+    (let [original-sign signing/sign-approve-agent-action!
+          action {:type "approveAgent"
+                  :agentAddress "0x9999999999999999999999999999999999999999"
+                  :nonce 1700000006666
+                  :hyperliquidChain "Mainnet"
+                  :signatureChainId "0x66eee"}]
+      (set! signing/sign-approve-agent-action!
+            (fn [_address _action]
+              (js/Promise.resolve
+               (clj->js {:r "0x1"
+                         :s "0x2"
+                         :v 27}))))
+      (trading/set-debug-exchange-simulator!
+       {:approveAgent {:responses [{:status "ok"}]}})
+      (-> (trading/approve-agent! (atom {}) support/owner-address action)
+          (.then (fn [resp]
+                   (-> (.json resp)
+                       (.then
+                        (fn [_body]
+                          (let [snapshot (trading/debug-exchange-simulator-snapshot)]
+                            (is (true? (:installed snapshot)))
+                            (is (= []
+                                   (get-in snapshot [:config :approveAgent :responses])))
+                            (is (= [{:paths [[:approveAgent]]
+                                     :matchedPath [:approveAgent]
+                                     :responseStatus "ok"
+                                     :remainingResponses 0}]
+                                   (:calls snapshot)))
+                            (done)))))))
+          (.catch (fn [err]
+                    (is false (str "Unexpected error: " err))
+                    (done)))
+          (.finally
+           (fn []
+             (trading/clear-debug-exchange-simulator!)
+             (set! signing/sign-approve-agent-action! original-sign)))))))
 
 (deftest parse-json-private-helper-parses-text-json-and-validates-contract-test
   (async done
@@ -169,6 +210,55 @@
               (done)))
            (fn []
              (restore-fetch!))))))))
+
+(deftest post-signed-action-private-helper-defaults-schedule-cancel-when-debug-simulator-installed-test
+  (async done
+    (let [fetch-called? (atom false)
+          restore-fetch! (support/install-fetch-stub!
+                          (fn [_url _opts]
+                            (reset! fetch-called? true)
+                            (js/Promise.resolve
+                             #js {:status 200
+                                  :json (fn []
+                                          (js/Promise.resolve
+                                           #js {:status "network"}))
+                                  :text (fn []
+                                          (js/Promise.resolve
+                                           "{\"status\":\"network\"}"))})))
+          action {:type "scheduleCancel"
+                  :time 1700000100000}
+          signature {:r "0x1"
+                     :s "0x2"
+                     :v 27}]
+      (trading/set-debug-exchange-simulator!
+       {:approveAgent {:responses []}})
+      (-> (@#'hyperopen.api.trading/post-signed-action!
+           action
+           1700000007777
+           signature)
+          (.then (fn [resp]
+                   (-> (.json resp)
+                       (.then
+                        (fn [body]
+                          (let [snapshot (trading/debug-exchange-simulator-snapshot)]
+                            (is (false? @fetch-called?))
+                            (is (= {:status "ok"}
+                                   (js->clj body :keywordize-keys true)))
+                            (is (= [{:paths [[:signedActions "scheduleCancel"]
+                                             [:signedActions :default]]
+                                     :matchedPath [:signedActions "scheduleCancel"]
+                                     :responseStatus "ok"
+                                     :remainingResponses nil
+                                     :defaulted true}]
+                                   (:calls snapshot)))
+                            (done)))))))
+          (.catch (fn [err]
+                    (is false (str "Unexpected error: " err))
+                    (done)))
+          (.finally
+           (fn []
+             (trading/clear-debug-exchange-simulator!)
+             (restore-fetch!)))))))
 
 (deftest post-signed-action-private-helper-preserves-safe-integer-nonce-test
   (async done

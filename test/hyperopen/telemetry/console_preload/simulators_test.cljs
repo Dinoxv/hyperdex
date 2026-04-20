@@ -303,18 +303,18 @@
       (finally
         (cleanup-simulator-state! browser-state)))))
 
-(deftest install-exchange-simulator-normalizes-js-object-config-test
-  (let [set-calls (atom [])
-        snapshot {:installed true
-                  :fills ["ok"]}]
-    (with-redefs [trading-api/set-debug-exchange-simulator! (fn [config]
-                                                              (swap! set-calls conj config))
-                  trading-api/debug-exchange-simulator-snapshot (fn []
-                                                                  snapshot)]
-      (let [result (js->clj (simulators/install-exchange-simulator! #js {:fills #js ["ok"]})
-                            :keywordize-keys true)]
-        (is (= [{:fills ["ok"]}] @set-calls))
-        (is (= snapshot result))))))
+(deftest install-exchange-simulator-normalizes-js-object-config-and-returns-diagnostics-test
+  (try
+    (let [result (js->clj (simulators/install-exchange-simulator! #js {:fills #js ["ok"]})
+                          :keywordize-keys true)]
+      (is (= {:installed true
+              :config {:fills ["ok"]}
+              :calls []}
+             result))
+      (is (= result
+             (trading-api/debug-exchange-simulator-snapshot))))
+    (finally
+      (simulators/clear-exchange-simulator!))))
 
 (deftest qa-reset-clears-runtime-traces-simulators-events-flight-recording-and-handler-suppression-test
   (let [browser-state (capture-browser-state)
