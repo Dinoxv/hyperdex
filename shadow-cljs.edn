@@ -22,6 +22,10 @@
                                 :depends-on #{:main}}
                   :trading_indicators {:entries [hyperopen.views.trading-chart.indicators-module]
                                        :depends-on #{:trade_chart}}
+                  :funding_modal {:entries [hyperopen.views.funding-modal-module]
+                                  :depends-on #{:main}}
+                  :spectate_mode_modal {:entries [hyperopen.views.spectate-mode-modal-module]
+                                        :depends-on #{:main}}
                   :portfolio_route {:entries [hyperopen.views.portfolio-view]
                                     :depends-on #{:main}}
                   :leaderboard_route {:entries [hyperopen.views.leaderboard-view]
@@ -105,6 +109,10 @@
                                     :depends-on #{:main}}
                       :trading_indicators {:entries [hyperopen.views.trading-chart.indicators-module]
                                            :depends-on #{:trade_chart}}
+                      :funding_modal {:entries [hyperopen.views.funding-modal-module]
+                                      :depends-on #{:main}}
+                      :spectate_mode_modal {:entries [hyperopen.views.spectate-mode-modal-module]
+                                            :depends-on #{:main}}
                       :portfolio_route {:entries [hyperopen.views.portfolio-view]
                                         :depends-on #{:main}}
                       :leaderboard_route {:entries [hyperopen.views.leaderboard-view]

@@ -1,8 +1,8 @@
 (ns hyperopen.views.app-view-test
-  (:require [clojure.string :as str]
-            [cljs.test :refer-macros [deftest is]]
+  (:require [cljs.test :refer-macros [deftest is]]
             [hyperopen.account.context :as account-context]
             [hyperopen.route-modules :as route-modules]
+            [hyperopen.surface-modules :as surface-modules]
             [hyperopen.state.trading :as trading]
             [hyperopen.test-support.hiccup :as hiccup]
             [hyperopen.views.app-view :as app-view]))
@@ -440,53 +440,41 @@
     (is (nil? banner-node))
     (is (some? portfolio-root))))
 
-(deftest app-view-renders-spectate-mode-modal-and-stop-control-when-open-and-active-test
+(deftest app-view-renders-spectate-mode-modal-through-surface-module-loader-test
   (let [address "0xabcdefabcdefabcdefabcdefabcdefabcdefabcd"
         label "The Assistance Fund"
-        view-node (app-view/app-view (assoc (base-state)
-                                            :router {:path "/trade"}
-                                            :wallet {:copy-feedback {:kind :success
-                                                                     :message "Spectate link copied to clipboard"}}
-                                            :account-context {:spectate-mode {:active? true
-                                                                              :address address}
-                                                              :spectate-ui {:modal-open? true
-                                                                            :search address
-                                                                            :label ""
-                                                                            :search-error nil}
-                                                              :watchlist [{:address address
-                                                                           :label label}]}))
-        modal-root (hiccup/find-by-data-role view-node "spectate-mode-modal-root")
-        watchlist-row (hiccup/find-by-data-role view-node "spectate-mode-watchlist-row")
-        watchlist-label (hiccup/find-by-data-role view-node "spectate-mode-watchlist-label")
-        close-button (hiccup/find-by-data-role view-node "spectate-mode-close")
-        stop-button (hiccup/find-by-data-role view-node "spectate-mode-stop")
-        copy-button (hiccup/find-by-data-role view-node "spectate-mode-watchlist-copy")
-        edit-button (hiccup/find-by-data-role view-node "spectate-mode-watchlist-edit")
-        link-button (hiccup/find-by-data-role view-node "spectate-mode-watchlist-link")
-        copy-feedback-row (hiccup/find-by-data-role view-node "spectate-mode-copy-feedback")
-        rendered-strings (set (hiccup/collect-strings modal-root))]
-    (is (some? modal-root))
-    (is (some? watchlist-row))
-    (is (some? watchlist-label))
-    (is (some? close-button))
-    (is (contains? (set (hiccup/collect-strings modal-root)) "Spectate Mode"))
-    (is (contains? (set (hiccup/collect-strings modal-root)) "Currently spectating: "))
-    (is (contains? rendered-strings address))
-    (is (contains? rendered-strings label))
-    (is (contains? rendered-strings "Spectate link copied to clipboard"))
-    (is (some? copy-feedback-row))
-    (is (not-any? #(str/starts-with? % "[[:li")
-                  rendered-strings))
-    (is (= [[:actions/close-spectate-mode-modal]]
-           (get-in close-button [1 :on :click])))
-    (is (= [[:actions/stop-spectate-mode]]
-           (get-in stop-button [1 :on :click])))
-    (is (= [[:actions/copy-spectate-mode-watchlist-address address]]
-           (get-in copy-button [1 :on :click])))
-    (is (= [[:actions/edit-spectate-mode-watchlist-address address]]
-           (get-in edit-button [1 :on :click])))
-    (is (= [[:actions/copy-spectate-mode-watchlist-link address]]
-           (get-in link-button [1 :on :click])))))
+        rendered-surface-ids (atom [])
+        view-node (with-redefs [surface-modules/render-surface-view
+                                (fn [state* surface-id]
+                                  (swap! rendered-surface-ids conj surface-id)
+                                  (when (= :spectate-mode-modal surface-id)
+                                    (is (= address
+                                           (get-in state* [:account-context :spectate-ui :search])))
+                                    (is (= label
+                                           (get-in state* [:account-context :watchlist 0 :label])))
+                                    [:div {:data-role "spectate-mode-lazy-surface"}
+                                     "Spectate modal loaded from surface module"]))]
+                    (app-view/app-view (assoc (base-state)
+                                              :router {:path "/trade"}
+                                              :wallet {:copy-feedback {:kind :success
+                                                                       :message "Spectate link copied to clipboard"}}
+                                              :account-context {:spectate-mode {:active? true
+                                                                                :address address}
+                                                                :spectate-ui {:modal-open? true
+                                                                              :search address
+                                                                              :label ""
+                                                                              :search-error nil}
+                                                                :watchlist [{:address address
+                                                                             :label label}]})))
+        lazy-surface (hiccup/find-by-data-role view-node "spectate-mode-lazy-surface")
+        direct-modal-root (hiccup/find-by-data-role view-node "spectate-mode-modal-root")]
+    (is (= {:surface-requested? true
+            :lazy-surface-rendered? true
+            :direct-modal-rendered? false}
+           {:surface-requested? (contains? (set @rendered-surface-ids)
+                                           :spectate-mode-modal)
+            :lazy-surface-rendered? (some? lazy-surface)
+            :direct-modal-rendered? (some? direct-modal-root)}))))
 
 (deftest app-view-renders-order-submit-confirmation-modal-when-open-test
   (let [view-node (app-view/app-view (assoc (base-state)

@@ -120,7 +120,8 @@
   (let [{search* :search
          label* :label} (spectate-mode-modal-prefill state)
         anchor* (normalize-anchor trigger-bounds)]
-    [[:effects/save-many [[[:account-context :spectate-ui :modal-open?] true]
+    [[:effects/load-surface-module :spectate-mode-modal]
+     [:effects/save-many [[[:account-context :spectate-ui :modal-open?] true]
                           [[:account-context :spectate-ui :anchor] anchor*]
                           [[:account-context :spectate-ui :search] search*]
                           [[:account-context :spectate-ui :label] label*]

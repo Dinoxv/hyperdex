@@ -16,6 +16,7 @@
             [hyperopen.runtime.effect-adapters.websocket :as ws-adapters]
             [hyperopen.startup.runtime :as startup-runtime]
             [hyperopen.route-modules :as route-modules]
+            [hyperopen.surface-modules :as surface-modules]
             [hyperopen.trade-modules :as trade-modules]
             [hyperopen.trading-crypto-modules :as trading-crypto-modules]
             [hyperopen.trading-indicators-modules :as trading-indicators-modules]
@@ -80,6 +81,10 @@
 (defn load-route-module-effect
   [_ store path]
   (route-modules/load-route-module! store path))
+
+(defn load-surface-module-effect
+  [_ store surface-id]
+  (surface-modules/load-surface-module! store surface-id))
 
 (defn load-trade-chart-module-effect
   [_ store]

@@ -12,6 +12,9 @@
 (def ^:private secondary-address
   "0x1111111111111111111111111111111111111111")
 
+(def ^:private spectate-mode-modal-surface-load-effect
+  [:effects/load-surface-module :spectate-mode-modal])
+
 (deftest open-spectate-mode-modal-prefills-active-address-and-stores-anchor-test
   (let [state {:wallet {:address owner-address}
                :account-context {:spectate-mode {:active? true
@@ -20,7 +23,8 @@
                                               :label "Assistance"}]
                                  :spectate-ui {:search "0xdeadbeef"
                                             :label "Old"}}}]
-    (is (= [[:effects/save-many [[[:account-context :spectate-ui :modal-open?] true]
+    (is (= [spectate-mode-modal-surface-load-effect
+            [:effects/save-many [[[:account-context :spectate-ui :modal-open?] true]
                                  [[:account-context :spectate-ui :anchor] {:left 100
                                                                         :right 180
                                                                         :top 18

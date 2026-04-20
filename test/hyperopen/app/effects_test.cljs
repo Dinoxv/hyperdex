@@ -52,6 +52,7 @@
                         (get-in deps [:asset-selector :sync-asset-selector-active-ctx-subscriptions])))
         (is (identical? effect-adapters/replace-shareable-route-query
                         (get-in deps [:navigation :replace-shareable-route-query])))
+        (is (fn? (get-in deps [:navigation :load-surface-module])))
         (is (identical? refresh-handler
                         (get-in deps [:websocket :refresh-websocket-health])))
         (is (identical? disconnect-handler

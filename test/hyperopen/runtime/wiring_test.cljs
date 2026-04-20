@@ -25,6 +25,7 @@
                     (get-in deps [:asset-selector :sync-asset-selector-active-ctx-subscriptions])))
     (is (identical? effect-adapters/load-trading-indicators-module-effect
                     (get-in deps [:navigation :load-trading-indicators-module])))
+    (is (fn? (get-in deps [:navigation :load-surface-module])))
     (is (identical? effect-adapters/replace-shareable-route-query
                     (get-in deps [:navigation :replace-shareable-route-query])))
     (is (identical? effect-adapters/fetch-candle-snapshot
@@ -74,7 +75,8 @@
     (is (identical? action-adapters/navigate
                     (get-in deps [:action-handlers :navigate])))
     (is (identical? effect-adapters/save
-                    (get-in deps [:effect-handlers :save])))))
+                    (get-in deps [:effect-handlers :save])))
+    (is (fn? (get-in deps [:effect-handlers :load-surface-module])))))
 
 (deftest runtime-action-deps-cover-catalog-handler-keys-test
   (let [action-deps (wiring/runtime-action-deps)

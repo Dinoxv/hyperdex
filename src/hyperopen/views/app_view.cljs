@@ -4,12 +4,11 @@
             [hyperopen.route-modules :as route-modules]
             [hyperopen.router :as router]
             [hyperopen.staking.actions :as staking-actions]
+            [hyperopen.surface-modules :as surface-modules]
             [hyperopen.trade.layout-actions :as trade-layout-actions]
             [hyperopen.vaults.infrastructure.routes :as vault-routes]
             [hyperopen.views.agent-trading-recovery-modal :as agent-trading-recovery-modal]
-            [hyperopen.views.funding-modal :as funding-modal]
             [hyperopen.views.footer-view :as footer-view]
-            [hyperopen.views.spectate-mode-modal :as spectate-mode-modal]
             [hyperopen.views.header-view :as header-view]
             [hyperopen.views.notifications-view :as notifications-view]
             [hyperopen.views.order-submit-confirmation-modal :as order-submit-confirmation-modal]
@@ -177,8 +176,8 @@
             (deferred-route-loading-shell state route))
         deferred-route? (deferred-route-loading-shell state route)
         :else (trade-view/trade-view state))]
-     (funding-modal/funding-modal-view state)
-     (spectate-mode-modal/spectate-mode-modal-view state)
+     (surface-modules/render-surface-view state :funding-modal)
+     (surface-modules/render-surface-view state :spectate-mode-modal)
      (agent-trading-recovery-modal/agent-trading-recovery-modal-view state)
      (order-submit-confirmation-modal/order-submit-confirmation-modal-view state)
      (notifications-view/notifications-view state)

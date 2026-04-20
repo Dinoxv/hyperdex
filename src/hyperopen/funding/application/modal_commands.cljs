@@ -37,7 +37,8 @@
    opener-data-role]
   (let [base (modal-state state)
         anchor* (normalize-anchor anchor)]
-    [[:effects/save funding-modal-path
+    [[:effects/load-surface-module :funding-modal]
+     [:effects/save funding-modal-path
       (-> (default-funding-modal-state)
           (assoc :open? true
                  :mode :deposit
@@ -54,7 +55,6 @@
                                         ""))
           (modal-state/with-open-focus-metadata base opener-data-role))]
      [:effects/api-fetch-hyperunit-fee-estimate]]))
-
 (defn open-funding-send-modal
   [{:keys [modal-state
            normalize-anchor
@@ -71,7 +71,8 @@
         send-modal-state (normalize-send-context {:non-blank-text non-blank-text
                                                   :parse-num parse-num}
                                                  send-context)]
-    [[:effects/save funding-modal-path
+    [[:effects/load-surface-module :funding-modal]
+     [:effects/save funding-modal-path
       (-> (default-funding-modal-state)
           (assoc :open? true
                  :mode :send
@@ -79,7 +80,6 @@
                  :destination-input "")
           (merge send-modal-state)
           (modal-state/with-open-focus-metadata base opener-data-role))]]))
-
 (defn open-funding-transfer-modal
   [{:keys [modal-state
            normalize-anchor
@@ -91,7 +91,8 @@
    opener-data-role]
   (let [base (modal-state state)
         anchor* (normalize-anchor anchor)]
-    [[:effects/save funding-modal-path
+    [[:effects/load-surface-module :funding-modal]
+     [:effects/save funding-modal-path
       (-> (default-funding-modal-state)
           (assoc :open? true
                  :mode :transfer
@@ -101,7 +102,6 @@
                  :to-perp? true
                  :destination-input (or (wallet-address state) ""))
           (modal-state/with-open-focus-metadata base opener-data-role))]]))
-
 (defn open-funding-withdraw-modal
   [{:keys [modal-state
            normalize-anchor
@@ -119,7 +119,8 @@
         selected-asset-key (or (normalize-withdraw-asset-key
                                 (:withdraw-selected-asset-key base))
                                withdraw-default-asset-key)]
-    [[:effects/save funding-modal-path
+    [[:effects/load-surface-module :funding-modal]
+     [:effects/save funding-modal-path
       (-> (default-funding-modal-state)
           (assoc :open? true
                  :mode :withdraw
@@ -131,7 +132,6 @@
           (modal-state/with-open-focus-metadata base opener-data-role))]
      [:effects/api-fetch-hyperunit-withdrawal-queue]
      [:effects/api-fetch-hyperunit-fee-estimate]]))
-
 (defn open-legacy-funding-modal
   [{:keys [default-funding-modal-state
            wallet-address
@@ -141,7 +141,8 @@
   (let [legacy* (if (keyword? legacy-kind)
                   legacy-kind
                   (keyword (str/lower-case (str (or legacy-kind "unknown")))))]
-    [[:effects/save funding-modal-path
+    [[:effects/load-surface-module :funding-modal]
+     [:effects/save funding-modal-path
       (-> (default-funding-modal-state)
           (assoc :open? true
                  :mode :legacy

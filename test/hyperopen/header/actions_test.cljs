@@ -40,23 +40,16 @@
         effects (actions/open-spectate-mode-mobile-header-menu
                  {:account-context {:spectate-ui {}
                                     :watchlist []}}
-                 bounds)
-        first-effect (first effects)
-        second-effect (second effects)
-        saved-path-values (second second-effect)]
-    (is (= [:effects/save [:header-ui :mobile-menu-open?] false]
-           first-effect))
-    (is (= :effects/save-many (first second-effect)))
-    (is (= true
-           (some (fn [[path value]]
-                   (and (= path [:account-context :spectate-ui :modal-open?])
-                        (= true value)))
-                 saved-path-values)))
-    (is (= bounds
-           (some (fn [[path value]]
-                   (when (= path [:account-context :spectate-ui :anchor])
-                     value))
-                 saved-path-values)))))
+                 bounds)]
+    (is (= [[:effects/save [:header-ui :mobile-menu-open?] false]
+            [:effects/load-surface-module :spectate-mode-modal]
+            [:effects/save-many [[[:account-context :spectate-ui :modal-open?] true]
+                                 [[:account-context :spectate-ui :anchor] bounds]
+                                 [[:account-context :spectate-ui :search] ""]
+                                 [[:account-context :spectate-ui :label] ""]
+                                 [[:account-context :spectate-ui :editing-watchlist-address] nil]
+                                 [[:account-context :spectate-ui :search-error] nil]]]]
+           effects))))
 
 (deftest header-settings-open-and-close-actions-save-deterministic-state-test
   (let [open-action (resolve-action 'open-header-settings)

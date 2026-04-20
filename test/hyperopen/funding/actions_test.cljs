@@ -12,6 +12,9 @@
                                                    :totalMarginUsed "11.5"}}}
    :funding-ui {:modal (funding-actions/default-funding-modal-state)}})
 
+(def ^:private funding-modal-surface-load-effect
+  [:effects/load-surface-module :funding-modal])
+
 (defn- expected-open-modal
   [mode & {:keys [legacy-kind] :or {legacy-kind nil}}]
   {:open? true
@@ -48,7 +51,8 @@
 
 (deftest open-funding-modal-actions-set-mode-and-open-state-test
   (let [state (base-state)]
-    (is (= [[:effects/save [:funding-ui :modal]
+    (is (= [funding-modal-surface-load-effect
+            [:effects/save [:funding-ui :modal]
              (assoc (expected-open-modal :send)
                     :destination-input ""
                     :send-token "xyz:GOLD"
@@ -64,14 +68,17 @@
                                                     :max-amount "4.25"
                                                     :max-display "4.250000"
                                                     :max-input "4.250000"})))
-    (is (= [[:effects/save [:funding-ui :modal]
+    (is (= [funding-modal-surface-load-effect
+            [:effects/save [:funding-ui :modal]
              (expected-open-modal :deposit)]
             [:effects/api-fetch-hyperunit-fee-estimate]]
            (funding-actions/open-funding-deposit-modal state)))
-    (is (= [[:effects/save [:funding-ui :modal]
+    (is (= [funding-modal-surface-load-effect
+            [:effects/save [:funding-ui :modal]
              (expected-open-modal :transfer)]]
            (funding-actions/open-funding-transfer-modal state)))
-    (is (= [[:effects/save [:funding-ui :modal]
+    (is (= [funding-modal-surface-load-effect
+            [:effects/save [:funding-ui :modal]
              (expected-open-modal :withdraw)]
             [:effects/api-fetch-hyperunit-withdrawal-queue]
             [:effects/api-fetch-hyperunit-fee-estimate]]
@@ -87,7 +94,8 @@
                 :height "34"
                 :viewport-width 1600
                 :viewport-height "900"}]
-    (is (= [[:effects/save [:funding-ui :modal]
+    (is (= [funding-modal-surface-load-effect
+            [:effects/save [:funding-ui :modal]
              (assoc (expected-open-modal :deposit)
                     :anchor {:left 940
                              :right 1220
@@ -110,7 +118,8 @@
                     :height "40"
                     "viewport-width" 430
                     "viewport-height" "932"}]
-    (is (= [[:effects/save [:funding-ui :modal]
+    (is (= [funding-modal-surface-load-effect
+            [:effects/save [:funding-ui :modal]
              (assoc (expected-open-modal :send)
                     :destination-input ""
                     :anchor {:left 16
@@ -119,8 +128,8 @@
                              :bottom 800
                              :width 398
                              :height 40
-                    :viewport-width 430
-                    :viewport-height 932})]]
+                             :viewport-width 430
+                             :viewport-height 932})]]
            (funding-actions/open-funding-send-modal state nil anchor)))))
 
 (deftest close-funding-modal-resets-state-and-restores-focus-test
@@ -140,12 +149,14 @@
 
 (deftest open-funding-modal-actions-store-opener-data-role-test
   (let [state (base-state)]
-    (is (= [[:effects/save [:funding-ui :modal]
+    (is (= [funding-modal-surface-load-effect
+            [:effects/save [:funding-ui :modal]
              (assoc (expected-open-modal :deposit)
                     :opener-data-role "funding-action-deposit")]
             [:effects/api-fetch-hyperunit-fee-estimate]]
            (funding-actions/open-funding-deposit-modal state nil "funding-action-deposit")))
-    (is (= [[:effects/save [:funding-ui :modal]
+    (is (= [funding-modal-surface-load-effect
+            [:effects/save [:funding-ui :modal]
              (assoc (expected-open-modal :send)
                     :destination-input ""
                     :opener-data-role "portfolio-action-send")]]
@@ -153,11 +164,13 @@
 
 (deftest set-funding-modal-compat-preserves-legacy-fallback-test
   (let [state (base-state)]
-    (is (= [[:effects/save [:funding-ui :modal]
+    (is (= [funding-modal-surface-load-effect
+            [:effects/save [:funding-ui :modal]
              (assoc (expected-open-modal :send)
                     :destination-input "")]]
            (funding-actions/set-funding-modal-compat state :send)))
-    (is (= [[:effects/save [:funding-ui :modal]
+    (is (= [funding-modal-surface-load-effect
+            [:effects/save [:funding-ui :modal]
              (expected-open-modal :legacy :legacy-kind :history)]]
            (funding-actions/set-funding-modal-compat state :history)))))
 

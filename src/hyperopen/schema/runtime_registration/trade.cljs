@@ -12,6 +12,7 @@
    [:effects/replace-state :replace-state]
    [:effects/replace-shareable-route-query :replace-shareable-route-query]
    [:effects/load-route-module :load-route-module]
+   [:effects/load-surface-module :load-surface-module]
    [:effects/load-trade-chart-module :load-trade-chart-module]
    [:effects/load-trading-indicators-module :load-trading-indicators-module]
    [:effects/fetch-asset-selector-markets :fetch-asset-selector-markets]

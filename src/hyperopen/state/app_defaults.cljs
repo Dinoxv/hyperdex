@@ -11,6 +11,7 @@
             [hyperopen.leaderboard.actions :as leaderboard-actions]
             [hyperopen.platform :as platform]
             [hyperopen.portfolio.actions :as portfolio-actions]
+            [hyperopen.surface-modules :as surface-modules]
             [hyperopen.trade-modules :as trade-modules]
             [hyperopen.trading-settings :as trading-settings]
             [hyperopen.vaults.application.transfer-state :as vault-transfer-state]
@@ -441,6 +442,7 @@
    :route-modules {:loaded #{}
                    :loading nil
                    :errors {}}
+   :surface-modules (surface-modules/default-state)
    :trade-modules (trade-modules/default-state)
    :order-form (or default-order-form {})
    :order-form-ui (or default-order-form-ui {})

@@ -22,7 +22,8 @@
            (compat/refresh-asset-markets state)))
     (is (= [[:effects/api-load-user-data "0xabc"]]
            (compat/load-user-data state "0xabc")))
-    (is (= [[:effects/save [:funding-ui :modal]
+    (is (= [[:effects/load-surface-module :funding-modal]
+            [:effects/save [:funding-ui :modal]
              {:open? true
               :mode :legacy
               :legacy-kind :history
