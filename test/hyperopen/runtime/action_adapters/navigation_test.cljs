@@ -6,6 +6,7 @@
             [hyperopen.runtime.action-adapters.navigation :as navigation-adapters]
             [hyperopen.runtime.effect-order-contract :as effect-order-contract]
             [hyperopen.staking.actions :as staking-actions]
+            [hyperopen.surface-modules :as surface-modules]
             [hyperopen.trade-modules :as trade-modules]
             [hyperopen.trading-indicators-modules :as trading-indicators-modules]
             [hyperopen.vaults.actions :as vault-actions]))
@@ -86,10 +87,13 @@
                 api-wallets-actions/load-api-wallet-route (fn [_state _path] [])
                 staking-actions/load-staking-route (fn [_state _path] [])
                 trade-modules/trade-chart-ready? (constantly false)
-                trade-modules/trade-chart-loading? (constantly false)]
+                trade-modules/trade-chart-loading? (constantly false)
+                surface-modules/surface-ready? (constantly false)
+                surface-modules/surface-loading? (constantly false)]
     (is (= [[:effects/save [:router :path] "/trade"]
             [:effects/push-state "/trade"]
-            [:effects/load-trade-chart-module]]
+            [:effects/load-trade-chart-module]
+            [:effects/load-surface-module :account-surfaces]]
            (navigation-adapters/navigate {} "/trade")))))
 
 (deftest navigate-trade-route-loads-indicator-runtime-when-active-indicators-exist-test
@@ -100,13 +104,42 @@
                 trade-modules/trade-chart-ready? (constantly false)
                 trade-modules/trade-chart-loading? (constantly false)
                 trading-indicators-modules/trading-indicators-ready? (constantly false)
-                trading-indicators-modules/trading-indicators-loading? (constantly false)]
+                trading-indicators-modules/trading-indicators-loading? (constantly false)
+                surface-modules/surface-ready? (constantly false)
+                surface-modules/surface-loading? (constantly false)]
     (is (= [[:effects/save [:router :path] "/trade"]
             [:effects/push-state "/trade"]
             [:effects/load-trade-chart-module]
-            [:effects/load-trading-indicators-module]]
+            [:effects/load-trading-indicators-module]
+            [:effects/load-surface-module :account-surfaces]]
            (navigation-adapters/navigate {:chart-options {:active-indicators {:sma {:period 20}}}}
                                          "/trade")))))
+
+(deftest navigate-trade-route-skips-account-surfaces-when-they-are-ready-or-loading-test
+  (with-redefs [vault-actions/load-vault-route (fn [_state _path] [])
+                funding-comparison-actions/load-funding-comparison-route (fn [_state _path] [])
+                api-wallets-actions/load-api-wallet-route (fn [_state _path] [])
+                staking-actions/load-staking-route (fn [_state _path] [])
+                trade-modules/trade-chart-ready? (constantly true)
+                trade-modules/trade-chart-loading? (constantly false)
+                surface-modules/surface-ready? (fn [_state surface-id]
+                                                 (= :account-surfaces surface-id))
+                surface-modules/surface-loading? (constantly false)]
+    (is (= [[:effects/save [:router :path] "/trade"]
+            [:effects/push-state "/trade"]]
+           (navigation-adapters/navigate {} "/trade"))))
+  (with-redefs [vault-actions/load-vault-route (fn [_state _path] [])
+                funding-comparison-actions/load-funding-comparison-route (fn [_state _path] [])
+                api-wallets-actions/load-api-wallet-route (fn [_state _path] [])
+                staking-actions/load-staking-route (fn [_state _path] [])
+                trade-modules/trade-chart-ready? (constantly true)
+                trade-modules/trade-chart-loading? (constantly false)
+                surface-modules/surface-ready? (constantly false)
+                surface-modules/surface-loading? (fn [_state surface-id]
+                                                   (= :account-surfaces surface-id))]
+    (is (= [[:effects/save [:router :path] "/trade"]
+            [:effects/push-state "/trade"]]
+           (navigation-adapters/navigate {} "/trade")))))
 
 (deftest navigate-entering-portfolio-loads-chart-benchmark-effects-test
   (with-redefs [portfolio-actions/select-portfolio-chart-tab (fn [_state tab]

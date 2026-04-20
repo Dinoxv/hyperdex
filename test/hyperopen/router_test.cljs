@@ -21,6 +21,8 @@
   (is (= "/trade" (router/normalize-path nil)))
   (is (= "/trade" (router/normalize-path "")))
   (is (= "/trade" (router/normalize-path "/")))
+  (is (= "/trade" (router/normalize-path "/index.html")))
+  (is (= "/trade" (router/normalize-path "/index.html?market=BTC")))
   (is (= "/staking" (router/normalize-path "/staking")))
   (is (= "/staking" (router/normalize-path "staking")))
   (is (= "/staking" (router/normalize-path "/staking/?tab=validators#history")))
@@ -31,6 +33,8 @@
 (deftest normalize-location-path-prefers-hash-route-when-pathname-is-root-test
   (is (= "/staking"
          (router/normalize-location-path "/" "#/staking")))
+  (is (= "/staking"
+         (router/normalize-location-path "/index.html" "#/staking?tab=validators")))
   (is (= "/staking"
          (router/normalize-location-path nil "#/staking?tab=validators")))
   (is (= "/portfolio"

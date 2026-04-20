@@ -8,6 +8,7 @@
             [hyperopen.route-modules :as route-modules]
             [hyperopen.router :as router]
             [hyperopen.staking.actions :as staking-actions]
+            [hyperopen.surface-modules :as surface-modules]
             [hyperopen.trade-modules :as trade-modules]
             [hyperopen.trading-indicators-modules :as trading-indicators-modules]
             [hyperopen.vaults.actions :as vault-actions]))
@@ -64,6 +65,13 @@
              (not (trading-indicators-modules/trading-indicators-loading? state)))
     [:effects/load-trading-indicators-module]))
 
+(defn- account-surfaces-module-effect
+  [state normalized-path]
+  (when (and (router/trade-route? normalized-path)
+             (not (surface-modules/surface-ready? state :account-surfaces))
+             (not (surface-modules/surface-loading? state :account-surfaces)))
+    [:effects/load-surface-module :account-surfaces]))
+
 (defn- route-loader-effects
   [state normalized-path]
   (into []
@@ -85,11 +93,13 @@
   (let [module-effect (when-let [_module-id (route-modules/route-module-id normalized-path)]
                         [:effects/load-route-module normalized-path])
         trade-chart-effect (trade-chart-module-effect state normalized-path)
-        trading-indicators-effect (trading-indicators-module-effect state normalized-path)]
+        trading-indicators-effect (trading-indicators-module-effect state normalized-path)
+        account-surfaces-effect (account-surfaces-module-effect state normalized-path)]
     (cond-> []
       module-effect (conj module-effect)
       trade-chart-effect (conj trade-chart-effect)
-      trading-indicators-effect (conj trading-indicators-effect))))
+      trading-indicators-effect (conj trading-indicators-effect)
+      account-surfaces-effect (conj account-surfaces-effect))))
 
 (defn- browser-navigation-effect
   [browser-path replace?]

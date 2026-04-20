@@ -4,6 +4,9 @@
 (def ^:private default-route
   "/trade")
 
+(def ^:private default-document-paths
+  #{"/index.html"})
+
 (def ^:private trade-route-prefix
   "/trade")
 
@@ -58,6 +61,12 @@
       (recur (subs path* 0 (dec (count path*))))
       path*)))
 
+(defn- default-route-path?
+  [path]
+  (or (= path "")
+      (= path "/")
+      (contains? default-document-paths path)))
+
 (defn normalize-path [path]
   (let [path* (if (string? path)
                 path
@@ -69,8 +78,7 @@
                        split-path-from-query-fragment
                        ensure-leading-slash
                        trim-trailing-slashes)]
-    (if (or (= normalized "")
-            (= normalized "/"))
+    (if (default-route-path? normalized)
       default-route
       normalized)))
 
@@ -168,11 +176,13 @@
   (let [pathname* (if (string? pathname)
                     pathname
                     (str (or pathname "")))
+        pathname-route (-> pathname*
+                           ensure-leading-slash
+                           trim-trailing-slashes)
         hash* (if (string? hash) (str/trim hash) "")
         hash-path (when (str/starts-with? hash* "#/")
                     (subs hash* 1))
-        candidate-path (if (or (= pathname* "")
-                               (= pathname* "/"))
+        candidate-path (if (default-route-path? pathname-route)
                          (or hash-path pathname*)
                          pathname*)]
     (normalize-path candidate-path)))

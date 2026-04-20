@@ -32,7 +32,8 @@
   (is (= [[:effects/save [:header-ui :mobile-menu-open?] false]
           [:effects/save [:router :path] "/trade"]
           [:effects/push-state "/trade"]
-          [:effects/load-trade-chart-module]]
+          [:effects/load-trade-chart-module]
+          [:effects/load-surface-module :account-surfaces]]
          (actions/navigate-mobile-header-menu {} "/trade"))))
 
 (deftest open-spectate-mode-mobile-header-menu-closes-before-opening-modal-test

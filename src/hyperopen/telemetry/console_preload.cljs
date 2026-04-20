@@ -358,7 +358,7 @@
         funding (funding-modal-oracle)]
     {:route (get-in state [:router :path])
      :wallet wallet
-     :funding funding
+     :funding funding :lazy-modules (select-keys state [:trade-modules :surface-modules])
      :trade-mobile-surface (get-in state [:trade-ui :mobile-surface])
      :account-tab (get-in state [:account-info :selected-tab])
      :action-trace-count (count (runtime-validation/debug-action-effect-traces-snapshot))
