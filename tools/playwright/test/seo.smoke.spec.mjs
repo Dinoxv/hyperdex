@@ -64,10 +64,14 @@ test("trade direct load returns the trade-specific title @smoke", async ({ reque
 });
 
 test("portfolio direct load returns the portfolio-specific title @smoke", async ({ request }) => {
-  const response = await request.get("/portfolio");
+  const response = await request.get(
+    "/portfolio?spectate=0x162cc7c861ebd0c06b3d72319201150482518185&range=1y&scope=all&chart=returns&bench=BTC&tab=performance-metrics",
+    { maxRedirects: 0 }
+  );
   const body = await response.text();
 
   expect(response.ok()).toBe(true);
+  expect(response.headers().location).toBeUndefined();
   expect(response.headers()["content-type"]).toContain("text/html");
   expect(extractTitle(body)).toBe("Portfolio analytics and tearsheets");
 });

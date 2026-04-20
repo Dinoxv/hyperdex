@@ -51,6 +51,15 @@ function resolveRequestPathname(requestUrl) {
   return normalizedPath.startsWith("/") ? normalizedPath : `/${normalizedPath}`;
 }
 
+function parseRequestUrl(requestUrl) {
+  const parsedUrl = new URL(requestUrl || "/", "http://127.0.0.1");
+  const decodedPathname = decodeURIComponent(parsedUrl.pathname);
+  return {
+    decodedPathname,
+    search: parsedUrl.search,
+  };
+}
+
 function parseHeadersRules(fileContent) {
   const rules = [];
   let activeRule = null;
@@ -152,6 +161,10 @@ function shouldTryDirectoryIndex(requestPathname) {
   return requestPathname.endsWith("/") || path.extname(requestPathname) === "";
 }
 
+function shouldTryHtmlFile(requestPathname) {
+  return requestPathname !== "/" && path.extname(requestPathname) === "";
+}
+
 function findNearest404Path(requestPathname) {
   const trimmedPath = requestPathname.replace(/^\/+|\/+$/g, "");
   const segments = trimmedPath ? trimmedPath.split("/") : [];
@@ -172,7 +185,10 @@ function findNearest404Path(requestPathname) {
 }
 
 function resolveFilePath(requestUrl) {
+  const { decodedPathname, search } = parseRequestUrl(requestUrl);
   const requestPathname = resolveRequestPathname(requestUrl);
+  const requestHadTrailingSlash =
+    decodedPathname.length > 1 && decodedPathname.endsWith("/");
   const relativePath = requestPathname === "/" ? "" : requestPathname.replace(/^\/+/, "");
   const exactCandidatePath = resolvePathWithinRoot(relativePath);
 
@@ -184,9 +200,32 @@ function resolveFilePath(requestUrl) {
     return { filePath: exactCandidatePath, requestPathname, statusCode: 200 };
   }
 
+  if (shouldTryHtmlFile(requestPathname)) {
+    const htmlFilePath = resolvePathWithinRoot(`${relativePath}.html`);
+    if (htmlFilePath && tryFile(htmlFilePath)) {
+      if (requestHadTrailingSlash) {
+        return {
+          requestPathname,
+          redirectLocation: `${requestPathname}${search}`,
+          statusCode: 307,
+        };
+      }
+
+      return { filePath: htmlFilePath, requestPathname, statusCode: 200 };
+    }
+  }
+
   if (shouldTryDirectoryIndex(requestPathname)) {
     const directoryIndexPath = resolvePathWithinRoot(path.join(relativePath, "index.html"));
     if (directoryIndexPath && tryFile(directoryIndexPath)) {
+      if (requestPathname !== "/" && !requestHadTrailingSlash) {
+        return {
+          requestPathname,
+          redirectLocation: `${requestPathname}/${search}`,
+          statusCode: 307,
+        };
+      }
+
       return { filePath: directoryIndexPath, requestPathname, statusCode: 200 };
     }
   }
@@ -211,6 +250,11 @@ function resolveFilePath(requestUrl) {
 function sendNotFound(response) {
   response.writeHead(404, { "Content-Type": "text/plain; charset=utf-8" });
   response.end("File not found.");
+}
+
+function sendRedirect(response, location, statusCode = 307) {
+  response.writeHead(statusCode, { Location: location });
+  response.end();
 }
 
 function sendFile(response, filePath, statusCode = 200, extraHeaders = {}) {
@@ -240,6 +284,11 @@ const server = http.createServer((request, response) => {
   }
 
   if (!resolvedFile.filePath) {
+    if (resolvedFile.redirectLocation) {
+      sendRedirect(response, resolvedFile.redirectLocation, resolvedFile.statusCode);
+      return;
+    }
+
     if (resolvedFile.statusCode === 403) {
       response.writeHead(403, { "Content-Type": "text/plain; charset=utf-8" });
       response.end("Forbidden");

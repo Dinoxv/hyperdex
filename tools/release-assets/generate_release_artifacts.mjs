@@ -133,7 +133,29 @@ export function routePathToOutputHtmlPath(routePath) {
     return APP_INDEX_PATH;
   }
 
-  return path.join(publicPathToRelativePath(normalizedPath), APP_INDEX_PATH);
+  const relativePath = publicPathToRelativePath(normalizedPath);
+  const decodedPath = (() => {
+    try {
+      return decodeURIComponent(normalizedPath);
+    } catch (_error) {
+      throw new Error(`Unsafe release route path: ${routePath}`);
+    }
+  })();
+  const decodedSegments = decodedPath.split("/").filter(Boolean);
+  const relativeSegments = relativePath.split("/");
+
+  if (
+    /%(?:2f|5c)/i.test(normalizedPath) ||
+    decodedPath.includes("\\") ||
+    relativePath.includes("\\") ||
+    path.isAbsolute(relativePath) ||
+    decodedSegments.some((segment) => segment === "." || segment === "..") ||
+    relativeSegments.some((segment) => segment === "." || segment === "..")
+  ) {
+    throw new Error(`Unsafe release route path: ${routePath}`);
+  }
+
+  return `${relativePath}.html`;
 }
 
 async function prepareOutputRoot(outputRoot) {

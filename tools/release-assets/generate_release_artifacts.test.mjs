@@ -57,9 +57,16 @@ const STATIC_ROUTE_PATHS = [
   "/funding-comparison",
   "/api",
 ];
-const STATIC_ROUTE_HTML_FILES = STATIC_ROUTE_PATHS.map((routePath) =>
-  routePathToOutputHtmlPath(routePath)
-).sort();
+const STATIC_ROUTE_HTML_FILES = [
+  "api.html",
+  "funding-comparison.html",
+  "index.html",
+  "leaderboard.html",
+  "portfolio.html",
+  "staking.html",
+  "trade.html",
+  "vaults.html",
+];
 const SAMPLE_MAIN_RELEASE_BUNDLE = [
   "function boot() { return true; }",
   "var loaderManager=new Tca;loaderManager.pk=!0;",
@@ -333,6 +340,33 @@ test("normalizeModuleUriToRelativeJsPath preserves nested js paths and strips qu
   assert.equal(normalizeModuleUriToRelativeJsPath("/assets/trade_chart.HASH.js"), null);
 });
 
+test("routePathToOutputHtmlPath emits slashless route HTML instead of directory indexes", () => {
+  assert.equal(routePathToOutputHtmlPath("/"), "index.html");
+  assert.equal(routePathToOutputHtmlPath("/portfolio"), "portfolio.html");
+  assert.equal(routePathToOutputHtmlPath("/portfolio/"), "portfolio.html");
+  assert.equal(
+    routePathToOutputHtmlPath("/portfolio?range=1y&tab=performance-metrics"),
+    "portfolio.html"
+  );
+  assert.equal(routePathToOutputHtmlPath("/funding-comparison"), "funding-comparison.html");
+  assert.notEqual(routePathToOutputHtmlPath("/portfolio"), path.join("portfolio", "index.html"));
+});
+
+test("routePathToOutputHtmlPath rejects traversal-like release route paths", () => {
+  assert.throws(
+    () => routePathToOutputHtmlPath("/../portfolio"),
+    /unsafe release route path/i
+  );
+  assert.throws(
+    () => routePathToOutputHtmlPath("/portfolio/../../trade"),
+    /unsafe release route path/i
+  );
+  assert.throws(
+    () => routePathToOutputHtmlPath("/..%2fportfolio"),
+    /unsafe release route path/i
+  );
+});
+
 test("buildSiteMetadata keeps /api lowercase in the generated metadata", () => {
   const metadata = buildSiteMetadata({
     canonicalOrigin: SAMPLE_CANONICAL_ORIGIN,
@@ -495,12 +529,9 @@ test("generateReleaseArtifacts assembles deterministic route-specific release pa
   });
 
   const generatedRootIndex = await fs.readFile(path.join(outputRoot, "index.html"), "utf8");
-  const generatedTrade = await fs.readFile(path.join(outputRoot, "trade", "index.html"), "utf8");
-  const generatedPortfolio = await fs.readFile(
-    path.join(outputRoot, "portfolio", "index.html"),
-    "utf8"
-  );
-  const generatedApi = await fs.readFile(path.join(outputRoot, "api", "index.html"), "utf8");
+  const generatedTrade = await fs.readFile(path.join(outputRoot, "trade.html"), "utf8");
+  const generatedPortfolio = await fs.readFile(path.join(outputRoot, "portfolio.html"), "utf8");
+  const generatedApi = await fs.readFile(path.join(outputRoot, "api.html"), "utf8");
   const generatedCss = await fs.readFile(
     path.join(outputRoot, "css", result.cssFileName),
     "utf8"
@@ -525,6 +556,9 @@ test("generateReleaseArtifacts assembles deterministic route-specific release pa
   for (const relativePath of STATIC_ROUTE_HTML_FILES) {
     await fs.access(path.join(outputRoot, relativePath));
   }
+  await assert.rejects(fs.access(path.join(outputRoot, "portfolio", "index.html")));
+  assert.ok(result.generatedRouteHtmlFiles.includes("portfolio.html"));
+  assert.ok(!result.generatedRouteHtmlFiles.includes(path.join("portfolio", "index.html")));
 
   assert.match(generatedTrade, new RegExp(`href="${result.cssHref.replace(".", "\\.")}"`));
   assert.match(
