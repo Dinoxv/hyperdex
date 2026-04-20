@@ -44,6 +44,30 @@
     (is (= [[:actions/dismiss-order-feedback-toast "submit"]]
            (get-in dismiss-node [1 :on :click])))))
 
+(deftest notifications-view-renders-order-canceled-toast-with-confirmation-styling-test
+  (let [view-node (notifications-view/notifications-view
+                   {:ui {:toasts [{:id "cancel"
+                                   :kind :success
+                                   :toast-surface :order-canceled
+                                   :headline "Order canceled"
+                                   :subline "Open orders updated"
+                                   :message "Order canceled."}]}})
+        toast-node (hiccup/find-by-data-role view-node "global-toast")
+        toast-classes (hiccup/node-class-set toast-node)
+        dismiss-node (hiccup/find-by-data-role toast-node "global-toast-dismiss")]
+    (is (contains? toast-classes "o-toast"))
+    (is (contains? toast-classes "pointer-events-auto"))
+    (is (not (contains? toast-classes "global-toast-surface")))
+    (is (some? (find-by-class toast-node "check")))
+    (is (some? (find-by-class toast-node "msg")))
+    (is (= "Order canceled"
+           (hiccup/node-text (find-by-class toast-node "line1"))))
+    (is (= "Open orders updated"
+           (hiccup/node-text (find-by-class toast-node "line2"))))
+    (is (contains? (hiccup/node-class-set dismiss-node) "close"))
+    (is (= [[:actions/dismiss-order-feedback-toast "cancel"]]
+           (get-in dismiss-node [1 :on :click])))))
+
 (deftest notifications-view-renders-trade-confirmation-toast-variants-test
   (let [fills [(fill-prop "fill-1" :buy "HYPE" 0.25 44.20 1800000000000)
                (fill-prop "fill-2" :buy "HYPE" 0.30 44.30 1800000003300)

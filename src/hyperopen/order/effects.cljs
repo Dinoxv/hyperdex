@@ -9,6 +9,7 @@
             [hyperopen.telemetry :as telemetry]
             [hyperopen.account.history.position-margin :as position-margin]
             [hyperopen.account.history.position-tpsl :as position-tpsl]
+            [hyperopen.order.toast-payloads :as toast-payloads]
             [hyperopen.api.trading :as trading-api]))
 
 (defn- cancel-request-oids
@@ -159,12 +160,6 @@
 (defn- cancel-order-error-message
   [exchange-response-error resp]
   (str "Order cancellation failed: " (exchange-response-error resp)))
-
-(defn- cancel-success-toast-message
-  [success-count]
-  (if (= 1 success-count)
-    "Order canceled."
-    (str success-count " orders canceled.")))
 
 (defn- submit-status-entries
   [resp]
@@ -323,7 +318,7 @@
 
       :else
       {:ok? true
-       :toast-message "TWAP terminated."})))
+       :toast-message (toast-payloads/twap-cancel-success-toast-payload)})))
 
 (defn- successful-cancel-entries
   [request status-entries]
@@ -372,7 +367,7 @@
       :else
       {:ok? true
        :success-cancels successful-cancels
-       :toast-message (cancel-success-toast-message success-count)})))
+       :toast-message (toast-payloads/cancel-success-toast-payload success-count)})))
 
 (defn- margin-mode-sync-error-message
   [error-text]

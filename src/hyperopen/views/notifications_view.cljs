@@ -186,22 +186,23 @@
           :pill (trade-toasts/PillToast single-fill options)
           (generic-toast-card toast))))))
 
-(defn- order-submitted-toast-card
-  [toast]
+(defn- status-toast-card
+  [toast dismiss-label]
   (let [{:keys [headline subline]} (toast-display-lines toast)
         toast-id (:id toast)]
     (trade-toasts/StatusToast
      {:headline headline
       :subline subline}
      {:on-dismiss [[:actions/dismiss-order-feedback-toast toast-id]]
-      :dismiss-label "Dismiss order submitted notification"
+      :dismiss-label dismiss-label
       :data-role "global-toast"})))
 
 (defn- toast-card
   [state toast]
   (case (:toast-surface toast)
     :trade-confirmation (trade-confirmation-toast-card state toast)
-    :order-submitted (order-submitted-toast-card toast)
+    :order-submitted (status-toast-card toast "Dismiss order submitted notification")
+    :order-canceled (status-toast-card toast "Dismiss order canceled notification")
     (generic-toast-card toast)))
 
 (defn notifications-view

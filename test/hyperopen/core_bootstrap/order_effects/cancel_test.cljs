@@ -65,6 +65,12 @@
                   (get-in @store [:ui :toast :kind])))
            (is (= "Order canceled."
                   (get-in @store [:ui :toast :message])))
+           (is (= :order-canceled
+                  (get-in @store [:ui :toast :toast-surface])))
+           (is (= "Order canceled"
+                  (get-in @store [:ui :toast :headline])))
+           (is (= "Open orders updated"
+                  (get-in @store [:ui :toast :subline])))
            (is (= [[[:actions/refresh-order-history]]]
                   @dispatched))
            (is (= 2 (count @refresh-calls)))
@@ -224,6 +230,12 @@
                   (get-in @store [:ui :toast :kind])))
            (is (= "TWAP terminated."
                   (get-in @store [:ui :toast :message])))
+           (is (= :order-canceled
+                  (get-in @store [:ui :toast :toast-surface])))
+           (is (= "TWAP terminated"
+                  (get-in @store [:ui :toast :headline])))
+           (is (= "Open orders updated"
+                  (get-in @store [:ui :toast :subline])))
            (is (= [[[:actions/refresh-order-history]]]
                   @dispatched))
            (is (= 2 (count @refresh-calls)))
