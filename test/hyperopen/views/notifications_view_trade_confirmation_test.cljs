@@ -16,6 +16,34 @@
    :orderType order-type
    :ts ts}))
 
+(defn- find-by-class
+  [node class-name]
+  (hiccup/find-first-node node #(contains? (hiccup/node-class-set %) class-name)))
+
+(deftest notifications-view-renders-order-submitted-toast-with-confirmation-styling-test
+  (let [view-node (notifications-view/notifications-view
+                   {:ui {:toasts [{:id "submit"
+                                   :kind :success
+                                   :toast-surface :order-submitted
+                                   :headline "Order submitted"
+                                   :subline "Awaiting fill confirmation"
+                                   :message "Order submitted."}]}})
+        toast-node (hiccup/find-by-data-role view-node "global-toast")
+        toast-classes (hiccup/node-class-set toast-node)
+        dismiss-node (hiccup/find-by-data-role toast-node "global-toast-dismiss")]
+    (is (contains? toast-classes "o-toast"))
+    (is (contains? toast-classes "pointer-events-auto"))
+    (is (not (contains? toast-classes "global-toast-surface")))
+    (is (some? (find-by-class toast-node "check")))
+    (is (some? (find-by-class toast-node "msg")))
+    (is (= "Order submitted"
+           (hiccup/node-text (find-by-class toast-node "line1"))))
+    (is (= "Awaiting fill confirmation"
+           (hiccup/node-text (find-by-class toast-node "line2"))))
+    (is (contains? (hiccup/node-class-set dismiss-node) "close"))
+    (is (= [[:actions/dismiss-order-feedback-toast "submit"]]
+           (get-in dismiss-node [1 :on :click])))))
+
 (deftest notifications-view-renders-trade-confirmation-toast-variants-test
   (let [fills [(fill-prop "fill-1" :buy "HYPE" 0.25 44.20 1800000000000)
                (fill-prop "fill-2" :buy "HYPE" 0.30 44.30 1800000003300)

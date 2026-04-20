@@ -107,7 +107,9 @@
                    (shell-state {:ui {:toasts [{:id "order-success"
                                                 :kind :success
                                                 :headline "Order submitted"
-                                                :subline "Limit buy 0.05 BTC at 101,950.00"}
+                                                :subline "Awaiting fill confirmation"
+                                                :message "Order submitted."
+                                                :toast-surface :order-submitted}
                                                {:id "withdrawal-error"
                                                 :kind :error
                                                 :headline "Withdrawal failed"

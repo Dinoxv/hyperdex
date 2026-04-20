@@ -152,6 +152,32 @@
             :data-role "trade-toast-dismiss"}
    (icon-close)])
 
+(defn StatusToast
+  ([{:keys [headline subline]}]
+   (StatusToast {:headline headline
+                 :subline subline}
+                {}))
+  ([{:keys [headline subline]} {:keys [on-dismiss dismiss-label data-role]}]
+   (when (seq headline)
+     [:div {:class ["o-toast" "pointer-events-auto"]
+            :role "status"
+            :aria-live "polite"
+            :data-role (or data-role "StatusToast")}
+      [:div {:class ["check"]}
+       (icon-check)]
+      [:div {:class ["msg"]}
+       [:div {:class ["line1"]}
+        headline]
+       (when (seq subline)
+         [:div {:class ["line2"]}
+          subline])]
+      [:button {:type "button"
+                :class ["close"]
+                :aria-label (or dismiss-label "Dismiss notification")
+                :on {:click on-dismiss}
+                :data-role "global-toast-dismiss"}
+       (icon-close)]])))
+
 (defn PillToast
   ([trade]
    (PillToast trade {}))

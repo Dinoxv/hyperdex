@@ -496,7 +496,7 @@
                                           (if ok?
                                             (do
                                               (swap! store update-order-submit-runtime nil)
-                                              (show-toast! store :success "Order submitted.")
+                                              (show-toast! store :success {:toast-surface :order-submitted :headline "Order submitted" :subline "Awaiting fill confirmation" :message "Order submitted."})
                                               (refresh-account-surfaces-after-order-mutation! store address)
                                               (dispatch! store nil [[:actions/refresh-order-history]]))
                                             (if (trading-api/enable-trading-recovery-error? error-text)

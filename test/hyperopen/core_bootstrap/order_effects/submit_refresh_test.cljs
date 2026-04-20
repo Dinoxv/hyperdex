@@ -58,6 +58,12 @@
            (is (= :success (get-in @store [:ui :toast :kind])))
            (is (= "Order submitted."
                   (get-in @store [:ui :toast :message])))
+           (is (= :order-submitted
+                  (get-in @store [:ui :toast :toast-surface])))
+           (is (= "Order submitted"
+                  (get-in @store [:ui :toast :headline])))
+           (is (= "Awaiting fill confirmation"
+                  (get-in @store [:ui :toast :subline])))
            (is (= [[[:actions/refresh-order-history]]]
                   @dispatched))
            (is (= 2 (count @refresh-calls)))
