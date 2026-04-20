@@ -53,6 +53,8 @@
     :per-dex-stagger-ms runtime-state/per-dex-stagger-ms
     :startup-stream-backfill-delay-ms runtime-state/startup-stream-backfill-delay-ms
     :startup-funding-history-lookback-ms runtime-state/startup-funding-history-lookback-ms
+    :deferred-bootstrap-delay-ms runtime-state/deferred-bootstrap-delay-ms
+    :non-visible-account-bootstrap-delay-ms runtime-state/deferred-bootstrap-delay-ms
     :schedule-idle-or-timeout! schedule-idle-or-timeout!
     :mark-performance! mark-performance!}))
 

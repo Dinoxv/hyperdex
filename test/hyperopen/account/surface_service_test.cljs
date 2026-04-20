@@ -248,3 +248,114 @@
                 @clearinghouse-calls))
          (done))
        0))))
+
+(deftest bootstrap-account-surfaces-defers-non-visible-account-surfaces-test
+  (async done
+    (let [deferred-delay-ms 37
+          funding-opts {:priority :high
+                        :start-time-ms 1000
+                        :end-time-ms 2000}
+          store (atom {:wallet {:address address}
+                       :websocket {:migration-flags {:startup-bootstrap-ws-first? false}}})
+          visible-calls (atom [])
+          hidden-calls (atom [])
+          ensure-calls (atom [])
+          stage-b-calls (atom [])
+          scheduled-callbacks (atom [])]
+      (surface-service/bootstrap-account-surfaces!
+       {:store store
+        :address address
+        :defer-non-visible-account-surfaces? true
+        :non-visible-account-bootstrap-delay-ms deferred-delay-ms
+        :startup-funding-request-opts funding-opts
+        :set-timeout-fn (fn [callback delay-ms]
+                          (swap! scheduled-callbacks conj {:callback callback
+                                                           :delay-ms delay-ms})
+                          :timeout-id)
+        :fetch-frontend-open-orders! (fn [_store fetch-address opts]
+                                       (swap! hidden-calls conj [:open-orders fetch-address opts]))
+        :fetch-user-fills! (fn [_store fetch-address opts]
+                             (swap! hidden-calls conj [:fills fetch-address opts]))
+        :fetch-spot-clearinghouse-state! (fn [_store fetch-address opts]
+                                           (swap! visible-calls conj [:spot fetch-address opts]))
+        :fetch-user-abstraction! (fn [_store fetch-address opts]
+                                   (swap! visible-calls conj [:abstraction fetch-address opts]))
+        :fetch-portfolio! (fn [_store fetch-address opts]
+                            (swap! visible-calls conj [:portfolio fetch-address opts]))
+        :fetch-user-fees! (fn [_store fetch-address opts]
+                            (swap! visible-calls conj [:user-fees fetch-address opts]))
+        :fetch-and-merge-funding-history! (fn [_store fetch-address opts]
+                                            (swap! hidden-calls conj [:fundings fetch-address opts]))
+        :ensure-perp-dexs! (fn [_store opts]
+                             (swap! ensure-calls conj opts)
+                             (js/Promise.resolve ["dex-a"]))
+        :stage-b-account-bootstrap! (fn [stage-address dex-names]
+                                      (swap! stage-b-calls conj [stage-address dex-names]))})
+      (is (= [[:spot address {:priority :high}]
+              [:abstraction address {:priority :high}]
+              [:portfolio address {:priority :high}]
+              [:user-fees address {:priority :high}]]
+             @visible-calls))
+      (is (= [] @hidden-calls))
+      (is (= [] @ensure-calls))
+      (is (= [] @stage-b-calls))
+      (is (= [deferred-delay-ms]
+             (mapv :delay-ms @scheduled-callbacks)))
+      (when-let [callback (:callback (first @scheduled-callbacks))]
+        (callback))
+      (js/setTimeout
+       (fn []
+         (is (= [[:open-orders address {:priority :low}]
+                 [:fills address {:priority :low}]
+                 [:fundings address (assoc funding-opts :priority :low)]]
+                @hidden-calls))
+         (is (= [{:priority :low}]
+                @ensure-calls))
+         (is (= [[address ["dex-a"]]]
+                @stage-b-calls))
+         (done))
+       0))))
+
+(deftest bootstrap-account-surfaces-deferred-warmup-skips-stale-address-test
+  (async done
+    (let [store (atom {:wallet {:address address}
+                       :websocket {:migration-flags {:startup-bootstrap-ws-first? false}}})
+          hidden-calls (atom [])
+          ensure-calls (atom [])
+          stage-b-calls (atom [])
+          scheduled-callbacks (atom [])]
+      (surface-service/bootstrap-account-surfaces!
+       {:store store
+        :address address
+        :defer-non-visible-account-surfaces? true
+        :non-visible-account-bootstrap-delay-ms 12
+        :set-timeout-fn (fn [callback delay-ms]
+                          (swap! scheduled-callbacks conj {:callback callback
+                                                           :delay-ms delay-ms})
+                          :timeout-id)
+        :fetch-frontend-open-orders! (fn [_store fetch-address opts]
+                                       (swap! hidden-calls conj [:open-orders fetch-address opts]))
+        :fetch-user-fills! (fn [_store fetch-address opts]
+                             (swap! hidden-calls conj [:fills fetch-address opts]))
+        :fetch-spot-clearinghouse-state! (fn [& _] nil)
+        :fetch-user-abstraction! (fn [& _] nil)
+        :fetch-portfolio! (fn [& _] nil)
+        :fetch-user-fees! (fn [& _] nil)
+        :fetch-and-merge-funding-history! (fn [_store fetch-address opts]
+                                            (swap! hidden-calls conj [:fundings fetch-address opts]))
+        :ensure-perp-dexs! (fn [_store opts]
+                             (swap! ensure-calls conj opts)
+                             (js/Promise.resolve ["dex-a"]))
+        :stage-b-account-bootstrap! (fn [stage-address dex-names]
+                                      (swap! stage-b-calls conj [stage-address dex-names]))})
+      (swap! store assoc-in [:wallet :address]
+             "0x2222222222222222222222222222222222222222")
+      (when-let [callback (:callback (first @scheduled-callbacks))]
+        (callback))
+      (js/setTimeout
+       (fn []
+         (is (= [] @hidden-calls))
+         (is (= [] @ensure-calls))
+         (is (= [] @stage-b-calls))
+         (done))
+       0))))

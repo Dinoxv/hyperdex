@@ -18,6 +18,8 @@
   "user-ws-subscription-handler")
 (def ^:private default-webdata2-handler-name
   "webdata2-subscription-handler")
+(def ^:private default-route-aware-deferred-delay-ms
+  1200)
 
 (defn mark-performance!
   [mark-name]
@@ -42,6 +44,12 @@
   [f]
   ;; Yield one macrotask so browser can paint before startup fetch/subscription work.
   (platform/set-timeout! f 0))
+
+(defn- normalize-delay-ms
+  [value fallback]
+  (if (number? value)
+    (max 0 (js/Math.floor value))
+    fallback))
 
 (defn yield-to-main!
   []
@@ -372,47 +380,34 @@
    (assoc deps :resolve-current-address account-context/effective-account-address)))
 
 (defn bootstrap-account-data!
-  [{:keys [store
-           address
-           fetch-frontend-open-orders!
-           fetch-user-fills!
-           fetch-spot-clearinghouse-state!
-           fetch-user-abstraction!
-           fetch-portfolio!
-           fetch-user-fees!
-           fetch-historical-orders!
-           fetch-and-merge-funding-history!
-           ensure-perp-dexs!
-           stage-b-account-bootstrap!
-           startup-stream-backfill-delay-ms
+  [{:keys [store address fetch-historical-orders!
            startup-funding-history-lookback-ms
-           log-fn]
+           non-visible-account-bootstrap-delay-ms]
     :as deps}]
   (when address
     (when-not (= address (:bootstrapped-address (startup-state deps)))
       (let [funding-request-opts
             (startup-funding-history-request-opts
-             startup-funding-history-lookback-ms)]
-      (swap-startup-state! deps assoc :bootstrapped-address address)
-      (swap! store reset-account-surface-state)
-      (prefetch-order-history! {:store store
-                                :fetch-historical-orders! fetch-historical-orders!})
-      (account-surface-service/bootstrap-account-surfaces!
-       {:store store
-        :address address
-        :fetch-frontend-open-orders! fetch-frontend-open-orders!
-        :fetch-user-fills! fetch-user-fills!
-        :fetch-spot-clearinghouse-state! fetch-spot-clearinghouse-state!
-        :fetch-user-abstraction! fetch-user-abstraction!
-        :fetch-portfolio! fetch-portfolio!
-        :fetch-user-fees! fetch-user-fees!
-        :fetch-and-merge-funding-history! fetch-and-merge-funding-history!
-        :ensure-perp-dexs! ensure-perp-dexs!
-        :stage-b-account-bootstrap! stage-b-account-bootstrap!
-        :startup-stream-backfill-delay-ms startup-stream-backfill-delay-ms
-        :startup-funding-request-opts funding-request-opts
-        :resolve-current-address account-context/effective-account-address
-        :log-fn log-fn})))))
+             startup-funding-history-lookback-ms)
+            portfolio-performance-route?
+            (account-surface-service/portfolio-performance-metrics-route? @store)]
+        (swap-startup-state! deps assoc :bootstrapped-address address)
+        (swap! store reset-account-surface-state)
+        (when-not portfolio-performance-route?
+          (prefetch-order-history! {:store store
+                                    :fetch-historical-orders! fetch-historical-orders!}))
+        (account-surface-service/bootstrap-account-surfaces!
+         (cond-> (assoc deps
+                        :startup-funding-request-opts funding-request-opts
+                        :resolve-current-address account-context/effective-account-address)
+           portfolio-performance-route?
+           (assoc :defer-non-visible-account-surfaces? true
+                  :non-visible-account-bootstrap-delay-ms
+                  (normalize-delay-ms non-visible-account-bootstrap-delay-ms
+                                      default-route-aware-deferred-delay-ms)
+                  :set-timeout-fn
+                  (fn [f delay-ms]
+                    (platform/set-timeout! f delay-ms)))))))))
 
 (defn- refresh-current-route!
   [store dispatch! new-address]
@@ -475,11 +470,11 @@
            fetch-asset-contexts!
            fetch-asset-selector-markets!
            mark-performance!]}]
-  ;; Keep first-load trade bootstrap narrow, but still hydrate the bootstrap
-  ;; selector metadata required by balances/account views.
-  (-> (js/Promise.all
-       (clj->js [(fetch-asset-contexts! store {:priority :high})
-                 (fetch-asset-selector-markets! store {:phase :bootstrap})]))
+  (-> (if (account-surface-service/portfolio-performance-metrics-route? @store)
+        (js/Promise.resolve nil)
+        (js/Promise.all
+         (clj->js [(fetch-asset-contexts! store {:priority :high})
+                   (fetch-asset-selector-markets! store {:phase :bootstrap})])))
       (.finally
        (fn []
          (mark-performance! "app:critical-data:ready")))))
@@ -519,10 +514,19 @@
            (mark-performance! "app:full-bootstrap:ready"))))))
 
 (defn schedule-deferred-bootstrap!
-  [{:keys [schedule-idle-or-timeout! run-deferred-bootstrap!] :as deps}]
+  [{:keys [store
+           schedule-idle-or-timeout!
+           run-deferred-bootstrap!
+           deferred-bootstrap-delay-ms]
+    :as deps}]
   (when-not (:deferred-scheduled? (startup-state deps))
     (swap-startup-state! deps assoc :deferred-scheduled? true)
-    (schedule-idle-or-timeout! run-deferred-bootstrap!)))
+    (if (and store
+             (account-surface-service/portfolio-performance-metrics-route? @store))
+      (platform/set-timeout! run-deferred-bootstrap!
+                             (normalize-delay-ms deferred-bootstrap-delay-ms
+                                                 default-route-aware-deferred-delay-ms))
+      (schedule-idle-or-timeout! run-deferred-bootstrap!))))
 
 (defn initialize-remote-data-streams!
   [{:keys [store

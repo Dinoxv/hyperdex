@@ -221,6 +221,7 @@
             [hyperopen.startup.collaborators-test]
             [hyperopen.startup.init-test]
             [hyperopen.startup.restore-test]
+            [hyperopen.startup.route-aware-bootstrap-test]
             [hyperopen.startup.route-refresh-test]
             [hyperopen.startup.runtime-test]
             [hyperopen.startup.watchers-test]
@@ -740,6 +741,7 @@
              'hyperopen.startup.collaborators-test
              'hyperopen.startup.init-test
              'hyperopen.startup.restore-test
+             'hyperopen.startup.route-aware-bootstrap-test
              'hyperopen.startup.route-refresh-test
              'hyperopen.startup.runtime-test
              'hyperopen.startup.watchers-test

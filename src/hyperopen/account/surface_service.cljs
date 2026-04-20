@@ -2,10 +2,22 @@
   (:require [hyperopen.account.context :as account-context]
             [hyperopen.account.surface-policy :as surface-policy]
             [hyperopen.platform :as platform]
+            [hyperopen.portfolio.actions :as portfolio-actions]
+            [hyperopen.portfolio.routes :as portfolio-routes]
             [hyperopen.websocket.migration-flags :as migration-flags]))
 
 (def ^:private default-startup-stream-backfill-delay-ms
   450)
+
+(def ^:private default-non-visible-account-bootstrap-delay-ms
+  1200)
+
+(defn portfolio-performance-metrics-route?
+  [state]
+  (and (portfolio-routes/portfolio-route? (get-in state [:router :path]))
+       (= :performance-metrics
+          (portfolio-actions/normalize-portfolio-account-info-tab
+           (get-in state [:portfolio-ui :account-info-tab])))))
 
 (defn- current-address
   [state resolve-current-address]
@@ -104,76 +116,141 @@
                (fetch-clearinghouse-state! store address dex {:priority :low})))))
        (* stagger-ms (inc idx))))))
 
-(defn bootstrap-account-surfaces!
+(defn- funding-opts-with-priority
+  [opts priority]
+  (if (= :high priority)
+    opts
+    (assoc (or opts {}) :priority priority)))
+
+(defn- bootstrap-visible-account-surfaces!
+  [{:keys [store
+           address
+           fetch-spot-clearinghouse-state!
+           fetch-user-abstraction!
+           fetch-portfolio!
+           fetch-user-fees!]}]
+  (call-when-fn! fetch-spot-clearinghouse-state! store address {:priority :high})
+  (call-when-fn! fetch-user-abstraction! store address {:priority :high})
+  (call-when-fn! fetch-portfolio! store address {:priority :high})
+  (call-when-fn! fetch-user-fees! store address {:priority :high}))
+
+(defn- bootstrap-open-orders-and-fills!
   [{:keys [store
            address
            fetch-frontend-open-orders!
            fetch-user-fills!
-           fetch-spot-clearinghouse-state!
-           fetch-user-abstraction!
-           fetch-portfolio!
-           fetch-user-fees!
+           startup-stream-backfill-delay-ms
+           set-timeout-fn
+           resolve-current-address]}
+   priority]
+  (let [state @store
+        ws-first-enabled? (migration-flags/startup-bootstrap-ws-first-enabled? state)
+        set-timeout-fn* (or set-timeout-fn platform/set-timeout!)
+        open-orders-opts {:priority priority}
+        fills-opts {:priority priority}]
+    (if ws-first-enabled?
+      (do
+        (schedule-stream-backed-fallback!
+         {:store store
+          :address address
+          :topic "openOrders"
+          :fetch-fn fetch-frontend-open-orders!
+          :opts open-orders-opts
+          :surface-hydrated? open-orders-surface-hydrated?
+          :startup-stream-backfill-delay-ms startup-stream-backfill-delay-ms
+          :set-timeout-fn set-timeout-fn*
+          :resolve-current-address resolve-current-address})
+        (schedule-stream-backed-fallback!
+         {:store store
+          :address address
+          :topic "userFills"
+          :fetch-fn fetch-user-fills!
+          :opts fills-opts
+          :startup-stream-backfill-delay-ms startup-stream-backfill-delay-ms
+          :set-timeout-fn set-timeout-fn*
+          :resolve-current-address resolve-current-address}))
+      (do
+        (call-when-fn! fetch-frontend-open-orders! store address open-orders-opts)
+        (call-when-fn! fetch-user-fills! store address fills-opts)))))
+
+(defn- bootstrap-funding-history-and-stage-b!
+  [{:keys [store
+           address
            fetch-and-merge-funding-history!
            ensure-perp-dexs!
            startup-stream-backfill-delay-ms
            startup-funding-request-opts
+           set-timeout-fn
            resolve-current-address
            log-fn]
     :or {log-fn (fn [& _] nil)}
+    :as deps}
+   priority]
+  (let [state @store
+        ws-first-enabled? (migration-flags/startup-bootstrap-ws-first-enabled? state)
+        set-timeout-fn* (or set-timeout-fn platform/set-timeout!)
+        funding-opts (funding-opts-with-priority startup-funding-request-opts priority)
+        run-stage-b! (or (:stage-b-account-bootstrap! deps)
+                         (fn [stage-b-address dex-names]
+                           (stage-b-account-bootstrap!
+                            (assoc deps
+                                   :address stage-b-address
+                                   :dexs dex-names))))]
+    (if ws-first-enabled?
+      (schedule-stream-backed-fallback!
+       {:store store
+        :address address
+        :topic "userFundings"
+        :fetch-fn fetch-and-merge-funding-history!
+        :opts funding-opts
+        :startup-stream-backfill-delay-ms startup-stream-backfill-delay-ms
+        :set-timeout-fn set-timeout-fn*
+        :resolve-current-address resolve-current-address})
+      (call-when-fn! fetch-and-merge-funding-history! store address funding-opts))
+    (when (fn? ensure-perp-dexs!)
+      (-> (ensure-perp-dexs! store {:priority :low})
+          (.then (fn [dexs]
+                   (when (active-address? store address resolve-current-address)
+                     (run-stage-b! address
+                                   (surface-policy/normalize-dex-names dexs)))))
+          (.catch (fn [err]
+                    (log-fn "Error bootstrapping per-dex account data:" err)))))))
+
+(defn- bootstrap-non-visible-account-surfaces!
+  [deps priority]
+  (bootstrap-open-orders-and-fills! deps priority)
+  (bootstrap-funding-history-and-stage-b! deps priority))
+
+(defn- schedule-non-visible-account-surfaces!
+  [{:keys [store
+           address
+           non-visible-account-bootstrap-delay-ms
+           set-timeout-fn
+           resolve-current-address]
+    :as deps}]
+  (let [delay-ms (max 0 (or non-visible-account-bootstrap-delay-ms
+                            default-non-visible-account-bootstrap-delay-ms))
+        set-timeout-fn* (or set-timeout-fn platform/set-timeout!)]
+    (set-timeout-fn*
+     (fn []
+       (when (active-address? store address resolve-current-address)
+         (bootstrap-non-visible-account-surfaces! deps :low)))
+     delay-ms)))
+
+(defn bootstrap-account-surfaces!
+  [{:keys [store
+           address
+           defer-non-visible-account-surfaces?]
     :as deps}]
   (when address
-    (let [state @store
-          ws-first-enabled? (migration-flags/startup-bootstrap-ws-first-enabled? state)
-          run-stage-b! (or (:stage-b-account-bootstrap! deps)
-                           (fn [stage-b-address dex-names]
-                             (stage-b-account-bootstrap!
-                              (assoc deps
-                                     :address stage-b-address
-                                     :dexs dex-names))))]
-      (if ws-first-enabled?
-        (do
-          (schedule-stream-backed-fallback!
-           {:store store
-            :address address
-            :topic "openOrders"
-            :fetch-fn fetch-frontend-open-orders!
-            :opts {:priority :high}
-            :surface-hydrated? open-orders-surface-hydrated?
-            :startup-stream-backfill-delay-ms startup-stream-backfill-delay-ms
-            :resolve-current-address resolve-current-address})
-          (schedule-stream-backed-fallback!
-           {:store store
-            :address address
-            :topic "userFills"
-            :fetch-fn fetch-user-fills!
-            :opts {:priority :high}
-            :startup-stream-backfill-delay-ms startup-stream-backfill-delay-ms
-            :resolve-current-address resolve-current-address}))
-        (do
-          (call-when-fn! fetch-frontend-open-orders! store address {:priority :high})
-          (call-when-fn! fetch-user-fills! store address {:priority :high})))
-      (call-when-fn! fetch-spot-clearinghouse-state! store address {:priority :high})
-      (call-when-fn! fetch-user-abstraction! store address {:priority :high})
-      (call-when-fn! fetch-portfolio! store address {:priority :high})
-      (call-when-fn! fetch-user-fees! store address {:priority :high})
-      (if ws-first-enabled?
-        (schedule-stream-backed-fallback!
-         {:store store
-          :address address
-          :topic "userFundings"
-          :fetch-fn fetch-and-merge-funding-history!
-          :opts startup-funding-request-opts
-          :startup-stream-backfill-delay-ms startup-stream-backfill-delay-ms
-          :resolve-current-address resolve-current-address})
-        (call-when-fn! fetch-and-merge-funding-history! store address startup-funding-request-opts))
-      (when (fn? ensure-perp-dexs!)
-        (-> (ensure-perp-dexs! store {:priority :low})
-            (.then (fn [dexs]
-                     (when (active-address? store address resolve-current-address)
-                       (run-stage-b! address
-                                     (surface-policy/normalize-dex-names dexs)))))
-            (.catch (fn [err]
-                      (log-fn "Error bootstrapping per-dex account data:" err))))))))
+    (if defer-non-visible-account-surfaces?
+      (do
+        (bootstrap-visible-account-surfaces! deps)
+        (schedule-non-visible-account-surfaces! deps))
+      (do
+        (bootstrap-open-orders-and-fills! deps :high)
+        (bootstrap-visible-account-surfaces! deps)
+        (bootstrap-funding-history-and-stage-b! deps :high)))))
 
 (defn- run-post-event-refresh!
   [{:keys [store
