@@ -467,6 +467,7 @@
             [hyperopen.websocket.active-asset-ctx-test]
             [hyperopen.websocket.agent-session-coverage-test]
             [hyperopen.websocket.api-coverage-bridge-test]
+            [hyperopen.websocket.api-wallets-application-coverage-test]
             [hyperopen.websocket.application.flight-recorder-test]
             [hyperopen.websocket.application.runtime-engine-test]
             [hyperopen.websocket.application.runtime-reducer-test]
@@ -991,6 +992,7 @@
              'hyperopen.websocket.active-asset-ctx-test
              'hyperopen.websocket.agent-session-coverage-test
              'hyperopen.websocket.api-coverage-bridge-test
+             'hyperopen.websocket.api-wallets-application-coverage-test
              'hyperopen.websocket.application.flight-recorder-test
              'hyperopen.websocket.application.runtime-engine-test
              'hyperopen.websocket.application.runtime-reducer-test
