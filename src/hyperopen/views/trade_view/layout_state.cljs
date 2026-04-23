@@ -5,10 +5,10 @@
   1024)
 
 (def ^:private desktop-account-panel-height
-  "clamp(21rem, 38vh, 29rem)")
+  "clamp(17rem, 32vh, 23rem)")
 
 (def ^:private desktop-chart-row-min-height
-  "27.75rem")
+  "24rem")
 
 (defn desktop-layout?
   [viewport-width]

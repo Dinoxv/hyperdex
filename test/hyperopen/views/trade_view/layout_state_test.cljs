@@ -41,7 +41,7 @@
     (is (true? (:account-panel-visible? layout)))
     (is (false? (:mobile-account-summary-visible? layout)))
     (is (false? (:show-mobile-active-asset? layout)))
-    (is (= "minmax(27.75rem, 1fr) clamp(21rem, 38vh, 29rem)"
+    (is (= "minmax(24rem, 1fr) clamp(17rem, 32vh, 23rem)"
            (:grid-template-rows (:grid-style layout))))
     (is (contains? (class-set (:desktop-active-asset-shell-classes layout)) "overflow-visible"))
     (is (contains? (class-set (:chart-panel-classes layout)) "overflow-visible"))

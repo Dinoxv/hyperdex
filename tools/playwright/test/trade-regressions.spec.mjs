@@ -19,6 +19,33 @@ async function selectAccountTab(page, tabValue) {
   await expect(tab).toHaveAttribute("aria-pressed", "true");
 }
 
+async function readTradeShellGeometry(page) {
+  return page.evaluate(() => {
+    const byParity = (id) => document.querySelector(`[data-parity-id="${id}"]`);
+    const chart = byParity("trade-chart-panel");
+    const orderbook = byParity("trade-orderbook-panel");
+    const account = byParity("trade-account-tables-panel");
+    const chartRect = chart?.getBoundingClientRect();
+    const orderbookRect = orderbook?.getBoundingClientRect();
+    const accountRect = account?.getBoundingClientRect();
+
+    if (!chartRect || !orderbookRect || !accountRect) {
+      throw new Error("trade shell geometry unavailable");
+    }
+
+    const lowerPanelShare = accountRect.height / (chartRect.height + accountRect.height);
+
+    return {
+      chartHeight: chartRect.height,
+      accountHeight: accountRect.height,
+      accountWidth: accountRect.width,
+      lowerPanelShare,
+      chartFlushDelta: accountRect.top - chartRect.bottom,
+      orderbookFlushDelta: accountRect.top - orderbookRect.bottom
+    };
+  });
+}
+
 async function seedDisconnectedSpectateAccountState(page) {
   await page.evaluate(() => {
     const c = globalThis.cljs?.core;
@@ -885,6 +912,47 @@ test("positions margin column leaves funding value readable at compact desktop w
   });
 
   expect(spacing.gapPx).toBeGreaterThanOrEqual(4);
+});
+
+test("desktop trade shell keeps the chart dominant while account tabs stay geometry-stable @regression", async ({
+  page
+}) => {
+  const reviewViewports = [
+    { width: 1280, height: 800 },
+    { width: 1440, height: 900 }
+  ];
+  const standardTabs = [
+    "balances",
+    "positions",
+    "open-orders",
+    "twap",
+    "trade-history",
+    "funding-history",
+    "order-history"
+  ];
+
+  for (const viewport of reviewViewports) {
+    await page.setViewportSize(viewport);
+    await visitRoute(page, "/trade");
+
+    let baselineGeometry = null;
+    for (const tab of standardTabs) {
+      await selectAccountTab(page, tab);
+      const geometry = await readTradeShellGeometry(page);
+
+      expect(Math.abs(geometry.chartFlushDelta)).toBeLessThanOrEqual(1);
+      expect(Math.abs(geometry.orderbookFlushDelta)).toBeLessThanOrEqual(1);
+      expect(geometry.lowerPanelShare).toBeLessThan(0.4);
+
+      if (!baselineGeometry) {
+        baselineGeometry = geometry;
+        continue;
+      }
+
+      expect(Math.abs(geometry.accountHeight - baselineGeometry.accountHeight)).toBeLessThanOrEqual(1);
+      expect(Math.abs(geometry.accountWidth - baselineGeometry.accountWidth)).toBeLessThanOrEqual(1);
+    }
+  }
 });
 
 test("named-dex close-position popover loads full market metadata before submit @regression", async ({
