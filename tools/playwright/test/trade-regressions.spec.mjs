@@ -961,6 +961,19 @@ test("trade route preserves core accessibility affordances @regression", async (
 });
 
 test("trade chart context menu supports pointer and keyboard flows @regression @smoke", async ({ page }) => {
+  await page.addInitScript(() => {
+    globalThis.__chartContextMenuClipboardWrites = [];
+    Object.defineProperty(navigator, "clipboard", {
+      configurable: true,
+      value: {
+        writeText(text) {
+          globalThis.__chartContextMenuClipboardWrites.push(text);
+          return Promise.resolve();
+        },
+      },
+    });
+  });
+
   await page.goto("/trade", { waitUntil: "commit" });
   await expect(page.locator('[data-parity-id="trade-root"]')).toBeVisible();
   await expect
@@ -987,6 +1000,48 @@ test("trade chart context menu supports pointer and keyboard flows @regression @
     await tradeModules.load_trade_chart_module_BANG_(store);
   });
   await expect(page.getByText("Loading Chart")).toBeHidden({ timeout: 20_000 });
+  await page.evaluate(() => {
+    const c = globalThis.cljs?.core;
+    const store = globalThis.hyperopen?.system?.store;
+
+    if (!c || !store) {
+      throw new Error("Hyperopen store or cljs core unavailable");
+    }
+
+    const keyword = c.keyword;
+    const vectorPath = (...segments) => c.PersistentVector.fromArray(segments, true);
+    const opts = c.PersistentArrayMap.fromArray([keyword("keywordize-keys"), true], true);
+    const rawCandles = Array.from({ length: 80 }, (_, index) => {
+      const base = 67_000 + index * 8;
+      return {
+        t: 1_700_000_000_000 + index * 86_400_000,
+        o: String(base),
+        h: String(base + 120),
+        l: String(base - 90),
+        c: String(base + 42),
+        v: String(1_000 + index)
+      };
+    });
+    const activeMarket = c.PersistentArrayMap.fromArray(
+      [
+        keyword("key"), "perp:BTC",
+        keyword("coin"), "BTC",
+        keyword("symbol"), "BTC",
+        keyword("market-type"), keyword("perp"),
+        keyword("price-decimals"), 2,
+        keyword("markRaw"), "67674"
+      ],
+      true
+    );
+
+    let nextState = c.deref(store);
+    nextState = c.assoc(nextState, keyword("active-asset"), "BTC");
+    nextState = c.assoc(nextState, keyword("active-market"), activeMarket);
+    nextState = c.assoc_in(nextState, vectorPath(keyword("chart-options"), keyword("selected-timeframe")), keyword("1d"));
+    nextState = c.assoc_in(nextState, vectorPath(keyword("candles"), "BTC", keyword("1d")), c.js__GT_clj(rawCandles, opts));
+    c.reset_BANG_(store, nextState);
+  });
+  await waitForIdle(page, { quietMs: 300, timeoutMs: 7_000, pollMs: 50 });
 
   const chartCanvas = page.locator('[data-parity-id="chart-canvas"]');
   await expect(chartCanvas).toBeVisible();
@@ -996,27 +1051,46 @@ test("trade chart context menu supports pointer and keyboard flows @regression @
     throw new Error("Trading chart canvas bounding box unavailable");
   }
 
-  await chartCanvas.click({
-    button: "right",
-    position: {
-      x: Math.max(24, Math.floor(chartBox.width / 2)),
-      y: Math.max(24, Math.floor(chartBox.height / 2))
-    }
-  });
-
   const contextMenu = page.locator('[data-role="chart-context-menu"]');
+  const resetItem = page.locator('[data-role="chart-context-menu-reset"]');
+  const copyItem = page.locator('[data-role="chart-context-menu-copy"]');
+  const openMenuAtChartCenter = async () => {
+    await chartCanvas.click({
+      button: "right",
+      position: {
+        x: Math.max(24, Math.floor(chartBox.width / 2)),
+        y: Math.max(24, Math.floor(chartBox.height / 2))
+      }
+    });
+    await expect(contextMenu).toBeVisible();
+    await expect(contextMenu).toHaveCount(1);
+  };
+
+  await openMenuAtChartCenter();
   await expect(contextMenu).toBeVisible();
-  await expect(page.locator('[data-role="chart-context-menu-reset"]')).toHaveText("Reset chart view");
-  await expect(page.locator('[data-role="chart-context-menu-copy"]')).toContainText("Copy price");
+  await expect(resetItem).toHaveText("Reset chart view");
+  await expect(copyItem).toContainText("Copy price");
+  await expect(copyItem).toBeEnabled();
+
+  const copyLabel = (await copyItem.textContent())?.replace(/^Copy price\s+/, "") ?? "";
+  expect(copyLabel).not.toBe("");
+  await copyItem.click();
+  await expect(copyItem).toHaveText("Copied");
+  await expect
+    .poll(() => page.evaluate(() => globalThis.__chartContextMenuClipboardWrites?.[0] || ""))
+    .toBe(copyLabel);
+  await expect(contextMenu).toBeHidden({ timeout: 3_000 });
+  await expect(chartCanvas).toBeFocused();
+
+  await openMenuAtChartCenter();
 
   await page.keyboard.press("Escape");
   await expect(contextMenu).toBeHidden();
+  await expect(chartCanvas).toBeFocused();
 
   await chartCanvas.focus();
   await page.keyboard.press("Shift+F10");
   await expect(contextMenu).toBeVisible();
-  const resetItem = page.locator('[data-role="chart-context-menu-reset"]');
-  const copyItem = page.locator('[data-role="chart-context-menu-copy"]');
   await expect(resetItem).toBeFocused();
   await expect(copyItem).toBeVisible();
   await page.keyboard.press("ArrowDown");
@@ -1032,18 +1106,18 @@ test("trade chart context menu supports pointer and keyboard flows @regression @
 
   await resetItem.click();
   await expect(contextMenu).toBeHidden();
+  await expect(chartCanvas).toBeFocused();
 
-  await chartCanvas.click({
-    button: "right",
-    position: {
-      x: Math.max(24, Math.floor(chartBox.width / 2)),
-      y: Math.max(24, Math.floor(chartBox.height / 2))
-    }
-  });
-  await expect(contextMenu).toBeVisible();
+  for (let index = 0; index < 3; index += 1) {
+    await openMenuAtChartCenter();
+    await page.keyboard.press("Escape");
+    await expect(contextMenu).toBeHidden();
+  }
 
+  await openMenuAtChartCenter();
   await page.mouse.click(Math.max(4, chartBox.x - 2), Math.max(4, chartBox.y - 2));
   await expect(contextMenu).toBeHidden();
+  await expect(contextMenu).toHaveCount(1);
 });
 
 test("active asset icon promotes BTC into loaded-icons after probe load @regression", async ({ page }) => {
