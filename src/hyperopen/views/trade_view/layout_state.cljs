@@ -7,8 +7,20 @@
 (def ^:private desktop-account-panel-height
   "clamp(17rem, 32vh, 23rem)")
 
+(def ^:private desktop-chart-canvas-min-height
+  "22.5rem")
+
+(def ^:private desktop-chart-toolbar-height
+  "2.8125rem")
+
+(def ^:private desktop-chart-market-strip-height
+  "5.5rem")
+
 (def ^:private desktop-chart-row-min-height
-  "24rem")
+  "calc(var(--trade-chart-market-strip-height) + var(--trade-chart-toolbar-height) + var(--trade-chart-canvas-min-height))")
+
+(def ^:private desktop-grid-min-height
+  "calc(var(--trade-chart-row-min-height) + var(--trade-account-panel-height))")
 
 (defn desktop-layout?
   [viewport-width]
@@ -20,8 +32,13 @@
 (defn desktop-trade-grid-style
   [desktop-layout?]
   (when desktop-layout?
-    {:grid-template-rows (str "minmax(" desktop-chart-row-min-height ", 1fr) "
-                              desktop-account-panel-height)}))
+    {:--trade-chart-canvas-min-height desktop-chart-canvas-min-height
+     :--trade-chart-toolbar-height desktop-chart-toolbar-height
+     :--trade-chart-market-strip-height desktop-chart-market-strip-height
+     :--trade-chart-row-min-height desktop-chart-row-min-height
+     :--trade-account-panel-height desktop-account-panel-height
+     :grid-template-rows "minmax(var(--trade-chart-row-min-height), 1fr) var(--trade-account-panel-height)"
+     :min-height desktop-grid-min-height}))
 
 (defn normalize-mobile-surface
   [state]

@@ -22,14 +22,20 @@ async function selectAccountTab(page, tabValue) {
 async function readTradeShellGeometry(page) {
   return page.evaluate(() => {
     const byParity = (id) => document.querySelector(`[data-parity-id="${id}"]`);
+    const byRole = (role) => document.querySelector(`[data-role="${role}"]`);
     const chart = byParity("trade-chart-panel");
     const orderbook = byParity("trade-orderbook-panel");
     const account = byParity("trade-account-tables-panel");
+    const chartCanvas = byParity("chart-canvas");
+    const chartLibrary = chartCanvas?.querySelector(".tv-lightweight-charts");
+    const scrollShell = byRole("trade-scroll-shell");
     const chartRect = chart?.getBoundingClientRect();
     const orderbookRect = orderbook?.getBoundingClientRect();
     const accountRect = account?.getBoundingClientRect();
+    const chartCanvasRect = chartCanvas?.getBoundingClientRect();
+    const chartLibraryRect = chartLibrary?.getBoundingClientRect();
 
-    if (!chartRect || !orderbookRect || !accountRect) {
+    if (!chartRect || !orderbookRect || !accountRect || !chartCanvasRect || !chartLibraryRect || !scrollShell) {
       throw new Error("trade shell geometry unavailable");
     }
 
@@ -41,7 +47,11 @@ async function readTradeShellGeometry(page) {
       accountWidth: accountRect.width,
       lowerPanelShare,
       chartFlushDelta: accountRect.top - chartRect.bottom,
-      orderbookFlushDelta: accountRect.top - orderbookRect.bottom
+      orderbookFlushDelta: accountRect.top - orderbookRect.bottom,
+      accountTopMinusChartCanvasBottom: accountRect.top - chartCanvasRect.bottom,
+      chartPanelBottomMinusChartCanvasBottom: chartRect.bottom - chartCanvasRect.bottom,
+      chartLibraryBottomMinusHostBottom: chartLibraryRect.bottom - chartCanvasRect.bottom,
+      scrollShellCanScroll: scrollShell.scrollHeight - scrollShell.clientHeight > 1
     };
   });
 }
@@ -951,6 +961,91 @@ test("desktop trade shell keeps the chart dominant while account tabs stay geome
 
       expect(Math.abs(geometry.accountHeight - baselineGeometry.accountHeight)).toBeLessThanOrEqual(1);
       expect(Math.abs(geometry.accountWidth - baselineGeometry.accountWidth)).toBeLessThanOrEqual(1);
+    }
+  }
+});
+
+test("desktop trade chart does not clip under zoom-equivalent viewports @regression", async ({
+  page
+}) => {
+  const reviewViewports = [
+    { width: 1440, height: 900 },
+    { width: 1280, height: 800 },
+    { width: 1285, height: 535 },
+    { width: 1102, height: 459 }
+  ];
+  const standardTabs = [
+    "balances",
+    "positions",
+    "open-orders",
+    "twap",
+    "trade-history",
+    "funding-history",
+    "order-history"
+  ];
+
+  for (const viewport of reviewViewports) {
+    const viewportLabel = `${viewport.width}x${viewport.height}`;
+    const expectsSidecarFlush = viewport.width >= 1280;
+    await page.setViewportSize(viewport);
+    await visitRoute(page, "/trade");
+
+    const chartCanvas = page.locator('[data-parity-id="chart-canvas"]');
+    const chartLibrary = chartCanvas.locator(".tv-lightweight-charts");
+
+    await expect(chartCanvas, `${viewportLabel} should render the trade chart canvas`).toBeVisible();
+    await expect(chartLibrary, `${viewportLabel} should mount the chart library host`).toBeVisible();
+    await waitForIdle(page, { quietMs: 250, timeoutMs: 7_000, pollMs: 50 });
+
+    let baselineGeometry = null;
+
+    for (const tab of standardTabs) {
+      await selectAccountTab(page, tab);
+      const geometry = await readTradeShellGeometry(page);
+
+      expect(
+        Math.abs(geometry.chartLibraryBottomMinusHostBottom),
+        `${viewportLabel} ${tab} chart library host should stay inside the chart canvas`
+      ).toBeLessThanOrEqual(1);
+      expect(
+        geometry.chartPanelBottomMinusChartCanvasBottom,
+        `${viewportLabel} ${tab} chart canvas should stay inside the chart panel`
+      ).toBeGreaterThanOrEqual(0);
+      expect(
+        geometry.accountTopMinusChartCanvasBottom,
+        `${viewportLabel} ${tab} account panel should not cover the chart canvas`
+      ).toBeGreaterThanOrEqual(0);
+      expect(
+        Math.abs(geometry.chartFlushDelta),
+        `${viewportLabel} ${tab} chart panel should stay flush with the account panel`
+      ).toBeLessThanOrEqual(1);
+      if (expectsSidecarFlush) {
+        expect(
+          Math.abs(geometry.orderbookFlushDelta),
+          `${viewportLabel} ${tab} order book should stay flush with the account panel`
+        ).toBeLessThanOrEqual(1);
+      }
+
+      if (viewport.height <= 535) {
+        expect(
+          geometry.scrollShellCanScroll,
+          `${viewportLabel} ${tab} short desktop shells should hand overflow to the outer scroll shell`
+        ).toBe(true);
+      }
+
+      if (!baselineGeometry) {
+        baselineGeometry = geometry;
+        continue;
+      }
+
+      expect(
+        Math.abs(geometry.accountHeight - baselineGeometry.accountHeight),
+        `${viewportLabel} ${tab} account tab changes should not resize the account panel height`
+      ).toBeLessThanOrEqual(1);
+      expect(
+        Math.abs(geometry.accountWidth - baselineGeometry.accountWidth),
+        `${viewportLabel} ${tab} account tab changes should not resize the account panel width`
+      ).toBeLessThanOrEqual(1);
     }
   }
 });

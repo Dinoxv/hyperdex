@@ -35,8 +35,10 @@
     (is (contains? right-divider-classes "right-[320px]"))
     (is (contains? (support/node-class-set chart-panel) "lg:row-start-1"))
     (is (some? grid-shell))
-    (is (= "minmax(24rem, 1fr) clamp(17rem, 32vh, 23rem)"
+    (is (= "minmax(var(--trade-chart-row-min-height), 1fr) var(--trade-account-panel-height)"
            (:grid-template-rows grid-style)))
+    (is (= "calc(var(--trade-chart-row-min-height) + var(--trade-account-panel-height))"
+           (:min-height grid-style)))
     (is (contains? (support/node-class-set grid-shell) "xl:grid-cols-[minmax(0,1fr)_280px_320px]"))
     (is (not (contains? (support/node-class-set grid-shell) "xl:row-span-2")))))
 
@@ -147,7 +149,9 @@
     (is (:desktop-layout? desktop-layout))
     (is (:show-equity-surface? desktop-layout))
     (is (:chart-panel-visible? desktop-layout))
-    (is (= "minmax(24rem, 1fr) clamp(17rem, 32vh, 23rem)"
+    (is (= "minmax(var(--trade-chart-row-min-height), 1fr) var(--trade-account-panel-height)"
            (:grid-template-rows (:grid-style desktop-layout))))
+    (is (= "calc(var(--trade-chart-row-min-height) + var(--trade-account-panel-height))"
+           (:min-height (:grid-style desktop-layout))))
     (is (contains? (set (:chart-panel-classes desktop-layout)) "lg:row-start-1"))
     (is (contains? (set (:account-panel-classes desktop-layout)) "xl:col-span-2"))))
