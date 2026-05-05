@@ -217,7 +217,7 @@
     (is (= :3m (:horizon underperform-view)))
     (is (= true (get underperform-values dirty-path)))))
 
-(deftest black-litterman-editor-save-uses-automatic-absolute-return-input-when-untouched-test
+(deftest black-litterman-editor-save-uses-baseline-sharpe-input-when-untouched-test
   (let [save-view (resolve-action 'save-portfolio-optimizer-black-litterman-editor-view)
         state (base-state
                {:portfolio
@@ -232,9 +232,8 @@
                   :history-data
                   {:candle-history-by-coin
                    {"BTC" [{:time 1000 :close "100"}
-                           {:time 2000 :close "101"}
-                           {:time 3000 :close "103.02"}
-                           {:time 4000 :close "106.1106"}]}
+                           {:time 2000 :close "100.01"}
+                           {:time 3000 :close "100.040003"}]}
                    :funding-history-by-coin {}}
                   :market-cap-by-coin {"BTC" 1}
                   :runtime {:as-of-ms 5000}}}
@@ -255,7 +254,7 @@
     (is (some? save-view))
     (is (= :absolute (:kind absolute-view)))
     (is (= "perp:BTC" (:instrument-id absolute-view)))
-    (is (near? 0.0365 (:return absolute-view)))))
+    (is (near? 0.073 (:return absolute-view)))))
 
 (deftest black-litterman-editor-save-rejects-invalid-relative-drafts-and-max-ten-views-test
   (let [save-view (resolve-action 'save-portfolio-optimizer-black-litterman-editor-view)

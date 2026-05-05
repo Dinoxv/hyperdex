@@ -20,5 +20,5 @@
   (let [request (:request readiness)]
     (if (and (= :ready (:status readiness))
              (= :black-litterman (get-in request [:return-model :kind])))
-      (engine-context/expected-return-inputs-by-instrument request)
+      (engine-context/baseline-expected-return-inputs-by-instrument request)
       {})))

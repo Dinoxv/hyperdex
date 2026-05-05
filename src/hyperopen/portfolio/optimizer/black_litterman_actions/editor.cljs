@@ -1,5 +1,5 @@
 (ns hyperopen.portfolio.optimizer.black-litterman-actions.editor
-  (:require [hyperopen.portfolio.optimizer.application.engine.context :as engine-context]
+  (:require [hyperopen.portfolio.optimizer.application.return-inputs :as return-inputs]
             [hyperopen.portfolio.optimizer.application.setup-readiness :as setup-readiness]
             [hyperopen.portfolio.optimizer.black-litterman-actions.common :as common]
             [hyperopen.portfolio.optimizer.black-litterman-actions.views :as views]))
@@ -78,12 +78,8 @@
 
 (defn- automatic-return-inputs
   [state]
-  (let [readiness (setup-readiness/build-readiness state)
-        request (:request readiness)]
-    (if (and (= :ready (:status readiness))
-             (= :black-litterman (get-in request [:return-model :kind])))
-      (engine-context/expected-return-inputs-by-instrument request)
-      {})))
+  (return-inputs/readiness-inputs-by-instrument
+   (setup-readiness/build-readiness state)))
 
 (defn- with-automatic-absolute-return-text
   [state kind draft editing?]

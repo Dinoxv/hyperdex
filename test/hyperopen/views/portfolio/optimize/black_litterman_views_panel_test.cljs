@@ -204,7 +204,7 @@
     (is (str/includes? panel-text "Alpha Yield"))
     (is (not (str/includes? panel-text vault-id)))))
 
-(deftest black-litterman-panel-prefills-absolute-return-with-sharpe-input-test
+(deftest black-litterman-panel-prefills-absolute-return-with-baseline-sharpe-input-test
   (let [draft {:universe [{:instrument-id "perp:BTC"
                            :market-type :perp
                            :coin "BTC"
@@ -216,8 +216,9 @@
                    :request {:universe (:universe draft)
                              :return-model (:return-model draft)
                              :risk-model (:risk-model draft)
+                             :periods-per-year 10
                              :history {:return-series-by-instrument
-                                       {"perp:BTC" [0.01 0.02 0.03]}}
+                                       {"perp:BTC" [0.01 0.03]}}
                              :black-litterman-prior
                              {:source :market-cap
                               :weights-by-instrument {"perp:BTC" 1}}}}
@@ -235,6 +236,6 @@
         preview (hiccup/find-by-data-role
                  panel
                  "portfolio-optimizer-black-litterman-preview-text")]
-    (is (= "3.65" (get-in return-input [1 :value])))
+    (is (= "20" (get-in return-input [1 :value])))
     (is (str/includes? (hiccup/node-text preview)
-                       "BTC expected return +3.65% annualized"))))
+                       "BTC expected return +20% annualized"))))

@@ -15,6 +15,11 @@
   (vec (or (get-in history [:expected-return-series-by-instrument instrument-id])
            (get-in history [:return-series-by-instrument instrument-id]))))
 
+(defn- expected-return-series?
+  [history instrument-id]
+  (contains? (or (:expected-return-series-by-instrument history) {})
+             instrument-id))
+
 (defn- return-intervals
   [history instrument-id]
   (vec (or (get-in history [:expected-return-intervals-by-instrument instrument-id])
@@ -56,7 +61,7 @@
          total-weight))))
 
 (defn- interval-observations
-  [history instrument-id series]
+  [history instrument-id series {:keys [allow-subdaily?]}]
   (let [intervals (return-intervals history instrument-id)]
     (when (= (count intervals) (count series))
       (let [observations (mapv (fn [simple-return {:keys [dt-days dt-years]}]
@@ -64,7 +69,9 @@
                                             (> simple-return -1)
                                             (or (nil? dt-days)
                                                 (and (math/finite-number? dt-days)
-                                                     (<= 1 dt-days)))
+                                                     (if allow-subdaily?
+                                                       (pos? dt-days)
+                                                       (<= 1 dt-days))))
                                             (math/finite-number? dt-years)
                                             (pos? dt-years))
                                    {:dt-years dt-years
@@ -75,10 +82,11 @@
                                series
                                intervals)]
         (when (and (every? some? observations)
-                   (some (fn [{:keys [dt-days]}]
-                           (or (nil? dt-days)
-                               (> dt-days 1)))
-                         intervals))
+                   (or allow-subdaily?
+                       (some (fn [{:keys [dt-days]}]
+                               (or (nil? dt-days)
+                                   (> dt-days 1)))
+                             intervals)))
           observations)))))
 
 (defn- geometric-annualized-return
@@ -92,7 +100,14 @@
 (defn- return-component
   [return-model periods-per-year history instrument-id series]
   (let [kind (:kind return-model)
-        observations (interval-observations history instrument-id series)]
+        observations (interval-observations
+                      history
+                      instrument-id
+                      series
+                      {:allow-subdaily?
+                       (and (expected-return-series? history instrument-id)
+                            (contains? #{:historical-mean :black-litterman}
+                                       kind))})]
     (or (case kind
           :ew-mean (when observations
                      (ew-mean (mapv :annualized-return observations)

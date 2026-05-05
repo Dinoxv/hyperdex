@@ -175,9 +175,8 @@ async function seedBlackLittermanAutomaticReturnState(page) {
       ),
       vector([
         candle(1000, "100"),
-        candle(2000, "101"),
-        candle(3000, "103.02"),
-        candle(4000, "106.1106")
+        candle(2000, "100.01"),
+        candle(3000, "100.040003")
       ])
     );
     state = c.assoc_in(
@@ -284,7 +283,7 @@ test("portfolio optimizer use my views editor flow exposes the Edit Views contra
   await expect(panel).toContainText(/views adjust expected returns only/i);
 });
 
-test("portfolio optimizer use my views prepopulates absolute return from Sharpe input @regression", async ({ page }) => {
+test("portfolio optimizer use my views prepopulates absolute return from baseline Sharpe input @regression", async ({ page }) => {
   test.setTimeout(90_000);
 
   await page.setViewportSize({ width: 900, height: 900 });
@@ -296,7 +295,7 @@ test("portfolio optimizer use my views prepopulates absolute return from Sharpe 
 
   const panel = page.locator("[data-role='portfolio-optimizer-black-litterman-panel']");
   const returnInput = panel.locator("[data-role='portfolio-optimizer-black-litterman-editor-return']");
-  await expect(returnInput).toHaveValue("3.65");
+  await expect(returnInput).toHaveValue("7.3");
   await expect(panel.locator("[data-role='portfolio-optimizer-black-litterman-preview-text']"))
-    .toContainText("BTC expected return +3.65% annualized");
+    .toContainText("BTC expected return +7.3% annualized");
 });
