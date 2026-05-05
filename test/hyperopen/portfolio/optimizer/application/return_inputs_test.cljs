@@ -25,6 +25,23 @@
     (is (near? 0.2 (get inputs "perp:BTC"))
         "Prefill should use the historical expected-return input for Sharpe, not BL equilibrium return.")))
 
+(deftest readiness-inputs-keep-single-asset-prefill-while-history-loading-test
+  (let [inputs (return-inputs/readiness-inputs-by-instrument
+                {:status :blocked
+                 :reason :history-loading
+                 :request {:universe [{:instrument-id "perp:BTC"}]
+                           :return-model {:kind :black-litterman
+                                          :views []}
+                           :risk-model {:kind :sample-covariance}
+                           :periods-per-year 10
+                           :history {:return-series-by-instrument
+                                     {"perp:BTC" [0.01 0.03]}}
+                           :black-litterman-prior
+                           {:source :market-cap
+                            :weights-by-instrument {"perp:BTC" 1}}}})]
+    (is (near? 0.2 (get inputs "perp:BTC"))
+        "A loading status should not suppress a usable single-asset baseline return.")))
+
 (deftest readiness-inputs-use-geometric-vault-window-return-when-history-has-subdaily-anchor-test
   (let [hlp-id "vault:0xdfc24b077bc1425ad1dea75bcb6f8158e10df303"
         inputs (return-inputs/readiness-inputs-by-instrument

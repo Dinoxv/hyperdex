@@ -199,6 +199,14 @@ async function seedBlackLittermanAutomaticReturnState(page) {
     );
     state = c.assoc_in(
       state,
+      c.PersistentVector.fromArray([kw("portfolio"), kw("optimizer"), kw("history-load-state")], true),
+      map([
+        kw("status"), kw("loading"),
+        kw("reason"), kw("selection-prefetch")
+      ])
+    );
+    state = c.assoc_in(
+      state,
       c.PersistentVector.fromArray(
         [kw("portfolio-ui"), kw("optimizer"), kw("black-litterman-editor")],
         true
@@ -283,7 +291,7 @@ test("portfolio optimizer use my views editor flow exposes the Edit Views contra
   await expect(panel).toContainText(/views adjust expected returns only/i);
 });
 
-test("portfolio optimizer use my views prepopulates absolute return from baseline Sharpe input @regression", async ({ page }) => {
+test("portfolio optimizer use my views prepopulates absolute return while history is loading @regression", async ({ page }) => {
   test.setTimeout(90_000);
 
   await page.setViewportSize({ width: 900, height: 900 });
