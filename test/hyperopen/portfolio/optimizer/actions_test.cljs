@@ -113,20 +113,20 @@
           "/trade"))))
 
 (deftest load-portfolio-optimizer-route-fetches-vault-metadata-for-universe-search-test
-  (is (= [[:effects/api-fetch-vault-index]
+  (is (= [[:effects/api-fetch-vault-index-with-cache]
           [:effects/api-fetch-vault-summaries]]
          (actions/load-portfolio-optimizer-route
           {:asset-selector {:phase :full}}
           "/portfolio/optimize/new")))
   (is (= [[:effects/load-portfolio-optimizer-scenario-index]
-          [:effects/api-fetch-vault-index]
+          [:effects/api-fetch-vault-index-with-cache]
           [:effects/api-fetch-vault-summaries]]
          (actions/load-portfolio-optimizer-route
           {:asset-selector {:phase :full}
            :vaults {}}
           "/portfolio/optimize")))
   (is (= [[:effects/load-portfolio-optimizer-scenario "scn_01"]
-          [:effects/api-fetch-vault-index]
+          [:effects/api-fetch-vault-index-with-cache]
           [:effects/api-fetch-vault-summaries]]
          (actions/load-portfolio-optimizer-route
           {:asset-selector {:phase :full}

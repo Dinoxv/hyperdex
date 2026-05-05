@@ -16,6 +16,14 @@ const OPTIMIZER_VAULT_LEADER_ADDRESS = "0x22222222222222222222222222222222222222
 const OPTIMIZER_EXACT_HLP_VAULT_ADDRESS = "0x4444444444444444444444444444444444444444";
 const OPTIMIZER_LARGE_HLP_VAULT_ADDRESS = "0x5555555555555555555555555555555555555555";
 const OPTIMIZER_MID_HLP_VAULT_ADDRESS = "0x6666666666666666666666666666666666666666";
+const OPTIMIZER_DEFAULT_VAULT_SUMMARY = {
+  vaultAddress: OPTIMIZER_VAULT_ADDRESS,
+  name: "Alpha Yield",
+  leader: OPTIMIZER_VAULT_LEADER_ADDRESS,
+  tvl: "5000000",
+  relationship: { type: "normal" },
+  createTimeMillis: 1777045900000
+};
 const OPTIMIZER_HLP_VAULT_SUMMARIES = [
   {
     vaultAddress: OPTIMIZER_EXACT_HLP_VAULT_ADDRESS,
@@ -397,15 +405,7 @@ async function seedOptimizerAssetSelectorMarkets(page) {
 }
 
 async function stubOptimizerVaultMetadata(page, vaultSummaries = null) {
-  const defaultVaultSummary = {
-    vaultAddress: OPTIMIZER_VAULT_ADDRESS,
-    name: "Alpha Yield",
-    leader: OPTIMIZER_VAULT_LEADER_ADDRESS,
-    tvl: "5000000",
-    relationship: { type: "normal" },
-    createTimeMillis: 1777045900000
-  };
-  const summaries = vaultSummaries ?? [defaultVaultSummary];
+  const summaries = vaultSummaries ?? [OPTIMIZER_DEFAULT_VAULT_SUMMARY];
 
   await page.route("https://stats-data.hyperliquid.xyz/Mainnet/vaults", async (route) => {
     await route.fulfill({
@@ -434,6 +434,83 @@ async function stubOptimizerVaultMetadata(page, vaultSummaries = null) {
     }
     await route.continue();
   });
+}
+
+async function seedOptimizerAssetSelectorFullPhase(page) {
+  await page.evaluate(() => {
+    const c = globalThis.cljs.core;
+    const kw = (name) => c.keyword(name);
+    const path = (...segments) =>
+      c.PersistentVector.fromArray(segments.map((segment) => kw(segment)), true);
+    const store = globalThis.hyperopen.system.store;
+    let state = c.assoc_in(c.deref(store), path("asset-selector", "phase"), kw("full"));
+    state = c.assoc_in(
+      state,
+      path("asset-selector", "markets"),
+      c.PersistentVector.fromArray([], true)
+    );
+    state = c.assoc_in(
+      state,
+      path("asset-selector", "market-by-key"),
+      c.PersistentArrayMap.fromArray([], true)
+    );
+    c.reset_BANG_(store, state);
+  });
+}
+
+async function putOptimizerVaultIndexCacheRecord(page, summaries) {
+  await page.evaluate(async (vaultSummaries) => {
+    const storeNames = [
+      "asset-selector-markets-cache",
+      "funding-history-cache",
+      "chart-visible-range-cache",
+      "vault-index-cache",
+      "leaderboard-preferences",
+      "leaderboard-cache",
+      "agent-locked-session",
+      "portfolio-optimizer"
+    ];
+    const cacheRecord = {
+      id: "vault-index-cache",
+      version: 1,
+      "saved-at-ms": 1777046000000,
+      etag: "\"optimizer-cache\"",
+      "last-modified": "Thu, 30 Apr 2026 10:00:00 GMT",
+      rows: vaultSummaries
+    };
+    const metadataRecord = {
+      id: "vault-index-cache:metadata",
+      version: 1,
+      "saved-at-ms": cacheRecord["saved-at-ms"],
+      etag: cacheRecord.etag,
+      "last-modified": cacheRecord["last-modified"]
+    };
+    const db = await new Promise((resolve, reject) => {
+      const request = indexedDB.open("hyperopen-persistence", 6);
+      request.onupgradeneeded = (event) => {
+        const database = event.target.result;
+        for (const storeName of storeNames) {
+          if (!database.objectStoreNames.contains(storeName)) {
+            database.createObjectStore(storeName);
+          }
+        }
+      };
+      request.onsuccess = (event) => resolve(event.target.result);
+      request.onerror = () => reject(request.error);
+      request.onblocked = () => reject(new Error("IndexedDB open blocked"));
+    });
+
+    await new Promise((resolve, reject) => {
+      const transaction = db.transaction(["vault-index-cache"], "readwrite");
+      const store = transaction.objectStore("vault-index-cache");
+      store.put(cacheRecord, "vault-index-cache");
+      store.put(metadataRecord, "vault-index-cache:metadata");
+      transaction.oncomplete = () => resolve(true);
+      transaction.onerror = () => reject(transaction.error);
+      transaction.onabort = () => reject(transaction.error);
+    });
+    db.close();
+  }, summaries);
 }
 
 async function seedOptimizerVaultRows(page) {
@@ -1199,6 +1276,82 @@ test("portfolio optimizer manual universe builder adds and removes assets @regre
   await ethAdd.click();
   await waitForIdle(page, { quietMs: 150, timeoutMs: 4_000, pollMs: 50 });
   await expect(ethSelected).toHaveCount(1);
+});
+
+test("portfolio optimizer vault search hydrates cached rows before live index completes @regression", async ({ page }) => {
+  let releaseLiveVaultIndex;
+  let liveReleased = false;
+  const liveVaultIndexReleased = new Promise((resolve) => {
+    releaseLiveVaultIndex = () => {
+      if (!liveReleased) {
+        liveReleased = true;
+        resolve();
+      }
+    };
+  });
+  let vaultIndexRequests = 0;
+
+  await page.route("https://stats-data.hyperliquid.xyz/Mainnet/vaults", async (route) => {
+    vaultIndexRequests += 1;
+    await liveVaultIndexReleased;
+    await route.fulfill({
+      status: 200,
+      contentType: "application/json",
+      body: JSON.stringify([OPTIMIZER_DEFAULT_VAULT_SUMMARY].map((summary) => ({ summary })))
+    });
+  });
+
+  await page.route("**/info", async (route) => {
+    const request = route.request();
+    if (request.method() === "POST") {
+      try {
+        const payload = request.postDataJSON();
+        if (payload?.type === "vaultSummaries") {
+          await route.fulfill({
+            status: 200,
+            contentType: "application/json",
+            body: JSON.stringify([OPTIMIZER_DEFAULT_VAULT_SUMMARY])
+          });
+          return;
+        }
+      } catch {
+        // Let non-JSON info requests follow the normal route.
+      }
+    }
+    await route.continue();
+  });
+
+  try {
+    await page.goto("/trade");
+    await waitForDebugBridge(page);
+    await debugCall(page, "qaReset");
+    await seedOptimizerAssetSelectorFullPhase(page);
+    await putOptimizerVaultIndexCacheRecord(page, [OPTIMIZER_DEFAULT_VAULT_SUMMARY]);
+    await debugCall(page, "dispatch", [
+      ":actions/navigate",
+      "/portfolio/optimize/new",
+      { "replace?": true }
+    ]);
+
+    await expect(page.locator("[data-role='portfolio-optimizer-setup-route-surface']"))
+      .toBeVisible();
+
+    const vaultKey = `vault:${OPTIMIZER_VAULT_ADDRESS}`;
+    const searchInput = page.locator("[data-role='portfolio-optimizer-universe-search-input']");
+    const vaultRow = page.locator(
+      `[data-role='portfolio-optimizer-universe-candidate-row-${vaultKey}']`
+    );
+
+    await searchInput.fill("alpha");
+    await expect(vaultRow).toBeVisible({ timeout: 4_000 });
+    await expect(vaultRow).toContainText("Alpha Yield");
+    await expect.poll(() => vaultIndexRequests, { timeout: 4_000 }).toBe(1);
+    expect(liveReleased).toBe(false);
+  } finally {
+    releaseLiveVaultIndex?.();
+    await waitForIdle(page, { quietMs: 150, timeoutMs: 4_000, pollMs: 50 })
+      .catch(() => {});
+  }
 });
 
 test("portfolio optimizer manual universe builder adds and removes vaults @regression", async ({ page }) => {
