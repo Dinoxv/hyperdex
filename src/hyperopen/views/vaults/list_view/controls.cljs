@@ -8,6 +8,8 @@
                           "w-full"
                           "items-center"
                           "justify-between"
+                          "min-h-12"
+                          "sm:min-h-0"
                           "rounded-md"
                           "px-2.5"
                           "py-1.5"
@@ -34,7 +36,10 @@
     [:details {:class ["relative" "group"]
                :data-role (str "vaults-" role-token "-menu")}
      [:summary {:class (into ["flex"
-                              "h-8"
+                              "h-11"
+                              "min-h-11"
+                              "sm:h-8"
+                              "sm:min-h-8"
                               "list-none"
                               "cursor-pointer"
                               "items-center"

@@ -155,6 +155,26 @@ async function stubVaultDetailTooltipFixture(page) {
   });
 }
 
+test("vault detail range menu uses phone-sized touch targets @regression", async ({ page }) => {
+  await stubVaultDetailTooltipFixture(page);
+  await page.setViewportSize({ width: 390, height: 844 });
+  await visitRoute(page, `/vaults/${VAULT_ADDRESS}`);
+
+  const trigger = page.locator("[data-role='vault-detail-chart-timeframe-trigger']");
+  await trigger.scrollIntoViewIfNeeded();
+  await expect(trigger).toBeVisible();
+
+  const triggerBox = await trigger.boundingBox();
+  expect(triggerBox?.height ?? 0).toBeGreaterThanOrEqual(44);
+
+  await trigger.click();
+  const option = page.locator("[data-role='vault-detail-chart-timeframe-option-one-year']");
+  await expect(option).toBeVisible();
+
+  const optionBox = await option.boundingBox();
+  expect(optionBox?.height ?? 0).toBeGreaterThanOrEqual(44);
+});
+
 for (const viewport of REVIEW_VIEWPORTS) {
   test(`vault detail returns tooltip labels the selected vault after hover ${viewport.label} @regression`, async ({ page }) => {
     await stubVaultDetailTooltipFixture(page);
