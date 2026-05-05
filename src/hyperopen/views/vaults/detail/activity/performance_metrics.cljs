@@ -235,6 +235,8 @@
                           value)
         estimated-row? (performance-metric-row-estimated? row benchmark-columns)]
     [:div {:class ["grid"
+                   "min-w-full"
+                   "w-max"
                    "items-center"
                    "justify-items-start"
                    "gap-3"
@@ -309,45 +311,11 @@
           "Loading benchmark history"]
          [:span {:class ["text-xs" "leading-5" "text-[#9fb4bb]"]}
           "Vault metrics stay visible while benchmark comparisons finish in the background."]]])
-     [:div {:class ["grid"
-                    "items-center"
-                    "justify-items-start"
-                    "gap-3"
-                    "border-b"
-                    "border-[#1f3b3c]"
-                    "bg-[#0a232d]"
-                    "px-4"
-                    "py-2.5"]
-            :style grid-style}
-      [:div {:class ["flex" "min-w-0" "items-center" "justify-between" "gap-2"]}
-       [:span {:class ["text-xs" "font-medium" "uppercase" "tracking-wide" "text-[#8aa0a7]"]}
-        "Metric"]
-       (when (and (seq timeframe-options)
-                  (keyword? selected-timeframe))
-         (chart/chart-timeframe-menu {:timeframe-options timeframe-options
-                                      :open? timeframe-menu-open?
-                                      :toggle-action :actions/toggle-vault-detail-performance-metrics-timeframe-dropdown
-                                      :close-action :actions/close-vault-detail-performance-metrics-timeframe-dropdown
-                                      :selected-timeframe selected-timeframe
-                                      :data-role-prefix "vault-detail-performance-metrics-timeframe"}))]
-      (for [[idx {:keys [coin label]}] (map-indexed vector benchmark-columns*)]
-        ^{:key (str "vault-detail-performance-metrics-benchmark-label-" coin)}
-        [:span {:class ["justify-self-start" "text-xs" "font-medium" "uppercase" "tracking-wide" "text-left" "text-[#8aa0a7]"]
-                :data-role (if (zero? idx)
-                             "vault-detail-performance-metrics-benchmark-label"
-                             (str "vault-detail-performance-metrics-benchmark-label-" coin))}
-         label])
-      [:span {:class ["justify-self-start" "text-xs" "font-medium" "uppercase" "tracking-wide" "text-left" "text-[#8aa0a7]"]
-              :data-role "vault-detail-performance-metrics-vault-label"}
-       (or (non-blank-text vault-label)
-           "Vault")]]
      [:div {:class ["flex-1"
                     "min-h-0"
-                    "space-y-2.5"
+                    "overflow-x-auto"
                     "overflow-y-auto"
                     "scrollbar-hide"
-                    "px-4"
-                    "py-3"
                     "focus:outline-none"
                     "focus:ring-1"
                     "focus:ring-inset"
@@ -356,12 +324,50 @@
             :role "region"
             :aria-label "Vault performance metrics"
             :tab-index 0}
-      (estimated-metrics-banner visible-reasons)
-      (for [[idx {:keys [id rows]}] (map-indexed vector visible-groups)]
-        ^{:key (str "vault-detail-performance-metrics-group-" (name id))}
-        [:div {:class (into ["space-y-1.5"]
-                            (when (pos? idx)
-                              ["border-t" "border-[#1f3b3c]" "pt-2.5"]))}
-         (for [{:keys [key] :as row} rows]
-           ^{:key (str "vault-detail-performance-metric-row-" (name key))}
-           (performance-metric-row row benchmark-columns* grid-style))])]]))
+      [:div {:class ["sticky"
+                     "top-0"
+                     "z-[1]"
+                     "grid"
+                     "min-w-full"
+                     "w-max"
+                     "items-center"
+                     "justify-items-start"
+                     "gap-3"
+                     "border-b"
+                     "border-[#1f3b3c]"
+                     "bg-[#0a232d]"
+                     "px-4"
+                     "py-2.5"]
+             :style grid-style}
+       [:div {:class ["flex" "min-w-0" "items-center" "justify-between" "gap-2"]}
+        [:span {:class ["text-xs" "font-medium" "uppercase" "tracking-wide" "text-[#8aa0a7]"]}
+         "Metric"]
+        (when (and (seq timeframe-options)
+                   (keyword? selected-timeframe))
+          (chart/chart-timeframe-menu {:timeframe-options timeframe-options
+                                       :open? timeframe-menu-open?
+                                       :toggle-action :actions/toggle-vault-detail-performance-metrics-timeframe-dropdown
+                                       :close-action :actions/close-vault-detail-performance-metrics-timeframe-dropdown
+                                       :selected-timeframe selected-timeframe
+                                       :data-role-prefix "vault-detail-performance-metrics-timeframe"}))]
+       (for [[idx {:keys [coin label]}] (map-indexed vector benchmark-columns*)]
+         ^{:key (str "vault-detail-performance-metrics-benchmark-label-" coin)}
+         [:span {:class ["justify-self-start" "text-xs" "font-medium" "uppercase" "tracking-wide" "text-left" "text-[#8aa0a7]"]
+                 :data-role (if (zero? idx)
+                              "vault-detail-performance-metrics-benchmark-label"
+                              (str "vault-detail-performance-metrics-benchmark-label-" coin))}
+          label])
+       [:span {:class ["justify-self-start" "text-xs" "font-medium" "uppercase" "tracking-wide" "text-left" "text-[#8aa0a7]"]
+               :data-role "vault-detail-performance-metrics-vault-label"}
+        (or (non-blank-text vault-label)
+            "Vault")]]
+      [:div {:class ["space-y-2.5" "px-4" "py-3"]}
+       (estimated-metrics-banner visible-reasons)
+       (for [[idx {:keys [id rows]}] (map-indexed vector visible-groups)]
+         ^{:key (str "vault-detail-performance-metrics-group-" (name id))}
+         [:div {:class (into ["min-w-full" "w-max" "space-y-1.5"]
+                             (when (pos? idx)
+                               ["border-t" "border-[#1f3b3c]" "pt-2.5"]))}
+          (for [{:keys [key] :as row} rows]
+            ^{:key (str "vault-detail-performance-metric-row-" (name key))}
+            (performance-metric-row row benchmark-columns* grid-style))])]]]))

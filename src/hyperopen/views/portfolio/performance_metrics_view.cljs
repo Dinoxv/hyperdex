@@ -113,6 +113,8 @@
                           value)
         estimated-row? (performance-metric-row-estimated? row benchmark-columns)]
     [:div {:class ["grid"
+                   "min-w-full"
+                   "w-max"
                    "items-center"
                    "justify-items-start"
                    "gap-3"
@@ -184,46 +186,56 @@
           "Calculating performance metrics"]
          [:span {:class ["text-xs" "leading-5" "text-trading-text-secondary"]}
           "Returns stay visible while the remaining analytics finish in the background."]]])
-     [:div {:class ["grid"
-                    "items-center"
-                    "justify-items-start"
-                    "gap-3"
-                    "border-b"
-                    "border-base-300"
-                    "bg-base-200/35"
-                    "px-4"
-                    "py-2.5"]
-            :style grid-style}
-      [:div {:class ["flex" "min-w-0" "items-center" "justify-between" "gap-2"]}
-       [:span {:class ["text-xs" "font-medium" "uppercase" "tracking-wide" "text-trading-text-secondary"]
-               :data-role "portfolio-performance-metrics-metric-label"}
-        "Metric"]
-       (when (map? time-range-selector)
-         [:div {:class ["flex" "items-center" "gap-1.5"]}
-          [:span {:class ["text-xs" "font-medium" "uppercase" "tracking-wide" "text-trading-text-secondary"]}
-           "Range"]
-          (summary-cards/summary-selector time-range-selector
-                                          :actions/toggle-portfolio-performance-metrics-time-range-dropdown
-                                          :actions/select-portfolio-summary-time-range
-                                          "portfolio-performance-metrics-time-range-selector")])]
-      (for [[idx {:keys [coin label]}] (map-indexed vector benchmark-columns*)]
-        ^{:key (str "portfolio-performance-metrics-benchmark-label-" coin)}
-        [:span {:class ["justify-self-start" "text-xs" "font-medium" "uppercase" "tracking-wide" "text-left" "text-trading-text-secondary"]
-                :data-role (if (zero? idx)
-                             "portfolio-performance-metrics-benchmark-label"
-                             (str "portfolio-performance-metrics-benchmark-label-" coin))}
-         label])
-      [:span {:class ["justify-self-start" "text-xs" "font-medium" "uppercase" "tracking-wide" "text-left" "text-trading-text-secondary"]
-              :data-role "portfolio-performance-metrics-portfolio-label"}
-       "Portfolio"]]
-     [:div {:class ["flex-1" "min-h-0" "space-y-2.5" "overflow-y-auto" "scrollbar-hide" "px-4" "py-3"]}
-      (low-confidence/estimated-metrics-banner visible-reasons)
-      (for [[idx {:keys [id rows]}] (map-indexed vector visible-groups)]
-        ^{:key (str "portfolio-performance-metrics-group-" (name id))}
-        [:div {:class (into ["space-y-1.5"]
-                            (when (pos? idx)
-                              ["border-t" "border-base-300" "pt-2.5"]))
-               :data-role (str "portfolio-performance-metrics-group-" (name id))}
-         (for [{:keys [key] :as row} rows]
-           ^{:key (str "portfolio-performance-metric-row-" (name key))}
-           (performance-metric-row row benchmark-columns* grid-style))])]]))
+     [:div {:class ["flex-1"
+                    "min-h-0"
+                    "overflow-x-auto"
+                    "overflow-y-auto"
+                    "scrollbar-hide"]}
+      [:div {:class ["sticky"
+                     "top-0"
+                     "z-[1]"
+                     "grid"
+                     "min-w-full"
+                     "w-max"
+                     "items-center"
+                     "justify-items-start"
+                     "gap-3"
+                     "border-b"
+                     "border-base-300"
+                     "bg-base-200"
+                     "px-4"
+                     "py-2.5"]
+             :style grid-style}
+       [:div {:class ["flex" "min-w-0" "items-center" "justify-between" "gap-2"]}
+        [:span {:class ["text-xs" "font-medium" "uppercase" "tracking-wide" "text-trading-text-secondary"]
+                :data-role "portfolio-performance-metrics-metric-label"}
+         "Metric"]
+        (when (map? time-range-selector)
+          [:div {:class ["flex" "items-center" "gap-1.5"]}
+           [:span {:class ["text-xs" "font-medium" "uppercase" "tracking-wide" "text-trading-text-secondary"]}
+            "Range"]
+           (summary-cards/summary-selector time-range-selector
+                                           :actions/toggle-portfolio-performance-metrics-time-range-dropdown
+                                           :actions/select-portfolio-summary-time-range
+                                           "portfolio-performance-metrics-time-range-selector")])]
+       (for [[idx {:keys [coin label]}] (map-indexed vector benchmark-columns*)]
+         ^{:key (str "portfolio-performance-metrics-benchmark-label-" coin)}
+         [:span {:class ["justify-self-start" "text-xs" "font-medium" "uppercase" "tracking-wide" "text-left" "text-trading-text-secondary"]
+                 :data-role (if (zero? idx)
+                              "portfolio-performance-metrics-benchmark-label"
+                              (str "portfolio-performance-metrics-benchmark-label-" coin))}
+          label])
+       [:span {:class ["justify-self-start" "text-xs" "font-medium" "uppercase" "tracking-wide" "text-left" "text-trading-text-secondary"]
+               :data-role "portfolio-performance-metrics-portfolio-label"}
+        "Portfolio"]]
+      [:div {:class ["space-y-2.5" "px-4" "py-3"]}
+       (low-confidence/estimated-metrics-banner visible-reasons)
+       (for [[idx {:keys [id rows]}] (map-indexed vector visible-groups)]
+         ^{:key (str "portfolio-performance-metrics-group-" (name id))}
+         [:div {:class (into ["min-w-full" "w-max" "space-y-1.5"]
+                             (when (pos? idx)
+                               ["border-t" "border-base-300" "pt-2.5"]))
+                :data-role (str "portfolio-performance-metrics-group-" (name id))}
+          (for [{:keys [key] :as row} rows]
+            ^{:key (str "portfolio-performance-metric-row-" (name key))}
+            (performance-metric-row row benchmark-columns* grid-style))])]]]))

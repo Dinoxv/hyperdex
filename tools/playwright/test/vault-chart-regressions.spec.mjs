@@ -175,6 +175,58 @@ test("vault detail range menu uses phone-sized touch targets @regression", async
   expect(optionBox?.height ?? 0).toBeGreaterThanOrEqual(44);
 });
 
+test("vault performance metrics keep scrolled value columns under their headers on mobile @regression", async ({ page }) => {
+  await stubVaultDetailTooltipFixture(page);
+  await page.setViewportSize({ width: 390, height: 844 });
+  await visitRoute(page, `/vaults/${VAULT_ADDRESS}`);
+
+  await expect(page.locator("[data-parity-id='vault-detail-root']")).toBeVisible();
+  await dispatch(page, [":actions/select-vault-detail-returns-benchmark", "HYPE"]);
+  await waitForIdle(page, { quietMs: 200, timeoutMs: 6_000, pollMs: 50 });
+
+  const scrollRegion = page.locator("[data-role='vault-detail-performance-metrics-scroll-region']");
+  await scrollRegion.scrollIntoViewIfNeeded();
+  await expect(scrollRegion).toBeVisible();
+
+  const horizontalScroll = await scrollRegion.evaluate((node) => {
+    node.scrollLeft = 160;
+    return {
+      scrollLeft: node.scrollLeft,
+      maxScrollLeft: node.scrollWidth - node.clientWidth
+    };
+  });
+
+  expect(horizontalScroll.maxScrollLeft).toBeGreaterThan(0);
+  expect(horizontalScroll.scrollLeft).toBeGreaterThan(0);
+
+  const vaultLabel = page.locator("[data-role='vault-detail-performance-metrics-vault-label']");
+  const hypeLabel = page.locator("[data-role='vault-detail-performance-metrics-benchmark-label-HYPE']");
+  const vaultValue = page.locator(
+    "[data-role='vault-detail-performance-metric-cumulative-return-vault-value']"
+  );
+  await expect(vaultLabel).toHaveText("Tooltip Vault");
+  await expect(hypeLabel).toContainText("HYPE");
+  await expect(vaultValue).toBeVisible();
+
+  const headerPaintCoverage = await page.evaluate(() => {
+    const label = document.querySelector("[data-role='vault-detail-performance-metrics-benchmark-label-HYPE']");
+    const header = label.parentElement;
+    return header.getBoundingClientRect().right - label.getBoundingClientRect().right;
+  });
+
+  expect(headerPaintCoverage).toBeGreaterThanOrEqual(0);
+
+  const alignment = await page.evaluate(() => {
+    const label = document.querySelector("[data-role='vault-detail-performance-metrics-vault-label']");
+    const value = document.querySelector(
+      "[data-role='vault-detail-performance-metric-cumulative-return-vault-value']"
+    );
+    return Math.abs(label.getBoundingClientRect().left - value.getBoundingClientRect().left);
+  });
+
+  expect(alignment).toBeLessThanOrEqual(4);
+});
+
 for (const viewport of REVIEW_VIEWPORTS) {
   test(`vault detail returns tooltip labels the selected vault after hover ${viewport.label} @regression`, async ({ page }) => {
     await stubVaultDetailTooltipFixture(page);
