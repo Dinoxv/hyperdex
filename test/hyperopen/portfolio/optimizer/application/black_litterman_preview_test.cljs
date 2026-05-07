@@ -67,3 +67,38 @@
       (is (< (get-in preview [:rows 1 :posterior-return])
              (get-in preview [:rows 1 :prior-return]))
           "A relative A-over-B view should lower B when baseline starts above A."))))
+
+(deftest build-preview-labels-vault-rows-from-universe-metadata-test
+  (is (some? build-preview))
+  (when build-preview
+    (let [vault-address "0x3333333333333333333333333333333333333333"
+          vault-id (str "vault:" vault-address)
+          preview (build-preview
+                   {:status :ready
+                    :request {:universe [{:instrument-id "perp:BTC"
+                                          :market-type :perp
+                                          :coin "BTC"}
+                                         {:instrument-id vault-id
+                                          :market-type :vault
+                                          :coin vault-id
+                                          :vault-address vault-address
+                                          :name "Alpha Yield"}]
+                              :return-model {:kind :black-litterman
+                                             :views [{:id "view-1"
+                                                      :kind :absolute
+                                                      :instrument-id vault-id
+                                                      :return 0.04
+                                                      :confidence 0.8
+                                                      :weights {vault-id 1}}]}
+                              :risk-model {:kind :sample-covariance}
+                              :periods-per-year 10
+                              :history {:return-series-by-instrument
+                                        {"perp:BTC" [0.01 0.02 -0.01 0.03]
+                                         vault-id [0.02 -0.01 0.04 0.01]}}
+                              :black-litterman-prior
+                              {:source :market-cap
+                               :weights-by-instrument {"perp:BTC" 0.5
+                                                       vault-id 0.5}}}})
+          vault-row (second (:rows preview))]
+      (is (= vault-id (:instrument-id vault-row)))
+      (is (= "Alpha Yield" (:label vault-row))))))

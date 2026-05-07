@@ -1,5 +1,6 @@
 (ns hyperopen.portfolio.optimizer.application.black-litterman-preview
-  (:require [hyperopen.portfolio.optimizer.application.engine.context :as engine-context]))
+  (:require [hyperopen.portfolio.optimizer.application.engine.context :as engine-context]
+            [hyperopen.portfolio.optimizer.application.instrument-labels :as instrument-labels]))
 
 (defn- instrument-ids
   [request]
@@ -32,11 +33,13 @@
       :else
       (let [prior (prior-returns-by-instrument request)
             posterior (posterior-returns-by-instrument request)
-            ids (instrument-ids request)]
+            ids (instrument-ids request)
+            labels (instrument-labels/labels-by-instrument (:universe request) ids)]
         {:status :ready
          :view-count (count (get-in request [:return-model :views]))
          :rows (mapv (fn [instrument-id]
                        {:instrument-id instrument-id
+                        :label (get labels instrument-id)
                         :prior-return (get prior instrument-id)
                         :posterior-return (get posterior instrument-id)})
                      ids)}))))

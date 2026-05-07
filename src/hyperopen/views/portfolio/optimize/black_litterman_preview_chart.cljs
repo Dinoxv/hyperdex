@@ -28,7 +28,8 @@
     [:div {:class ["grid" "grid-cols-[72px_minmax(0,1fr)_76px]" "items-center" "gap-3"
                    "border-b" "border-base-300" "py-2" "last:border-b-0"]}
      [:span {:class ["font-mono" "text-[0.6875rem]" "font-semibold"]}
-      (:instrument-id row)]
+      (or (:label row)
+          (:instrument-id row))]
      [:div {:class ["min-w-0" "space-y-1"]}
       [:div {:class ["h-1.5" "bg-base-300"]}
        [:div {:class ["h-full" "bg-info"]

@@ -218,6 +218,124 @@ async function seedBlackLittermanAutomaticReturnState(page) {
   await waitForIdle(page, { quietMs: 150, timeoutMs: 4_000, pollMs: 50 });
 }
 
+async function seedBlackLittermanVaultPreviewState(page) {
+  const vaultAddress = "0x3333333333333333333333333333333333333333";
+  const vaultId = `vault:${vaultAddress}`;
+
+  await page.evaluate(({ vaultAddress, vaultId }) => {
+    const c = globalThis.cljs.core;
+    const kw = (name) => c.keyword(name);
+    const map = (entries) => c.PersistentArrayMap.fromArray(entries, true);
+    const vector = (items) => c.PersistentVector.fromArray(items, true);
+    const candle = (time, close) => map([kw("time"), time, kw("close"), close]);
+    const dayStartMs = (day) => new Date(`${day}T00:00:00.000Z`).getTime();
+    const summaryFromPoints = (points) =>
+      map([
+        kw("accountValueHistory"),
+        vector(points.map(([timeMs, accountValue]) => vector([timeMs, accountValue]))),
+        kw("pnlHistory"),
+        vector(points.map(([timeMs, _accountValue, pnlValue]) => vector([timeMs, pnlValue])))
+      ]);
+
+    const t0 = dayStartMs("2026-05-01");
+    const t1 = dayStartMs("2026-05-02");
+    const t2 = dayStartMs("2026-05-03");
+    const t3 = dayStartMs("2026-05-04");
+    const btcInstrument = map([
+      kw("instrument-id"), "perp:BTC",
+      kw("market-type"), kw("perp"),
+      kw("coin"), "BTC",
+      kw("symbol"), "BTC-USDC"
+    ]);
+    const vaultInstrument = map([
+      kw("instrument-id"), vaultId,
+      kw("market-type"), kw("vault"),
+      kw("coin"), vaultId,
+      kw("vault-address"), vaultAddress,
+      kw("name"), "Alpha Yield"
+    ]);
+    const absoluteView = map([
+      kw("id"), "view-1",
+      kw("kind"), kw("absolute"),
+      kw("instrument-id"), vaultId,
+      kw("return"), 0.04,
+      kw("confidence"), 0.8,
+      kw("weights"), map([vaultId, 1])
+    ]);
+    const draft = map([
+      kw("universe"), vector([btcInstrument, vaultInstrument]),
+      kw("objective"), map([kw("kind"), kw("max-sharpe")]),
+      kw("return-model"), map([
+        kw("kind"), kw("black-litterman"),
+        kw("views"), vector([absoluteView])
+      ]),
+      kw("risk-model"), map([kw("kind"), kw("sample-covariance")]),
+      kw("constraints"), map([kw("long-only?"), true, kw("max-asset-weight"), 0.75])
+    ]);
+    const historyData = map([
+      kw("candle-history-by-coin"),
+      map([
+        "BTC",
+        vector([
+          candle(t0, "100"),
+          candle(t1, "101"),
+          candle(t2, "99"),
+          candle(t3, "102")
+        ])
+      ]),
+      kw("funding-history-by-coin"),
+      map([]),
+      kw("vault-details-by-address"),
+      map([
+        vaultAddress,
+        map([
+          kw("portfolio"),
+          map([
+            kw("month"),
+            summaryFromPoints([
+              [t0, 100, 0],
+              [t1, 102, 2],
+              [t2, 99, -1],
+              [t3, 104, 4]
+            ])
+          ])
+        ])
+      ])
+    ]);
+    const store = globalThis.hyperopen.system.store;
+    let state = c.deref(store);
+    state = c.assoc_in(
+      state,
+      c.PersistentVector.fromArray([kw("portfolio"), kw("optimizer"), kw("draft")], true),
+      draft
+    );
+    state = c.assoc_in(
+      state,
+      c.PersistentVector.fromArray([kw("portfolio"), kw("optimizer"), kw("history-data")], true),
+      historyData
+    );
+    state = c.assoc_in(
+      state,
+      c.PersistentVector.fromArray([kw("portfolio"), kw("optimizer"), kw("market-cap-by-coin")], true),
+      map(["BTC", 100, vaultId, 100])
+    );
+    state = c.assoc_in(
+      state,
+      c.PersistentVector.fromArray([kw("portfolio"), kw("optimizer"), kw("runtime"), kw("as-of-ms")], true),
+      t3 + 24 * 60 * 60 * 1000
+    );
+    state = c.assoc_in(
+      state,
+      c.PersistentVector.fromArray([kw("portfolio"), kw("optimizer"), kw("history-load-state")], true),
+      map([kw("status"), kw("idle")])
+    );
+    c.reset_BANG_(store, state);
+  }, { vaultAddress, vaultId });
+
+  await waitForIdle(page, { quietMs: 150, timeoutMs: 4_000, pollMs: 50 });
+  return { vaultId };
+}
+
 async function widthRatio(child, parent) {
   const [childBox, parentBox] = await Promise.all([
     child.boundingBox(),
@@ -306,4 +424,20 @@ test("portfolio optimizer use my views prepopulates absolute return while histor
   await expect(returnInput).toHaveValue("7.3");
   await expect(panel.locator("[data-role='portfolio-optimizer-black-litterman-preview-text']"))
     .toContainText("BTC expected return +7.3% annualized");
+});
+
+test("portfolio optimizer use my views preview labels vault rows by name @regression", async ({ page }) => {
+  test.setTimeout(90_000);
+
+  await page.setViewportSize({ width: 900, height: 900 });
+  await visitRoute(page, "/portfolio/optimize/new");
+  await expect(page.locator("[data-role='portfolio-optimizer-setup-route-surface']"))
+    .toBeVisible({ timeout: 60_000 });
+
+  const { vaultId } = await seedBlackLittermanVaultPreviewState(page);
+  const preview = page.locator("[data-role='portfolio-optimizer-black-litterman-preview-panel']");
+
+  await expect(preview).toBeVisible();
+  await expect(preview).toContainText("Alpha Yield");
+  await expect(preview).not.toContainText(vaultId);
 });
