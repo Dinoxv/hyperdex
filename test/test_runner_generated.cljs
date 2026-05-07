@@ -187,6 +187,7 @@
             [hyperopen.portfolio.metrics.parsing-test]
             [hyperopen.portfolio.metrics.quantstats-parity-test]
             [hyperopen.portfolio.optimizer.actions-test]
+            [hyperopen.portfolio.optimizer.application.black-litterman-calibration-test]
             [hyperopen.portfolio.optimizer.application.black-litterman-preview-test]
             [hyperopen.portfolio.optimizer.application.current-portfolio-test]
             [hyperopen.portfolio.optimizer.application.engine-test]
@@ -802,6 +803,7 @@
              'hyperopen.portfolio.metrics.parsing-test
              'hyperopen.portfolio.metrics.quantstats-parity-test
              'hyperopen.portfolio.optimizer.actions-test
+             'hyperopen.portfolio.optimizer.application.black-litterman-calibration-test
              'hyperopen.portfolio.optimizer.application.black-litterman-preview-test
              'hyperopen.portfolio.optimizer.application.current-portfolio-test
              'hyperopen.portfolio.optimizer.application.engine-test

@@ -1,10 +1,5 @@
-(ns hyperopen.portfolio.optimizer.application.black-litterman-preview)
-
-(defn- finite-number?
-  [value]
-  (and (number? value)
-       (not (js/isNaN value))
-       (js/isFinite value)))
+(ns hyperopen.portfolio.optimizer.application.black-litterman-preview
+  (:require [hyperopen.portfolio.optimizer.application.engine.context :as engine-context]))
 
 (defn- instrument-ids
   [request]
@@ -12,62 +7,11 @@
 
 (defn- prior-returns-by-instrument
   [request]
-  (let [prior (get-in request [:black-litterman-prior :weights-by-instrument])]
-    (into {}
-          (map (fn [instrument-id]
-                 [instrument-id (or (get prior instrument-id) 0)]))
-          (instrument-ids request))))
-
-(defn- view-weights
-  [view]
-  (or (:weights view)
-      (case (:kind view)
-        :absolute
-        (when-let [instrument-id (:instrument-id view)]
-          {instrument-id 1})
-        :relative
-        (let [instrument-id (:instrument-id view)
-              comparator-id (:comparator-instrument-id view)]
-          (when (and instrument-id comparator-id)
-            (case (:direction view)
-              :underperform {instrument-id -1
-                             comparator-id 1}
-              {instrument-id 1
-               comparator-id -1})))
-        nil)))
-
-(defn- view-current-return
-  [returns view]
-  (reduce-kv (fn [acc instrument-id weight]
-               (+ acc (* weight (or (get returns instrument-id) 0))))
-             0
-             (or (view-weights view) {})))
-
-(defn- apply-view
-  [returns view]
-  (let [weights (view-weights view)
-        q (:return view)
-        omega (or (:confidence-variance view) 1)]
-    (if (and (map? weights)
-             (seq weights)
-             (finite-number? q))
-      (let [current (view-current-return returns view)
-            denominator (+ (reduce + (map #(js/Math.abs %) (vals weights)))
-                           (max 0 omega))
-            adjustment (if (pos? denominator)
-                         (/ (- q current) denominator)
-                         0)]
-        (reduce-kv (fn [acc instrument-id weight]
-                     (update acc instrument-id (fnil + 0) (* weight adjustment)))
-                   returns
-                   weights))
-      returns)))
+  (engine-context/baseline-expected-return-inputs-by-instrument request))
 
 (defn- posterior-returns-by-instrument
   [request]
-  (reduce apply-view
-          (prior-returns-by-instrument request)
-          (get-in request [:return-model :views])))
+  (engine-context/expected-return-inputs-by-instrument request))
 
 (defn build-preview
   [readiness]

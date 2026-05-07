@@ -17,8 +17,9 @@
              :return-model {:kind :black-litterman
                             :views views}
              :risk-model {:kind :sample-covariance}
-             :history {:return-series-by-instrument {"A" [1 2 3]
-                                                     "B" [2 4 6]}}
+             :periods-per-year 10
+             :history {:return-series-by-instrument {"A" [0.01 0.03 0.02]
+                                                     "B" [0.04 0.01 0.04]}}
              :black-litterman-prior {:source :market-cap
                                      :weights-by-instrument {"A" 0.6
                                                              "B" 0.4}}}})
@@ -57,7 +58,12 @@
                                 "B" -1}}]))]
       (is (= :ready (:status preview)))
       (is (= ["A" "B"] (mapv :instrument-id (:rows preview))))
-      (is (near? 0.6 (get-in preview [:rows 0 :prior-return])))
-      (is (near? 0.4 (get-in preview [:rows 1 :prior-return])))
-      (is (near? 0.5666666667 (get-in preview [:rows 0 :posterior-return])))
-      (is (near? 0.4333333333 (get-in preview [:rows 1 :posterior-return]))))))
+      (is (near? 0.2 (get-in preview [:rows 0 :prior-return]))
+          "Preview should label baseline expected returns as priors, not prior weights.")
+      (is (near? 0.3 (get-in preview [:rows 1 :prior-return])))
+      (is (> (get-in preview [:rows 0 :posterior-return])
+             (get-in preview [:rows 0 :prior-return]))
+          "A relative A-over-B view should raise A when baseline starts below B.")
+      (is (< (get-in preview [:rows 1 :posterior-return])
+             (get-in preview [:rows 1 :prior-return]))
+          "A relative A-over-B view should lower B when baseline starts above A."))))

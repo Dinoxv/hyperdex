@@ -43,30 +43,41 @@
     :periods-per-year (:periods-per-year request)
     :history (:history request)}))
 
-(defn- expected-return-result
-  [request risk-result]
-  (if (= :black-litterman (return-model-kind request))
-    (let [base (base-return-estimate request)
-          posterior (black-litterman/posterior-returns
-                     {:instrument-ids (:instrument-ids risk-result)
-                      :covariance (:covariance risk-result)
-                      :prior-weights (prior-weights request (:instrument-ids risk-result))
-                      :risk-aversion (get-in request [:return-model :risk-aversion])
-                      :tau (get-in request [:return-model :tau])
-                      :views (get-in request [:return-model :views])
-                      :prior-source (get-in request [:black-litterman-prior :source])})]
-      {:model :black-litterman
-       :instrument-ids (:instrument-ids posterior)
-       :expected-returns-by-instrument (:expected-returns-by-instrument posterior)
-       :decomposition-by-instrument (:decomposition-by-instrument base)
-       :diagnostics (:diagnostics posterior)
-       :warnings (:warnings base)})
-    (base-return-estimate request)))
-
 (defn expected-return-vector
   [return-result instrument-ids]
   (mapv #(or (get-in return-result [:expected-returns-by-instrument %]) 0)
         instrument-ids))
+
+(defn- expected-return-result
+  [request risk-result]
+  (if (= :black-litterman (return-model-kind request))
+    (let [base (base-return-estimate request)
+          baseline-prior-returns (expected-return-vector base
+                                                         (:instrument-ids risk-result))
+          posterior (black-litterman/posterior-returns
+                     {:instrument-ids (:instrument-ids risk-result)
+                      :covariance (:covariance risk-result)
+                      :prior-weights (prior-weights request (:instrument-ids risk-result))
+                      :prior-returns baseline-prior-returns
+                      :risk-aversion (get-in request [:return-model :risk-aversion])
+                      :tau (get-in request [:return-model :tau])
+                      :views (get-in request [:return-model :views])
+                      :prior-source (get-in request [:black-litterman-prior :source])})
+          posterior-diagnostics (:diagnostics posterior)
+          diagnostics (assoc posterior-diagnostics
+                             :prior-return-source
+                             (if (= :provided (:prior-return-source posterior-diagnostics))
+                               :baseline-expected-returns
+                               (:prior-return-source posterior-diagnostics))
+                             :weight-prior-source
+                             (get-in request [:black-litterman-prior :source]))]
+      {:model :black-litterman
+       :instrument-ids (:instrument-ids posterior)
+       :expected-returns-by-instrument (:expected-returns-by-instrument posterior)
+       :decomposition-by-instrument (:decomposition-by-instrument base)
+       :diagnostics diagnostics
+       :warnings (:warnings base)})
+    (base-return-estimate request)))
 
 (defn expected-return-inputs-by-instrument
   "Returns the same ordered expected-return inputs used by objective scoring."
