@@ -61,6 +61,25 @@
     (is (not= (get-in btc-prior [1 :x])
               (get-in btc-posterior [1 :x])))))
 
+(deftest black-litterman-preview-chart-renders-key-inside-chart-bottom-test
+  (let [panel (ready-preview-panel)
+        chart (hiccup/find-by-data-role
+               panel
+               "portfolio-optimizer-black-litterman-preview-svg")
+        legend (hiccup/find-by-data-role
+                chart
+                "portfolio-optimizer-black-litterman-preview-legend")
+        legend-text (hiccup/node-text legend)]
+    (is (some? legend))
+    (is (= :g (first legend)))
+    (is (= "translate(0 296)" (get-in legend [1 :transform])))
+    (is (= "translate(232 0)" (get-in legend [2 1 :transform])))
+    (is (= "translate(552 0)" (get-in legend [3 1 :transform])))
+    (is (str/includes? legend-text "Market reference"))
+    (is (str/includes? legend-text "(prior)"))
+    (is (str/includes? legend-text "Combined output"))
+    (is (str/includes? legend-text "(posterior)"))))
+
 (deftest black-litterman-preview-chart-renders-vault-name-instead-of-address-test
   (let [vault-address "0x3333333333333333333333333333333333333333"
         vault-id (str "vault:" vault-address)

@@ -469,6 +469,15 @@ test("portfolio optimizer use my views preview renders vertical bars across revi
         return {
           prior: readRect("portfolio-optimizer-black-litterman-preview-bar-prior-perp:BTC"),
           posterior: readRect("portfolio-optimizer-black-litterman-preview-bar-posterior-perp:BTC"),
+          legendTransform: svg
+            .querySelector("[data-role='portfolio-optimizer-black-litterman-preview-legend']")
+            ?.getAttribute("transform"),
+          legendItemTransforms: Array.from(
+            svg.querySelectorAll("[data-role='portfolio-optimizer-black-litterman-preview-legend'] > g")
+          ).map((legendItem) => legendItem.getAttribute("transform")),
+          legendText: svg
+            .querySelector("[data-role='portfolio-optimizer-black-litterman-preview-legend']")
+            ?.textContent,
           horizontalOverflow: document.documentElement.scrollWidth - window.innerWidth
         };
       });
@@ -481,6 +490,14 @@ test("portfolio optimizer use my views preview renders vertical bars across revi
       .toBe(chartGeometry.posterior.width);
     expect(chartGeometry.prior.x, `${viewport.id} grouped bar x separation`)
       .not.toBe(chartGeometry.posterior.x);
+    expect(chartGeometry.legendTransform, `${viewport.id} legend position`)
+      .toBe("translate(0 296)");
+    expect(chartGeometry.legendItemTransforms, `${viewport.id} legend columns`)
+      .toEqual(["translate(232 0)", "translate(552 0)"]);
+    expect(chartGeometry.legendText, `${viewport.id} legend text`)
+      .toContain("Market reference");
+    expect(chartGeometry.legendText, `${viewport.id} legend text`)
+      .toContain("Combined output");
     expect(chartGeometry.horizontalOverflow, `${viewport.id} horizontal overflow`).toBeLessThanOrEqual(1);
   }
 });

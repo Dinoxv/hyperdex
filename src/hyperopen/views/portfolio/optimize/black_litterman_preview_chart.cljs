@@ -6,11 +6,13 @@
   ["font-mono" "text-[0.625rem]" "font-semibold" "uppercase" "tracking-[0.08em]" "text-trading-muted/70"])
 
 (def ^:private chart-width 760)
-(def ^:private chart-height 286)
+(def ^:private chart-height 326)
 (def ^:private chart-plot-left 48)
 (def ^:private chart-plot-right 736)
 (def ^:private chart-plot-top 26)
 (def ^:private chart-plot-bottom 224)
+(def ^:private chart-legend-y 296)
+(def ^:private chart-legend-column-gap 320)
 
 (def ^:private chart-grid-stroke "rgb(90 95 104 / 0.22)")
 (def ^:private chart-axis-stroke "rgb(90 95 104 / 0.38)")
@@ -178,6 +180,41 @@
                 :stroke chart-grid-stroke}]))
     (chart-ticks domain))])
 
+(defn- legend-item
+  [center-x fill label qualifier]
+  [:g {:transform (str "translate(" center-x " 0)")}
+   [:rect {:x -84
+           :y -8
+           :width 12
+           :height 12
+           :fill fill}]
+   [:text {:x -60
+           :y -4
+           :fill "currentColor"
+           :fontSize 12
+           :letterSpacing 2.4
+           :opacity 0.72
+           :text-anchor "start"}
+    label]
+   [:text {:x -60
+           :y 18
+           :fill "currentColor"
+           :fontSize 12
+           :letterSpacing 2.4
+           :opacity 0.72
+           :text-anchor "start"}
+    qualifier]])
+
+(defn- chart-legend
+  []
+  (let [center-x (/ (+ chart-plot-left chart-plot-right) 2)
+        prior-x (- center-x (/ chart-legend-column-gap 2))
+        posterior-x (+ center-x (/ chart-legend-column-gap 2))]
+    [:g {:transform (str "translate(0 " chart-legend-y ")")
+         :data-role "portfolio-optimizer-black-litterman-preview-legend"}
+     (legend-item prior-x prior-fill "Market reference" "(prior)")
+     (legend-item posterior-x posterior-fill "Combined output" "(posterior)")]))
+
 (defn- preview-chart
   [rows]
   (let [row-count (count rows)
@@ -186,7 +223,7 @@
     [:div {:class ["mt-4" "overflow-hidden" "border" "border-base-300" "bg-base-200/20" "p-3"]
            :data-role "portfolio-optimizer-black-litterman-preview-chart-box"}
      [:svg {:viewBox (str "0 0 " chart-width " " chart-height)
-            :class ["h-[17.875rem]" "w-full" "overflow-visible" "text-trading-text"]
+            :class ["h-[20.375rem]" "w-full" "overflow-visible" "text-trading-text"]
             :data-role "portfolio-optimizer-black-litterman-preview-svg"
             :aria-label "Expected return per asset chart. Bars compare market reference prior returns against combined posterior output."}
       (chart-grid domain)
@@ -213,7 +250,8 @@
            (delta-label domain row-count idx row)])
         rows)]
       [:g {:data-role "portfolio-optimizer-black-litterman-preview-x-axis"}
-       (map-indexed (partial asset-label row-count) rows)]]]))
+       (map-indexed (partial asset-label row-count) rows)]
+      (chart-legend)]]))
 
 (defn black-litterman-preview-panel
   [readiness]
@@ -224,17 +262,7 @@
       [:div
        [:p {:class eyebrow-class} "Expected return per asset - annualized"]
        [:h3 {:class ["mt-2" "text-[0.875rem]" "font-medium"]}
-        "Market reference vs combined output"]]
-      [:div {:class ["flex" "items-center" "gap-3" "font-mono" "text-[0.625rem]"
-                     "uppercase" "tracking-[0.08em]" "text-trading-muted"]}
-       [:span {:class ["inline-flex" "items-center" "gap-1.5"]}
-        [:span {:class ["h-2" "w-2" "bg-info"]
-                :aria-hidden "true"}]
-        "Market reference (prior)"]
-       [:span {:class ["inline-flex" "items-center" "gap-1.5"]}
-        [:span {:class ["h-2" "w-2" "bg-warning"]
-                :aria-hidden "true"}]
-        "Combined output (posterior)"]]]
+        "Market reference vs combined output"]]]
      (case (:status preview)
        :ready
        (preview-chart (:rows preview))
