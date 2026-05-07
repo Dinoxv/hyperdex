@@ -5,42 +5,215 @@
 (def ^:private eyebrow-class
   ["font-mono" "text-[0.625rem]" "font-semibold" "uppercase" "tracking-[0.08em]" "text-trading-muted/70"])
 
+(def ^:private chart-width 760)
+(def ^:private chart-height 286)
+(def ^:private chart-plot-left 48)
+(def ^:private chart-plot-right 736)
+(def ^:private chart-plot-top 26)
+(def ^:private chart-plot-bottom 224)
+
+(def ^:private chart-grid-stroke "rgb(90 95 104 / 0.22)")
+(def ^:private chart-axis-stroke "rgb(90 95 104 / 0.38)")
+(def ^:private prior-fill "#6b8db5")
+(def ^:private posterior-fill "#d4b558")
+
 (defn- finite-number?
   [value]
   (and (number? value)
        (not (js/isNaN value))
        (js/isFinite value)))
 
-(defn- row-bar-width
-  [value max-abs]
-  (if (and (finite-number? value)
-           (pos? max-abs))
-    (str (max 2 (* 100 (/ (js/Math.abs value) max-abs))) "%")
-    "2%"))
+(defn- finite-preview-values
+  [rows]
+  (filter finite-number?
+          (mapcat (juxt :prior-return :posterior-return) rows)))
 
-(defn- preview-row
-  [max-abs row]
+(defn- chart-domain
+  [rows]
+  (if-let [values (seq (finite-preview-values rows))]
+    (let [domain-min (min 0 (apply min values))
+          domain-max (max 0 (apply max values))
+          span (max 0.0001 (- domain-max domain-min))
+          padding (* span 0.08)]
+      [(if (neg? domain-min) (- domain-min padding) 0)
+       (if (pos? domain-max) (+ domain-max padding) 0.01)])
+    [0 0.01]))
+
+(defn- chart-y
+  [[domain-min domain-max] value]
+  (if (and (finite-number? value)
+           (not= domain-min domain-max))
+    (+ chart-plot-top
+       (* (/ (- domain-max value)
+             (- domain-max domain-min))
+          (- chart-plot-bottom chart-plot-top)))
+    chart-plot-bottom))
+
+(defn- chart-ticks
+  [[domain-min domain-max]]
+  (let [step (/ (- domain-max domain-min) 4)]
+    (mapv #(+ domain-min (* step %)) (range 5))))
+
+(defn- group-step
+  [row-count]
+  (/ (- chart-plot-right chart-plot-left) (max 1 row-count)))
+
+(defn- bar-width
+  [row-count]
+  (let [step (group-step row-count)]
+    (max 8 (min 24 (/ step 3)))))
+
+(defn- group-center-x
+  [row-count idx]
+  (+ chart-plot-left
+     (* (group-step row-count) idx)
+     (/ (group-step row-count) 2)))
+
+(defn- bar-x
+  [row-count idx series-index]
+  (let [width (bar-width row-count)
+        gap 5
+        group-start (- (group-center-x row-count idx)
+                       width
+                       (/ gap 2))]
+    (+ group-start
+       (* series-index (+ width gap)))))
+
+(defn- bar-rect
+  [domain row-count idx row series-key value]
+  (when (finite-number? value)
+    (let [zero-y (chart-y domain 0)
+          value-y (chart-y domain value)
+          height (max 1 (js/Math.abs (- zero-y value-y)))
+          y (min zero-y value-y)
+          series-index (case series-key
+                         :prior 0
+                         :posterior 1)]
+      [:rect {:key (str (name series-key) "-" idx)
+              :x (bar-x row-count idx series-index)
+              :y y
+              :width (bar-width row-count)
+              :height height
+              :fill (case series-key
+                      :prior prior-fill
+                      :posterior posterior-fill)
+              :rx 0
+              :data-role (str "portfolio-optimizer-black-litterman-preview-bar-"
+                              (name series-key)
+                              "-"
+                              (:instrument-id row))
+              :aria-label (str (or (:label row) (:instrument-id row))
+                               " "
+                               (case series-key
+                                 :prior "market reference "
+                                 :posterior "combined output ")
+                               (opt-format/format-pct value)
+                               " annualized")}])))
+
+(defn- delta-label
+  [domain row-count idx row]
   (let [prior (:prior-return row)
         posterior (:posterior-return row)
         delta (when (and (finite-number? prior)
                          (finite-number? posterior))
                 (- posterior prior))]
-    [:div {:class ["grid" "grid-cols-[72px_minmax(0,1fr)_76px]" "items-center" "gap-3"
-                   "border-b" "border-base-300" "py-2" "last:border-b-0"]}
-     [:span {:class ["font-mono" "text-[0.6875rem]" "font-semibold"]}
-      (or (:label row)
-          (:instrument-id row))]
-     [:div {:class ["min-w-0" "space-y-1"]}
-      [:div {:class ["h-1.5" "bg-base-300"]}
-       [:div {:class ["h-full" "bg-info"]
-              :style {:width (row-bar-width prior max-abs)}}]]
-      [:div {:class ["h-1.5" "bg-base-300"]}
-       [:div {:class ["h-full" "bg-warning"]
-              :style {:width (row-bar-width posterior max-abs)}}]]]
-     [:span {:class ["text-right" "font-mono" "text-[0.65625rem]" "text-trading-muted"]}
-      (if (finite-number? delta)
-        (opt-format/format-pct-delta delta {:suffix ""})
-        "N/A")]]))
+    (when (and (finite-number? delta)
+               (>= (js/Math.abs delta) 0.005))
+      (let [value-y (min (chart-y domain prior)
+                         (chart-y domain posterior))]
+        [:text {:key (str "delta-" idx)
+                :x (group-center-x row-count idx)
+                :y (max 12 (- value-y 9))
+                :fill "currentColor"
+                :fontSize 9
+                :opacity 0.66
+                :text-anchor "middle"
+                :data-role (str "portfolio-optimizer-black-litterman-preview-view-delta-"
+                                (:instrument-id row))}
+         (str "view " (opt-format/format-pct-delta delta {:suffix ""}))]))))
+
+(defn- tick-label
+  [domain idx value]
+  (let [y (chart-y domain value)]
+    [:text {:key (str "y-label-" idx)
+            :x (- chart-plot-left 10)
+            :y (+ y 4)
+            :fill "currentColor"
+            :fontSize 9
+            :opacity 0.58
+            :text-anchor "end"
+            :data-role (str "portfolio-optimizer-black-litterman-preview-y-tick-" idx)}
+     (opt-format/format-pct value {:minimum-fraction-digits 0
+                                   :maximum-fraction-digits 0})]))
+
+(defn- label-text
+  [row]
+  (or (:label row)
+      (:instrument-id row)))
+
+(defn- asset-label
+  [row-count idx row]
+  [:text {:key (str "x-label-" idx)
+          :x (group-center-x row-count idx)
+          :y (+ chart-plot-bottom 24)
+          :fill "currentColor"
+          :fontSize 10
+          :opacity 0.72
+          :text-anchor "middle"
+          :data-role (str "portfolio-optimizer-black-litterman-preview-x-label-"
+                          (:instrument-id row))}
+   (label-text row)])
+
+(defn- chart-grid
+  [domain]
+  [:g {:data-role "portfolio-optimizer-black-litterman-preview-grid"}
+   (map-indexed
+    (fn [idx value]
+      (let [y (chart-y domain value)]
+        [:line {:key (str "grid-" idx)
+                :x1 chart-plot-left
+                :x2 chart-plot-right
+                :y1 y
+                :y2 y
+                :stroke chart-grid-stroke}]))
+    (chart-ticks domain))])
+
+(defn- preview-chart
+  [rows]
+  (let [row-count (count rows)
+        domain (chart-domain rows)
+        zero-y (chart-y domain 0)]
+    [:div {:class ["mt-4" "overflow-hidden" "border" "border-base-300" "bg-base-200/20" "p-3"]
+           :data-role "portfolio-optimizer-black-litterman-preview-chart-box"}
+     [:svg {:viewBox (str "0 0 " chart-width " " chart-height)
+            :class ["h-[17.875rem]" "w-full" "overflow-visible" "text-trading-text"]
+            :data-role "portfolio-optimizer-black-litterman-preview-svg"
+            :aria-label "Expected return per asset chart. Bars compare market reference prior returns against combined posterior output."}
+      (chart-grid domain)
+      [:line {:x1 chart-plot-left
+              :x2 chart-plot-right
+              :y1 zero-y
+              :y2 zero-y
+              :stroke chart-axis-stroke}]
+      [:line {:x1 chart-plot-left
+              :x2 chart-plot-left
+              :y1 chart-plot-top
+              :y2 chart-plot-bottom
+              :stroke chart-axis-stroke}]
+      [:g {:data-role "portfolio-optimizer-black-litterman-preview-y-axis"}
+       (map-indexed (partial tick-label domain) (chart-ticks domain))]
+      [:g {:data-role "portfolio-optimizer-black-litterman-preview-bars"}
+       (map-indexed
+        (fn [idx row]
+          [:g {:key (str "asset-" idx)
+               :data-role (str "portfolio-optimizer-black-litterman-preview-asset-"
+                               (:instrument-id row))}
+           (bar-rect domain row-count idx row :prior (:prior-return row))
+           (bar-rect domain row-count idx row :posterior (:posterior-return row))
+           (delta-label domain row-count idx row)])
+        rows)]
+      [:g {:data-role "portfolio-optimizer-black-litterman-preview-x-axis"}
+       (map-indexed (partial asset-label row-count) rows)]]]))
 
 (defn black-litterman-preview-panel
   [readiness]
@@ -49,28 +222,22 @@
                :data-role "portfolio-optimizer-black-litterman-preview-panel"}
      [:div {:class ["flex" "items-start" "justify-between" "gap-3"]}
       [:div
-       [:p {:class eyebrow-class} "Expected return preview"]
+       [:p {:class eyebrow-class} "Expected return per asset - annualized"]
        [:h3 {:class ["mt-2" "text-[0.875rem]" "font-medium"]}
         "Market reference vs combined output"]]
       [:div {:class ["flex" "items-center" "gap-3" "font-mono" "text-[0.625rem]"
                      "uppercase" "tracking-[0.08em]" "text-trading-muted"]}
        [:span {:class ["inline-flex" "items-center" "gap-1.5"]}
-        [:span {:class ["h-2" "w-2" "bg-info"]}]
-        "Prior"]
+        [:span {:class ["h-2" "w-2" "bg-info"]
+                :aria-hidden "true"}]
+        "Market reference (prior)"]
        [:span {:class ["inline-flex" "items-center" "gap-1.5"]}
-        [:span {:class ["h-2" "w-2" "bg-warning"]}]
-        "Posterior"]]]
+        [:span {:class ["h-2" "w-2" "bg-warning"]
+                :aria-hidden "true"}]
+        "Combined output (posterior)"]]]
      (case (:status preview)
        :ready
-       (let [rows (:rows preview)
-             max-abs (or (seq (map js/Math.abs
-                                    (filter finite-number?
-                                            (mapcat (juxt :prior-return :posterior-return)
-                                                    rows))))
-                         [1])
-             max-abs* (apply max max-abs)]
-         (into [:div {:class ["mt-4"]}]
-               (map (partial preview-row max-abs*) rows)))
+       (preview-chart (:rows preview))
 
        :empty
        [:p {:class ["mt-4" "border" "border-base-300" "bg-base-200/30" "p-3"

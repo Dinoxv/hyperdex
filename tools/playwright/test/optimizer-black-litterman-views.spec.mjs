@@ -1,6 +1,13 @@
 import { expect, test } from "@playwright/test";
 import { visitRoute, waitForIdle } from "../support/hyperopen.mjs";
 
+const DESIGN_REVIEW_VIEWPORTS = Object.freeze([
+  { id: "review-375", width: 375, height: 812 },
+  { id: "review-768", width: 768, height: 1024 },
+  { id: "review-1280", width: 1280, height: 900 },
+  { id: "review-1440", width: 1440, height: 900 }
+]);
+
 async function seedMarkets(page) {
   await page.evaluate(() => {
     const c = globalThis.cljs.core;
@@ -426,18 +433,54 @@ test("portfolio optimizer use my views prepopulates absolute return while histor
     .toContainText("BTC expected return +7.3% annualized");
 });
 
-test("portfolio optimizer use my views preview labels vault rows by name @regression", async ({ page }) => {
+test("portfolio optimizer use my views preview renders vertical bars across review widths @regression", async ({ page }) => {
   test.setTimeout(90_000);
 
-  await page.setViewportSize({ width: 900, height: 900 });
-  await visitRoute(page, "/portfolio/optimize/new");
-  await expect(page.locator("[data-role='portfolio-optimizer-setup-route-surface']"))
-    .toBeVisible({ timeout: 60_000 });
+  for (const viewport of DESIGN_REVIEW_VIEWPORTS) {
+    await page.setViewportSize({ width: viewport.width, height: viewport.height });
+    await visitRoute(page, "/portfolio/optimize/new");
+    await expect(page.locator("[data-role='portfolio-optimizer-setup-route-surface']"))
+      .toBeVisible({ timeout: 60_000 });
 
-  const { vaultId } = await seedBlackLittermanVaultPreviewState(page);
-  const preview = page.locator("[data-role='portfolio-optimizer-black-litterman-preview-panel']");
+    const { vaultId } = await seedBlackLittermanVaultPreviewState(page);
+    const preview = page.locator("[data-role='portfolio-optimizer-black-litterman-preview-panel']");
+    await preview.scrollIntoViewIfNeeded();
 
-  await expect(preview).toBeVisible();
-  await expect(preview).toContainText("Alpha Yield");
-  await expect(preview).not.toContainText(vaultId);
+    await expect(preview).toBeVisible();
+    await expect(preview).toContainText("Alpha Yield");
+    await expect(preview).not.toContainText(vaultId);
+
+    const chartGeometry = await preview
+      .locator("[data-role='portfolio-optimizer-black-litterman-preview-svg']")
+      .evaluate((svg) => {
+        const readRect = (role) => {
+          const rect = svg.querySelector(`[data-role="${role}"]`);
+          return rect
+            ? {
+                tagName: rect.tagName.toLowerCase(),
+                x: Number(rect.getAttribute("x")),
+                y: Number(rect.getAttribute("y")),
+                width: Number(rect.getAttribute("width")),
+                height: Number(rect.getAttribute("height"))
+              }
+            : null;
+        };
+
+        return {
+          prior: readRect("portfolio-optimizer-black-litterman-preview-bar-prior-perp:BTC"),
+          posterior: readRect("portfolio-optimizer-black-litterman-preview-bar-posterior-perp:BTC"),
+          horizontalOverflow: document.documentElement.scrollWidth - window.innerWidth
+        };
+      });
+
+    expect(chartGeometry.prior?.tagName, `${viewport.id} prior bar`).toBe("rect");
+    expect(chartGeometry.posterior?.tagName, `${viewport.id} posterior bar`).toBe("rect");
+    expect(chartGeometry.prior.height, `${viewport.id} prior bar height`).toBeGreaterThan(0);
+    expect(chartGeometry.posterior.height, `${viewport.id} posterior bar height`).toBeGreaterThan(0);
+    expect(chartGeometry.prior.width, `${viewport.id} grouped bar width`)
+      .toBe(chartGeometry.posterior.width);
+    expect(chartGeometry.prior.x, `${viewport.id} grouped bar x separation`)
+      .not.toBe(chartGeometry.posterior.x);
+    expect(chartGeometry.horizontalOverflow, `${viewport.id} horizontal overflow`).toBeLessThanOrEqual(1);
+  }
 });
