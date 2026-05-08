@@ -113,6 +113,11 @@
   (not= (instrument-ids requested-universe)
         (instrument-ids (:universe request))))
 
+(defn- missing-black-litterman-views?
+  [request]
+  (and (= :black-litterman (get-in request [:return-model :kind]))
+       (empty? (get-in request [:return-model :views]))))
+
 (defn- requested-instrument-by-id
   [request]
   (into {}
@@ -240,6 +245,7 @@
     (case (:reason readiness)
       :missing-universe "Select a universe before running."
       :history-loading "Optimizer history is already loading."
+      :missing-black-litterman-views "Add a view before running Use my views."
       :no-eligible-history
       (with-details "No eligible history was available for this universe."
                     "No eligible history was available")
@@ -263,9 +269,11 @@
       (let [request (with-cost-contexts state (build-request state draft))
             eligible? (boolean (seq (:universe request)))
             incomplete? (incomplete-history? requested-universe request)
+            missing-bl-views? (missing-black-litterman-views? request)
             runnable? (and eligible?
                            (not incomplete?)
-                           (not history-loading?))
+                           (not history-loading?)
+                           (not missing-bl-views?))
             blocking-warnings (if (or (not eligible?) incomplete?)
                                 (blocking-history-warnings requested-universe
                                                           request)
@@ -275,6 +283,7 @@
                    history-loading? :history-loading
                    (not eligible?) :no-eligible-history
                    incomplete? :incomplete-history
+                   missing-bl-views? :missing-black-litterman-views
                    :else nil)
          :runnable? (boolean runnable?)
          :request request

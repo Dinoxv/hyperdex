@@ -1,6 +1,8 @@
 (ns hyperopen.portfolio.optimizer.actions.run
-  (:require [hyperopen.portfolio.optimizer.actions.common :as common]
+  (:require [hyperopen.portfolio.optimizer.actions.common :as action-common]
             [hyperopen.portfolio.optimizer.application.setup-readiness :as setup-readiness]
+            [hyperopen.portfolio.optimizer.black-litterman-actions.common :as bl-common]
+            [hyperopen.portfolio.optimizer.black-litterman-actions.editor-model :as bl-editor-model]
             [hyperopen.portfolio.optimizer.query-state :as optimizer-query-state]
             [hyperopen.portfolio.routes :as portfolio-routes]))
 
@@ -17,17 +19,44 @@
     [[:effects/load-portfolio-optimizer-history]]
     []))
 
+(defn- run-pipeline-effect
+  []
+  [:effects/run-portfolio-optimizer-pipeline])
+
+(defn- black-litterman-run-effects
+  [state]
+  (let [pending (bl-editor-model/pending-editor-view-result state)
+        active-views (bl-common/black-litterman-views state)]
+    (case (:status pending)
+      :valid
+      (conj (bl-common/save-draft-path-values
+             (bl-editor-model/materialized-view-path-values pending))
+            (run-pipeline-effect))
+
+      :invalid
+      (bl-common/save-ui-path-values
+       (bl-editor-model/error-path-values (:errors pending)))
+
+      (if (seq active-views)
+        [(run-pipeline-effect)]
+        (bl-common/save-ui-path-values
+         (bl-editor-model/missing-view-error-path-values))))))
+
 (defn run-portfolio-optimizer-from-draft
   [state]
   (if (seq (get-in state [:portfolio :optimizer :draft :universe]))
-    [[:effects/run-portfolio-optimizer-pipeline]]
+    (if (bl-common/black-litterman-return-model? state)
+      (black-litterman-run-effects state)
+      [(run-pipeline-effect)])
     []))
 
 (defn run-portfolio-optimizer-from-ready-draft
   [state]
   (let [{:keys [request runnable?]} (setup-readiness/build-readiness state)]
     (if runnable?
-      [[:effects/run-portfolio-optimizer request (common/build-request-signature request)]]
+      [[:effects/run-portfolio-optimizer
+        request
+        (action-common/build-request-signature request)]]
       [])))
 
 (defn save-portfolio-optimizer-scenario-from-current
@@ -52,19 +81,23 @@
        :optimize-scenario [[:effects/load-portfolio-optimizer-scenario
                             (:scenario-id route)]]
        [])
-     (if (contains? #{:optimize-index :optimize-new :optimize-scenario}
+      (if (contains? #{:optimize-index :optimize-new :optimize-scenario}
                     (:kind route))
        (into (asset-selector-market-fetch-effects state)
-             (common/vault-list-metadata-fetch-effects state))
+             (action-common/vault-list-metadata-fetch-effects state))
        []))))
 
 (defn archive-portfolio-optimizer-scenario
   [_state scenario-id]
-  (common/scenario-id-effect :effects/archive-portfolio-optimizer-scenario scenario-id))
+  (action-common/scenario-id-effect
+   :effects/archive-portfolio-optimizer-scenario
+   scenario-id))
 
 (defn duplicate-portfolio-optimizer-scenario
   [_state scenario-id]
-  (common/scenario-id-effect :effects/duplicate-portfolio-optimizer-scenario scenario-id))
+  (action-common/scenario-id-effect
+   :effects/duplicate-portfolio-optimizer-scenario
+   scenario-id))
 
 (defn run-portfolio-optimizer
   [_state request request-signature]

@@ -3,6 +3,79 @@
             [hyperopen.portfolio.optimizer.actions :as actions]
             [hyperopen.portfolio.optimizer.fixtures :as fixtures]))
 
+(def ^:private bl-editor-path
+  [:portfolio-ui :optimizer :black-litterman-editor])
+
+(def ^:private bl-views-path
+  [:portfolio :optimizer :draft :return-model :views])
+
+(def ^:private bl-errors-path
+  [:portfolio-ui :optimizer :black-litterman-editor :errors])
+
+(def ^:private dirty-path
+  [:portfolio :optimizer :draft :metadata :dirty?])
+
+(defn- deep-merge
+  [& maps]
+  (apply merge-with
+         (fn [left right]
+           (if (and (map? left)
+                    (map? right))
+             (deep-merge left right)
+             right))
+         maps))
+
+(defn- effect-values-by-path
+  [effects]
+  (reduce (fn [acc effect]
+            (case (first effect)
+              :effects/save
+              (assoc acc (second effect) (nth effect 2))
+
+              :effects/save-many
+              (reduce (fn [acc [path value]]
+                        (assoc acc path value))
+                      acc
+                      (second effect))
+
+              acc))
+          {}
+          (or effects [])))
+
+(defn- black-litterman-draft-state
+  [& overrides]
+  (apply deep-merge
+         {:portfolio
+          {:optimizer
+           {:draft {:id "draft-bl"
+                    :universe [{:instrument-id "perp:BTC"
+                                :market-type :perp
+                                :coin "BTC"}
+                               {:instrument-id "perp:ETH"
+                                :market-type :perp
+                                :coin "ETH"}]
+                    :objective {:kind :minimum-variance}
+                    :return-model {:kind :black-litterman
+                                   :views []}
+                    :risk-model {:kind :sample-covariance}
+                    :constraints {:long-only? true}
+                    :metadata {:dirty? false}}
+            :history-data {:candle-history-by-coin {}
+                           :funding-history-by-coin {}}
+            :runtime {:as-of-ms 2500}}}
+          :portfolio-ui
+          {:optimizer
+           {:black-litterman-editor
+            {:selected-kind :absolute
+             :drafts {:absolute {:instrument-id "perp:BTC"
+                                 :return-text ""
+                                 :return-text-touched? false
+                                 :confidence :medium
+                                 :horizon :3m
+                                 :notes ""}}
+             :errors {}}}}}
+         overrides))
+
 (deftest run-portfolio-optimizer-emits-registered-worker-effect-test
   (let [request {:scenario-id "scenario-1"
                  :objective {:kind :minimum-variance}}
@@ -66,6 +139,41 @@
                                   :history-data {:candle-history-by-coin {}
                                                  :funding-history-by-coin {}}
                                   :runtime {:as-of-ms 2500}}}}))))
+
+(deftest run-portfolio-optimizer-from-draft-materializes-pending-black-litterman-view-test
+  (let [effects (actions/run-portfolio-optimizer-from-draft
+                 (black-litterman-draft-state
+                  {:portfolio-ui
+                   {:optimizer
+                    {:black-litterman-editor
+                     {:drafts {:absolute {:return-text "20"
+                                          :return-text-touched? true
+                                          :confidence :high
+                                          :horizon :1y
+                                          :notes "User view"}}}}}}))
+        values (effect-values-by-path effects)
+        [view] (get values bl-views-path)]
+    (is (= [:effects/save-many :effects/run-portfolio-optimizer-pipeline]
+           (mapv first effects)))
+    (is (= {:kind :absolute
+            :instrument-id "perp:BTC"
+            :return 0.2
+            :confidence 0.75
+            :weights {"perp:BTC" 1}}
+           (select-keys view [:kind :instrument-id :return :confidence :weights])))
+    (is (= {} (get values bl-errors-path)))
+    (is (= true (get values dirty-path)))))
+
+(deftest run-portfolio-optimizer-from-draft-blocks-empty-black-litterman-views-test
+  (let [effects (actions/run-portfolio-optimizer-from-draft
+                 (black-litterman-draft-state))
+        values (effect-values-by-path effects)]
+    (is (= [:effects/save-many]
+           (mapv first effects)))
+    (is (= "Add a view before running Use my views."
+           (get values (conj bl-errors-path :return-text))))
+    (is (not (some #(= :effects/run-portfolio-optimizer-pipeline (first %))
+                   effects)))))
 
 (deftest load-portfolio-optimizer-history-from-draft-requires-universe-test
   (is (= [[:effects/load-portfolio-optimizer-history]]

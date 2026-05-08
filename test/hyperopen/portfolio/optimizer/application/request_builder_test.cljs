@@ -406,3 +406,24 @@
     (is (= [{:code :invalid-black-litterman-view
              :view-id "legacy-bad"}]
            (mapv #(select-keys % [:code :view-id]) warnings)))))
+
+(deftest build-engine-request-drops-black-litterman-views-outside-eligible-universe-test
+  (let [request (black-litterman-request
+                 [{:id "stale-btc"
+                   :kind :absolute
+                   :instrument-id "BTC"
+                   :return 0.2
+                   :confidence 0.75}
+                  {:id "valid-hype"
+                   :kind :absolute
+                   :instrument-id "perp:HYPE"
+                   :return 0.35
+                   :confidence 0.75}])
+        warnings (filterv #(= :black-litterman-view-outside-universe (:code %))
+                          (:warnings request))]
+    (is (= ["valid-hype"]
+           (mapv :id (get-in request [:return-model :views]))))
+    (is (= [{:code :black-litterman-view-outside-universe
+             :view-id "stale-btc"
+             :instrument-ids ["BTC"]}]
+           (mapv #(select-keys % [:code :view-id :instrument-ids]) warnings)))))

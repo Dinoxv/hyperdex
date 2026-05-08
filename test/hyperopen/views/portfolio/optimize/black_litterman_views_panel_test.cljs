@@ -101,6 +101,28 @@
                        "views adjust expected returns only"))
     (is (= 0 (hiccup/count-nodes panel #(= :select (first %)))))))
 
+(deftest portfolio-optimizer-workspace-shows-valid-pending-view-run-status-test
+  (let [view-node (optimizer-view
+                   {:portfolio
+                    {:optimizer
+                     {:draft
+                      {:return-model {:views []}}}}
+                    :portfolio-ui
+                    {:optimizer
+                     {:black-litterman-editor
+                      {:drafts {:absolute {:instrument-id "perp:BTC"
+                                           :return-text "20"
+                                           :return-text-touched? true
+                                           :confidence :high
+                                           :horizon :1y
+                                           :notes ""}}}}}})
+        panel (hiccup/find-by-data-role view-node "portfolio-optimizer-black-litterman-panel")
+        status (hiccup/find-by-data-role
+                panel
+                "portfolio-optimizer-black-litterman-pending-view-status")]
+    (is (= "Pending view will apply on run."
+           (hiccup/node-text status)))))
+
 (deftest portfolio-optimizer-workspace-renders-save-mode-and-cancel-edit-action-test
   (let [view-node (optimizer-view
                    {:portfolio-ui

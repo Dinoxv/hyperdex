@@ -124,6 +124,12 @@
   (cond-> {:code :invalid-black-litterman-view}
     (:id view) (assoc :view-id (:id view))))
 
+(defn- black-litterman-view-outside-universe-warning
+  [view instrument-ids]
+  (cond-> {:code :black-litterman-view-outside-universe
+           :instrument-ids (vec instrument-ids)}
+    (:id view) (assoc :view-id (:id view))))
+
 (defn- normalize-direction
   [direction]
   (case direction
@@ -191,6 +197,63 @@
       {:return-model return-model*
        :warnings []})))
 
+(defn- non-zero-weight-id?
+  [[instrument-id weight]]
+  (and (non-blank-text instrument-id)
+       (finite-number? weight)
+       (not (zero? weight))))
+
+(defn- black-litterman-view-instrument-ids
+  [view]
+  (let [weights (->> (:weights view)
+                     (filter non-zero-weight-id?)
+                     (map first)
+                     vec)]
+    (case (:kind view)
+      :relative
+      (let [ids (or (seq (normalize-id-list [(:instrument-id view)
+                                             (:comparator-instrument-id view)]))
+                    (seq (normalize-id-list [(:long-instrument-id view)
+                                             (:short-instrument-id view)]))
+                    weights)]
+        (vec ids))
+
+      :absolute
+      (let [ids (or (seq (normalize-id-list [(:instrument-id view)]))
+                    weights)]
+        (vec ids))
+
+      weights)))
+
+(defn- view-overlaps-eligible-universe?
+  [eligible-ids view]
+  (let [ids (black-litterman-view-instrument-ids view)]
+    (case (:kind view)
+      :relative
+      (and (seq ids)
+           (every? #(contains? eligible-ids %) ids))
+
+      (boolean
+       (some #(contains? eligible-ids %) ids)))))
+
+(defn- filter-black-litterman-views-for-universe
+  [return-model eligible-universe]
+  (if-not (= :black-litterman (:kind return-model))
+    {:return-model return-model
+     :warnings []}
+    (let [eligible-ids (set (keep :instrument-id eligible-universe))
+          normalized (map (fn [view]
+                            (if (view-overlaps-eligible-universe? eligible-ids view)
+                              {:view view}
+                              {:warning
+                               (black-litterman-view-outside-universe-warning
+                                view
+                                (black-litterman-view-instrument-ids view))}))
+                          (or (:views return-model) []))]
+      {:return-model (assoc return-model
+                            :views (vec (keep :view normalized)))
+       :warnings (vec (keep :warning normalized))})))
+
 (defn- black-litterman-return-model?
   [return-model]
   (= :black-litterman (:kind return-model)))
@@ -227,11 +290,16 @@
                   :stale-after-ms stale-after-ms
                   :funding-periods-per-year funding-periods-per-year})
         eligible-universe (:eligible-instruments history)
+        universe-filtered-return-model (filter-black-litterman-views-for-universe
+                                        return-model
+                                        eligible-universe)
+        return-model (:return-model universe-filtered-return-model)
         prior (bl-prior requested-universe
                         current-portfolio
                         market-cap-by-coin
                         return-model)
         warnings (vec (concat (:warnings normalized-return-model)
+                              (:warnings universe-filtered-return-model)
                               (:warnings history)
                               (:warnings prior)))]
     (cond-> {:scenario-id (:id draft*)

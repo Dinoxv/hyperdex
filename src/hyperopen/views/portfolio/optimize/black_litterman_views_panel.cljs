@@ -1,7 +1,7 @@
 (ns hyperopen.views.portfolio.optimize.black-litterman-views-panel
   (:require [clojure.string :as str]
             [hyperopen.portfolio.optimizer.application.return-inputs :as return-inputs]
-            [hyperopen.views.portfolio.optimize.instrument-display :as instrument-display]))
+            [hyperopen.views.portfolio.optimize.black-litterman-views-model :as model]))
 
 (def ^:private max-active-views 10)
 
@@ -28,102 +28,6 @@
    "font-mono" "text-[0.71875rem]" "text-trading-text" "outline-none"
    "focus:border-warning/70"])
 
-(defn- normalize-kind
-  [value fallback]
-  (cond
-    (keyword? value) value
-    (string? value) (keyword value)
-    :else fallback))
-
-(defn- instrument-label
-  [universe instrument-id]
-  (or (some (fn [instrument]
-              (when (= instrument-id (:instrument-id instrument))
-                (or (when (instrument-display/vault-instrument? instrument)
-                      (instrument-display/primary-label instrument))
-                    (:coin instrument)
-                    (:symbol instrument)
-                    (:name instrument))))
-            universe)
-      (some-> instrument-id
-              (str/split #":")
-              last)
-      instrument-id
-      "Select"))
-
-(defn- finite-number?
-  [value]
-  (and (number? value)
-       (not (js/isNaN value))
-       (js/isFinite value)))
-
-(defn- parse-percent-text
-  [value]
-  (let [text (some-> value
-                     str
-                     str/trim
-                     (str/replace #"," "")
-                     (str/replace #"%" "")
-                     str/trim)]
-    (when (seq text)
-      (let [parsed (js/Number text)]
-        (when (finite-number? parsed)
-          (/ parsed 100))))))
-
-(defn- pct-label
-  ([value]
-   (pct-label value false))
-  ([value signed?]
-   (if (finite-number? value)
-     (let [pct (* value 100)
-           abs-pct (js/Math.abs pct)
-           fixed (.toFixed abs-pct 2)
-           trimmed (str/replace fixed #"\.?0+$" "")
-           sign (cond
-                  (not signed?) ""
-                  (pos? pct) "+"
-                  (neg? pct) "-"
-                  :else "")]
-       (str sign trimmed "%"))
-     "--")))
-
-(defn- display-confidence
-  [value]
-  (name (normalize-kind value :medium)))
-
-(defn- display-horizon
-  [value]
-  (-> (name (normalize-kind value :3m))
-      str/upper-case))
-
-(defn- view-primary-id
-  [view]
-  (or (:instrument-id view)
-      (:long-instrument-id view)))
-
-(defn- view-comparator-id
-  [view]
-  (or (:comparator-instrument-id view)
-      (:short-instrument-id view)))
-
-(defn- view-direction
-  [view]
-  (normalize-kind (:direction view) :outperform))
-
-(defn- view-summary
-  [universe view]
-  (let [kind (:kind view)
-        primary (instrument-label universe (view-primary-id view))
-        comparator (instrument-label universe (view-comparator-id view))
-        direction (view-direction view)
-        return-label (pct-label (:return view) (= :absolute kind))]
-    (case kind
-      :relative
-      (str primary " "
-           (if (= :underperform direction) "<" ">")
-           " " comparator " by " (pct-label (:return view)) " annualized")
-      (str primary " expected return " return-label " annualized"))))
-
 (defn- draft-defaults
   [universe kind]
   (let [ids (mapv :instrument-id universe)
@@ -146,7 +50,7 @@
 
 (defn- selected-kind
   [editor-state]
-  (let [kind (normalize-kind (:selected-kind editor-state) :absolute)]
+  (let [kind (model/normalize-kind (:selected-kind editor-state) :absolute)]
     (if (contains? #{:absolute :relative} kind)
       kind
       :absolute)))
@@ -165,7 +69,7 @@
              (not editing?)
              instrument-id
              (not (:return-text-touched? draft))
-             (nil? (parse-percent-text (:return-text draft))))
+             (nil? (model/parse-percent-text (:return-text draft))))
       (if-let [return-input (get return-inputs instrument-id)]
         (assoc draft :return-text (return-inputs/decimal->percent-text return-input))
         draft)
@@ -177,6 +81,14 @@
              (drop-nil-values (get-in editor-state [:drafts kind])))
       (with-automatic-absolute-return-text kind return-inputs editing?)))
 
+(defn- pending-draft?
+  [draft editing?]
+  (boolean
+   (or editing?
+       (:return-text-touched? draft)
+       (some-> (:return-text draft) str str/trim seq)
+       (some-> (:notes draft) str str/trim seq))))
+
 (defn- instrument-grid-class
   [kind]
   (cond-> ["grid" "grid-cols-1" "gap-3"]
@@ -187,7 +99,7 @@
   (let [ids (set (keep :instrument-id universe))
         instrument-id (:instrument-id draft)
         comparator-id (:comparator-instrument-id draft)
-        return-value (parse-percent-text (:return-text draft))]
+        return-value (model/parse-percent-text (:return-text draft))]
     (and (or editing? (< active-count max-active-views))
          (contains? ids instrument-id)
          (some? return-value)
@@ -199,8 +111,8 @@
 
 (defn- preview-text
   [universe kind draft]
-  (let [value (parse-percent-text (:return-text draft))
-        asset (instrument-label universe (:instrument-id draft))]
+  (let [value (model/parse-percent-text (:return-text draft))
+        asset (model/instrument-label universe (:instrument-id draft))]
     (if (and (:instrument-id draft) value)
       (case kind
         :relative
@@ -208,10 +120,10 @@
           (if (and comparator-id (not= comparator-id (:instrument-id draft)))
             (str asset " "
                  (if (= :underperform (:direction draft)) "<" ">")
-                 " " (instrument-label universe comparator-id)
-                 " by " (pct-label value) " annualized")
+                 " " (model/instrument-label universe comparator-id)
+                 " by " (model/pct-label value) " annualized")
             "Select a comparator asset to preview this view."))
-        (str asset " expected return " (pct-label value true) " annualized"))
+        (str asset " expected return " (model/pct-label value true) " annualized"))
       "Select an asset and enter a value to preview this view.")))
 
 (defn- segmented-button
@@ -276,7 +188,7 @@
                             :on {:click [[:actions/set-portfolio-optimizer-black-litterman-editor-field
                                           field
                                           instrument-id]]}}
-                   [:span {:class ["font-mono"]} (instrument-label universe instrument-id)]
+                   [:span {:class ["font-mono"]} (model/instrument-label universe instrument-id)]
                    (when (:symbol instrument)
                      [:span {:class ["ml-2" "text-trading-muted"]} (:symbol instrument)])]))
               universe))])
@@ -313,13 +225,14 @@
 
 (defn- active-view-card
   [universe view]
-  (let [summary (view-summary universe view)
-        confidence (display-confidence (or (:confidence-level view)
-                                           (cond
-                                             (<= (or (:confidence view) 0.5) 0.25) :low
-                                             (<= (or (:confidence view) 0.5) 0.5) :medium
-                                             :else :high)))
-        horizon (display-horizon (:horizon view))]
+  (let [summary (model/view-summary universe view)
+        confidence (model/display-confidence
+                    (or (:confidence-level view)
+                        (cond
+                          (<= (or (:confidence view) 0.5) 0.25) :low
+                          (<= (or (:confidence view) 0.5) 0.5) :medium
+                          :else :high)))
+        horizon (model/display-horizon (:horizon view))]
     [:div {:class ["border" "border-base-300" "bg-base-200/50" "p-2.5" "text-left"]
            :role "button"
            :tabindex 0
@@ -355,6 +268,7 @@
            return-inputs (return-inputs/readiness-inputs-by-instrument readiness)
            draft* (selected-draft universe editor-state kind return-inputs editing?)
            valid? (draft-valid? universe kind draft* (count views) editing?)
+           pending? (pending-draft? draft* editing?)
            clear-open? (true? (:clear-confirmation-open? editor-state))]
        [:section {:class ["portfolio-optimizer-bl-panel" "space-y-4"]
                   :data-role "portfolio-optimizer-black-litterman-panel"}
@@ -426,8 +340,14 @@
               :data-role "portfolio-optimizer-black-litterman-preview-text"}
           (preview-text universe kind draft*)]
          [:p {:class ["mt-1" "font-mono" "text-[0.625rem]" "text-trading-muted"]}
-          (str "Confidence: " (display-confidence (:confidence draft*))
-               " · Horizon: " (display-horizon (:horizon draft*)))]]
+          (str "Confidence: " (model/display-confidence (:confidence draft*))
+               " · Horizon: " (model/display-horizon (:horizon draft*)))]
+         (when (and pending? valid?)
+           [:p {:class ["mt-2" "font-mono" "text-[0.625rem]" "text-warning"]
+                :data-role "portfolio-optimizer-black-litterman-pending-view-status"}
+            (if editing?
+              "Pending changes will apply on run."
+              "Pending view will apply on run.")])]
 
         (when (:comparator-instrument-id errors)
           [:p {:class ["text-[0.65625rem]" "text-warning"]} (:comparator-instrument-id errors)])

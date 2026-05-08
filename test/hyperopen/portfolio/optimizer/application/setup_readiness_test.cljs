@@ -151,6 +151,26 @@
            (get-in readiness
                    [:request :execution-assumptions :cost-contexts-by-id "perp:ETH" :fallback-bps])))))
 
+(deftest build-readiness-blocks-empty-black-litterman-views-test
+  (let [readiness (setup-readiness/build-readiness
+                   (optimizer-state
+                    {:portfolio
+                     {:optimizer
+                      {:draft {:return-model {:kind :black-litterman
+                                              :views []}}
+                       :history-data
+                       {:candle-history-by-coin
+                        {"BTC" [{:time 1000 :close "100"}
+                                {:time 2000 :close "110"}]
+                         "ETH" [{:time 1000 :close "2000"}
+                                {:time 2000 :close "2200"}]}
+                        :funding-history-by-coin {}}}}}))]
+    (is (= :blocked (:status readiness)))
+    (is (= :missing-black-litterman-views (:reason readiness)))
+    (is (= false (:runnable? readiness)))
+    (is (= "Add a view before running Use my views."
+           (setup-readiness/readiness-error-message readiness)))))
+
 (deftest build-readiness-applies-manual-capital-when-snapshot-has-no-nav-test
   (let [readiness (setup-readiness/build-readiness
                    (optimizer-state
