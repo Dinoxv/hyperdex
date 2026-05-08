@@ -1,9 +1,74 @@
 (ns hyperopen.views.portfolio.optimize.scenario-detail-view-test
   (:require [cljs.test :refer-macros [deftest is]]
+            [hyperopen.portfolio.optimizer.actions.common :as action-common]
+            [hyperopen.portfolio.optimizer.application.setup-readiness :as setup-readiness]
             [hyperopen.portfolio.optimizer.fixtures :as fixtures]
             [hyperopen.views.portfolio-view :as portfolio-view]
             [hyperopen.views.portfolio.optimize.test-support
              :refer [click-actions collect-strings node-by-role]]))
+
+(defn- ready-scenario-state
+  [scenario-id return-model]
+  {:router {:path (str "/portfolio/optimize/" scenario-id)}
+   :portfolio {:optimizer
+               {:active-scenario {:loaded-id scenario-id
+                                  :name "BTC View"
+                                  :status :computed
+                                  :read-only? false}
+                :draft {:id scenario-id
+                        :name "BTC View"
+                        :universe [{:instrument-id "perp:BTC"
+                                    :market-type :perp
+                                    :coin "BTC"}]
+                        :objective {:kind :max-sharpe}
+                        :return-model return-model
+                        :risk-model {:kind :sample-covariance}
+                        :constraints {:long-only? true
+                                      :max-asset-weight 1.0}
+                        :metadata {:dirty? false}}
+                :history-data {:candle-history-by-coin
+                               {"BTC" [{:time 1000 :close "100"}
+                                       {:time 2000 :close "110"}]}
+                               :funding-history-by-coin {}}
+                :market-cap-by-coin {}
+                :runtime {:as-of-ms 2500
+                          :stale-after-ms 60000}
+                :run-state {:status :succeeded
+                            :run-id "run-1"
+                            :completed-at-ms 2600}}}
+   :webdata2 {:clearinghouseState
+              {:marginSummary {:accountValue "1000"}
+               :assetPositions []}}})
+
+(defn- request-signature-for-state
+  [state]
+  (let [{:keys [request runnable?]} (setup-readiness/build-readiness state)]
+    (is runnable?)
+    (action-common/build-request-signature request)))
+
+(defn- solved-run-for-state
+  [state]
+  (fixtures/sample-last-successful-run
+   {:computed-at-ms 2600
+    :request-signature (request-signature-for-state state)
+    :result {:status :solved
+             :as-of-ms 2600
+             :instrument-ids ["perp:BTC"]
+             :target-weights [1.0]
+             :current-weights [0.0]
+             :target-weights-by-instrument {"perp:BTC" 1.0}
+             :current-weights-by-instrument {"perp:BTC" 0.0}
+             :expected-return 0.2
+             :volatility 1.0
+             :performance {:shrunk-sharpe 0.2}
+             :history-summary {:return-observations 2 :stale? false}
+             :return-model :historical-mean
+             :risk-model :sample-covariance
+             :diagnostics {:turnover 1.0}
+             :rebalance-preview {:status :ready
+                                 :capital-usd 1000
+                                 :summary {:ready-count 1 :blocked-count 0}
+                                 :rows []}}}))
 
 (deftest portfolio-view-delegates-optimizer-scenario-route-to-detail-surface-test
   (let [view-node (portfolio-view/portfolio-view
@@ -90,9 +155,12 @@
     (is (= [[:actions/run-portfolio-optimizer-from-draft]]
            (click-actions
             (node-by-role view-node "portfolio-optimizer-scenario-rerun-stale"))))
-    (is (= [[:actions/save-portfolio-optimizer-scenario-from-current]]
-           (click-actions
-            (node-by-role view-node "portfolio-optimizer-scenario-save"))))
+    (is (= true
+           (get-in (node-by-role view-node "portfolio-optimizer-scenario-save")
+                   [1 :disabled])))
+    (is (nil?
+         (click-actions
+          (node-by-role view-node "portfolio-optimizer-scenario-save"))))
     (is (= [[:actions/run-portfolio-optimizer-from-draft]]
            (click-actions
             (node-by-role view-node "portfolio-optimizer-scenario-rerun"))))
@@ -103,7 +171,34 @@
     (is (contains? strings "20.00%"))
     (is (contains? strings "data as of "))
     (is (contains? strings "gross ≤ 1.5 · cap 40.00%"))
-    (is (contains? strings "Draft inputs changed after the last successful run. Rerun before using recommendation or rebalance output."))))
+    (is (contains? strings "Draft inputs differ from the last successful run. Rerun before using recommendation or rebalance output."))))
+
+(deftest portfolio-optimizer-scenario-detail-marks-clean-mismatched-result-stale-test
+  (let [scenario-id "scn_bl"
+        black-litterman-state
+        (ready-scenario-state
+         scenario-id
+         {:kind :black-litterman
+          :views [{:kind :absolute
+                   :instrument-id "perp:BTC"
+                   :return 0.2
+                   :confidence 0.75
+                   :weights {"perp:BTC" 1}}]})
+        historical-state
+        (assoc-in black-litterman-state
+                  [:portfolio :optimizer :draft :return-model]
+                  {:kind :historical-mean})
+        view-node (portfolio-view/portfolio-view
+                   (assoc-in black-litterman-state
+                             [:portfolio :optimizer :last-successful-run]
+                             (solved-run-for-state historical-state)))
+        save-button (node-by-role view-node "portfolio-optimizer-scenario-save")]
+    (is (some? (node-by-role view-node "portfolio-optimizer-scenario-stale-banner"))
+        "A clean draft is still stale when the retained solved run was produced from different optimizer inputs.")
+    (is (= true (get-in save-button [1 :disabled]))
+        "Mismatched solved runs must not be saveable as the active scenario.")
+    (is (nil?
+           (click-actions save-button)))))
 
 (deftest portfolio-optimizer-inputs-tab-renders-read-only-audit-test
   (let [view-node (portfolio-view/portfolio-view

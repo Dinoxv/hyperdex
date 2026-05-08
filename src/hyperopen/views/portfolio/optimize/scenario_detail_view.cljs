@@ -1,5 +1,7 @@
 (ns hyperopen.views.portfolio.optimize.scenario-detail-view
   (:require [hyperopen.portfolio.optimizer.defaults :as optimizer-defaults]
+            [hyperopen.portfolio.optimizer.application.run-identity :as run-identity]
+            [hyperopen.portfolio.optimizer.application.setup-readiness :as setup-readiness]
             [hyperopen.portfolio.optimizer.query-state :as optimizer-query-state]
             [hyperopen.portfolio.routes :as portfolio-routes]
             [hyperopen.views.portfolio.optimize.execution-modal :as execution-modal]
@@ -77,6 +79,16 @@
         (get-in state [:portfolio :optimizer :draft :name]))
       (str "Scenario " scenario-id)))
 
+(defn- optimizer-draft
+  [state]
+  (or (get-in state [:portfolio :optimizer :draft])
+      (optimizer-defaults/default-draft)))
+
+(defn- optimizer-running?
+  [state]
+  (or (= :running (get-in state [:portfolio :optimizer :run-state :status]))
+      (= :running (get-in state [:portfolio :optimizer :optimization-progress :status]))))
+
 (defn- result
   [state]
   (get-in state [:portfolio :optimizer :last-successful-run :result]))
@@ -86,9 +98,19 @@
   (= :solved (:status (result state))))
 
 (defn- scenario-stale?
-  [state]
-  (and (some? (get-in state [:portfolio :optimizer :last-successful-run]))
-       (true? (get-in state [:portfolio :optimizer :draft :metadata :dirty?]))))
+  [state readiness]
+  (run-identity/stale-run?
+   {:draft (optimizer-draft state)
+    :readiness readiness
+    :last-successful-run (get-in state [:portfolio :optimizer :last-successful-run])}))
+
+(defn- current-result?
+  [state readiness]
+  (run-identity/current-solved-run?
+   {:draft (optimizer-draft state)
+    :readiness readiness
+    :running? (optimizer-running? state)
+    :last-successful-run (get-in state [:portfolio :optimizer :last-successful-run])}))
 
 (defn- tab-path
   [scenario-id tab-key]
@@ -106,12 +128,14 @@
                          (portfolio-routes/portfolio-optimize-scenario-path scenario-id)))))))
 
 (defn- scenario-header
-  [state scenario-id]
+  [state scenario-id current-result?]
   (let [status (get-in state [:portfolio :optimizer :active-scenario :status])
         read-only? (true? (get-in state [:portfolio :optimizer :active-scenario :read-only?]))
         running? (= :running (get-in state [:portfolio :optimizer :run-state :status]))
         save-state (get-in state [:portfolio :optimizer :scenario-save-state :status])
-        saving? (= :saving save-state)]
+        saving? (= :saving save-state)
+        save-disabled? (or saving?
+                           (not current-result?))]
     [:header {:class ["border-b"
                       "border-base-300"
                       "bg-base-100/95"
@@ -171,8 +195,9 @@
                          "disabled:cursor-not-allowed"
                          "disabled:text-trading-muted"]
                  :data-role "portfolio-optimizer-scenario-save"
-                 :disabled saving?
-                 :on {:click [[:actions/save-portfolio-optimizer-scenario-from-current]]}}
+                 :disabled save-disabled?
+                 :on (when-not save-disabled?
+                       {:click [[:actions/save-portfolio-optimizer-scenario-from-current]]})}
         (if saving? "Saving" "Save scenario")]
        [:button {:type "button"
                  :class ["rounded-lg"
@@ -257,8 +282,8 @@
                "constraint utilization")]))
 
 (defn- stale-banner
-  [state]
-  (when (scenario-stale? state)
+  [stale?]
+  (when stale?
     [:section {:class ["rounded-xl"
                        "border"
                        "border-warning/50"
@@ -269,7 +294,7 @@
                :data-role "portfolio-optimizer-scenario-stale-banner"}
      [:span {:class ["font-semibold"]} "Stale"]
      [:span {:class ["ml-2"]}
-      "Draft inputs changed after the last successful run. Rerun before using recommendation or rebalance output."]
+      "Draft inputs differ from the last successful run. Rerun before using recommendation or rebalance output."]
      [:button {:type "button"
                :class ["ml-3"
                        "rounded-md"
@@ -359,14 +384,14 @@
    [:p {:class ["mt-2" "text-sm" "text-trading-muted"]} body]])
 
 (defn- recommendation-tab
-  [state]
+  [state stale?]
   [:section {:class ["space-y-0"]
              :data-role "portfolio-optimizer-recommendation-tab"}
    (if (solved-result? state)
      (results-panel/results-panel
       (get-in state [:portfolio :optimizer :last-successful-run])
       (get-in state [:portfolio :optimizer :draft])
-      {:stale? (scenario-stale? state)
+      {:stale? stale?
        :frontier-overlay-mode (get-in state [:portfolio-ui :optimizer :frontier-overlay-mode])
        :constrain-frontier? (get-in state [:portfolio-ui :optimizer :constrain-frontier?])
        :include-rebalance? false})
@@ -386,14 +411,14 @@
                 "A rebalance preview is available after a successful optimization run."))])
 
 (defn- tab-body
-  [state selected-tab]
+  [state selected-tab stale?]
   (case selected-tab
     :rebalance (rebalance-tab state)
     :tracking [:section {:class ["space-y-4"]
                          :data-role "portfolio-optimizer-tracking-tab"}
                (tracking-panel/tracking-panel state)]
     :inputs (inputs-tab-view/inputs-tab state)
-    (recommendation-tab state)))
+    (recommendation-tab state stale?)))
 
 (defn- scenario-loading-state
   [scenario-id]
@@ -406,16 +431,19 @@
   (let [scenario-id (:scenario-id route)
         loading? (route-mismatched? state scenario-id)
         state* (scenario-scoped-state state scenario-id)
-        selected-tab (active-tab state)]
+        selected-tab (active-tab state)
+        readiness (setup-readiness/build-readiness state*)
+        current-result? (current-result? state* readiness)
+        stale? (scenario-stale? state* readiness)]
     [:section {:class ["portfolio-optimizer-v4" "space-y-0" "leading-4" "text-trading-text"]
                :data-role "portfolio-optimizer-scenario-detail-surface"
                :data-scenario-id scenario-id}
-     (scenario-header state* scenario-id)
+     (scenario-header state* scenario-id current-result?)
      (provenance-strip state* scenario-id)
      (scenario-tabs scenario-id selected-tab)
      (kpi-strip state*)
-     (stale-banner state*)
+     (stale-banner stale?)
      (if loading?
        (scenario-loading-state scenario-id)
-       (tab-body state* selected-tab))
+       (tab-body state* selected-tab stale?))
      (execution-modal/execution-modal state*)]))

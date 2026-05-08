@@ -1,5 +1,6 @@
 (ns hyperopen.portfolio.optimizer.actions.run
   (:require [hyperopen.portfolio.optimizer.actions.common :as action-common]
+            [hyperopen.portfolio.optimizer.application.run-identity :as run-identity]
             [hyperopen.portfolio.optimizer.application.setup-readiness :as setup-readiness]
             [hyperopen.portfolio.optimizer.black-litterman-actions.common :as bl-common]
             [hyperopen.portfolio.optimizer.black-litterman-actions.editor-model :as bl-editor-model]
@@ -59,10 +60,18 @@
         (action-common/build-request-signature request)]]
       [])))
 
+(defn- optimizer-running?
+  [state]
+  (or (= :running (get-in state [:portfolio :optimizer :run-state :status]))
+      (= :running (get-in state [:portfolio :optimizer :optimization-progress :status]))))
+
 (defn save-portfolio-optimizer-scenario-from-current
   [state]
-  (if (= :solved
-         (get-in state [:portfolio :optimizer :last-successful-run :result :status]))
+  (if (run-identity/current-solved-run?
+       {:draft (get-in state [:portfolio :optimizer :draft])
+        :readiness (setup-readiness/build-readiness state)
+        :running? (optimizer-running? state)
+        :last-successful-run (get-in state [:portfolio :optimizer :last-successful-run])})
     [[:effects/save-portfolio-optimizer-scenario]]
     []))
 

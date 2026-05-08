@@ -1,9 +1,62 @@
 (ns hyperopen.views.portfolio.optimize.workspace-view-test
   (:require [cljs.test :refer-macros [deftest is]]
+            [hyperopen.portfolio.optimizer.actions.common :as action-common]
+            [hyperopen.portfolio.optimizer.application.setup-readiness :as setup-readiness]
             [hyperopen.portfolio.optimizer.fixtures :as fixtures]
             [hyperopen.views.portfolio-view :as portfolio-view]
             [hyperopen.views.portfolio.optimize.test-support
              :refer [change-actions click-actions collect-strings input-actions node-by-role]]))
+
+(defn- ready-workspace-state
+  [return-model]
+  {:router {:path "/portfolio/optimize/new"}
+   :portfolio {:optimizer
+                {:draft {:id "draft-current"
+                        :universe [{:instrument-id "perp:BTC"
+                                    :market-type :perp
+                                    :coin "BTC"}
+                                   {:instrument-id "perp:ETH"
+                                    :market-type :perp
+                                    :coin "ETH"}]
+                        :objective {:kind :max-sharpe}
+                        :return-model return-model
+                        :risk-model {:kind :sample-covariance}
+                        :constraints {:long-only? true
+                                      :max-asset-weight 1.0}
+                        :metadata {:dirty? false}}
+                :history-data {:candle-history-by-coin
+                               {"BTC" [{:time 1000 :close "100"}
+                                       {:time 2000 :close "110"}
+                                       {:time 3000 :close "108"}
+                                       {:time 4000 :close "116"}]
+                                "ETH" [{:time 1000 :close "50"}
+                                       {:time 2000 :close "54"}
+                                       {:time 3000 :close "49"}
+                                       {:time 4000 :close "55"}]}
+                               :funding-history-by-coin {}}
+                :market-cap-by-coin {}
+                :runtime {:as-of-ms 2500
+                          :stale-after-ms 60000}
+                :run-state {:status :succeeded
+                            :run-id "run-1"
+                            :completed-at-ms 2600}}}
+   :webdata2 {:clearinghouseState
+              {:marginSummary {:accountValue "1000"}
+               :assetPositions []}}})
+
+(defn- request-signature-for-state
+  [state]
+  (let [{:keys [request runnable?]} (setup-readiness/build-readiness state)]
+    (is runnable?)
+    (action-common/build-request-signature request)))
+
+(defn- solved-run-for-state
+  [state]
+  (fixtures/sample-last-successful-run
+   {:computed-at-ms 2600
+    :request-signature (request-signature-for-state state)
+    :result {:status :solved
+             :instrument-ids ["perp:BTC"]}}))
 
 (deftest portfolio-optimizer-workspace-enables-run-for-draft-universe-test
   (let [view-node (portfolio-view/portfolio-view
@@ -104,24 +157,11 @@
     (is (contains? strings "2 assets"))))
 
 (deftest portfolio-optimizer-workspace-links-current-clean-result-test
-  (let [view-node (portfolio-view/portfolio-view
-                   {:router {:path "/portfolio/optimize/new"}
-                    :portfolio {:optimizer
-                                {:draft {:universe [{:instrument-id "perp:BTC"
-                                                     :market-type :perp
-                                                     :coin "BTC"}]
-                                         :metadata {:dirty? false}}
-                                 :history-data {:candle-history-by-coin
-                                                {"BTC" [{:time 1000 :close "100"}
-                                                        {:time 2000 :close "110"}]}
-                                                :funding-history-by-coin {}}
-                                 :runtime {:as-of-ms 2500}
-                                 :run-state {:status :succeeded
-                                             :run-id "run-1"
-                                             :completed-at-ms 2600}
-                                 :last-successful-run (fixtures/sample-last-successful-run
-                                                       {:computed-at-ms 2600
-                                                        :result {:instrument-ids ["perp:BTC"]}})}}})
+  (let [state (ready-workspace-state {:kind :historical-mean})
+        view-node (portfolio-view/portfolio-view
+                   (assoc-in state
+                             [:portfolio :optimizer :last-successful-run]
+                             (solved-run-for-state state)))
         view-weights-link (node-by-role view-node "portfolio-optimizer-view-weights")
         results-link (node-by-role view-node "portfolio-optimizer-results-link")]
     (is (= "button" (get-in view-weights-link [1 :type])))
@@ -130,6 +170,29 @@
     (is (= "button" (get-in results-link [1 :type])))
     (is (= [[:actions/navigate "/portfolio/optimize/draft"]]
            (click-actions results-link)))))
+
+(deftest portfolio-optimizer-workspace-hides-clean-mismatched-result-test
+  (let [black-litterman-state
+        (ready-workspace-state
+         {:kind :black-litterman
+          :views [{:kind :absolute
+                   :instrument-id "perp:BTC"
+                   :return 0.2
+                   :confidence 0.75
+                   :weights {"perp:BTC" 1}}]})
+        historical-state
+        (assoc-in black-litterman-state
+                  [:portfolio :optimizer :draft :return-model]
+                  {:kind :historical-mean})
+        view-node (portfolio-view/portfolio-view
+                   (assoc-in black-litterman-state
+                             [:portfolio :optimizer :last-successful-run]
+                             (solved-run-for-state historical-state)))]
+    (is (nil? (node-by-role view-node "portfolio-optimizer-view-weights"))
+        "A clean Black-Litterman draft must not expose weights from a historical-mean run.")
+    (is (nil? (node-by-role view-node "portfolio-optimizer-results-link"))
+        "The setup rail should not navigate to mismatched retained results.")
+    (is (nil? (node-by-role view-node "portfolio-optimizer-results-surface")))))
 
 (deftest portfolio-optimizer-workspace-shows-history-load-state-test
   (let [loading-node (portfolio-view/portfolio-view

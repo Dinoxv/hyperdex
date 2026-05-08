@@ -1,5 +1,6 @@
 (ns hyperopen.portfolio.optimizer.actions.common
   (:require [clojure.string :as str]
+            [hyperopen.portfolio.optimizer.application.run-identity :as run-identity]
             [hyperopen.portfolio.optimizer.application.universe-candidates :as universe-candidates]))
 
 (def supported-universe-market-types
@@ -147,9 +148,7 @@
 
 (defn build-request-signature
   [request]
-  {:scenario-id (:scenario-id request)
-   :as-of-ms (:as-of-ms request)
-   :request request})
+  (run-identity/build-request-signature request))
 
 (defn current-scenario-id
   [state]

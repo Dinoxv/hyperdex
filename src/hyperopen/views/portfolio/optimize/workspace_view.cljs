@@ -1,5 +1,6 @@
 (ns hyperopen.views.portfolio.optimize.workspace-view
   (:require [hyperopen.portfolio.optimizer.application.current-portfolio :as current-portfolio]
+            [hyperopen.portfolio.optimizer.application.run-identity :as run-identity]
             [hyperopen.portfolio.optimizer.application.setup-readiness :as setup-readiness]
             [hyperopen.portfolio.optimizer.defaults :as optimizer-defaults]
             [hyperopen.portfolio.routes :as portfolio-routes]
@@ -17,12 +18,6 @@
   [state]
   (or (get-in state [:portfolio :optimizer :draft])
       (optimizer-defaults/default-draft)))
-
-(defn- current-solved-run?
-  [draft running? last-successful-run]
-  (and (= :solved (get-in last-successful-run [:result :status]))
-       (not running?)
-       (not (true? (get-in draft [:metadata :dirty?])))))
 
 (defn workspace-view
   [state route]
@@ -42,7 +37,11 @@
         run-triggerable? (and (seq (:universe draft))
                               (not running?))
         last-successful-run (get-in state [:portfolio :optimizer :last-successful-run])
-        solved-run? (current-solved-run? draft running? last-successful-run)
+        solved-run? (run-identity/current-solved-run?
+                     {:draft draft
+                      :readiness readiness
+                      :running? running?
+                      :last-successful-run last-successful-run})
         scenario-save-state (or (get-in state [:portfolio :optimizer :scenario-save-state])
                                 (optimizer-defaults/default-scenario-save-state))
         saving-scenario? (= :saving (:status scenario-save-state))

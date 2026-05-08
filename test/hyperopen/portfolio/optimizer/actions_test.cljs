@@ -1,6 +1,8 @@
 (ns hyperopen.portfolio.optimizer.actions-test
   (:require [cljs.test :refer-macros [deftest is]]
+            [hyperopen.portfolio.optimizer.actions.common :as action-common]
             [hyperopen.portfolio.optimizer.actions :as actions]
+            [hyperopen.portfolio.optimizer.application.setup-readiness :as setup-readiness]
             [hyperopen.portfolio.optimizer.fixtures :as fixtures]))
 
 (def ^:private bl-editor-path
@@ -75,6 +77,43 @@
                                  :notes ""}}
              :errors {}}}}}
          overrides))
+
+(defn- ready-optimizer-state
+  [return-model]
+  {:portfolio
+   {:optimizer
+    {:draft {:id "draft-current"
+             :universe [{:instrument-id "perp:BTC"
+                         :market-type :perp
+                         :coin "BTC"}]
+             :objective {:kind :max-sharpe}
+             :return-model return-model
+             :risk-model {:kind :sample-covariance}
+             :constraints {:long-only? true
+                           :max-asset-weight 1.0}
+             :metadata {:dirty? false}}
+     :history-data {:candle-history-by-coin
+                    {"BTC" [{:time 1000 :close "100"}
+                            {:time 2000 :close "110"}]}
+                    :funding-history-by-coin {}}
+     :market-cap-by-coin {}
+     :runtime {:as-of-ms 2500
+               :stale-after-ms 60000}}}
+   :webdata2 {:clearinghouseState
+              {:marginSummary {:accountValue "1000"}
+               :assetPositions []}}})
+
+(defn- request-signature-for-state
+  [state]
+  (let [{:keys [request runnable?]} (setup-readiness/build-readiness state)]
+    (is runnable?)
+    (action-common/build-request-signature request)))
+
+(defn- solved-run-for-state
+  [state]
+  (fixtures/sample-last-successful-run
+   {:request-signature (request-signature-for-state state)
+    :result {:status :solved}}))
 
 (deftest run-portfolio-optimizer-emits-registered-worker-effect-test
   (let [request {:scenario-id "scenario-1"
@@ -186,18 +225,43 @@
           {:portfolio {:optimizer {:draft {:universe []}}}}))))
 
 (deftest save-portfolio-optimizer-scenario-from-current-requires-solved-run-test
-  (is (= [[:effects/save-portfolio-optimizer-scenario]]
-         (actions/save-portfolio-optimizer-scenario-from-current
-          {:portfolio {:optimizer {:last-successful-run
-                                    (fixtures/sample-last-successful-run)}}})))
-  (is (= []
-         (actions/save-portfolio-optimizer-scenario-from-current
-          {:portfolio {:optimizer {:last-successful-run
-                                    (fixtures/sample-last-successful-run
-                                     {:result {:status :infeasible}})}}})))
+  (let [state (ready-optimizer-state {:kind :historical-mean})]
+    (is (= [[:effects/save-portfolio-optimizer-scenario]]
+           (actions/save-portfolio-optimizer-scenario-from-current
+            (assoc-in state
+                      [:portfolio :optimizer :last-successful-run]
+                      (solved-run-for-state state))))))
+  (let [state (ready-optimizer-state {:kind :historical-mean})]
+    (is (= []
+           (actions/save-portfolio-optimizer-scenario-from-current
+            (assoc-in state
+                      [:portfolio :optimizer :last-successful-run]
+                      (fixtures/sample-last-successful-run
+                       {:request-signature (request-signature-for-state state)
+                        :result {:status :infeasible}}))))))
   (is (= []
          (actions/save-portfolio-optimizer-scenario-from-current
           {:portfolio {:optimizer {}}}))))
+
+(deftest save-portfolio-optimizer-scenario-from-current-rejects-stale-solved-run-test
+  (let [black-litterman-state
+        (ready-optimizer-state
+         {:kind :black-litterman
+          :views [{:kind :absolute
+                   :instrument-id "perp:BTC"
+                   :return 0.2
+                   :confidence 0.75
+                   :weights {"perp:BTC" 1}}]})
+        historical-state
+        (assoc-in black-litterman-state
+                  [:portfolio :optimizer :draft :return-model]
+                  {:kind :historical-mean})]
+    (is (= []
+           (actions/save-portfolio-optimizer-scenario-from-current
+            (assoc-in black-litterman-state
+                      [:portfolio :optimizer :last-successful-run]
+                      (solved-run-for-state historical-state))))
+        "A solved historical/max-sharpe result must not be saved as the active Black-Litterman scenario.")))
 
 (deftest load-portfolio-optimizer-route-emits-scenario-read-effects-test
   (is (= [[:effects/load-portfolio-optimizer-scenario-index]]

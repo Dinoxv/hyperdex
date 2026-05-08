@@ -1,12 +1,7 @@
 (ns hyperopen.runtime.effect-adapters.portfolio-optimizer-pipeline
   (:require [hyperopen.portfolio.optimizer.application.progress :as progress]
+            [hyperopen.portfolio.optimizer.application.run-identity :as run-identity]
             [hyperopen.portfolio.optimizer.application.setup-readiness :as setup-readiness]))
-
-(defn- request-run-signature
-  [request]
-  {:scenario-id (:scenario-id request)
-   :as-of-ms (:as-of-ms request)
-   :request request})
 
 (defn- error-message
   [err]
@@ -73,7 +68,7 @@
                        {:status :running
                         :percent 15})
   (request-run! {:request request
-                 :request-signature (request-run-signature request)
+                 :request-signature (run-identity/build-request-signature request)
                  :store store
                  :run-id run-id}))
 

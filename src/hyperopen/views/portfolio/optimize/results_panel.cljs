@@ -265,7 +265,7 @@
        [:p {:class ["text-[0.65rem]" "font-semibold" "uppercase" "tracking-[0.24em]" "text-warning"]}
         "Stale Result"]
        [:p {:class ["mt-2" "text-sm" "text-trading-muted"]}
-        "The setup draft has changed since the retained allocation was computed. Rerun before using these weights for execution."]]
+        "The setup draft inputs differ from the retained allocation. Rerun before using these weights for execution."]]
       [:button {:type "button"
                 :class ["rounded-lg" "border" "border-warning/60" "bg-warning/10" "px-3" "py-2"
                         "text-sm" "font-semibold" "text-warning" "hover:bg-warning/20"]
