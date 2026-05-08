@@ -132,7 +132,7 @@
 
   @media (min-width: 960px) {
     .portfolio-optimizer-v4 [data-role="portfolio-optimizer-setup-use-my-views-insight-cards"] {
-      grid-template-columns: repeat(3, minmax(0, 1fr));
+      grid-template-columns: minmax(0, 1.16fr) minmax(11rem, 0.68fr) minmax(0, 1.16fr);
     }
   }
 
