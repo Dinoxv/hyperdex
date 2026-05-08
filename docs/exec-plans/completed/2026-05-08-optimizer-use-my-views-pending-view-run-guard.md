@@ -1,6 +1,6 @@
 ---
 owner: portfolio
-status: active
+status: completed
 created: 2026-05-08
 source_of_truth: false
 tracked_issue: hyperopen-fexd
@@ -18,6 +18,8 @@ A user who selects `Use my views`, enters a BTC expected return of `20%`, and ru
 
 After this change, the run path must make that state boundary explicit. A valid pending editor view is materialized into the optimizer draft before the run starts, invalid pending editor content blocks the run with field-level errors, and Black-Litterman mode cannot run with zero active or pending views. The repair also guards against stale persisted views, such as a raw `BTC` view ID when the eligible universe contains `perp:BTC`, so a view cannot silently become a zero-weight row in the posterior math.
 
+Follow-up screenshots on 2026-05-08 showed a second failure mode: the setup page's combined output correctly showed BTC moving from about `-21.4%` to `9.7%`, while the weights/frontier page still showed the old `-21.38%` BTC standalone marker. That means the posterior math and preview can be correct while the user is navigated to a retained stale result. The setup page exposed `View weights` and the right-rail results link whenever any old successful result existed, even when the current draft was dirty or a replacement run was in flight. That stale navigation path must be closed so only a clean, completed current result is presented as the weights page.
+
 ## Progress
 
 - [x] (2026-05-08T18:36Z) Investigated the screenshot path from frontier marker display back through engine payload, Black-Litterman posterior, request building, readiness, and the editor actions.
@@ -28,6 +30,9 @@ After this change, the run path must make that state boundary explicit. A valid 
 - [x] (2026-05-08T19:15Z) Implement request-builder validation for non-overlapping Black-Litterman view rows.
 - [x] (2026-05-08T19:15Z) Update UI affordances and browser coverage.
 - [x] (2026-05-08T19:15Z) Run focused tests, Playwright coverage, and required repo gates.
+- [x] (2026-05-08T20:55Z) Reproduced the follow-up stale weights navigation bug with a RED setup-view test.
+- [x] (2026-05-08T21:00Z) Hid stale setup result navigation until the draft is clean and no run is active.
+- [x] (2026-05-08T21:00Z) Tightened the Black-Litterman calibration regression so BTC standalone overlays must use a positive posterior after a valid BTC view.
 
 ## Surprises & Discoveries
 
@@ -52,6 +57,9 @@ After this change, the run path must make that state boundary explicit. A valid 
 - Observation: The Black-Litterman editor panel was already close to the production namespace-size threshold.
   Evidence: Adding the pending-view status pushed `src/hyperopen/views/portfolio/optimize/black_litterman_views_panel.cljs` to `512` lines and `npm run check` failed at `lint:namespace-sizes`. Splitting pure display helpers into `src/hyperopen/views/portfolio/optimize/black_litterman_views_model.cljs` reduced the panel to `417` lines and kept the new helper at `99` lines without adding a size exception.
 
+- Observation: The follow-up screenshots prove this was not a formatter or chart sign flip. The setup preview had already computed the posterior BTC row, but the weights page could still show a retained prior result.
+  Evidence: `setup_v4_use_my_views_cards.cljs` derives the setup cards from the current readiness request, while `results_panel.cljs` renders `[:portfolio :optimizer :last-successful-run :result]`. `workspace_view.cljs` previously considered `solved-run?` true for any old solved run and passed that through to `setup-bottom-actions` and `context-rail`, even when `[:portfolio :optimizer :draft :metadata :dirty?]` was true or `run-state` was `:running`.
+
 ## Decision Log
 
 - Decision: Treat this as a run-boundary and validation bug, not a chart-rendering bug.
@@ -70,6 +78,14 @@ After this change, the run path must make that state boundary explicit. A valid 
   Rationale: Persisted or legacy views can use display-level IDs such as `BTC` while the engine uses instrument IDs such as `perp:BTC`. Those views currently normalize as structurally valid but become all-zero view rows and do not affect the posterior.
   Date/Author: 2026-05-08 / Codex
 
+- Decision: Treat the follow-up as stale result navigation, not a second posterior computation bug.
+  Rationale: Engine payload construction already uses the posterior `expected-returns` vector for `:frontier-overlays`; the failing UI path was that setup still linked to an old `last-successful-run` while the current draft had unsaved Black-Litterman changes or a rerun was in flight.
+  Date/Author: 2026-05-08 / Codex
+
+- Decision: Hide setup weights/result navigation unless the last successful run is current.
+  Rationale: A retained result is useful status context during edits or reruns, but presenting it as "View weights" makes stale weights look like the output of the current views. A result is current only when the last run is solved, no run is active, and the draft dirty flag is false.
+  Date/Author: 2026-05-08 / Codex
+
 ## Outcomes & Retrospective
 
 This plan records the diagnosis, implementation path, and validation evidence. The complexity increase stayed small by extracting editor parsing and materialization into one shared pure namespace reused by the editor, run action, and tests. The complexity decrease is larger because the optimizer now has one explicit path from typed view to active engine view, with no silent no-op state.
@@ -84,6 +100,16 @@ Validation completed:
 - Browser regression: `PLAYWRIGHT_BASE_URL=http://127.0.0.1:8082 PLAYWRIGHT_WEB_SERVER_COMMAND='npx shadow-cljs --force-spawn --config-merge ... watch app portfolio portfolio-worker portfolio-optimizer-worker vault-detail-worker' npx playwright test tools/playwright/test/optimizer-black-litterman-views.spec.mjs` reached `4 passed`.
 - Browser cleanup: `npm run browser:cleanup` returned `{"ok": true, "stopped": [], "results": []}`.
 - Required gates: `npm run check`, `npm test` (`3793 tests`, `20909 assertions`, `0 failures`, `0 errors`), and `npm run test:websocket` (`524 tests`, `3043 assertions`, `0 failures`, `0 errors`) all exited `0`.
+
+Follow-up stale-result repair completed on 2026-05-08. The setup workspace now treats a successful run as current only when the last run is solved, no optimizer run is active, and the draft dirty flag is false. Dirty or in-flight drafts can still show the retained last successful run as status context, but they no longer expose `View weights`, the right-rail results link, or scenario saving as if the retained result belongs to the current Black-Litterman view. The Black-Litterman calibration regression also now asserts that a valid BTC posterior cannot leave the standalone BTC overlay negative.
+
+Follow-up validation completed:
+
+- RED setup regression first failed with `portfolio-optimizer-setup-route-shows-run-state-without-retained-result-surface-test`: dirty/in-flight drafts still exposed stale weights navigation.
+- Focused GREEN regression: `npx shadow-cljs --force-spawn compile test && node out/test.js` reached `3794 tests`, `20912 assertions`, `0 failures`, `0 errors`.
+- Browser regression: `PLAYWRIGHT_REUSE_EXISTING_SERVER=true npx playwright test tools/playwright/test/optimizer-black-litterman-views.spec.mjs` reached `5 passed`.
+- Browser cleanup: `npm run browser:cleanup` returned `{"ok": true, "stopped": [], "results": []}`.
+- Required gates: `npm run check`, `npm test` (`3794 tests`, `20912 assertions`, `0 failures`, `0 errors`), and `npm run test:websocket` (`524 tests`, `3043 assertions`, `0 failures`, `0 errors`) all exited `0`.
 
 ## Context and Orientation
 

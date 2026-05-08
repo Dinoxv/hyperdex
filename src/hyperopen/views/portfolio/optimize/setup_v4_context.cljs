@@ -10,7 +10,7 @@
 
 (defn context-rail
   [{:keys [draft editor-state readiness snapshot preview-snapshot run-state optimization-progress
-           history-load-state last-successful-run result-path]}]
+           history-load-state last-successful-run current-result? result-path]}]
   (let [bl? (= :black-litterman (get-in draft [:return-model :kind]))
         progress-visible? (contains? #{:running :succeeded :failed}
                                      (:status optimization-progress))
@@ -68,7 +68,7 @@
         (when run-visible?
           (run-status-panel/run-status-panel run-state))
         (run-status-panel/last-successful-run-panel run-state last-successful-run)
-        (when (:result last-successful-run)
+        (when (and current-result? (:result last-successful-run))
           [:button {:type "button"
                     :class ["mt-3" "w-full" "border" "border-warning/60" "bg-warning/10"
                             "px-3" "py-2" "text-left" "text-[0.6875rem]" "font-medium" "text-warning"]

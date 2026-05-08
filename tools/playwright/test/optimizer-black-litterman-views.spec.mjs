@@ -333,6 +333,109 @@ async function seedBlackLittermanPendingBtcRunState(page) {
   await waitForIdle(page, { quietMs: 150, timeoutMs: 4_000, pollMs: 50 });
 }
 
+async function seedBlackLittermanDirtyRetainedResultState(page) {
+  await page.evaluate(() => {
+    const c = globalThis.cljs.core;
+    const kw = (name) => c.keyword(name);
+    const map = (entries) => c.PersistentArrayMap.fromArray(entries, true);
+    const vector = (items) => c.PersistentVector.fromArray(items, true);
+    const candle = (time, close) => map([kw("time"), time, kw("close"), close]);
+    const btcInstrument = map([
+      kw("instrument-id"), "perp:BTC",
+      kw("market-type"), kw("perp"),
+      kw("coin"), "BTC",
+      kw("symbol"), "BTC-USDC"
+    ]);
+    const activeView = map([
+      kw("id"), "view-1",
+      kw("kind"), kw("absolute"),
+      kw("instrument-id"), "perp:BTC",
+      kw("return"), 0.2,
+      kw("confidence"), 0.75,
+      kw("weights"), map(["perp:BTC", 1])
+    ]);
+    const draft = map([
+      kw("universe"), vector([btcInstrument]),
+      kw("objective"), map([kw("kind"), kw("max-sharpe")]),
+      kw("return-model"), map([kw("kind"), kw("black-litterman"), kw("views"), vector([activeView])]),
+      kw("risk-model"), map([kw("kind"), kw("sample-covariance")]),
+      kw("constraints"), map([kw("long-only?"), true, kw("max-asset-weight"), 1]),
+      kw("metadata"), map([kw("dirty?"), true])
+    ]);
+    const lastSuccessfulRun = map([
+      kw("request-signature"), map([kw("seed"), "old-result"]),
+      kw("computed-at-ms"), 4000,
+      kw("result"), map([
+        kw("status"), kw("solved"),
+        kw("instrument-ids"), vector(["perp:BTC"]),
+        kw("target-weights"), vector([1]),
+        kw("current-weights"), vector([0]),
+        kw("frontier"), vector([]),
+        kw("frontier-overlays"), map([])
+      ])
+    ]);
+    const store = globalThis.hyperopen.system.store;
+    let state = c.deref(store);
+    state = c.assoc_in(
+      state,
+      c.PersistentVector.fromArray([kw("portfolio"), kw("optimizer"), kw("draft")], true),
+      draft
+    );
+    state = c.assoc_in(
+      state,
+      c.PersistentVector.fromArray(
+        [kw("portfolio"), kw("optimizer"), kw("history-data"), kw("candle-history-by-coin"), "BTC"],
+        true
+      ),
+      vector([
+        candle(1000, "100"),
+        candle(2000, "95"),
+        candle(3000, "92"),
+        candle(4000, "90")
+      ])
+    );
+    state = c.assoc_in(
+      state,
+      c.PersistentVector.fromArray(
+        [kw("portfolio"), kw("optimizer"), kw("history-data"), kw("funding-history-by-coin")],
+        true
+      ),
+      map([])
+    );
+    state = c.assoc_in(
+      state,
+      c.PersistentVector.fromArray([kw("portfolio"), kw("optimizer"), kw("market-cap-by-coin")], true),
+      map(["BTC", 100])
+    );
+    state = c.assoc_in(
+      state,
+      c.PersistentVector.fromArray([kw("portfolio"), kw("optimizer"), kw("runtime"), kw("as-of-ms")], true),
+      5000
+    );
+    state = c.assoc_in(
+      state,
+      c.PersistentVector.fromArray([kw("portfolio"), kw("optimizer"), kw("history-load-state")], true),
+      map([kw("status"), kw("idle")])
+    );
+    state = c.assoc_in(
+      state,
+      c.PersistentVector.fromArray([kw("portfolio"), kw("optimizer"), kw("run-state")], true),
+      map([
+        kw("status"), kw("running"),
+        kw("run-id"), "run-new-view",
+        kw("started-at-ms"), 5000
+      ])
+    );
+    state = c.assoc_in(
+      state,
+      c.PersistentVector.fromArray([kw("portfolio"), kw("optimizer"), kw("last-successful-run")], true),
+      lastSuccessfulRun
+    );
+    c.reset_BANG_(store, state);
+  });
+  await waitForIdle(page, { quietMs: 150, timeoutMs: 4_000, pollMs: 50 });
+}
+
 async function readBlackLittermanDraftViews(page) {
   return page.evaluate(() => {
     const c = globalThis.cljs.core;
@@ -616,6 +719,22 @@ test("portfolio optimizer run applies a valid pending BTC view before pipeline @
       firstConfidence: 0.75,
       errorCount: 0
     });
+});
+
+test("portfolio optimizer setup hides stale retained weights during a view rerun @regression", async ({ page }) => {
+  test.setTimeout(90_000);
+
+  await page.setViewportSize({ width: 900, height: 900 });
+  await visitOptimizerNew(page);
+
+  await seedBlackLittermanDirtyRetainedResultState(page);
+
+  await expect(page.locator("[data-role='portfolio-optimizer-last-successful-run']"))
+    .toContainText("Retaining last successful result while rerunning.");
+  await expect(page.locator("[data-role='portfolio-optimizer-view-weights']"))
+    .toHaveCount(0);
+  await expect(page.locator("[data-role='portfolio-optimizer-results-link']"))
+    .toHaveCount(0);
 });
 
 test("portfolio optimizer use my views preview renders vertical bars across review widths @regression", async ({ page }) => {

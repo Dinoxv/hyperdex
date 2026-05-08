@@ -18,6 +18,12 @@
   (or (get-in state [:portfolio :optimizer :draft])
       (optimizer-defaults/default-draft)))
 
+(defn- current-solved-run?
+  [draft running? last-successful-run]
+  (and (= :solved (get-in last-successful-run [:result :status]))
+       (not running?)
+       (not (true? (get-in draft [:metadata :dirty?])))))
+
 (defn workspace-view
   [state route]
   (let [snapshot (current-portfolio/current-portfolio-snapshot state)
@@ -36,7 +42,7 @@
         run-triggerable? (and (seq (:universe draft))
                               (not running?))
         last-successful-run (get-in state [:portfolio :optimizer :last-successful-run])
-        solved-run? (= :solved (get-in last-successful-run [:result :status]))
+        solved-run? (current-solved-run? draft running? last-successful-run)
         scenario-save-state (or (get-in state [:portfolio :optimizer :scenario-save-state])
                                 (optimizer-defaults/default-scenario-save-state))
         saving-scenario? (= :saving (:status scenario-save-state))
@@ -88,5 +94,6 @@
                                       :optimization-progress optimization-progress
                                       :history-load-state history-load-state
                                       :last-successful-run last-successful-run
+                                      :current-result? solved-run?
                                       :result-path result-path})]
      (execution-modal/execution-modal state)]))

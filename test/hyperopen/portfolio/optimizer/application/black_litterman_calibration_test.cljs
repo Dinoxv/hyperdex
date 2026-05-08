@@ -103,6 +103,8 @@
                                    :weights [0.31 0.3 0.39]})})
         standalone (overlay-by-id result :standalone)]
     (is (= :solved (:status result)))
+    (is (pos? (get-in standalone [btc-id :expected-return]))
+        "BTC standalone overlay should use the Black-Litterman posterior, not the negative baseline prior.")
     (is (<= (get-in standalone [btc-id :expected-return]) 0.205)
         "BTC should not inherit a 60% covariance-implied fallback prior after a 20% absolute view.")
     (is (within? 0.2

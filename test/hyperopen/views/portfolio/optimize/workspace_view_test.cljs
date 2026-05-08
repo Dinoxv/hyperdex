@@ -88,11 +88,10 @@
     (is (= true (get-in run-button [1 :disabled])))
     (is (some? (node-by-role view-node "portfolio-optimizer-run-status-panel")))
     (is (some? (node-by-role view-node "portfolio-optimizer-last-successful-run")))
-    (is (= "button" (get-in view-weights-link [1 :type])))
-    (is (= [[:actions/navigate "/portfolio/optimize/draft"]]
-           (click-actions view-weights-link)))
-    (is (= "button" (get-in results-link [1 :type])))
-    (is (= [[:actions/navigate "/portfolio/optimize/draft"]] (click-actions results-link)))
+    (is (nil? view-weights-link)
+        "Dirty or in-flight drafts must not expose stale weights as the current result.")
+    (is (nil? results-link)
+        "The setup rail should not navigate to stale retained results for a dirty draft.")
     (is (nil? (node-by-role view-node "portfolio-optimizer-results-surface")))
     (is (nil? (node-by-role view-node "portfolio-optimizer-rebalance-preview")))
     (is (nil? (node-by-role view-node "portfolio-optimizer-tracking-panel")))
@@ -103,6 +102,34 @@
     (is (contains? strings "Running"))
     (is (contains? strings "Retaining last successful result while rerunning."))
     (is (contains? strings "2 assets"))))
+
+(deftest portfolio-optimizer-workspace-links-current-clean-result-test
+  (let [view-node (portfolio-view/portfolio-view
+                   {:router {:path "/portfolio/optimize/new"}
+                    :portfolio {:optimizer
+                                {:draft {:universe [{:instrument-id "perp:BTC"
+                                                     :market-type :perp
+                                                     :coin "BTC"}]
+                                         :metadata {:dirty? false}}
+                                 :history-data {:candle-history-by-coin
+                                                {"BTC" [{:time 1000 :close "100"}
+                                                        {:time 2000 :close "110"}]}
+                                                :funding-history-by-coin {}}
+                                 :runtime {:as-of-ms 2500}
+                                 :run-state {:status :succeeded
+                                             :run-id "run-1"
+                                             :completed-at-ms 2600}
+                                 :last-successful-run (fixtures/sample-last-successful-run
+                                                       {:computed-at-ms 2600
+                                                        :result {:instrument-ids ["perp:BTC"]}})}}})
+        view-weights-link (node-by-role view-node "portfolio-optimizer-view-weights")
+        results-link (node-by-role view-node "portfolio-optimizer-results-link")]
+    (is (= "button" (get-in view-weights-link [1 :type])))
+    (is (= [[:actions/navigate "/portfolio/optimize/draft"]]
+           (click-actions view-weights-link)))
+    (is (= "button" (get-in results-link [1 :type])))
+    (is (= [[:actions/navigate "/portfolio/optimize/draft"]]
+           (click-actions results-link)))))
 
 (deftest portfolio-optimizer-workspace-shows-history-load-state-test
   (let [loading-node (portfolio-view/portfolio-view
