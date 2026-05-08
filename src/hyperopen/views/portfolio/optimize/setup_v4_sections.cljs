@@ -358,6 +358,18 @@
     [:p {:class ["text-[0.6875rem]" "font-medium" "text-trading-text"]} title]
     [:p {:class ["mt-1" "text-[0.6875rem]" "leading-[1.45]" "text-trading-muted"]} copy]]])
 
+(defn- model-assumptions-panel
+  []
+  [:section {:class ["border" "border-base-300" "bg-base-100/90"]
+             :data-role "portfolio-optimizer-model-assumptions-panel"
+             :data-v4-note "true"}
+   [:p {:class eyebrow-class} "What this model assumes"]
+   [:ul {:class ["mt-1" "space-y-px" "text-[0.65625rem]" "leading-[1.32]" "text-trading-muted"]}
+    [:li "Returns are roughly normal at the chosen horizon."]
+    [:li "Past covariance is informative about future covariance."]
+    [:li "Cross-margin is treated as one book."]
+    [:li "Tail risk and drawdown are not modeled in this setup pass."]]])
+
 (defn- action-objective-label
   [objective-kind]
   (case objective-kind
@@ -430,6 +442,78 @@
            :data-role "portfolio-optimizer-setup-bottom-actions-status-detail"}
      (str "Solving " objective-copy " · " model-copy)]]]))
 
+(defn- use-my-views-legend-item
+  [role swatch-class label qualifier]
+  [:div {:class ["flex" "items-center" "gap-2.5"] :data-role role}
+   [:span {:class (into ["h-2.5" "w-2.5" "shrink-0" "rounded-full" "border" "border-black/10"]
+                        swatch-class)
+           :aria-hidden "true"}]
+   [:div {:class ["flex" "flex-wrap" "items-baseline" "gap-x-1.5" "gap-y-0.5"
+                  "text-[0.6875rem]" "leading-[1.4]"]}
+    [:span {:class ["font-medium" "text-trading-text"]} label]
+    [:span {:class ["text-trading-muted"]} qualifier]]])
+
+(defn- use-my-views-card
+  [role title copy]
+  [:section {:class ["border" "border-base-300" "bg-base-100/90" "p-4"]
+             :data-role role}
+   [:p {:class eyebrow-class} title]
+   [:p {:class ["mt-2" "text-[0.6875rem]" "leading-[1.45]" "text-trading-muted"]}
+    copy]])
+
+(defn- use-my-views-workspace
+  [{:keys [draft readiness running? run-triggerable? saving-scenario? solved-run? result-path]}]
+  [:section {:class ["space-y-4"] :data-role "portfolio-optimizer-setup-use-my-views-workspace"}
+   [:div {:class ["space-y-4"] :data-role "portfolio-optimizer-setup-use-my-views-context"}
+    [:div {:class ["px-1" "pt-2" "pb-1"]}
+     [:p {:class eyebrow-class} "Use my views"]
+     [:h2 {:class ["mt-2" "text-[0.875rem]" "font-medium" "tracking-[-0.01em]"]}
+      "What the model assumes and what your views change"]]
+    [:div {:class ["grid" "gap-3" "border" "border-base-300" "bg-base-100/90" "p-4"
+                   "sm:grid-cols-2" "xl:grid-cols-3"]
+           :data-role "portfolio-optimizer-setup-use-my-views-legend"}
+     (use-my-views-legend-item
+      "portfolio-optimizer-setup-use-my-views-legend-market-reference"
+      ["bg-[#6b8db5]"]
+      "Market reference"
+      "(prior)")
+     (use-my-views-legend-item
+      "portfolio-optimizer-setup-use-my-views-legend-your-view"
+      ["bg-transparent" "ring-2" "ring-warning/70" "border-warning/50"]
+      "Your view"
+      "tilt")
+     (use-my-views-legend-item
+      "portfolio-optimizer-setup-use-my-views-legend-combined-output"
+      ["bg-[#d4b558]"]
+      "Combined output"
+      "(posterior)")]
+    [:div {:class ["border" "border-base-300" "bg-base-200/10" "p-1.5"]
+           :data-role "portfolio-optimizer-setup-use-my-views-chart-shell"}
+     (black-litterman-preview-chart/black-litterman-preview-panel
+      readiness
+      {:legend-layout :external})]
+    [:div {:class ["grid" "grid-cols-1" "gap-3" "xl:grid-cols-3"]
+           :data-role "portfolio-optimizer-setup-use-my-views-insight-cards"}
+     (use-my-views-card
+      "portfolio-optimizer-setup-use-my-views-card-market-reference"
+      "Market reference"
+      "Prior weights come from market-cap proxy or current portfolio fallback.")
+     (use-my-views-card
+      "portfolio-optimizer-setup-use-my-views-card-your-views"
+      "Your views"
+      "Absolute or relative beliefs tilt expected returns with explicit confidence.")
+     (use-my-views-card
+      "portfolio-optimizer-setup-use-my-views-card-combined-output"
+      "Combined output"
+      "The posterior return estimate feeds the selected optimizer objective.")]]
+   (model-assumptions-panel)
+   (setup-bottom-actions {:draft draft
+                          :running? running?
+                          :run-triggerable? run-triggerable?
+                          :saving-scenario? saving-scenario?
+                          :solved-run? solved-run?
+                          :result-path result-path})])
+
 (defn summary-pane
   [{:keys [draft readiness running? run-triggerable? saving-scenario? solved-run? result-path]}]
   (let [preset (active-preset draft)
@@ -437,64 +521,43 @@
         return-kind (get-in draft [:return-model :kind])
         constraints (:constraints draft)
         bl? (= :black-litterman return-kind)]
-    [:main {:class ["space-y-4" "leading-4"] :data-role "portfolio-optimizer-setup-summary-pane"}
-     [:div {:class ["px-1" "pt-2" "pb-1"]
-            :data-role "portfolio-optimizer-setup-summary-heading"}
-       [:p {:class eyebrow-class} "Summary"]
-       [:h2 {:class ["mt-2" "text-[0.875rem]" "font-medium" "tracking-[-0.01em]"]}
-        (if bl?
-          "What your views will change"
-          "What this scenario will solve for")]]
-     [:section {:class ["border" "border-base-300" "bg-base-100/90"]
-                :data-role "portfolio-optimizer-setup-summary-panel"}
-      (summary-row "Preset" (labelize preset)
-                   "You can deviate from the preset below without changing the universe.")
-      (summary-row "Universe" (setup-v4-summary/universe-summary draft)
-                   "Selected instruments are optimized as one cross-margin book.")
-      (summary-row "Expected Returns" (labelize return-kind)
-                   (if bl?
-                     "Market reference plus explicit views produces the posterior return estimate."
-                     "Funding-adjusted return assumptions are kept separate from covariance."))
-      (summary-row "Objective" (labelize objective-kind)
-                   "Objective remains separate from return model selection.")
-      (summary-row "Constraints"
-                   (str "gross <= " (or (:gross-max constraints) "--")
-                        " - cap <= " (percent-label (:max-asset-weight constraints)))
-                   "Constraints are enforced before the recommendation is accepted.")
-      (summary-row "Horizon" "Annualized"
-                   "Displayed return and volatility metrics use the optimizer annualization convention.")]
-     (when bl?
-       [:section {:class ["border" "border-warning/50" "bg-warning/10" "p-4"]
-                  :data-role "portfolio-optimizer-setup-use-my-views-context"}
-        [:p {:class eyebrow-class} "Use my views"]
-        [:h3 {:class ["mt-2" "text-[0.875rem]" "font-medium"]}
-         "What the model assumes and what your views change"]
-        [:div {:class ["mt-4" "grid" "grid-cols-1" "gap-3" "lg:grid-cols-3"]}
-         [:div [:p {:class eyebrow-class} "1 - Market reference"]
-          [:p {:class ["mt-2" "text-[0.6875rem]" "leading-[1.45]" "text-trading-muted"]}
-           "Prior weights come from market-cap proxy or current portfolio fallback."]]
-         [:div [:p {:class eyebrow-class} "2 - Your views"]
-          [:p {:class ["mt-2" "text-[0.6875rem]" "leading-[1.45]" "text-trading-muted"]}
-           "Absolute or relative beliefs tilt expected returns with explicit confidence."]]
-         [:div [:p {:class eyebrow-class} "3 - Combined output"]
-          [:p {:class ["mt-2" "text-[0.6875rem]" "leading-[1.45]" "text-trading-muted"]}
-           "The posterior return estimate feeds the selected optimizer objective."]]]])
-     (when bl?
-       (black-litterman-preview-chart/black-litterman-preview-panel readiness))
-     [:div {:class ["space-y-2"]
-            :data-role "portfolio-optimizer-model-assumptions-stack"}
-      [:section {:class ["border" "border-base-300" "bg-base-100/90"]
-                 :data-role "portfolio-optimizer-model-assumptions-panel"
-                 :data-v4-note "true"}
-       [:p {:class eyebrow-class} "What this model assumes"]
-       [:ul {:class ["mt-1" "space-y-px" "text-[0.65625rem]" "leading-[1.32]" "text-trading-muted"]}
-        [:li "Returns are roughly normal at the chosen horizon."]
-        [:li "Past covariance is informative about future covariance."]
-        [:li "Cross-margin is treated as one book."]
-        [:li "Tail risk and drawdown are not modeled in this setup pass."]]]
-      (setup-bottom-actions {:draft draft
-                             :running? running?
-                             :run-triggerable? run-triggerable?
-                             :saving-scenario? saving-scenario?
-                             :solved-run? solved-run?
-                             :result-path result-path})]]))
+    (into
+     [:main {:class ["space-y-4" "leading-4"] :data-role "portfolio-optimizer-setup-summary-pane"}]
+     (if bl?
+       [(use-my-views-workspace {:draft draft
+                                 :readiness readiness
+                                 :running? running?
+                                 :run-triggerable? run-triggerable?
+                                 :saving-scenario? saving-scenario?
+                                 :solved-run? solved-run?
+                                 :result-path result-path})]
+       [[:div {:class ["px-1" "pt-2" "pb-1"]
+               :data-role "portfolio-optimizer-setup-summary-heading"}
+         [:p {:class eyebrow-class} "Summary"]
+         [:h2 {:class ["mt-2" "text-[0.875rem]" "font-medium" "tracking-[-0.01em]"]}
+          "What this scenario will solve for"]]
+        [:section {:class ["border" "border-base-300" "bg-base-100/90"]
+                   :data-role "portfolio-optimizer-setup-summary-panel"}
+         (summary-row "Preset" (labelize preset)
+                      "You can deviate from the preset below without changing the universe.")
+         (summary-row "Universe" (setup-v4-summary/universe-summary draft)
+                      "Selected instruments are optimized as one cross-margin book.")
+         (summary-row "Expected Returns" (labelize return-kind)
+                      "Funding-adjusted return assumptions are kept separate from covariance.")
+         (summary-row "Objective" (labelize objective-kind)
+                      "Objective remains separate from return model selection.")
+         (summary-row "Constraints"
+                      (str "gross <= " (or (:gross-max constraints) "--")
+                           " - cap <= " (percent-label (:max-asset-weight constraints)))
+                      "Constraints are enforced before the recommendation is accepted.")
+         (summary-row "Horizon" "Annualized"
+                      "Displayed return and volatility metrics use the optimizer annualization convention.")]
+        [:div {:class ["space-y-2"]
+               :data-role "portfolio-optimizer-model-assumptions-stack"}
+         (model-assumptions-panel)
+         (setup-bottom-actions {:draft draft
+                                :running? running?
+                                :run-triggerable? run-triggerable?
+                                :saving-scenario? saving-scenario?
+                                :solved-run? solved-run?
+                                :result-path result-path})]]))))

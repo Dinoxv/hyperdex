@@ -2,6 +2,7 @@
   (:require [cljs.test :refer-macros [deftest is]]
             [clojure.string :as str]
             [hyperopen.portfolio.optimizer.application.universe-candidates :as universe-candidates]
+            [hyperopen.views.portfolio.optimize.setup-v4-sections :as setup-v4-sections]
             [hyperopen.views.portfolio.optimize.setup-v4-universe :as setup-v4-universe]
             [hyperopen.views.portfolio-view :as portfolio-view]))
 
@@ -94,6 +95,63 @@
    :coin "BTC"
    :symbol "BTC-USDC"
    :name "Bitcoin"})
+
+(def ^:private eth-instrument
+  {:instrument-id "perp:ETH"
+   :market-type :perp
+   :coin "ETH"
+   :symbol "ETH-USDC"
+   :name "Ethereum"})
+
+(defn- black-litterman-ready-readiness
+  []
+  {:status :ready
+   :runnable? true
+   :warnings []
+   :blocking-warnings []
+   :request {:universe [btc-instrument
+                        eth-instrument]
+             :return-model {:kind :black-litterman
+                            :views [{:id "view-1"
+                                     :kind :relative
+                                     :instrument-id "perp:BTC"
+                                     :comparator-instrument-id "perp:ETH"
+                                     :direction :outperform
+                                     :return 0.1
+                                     :confidence 0.5
+                                     :confidence-variance 1
+                                     :weights {"perp:BTC" 1
+                                               "perp:ETH" -1}}]}
+             :risk-model {:kind :sample-covariance}
+             :periods-per-year 10
+             :history {:return-series-by-instrument
+                       {"perp:BTC" [0.01 0.03 0.02]
+                        "perp:ETH" [0.04 0.01 0.04]}}
+             :black-litterman-prior
+             {:source :market-cap
+              :weights-by-instrument {"perp:BTC" 0.6
+                                      "perp:ETH" 0.4}}}})
+
+(defn- black-litterman-ready-draft
+  []
+  {:universe [btc-instrument
+              eth-instrument]
+   :objective {:kind :max-sharpe}
+   :return-model {:kind :black-litterman
+                  :views [{:id "view-1"
+                           :kind :relative
+                           :instrument-id "perp:BTC"
+                           :comparator-instrument-id "perp:ETH"
+                           :direction :outperform
+                           :return 0.1
+                           :confidence 0.5
+                           :confidence-variance 1
+                           :weights {"perp:BTC" 1
+                                     "perp:ETH" -1}}]}
+   :risk-model {:kind :sample-covariance}
+   :constraints {:long-only? false
+                 :max-asset-weight 0.4
+                 :gross-max 1.5}})
 
 (defn- candle-rows
   [time-and-close-pairs]
@@ -257,6 +315,67 @@
            (input-actions
             (node-by-role view-node
                           "portfolio-optimizer-constraint-gross-max-input"))))))
+
+(deftest setup-v4-black-litterman-summary-pane-uses-dedicated-center-workspace-contract-test
+  (let [view-node (setup-v4-sections/summary-pane
+                   {:draft (black-litterman-ready-draft)
+                    :readiness (black-litterman-ready-readiness)
+                    :running? false
+                    :run-triggerable? true
+                    :saving-scenario? false
+                    :solved-run? false
+                    :result-path "/portfolio/optimize/scenarios/draft"})
+        workspace (node-by-role view-node
+                                "portfolio-optimizer-setup-use-my-views-workspace")
+        workspace-text (node-text workspace)
+        external-legend (node-by-role view-node
+                                      "portfolio-optimizer-setup-use-my-views-legend")
+        legend-text (node-text external-legend)
+        chart-shell (node-by-role view-node
+                                  "portfolio-optimizer-setup-use-my-views-chart-shell")
+        insight-cards (node-by-role view-node
+                                    "portfolio-optimizer-setup-use-my-views-insight-cards")
+        action-bar (node-by-role view-node "portfolio-optimizer-setup-bottom-actions")
+        run-button (node-by-role action-bar "portfolio-optimizer-run-draft")
+        save-button (node-by-role action-bar "portfolio-optimizer-save-scenario")]
+    (is (some? workspace))
+    (is (nil? (node-by-role view-node "portfolio-optimizer-setup-summary-heading")))
+    (is (nil? (node-by-role view-node "portfolio-optimizer-setup-summary-panel")))
+    (is (str/includes? workspace-text "Use my views"))
+    (is (str/includes? workspace-text
+                       "What the model assumes and what your views change"))
+    (is (some? external-legend))
+    (is (= ["portfolio-optimizer-setup-use-my-views-legend-market-reference"
+            "portfolio-optimizer-setup-use-my-views-legend-your-view"
+            "portfolio-optimizer-setup-use-my-views-legend-combined-output"]
+           (child-roles external-legend)))
+    (is (str/includes? legend-text "Market reference"))
+    (is (str/includes? legend-text "(prior)"))
+    (is (str/includes? legend-text "Your view"))
+    (is (str/includes? legend-text "Combined output"))
+    (is (str/includes? legend-text "(posterior)"))
+    (is (some? chart-shell))
+    (is (some? (node-by-role chart-shell
+                             "portfolio-optimizer-black-litterman-preview-panel")))
+    (is (= ["portfolio-optimizer-setup-use-my-views-card-market-reference"
+            "portfolio-optimizer-setup-use-my-views-card-your-views"
+            "portfolio-optimizer-setup-use-my-views-card-combined-output"]
+           (child-roles insight-cards)))
+    (is (str/includes? (node-text (node-by-role insight-cards
+                                                "portfolio-optimizer-setup-use-my-views-card-market-reference"))
+                       "Market reference"))
+    (is (str/includes? (node-text (node-by-role insight-cards
+                                                "portfolio-optimizer-setup-use-my-views-card-your-views"))
+                       "Your views"))
+    (is (str/includes? (node-text (node-by-role insight-cards
+                                                "portfolio-optimizer-setup-use-my-views-card-combined-output"))
+                       "Combined output"))
+    (is (some? action-bar))
+    (is (= false (get-in run-button [1 :disabled])))
+    (is (= [[:actions/run-portfolio-optimizer-from-draft]]
+           (click-actions run-button)))
+    (is (= [[:actions/save-portfolio-optimizer-scenario-from-current]]
+           (click-actions save-button)))))
 
 (deftest setup-v4-return-risk-model-buttons-expose-tooltips-test
   (let [view-node (portfolio-view/portfolio-view
@@ -549,7 +668,7 @@
                                                      :vault-address vault-address
                                                      :name "Alpha Yield"}]
                                          :objective {:kind :minimum-variance}
-                                         :return-model {:kind :black-litterman}
+                                         :return-model {:kind :historical-mean}
                                          :risk-model {:kind :diagonal-shrink}
                                          :constraints {:long-only? true
                                                        :max-asset-weight 0.25

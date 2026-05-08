@@ -4,36 +4,43 @@
             [hyperopen.test-support.hiccup :as hiccup]
             [hyperopen.views.portfolio.optimize.black-litterman-preview-chart :as preview-chart]))
 
-(defn- ready-preview-panel
+(defn- ready-preview-readiness
   []
-  (preview-chart/black-litterman-preview-panel
-   {:status :ready
-    :request {:universe [{:instrument-id "perp:BTC"
-                          :market-type :perp
-                          :coin "BTC"}
-                         {:instrument-id "perp:ETH"
-                          :market-type :perp
-                          :coin "ETH"}]
-              :return-model {:kind :black-litterman
-                             :views [{:id "view-1"
-                                      :kind :relative
-                                      :instrument-id "perp:BTC"
-                                      :comparator-instrument-id "perp:ETH"
-                                      :direction :outperform
-                                      :return 0.1
-                                      :confidence 0.5
-                                      :confidence-variance 1
-                                      :weights {"perp:BTC" 1
-                                                "perp:ETH" -1}}]}
-              :risk-model {:kind :sample-covariance}
-              :periods-per-year 10
-              :history {:return-series-by-instrument
-                        {"perp:BTC" [0.01 0.03 0.02]
-                         "perp:ETH" [0.04 0.01 0.04]}}
-              :black-litterman-prior
-              {:source :market-cap
-               :weights-by-instrument {"perp:BTC" 0.6
-                                       "perp:ETH" 0.4}}}}))
+  {:status :ready
+   :request {:universe [{:instrument-id "perp:BTC"
+                         :market-type :perp
+                         :coin "BTC"}
+                        {:instrument-id "perp:ETH"
+                         :market-type :perp
+                         :coin "ETH"}]
+             :return-model {:kind :black-litterman
+                            :views [{:id "view-1"
+                                     :kind :relative
+                                     :instrument-id "perp:BTC"
+                                     :comparator-instrument-id "perp:ETH"
+                                     :direction :outperform
+                                     :return 0.1
+                                     :confidence 0.5
+                                     :confidence-variance 1
+                                     :weights {"perp:BTC" 1
+                                               "perp:ETH" -1}}]}
+             :risk-model {:kind :sample-covariance}
+             :periods-per-year 10
+             :history {:return-series-by-instrument
+                       {"perp:BTC" [0.01 0.03 0.02]
+                        "perp:ETH" [0.04 0.01 0.04]}}
+             :black-litterman-prior
+             {:source :market-cap
+              :weights-by-instrument {"perp:BTC" 0.6
+                                      "perp:ETH" 0.4}}}})
+
+(defn- ready-preview-panel
+  ([] (preview-chart/black-litterman-preview-panel
+       (ready-preview-readiness)))
+  ([opts]
+   (preview-chart/black-litterman-preview-panel
+    (ready-preview-readiness)
+    opts)))
 
 (deftest black-litterman-preview-chart-renders-vertical-grouped-bars-test
   (let [panel (ready-preview-panel)
@@ -79,6 +86,19 @@
     (is (str/includes? legend-text "(prior)"))
     (is (str/includes? legend-text "Combined output"))
     (is (str/includes? legend-text "(posterior)"))))
+
+(deftest black-litterman-preview-chart-supports-external-legend-layout-test
+  (let [panel (ready-preview-panel {:legend-layout :external})
+        chart (hiccup/find-by-data-role
+               panel
+               "portfolio-optimizer-black-litterman-preview-svg")
+        legend (hiccup/find-by-data-role
+                chart
+                "portfolio-optimizer-black-litterman-preview-legend")]
+    (is (some? chart))
+    (is (nil? legend))
+    (is (str/includes? (hiccup/node-text panel)
+                       "Market reference vs combined output"))))
 
 (deftest black-litterman-preview-chart-renders-vault-name-instead-of-address-test
   (let [vault-address "0x3333333333333333333333333333333333333333"

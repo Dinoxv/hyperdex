@@ -216,10 +216,12 @@
      (legend-item posterior-x posterior-fill "Combined output" "(posterior)")]))
 
 (defn- preview-chart
-  [rows]
-  (let [row-count (count rows)
-        domain (chart-domain rows)
-        zero-y (chart-y domain 0)]
+  ([rows]
+   (preview-chart rows nil))
+  ([rows {:keys [legend-layout]}]
+   (let [row-count (count rows)
+         domain (chart-domain rows)
+         zero-y (chart-y domain 0)]
     [:div {:class ["mt-4" "overflow-hidden" "border" "border-base-300" "bg-base-200/20" "p-3"]
            :data-role "portfolio-optimizer-black-litterman-preview-chart-box"}
      [:svg {:viewBox (str "0 0 " chart-width " " chart-height)
@@ -251,27 +253,30 @@
         rows)]
       [:g {:data-role "portfolio-optimizer-black-litterman-preview-x-axis"}
        (map-indexed (partial asset-label row-count) rows)]
-      (chart-legend)]]))
+      (when (not= :external legend-layout)
+        (chart-legend))]])))
 
 (defn black-litterman-preview-panel
-  [readiness]
-  (let [preview (preview/build-preview readiness)]
-    [:section {:class ["border" "border-base-300" "bg-base-100/90" "p-4"]
-               :data-role "portfolio-optimizer-black-litterman-preview-panel"}
-     [:div {:class ["flex" "items-start" "justify-between" "gap-3"]}
-      [:div
-       [:p {:class eyebrow-class} "Expected return per asset - annualized"]
-       [:h3 {:class ["mt-2" "text-[0.875rem]" "font-medium"]}
-        "Market reference vs combined output"]]]
-     (case (:status preview)
-       :ready
-       (preview-chart (:rows preview))
+  ([readiness]
+   (black-litterman-preview-panel readiness nil))
+  ([readiness opts]
+   (let [preview (preview/build-preview readiness)]
+     [:section {:class ["border" "border-base-300" "bg-base-100/90" "p-4"]
+                :data-role "portfolio-optimizer-black-litterman-preview-panel"}
+      [:div {:class ["flex" "items-start" "justify-between" "gap-3"]}
+       [:div
+        [:p {:class eyebrow-class} "Expected return per asset - annualized"]
+        [:h3 {:class ["mt-2" "text-[0.875rem]" "font-medium"]}
+         "Market reference vs combined output"]]]
+      (case (:status preview)
+        :ready
+        (preview-chart (:rows preview) opts)
 
-       :empty
-       [:p {:class ["mt-4" "border" "border-base-300" "bg-base-200/30" "p-3"
-                    "text-[0.6875rem]" "text-trading-muted"]}
-        "No active views yet. Add a view to compare posterior expected returns against the market reference."]
+        :empty
+        [:p {:class ["mt-4" "border" "border-base-300" "bg-base-200/30" "p-3"
+                     "text-[0.6875rem]" "text-trading-muted"]}
+         "No active views yet. Add a view to compare posterior expected returns against the market reference."]
 
-       [:p {:class ["mt-4" "border" "border-base-300" "bg-base-200/30" "p-3"
-                    "text-[0.6875rem]" "text-trading-muted"]}
-        "Posterior preview will appear once the universe has eligible history. Views still save with the scenario."])]))
+        [:p {:class ["mt-4" "border" "border-base-300" "bg-base-200/30" "p-3"
+                     "text-[0.6875rem]" "text-trading-muted"]}
+         "Posterior preview will appear once the universe has eligible history. Views still save with the scenario."])])))

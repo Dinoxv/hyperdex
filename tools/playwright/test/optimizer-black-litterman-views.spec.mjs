@@ -356,13 +356,36 @@ async function widthRatio(child, parent) {
   return childBox.width / parentBox.width;
 }
 
+async function visitOptimizerNew(page) {
+  const routeSurface = page.locator("[data-role='portfolio-optimizer-setup-route-surface']");
+  let lastError = null;
+
+  for (let attempt = 0; attempt < 3; attempt += 1) {
+    try {
+      await visitRoute(page, "/portfolio/optimize/new", {
+        routeModuleTimeoutMs: 30_000,
+        idleOptions: { quietMs: 400, timeoutMs: 8_000, pollMs: 50 }
+      });
+      await expect(routeSurface).toBeVisible({ timeout: 30_000 });
+      return;
+    } catch (error) {
+      lastError = error;
+      if (attempt === 2) {
+        throw error;
+      }
+      await page.goto("/trade");
+      await page.waitForTimeout(250);
+    }
+  }
+
+  throw lastError;
+}
+
 test("portfolio optimizer use my views editor flow exposes the Edit Views contract @regression", async ({ page }) => {
   test.setTimeout(90_000);
 
   await page.setViewportSize({ width: 900, height: 900 });
-  await visitRoute(page, "/portfolio/optimize/new");
-  await expect(page.locator("[data-role='portfolio-optimizer-setup-route-surface']"))
-    .toBeVisible({ timeout: 60_000 });
+  await visitOptimizerNew(page);
 
   await seedMarkets(page);
   await seedBlackLittermanEditorState(page);
@@ -420,9 +443,7 @@ test("portfolio optimizer use my views prepopulates absolute return while histor
   test.setTimeout(90_000);
 
   await page.setViewportSize({ width: 900, height: 900 });
-  await visitRoute(page, "/portfolio/optimize/new");
-  await expect(page.locator("[data-role='portfolio-optimizer-setup-route-surface']"))
-    .toBeVisible({ timeout: 60_000 });
+  await visitOptimizerNew(page);
 
   await seedBlackLittermanAutomaticReturnState(page);
 
@@ -438,17 +459,46 @@ test("portfolio optimizer use my views preview renders vertical bars across revi
 
   for (const viewport of DESIGN_REVIEW_VIEWPORTS) {
     await page.setViewportSize({ width: viewport.width, height: viewport.height });
-    await visitRoute(page, "/portfolio/optimize/new");
-    await expect(page.locator("[data-role='portfolio-optimizer-setup-route-surface']"))
-      .toBeVisible({ timeout: 60_000 });
+    await visitOptimizerNew(page);
 
     const { vaultId } = await seedBlackLittermanVaultPreviewState(page);
     const preview = page.locator("[data-role='portfolio-optimizer-black-litterman-preview-panel']");
+    const workspace = page.locator("[data-role='portfolio-optimizer-setup-use-my-views-workspace']");
+    const legend = page.locator("[data-role='portfolio-optimizer-setup-use-my-views-legend']");
+    const chartShell = page.locator("[data-role='portfolio-optimizer-setup-use-my-views-chart-shell']");
+    const cards = page.locator("[data-role='portfolio-optimizer-setup-use-my-views-insight-cards']");
+    const actionBar = page.locator("[data-role='portfolio-optimizer-setup-bottom-actions']");
     await preview.scrollIntoViewIfNeeded();
 
+    await expect(workspace).toBeVisible();
+    await expect(workspace).toContainText("What the model assumes and what your views change");
+    await expect(page.locator("[data-role='portfolio-optimizer-setup-summary-heading']")).toHaveCount(0);
+    await expect(page.locator("[data-role='portfolio-optimizer-setup-summary-panel']")).toHaveCount(0);
+    await expect(legend.locator("[data-role='portfolio-optimizer-setup-use-my-views-legend-market-reference']"))
+      .toContainText("Market reference");
+    await expect(legend.locator("[data-role='portfolio-optimizer-setup-use-my-views-legend-your-view']"))
+      .toContainText("Your view");
+    await expect(legend.locator("[data-role='portfolio-optimizer-setup-use-my-views-legend-combined-output']"))
+      .toContainText("Combined output");
+    await expect(chartShell).toBeVisible();
+    await expect(cards.locator("[data-role^='portfolio-optimizer-setup-use-my-views-card-']"))
+      .toHaveCount(3);
+    await expect(cards.locator("[data-role='portfolio-optimizer-setup-use-my-views-card-market-reference']"))
+      .toContainText("Market reference");
+    await expect(cards.locator("[data-role='portfolio-optimizer-setup-use-my-views-card-your-views']"))
+      .toContainText("Your views");
+    await expect(cards.locator("[data-role='portfolio-optimizer-setup-use-my-views-card-combined-output']"))
+      .toContainText("Combined output");
+    await expect(actionBar).toBeVisible();
+    await expect(actionBar.locator("[data-role='portfolio-optimizer-run-draft']"))
+      .toBeVisible();
+    await expect(actionBar.locator("[data-role='portfolio-optimizer-save-scenario']"))
+      .toBeVisible();
     await expect(preview).toBeVisible();
     await expect(preview).toContainText("Alpha Yield");
     await expect(preview).not.toContainText(vaultId);
+    await expect(preview.locator("[data-role='portfolio-optimizer-black-litterman-preview-legend']"))
+      .toHaveCount(0);
 
     const chartGeometry = await preview
       .locator("[data-role='portfolio-optimizer-black-litterman-preview-svg']")
@@ -475,9 +525,6 @@ test("portfolio optimizer use my views preview renders vertical bars across revi
           legendItemTransforms: Array.from(
             svg.querySelectorAll("[data-role='portfolio-optimizer-black-litterman-preview-legend'] > g")
           ).map((legendItem) => legendItem.getAttribute("transform")),
-          legendText: svg
-            .querySelector("[data-role='portfolio-optimizer-black-litterman-preview-legend']")
-            ?.textContent,
           horizontalOverflow: document.documentElement.scrollWidth - window.innerWidth
         };
       });
@@ -491,13 +538,9 @@ test("portfolio optimizer use my views preview renders vertical bars across revi
     expect(chartGeometry.prior.x, `${viewport.id} grouped bar x separation`)
       .not.toBe(chartGeometry.posterior.x);
     expect(chartGeometry.legendTransform, `${viewport.id} legend position`)
-      .toBe("translate(0 296)");
+      .toBeUndefined();
     expect(chartGeometry.legendItemTransforms, `${viewport.id} legend columns`)
-      .toEqual(["translate(232 0)", "translate(552 0)"]);
-    expect(chartGeometry.legendText, `${viewport.id} legend text`)
-      .toContain("Market reference");
-    expect(chartGeometry.legendText, `${viewport.id} legend text`)
-      .toContain("Combined output");
+      .toEqual([]);
     expect(chartGeometry.horizontalOverflow, `${viewport.id} horizontal overflow`).toBeLessThanOrEqual(1);
   }
 });
