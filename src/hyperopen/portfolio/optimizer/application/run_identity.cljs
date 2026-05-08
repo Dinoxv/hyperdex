@@ -12,6 +12,16 @@
    :history
    :black-litterman-prior])
 
+(defn- stable-execution-assumptions
+  [execution-assumptions]
+  (when (map? execution-assumptions)
+    (dissoc execution-assumptions :cost-contexts-by-id)))
+
+(defn- stable-history
+  [history]
+  (when (map? history)
+    (dissoc history :freshness)))
+
 (defn build-request-signature
   [request]
   {:scenario-id (:scenario-id request)
@@ -21,7 +31,9 @@
 (defn optimizer-input-signature
   [request]
   (when (map? request)
-    (select-keys request optimizer-input-keys)))
+    (-> (select-keys request optimizer-input-keys)
+        (update :execution-assumptions stable-execution-assumptions)
+        (update :history stable-history))))
 
 (defn matching-request?
   [request last-successful-run]
