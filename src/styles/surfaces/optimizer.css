@@ -124,6 +124,129 @@
     background-color: transparent;
   }
 
+  .portfolio-optimizer-v4 [data-role="portfolio-optimizer-setup-use-my-views-insight-cards"] {
+    display: grid;
+    grid-template-columns: 1fr;
+    gap: 12px;
+  }
+
+  @media (min-width: 960px) {
+    .portfolio-optimizer-v4 [data-role="portfolio-optimizer-setup-use-my-views-insight-cards"] {
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+    }
+  }
+
+  .portfolio-optimizer-v4
+    :is(
+      [data-role="portfolio-optimizer-setup-use-my-views-card-market-reference"],
+      [data-role="portfolio-optimizer-setup-use-my-views-card-your-views"],
+      [data-role="portfolio-optimizer-setup-use-my-views-card-combined-output"]
+    ) {
+    border-color: var(--optimizer-border);
+    background-color: var(--optimizer-surface);
+  }
+
+  .portfolio-optimizer-v4 .views-trust-panel__box {
+    padding: 14px;
+  }
+
+  .portfolio-optimizer-v4 [data-role="portfolio-optimizer-setup-use-my-views-card-your-views"] {
+    border-color: var(--optimizer-accent-border);
+    background-color: color-mix(in srgb, var(--optimizer-accent) 4%, transparent);
+  }
+
+  .portfolio-optimizer-v4 .views-trust-panel__eyebrow {
+    color: var(--optimizer-text-3);
+    font-family: "JetBrains Mono", var(--font-mono);
+    font-size: 9.5px;
+    font-weight: 600;
+    letter-spacing: 0.08em;
+    line-height: 1.35;
+    text-transform: uppercase;
+  }
+
+  .portfolio-optimizer-v4 .views-trust-panel__eyebrow--accent {
+    color: var(--optimizer-accent);
+  }
+
+  .portfolio-optimizer-v4 .views-trust-panel__headline {
+    margin-top: 12px;
+    color: var(--optimizer-text);
+    font-size: 13px;
+    font-weight: 500;
+    line-height: 1.25;
+  }
+
+  .portfolio-optimizer-v4 .views-trust-panel__description {
+    margin-top: 10px;
+    color: var(--optimizer-text-2);
+    font-size: 11px;
+    font-weight: 500;
+    line-height: 1.55;
+  }
+
+  .portfolio-optimizer-v4 .views-trust-panel__body {
+    margin-top: 14px;
+    display: grid;
+    gap: 4px;
+    font-family: "JetBrains Mono", var(--font-mono);
+    font-size: 10.5px;
+    line-height: 1.35;
+  }
+
+  .portfolio-optimizer-v4 .views-trust-panel__row {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto;
+    align-items: baseline;
+    gap: 12px;
+    font-variant-numeric: tabular-nums;
+  }
+
+  .portfolio-optimizer-v4 .views-trust-panel__empty {
+    color: var(--optimizer-text-2);
+    font-family: "Inter Variable", var(--font-ui-system);
+    font-size: 10.5px;
+    font-weight: 500;
+    line-height: 1.45;
+  }
+
+  .portfolio-optimizer-v4 .views-trust-panel__value--prior {
+    color: var(--optimizer-info);
+  }
+
+  .portfolio-optimizer-v4 .views-trust-panel__value--view {
+    color: var(--optimizer-text-2);
+  }
+
+  .portfolio-optimizer-v4 .views-trust-panel__confidence {
+    color: var(--optimizer-text-3);
+  }
+
+  .portfolio-optimizer-v4 .views-trust-panel__value--combined {
+    color: var(--optimizer-accent);
+    font-weight: 600;
+  }
+
+  .portfolio-optimizer-v4 .views-trust-panel__callout {
+    margin-top: 10px;
+    border: 1px solid var(--optimizer-border);
+    background-color: var(--optimizer-bg);
+    padding: 8px;
+    color: var(--optimizer-text-2);
+    font-family: "Inter Variable", var(--font-ui-system);
+    font-size: 10.5px;
+    font-weight: 500;
+    line-height: 1.45;
+  }
+
+  .portfolio-optimizer-v4
+    [data-role="portfolio-optimizer-setup-use-my-views-card-combined-output-note"],
+  .portfolio-optimizer-v4
+    [data-role$="-empty"][data-role^="portfolio-optimizer-setup-use-my-views-card-"] {
+    border-color: var(--optimizer-border);
+    background-color: var(--optimizer-bg);
+  }
+
   .portfolio-optimizer-v4 [data-role="portfolio-optimizer-scenario-detail-surface"] {
     background-color: var(--optimizer-bg);
   }

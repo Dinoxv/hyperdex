@@ -9,18 +9,16 @@
 (def ^:private max-output-rows 4)
 
 (def ^:private step-class
-  ["font-mono" "text-[0.625rem]" "font-semibold" "uppercase" "tracking-[0.08em]"
-   "text-trading-muted/60"])
+  ["views-trust-panel__eyebrow"])
 
 (def ^:private title-class
-  ["mt-3" "text-[0.875rem]" "font-semibold" "leading-[1.25]" "text-trading-text"])
+  ["views-trust-panel__headline"])
 
 (def ^:private body-class
-  ["mt-3" "text-[0.75rem]" "font-medium" "leading-[1.55]" "text-trading-muted"])
+  ["views-trust-panel__description"])
 
 (def ^:private row-list-class
-  ["mt-4" "space-y-1.5" "font-mono" "text-[0.71875rem]" "leading-[1.35]"
-   "tabular-nums"])
+  ["views-trust-panel__body"])
 
 (defn preview
   [readiness]
@@ -135,47 +133,69 @@
   [count singular pluralized]
   (if (= 1 count) singular pluralized))
 
+(defn- delta-for-row
+  [row]
+  (when (and (finite-number? (:prior-return row))
+             (finite-number? (:posterior-return row)))
+    (- (:posterior-return row) (:prior-return row))))
+
+(defn- abs-number
+  [value]
+  (js/Math.abs value))
+
+(defn- material-move?
+  [row]
+  (some-> row delta-for-row abs-number (>= 0.001)))
+
+(defn- step-id
+  [step]
+  (str "views-trust-" step))
+
 (defn- card-shell
-  [{:keys [role step label title copy accent?]} rows]
-  [:section {:class (cond-> ["flex" "min-h-[15.5rem]" "flex-col" "border"
-                             "border-base-300" "bg-[#101416]" "px-5" "py-5"]
-                      accent? (conj "border-warning/60" "bg-[#12110d]"))
-             :data-role role}
-   [:p {:class (cond-> step-class
-                 accent? (conj "text-warning"))}
+  [{:keys [role step label title copy accent? dim?]} rows]
+  [:section (cond-> {:class (cond-> ["views-trust-panel__box" "flex" "min-h-[15.5rem]" "flex-col"
+                                     "border" "border-base-300"]
+                              dim? (conj "opacity-50"))
+                     :aria-labelledby (step-id step)
+                     :data-role role}
+              accent? (assoc :aria-current "step"))
+   [:h3 {:id (step-id step)
+         :class (cond-> step-class
+                  accent? (conj "views-trust-panel__eyebrow--accent"))}
     [:span step]
     [:span {:class ["mx-2" "text-trading-muted/50"]} "·"]
     label]
-   [:h3 {:class title-class} title]
-   [:p {:class body-class} copy]
+   [:p {:class title-class} title]
+   (when copy
+     [:p {:class body-class} copy])
    (into [:div {:class row-list-class}]
          rows)])
 
 (defn- empty-row
   [role copy]
-  [:div {:class ["border" "border-base-300" "bg-base-200/20" "px-3" "py-2"
-                 "font-sans" "text-[0.71875rem]" "font-medium" "leading-[1.45]"
-                 "text-trading-muted"]
+  [:div {:class ["views-trust-panel__empty"]
          :data-role role}
    copy])
 
 (defn- value-row
   [role label value value-class]
-  [:div {:class ["grid" "grid-cols-[minmax(0,1fr)_auto]" "items-baseline" "gap-3"]
+  [:div {:class ["views-trust-panel__row"]
          :data-role role}
    [:span {:class ["min-w-0" "truncate" "text-trading-muted"]} label]
-   [:span {:class (into ["text-right"] value-class)} value]])
+   [:span {:class (into ["num" "text-right"] value-class)} value]])
 
 (defn- market-reference-card
   [preview]
-  (let [rows (take max-market-reference-rows (:rows preview))
+  (let [rows (->> (:rows preview)
+                  (sort-by #(or (:prior-return %) js/Number.NEGATIVE_INFINITY) >)
+                  (take max-market-reference-rows))
         ready? (seq rows)]
     (card-shell
      {:role "portfolio-optimizer-setup-use-my-views-card-market-reference"
       :step "1"
       :label "Market reference"
       :title "What the model assumes before your views"
-      :copy "Baseline expected returns from the current return inputs before your Black-Litterman views are blended. This calibrated reference is not a forecast."}
+      :copy "Returns implied by current market weights and the stabilized covariance. This is a calibrated baseline — not a forecast."}
      (if ready?
        (map-indexed
         (fn [idx row]
@@ -183,7 +203,7 @@
            (str "portfolio-optimizer-setup-use-my-views-card-market-reference-row-" idx)
            (or (:label row) (short-id-label (:instrument-id row)))
            (pct (:prior-return row))
-           ["text-[#8eb1dd]"]))
+           ["views-trust-panel__value--prior"]))
         rows)
        [(empty-row
          "portfolio-optimizer-setup-use-my-views-card-market-reference-empty"
@@ -197,26 +217,25 @@
       :step "2"
       :label "Your views"
       :title "What you're changing"
-      :copy (if (pos? view-count)
+      :copy (when (pos? view-count)
               (str view-count " " (plural view-count "view" "views")
-                   " active. Confidence determines how much each view pulls the combined output away from the market reference.")
-              "No active views yet. Add an absolute or relative view to pull the combined output away from the market reference.")
+                   " active. Confidence determines how much each view pulls the combined output away from the market reference."))
       :accent? true}
      (if (pos? view-count)
        (map-indexed
         (fn [idx view]
-          [:div {:class ["grid" "grid-cols-[minmax(0,1fr)_auto]" "items-baseline" "gap-3"]
+          [:div {:class ["views-trust-panel__row"]
                  :data-role (str "portfolio-optimizer-setup-use-my-views-card-your-views-row-" idx)}
            [:span {:class ["min-w-0" "truncate" "text-trading-muted"]}
             (view-expression labels view)]
-           [:span {:class ["text-right" "whitespace-nowrap"]}
-            [:span {:class ["text-trading-text"]} (signed-view-pct (:return view))]
+           [:span {:class ["num" "text-right" "whitespace-nowrap"]}
+            [:span {:class ["views-trust-panel__value--view"]} (signed-view-pct (:return view))]
             [:span {:class ["text-trading-muted/50"]} " · "]
-            [:span {:class ["text-trading-muted"]} (confidence-label view)]]])
+            [:span {:class ["views-trust-panel__confidence"]} (confidence-label view)]]])
         (take max-view-rows views))
        [(empty-row
          "portfolio-optimizer-setup-use-my-views-card-your-views-empty"
-         "No active views.")]))))
+         "No views added yet. Add one in the editor below to see how it changes the recommendation.")]))))
 
 (defn- row-by-id
   [rows]
@@ -227,29 +246,81 @@
 (defn- output-instrument-ids
   [views preview]
   (let [preview-ids (set (keep :instrument-id (:rows preview)))
+        row-by-id* (row-by-id (:rows preview))
         primary-ids (->> views
                          (keep primary-id)
                          (filter preview-ids)
                          distinct)
-        changed-ids (->> (:rows preview)
-                         (filter (fn [row]
-                                   (let [delta (- (or (:posterior-return row) 0)
-                                                  (or (:prior-return row) 0))]
-                                     (and (finite-number? delta)
-                                          (not (zero? delta))))))
-                         (map :instrument-id)
-                         distinct)]
-    (if (seq primary-ids)
-      primary-ids
-      changed-ids)))
+        eligible-ids (set (concat primary-ids
+                                  (->> (:rows preview)
+                                       (filter material-move?)
+                                       (map :instrument-id))))]
+    (->> eligible-ids
+         (keep row-by-id*)
+         (sort-by #(abs-number (or (delta-for-row %) 0)) >)
+         (map :instrument-id))))
+
+(defn- output-callout
+  [views labels rows-by-id]
+  (let [low-muted
+        (some
+         (fn [view]
+           (let [id (primary-id view)
+                 row (get rows-by-id id)
+                 prior (:prior-return row)
+                 posterior (:posterior-return row)
+                 view-return (:return view)
+                 pulled (when (and (finite-number? prior)
+                                   (finite-number? posterior))
+                          (abs-number (- posterior prior)))
+                 claim-distance (when (and (finite-number? view-return)
+                                           (finite-number? prior))
+                                  (abs-number (- view-return prior)))
+                 ratio (when (and pulled claim-distance (pos? claim-distance))
+                         (/ pulled claim-distance))]
+             (when (and (= "low" (confidence-label view))
+                        ratio
+                        (< ratio 0.25))
+               {:kind :low-muted
+                :instrument-id id
+                :view-return view-return
+                :posterior posterior})))
+         views)
+        dominated
+        (some
+         (fn [row]
+           (let [delta (delta-for-row row)]
+             (when (and delta (> (abs-number delta) 0.05))
+               {:kind :dominated
+                :instrument-id (:instrument-id row)
+                :delta delta
+                :confidence (or (some (fn [view]
+                                        (when (= (:instrument-id row) (primary-id view))
+                                          (confidence-label view)))
+                                      views)
+                                "medium")})))
+         (sort-by #(abs-number (or (delta-for-row %) 0)) > (vals rows-by-id)))]
+    (cond
+      low-muted
+      (str "Low confidence on " (label-for labels (:instrument-id low-muted))
+           " means your " (signed-view-pct (:view-return low-muted))
+           " view only pulls posterior to " (pct (:posterior low-muted))
+           ". Strong claims need strong confidence.")
+
+      dominated
+      (str (label-for labels (:instrument-id dominated))
+           " moved " (signed-delta (:delta dominated))
+           "pp — your " (:confidence dominated)
+           " view dominated the prior here.")
+
+      :else nil)))
 
 (defn- output-note
-  [views labels]
-  (if-let [low-view (first (filter #(= "low" (confidence-label %)) views))]
-    (str "Low confidence on " (label-for labels (primary-id low-view))
-         " means your " (signed-view-pct (:return low-view))
-         " view only moves the combined output partway from the reference.")
-    "Confidence weighting controls how far the combined output moves away from the market reference."))
+  [copy]
+  [:aside {:class ["views-trust-panel__callout"]
+           :role "note"
+           :data-role "portfolio-optimizer-setup-use-my-views-card-combined-output-callout"}
+   copy])
 
 (defn- combined-output-card
   [views labels preview]
@@ -257,13 +328,15 @@
         output-rows (->> (output-instrument-ids views preview)
                          (keep rows-by-id)
                          (take max-output-rows))
-        view-count (count views)]
+        view-count (count views)
+        callout-copy (output-callout views labels rows-by-id)]
     (card-shell
      {:role "portfolio-optimizer-setup-use-my-views-card-combined-output"
       :step "3"
       :label "Combined output"
       :title "How much your views actually matter"
-      :copy "Posterior return per asset, after blending the market reference with your views weighted by confidence."}
+      :copy "Posterior return per asset, after blending the market reference with your views weighted by confidence."
+      :dim? (zero? view-count)}
      (cond
        (not (seq (:rows preview)))
        [(empty-row
@@ -273,7 +346,7 @@
        (zero? view-count)
        [(empty-row
          "portfolio-optimizer-setup-use-my-views-card-combined-output-empty"
-         "No active views yet. Posterior output matches the market reference.")]
+         "Add a view to see the combined output.")]
 
        :else
        (if (seq output-rows)
@@ -285,22 +358,19 @@
                    delta (when (and (finite-number? prior)
                                     (finite-number? posterior))
                            (- posterior prior))]
-               [:div {:class ["grid" "grid-cols-[minmax(0,1fr)_auto]" "items-baseline" "gap-3"]
+               [:div {:class ["views-trust-panel__row"]
                       :data-role (str "portfolio-optimizer-setup-use-my-views-card-combined-output-row-" idx)}
                 [:span {:class ["min-w-0" "truncate" "text-trading-muted"]}
                  (or (:label row) (short-id-label (:instrument-id row)))]
-                [:span {:class ["text-right" "whitespace-nowrap"]}
+                [:span {:class ["num" "text-right" "whitespace-nowrap"]}
                  [:span {:class ["text-trading-muted/70"]} (pct prior)]
                  [:span {:class ["px-1.5" "text-trading-muted/50"]} "→"]
-                 [:span {:class ["font-semibold" "text-warning"]} (pct posterior)]
+                 [:span {:class ["views-trust-panel__value--combined"]} (pct posterior)]
                  [:span {:class ["ml-1.5" "text-trading-muted/70"]}
                   (str "(" (signed-delta delta) ")")]]]))
            output-rows)
-          [[:div {:class ["mt-4" "border" "border-base-300" "bg-base-200/20"
-                          "px-3" "py-2" "font-sans" "text-[0.71875rem]"
-                          "font-medium" "leading-[1.45]" "text-trading-muted"]
-                  :data-role "portfolio-optimizer-setup-use-my-views-card-combined-output-note"}
-            (output-note views labels)]])
+          (when callout-copy
+            [(output-note callout-copy)]))
          [(empty-row
            "portfolio-optimizer-setup-use-my-views-card-combined-output-empty"
            "Active views do not match the current model universe yet. Combined output will update after the views are corrected or removed.")])))))

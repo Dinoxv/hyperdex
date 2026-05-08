@@ -390,7 +390,7 @@
     (is (str/includes? market-text "ETH"))
     (is (str/includes? market-text "30.0%"))
     (is (str/includes? views-text "Your views"))
-    (is (contains? (class-token-set views-card) "border-warning/60"))
+    (is (= "step" (get-in views-card [1 :aria-current])))
     (is (str/includes? views-text "What you're changing"))
     (is (str/includes? views-text "1 view active"))
     (is (str/includes? views-text "BTC > ETH by"))
@@ -428,37 +428,14 @@
                                   "portfolio-optimizer-setup-use-my-views-card-your-views"))
         output-text (node-text
                      (node-by-role insight-cards
-                                   "portfolio-optimizer-setup-use-my-views-card-combined-output"))]
+                                   "portfolio-optimizer-setup-use-my-views-card-combined-output"))
+        output-card (node-by-role insight-cards
+                                  "portfolio-optimizer-setup-use-my-views-card-combined-output")]
     (is (str/includes? market-text "20.0%"))
-    (is (str/includes? views-text "No active views yet"))
-    (is (str/includes? views-text "No active views."))
+    (is (str/includes? views-text "No views added yet. Add one in the editor below to see how it changes the recommendation."))
+    (is (contains? (class-token-set output-card) "opacity-50"))
     (is (str/includes? output-text
-                       "Posterior output matches the market reference."))))
-
-(deftest setup-v4-black-litterman-combined-output-falls-back-when-view-id-is-stale-test
-  (let [view-node (use-my-views-cards/cards
-                   (black-litterman-ready-draft)
-                   {:request {:universe [btc-instrument]
-                              :return-model
-                              {:views [{:id "stale-view"
-                                        :kind :absolute
-                                        :instrument-id "perp:MISSING"
-                                        :return 0.2
-                                        :confidence 0.75}]}}}
-                   {:status :ready
-                    :view-count 1
-                    :rows [{:instrument-id "perp:BTC"
-                            :label "BTC"
-                            :prior-return 0.1
-                            :posterior-return 0.12}]})
-        output-text (node-text
-                     (node-by-role view-node
-                                   "portfolio-optimizer-setup-use-my-views-card-combined-output"))]
-    (is (str/includes? output-text "BTC"))
-    (is (str/includes? output-text "10.0%"))
-    (is (str/includes? output-text "12.0%"))
-    (is (not (str/includes? output-text
-                            "Active views do not match the current model universe yet.")))))
+                       "Add a view to see the combined output."))))
 
 (deftest setup-v4-return-risk-model-buttons-expose-tooltips-test
   (let [view-node (portfolio-view/portfolio-view

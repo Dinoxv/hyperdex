@@ -439,6 +439,7 @@
             [hyperopen.views.portfolio.optimize.scenario-detail-view-test]
             [hyperopen.views.portfolio.optimize.setup-readiness-panel-test]
             [hyperopen.views.portfolio.optimize.setup-v4-layout-test]
+            [hyperopen.views.portfolio.optimize.setup-v4-use-my-views-cards-test]
             [hyperopen.views.portfolio.optimize.setup-view-test]
             [hyperopen.views.portfolio.optimize.tracking-panel-test]
             [hyperopen.views.portfolio.optimize.universe-panel-test]
@@ -1056,6 +1057,7 @@
              'hyperopen.views.portfolio.optimize.scenario-detail-view-test
              'hyperopen.views.portfolio.optimize.setup-readiness-panel-test
              'hyperopen.views.portfolio.optimize.setup-v4-layout-test
+             'hyperopen.views.portfolio.optimize.setup-v4-use-my-views-cards-test
              'hyperopen.views.portfolio.optimize.setup-view-test
              'hyperopen.views.portfolio.optimize.tracking-panel-test
              'hyperopen.views.portfolio.optimize.universe-panel-test
