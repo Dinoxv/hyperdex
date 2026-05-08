@@ -14,6 +14,19 @@
   [request]
   (engine-context/expected-return-inputs-by-instrument request))
 
+(defn- preview-rows
+  [request]
+  (let [prior (prior-returns-by-instrument request)
+        posterior (posterior-returns-by-instrument request)
+        ids (instrument-ids request)
+        labels (instrument-labels/labels-by-instrument (:universe request) ids)]
+    (mapv (fn [instrument-id]
+            {:instrument-id instrument-id
+             :label (get labels instrument-id)
+             :prior-return (get prior instrument-id)
+             :posterior-return (get posterior instrument-id)})
+          ids)))
+
 (defn build-preview
   [readiness]
   (let [request (:request readiness)]
@@ -28,18 +41,10 @@
 
       (empty? (get-in request [:return-model :views]))
       {:status :empty
-       :view-count 0}
+       :view-count 0
+       :rows (preview-rows request)}
 
       :else
-      (let [prior (prior-returns-by-instrument request)
-            posterior (posterior-returns-by-instrument request)
-            ids (instrument-ids request)
-            labels (instrument-labels/labels-by-instrument (:universe request) ids)]
-        {:status :ready
-         :view-count (count (get-in request [:return-model :views]))
-         :rows (mapv (fn [instrument-id]
-                       {:instrument-id instrument-id
-                        :label (get labels instrument-id)
-                        :prior-return (get prior instrument-id)
-                        :posterior-return (get posterior instrument-id)})
-                     ids)}))))
+      {:status :ready
+       :view-count (count (get-in request [:return-model :views]))
+       :rows (preview-rows request)})))

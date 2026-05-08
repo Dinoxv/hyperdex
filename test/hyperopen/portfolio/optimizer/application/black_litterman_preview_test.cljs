@@ -36,10 +36,14 @@
 (deftest build-preview-returns-empty-when-no-views-exist-test
   (is (some? build-preview))
   (when build-preview
-    (is (= {:status :empty
-            :view-count 0}
-           (select-keys (build-preview (ready-request []))
-                        [:status :view-count])))))
+    (let [preview (build-preview (ready-request []))]
+      (is (= {:status :empty
+              :view-count 0}
+             (select-keys preview [:status :view-count])))
+      (is (= ["A" "B"] (mapv :instrument-id (:rows preview))))
+      (is (near? 0.2 (get-in preview [:rows 0 :prior-return])))
+      (is (near? (get-in preview [:rows 0 :prior-return])
+                 (get-in preview [:rows 0 :posterior-return]))))))
 
 (deftest build-preview-returns-prior-and-posterior-rows-when-readiness-request-is-available-test
   (is (some? build-preview))

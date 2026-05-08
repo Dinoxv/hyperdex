@@ -3,6 +3,7 @@
             [clojure.string :as str]
             [hyperopen.portfolio.optimizer.application.universe-candidates :as universe-candidates]
             [hyperopen.views.portfolio.optimize.setup-v4-sections :as setup-v4-sections]
+            [hyperopen.views.portfolio.optimize.setup-v4-use-my-views-cards :as use-my-views-cards]
             [hyperopen.views.portfolio.optimize.setup-v4-universe :as setup-v4-universe]
             [hyperopen.views.portfolio-view :as portfolio-view]))
 
@@ -152,6 +153,18 @@
    :constraints {:long-only? false
                  :max-asset-weight 0.4
                  :gross-max 1.5}})
+
+(defn- black-litterman-empty-readiness
+  []
+  (assoc-in (black-litterman-ready-readiness)
+            [:request :return-model :views]
+            []))
+
+(defn- black-litterman-empty-draft
+  []
+  (assoc-in (black-litterman-ready-draft)
+            [:return-model :views]
+            []))
 
 (defn- candle-rows
   [time-and-close-pairs]
@@ -335,6 +348,15 @@
                                   "portfolio-optimizer-setup-use-my-views-chart-shell")
         insight-cards (node-by-role view-node
                                     "portfolio-optimizer-setup-use-my-views-insight-cards")
+        market-card (node-by-role insight-cards
+                                  "portfolio-optimizer-setup-use-my-views-card-market-reference")
+        views-card (node-by-role insight-cards
+                                 "portfolio-optimizer-setup-use-my-views-card-your-views")
+        output-card (node-by-role insight-cards
+                                  "portfolio-optimizer-setup-use-my-views-card-combined-output")
+        market-text (node-text market-card)
+        views-text (node-text views-card)
+        output-text (node-text output-card)
         action-bar (node-by-role view-node "portfolio-optimizer-setup-bottom-actions")
         run-button (node-by-role action-bar "portfolio-optimizer-run-draft")
         save-button (node-by-role action-bar "portfolio-optimizer-save-scenario")]
@@ -361,21 +383,82 @@
             "portfolio-optimizer-setup-use-my-views-card-your-views"
             "portfolio-optimizer-setup-use-my-views-card-combined-output"]
            (child-roles insight-cards)))
-    (is (str/includes? (node-text (node-by-role insight-cards
-                                                "portfolio-optimizer-setup-use-my-views-card-market-reference"))
-                       "Market reference"))
-    (is (str/includes? (node-text (node-by-role insight-cards
-                                                "portfolio-optimizer-setup-use-my-views-card-your-views"))
-                       "Your views"))
-    (is (str/includes? (node-text (node-by-role insight-cards
-                                                "portfolio-optimizer-setup-use-my-views-card-combined-output"))
-                       "Combined output"))
+    (is (str/includes? market-text "Market reference"))
+    (is (str/includes? market-text "What the model assumes before your views"))
+    (is (str/includes? market-text "BTC"))
+    (is (str/includes? market-text "20.0%"))
+    (is (str/includes? market-text "ETH"))
+    (is (str/includes? market-text "30.0%"))
+    (is (str/includes? views-text "Your views"))
+    (is (contains? (class-token-set views-card) "border-warning/60"))
+    (is (str/includes? views-text "What you're changing"))
+    (is (str/includes? views-text "1 view active"))
+    (is (str/includes? views-text "BTC > ETH by"))
+    (is (str/includes? views-text "+10%"))
+    (is (str/includes? views-text "medium"))
+    (is (str/includes? output-text "Combined output"))
+    (is (str/includes? output-text "How much your views actually matter"))
+    (is (str/includes? output-text "BTC"))
+    (is (str/includes? output-text "20.0%"))
+    (is (str/includes? output-text "→"))
+    (is (str/includes? output-text "(+"))
     (is (some? action-bar))
     (is (= false (get-in run-button [1 :disabled])))
     (is (= [[:actions/run-portfolio-optimizer-from-draft]]
            (click-actions run-button)))
     (is (= [[:actions/save-portfolio-optimizer-scenario-from-current]]
            (click-actions save-button)))))
+
+(deftest setup-v4-black-litterman-insight-cards-render-empty-view-state-test
+  (let [view-node (setup-v4-sections/summary-pane
+                   {:draft (black-litterman-empty-draft)
+                    :readiness (black-litterman-empty-readiness)
+                    :running? false
+                    :run-triggerable? true
+                    :saving-scenario? false
+                    :solved-run? false
+                    :result-path "/portfolio/optimize/scenarios/draft"})
+        insight-cards (node-by-role view-node
+                                    "portfolio-optimizer-setup-use-my-views-insight-cards")
+        market-text (node-text
+                     (node-by-role insight-cards
+                                   "portfolio-optimizer-setup-use-my-views-card-market-reference"))
+        views-text (node-text
+                    (node-by-role insight-cards
+                                  "portfolio-optimizer-setup-use-my-views-card-your-views"))
+        output-text (node-text
+                     (node-by-role insight-cards
+                                   "portfolio-optimizer-setup-use-my-views-card-combined-output"))]
+    (is (str/includes? market-text "20.0%"))
+    (is (str/includes? views-text "No active views yet"))
+    (is (str/includes? views-text "No active views."))
+    (is (str/includes? output-text
+                       "Posterior output matches the market reference."))))
+
+(deftest setup-v4-black-litterman-combined-output-falls-back-when-view-id-is-stale-test
+  (let [view-node (use-my-views-cards/cards
+                   (black-litterman-ready-draft)
+                   {:request {:universe [btc-instrument]
+                              :return-model
+                              {:views [{:id "stale-view"
+                                        :kind :absolute
+                                        :instrument-id "perp:MISSING"
+                                        :return 0.2
+                                        :confidence 0.75}]}}}
+                   {:status :ready
+                    :view-count 1
+                    :rows [{:instrument-id "perp:BTC"
+                            :label "BTC"
+                            :prior-return 0.1
+                            :posterior-return 0.12}]})
+        output-text (node-text
+                     (node-by-role view-node
+                                   "portfolio-optimizer-setup-use-my-views-card-combined-output"))]
+    (is (str/includes? output-text "BTC"))
+    (is (str/includes? output-text "10.0%"))
+    (is (str/includes? output-text "12.0%"))
+    (is (not (str/includes? output-text
+                            "Active views do not match the current model universe yet.")))))
 
 (deftest setup-v4-return-risk-model-buttons-expose-tooltips-test
   (let [view-node (portfolio-view/portfolio-view

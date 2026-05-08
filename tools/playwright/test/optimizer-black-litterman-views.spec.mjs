@@ -481,14 +481,32 @@ test("portfolio optimizer use my views preview renders vertical bars across revi
     await expect(legend.locator("[data-role='portfolio-optimizer-setup-use-my-views-legend-combined-output']"))
       .toContainText("Combined output");
     await expect(chartShell).toBeVisible();
-    await expect(cards.locator("[data-role^='portfolio-optimizer-setup-use-my-views-card-']"))
-      .toHaveCount(3);
-    await expect(cards.locator("[data-role='portfolio-optimizer-setup-use-my-views-card-market-reference']"))
-      .toContainText("Market reference");
-    await expect(cards.locator("[data-role='portfolio-optimizer-setup-use-my-views-card-your-views']"))
-      .toContainText("Your views");
-    await expect(cards.locator("[data-role='portfolio-optimizer-setup-use-my-views-card-combined-output']"))
-      .toContainText("Combined output");
+    const marketReferenceCard = cards.locator(
+      "[data-role='portfolio-optimizer-setup-use-my-views-card-market-reference']"
+    );
+    const yourViewsCard = cards.locator(
+      "[data-role='portfolio-optimizer-setup-use-my-views-card-your-views']"
+    );
+    const combinedOutputCard = cards.locator(
+      "[data-role='portfolio-optimizer-setup-use-my-views-card-combined-output']"
+    );
+    await expect(marketReferenceCard).toHaveCount(1);
+    await expect(yourViewsCard).toHaveCount(1);
+    await expect(combinedOutputCard).toHaveCount(1);
+    await expect(marketReferenceCard)
+      .toContainText("What the model assumes before your views");
+    await expect(marketReferenceCard).toContainText("BTC");
+    await expect(marketReferenceCard).toContainText("Alpha Yield");
+    await expect(yourViewsCard).toContainText("What you're changing");
+    await expect(yourViewsCard).toContainText("1 view active");
+    await expect(yourViewsCard).toContainText("Alpha Yield");
+    await expect(yourViewsCard).toContainText("+4%");
+    await expect(yourViewsCard).toContainText("high");
+    await expect(combinedOutputCard)
+      .toContainText("How much your views actually matter");
+    await expect(combinedOutputCard).toContainText("Alpha Yield");
+    await expect(combinedOutputCard).toContainText("→");
+    await expect(combinedOutputCard).toContainText("(");
     await expect(actionBar).toBeVisible();
     await expect(actionBar.locator("[data-role='portfolio-optimizer-run-draft']"))
       .toBeVisible();

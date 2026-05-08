@@ -4,6 +4,7 @@
             [hyperopen.views.portfolio.optimize.black-litterman-preview-chart :as black-litterman-preview-chart]
             [hyperopen.views.portfolio.optimize.instrument-overrides-panel :as instrument-overrides-panel]
             [hyperopen.views.portfolio.optimize.setup-v4-summary :as setup-v4-summary]
+            [hyperopen.views.portfolio.optimize.setup-v4-use-my-views-cards :as use-my-views-cards]
             [hyperopen.views.portfolio.optimize.setup-v4-universe :as setup-v4-universe]))
 (def ^:private eyebrow-class
   ["font-mono" "text-[0.625rem]" "font-semibold" "uppercase" "tracking-[0.08em]" "text-trading-muted/70"])
@@ -453,66 +454,47 @@
     [:span {:class ["font-medium" "text-trading-text"]} label]
     [:span {:class ["text-trading-muted"]} qualifier]]])
 
-(defn- use-my-views-card
-  [role title copy]
-  [:section {:class ["border" "border-base-300" "bg-base-100/90" "p-4"]
-             :data-role role}
-   [:p {:class eyebrow-class} title]
-   [:p {:class ["mt-2" "text-[0.6875rem]" "leading-[1.45]" "text-trading-muted"]}
-    copy]])
-
 (defn- use-my-views-workspace
   [{:keys [draft readiness running? run-triggerable? saving-scenario? solved-run? result-path]}]
-  [:section {:class ["space-y-4"] :data-role "portfolio-optimizer-setup-use-my-views-workspace"}
-   [:div {:class ["space-y-4"] :data-role "portfolio-optimizer-setup-use-my-views-context"}
-    [:div {:class ["px-1" "pt-2" "pb-1"]}
-     [:p {:class eyebrow-class} "Use my views"]
-     [:h2 {:class ["mt-2" "text-[0.875rem]" "font-medium" "tracking-[-0.01em]"]}
-      "What the model assumes and what your views change"]]
-    [:div {:class ["grid" "gap-3" "border" "border-base-300" "bg-base-100/90" "p-4"
-                   "sm:grid-cols-2" "xl:grid-cols-3"]
-           :data-role "portfolio-optimizer-setup-use-my-views-legend"}
-     (use-my-views-legend-item
-      "portfolio-optimizer-setup-use-my-views-legend-market-reference"
-      ["bg-[#6b8db5]"]
-      "Market reference"
-      "(prior)")
-     (use-my-views-legend-item
-      "portfolio-optimizer-setup-use-my-views-legend-your-view"
-      ["bg-transparent" "ring-2" "ring-warning/70" "border-warning/50"]
-      "Your view"
-      "tilt")
-     (use-my-views-legend-item
-      "portfolio-optimizer-setup-use-my-views-legend-combined-output"
-      ["bg-[#d4b558]"]
-      "Combined output"
-      "(posterior)")]
-    [:div {:class ["border" "border-base-300" "bg-base-200/10" "p-1.5"]
-           :data-role "portfolio-optimizer-setup-use-my-views-chart-shell"}
-     (black-litterman-preview-chart/black-litterman-preview-panel
-      readiness
-      {:legend-layout :external})]
-    [:div {:class ["grid" "grid-cols-1" "gap-3" "xl:grid-cols-3"]
-           :data-role "portfolio-optimizer-setup-use-my-views-insight-cards"}
-     (use-my-views-card
-      "portfolio-optimizer-setup-use-my-views-card-market-reference"
-      "Market reference"
-      "Prior weights come from market-cap proxy or current portfolio fallback.")
-     (use-my-views-card
-      "portfolio-optimizer-setup-use-my-views-card-your-views"
-      "Your views"
-      "Absolute or relative beliefs tilt expected returns with explicit confidence.")
-     (use-my-views-card
-      "portfolio-optimizer-setup-use-my-views-card-combined-output"
-      "Combined output"
-      "The posterior return estimate feeds the selected optimizer objective.")]]
-   (model-assumptions-panel)
-   (setup-bottom-actions {:draft draft
-                          :running? running?
-                          :run-triggerable? run-triggerable?
-                          :saving-scenario? saving-scenario?
-                          :solved-run? solved-run?
-                          :result-path result-path})])
+  (let [preview (use-my-views-cards/preview readiness)]
+    [:section {:class ["space-y-4"] :data-role "portfolio-optimizer-setup-use-my-views-workspace"}
+     [:div {:class ["space-y-4"] :data-role "portfolio-optimizer-setup-use-my-views-context"}
+      [:div {:class ["px-1" "pt-2" "pb-1"]}
+       [:p {:class eyebrow-class} "Use my views"]
+       [:h2 {:class ["mt-2" "text-[0.875rem]" "font-medium" "tracking-[-0.01em]"]}
+        "What the model assumes and what your views change"]]
+      [:div {:class ["grid" "gap-3" "border" "border-base-300" "bg-base-100/90" "p-4"
+                     "sm:grid-cols-2" "xl:grid-cols-3"]
+             :data-role "portfolio-optimizer-setup-use-my-views-legend"}
+       (use-my-views-legend-item
+        "portfolio-optimizer-setup-use-my-views-legend-market-reference"
+        ["bg-[#6b8db5]"]
+        "Market reference"
+        "(prior)")
+       (use-my-views-legend-item
+        "portfolio-optimizer-setup-use-my-views-legend-your-view"
+        ["bg-transparent" "ring-2" "ring-warning/70" "border-warning/50"]
+        "Your view"
+        "tilt")
+       (use-my-views-legend-item
+        "portfolio-optimizer-setup-use-my-views-legend-combined-output"
+        ["bg-[#d4b558]"]
+        "Combined output"
+        "(posterior)")]
+      [:div {:class ["border" "border-base-300" "bg-base-200/10" "p-1.5"]
+             :data-role "portfolio-optimizer-setup-use-my-views-chart-shell"}
+       (black-litterman-preview-chart/black-litterman-preview-panel
+        readiness
+        {:legend-layout :external
+         :preview preview})]
+      (use-my-views-cards/cards draft readiness preview)]
+     (model-assumptions-panel)
+     (setup-bottom-actions {:draft draft
+                            :running? running?
+                            :run-triggerable? run-triggerable?
+                            :saving-scenario? saving-scenario?
+                            :solved-run? solved-run?
+                            :result-path result-path})]))
 
 (defn summary-pane
   [{:keys [draft readiness running? run-triggerable? saving-scenario? solved-run? result-path]}]

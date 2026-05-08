@@ -260,7 +260,8 @@
   ([readiness]
    (black-litterman-preview-panel readiness nil))
   ([readiness opts]
-   (let [preview (preview/build-preview readiness)]
+   (let [preview (or (:preview opts)
+                     (preview/build-preview readiness))]
      [:section {:class ["border" "border-base-300" "bg-base-100/90" "p-4"]
                 :data-role "portfolio-optimizer-black-litterman-preview-panel"}
       [:div {:class ["flex" "items-start" "justify-between" "gap-3"]}
