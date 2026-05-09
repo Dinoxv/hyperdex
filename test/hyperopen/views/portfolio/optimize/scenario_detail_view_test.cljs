@@ -148,7 +148,8 @@
     (is (some? (node-by-role view-node "portfolio-optimizer-scenario-kpi-sharpe")))
     (is (some? (node-by-role view-node "portfolio-optimizer-scenario-kpi-turnover")))
     (is (some? (node-by-role view-node "portfolio-optimizer-scenario-kpi-rebalance")))
-    (is (some? (node-by-role view-node "portfolio-optimizer-results-surface")))
+    (is (nil? (node-by-role view-node "portfolio-optimizer-results-surface")))
+    (is (some? (node-by-role view-node "portfolio-optimizer-recommendation-stale-blocked")))
     (is (nil? (node-by-role view-node "portfolio-optimizer-rebalance-preview")))
     (is (nil? (node-by-role view-node "portfolio-optimizer-tracking-panel")))
     (is (some? (node-by-role view-node "portfolio-optimizer-scenario-stale-banner")))
@@ -198,7 +199,18 @@
     (is (= true (get-in save-button [1 :disabled]))
         "Mismatched solved runs must not be saveable as the active scenario.")
     (is (nil?
-           (click-actions save-button)))))
+           (click-actions save-button)))
+    (is (some? (node-by-role view-node
+                              "portfolio-optimizer-recommendation-stale-blocked"))
+        "The recommendation tab should block stale actionable output.")
+    (is (nil? (node-by-role view-node "portfolio-optimizer-frontier-panel"))
+        "A stale retained result must not render an actionable frontier.")
+    (is (nil? (node-by-role view-node "portfolio-optimizer-target-exposure-table"))
+        "A stale retained result must not render actionable allocation weights.")
+    (is (= [[:actions/run-portfolio-optimizer-from-draft]]
+           (click-actions
+            (node-by-role view-node
+                          "portfolio-optimizer-recommendation-run-again"))))))
 
 (deftest portfolio-optimizer-inputs-tab-renders-read-only-audit-test
   (let [view-node (portfolio-view/portfolio-view

@@ -72,11 +72,13 @@
                              :weight-prior-source
                              (get-in request [:black-litterman-prior :source]))]
       {:model :black-litterman
+       :status (:status posterior)
        :instrument-ids (:instrument-ids posterior)
        :expected-returns-by-instrument (:expected-returns-by-instrument posterior)
        :decomposition-by-instrument (:decomposition-by-instrument base)
        :diagnostics diagnostics
-       :warnings (:warnings base)})
+       :warnings (vec (concat (:warnings posterior)
+                              (:warnings base)))})
     (base-return-estimate request)))
 
 (defn expected-return-inputs-by-instrument
@@ -113,6 +115,13 @@
                            instrument-ids)
     :constraints (:constraints request)}))
 
+(defn- invalid-return-model-plan
+  [return-result]
+  {:status :infeasible
+   :reason :invalid-return-model
+   :warnings (:warnings return-result)
+   :problems []})
+
 (defn report-progress!
   [on-progress payload]
   (when (fn? on-progress)
@@ -142,28 +151,37 @@
              :percent 100
              :detail (or (some-> (:model return-result) name)
                          "estimated")})
-         expected-returns (expected-return-vector return-result instrument-ids)
-         encoded (encoded-constraints request instrument-ids)
-         current-weights* (current-weights request instrument-ids)
-         solver-plan (objectives/build-solver-plan
-                      {:objective (:objective request)
-                       :instrument-ids instrument-ids
-                       :expected-returns expected-returns
-                       :covariance (:covariance risk-result)
-                       :encoded-constraints encoded
-                       :return-tilts (:return-tilts request)})
-         {:keys [plans aliases]} (display-frontier/build-plans
-                                  {:request request
-                                   :instrument-ids instrument-ids
-                                   :expected-returns expected-returns
-                                   :covariance (:covariance risk-result)
-                                   :solver-plan solver-plan
-                                   :return-tilts (:return-tilts request)})]
-     {:risk-result risk-result
-      :return-result return-result
-      :expected-returns expected-returns
-      :encoded encoded
-      :current-weights current-weights*
-      :solver-plan solver-plan
-      :display-frontier-plans plans
-      :display-frontier-aliases aliases})))
+         expected-returns (expected-return-vector return-result instrument-ids)]
+     (if (= :invalid (:status return-result))
+       {:risk-result risk-result
+        :return-result return-result
+        :expected-returns expected-returns
+        :encoded nil
+        :current-weights (current-weights request instrument-ids)
+        :solver-plan (invalid-return-model-plan return-result)
+        :display-frontier-plans {}
+        :display-frontier-aliases {}}
+       (let [encoded (encoded-constraints request instrument-ids)
+             current-weights* (current-weights request instrument-ids)
+             solver-plan (objectives/build-solver-plan
+                          {:objective (:objective request)
+                           :instrument-ids instrument-ids
+                           :expected-returns expected-returns
+                           :covariance (:covariance risk-result)
+                           :encoded-constraints encoded
+                           :return-tilts (:return-tilts request)})
+             {:keys [plans aliases]} (display-frontier/build-plans
+                                      {:request request
+                                       :instrument-ids instrument-ids
+                                       :expected-returns expected-returns
+                                       :covariance (:covariance risk-result)
+                                       :solver-plan solver-plan
+                                       :return-tilts (:return-tilts request)})]
+         {:risk-result risk-result
+          :return-result return-result
+          :expected-returns expected-returns
+          :encoded encoded
+          :current-weights current-weights*
+          :solver-plan solver-plan
+          :display-frontier-plans plans
+          :display-frontier-aliases aliases})))))

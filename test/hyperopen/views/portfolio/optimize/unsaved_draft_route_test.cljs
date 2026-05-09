@@ -1,5 +1,7 @@
 (ns hyperopen.views.portfolio.optimize.unsaved-draft-route-test
   (:require [cljs.test :refer-macros [deftest is]]
+            [hyperopen.portfolio.optimizer.actions.common :as action-common]
+            [hyperopen.portfolio.optimizer.application.setup-readiness :as setup-readiness]
             [hyperopen.portfolio.optimizer.fixtures :as fixtures]
             [hyperopen.views.portfolio-view :as portfolio-view]))
 
@@ -33,42 +35,48 @@
     (seq? node) (mapcat collect-strings node)
     :else []))
 
-(def solved-run
-  (fixtures/sample-last-successful-run
-   {:computed-at-ms 1714137600000
-    :request-signature {:seed 1}
-    :result {:as-of-ms 1714137600000
-             :instrument-ids ["perp:BTC" "perp:ETH"]
-             :current-weights [0.1 0.2]
-             :target-weights [0.35 0.15]
-             :target-weights-by-instrument {"perp:BTC" 0.35
-                                            "perp:ETH" 0.15}
-             :current-weights-by-instrument {"perp:BTC" 0.1
-                                             "perp:ETH" 0.2}
-             :expected-return 0.14
-             :volatility 0.32
-             :performance {:shrunk-sharpe 0.44}
-             :history-summary {:return-observations 12}
-             :return-model :historical-mean
-             :risk-model :diagonal-shrink
-             :frontier []
-             :return-decomposition-by-instrument
-             {"perp:BTC" {:return-component 0.1
-                          :funding-component 0.02}
-              "perp:ETH" {:return-component 0.08
-                          :funding-component 0.01}}
-             :diagnostics {:gross-exposure 0.5
-                           :net-exposure 0.5
-                           :effective-n 2
-                           :turnover 0.2}
-             :rebalance-preview {:status :ready
-                                 :capital-usd 100000
-                                 :summary {:ready-count 2}
-                                 :rows []}}}))
+(def solved-result
+  {:as-of-ms 1714137600000
+   :instrument-ids ["perp:BTC" "perp:ETH"]
+   :current-weights [0.1 0.2]
+   :target-weights [0.35 0.15]
+   :target-weights-by-instrument {"perp:BTC" 0.35
+                                  "perp:ETH" 0.15}
+   :current-weights-by-instrument {"perp:BTC" 0.1
+                                   "perp:ETH" 0.2}
+   :expected-return 0.14
+   :volatility 0.32
+   :performance {:shrunk-sharpe 0.44}
+   :history-summary {:return-observations 12}
+   :return-model :historical-mean
+   :risk-model :diagonal-shrink
+   :frontier []
+   :return-decomposition-by-instrument
+   {"perp:BTC" {:return-component 0.1
+                :funding-component 0.02}
+    "perp:ETH" {:return-component 0.08
+                :funding-component 0.01}}
+   :diagnostics {:gross-exposure 0.5
+                 :net-exposure 0.5
+                 :effective-n 2
+                 :turnover 0.2}
+   :rebalance-preview {:status :ready
+                       :capital-usd 100000
+                       :summary {:ready-count 2}
+                       :rows []}})
+
+(defn- with-current-solved-run
+  [state result]
+  (let [request (:request (setup-readiness/build-readiness state))]
+    (assoc-in state
+              [:portfolio :optimizer :last-successful-run]
+              (fixtures/sample-last-successful-run
+               {:computed-at-ms 1714137600000
+                :request-signature (action-common/build-request-signature request)
+                :result result}))))
 
 (deftest unsaved-draft-results-route-renders-last-run-weights-test
-  (let [view-node (portfolio-view/portfolio-view
-                   {:router {:path "/portfolio/optimize/draft"}
+  (let [base-state {:router {:path "/portfolio/optimize/draft"}
                     :portfolio {:optimizer
                                 {:active-scenario {:loaded-id nil
                                                    :status :computed}
@@ -83,8 +91,9 @@
                                          :return-model {:kind :historical-mean}
                                          :risk-model {:kind :diagonal-shrink}
                                          :constraints {:max-asset-weight 0.4
-                                                       :gross-max 1.5}}
-                                 :last-successful-run solved-run}}})]
+                                                       :gross-max 1.5}}}}}
+        view-node (portfolio-view/portfolio-view
+                   (with-current-solved-run base-state solved-result))]
     (is (some? (node-by-role view-node
                              "portfolio-optimizer-scenario-detail-surface")))
     (is (some? (node-by-role view-node
@@ -101,49 +110,46 @@
     (doseq [[case-label labels-by-instrument] [["missing label" nil]
                                                ["raw address label" {vault-id vault-address}]]]
       (let [view-node (portfolio-view/portfolio-view
-                       {:router {:path "/portfolio/optimize/draft"}
-                        :portfolio {:optimizer
-                                    {:active-scenario {:loaded-id nil
-                                                       :status :computed}
-                                     :draft {:name "New Scenario"
-                                             :universe [{:instrument-id vault-id
-                                                         :market-type :vault
-                                                         :coin vault-id
-                                                         :vault-address vault-address
-                                                         :name vault-name
-                                                         :symbol vault-name}]
-                                             :objective {:kind :minimum-variance}
-                                             :return-model {:kind :historical-mean}
-                                             :risk-model {:kind :diagonal-shrink}
-                                             :constraints {:max-asset-weight 0.5
-                                                           :gross-max 1.5}}
-                                     :last-successful-run
-                                     (fixtures/sample-last-successful-run
-                                      {:computed-at-ms 1714137600000
-                                       :request-signature {:seed 2}
-                                       :result {:as-of-ms 1714137600000
-                                                :instrument-ids [vault-id]
-                                                :current-weights [0.0]
-                                                :target-weights [0.5]
-                                                :labels-by-instrument labels-by-instrument
-                                                :target-weights-by-instrument {vault-id 0.5}
-                                                :current-weights-by-instrument {vault-id 0.0}
-                                                :expected-return 0.14
-                                                :volatility 0.32
-                                                :performance {:shrunk-sharpe 0.44}
-                                                :history-summary {:return-observations 12}
-                                                :return-model :historical-mean
-                                                :risk-model :diagonal-shrink
-                                                :frontier []
-                                                :return-decomposition-by-instrument {}
-                                                :diagnostics {:gross-exposure 0.5
-                                                              :net-exposure 0.5
-                                                              :effective-n 1
-                                                              :turnover 0.5}
-                                                :rebalance-preview {:status :ready
-                                                                    :capital-usd 100000
-                                                                    :summary {:ready-count 1}
-                                                                    :rows []}}})}}})
+                       (let [base-state {:router {:path "/portfolio/optimize/draft"}
+                                         :portfolio {:optimizer
+                                                     {:active-scenario {:loaded-id nil
+                                                                        :status :computed}
+                                                      :draft {:name "New Scenario"
+                                                              :universe [{:instrument-id vault-id
+                                                                          :market-type :vault
+                                                                          :coin vault-id
+                                                                          :vault-address vault-address
+                                                                          :name vault-name
+                                                                          :symbol vault-name}]
+                                                              :objective {:kind :minimum-variance}
+                                                              :return-model {:kind :historical-mean}
+                                                              :risk-model {:kind :diagonal-shrink}
+                                                              :constraints {:max-asset-weight 0.5
+                                                                            :gross-max 1.5}}}}}
+                             result {:as-of-ms 1714137600000
+                                     :instrument-ids [vault-id]
+                                     :current-weights [0.0]
+                                     :target-weights [0.5]
+                                     :labels-by-instrument labels-by-instrument
+                                     :target-weights-by-instrument {vault-id 0.5}
+                                     :current-weights-by-instrument {vault-id 0.0}
+                                     :expected-return 0.14
+                                     :volatility 0.32
+                                     :performance {:shrunk-sharpe 0.44}
+                                     :history-summary {:return-observations 12}
+                                     :return-model :historical-mean
+                                     :risk-model :diagonal-shrink
+                                     :frontier []
+                                     :return-decomposition-by-instrument {}
+                                     :diagnostics {:gross-exposure 0.5
+                                                   :net-exposure 0.5
+                                                   :effective-n 1
+                                                   :turnover 0.5}
+                                     :rebalance-preview {:status :ready
+                                                         :capital-usd 100000
+                                                         :summary {:ready-count 1}
+                                                         :rows []}}]
+                         (with-current-solved-run base-state result)))
             strings (set (collect-strings view-node))]
         (is (contains? strings vault-name) case-label)
         (is (not (contains? strings vault-address)) case-label)))))

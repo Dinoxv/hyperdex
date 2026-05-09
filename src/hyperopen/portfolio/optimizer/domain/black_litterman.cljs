@@ -52,6 +52,32 @@
   [instrument-ids views]
   (mapv (partial view-row instrument-ids) views))
 
+(defn- zero-view-row?
+  [row]
+  (every? zero? row))
+
+(defn- view-instrument-ids
+  [view]
+  (mapv (fn [instrument-id]
+          (if (keyword? instrument-id)
+            (subs (str instrument-id) 1)
+            (str instrument-id)))
+        (keys (:weights view))))
+
+(defn- invalid-view-row-warning
+  [view]
+  {:code :black-litterman-view-has-no-matching-instrument
+   :view-id (:id view)
+   :instrument-ids (view-instrument-ids view)})
+
+(defn- invalid-view-row-warnings
+  [views rows]
+  (->> (map vector views rows)
+       (keep (fn [[view row]]
+               (when (zero-view-row? row)
+                 (invalid-view-row-warning view))))
+       vec))
+
 (defn- view-returns
   [views]
   (mapv :return views))
@@ -117,29 +143,41 @@
        :expected-returns pi
        :expected-returns-by-instrument (zipmap instrument-ids pi)
        :diagnostics {:prior-source (or prior-source :market-cap)
-                     :prior-return-source (:source prior-return)
-                     :view-count 0
-                     :tau tau*}}
-      (let [p (view-rows instrument-ids views*)
-            pt (math/transpose p)
-            q (view-returns views*)
-            tau-sigma (math/scalar-matrix tau* covariance)
-            tau-sigma-inv (math/inverse tau-sigma)
-            omega-inv (math/inverse (omega tau-sigma views* p))
-            left (math/matrix-add tau-sigma-inv
-                                  (math/mat-mul
-                                   (math/mat-mul pt omega-inv)
-                                   p))
-            right (math/vec-add (math/mat-vec tau-sigma-inv pi)
-                                (math/mat-vec
-                                 (math/mat-mul pt omega-inv)
-                                 q))
-            posterior (math/mat-vec (math/inverse left) right)]
-        {:model :black-litterman
-         :instrument-ids instrument-ids
-         :expected-returns posterior
-         :expected-returns-by-instrument (zipmap instrument-ids posterior)
-         :diagnostics {:prior-source (or prior-source :market-cap)
                        :prior-return-source (:source prior-return)
-                       :view-count (count views*)
-                       :tau tau*}}))))
+                       :view-count 0
+                       :tau tau*}}
+      (let [p (view-rows instrument-ids views*)
+            invalid-warnings (invalid-view-row-warnings views* p)]
+        (if (seq invalid-warnings)
+          {:status :invalid
+           :model :black-litterman
+           :instrument-ids instrument-ids
+           :expected-returns pi
+           :expected-returns-by-instrument (zipmap instrument-ids pi)
+           :diagnostics {:prior-source (or prior-source :market-cap)
+                         :prior-return-source (:source prior-return)
+                         :view-count (count views*)
+                         :tau tau*}
+           :warnings invalid-warnings}
+          (let [pt (math/transpose p)
+                q (view-returns views*)
+                tau-sigma (math/scalar-matrix tau* covariance)
+                tau-sigma-inv (math/inverse tau-sigma)
+                omega-inv (math/inverse (omega tau-sigma views* p))
+                left (math/matrix-add tau-sigma-inv
+                                      (math/mat-mul
+                                       (math/mat-mul pt omega-inv)
+                                       p))
+                right (math/vec-add (math/mat-vec tau-sigma-inv pi)
+                                    (math/mat-vec
+                                     (math/mat-mul pt omega-inv)
+                                     q))
+                posterior (math/mat-vec (math/inverse left) right)]
+            {:model :black-litterman
+             :instrument-ids instrument-ids
+             :expected-returns posterior
+             :expected-returns-by-instrument (zipmap instrument-ids posterior)
+             :diagnostics {:prior-source (or prior-source :market-cap)
+                           :prior-return-source (:source prior-return)
+                           :view-count (count views*)
+                           :tau tau*}}))))))

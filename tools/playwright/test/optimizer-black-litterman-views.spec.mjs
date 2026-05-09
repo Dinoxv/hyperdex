@@ -284,9 +284,9 @@ async function seedBlackLittermanPendingBtcRunState(page) {
         "BTC",
         vector([
           candle(1000, "100"),
-          candle(2000, "95"),
-          candle(3000, "92"),
-          candle(4000, "90")
+          candle(2000, "99.92"),
+          candle(3000, "100.01"),
+          candle(4000, "99.7")
         ]),
         "ETH",
         vector([
@@ -458,6 +458,46 @@ async function readBlackLittermanDraftViews(page) {
       firstReturn: firstView ? c.get(firstView, kw("return")) : null,
       firstConfidence: firstView ? c.get(firstView, kw("confidence")) : null,
       errorCount: c.count(errors)
+    };
+  });
+}
+
+async function readBlackLittermanRunResult(page) {
+  return page.evaluate(() => {
+    const c = globalThis.cljs.core;
+    const kw = (name) => c.keyword(name);
+    const path = (...segments) => c.PersistentVector.fromArray(segments.map(kw), true);
+    const store = globalThis.hyperopen.system.store;
+    const state = c.deref(store);
+    const result = c.get_in(
+      state,
+      path("portfolio", "optimizer", "last-successful-run", "result")
+    );
+
+    if (!result) {
+      return null;
+    }
+
+    const expectedByInstrument = c.get(result, kw("expected-returns-by-instrument"));
+    const diagnostics = c.get(result, kw("black-litterman-diagnostics"));
+    const overlays = c.get(result, kw("frontier-overlays"));
+    const standalone = overlays ? c.get(overlays, kw("standalone")) : null;
+    let standaloneBtc = null;
+
+    for (let seq = c.seq(standalone); seq; seq = c.next(seq)) {
+      const point = c.first(seq);
+      if (c.get(point, kw("instrument-id")) === "perp:BTC") {
+        standaloneBtc = c.get(point, kw("expected-return"));
+        break;
+      }
+    }
+
+    return {
+      status: String(c.get(result, kw("status"))),
+      returnModel: String(c.get(result, kw("return-model"))),
+      viewCount: diagnostics ? c.get(diagnostics, kw("view-count")) : null,
+      expectedBtc: expectedByInstrument ? c.get(expectedByInstrument, "perp:BTC") : null,
+      standaloneBtc
     };
   });
 }
@@ -691,7 +731,7 @@ test("portfolio optimizer use my views prepopulates absolute return while histor
     .toContainText("BTC expected return +7.3% annualized");
 });
 
-test("portfolio optimizer run applies a valid pending BTC view before pipeline @regression", async ({ page }) => {
+test("portfolio optimizer run applies a valid pending BTC view through the worker result @regression", async ({ page }) => {
   test.setTimeout(90_000);
 
   await page.setViewportSize({ width: 900, height: 900 });
@@ -719,6 +759,24 @@ test("portfolio optimizer run applies a valid pending BTC view before pipeline @
       firstConfidence: 0.75,
       errorCount: 0
     });
+
+  await expect(page.locator("[data-role='portfolio-optimizer-run-status-panel']"))
+    .toContainText("Succeeded", { timeout: 15_000 });
+
+  await expect
+    .poll(() => readBlackLittermanRunResult(page), {
+      message: "worker-backed BL run should produce positive BTC effective return",
+      timeout: 4_000
+    })
+    .toMatchObject({
+      status: ":solved",
+      returnModel: "black-litterman",
+      viewCount: 1
+    });
+
+  const result = await readBlackLittermanRunResult(page);
+  expect(result.expectedBtc).toBeGreaterThan(0);
+  expect(result.standaloneBtc).toBeGreaterThan(0);
 });
 
 test("portfolio optimizer setup hides stale retained weights during a view rerun @regression", async ({ page }) => {

@@ -383,11 +383,39 @@
     title]
    [:p {:class ["mt-2" "text-sm" "text-trading-muted"]} body]])
 
+(defn- stale-recommendation-blocked
+  []
+  [:section {:class ["rounded-xl"
+                     "border"
+                     "border-warning/50"
+                     "bg-warning/10"
+                     "p-4"
+                     "text-sm"
+                     "text-warning"]
+             :data-role "portfolio-optimizer-recommendation-stale-blocked"}
+   [:p {:class ["font-semibold"]} "Recommendation is stale"]
+   [:p {:class ["mt-2" "max-w-2xl" "text-trading-muted"]}
+    "Draft inputs differ from the last successful run. Rerun before using allocation weights or the efficient frontier."]
+   [:button {:type "button"
+             :class ["mt-3"
+                     "rounded-md"
+                     "border"
+                     "border-warning/50"
+                     "px-3"
+                     "py-1.5"
+                     "text-xs"
+                     "font-semibold"
+                     "text-warning"]
+             :data-role "portfolio-optimizer-recommendation-run-again"
+             :on {:click [[:actions/run-portfolio-optimizer-from-draft]]}}
+    "Run again"]])
+
 (defn- recommendation-tab
-  [state stale?]
+  [state stale? current-result?]
   [:section {:class ["space-y-0"]
              :data-role "portfolio-optimizer-recommendation-tab"}
-   (if (solved-result? state)
+   (cond
+     (and (solved-result? state) current-result?)
      (results-panel/results-panel
       (get-in state [:portfolio :optimizer :last-successful-run])
       (get-in state [:portfolio :optimizer :draft])
@@ -395,6 +423,11 @@
        :frontier-overlay-mode (get-in state [:portfolio-ui :optimizer :frontier-overlay-mode])
        :constrain-frontier? (get-in state [:portfolio-ui :optimizer :constrain-frontier?])
        :include-rebalance? false})
+
+     (solved-result? state)
+     (stale-recommendation-blocked)
+
+     :else
      (empty-tab "portfolio-optimizer-recommendation-empty"
                 "Recommendation"
                 "Run or load this scenario to review target allocation, frontier, diagnostics, and rebalance context."))])
@@ -411,14 +444,14 @@
                 "A rebalance preview is available after a successful optimization run."))])
 
 (defn- tab-body
-  [state selected-tab stale?]
+  [state selected-tab stale? current-result?]
   (case selected-tab
     :rebalance (rebalance-tab state)
     :tracking [:section {:class ["space-y-4"]
                          :data-role "portfolio-optimizer-tracking-tab"}
                (tracking-panel/tracking-panel state)]
     :inputs (inputs-tab-view/inputs-tab state)
-    (recommendation-tab state stale?)))
+    (recommendation-tab state stale? current-result?)))
 
 (defn- scenario-loading-state
   [scenario-id]
@@ -445,5 +478,5 @@
      (stale-banner stale?)
      (if loading?
        (scenario-loading-state scenario-id)
-       (tab-body state* selected-tab stale?))
+       (tab-body state* selected-tab stale? current-result?))
      (execution-modal/execution-modal state*)]))

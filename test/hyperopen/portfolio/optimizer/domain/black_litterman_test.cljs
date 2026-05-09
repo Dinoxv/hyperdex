@@ -100,3 +100,27 @@
     (is (< (abs* (- 0.2 high))
            (abs* (- 0.2 low)))
         "Higher confidence should move the posterior closer to the entered view.")))
+
+(deftest posterior-returns-rejects-view-rows-without-matching-instruments-test
+  (let [posterior (black-litterman/posterior-returns
+                   {:instrument-ids ["perp:BTC"]
+                    :covariance [[1.8]]
+                    :prior-weights [1]
+                    :prior-returns [-0.13]
+                    :risk-aversion 1
+                    :tau 0.05
+                    :views [{:id "eth-view"
+                             :kind :absolute
+                             :weights {"perp:ETH" 1}
+                             :return 0.2
+                             :confidence 0.75}]
+                    :prior-source :fallback-equal-weight})
+        warning (first (:warnings posterior))]
+    (is (= :invalid (:status posterior)))
+    (is (= :black-litterman-view-has-no-matching-instrument
+           (:code warning)))
+    (is (= "eth-view" (:view-id warning)))
+    (is (= ["perp:ETH"] (:instrument-ids warning)))
+    (is (= 1 (get-in posterior [:diagnostics :view-count])))
+    (is (= {"perp:BTC" -0.13}
+           (:expected-returns-by-instrument posterior)))))

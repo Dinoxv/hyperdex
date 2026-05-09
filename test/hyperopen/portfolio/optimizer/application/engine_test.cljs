@@ -192,6 +192,30 @@
              :target-net 1}]
            (get-in result [:details :violations])))))
 
+(deftest run-optimization-blocks-black-litterman-views-without-matching-instruments-test
+  (let [called? (atom false)
+        result (engine/run-optimization
+                (assoc base-request
+                       :return-model {:kind :black-litterman
+                                      :views [{:id "sol-view"
+                                               :kind :absolute
+                                               :instrument-id "perp:SOL"
+                                               :weights {"perp:SOL" 1}
+                                               :return 0.2
+                                               :confidence 0.75}]})
+                {:solve-problem (fn [_]
+                                  (reset! called? true)
+                                  {:status :solved
+                                   :weights [0.5 0.5]})})
+        warning (first (:warnings result))]
+    (is (= :infeasible (:status result)))
+    (is (= :invalid-return-model (:reason result)))
+    (is (false? @called?))
+    (is (= :black-litterman-view-has-no-matching-instrument
+           (:code warning)))
+    (is (= "sol-view" (:view-id warning)))
+    (is (= ["perp:SOL"] (:instrument-ids warning)))))
+
 (deftest run-optimization-solves-frontier-sweep-and-selects-target-volatility-result-test
   (let [result (engine/run-optimization
                 (assoc base-request

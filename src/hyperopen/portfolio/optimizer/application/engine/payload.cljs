@@ -192,6 +192,7 @@
      :labels-by-instrument labels-by-instrument*
      :target-weights-by-instrument (zipmap instrument-ids target-weights)
      :current-weights-by-instrument (zipmap instrument-ids current-weights*)
+     :expected-returns-by-instrument (zipmap instrument-ids expected-returns)
      :dropped-weights dropped
      :current-expected-return current-expected-return
      :current-volatility current-volatility

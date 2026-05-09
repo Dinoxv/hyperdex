@@ -55,10 +55,12 @@
    [:execution-assumptions :cost-contexts-by-id]
    [:execution-assumptions :fee-bps-by-id]
    [:payload :return-decomposition-by-instrument]
+   [:payload :expected-returns-by-instrument]
    [:payload :current-weights-by-instrument]
    [:payload :target-weights-by-instrument]
    [:payload :diagnostics :weight-sensitivity-by-instrument]
    [:return-decomposition-by-instrument]
+   [:expected-returns-by-instrument]
    [:current-weights-by-instrument]
    [:target-weights-by-instrument]
    [:diagnostics :weight-sensitivity-by-instrument]])
@@ -96,8 +98,19 @@
           value
           instrument-keyed-map-paths))
 
+(defn- normalize-black-litterman-view-weights
+  [value]
+  (update-existing-in
+   value
+   [:return-model :views]
+   (fn [views]
+     (mapv (fn [view]
+             (update-existing-in view [:weights] stringify-instrument-keyed-map))
+           views))))
+
 (defn normalize-worker-boundary
   [value]
   (-> value
       normalize-wire-values
-      normalize-instrument-keyed-maps))
+      normalize-instrument-keyed-maps
+      normalize-black-litterman-view-weights))

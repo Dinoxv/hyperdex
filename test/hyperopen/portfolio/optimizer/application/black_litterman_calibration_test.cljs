@@ -1,6 +1,7 @@
 (ns hyperopen.portfolio.optimizer.application.black-litterman-calibration-test
   (:require [cljs.test :refer-macros [deftest is]]
-            [hyperopen.portfolio.optimizer.application.engine :as engine]))
+            [hyperopen.portfolio.optimizer.application.engine :as engine]
+            [hyperopen.portfolio.optimizer.infrastructure.wire :as wire]))
 
 (defn- within?
   [expected actual tolerance]
@@ -11,6 +12,53 @@
   (into {}
         (map (juxt :instrument-id identity))
         (get-in result [:frontier-overlays mode])))
+
+(defn- one-asset-btc-view-request
+  [view-weights]
+  (let [btc-id "perp:BTC"
+        one-year-interval [{:dt-days 365.2425
+                            :dt-years 1}]]
+    {:scenario-id "bl-worker-boundary-regression"
+     :universe [{:instrument-id btc-id
+                 :market-type :perp
+                 :coin "BTC"
+                 :shortable? true}]
+     :current-portfolio {:capital {:nav-usdc 10000}
+                         :by-instrument {}}
+     :return-model {:kind :black-litterman
+                    :views [{:id "btc-positive-view"
+                             :kind :absolute
+                             :instrument-id btc-id
+                             :weights view-weights
+                             :return 0.2
+                             :confidence 0.75
+                             :confidence-variance 0.25}]}
+     :risk-model {:kind :sample-covariance}
+     :objective {:kind :max-sharpe}
+     :constraints {:long-only? true
+                   :max-asset-weight 1
+                   :rebalance-tolerance 0.001}
+     :history {:calendar [0 1 2 3 4 5]
+               :return-calendar [1 2 3 4 5]
+               :return-series-by-instrument
+               {btc-id [-0.1 -0.05 0 0.05 0.1]}
+               :expected-return-series-by-instrument
+               {btc-id [-0.13]}
+               :expected-return-intervals-by-instrument
+               {btc-id one-year-interval}
+               :funding-by-instrument
+               {btc-id {:source :missing-market-funding-history
+                        :annualized-carry 0}}
+               :freshness {:as-of-ms 6
+                           :oldest-common-ms 0
+                           :latest-common-ms 5
+                           :age-ms 1
+                           :stale? false}}
+     :black-litterman-prior
+     {:source :fallback-equal-weight
+      :weights-by-instrument {btc-id 1}}
+     :warnings []
+     :as-of-ms 6}))
 
 (deftest black-litterman-run-uses-baseline-return-priors-for-frontier-overlays-test
   (let [btc-id "perp:BTC"
@@ -115,3 +163,24 @@
            (get-in result [:black-litterman-diagnostics :prior-return-source])))
     (is (contains? (set (map :code (:warnings result)))
                    :missing-market-cap-prior))))
+
+(deftest black-litterman-run-survives-worker-boundary-keywordized-view-weights-test
+  (let [btc-id "perp:BTC"
+        decoded-id (keyword btc-id)
+        request (wire/normalize-worker-boundary
+                 (one-asset-btc-view-request {decoded-id 1}))
+        result (engine/run-optimization
+                request
+                {:solve-problem (fn [_problem]
+                                  {:status :solved
+                                   :solver :fixture-solver
+                                   :weights [1]})})
+        standalone (overlay-by-id result :standalone)]
+    (is (= :solved (:status result)))
+    (is (= {"perp:BTC" 1}
+           (get-in request [:return-model :views 0 :weights])))
+    (is (= 1 (get-in result [:black-litterman-diagnostics :view-count])))
+    (is (pos? (get-in standalone [btc-id :expected-return]))
+        "BTC overlay should use the Black-Litterman posterior after worker boundary normalization.")
+    (is (pos? (get-in result [:expected-returns-by-instrument btc-id]))
+        "Solved payload should expose the effective expected return vector used by the optimizer.")))
