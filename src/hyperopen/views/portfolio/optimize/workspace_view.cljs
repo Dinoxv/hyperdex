@@ -11,8 +11,10 @@
             [hyperopen.views.portfolio.optimize.setup-v4-sections :as setup-v4]))
 
 (defn- retained-result-path
-  []
-  (portfolio-routes/portfolio-optimize-scenario-path "draft"))
+  [state]
+  (portfolio-routes/portfolio-optimize-scenario-path
+   (or (get-in state [:portfolio :optimizer :active-scenario :loaded-id])
+       "draft")))
 
 (defn- optimizer-draft
   [state]
@@ -48,7 +50,7 @@
         history-load-state (or (get-in state [:portfolio :optimizer :history-load-state])
                                (optimizer-defaults/default-history-load-state))
         scenario-id (:scenario-id route)
-        result-path (retained-result-path)
+        result-path (retained-result-path state)
         infeasible-result (infeasible-panel/infeasible-result run-state)
         highlighted-controls (infeasible-panel/highlighted-control-keys infeasible-result)]
     [:section {:class ["portfolio-optimizer-v4" "space-y-3" "pb-16" "leading-4" "text-trading-text"]

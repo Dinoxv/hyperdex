@@ -171,6 +171,27 @@
     (is (= [[:actions/navigate "/portfolio/optimize/draft"]]
            (click-actions results-link)))))
 
+(deftest portfolio-optimizer-workspace-links-current-generated-draft-result-test
+  (let [state (ready-workspace-state {:kind :black-litterman
+                                      :views [{:kind :absolute
+                                               :instrument-id "perp:BTC"
+                                               :return 0.2
+                                               :confidence 0.75
+                                               :weights {"perp:BTC" 1}}]})
+        state* (assoc-in state
+                         [:portfolio :optimizer :active-scenario :loaded-id]
+                         "draft-current")
+        view-node (portfolio-view/portfolio-view
+                   (assoc-in state*
+                             [:portfolio :optimizer :last-successful-run]
+                             (solved-run-for-state state*)))
+        view-weights-link (node-by-role view-node "portfolio-optimizer-view-weights")
+        results-link (node-by-role view-node "portfolio-optimizer-results-link")]
+    (is (= [[:actions/navigate "/portfolio/optimize/draft-current"]]
+           (click-actions view-weights-link)))
+    (is (= [[:actions/navigate "/portfolio/optimize/draft-current"]]
+           (click-actions results-link)))))
+
 (deftest portfolio-optimizer-workspace-hides-clean-mismatched-result-test
   (let [black-litterman-state
         (ready-workspace-state

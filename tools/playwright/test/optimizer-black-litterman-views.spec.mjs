@@ -245,6 +245,8 @@ async function seedBlackLittermanPendingBtcRunState(page) {
       kw("symbol"), "ETH-USDC"
     ]);
     const draft = map([
+      kw("id"), "bl-draft-current",
+      kw("name"), "BL Current Draft",
       kw("universe"), vector([btcInstrument, ethInstrument]),
       kw("objective"), map([kw("kind"), kw("max-sharpe")]),
       kw("return-model"), map([kw("kind"), kw("black-litterman"), kw("views"), vector([])]),
@@ -777,6 +779,16 @@ test("portfolio optimizer run applies a valid pending BTC view through the worke
   const result = await readBlackLittermanRunResult(page);
   expect(result.expectedBtc).toBeGreaterThan(0);
   expect(result.standaloneBtc).toBeGreaterThan(0);
+
+  await expect(page.locator("[data-role='portfolio-optimizer-view-weights']"))
+    .toBeVisible();
+  await page.locator("[data-role='portfolio-optimizer-view-weights']").click();
+  await waitForIdle(page, { quietMs: 150, timeoutMs: 4_000, pollMs: 50 });
+  await expect(page).toHaveURL(/\/portfolio\/optimize\/bl-draft-current/);
+  await expect(page.locator("[data-role='portfolio-optimizer-results-surface']"))
+    .toContainText("Allocation");
+  await expect(page.locator("[data-role='portfolio-optimizer-frontier-panel']"))
+    .toContainText("Efficient Frontier");
 });
 
 test("portfolio optimizer setup hides stale retained weights during a view rerun @regression", async ({ page }) => {
