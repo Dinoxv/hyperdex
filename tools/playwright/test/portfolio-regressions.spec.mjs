@@ -586,6 +586,35 @@ async function readOptimizerTargetWeights(page) {
   });
 }
 
+async function appendOptimizerBtcHistoryPoint(page) {
+  await page.evaluate(() => {
+    const c = globalThis.cljs.core;
+    const kw = (name) => c.keyword(name);
+    const candle = c.PersistentArrayMap.fromArray(
+      [kw("time"), 1777145600000, kw("close"), "109"],
+      true
+    );
+    const btcHistoryPath = c.PersistentVector.fromArray(
+      [
+        kw("portfolio"),
+        kw("optimizer"),
+        kw("history-data"),
+        kw("candle-history-by-coin"),
+        "BTC"
+      ],
+      true
+    );
+    const store = globalThis.hyperopen.system.store;
+    const state = c.deref(store);
+    const candles = c.get_in(state, btcHistoryPath) || c.PersistentVector.EMPTY;
+    c.reset_BANG_(
+      store,
+      c.assoc_in(state, btcHistoryPath, c.conj(candles, candle))
+    );
+  });
+  await waitForIdle(page, { quietMs: 150, timeoutMs: 4_000, pollMs: 50 });
+}
+
 async function seedOptimizerBtcOnlyHistory(page) {
   await page.evaluate(() => {
     const c = globalThis.cljs.core;
@@ -1709,6 +1738,7 @@ test("portfolio optimizer recommendation chart shows minimum variance frontier o
     .toContainText("Last successful result is available for comparison.");
   await expect(page.locator("[data-role='portfolio-optimizer-results-surface']"))
     .toHaveCount(0);
+  await appendOptimizerBtcHistoryPoint(page);
   await expect(page.locator("[data-role='portfolio-optimizer-view-weights']"))
     .toBeVisible();
   await page.locator("[data-role='portfolio-optimizer-view-weights']").click();

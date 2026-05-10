@@ -16,6 +16,16 @@
    (or (get-in state [:portfolio :optimizer :active-scenario :loaded-id])
        "draft")))
 
+(defn- completed-run-result?
+  [{:keys [draft run-state running? last-successful-run]}]
+  (and (run-identity/solved-run? last-successful-run)
+       (= :succeeded (:status run-state))
+       (not running?)
+       (not (true? (get-in draft [:metadata :dirty?])))
+       (some? (:request-signature run-state))
+       (= (:request-signature run-state)
+          (:request-signature last-successful-run))))
+
 (defn- optimizer-draft
   [state]
   (or (get-in state [:portfolio :optimizer :draft])
@@ -39,11 +49,16 @@
         run-triggerable? (and (seq (:universe draft))
                               (not running?))
         last-successful-run (get-in state [:portfolio :optimizer :last-successful-run])
-        solved-run? (run-identity/current-solved-run?
-                     {:draft draft
-                      :readiness readiness
-                      :running? running?
-                      :last-successful-run last-successful-run})
+        solved-run? (or (completed-run-result?
+                         {:draft draft
+                          :run-state run-state
+                          :running? running?
+                          :last-successful-run last-successful-run})
+                        (run-identity/current-solved-run?
+                         {:draft draft
+                          :readiness readiness
+                          :running? running?
+                          :last-successful-run last-successful-run}))
         scenario-save-state (or (get-in state [:portfolio :optimizer :scenario-save-state])
                                 (optimizer-defaults/default-scenario-save-state))
         saving-scenario? (= :saving (:status scenario-save-state))

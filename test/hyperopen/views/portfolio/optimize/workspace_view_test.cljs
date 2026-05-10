@@ -192,6 +192,26 @@
     (is (= [[:actions/navigate "/portfolio/optimize/draft-current"]]
            (click-actions results-link)))))
 
+(deftest portfolio-optimizer-workspace-keeps-completed-run-link-after-snapshot-drift-test
+  (let [state (ready-workspace-state {:kind :historical-mean})
+        solved-run (solved-run-for-state state)
+        state* (-> state
+                   (assoc-in [:portfolio :optimizer :active-scenario :loaded-id]
+                             "draft-current")
+                   (assoc-in [:portfolio :optimizer :run-state :request-signature]
+                             (:request-signature solved-run))
+                   (assoc-in [:portfolio :optimizer :last-successful-run]
+                             solved-run)
+                   (assoc-in [:webdata2 :clearinghouseState :marginSummary :accountValue]
+                             "2000"))
+        view-node (portfolio-view/portfolio-view state*)
+        view-weights-link (node-by-role view-node "portfolio-optimizer-view-weights")
+        results-link (node-by-role view-node "portfolio-optimizer-results-link")]
+    (is (= [[:actions/navigate "/portfolio/optimize/draft-current"]]
+           (click-actions view-weights-link)))
+    (is (= [[:actions/navigate "/portfolio/optimize/draft-current"]]
+           (click-actions results-link)))))
+
 (deftest portfolio-optimizer-workspace-hides-clean-mismatched-result-test
   (let [black-litterman-state
         (ready-workspace-state
