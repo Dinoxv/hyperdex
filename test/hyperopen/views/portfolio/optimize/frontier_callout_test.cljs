@@ -2,7 +2,7 @@
   (:require [cljs.test :refer-macros [deftest is]]
             [hyperopen.views.portfolio.optimize.frontier-callout :as frontier-callout]
             [hyperopen.views.portfolio.optimize.test-support
-             :refer [collect-nodes collect-strings node-attr text-node]]))
+             :refer [collect-nodes collect-strings node-attr node-by-role text-node]]))
 
 (deftest frontier-callout-wraps-long-title-within-card-test
   (let [callout (frontier-callout/callout
@@ -22,3 +22,53 @@
     (is (< 113 (node-attr rect :height))
         "Wrapped title should grow the callout instead of overlapping metric rows.")
     (is (= 52 (node-attr first-metric :y)))))
+
+(deftest blended-portfolio-callout-renders-designer-allocation-card-test
+  (let [callout (frontier-callout/callout
+                 {:bounds {:width 560 :height 340}
+                  :data-role "portfolio-optimizer-frontier-callout-target"
+                  :label "Target"
+                  :variant :blended
+                  :point {:x 120 :y 70}
+                  :rows (frontier-callout/point-rows
+                         {:expected-return 0.146
+                          :volatility 0.12
+                          :sharpe 0.84})
+                  :allocations {:rows [{:label "BTC" :weight 0.24 :value "24.0%"}
+                                       {:label "USDC" :weight 0.22 :value "22.0%"}
+                                       {:label "ETH" :weight 0.18 :value "18.0%"}
+                                       {:label "SOL" :weight 0.165 :value "16.5%"}
+                                       {:label "HYPE" :weight 0.115 :value "11.5%"}
+                                       {:label "kPEPE" :weight 0.04 :value "4.0%"}
+                                       {:label "DOGE" :weight 0.025 :value "2.5%"}
+                                       {:label "LINK" :weight 0.015 :value "1.5%"}]}})
+        card (first (collect-nodes callout #(and (= :rect (first %))
+                                                 (= "portfolio-optimizer-frontier-callout-card"
+                                                    (node-attr % :data-role)))))
+        first-segment (node-by-role callout
+                                    "portfolio-optimizer-frontier-callout-allocation-segment-0")
+        first-dot (node-by-role callout
+                                "portfolio-optimizer-frontier-callout-allocation-dot-0")
+        strings (set (collect-strings callout))]
+    (is (= 224 (node-attr card :width)))
+    (is (= 0 (node-attr card :rx)))
+    (is (contains? strings "TARGET"))
+    (is (contains? strings "PORTFOLIO"))
+    (is (contains? strings "μ · return"))
+    (is (contains? strings "σ · vol"))
+    (is (contains? strings "IMPLIED ALLOCATION"))
+    (is (contains? strings "BTC"))
+    (is (contains? strings "USDC"))
+    (is (contains? strings "ETH"))
+    (is (contains? strings "SOL"))
+    (is (contains? strings "HYPE"))
+    (is (contains? strings "kPEPE"))
+    (is (contains? strings "+2 more"))
+    (is (not (contains? strings "Expected Return")))
+    (is (not (contains? strings "DOGE")))
+    (is (= 8
+           (count (collect-nodes callout
+                                 #(and (= :rect (first %))
+                                       (some? (node-attr % :data-allocation-segment)))))))
+    (is (= "#e2b84f" (node-attr first-segment :fill)))
+    (is (= "#e2b84f" (node-attr first-dot :fill)))))

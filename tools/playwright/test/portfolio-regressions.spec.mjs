@@ -1866,13 +1866,15 @@ test("portfolio optimizer recommendation chart shows minimum variance frontier o
     }
     return false;
   })).toBe(true);
-  await expect(page.locator("[data-role='portfolio-optimizer-frontier-callout-target-border']"))
-    .toHaveAttribute("fill", "url(#portfolioOptimizerTargetTooltipBorderGradient)");
-  await expect(targetCallout).toContainText("Target");
-  await expect(targetCallout).toContainText("Expected Return");
-  await expect(targetCallout).toContainText("Volatility");
+  await expect(targetCallout.locator("[data-role='portfolio-optimizer-frontier-callout-card']"))
+    .toHaveAttribute("stroke", "var(--optimizer-border-strong)");
+  await expect(targetCallout).toContainText("TARGET");
+  await expect(targetCallout).toContainText("PORTFOLIO");
+  await expect(targetCallout).toContainText("μ · return");
+  await expect(targetCallout).toContainText("σ · vol");
   await expect(targetCallout).toContainText("Sharpe");
-  await expect(targetCallout).toContainText("Gross Exposure");
+  await expect(targetCallout).toContainText("IMPLIED ALLOCATION");
+  await expect(targetCallout).not.toContainText("Gross Exposure");
 
   const standaloneMarkerGroup = page.locator("[data-role='portfolio-optimizer-frontier-overlay-standalone-perp:BTC']");
   const standaloneMarkerSymbol = page.locator("[data-role='portfolio-optimizer-frontier-overlay-symbol-standalone-perp:BTC']");

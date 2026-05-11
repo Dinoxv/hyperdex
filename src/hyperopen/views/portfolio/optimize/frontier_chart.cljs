@@ -241,6 +241,7 @@
      {:bounds chart-bounds
       :data-role (str "portfolio-optimizer-frontier-callout-frontier-" idx)
       :data-frontier-callout-id (frontier-callout-id idx)
+      :variant :blended
       :label label
       :point position
       :rows rows

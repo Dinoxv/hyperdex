@@ -83,26 +83,31 @@
         label-y (- y 23)
         label "Target"
         rows (frontier-callout/point-rows
-              point
-              {:exposure (frontier-callout/exposure-summary result :target)})]
+              point)
+        allocations (frontier-callout/allocation-summary
+                     (:instrument-ids result)
+                     (:target-weights result)
+                     (:labels-by-instrument result))]
     {:position position
      :x x
      :y y
      :label-x label-x
      :label-y label-y
      :label label
-     :rows rows}))
+     :rows rows
+     :allocations allocations}))
 
 (defn callout
   [{:keys [bounds] :as opts}]
-  (let [{:keys [position label rows]} (target-model opts)]
+  (let [{:keys [position label rows allocations]} (target-model opts)]
     (frontier-callout/callout
      {:bounds bounds
       :data-role "portfolio-optimizer-frontier-callout-target"
-      :variant :target
+      :variant :blended
       :label label
       :point position
-      :rows rows})))
+      :rows rows
+      :allocations allocations})))
 
 (defn marker
   [{:keys [render-callout?] :as opts}]

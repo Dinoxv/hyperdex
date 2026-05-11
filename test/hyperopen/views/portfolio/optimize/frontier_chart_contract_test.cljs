@@ -163,12 +163,12 @@
     (is (= "3 3" (node-attr target-leader-line :stroke-dasharray)))
     (is (nil? current-marker))
     (is (some? target-callout))
-    (is (= "url(#portfolioOptimizerTargetTooltipBorderGradient)"
+    (is (= "var(--optimizer-border-strong)"
            (node-attr (first (collect-nodes target-callout
                                             #(and (= :rect (first %))
-                                                  (= "portfolio-optimizer-frontier-callout-target-border"
+                                                  (= "portfolio-optimizer-frontier-callout-card"
                                                      (node-attr % :data-role)))))
-                      :fill)))
+                      :stroke)))
     (is (some? frontier-callout))
     (is (some? standalone-callout))
     (is (some? contribution-callout))
@@ -193,7 +193,7 @@
         "Contribution asset markers should use symbol text instead of triangle paths.")
     (is (empty? (collect-nodes view-node #(= :title (first %))))
         "SVG native title nodes should not create a second browser tooltip.")
-    (is (= "var(--optimizer-accent)"
+    (is (= "var(--optimizer-border-strong)"
            (node-attr (first (collect-nodes frontier-callout #(= :rect (first %)))) :stroke)))
     (is (= "none" (node-attr (first (collect-nodes standalone-callout #(= :rect (first %)))) :stroke)))
     (is (some? (first (collect-nodes standalone-callout #(= :line (first %)))))
@@ -202,33 +202,34 @@
         "Callouts should not intercept marker hover targets.")
     (is (= "end" (node-attr (text-node standalone-callout "40.00%") :text-anchor)))
     (is (nil? (node-attr (text-node standalone-callout "40.00%") :textAnchor)))
-    (is (= #{"Target"
-             "Expected Return"
-             "Volatility"
+    (is (= #{"TARGET"
+             "PORTFOLIO"
+             "μ · return"
+             "σ · vol"
              "Sharpe"
-             "Gross Exposure"
-             "Net Exposure"
+             "IMPLIED ALLOCATION"
+             "BTC"
+             "PURR"
              "18.00%"
              "42.00%"
              "0.43"
-             "37.00%"
-             "33.00%"}
+             "35.0%"
+             "-2.0%"}
            (set (collect-strings target-callout))))
     (is (not (contains? strings "Current Portfolio")))
     (is (not (contains? strings "Where you are now")))
-    (is (= #{"Frontier Point 2"
-             "Expected Return"
-             "Volatility"
+    (is (= #{"FRONTIER POINT 2"
+             "PORTFOLIO"
+             "μ · return"
+             "σ · vol"
              "Sharpe"
-             "ALLOCATIONS"
+             "IMPLIED ALLOCATION"
              "BTC"
              "PURR"
-             "Sum"
              "18.00%"
              "42.00%"
              "0.43"
-             "50.0%"
-             "100.0%"}
+             "50.0%"}
            (set (collect-strings frontier-callout))))
     (is (= #{"BTC"
              "Expected Return"
