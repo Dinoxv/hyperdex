@@ -6,6 +6,7 @@
 (def ^:private callout-margin 8)
 (def ^:private row-height 16)
 (def ^:private visible-allocation-count 6)
+(def ^:private allocation-label-max-chars 24)
 (def ^:private allocation-colors
   ["#e2b84f" "#2f80ed" "#7a8491" "#b26be5"
    "#35d7c7" "#83c44d" "#f59f43" "#ff6bb3"])
@@ -50,6 +51,22 @@
     (if (opt-format/finite-number? weight)
       (js/Math.abs weight)
       0)))
+
+(defn- compact-label
+  [label]
+  (let [label* (str/trim (str label))]
+    (if (<= (count label*) allocation-label-max-chars)
+      label*
+      (let [[_ lead suffix] (re-matches #"^(.+?)\s+(\([^)]+\))$" label*)]
+        (if (and lead suffix
+                 (< (count suffix) (- allocation-label-max-chars 4)))
+          (let [lead-limit (- allocation-label-max-chars
+                              (count suffix)
+                              4)]
+            (str (str/trim (subs lead 0 (max 0 lead-limit)))
+                 "... "
+                 suffix))
+          (str (subs label* 0 (- allocation-label-max-chars 3)) "..."))))))
 
 (defn- normalized-allocation-rows
   [allocations]
@@ -149,7 +166,8 @@
 (defn- allocation-row
   [idx start-y {:keys [label value color]}]
   (let [row-y (+ start-y (* row-height idx))
-        dot-y (- row-y 4)]
+        dot-y (- row-y 4)
+        label* (compact-label label)]
     [:g {:key (str "blended-allocation-row-" idx)}
      [:circle {:cx 13
                :cy dot-y
@@ -161,8 +179,11 @@
              :y row-y
              :fill "var(--optimizer-text)"
              :fontSize 10
-             :fontWeight 700}
-      label]
+             :fontWeight 700
+             :data-role (str "portfolio-optimizer-frontier-callout-allocation-label-"
+                             idx)
+             :data-full-label label}
+      label*]
      [:text {:x (- callout-width 10)
              :y row-y
              :fill "var(--optimizer-text)"

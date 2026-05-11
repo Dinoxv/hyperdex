@@ -72,3 +72,35 @@
                                        (some? (node-attr % :data-allocation-segment)))))))
     (is (= "#e2b84f" (node-attr first-segment :fill)))
     (is (= "#e2b84f" (node-attr first-dot :fill)))))
+
+(deftest blended-portfolio-callout-compacts-long-allocation-label-test
+  (let [callout (frontier-callout/callout
+                 {:bounds {:width 560 :height 340}
+                  :data-role "portfolio-optimizer-frontier-callout-target"
+                  :label "Target"
+                  :variant :blended
+                  :point {:x 120 :y 70}
+                  :rows (frontier-callout/point-rows
+                         {:expected-return 0.3214
+                          :volatility 0.5981
+                          :sharpe 0.542})
+                  :allocations {:rows [{:label "Hyperliquidity Provider (HLP)"
+                                         :weight 0.5
+                                         :value "50.0%"}
+                                        {:label "Growi HF"
+                                         :weight 0.464
+                                         :value "46.4%"}
+                                        {:label "BTC"
+                                         :weight 0.036
+                                         :value "3.6%"}]}})
+        long-label (node-by-role
+                    callout
+                    "portfolio-optimizer-frontier-callout-allocation-label-0")
+        value-node (text-node callout "50.0%")
+        strings (set (collect-strings callout))]
+    (is (= "Hyperliquidity... (HLP)"
+           (first (collect-strings long-label))))
+    (is (= "Hyperliquidity Provider (HLP)"
+           (node-attr long-label :data-full-label)))
+    (is (contains? strings "50.0%"))
+    (is (= "end" (node-attr value-node :text-anchor)))))
