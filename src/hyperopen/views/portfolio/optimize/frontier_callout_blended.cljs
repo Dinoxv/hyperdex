@@ -1,5 +1,6 @@
 (ns hyperopen.views.portfolio.optimize.frontier-callout-blended
   (:require [clojure.string :as str]
+            [hyperopen.views.asset-icon :as asset-icon]
             [hyperopen.views.portfolio.optimize.format :as opt-format]))
 
 (def ^:private callout-width 224)
@@ -44,6 +45,48 @@
 (defn- allocation-color
   [idx]
   (nth allocation-colors (mod idx (count allocation-colors))))
+
+(defn- vault-instrument?
+  [instrument-id]
+  (str/starts-with? (or (some-> instrument-id str) "") "vault:"))
+
+(defn- non-blank-text
+  [value]
+  (let [text (some-> value str str/trim)]
+    (when (seq text)
+      text)))
+
+(defn- base-symbol
+  [value]
+  (some-> value
+          non-blank-text
+          (str/replace #"^.*:" "")
+          (str/split #"/|-" 2)
+          first
+          non-blank-text))
+
+(defn- allocation-market
+  [{:keys [instrument-id label]}]
+  (let [instrument-id* (non-blank-text instrument-id)
+        [kind raw-coin] (when instrument-id*
+                          (str/split instrument-id* #":" 2))
+        market-type (case kind
+                      "spot" :spot
+                      "perp" :perp
+                      nil)
+        coin (or (non-blank-text raw-coin)
+                 (base-symbol label))
+        base (or (base-symbol coin)
+                 (base-symbol label))]
+    {:key instrument-id*
+     :coin coin
+     :symbol (or (when (= :spot market-type)
+                   (when base
+                     (str base "/USDC")))
+                 base
+                 label)
+     :base base
+     :market-type market-type}))
 
 (defn- allocation-weight-magnitude
   [row]
@@ -163,18 +206,52 @@
                    :fill "rgba(255, 255, 255, 0.08)"}]]
           segments)))
 
+(defn- allocation-symbol
+  [idx dot-y {:keys [color instrument-id] :as row}]
+  (let [symbol-size 7
+        symbol-half (/ symbol-size 2)
+        icon-url (when (and (some? instrument-id)
+                            (not (vault-instrument? instrument-id)))
+                   (asset-icon/market-icon-url (allocation-market row)))]
+    (cond
+      (vault-instrument? instrument-id)
+      [:rect {:x (- 13 3)
+              :y (- dot-y 3)
+              :width 6
+              :height 6
+              :fill "rgba(53, 215, 199, 0.16)"
+              :stroke "rgba(143, 252, 241, 0.78)"
+              :strokeWidth 1
+              :transform (str "rotate(45 13 " dot-y ")")
+              :data-role (str "portfolio-optimizer-frontier-callout-allocation-vault-diamond-"
+                              idx)}]
+
+      (seq icon-url)
+      [:image {:x (- 13 symbol-half)
+               :y (- dot-y symbol-half)
+               :width symbol-size
+               :height symbol-size
+               :href icon-url
+               :preserveAspectRatio "xMidYMid meet"
+               :aria-hidden true
+               :data-role (str "portfolio-optimizer-frontier-callout-allocation-symbol-"
+                               idx)}]
+
+      :else
+      [:circle {:cx 13
+                :cy dot-y
+                :r 3.5
+                :fill color
+                :data-role (str "portfolio-optimizer-frontier-callout-allocation-dot-"
+                                idx)}])))
+
 (defn- allocation-row
-  [idx start-y {:keys [label value color]}]
+  [idx start-y {:keys [label value] :as row}]
   (let [row-y (+ start-y (* row-height idx))
         dot-y (- row-y 4)
         label* (compact-label label)]
     [:g {:key (str "blended-allocation-row-" idx)}
-     [:circle {:cx 13
-               :cy dot-y
-               :r 3.5
-               :fill color
-               :data-role (str "portfolio-optimizer-frontier-callout-allocation-dot-"
-                               idx)}]
+     (allocation-symbol idx dot-y row)
      [:text {:x 22
              :y row-y
              :fill "var(--optimizer-text)"

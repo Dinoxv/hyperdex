@@ -73,6 +73,39 @@
     (is (= "#e2b84f" (node-attr first-segment :fill)))
     (is (= "#e2b84f" (node-attr first-dot :fill)))))
 
+(deftest blended-portfolio-callout-renders-allocation-symbols-test
+  (let [callout (frontier-callout/callout
+                 {:bounds {:width 560 :height 340}
+                  :data-role "portfolio-optimizer-frontier-callout-target"
+                  :label "Target"
+                  :variant :blended
+                  :point {:x 120 :y 70}
+                  :rows (frontier-callout/point-rows
+                         {:expected-return 0.146
+                          :volatility 0.12
+                          :sharpe 0.84})
+                  :allocations {:rows [{:label "BTC"
+                                         :instrument-id "perp:BTC"
+                                         :weight 0.54
+                                         :value "54.0%"}
+                                        {:label "Hyperliquidity Provider (HLP)"
+                                         :instrument-id "vault:0x1111111111111111111111111111111111111111"
+                                         :weight 0.46
+                                         :value "46.0%"}]}})
+        btc-symbol (node-by-role
+                    callout
+                    "portfolio-optimizer-frontier-callout-allocation-symbol-0")
+        vault-diamond (node-by-role
+                       callout
+                       "portfolio-optimizer-frontier-callout-allocation-vault-diamond-1")
+        first-dot (node-by-role
+                   callout
+                   "portfolio-optimizer-frontier-callout-allocation-dot-0")]
+    (is (= "https://app.hyperliquid.xyz/coins/BTC.svg"
+           (node-attr btc-symbol :href)))
+    (is (some? vault-diamond))
+    (is (nil? first-dot))))
+
 (deftest blended-portfolio-callout-compacts-long-allocation-label-test
   (let [callout (frontier-callout/callout
                  {:bounds {:width 560 :height 340}

@@ -73,6 +73,7 @@
                                       (not (zero? weight)))
                              {:label (allocation-label labels-by-instrument*
                                                        instrument-id)
+                              :instrument-id instrument-id
                               :weight weight
                               :value (opt-format/format-pct
                                       weight
