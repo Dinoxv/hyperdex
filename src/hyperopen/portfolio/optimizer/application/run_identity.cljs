@@ -1,39 +1,13 @@
-(ns hyperopen.portfolio.optimizer.application.run-identity)
-
-(def ^:private optimizer-input-keys
-  [:requested-universe
-   :universe
-   :current-portfolio
-   :return-model
-   :risk-model
-   :objective
-   :constraints
-   :execution-assumptions
-   :history
-   :black-litterman-prior])
-
-(defn- stable-execution-assumptions
-  [execution-assumptions]
-  (when (map? execution-assumptions)
-    (dissoc execution-assumptions :cost-contexts-by-id)))
-
-(defn- stable-history
-  [history]
-  (when (map? history)
-    (dissoc history :freshness)))
+(ns hyperopen.portfolio.optimizer.application.run-identity
+  (:require [hyperopen.portfolio.optimizer.contracts :as contracts]))
 
 (defn build-request-signature
   [request]
-  {:scenario-id (:scenario-id request)
-   :as-of-ms (:as-of-ms request)
-   :request request})
+  (contracts/build-request-signature request))
 
 (defn optimizer-input-signature
   [request]
-  (when (map? request)
-    (-> (select-keys request optimizer-input-keys)
-        (update :execution-assumptions stable-execution-assumptions)
-        (update :history stable-history))))
+  (contracts/optimizer-input-signature request))
 
 (defn matching-request?
   [request last-successful-run]
