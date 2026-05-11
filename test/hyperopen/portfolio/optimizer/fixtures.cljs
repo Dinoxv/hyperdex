@@ -257,7 +257,10 @@
    (let [instrument-ids ["perp:BTC" "perp:ETH" "spot:PURR"]
          target-weights [0.5 0.35 0.05]
          current-weights [0.45 0.3 0.05]
-         target-by-id (zipmap instrument-ids target-weights)]
+         target-by-id (zipmap instrument-ids target-weights)
+         expected-by-id {"perp:BTC" 0.14
+                         "perp:ETH" 0.1
+                         "spot:PURR" 0.12}]
      (with-overrides
       {:status :solved
        :scenario-id default-scenario-id
@@ -270,6 +273,7 @@
                               "spot:PURR" "PURR"}
        :target-weights-by-instrument target-by-id
        :current-weights-by-instrument (current-weights-by-instrument)
+       :expected-returns-by-instrument expected-by-id
        :dropped-weights []
        :current-expected-return 0.12
        :current-volatility 0.24

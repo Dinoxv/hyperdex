@@ -69,6 +69,10 @@
             "perp:ETH" 0.3
             "spot:PURR" 0.05}
            (:current-weights-by-instrument result)))
+    (is (= {"perp:BTC" 0.14
+            "perp:ETH" 0.1
+            "spot:PURR" 0.12}
+           (:expected-returns-by-instrument result)))
     (is (approx= 0.15 (get-in result [:diagnostics :turnover])))
     (is (= :ready (get-in result [:rebalance-preview :status])))
     (is (= 2 (get-in result [:rebalance-preview :summary :ready-count])))
