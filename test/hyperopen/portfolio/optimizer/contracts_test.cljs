@@ -1,7 +1,9 @@
 (ns hyperopen.portfolio.optimizer.contracts-test
   (:require [cljs.test :refer-macros [deftest is testing]]
             [clojure.spec.alpha :as s]
-            [hyperopen.portfolio.optimizer.contracts :as contracts]))
+            [hyperopen.portfolio.optimizer.contract-fixtures :as contract-fixtures]
+            [hyperopen.portfolio.optimizer.contracts :as contracts]
+            [hyperopen.portfolio.optimizer.fixtures :as optimizer-fixtures]))
 
 (def sample-request
   {:scenario-id "scn_contract"
@@ -52,6 +54,10 @@
                                         "perp:ETH" {:total 0.08}}
    :diagnostics {:weight-sensitivity-by-instrument {"perp:BTC" {:max-delta 0.01}}}
    :rebalance-preview {:trades []}})
+
+(defn- allowed?
+  [allowed status]
+  (contains? allowed status))
 
 (deftest state-paths-and-contract-specs-are-named-test
   (is (= [:portfolio :optimizer]
@@ -149,6 +155,19 @@
            :updated-at-ms 4000
            :snapshots []})))))
 
+(deftest v1-persisted-contract-fixtures-migrate-and-validate-test
+  (let [draft (contracts/migrate-draft contract-fixtures/v1-draft)
+        scenario (contracts/migrate-scenario-record
+                  contract-fixtures/v1-scenario-record)
+        tracking (contracts/migrate-tracking-record
+                  contract-fixtures/v1-tracking-record)]
+    (is (s/valid? ::contracts/draft draft)
+        (s/explain-str ::contracts/draft draft))
+    (is (s/valid? ::contracts/scenario-record scenario)
+        (s/explain-str ::contracts/scenario-record scenario))
+    (is (s/valid? ::contracts/tracking-record tracking)
+        (s/explain-str ::contracts/tracking-record tracking))))
+
 (deftest request-signature-canonicalizes-optimizer-inputs-test
   (let [signature (contracts/build-request-signature sample-request)
         changed-volatile (-> sample-request
@@ -225,6 +244,30 @@
                         (assoc sample-solved-result
                                :target-weights-by-instrument
                                {"perp:BTC" 0.6})))))
+
+(deftest result-payload-contract-accepts-real-solved-fixture-test
+  (let [payload (get-in (optimizer-fixtures/sample-scenario-state)
+                        [:portfolio
+                         :optimizer
+                         :last-successful-run
+                         :result])]
+    (is (= :solved (:status payload)))
+    (is (s/valid? ::contracts/result-payload payload)
+        (s/explain-str ::contracts/result-payload payload))))
+
+(deftest optimizer-contract-status-sets-cover-current-producers-test
+  (testing "draft statuses"
+    (doseq [status [:draft :saved :archived :tracking]]
+      (is (allowed? contracts/draft-statuses status))))
+  (testing "scenario record statuses"
+    (doseq [status [:saved :archived :executed :partially-executed :tracking :failed]]
+      (is (allowed? contracts/scenario-record-statuses status))))
+  (testing "tracking snapshot statuses"
+    (doseq [status [:tracked :not-trackable]]
+      (is (allowed? contracts/tracking-snapshot-statuses status))))
+  (testing "result payload statuses"
+    (doseq [status [:solved :infeasible :error :failed]]
+      (is (allowed? contracts/result-payload-statuses status)))))
 
 (deftest wire-codec-normalizes-worker-boundary-test
   (let [perp-id (keyword "perp:BTC")
