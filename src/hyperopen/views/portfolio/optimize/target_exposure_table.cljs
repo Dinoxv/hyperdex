@@ -1,5 +1,6 @@
 (ns hyperopen.views.portfolio.optimize.target-exposure-table
   (:require [clojure.string :as str]
+            [hyperopen.views.asset-icon :as asset-icon]
             [hyperopen.views.portfolio.optimize.format :as opt-format]))
 
 (defn- format-delta-pct
@@ -59,6 +60,75 @@
   (or (get labels-by-instrument instrument-id)
       (str instrument-id)))
 
+(defn- data-role-token
+  [value]
+  (-> (str value)
+      (str/replace #"[^A-Za-z0-9_-]+" "-")
+      (str/replace #"(^-+|-+$)" "")))
+
+(defn- vault-instrument?
+  [instrument-id]
+  (str/starts-with? (or (some-> instrument-id str) "") "vault:"))
+
+(defn- base-symbol
+  [value]
+  (some-> value
+          str
+          str/trim
+          (str/replace #"^.*:" "")
+          (str/split #"/|-" 2)
+          first
+          str/trim
+          not-empty))
+
+(defn- instrument-market
+  [labels-by-instrument instrument-id]
+  (let [instrument-id* (str instrument-id)
+        label (instrument-label labels-by-instrument instrument-id)
+        [kind raw-coin] (str/split instrument-id* #":" 2)
+        market-type (case kind
+                      "spot" :spot
+                      "perp" :perp
+                      nil)
+        coin (or (not-empty raw-coin)
+                 (base-symbol label))
+        base (or (base-symbol coin)
+                 (base-symbol label))]
+    {:key instrument-id*
+     :coin coin
+     :symbol (or (when (= :spot market-type)
+                   (when base
+                     (str base "/USDC")))
+                 base
+                 label)
+     :base base
+     :market-type market-type}))
+
+(defn- allocation-asset-icon
+  [asset labels-by-instrument rows]
+  (let [representative (or (some #(when-not (vault-instrument? (:instrument-id %)) %) rows)
+                           (first rows))
+        instrument-id (:instrument-id representative)
+        vault? (vault-instrument? instrument-id)
+        icon-url (when-not vault?
+                   (asset-icon/market-icon-url
+                    (instrument-market labels-by-instrument instrument-id)))]
+    [:span {:class ["inline-flex" "h-4" "w-4" "shrink-0" "items-center" "justify-center"]
+            :data-role (str "portfolio-optimizer-target-exposure-icon-"
+                            (data-role-token asset))
+            :aria-hidden true}
+     (if vault?
+       [:span {:class ["block" "h-2.5" "w-2.5" "rotate-45" "border" "border-cyan-300/70" "bg-cyan-300/15" "shadow-[0_0_6px_rgba(34,211,238,0.24)]"]
+               :data-role (str "portfolio-optimizer-target-exposure-vault-diamond-"
+                               (data-role-token asset))}]
+       (if (seq icon-url)
+         [:img {:class ["block" "h-4" "w-4" "rounded-full" "object-contain"]
+                :src icon-url
+                :alt ""
+                :data-role (str "portfolio-optimizer-target-exposure-asset-icon-img-"
+                                (data-role-token asset))}]
+         [:span {:class ["block" "h-3" "w-3" "rounded-full" "border" "border-base-300" "bg-base-200"]}]))]))
+
 (defn- leg-label
   [labels-by-instrument instrument-id current-weight target-weight]
   (let [value (str instrument-id)
@@ -72,12 +142,6 @@
                :else "perp long")
       "vault" (instrument-label labels-by-instrument instrument-id)
       value)))
-
-(defn- data-role-token
-  [value]
-  (-> (str value)
-      (str/replace #"[^A-Za-z0-9_-]+" "-")
-      (str/replace #"(^-+|-+$)" "")))
 
 (defn- exposure-row
   [idx labels-by-instrument binding-instrument-ids hidden? instrument-id capital-usd current-weight target-weight]
@@ -105,7 +169,7 @@
       (format-compact-usdc (- target-notional current-notional))]]))
 
 (defn- exposure-group-row
-  [asset capital-usd binding-instrument-ids rows]
+  [asset labels-by-instrument capital-usd binding-instrument-ids rows]
   (let [current-weight (reduce + 0 (map :current-weight rows))
         target-weight (reduce + 0 (map :target-weight rows))
         delta (- target-weight current-weight)
@@ -118,9 +182,11 @@
      [:td {:class ["w-5" "font-mono" "text-trading-muted/70"]}
       (when expandable? "▾")]
      [:td {:class ["font-mono" "font-semibold" "text-trading-text"]}
-      [:span {:data-role (str "portfolio-optimizer-target-exposure-group-"
-                              (data-role-token asset))}
-       asset]
+      [:span {:class ["inline-flex" "min-w-0" "items-center" "gap-2"]}
+       (allocation-asset-icon asset labels-by-instrument rows)
+       [:span {:data-role (str "portfolio-optimizer-target-exposure-group-"
+                               (data-role-token asset))}
+        asset]]
       (when binding?
         [:span {:class ["ml-2" "border" "border-warning/50" "px-1.5" "py-0.5"
                         "font-mono" "text-[0.5rem]" "font-semibold" "uppercase"
@@ -183,7 +249,7 @@
         (mapcat
          (fn [[asset asset-rows]]
            (concat
-            [(exposure-group-row asset capital-usd binding-instrument-ids asset-rows)]
+            [(exposure-group-row asset labels-by-instrument capital-usd binding-instrument-ids asset-rows)]
             (map (fn [{:keys [idx instrument-id current-weight target-weight]}]
                    (exposure-row idx
                                  labels-by-instrument

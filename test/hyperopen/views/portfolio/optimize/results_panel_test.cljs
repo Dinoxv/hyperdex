@@ -13,6 +13,10 @@
                    draft
                    {:stale? true
                     :frontier-overlay-mode :standalone})
+        btc-icon (node-by-role view-node
+                               "portfolio-optimizer-target-exposure-asset-icon-img-BTC")
+        purr-icon (node-by-role view-node
+                                "portfolio-optimizer-target-exposure-asset-icon-img-PURR")
         strings (set (collect-strings view-node))]
     (is (some? (node-by-role view-node "portfolio-optimizer-results-surface")))
     (is (some? (node-by-role view-node "portfolio-optimizer-stale-result-banner")))
@@ -28,6 +32,10 @@
     (is (some? (node-by-role view-node "portfolio-optimizer-frontier-svg")))
     (is (some? (node-by-role view-node "portfolio-optimizer-frontier-path")))
     (is (some? (node-by-role view-node "portfolio-optimizer-target-exposure-table")))
+    (is (= "https://app.hyperliquid.xyz/coins/BTC.svg"
+           (node-attr btc-icon :src)))
+    (is (= "https://app.hyperliquid.xyz/coins/PURR_spot.svg"
+           (node-attr purr-icon :src)))
     (is (some? (node-by-role view-node "portfolio-optimizer-result-warnings")))
     (is (some? (node-by-role view-node "portfolio-optimizer-diagnostics-panel")))
     (is (some? (node-by-role view-node "portfolio-optimizer-rebalance-preview")))

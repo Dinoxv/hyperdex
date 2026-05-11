@@ -23,6 +23,22 @@
   [node]
   (apply str (collect-strings node)))
 
+(defn- find-first-node
+  [node pred]
+  (cond
+    (vector? node)
+    (or (when (pred node) node)
+        (some #(find-first-node % pred) (node-children node)))
+
+    (seq? node)
+    (some #(find-first-node % pred) node)
+
+    :else nil))
+
+(defn- node-by-role
+  [node role]
+  (find-first-node node #(= role (get-in % [1 :data-role]))))
+
 (defn- solved-result
   [vault-id vault-label]
   (fixtures/sample-solved-result
@@ -70,8 +86,11 @@
                     :computed-at-ms 2600}
                    {:objective {:kind :target-volatility}}
                    {:frontier-overlay-mode :none})
+        diamond (node-by-role view-node
+                              "portfolio-optimizer-target-exposure-vault-diamond-HLP-Vault")
         text (node-text view-node)]
     (is (str/includes? text "HLP Vault"))
+    (is (some? diamond))
     (is (not (str/includes? text vault-id)))
     (is (not (str/includes? text vault-address)))))
 
