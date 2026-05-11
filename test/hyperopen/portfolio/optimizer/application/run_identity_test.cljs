@@ -55,3 +55,22 @@
         last-run {:request-signature (run-identity/build-request-signature run-request)
                   :result {:status :solved}}]
     (is (false? (run-identity/matching-request? changed-request last-run)))))
+
+(deftest completed-run-signature-keeps-result-current-after-input-drift-test
+  (let [run-request (request {})
+        request-signature (run-identity/build-request-signature run-request)
+        render-request (assoc-in run-request
+                                 [:current-portfolio :capital :nav-usdc]
+                                 2000)
+        last-run {:request-signature request-signature
+                  :result {:status :solved}}
+        ctx {:draft {:metadata {:dirty? false}}
+             :readiness {:request render-request}
+             :run-state {:status :succeeded
+                         :request-signature request-signature}
+             :running? false
+             :last-successful-run last-run}]
+    (is (run-identity/current-solved-run? ctx)
+        "The completed worker run should remain current when its own request signature matches the retained solved result.")
+    (is (false? (run-identity/stale-run? ctx))
+        "The detail route should not block a just-completed solved run because live inputs refreshed after completion.")))

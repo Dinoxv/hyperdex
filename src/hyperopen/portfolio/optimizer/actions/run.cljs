@@ -70,6 +70,7 @@
   (if (run-identity/current-solved-run?
        {:draft (get-in state [:portfolio :optimizer :draft])
         :readiness (setup-readiness/build-readiness state)
+        :run-state (get-in state [:portfolio :optimizer :run-state])
         :running? (optimizer-running? state)
         :last-successful-run (get-in state [:portfolio :optimizer :last-successful-run])})
     [[:effects/save-portfolio-optimizer-scenario]]

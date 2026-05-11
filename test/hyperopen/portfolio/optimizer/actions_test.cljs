@@ -263,6 +263,20 @@
                       (solved-run-for-state historical-state))))
         "A solved historical/max-sharpe result must not be saved as the active Black-Litterman scenario.")))
 
+(deftest save-portfolio-optimizer-scenario-from-current-allows-completed-run-after-snapshot-drift-test
+  (let [state (ready-optimizer-state {:kind :historical-mean})
+        solved-run (solved-run-for-state state)
+        state* (-> state
+                   (assoc-in [:portfolio :optimizer :run-state]
+                             {:status :succeeded
+                              :request-signature (:request-signature solved-run)})
+                   (assoc-in [:portfolio :optimizer :last-successful-run]
+                             solved-run)
+                   (assoc-in [:webdata2 :clearinghouseState :marginSummary :accountValue]
+                             "2000"))]
+    (is (= [[:effects/save-portfolio-optimizer-scenario]]
+           (actions/save-portfolio-optimizer-scenario-from-current state*)))))
+
 (deftest load-portfolio-optimizer-route-emits-scenario-read-effects-test
   (is (= [[:effects/load-portfolio-optimizer-scenario-index]]
          (actions/load-portfolio-optimizer-route

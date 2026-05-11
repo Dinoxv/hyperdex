@@ -212,6 +212,25 @@
             (node-by-role view-node
                           "portfolio-optimizer-recommendation-run-again"))))))
 
+(deftest portfolio-optimizer-scenario-detail-keeps-completed-result-after-snapshot-drift-test
+  (let [scenario-id "draft"
+        state (ready-scenario-state scenario-id {:kind :historical-mean})
+        solved-run (solved-run-for-state state)
+        view-node (portfolio-view/portfolio-view
+                   (-> state
+                       (assoc-in [:portfolio :optimizer :run-state :request-signature]
+                                 (:request-signature solved-run))
+                       (assoc-in [:portfolio :optimizer :last-successful-run]
+                                 solved-run)
+                       (assoc-in [:webdata2 :clearinghouseState :marginSummary :accountValue]
+                                 "2000")))
+        save-button (node-by-role view-node "portfolio-optimizer-scenario-save")]
+    (is (nil? (node-by-role view-node "portfolio-optimizer-scenario-stale-banner")))
+    (is (nil? (node-by-role view-node "portfolio-optimizer-recommendation-stale-blocked")))
+    (is (some? (node-by-role view-node "portfolio-optimizer-results-surface")))
+    (is (some? (node-by-role view-node "portfolio-optimizer-frontier-panel")))
+    (is (= false (get-in save-button [1 :disabled])))))
+
 (deftest portfolio-optimizer-inputs-tab-renders-read-only-audit-test
   (let [view-node (portfolio-view/portfolio-view
                    {:router {:path "/portfolio/optimize/scn_inputs"}

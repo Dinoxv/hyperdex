@@ -7,6 +7,7 @@ const DESIGN_REVIEW_VIEWPORTS = Object.freeze([
   { id: "review-1280", width: 1280, height: 900 },
   { id: "review-1440", width: 1440, height: 900 }
 ]);
+const OPTIMIZER_SPECTATE_ADDRESS = "0x162cc7c861ebd0c06b3d72319201150482518185";
 
 async function seedMarkets(page) {
   await page.evaluate(() => {
@@ -332,6 +333,37 @@ async function seedBlackLittermanPendingBtcRunState(page) {
     );
     c.reset_BANG_(store, state);
   });
+  await waitForIdle(page, { quietMs: 150, timeoutMs: 4_000, pollMs: 50 });
+}
+
+async function seedOptimizerAccountValue(page, accountValue) {
+  await page.evaluate(({ address, accountValue: value }) => {
+    const c = globalThis.cljs.core;
+    const kw = (name) => c.keyword(name);
+    const path = (...segments) =>
+      c.PersistentVector.fromArray(segments.map((segment) => kw(segment)), true);
+    const map = (entries) => c.PersistentArrayMap.fromArray(entries, true);
+    const opts = map([kw("keywordize-keys"), true]);
+    const spectateMode = map([
+      kw("active?"), true,
+      kw("address"), address,
+      kw("started-at-ms"), 1777046300000
+    ]);
+    const webdata = c.js__GT_clj(
+      {
+        clearinghouseState: {
+          marginSummary: { accountValue: value },
+          assetPositions: []
+        }
+      },
+      opts
+    );
+    const store = globalThis.hyperopen.system.store;
+    let state = c.deref(store);
+    state = c.assoc_in(state, path("account-context", "spectate-mode"), spectateMode);
+    state = c.assoc_in(state, path("webdata2"), webdata);
+    c.reset_BANG_(store, state);
+  }, { address: OPTIMIZER_SPECTATE_ADDRESS, accountValue });
   await waitForIdle(page, { quietMs: 150, timeoutMs: 4_000, pollMs: 50 });
 }
 
@@ -740,6 +772,7 @@ test("portfolio optimizer run applies a valid pending BTC view through the worke
   await visitOptimizerNew(page);
 
   await seedBlackLittermanPendingBtcRunState(page);
+  await seedOptimizerAccountValue(page, "1000");
 
   const panel = page.locator("[data-role='portfolio-optimizer-black-litterman-panel']");
   await expect(panel.locator("[data-role='portfolio-optimizer-black-litterman-preview-text']"))
@@ -782,9 +815,16 @@ test("portfolio optimizer run applies a valid pending BTC view through the worke
 
   await expect(page.locator("[data-role='portfolio-optimizer-view-weights']"))
     .toBeVisible();
+  await seedOptimizerAccountValue(page, "2000");
+  await expect(page.locator("[data-role='portfolio-optimizer-view-weights']"))
+    .toBeVisible();
   await page.locator("[data-role='portfolio-optimizer-view-weights']").click();
   await waitForIdle(page, { quietMs: 150, timeoutMs: 4_000, pollMs: 50 });
   await expect(page).toHaveURL(/\/portfolio\/optimize\/bl-draft-current/);
+  await expect(page.locator("[data-role='portfolio-optimizer-scenario-stale-banner']"))
+    .toHaveCount(0);
+  await expect(page.locator("[data-role='portfolio-optimizer-recommendation-stale-blocked']"))
+    .toHaveCount(0);
   await expect(page.locator("[data-role='portfolio-optimizer-results-surface']"))
     .toContainText("Allocation");
   await expect(page.locator("[data-role='portfolio-optimizer-frontier-panel']"))

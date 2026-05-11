@@ -102,6 +102,8 @@
   (run-identity/stale-run?
    {:draft (optimizer-draft state)
     :readiness readiness
+    :run-state (get-in state [:portfolio :optimizer :run-state])
+    :running? (optimizer-running? state)
     :last-successful-run (get-in state [:portfolio :optimizer :last-successful-run])}))
 
 (defn- current-result?
@@ -109,6 +111,7 @@
   (run-identity/current-solved-run?
    {:draft (optimizer-draft state)
     :readiness readiness
+    :run-state (get-in state [:portfolio :optimizer :run-state])
     :running? (optimizer-running? state)
     :last-successful-run (get-in state [:portfolio :optimizer :last-successful-run])}))
 
