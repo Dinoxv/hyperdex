@@ -1,8 +1,9 @@
-(ns hyperopen.portfolio.optimizer.defaults)
+(ns hyperopen.portfolio.optimizer.defaults
+  (:require [hyperopen.portfolio.optimizer.contracts :as contracts]))
 
 (defn default-draft
   []
-  {:schema-version 1
+  {:schema-version contracts/draft-schema-version
    :status :draft
    :name "Untitled Optimization"
    :universe []

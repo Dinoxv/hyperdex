@@ -1,4 +1,5 @@
-(ns hyperopen.portfolio.optimizer.application.scenario-records)
+(ns hyperopen.portfolio.optimizer.application.scenario-records
+  (:require [hyperopen.portfolio.optimizer.contracts :as contracts]))
 
 (defn- result-summary
   [saved-run & ks]
@@ -9,7 +10,7 @@
 
 (defn- with-saved-metadata
   [draft saved-at-ms]
-  (-> draft
+  (-> (contracts/migrate-draft draft)
       (assoc-in [:metadata :dirty?] false)
       (assoc-in [:metadata :saved-at-ms] saved-at-ms)
       (assoc-in [:metadata :updated-at-ms] saved-at-ms)))
@@ -21,7 +22,7 @@
                           :status :saved))
         created-at-ms (or (get-in draft [:metadata :created-at-ms])
                           saved-at-ms)]
-    {:schema-version 1
+    {:schema-version contracts/scenario-record-schema-version
      :id scenario-id
      :name (or (:name draft) "Untitled Optimization")
      :address address
@@ -33,7 +34,8 @@
 
 (defn scenario-summary
   [scenario-record]
-  (let [config (:config scenario-record)
+  (let [scenario-record (contracts/migrate-scenario-record scenario-record)
+        config (:config scenario-record)
         saved-run (:saved-run scenario-record)]
     (cond-> {:id (:id scenario-record)
              :name (:name scenario-record)
@@ -69,7 +71,7 @@
 
 (defn archive-scenario-record
   [scenario-record archived-at-ms]
-  (-> scenario-record
+  (-> (contracts/migrate-scenario-record scenario-record)
       (assoc :status :archived
              :updated-at-ms archived-at-ms)
       (assoc-in [:config :status] :archived)
@@ -78,7 +80,8 @@
 
 (defn duplicate-scenario-record
   [{:keys [source-record scenario-id duplicated-at-ms]}]
-  (let [copy-name (str "Copy of " (:name source-record))
+  (let [source-record (contracts/migrate-scenario-record source-record)
+        copy-name (str "Copy of " (:name source-record))
         config (-> (:config source-record)
                    (assoc :id scenario-id
                           :name copy-name
@@ -98,7 +101,8 @@
 
 (defn append-execution-ledger
   [scenario-record ledger]
-  (let [execution-status (:status ledger)
+  (let [scenario-record (contracts/migrate-scenario-record scenario-record)
+        execution-status (:status ledger)
         status (if (contains? execution-scenario-statuses execution-status)
                  execution-status
                  (:status scenario-record))
@@ -115,7 +119,7 @@
 
 (defn mark-tracking-enabled
   [scenario-record enabled-at-ms]
-  (-> scenario-record
+  (-> (contracts/migrate-scenario-record scenario-record)
       (assoc :status :tracking
              :updated-at-ms enabled-at-ms)
       (assoc-in [:config :status] :tracking)

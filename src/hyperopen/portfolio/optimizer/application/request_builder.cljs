@@ -1,6 +1,7 @@
 (ns hyperopen.portfolio.optimizer.application.request-builder
   (:require [clojure.string :as str]
             [hyperopen.portfolio.optimizer.application.history-loader :as history-loader]
+            [hyperopen.portfolio.optimizer.contracts :as contracts]
             [hyperopen.portfolio.optimizer.infrastructure.prior-data :as prior-data]))
 
 (def default-return-model
@@ -274,7 +275,7 @@
            as-of-ms
            stale-after-ms
            funding-periods-per-year]}]
-  (let [draft* (or draft {})
+  (let [draft* (contracts/migrate-draft draft)
         requested-universe (draft-universe draft*)
         normalized-return-model (normalize-return-model (:return-model draft*))
         return-model (:return-model normalized-return-model)

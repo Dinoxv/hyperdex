@@ -1,4 +1,5 @@
-(ns hyperopen.portfolio.optimizer.application.tracking)
+(ns hyperopen.portfolio.optimizer.application.tracking
+  (:require [hyperopen.portfolio.optimizer.contracts :as contracts]))
 
 (defn- finite-number?
   [value]
@@ -85,7 +86,8 @@
 
 (defn append-tracking-snapshot
   [tracking-record snapshot]
-  (let [scenario-id (:scenario-id snapshot)
+  (let [tracking-record (contracts/migrate-tracking-record tracking-record)
+        scenario-id (:scenario-id snapshot)
         snapshots (vec (:snapshots tracking-record))
         baseline-nav (some :nav-usdc snapshots)
         snapshot* (assoc snapshot
@@ -93,6 +95,7 @@
                          (realized-return baseline-nav
                                           (:nav-usdc snapshot)
                                           (:realized-return snapshot)))]
-    {:scenario-id scenario-id
+    {:schema-version contracts/tracking-record-schema-version
+     :scenario-id scenario-id
      :updated-at-ms (:as-of-ms snapshot*)
      :snapshots (conj snapshots snapshot*)}))
