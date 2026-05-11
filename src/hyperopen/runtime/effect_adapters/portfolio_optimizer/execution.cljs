@@ -1,6 +1,7 @@
 (ns hyperopen.runtime.effect-adapters.portfolio-optimizer.execution
   (:require [hyperopen.portfolio.optimizer.application.execution :as execution]
             [hyperopen.portfolio.optimizer.application.scenario-records :as scenario-records]
+            [hyperopen.portfolio.optimizer.contracts :as contracts]
             [hyperopen.runtime.effect-adapters.portfolio-optimizer-scenarios :as scenario-effects]))
 
 (defn- begin-execution-state
@@ -105,22 +106,22 @@
 
 (defn- apply-execution-ledger
   [state ledger]
-  (let [history (conj (vec (get-in state [:portfolio :optimizer :execution :history]))
+  (let [history (conj (vec (get-in state contracts/execution-history-path))
                       ledger)
         scenario-status (:status ledger)]
     (cond-> (-> state
-                (assoc-in [:portfolio :optimizer :execution]
+                (assoc-in contracts/execution-path
                           {:status scenario-status
                            :attempt nil
                            :history history
                            :error (when (= :failed scenario-status)
                                     {:message "Execution failed before any rows submitted."})})
-                (assoc-in [:portfolio :optimizer :execution-modal :submitting?] false)
-                (assoc-in [:portfolio :optimizer :execution-modal :error]
+                (assoc-in contracts/execution-modal-submitting-path false)
+                (assoc-in contracts/execution-modal-error-path
                           (when (= :failed scenario-status)
                             "Execution failed before any rows submitted.")))
       (contains? #{:executed :partially-executed} scenario-status)
-      (assoc-in [:portfolio :optimizer :active-scenario :status] scenario-status))))
+      (assoc-in contracts/active-scenario-status-path scenario-status))))
 
 (defn- refresh-after-execution!
   [dispatch! store address ledger]
@@ -132,9 +133,9 @@
 (defn- apply-execution-ledger-persistence
   [state scenario-index scenario-record]
   (-> state
-      (assoc-in [:portfolio :optimizer :scenario-index] scenario-index)
-      (assoc-in [:portfolio :optimizer :draft] (:config scenario-record))
-      (assoc-in [:portfolio :optimizer :active-scenario :status]
+      (assoc-in contracts/scenario-index-path scenario-index)
+      (assoc-in contracts/draft-path (:config scenario-record))
+      (assoc-in contracts/active-scenario-status-path
                 (:status scenario-record))))
 
 (defn- persist-execution-ledger!
@@ -163,7 +164,7 @@
                                       (scenario-records/refresh-scenario-index-summary
                                        (or loaded-index
                                            (get-in @store
-                                                   [:portfolio :optimizer :scenario-index])
+                                                   contracts/scenario-index-path)
                                            (scenario-effects/default-scenario-index))
                                        (scenario-records/scenario-summary updated-record))]
                                   (-> (save-scenario! scenario-id updated-record)
@@ -178,7 +179,7 @@
         (.catch persist-promise
                 (fn [err]
                   (swap! store assoc-in
-                         [:portfolio :optimizer :execution :persistence-error]
+                         contracts/execution-persistence-error-path
                          {:message (runtime-error-message err)})
                   ledger))))))
 
@@ -211,7 +212,7 @@
         (js/Promise.resolve ledger))
       (do
         (swap! store assoc-in
-               [:portfolio :optimizer :execution]
+               contracts/execution-path
                (begin-execution-state attempt started-at-ms))
         (-> (submit-execution-rows! submit-order! store address (:rows attempt))
             (.then (fn [rows]

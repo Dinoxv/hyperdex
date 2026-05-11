@@ -4,19 +4,20 @@
             [hyperopen.portfolio.optimizer.application.setup-readiness :as setup-readiness]
             [hyperopen.portfolio.optimizer.black-litterman-actions.common :as bl-common]
             [hyperopen.portfolio.optimizer.black-litterman-actions.editor-model :as bl-editor-model]
+            [hyperopen.portfolio.optimizer.contracts :as contracts]
             [hyperopen.portfolio.optimizer.query-state :as optimizer-query-state]
             [hyperopen.portfolio.routes :as portfolio-routes]))
 
 (defn set-portfolio-optimizer-results-tab
   [_state tab]
   [[:effects/save
-    [:portfolio-ui :optimizer :results-tab]
+    contracts/ui-results-tab-path
     (optimizer-query-state/normalize-results-tab tab)]
    [:effects/replace-shareable-route-query]])
 
 (defn load-portfolio-optimizer-history-from-draft
   [state]
-  (if (seq (get-in state [:portfolio :optimizer :draft :universe]))
+  (if (seq (get-in state contracts/draft-universe-path))
     [[:effects/load-portfolio-optimizer-history]]
     []))
 
@@ -45,7 +46,7 @@
 
 (defn run-portfolio-optimizer-from-draft
   [state]
-  (if (seq (get-in state [:portfolio :optimizer :draft :universe]))
+  (if (seq (get-in state contracts/draft-universe-path))
     (if (bl-common/black-litterman-return-model? state)
       (black-litterman-run-effects state)
       [(run-pipeline-effect)])
@@ -62,17 +63,17 @@
 
 (defn- optimizer-running?
   [state]
-  (or (= :running (get-in state [:portfolio :optimizer :run-state :status]))
-      (= :running (get-in state [:portfolio :optimizer :optimization-progress :status]))))
+  (or (= :running (get-in state contracts/run-state-status-path))
+      (= :running (get-in state contracts/optimization-progress-status-path))))
 
 (defn save-portfolio-optimizer-scenario-from-current
   [state]
   (if (run-identity/current-solved-run?
-       {:draft (get-in state [:portfolio :optimizer :draft])
+       {:draft (get-in state contracts/draft-path)
         :readiness (setup-readiness/build-readiness state)
-        :run-state (get-in state [:portfolio :optimizer :run-state])
+        :run-state (get-in state contracts/run-state-path)
         :running? (optimizer-running? state)
-        :last-successful-run (get-in state [:portfolio :optimizer :last-successful-run])})
+        :last-successful-run (get-in state contracts/last-successful-run-path)})
     [[:effects/save-portfolio-optimizer-scenario]]
     []))
 

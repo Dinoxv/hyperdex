@@ -1,5 +1,6 @@
 (ns hyperopen.runtime.effect-adapters.portfolio-optimizer-scenario-state
-  (:require [hyperopen.portfolio.optimizer.application.scenario-records :as scenario-records]))
+  (:require [hyperopen.portfolio.optimizer.application.scenario-records :as scenario-records]
+            [hyperopen.portfolio.optimizer.contracts :as contracts]))
 
 (defn error-message
   [err]
@@ -152,13 +153,13 @@
 (defn apply-scenario-save-success
   [state scenario-index scenario-record started-at-ms completed-at-ms]
   (-> state
-      (assoc-in [:portfolio :optimizer :draft] (:config scenario-record))
-      (assoc-in [:portfolio :optimizer :active-scenario]
+      (assoc-in contracts/draft-path (:config scenario-record))
+      (assoc-in contracts/active-scenario-path
                 {:loaded-id (:id scenario-record)
                  :status :saved
                  :read-only? false})
-      (assoc-in [:portfolio :optimizer :scenario-index] scenario-index)
-      (assoc-in [:portfolio :optimizer :scenario-save-state]
+      (assoc-in contracts/scenario-index-path scenario-index)
+      (assoc-in contracts/scenario-save-state-path
                 (saved-scenario-save-state (:id scenario-record)
                                            started-at-ms
                                            completed-at-ms))))
@@ -166,7 +167,7 @@
 (defn apply-scenario-save-error
   [state scenario-id started-at-ms completed-at-ms err]
   (assoc-in state
-            [:portfolio :optimizer :scenario-save-state]
+            contracts/scenario-save-state-path
             (failed-scenario-save-state scenario-id
                                         started-at-ms
                                         completed-at-ms
@@ -175,14 +176,14 @@
 (defn apply-scenario-index-load-success
   [state scenario-index started-at-ms completed-at-ms]
   (-> state
-      (assoc-in [:portfolio :optimizer :scenario-index] scenario-index)
-      (assoc-in [:portfolio :optimizer :scenario-index-load-state]
+      (assoc-in contracts/scenario-index-path scenario-index)
+      (assoc-in contracts/scenario-index-load-state-path
                 (loaded-scenario-index-load-state started-at-ms completed-at-ms))))
 
 (defn apply-scenario-index-load-error
   [state started-at-ms completed-at-ms err]
   (assoc-in state
-            [:portfolio :optimizer :scenario-index-load-state]
+            contracts/scenario-index-load-state-path
             (failed-scenario-index-load-state started-at-ms
                                              completed-at-ms
                                              err)))
@@ -197,22 +198,22 @@
                                 completed-at-ms))
   ([state scenario-id scenario-record tracking-record started-at-ms completed-at-ms]
    (let [scenario-index (scenario-records/refresh-scenario-index-summary
-                         (or (get-in state [:portfolio :optimizer :scenario-index])
+                         (or (get-in state contracts/scenario-index-path)
                              (default-scenario-index))
                          (scenario-records/scenario-summary scenario-record))]
      (-> state
-         (assoc-in [:portfolio :optimizer :draft] (:config scenario-record))
-         (assoc-in [:portfolio :optimizer :last-successful-run] (:saved-run scenario-record))
-         (assoc-in [:portfolio :optimizer :active-scenario]
+         (assoc-in contracts/draft-path (:config scenario-record))
+         (assoc-in contracts/last-successful-run-path (:saved-run scenario-record))
+         (assoc-in contracts/active-scenario-path
                    {:loaded-id scenario-id
                     :status (:status scenario-record)
                     :read-only? false})
-         (assoc-in [:portfolio :optimizer :scenario-index] scenario-index)
-         (assoc-in [:portfolio :optimizer :scenario-load-state]
+         (assoc-in contracts/scenario-index-path scenario-index)
+         (assoc-in contracts/scenario-load-state-path
                    (loaded-scenario-load-state scenario-id
                                                started-at-ms
                                                completed-at-ms))
-         (assoc-in [:portfolio :optimizer :tracking]
+         (assoc-in contracts/tracking-path
                    (if (map? tracking-record)
                      tracking-record
                      (cleared-tracking-state scenario-id)))))))
@@ -220,7 +221,7 @@
 (defn apply-scenario-load-not-found
   [state scenario-id started-at-ms completed-at-ms]
   (assoc-in state
-            [:portfolio :optimizer :scenario-load-state]
+            contracts/scenario-load-state-path
             (not-found-scenario-load-state scenario-id
                                            started-at-ms
                                            completed-at-ms)))
@@ -228,7 +229,7 @@
 (defn apply-scenario-load-error
   [state scenario-id started-at-ms completed-at-ms err]
   (assoc-in state
-            [:portfolio :optimizer :scenario-load-state]
+            contracts/scenario-load-state-path
             (failed-scenario-load-state scenario-id
                                         started-at-ms
                                         completed-at-ms
@@ -238,23 +239,23 @@
   [state scenario-index archived-record started-at-ms completed-at-ms]
   (let [scenario-id (:id archived-record)
         active? (= scenario-id
-                   (get-in state [:portfolio :optimizer :active-scenario :loaded-id]))]
+                   (get-in state contracts/active-scenario-loaded-id-path))]
     (cond-> (-> state
-                (assoc-in [:portfolio :optimizer :scenario-index] scenario-index)
-                (assoc-in [:portfolio :optimizer :scenario-archive-state]
+                (assoc-in contracts/scenario-index-path scenario-index)
+                (assoc-in contracts/scenario-archive-state-path
                           (archived-scenario-archive-state scenario-id
                                                            started-at-ms
                                                            completed-at-ms)))
       active?
-      (assoc-in [:portfolio :optimizer :active-scenario :status] :archived)
+      (assoc-in contracts/active-scenario-status-path :archived)
 
       active?
-      (assoc-in [:portfolio :optimizer :draft] (:config archived-record)))))
+      (assoc-in contracts/draft-path (:config archived-record)))))
 
 (defn apply-scenario-archive-error
   [state scenario-id started-at-ms completed-at-ms err]
   (assoc-in state
-            [:portfolio :optimizer :scenario-archive-state]
+            contracts/scenario-archive-state-path
             (failed-scenario-archive-state scenario-id
                                            started-at-ms
                                            completed-at-ms
@@ -263,8 +264,8 @@
 (defn apply-scenario-duplicate-success
   [state scenario-index duplicated-record source-scenario-id started-at-ms completed-at-ms]
   (-> state
-      (assoc-in [:portfolio :optimizer :scenario-index] scenario-index)
-      (assoc-in [:portfolio :optimizer :scenario-duplicate-state]
+      (assoc-in contracts/scenario-index-path scenario-index)
+      (assoc-in contracts/scenario-duplicate-state-path
                 (duplicated-scenario-duplicate-state source-scenario-id
                                                      (:id duplicated-record)
                                                      started-at-ms
@@ -273,7 +274,7 @@
 (defn apply-scenario-duplicate-error
   [state source-scenario-id started-at-ms completed-at-ms err]
   (assoc-in state
-            [:portfolio :optimizer :scenario-duplicate-state]
+            contracts/scenario-duplicate-state-path
             (failed-scenario-duplicate-state source-scenario-id
                                              started-at-ms
                                              completed-at-ms

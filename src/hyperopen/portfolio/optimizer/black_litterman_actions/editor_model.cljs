@@ -2,7 +2,8 @@
   (:require [hyperopen.portfolio.optimizer.application.return-inputs :as return-inputs]
             [hyperopen.portfolio.optimizer.application.setup-readiness :as setup-readiness]
             [hyperopen.portfolio.optimizer.black-litterman-actions.common :as common]
-            [hyperopen.portfolio.optimizer.black-litterman-actions.views :as views]))
+            [hyperopen.portfolio.optimizer.black-litterman-actions.views :as views]
+            [hyperopen.portfolio.optimizer.contracts :as contracts]))
 
 (def missing-view-error-message
   "Add a view before running Use my views.")
@@ -186,7 +187,7 @@
 
 (defn materialized-view-path-values
   [{:keys [kind draft views]}]
-  [[[:portfolio :optimizer :draft :return-model :views] views]
+  [[contracts/draft-return-model-views-path views]
    [(conj common/editor-path :drafts kind) (reset-draft-after-save draft)]
    [(conj common/editor-path :editing-view-id) nil]
    [(conj common/editor-path :errors) {}]

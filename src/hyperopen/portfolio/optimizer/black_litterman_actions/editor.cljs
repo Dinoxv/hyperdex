@@ -1,6 +1,7 @@
 (ns hyperopen.portfolio.optimizer.black-litterman-actions.editor
   (:require [hyperopen.portfolio.optimizer.black-litterman-actions.common :as common]
-            [hyperopen.portfolio.optimizer.black-litterman-actions.editor-model :as editor-model]))
+            [hyperopen.portfolio.optimizer.black-litterman-actions.editor-model :as editor-model]
+            [hyperopen.portfolio.optimizer.contracts :as contracts]))
 
 (defn set-portfolio-optimizer-black-litterman-editor-type
   [_state view-kind]
@@ -66,7 +67,7 @@
   (if (and (common/black-litterman-return-model? state)
            (seq (common/black-litterman-views state)))
     (common/save-draft-path-values
-     [[[:portfolio :optimizer :draft :return-model :views] []]
+     [[contracts/draft-return-model-views-path []]
       [(conj common/editor-path :clear-confirmation-open?) false]
       [(conj common/editor-path :editing-view-id) nil]
       [(conj common/editor-path :errors) {}]])

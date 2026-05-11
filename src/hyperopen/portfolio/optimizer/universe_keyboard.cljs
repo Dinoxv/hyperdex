@@ -1,5 +1,6 @@
 (ns hyperopen.portfolio.optimizer.universe-keyboard
-  (:require [clojure.string :as str]))
+  (:require [clojure.string :as str]
+            [hyperopen.portfolio.optimizer.contracts :as contracts]))
 
 (defn- non-blank-text
   [value]
@@ -27,20 +28,20 @@
   (let [market-keys* (normalize-market-keys market-keys)
         candidate-count (count market-keys*)
         active-index (bounded-active-index
-                      (get-in state [:portfolio-ui :optimizer :universe-search-active-index])
+                      (get-in state contracts/ui-universe-search-active-index-path)
                       candidate-count)]
     (case key
       "ArrowDown"
       (if (pos? candidate-count)
         [[:effects/save
-          [:portfolio-ui :optimizer :universe-search-active-index]
+          contracts/ui-universe-search-active-index-path
           (mod (inc active-index) candidate-count)]]
         [])
 
       "ArrowUp"
       (if (pos? candidate-count)
         [[:effects/save
-          [:portfolio-ui :optimizer :universe-search-active-index]
+          contracts/ui-universe-search-active-index-path
           (mod (dec active-index) candidate-count)]]
         [])
 

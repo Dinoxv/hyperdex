@@ -1,5 +1,6 @@
 (ns hyperopen.portfolio.optimizer.actions.draft
-  (:require [hyperopen.portfolio.optimizer.actions.common :as common]))
+  (:require [hyperopen.portfolio.optimizer.actions.common :as common]
+            [hyperopen.portfolio.optimizer.contracts :as contracts]))
 
 (def objective-models
   {:minimum-variance {:kind :minimum-variance}
@@ -73,19 +74,19 @@
 
 (defn set-portfolio-optimizer-objective-kind
   [_state kind]
-  (set-draft-model [:portfolio :optimizer :draft :objective]
+  (set-draft-model contracts/draft-objective-path
                    objective-models
                    kind))
 
 (defn set-portfolio-optimizer-return-model-kind
   [_state kind]
-  (set-draft-model [:portfolio :optimizer :draft :return-model]
+  (set-draft-model contracts/draft-return-model-path
                    return-models
                    kind))
 
 (defn set-portfolio-optimizer-risk-model-kind
   [_state kind]
-  (set-draft-model [:portfolio :optimizer :draft :risk-model]
+  (set-draft-model contracts/draft-risk-model-path
                    risk-models
                    kind))
 
@@ -94,8 +95,8 @@
   (if-let [{:keys [objective return-model]} (get setup-presets
                                                  (common/normalize-keyword-like preset))]
     (common/save-draft-path-values
-     [[[:portfolio :optimizer :draft :objective] objective]
-      [[:portfolio :optimizer :draft :return-model] return-model]])
+     [[contracts/draft-objective-path objective]
+      [contracts/draft-return-model-path return-model]])
     []))
 
 (defn set-portfolio-optimizer-constraint
@@ -111,7 +112,7 @@
                  :else nil)]
     (if (some? value*)
       (common/save-draft-path-values
-       [[[:portfolio :optimizer :draft :constraints constraint-key*] value*]])
+       [[(conj contracts/draft-constraints-path constraint-key*) value*]])
       [])))
 
 (defn set-portfolio-optimizer-objective-parameter
@@ -121,7 +122,7 @@
                  (common/parse-number-value value))]
     (if (some? value*)
       (common/save-draft-path-values
-       [[[:portfolio :optimizer :draft :objective parameter-key*] value*]])
+       [[(conj contracts/draft-objective-path parameter-key*) value*]])
       [])))
 
 (defn set-portfolio-optimizer-execution-assumption
@@ -143,7 +144,7 @@
     (if (or (some? value*)
             manual-capital-clear?)
       (common/save-draft-path-values
-       [[[:portfolio :optimizer :draft :execution-assumptions assumption-key*] value*]])
+       [[(conj contracts/draft-execution-assumptions-path assumption-key*) value*]])
       [])))
 
 (defn set-portfolio-optimizer-instrument-filter
@@ -155,7 +156,7 @@
              instrument-id*
              (some? enabled?*))
       (common/save-draft-path-values
-       [[[:portfolio :optimizer :draft :constraints filter-key*]
+       [[(conj contracts/draft-constraints-path filter-key*)
          (common/set-membership
           (common/constraint-list state filter-key*)
           instrument-id*
@@ -175,7 +176,10 @@
            (= :max-weight override-key*)
            (some? numeric-value))
       (common/save-draft-path-values
-       [[[:portfolio :optimizer :draft :constraints :asset-overrides instrument-id* :max-weight]
+       [[(conj contracts/draft-constraints-path
+               :asset-overrides
+               instrument-id*
+               :max-weight)
          numeric-value]])
 
       (and instrument-id*
@@ -183,14 +187,17 @@
            (= :perp (common/instrument-market-type state instrument-id*))
            (some? numeric-value))
       (common/save-draft-path-values
-       [[[:portfolio :optimizer :draft :constraints :perp-leverage instrument-id* :max-weight]
+       [[(conj contracts/draft-constraints-path
+               :perp-leverage
+               instrument-id*
+               :max-weight)
          numeric-value]])
 
       (and instrument-id*
            (= :held-lock? override-key*)
            (some? boolean-value))
       (common/save-draft-path-values
-       [[[:portfolio :optimizer :draft :constraints :held-locks]
+       [[(conj contracts/draft-constraints-path :held-locks)
          (common/set-membership
           (common/constraint-list state :held-locks)
           instrument-id*

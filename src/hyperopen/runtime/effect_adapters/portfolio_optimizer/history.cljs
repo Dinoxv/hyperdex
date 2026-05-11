@@ -1,5 +1,6 @@
 (ns hyperopen.runtime.effect-adapters.portfolio-optimizer.history
-  (:require [hyperopen.portfolio.optimizer.application.history-prefetch :as history-prefetch]))
+  (:require [hyperopen.portfolio.optimizer.application.history-prefetch :as history-prefetch]
+            [hyperopen.portfolio.optimizer.contracts :as contracts]))
 
 (def ^:private default-funding-window-ms
   (* 365 24 60 60 1000))
@@ -22,7 +23,7 @@
 
 (defn- optimizer-runtime
   [state]
-  (get-in state [:portfolio :optimizer :runtime]))
+  (get-in state contracts/runtime-path))
 
 (defn- history-request
   [env state opts]
@@ -31,7 +32,7 @@
         now-ms (or (:now-ms opts*)
                    (:as-of-ms runtime)
                    ((:now-ms env)))]
-    (merge {:universe (get-in state [:portfolio :optimizer :draft :universe])
+    (merge {:universe (get-in state contracts/draft-universe-path)
             :interval :1d
             :bars 365
             :priority :high
@@ -80,22 +81,22 @@
 (defn- apply-history-success
   [state signature completed-at-ms bundle]
   (if (= signature
-         (get-in state [:portfolio :optimizer :history-load-state :request-signature]))
-    (let [current-state (get-in state [:portfolio :optimizer :history-load-state])]
+         (get-in state contracts/history-load-state-request-signature-path))
+    (let [current-state (get-in state contracts/history-load-state-path)]
       (-> state
-          (assoc-in [:portfolio :optimizer :history-data]
+          (assoc-in contracts/history-data-path
                     (assoc bundle :loaded-at-ms completed-at-ms))
-          (assoc-in [:portfolio :optimizer :history-load-state]
+          (assoc-in contracts/history-load-state-path
                     (success-history-load-state current-state completed-at-ms bundle))))
     state))
 
 (defn- apply-history-error
   [state signature completed-at-ms err]
   (if (= signature
-         (get-in state [:portfolio :optimizer :history-load-state :request-signature]))
-    (let [current-state (get-in state [:portfolio :optimizer :history-load-state])]
+         (get-in state contracts/history-load-state-request-signature-path))
+    (let [current-state (get-in state contracts/history-load-state-path)]
       (assoc-in state
-                [:portfolio :optimizer :history-load-state]
+                contracts/history-load-state-path
                 (failed-history-load-state current-state completed-at-ms err)))
     state))
 
@@ -127,9 +128,9 @@
 (defn- begin-selection-prefetch
   [state instrument-id* signature started-at-ms]
   (-> state
-      (assoc-in [:portfolio :optimizer :history-load-state]
+      (assoc-in contracts/history-load-state-path
                 (begin-history-load-state signature started-at-ms))
-      (update-in [:portfolio :optimizer :history-prefetch]
+      (update-in contracts/history-prefetch-path
                  (fn [prefetch-state]
                    (-> (merge history-prefetch/default-state prefetch-state)
                        (assoc :active-instrument-id instrument-id*)
@@ -153,7 +154,7 @@
 (defn- current-universe-ids
   [state]
   (keep :instrument-id
-        (get-in state [:portfolio :optimizer :draft :universe])))
+        (get-in state contracts/draft-universe-path)))
 
 (defn- apply-selection-prefetch-success
   [state instrument-id* signature completed-at-ms bundle]
@@ -163,36 +164,33 @@
         selected? (history-prefetch/instrument-selected? state instrument-id*)
         current-signature? (= signature
                               (get-in state
-                                      [:portfolio
-                                       :optimizer
-                                       :history-load-state
-                                       :request-signature]))
+                                      contracts/history-load-state-request-signature-path))
         status (history-prefetch/succeeded-status
                 (:started-at-ms current-status)
                 completed-at-ms
                 (:warnings bundle))]
     (cond-> state
       (and selected? current-signature?)
-      (update-in [:portfolio :optimizer :history-data]
+      (update-in contracts/history-data-path
                  merge-history-bundle
                  bundle
                  completed-at-ms)
 
       current-signature?
-      (assoc-in [:portfolio :optimizer :history-load-state]
+      (assoc-in contracts/history-load-state-path
                 (success-history-load-state
-                 (get-in state [:portfolio :optimizer :history-load-state])
+                 (get-in state contracts/history-load-state-path)
                  completed-at-ms
                  bundle))
 
       :always
-      (update-in [:portfolio :optimizer :history-prefetch]
+      (update-in contracts/history-prefetch-path
                  finish-selection-prefetch-state
                  instrument-id*
                  status)
 
       :always
-      (update-in [:portfolio :optimizer :history-prefetch]
+      (update-in contracts/history-prefetch-path
                  history-prefetch/cleanup-to-instrument-ids
                  (current-universe-ids state)))))
 
@@ -201,7 +199,7 @@
   (let [current-prefetch-state (history-prefetch/prefetch-state state)
         current-status (get-in current-prefetch-state
                                [:by-instrument-id instrument-id*])
-        current-load-state (get-in state [:portfolio :optimizer :history-load-state])
+        current-load-state (get-in state contracts/history-load-state-path)
         current-signature? (= signature (:request-signature current-load-state))
         status (history-prefetch/failed-status
                 (:started-at-ms current-status)
@@ -209,17 +207,17 @@
                 {:message (error-message err)})]
     (cond-> state
       current-signature?
-      (assoc-in [:portfolio :optimizer :history-load-state]
+      (assoc-in contracts/history-load-state-path
                 (failed-history-load-state current-load-state completed-at-ms err))
 
       :always
-      (update-in [:portfolio :optimizer :history-prefetch]
+      (update-in contracts/history-prefetch-path
                  finish-selection-prefetch-state
                  instrument-id*
                  status)
 
       :always
-      (update-in [:portfolio :optimizer :history-prefetch]
+      (update-in contracts/history-prefetch-path
                  history-prefetch/cleanup-to-instrument-ids
                  (current-universe-ids state)))))
 
@@ -292,10 +290,10 @@
        (selection-prefetch? opts*)
        (drain-selection-prefetch! env store opts*)
 
-       (seq (:universe request))
-       (do
-         (swap! store assoc-in
-                [:portfolio :optimizer :history-load-state]
+      (seq (:universe request))
+      (do
+        (swap! store assoc-in
+                contracts/history-load-state-path
                 (begin-history-load-state signature started-at-ms))
          (-> (request-history-bundle! env on-progress request)
              (.then (fn [bundle]

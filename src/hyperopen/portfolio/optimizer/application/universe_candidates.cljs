@@ -1,6 +1,7 @@
 (ns hyperopen.portfolio.optimizer.application.universe-candidates
   (:require [clojure.string :as str]
-            [hyperopen.asset-selector.query :as asset-query]))
+            [hyperopen.asset-selector.query :as asset-query]
+            [hyperopen.portfolio.optimizer.contracts :as contracts]))
 
 (def ^:private default-candidate-limit
   6)
@@ -310,7 +311,7 @@
   (if-not (seq markets)
     0
     (let [last-index (dec (count markets))
-          idx (or (some-> (get-in state [:portfolio-ui :optimizer :universe-search-active-index])
+          idx (or (some-> (get-in state contracts/ui-universe-search-active-index-path)
                           finite-number
                           js/Math.floor)
                   0)]

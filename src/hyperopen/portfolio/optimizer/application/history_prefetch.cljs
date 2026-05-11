@@ -1,5 +1,6 @@
 (ns hyperopen.portfolio.optimizer.application.history-prefetch
-  (:require [hyperopen.portfolio.optimizer.application.history-loader.instruments :as instruments]))
+  (:require [hyperopen.portfolio.optimizer.application.history-loader.instruments :as instruments]
+            [hyperopen.portfolio.optimizer.contracts :as contracts]))
 
 (def default-state
   {:queue []
@@ -15,7 +16,7 @@
 (defn prefetch-state
   [state]
   (merge default-state
-         (get-in state [:portfolio :optimizer :history-prefetch])))
+         (get-in state contracts/history-prefetch-path)))
 
 (defn instrument-id
   [instrument]
@@ -23,7 +24,7 @@
 
 (defn- history-data
   [state]
-  (get-in state [:portfolio :optimizer :history-data]))
+  (get-in state contracts/history-data-path))
 
 (defn- rows-present?
   [value]
@@ -152,7 +153,7 @@
    (prefetch-state state)
    (remove #{instrument-id*}
            (concat (map instrument-id
-                        (get-in state [:portfolio :optimizer :draft :universe]))
+                        (get-in state contracts/draft-universe-path))
                    (keys (:by-instrument-id (prefetch-state state)))))))
 
 (defn first-queued-instrument
@@ -163,4 +164,4 @@
   [state instrument-id*]
   (boolean
    (some #(= instrument-id* (:instrument-id %))
-         (get-in state [:portfolio :optimizer :draft :universe]))))
+         (get-in state contracts/draft-universe-path))))
