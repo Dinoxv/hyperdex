@@ -35,17 +35,55 @@
    :execution-assumptions {:default-order-type :market}
    :metadata {:dirty? false}})
 
+(def sample-solved-result
+  {:status :solved
+   :scenario-id "scn_contract"
+   :as-of-ms 5000
+   :instrument-ids ["perp:BTC" "perp:ETH"]
+   :target-weights [0.6 0.4]
+   :current-weights [0.5 0.5]
+   :target-weights-by-instrument {"perp:BTC" 0.6
+                                  "perp:ETH" 0.4}
+   :current-weights-by-instrument {"perp:BTC" 0.5
+                                   "perp:ETH" 0.5}
+   :expected-returns-by-instrument {"perp:BTC" 0.12
+                                    "perp:ETH" 0.08}
+   :return-decomposition-by-instrument {"perp:BTC" {:total 0.12}
+                                        "perp:ETH" {:total 0.08}}
+   :diagnostics {:weight-sensitivity-by-instrument {"perp:BTC" {:max-delta 0.01}}}
+   :rebalance-preview {:trades []}})
+
 (deftest state-paths-and-contract-specs-are-named-test
   (is (= [:portfolio :optimizer]
          contracts/optimizer-path))
   (is (= [:portfolio :optimizer :draft]
          contracts/draft-path))
+  (is (= [:portfolio :optimizer :draft :return-model]
+         contracts/draft-return-model-path))
+  (is (= [:portfolio :optimizer :draft :return-model :views]
+         contracts/draft-return-model-views-path))
+  (is (= [:portfolio :optimizer :draft :metadata :dirty?]
+         contracts/draft-dirty-path))
   (is (= [:portfolio :optimizer :run-state]
          contracts/run-state-path))
+  (is (= [:portfolio :optimizer :last-successful-run :result]
+         contracts/last-successful-run-result-path))
+  (is (= [:portfolio :optimizer :history-load-state :request-signature]
+         contracts/history-load-state-request-signature-path))
+  (is (= [:portfolio :optimizer :execution-modal :error]
+         contracts/execution-modal-error-path))
   (is (= [:portfolio :optimizer :tracking]
          contracts/tracking-path))
+  (is (= [:portfolio :optimizer :tracking :error]
+         contracts/tracking-error-path))
   (is (= [:portfolio-ui :optimizer]
          contracts/optimizer-ui-path))
+  (is (= [:portfolio-ui :optimizer :results-tab]
+         contracts/ui-results-tab-path))
+  (is (= [:portfolio-ui :optimizer :black-litterman-editor]
+         contracts/ui-black-litterman-editor-path))
+  (is (= [:portfolio-ui :optimizer :frontier-overlay-mode]
+         contracts/ui-frontier-overlay-mode-path))
   (is (= ::contracts/draft
          (:optimizer/draft contracts/contract-specs)))
   (is (= ::contracts/request-signature
@@ -82,6 +120,35 @@
       (is (= record (contracts/migrate-tracking-record record)))
       (is (s/valid? ::contracts/tracking-record record)))))
 
+(deftest future-version-migrations-fail-until-format-changes-test
+  (testing "current optimizer persisted contracts are still version 1"
+    (is (= 1 contracts/draft-schema-version))
+    (is (= 1 contracts/scenario-record-schema-version))
+    (is (= 1 contracts/tracking-record-schema-version)))
+  (testing "unsupported future versions fail loudly until a real migration exists"
+    (is (thrown-with-msg?
+         js/Error
+         #"Unsupported optimizer draft schema version"
+         (contracts/migrate-draft (assoc sample-draft :schema-version 2))))
+    (is (thrown-with-msg?
+         js/Error
+         #"Unsupported optimizer scenario record schema version"
+         (contracts/migrate-scenario-record
+          {:schema-version 2
+           :id "scn_contract"
+           :name "Contract Scenario"
+           :status :saved
+           :config (contracts/migrate-draft sample-draft)
+           :updated-at-ms 3000})))
+    (is (thrown-with-msg?
+         js/Error
+         #"Unsupported optimizer tracking record schema version"
+         (contracts/migrate-tracking-record
+          {:schema-version 2
+           :scenario-id "scn_contract"
+           :updated-at-ms 4000
+           :snapshots []})))))
+
 (deftest request-signature-canonicalizes-optimizer-inputs-test
   (let [signature (contracts/build-request-signature sample-request)
         changed-volatile (-> sample-request
@@ -107,6 +174,57 @@
     (is (not= (:input-signature signature)
               (contracts/optimizer-input-signature changed-model)))
     (is (s/valid? ::contracts/request-signature signature))))
+
+(deftest specs-reject-malformed-stabilized-contracts-test
+  (testing "draft maps require the stabilized draft shapes"
+    (let [draft (contracts/migrate-draft sample-draft)]
+      (is (false? (s/valid? ::contracts/draft
+                            (assoc draft :universe {"perp:BTC" true}))))
+      (is (false? (s/valid? ::contracts/draft
+                            (assoc draft :status :unknown))))
+      (is (false? (s/valid? ::contracts/draft
+                            (assoc draft :constraints []))))))
+  (testing "request signatures must be canonical for their request"
+    (is (false? (s/valid? ::contracts/request-signature
+                          (assoc (contracts/build-request-signature sample-request)
+                                 :input-signature
+                                 {:return-model {:kind :not-the-request}})))))
+  (testing "scenario and tracking records reject unknown lifecycle statuses"
+    (let [draft (contracts/migrate-draft sample-draft)]
+      (is (false? (s/valid? ::contracts/scenario-record
+                            {:schema-version contracts/scenario-record-schema-version
+                             :id "scn_contract"
+                             :name "Contract Scenario"
+                             :status :missing
+                             :config draft
+                             :updated-at-ms 3000}))))
+    (is (false? (s/valid? ::contracts/tracking-snapshot
+                          {:scenario-id "scn_contract"
+                           :as-of-ms 4000
+                           :status :missing})))
+    (is (false? (s/valid? ::contracts/tracking-record
+                          {:schema-version contracts/tracking-record-schema-version
+                           :scenario-id "scn_contract"
+                           :updated-at-ms 4000
+                           :snapshots [{:scenario-id "scn_contract"
+                                        :as-of-ms 4000
+                                        :status :missing}]})))))
+
+(deftest result-payload-contract-validates-solved-payloads-test
+  (is (s/valid? ::contracts/result-payload sample-solved-result))
+  (is (s/valid? ::contracts/result-payload
+                {:status :infeasible
+                 :reason :insufficient-history}))
+  (is (false? (s/valid? ::contracts/result-payload
+                        {:status :solved})))
+  (is (false? (s/valid? ::contracts/result-payload
+                        (assoc sample-solved-result
+                               :target-weights
+                               [0.6]))))
+  (is (false? (s/valid? ::contracts/result-payload
+                        (assoc sample-solved-result
+                               :target-weights-by-instrument
+                               {"perp:BTC" 0.6})))))
 
 (deftest wire-codec-normalizes-worker-boundary-test
   (let [perp-id (keyword "perp:BTC")

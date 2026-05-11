@@ -1,7 +1,8 @@
 (ns hyperopen.runtime.effect-adapters.portfolio-optimizer-pipeline
   (:require [hyperopen.portfolio.optimizer.application.progress :as progress]
             [hyperopen.portfolio.optimizer.application.run-identity :as run-identity]
-            [hyperopen.portfolio.optimizer.application.setup-readiness :as setup-readiness]))
+            [hyperopen.portfolio.optimizer.application.setup-readiness :as setup-readiness]
+            [hyperopen.portfolio.optimizer.contracts :as contracts]))
 
 (defn- error-message
   [err]
@@ -17,14 +18,14 @@
 
 (defn- current-progress
   [state]
-  (get-in state [:portfolio :optimizer :optimization-progress]))
+  (get-in state contracts/optimization-progress-path))
 
 (defn- update-progress
   [state run-id f & args]
   (let [progress-state (current-progress state)]
     (if (= run-id (:run-id progress-state))
       (assoc-in state
-                [:portfolio :optimizer :optimization-progress]
+                contracts/optimization-progress-path
                 (apply f progress-state args))
       state)))
 
@@ -39,7 +40,7 @@
 (defn- begin-pipeline-progress!
   [now-ms store run-id request]
   (swap! store assoc-in
-         [:portfolio :optimizer :optimization-progress]
+         contracts/optimization-progress-path
          (progress/begin-progress {:run-id run-id
                                    :scenario-id (:scenario-id request)
                                    :request request
@@ -83,9 +84,9 @@
 (defn- selection-prefetch-loading?
   [state]
   (and (= :loading
-          (get-in state [:portfolio :optimizer :history-load-state :status]))
+          (get-in state contracts/history-load-state-status-path))
        (some? (get-in state
-                      [:portfolio :optimizer :history-prefetch :active-instrument-id]))))
+                      contracts/history-prefetch-active-instrument-id-path))))
 
 (defn- wait-for-history-load-idle!
   [store {:keys [poll-ms timeout-ms]
@@ -140,7 +141,7 @@
 (defn run-portfolio-optimizer-pipeline-effect
   [{:keys [now-ms next-run-id request-run! load-history!] :as env} _ store]
   (let [state @store
-        draft (get-in state [:portfolio :optimizer :draft])
+        draft (get-in state contracts/draft-path)
         universe (vec (:universe draft))
         initial-readiness (setup-readiness/build-readiness state)
         initial-request (or (:request initial-readiness)

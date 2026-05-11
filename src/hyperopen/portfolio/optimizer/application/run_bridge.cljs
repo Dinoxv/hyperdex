@@ -1,5 +1,6 @@
 (ns hyperopen.portfolio.optimizer.application.run-bridge
   (:require [hyperopen.portfolio.optimizer.application.progress :as progress]
+            [hyperopen.portfolio.optimizer.contracts :as contracts]
             [hyperopen.portfolio.optimizer.infrastructure.worker-client :as worker-client]
             [hyperopen.system :as system]))
 
@@ -18,11 +19,11 @@
 
 (defn- run-state
   [state]
-  (get-in state [:portfolio :optimizer :run-state]))
+  (get-in state contracts/run-state-path))
 
 (defn- active-scenario-id
   [state]
-  (get-in state [:portfolio :optimizer :active-scenario :loaded-id]))
+  (get-in state contracts/active-scenario-loaded-id-path))
 
 (defn- stale-message?
   [state id]
@@ -55,7 +56,7 @@
       (reset! last-run-request {:request-signature request-signature
                                 :run-id run-id})
       (swap! store* assoc-in
-             [:portfolio :optimizer :run-state]
+             contracts/run-state-path
              (start-run-state {:run-id run-id
                                :scenario-id scenario-id
                                :request-signature request-signature
@@ -65,14 +66,14 @@
 
 (defn- current-progress
   [state]
-  (get-in state [:portfolio :optimizer :optimization-progress]))
+  (get-in state contracts/optimization-progress-path))
 
 (defn- update-progress
   [state id f & args]
   (let [progress-state (current-progress state)]
     (if (= id (:run-id progress-state))
       (assoc-in state
-                [:portfolio :optimizer :optimization-progress]
+                contracts/optimization-progress-path
                 (apply f progress-state args))
       state)))
 
@@ -116,14 +117,14 @@
       (if (= :solved (:status payload))
         (let [scenario-id (:scenario-id current-run)]
           (-> state
-              (assoc-in [:portfolio :optimizer :run-state]
+              (assoc-in contracts/run-state-path
                         (success-run-state current-run computed-at-ms))
-              (assoc-in [:portfolio :optimizer :last-successful-run]
+              (assoc-in contracts/last-successful-run-path
                         {:request-signature (:request-signature current-run)
                          :result payload
                          :computed-at-ms computed-at-ms})
-              (assoc-in [:portfolio :optimizer :draft :metadata :dirty?] false)
-              (update-in [:portfolio :optimizer :active-scenario]
+              (assoc-in contracts/draft-dirty-path false)
+              (update-in contracts/active-scenario-path
                          (fn [active-scenario]
                            (cond-> (assoc (or active-scenario {})
                                           :status :computed
@@ -131,7 +132,7 @@
                              scenario-id (assoc :loaded-id scenario-id))))
               (update-progress id progress/succeed-progress computed-at-ms)))
         (-> state
-            (assoc-in [:portfolio :optimizer :run-state]
+            (assoc-in contracts/run-state-path
                       (non-solved-run-state current-run computed-at-ms payload))
             (update-progress id progress/fail-progress computed-at-ms payload))))))
 
@@ -140,7 +141,7 @@
   (if (stale-message? state id)
     state
     (-> state
-        (assoc-in [:portfolio :optimizer :run-state]
+        (assoc-in contracts/run-state-path
                   (failed-run-state (run-state state) computed-at-ms payload))
         (update-progress id progress/fail-progress computed-at-ms payload))))
 

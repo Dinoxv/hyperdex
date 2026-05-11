@@ -1,5 +1,6 @@
 (ns hyperopen.portfolio.optimizer.query-state
-  (:require [clojure.string :as str]))
+  (:require [clojure.string :as str]
+            [hyperopen.portfolio.optimizer.contracts :as contracts]))
 
 (def owned-query-keys
   #{"ofilter" "osort" "oview" "otab" "odiag"})
@@ -140,23 +141,23 @@
   (let [query-state* (or query-state {})]
     (cond-> state
       (contains? query-state* :list-filter)
-      (assoc-in [:portfolio-ui :optimizer :list-filter] (:list-filter query-state*))
+      (assoc-in contracts/ui-list-filter-path (:list-filter query-state*))
 
       (contains? query-state* :list-sort)
-      (assoc-in [:portfolio-ui :optimizer :list-sort] (:list-sort query-state*))
+      (assoc-in contracts/ui-list-sort-path (:list-sort query-state*))
 
       (contains? query-state* :workspace-panel)
-      (assoc-in [:portfolio-ui :optimizer :workspace-panel] (:workspace-panel query-state*))
+      (assoc-in contracts/ui-workspace-panel-path (:workspace-panel query-state*))
 
       (contains? query-state* :results-tab)
-      (assoc-in [:portfolio-ui :optimizer :results-tab] (:results-tab query-state*))
+      (assoc-in contracts/ui-results-tab-path (:results-tab query-state*))
 
       (contains? query-state* :diagnostics-tab)
-      (assoc-in [:portfolio-ui :optimizer :diagnostics-tab] (:diagnostics-tab query-state*)))))
+      (assoc-in contracts/ui-diagnostics-tab-path (:diagnostics-tab query-state*)))))
 
 (defn optimizer-query-state
   [state]
-  (let [optimizer-state (get-in state [:portfolio-ui :optimizer])]
+  (let [optimizer-state (get-in state contracts/optimizer-ui-path)]
     {:list-filter (normalize-list-filter (:list-filter optimizer-state))
      :list-sort (normalize-list-sort (:list-sort optimizer-state))
      :workspace-panel (normalize-workspace-panel (:workspace-panel optimizer-state))

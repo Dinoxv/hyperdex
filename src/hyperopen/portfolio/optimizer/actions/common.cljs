@@ -1,7 +1,8 @@
 (ns hyperopen.portfolio.optimizer.actions.common
   (:require [clojure.string :as str]
             [hyperopen.portfolio.optimizer.application.run-identity :as run-identity]
-            [hyperopen.portfolio.optimizer.application.universe-candidates :as universe-candidates]))
+            [hyperopen.portfolio.optimizer.application.universe-candidates :as universe-candidates]
+            [hyperopen.portfolio.optimizer.contracts :as contracts]))
 
 (def supported-universe-market-types
   #{:perp :spot :vault})
@@ -23,7 +24,7 @@
   [path-values]
   [[:effects/save-many
     (conj (vec path-values)
-          [[:portfolio :optimizer :draft :metadata :dirty?] true])]])
+          [contracts/draft-dirty-path true])]])
 
 (defn non-blank-text
   [value]
@@ -119,12 +120,12 @@
 
 (defn constraint-list
   [state constraint-key]
-  (vec (or (get-in state [:portfolio :optimizer :draft :constraints constraint-key])
+  (vec (or (get-in state (conj contracts/draft-constraints-path constraint-key))
            [])))
 
 (defn draft-universe
   [state]
-  (vec (or (get-in state [:portfolio :optimizer :draft :universe])
+  (vec (or (get-in state contracts/draft-universe-path)
            [])))
 
 (defn instrument-present?
@@ -137,7 +138,7 @@
   (some (fn [instrument]
           (when (= instrument-id (:instrument-id instrument))
             (:market-type instrument)))
-        (get-in state [:portfolio :optimizer :draft :universe])))
+        (get-in state contracts/draft-universe-path)))
 
 (defn set-membership
   [items item enabled?]
@@ -152,8 +153,8 @@
 
 (defn current-scenario-id
   [state]
-  (or (non-blank-text (get-in state [:portfolio :optimizer :active-scenario :loaded-id]))
-      (non-blank-text (get-in state [:portfolio :optimizer :draft :id]))))
+  (or (non-blank-text (get-in state contracts/active-scenario-loaded-id-path))
+      (non-blank-text (get-in state contracts/draft-id-path))))
 
 (defn vault-list-metadata-fetch-effects
   [state]

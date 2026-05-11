@@ -1,5 +1,6 @@
 (ns hyperopen.portfolio.optimizer.frontier-actions
-  (:require [clojure.string :as str]))
+  (:require [clojure.string :as str]
+            [hyperopen.portfolio.optimizer.contracts :as contracts]))
 
 (def ^:private frontier-overlay-modes
   #{:standalone
@@ -29,11 +30,11 @@
 (defn set-portfolio-optimizer-frontier-overlay-mode
   [_state mode]
   [[:effects/save
-    [:portfolio-ui :optimizer :frontier-overlay-mode]
+    contracts/ui-frontier-overlay-mode-path
     (normalize-frontier-overlay-mode mode)]])
 
 (defn set-portfolio-optimizer-constrain-frontier
   [_state constrained?]
   [[:effects/save
-    [:portfolio-ui :optimizer :constrain-frontier?]
+    contracts/ui-constrain-frontier-path
     (true? constrained?)]])

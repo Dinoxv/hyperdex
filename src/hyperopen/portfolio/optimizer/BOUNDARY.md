@@ -39,3 +39,9 @@ The optimizer worker may depend on pure optimizer domain/application namespaces
 and worker-safe optimizer infrastructure adapters such as the solver adapter.
 Browser UI, IndexedDB, websocket, and exchange submit effects belong in
 infrastructure clients and runtime effect adapters outside the worker runtime.
+
+`hyperopen.portfolio.optimizer.contracts` owns optimizer map contracts, schema
+versions, migration entry points, canonical request-signature construction,
+state path constants, and worker wire codecs. Other optimizer namespaces should
+consume those named contracts instead of re-declaring optimizer map shapes or
+hardcoded optimizer state paths.

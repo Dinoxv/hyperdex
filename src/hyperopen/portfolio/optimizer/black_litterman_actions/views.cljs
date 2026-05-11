@@ -1,5 +1,6 @@
 (ns hyperopen.portfolio.optimizer.black-litterman-actions.views
-  (:require [hyperopen.portfolio.optimizer.black-litterman-actions.common :as common]))
+  (:require [hyperopen.portfolio.optimizer.black-litterman-actions.common :as common]
+            [hyperopen.portfolio.optimizer.contracts :as contracts]))
 
 (defn view-primary-instrument-id
   [view]
@@ -113,7 +114,7 @@
 (defn- save-views
   [views]
   (common/save-draft-path-values
-   [[[:portfolio :optimizer :draft :return-model :views] (vec views)]]))
+   [[contracts/draft-return-model-views-path (vec views)]]))
 
 (defn add-portfolio-optimizer-black-litterman-view
   [state view-kind]
@@ -189,7 +190,7 @@
              view-id*
              (not= views views*))
       (common/save-draft-path-values
-       [[[:portfolio :optimizer :draft :return-model :views] views*]
+       [[contracts/draft-return-model-views-path views*]
         [(conj common/editor-path :editing-view-id)
          (when (not= view-id*
                      (get-in state (conj common/editor-path :editing-view-id)))

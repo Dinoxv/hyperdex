@@ -3,7 +3,8 @@
             [clojure.string :as str]
             [hyperopen.portfolio.optimizer.application.current-portfolio :as current-portfolio]
             [hyperopen.portfolio.optimizer.application.orderbook-loader :as orderbook-loader]
-            [hyperopen.portfolio.optimizer.application.request-builder :as request-builder]))
+            [hyperopen.portfolio.optimizer.application.request-builder :as request-builder]
+            [hyperopen.portfolio.optimizer.contracts :as contracts]))
 
 (def ^:private vault-instrument-prefix
   "vault:")
@@ -29,7 +30,7 @@
 
 (defn- current-as-of-ms
   [state]
-  (or (get-in state [:portfolio :optimizer :runtime :as-of-ms])
+  (or (get-in state contracts/runtime-as-of-ms-path)
       (.now js/Date)))
 
 (defn- positive-number?
@@ -74,12 +75,12 @@
     :current-portfolio (with-manual-capital
                          (current-portfolio/current-portfolio-snapshot state)
                          draft)
-    :history-data (get-in state [:portfolio :optimizer :history-data])
-    :market-cap-by-coin (get-in state [:portfolio :optimizer :market-cap-by-coin])
+    :history-data (get-in state contracts/history-data-path)
+    :market-cap-by-coin (get-in state contracts/market-cap-by-coin-path)
     :as-of-ms (current-as-of-ms state)
-    :stale-after-ms (get-in state [:portfolio :optimizer :runtime :stale-after-ms])
+    :stale-after-ms (get-in state contracts/runtime-stale-after-ms-path)
     :funding-periods-per-year (get-in state
-                                      [:portfolio :optimizer :runtime :funding-periods-per-year])}))
+                                      contracts/runtime-funding-periods-per-year-path)}))
 
 (defn- orderbook-cost-contexts
   [state request]
@@ -87,7 +88,7 @@
         opts {:now-ms (:as-of-ms request)
               :fallback-bps fallback-bps
               :stale-after-ms (or (get-in state
-                                          [:portfolio :optimizer :runtime :orderbook-stale-after-ms])
+                                          contracts/runtime-orderbook-stale-after-ms-path)
                                   orderbook-loader/default-stale-after-ms)}]
     (into {}
           (map (fn [{:keys [instrument-id coin]}]
@@ -256,10 +257,10 @@
 
 (defn build-readiness
   [state]
-  (let [draft (get-in state [:portfolio :optimizer :draft])
+  (let [draft (get-in state contracts/draft-path)
         requested-universe (vec (or (:universe draft) []))
         history-loading? (= :loading
-                            (get-in state [:portfolio :optimizer :history-load-state :status]))]
+                            (get-in state contracts/history-load-state-status-path))]
     (if (empty? requested-universe)
       {:status :blocked
        :reason :missing-universe

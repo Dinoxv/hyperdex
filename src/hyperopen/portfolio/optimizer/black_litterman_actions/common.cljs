@@ -1,5 +1,6 @@
 (ns hyperopen.portfolio.optimizer.black-litterman-actions.common
-  (:require [clojure.string :as str]))
+  (:require [clojure.string :as str]
+            [hyperopen.portfolio.optimizer.contracts :as contracts]))
 
 (def view-kinds
   #{:absolute
@@ -8,7 +9,7 @@
 (def max-active-views 10)
 
 (def editor-path
-  [:portfolio-ui :optimizer :black-litterman-editor])
+  contracts/ui-black-litterman-editor-path)
 
 (def numeric-parameter-keys
   #{:return
@@ -101,7 +102,7 @@
   [path-values]
   [[:effects/save-many
     (conj (vec path-values)
-          [[:portfolio :optimizer :draft :metadata :dirty?] true])]])
+          [contracts/draft-dirty-path true])]])
 
 (defn save-ui-path-values
   [path-values]
@@ -109,17 +110,17 @@
 
 (defn draft-universe
   [state]
-  (vec (or (get-in state [:portfolio :optimizer :draft :universe])
+  (vec (or (get-in state contracts/draft-universe-path)
            [])))
 
 (defn black-litterman-return-model?
   [state]
   (= :black-litterman
-     (get-in state [:portfolio :optimizer :draft :return-model :kind])))
+     (get-in state (conj contracts/draft-return-model-path :kind))))
 
 (defn black-litterman-views
   [state]
-  (vec (or (get-in state [:portfolio :optimizer :draft :return-model :views])
+  (vec (or (get-in state contracts/draft-return-model-views-path)
            [])))
 
 (defn universe-instrument-ids

@@ -11,26 +11,136 @@
 
 (def optimizer-path [:portfolio :optimizer])
 (def draft-path (conj optimizer-path :draft))
+(def draft-id-path (conj draft-path :id))
+(def draft-status-path (conj draft-path :status))
+(def draft-universe-path (conj draft-path :universe))
+(def draft-objective-path (conj draft-path :objective))
+(def draft-return-model-path (conj draft-path :return-model))
+(def draft-return-model-views-path (conj draft-return-model-path :views))
+(def draft-risk-model-path (conj draft-path :risk-model))
+(def draft-constraints-path (conj draft-path :constraints))
+(def draft-execution-assumptions-path (conj draft-path :execution-assumptions))
+(def draft-metadata-path (conj draft-path :metadata))
+(def draft-dirty-path (conj draft-metadata-path :dirty?))
 (def active-scenario-path (conj optimizer-path :active-scenario))
+(def active-scenario-loaded-id-path (conj active-scenario-path :loaded-id))
+(def active-scenario-status-path (conj active-scenario-path :status))
+(def active-scenario-read-only-path (conj active-scenario-path :read-only?))
 (def run-state-path (conj optimizer-path :run-state))
+(def run-state-status-path (conj run-state-path :status))
+(def runtime-path (conj optimizer-path :runtime))
+(def runtime-as-of-ms-path (conj runtime-path :as-of-ms))
+(def runtime-stale-after-ms-path (conj runtime-path :stale-after-ms))
+(def runtime-funding-periods-per-year-path
+  (conj runtime-path :funding-periods-per-year))
+(def runtime-orderbook-stale-after-ms-path
+  (conj runtime-path :orderbook-stale-after-ms))
+(def history-data-path (conj optimizer-path :history-data))
+(def market-cap-by-coin-path (conj optimizer-path :market-cap-by-coin))
 (def history-load-state-path (conj optimizer-path :history-load-state))
+(def history-load-state-status-path (conj history-load-state-path :status))
+(def history-load-state-request-signature-path
+  (conj history-load-state-path :request-signature))
 (def history-prefetch-path (conj optimizer-path :history-prefetch))
+(def history-prefetch-active-instrument-id-path
+  (conj history-prefetch-path :active-instrument-id))
 (def optimization-progress-path (conj optimizer-path :optimization-progress))
+(def optimization-progress-status-path (conj optimization-progress-path :status))
 (def scenario-index-path (conj optimizer-path :scenario-index))
 (def scenario-save-state-path (conj optimizer-path :scenario-save-state))
 (def scenario-load-state-path (conj optimizer-path :scenario-load-state))
 (def scenario-index-load-state-path (conj optimizer-path :scenario-index-load-state))
 (def scenario-archive-state-path (conj optimizer-path :scenario-archive-state))
 (def scenario-duplicate-state-path (conj optimizer-path :scenario-duplicate-state))
+(def last-successful-run-path (conj optimizer-path :last-successful-run))
+(def last-successful-run-result-path (conj last-successful-run-path :result))
 (def execution-modal-path (conj optimizer-path :execution-modal))
+(def execution-modal-error-path (conj execution-modal-path :error))
+(def execution-modal-submitting-path (conj execution-modal-path :submitting?))
 (def execution-path (conj optimizer-path :execution))
+(def execution-history-path (conj execution-path :history))
+(def execution-persistence-error-path (conj execution-path :persistence-error))
 (def tracking-path (conj optimizer-path :tracking))
+(def tracking-error-path (conj tracking-path :error))
 (def optimizer-ui-path [:portfolio-ui :optimizer])
+(def ui-list-filter-path (conj optimizer-ui-path :list-filter))
+(def ui-list-sort-path (conj optimizer-ui-path :list-sort))
+(def ui-workspace-panel-path (conj optimizer-ui-path :workspace-panel))
+(def ui-results-tab-path (conj optimizer-ui-path :results-tab))
+(def ui-diagnostics-tab-path (conj optimizer-ui-path :diagnostics-tab))
+(def ui-universe-search-query-path (conj optimizer-ui-path :universe-search-query))
+(def ui-universe-search-active-index-path
+  (conj optimizer-ui-path :universe-search-active-index))
+(def ui-black-litterman-editor-path
+  (conj optimizer-ui-path :black-litterman-editor))
+(def ui-frontier-overlay-mode-path
+  (conj optimizer-ui-path :frontier-overlay-mode))
+(def ui-constrain-frontier-path (conj optimizer-ui-path :constrain-frontier?))
+
+(declare optimizer-input-signature)
 
 (defn- contains-keys?
   [value ks]
   (and (map? value)
        (every? #(contains? value %) ks)))
+
+(defn- finite-number?
+  [value]
+  (and (number? value)
+       (not (js/isNaN value))
+       (js/isFinite value)))
+
+(defn- non-blank-string?
+  [value]
+  (and (string? value)
+       (seq (str/trim value))))
+
+(def draft-statuses
+  #{:draft :saved :archived :tracking})
+
+(def scenario-record-statuses
+  #{:saved :archived :executed :partially-executed :tracking :failed})
+
+(def tracking-snapshot-statuses
+  #{:tracked :not-trackable})
+
+(def result-payload-statuses
+  #{:solved :infeasible :error :failed})
+
+(defn- absent-or-allowed?
+  [allowed value]
+  (or (nil? value)
+      (contains? allowed value)))
+
+(defn- valid-instrument-map?
+  [instrument-ids value]
+  (and (map? value)
+       (every? #(contains? value %) instrument-ids)))
+
+(defn- solved-result-payload?
+  [value]
+  (let [instrument-ids (:instrument-ids value)
+        target-weights (:target-weights value)
+        current-weights (:current-weights value)
+        instrument-count (count instrument-ids)]
+    (and (vector? instrument-ids)
+         (every? non-blank-string? instrument-ids)
+         (vector? target-weights)
+         (vector? current-weights)
+         (= instrument-count (count target-weights))
+         (= instrument-count (count current-weights))
+         (valid-instrument-map? instrument-ids
+                                (:target-weights-by-instrument value))
+         (valid-instrument-map? instrument-ids
+                                (:current-weights-by-instrument value))
+         (valid-instrument-map? instrument-ids
+                                (:expected-returns-by-instrument value))
+         (or (nil? (:return-decomposition-by-instrument value))
+             (map? (:return-decomposition-by-instrument value)))
+         (or (nil? (:diagnostics value))
+             (map? (:diagnostics value)))
+         (or (nil? (:rebalance-preview value))
+             (map? (:rebalance-preview value))))))
 
 (s/def ::draft
   (s/and map?
@@ -41,7 +151,15 @@
                              :risk-model
                              :constraints
                              :execution-assumptions
-                             :metadata])))
+                             :metadata])
+         #(absent-or-allowed? draft-statuses (:status %))
+         #(vector? (:universe %))
+         #(map? (:objective %))
+         #(map? (:return-model %))
+         #(map? (:risk-model %))
+         #(map? (:constraints %))
+         #(map? (:execution-assumptions %))
+         #(map? (:metadata %))))
 
 (s/def ::engine-request
   (s/and map?
@@ -53,32 +171,67 @@
                              :objective
                              :constraints
                              :execution-assumptions
-                             :history])))
+                             :history])
+         #(vector? (:universe %))
+         #(vector? (:requested-universe %))
+         #(map? (:current-portfolio %))
+         #(map? (:return-model %))
+         #(map? (:risk-model %))
+         #(map? (:objective %))
+         #(map? (:constraints %))
+         #(map? (:execution-assumptions %))
+         #(map? (:history %))))
 
 (s/def ::request-signature
   (s/and map?
          #(= request-signature-schema-version (:schema-version %))
-         #(contains-keys? % [:request :input-signature])))
+         #(contains-keys? % [:request :input-signature])
+         #(map? (:request %))
+         #(= (optimizer-input-signature (:request %))
+             (:input-signature %))))
 
 (s/def ::scenario-record
   (s/and map?
          #(= scenario-record-schema-version (:schema-version %))
          #(contains-keys? % [:id :name :status :config :updated-at-ms])
+         #(non-blank-string? (:id %))
+         #(string? (:name %))
+         #(contains? scenario-record-statuses (:status %))
+         #(finite-number? (:updated-at-ms %))
          #(s/valid? ::draft (:config %))))
 
 (s/def ::tracking-snapshot
   (s/and map?
-         #(contains-keys? % [:scenario-id :as-of-ms :status])))
+         #(contains-keys? % [:scenario-id :as-of-ms :status])
+         #(non-blank-string? (:scenario-id %))
+         #(finite-number? (:as-of-ms %))
+         #(contains? tracking-snapshot-statuses (:status %))
+         #(if (= :tracked (:status %))
+            (vector? (:rows %))
+            true)
+         #(if (= :not-trackable (:status %))
+            (vector? (:warnings %))
+            true)))
 
 (s/def ::tracking-record
   (s/and map?
          #(= tracking-record-schema-version (:schema-version %))
          #(contains-keys? % [:scenario-id :updated-at-ms :snapshots])
-         #(vector? (:snapshots %))))
+         #(non-blank-string? (:scenario-id %))
+         #(finite-number? (:updated-at-ms %))
+         #(vector? (:snapshots %))
+         #(every? (fn [snapshot]
+                    (and (s/valid? ::tracking-snapshot snapshot)
+                         (= (:scenario-id %) (:scenario-id snapshot))))
+                  (:snapshots %))))
 
 (s/def ::result-payload
   (s/and map?
-         #(contains? % :status)))
+         #(contains? % :status)
+         #(contains? result-payload-statuses (:status %))
+         #(if (= :solved (:status %))
+            (solved-result-payload? %)
+            true)))
 
 (s/def ::worker-envelope
   (s/and map?

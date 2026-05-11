@@ -1,6 +1,7 @@
 (ns hyperopen.runtime.effect-adapters.portfolio-optimizer-scenarios
   (:require [hyperopen.account.context :as account-context]
             [hyperopen.portfolio.optimizer.application.scenario-records :as scenario-records]
+            [hyperopen.portfolio.optimizer.contracts :as contracts]
             [hyperopen.portfolio.optimizer.defaults :as optimizer-defaults]
             [hyperopen.portfolio.routes :as portfolio-routes]
             [hyperopen.runtime.effect-adapters.portfolio-optimizer-scenario-state :as state]))
@@ -30,9 +31,9 @@
         new-route? (= :optimize-new route-kind)]
     (or (:scenario-id opts)
         (when-not new-route?
-          (get-in state [:portfolio :optimizer :active-scenario :loaded-id]))
+          (get-in state contracts/active-scenario-loaded-id-path))
         (when-not new-route?
-          (get-in state [:portfolio :optimizer :draft :id]))
+          (get-in state contracts/draft-id-path))
         ((env-fn env :next-scenario-id) now-ms))))
 
 (def default-scenario-index state/default-scenario-index)
@@ -58,13 +59,13 @@
   [state scenario-index scenario-record]
   (let [scenario-id (:id scenario-record)]
     (-> state
-        (assoc-in [:portfolio :optimizer :scenario-index] scenario-index)
-        (assoc-in [:portfolio :optimizer :draft] (:config scenario-record))
-        (assoc-in [:portfolio :optimizer :active-scenario]
+        (assoc-in contracts/scenario-index-path scenario-index)
+        (assoc-in contracts/draft-path (:config scenario-record))
+        (assoc-in contracts/active-scenario-path
                   {:loaded-id scenario-id
                    :status (:status scenario-record)
                    :read-only? false})
-        (assoc-in [:portfolio :optimizer :tracking]
+        (assoc-in contracts/tracking-path
                   (state/cleared-tracking-state scenario-id)))))
 
 (defn load-portfolio-optimizer-scenario-index-effect
@@ -77,7 +78,7 @@
     (if address
       (do
         (swap! store assoc-in
-               [:portfolio :optimizer :scenario-index-load-state]
+               contracts/scenario-index-load-state-path
                (begin-scenario-index-load-state started-at-ms))
         (-> (load-scenario-index! address)
             (.then (fn [loaded-index]
@@ -115,7 +116,7 @@
     (if scenario-id
       (do
         (swap! store assoc-in
-               [:portfolio :optimizer :scenario-load-state]
+               contracts/scenario-load-state-path
                (begin-scenario-load-state scenario-id started-at-ms))
         (-> (load-scenario! scenario-id)
             (.then (fn [scenario-record]
@@ -169,7 +170,7 @@
     (if (and address scenario-id)
       (do
         (swap! store assoc-in
-               [:portfolio :optimizer :scenario-archive-state]
+               contracts/scenario-archive-state-path
                (begin-scenario-archive-state scenario-id started-at-ms))
         (-> (load-scenario! scenario-id)
             (.then (fn [scenario-record]
@@ -185,7 +186,7 @@
                                           (scenario-records/refresh-scenario-index-summary
                                            (or loaded-index
                                                (get-in @store
-                                                       [:portfolio :optimizer :scenario-index])
+                                                       contracts/scenario-index-path)
                                                (default-scenario-index))
                                            (scenario-records/scenario-summary archived-record))]
                                       (-> (save-scenario! scenario-id archived-record)
@@ -232,7 +233,7 @@
     (if (and address scenario-id duplicated-scenario-id)
       (do
         (swap! store assoc-in
-               [:portfolio :optimizer :scenario-duplicate-state]
+               contracts/scenario-duplicate-state-path
                (begin-scenario-duplicate-state scenario-id started-at-ms))
         (-> (load-scenario! scenario-id)
             (.then (fn [scenario-record]
@@ -249,7 +250,7 @@
                                           (scenario-records/upsert-scenario-index
                                            (or loaded-index
                                                (get-in @store
-                                                       [:portfolio :optimizer :scenario-index])
+                                                       contracts/scenario-index-path)
                                                (default-scenario-index))
                                            (scenario-records/scenario-summary duplicated-record))]
                                       (-> (save-scenario! duplicated-scenario-id duplicated-record)
@@ -287,8 +288,8 @@
   [env store]
   (let [state @store
         address (account-context/effective-account-address state)
-        scenario-id (or (get-in state [:portfolio :optimizer :active-scenario :loaded-id])
-                        (get-in state [:portfolio :optimizer :draft :id]))
+        scenario-id (or (get-in state contracts/active-scenario-loaded-id-path)
+                        (get-in state contracts/draft-id-path))
         now-ms-fn (env-fn env :now-ms)
         load-scenario! (env-fn env :load-scenario!)
         load-scenario-index! (env-fn env :load-scenario-index!)
@@ -311,7 +312,7 @@
                                         (scenario-records/refresh-scenario-index-summary
                                          (or loaded-index
                                              (get-in @store
-                                                     [:portfolio :optimizer :scenario-index])
+                                                     contracts/scenario-index-path)
                                              (default-scenario-index))
                                          (scenario-records/scenario-summary updated-record))]
                                     (-> (save-scenario! scenario-id updated-record)
@@ -325,7 +326,7 @@
                                                  updated-record))))))))))
           (.catch (fn [err]
                     (swap! store assoc-in
-                           [:portfolio :optimizer :tracking :error]
+                           contracts/tracking-error-path
                            {:message (state/error-message err)})
                     nil)))
       (js/Promise.resolve nil))))
@@ -335,23 +336,23 @@
   (let [opts* (or opts {})
         state @store
         address (account-context/effective-account-address state)
-        draft (or (get-in state [:portfolio :optimizer :draft])
+        draft (or (get-in state contracts/draft-path)
                   (optimizer-defaults/default-draft))
-        last-successful-run (get-in state [:portfolio :optimizer :last-successful-run])
+        last-successful-run (get-in state contracts/last-successful-run-path)
         now-ms-fn (env-fn env :now-ms)
         load-scenario-index! (env-fn env :load-scenario-index!)
         save-scenario! (env-fn env :save-scenario!)
         save-scenario-index! (env-fn env :save-scenario-index!)
         started-at-ms (now-ms-fn)
         scenario-id (current-scenario-id env state opts* started-at-ms)
-        existing-index (or (get-in state [:portfolio :optimizer :scenario-index])
+        existing-index (or (get-in state contracts/scenario-index-path)
                            (default-scenario-index))]
     (if (and address
              scenario-id
              (solved-run? last-successful-run))
       (do
         (swap! store assoc-in
-               [:portfolio :optimizer :scenario-save-state]
+               contracts/scenario-save-state-path
                (begin-scenario-save-state scenario-id started-at-ms))
         (-> (load-scenario-index! address)
             (.then (fn [loaded-index]
@@ -387,7 +388,7 @@
                       nil))))
       (do
         (swap! store assoc-in
-               [:portfolio :optimizer :scenario-save-state]
+               contracts/scenario-save-state-path
                (failed-scenario-save-state scenario-id
                                            started-at-ms
                                            started-at-ms
