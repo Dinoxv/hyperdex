@@ -1,8 +1,8 @@
 (ns hyperopen.runtime.effect-adapters.portfolio-optimizer.execution
   (:require [hyperopen.portfolio.optimizer.application.execution :as execution]
             [hyperopen.portfolio.optimizer.application.scenario-records :as scenario-records]
-            [hyperopen.portfolio.optimizer.contracts :as contracts]
-            [hyperopen.runtime.effect-adapters.portfolio-optimizer-scenarios :as scenario-effects]))
+            [hyperopen.portfolio.optimizer.application.scenario-workflow :as scenario-workflow]
+            [hyperopen.portfolio.optimizer.contracts :as contracts]))
 
 (defn- begin-execution-state
   [attempt started-at-ms]
@@ -161,11 +161,11 @@
                                        scenario-record
                                        ledger)
                                       scenario-index
-                                      (scenario-records/refresh-scenario-index-summary
-                                       (or loaded-index
-                                           (get-in @store
-                                                   contracts/scenario-index-path)
-                                           (scenario-effects/default-scenario-index))
+	                                      (scenario-records/refresh-scenario-index-summary
+	                                       (or loaded-index
+	                                           (get-in @store
+	                                                   contracts/scenario-index-path)
+	                                           (scenario-workflow/default-scenario-index))
                                        (scenario-records/scenario-summary updated-record))]
                                   (-> (save-scenario! scenario-id updated-record)
                                       (.then (fn [_]

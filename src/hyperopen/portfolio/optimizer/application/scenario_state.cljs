@@ -1,4 +1,4 @@
-(ns hyperopen.runtime.effect-adapters.portfolio-optimizer-scenario-state
+(ns hyperopen.portfolio.optimizer.application.scenario-state
   (:require [hyperopen.portfolio.optimizer.application.scenario-records :as scenario-records]
             [hyperopen.portfolio.optimizer.contracts :as contracts]))
 
@@ -279,3 +279,22 @@
                                              started-at-ms
                                              completed-at-ms
                                              err)))
+
+(defn apply-manual-tracking-success
+  [state scenario-index scenario-record]
+  (let [scenario-id (:id scenario-record)]
+    (-> state
+        (assoc-in contracts/scenario-index-path scenario-index)
+        (assoc-in contracts/draft-path (:config scenario-record))
+        (assoc-in contracts/active-scenario-path
+                  {:loaded-id scenario-id
+                   :status (:status scenario-record)
+                   :read-only? false})
+        (assoc-in contracts/tracking-path
+                  (cleared-tracking-state scenario-id)))))
+
+(defn apply-manual-tracking-error
+  [state err]
+  (assoc-in state
+            contracts/tracking-error-path
+            {:message (error-message err)}))
