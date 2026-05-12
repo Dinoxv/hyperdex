@@ -194,12 +194,16 @@
             [hyperopen.portfolio.optimizer.application.execution-test]
             [hyperopen.portfolio.optimizer.application.history-loader-test]
             [hyperopen.portfolio.optimizer.application.history-loader-vaults-test]
+            [hyperopen.portfolio.optimizer.application.history-workflow-test]
             [hyperopen.portfolio.optimizer.application.orderbook-loader-test]
+            [hyperopen.portfolio.optimizer.application.pipeline-workflow-test]
             [hyperopen.portfolio.optimizer.application.request-builder-test]
             [hyperopen.portfolio.optimizer.application.return-inputs-test]
             [hyperopen.portfolio.optimizer.application.run-bridge-test]
+            [hyperopen.portfolio.optimizer.application.run-bridge-workflow-test]
             [hyperopen.portfolio.optimizer.application.run-identity-test]
             [hyperopen.portfolio.optimizer.application.scenario-records-test]
+            [hyperopen.portfolio.optimizer.application.scenario-workflow-test]
             [hyperopen.portfolio.optimizer.application.setup-readiness-test]
             [hyperopen.portfolio.optimizer.application.tracking-test]
             [hyperopen.portfolio.optimizer.application.universe-candidates-test]
@@ -823,12 +827,16 @@
              'hyperopen.portfolio.optimizer.application.execution-test
              'hyperopen.portfolio.optimizer.application.history-loader-test
              'hyperopen.portfolio.optimizer.application.history-loader-vaults-test
+             'hyperopen.portfolio.optimizer.application.history-workflow-test
              'hyperopen.portfolio.optimizer.application.orderbook-loader-test
+             'hyperopen.portfolio.optimizer.application.pipeline-workflow-test
              'hyperopen.portfolio.optimizer.application.request-builder-test
              'hyperopen.portfolio.optimizer.application.return-inputs-test
              'hyperopen.portfolio.optimizer.application.run-bridge-test
+             'hyperopen.portfolio.optimizer.application.run-bridge-workflow-test
              'hyperopen.portfolio.optimizer.application.run-identity-test
              'hyperopen.portfolio.optimizer.application.scenario-records-test
+             'hyperopen.portfolio.optimizer.application.scenario-workflow-test
              'hyperopen.portfolio.optimizer.application.setup-readiness-test
              'hyperopen.portfolio.optimizer.application.tracking-test
              'hyperopen.portfolio.optimizer.application.universe-candidates-test

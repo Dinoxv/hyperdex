@@ -1,8 +1,6 @@
 (ns hyperopen.runtime.effect-adapters.portfolio-optimizer-pipeline
-  (:require [hyperopen.portfolio.optimizer.application.progress :as progress]
-            [hyperopen.portfolio.optimizer.application.run-identity :as run-identity]
-            [hyperopen.portfolio.optimizer.application.setup-readiness :as setup-readiness]
-            [hyperopen.portfolio.optimizer.contracts :as contracts]))
+  (:require [hyperopen.portfolio.optimizer.application.pipeline-workflow :as workflow]
+            [hyperopen.portfolio.optimizer.application.progress :as progress]))
 
 (defn- error-message
   [err]
@@ -11,40 +9,9 @@
       (some-> err .-message)
       (str err)))
 
-(defn- progress-error
-  [code message]
-  {:code code
-   :message message})
-
-(defn- current-progress
-  [state]
-  (get-in state contracts/optimization-progress-path))
-
-(defn- update-progress
-  [state run-id f & args]
-  (let [progress-state (current-progress state)]
-    (if (= run-id (:run-id progress-state))
-      (assoc-in state
-                contracts/optimization-progress-path
-                (apply f progress-state args))
-      state)))
-
 (defn- mark-progress-step!
   [store run-id step-id attrs]
-  (swap! store update-progress run-id progress/mark-step step-id attrs))
-
-(defn- fail-progress!
-  [now-ms store run-id error]
-  (swap! store update-progress run-id progress/fail-progress (now-ms) error))
-
-(defn- begin-pipeline-progress!
-  [now-ms store run-id request]
-  (swap! store assoc-in
-         contracts/optimization-progress-path
-         (progress/begin-progress {:run-id run-id
-                                   :scenario-id (:scenario-id request)
-                                   :request request
-                                   :started-at-ms (now-ms)})))
+  (swap! store workflow/update-progress run-id progress/mark-step step-id attrs))
 
 (defn- fetch-progress-callback
   [store run-id]
@@ -56,38 +23,6 @@
                           :percent percent
                           :detail (str completed "/" total " requests")})))
 
-(defn- run-worker-from-ready-request!
-  [request-run! store run-id request]
-  (mark-progress-step! store
-                       run-id
-                       :fetch-returns
-                       {:status :succeeded
-                        :percent 100})
-  (mark-progress-step! store
-                       run-id
-                       :risk-model
-                       {:status :running
-                        :percent 15})
-  (request-run! {:request request
-                 :request-signature (run-identity/build-request-signature request)
-                 :store store
-                 :run-id run-id}))
-
-(defn- pipeline-ready-request
-  [store]
-  (let [{:keys [request runnable?] :as readiness}
-        (setup-readiness/build-readiness @store)]
-    (when-not runnable?
-      (throw (js/Error. (setup-readiness/readiness-error-message readiness))))
-    request))
-
-(defn- selection-prefetch-loading?
-  [state]
-  (and (= :loading
-          (get-in state contracts/history-load-state-status-path))
-       (some? (get-in state
-                      contracts/history-prefetch-active-instrument-id-path))))
-
 (defn- wait-for-history-load-idle!
   [store {:keys [poll-ms timeout-ms]
           :or {poll-ms 50
@@ -97,7 +32,7 @@
      (fn [resolve reject]
        (letfn [(tick []
                  (cond
-                   (not (selection-prefetch-loading? @store))
+                   (not (workflow/selection-prefetch-loading? @store))
                    (resolve true)
 
                    (> (- (.now js/Date) started-at-ms) timeout-ms)
@@ -107,76 +42,82 @@
                    (js/setTimeout tick poll-ms)))]
          (tick))))))
 
+(declare interpret-result!)
+
+(defn- apply-result!
+  [store result]
+  (reset! store (:state result))
+  result)
+
+(defn- request-worker-run!
+  [request-run! store {:keys [run-id request request-signature]}]
+  (request-run! {:request request
+                 :request-signature request-signature
+                 :store store
+                 :run-id run-id})
+  (js/Promise.resolve run-id))
+
 (defn- load-history-then-run!
-  [load-history! request-run! store run-id]
+  [{:keys [load-history!] :as env} store run-id]
   (-> (load-history! store
                      {:on-progress (fetch-progress-callback store run-id)})
       (.then (fn [_bundle]
-               (let [request (pipeline-ready-request store)]
-                 (run-worker-from-ready-request! request-run! store run-id request)
-                 run-id)))))
+               (interpret-result!
+                env
+                store
+                (workflow/after-history-loaded {:state @store
+                                                :run-id run-id}))))))
 
-(defn- wait-or-load-history-then-run!
-  [{:keys [request-run! load-history! history-idle-poll-ms history-idle-timeout-ms]} store run-id]
-  (if (selection-prefetch-loading? @store)
+(defn- interpret-command!
+  [{:keys [request-run! history-idle-poll-ms history-idle-timeout-ms] :as env} store command]
+  (case (:command/type command)
+    :optimizer.workflow/request-worker-run
+    (request-worker-run! request-run! store command)
+
+    :optimizer.workflow/load-history
+    (load-history-then-run! env store (:run-id command))
+
+    :optimizer.workflow/wait-for-history-idle
     (-> (wait-for-history-load-idle!
          store
-         {:poll-ms history-idle-poll-ms
-          :timeout-ms history-idle-timeout-ms})
+         {:poll-ms (or (:poll-ms command) history-idle-poll-ms)
+          :timeout-ms (or (:timeout-ms command) history-idle-timeout-ms)})
         (.then (fn [_]
-                 (let [{:keys [request runnable?]} (setup-readiness/build-readiness @store)]
-                   (if runnable?
-                     (do
-                       (run-worker-from-ready-request! request-run! store run-id request)
-                     run-id)
-                    (load-history-then-run! load-history!
-                                            request-run!
-                                            store
-                                            run-id))))))
-    (load-history-then-run! load-history!
-                            request-run!
-                            store
-                            run-id)))
+                 (interpret-result!
+                  env
+                  store
+                  (workflow/after-history-idle {:state @store
+                                                :run-id (:run-id command)})))))
+
+    (js/Promise.resolve nil)))
+
+(defn- interpret-result!
+  [env store result]
+  (let [result* (apply-result! store result)]
+    (if-let [command (first (:commands result*))]
+      (interpret-command! env store command)
+      (js/Promise.resolve nil))))
 
 (defn run-portfolio-optimizer-pipeline-effect
-  [{:keys [now-ms next-run-id request-run! load-history!] :as env} _ store]
-  (let [state @store
-        draft (get-in state contracts/draft-path)
-        universe (vec (:universe draft))
-        initial-readiness (setup-readiness/build-readiness state)
-        initial-request (or (:request initial-readiness)
-                            {:scenario-id (:id draft)
-                             :requested-universe universe
-                             :universe universe
-                             :return-model (:return-model draft)
-                             :risk-model (:risk-model draft)
-                             :objective (:objective draft)})
-        run-id (next-run-id)]
-    (begin-pipeline-progress! now-ms store run-id initial-request)
-    (cond
-      (empty? universe)
-      (do
-        (fail-progress! now-ms
-                        store
-                        run-id
-                        (progress-error :missing-universe
-                                        "Select a universe before running."))
-        (js/Promise.resolve nil))
-
-      (:runnable? initial-readiness)
-      (do
-        (run-worker-from-ready-request! request-run!
-                                        store
-                                        run-id
-                                        (:request initial-readiness))
-        (js/Promise.resolve run-id))
-
-      :else
-      (-> (wait-or-load-history-then-run! env store run-id)
-          (.catch (fn [err]
-                    (fail-progress!
-                     now-ms
-                     store
-                     run-id
-                     (progress-error :pipeline-failed (error-message err)))
-                    nil))))))
+  [{:keys [now-ms next-run-id] :as env} _ store]
+  (let [run-id (next-run-id)
+        started-at-ms (now-ms)]
+    (-> (interpret-result!
+         env
+         store
+         (workflow/begin-run
+          {:state @store
+           :run-id run-id
+           :started-at-ms started-at-ms
+           :history-idle-poll-ms (:history-idle-poll-ms env)
+           :history-idle-timeout-ms (:history-idle-timeout-ms env)}))
+        (.catch (fn [err]
+                  (apply-result!
+                   store
+                   (workflow/fail-run
+                    {:state @store
+                     :run-id run-id
+                     :completed-at-ms (now-ms)
+                     :error (workflow/progress-error :pipeline-failed
+                                                     (error-message err))}))
+                  nil)))))

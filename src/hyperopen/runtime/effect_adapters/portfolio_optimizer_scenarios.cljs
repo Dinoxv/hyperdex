@@ -1,8 +1,8 @@
 (ns hyperopen.runtime.effect-adapters.portfolio-optimizer-scenarios
   (:require [hyperopen.account.context :as account-context]
             [hyperopen.portfolio.optimizer.application.scenario-records :as scenario-records]
+            [hyperopen.portfolio.optimizer.application.scenario-workflow :as scenario-workflow]
             [hyperopen.portfolio.optimizer.contracts :as contracts]
-            [hyperopen.portfolio.optimizer.defaults :as optimizer-defaults]
             [hyperopen.portfolio.routes :as portfolio-routes]
             [hyperopen.runtime.effect-adapters.portfolio-optimizer-scenario-state :as state]))
 
@@ -16,10 +16,6 @@
     (-> (load-tracking! scenario-id)
         (.catch (fn [_err] nil)))
     (js/Promise.resolve nil)))
-
-(defn- solved-run?
-  [last-successful-run]
-  (= :solved (get-in last-successful-run [:result :status])))
 
 (def ^:private manual-tracking-source-statuses
   #{:saved :computed})
@@ -336,61 +332,48 @@
   (let [opts* (or opts {})
         state @store
         address (account-context/effective-account-address state)
-        draft (or (get-in state contracts/draft-path)
-                  (optimizer-defaults/default-draft))
-        last-successful-run (get-in state contracts/last-successful-run-path)
         now-ms-fn (env-fn env :now-ms)
         load-scenario-index! (env-fn env :load-scenario-index!)
         save-scenario! (env-fn env :save-scenario!)
         save-scenario-index! (env-fn env :save-scenario-index!)
         started-at-ms (now-ms-fn)
         scenario-id (current-scenario-id env state opts* started-at-ms)
-        existing-index (or (get-in state contracts/scenario-index-path)
-                           (default-scenario-index))]
-    (if (and address
-             scenario-id
-             (solved-run? last-successful-run))
-      (do
-        (swap! store assoc-in
-               contracts/scenario-save-state-path
-               (begin-scenario-save-state scenario-id started-at-ms))
-        (-> (load-scenario-index! address)
-            (.then (fn [loaded-index]
-                     (let [scenario-record (scenario-records/build-saved-scenario-record
-                                            {:address address
-                                             :scenario-id scenario-id
-                                             :draft draft
-                                             :last-successful-run last-successful-run
-                                             :saved-at-ms started-at-ms})
-                           scenario-index (scenario-records/upsert-scenario-index
-                                           (or loaded-index existing-index (default-scenario-index))
-                                           (scenario-records/scenario-summary scenario-record))]
-                       (-> (save-scenario! scenario-id scenario-record)
-                           (.then (fn [_]
-                                    (save-scenario-index! address scenario-index)))
-                           (.then (fn [_]
-                                    (let [completed-at-ms (now-ms-fn)]
-                                      (swap! store
-                                             apply-scenario-save-success
-                                             scenario-index
-                                             scenario-record
-                                             started-at-ms
-                                             completed-at-ms)
-                                      scenario-record)))))))
-            (.catch (fn [err]
-                      (let [completed-at-ms (now-ms-fn)]
-                        (swap! store
-                               apply-scenario-save-error
-                               scenario-id
-                               started-at-ms
-                               completed-at-ms
-                               err))
-                      nil))))
-      (do
-        (swap! store assoc-in
-               contracts/scenario-save-state-path
-               (failed-scenario-save-state scenario-id
+        begin-result (scenario-workflow/begin-save
+                      {:state state
+                       :address address
+                       :scenario-id scenario-id
+                       :started-at-ms started-at-ms})]
+    (reset! store (:state begin-result))
+    (if-let [_load-command (first (:commands begin-result))]
+      (-> (load-scenario-index! address)
+          (.then (fn [loaded-index]
+                   (let [save-plan (scenario-workflow/continue-save-after-index
+                                    {:state @store
+                                     :address address
+                                     :scenario-id scenario-id
+                                     :started-at-ms started-at-ms
+                                     :loaded-index loaded-index})
+                         scenario-record (:scenario-record save-plan)
+                         scenario-index (:scenario-index save-plan)]
+                     (-> (save-scenario! scenario-id scenario-record)
+                         (.then (fn [_]
+                                  (save-scenario-index! address scenario-index)))
+                         (.then (fn [_]
+                                  (let [completed-at-ms (now-ms-fn)]
+                                    (swap! store
+                                           apply-scenario-save-success
+                                           scenario-index
+                                           scenario-record
                                            started-at-ms
-                                           started-at-ms
-                                           {:message "Cannot save scenario without an address and solved run."}))
-        (js/Promise.resolve nil)))))
+                                           completed-at-ms)
+                                    scenario-record)))))))
+          (.catch (fn [err]
+                    (let [completed-at-ms (now-ms-fn)]
+                      (swap! store
+                             apply-scenario-save-error
+                             scenario-id
+                             started-at-ms
+                             completed-at-ms
+                             err))
+                    nil)))
+      (js/Promise.resolve nil))))
