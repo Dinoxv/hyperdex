@@ -1,0 +1,48 @@
+(ns hyperopen.views.portfolio.optimize.setup-v4-model-controls
+  (:require [hyperopen.views.portfolio.optimize.setup-v4-controls :as controls]))
+
+(def ^:private model-help
+  {:historical-mean "Uses the arithmetic mean of historical returns for each selected asset."
+   :ew-mean "Uses exponentially weighted historical returns so recent observations count more."
+   :black-litterman "Combines market-implied returns with your Black-Litterman views and confidence inputs."
+   :diagonal-shrink "Shrinks the covariance estimate toward a diagonal model to reduce noisy cross-asset correlations."
+   :sample-covariance "Uses the raw historical covariance matrix from the selected asset return history."})
+
+(defn model-section
+  [draft]
+  (let [return-kind (get-in draft [:return-model :kind])
+        risk-kind (get-in draft [:risk-model :kind])]
+    (controls/disclosure-panel
+     "portfolio-optimizer-return-risk-panel"
+     (controls/disclosure-heading "03" "Return / Risk Model" (controls/labelize return-kind))
+     [:div {:class ["mt-3" "space-y-3"] :data-role "portfolio-optimizer-setup-model-grid"}
+      [:div {:data-role "portfolio-optimizer-return-model-panel"}
+       [:p {:class controls/eyebrow-class} "Expected returns"]
+       [:div {:class ["mt-2" "grid" "grid-cols-3" "border"
+                      "border-base-300"]}
+        (controls/segmented-button "Historical" "Historical Mean" (:historical-mean model-help) :start (= :historical-mean return-kind)
+                                   "portfolio-optimizer-return-model-historical-mean"
+                                   [:actions/set-portfolio-optimizer-return-model-kind :historical-mean])
+        (controls/segmented-button "EW Mean" nil (:ew-mean model-help) :center (= :ew-mean return-kind)
+                                   "portfolio-optimizer-return-model-ew-mean"
+                                   [:actions/set-portfolio-optimizer-return-model-kind :ew-mean])
+        (controls/segmented-button "Use my views" nil (:black-litterman model-help) :end (= :black-litterman return-kind)
+                                   "portfolio-optimizer-return-model-black-litterman"
+                                   [:actions/set-portfolio-optimizer-return-model-kind :black-litterman])
+        [:span {:class ["sr-only"]} "Black-Litterman"]]
+       [:p {:class ["mt-2" "text-[0.6875rem]" "text-trading-muted"]}
+        (case return-kind
+          :black-litterman "Black-Litterman stays here as a return-model mode, not an objective."
+          :ew-mean "Exponentially weighted returns emphasize recent history."
+          "Average of past returns. Simple and auditable for first runs.")]]
+      [:div {:data-role "portfolio-optimizer-setup-model-column"}
+       [:div {:data-role "portfolio-optimizer-risk-model-panel"}
+        [:p {:class controls/eyebrow-class} "Risk model"]
+        [:div {:class ["mt-2" "grid" "grid-cols-2" "border"
+                       "border-base-300"]}
+         (controls/segmented-button "Stabilized Covariance" "Diagonal Shrink" (:diagonal-shrink model-help) :start (= :diagonal-shrink risk-kind)
+                                    "portfolio-optimizer-risk-model-diagonal-shrink"
+                                    [:actions/set-portfolio-optimizer-risk-model-kind :diagonal-shrink])
+         (controls/segmented-button "Sample Covariance" nil (:sample-covariance model-help) :end (= :sample-covariance risk-kind)
+                                    "portfolio-optimizer-risk-model-sample-covariance"
+                                    [:actions/set-portfolio-optimizer-risk-model-kind :sample-covariance])]]]])))
