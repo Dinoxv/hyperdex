@@ -1,15 +1,15 @@
 owner: product+platform
-status: active
-source_of_truth: true
+status: completed
+source_of_truth: false
 local_scratch_refs:
   - bd: hyperopen-cwlf
     authoritative: false
 based_on:
   - /Users/barry/Downloads/hyperopen portfolio optimizer/styles.css
   - /Users/barry/Downloads/hyperopen portfolio optimizer/v4.jsx
-  - /Users/barry/.codex/worktrees/d394/hyperopen/tmp/portfolio-optimizer-current-v4-diff-1294x885.png
-  - /Users/barry/.codex/worktrees/d394/hyperopen/docs/exec-plans/active/2026-04-27-portfolio-optimizer-setup-v4-pixel-parity.md
-  - /Users/barry/.codex/worktrees/d394/hyperopen/docs/exec-plans/active/2026-04-26-portfolio-optimizer-v4-alignment.md
+  - /hyperopen/tmp/portfolio-optimizer-current-v4-diff-1294x885.png
+  - /hyperopen/docs/exec-plans/completed/2026-04-27-portfolio-optimizer-setup-v4-pixel-parity.md
+  - /hyperopen/docs/exec-plans/completed/2026-04-26-portfolio-optimizer-v4-alignment.md
 
 # Portfolio Optimizer V4 Visual Parity Remediation
 
@@ -23,11 +23,13 @@ Public refs:
 - Direct maintainer request captured in this ExecPlan. No GitHub issue or PR is linked in this checkout.
 
 Repo artifacts:
-- Parent implementation context: `/hyperopen/docs/exec-plans/active/2026-04-27-portfolio-optimizer-setup-v4-pixel-parity.md`.
-- Parent implementation context: `/hyperopen/docs/exec-plans/active/2026-04-26-portfolio-optimizer-v4-alignment.md`.
+- Parent implementation context: `/hyperopen/docs/exec-plans/completed/2026-04-27-portfolio-optimizer-setup-v4-pixel-parity.md`.
+- Parent implementation context: `/hyperopen/docs/exec-plans/completed/2026-04-26-portfolio-optimizer-v4-alignment.md`.
 
 Local scratch refs (non-authoritative):
 - Beads / `bd`: `hyperopen-cwlf` ("Remediate portfolio optimizer v4 visual parity deltas"), authoritative: false.
+
+Consolidation note: On 2026-05-12, `hyperopen-5di4` moved this plan from `docs/exec-plans/active/` to `docs/exec-plans/completed/`. It remains historical implementation evidence only; it is no longer an active source-of-truth plan.
 
 ## Purpose / Big Picture
 
@@ -48,7 +50,7 @@ This is a visual remediation pass, not another information-architecture rewrite.
 - [x] (2026-04-27 18:16Z) Slice 5: captured a fresh browser screenshot artifact at `tmp/portfolio-optimizer-v4-remediation-1294x885.png` and ran the optimizer Playwright regression subset plus the history-network smoke.
 - [x] (2026-04-27 18:25Z) Validation completed: `npm run check`, `npm test`, `npm run test:websocket`, `npx playwright test tools/playwright/test/portfolio-regressions.spec.mjs -g "portfolio optimizer"`, `npx playwright test tools/playwright/test/optimizer-history-network.qa.spec.mjs`, and `npm run browser:cleanup` passed.
 - [x] (2026-04-27 18:49Z) Follow-up pass: extracted `setup_v4_universe.cljs`, replaced the generic manual-add list with a v4-style custom search block, search-result rows, quick-add chips, and included-instrument table treatment; tightened the route grid to `380px / 1fr / 340px`; captured `tmp/portfolio-optimizer-v4-pass2-1294x885.png`.
-- [ ] Await product/design review of `tmp/portfolio-optimizer-v4-pass2-1294x885.png` against the v4 artboard before moving this ExecPlan out of `active`.
+- [x] (2026-05-12 02:40Z) Recorded the product/design review wait state as historical rather than active implementation scope and moved this plan out of `active/` under `hyperopen-5di4`.
 
 ## Surprises & Discoveries
 
@@ -56,7 +58,7 @@ This is a visual remediation pass, not another information-architecture rewrite.
   Evidence: `src/hyperopen/views/portfolio/optimize/workspace_view.cljs` already composes `setup_v4_sections.cljs`, `setup_v4_context.cljs`, and the scoped `portfolio-optimizer-v4` wrapper, so no new route split is required.
 
 - Observation: The current screenshot shows the remaining gap is density and border treatment, not missing setup sections.
-  Evidence: `/Users/barry/.codex/worktrees/d394/hyperopen/tmp/portfolio-optimizer-current-v4-diff-1294x885.png` already includes the header, preset row, left rail, summary pane, and right rail, but the header has an extra secondary row, the left column is broken into separated cards, and the right rail still reads as mixed panel primitives.
+  Evidence: `/hyperopen/tmp/portfolio-optimizer-current-v4-diff-1294x885.png` already includes the header, preset row, left rail, summary pane, and right rail, but the header has an extra secondary row, the left column is broken into separated cards, and the right rail still reads as mixed panel primitives.
 
 - Observation: The current optimizer CSS wrapper is intentionally light and does not yet encode most of the v4 primitive system.
   Evidence: `src/styles/main.css` only scopes accent colors, panel backgrounds, and a few radius and selected-state overrides, while `/Users/barry/Downloads/hyperopen portfolio optimizer/styles.css` defines the deeper v4 primitive set: 2px radii, 26px controls, dense mono labels, thin borders, tabular numerics, and continuous pane dividers.
@@ -130,11 +132,13 @@ This pass materially tightened `/portfolio/optimize/new` against the v4 setup ar
 
 The implementation reduced local complexity by extracting `setup_v4_header.cljs` and `setup_v4_universe.cljs` from the previously oversized `setup_v4_sections.cljs`. It increased CSS specificity inside `.portfolio-optimizer-v4`, but that complexity is intentionally route-scoped and prevents global HyperOpen header/footer or unrelated route drift. Remaining visual gaps are now narrower: the custom search/results model is structurally aligned, but exact pixel parity still depends on final production data density, the current app shell gutters, and the right-rail status behavior when readiness warnings are legitimately actionable.
 
+Consolidation outcome: The remaining product/design review item is now a historical note, not active engineering work. This plan is complete and should not be used as current optimizer source-of-truth scope.
+
 ## Context and Orientation
 
 The setup route is rendered by `src/hyperopen/views/portfolio/optimize/workspace_view.cljs`. That namespace already calculates the optimizer draft, readiness, current-portfolio preview, run state, and result-link context, then composes the setup surface from helper namespaces. `src/hyperopen/views/portfolio/optimize/setup_v4_header.cljs` owns the compact setup header and preset row. `src/hyperopen/views/portfolio/optimize/setup_v4_sections.cljs` owns the left control rail and center summary pane. `src/hyperopen/views/portfolio/optimize/setup_v4_context.cljs` owns the right rail, including the preset rationale copy, the Black-Litterman editor, trust and freshness messaging, optimization progress, readiness, run status, and the results link. `src/styles/main.css` contains the route-local `portfolio-optimizer-v4` style wrapper that scopes the v4 look.
 
-For this plan, "visual parity remediation" means closing the remaining deltas in spacing, border treatment, rail continuity, and control density while leaving optimizer logic intact. The design source of truth is `/Users/barry/Downloads/hyperopen portfolio optimizer/v4.jsx` plus `/Users/barry/Downloads/hyperopen portfolio optimizer/styles.css`. The screenshot source of truth for the current state is `/Users/barry/.codex/worktrees/d394/hyperopen/tmp/portfolio-optimizer-current-v4-diff-1294x885.png`.
+For this plan, "visual parity remediation" means closing the remaining deltas in spacing, border treatment, rail continuity, and control density while leaving optimizer logic intact. The design source of truth is `/Users/barry/Downloads/hyperopen portfolio optimizer/v4.jsx` plus `/Users/barry/Downloads/hyperopen portfolio optimizer/styles.css`. The screenshot source of truth for the current state is `/hyperopen/tmp/portfolio-optimizer-current-v4-diff-1294x885.png`.
 
 The current screenshot identifies five concrete deltas that align to the requested slices. The header still reads as two stacked bands because the draft-state badge creates a second visual row. The preset strip is close but does not fully match the v4 control density and selected-state treatment. The left rail is composed from four boxed panels plus a detached advanced-overrides box instead of a denser continuous column. The right rail still mixes separate cards and nested panels instead of one normalized stacked shell. The scoped CSS wrapper does not yet encode the full v4 primitive system needed to make those surfaces look consistent.
 
@@ -178,13 +182,13 @@ This slice should not remove any working status panels or the results link. The 
 
 ### Slice 5: Browser Screenshot Parity Validation
 
-Use the existing optimizer Playwright regression path to exercise `/portfolio/optimize/new` and capture a deterministic manual screenshot artifact at the same desktop footprint used by the screenshot inventory. Reuse existing optimizer fixtures where possible, wait for the setup route surface to settle, and record the screenshot artifact path in this plan so reviewers can compare it directly against `/Users/barry/.codex/worktrees/d394/hyperopen/tmp/portfolio-optimizer-current-v4-diff-1294x885.png`.
+Use the existing optimizer Playwright regression path to exercise `/portfolio/optimize/new` and capture a deterministic manual screenshot artifact at the same desktop footprint used by the screenshot inventory. Reuse existing optimizer fixtures where possible, wait for the setup route surface to settle, and record the screenshot artifact path in this plan so reviewers can compare it directly against `/hyperopen/tmp/portfolio-optimizer-current-v4-diff-1294x885.png`.
 
 This slice does not require screenshot snapshot testing for the entire route shell. It requires passing committed browser regressions plus one saved artifact that proves the targeted header, preset strip, left rail, and right rail deltas were actually closed.
 
 ## Concrete Steps
 
-From `/Users/barry/.codex/worktrees/d394/hyperopen`, make the edits with `apply_patch`.
+From repository root (`/hyperopen`), make the edits with `apply_patch`.
 
 1. Update `src/styles/main.css` inside the `.portfolio-optimizer-v4` scope with the missing v4 tokens and primitive selectors required by the setup surface.
 2. Add `src/hyperopen/views/portfolio/optimize/setup_v4_header.cljs` for the compact header and preset strip, and update `workspace_view.cljs` to call it.
@@ -219,9 +223,9 @@ Acceptance must stay behavior-first and screenshot-backed.
 
 - The right column at `data-role="portfolio-optimizer-right-rail"` uses one normalized hierarchy in both default and Black-Litterman states. In the idle default state it shows preset-safety guidance without default readiness/run-status dashboard cards. In actionable states it still renders trust, readiness, progress, run-status, last-successful-run, read-only warning, and result-link content. In Black-Litterman state it renders the existing views editor in the top context section while retaining the conditional status stack below.
 
-- `npm run check`, `npm test`, and `npm run test:websocket` all pass from `/Users/barry/.codex/worktrees/d394/hyperopen`, and the setup-route parity work does not rely on a new long-lived namespace-size exception for `setup_v4_sections.cljs`.
+- `npm run check`, `npm test`, and `npm run test:websocket` all pass from repository root, and the setup-route parity work does not rely on a new long-lived namespace-size exception for `setup_v4_sections.cljs`.
 
-- `npx playwright test tools/playwright/test/portfolio-regressions.spec.mjs -g "portfolio optimizer"` and `npx playwright test tools/playwright/test/optimizer-history-network.qa.spec.mjs` pass, and the desktop screenshot artifact at `/Users/barry/.codex/worktrees/d394/hyperopen/tmp/portfolio-optimizer-v4-remediation-1294x885.png` visibly improves header density, preset strip, left-rail continuity, and right-rail normalization compared with `/Users/barry/.codex/worktrees/d394/hyperopen/tmp/portfolio-optimizer-current-v4-diff-1294x885.png`.
+- `npx playwright test tools/playwright/test/portfolio-regressions.spec.mjs -g "portfolio optimizer"` and `npx playwright test tools/playwright/test/optimizer-history-network.qa.spec.mjs` pass, and the desktop screenshot artifact at `/hyperopen/tmp/portfolio-optimizer-v4-remediation-1294x885.png` visibly improves header density, preset strip, left-rail continuity, and right-rail normalization compared with `/hyperopen/tmp/portfolio-optimizer-current-v4-diff-1294x885.png`.
 
 ## Idempotence and Recovery
 
@@ -233,11 +237,11 @@ Browser screenshot capture can leave local artifacts or browser processes behind
 
 The primary design reference for this pass is the setup block in `/Users/barry/Downloads/hyperopen portfolio optimizer/v4.jsx` beginning at the compact header, the preset row, and the `420px 1fr 380px` workspace grid. The primary CSS reference is `/Users/barry/Downloads/hyperopen portfolio optimizer/styles.css`, especially the control primitives, panel shells, mono labels, and border treatment.
 
-The current-state reviewer artifact is `/Users/barry/.codex/worktrees/d394/hyperopen/tmp/portfolio-optimizer-current-v4-diff-1294x885.png`.
+The current-state reviewer artifact is `/hyperopen/tmp/portfolio-optimizer-current-v4-diff-1294x885.png`.
 
-The post-remediation reviewer artifact is `/Users/barry/.codex/worktrees/d394/hyperopen/tmp/portfolio-optimizer-v4-remediation-1294x885.png`.
+The post-remediation reviewer artifact is `/hyperopen/tmp/portfolio-optimizer-v4-remediation-1294x885.png`.
 
-The second-pass reviewer artifact is `/Users/barry/.codex/worktrees/d394/hyperopen/tmp/portfolio-optimizer-v4-pass2-1294x885.png`.
+The second-pass reviewer artifact is `/hyperopen/tmp/portfolio-optimizer-v4-pass2-1294x885.png`.
 
 Validation transcript summary:
 
@@ -274,3 +278,5 @@ The implementation should preserve the current setup-route interfaces:
 - `tools/playwright/test/portfolio-regressions.spec.mjs` remains the committed deterministic browser surface for setup-route regression coverage unless a smaller dedicated optimizer setup spec becomes necessary during implementation.
 
 Revision note (2026-04-27 / Codex): Initial plan created after auditing the v4 design CSS and JSX, the current setup screenshot, the existing optimizer setup parity plans, and the current setup route implementation seams.
+
+Revision note (2026-05-12 / Codex): Moved from `active/` to `completed/`, marked non-source-of-truth, converted old worktree-specific plan and screenshot references to repository-root paths, and recorded the pending design-review item as historical rather than active implementation scope during `hyperopen-5di4` consolidation.

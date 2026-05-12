@@ -1,13 +1,13 @@
 owner: product+platform
-status: active
-source_of_truth: true
+status: completed
+source_of_truth: false
 local_scratch_refs:
   - bd: hyperopen-g0m6
     authoritative: false
 based_on:
   - /Users/barry/Downloads/hyperopen portfolio optimizer/v4.jsx
   - /var/folders/dg/3nkyzrp12fn141vv7f6rc9v40000gn/T/TemporaryItems/NSIRD_screencaptureui_WvbRPz/Screenshot 2026-04-27 at 11.47.13 AM.png
-  - /Users/barry/.codex/worktrees/d394/hyperopen/docs/exec-plans/active/2026-04-26-portfolio-optimizer-v4-alignment.md
+  - /hyperopen/docs/exec-plans/completed/2026-04-26-portfolio-optimizer-v4-alignment.md
 
 # Portfolio Optimizer Setup V4 Pixel Parity
 
@@ -21,10 +21,12 @@ Public refs:
 - Direct maintainer request captured in this ExecPlan. No GitHub issue or PR is linked in this checkout.
 
 Repo artifacts:
-- Parent implementation context: `/hyperopen/docs/exec-plans/active/2026-04-26-portfolio-optimizer-v4-alignment.md`.
+- Parent implementation context: `/hyperopen/docs/exec-plans/completed/2026-04-26-portfolio-optimizer-v4-alignment.md`.
 
 Local scratch refs (non-authoritative):
 - Beads / `bd`: `hyperopen-g0m6` ("Align optimizer setup page to v4 pixel parity"), authoritative: false.
+
+Consolidation note: On 2026-05-12, `hyperopen-5di4` moved this plan from `docs/exec-plans/active/` to `docs/exec-plans/completed/`. It remains historical implementation evidence only; it is no longer an active source-of-truth plan.
 
 ## Purpose / Big Picture
 
@@ -40,7 +42,7 @@ This is not a solver pass and not a global shell pass. The designer's `Topbar`, 
 - [x] (2026-04-27 16:40Z) Implemented the setup route layout decomposition and kept existing optimizer actions wired. `workspace_view.cljs` is now a small composition layer and the v4 setup body is split across `setup_v4_sections.cljs` and `setup_v4_context.cljs`.
 - [x] (2026-04-27 16:47Z) Added focused layout regression tests in `test/hyperopen/views/portfolio/optimize/setup_v4_layout_test.cljs` without growing the capped legacy `view_test.cljs`.
 - [x] (2026-04-27 17:05Z) Ran repo gates and optimizer browser QA. `npm run check`, `npm test`, `npm run test:websocket`, and `npx playwright test tools/playwright/test/portfolio-regressions.spec.mjs -g "portfolio optimizer"` passed.
-- [ ] Optional follow-up: capture a designer-facing screenshot comparison if product wants another manual pixel-tuning pass after reviewing the implemented browser surface.
+- [x] (2026-05-12 02:39Z) Closed the optional screenshot follow-up as historical because the later visual remediation plan captured `tmp/portfolio-optimizer-v4-remediation-1294x885.png` and `tmp/portfolio-optimizer-v4-pass2-1294x885.png`, then this plan moved out of `active/` under `hyperopen-5di4`.
 
 ## Surprises & Discoveries
 
@@ -86,6 +88,8 @@ The setup route is now structurally closer to the v4 design. The old scenario-na
 
 The implementation reduced complexity in the primary setup entrypoint by shrinking `workspace_view.cljs` from 607 lines to 79 lines and removing its namespace-size exception. Complexity moved into two focused setup namespaces under the 500-line production threshold, which should make follow-up pixel tuning less risky. One optional follow-up remains: if the designer needs exact artboard-level parity, capture a fresh screenshot sequence and tune spacing/copy against that visual artifact.
 
+Consolidation outcome: The screenshot follow-up was later handled by the visual remediation plan, so this plan is now complete historical context. Active optimizer planning should not route through this document.
+
 ## Context and Orientation
 
 The editable optimizer setup route is rendered by `src/hyperopen/views/portfolio/optimize/workspace_view.cljs`. The route is reached through `/portfolio/optimize/new`; the global app header and footer come from the existing portfolio/app shell and must remain intact. The setup view currently renders a full-width setup header, a preset row, a left scenario/navigation rail, a main column containing universe/model/constraints sections, and a right trust/freshness rail. The core actions already work, but the layout does not match v4.
@@ -112,7 +116,7 @@ Run `npm test`, `npm run check`, and `npm run test:websocket`. For browser QA, r
 
 ## Concrete Steps
 
-From `/Users/barry/.codex/worktrees/d394/hyperopen`, make the edits with `apply_patch`.
+From repository root (`/hyperopen`), make the edits with `apply_patch`.
 
 1. Add `src/hyperopen/views/portfolio/optimize/setup_v4_sections.cljs` with reusable components.
 2. Modify `src/hyperopen/views/portfolio/optimize/workspace_view.cljs` to require the new namespace and replace the setup route body with the v4 grid composition.
@@ -172,3 +176,5 @@ The new namespace should expose pure view functions that return Hiccup:
     context-rail
 
 These functions receive the existing `state`, `route`, `draft`, `readiness`, `snapshot`, `preview-snapshot`, `run-state`, `optimization-progress`, `history-load-state`, `last-successful-run`, `saving-scenario?`, `running?`, `run-triggerable?`, and `highlighted-controls` values already computed by `workspace_view.cljs`. They should emit the existing action vectors directly and not add new application actions unless a behavior cannot otherwise be preserved.
+
+Revision note (2026-05-12 / Codex): Moved from `active/` to `completed/`, marked non-source-of-truth, replaced the old worktree-specific v4 alignment plan reference with the completed repository-root path, and recorded that the optional screenshot follow-up was superseded by the completed visual remediation pass.

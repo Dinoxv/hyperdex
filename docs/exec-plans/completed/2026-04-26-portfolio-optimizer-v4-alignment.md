@@ -1,6 +1,6 @@
 owner: product+platform
-status: active
-source_of_truth: true
+status: completed
+source_of_truth: false
 local_scratch_refs:
   - bd: hyperopen-q7j5
     authoritative: false
@@ -11,8 +11,8 @@ based_on:
   - /tmp/hyperopen-optimizer-design-v4/Portfolio Optimizer.html
   - /tmp/hyperopen-optimizer-design-v4/DESIGN.md
   - /tmp/hyperopen-optimizer-design-v4/styles.css
-  - /Users/barry/.codex/worktrees/d394/hyperopen/tmp/hyperopen-source-review-2026-04-26.zip
-  - /Users/barry/.codex/worktrees/d394/hyperopen/tmp/portfolio-optimizer-scroll-sequence-2026-04-26/
+  - /hyperopen/tmp/hyperopen-source-review-2026-04-26.zip
+  - /hyperopen/tmp/portfolio-optimizer-scroll-sequence-2026-04-26/
 
 # Portfolio Optimizer V4 Alignment ExecPlan
 
@@ -30,6 +30,8 @@ Repo artifacts:
 
 Local scratch refs (non-authoritative):
 - Beads / `bd`: `hyperopen-q7j5` ("Align portfolio optimizer UI with v4 design"), authoritative: false.
+
+Consolidation note: On 2026-05-12, `hyperopen-5di4` moved this plan from `docs/exec-plans/active/` to `docs/exec-plans/completed/`. It remains historical implementation evidence only; it is no longer the active source of truth for optimizer refactor scope.
 
 ## Purpose / Big Picture
 
@@ -115,7 +117,7 @@ Recommended sequencing:
 - [x] (2026-04-26) Extracted target exposure and read-only inputs rendering into dedicated component namespaces after namespace-size validation surfaced oversized migration modules. `scenario_detail_view.cljs` and `results_panel.cljs` are now below the production namespace-size threshold; the migration view test keeps a temporary capped exception pending a later test-suite split.
 - [x] (2026-04-26) Started Phase 7 visual normalization with a route-local `portfolio-optimizer-v4` wrapper and scoped CSS for denser radii, optimizer amber selected states, tiled panel layering, and tabular numeric treatment. This is deliberately local to optimizer surfaces and does not change global HyperOpen primitives.
 - [x] (2026-04-26) Updated browser regression coverage for the route-decomposed optimizer IA. The optimizer history-fetch smoke passed, and the `portfolio-regressions.spec.mjs -g "portfolio optimizer"` subset passed `9/9`, including setup, manual universe add/remove, history load, run storage, persisted scenario hydration, tracking tab, rebalance execution modal, Spectate Mode read-only handling, and failed-attempt recovery.
-- [ ] Phase 7: Visual primitive normalization and browser QA artifact pass.
+- [x] (2026-05-12 02:38Z) Consolidated Phase 7 into completed history because the follow-up setup pixel parity and visual remediation plans completed the route-local visual primitive work and browser artifact pass. This plan moved out of `active/` under `hyperopen-5di4`.
 
 ## Surprises & Discoveries
 
@@ -230,7 +232,9 @@ Recommended sequencing:
 
 ## Outcomes & Retrospective
 
-Not started. This section must be updated after each implementation phase. The expected outcome is a route-decomposed optimizer surface that passes browser QA and is materially closer to v4 in IA, hierarchy, visual language, and interaction model while preserving current optimizer behavior.
+The core v4 alignment work completed. The optimizer gained route-specific setup and scenario-detail surfaces, route-backed scenario tabs, a recommendation surface that no longer carries tracking and rebalance as trailing sections, a dedicated rebalance review tab, a read-only inputs audit tab, SVG frontier rendering, stale route-state guards, and Playwright coverage for the decomposed information architecture.
+
+This plan reduced UI complexity by replacing the original all-in-one optimizer page with smaller route-owned surfaces and by moving target exposure and read-only inputs rendering into focused component namespaces. Later completed plans tightened the setup visual treatment and selector/view-model boundaries, so this document is now historical context rather than active implementation scope.
 
 ## Context And Orientation
 
@@ -1059,9 +1063,11 @@ Current implementation evidence inspected:
 
 Screenshot evidence:
 
-- `/Users/barry/.codex/worktrees/d394/hyperopen/tmp/portfolio-optimizer-current-view-2026-04-26.png`
-- `/Users/barry/.codex/worktrees/d394/hyperopen/tmp/portfolio-optimizer-full-page-2026-04-26.png`
-- `/Users/barry/.codex/worktrees/d394/hyperopen/tmp/portfolio-optimizer-scroll-sequence-2026-04-26/portfolio-optimizer-scroll-01.png`
-- `/Users/barry/.codex/worktrees/d394/hyperopen/tmp/portfolio-optimizer-scroll-sequence-2026-04-26/portfolio-optimizer-scroll-04.png`
-- `/Users/barry/.codex/worktrees/d394/hyperopen/tmp/portfolio-optimizer-scroll-sequence-2026-04-26/portfolio-optimizer-scroll-06.png`
-- `/Users/barry/.codex/worktrees/d394/hyperopen/tmp/portfolio-optimizer-scroll-sequence-2026-04-26/portfolio-optimizer-scroll-07.png`
+- `/hyperopen/tmp/portfolio-optimizer-current-view-2026-04-26.png`
+- `/hyperopen/tmp/portfolio-optimizer-full-page-2026-04-26.png`
+- `/hyperopen/tmp/portfolio-optimizer-scroll-sequence-2026-04-26/portfolio-optimizer-scroll-01.png`
+- `/hyperopen/tmp/portfolio-optimizer-scroll-sequence-2026-04-26/portfolio-optimizer-scroll-04.png`
+- `/hyperopen/tmp/portfolio-optimizer-scroll-sequence-2026-04-26/portfolio-optimizer-scroll-06.png`
+- `/hyperopen/tmp/portfolio-optimizer-scroll-sequence-2026-04-26/portfolio-optimizer-scroll-07.png`
+
+Revision note (2026-05-12 / Codex): Moved from `active/` to `completed/`, marked non-source-of-truth, and normalized old worktree-specific artifact paths during stale optimizer v4 ExecPlan consolidation under `hyperopen-5di4`.
