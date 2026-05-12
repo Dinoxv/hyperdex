@@ -1,5 +1,5 @@
 (ns hyperopen.views.portfolio.optimize.setup-v4-universe
-  (:require [clojure.string :as str]
+  (:require [hyperopen.portfolio.optimizer.application.view-model :as optimizer-view-model]
             [hyperopen.portfolio.optimizer.application.universe-candidates :as universe-candidates]
             [hyperopen.portfolio.optimizer.coercion :as coercion]
             [hyperopen.views.portfolio.optimize.instrument-display :as instrument-display]))
@@ -50,93 +50,6 @@
           (if (>= volume 50000000) "deep" "medium")
           "medium"))))
 
-(def ^:private missing-history-warning-codes
-  #{:missing-history-coin
-    :missing-candle-history
-    :missing-vault-address
-    :missing-vault-history})
-
-(def ^:private insufficient-history-warning-codes
-  #{:insufficient-candle-history
-    :insufficient-vault-history})
-
-(defn- instrument-ids
-  [instruments]
-  (into #{} (keep :instrument-id) instruments))
-
-(defn- warning-by-instrument-id
-  [readiness instrument-id]
-  (some (fn [warning]
-          (when (= instrument-id (:instrument-id warning))
-            warning))
-        (:blocking-warnings readiness)))
-
-(defn- history-rows
-  [state instrument]
-  (if (= :vault (:market-type instrument))
-    (get-in state [:portfolio :optimizer :history-data :vault-details-by-address
-                   (:vault-address instrument)])
-    (get-in state [:portfolio :optimizer :history-data :candle-history-by-coin
-                   (:coin instrument)])))
-
-(defn- selected-history-label
-  [state readiness history-load-state history-status-by-id instrument]
-  (let [instrument-id (:instrument-id instrument)
-        prefetch-status (get-in state
-                                [:portfolio
-                                 :optimizer
-                                 :history-prefetch
-                                 :by-instrument-id
-                                 instrument-id
-                                 :status])
-        loading-ids (instrument-ids (get-in history-load-state
-                                            [:request-signature :universe]))
-        eligible-ids (instrument-ids (get-in readiness [:request :universe]))
-        readiness-status (get history-status-by-id instrument-id)
-        warning (warning-by-instrument-id readiness instrument-id)
-        warning-code (:code warning)
-        load-validated? (and (= :succeeded (:status history-load-state))
-                             (contains? loading-ids instrument-id))
-        cached-history? (seq (history-rows state instrument))]
-    (cond
-      (= :queued prefetch-status)
-      "queued"
-
-      (= :loading prefetch-status)
-      "loading"
-
-      (and (= :loading (:status history-load-state))
-           (contains? loading-ids instrument-id))
-      "loading"
-
-      (= :loaded-but-misaligned readiness-status)
-      "shared gap"
-
-      (= :aligned readiness-status)
-      "sufficient"
-
-      (contains? eligible-ids instrument-id)
-      "sufficient"
-
-      (and (= :insufficient readiness-status)
-           (or load-validated? cached-history?))
-      "insufficient"
-
-      (and (contains? insufficient-history-warning-codes warning-code)
-           (or load-validated? cached-history?))
-      "insufficient"
-
-      (and (= :missing readiness-status)
-           load-validated?)
-      "missing"
-
-      (and (contains? missing-history-warning-codes warning-code)
-           load-validated?)
-      "missing"
-
-      :else
-      "pending")))
-
 (defn- tag
   ([label tone]
    (tag label tone nil))
@@ -169,11 +82,11 @@
   (let [instrument-id (:instrument-id instrument)
         coin (:coin instrument)
         market-type (:market-type instrument)
-        history (selected-history-label state
-                                        readiness
-                                        history-load-state
-                                        history-status-by-id
-                                        instrument)
+        history (optimizer-view-model/selected-history-label state
+                                                             readiness
+                                                             history-load-state
+                                                             history-status-by-id
+                                                             instrument)
         primary-label (instrument-display/primary-label instrument)
         {:keys [name base-label]} (universe-candidates/market-display instrument)
         secondary-label (or (normalized-text (:name instrument))
@@ -256,20 +169,16 @@
 (defn universe-section
   ([state draft]
    (universe-section state draft nil))
-  ([state draft {:keys [readiness history-load-state history-status-by-id]}]
-   (let [universe (vec (or (:universe draft) []))
-         history-load-state* (or history-load-state
-                                 (get-in state [:portfolio :optimizer :history-load-state]))
-         history-status-by-id* (or history-status-by-id {})
-         search-query (or (get-in state [:portfolio-ui :optimizer :universe-search-query]) "")
-         searching? (seq (normalized-text search-query))
-         markets (if searching?
-                   (universe-candidates/candidate-markets state universe search-query)
-                   [])
-         active-index (universe-candidates/active-index state markets)
-         market-keys (if searching?
-                       (mapv :key markets)
-                       [])]
+  ([state draft opts]
+   (let [{:keys [universe
+                 readiness
+                 history-load-state
+                 history-status-by-id
+                 search-query
+                 searching?
+                 markets
+                 active-index
+                 market-keys]} (optimizer-view-model/universe-section-model state draft opts)]
     [:section {:class ["border" "border-base-300" "bg-base-100/90" "p-3" "leading-4"]
                :data-role "portfolio-optimizer-universe-panel"}
      [:div {:class ["flex" "items-center" "justify-between" "gap-3" "border-b"
@@ -346,8 +255,8 @@
            "No matching unused instruments found."]))]
      (selected-table state
                      readiness
-                     history-load-state*
-                     history-status-by-id*
+                     history-load-state
+                     history-status-by-id
                      universe)
      [:div {:class ["mt-2" "font-mono" "text-[0.58rem]" "leading-5"
                     "text-trading-muted/70"]}

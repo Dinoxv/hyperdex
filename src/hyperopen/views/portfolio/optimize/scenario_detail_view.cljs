@@ -1,8 +1,5 @@
 (ns hyperopen.views.portfolio.optimize.scenario-detail-view
-  (:require [hyperopen.portfolio.optimizer.defaults :as optimizer-defaults]
-            [hyperopen.portfolio.optimizer.application.run-identity :as run-identity]
-            [hyperopen.portfolio.optimizer.application.setup-readiness :as setup-readiness]
-            [hyperopen.portfolio.optimizer.query-state :as optimizer-query-state]
+  (:require [hyperopen.portfolio.optimizer.application.view-model :as optimizer-view-model]
             [hyperopen.portfolio.routes :as portfolio-routes]
             [hyperopen.views.portfolio.optimize.execution-modal :as execution-modal]
             [hyperopen.views.portfolio.optimize.format :as opt-format]
@@ -16,104 +13,6 @@
    {:key :rebalance :label "Rebalance preview" :data-role "portfolio-optimizer-scenario-tab-rebalance"}
    {:key :tracking :label "Tracking" :data-role "portfolio-optimizer-scenario-tab-tracking"}
    {:key :inputs :label "Inputs" :data-role "portfolio-optimizer-scenario-tab-inputs"}])
-
-(defn- active-tab
-  [state]
-  (optimizer-query-state/normalize-results-tab
-   (get-in state [:portfolio-ui :optimizer :results-tab])))
-
-(defn- loaded-scenario-matches-route?
-  [state scenario-id]
-  (= scenario-id
-     (get-in state [:portfolio :optimizer :active-scenario :loaded-id])))
-
-(defn- pending-route-load?
-  [state scenario-id]
-  (let [load-state (get-in state [:portfolio :optimizer :scenario-load-state])]
-    (and (= scenario-id (:scenario-id load-state))
-         (= :loading (:status load-state)))))
-
-(defn- retained-unsaved-run?
-  [state]
-  (and (nil? (get-in state [:portfolio :optimizer :active-scenario :loaded-id]))
-       (some? (get-in state [:portfolio :optimizer :last-successful-run]))))
-
-(defn- retained-unsaved-route?
-  [state scenario-id]
-  (and (retained-unsaved-run? state)
-       (contains? #{"draft"}
-                  scenario-id)))
-
-(defn- route-mismatched?
-  [state scenario-id]
-  (let [loaded-id (get-in state [:portfolio :optimizer :active-scenario :loaded-id])]
-    (and (not (retained-unsaved-route? state scenario-id))
-         (or (and (some? loaded-id)
-                  (not= loaded-id scenario-id))
-             (and (nil? loaded-id)
-                  (or (pending-route-load? state scenario-id)
-                      (retained-unsaved-run? state)))))))
-
-(defn- scenario-scoped-state
-  [state scenario-id]
-  (if (route-mismatched? state scenario-id)
-    (-> state
-        (assoc-in [:portfolio :optimizer :draft] (optimizer-defaults/default-draft))
-        (assoc-in [:portfolio :optimizer :last-successful-run] nil)
-        (assoc-in [:portfolio :optimizer :tracking] (optimizer-defaults/default-tracking-state))
-        (assoc-in [:portfolio :optimizer :active-scenario]
-                  {:loaded-id nil
-                   :status :loading
-                   :read-only? true}))
-    state))
-
-(defn- scenario-name
-  [state scenario-id]
-  (or (when (loaded-scenario-matches-route? state scenario-id)
-        (or (get-in state [:portfolio :optimizer :active-scenario :name])
-            (get-in state [:portfolio :optimizer :draft :name])))
-      (when (retained-unsaved-route? state scenario-id)
-        (or (get-in state [:portfolio :optimizer :draft :name])
-            "Unsaved Optimization"))
-      (when (= scenario-id (get-in state [:portfolio :optimizer :draft :id]))
-        (get-in state [:portfolio :optimizer :draft :name]))
-      (str "Scenario " scenario-id)))
-
-(defn- optimizer-draft
-  [state]
-  (or (get-in state [:portfolio :optimizer :draft])
-      (optimizer-defaults/default-draft)))
-
-(defn- optimizer-running?
-  [state]
-  (or (= :running (get-in state [:portfolio :optimizer :run-state :status]))
-      (= :running (get-in state [:portfolio :optimizer :optimization-progress :status]))))
-
-(defn- result
-  [state]
-  (get-in state [:portfolio :optimizer :last-successful-run :result]))
-
-(defn- solved-result?
-  [state]
-  (= :solved (:status (result state))))
-
-(defn- scenario-stale?
-  [state readiness]
-  (run-identity/stale-run?
-   {:draft (optimizer-draft state)
-    :readiness readiness
-    :run-state (get-in state [:portfolio :optimizer :run-state])
-    :running? (optimizer-running? state)
-    :last-successful-run (get-in state [:portfolio :optimizer :last-successful-run])}))
-
-(defn- current-result?
-  [state readiness]
-  (run-identity/current-solved-run?
-   {:draft (optimizer-draft state)
-    :readiness readiness
-    :run-state (get-in state [:portfolio :optimizer :run-state])
-    :running? (optimizer-running? state)
-    :last-successful-run (get-in state [:portfolio :optimizer :last-successful-run])}))
 
 (defn- tab-path
   [scenario-id tab-key]
@@ -131,11 +30,16 @@
                          (portfolio-routes/portfolio-optimize-scenario-path scenario-id)))))))
 
 (defn- scenario-header
-  [state scenario-id current-result?]
-  (let [status (get-in state [:portfolio :optimizer :active-scenario :status])
-        read-only? (true? (get-in state [:portfolio :optimizer :active-scenario :read-only?]))
-        running? (= :running (get-in state [:portfolio :optimizer :run-state :status]))
-        save-state (get-in state [:portfolio :optimizer :scenario-save-state :status])
+  [{:keys [scenario-id
+           scenario-name
+           active-scenario
+           run-state
+           scenario-save-state
+           current-result?]}]
+  (let [status (:status active-scenario)
+        read-only? (true? (:read-only? active-scenario))
+        running? (= :running (:status run-state))
+        save-state (:status scenario-save-state)
         saving? (= :saving save-state)
         save-disabled? (or saving?
                            (not current-result?))]
@@ -155,7 +59,7 @@
         "Scenario"]
        [:div {:class ["mt-1" "flex" "flex-wrap" "items-center" "gap-2"]}
         [:h1 {:class ["text-lg" "font-medium" "tracking-[-0.01em]"]}
-         (scenario-name state scenario-id)]
+         scenario-name]
         [:span {:class ["text-[0.8125rem]" "text-trading-muted"]}
          (str "/ scenario id " scenario-id
               (when read-only? " · read-only"))]
@@ -237,9 +141,8 @@
     delta]])
 
 (defn- kpi-strip
-  [state]
-  (let [result* (result state)
-        preview (:rebalance-preview result*)
+  [result*]
+  (let [preview (:rebalance-preview result*)
         performance (:performance result*)
         diagnostics (:diagnostics result*)
         current-return (:current-expected-return result*)
@@ -312,11 +215,8 @@
       "Rerun"]]))
 
 (defn- provenance-strip
-  [state scenario-id]
-  (let [draft (or (get-in state [:portfolio :optimizer :draft])
-                  (optimizer-defaults/default-draft))
-        result* (result state)
-        history-summary (:history-summary result*)
+  [{:keys [draft result scenario-id]}]
+  (let [result* result
         constraints (:constraints draft)]
     (let [field (fn [label value]
                   [:div {:class ["border-r" "border-base-300" "px-3" "py-2"]}
@@ -413,21 +313,30 @@
              :on {:click [[:actions/run-portfolio-optimizer-from-draft]]}}
     "Run again"]])
 
+(defn- solved-result?
+  [model]
+  (= :solved (:status (:result model))))
+
 (defn- recommendation-tab
-  [state stale? current-result?]
+  [{:keys [last-successful-run
+           draft
+           stale?
+           current-result?
+           frontier-overlay-mode
+           constrain-frontier?] :as model}]
   [:section {:class ["space-y-0"]
              :data-role "portfolio-optimizer-recommendation-tab"}
    (cond
-     (and (solved-result? state) current-result?)
+     (and (solved-result? model) current-result?)
      (results-panel/results-panel
-      (get-in state [:portfolio :optimizer :last-successful-run])
-      (get-in state [:portfolio :optimizer :draft])
+      last-successful-run
+      draft
       {:stale? stale?
-       :frontier-overlay-mode (get-in state [:portfolio-ui :optimizer :frontier-overlay-mode])
-       :constrain-frontier? (get-in state [:portfolio-ui :optimizer :constrain-frontier?])
+       :frontier-overlay-mode frontier-overlay-mode
+       :constrain-frontier? constrain-frontier?
        :include-rebalance? false})
 
-     (solved-result? state)
+     (solved-result? model)
      (stale-recommendation-blocked)
 
      :else
@@ -436,25 +345,25 @@
                 "Run or load this scenario to review target allocation, frontier, diagnostics, and rebalance context."))])
 
 (defn- rebalance-tab
-  [state]
+  [{:keys [last-successful-run] :as model}]
   [:section {:class ["space-y-4"]
              :data-role "portfolio-optimizer-rebalance-tab"}
-   (if (solved-result? state)
+   (if (solved-result? model)
      (rebalance-tab-view/rebalance-tab
-      (get-in state [:portfolio :optimizer :last-successful-run]))
+      last-successful-run)
      (empty-tab "portfolio-optimizer-rebalance-empty"
                 "Rebalance Preview"
                 "A rebalance preview is available after a successful optimization run."))])
 
 (defn- tab-body
-  [state selected-tab stale? current-result?]
+  [{:keys [state selected-tab] :as model}]
   (case selected-tab
-    :rebalance (rebalance-tab state)
+    :rebalance (rebalance-tab model)
     :tracking [:section {:class ["space-y-4"]
                          :data-role "portfolio-optimizer-tracking-tab"}
                (tracking-panel/tracking-panel state)]
     :inputs (inputs-tab-view/inputs-tab state)
-    (recommendation-tab state stale? current-result?)))
+    (recommendation-tab model)))
 
 (defn- scenario-loading-state
   [scenario-id]
@@ -464,22 +373,21 @@
 
 (defn scenario-detail-view
   [state route]
-  (let [scenario-id (:scenario-id route)
-        loading? (route-mismatched? state scenario-id)
-        state* (scenario-scoped-state state scenario-id)
-        selected-tab (active-tab state)
-        readiness (setup-readiness/build-readiness state*)
-        current-result? (current-result? state* readiness)
-        stale? (scenario-stale? state* readiness)]
+  (let [{:keys [scenario-id
+                loading?
+                state
+                selected-tab
+                result
+                stale?] :as model} (optimizer-view-model/scenario-detail-model state route)]
     [:section {:class ["portfolio-optimizer-v4" "space-y-0" "leading-4" "text-trading-text"]
                :data-role "portfolio-optimizer-scenario-detail-surface"
                :data-scenario-id scenario-id}
-     (scenario-header state* scenario-id current-result?)
-     (provenance-strip state* scenario-id)
+     (scenario-header model)
+     (provenance-strip model)
      (scenario-tabs scenario-id selected-tab)
-     (kpi-strip state*)
+     (kpi-strip result)
      (stale-banner stale?)
      (if loading?
        (scenario-loading-state scenario-id)
-       (tab-body state* selected-tab stale? current-result?))
-     (execution-modal/execution-modal state*)]))
+       (tab-body model))
+     (execution-modal/execution-modal state)]))
