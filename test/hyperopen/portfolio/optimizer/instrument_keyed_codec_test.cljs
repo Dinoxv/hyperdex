@@ -43,6 +43,27 @@
            (get-in normalized
                    [:diagnostics :custom :weight-sensitivity-by-instrument])))))
 
+(deftest normalize-worker-boundary-preserves-unrelated-nested-map-keys-test
+  (let [btc (keyword "perp:BTC")
+        raw-weights {btc 1
+                     :cash-buffer 0.05}
+        normalized (codec/normalize-worker-boundary
+                    {:payload {:metadata {:weights raw-weights}
+                               :custom-by-id raw-weights}})]
+    (is (= raw-weights
+           (get-in normalized [:payload :metadata :weights])))
+    (is (= raw-weights
+           (get-in normalized [:payload :custom-by-id])))))
+
+(deftest normalize-worker-boundary-covers-legacy-instrument-keyed-paths-test
+  (let [btc (keyword "perp:BTC")]
+    (doseq [path codec/instrument-keyed-map-paths]
+      (let [normalized (codec/normalize-worker-boundary
+                        (assoc-in {} path {btc {:weight 0.5}}))]
+        (is (= {"perp:BTC" {:weight 0.5}}
+               (get-in normalized path))
+            (str "legacy path should still normalize: " (pr-str path)))))))
+
 (deftest normalize-worker-boundary-stringifies-black-litterman-view-weights-test
   (let [btc (keyword "perp:BTC")
         normalized (codec/normalize-worker-boundary
