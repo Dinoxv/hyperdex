@@ -296,3 +296,166 @@
             {:status :idle}
             {(:instrument-id vault-instrument) :insufficient}
             vault-instrument)))))
+
+(deftest tracking-model-projects-latest-snapshot-labels-and-manual-state-test
+  (let [vault-id (str "vault:" vault-address)
+        tracked-state {:portfolio
+                       {:optimizer
+                        {:active-scenario {:loaded-id "scn_track"
+                                           :status :executed}
+                         :draft {:id "draft-track"}
+                         :last-successful-run
+                         {:result {:labels-by-instrument {vault-id "Alpha Vault"}}}
+                         :tracking {:scenario-id "scn_track"
+                                    :updated-at-ms 2000
+                                    :snapshots
+                                    [{:scenario-id "scn_track"
+                                      :as-of-ms 1000
+                                      :status :tracked
+                                      :rows [{:instrument-id "perp:BTC"}]}
+                                     {:scenario-id "scn_track"
+                                      :as-of-ms 2000
+                                      :status :tracked
+                                      :rows [{:instrument-id vault-id
+                                              :weight-drift 0.05}]}]}}}}
+        tracked-model (view-model/tracking-model tracked-state)
+        manual-model (view-model/tracking-model
+                      {:portfolio {:optimizer {:active-scenario {:loaded-id "scn_saved"
+                                                                 :status :saved}
+                                               :tracking {:snapshots []}}}})
+        unsaved-model (view-model/tracking-model
+                       {:portfolio {:optimizer {:active-scenario {:loaded-id nil
+                                                                  :status :computed}
+                                                :draft {:id nil}
+                                                :tracking {:snapshots []}}}})]
+    (is (= :executed (:scenario-status tracked-model)))
+    (is (true? (:trackable? tracked-model)))
+    (is (false? (:manual-tracking? tracked-model)))
+    (is (= "scn_track" (:active-scenario-id tracked-model)))
+    (is (= "Alpha Vault" (get-in tracked-model [:latest-snapshot :rows 0 :instrument-label])))
+    (is (= "Alpha Vault" (get-in tracked-model [:latest-rows 0 :instrument-label])))
+    (is (= 2 (count (:snapshots tracked-model))))
+    (is (true? (:manual-tracking? manual-model)))
+    (is (true? (:manual-tracking-enableable? manual-model)))
+    (is (true? (:manual-tracking? unsaved-model)))
+    (is (false? (:manual-tracking-enableable? unsaved-model)))))
+
+(deftest execution-modal-model-projects-confirm-state-history-and-labels-test
+  (let [vault-id (str "vault:" vault-address)
+        state {:portfolio
+               {:optimizer
+                {:last-successful-run
+                 {:result {:labels-by-instrument {vault-id "Alpha Vault"}}}
+                 :execution
+                 {:history [{:attempt-id "exec_1"
+                             :status :failed
+                             :rows [{:instrument-id vault-id
+                                     :status :failed
+                                     :side :sell
+                                     :delta-notional-usd -400
+                                     :error {:message "exchange unavailable"}}]}]}
+                 :execution-modal
+                 {:open? true
+                  :submitting? false
+                  :plan {:status :partially-blocked
+                         :summary {:ready-count 1
+                                   :blocked-count 1
+                                   :gross-ready-notional-usd 1000}
+                         :rows [{:instrument-id vault-id
+                                 :status :ready
+                                 :side :buy
+                                 :delta-notional-usd 1000}
+                                {:instrument-id "spot:PURR"
+                                 :status :blocked
+                                 :reason :spot-submit-unsupported}]}}}}}
+        model (view-model/execution-modal-model state)
+        submitting-model (view-model/execution-modal-model
+                          (assoc-in state
+                                    [:portfolio :optimizer :execution-modal :submitting?]
+                                    true))
+        disabled-model (view-model/execution-modal-model
+                        (-> state
+                            (assoc-in [:portfolio :optimizer :execution-modal :plan :summary :ready-count]
+                                      0)
+                            (assoc-in [:portfolio :optimizer :execution-modal :plan :execution-disabled?]
+                                      true)))]
+    (is (true? (:open? model)))
+    (is (true? (:ready? model)))
+    (is (false? (:confirm-disabled? model)))
+    (is (= "Alpha Vault" (get-in model [:plan :rows 0 :instrument-label])))
+    (is (= "Alpha Vault" (get-in model [:latest-attempt :rows 0 :instrument-label])))
+    (is (= "exchange unavailable" (get-in model [:latest-attempt :rows 0 :error :message])))
+    (is (true? (:confirm-disabled? submitting-model)))
+    (is (false? (:ready? disabled-model)))
+    (is (true? (:confirm-disabled? disabled-model)))
+    (is (= "Order submission wiring is not enabled in this slice."
+           (:disabled-message disabled-model)))))
+
+(deftest inputs-audit-model-projects-draft-scenario-and-readable-input-labels-test
+  (let [vault-id (str "vault:" vault-address)
+        model (view-model/inputs-audit-model
+               {:portfolio
+                {:optimizer
+                 {:active-scenario {:loaded-id "scn_inputs"}
+                  :draft {:id "draft_inputs"
+                          :universe [btc-instrument
+                                     {:instrument-id vault-id
+                                      :market-type :vault
+                                      :coin vault-id
+                                      :vault-address vault-address
+                                      :name "Alpha Vault"}]
+                          :objective {:kind :target-volatility}
+                          :return-model {:kind :black-litterman
+                                         :views [{:kind :relative
+                                                  :long-instrument-id "perp:BTC"
+                                                  :short-instrument-id vault-id
+                                                  :direction :outperform
+                                                  :return 0.04}
+                                                 {:kind :absolute
+                                                  :instrument-id vault-id
+                                                  :return 0.08}]}
+                          :risk-model {:kind :diagonal-shrink}
+                          :constraints {:long-only? true}
+                          :execution-assumptions {:fee-mode :taker}}}}})]
+    (is (= "scn_inputs" (:scenario-id model)))
+    (is (= :target-volatility (:objective-kind model)))
+    (is (= :black-litterman (:return-model-kind model)))
+    (is (= :diagonal-shrink (:risk-model-kind model)))
+    (is (= "perp:BTC" (get-in model [:universe-rows 0 :audit-label])))
+    (is (= "Alpha Vault" (get-in model [:universe-rows 1 :audit-label])))
+    (is (= "BTC" (get-in model [:view-rows 0 :primary-label])))
+    (is (= "Alpha Vault" (get-in model [:view-rows 0 :comparator-label])))
+    (is (= "Alpha Vault" (get-in model [:view-rows 1 :primary-label])))
+    (is (= [{:kind :relative
+             :long-instrument-id "perp:BTC"
+             :short-instrument-id vault-id
+             :direction :outperform
+             :return 0.04}
+            {:kind :absolute
+             :instrument-id vault-id
+             :return 0.08}]
+           (mapv #(dissoc % :primary-label :comparator-label)
+                 (:view-rows model))))))
+
+(deftest universe-panel-model-projects-asset-query-candidates-test
+  (let [model (view-model/universe-panel-model
+               {:portfolio-ui {:optimizer {:universe-search-query "hype"
+                                           :universe-search-active-index 1}}
+                :asset-selector
+                {:markets [{:key "perp:HYPE"
+                            :market-type :perp
+                            :coin "HYPE"
+                            :symbol "HYPE-USDC"
+                            :volume24h 2000}
+                           {:key "spot:HYPE"
+                            :market-type :spot
+                            :coin "HYPE"
+                            :symbol "HYPE"
+                            :base "HYPE"
+                            :quote "USDC"
+                            :volume24h 1000}]}}
+               {:universe [btc-instrument]})]
+    (is (= [btc-instrument] (:universe model)))
+    (is (= "hype" (:search-query model)))
+    (is (= ["perp:HYPE" "spot:HYPE"] (:market-keys model)))
+    (is (= 1 (:active-index model)))))

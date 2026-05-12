@@ -1,13 +1,6 @@
 (ns hyperopen.views.portfolio.optimize.tracking-panel
-  (:require [hyperopen.portfolio.optimizer.ids :as ids]
+  (:require [hyperopen.portfolio.optimizer.application.view-model :as optimizer-view-model]
             [hyperopen.views.portfolio.optimize.format :as opt-format]))
-
-(def trackable-statuses #{:executed :partially-executed :tracking})
-(def manual-tracking-source-statuses #{:saved :computed})
-
-(defn- latest-snapshot
-  [tracking-record]
-  (last (vec (:snapshots tracking-record))))
 
 (defn- metric-card
   [label value]
@@ -17,21 +10,8 @@
    [:p {:class ["mt-2" "text-lg" "font-semibold" "tabular-nums"]}
     value]])
 
-(defn- labels-by-instrument
-  [state]
-  (or (get-in state [:portfolio :optimizer :last-successful-run :result :labels-by-instrument])
-      {}))
-
-(defn- instrument-label
-  [labels-by-instrument instrument-id]
-  (let [value (str instrument-id)]
-    (if (ids/vault-instrument-id? value)
-      (or (get labels-by-instrument instrument-id)
-          value)
-      value)))
-
 (defn- tracking-row
-  [labels-by-instrument idx row]
+  [idx row]
   [:div {:class ["grid"
                  "grid-cols-[minmax(8rem,1.1fr)_repeat(4,minmax(5rem,0.8fr))]"
                  "gap-3"
@@ -44,7 +24,7 @@
                  "tabular-nums"]
          :data-role (str "portfolio-optimizer-tracking-row-" idx)}
    [:span {:class ["font-semibold" "text-trading-text"]}
-    (instrument-label labels-by-instrument (:instrument-id row))]
+    (:instrument-label row)]
    [:span (opt-format/format-pct (:current-weight row))]
    [:span (opt-format/format-pct (:target-weight row))]
    [:span (opt-format/format-pct (:weight-drift row))]
@@ -69,7 +49,7 @@
    [:span {:class ["font-semibold" "text-trading-muted"]} "Notional"]])
 
 (defn- drift-chart
-  [rows labels-by-instrument]
+  [rows]
   [:section {:class ["mt-4" "rounded-lg" "border" "border-base-300" "bg-base-200/30" "p-3"]
              :data-role "portfolio-optimizer-drift-chart"}
    [:p {:class ["text-[0.65rem]" "font-semibold" "uppercase" "tracking-[0.18em]" "text-trading-muted"]}
@@ -83,7 +63,7 @@
                          0)]
              [:div {:class ["grid" "grid-cols-[8rem_minmax(0,1fr)_4rem]" "items-center" "gap-2" "text-xs"]}
               [:span {:class ["truncate" "font-semibold"]}
-               (instrument-label labels-by-instrument (:instrument-id row))]
+               (:instrument-label row)]
               [:div {:class ["h-2" "overflow-hidden" "rounded-full" "bg-base-300"]}
                [:div {:class ["h-full" "rounded-full" "bg-primary/70"]
                       :style {:width (str width "%")}}]]
@@ -107,14 +87,9 @@
         [:p {:class ["tabular-nums"]} (str "Predicted " (opt-format/format-pct (:predicted-return snapshot)))]])
      snapshots))])
 
-(defn- active-scenario-id
-  [state]
-  (or (get-in state [:portfolio :optimizer :active-scenario :loaded-id])
-      (get-in state [:portfolio :optimizer :draft :id])))
-
 (defn- manual-tracking-panel
-  [state]
-  (let [enableable? (some? (active-scenario-id state))]
+  [model]
+  (let [enableable? (:manual-tracking-enableable? model)]
     [:section {:class ["rounded-xl" "border" "border-base-300" "bg-base-100/95" "p-4"]
                :data-role "portfolio-optimizer-tracking-panel"}
      [:p {:class ["text-[0.65rem]" "font-semibold" "uppercase" "tracking-[0.24em]" "text-trading-muted"]}
@@ -138,15 +113,16 @@
 
 (defn tracking-panel
   [state]
-  (let [scenario-status (get-in state [:portfolio :optimizer :active-scenario :status])
-        tracking-record (get-in state [:portfolio :optimizer :tracking])
-        labels-by-instrument* (labels-by-instrument state)
-        latest (latest-snapshot tracking-record)]
+  (let [{:keys [manual-tracking?
+                trackable?
+                tracking-record
+                latest-snapshot
+                latest-rows] :as model} (optimizer-view-model/tracking-model state)]
     (cond
-      (contains? manual-tracking-source-statuses scenario-status)
-      (manual-tracking-panel state)
+      manual-tracking?
+      (manual-tracking-panel model)
 
-      (contains? trackable-statuses scenario-status)
+      trackable?
       (into
        [:section {:class ["rounded-xl" "border" "border-base-300" "bg-base-100/95" "p-4"]
                   :data-role "portfolio-optimizer-tracking-panel"}
@@ -186,19 +162,18 @@
                    :data-role "portfolio-optimizer-reoptimize-current"
                    :on {:click [[:actions/run-portfolio-optimizer-from-draft]]}}
           "Re-optimize From Current"]]
-        (if latest
+        (if latest-snapshot
           [:div {:class ["mt-4" "grid" "grid-cols-2" "gap-2" "lg:grid-cols-6"]}
-           (metric-card "Status" (opt-format/keyword-label (:status latest)))
-           (metric-card "Weight Drift RMS" (opt-format/format-pct (:weight-drift-rms latest)))
-           (metric-card "Max Drift" (opt-format/format-pct (:max-abs-weight-drift latest)))
-           (metric-card "Predicted Return" (opt-format/format-pct (:predicted-return latest)))
-           (metric-card "Predicted Vol" (opt-format/format-pct (:predicted-volatility latest)))
-           (metric-card "Realized Return" (opt-format/format-pct (:realized-return latest)))]
+           (metric-card "Status" (opt-format/keyword-label (:status latest-snapshot)))
+           (metric-card "Weight Drift RMS" (opt-format/format-pct (:weight-drift-rms latest-snapshot)))
+           (metric-card "Max Drift" (opt-format/format-pct (:max-abs-weight-drift latest-snapshot)))
+           (metric-card "Predicted Return" (opt-format/format-pct (:predicted-return latest-snapshot)))
+           (metric-card "Predicted Vol" (opt-format/format-pct (:predicted-volatility latest-snapshot)))
+           (metric-card "Realized Return" (opt-format/format-pct (:realized-return latest-snapshot)))]
           [:p {:class ["mt-4" "rounded-lg" "border" "border-base-300" "bg-base-200/40" "p-3" "text-sm" "text-trading-muted"]}
            "No tracking snapshots yet. Refresh tracking after execution to measure weight drift."])]
-       (when latest
-         (concat [(drift-chart (:rows latest) labels-by-instrument*)
+       (when latest-snapshot
+         (concat [(drift-chart latest-rows)
                   (tracking-path (:snapshots tracking-record))
                   (tracking-header-row)]
-                 (map-indexed (partial tracking-row labels-by-instrument*)
-                              (:rows latest))))))))
+                 (map-indexed tracking-row latest-rows)))))))

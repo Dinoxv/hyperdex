@@ -1,5 +1,5 @@
 (ns hyperopen.views.portfolio.optimize.execution-modal
-  (:require [hyperopen.portfolio.optimizer.ids :as ids]
+  (:require [hyperopen.portfolio.optimizer.application.view-model :as optimizer-view-model]
             [hyperopen.views.portfolio.optimize.format :as opt-format]))
 
 (defn- summary-card
@@ -11,21 +11,8 @@
    [:p {:class ["mt-2" "text-lg" "font-semibold" "tabular-nums"]}
     value]])
 
-(defn- labels-by-instrument
-  [state]
-  (or (get-in state [:portfolio :optimizer :last-successful-run :result :labels-by-instrument])
-      {}))
-
-(defn- instrument-label
-  [labels-by-instrument instrument-id]
-  (let [value (str instrument-id)]
-    (if (ids/vault-instrument-id? value)
-      (or (get labels-by-instrument instrument-id)
-          value)
-      value)))
-
 (defn- row
-  [labels-by-instrument execution-row]
+  [execution-row]
   [:div {:class ["grid"
                  "grid-cols-[minmax(8rem,1.1fr)_repeat(9,minmax(5rem,0.75fr))]"
                  "gap-3"
@@ -37,7 +24,7 @@
                  "text-xs"
                  "tabular-nums"]}
    [:span {:class ["font-semibold" "text-trading-text"]}
-    (instrument-label labels-by-instrument (:instrument-id execution-row))]
+    (:instrument-label execution-row)]
    [:span (opt-format/keyword-label (:status execution-row))]
    [:span (opt-format/keyword-label (:side execution-row))]
    [:span (opt-format/format-usdc (:delta-notional-usd execution-row))]
@@ -78,7 +65,7 @@
       (:reason execution-row)))
 
 (defn- latest-attempt-row
-  [labels-by-instrument execution-row]
+  [execution-row]
   [:div {:class ["grid"
                  "grid-cols-[minmax(8rem,1.1fr)_repeat(4,minmax(5rem,0.8fr))]"
                  "gap-3"
@@ -90,14 +77,14 @@
                  "text-xs"
                  "tabular-nums"]}
    [:span {:class ["font-semibold" "text-trading-text"]}
-    (instrument-label labels-by-instrument (:instrument-id execution-row))]
+    (:instrument-label execution-row)]
    [:span (opt-format/keyword-label (:status execution-row))]
    [:span (opt-format/keyword-label (:side execution-row))]
    [:span (opt-format/format-usdc (:delta-notional-usd execution-row))]
    [:span (opt-format/keyword-label (row-error-message execution-row))]])
 
 (defn- latest-attempt-panel
-  [labels-by-instrument latest-attempt]
+  [latest-attempt]
   (when (seq (:rows latest-attempt))
     [:section {:class ["mt-4"
                        "rounded-xl"
@@ -145,24 +132,19 @@
         [:span "Side"]
         [:span "Delta"]
         [:span "Recovery Detail"]]
-       (map (partial latest-attempt-row labels-by-instrument)
-            (:rows latest-attempt))))]))
+       (map latest-attempt-row (:rows latest-attempt))))]))
 
 (defn execution-modal
   [state]
-  (let [modal (get-in state [:portfolio :optimizer :execution-modal])
-        plan (:plan modal)
-        summary (:summary plan)
-        labels-by-instrument* (labels-by-instrument state)
-        latest-attempt (last (vec (get-in state [:portfolio :optimizer :execution :history])))
-        submitting? (boolean (:submitting? modal))
-        ready? (pos? (or (:ready-count summary) 0))
-        confirm-disabled? (or submitting?
-                              (:execution-disabled? plan)
-                              (not ready?))
-        disabled-message (or (:disabled-message plan)
-                             "Order submission wiring is not enabled in this slice.")]
-    (when (:open? modal)
+  (let [{:keys [modal
+                open?
+                plan
+                summary
+                latest-attempt
+                submitting?
+                confirm-disabled?
+                disabled-message]} (optimizer-view-model/execution-modal-model state)]
+    (when open?
       [:div {:class ["fixed" "inset-0" "z-50" "flex" "items-center" "justify-center"
                      "bg-black/60" "p-6"]
              :data-role "portfolio-optimizer-execution-modal"}
@@ -206,8 +188,8 @@
         (into
          [:div {:class ["mt-4" "space-y-2"]}]
          (cons (execution-row-header)
-               (map (partial row labels-by-instrument*) (:rows plan))))
-        (latest-attempt-panel labels-by-instrument* latest-attempt)
+               (map row (:rows plan))))
+        (latest-attempt-panel latest-attempt)
         [:div {:class ["mt-5" "flex" "items-center" "justify-end" "gap-3"]}
          [:button {:type "button"
                    :class ["rounded-lg" "border" "border-base-300" "px-4" "py-2" "text-sm"
