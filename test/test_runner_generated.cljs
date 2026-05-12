@@ -193,6 +193,7 @@
             [hyperopen.portfolio.optimizer.application.engine-test]
             [hyperopen.portfolio.optimizer.application.execution-test]
             [hyperopen.portfolio.optimizer.application.history-loader-test]
+            [hyperopen.portfolio.optimizer.application.history-loader-vaults-test]
             [hyperopen.portfolio.optimizer.application.orderbook-loader-test]
             [hyperopen.portfolio.optimizer.application.request-builder-test]
             [hyperopen.portfolio.optimizer.application.return-inputs-test]
@@ -262,7 +263,9 @@
             [hyperopen.runtime.effect-adapters.order-test]
             [hyperopen.runtime.effect-adapters.portfolio-optimizer-execution-test]
             [hyperopen.runtime.effect-adapters.portfolio-optimizer-history-facade-test]
+            [hyperopen.runtime.effect-adapters.portfolio-optimizer-history-test]
             [hyperopen.runtime.effect-adapters.portfolio-optimizer-pipeline-test]
+            [hyperopen.runtime.effect-adapters.portfolio-optimizer-scenarios-test]
             [hyperopen.runtime.effect-adapters.portfolio-optimizer-test]
             [hyperopen.runtime.effect-adapters.portfolio-optimizer-tracking-test]
             [hyperopen.runtime.effect-adapters.staking-test]
@@ -445,7 +448,9 @@
             [hyperopen.views.portfolio.optimize.scenario-detail-view-test]
             [hyperopen.views.portfolio.optimize.setup-readiness-panel-test]
             [hyperopen.views.portfolio.optimize.setup-v4-layout-test]
+            [hyperopen.views.portfolio.optimize.setup-v4-universe-layout-test]
             [hyperopen.views.portfolio.optimize.setup-v4-use-my-views-cards-test]
+            [hyperopen.views.portfolio.optimize.setup-v4-use-my-views-workspace-test]
             [hyperopen.views.portfolio.optimize.setup-view-test]
             [hyperopen.views.portfolio.optimize.tracking-panel-test]
             [hyperopen.views.portfolio.optimize.universe-panel-test]
@@ -817,6 +822,7 @@
              'hyperopen.portfolio.optimizer.application.engine-test
              'hyperopen.portfolio.optimizer.application.execution-test
              'hyperopen.portfolio.optimizer.application.history-loader-test
+             'hyperopen.portfolio.optimizer.application.history-loader-vaults-test
              'hyperopen.portfolio.optimizer.application.orderbook-loader-test
              'hyperopen.portfolio.optimizer.application.request-builder-test
              'hyperopen.portfolio.optimizer.application.return-inputs-test
@@ -886,7 +892,9 @@
              'hyperopen.runtime.effect-adapters.order-test
              'hyperopen.runtime.effect-adapters.portfolio-optimizer-execution-test
              'hyperopen.runtime.effect-adapters.portfolio-optimizer-history-facade-test
+             'hyperopen.runtime.effect-adapters.portfolio-optimizer-history-test
              'hyperopen.runtime.effect-adapters.portfolio-optimizer-pipeline-test
+             'hyperopen.runtime.effect-adapters.portfolio-optimizer-scenarios-test
              'hyperopen.runtime.effect-adapters.portfolio-optimizer-test
              'hyperopen.runtime.effect-adapters.portfolio-optimizer-tracking-test
              'hyperopen.runtime.effect-adapters.staking-test
@@ -1069,7 +1077,9 @@
              'hyperopen.views.portfolio.optimize.scenario-detail-view-test
              'hyperopen.views.portfolio.optimize.setup-readiness-panel-test
              'hyperopen.views.portfolio.optimize.setup-v4-layout-test
+             'hyperopen.views.portfolio.optimize.setup-v4-universe-layout-test
              'hyperopen.views.portfolio.optimize.setup-v4-use-my-views-cards-test
+             'hyperopen.views.portfolio.optimize.setup-v4-use-my-views-workspace-test
              'hyperopen.views.portfolio.optimize.setup-view-test
              'hyperopen.views.portfolio.optimize.tracking-panel-test
              'hyperopen.views.portfolio.optimize.universe-panel-test

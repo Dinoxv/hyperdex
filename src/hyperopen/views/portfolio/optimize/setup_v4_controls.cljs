@@ -1,0 +1,112 @@
+(ns hyperopen.views.portfolio.optimize.setup-v4-controls
+  (:require [clojure.string :as str]))
+
+(def eyebrow-class
+  ["font-mono" "text-[0.625rem]" "font-semibold" "uppercase" "tracking-[0.08em]" "text-trading-muted/70"])
+
+(def section-title-class
+  ["text-[0.6875rem]" "font-semibold" "uppercase" "tracking-[0.08em]" "text-trading-text"])
+
+(def input-class
+  ["w-full" "border" "border-base-300" "bg-base-100/80" "px-2" "py-1.5"
+   "font-mono" "text-[0.6875rem]" "font-medium" "outline-none"
+   "transition-shadow" "focus:border-warning/70"
+   "focus:shadow-[0_0_0_1px_rgba(212,181,88,0.75)]"])
+
+(defn labelize
+  [value]
+  (-> (name (or value :unknown))
+      (str/replace "-" " ")
+      (str/capitalize)))
+
+(defn percent-label
+  [value]
+  (if (number? value)
+    (str (.toFixed (* value 100) 0) "%")
+    "--"))
+
+(defn panel
+  [role & children]
+  (into [:section {:class ["border" "border-base-300" "bg-base-100/90" "p-3"]
+                   :data-role role}]
+        children))
+
+(defn disclosure-panel
+  [role & children]
+  (into [:details {:class ["border" "border-base-300" "bg-base-100/90" "p-3"]
+                   :data-role role}]
+        children))
+
+(defn section-heading
+  [idx title trailing]
+  [:div {:class ["flex" "items-center" "justify-between" "gap-3" "border-b" "border-base-300" "pb-2"]}
+   [:p {:class section-title-class}
+    [:span {:class ["mr-2" "font-mono" "text-trading-muted/70"]} idx]
+    title]
+   (when trailing
+     [:span {:class ["font-mono" "text-[0.65625rem]" "uppercase" "tracking-[0.08em]"
+                      "text-trading-muted/70"]}
+      trailing])])
+
+(defn disclosure-heading
+  [idx title trailing]
+  [:summary {:class ["cursor-pointer" "select-none" "focus:outline-none" "focus:text-warning"]}
+   (section-heading idx title trailing)])
+
+(defn segmented-button
+  ([label selected? role action]
+   (segmented-button label nil nil :center selected? role action))
+  ([label hidden-label selected? role action]
+   (segmented-button label hidden-label nil :center selected? role action))
+  ([label hidden-label help-copy tooltip-position selected? role action]
+   (let [tooltip-id (str role "-tooltip")
+         tooltip-position-classes (case tooltip-position
+                                    :start ["left-0"]
+                                    :end ["right-0"]
+                                    ["left-1/2" "-translate-x-1/2"])]
+     [:button {:type "button"
+               :class (cond-> ["group" "relative" "border-r" "border-base-300"
+                               "bg-transparent" "px-2" "py-1.5" "text-center"
+                               "text-[0.65625rem]" "font-medium" "uppercase"
+                               "tracking-[0.04em]" "text-trading-muted"
+                               "transition-colors" "last:border-r-0"
+                               "hover:text-warning" "focus:outline-none"
+                               "focus:text-warning"
+                               "focus:shadow-[inset_0_0_0_1px_rgba(212,181,88,0.75)]"]
+                        selected? (conj "bg-base-200/40" "text-trading-text"))
+               :aria-pressed (str selected?)
+               :aria-describedby (when help-copy tooltip-id)
+               :data-role role
+               :on {:click [action]}}
+      label
+      (when hidden-label
+        [:span {:class ["sr-only"]} hidden-label])
+      (when help-copy
+        [:span {:class (into ["pointer-events-none" "absolute" "top-[calc(100%+6px)]"
+                              "z-30" "w-72" "max-w-[calc(100vw-2rem)]"
+                              "border" "border-base-300" "bg-base-100" "px-2" "py-1.5"
+                              "font-sans" "text-[0.65625rem]" "font-normal"
+                              "normal-case" "leading-[1.45]" "tracking-normal"
+                              "text-trading-muted" "opacity-0"
+                              "shadow-[0_12px_32px_rgba(0,0,0,0.45)]"
+                              "transition-opacity" "duration-150"
+                              "group-hover:opacity-100" "group-focus:opacity-100"]
+                             tooltip-position-classes)
+                :id tooltip-id
+                :role "tooltip"
+                :data-role tooltip-id}
+         help-copy])])))
+
+(defn number-input
+  [label value role action highlighted?]
+  [:label {:class (cond-> ["block" "border" "border-base-300" "bg-base-200/20" "p-2"]
+                    highlighted? (conj "border-warning/70" "bg-warning/10"))}
+   [:span {:class eyebrow-class} label]
+   [:input {:type "text"
+            :inputmode "decimal"
+            :class (conj input-class "mt-2")
+            :data-role role
+            :data-infeasible (when highlighted? "true")
+            :aria-invalid (when highlighted? "true")
+            :value (str value)
+            :on {:input [action]}}]])
