@@ -19,6 +19,17 @@
   (is (= {:results-tab :recommendation}
          (query-state/parse-optimizer-query "?otab=diagnostics"))))
 
+(deftest parse-optimizer-query-normalizes-shared-keyword-edge-cases-test
+  (is (= {:list-filter :partially-executed
+          :list-sort :updated-desc
+          :workspace-panel :results
+          :results-tab :recommendation
+          :diagnostics-tab :sensitivity}
+         (query-state/parse-optimizer-query
+          "?ofilter=partiallyExecuted&osort=updated_desc&oview=results&otab=frontier&odiag=sensitivity")))
+  (is (= {:list-filter :partially-executed}
+         (query-state/parse-optimizer-query "?ofilter=partial_executed"))))
+
 (deftest apply-optimizer-query-state-merges-only-recognized-view-state-test
   (is (= {:portfolio-ui {:optimizer {:list-filter :executed
                                       :list-sort :updated-asc
