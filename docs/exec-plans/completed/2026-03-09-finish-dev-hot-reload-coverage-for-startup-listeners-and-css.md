@@ -2,7 +2,7 @@
 
 This ExecPlan is a living document. The sections `Progress`, `Surprises & Discoveries`, `Decision Log`, and `Outcomes & Retrospective` must be kept up to date as work proceeds.
 
-This document follows `/hyperopen/.agents/PLANS.md`, `/hyperopen/docs/PLANS.md`, and `/hyperopen/docs/WORK_TRACKING.md`. The live `bd` issue for this work is `hyperopen-xw1` ("Finish dev hot-reload coverage for startup listeners and CSS"), and `bd` remains the lifecycle source of truth until this plan is moved out of `active`.
+This document follows `/hyperopen/.agents/PLANS.md`, `/hyperopen/docs/PLANS.md`, and `/hyperopen/docs/WORK_TRACKING.md`. The live `bd` issue for this work is `hyperopen-xw1` ("Finish dev hot-reload coverage for startup listeners and CSS"), and `bd` was the local tracker used at the time until this plan is moved out of `active`.
 
 ## Purpose / Big Picture
 

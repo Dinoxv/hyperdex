@@ -21,6 +21,7 @@ NON-NEGOTIABLE REQUIREMENTS:
 * Every ExecPlan must enable a complete novice to implement the feature end-to-end without prior knowledge of this repo.
 * Every ExecPlan must produce a demonstrably working behavior, not merely code changes to "meet a definition".
 * Every ExecPlan must define every term of art in plain language or do not use it.
+* Every active ExecPlan must identify durable context when applicable: GitHub Issues or Pull Requests, parent ExecPlans, Improvement Plane artifacts, repo artifacts, or a direct user/maintainer request captured in the plan. Local scratch references such as Beads / bd are optional, must be marked non-authoritative, and must not be required to understand or execute the plan.
 
 Purpose and intent come first. Begin by explaining, in a few sentences, why the work matters from a user's perspective: what someone can do after this change that they could not do before, and how to see it working. Then guide the reader through the exact steps to achieve that outcome, including what to edit, what to run, and what they should observe.
 
@@ -85,6 +86,17 @@ Prefer additive code changes followed by subtractions that keep tests passing. P
     ## Purpose / Big Picture
 
     Explain in a few sentences what someone gains after this change and how they can see it working. State the user-visible behavior you will enable.
+
+    ## Context References
+
+    Public refs:
+    - GitHub Issue, GitHub PR, public work reference, or direct user/maintainer request captured here.
+
+    Repo artifacts:
+    - Parent ExecPlan, Improvement Plane artifact, canonical doc, or other committed repo path that this plan builds on.
+
+    Local scratch refs (non-authoritative):
+    - None, or Beads / bd references explicitly marked as non-authoritative.
 
     ## Progress
 

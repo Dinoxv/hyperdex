@@ -88,7 +88,7 @@ The change will make the funding surface safer to extend: domain rules become pu
   Date/Author: 2026-03-03 / Codex
 
 - Decision: Track work in `bd` issue `hyperopen-8sn` and treat this ExecPlan as implementation guidance, not issue status.
-  Rationale: `/hyperopen/docs/WORK_TRACKING.md` requires `bd` as the issue lifecycle source of truth.
+  Rationale: `/hyperopen/docs/WORK_TRACKING.md` requires `bd` as the local issue tracker.
   Date/Author: 2026-03-03 / Codex
 
 - Decision: Add an ADR only if final module boundaries introduce permanent new architectural ownership rules beyond funding internals.

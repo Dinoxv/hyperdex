@@ -16,7 +16,7 @@ Use this skill explicitly when a Hyperopen change is large enough to need orches
 
 ## Workflow
 
-1. Ensure the work is tracked in `bd` and has an active ExecPlan if the change is complex.
+1. Ensure the work has contributor-visible context, such as a GitHub Issue/PR or a direct maintainer/user request captured in the active ExecPlan when the change is complex.
 2. Refresh the plan or spec with `spec_writer` when the scope, risks, or acceptance criteria are not already frozen.
 3. Spawn `acceptance_test_writer` and `edge_case_test_writer` in parallel to propose complementary coverage only. Wait for both before merging their outputs.
 4. Freeze one approved test contract, then spawn `tdd_test_writer` to materialize the failing tests for that contract only.
@@ -32,4 +32,3 @@ Use this skill explicitly when a Hyperopen change is large enough to need orches
 - Only `worker` edits `/hyperopen/src/**` unless the user explicitly overrides that rule.
 - `acceptance_test_writer` and `edge_case_test_writer` propose tests only.
 - `tdd_test_writer` owns RED-phase test materialization.
-

@@ -257,7 +257,7 @@ This refactor is accepted when all of the following are true:
   - `npm run check`
   - `npm test`
   - `npm run test:websocket`
-- Any remaining follow-up work is tracked in `bd`, not in ad hoc markdown TODOs.
+- Any remaining follow-up work is promoted to a durable public or committed artifact, not left in ad hoc markdown TODOs.
 
 ## Idempotence and Recovery
 

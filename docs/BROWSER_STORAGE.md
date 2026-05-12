@@ -1,7 +1,7 @@
 ---
 owner: platform
 status: canonical
-last_reviewed: 2026-03-05
+last_reviewed: 2026-05-12
 review_cycle_days: 90
 source_of_truth: true
 ---
@@ -21,7 +21,7 @@ This document defines when Hyperopen browser persistence should use IndexedDB, `
 - Use `/hyperopen/src/hyperopen/platform/indexed_db.cljs` as the shared IndexedDB boundary. Do not add ad hoc `js/indexedDB` calls throughout feature code.
 - Keep storage records deterministic. IndexedDB records should use a stable key and include `:saved-at-ms`. Include `:version` when schema evolution or migration ordering matters.
 - Treat migration fallback as temporary rollout behavior, not as a permanent dual-write requirement. If a new backend replaces an old one, prefer new-backend read first and keep old-backend fallback only long enough to de-risk rollout.
-- Record any planned fallback removal or storage cleanup follow-up in `bd` instead of leaving it implicit in comments or ExecPlans.
+- Record any planned fallback removal or storage cleanup follow-up in a contributor-visible artifact such as a GitHub Issue/PR, active ExecPlan, Improvement Plane artifact, or canonical doc.
 
 ## Storage Selection Rules
 
@@ -71,6 +71,6 @@ When adding or changing browser persistence, answer these questions in order:
 2. Can this value grow per asset, timeframe, coin, or history row, or can it update repeatedly on a hot path? If yes, use IndexedDB.
 3. Must the data disappear with the current browser session because product behavior says it is session-only? If yes, use `sessionStorage`.
 4. Does the storage choice involve secret or signing material? If yes, follow `/hyperopen/docs/SECURITY.md` and remember that choosing IndexedDB versus `localStorage` does not solve Cross-Site Scripting risk.
-5. Are you replacing an older storage backend? If yes, ship a staged migration with new-backend-first reads, temporary fallback, and a `bd` follow-up for cleanup if cleanup is not part of the current task.
+5. Are you replacing an older storage backend? If yes, ship a staged migration with new-backend-first reads, temporary fallback, and contributor-visible follow-up tracking if cleanup is not part of the current task.
 
 Default rule for future agents: if the value is not obviously a tiny synchronous preference, prefer IndexedDB over `localStorage` for browser durability.

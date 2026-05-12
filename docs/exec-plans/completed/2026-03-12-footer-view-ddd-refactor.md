@@ -15,7 +15,7 @@ Users should still be able to open the trade page, use the mobile bottom nav, cl
 ## Progress
 
 - [x] (2026-03-12 20:43 EDT) Audited `/hyperopen/src/hyperopen/views/footer_view.cljs`, `/hyperopen/test/hyperopen/views/footer_view_test.cljs`, and the existing websocket diagnostics seams already present in `/hyperopen/src/hyperopen/websocket/diagnostics_actions.cljs`, `/hyperopen/src/hyperopen/websocket/diagnostics_payload.cljs`, and `/hyperopen/src/hyperopen/websocket/diagnostics_sanitize.cljs`.
-- [x] (2026-03-12 20:58 EDT) Created and claimed `bd` issue `hyperopen-y7gi` for this refactor so the work is tracked in the repository source of truth.
+- [x] (2026-03-12 20:58 EDT) Created and claimed `bd` issue `hyperopen-y7gi` for this refactor so the work matched the local tracker policy at the time.
 - [x] (2026-03-12 21:00 EDT) Authored this active ExecPlan with concrete namespace targets, milestone ordering, correctness fixes, and validation gates.
 - [x] (2026-03-12 21:12 EDT) Extracted canonical diagnostics taxonomy and normalization into `/hyperopen/src/hyperopen/websocket/diagnostics/catalog.cljs` and `/hyperopen/src/hyperopen/websocket/diagnostics/schema.cljs`, including explicit `:n-a` -> `:event-driven` normalization and `nil` -> `:unknown`.
 - [x] (2026-03-12 21:14 EDT) Moved connection scoring, status dominance, cooldown labeling, and reset or reconnect availability rules into `/hyperopen/src/hyperopen/websocket/diagnostics/policy.cljs`, and updated `/hyperopen/src/hyperopen/websocket/diagnostics_actions.cljs`, `/hyperopen/src/hyperopen/websocket/diagnostics_runtime.cljs`, and `/hyperopen/src/hyperopen/websocket/health_runtime.cljs` to delegate to the shared policy seam.

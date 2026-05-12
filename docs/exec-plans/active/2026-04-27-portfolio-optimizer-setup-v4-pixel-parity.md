@@ -1,7 +1,9 @@
 owner: product+platform
 status: active
 source_of_truth: true
-tracked_issue: hyperopen-g0m6
+local_scratch_refs:
+  - bd: hyperopen-g0m6
+    authoritative: false
 based_on:
   - /Users/barry/Downloads/hyperopen portfolio optimizer/v4.jsx
   - /var/folders/dg/3nkyzrp12fn141vv7f6rc9v40000gn/T/TemporaryItems/NSIRD_screencaptureui_WvbRPz/Screenshot 2026-04-27 at 11.47.13 AM.png
@@ -13,7 +15,16 @@ This ExecPlan is a living document. The sections `Progress`, `Surprises & Discov
 
 This document follows `/hyperopen/.agents/PLANS.md` and `/hyperopen/docs/PLANS.md`. It is self-contained so an engineer can execute the work without relying on the conversation that produced it.
 
-Tracked issue: `hyperopen-g0m6` ("Align optimizer setup page to v4 pixel parity").
+## Context References
+
+Public refs:
+- Direct maintainer request captured in this ExecPlan. No GitHub issue or PR is linked in this checkout.
+
+Repo artifacts:
+- Parent implementation context: `/hyperopen/docs/exec-plans/active/2026-04-26-portfolio-optimizer-v4-alignment.md`.
+
+Local scratch refs (non-authoritative):
+- Beads / `bd`: `hyperopen-g0m6` ("Align optimizer setup page to v4 pixel parity"), authoritative: false.
 
 ## Purpose / Big Picture
 

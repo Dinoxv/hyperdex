@@ -2,7 +2,7 @@
 
 This ExecPlan is a living document. The sections `Progress`, `Surprises & Discoveries`, `Decision Log`, and `Outcomes & Retrospective` must be kept up to date as work proceeds.
 
-This document follows `/hyperopen/.agents/PLANS.md` and `/hyperopen/docs/PLANS.md`. The primary live `bd` issue is `hyperopen-ta4x`. Related route-scope follow-up context also exists in `hyperopen-lgva`, but `bd` remains the status source of truth while this plan is active.
+This document follows `/hyperopen/.agents/PLANS.md` and `/hyperopen/docs/PLANS.md`. The primary live `bd` issue is `hyperopen-ta4x`. Related route-scope follow-up context also exists in `hyperopen-lgva`, but `bd` was the local tracker used during the active phase.
 
 ## Purpose / Big Picture
 

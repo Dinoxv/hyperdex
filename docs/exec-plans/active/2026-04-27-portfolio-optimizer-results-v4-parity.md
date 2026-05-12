@@ -3,14 +3,25 @@ owner: frontend
 status: active
 created: 2026-04-27
 source_of_truth: false
-tracked_issue: hyperopen-4pr0
+local_scratch_refs:
+  - bd: hyperopen-4pr0
+    authoritative: false
 ---
 
 # Portfolio Optimizer Results V4 Parity
 
 This ExecPlan is a living document. The sections `Progress`, `Surprises & Discoveries`, `Decision Log`, and `Outcomes & Retrospective` must be kept current while work proceeds.
 
-Tracked issue: `hyperopen-4pr0` ("Align optimizer results page to v4 parity").
+## Context References
+
+Public refs:
+- Direct maintainer request captured in this ExecPlan. No GitHub issue or PR is linked in this checkout.
+
+Repo artifacts:
+- Parent implementation context: `/hyperopen/docs/exec-plans/active/2026-04-26-portfolio-optimizer-v4-alignment.md`.
+
+Local scratch refs (non-authoritative):
+- Beads / `bd`: `hyperopen-4pr0` ("Align optimizer results page to v4 parity"), authoritative: false.
 
 ## Objective
 Bring `/portfolio/optimize/:scenario-id?otab=recommendation` materially closer to the v4 Results artboard while preserving the existing optimizer run result, diagnostics, frontier, signed exposure, funding decomposition, and scenario persistence behavior.

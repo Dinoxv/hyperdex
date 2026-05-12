@@ -2,7 +2,7 @@
 
 This ExecPlan is a living document. The sections `Progress`, `Surprises & Discoveries`, `Decision Log`, and `Outcomes & Retrospective` must be kept up to date as work proceeds.
 
-This document is governed by `/hyperopen/.agents/PLANS.md` and `/hyperopen/docs/PLANS.md`. The tracked work item for this plan was `hyperopen-gwu2`, and that `bd` issue remained the lifecycle source of truth until it was closed as completed on 2026-04-07.
+This document is governed by `/hyperopen/.agents/PLANS.md` and `/hyperopen/docs/PLANS.md`. The tracked work item for this plan was `hyperopen-gwu2`, and that `bd` issue was the local tracker reference until it was closed as completed on 2026-04-07.
 
 ## Purpose / Big Picture
 

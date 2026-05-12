@@ -15,7 +15,7 @@ The user-visible proof is simple. Listing `/hyperopen/docs/exec-plans/active/` a
 - [x] (2026-03-09 18:21Z) Audited `/hyperopen/.agents/PLANS.md`, `/hyperopen/docs/PLANS.md`, `/hyperopen/docs/WORK_TRACKING.md`, active/completed ExecPlan directories, and the current docs check implementation.
 - [x] (2026-03-09 18:24Z) Created and claimed `bd` task `hyperopen-asq` for this cleanup and guardrail work.
 - [x] (2026-03-09 18:28Z) Built an active-plan audit showing 52 root ExecPlan files in `/hyperopen/docs/exec-plans/active/`, including closed-issue plans, authored-only stale plans, and superseded notes.
-- [x] (2026-03-09 18:29Z) Added docs-check guardrails in `/hyperopen/dev/check_docs.clj` that require active ExecPlans to reference live `bd` work and retain at least one unchecked progress item.
+- [x] (2026-03-09 18:29Z) Added the then-current docs-check guardrails in `/hyperopen/dev/check_docs.clj` for active ExecPlan tracker references and unchecked progress.
 - [x] (2026-03-09 18:29Z) Added docs-check regression coverage in `/hyperopen/dev/check_docs_test.clj` for missing `bd` links, closed-only `bd` links, missing unchecked progress, and valid active-plan state.
 - [x] (2026-03-09 18:30Z) Reclassified the stale active backlog: moved 48 historical plans to `/hyperopen/docs/exec-plans/completed/` and 4 non-active notes to `/hyperopen/docs/exec-plans/deferred/`.
 - [x] (2026-03-09 18:31Z) Created backlog `bd` issues `hyperopen-1ug`, `hyperopen-gvp`, and `hyperopen-0o0` for the deferred authored-only plans that still represent future work.
@@ -56,14 +56,14 @@ The user-visible proof is simple. Listing `/hyperopen/docs/exec-plans/active/` a
   Date/Author: 2026-03-09 / Codex
 
 - Decision: Create `bd` issues for deferred authored-only plans that still represent future work.
-  Rationale: Deferred markdown plans are useful context, but `bd` must remain the source of truth for open backlog so the cleanup does not replace one shadow tracker with another.
+  Rationale: Deferred markdown plans are useful context, but `bd` was the local tracker used for open backlog so the cleanup did not replace one shadow tracker with another.
   Date/Author: 2026-03-09 / Codex
 
 ## Outcomes & Retrospective
 
 Implementation completed. The active ExecPlan backlog was normalized so that only live execution remains in `/hyperopen/docs/exec-plans/active/`. The cleanup moved 48 historical plans into `/hyperopen/docs/exec-plans/completed/` and 4 non-active notes into `/hyperopen/docs/exec-plans/deferred/`. Three of those deferred notes still represented future backlog, so the cleanup also created `bd` issues `hyperopen-1ug`, `hyperopen-gvp`, and `hyperopen-0o0`.
 
-The new guardrail now lives in `/hyperopen/dev/check_docs.clj` and is covered by `/hyperopen/dev/check_docs_test.clj`. `npm run check` now fails if a root active ExecPlan has no valid live `bd` issue reference or no remaining unchecked progress items. The planning docs were updated to describe `active`, `completed`, and `deferred` roles explicitly, and README guidance now matches the enforced behavior.
+The historical guardrail added by this task lived in `/hyperopen/dev/check_docs.clj` and was covered by `/hyperopen/dev/check_docs_test.clj`. At the time, `npm run check` failed if a root active ExecPlan had no valid live local tracker reference or no remaining unchecked progress items. The planning docs were updated to describe `active`, `completed`, and `deferred` roles explicitly, and README guidance matched the then-enforced behavior.
 
 Validation results after `npm ci`:
 
@@ -77,7 +77,7 @@ Complexity impact: overall operational complexity is reduced. The repository now
 
 Active ExecPlans currently live in `/hyperopen/docs/exec-plans/active/`, completed plans live in `/hyperopen/docs/exec-plans/completed/`, and deferred plans live in `/hyperopen/docs/exec-plans/deferred/`. The current docs linter is `/hyperopen/dev/check_docs.clj`, with regression coverage in `/hyperopen/dev/check_docs_test.clj`.
 
-This repo uses `bd` as the source of truth for issue lifecycle tracking. For this task, “live `bd` work” means at least one referenced `bd` issue exists and is not closed. For this task, “remaining unchecked progress” means the active ExecPlan still contains at least one unchecked `- [ ]` progress item.
+This repo previously used `bd` for issue lifecycle tracking. For this historical task, “live local tracker work” meant at least one referenced `bd` issue existed and was not closed. For this task, “remaining unchecked progress” means the active ExecPlan still contains at least one unchecked `- [ ]` progress item.
 
 The current cleanup target is the root of `/hyperopen/docs/exec-plans/active/`. Nested `artifacts/` files are supporting evidence and are not themselves active plans.
 
@@ -134,4 +134,4 @@ Initial audit summary:
 
 ## Interfaces and Dependencies
 
-`/hyperopen/dev/check_docs.clj` should expose enough internal helpers that tests can supply a fake `bd` lookup function through config. The guardrail must use the local `bd` CLI output as the source of truth for issue status and must only inspect root active ExecPlan files, not nested artifacts.
+`/hyperopen/dev/check_docs.clj` should expose enough internal helpers that tests can supply a fake `bd` lookup function through config. The guardrail must use the local `bd` CLI output as the then-current issue-status reference and must only inspect root active ExecPlan files, not nested artifacts.

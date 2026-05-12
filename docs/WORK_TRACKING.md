@@ -1,7 +1,7 @@
 ---
 owner: platform
 status: canonical
-last_reviewed: 2026-03-04
+last_reviewed: 2026-05-12
 review_cycle_days: 90
 source_of_truth: true
 ---
@@ -9,119 +9,72 @@ source_of_truth: true
 # Work Tracking and Session Handoff
 
 ## Purpose
-Define one source of truth for issue tracking and remove ambiguity between `bd` issue lifecycle tracking and markdown planning artifacts.
+Define the durable, contributor-visible places where Hyperopen work is tracked and handed off. Local-only tools may help an individual session, but they are not project memory.
 
 ## Scope and Precedence
-- This document governs issue tracking, dependency tracking, and session handoff expectations.
+- This document governs work tracking, dependency context, and session handoff expectations.
 - Planning artifacts still follow `/hyperopen/docs/PLANS.md` and `/hyperopen/.agents/PLANS.md`.
 - If guidance conflicts, task-specific user/developer instructions take precedence for the current task.
 
-## `bd` Issue Tracking Source of Truth
-- Use `bd` for all backlog, bug, feature, and follow-up issue tracking.
-- Do not maintain a parallel issue queue in markdown.
-- Use `--json` with `bd` commands when output is consumed programmatically by agents.
+## Canonical Work Tracking Model
 
-## Why `bd`
-- Dependency-aware tracking: model blocked/unblocked relationships directly.
-- Agent-friendly command surface: deterministic JSON output for automation.
-- Local-first tracking: `bd` state stays in-repo without requiring remote sync.
-- Single tracker discipline: prevents split status across docs, notes, and external systems.
+Public and contributor-visible work tracking:
+- GitHub Issues track bugs, features, chores, follow-ups, priorities, and ownership that should survive beyond one local session.
+- GitHub Pull Requests track review discussion, implementation status, validation evidence, and merge decisions.
+- Docs may reference GitHub issue numbers, PR numbers, or other public work references when those are the durable context for a change.
 
-## Quick Start
+Implementation records:
+- ExecPlans under `/hyperopen/docs/exec-plans/**` are self-contained implementation artifacts for complex features, significant refactors, risky bug work, and governed multi-agent work.
+- ExecPlans are not an issue tracker or backlog. They describe active or historical implementation context, decisions, progress, and validation evidence.
+- Active ExecPlans should reference durable context when applicable: a GitHub issue, GitHub PR, parent ExecPlan, Improvement Plane artifact, or direct user/maintainer request captured in the plan.
 
-### Check ready work
-Use this first to find unblocked issues:
+Agent-harness learning:
+- Improvement Plane artifacts, when present, live in committed repo paths such as `/hyperopen/improvement/**` or an equivalent governed path.
+- Improvement records should use `public_refs` for durable references and `local_refs` for optional local scratch.
+- `local_refs` may include Beads / `bd` identifiers only when marked non-authoritative.
 
-`bd ready --json`
+Canonical docs and review history:
+- Canonical docs capture durable policy, architecture, safety, and product context.
+- PR review threads and review summaries are durable review history; do not hide required project context in local-only notes.
 
-### Create new issues
-Create explicitly typed issues with priority and context:
+## Optional Local Scratch
 
-`bd create "Issue title" --description="Detailed context" -t bug|feature|task|epic|chore -p 0-4 --json`
+Beads / `bd` may be useful for a maintainer or agent to decompose local tasks, sort dependencies, or coordinate an ephemeral session. Treat it as local scratch only.
 
-When new work is discovered while implementing another issue, link it:
+Rules:
+- Do not require Beads / `bd` to understand the repository, run CI, review a PR, continue from a fresh clone, or contribute externally.
+- Do not store the only copy of a bug, follow-up, design decision, validation result, or blocker in local Beads state.
+- If Beads / `bd` is referenced in an ExecPlan or Improvement Plane artifact, label it as a local scratch reference and non-authoritative.
+- Do not run `bd sync`, `bd dolt push`, `bd dolt pull`, or similar remote/local tracker sync commands unless the user explicitly asks for a migration or recovery step.
 
-`bd create "Found issue" --description="What was discovered" -p 1 --deps discovered-from:<parent-id> --json`
+## Promote Scratch To Durable Artifacts
 
-### Claim and update
-Claim atomically and keep status fields current:
+When local notes reveal durable work, promote them before handoff:
+- Bug, feature, chore, or follow-up: create or link a GitHub Issue, or capture it in the active PR when it is scoped to that PR.
+- Complex or risky implementation context: update or create the relevant ExecPlan under `/hyperopen/docs/exec-plans/**`.
+- Agent-harness failure, proposal, or lesson: write an Improvement Plane artifact with `public_refs` and non-authoritative `local_refs`.
+- Stable policy, invariant, or operational rule: update the canonical doc that owns that area.
+- Review feedback: keep it in the PR review thread or summarize it in the PR so external contributors can see it.
 
-`bd update <id> --claim --json`
-
-Examples:
-- `bd update bd-42 --priority 1 --json`
-- `bd update bd-42 --assignee <owner> --json`
-
-### Complete work
-Close completed items with a reason:
-
-`bd close <id> --reason "Completed" --json`
-
-## Issue Types
-- `bug`: broken behavior
-- `feature`: net-new functionality
-- `task`: implementation, testing, refactor, docs work item
-- `epic`: parent issue that tracks multiple related items
-- `chore`: maintenance or operational work
-
-## Priority Scale
-- `0`: critical (security, data loss, broken build/release)
-- `1`: high (major capability or significant bug)
-- `2`: medium (default)
-- `3`: low (polish/optimization)
-- `4`: backlog (not currently scheduled)
-
-## Workflow for Agents
-1. Check ready work: `bd ready --json`
-2. Claim issue: `bd update <id> --claim --json`
-3. Implement and validate.
-4. Link discovered follow-up work using `discovered-from:<parent-id>`.
-5. Close completed issue: `bd close <id> --reason "Completed" --json`
-
-## Local-Only Behavior
-- `bd` is local-only in this repository.
-- Do not run `bd sync` (removed from current `bd` CLI).
-- Do not run `bd dolt push`/`bd dolt pull` unless explicitly requested for a migration.
-
-## Important Rules
-- Use `bd` for all issue lifecycle tracking.
-- Use `--json` for agent/programmatic invocations.
-- Link discovered work to its parent issue with `discovered-from`.
-- Do not create duplicate trackers in markdown or external tools.
-
-## Markdown Artifacts: Allowed vs Disallowed
-
-Allowed markdown usage (not issue tracking):
-- ExecPlan checklists and progress logs under `/hyperopen/docs/exec-plans/**` required by `/hyperopen/.agents/PLANS.md`
-- Governance/invariant checklists in canonical docs (for example `/hyperopen/docs/RELIABILITY.md`, `/hyperopen/ARCHITECTURE.md`)
-- Product/spec acceptance checklists that describe scope or validation criteria
-
-Disallowed markdown usage (issue tracking anti-pattern):
-- Ad-hoc TODO/backlog/task lists in docs, PR descriptions, or notes used as the source of open work
-- Tracking issue ownership/status in markdown when the same work should be tracked in `bd`
-- Creating a second tracker alongside `bd`
-
-Practical rule:
-- If an item requires future follow-up beyond the current change, create or link a `bd` issue id.
-- Markdown may reference the `bd` id for context, but `bd` remains the status source of truth.
+Do not create a markdown backlog or issue queue as a replacement tracker. Markdown checklists are acceptable only inside implementation artifacts, governed docs, product/spec acceptance criteria, or PR descriptions where GitHub remains the visible work surface.
 
 ## Session Completion and Handoff
 When finishing a coding session or handing work to another contributor:
-1. File or link `bd` issues for all remaining follow-up work.
+1. Update the GitHub Issue/PR, active ExecPlan, Improvement Plane artifact, or canonical doc that owns any remaining follow-up.
 2. Run required quality gates when code changed:
    - `npm run check`
    - `npm test`
    - `npm run test:websocket`
-3. Update `bd` issue status (close completed work, update remaining work).
+3. Record validation evidence and blockers in contributor-visible artifacts.
 4. Pull/rebase and push only when the user explicitly requests remote sync in the current session:
    - `git pull --rebase`
    - `git push`
    - `git status` (confirm clean state and up-to-date branch)
-5. Provide handoff notes with relevant `bd` ids and any blockers.
+5. Provide handoff notes with relevant GitHub refs, ExecPlan paths, Improvement Plane artifacts, and any blockers.
 
 If remote sync is not explicitly requested, stop at local commit and provide handoff notes.
 
-If push is explicitly requested but cannot complete due environment or permissions, record the blocker explicitly in the handoff and in `bd`.
+If push is explicitly requested but cannot complete due environment or permissions, record the blocker explicitly in the handoff and in the relevant public or committed artifact.
 
 ## Shared Agent Command Phrases
 - Machine-readable registry: `/hyperopen/command-phrases.edn`

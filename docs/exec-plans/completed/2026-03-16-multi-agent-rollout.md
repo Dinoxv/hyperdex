@@ -1,12 +1,12 @@
 # Multi-Agent Rollout Scaffold
 
-This document is maintained in accordance with `/hyperopen/.agents/PLANS.md` and executes `bd` issue `hyperopen-q0qy`.
+This document is maintained in accordance with `/hyperopen/.agents/PLANS.md` and was associated with local `bd` issue `hyperopen-q0qy`.
 
 ## Purpose / Big Picture
 
-Hyperopen already has agent-legible docs, structured planning, browser MCP tooling, and deterministic quality gates. This change adds the missing repo-local multi-agent contract so one `bd` ticket can move through a repeatable local pipeline: ExecPlan creation, separate test-design proposals, a merged failing-test contract, implementation, review, and browser QA or an explicit browser-QA skip.
+Hyperopen already has agent-legible docs, structured planning, browser MCP tooling, and deterministic quality gates. This change added the missing repo-local multi-agent contract so one local work key could move through a repeatable pipeline: ExecPlan creation, separate test-design proposals, a merged failing-test contract, implementation, review, and browser QA or an explicit browser-QA skip.
 
-After this change, a contributor can run repo-local multi-agent commands, inspect structured artifacts under `/hyperopen/tmp/multi-agent/<bd-id>/`, and use the checked-in role and skill files as the source of truth for how each agent is allowed to work.
+After this change, a contributor can run repo-local multi-agent commands, inspect structured artifacts under `/hyperopen/tmp/multi-agent/<local-run-key>/`, and use the checked-in role and skill files as the durable reference for how each agent is allowed to work.
 
 ## Progress
 

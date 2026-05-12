@@ -257,7 +257,7 @@ The change is accepted only when all of the following are true:
    - `npm test`
    - `npm run test:websocket`
 7. Browser QA confirms the local trade route still bootstraps account surfaces and does not regress the post-fill refresh flow.
-8. Any discovered issues are tracked in `bd` and either fixed in this session or explicitly handed off with IDs.
+8. Any discovered issues are promoted to durable handoff artifacts and either fixed in this session or explicitly handed off with references.
 
 ## Idempotence and Recovery
 

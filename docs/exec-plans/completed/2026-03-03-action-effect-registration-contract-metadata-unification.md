@@ -4,7 +4,7 @@ This ExecPlan is a living document. The sections `Progress`, `Surprises & Discov
 
 This document is maintained in accordance with `/hyperopen/.agents/PLANS.md`.
 
-Work tracking source of truth for implementation status is `bd` issue `hyperopen-7wl` (per `/hyperopen/docs/WORK_TRACKING.md`).
+Local tracker reference for implementation status was `bd` issue `hyperopen-7wl` (per `/hyperopen/docs/WORK_TRACKING.md`).
 
 ## Purpose / Big Picture
 

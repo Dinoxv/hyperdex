@@ -10,7 +10,7 @@ tracked_issue: hyperopen-89az
 
 This ExecPlan is a living document. The sections `Progress`, `Surprises & Discoveries`, `Decision Log`, and `Outcomes & Retrospective` must be kept current while work proceeds.
 
-This document follows `/hyperopen/AGENTS.md`, `/hyperopen/docs/PLANS.md`, `/hyperopen/docs/WORK_TRACKING.md`, and `/hyperopen/src/hyperopen/portfolio/optimizer/BOUNDARY.md`. The live `bd` issue is `hyperopen-89az`; `bd` remains the lifecycle source of truth.
+This document follows `/hyperopen/AGENTS.md`, `/hyperopen/docs/PLANS.md`, `/hyperopen/docs/WORK_TRACKING.md`, and `/hyperopen/src/hyperopen/portfolio/optimizer/BOUNDARY.md`. The live `bd` issue is `hyperopen-89az`; `bd` was the local tracker used at the time.
 
 ## Purpose / Big Picture
 

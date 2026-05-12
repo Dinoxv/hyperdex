@@ -2,7 +2,7 @@
 
 This ExecPlan is a living document. The sections `Progress`, `Surprises & Discoveries`, `Decision Log`, and `Outcomes & Retrospective` must be kept up to date as work proceeds.
 
-This plan follows `/hyperopen/.agents/PLANS.md` and `/hyperopen/docs/PLANS.md`. Active work is tracked in `bd` issue `hyperopen-hv9i`.
+This plan follows `/hyperopen/.agents/PLANS.md` and `/hyperopen/docs/PLANS.md`. Active-phase local tracker context was `bd` issue `hyperopen-hv9i`.
 
 ## Purpose / Big Picture
 

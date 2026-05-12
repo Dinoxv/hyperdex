@@ -22,7 +22,7 @@ Use this skill when acting as the `edge_case_test_writer` role for a multi-agent
 
 ## Guardrails
 
-- Write only proposal artifacts under `/hyperopen/tmp/multi-agent/<bd-id>/`.
+- Write only proposal artifacts under `/hyperopen/tmp/multi-agent/<local-run-key>/`.
 - Do not materialize tests directly.
 - Do not edit `/hyperopen/src/**`.
 

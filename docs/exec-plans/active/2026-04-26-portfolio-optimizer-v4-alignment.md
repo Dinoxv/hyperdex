@@ -1,7 +1,9 @@
 owner: product+platform
 status: active
 source_of_truth: true
-tracked_issue: hyperopen-q7j5
+local_scratch_refs:
+  - bd: hyperopen-q7j5
+    authoritative: false
 based_on:
   - /Users/barry/Downloads/HO-PDD-002_portfolio_optimization.md
   - /Users/barry/Downloads/hyperopen portfolio optimizer.zip
@@ -18,7 +20,16 @@ This ExecPlan is a living document. The sections `Progress`, `Surprises & Discov
 
 This document follows `/hyperopen/.agents/PLANS.md` and `/hyperopen/docs/PLANS.md`. It is self-contained so an engineer can execute the work without relying on the conversation that produced it.
 
-Tracked issue: `hyperopen-q7j5` ("Align portfolio optimizer UI with v4 design").
+## Context References
+
+Public refs:
+- Direct maintainer request captured in this ExecPlan. No GitHub issue or PR is linked in this checkout.
+
+Repo artifacts:
+- Product and design source references are listed in `based_on`; local-only source files should be promoted into committed artifacts before external handoff if they remain required.
+
+Local scratch refs (non-authoritative):
+- Beads / `bd`: `hyperopen-q7j5` ("Align portfolio optimizer UI with v4 design"), authoritative: false.
 
 ## Purpose / Big Picture
 

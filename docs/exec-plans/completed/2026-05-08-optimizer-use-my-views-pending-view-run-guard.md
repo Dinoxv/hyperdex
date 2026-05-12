@@ -10,7 +10,7 @@ tracked_issue: hyperopen-fexd
 
 This ExecPlan is a living document. The sections `Progress`, `Surprises & Discoveries`, `Decision Log`, and `Outcomes & Retrospective` must be kept current while work proceeds.
 
-This document is maintained in accordance with `/hyperopen/docs/PLANS.md` and `/hyperopen/.agents/PLANS.md`. The live `bd` issue for this work is `hyperopen-fexd`, and `bd` remains the lifecycle source of truth until this plan moves out of `active/`.
+This document is maintained in accordance with `/hyperopen/docs/PLANS.md` and `/hyperopen/.agents/PLANS.md`. The live `bd` issue for this work is `hyperopen-fexd`; the `bd` issue is historical local tracker context from the active phase.
 
 ## Purpose / Big Picture
 
