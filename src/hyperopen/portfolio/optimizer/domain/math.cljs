@@ -1,10 +1,7 @@
-(ns hyperopen.portfolio.optimizer.domain.math)
+(ns hyperopen.portfolio.optimizer.domain.math
+  (:require [hyperopen.portfolio.optimizer.coercion :as coercion]))
 
-(defn finite-number?
-  [value]
-  (and (number? value)
-       (not (js/isNaN value))
-       (js/isFinite value)))
+(def finite-number? coercion/finite-number?)
 
 (defn mean
   [values]

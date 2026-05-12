@@ -1,11 +1,8 @@
 (ns hyperopen.portfolio.optimizer.application.instrument-labels
-  (:require [clojure.string :as str]))
+  (:require [hyperopen.portfolio.optimizer.coercion :as coercion]
+            [hyperopen.portfolio.optimizer.ids :as ids]))
 
-(defn- non-blank-text
-  [value]
-  (let [text (some-> value str str/trim)]
-    (when (seq text)
-      text)))
+(def ^:private non-blank-text coercion/non-blank-text)
 
 (defn- universe-by-id
   [universe]
@@ -14,13 +11,11 @@
                [(:instrument-id instrument) instrument]))
         universe))
 
-(defn- vault-instrument-id?
-  [instrument-id]
-  (str/starts-with? (or (some-> instrument-id str) "") "vault:"))
+(def ^:private vault-instrument-id? ids/vault-instrument-id?)
 
 (defn- vault-instrument?
   [instrument instrument-id]
-  (or (= :vault (:market-type instrument))
+  (or (= :vault (ids/normalize-market-type (:market-type instrument)))
       (vault-instrument-id? instrument-id)))
 
 (defn- label-for-instrument

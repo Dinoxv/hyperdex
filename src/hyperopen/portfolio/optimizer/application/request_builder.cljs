@@ -1,7 +1,7 @@
 (ns hyperopen.portfolio.optimizer.application.request-builder
-  (:require [clojure.string :as str]
-            [hyperopen.portfolio.optimizer.application.history-loader :as history-loader]
+  (:require [hyperopen.portfolio.optimizer.application.history-loader :as history-loader]
             [hyperopen.portfolio.optimizer.contracts :as contracts]
+            [hyperopen.portfolio.optimizer.coercion :as coercion]
             [hyperopen.portfolio.optimizer.infrastructure.prior-data :as prior-data]))
 
 (def default-return-model
@@ -17,22 +17,9 @@
   [draft]
   (vec (or (:universe draft) [])))
 
-(defn- non-blank-text
-  [value]
-  (let [text (some-> value str str/trim)]
-    (when (seq text)
-      text)))
+(def ^:private non-blank-text coercion/non-blank-text)
 
-(defn- normalize-id-list
-  [values]
-  (->> (cond
-         (nil? values) []
-         (set? values) values
-         (sequential? values) values
-         :else [values])
-       (keep non-blank-text)
-       distinct
-       vec))
+(def ^:private normalize-id-list coercion/normalize-id-list)
 
 (defn- normalize-net-exposure
   [constraints]
@@ -94,11 +81,7 @@
       (some? fallback-slippage-bps)
       (assoc :fallback-slippage-bps fallback-slippage-bps))))
 
-(defn- finite-number?
-  [value]
-  (and (number? value)
-       (not (js/isNaN value))
-       (js/isFinite value)))
+(def ^:private finite-number? coercion/finite-number?)
 
 (defn- confidence-variance
   [confidence]

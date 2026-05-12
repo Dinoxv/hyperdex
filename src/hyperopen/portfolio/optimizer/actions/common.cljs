@@ -1,24 +1,13 @@
 (ns hyperopen.portfolio.optimizer.actions.common
-  (:require [clojure.string :as str]
-            [hyperopen.portfolio.optimizer.application.run-identity :as run-identity]
-            [hyperopen.portfolio.optimizer.application.universe-candidates :as universe-candidates]
-            [hyperopen.portfolio.optimizer.contracts :as contracts]))
+  (:require [hyperopen.portfolio.optimizer.application.run-identity :as run-identity]
+            [hyperopen.portfolio.optimizer.contracts :as contracts]
+            [hyperopen.portfolio.optimizer.coercion :as coercion]
+            [hyperopen.portfolio.optimizer.ids :as ids]))
 
 (def supported-universe-market-types
   #{:perp :spot :vault})
 
-(defn normalize-keyword-like
-  [value]
-  (let [text (cond
-               (keyword? value) (name value)
-               (string? value) (str/trim value)
-               :else nil)]
-    (when (seq text)
-      (-> text
-          (str/replace #"([a-z0-9])([A-Z])" "$1-$2")
-          (str/replace #"[_\s]+" "-")
-          str/lower-case
-          keyword))))
+(def normalize-keyword-like coercion/normalize-keyword-like)
 
 (defn save-draft-path-values
   [path-values]
@@ -26,11 +15,7 @@
     (conj (vec path-values)
           [contracts/draft-dirty-path true])]])
 
-(defn non-blank-text
-  [value]
-  (let [text (some-> value str str/trim)]
-    (when (seq text)
-      text)))
+(def non-blank-text coercion/non-blank-text)
 
 (defn exposure->universe-instrument
   [exposure]
@@ -56,7 +41,7 @@
   (let [instrument-id (non-blank-text (:key market))
         coin (non-blank-text (:coin market))
         market-type (normalize-keyword-like (:market-type market))
-        vault-address (universe-candidates/normalize-vault-address (:vault-address market))]
+        vault-address (ids/normalize-vault-address (:vault-address market))]
     (when (and instrument-id
                coin
                (contains? supported-universe-market-types market-type)
@@ -91,32 +76,9 @@
             :items []}
            instruments)))
 
-(defn parse-number-value
-  [value]
-  (cond
-    (number? value)
-    (when (js/isFinite value)
-      value)
+(def parse-number-value coercion/parse-number)
 
-    (string? value)
-    (let [text (str/trim value)]
-      (when (seq text)
-        (let [parsed (js/Number text)]
-          (when (and (number? parsed)
-                     (js/isFinite parsed))
-            parsed))))
-
-    :else nil))
-
-(defn parse-boolean-value
-  [value]
-  (cond
-    (boolean? value) value
-    (string? value) (case (str/lower-case (str/trim value))
-                      "true" true
-                      "false" false
-                      nil)
-    :else nil))
+(def parse-boolean-value coercion/parse-boolean-value)
 
 (defn constraint-list
   [state constraint-key]

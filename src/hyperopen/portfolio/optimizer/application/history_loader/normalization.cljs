@@ -1,5 +1,6 @@
 (ns hyperopen.portfolio.optimizer.application.history-loader.normalization
-  (:require [hyperopen.portfolio.metrics.history :as metrics-history]))
+  (:require [hyperopen.portfolio.metrics.history :as metrics-history]
+            [hyperopen.portfolio.optimizer.coercion :as coercion]))
 
 (def ^:private direct-vault-window-preference
   [:one-year :six-month :three-month :month :week :day])
@@ -9,25 +10,9 @@
 
 (declare cumulative-percent-row->price-row)
 
-(defn finite-number?
-  [value]
-  (and (number? value)
-       (not (js/isNaN value))
-       (js/isFinite value)))
+(def finite-number? coercion/finite-number?)
 
-(defn parse-number
-  [value]
-  (cond
-    (finite-number? value)
-    value
-
-    (string? value)
-    (let [parsed (js/parseFloat value)]
-      (when (finite-number? parsed)
-        parsed))
-
-    :else
-    nil))
+(def parse-number coercion/parse-float-number)
 
 (defn parse-ms
   [value]

@@ -1,16 +1,10 @@
 (ns hyperopen.portfolio.optimizer.application.tracking
-  (:require [hyperopen.portfolio.optimizer.contracts :as contracts]))
+  (:require [hyperopen.portfolio.optimizer.contracts :as contracts]
+            [hyperopen.portfolio.optimizer.coercion :as coercion]))
 
-(defn- finite-number?
-  [value]
-  (and (number? value)
-       (not (js/isNaN value))
-       (js/isFinite value)))
+(def ^:private finite-number? coercion/finite-number?)
 
-(defn- positive-number?
-  [value]
-  (and (finite-number? value)
-       (pos? value)))
+(def ^:private positive-number? coercion/positive-number?)
 
 (defn- current-weight-by-instrument
   [current-snapshot nav-usdc]

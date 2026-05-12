@@ -1,11 +1,8 @@
 (ns hyperopen.portfolio.optimizer.universe-keyboard
-  (:require [clojure.string :as str]
-            [hyperopen.portfolio.optimizer.contracts :as contracts]))
+  (:require [hyperopen.portfolio.optimizer.contracts :as contracts]
+            [hyperopen.portfolio.optimizer.coercion :as coercion]))
 
-(defn- non-blank-text
-  [value]
-  (let [text (some-> value str str/trim)]
-    (when (seq text) text)))
+(def ^:private non-blank-text coercion/non-blank-text)
 
 (defn- normalize-market-keys
   [market-keys]

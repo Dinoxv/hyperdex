@@ -1,10 +1,7 @@
-(ns hyperopen.views.portfolio.optimize.format)
+(ns hyperopen.views.portfolio.optimize.format
+  (:require [hyperopen.portfolio.optimizer.coercion :as coercion]))
 
-(defn finite-number?
-  [value]
-  (and (number? value)
-       (not (js/isNaN value))
-       (js/isFinite value)))
+(def finite-number? coercion/finite-number?)
 
 (defn- locale-number
   [value options]

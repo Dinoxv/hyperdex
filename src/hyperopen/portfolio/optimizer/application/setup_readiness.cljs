@@ -4,10 +4,9 @@
             [hyperopen.portfolio.optimizer.application.current-portfolio :as current-portfolio]
             [hyperopen.portfolio.optimizer.application.orderbook-loader :as orderbook-loader]
             [hyperopen.portfolio.optimizer.application.request-builder :as request-builder]
-            [hyperopen.portfolio.optimizer.contracts :as contracts]))
-
-(def ^:private vault-instrument-prefix
-  "vault:")
+            [hyperopen.portfolio.optimizer.contracts :as contracts]
+            [hyperopen.portfolio.optimizer.coercion :as coercion]
+            [hyperopen.portfolio.optimizer.ids :as ids]))
 
 (def ^:private history-blocking-warning-codes
   #{:missing-history-coin
@@ -33,25 +32,13 @@
   (or (get-in state contracts/runtime-as-of-ms-path)
       (.now js/Date)))
 
-(defn- positive-number?
-  [value]
-  (and (number? value)
-       (pos? value)
-       (not (js/isNaN value))
-       (js/isFinite value)))
+(def ^:private positive-number? coercion/positive-number?)
 
-(defn- non-blank-text
-  [value]
-  (let [text (some-> value str str/trim)]
-    (when (seq text)
-      text)))
+(def ^:private non-blank-text coercion/non-blank-text)
 
 (defn- vault-ref?
   [value]
-  (let [text (some-> value str str/trim str/lower-case)]
-    (boolean
-     (and (seq text)
-          (str/starts-with? text vault-instrument-prefix)))))
+  (ids/vault-instrument-id? value))
 
 (defn- with-manual-capital
   [snapshot draft]

@@ -1,4 +1,5 @@
-(ns hyperopen.portfolio.optimizer.domain.rebalance)
+(ns hyperopen.portfolio.optimizer.domain.rebalance
+  (:require [hyperopen.portfolio.optimizer.coercion :as coercion]))
 
 (def default-fallback-slippage-bps
   25)
@@ -7,11 +8,7 @@
   [value]
   (js/Math.abs value))
 
-(defn- finite-number?
-  [value]
-  (and (number? value)
-       (not (js/isNaN value))
-       (js/isFinite value)))
+(def ^:private finite-number? coercion/finite-number?)
 
 (defn- side-for
   [delta-value]
@@ -20,19 +17,9 @@
     (neg? delta-value) :sell
     :else :none))
 
-(defn- finite-positive?
-  [value]
-  (and (finite-number? value)
-       (pos? value)
-       true))
+(def ^:private finite-positive? coercion/positive-number?)
 
-(defn- parse-number
-  [value]
-  (cond
-    (finite-number? value) value
-    (string? value) (let [parsed (js/parseFloat value)]
-                      (when (finite-number? parsed) parsed))
-    :else nil))
+(def ^:private parse-number coercion/parse-float-number)
 
 (defn- level-price
   [level]

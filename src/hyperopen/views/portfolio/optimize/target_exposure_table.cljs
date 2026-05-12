@@ -1,5 +1,6 @@
 (ns hyperopen.views.portfolio.optimize.target-exposure-table
   (:require [clojure.string :as str]
+            [hyperopen.portfolio.optimizer.ids :as ids]
             [hyperopen.views.asset-icon :as asset-icon]
             [hyperopen.views.portfolio.optimize.format :as opt-format]))
 
@@ -66,9 +67,7 @@
       (str/replace #"[^A-Za-z0-9_-]+" "-")
       (str/replace #"(^-+|-+$)" "")))
 
-(defn- vault-instrument?
-  [instrument-id]
-  (str/starts-with? (or (some-> instrument-id str) "") "vault:"))
+(def ^:private vault-instrument? ids/vault-instrument-id?)
 
 (defn- base-symbol
   [value]

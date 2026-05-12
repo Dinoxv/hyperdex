@@ -1,33 +1,9 @@
 (ns hyperopen.portfolio.optimizer.infrastructure.prior-data
-  (:require [clojure.string :as str]))
+  (:require [hyperopen.portfolio.optimizer.coercion :as coercion]))
 
-(defn- finite-number?
-  [value]
-  (and (number? value)
-       (not (js/isNaN value))
-       (js/isFinite value)))
+(def ^:private parse-number coercion/parse-float-number)
 
-(defn- parse-number
-  [value]
-  (cond
-    (finite-number? value)
-    value
-
-    (string? value)
-    (let [text (str/trim value)
-          parsed (js/parseFloat text)]
-      (when (and (seq text)
-                 (finite-number? parsed))
-        parsed))
-
-    :else
-    nil))
-
-(defn- non-blank-text
-  [value]
-  (let [text (some-> value str str/trim)]
-    (when (seq text)
-      text)))
+(def ^:private non-blank-text coercion/non-blank-text)
 
 (defn- instrument-id
   [instrument]
@@ -38,10 +14,7 @@
   [instrument]
   (non-blank-text (:coin instrument)))
 
-(defn- positive-number?
-  [value]
-  (and (number? value)
-       (pos? value)))
+(def ^:private positive-number? coercion/positive-number?)
 
 (defn- normalize-weights
   [weights-by-instrument]

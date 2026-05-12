@@ -205,6 +205,7 @@
             [hyperopen.portfolio.optimizer.application.universe-candidates-vault-ordering-test]
             [hyperopen.portfolio.optimizer.black-litterman-actions-test]
             [hyperopen.portfolio.optimizer.black-litterman-view-edits-test]
+            [hyperopen.portfolio.optimizer.coercion-test]
             [hyperopen.portfolio.optimizer.contracts-test]
             [hyperopen.portfolio.optimizer.defaults-test]
             [hyperopen.portfolio.optimizer.domain.black-litterman-test]
@@ -221,12 +222,14 @@
             [hyperopen.portfolio.optimizer.execution-actions-test]
             [hyperopen.portfolio.optimizer.fixtures-test]
             [hyperopen.portfolio.optimizer.frontier-actions-test]
+            [hyperopen.portfolio.optimizer.ids-test]
             [hyperopen.portfolio.optimizer.infrastructure.history-client-test]
             [hyperopen.portfolio.optimizer.infrastructure.persistence-test]
             [hyperopen.portfolio.optimizer.infrastructure.prior-data-test]
             [hyperopen.portfolio.optimizer.infrastructure.solver-adapter-parity-test]
             [hyperopen.portfolio.optimizer.infrastructure.solver-adapter-test]
             [hyperopen.portfolio.optimizer.infrastructure.wire-test]
+            [hyperopen.portfolio.optimizer.instrument-keyed-codec-test]
             [hyperopen.portfolio.optimizer.query-state-test]
             [hyperopen.portfolio.optimizer.tracking-actions-test]
             [hyperopen.portfolio.optimizer.universe-actions-test]
@@ -825,6 +828,7 @@
              'hyperopen.portfolio.optimizer.application.universe-candidates-vault-ordering-test
              'hyperopen.portfolio.optimizer.black-litterman-actions-test
              'hyperopen.portfolio.optimizer.black-litterman-view-edits-test
+             'hyperopen.portfolio.optimizer.coercion-test
              'hyperopen.portfolio.optimizer.contracts-test
              'hyperopen.portfolio.optimizer.defaults-test
              'hyperopen.portfolio.optimizer.domain.black-litterman-test
@@ -841,12 +845,14 @@
              'hyperopen.portfolio.optimizer.execution-actions-test
              'hyperopen.portfolio.optimizer.fixtures-test
              'hyperopen.portfolio.optimizer.frontier-actions-test
+             'hyperopen.portfolio.optimizer.ids-test
              'hyperopen.portfolio.optimizer.infrastructure.history-client-test
              'hyperopen.portfolio.optimizer.infrastructure.persistence-test
              'hyperopen.portfolio.optimizer.infrastructure.prior-data-test
              'hyperopen.portfolio.optimizer.infrastructure.solver-adapter-parity-test
              'hyperopen.portfolio.optimizer.infrastructure.solver-adapter-test
              'hyperopen.portfolio.optimizer.infrastructure.wire-test
+             'hyperopen.portfolio.optimizer.instrument-keyed-codec-test
              'hyperopen.portfolio.optimizer.query-state-test
              'hyperopen.portfolio.optimizer.tracking-actions-test
              'hyperopen.portfolio.optimizer.universe-actions-test

@@ -1,6 +1,7 @@
 (ns hyperopen.views.portfolio.optimize.setup-v4-universe
   (:require [clojure.string :as str]
             [hyperopen.portfolio.optimizer.application.universe-candidates :as universe-candidates]
+            [hyperopen.portfolio.optimizer.coercion :as coercion]
             [hyperopen.views.portfolio.optimize.instrument-display :as instrument-display]))
 
 (def ^:private eyebrow-class
@@ -15,23 +16,9 @@
    "transition-shadow" "focus:border-warning/70"
    "focus:shadow-[0_0_0_1px_rgba(212,181,88,0.75)]"])
 
-(defn- normalized-text
-  [value]
-  (some-> value str str/trim))
+(def ^:private normalized-text coercion/non-blank-text)
 
-(defn- finite-number
-  [value]
-  (cond
-    (number? value)
-    (when (js/isFinite value) value)
-
-    (string? value)
-    (let [parsed (js/Number value)]
-      (when (and (number? parsed)
-                 (js/isFinite parsed))
-        parsed))
-
-    :else nil))
+(def ^:private finite-number coercion/parse-number)
 
 (defn- compact-usd
   [value]

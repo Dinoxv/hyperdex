@@ -1,5 +1,6 @@
 (ns hyperopen.views.portfolio.optimize.black-litterman-views-model
   (:require [clojure.string :as str]
+            [hyperopen.portfolio.optimizer.coercion :as coercion]
             [hyperopen.views.portfolio.optimize.instrument-display :as instrument-display]))
 
 (defn normalize-kind
@@ -25,24 +26,9 @@
       instrument-id
       "Select"))
 
-(defn finite-number?
-  [value]
-  (and (number? value)
-       (not (js/isNaN value))
-       (js/isFinite value)))
+(def finite-number? coercion/finite-number?)
 
-(defn parse-percent-text
-  [value]
-  (let [text (some-> value
-                     str
-                     str/trim
-                     (str/replace #"," "")
-                     (str/replace #"%" "")
-                     str/trim)]
-    (when (seq text)
-      (let [parsed (js/Number text)]
-        (when (finite-number? parsed)
-          (/ parsed 100))))))
+(def parse-percent-text coercion/parse-percent-text)
 
 (defn pct-label
   ([value]

@@ -1,22 +1,20 @@
 (ns hyperopen.portfolio.optimizer.application.universe-candidates
   (:require [clojure.string :as str]
             [hyperopen.asset-selector.query :as asset-query]
-            [hyperopen.portfolio.optimizer.contracts :as contracts]))
+            [hyperopen.portfolio.optimizer.contracts :as contracts]
+            [hyperopen.portfolio.optimizer.coercion :as coercion]
+            [hyperopen.portfolio.optimizer.ids :as ids]))
 
 (def ^:private default-candidate-limit
   6)
 
 (def vault-instrument-prefix
-  "vault:")
+  ids/vault-instrument-prefix)
 
 (defonce vault-candidates-cache
   (atom nil))
 
-(defn- normalized-text
-  [value]
-  (let [text (some-> value str str/trim)]
-    (when (seq text)
-      text)))
+(def ^:private normalized-text coercion/non-blank-text)
 
 (defn- raw-asset-id?
   [value]
@@ -26,22 +24,11 @@
           (or (str/starts-with? text "@")
               (re-matches #"\d+" text))))))
 
-(defn normalize-vault-address
-  [value]
-  (some-> value str str/trim str/lower-case not-empty))
+(def normalize-vault-address ids/normalize-vault-address)
 
-(defn vault-instrument-id
-  [vault-address]
-  (when-let [vault-address* (normalize-vault-address vault-address)]
-    (str vault-instrument-prefix vault-address*)))
+(def vault-instrument-id ids/vault-instrument-id)
 
-(defn vault-address-from-instrument-id
-  [value]
-  (let [text (some-> value str str/trim)
-        lower (some-> text str/lower-case)]
-    (when (and (seq lower)
-               (str/starts-with? lower vault-instrument-prefix))
-      (normalize-vault-address (subs text (count vault-instrument-prefix))))))
+(def vault-address-from-instrument-id ids/vault-address-from-instrument-id)
 
 (defn- hip3-instrument?
   [instrument]
@@ -130,18 +117,7 @@
   [market]
   (if (= :spot (:market-type market)) 0 1))
 
-(defn- finite-number
-  [value]
-  (cond
-    (number? value)
-    (when (js/isFinite value) value)
-
-    (string? value)
-    (let [parsed (js/Number value)]
-      (when (js/isFinite parsed)
-        parsed))
-
-    :else nil))
+(def ^:private finite-number coercion/parse-number)
 
 (defn- vault-tvl
   [row]

@@ -2,6 +2,7 @@
   (:require [hyperopen.portfolio.optimizer.contracts :as contracts]))
 
 (def enum-value-keys contracts/enum-value-keys)
+(def instrument-keyed-map-keys contracts/instrument-keyed-map-keys)
 (def instrument-keyed-map-paths contracts/instrument-keyed-map-paths)
 (def instrument-id-key contracts/instrument-id-key)
 (def stringify-instrument-keyed-map contracts/stringify-instrument-keyed-map)

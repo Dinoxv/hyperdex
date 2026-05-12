@@ -1,14 +1,10 @@
 (ns hyperopen.portfolio.optimizer.infrastructure.persistence
   (:require [cljs.reader :as reader]
-            [clojure.string :as str]
             [hyperopen.account.context :as account-context]
+            [hyperopen.portfolio.optimizer.coercion :as coercion]
             [hyperopen.platform.indexed-db :as indexed-db]))
 
-(defn- non-blank-text
-  [value]
-  (let [text (some-> value str str/trim)]
-    (when (seq text)
-      text)))
+(def ^:private non-blank-text coercion/non-blank-text)
 
 (defn- address-token
   [address]

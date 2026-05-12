@@ -24,9 +24,7 @@
   [readiness]
   (black-litterman-preview/build-preview readiness))
 
-(defn- finite-number?
-  [value]
-  (opt-format/finite-number? value))
+(def ^:private finite-number? opt-format/finite-number?)
 
 (defn- pct
   [value]

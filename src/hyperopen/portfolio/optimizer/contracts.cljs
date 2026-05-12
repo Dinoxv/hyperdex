@@ -1,6 +1,7 @@
 (ns hyperopen.portfolio.optimizer.contracts
   (:require [clojure.spec.alpha :as s]
-            [clojure.string :as str]))
+            [hyperopen.portfolio.optimizer.coercion :as coercion]
+            [hyperopen.portfolio.optimizer.instrument-keyed-codec :as instrument-keyed-codec]))
 
 (def draft-schema-version 1)
 (def scenario-record-schema-version 1)
@@ -84,16 +85,10 @@
   (and (map? value)
        (every? #(contains? value %) ks)))
 
-(defn- finite-number?
-  [value]
-  (and (number? value)
-       (not (js/isNaN value))
-       (js/isFinite value)))
-
 (defn- non-blank-string?
   [value]
   (and (string? value)
-       (seq (str/trim value))))
+       (coercion/non-blank-text value)))
 
 (def draft-statuses
   #{:draft :saved :archived :tracking})
@@ -197,14 +192,14 @@
          #(non-blank-string? (:id %))
          #(string? (:name %))
          #(contains? scenario-record-statuses (:status %))
-         #(finite-number? (:updated-at-ms %))
+         #(coercion/finite-number? (:updated-at-ms %))
          #(s/valid? ::draft (:config %))))
 
 (s/def ::tracking-snapshot
   (s/and map?
          #(contains-keys? % [:scenario-id :as-of-ms :status])
          #(non-blank-string? (:scenario-id %))
-         #(finite-number? (:as-of-ms %))
+         #(coercion/finite-number? (:as-of-ms %))
          #(contains? tracking-snapshot-statuses (:status %))
          #(if (= :tracked (:status %))
             (vector? (:rows %))
@@ -218,7 +213,7 @@
          #(= tracking-record-schema-version (:schema-version %))
          #(contains-keys? % [:scenario-id :updated-at-ms :snapshots])
          #(non-blank-string? (:scenario-id %))
-         #(finite-number? (:updated-at-ms %))
+         #(coercion/finite-number? (:updated-at-ms %))
          #(vector? (:snapshots %))
          #(every? (fn [snapshot]
                     (and (s/valid? ::tracking-snapshot snapshot)
@@ -327,117 +322,13 @@
    :request request
    :input-signature (optimizer-input-signature request)})
 
-(def enum-value-keys
-  #{:code
-    :default-order-type
-    :fee-mode
-    :funding-source
-    :instrument-type
-    :kind
-    :market-type
-    :model
-    :objective-kind
-    :order-type
-    :reason
-    :side
-    :source
-    :status
-    :strategy
-    :type})
-
-(defn- keyword-value
-  [value]
-  (cond
-    (keyword? value) value
-    (string? value) (let [text (str/trim value)]
-                      (when (seq text)
-                        (keyword text)))
-    :else value))
-
-(defn instrument-id-key
-  [key]
-  (cond
-    (keyword? key) (subs (str key) 1)
-    (string? key) key
-    :else (str key)))
-
-(defn stringify-instrument-keyed-map
-  [value]
-  (if (map? value)
-    (into {}
-          (map (fn [[key item]]
-                 [(instrument-id-key key) item]))
-          value)
-    value))
-
-(def instrument-keyed-map-paths
-  [[:current-portfolio :by-instrument]
-   [:history :return-series-by-instrument]
-   [:history :price-series-by-instrument]
-   [:history :funding-by-instrument]
-   [:black-litterman-prior :weights-by-instrument]
-   [:constraints :per-asset-overrides]
-   [:constraints :per-perp-leverage-caps]
-   [:execution-assumptions :prices-by-id]
-   [:execution-assumptions :cost-contexts-by-id]
-   [:execution-assumptions :fee-bps-by-id]
-   [:payload :return-decomposition-by-instrument]
-   [:payload :expected-returns-by-instrument]
-   [:payload :current-weights-by-instrument]
-   [:payload :target-weights-by-instrument]
-   [:payload :diagnostics :weight-sensitivity-by-instrument]
-   [:return-decomposition-by-instrument]
-   [:expected-returns-by-instrument]
-   [:current-weights-by-instrument]
-   [:target-weights-by-instrument]
-   [:diagnostics :weight-sensitivity-by-instrument]])
-
-(defn normalize-wire-values
-  [value]
-  (cond
-    (map? value)
-    (into {}
-          (map (fn [[key item]]
-                 (let [item* (normalize-wire-values item)]
-                   [key (if (contains? enum-value-keys key)
-                          (keyword-value item*)
-                          item*)])))
-          value)
-
-    (vector? value)
-    (mapv normalize-wire-values value)
-
-    (seq? value)
-    (doall (map normalize-wire-values value))
-
-    :else value))
-
-(defn- update-existing-in
-  [value path f]
-  (if (nil? (get-in value path))
-    value
-    (update-in value path f)))
-
-(defn normalize-instrument-keyed-maps
-  [value]
-  (reduce (fn [value* path]
-            (update-existing-in value* path stringify-instrument-keyed-map))
-          value
-          instrument-keyed-map-paths))
-
-(defn- normalize-black-litterman-view-weights
-  [value]
-  (update-existing-in
-   value
-   [:return-model :views]
-   (fn [views]
-     (mapv (fn [view]
-             (update-existing-in view [:weights] stringify-instrument-keyed-map))
-           views))))
-
-(defn normalize-worker-boundary
-  [value]
-  (-> value
-      normalize-wire-values
-      normalize-instrument-keyed-maps
-      normalize-black-litterman-view-weights))
+(def enum-value-keys instrument-keyed-codec/enum-value-keys)
+(def instrument-keyed-map-keys instrument-keyed-codec/instrument-keyed-map-keys)
+(def instrument-keyed-map-paths instrument-keyed-codec/instrument-keyed-map-paths)
+(def instrument-id-key instrument-keyed-codec/instrument-id-key)
+(def stringify-instrument-keyed-map
+  instrument-keyed-codec/stringify-instrument-keyed-map)
+(def normalize-wire-values instrument-keyed-codec/normalize-wire-values)
+(def normalize-instrument-keyed-maps
+  instrument-keyed-codec/normalize-instrument-keyed-maps)
+(def normalize-worker-boundary instrument-keyed-codec/normalize-worker-boundary)

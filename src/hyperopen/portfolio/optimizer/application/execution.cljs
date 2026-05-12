@@ -1,14 +1,10 @@
 (ns hyperopen.portfolio.optimizer.application.execution
   (:require [clojure.string :as str]
             [hyperopen.api.gateway.orders.commands :as order-commands]
-            [hyperopen.asset-selector.markets :as markets]))
+            [hyperopen.asset-selector.markets :as markets]
+            [hyperopen.portfolio.optimizer.coercion :as coercion]))
 
-(defn- finite-positive?
-  [value]
-  (and (number? value)
-       (pos? value)
-       (not (js/isNaN value))
-       (js/isFinite value)))
+(def ^:private finite-positive? coercion/positive-number?)
 
 (defn- parse-int-value
   [value]
@@ -20,11 +16,7 @@
                (not (js/isNaN num)))
       (js/Math.floor num))))
 
-(defn- non-blank-text
-  [value]
-  (let [text (some-> value str str/trim)]
-    (when (seq text)
-      text)))
+(def ^:private non-blank-text coercion/non-blank-text)
 
 (defn- ready-perp-row?
   [row]
