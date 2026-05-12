@@ -5,6 +5,7 @@
             [hyperopen.portfolio.optimizer.application.universe-candidates :as universe-candidates]
             [hyperopen.portfolio.optimizer.black-litterman-actions.views :as black-litterman-views]
             [hyperopen.portfolio.optimizer.contracts :as contracts]
+            [hyperopen.portfolio.optimizer.ids :as ids]
             [hyperopen.portfolio.optimizer.universe-keyboard :as universe-keyboard]))
 
 (defn set-portfolio-optimizer-universe-search-query
@@ -39,11 +40,11 @@
   (let [market-key* (common/non-blank-text market-key)
         universe (common/draft-universe state)
         market (or (get-in state [:asset-selector :market-by-key market-key*])
-                   (when-let [vault-address (universe-candidates/vault-address-from-instrument-id
+                   (when-let [vault-address (ids/vault-address-from-instrument-id
                                              market-key*)]
                      (some (fn [row]
                              (when (= vault-address
-                                      (universe-candidates/normalize-vault-address
+                                      (ids/normalize-vault-address
                                        (:vault-address row)))
                                (universe-candidates/vault-row->candidate row)))
                            (get-in state [:vaults :merged-index-rows]))))

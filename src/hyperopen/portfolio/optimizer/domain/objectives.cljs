@@ -1,4 +1,5 @@
-(ns hyperopen.portfolio.optimizer.domain.objectives)
+(ns hyperopen.portfolio.optimizer.domain.objectives
+  (:require [hyperopen.portfolio.optimizer.coercion :as coercion]))
 
 (def default-frontier-point-count
   40)
@@ -37,11 +38,7 @@
   [n]
   (vec (repeat n 1)))
 
-(defn- finite-number?
-  [value]
-  (and (number? value)
-       (not (js/isNaN value))
-       (js/isFinite value)))
+(def ^:private finite-number? coercion/finite-number?)
 
 (defn- linear-vector
   [expected-returns return-tilt]

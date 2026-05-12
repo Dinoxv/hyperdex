@@ -6,30 +6,16 @@
             [hyperopen.portfolio.optimizer.domain.frontier-overlays :as frontier-overlays]
             [hyperopen.portfolio.optimizer.domain.math :as math]
             [hyperopen.portfolio.optimizer.domain.rebalance :as rebalance]
-            [hyperopen.portfolio.optimizer.domain.weight-cleaning :as weight-cleaning]))
+            [hyperopen.portfolio.optimizer.domain.weight-cleaning :as weight-cleaning]
+            [hyperopen.portfolio.optimizer.coercion :as coercion]))
 
 (defn- sqrt
   [value]
   (js/Math.sqrt (max 0 value)))
 
-(defn- finite-number?
-  [value]
-  (and (number? value)
-       (not (js/isNaN value))
-       (js/isFinite value)))
+(def ^:private finite-number? coercion/finite-number?)
 
-(defn- parse-number
-  [value]
-  (cond
-    (finite-number? value) value
-
-    (string? value)
-    (let [parsed (js/parseFloat value)]
-      (when (finite-number? parsed)
-        parsed))
-
-    :else
-    nil))
+(def ^:private parse-number coercion/parse-float-number)
 
 (defn- dust-threshold
   [request]

@@ -1,39 +1,18 @@
 (ns hyperopen.portfolio.optimizer.application.current-portfolio
   (:require [clojure.string :as str]
             [hyperopen.account.context :as account-context]
-            [hyperopen.asset-selector.markets :as markets]))
+            [hyperopen.asset-selector.markets :as markets]
+            [hyperopen.portfolio.optimizer.coercion :as coercion]))
 
-(defn- non-blank-text
-  [value]
-  (let [text (some-> value str str/trim)]
-    (when (seq text)
-      text)))
+(def ^:private non-blank-text coercion/non-blank-text)
 
-(defn- parse-number
-  [value]
-  (cond
-    (number? value)
-    (when (js/isFinite value)
-      value)
-
-    (string? value)
-    (let [text (str/trim value)
-          parsed (js/parseFloat text)]
-      (when (and (seq text)
-                 (js/isFinite parsed))
-        parsed))
-
-    :else
-    nil))
+(def ^:private parse-number coercion/parse-float-number)
 
 (defn- abs-number
   [value]
   (js/Math.abs value))
 
-(defn- positive-number?
-  [value]
-  (and (number? value)
-       (pos? value)))
+(def ^:private positive-number? coercion/positive-number?)
 
 (defn- zeroish?
   [value]

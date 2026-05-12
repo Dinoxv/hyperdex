@@ -1,11 +1,9 @@
 (ns hyperopen.views.portfolio.optimize.instrument-display
-  (:require [clojure.string :as str]))
+  (:require [clojure.string :as str]
+            [hyperopen.portfolio.optimizer.coercion :as coercion]
+            [hyperopen.portfolio.optimizer.ids :as ids]))
 
-(defn non-blank-text
-  [value]
-  (let [text (some-> value str str/trim)]
-    (when (seq text)
-      text)))
+(def non-blank-text coercion/non-blank-text)
 
 (defn raw-asset-id?
   [value]
@@ -15,26 +13,15 @@
           (or (str/starts-with? text "@")
               (re-matches #"\d+" text))))))
 
-(def ^:private vault-prefix
-  "vault:")
-
 (defn vault-instrument?
   [instrument]
-  (= :vault (:market-type instrument)))
+  (ids/vault-instrument? instrument))
 
 (defn vault-address
   [instrument]
-  (let [direct (non-blank-text (:vault-address instrument))
-        from-value (fn [value]
-                     (let [text (non-blank-text value)
-                           lower (some-> text str/lower-case)]
-                       (when (and lower
-                                  (str/starts-with? lower vault-prefix))
-                         (subs text (count vault-prefix)))))]
-    (some-> (or direct
-                (from-value (:coin instrument))
-                (from-value (:instrument-id instrument)))
-            str/lower-case)))
+  (or (ids/normalize-vault-address (:vault-address instrument))
+      (ids/vault-address-from-value (:coin instrument))
+      (ids/vault-address-from-value (:instrument-id instrument))))
 
 (defn hip3-instrument?
   [instrument]
@@ -45,7 +32,7 @@
 
 (defn spot-instrument?
   [instrument]
-  (= :spot (:market-type instrument)))
+  (= :spot (ids/normalize-market-type (:market-type instrument))))
 
 (defn symbol-first?
   [instrument]

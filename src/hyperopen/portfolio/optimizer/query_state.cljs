@@ -1,6 +1,7 @@
 (ns hyperopen.portfolio.optimizer.query-state
   (:require [clojure.string :as str]
-            [hyperopen.portfolio.optimizer.contracts :as contracts]))
+            [hyperopen.portfolio.optimizer.contracts :as contracts]
+            [hyperopen.portfolio.optimizer.coercion :as coercion]))
 
 (def owned-query-keys
   #{"ofilter" "osort" "oview" "otab" "odiag"})
@@ -45,12 +46,6 @@
 (def ^:private diagnostics-tab-values
   #{:conditioning :constraints :sensitivity :data :returns})
 
-(defn- non-blank-text
-  [value]
-  (let [text (some-> value str str/trim)]
-    (when (seq text)
-      text)))
-
 (defn- normalize-search
   [search]
   (let [search* (some-> search str str/trim)]
@@ -74,24 +69,11 @@
 
 (defn- param-value
   [params key]
-  (some-> params (.get key) non-blank-text))
-
-(defn- normalize-keyword-like
-  [value]
-  (if (keyword? value)
-    value
-    (some-> value non-blank-text str/lower-case keyword)))
-
-(defn- normalize-enum
-  [value valid-values fallback]
-  (let [value* (normalize-keyword-like value)]
-    (if (contains? valid-values value*)
-      value*
-      fallback)))
+  (some-> params (.get key) coercion/non-blank-text))
 
 (defn normalize-list-filter
   [value]
-  (let [value* (normalize-keyword-like value)
+  (let [value* (coercion/normalize-keyword-like value)
         aliased-value (get list-filter-aliases value* value*)]
     (if (contains? list-filter-values aliased-value)
       aliased-value
@@ -99,15 +81,15 @@
 
 (defn normalize-list-sort
   [value]
-  (normalize-enum value list-sort-values default-list-sort))
+  (coercion/normalize-enum value list-sort-values default-list-sort))
 
 (defn normalize-workspace-panel
   [value]
-  (normalize-enum value workspace-panel-values default-workspace-panel))
+  (coercion/normalize-enum value workspace-panel-values default-workspace-panel))
 
 (defn normalize-results-tab
   [value]
-  (let [value* (normalize-keyword-like value)
+  (let [value* (coercion/normalize-keyword-like value)
         aliased-value (get results-tab-aliases value* value*)]
     (if (contains? results-tab-values aliased-value)
       aliased-value
@@ -115,7 +97,7 @@
 
 (defn normalize-diagnostics-tab
   [value]
-  (normalize-enum value diagnostics-tab-values default-diagnostics-tab))
+  (coercion/normalize-enum value diagnostics-tab-values default-diagnostics-tab))
 
 (defn parse-optimizer-query
   [query]

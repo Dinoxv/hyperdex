@@ -1,5 +1,5 @@
 (ns hyperopen.portfolio.optimizer.application.orderbook-loader
-  (:require [clojure.string :as str]))
+  (:require [hyperopen.portfolio.optimizer.coercion :as coercion]))
 
 (def default-stale-after-ms
   15000)
@@ -7,11 +7,7 @@
 (def default-fallback-bps
   25)
 
-(defn- non-blank-text
-  [value]
-  (let [text (some-> value str str/trim)]
-    (when (seq text)
-      text)))
+(def ^:private non-blank-text coercion/non-blank-text)
 
 (defn- needed-row?
   [row]

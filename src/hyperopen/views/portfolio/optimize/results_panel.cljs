@@ -1,26 +1,19 @@
 (ns hyperopen.views.portfolio.optimize.results-panel
   (:require [clojure.string :as str]
             [hyperopen.portfolio.optimizer.application.instrument-labels :as instrument-labels]
+            [hyperopen.portfolio.optimizer.coercion :as coercion]
+            [hyperopen.portfolio.optimizer.ids :as ids]
             [hyperopen.views.portfolio.optimize.format :as opt-format]
             [hyperopen.views.portfolio.optimize.frontier-chart :as frontier-chart]
             [hyperopen.views.portfolio.optimize.target-exposure-table :as target-exposure-table]))
 
 (def ^:private vault-instrument-prefix
-  "vault:")
+  ids/vault-instrument-prefix)
 
-(defn- non-blank-text
-  [value]
-  (let [text (some-> value str str/trim)]
-    (when (seq text)
-      text)))
+(def ^:private non-blank-text coercion/non-blank-text)
 
-(defn- vault-address-from-instrument-id
-  [instrument-id]
-  (let [text (non-blank-text instrument-id)
-        lower (some-> text str/lower-case)]
-    (when (and lower
-               (str/starts-with? lower vault-instrument-prefix))
-      (subs lower (count vault-instrument-prefix)))))
+(def ^:private vault-address-from-instrument-id
+  ids/vault-address-from-instrument-id)
 
 (defn- raw-vault-label?
   [instrument-id label]

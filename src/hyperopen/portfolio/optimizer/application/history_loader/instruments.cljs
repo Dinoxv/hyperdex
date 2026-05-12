@@ -1,14 +1,9 @@
 (ns hyperopen.portfolio.optimizer.application.history-loader.instruments
-  (:require [clojure.string :as str]))
+  (:require [clojure.string :as str]
+            [hyperopen.portfolio.optimizer.coercion :as coercion]
+            [hyperopen.portfolio.optimizer.ids :as ids]))
 
-(def ^:private vault-instrument-prefix
-  "vault:")
-
-(defn non-blank-text
-  [value]
-  (let [text (some-> value str str/trim)]
-    (when (seq text)
-      text)))
+(def non-blank-text coercion/non-blank-text)
 
 (declare market-type)
 
@@ -42,25 +37,13 @@
   (or (non-blank-text (:instrument-id instrument))
       (normalize-coin instrument)))
 
-(defn normalize-vault-address
-  [value]
-  (some-> value str str/trim str/lower-case not-empty))
+(def normalize-vault-address ids/normalize-vault-address)
 
-(defn vault-address-from-value
-  [value]
-  (let [text (some-> value str str/trim)
-        lower (some-> text str/lower-case)]
-    (when (and (seq lower)
-               (str/starts-with? lower vault-instrument-prefix))
-      (normalize-vault-address (subs text (count vault-instrument-prefix))))))
+(def vault-address-from-value ids/vault-address-from-value)
 
 (defn market-type
   [instrument]
-  (let [value (:market-type instrument)]
-    (cond
-      (keyword? value) value
-      (string? value) (keyword (str/lower-case (str/trim value)))
-      :else nil)))
+  (ids/normalize-market-type (:market-type instrument)))
 
 (defn perp-instrument?
   [instrument]

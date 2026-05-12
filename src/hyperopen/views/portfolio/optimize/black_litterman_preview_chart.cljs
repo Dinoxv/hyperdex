@@ -19,11 +19,7 @@
 (def ^:private prior-fill "#6b8db5")
 (def ^:private posterior-fill "#d4b558")
 
-(defn- finite-number?
-  [value]
-  (and (number? value)
-       (not (js/isNaN value))
-       (js/isFinite value)))
+(def ^:private finite-number? opt-format/finite-number?)
 
 (defn- finite-preview-values
   [rows]

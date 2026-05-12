@@ -1,5 +1,6 @@
 (ns hyperopen.views.portfolio.optimize.rebalance-tab
   (:require [clojure.string :as str]
+            [hyperopen.portfolio.optimizer.ids :as ids]
             [hyperopen.views.portfolio.optimize.format :as opt-format]))
 
 (defn- instrument-group-key
@@ -13,7 +14,7 @@
 (defn- instrument-label
   [labels-by-instrument instrument-id]
   (let [value (str instrument-id)]
-    (if (str/starts-with? value "vault:")
+    (if (ids/vault-instrument-id? value)
       (or (get labels-by-instrument instrument-id)
           value)
       value)))

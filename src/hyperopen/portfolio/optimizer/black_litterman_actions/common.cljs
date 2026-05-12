@@ -1,6 +1,6 @@
 (ns hyperopen.portfolio.optimizer.black-litterman-actions.common
-  (:require [clojure.string :as str]
-            [hyperopen.portfolio.optimizer.contracts :as contracts]))
+  (:require [hyperopen.portfolio.optimizer.contracts :as contracts]
+            [hyperopen.portfolio.optimizer.coercion :as coercion]))
 
 (def view-kinds
   #{:absolute
@@ -32,71 +32,17 @@
 (def relative-directions
   #{:outperform :underperform})
 
-(defn normalize-keyword-like
-  [value]
-  (let [text (cond
-               (keyword? value) (name value)
-               (string? value) (str/trim value)
-               :else nil)]
-    (when (seq text)
-      (-> text
-          (str/replace #"([a-z0-9])([A-Z])" "$1-$2")
-          (str/replace #"[_\s]+" "-")
-          str/lower-case
-          keyword))))
+(def normalize-keyword-like coercion/normalize-keyword-like)
 
-(defn non-blank-text
-  [value]
-  (let [text (some-> value str str/trim)]
-    (when (seq text)
-      text)))
+(def non-blank-text coercion/non-blank-text)
 
-(defn finite-number?
-  [value]
-  (and (number? value)
-       (not (js/isNaN value))
-       (js/isFinite value)))
+(def finite-number? coercion/finite-number?)
 
-(defn parse-number-value
-  [value]
-  (cond
-    (finite-number? value)
-    value
+(def parse-number-value coercion/parse-number)
 
-    (string? value)
-    (let [text (str/trim value)]
-      (when (seq text)
-        (let [parsed (js/Number text)]
-          (when (finite-number? parsed)
-            parsed))))
+(def parse-percent-text coercion/parse-percent-text)
 
-    :else nil))
-
-(defn parse-percent-text
-  [value]
-  (cond
-    (finite-number? value)
-    (/ value 100)
-
-    (string? value)
-    (let [text (-> value
-                   str/trim
-                   (str/replace #"," "")
-                   (str/replace #"%" "")
-                   str/trim)]
-      (when (seq text)
-        (let [parsed (js/Number text)]
-          (when (finite-number? parsed)
-            (/ parsed 100)))))
-
-    :else nil))
-
-(defn decimal->percent-text
-  [value]
-  (if (finite-number? value)
-    (-> (.toFixed (* value 100) 4)
-        (str/replace #"\.?0+$" ""))
-    ""))
+(def decimal->percent-text coercion/decimal->percent-text)
 
 (defn save-draft-path-values
   [path-values]

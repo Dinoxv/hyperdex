@@ -1,5 +1,7 @@
 (ns hyperopen.views.portfolio.optimize.frontier-callout-blended
   (:require [clojure.string :as str]
+            [hyperopen.portfolio.optimizer.coercion :as coercion]
+            [hyperopen.portfolio.optimizer.ids :as ids]
             [hyperopen.views.asset-icon :as asset-icon]
             [hyperopen.views.portfolio.optimize.format :as opt-format]))
 
@@ -46,15 +48,9 @@
   [idx]
   (nth allocation-colors (mod idx (count allocation-colors))))
 
-(defn- vault-instrument?
-  [instrument-id]
-  (str/starts-with? (or (some-> instrument-id str) "") "vault:"))
+(def ^:private vault-instrument? ids/vault-instrument-id?)
 
-(defn- non-blank-text
-  [value]
-  (let [text (some-> value str str/trim)]
-    (when (seq text)
-      text)))
+(def ^:private non-blank-text coercion/non-blank-text)
 
 (defn- base-symbol
   [value]

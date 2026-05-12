@@ -1,24 +1,13 @@
 (ns hyperopen.portfolio.optimizer.frontier-actions
-  (:require [clojure.string :as str]
-            [hyperopen.portfolio.optimizer.contracts :as contracts]))
+  (:require [hyperopen.portfolio.optimizer.contracts :as contracts]
+            [hyperopen.portfolio.optimizer.coercion :as coercion]))
 
 (def ^:private frontier-overlay-modes
   #{:standalone
     :contribution
     :none})
 
-(defn- normalize-keyword-like
-  [value]
-  (let [text (cond
-               (keyword? value) (name value)
-               (string? value) (str/trim value)
-               :else nil)]
-    (when (seq text)
-      (-> text
-          (str/replace #"([a-z0-9])([A-Z])" "$1-$2")
-          (str/replace #"[_\s]+" "-")
-          str/lower-case
-          keyword))))
+(def ^:private normalize-keyword-like coercion/normalize-keyword-like)
 
 (defn normalize-frontier-overlay-mode
   [value]

@@ -5,9 +5,7 @@
   [value]
   (js/Math.sqrt (max 0 (or value 0))))
 
-(defn- finite-number?
-  [value]
-  (math/finite-number? value))
+(def ^:private finite-number? math/finite-number?)
 
 (defn asset-overlay-points
   [{:keys [instrument-ids

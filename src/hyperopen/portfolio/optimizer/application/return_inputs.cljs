@@ -1,19 +1,8 @@
 (ns hyperopen.portfolio.optimizer.application.return-inputs
-  (:require [clojure.string :as str]
-            [hyperopen.portfolio.optimizer.application.engine.context :as engine-context]))
+  (:require [hyperopen.portfolio.optimizer.application.engine.context :as engine-context]
+            [hyperopen.portfolio.optimizer.coercion :as coercion]))
 
-(defn- finite-number?
-  [value]
-  (and (number? value)
-       (not (js/isNaN value))
-       (js/isFinite value)))
-
-(defn decimal->percent-text
-  [value]
-  (if (finite-number? value)
-    (-> (.toFixed (* value 100) 4)
-        (str/replace #"\.?0+$" ""))
-    ""))
+(def decimal->percent-text coercion/decimal->percent-text)
 
 (defn readiness-inputs-by-instrument
   [readiness]

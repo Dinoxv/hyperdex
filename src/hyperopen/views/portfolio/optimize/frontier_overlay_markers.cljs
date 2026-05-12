@@ -1,6 +1,8 @@
 (ns hyperopen.views.portfolio.optimize.frontier-overlay-markers
   (:require ["lucide/dist/esm/icons/layers-2.js" :default lucide-layers-2-node]
             [clojure.string :as str]
+            [hyperopen.portfolio.optimizer.coercion :as coercion]
+            [hyperopen.portfolio.optimizer.ids :as ids]
             [hyperopen.views.asset-icon :as asset-icon]
             [hyperopen.views.portfolio.optimize.frontier-callout :as frontier-callout]
             [hyperopen.views.portfolio.optimize.format :as opt-format]))
@@ -98,14 +100,10 @@
 
 (defn- vault-point?
   [point]
-  (or (= :vault (:market-type point))
-      (str/starts-with? (or (some-> (:instrument-id point) str) "") "vault:")))
+  (or (= :vault (ids/normalize-market-type (:market-type point)))
+      (ids/vault-instrument-id? (:instrument-id point))))
 
-(defn- non-blank-text
-  [value]
-  (let [text (some-> value str str/trim)]
-    (when (seq text)
-      text)))
+(def ^:private non-blank-text coercion/non-blank-text)
 
 (defn- base-symbol
   [value]
