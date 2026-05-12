@@ -20,6 +20,16 @@
    :symbol "ETH-USDC"
    :name "Ethereum"})
 
+(def ^:private vault-address
+  "0x1111111111111111111111111111111111111111")
+
+(def ^:private vault-instrument
+  {:instrument-id (str "vault:" vault-address)
+   :market-type :vault
+   :coin (str "vault:" vault-address)
+   :vault-address vault-address
+   :name "Alpha Vault"})
+
 (defn- candle-rows
   [time-and-close-pairs]
   (mapv (fn [[time-ms close]]
@@ -148,6 +158,36 @@
     (is (false? (:current-result? model)))
     (is (false? (:stale? model)))))
 
+(deftest scenario-detail-model-retains-unsaved-draft-route-state-test
+  (let [retained-run (fixtures/sample-last-successful-run
+                      {:result {:status :solved
+                                :instrument-ids ["perp:BTC"]
+                                :target-weights [1.0]
+                                :current-weights [0.25]}})
+        state {:portfolio-ui {:optimizer {:results-tab :recommendation}}
+               :portfolio {:optimizer
+                           {:active-scenario {:loaded-id nil
+                                              :status :computed}
+                            :draft {:id "draft-current"
+                                    :name "Retained Draft"
+                                    :universe [btc-instrument]}
+                            :last-successful-run retained-run
+                            :scenario-load-state {:status :loading
+                                                  :scenario-id "draft"}}}}
+        model (view-model/scenario-detail-model state {:scenario-id "draft"})
+        unnamed-model (view-model/scenario-detail-model
+                       (assoc-in state [:portfolio :optimizer :draft :name] nil)
+                       {:scenario-id "draft"})]
+    (is (= "draft" (:scenario-id model)))
+    (is (false? (:loading? model)))
+    (is (= "Retained Draft" (:scenario-name model)))
+    (is (= retained-run (:last-successful-run model)))
+    (is (= {:loaded-id nil
+            :status :computed}
+           (:active-scenario model)))
+    (is (= [btc-instrument] (get-in model [:state :portfolio :optimizer :draft :universe])))
+    (is (= "Unsaved Optimization" (:scenario-name unnamed-model)))))
+
 (deftest universe-section-model-projects-search-candidates-test
   (let [calls (atom [])
         candidate {:key "perp:ETH"
@@ -231,3 +271,28 @@
              :request-signature {:universe [btc-instrument]}}
             {"perp:BTC" :insufficient}
             btc-instrument)))))
+
+(deftest selected-history-label-projects-vault-gap-and-cache-state-test
+  (testing "vault shared gaps are surfaced before generic readiness labels"
+    (is (= "shared gap"
+           (view-model/selected-history-label
+            {}
+            {:request {:universe [vault-instrument]}}
+            {:status :succeeded
+             :request-signature {:universe [vault-instrument]}}
+            {(:instrument-id vault-instrument) :loaded-but-misaligned}
+            vault-instrument))))
+  (testing "cached vault history allows an insufficient label without a fresh load result"
+    (is (= "insufficient"
+           (view-model/selected-history-label
+            {:portfolio {:optimizer {:history-data
+                                      {:vault-details-by-address
+                                       {vault-address {:portfolio
+                                                       {:month
+                                                        {:accountValueHistory
+                                                         [[1000 100]
+                                                          [2000 101]]}}}}}}}}
+            {}
+            {:status :idle}
+            {(:instrument-id vault-instrument) :insufficient}
+            vault-instrument)))))
