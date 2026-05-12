@@ -2,7 +2,7 @@
 
 This ExecPlan is a living document. The sections `Progress`, `Surprises & Discoveries`, `Decision Log`, and `Outcomes & Retrospective` must be kept up to date as work proceeds.
 
-This document follows `/hyperopen/.agents/PLANS.md`, `/hyperopen/docs/PLANS.md`, and `/hyperopen/docs/WORK_TRACKING.md`. The live `bd` issue for this work is `hyperopen-ye7x` ("Reduce trade startup main-thread work"), and `bd` remains the lifecycle source of truth until this plan is moved out of `active`.
+This document follows `/hyperopen/.agents/PLANS.md`, `/hyperopen/docs/PLANS.md`, and `/hyperopen/docs/WORK_TRACKING.md`. The live `bd` issue for this work is `hyperopen-ye7x` ("Reduce trade startup main-thread work"), and `bd` was the local tracker used at the time until this plan is moved out of `active`.
 
 This plan is a narrow follow-up to `/hyperopen/docs/exec-plans/completed/2026-04-01-desktop-trade-route-startup-tbt.md`. That earlier work already split the trade chart, trading crypto, and indicator runtime off the cold route. The remaining work in scope here is not another chunk-splitting wave. It is startup orchestration work: do less before or immediately after first paint, move obviously non-visible work later, and stop scheduling non-trade startup work on the default `/trade` route.
 

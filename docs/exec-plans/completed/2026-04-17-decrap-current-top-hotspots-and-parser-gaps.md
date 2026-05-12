@@ -2,7 +2,7 @@
 
 This ExecPlan is a living document. The sections `Progress`, `Surprises & Discoveries`, `Decision Log`, and `Outcomes & Retrospective` must be kept up to date as work proceeds.
 
-This document is governed by `/hyperopen/.agents/PLANS.md` and `/hyperopen/docs/PLANS.md`. The live work-tracking item is `bd` issue `hyperopen-p3q4` (`DeCRAP current top hotspots and CRAP parser gaps`). `bd` remains the issue lifecycle source of truth while this file records the implementation plan, progress, decisions, and validation evidence.
+This document is governed by `/hyperopen/.agents/PLANS.md` and `/hyperopen/docs/PLANS.md`. The live work-tracking item is `bd` issue `hyperopen-p3q4` (`DeCRAP current top hotspots and CRAP parser gaps`). `bd` was the local tracker reference while this file recorded the implementation plan, progress, decisions, and validation evidence.
 
 ## Purpose / Big Picture
 

@@ -1,7 +1,7 @@
 ---
 owner: platform
 status: canonical
-last_reviewed: 2026-03-04
+last_reviewed: 2026-05-12
 review_cycle_days: 90
 source_of_truth: true
 ---
@@ -13,7 +13,7 @@ This map preserves every major section from the previous monolithic `/hyperopen/
 ## Section Map
 - `Scope and Precedence` -> `/hyperopen/AGENTS.md#source-of-truth-and-precedence`
 - `ExecPlans` -> `/hyperopen/docs/PLANS.md#execplan-contract`
-- `Issue Tracking with bd (beads)` -> `/hyperopen/docs/WORK_TRACKING.md#bd-issue-tracking-source-of-truth`
+- `Work Tracking and Optional Local Scratch` -> `/hyperopen/docs/WORK_TRACKING.md#canonical-work-tracking-model`
 - `Landing the Plane (Session Completion)` -> `/hyperopen/docs/WORK_TRACKING.md#session-completion-and-handoff`
 - `Shared Phrase: land the worktree` -> `/hyperopen/command-phrases.edn` (machine-readable) and `/hyperopen/docs/WORK_TRACKING.md#shared-agent-command-phrases` (long-form)
 - `UI Guidance (UI Tasks Only)` -> `/hyperopen/docs/FRONTEND.md#ui-guidance-ui-tasks-only`

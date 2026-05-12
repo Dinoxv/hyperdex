@@ -18,8 +18,7 @@
            :index-rules [{:index "docs/product-specs/index.md" :dir "docs/product-specs"}]
            :agents-required-links ["docs/product-specs/index.md"]
            :active-exec-plan-dir "docs/exec-plans/active"
-           :bd-show-fn (fn [_issue-ids] {})
-           :skip-bd-validation? false
+           :work-tracking-policy-files []
            :today test-today}
           overrides)))
 
@@ -81,14 +80,26 @@
                (with-front-matter spec-meta
                                   "# Spec A\n\ncontent\n")))
 
+(def durable-context-text
+  "## Context References\n\nPublic refs:\n- Direct maintainer request captured in this ExecPlan.\n\nRepo artifacts:\n- /hyperopen/docs/exec-plans/active/2026-03-09-sample.md\n\nLocal scratch refs (non-authoritative):\n- None.\n\n")
+
 (defn active-plan
-  [{:keys [issue-id unchecked-count checked-count]}]
+  [{:keys [context-text unchecked-count checked-count]}]
   (str "# Active Plan\n\n"
+       "## Purpose / Big Picture\n\n"
+       "Explain the user-visible purpose.\n\n"
+       (or context-text durable-context-text)
        "## Progress\n\n"
-       (when issue-id
-         (str "Tracking issue: `" issue-id "`\n\n"))
        (apply str (repeat checked-count "- [x] Finished step.\n"))
-       (apply str (repeat unchecked-count "- [ ] Remaining step.\n"))))
+       (apply str (repeat unchecked-count "- [ ] Remaining step.\n"))
+       "\n## Surprises & Discoveries\n\n"
+       "- Observation: None yet.\n  Evidence: Initial plan.\n\n"
+       "## Decision Log\n\n"
+       "- Decision: Keep scope narrow.\n  Rationale: Test fixture.\n  Date/Author: 2026-02-13 / Test\n\n"
+       "## Outcomes & Retrospective\n\n"
+       "Not complete yet.\n\n"
+       "## Validation and Acceptance\n\n"
+       "Run the focused validation command and expect it to pass.\n"))
 
 (deftest passing-repo-has-no-errors
   (with-temp-repo
@@ -157,43 +168,39 @@
     (is (not (contains? required "PRDs/README.md")))
     (is (not (contains? required "PPDs/README.md")))))
 
-(deftest active-exec-plan-with-open-issue-and-unchecked-progress-passes
+(deftest active-exec-plan-with-durable-context-and-unchecked-progress-passes
   (with-temp-repo
     (fn [root]
       (baseline-files! root)
       (write-file! root
                    "docs/exec-plans/active/2026-03-09-sample.md"
-                   (active-plan {:issue-id "hyperopen-123"
-                                 :checked-count 1
+                   (active-plan {:checked-count 1
                                  :unchecked-count 1}))
-      (is (empty? (docs/check-repo root
-                                   (test-config {:bd-show-fn (fn [issue-ids]
-                                                               (zipmap issue-ids (repeat "in_progress")))})))))))
+      (is (empty? (docs/check-repo root (test-config)))))))
 
-(deftest active-exec-plan-without-bd-link-is-reported
+(deftest active-exec-plan-without-durable-context-is-reported
   (with-temp-repo
     (fn [root]
       (baseline-files! root)
       (write-file! root
                    "docs/exec-plans/active/2026-03-09-sample.md"
-                   (active-plan {:checked-count 0
+                   (active-plan {:context-text ""
+                                 :checked-count 0
                                  :unchecked-count 1}))
       (let [codes (set (map :code (docs/check-repo root (test-config))))]
-        (is (contains? codes :active-exec-plan-missing-bd-link))))))
+        (is (contains? codes :active-exec-plan-missing-context-reference))))))
 
-(deftest active-exec-plan-with-only-closed-issues-is-reported
+(deftest active-exec-plan-local-bd-ref-alone-is-not-durable-context
   (with-temp-repo
     (fn [root]
       (baseline-files! root)
       (write-file! root
                    "docs/exec-plans/active/2026-03-09-sample.md"
-                   (active-plan {:issue-id "hyperopen-123"
+                   (active-plan {:context-text "## Context References\n\nLocal scratch refs (non-authoritative):\n- bd: `hyperopen-123`, authoritative: false.\n\n"
                                  :checked-count 1
                                  :unchecked-count 1}))
-      (let [codes (set (map :code (docs/check-repo root
-                                                   (test-config {:bd-show-fn (fn [_issue-ids]
-                                                                               {"hyperopen-123" "closed"})}))))]
-        (is (contains? codes :active-exec-plan-no-open-bd-issue))))))
+      (let [codes (set (map :code (docs/check-repo root (test-config))))]
+        (is (contains? codes :active-exec-plan-missing-context-reference))))))
 
 (deftest active-exec-plan-without-unchecked-progress-is-reported
   (with-temp-repo
@@ -201,38 +208,45 @@
       (baseline-files! root)
       (write-file! root
                    "docs/exec-plans/active/2026-03-09-sample.md"
-                   (active-plan {:issue-id "hyperopen-123"
-                                 :checked-count 2
+                   (active-plan {:checked-count 2
                                  :unchecked-count 0}))
-      (let [codes (set (map :code (docs/check-repo root
-                                                   (test-config {:bd-show-fn (fn [_issue-ids]
-                                                                               {"hyperopen-123" "open"})}))))]
+      (let [codes (set (map :code (docs/check-repo root (test-config))))]
         (is (contains? codes :active-exec-plan-no-unchecked-progress))))))
 
-(deftest active-exec-plan-skip-bd-validation-keeps-structural-guardrails
+(deftest active-exec-plan-missing-required-section-is-reported
   (with-temp-repo
     (fn [root]
       (baseline-files! root)
-      (let [exploding-bd-show (fn [_issue-ids]
-                                (throw (ex-info "bd should not be called" {})))]
-        (write-file! root
-                     "docs/exec-plans/active/2026-03-09-sample.md"
-                     (active-plan {:issue-id "hyperopen-123"
-                                   :checked-count 1
-                                   :unchecked-count 1}))
-        (is (empty? (docs/check-repo root
-                                     (test-config {:skip-bd-validation? true
-                                                   :bd-show-fn exploding-bd-show}))))
+      (write-file! root
+                   "docs/exec-plans/active/2026-03-09-sample.md"
+                   (str "# Active Plan\n\n"
+                        durable-context-text
+                        "## Progress\n\n- [ ] Remaining step.\n"))
+      (let [codes (set (map :code (docs/check-repo root (test-config))))]
+        (is (contains? codes :active-exec-plan-missing-purpose))
+        (is (contains? codes :active-exec-plan-missing-decision-log))
+        (is (contains? codes :active-exec-plan-missing-validation))))))
 
-        (write-file! root
-                     "docs/exec-plans/active/2026-03-09-sample.md"
-                     (active-plan {:checked-count 0
-                                   :unchecked-count 1}))
-        (let [codes (set (map :code (docs/check-repo root
-                                                     (test-config {:skip-bd-validation? true
-                                                                   :bd-show-fn exploding-bd-show}))))]
-          (is (contains? codes :active-exec-plan-missing-bd-link))
-          (is (not (contains? codes :active-exec-plan-no-open-bd-issue))))))))
+(deftest stale-canonical-bd-requirement-is-reported
+  (with-temp-repo
+    (fn [root]
+      (baseline-files! root)
+      (write-file! root
+                   "docs/WORK_TRACKING.md"
+                   (str "Use `b" "d` for all backlog, bug, feature, and follow-up issue tracking.\n"))
+      (let [codes (set (map :code (docs/check-repo root
+                                                   (test-config {:work-tracking-policy-files ["docs/WORK_TRACKING.md"]}))))]
+        (is (contains? codes :stale-bd-requirement))))))
+
+(deftest optional-non-authoritative-bd-reference-is-allowed
+  (with-temp-repo
+    (fn [root]
+      (baseline-files! root)
+      (write-file! root
+                   "docs/WORK_TRACKING.md"
+                   "Beads may be used as optional local scratch. Local refs may include bd: hyperopen-123 when authoritative: false.\n")
+      (is (empty? (docs/check-repo root
+                                   (test-config {:work-tracking-policy-files ["docs/WORK_TRACKING.md"]})))))))
 
 (defn -main
   [& _args]

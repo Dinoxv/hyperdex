@@ -2,7 +2,7 @@
 
 This ExecPlan is a living document. The sections `Progress`, `Surprises & Discoveries`, `Decision Log`, and `Outcomes & Retrospective` must be kept up to date as work proceeds.
 
-This document is governed by `/Users/barry/.codex/worktrees/0c2d/hyperopen/.agents/PLANS.md`, `/Users/barry/.codex/worktrees/0c2d/hyperopen/docs/PLANS.md`, and `/Users/barry/.codex/worktrees/0c2d/hyperopen/docs/WORK_TRACKING.md`. The tracked work item for this plan is `hyperopen-38i5`, and that `bd` issue must remain the lifecycle source of truth while this plan tracks the implementation story.
+This document is governed by `/Users/barry/.codex/worktrees/0c2d/hyperopen/.agents/PLANS.md`, `/Users/barry/.codex/worktrees/0c2d/hyperopen/docs/PLANS.md`, and `/Users/barry/.codex/worktrees/0c2d/hyperopen/docs/WORK_TRACKING.md`. The tracked work item for this plan is `hyperopen-38i5`; the `bd` issue is historical local tracker context for this plan.
 
 ## Purpose / Big Picture
 

@@ -1,6 +1,6 @@
 # Reduce The Top Remaining CRAP Hotspots For `hyperopen-do7z`
 
-This ExecPlan is the completed implementation record for `hyperopen-do7z`. It is governed by `/hyperopen/.agents/PLANS.md` and `/hyperopen/docs/PLANS.md`. `bd` remained the lifecycle source of truth while this file tracked the implementation and validation story.
+This ExecPlan is the completed implementation record for `hyperopen-do7z`. It is governed by `/hyperopen/.agents/PLANS.md` and `/hyperopen/docs/PLANS.md`. `bd` was the local tracker reference while this file tracked the implementation and validation story.
 
 ## Purpose / Big Picture
 

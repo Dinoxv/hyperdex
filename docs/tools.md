@@ -1,7 +1,7 @@
 ---
 owner: platform
 status: canonical
-last_reviewed: 2026-03-22
+last_reviewed: 2026-05-12
 review_cycle_days: 90
 source_of_truth: true
 ---
@@ -22,7 +22,7 @@ Use this file as the single starting point for what actions this repo provides t
 8. For a checked-in overnight hotspot sweep, use `bb tools/mutate_nightly.clj` with targets from `/hyperopen/tools/mutate/nightly_targets.edn`.
 9. For interactive feature, bug, and UI orchestration, invoke `$feature-flow`, `$bug-flow`, or `$ui-flow` explicitly.
 10. For multi-agent role, artifact, and gate rules, use `/hyperopen/docs/MULTI_AGENT.md` and the manager under `/hyperopen/tools/multi-agent/`.
-11. For issue tracking and session handoff rules, use `/hyperopen/docs/WORK_TRACKING.md`.
+11. For public work tracking, optional local scratch, and session handoff rules, use `/hyperopen/docs/WORK_TRACKING.md`.
 12. For Lean-backed formal-tool commands, use `npm run formal:verify -- --surface <vault-transfer|order-request-standard|order-request-advanced|effect-order-contract|portfolio-returns-estimator|portfolio-returns-normalization|trading-submit-policy|order-form-ownership>` and `npm run formal:sync -- --surface <surface>`.
 13. For optional websocket TLA+ model-checking, use `npm run tla:verify -- --spec websocket-runtime` for the bounded safety pass and `npm run tla:verify -- --spec websocket-runtime-liveness` for the focused liveness pass.
 14. For exact browser inspection command syntax, see:
@@ -52,9 +52,9 @@ Use this file as the single starting point for what actions this repo provides t
 | `npm run portfolio` | Watch only the Portfolio workbench plus Tailwind | Isolated component workbench iteration |
 | `npm run portfolio:watch` | Watch the dedicated Shadow `:portfolio` target | Workbench-only CLJS compile loop |
 | `npm run test:runner:generate` | Regenerate test runner list | Usually after adding/removing test namespaces |
-| `npm run agent:dry-run -- --issue <bd-id>` | Produce a synthetic multi-agent artifact bundle without model execution | Validate manager wiring, artifact paths, and phase ordering locally |
-| `npm run agent:ticket -- --issue <bd-id>` | Run the repo-local multi-agent workflow for one ticket | Local manager-style orchestration for complex tickets |
-| `npm run agent:resume-ticket -- --issue <bd-id>` | Resume a prior multi-agent ticket run from existing artifacts | Continue after an interrupted local run |
+| `npm run agent:dry-run -- --issue <local-run-key>` | Produce a synthetic multi-agent artifact bundle without model execution | Validate manager wiring, artifact paths, and phase ordering locally |
+| `npm run agent:ticket -- --issue <local-run-key>` | Run the repo-local multi-agent workflow for one local run key | Maintainer-only local orchestration; durable work context must still live in GitHub, ExecPlans, or committed artifacts |
+| `npm run agent:resume-ticket -- --issue <local-run-key>` | Resume a prior multi-agent run from existing artifacts | Continue after an interrupted local run |
 | `npm run test:multi-agent` | Multi-agent manager unit tests | Before changing `/hyperopen/tools/multi-agent/**`, role config, or artifact contracts |
 | `bb tools/crap_report.clj --scope src` | Print CRAP hotspots from existing `coverage/lcov.info` | After `npm run coverage` when triaging risky functions/modules |
 | `bb tools/mutate.clj --scan --module src/hyperopen/...` | Report mutation counts and coverage-aware eligible sites for one module | After `npm run coverage` when validating a hotspot module or pure policy seam |
@@ -162,14 +162,14 @@ All repo-local multi-agent orchestration lives under `/hyperopen/tools/multi-age
 
 Commands:
 
-- `node tools/multi-agent/src/cli.mjs dry-run --issue <bd-id>`
-- `node tools/multi-agent/src/cli.mjs ticket --issue <bd-id>`
-- `node tools/multi-agent/src/cli.mjs resume-ticket --issue <bd-id>`
+- `node tools/multi-agent/src/cli.mjs dry-run --issue <local-run-key>`
+- `node tools/multi-agent/src/cli.mjs ticket --issue <local-run-key>`
+- `node tools/multi-agent/src/cli.mjs resume-ticket --issue <local-run-key>`
 
 Key rules:
 
-- Use a `bd` issue id as the workflow key.
-- Artifacts are written under `/hyperopen/tmp/multi-agent/<bd-id>/`.
+- Use a local run key for transient artifact paths. The legacy option name is still `--issue`.
+- Artifacts are written under `/hyperopen/tmp/multi-agent/<local-run-key>/`.
 - Native Codex project config lives under `/hyperopen/.codex/config.toml`.
 - Repo-local checked-in agent definitions live under `/hyperopen/.codex/agents/*.toml`.
 - Real runs require `OPENAI_API_KEY` and a local `codex` CLI.
@@ -190,9 +190,9 @@ Example:
 - `/hyperopen/tools/phrase get --suggest "land the work tree"`
 - `/hyperopen/tools/phrase get --accept-fuzzy "land the work tree"`
 
-## 6) Issue tracking tool (`bd`)
+## 6) Optional local scratch (`bd` / Beads)
 
-`bd` is the canonical issue tracker for this repository.
+Beads / `bd` is optional local scratch for maintainers or agents who want temporary decomposition or dependency sorting. It is not project memory, is not required for CI or fresh clones, and must not be the only place durable work context exists.
 
 Common commands:
 - `bd ready --json`
@@ -201,7 +201,7 @@ Common commands:
 - `bd close <id> --reason "Completed" --json`
 - `bd backup status --json`
 
-For policy details, including markdown-vs-`bd` boundaries and session-completion workflow, follow `/hyperopen/docs/WORK_TRACKING.md`.
+Promote any durable outcome into a GitHub Issue/PR, ExecPlan, Improvement Plane artifact, canonical doc, or PR review note before handoff. For policy details, follow `/hyperopen/docs/WORK_TRACKING.md`.
 
 ## 7) Browser Inspection tools (CLI)
 

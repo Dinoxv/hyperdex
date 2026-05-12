@@ -53,7 +53,7 @@ Today, `/hyperopen/src/hyperopen/websocket/application/runtime_reducer.cljs` is 
   Rationale: health refresh depends on websocket health derivation and stream rollups, while runtime-view projection depends only on packaging reducer state into effect payloads and fingerprints. Keeping those concerns separate preserved the existing runtime helper pattern and yielded smaller direct test surfaces.
   Date/Author: 2026-04-06 / Codex
 
-- Decision: close the duplicate `bd` issue `hyperopen-nj34` created during delegated analysis and keep `hyperopen-z8ve` as the single source of truth.
+- Decision: close the duplicate `bd` issue `hyperopen-nj34` created during delegated analysis and keep `hyperopen-z8ve` as the single local tracker reference.
   Rationale: the repo should not carry two live issues or two active ExecPlans for the same refactor. Consolidation preserved one canonical plan and one issue lifecycle.
   Date/Author: 2026-04-06 / Codex
 

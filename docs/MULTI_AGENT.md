@@ -1,7 +1,7 @@
 ---
 owner: platform
 status: canonical
-last_reviewed: 2026-03-18
+last_reviewed: 2026-05-12
 review_cycle_days: 90
 source_of_truth: true
 ---
@@ -17,7 +17,7 @@ Describe the actual Hyperopen multi-agent workflow without duplicating the full 
 - This document governs how Hyperopen expects multi-agent orchestration to work.
 - `/hyperopen/AGENTS.md` is the root operating contract.
 - `/hyperopen/docs/PLANS.md` is the public planning entry point for ExecPlans.
-- `/hyperopen/docs/WORK_TRACKING.md` remains the source of truth for `bd` workflow and handoff.
+- `/hyperopen/docs/WORK_TRACKING.md` governs public work references, optional local scratch, and handoff.
 - If the runtime code and prose docs drift, fix the runtime or clearly mark compatibility behavior; do not document two equal “canonical” flows.
 
 ## Workflow Entry Points
@@ -71,7 +71,9 @@ Use the workflow skills as the primary interactive entry points. The skills carr
 
 ### Repo-Local Manager
 
-`npm run agent:ticket -- --issue <bd-id>` implements the ticket-runner path for complex tracked work:
+The repo-local manager is a maintainer-oriented local orchestration path. Durable work context still belongs in GitHub Issues/PRs, the active ExecPlan, Improvement Plane artifacts, canonical docs, or direct maintainer/user request notes captured in committed artifacts.
+
+Current manager commands retain the legacy `--issue` option name for compatibility with local runs. Treat that value as a local run key, not canonical project status:
 
 1. `spec_writer` refreshes the active ExecPlan and emits `spec.json`
 2. `acceptance_test_writer` and `edge_case_test_writer` emit proposal artifacts
@@ -81,14 +83,14 @@ Use the workflow skills as the primary interactive entry points. The skills carr
 6. `worker` implements the smallest change that satisfies the contract
 7. `reviewer` and `browser_debugger` run before final quality gates
 
-The manager writes artifacts under `/hyperopen/tmp/multi-agent/<bd-id>/` and the tests under `/hyperopen/tools/multi-agent/test/**` enforce that contract.
+The manager writes artifacts under `/hyperopen/tmp/multi-agent/<local-run-key>/` and the tests under `/hyperopen/tools/multi-agent/test/**` enforce that local artifact contract. Any durable outcome from those artifacts must be reflected back into a contributor-visible reference or committed implementation artifact before handoff.
 
 ## Planning Integration
 
 - Complex multi-agent work still requires an ExecPlan under `/hyperopen/docs/exec-plans/**`.
 - `spec_writer` owns creating or refreshing the active ExecPlan instead of creating a parallel requirements document.
 - The approved test contract and any important workflow decisions must be reflected back into the active ExecPlan.
-- `bd` remains the lifecycle source of truth; markdown artifacts do not replace it.
+- Public status and review context stay in GitHub Issues/PRs. Beads / `bd` references are optional local scratch and must be non-authoritative.
 
 ## Write Surfaces
 

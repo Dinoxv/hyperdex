@@ -35,7 +35,7 @@ After this change, `/vaults` should stay visually stable while it hydrates and s
   Date/Author: 2026-03-17 / Codex
 
 - Decision: create a new tracked task instead of reusing an unrelated existing `bd` issue.
-  Rationale: the ready queue did not contain an existing issue for this exact `/vaults` route render-performance pass, and the repository requires `bd` to remain the source of truth for work tracking.
+  Rationale: the ready queue did not contain an existing issue for this exact `/vaults` route render-performance pass, and the repository policy at the time used `bd` for work tracking.
   Date/Author: 2026-03-17 / Codex
 
 - Decision: use the generated release artifact root on `http://localhost:8082` for the clean Lighthouse rerun instead of waiting for a separate dev/watch server to appear.

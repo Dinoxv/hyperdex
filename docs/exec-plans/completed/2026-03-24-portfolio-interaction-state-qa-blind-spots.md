@@ -2,7 +2,7 @@
 
 This ExecPlan is a living document. The sections `Progress`, `Surprises & Discoveries`, `Decision Log`, and `Outcomes & Retrospective` must be kept up to date as work proceeds.
 
-This document is governed by `/hyperopen/.agents/PLANS.md` and `/hyperopen/docs/PLANS.md`. The tracked `bd` work for this plan is parent epic `hyperopen-6len` with child tasks `hyperopen-l6vw` and `hyperopen-x7uh`, and `bd` remains the lifecycle source of truth while this plan tracks the implementation story.
+This document is governed by `/hyperopen/.agents/PLANS.md` and `/hyperopen/docs/PLANS.md`. The tracked `bd` work for this plan is parent epic `hyperopen-6len` with child tasks `hyperopen-l6vw` and `hyperopen-x7uh`, and `bd` was the local tracker used at the time while this plan tracks the implementation story.
 
 ## Purpose / Big Picture
 

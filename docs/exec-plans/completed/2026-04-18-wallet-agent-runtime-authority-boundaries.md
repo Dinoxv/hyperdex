@@ -2,7 +2,7 @@
 
 This ExecPlan is a living document. The sections `Progress`, `Surprises & Discoveries`, `Decision Log`, and `Outcomes & Retrospective` must be kept up to date as work proceeds.
 
-This document is governed by `docs/PLANS.md` and `.agents/PLANS.md`. The tracked work item for this plan is `hyperopen-g0cv`; that `bd` issue remains the lifecycle source of truth while this file is active.
+This document is governed by `docs/PLANS.md` and `.agents/PLANS.md`. The tracked work item for this plan is `hyperopen-g0cv`; that `bd` issue was the local tracker reference while this file was active.
 
 ## Purpose / Big Picture
 
@@ -294,7 +294,7 @@ Run focused validation first, then the required repository gates. The mandatory 
 
 Because this is not UI-facing, Browser MCP and governed browser QA are skipped by default. If implementation changes Playwright-covered passkey live behavior, modifies `tools/playwright/**`, or changes visible trading settings or passkey interaction behavior, also run `npx playwright test tools/playwright/test/trade-regressions.spec.mjs --grep "passkey|session toggles|locked remembered passkey session submit triggers unlock flow instead of recovery"` and then `npm run browser:cleanup`.
 
-Milestone 6 is complete when all required commands pass, conditional browser accounting is explicitly marked as skipped or passed, and `bd` remains the lifecycle source of truth for any remaining follow-up.
+Milestone 6 is complete when all required commands pass, conditional browser accounting is explicitly marked as skipped or passed, and `bd` was the local tracker used at the time for any remaining follow-up.
 
 ## Concrete Steps
 

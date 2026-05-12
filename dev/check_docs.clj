@@ -2,9 +2,7 @@
 
 (ns dev.check-docs
   (:require [clojure.java.io :as io]
-            [clojure.java.shell :as shell]
-            [clojure.string :as str]
-            [cheshire.core :as json]))
+            [clojure.string :as str]))
 
 (def default-required-files
   ["AGENTS.md"
@@ -54,6 +52,19 @@
 (def default-active-exec-plan-dir
   "docs/exec-plans/active")
 
+(def default-work-tracking-policy-files
+  ["AGENTS.md"
+   ".agents/PLANS.md"
+   ".agents/skills/feature-flow/SKILL.md"
+   ".agents/skills/bug-flow/SKILL.md"
+   "docs/WORK_TRACKING.md"
+   "docs/PLANS.md"
+   "docs/MULTI_AGENT.md"
+   "docs/tools.md"
+   "docs/references/toolchain.md"
+   "docs/BROWSER_STORAGE.md"
+   "docs/qa/agent-first-ui-manual-exceptions.md"])
+
 (def default-agents-required-links
   ["ARCHITECTURE.md"
    "docs/DESIGN.md"
@@ -87,8 +98,7 @@
    :index-rules default-index-rules
    :agents-required-links default-agents-required-links
    :active-exec-plan-dir default-active-exec-plan-dir
-   :bd-show-fn nil
-   :skip-bd-validation? (env-true? "HYPEROPEN_SKIP_BD_DOCS_CHECK")
+   :work-tracking-policy-files default-work-tracking-policy-files
    :today (utc-today)})
 
 (defn normalize-path
@@ -288,97 +298,98 @@
   [root rel-path]
   (slurp (io/file root rel-path)))
 
-(def active-exec-plan-issue-pattern
-  #"\bhyperopen-[a-z0-9]+(?:\.[0-9]+)?\b")
-
-(defn extract-active-exec-plan-issue-ids
-  [text]
-  (->> (re-seq active-exec-plan-issue-pattern text)
-       distinct
-       sort
-       vec))
-
 (defn active-exec-plan-unchecked-count
   [text]
   (count (re-seq #"(?m)^- \[ \]" text)))
 
-(defn default-bd-show-fn
-  [issue-ids]
-  (reduce (fn [acc issue-id]
-            (let [{:keys [exit out err]} (shell/sh "bd" "show" issue-id "--json")]
-              (cond
-                (zero? exit)
-                (let [rows (json/parse-string out true)
-                      status (-> rows first :status)]
-                  (if status
-                    (assoc acc issue-id status)
-                    acc))
+(def active-exec-plan-required-sections
+  [{:code :active-exec-plan-missing-purpose
+    :pattern #"(?im)^##\s+(Purpose\b|Purpose / Big Picture\b|Objective\b)"
+    :message "active ExecPlan must explain purpose or objective"}
+   {:code :active-exec-plan-missing-progress
+    :pattern #"(?im)^##\s+Progress\b"
+    :message "active ExecPlan must include a Progress section"}
+   {:code :active-exec-plan-missing-discoveries
+    :pattern #"(?im)^##\s+Surprises & Discoveries\b"
+    :message "active ExecPlan must include a Surprises & Discoveries section"}
+   {:code :active-exec-plan-missing-decision-log
+    :pattern #"(?im)^##\s+Decision Log\b"
+    :message "active ExecPlan must include a Decision Log section"}
+   {:code :active-exec-plan-missing-outcomes
+    :pattern #"(?im)^##\s+Outcomes & Retrospective\b"
+    :message "active ExecPlan must include an Outcomes & Retrospective section"}
+   {:code :active-exec-plan-missing-validation
+    :pattern #"(?im)^##\s+(Validation|Validation and Acceptance|Validation And Acceptance|Acceptance Criteria)\b"
+    :message "active ExecPlan must include validation or acceptance expectations"}])
 
-                (re-find #"not found|no issue|unknown issue|does not exist" (str/lower-case err))
-                acc
+(def active-exec-plan-durable-context-patterns
+  [#"(?im)^\s*Public refs?:"
+   #"(?im)^\s*Public references?:"
+   #"(?im)^\s*public_refs\s*:"
+   #"(?im)^\s*Repo artifacts?:"
+   #"(?im)^\s*repo_artifacts\s*:"
+   #"(?im)\bGitHub (issue|pull request|PR)\b"
+   #"(?im)\bparent ExecPlan\b"
+   #"(?im)\bImprovement Plane\b"
+   #"(?im)\bdirect (user|maintainer) request\b"])
 
-                :else
-                (throw (ex-info (str "bd show failed for " issue-id)
-                                {:issue-id issue-id
-                                 :stderr err
-                                 :exit exit})))))
-          {}
-          issue-ids))
+(defn missing-section-errors
+  [path text]
+  (->> active-exec-plan-required-sections
+       (remove #(re-find (:pattern %) text))
+       (mapv #(err (:code %) path (:message %)))))
+
+(defn durable-context-reference?
+  [text]
+  (boolean (some #(re-find % text) active-exec-plan-durable-context-patterns)))
 
 (defn active-exec-plan-errors
-  [root {:keys [active-exec-plan-dir bd-show-fn skip-bd-validation?]}]
+  [root {:keys [active-exec-plan-dir]}]
   (let [plan-dir (or active-exec-plan-dir default-active-exec-plan-dir)
         plan-files (->> (markdown-files-in-dir root plan-dir)
                         (remove #(= % (str plan-dir "/README.md")))
                         vec)]
     (if (empty? plan-files)
       []
-      (let [plans (mapv (fn [rel-path]
-                          (let [text (file-text root rel-path)]
-                            {:path rel-path
-                             :text text
-                             :issue-ids (extract-active-exec-plan-issue-ids text)
-                             :unchecked-count (active-exec-plan-unchecked-count text)}))
-                        plan-files)
-            all-ids (->> plans (mapcat :issue-ids) distinct sort vec)
-            lookup (or bd-show-fn default-bd-show-fn)]
-        (if skip-bd-validation?
-          (mapcat (fn [{:keys [path issue-ids unchecked-count]}]
-                    (cond-> []
-                      (empty? issue-ids)
-                      (conj (err :active-exec-plan-missing-bd-link
-                                 path
-                                 "active ExecPlan must reference at least one bd issue id"))
+      (mapcat (fn [path]
+                (let [text (file-text root path)
+                      unchecked-count (active-exec-plan-unchecked-count text)]
+                  (cond-> (missing-section-errors path text)
+                    (not (durable-context-reference? text))
+                    (conj (err :active-exec-plan-missing-context-reference
+                               path
+                               "active ExecPlan must include a durable context reference such as a GitHub issue/PR, parent ExecPlan, Improvement Plane artifact, repo artifact, or direct user/maintainer request"))
 
-                      (zero? unchecked-count)
-                      (conj (err :active-exec-plan-no-unchecked-progress
-                                 path
-                                 "active ExecPlan has no remaining unchecked progress items; move it out of active"))))
-                  plans)
-          (try
-            (let [status-by-id (lookup all-ids)]
-              (mapcat (fn [{:keys [path issue-ids unchecked-count]}]
-                        (let [valid-ids (filter #(contains? status-by-id %) issue-ids)
-                              open-ids (filter #(not= "closed" (get status-by-id %)) valid-ids)]
-                          (cond-> []
-                            (empty? valid-ids)
-                            (conj (err :active-exec-plan-missing-bd-link
-                                       path
-                                       "active ExecPlan must reference at least one valid bd issue id"))
+                    (zero? unchecked-count)
+                    (conj (err :active-exec-plan-no-unchecked-progress
+                               path
+                               "active ExecPlan has no remaining unchecked progress items; move it out of active")))))
+              plan-files))))
 
-                            (and (seq valid-ids) (empty? open-ids))
-                            (conj (err :active-exec-plan-no-open-bd-issue
-                                       path
-                                       (str "active ExecPlan only references closed bd issues: "
-                                            (str/join ", " valid-ids))))
+(def stale-bd-requirement-patterns
+  [{:pattern #"(?im)\bbd\b[^\n.]*\b(source of truth|canonical issue tracker|lifecycle source of truth|issue lifecycle source of truth)\b"
+    :message "bd must not be described as canonical or as a source of truth"}
+   {:pattern #"(?im)\b(source of truth|canonical issue tracker|lifecycle source of truth|issue lifecycle source of truth)\b[^\n.]*\bbd\b"
+    :message "bd must not be described as canonical or as a source of truth"}
+   {:pattern #"(?im)\buse\s+`?bd`?\s+for\s+all\b"
+    :message "bd must not be required for all backlog, bug, feature, or follow-up tracking"}
+   {:pattern #"(?im)\bensure\b[^\n.]*\btracked in\s+`?bd`?\b"
+    :message "bd must not be required before work can proceed"}
+   {:pattern #"(?im)\bactive ExecPlans?\b[^\n.]*\bmust reference\b[^\n.]*\bbd\b"
+    :message "active ExecPlans must not require bd issue ids"}
+   {:pattern #"(?im)\bmust reference at least one\b[^\n.]*\bbd issue\b"
+    :message "active ExecPlans must not require bd issue ids"}])
 
-                            (zero? unchecked-count)
-                            (conj (err :active-exec-plan-no-unchecked-progress
-                                       path
-                                       "active ExecPlan has no remaining unchecked progress items; move it out of active")))))
-                      plans))
-            (catch Exception ex
-              [(err :bd-query-failed plan-dir (or (.getMessage ex) "failed to query bd issue status"))])))))))
+(defn stale-bd-requirement-errors
+  [root policy-files]
+  (mapcat (fn [path]
+            (if-not (path-exists? root path)
+              []
+              (let [text (file-text root path)]
+                (->> stale-bd-requirement-patterns
+                     (filter #(re-find (:pattern %) text))
+                     (map #(err :stale-bd-requirement path (:message %)))))))
+          policy-files))
 
 (defn validate-governed-doc
   [root rel-path today]
@@ -432,12 +443,14 @@
         governed (governed-doc-paths root config)
         governed-errors (mapcat #(validate-governed-doc root % today) governed)
         index-errors (mapcat #(index-coverage-errors root %) (:index-rules config))
-        active-plan-errors (active-exec-plan-errors root config)]
+        active-plan-errors (active-exec-plan-errors root config)
+        stale-bd-errors (stale-bd-requirement-errors root (:work-tracking-policy-files config))]
      (-> []
          (into (required-file-errors root required))
          (into governed-errors)
          (into index-errors)
          (into active-plan-errors)
+         (into stale-bd-errors)
          (into (agents-link-errors root (:agents-required-links config)))))))
 
 (defn print-errors!
@@ -452,9 +465,7 @@
         errors (check-repo root config)]
     (if (empty? errors)
       (do
-        (println (if (:skip-bd-validation? config)
-                   "Docs check passed. Skipped bd issue status validation."
-                   "Docs check passed."))
+        (println "Docs check passed.")
         (System/exit 0))
       (do
         (print-errors! errors)

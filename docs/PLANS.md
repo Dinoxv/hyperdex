@@ -1,7 +1,7 @@
 ---
 owner: platform
 status: canonical
-last_reviewed: 2026-03-18
+last_reviewed: 2026-05-12
 review_cycle_days: 90
 source_of_truth: true
 ---
@@ -27,7 +27,7 @@ An ExecPlan is Hyperopen’s term for a living execution plan: a self-contained 
 - self-contained context and acceptance criteria
 - explicit `Progress`, `Surprises & Discoveries`, `Decision Log`, and `Outcomes & Retrospective` sections
 - concrete file paths, commands, and validation expectations
-- a live connection to the tracked `bd` work while implementation is active
+- durable context references when applicable: GitHub Issue/PR, parent ExecPlan, Improvement Plane artifact, repo artifact, or direct user/maintainer request
 
 ## Storage Layout
 
@@ -39,16 +39,17 @@ An ExecPlan is Hyperopen’s term for a living execution plan: a self-contained 
 ## Lifecycle
 
 1. Capture intent, assumptions, and acceptance criteria in an active plan.
-2. Link the active plan to live `bd` work and keep its living sections current while implementing.
+2. Link the active plan to durable work context when applicable and keep its living sections current while implementing.
 3. Keep at least one unchecked progress item in an active plan while work remains.
 4. Move the plan to completed after acceptance criteria pass.
 5. Move stale or intentionally paused planning notes out of active and into deferred.
 
-## Relationship To `bd`
+## Relationship To Work Tracking
 
-- Issue lifecycle tracking lives in `/hyperopen/docs/WORK_TRACKING.md` and `bd`.
-- ExecPlan checklists and progress entries are required implementation artifacts; they do not replace `bd` issue status tracking.
-- Markdown may reference `bd` ids for context, but `bd` remains the status source of truth.
+- Public backlog, ownership, and review status live in GitHub Issues and Pull Requests.
+- ExecPlan checklists and progress entries are required implementation artifacts for complex work; they do not replace public work tracking.
+- Improvement Plane artifacts capture durable agent-harness failures, proposals, and lessons when they exist.
+- Beads / `bd` may appear only as an optional local scratch reference. It is not required for an ExecPlan and does not define project status.
 
 ## Multi-Agent Integration
 
@@ -59,10 +60,11 @@ An ExecPlan is Hyperopen’s term for a living execution plan: a self-contained 
 ## Validation And Guardrails
 
 - `active` means work is being executed now, not “maybe later” or “historical context.”
-- Active ExecPlans must reference at least one live `bd` issue and must retain at least one unchecked progress item.
+- Active ExecPlans must retain at least one unchecked progress item, clear purpose, progress, decision, retrospective, and validation sections.
+- Active ExecPlans must not become generic backlogs. Move paused or future work to GitHub Issues, PR notes, or `deferred/` implementation context as appropriate.
 - `npm run check` enforces the active-plan guardrails through `/hyperopen/dev/check_docs.clj`.
 - `completed` is for accepted or otherwise closed historical records.
-- `deferred` is for non-active planning notes; `bd` remains the source of truth for whether deferred work is actually open backlog.
+- `deferred` is for non-active planning notes; GitHub Issues/PRs are the contributor-visible source for whether work remains open.
 
 ## Detailed Template Source
 

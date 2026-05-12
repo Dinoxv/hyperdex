@@ -15,7 +15,7 @@ The observable behavior stays simple: successful TWAP termination still shows `T
 ## Progress
 
 - [x] (2026-03-18 01:50Z) Reviewed `/hyperopen/AGENTS.md`, `/hyperopen/docs/PLANS.md`, `/hyperopen/.agents/PLANS.md`, and `/hyperopen/docs/WORK_TRACKING.md` for planning, validation, and `bd` requirements.
-- [x] (2026-03-18 01:50Z) Created and claimed `hyperopen-oskz` so this plan references live `bd` work as required by `/hyperopen/docs/PLANS.md`.
+- [x] (2026-03-18 01:50Z) Created and claimed local `bd` reference `hyperopen-oskz` under the planning policy in effect at the time.
 - [x] (2026-03-18 01:52Z) Inspected `/hyperopen/src/hyperopen/order/effects.cljs` and `/hyperopen/test/hyperopen/core_bootstrap/order_effects_test.cljs` to identify the public TWAP cancel seam and the duplicated error-normalization logic.
 - [x] (2026-03-18 01:53Z) Authored this active ExecPlan before implementation.
 - [x] (2026-03-18 01:57Z) Replaced the duplicated TWAP parser by extracting shared status-normalization helpers in `/hyperopen/src/hyperopen/order/effects.cljs` and routing `twap-cancel-outcome` through `cancel-status-error-value`.

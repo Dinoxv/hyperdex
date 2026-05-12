@@ -1,7 +1,7 @@
 ---
 owner: platform
 status: canonical
-last_reviewed: 2026-03-22
+last_reviewed: 2026-05-12
 review_cycle_days: 90
 source_of_truth: true
 ---
@@ -44,7 +44,9 @@ Root operating contract for Codex in this repository. Keep the first screen prac
 
 ## Planning And Tracking
 - Complex work requires an ExecPlan under `/hyperopen/docs/exec-plans/**`.
-- `bd` is the issue lifecycle source of truth.
+- Public backlog and contributor-visible work tracking use GitHub Issues and PRs.
+- Improvement Plane artifacts, when present, live in committed repo paths.
+- Beads / `bd` is optional local scratch only; it is not required for CI, fresh clones, PR review, or repo understanding.
 - Follow `/hyperopen/docs/PLANS.md`, `/hyperopen/docs/WORK_TRACKING.md`, and `/hyperopen/docs/MULTI_AGENT.md`.
 
 ## Validation And Return Contract

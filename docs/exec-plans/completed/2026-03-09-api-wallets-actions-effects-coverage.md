@@ -33,7 +33,7 @@ After this change, regressions in the API-wallet runtime will be caught by autom
 ## Decision Log
 
 - Decision: Track this as a `bd` task even though the user provided the scope directly.
-  Rationale: `/hyperopen/docs/WORK_TRACKING.md` requires `bd` to remain the issue lifecycle source of truth for implementation work.
+  Rationale: `/hyperopen/docs/WORK_TRACKING.md` requires `bd` as the local issue tracker for implementation work.
   Date/Author: 2026-03-09 / Codex
 
 - Decision: Focus the change on tests rather than code changes in `/hyperopen/src/hyperopen/api_wallets/actions.cljs` and `/hyperopen/src/hyperopen/api_wallets/effects.cljs`.

@@ -2,7 +2,7 @@
 
 This ExecPlan is a living document. The sections `Progress`, `Surprises & Discoveries`, `Decision Log`, and `Outcomes & Retrospective` must be kept up to date as work proceeds.
 
-This document follows `/hyperopen/.agents/PLANS.md`. It is linked to `bd` issue `hyperopen-wbf6`, which is the issue lifecycle source of truth while implementation is active.
+This document follows `/hyperopen/.agents/PLANS.md`. It is linked to `bd` issue `hyperopen-wbf6`, which was the local tracker reference while implementation was active.
 
 ## Purpose / Big Picture
 

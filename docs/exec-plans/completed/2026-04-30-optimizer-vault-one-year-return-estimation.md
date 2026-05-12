@@ -10,7 +10,7 @@ tracked_issue: hyperopen-0amu
 
 This ExecPlan is a living document. The sections `Progress`, `Surprises & Discoveries`, `Decision Log`, and `Outcomes & Retrospective` must be kept current while work proceeds.
 
-This document follows `/hyperopen/.agents/PLANS.md`, `/hyperopen/docs/PLANS.md`, `/hyperopen/docs/WORK_TRACKING.md`, and `/hyperopen/src/hyperopen/portfolio/optimizer/BOUNDARY.md`. The live `bd` issue for this work is `hyperopen-0amu`, and `bd` remains the lifecycle source of truth until this plan moves out of `active/`.
+This document follows `/hyperopen/.agents/PLANS.md`, `/hyperopen/docs/PLANS.md`, `/hyperopen/docs/WORK_TRACKING.md`, and `/hyperopen/src/hyperopen/portfolio/optimizer/BOUNDARY.md`. The live `bd` issue for this work is `hyperopen-0amu`; the `bd` issue is historical local tracker context from the active phase.
 
 ## Purpose / Big Picture
 

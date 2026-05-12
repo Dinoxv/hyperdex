@@ -97,7 +97,7 @@ The intentionally skipped surfaces are:
 - the full trading chart workspace in `/hyperopen/src/hyperopen/views/trading_chart/core.cljs` and related chart interop, because it depends on lifecycle-heavy `lightweight-charts` mounting and drag interactions that deserve a dedicated second-pass harness
 - route-shell compositions such as `/hyperopen/src/hyperopen/views/app_view.cljs`, `/hyperopen/src/hyperopen/views/trade_view.cljs`, and `/hyperopen/src/hyperopen/views/vaults/detail_view.cljs`, because the first pass focused on reusable leaf/composite surfaces rather than full-page orchestration
 
-The next highest-value batch is tracked in `bd` issue `hyperopen-anv`: add Portfolio scenes for the trading chart workspace and the route-shell compositions built from the newly isolated subcomponents.
+The next highest-value batch was recorded in local `bd` issue `hyperopen-anv`: add Portfolio scenes for the trading chart workspace and the route-shell compositions built from the newly isolated subcomponents.
 
 ## Context and Orientation
 

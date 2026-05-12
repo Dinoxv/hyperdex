@@ -30,4 +30,4 @@ Use this skill when acting as the `spec_writer` role for a multi-agent ticket.
 ## Expected Outputs
 
 - Updated active ExecPlan under `/hyperopen/docs/exec-plans/active/`
-- Structured `spec.json` data written by the manager under `/hyperopen/tmp/multi-agent/<bd-id>/`
+- Structured `spec.json` data written by the manager under `/hyperopen/tmp/multi-agent/<local-run-key>/`

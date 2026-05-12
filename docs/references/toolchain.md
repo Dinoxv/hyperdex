@@ -1,7 +1,7 @@
 ---
 owner: platform
 status: canonical
-last_reviewed: 2026-03-10
+last_reviewed: 2026-05-12
 review_cycle_days: 90
 source_of_truth: true
 ---
@@ -17,9 +17,9 @@ Repository build and test entry points:
 - `npm run lint:delimiters -- --changed`
 - `npm run mutate:nightly`
 - `npm run test:websocket`
-- `npm run agent:dry-run -- --issue <bd-id>`
-- `npm run agent:ticket -- --issue <bd-id>`
-- `npm run agent:resume-ticket -- --issue <bd-id>`
+- `npm run agent:dry-run -- --issue <local-run-key>`
+- `npm run agent:ticket -- --issue <local-run-key>`
+- `npm run agent:resume-ticket -- --issue <local-run-key>`
 - `npm run dev`
 - `npm run dev:portfolio`
 - `npm run portfolio`
@@ -55,9 +55,9 @@ Browser inspection and parity commands:
 - `node tools/browser-inspection/src/cli.mjs session attach --attach-port <cdp-port> --target-id <cdp-target-id>`
 
 Multi-agent orchestration commands:
-- `node tools/multi-agent/src/cli.mjs dry-run --issue <bd-id>`
-- `node tools/multi-agent/src/cli.mjs ticket --issue <bd-id>`
-- `node tools/multi-agent/src/cli.mjs resume-ticket --issue <bd-id>`
+- `node tools/multi-agent/src/cli.mjs dry-run --issue <local-run-key>`
+- `node tools/multi-agent/src/cli.mjs ticket --issue <local-run-key>`
+- `node tools/multi-agent/src/cli.mjs resume-ticket --issue <local-run-key>`
 
 Comprehensive tool surface and use guidance:
 - `/hyperopen/docs/tools.md`

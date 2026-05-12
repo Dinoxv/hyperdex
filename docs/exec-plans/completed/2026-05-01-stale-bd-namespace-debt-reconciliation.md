@@ -10,7 +10,7 @@ tracked_issue: hyperopen-oy7v
 
 This ExecPlan is a living document. The sections `Progress`, `Surprises & Discoveries`, `Decision Log`, and `Outcomes & Retrospective` must be kept current while work proceeds.
 
-This document follows `/hyperopen/AGENTS.md`, `/hyperopen/docs/PLANS.md`, and `/hyperopen/docs/WORK_TRACKING.md`. The live `bd` issue is `hyperopen-oy7v`; `bd` remains the lifecycle source of truth.
+This document follows `/hyperopen/AGENTS.md`, `/hyperopen/docs/PLANS.md`, and `/hyperopen/docs/WORK_TRACKING.md`. The live `bd` issue is `hyperopen-oy7v`; `bd` was the local tracker used at the time.
 
 ## Purpose / Big Picture
 

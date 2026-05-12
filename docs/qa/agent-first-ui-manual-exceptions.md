@@ -1,7 +1,7 @@
 ---
 owner: platform
 status: canonical
-last_reviewed: 2026-03-16
+last_reviewed: 2026-05-12
 review_cycle_days: 90
 source_of_truth: true
 ---
@@ -29,7 +29,7 @@ Use this runbook only when the scenario runner classifies a failure as `manual-e
 1. Record the failing scenario id, viewport, and run directory from the scenario summary.
 2. Reproduce only the unsupported step with a real extension or hardware wallet.
 3. Capture the exact browser state with screenshots plus the relevant scenario JSON and markdown artifacts.
-4. If the product behavior is wrong, file or update a `bd` issue linked to the nightly or PR run evidence.
+4. If the product behavior is wrong, file or update a GitHub Issue or PR note linked to the nightly or PR run evidence.
 5. If the product behavior is correct but unsupported by automation, keep the result as `manual-exception` and note the unsupported dependency.
 
 ## Non-Exceptions

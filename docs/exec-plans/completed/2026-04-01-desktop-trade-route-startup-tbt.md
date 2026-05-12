@@ -2,7 +2,7 @@
 
 This ExecPlan is a living document. The sections `Progress`, `Surprises & Discoveries`, `Decision Log`, and `Outcomes & Retrospective` must be kept up to date as work proceeds.
 
-This document follows `/hyperopen/.agents/PLANS.md`, `/hyperopen/docs/PLANS.md`, and `/hyperopen/docs/WORK_TRACKING.md`. The `bd` issue for this work is `hyperopen-k47v` ("Reduce desktop trade-route startup TBT"), and `bd` remained the lifecycle source of truth while this plan was active.
+This document follows `/hyperopen/.agents/PLANS.md`, `/hyperopen/docs/PLANS.md`, and `/hyperopen/docs/WORK_TRACKING.md`. The `bd` issue for this work is `hyperopen-k47v` ("Reduce desktop trade-route startup TBT"), and `bd` was the local tracker reference while this plan was active.
 
 This plan is a second-wave follow-up to `/hyperopen/docs/exec-plans/completed/2026-03-16-release-build-performance-leverage-plan.md`. That earlier work already removed large font waste, split non-trade routes, moved the trade chart into its own browser module, and trimmed several startup and render-churn paths. This plan starts from the current deployed baseline and targets the remaining desktop trade-route bottlenecks that still keep PageSpeed at `79`.
 

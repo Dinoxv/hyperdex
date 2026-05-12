@@ -16,7 +16,7 @@ Use this skill explicitly when the failure mode is not already fully understood 
 
 ## Workflow
 
-1. Ensure the work is tracked in `bd`. If the bug is broad or risky, keep an active ExecPlan current while investigating.
+1. Ensure the bug has contributor-visible context, such as a GitHub Issue/PR or a direct maintainer/user request captured in the active ExecPlan when the bug is broad or risky.
 2. Spawn `debugger` to isolate likely root cause from code, logs, and local evidence.
 3. If the bug is UI-facing, browser-dependent, or needs live reproduction evidence, also spawn `browser_debugger` in parallel. Wait for both before deciding on the fix path.
 4. Summarize the agreed failure mode, exact reproduction steps, and the smallest acceptable behavioral correction.
@@ -31,4 +31,3 @@ Use this skill explicitly when the failure mode is not already fully understood 
 - Parent thread owns orchestration and synthesis.
 - Prefer regression tests over broad rewrites.
 - Keep the fix scoped to the proven failure mode unless the user broadens scope.
-

@@ -18,7 +18,7 @@ The work is intentionally ordered by leverage. The first wave removes large cold
 - [x] (2026-03-16 11:59Z) Audited the March 16 release Lighthouse report captured against `http://localhost:8081/` and extracted the dominant performance regressors.
 - [x] (2026-03-16 12:00Z) Mapped the dominant regressors to concrete files in the current app shell, font configuration, startup flow, and render loop.
 - [x] (2026-03-16 12:01Z) Authored this deferred ExecPlan so the performance work can be promoted into active execution with the research already embedded here.
-- [x] (2026-03-16 12:18Z) Promoted this plan into `/hyperopen/docs/exec-plans/active/` and linked live `bd` work via `hyperopen-finw`.
+- [x] (2026-03-16 12:18Z) Promoted this plan into `/hyperopen/docs/exec-plans/active/` and linked local `bd` context via `hyperopen-finw`.
 - [x] (2026-03-16 16:24Z) Implemented Milestone 1 by removing Splash from the default stylesheet path, restyling the header brand on the system stack, and routing canvas text measurement through a shared UI-font resolver.
 - [x] (2026-03-16 16:31Z) Rebuilt the release app, ran required validation gates, and confirmed via extension-free Lighthouse that `http://localhost:8081/` now issues zero font requests on the default route; the run still hit the 45 second load timeout, so Milestone 0 remains open for clean score baselining.
 - [x] (2026-03-16 16:46Z) Created and claimed `hyperopen-7nop` to execute Milestone 2 as route-level bundle splitting while keeping the trade route in the initial browser module.

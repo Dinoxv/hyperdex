@@ -21,7 +21,7 @@ Use this skill when acting as the `acceptance_test_writer` role for a multi-agen
 
 ## Guardrails
 
-- Write only manager artifacts under `/hyperopen/tmp/multi-agent/<bd-id>/`.
+- Write only manager artifacts under `/hyperopen/tmp/multi-agent/<local-run-key>/`.
 - Do not materialize tests directly.
 - Never edit `/hyperopen/src/**`.
 

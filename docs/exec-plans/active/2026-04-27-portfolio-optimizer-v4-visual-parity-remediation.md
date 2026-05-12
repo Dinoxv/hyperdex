@@ -1,7 +1,9 @@
 owner: product+platform
 status: active
 source_of_truth: true
-tracked_issue: hyperopen-cwlf
+local_scratch_refs:
+  - bd: hyperopen-cwlf
+    authoritative: false
 based_on:
   - /Users/barry/Downloads/hyperopen portfolio optimizer/styles.css
   - /Users/barry/Downloads/hyperopen portfolio optimizer/v4.jsx
@@ -15,7 +17,17 @@ This ExecPlan is a living document. The sections `Progress`, `Surprises & Discov
 
 This document follows `/hyperopen/.agents/PLANS.md` and `/hyperopen/docs/PLANS.md`. It is self-contained so an engineer can execute the work without relying on the conversation that produced it.
 
-Tracked issue: `hyperopen-cwlf` ("Remediate portfolio optimizer v4 visual parity deltas").
+## Context References
+
+Public refs:
+- Direct maintainer request captured in this ExecPlan. No GitHub issue or PR is linked in this checkout.
+
+Repo artifacts:
+- Parent implementation context: `/hyperopen/docs/exec-plans/active/2026-04-27-portfolio-optimizer-setup-v4-pixel-parity.md`.
+- Parent implementation context: `/hyperopen/docs/exec-plans/active/2026-04-26-portfolio-optimizer-v4-alignment.md`.
+
+Local scratch refs (non-authoritative):
+- Beads / `bd`: `hyperopen-cwlf` ("Remediate portfolio optimizer v4 visual parity deltas"), authoritative: false.
 
 ## Purpose / Big Picture
 
@@ -134,7 +146,7 @@ The largest visual risk is over-correcting through global CSS. Mitigate that by 
 
 The main QA risk is calling the pass "done" based on structural tests alone. Mitigate that by adding a deterministic Playwright screenshot capture at the setup route and comparing it against the current screenshot inventory at the same desktop footprint before accepting the slice.
 
-The main scope risk is expanding into new preset behavior, new summary content, or scenario-detail polish. Mitigate that by treating the required slices as the only implementation slices in this plan and recording any additional deltas as separate `bd` follow-ups instead of folding them into this pass.
+The main scope risk is expanding into new preset behavior, new summary content, or scenario-detail polish. Mitigate that by treating the required slices as the only implementation slices in this plan and recording any additional durable deltas in GitHub, a PR note, or another committed implementation artifact instead of folding them into this pass.
 
 The main implementation risk is that `setup_v4_sections.cljs` already fails the namespace-size gate before new parity work begins. Mitigate that by extracting focused helper namespaces as part of the header/preset or left-rail slices instead of growing the existing file and then backfilling an exception.
 

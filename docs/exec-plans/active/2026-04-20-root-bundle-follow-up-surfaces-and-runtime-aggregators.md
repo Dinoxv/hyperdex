@@ -4,7 +4,16 @@ This ExecPlan is a living document. The sections `Progress`, `Surprises & Discov
 
 This document follows `/hyperopen/.agents/PLANS.md`. It is self-contained so a future contributor can continue from this file without relying on conversation history.
 
-Tracked issue: `hyperopen-kefh` ("Shrink root bundle follow-up surfaces and runtime aggregators").
+## Context References
+
+Public refs:
+- Direct maintainer request captured in this ExecPlan. No GitHub issue or PR is linked in this checkout.
+
+Repo artifacts:
+- Parent implementation context: first-wave lazy root modal split commit noted in `Progress`.
+
+Local scratch refs (non-authoritative):
+- Beads / `bd`: `hyperopen-kefh` ("Shrink root bundle follow-up surfaces and runtime aggregators"), authoritative: false.
 
 ## Purpose / Big Picture
 
