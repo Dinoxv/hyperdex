@@ -1,8 +1,6 @@
 (ns hyperopen.views.portfolio.optimize.inputs-tab
-  (:require [clojure.string :as str]
-            [hyperopen.portfolio.optimizer.defaults :as optimizer-defaults]
-            [hyperopen.views.portfolio.optimize.format :as opt-format]
-            [hyperopen.views.portfolio.optimize.instrument-display :as instrument-display]))
+  (:require [hyperopen.portfolio.optimizer.application.view-model :as optimizer-view-model]
+            [hyperopen.views.portfolio.optimize.format :as opt-format]))
 
 (defn- audit-card
   [data-role title & children]
@@ -13,87 +11,57 @@
    (into [:div {:class ["mt-3"]}]
          children)])
 
-(defn- universe-instrument-label
-  [instrument]
-  (if (instrument-display/vault-instrument? instrument)
-    (instrument-display/primary-label instrument)
-    (:instrument-id instrument)))
-
 (defn- universe-audit
-  [draft]
+  [{:keys [universe-rows]}]
   (audit-card
    "portfolio-optimizer-inputs-universe"
    "Universe"
-   [:p {:class ["font-semibold" "tabular-nums"]} (str (count (:universe draft)) " instruments")]
+   [:p {:class ["font-semibold" "tabular-nums"]} (str (count universe-rows) " instruments")]
    (into [:div {:class ["mt-3" "space-y-1"]}]
         (map (fn [instrument]
                 [:p {:class ["rounded-md" "border" "border-base-300" "bg-base-100/70" "px-2" "py-1"
                              "text-xs" "font-semibold" "tabular-nums"]}
-                 (universe-instrument-label instrument)])
-              (:universe draft)))))
-
-(defn- instrument-label
-  [draft instrument-id]
-  (or (some (fn [instrument]
-              (when (= instrument-id (:instrument-id instrument))
-                (or (when (instrument-display/vault-instrument? instrument)
-                      (instrument-display/primary-label instrument))
-                    (:coin instrument)
-                    (:symbol instrument))))
-            (:universe draft))
-      (some-> instrument-id
-              (str/split #":")
-              last)
-      instrument-id))
-
-(defn- view-primary-id
-  [view]
-  (or (:instrument-id view)
-      (:long-instrument-id view)))
-
-(defn- view-comparator-id
-  [view]
-  (or (:comparator-instrument-id view)
-      (:short-instrument-id view)))
+                 (:audit-label instrument)])
+              universe-rows))))
 
 (defn- view-summary
-  [draft view]
+  [view]
   (case (:kind view)
     :relative
-    (str (instrument-label draft (view-primary-id view))
+    (str (:primary-label view)
          " "
          (if (= :underperform (:direction view)) "<" ">")
          " "
-         (instrument-label draft (view-comparator-id view))
+         (:comparator-label view)
          " by "
          (opt-format/format-pct (:return view)
                                 {:minimum-fraction-digits 0
                                  :maximum-fraction-digits 2}))
-    (str (instrument-label draft (:instrument-id view))
+    (str (:primary-label view)
          " expected return "
          (opt-format/format-pct (:return view)
                                 {:minimum-fraction-digits 0
                                  :maximum-fraction-digits 2}))))
 
 (defn- models-audit
-  [draft views]
+  [{:keys [objective-kind return-model-kind risk-model-kind view-rows]}]
   (audit-card
    "portfolio-optimizer-inputs-models"
    "Model Stack"
    [:div {:class ["grid" "grid-cols-1" "gap-2" "sm:grid-cols-3"]}
-    [:div [:span {:class ["text-xs" "text-trading-muted"]} "Objective"] [:p (opt-format/keyword-label (get-in draft [:objective :kind]))]]
-    [:div [:span {:class ["text-xs" "text-trading-muted"]} "Return Model"] [:p (opt-format/keyword-label (get-in draft [:return-model :kind]))]]
-    [:div [:span {:class ["text-xs" "text-trading-muted"]} "Risk Model"] [:p (opt-format/keyword-label (get-in draft [:risk-model :kind]))]]]
+    [:div [:span {:class ["text-xs" "text-trading-muted"]} "Objective"] [:p (opt-format/keyword-label objective-kind)]]
+    [:div [:span {:class ["text-xs" "text-trading-muted"]} "Return Model"] [:p (opt-format/keyword-label return-model-kind)]]
+    [:div [:span {:class ["text-xs" "text-trading-muted"]} "Risk Model"] [:p (opt-format/keyword-label risk-model-kind)]]]
    [:div {:class ["mt-3" "space-y-1" "text-xs" "text-trading-muted"]}
-    [:p (str "Black-Litterman views: " (count views))]
-    (if (seq views)
+    [:p (str "Black-Litterman views: " (count view-rows))]
+    (if (seq view-rows)
       (into [:div {:class ["space-y-1"]
                    :data-role "portfolio-optimizer-inputs-black-litterman-views"}]
             (map (fn [view]
                    [:p {:class ["rounded-md" "border" "border-base-300" "bg-base-100/70"
                                 "px-2" "py-1"]}
-                    (view-summary draft view)])
-                 views))
+                    (view-summary view)])
+                 view-rows))
       [:p "Views adjust expected returns only; covariance/risk inputs are unchanged."])]))
 
 (defn- constraints-audit
@@ -123,13 +91,8 @@
 
 (defn inputs-tab
   [state]
-  (let [draft (or (get-in state [:portfolio :optimizer :draft])
-                  (optimizer-defaults/default-draft))
-        scenario-id (or (get-in state [:portfolio :optimizer :active-scenario :loaded-id])
-                        (:id draft))
-        constraints (:constraints draft)
-        execution-assumptions (:execution-assumptions draft)
-        views (get-in draft [:return-model :views])]
+  (let [{:keys [scenario-id constraints execution-assumptions] :as model}
+        (optimizer-view-model/inputs-audit-model state)]
     [:section {:class ["rounded-xl" "border" "border-base-300" "bg-base-100/95" "p-4"]
                :data-role "portfolio-optimizer-inputs-tab"}
      [:div {:class ["flex" "flex-wrap" "items-start" "justify-between" "gap-3"]}
@@ -147,7 +110,7 @@
          "Duplicate to Edit"])]
      [:div {:class ["mt-4" "grid" "grid-cols-1" "gap-3" "lg:grid-cols-2"]
             :data-role "portfolio-optimizer-inputs-audit-grid"}
-      (universe-audit draft)
-      (models-audit draft views)
+      (universe-audit model)
+      (models-audit model)
       (constraints-audit constraints)
       (execution-audit execution-assumptions)]]))

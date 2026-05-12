@@ -1,5 +1,5 @@
 (ns hyperopen.views.portfolio.optimize.universe-panel
-  (:require [hyperopen.portfolio.optimizer.application.universe-candidates :as universe-candidates]
+  (:require [hyperopen.portfolio.optimizer.application.view-model :as optimizer-view-model]
             [hyperopen.views.portfolio.optimize.instrument-display :as instrument-display]))
 
 (def ^:private search-input-class
@@ -56,15 +56,11 @@
 
 (defn universe-panel
   [state draft]
-  (let [universe (vec (or (:universe draft) []))
-        search-query (or (get-in state [:portfolio-ui :optimizer :universe-search-query]) "")
-        markets (universe-candidates/candidate-markets
-                 state
-                 universe
-                 search-query
-                 {:ranking :asset-query})
-        active-index (universe-candidates/active-index state markets)
-        market-keys (mapv :key markets)]
+  (let [{:keys [universe
+                search-query
+                markets
+                active-index
+                market-keys]} (optimizer-view-model/universe-panel-model state draft)]
     [:section {:class ["rounded-xl" "border" "border-base-300" "bg-base-100/95" "p-4"]
                :data-role "portfolio-optimizer-universe-panel"}
      [:div {:class ["flex" "items-start" "justify-between" "gap-3"]}
