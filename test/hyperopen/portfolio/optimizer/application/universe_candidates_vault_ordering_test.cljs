@@ -1,14 +1,6 @@
 (ns hyperopen.portfolio.optimizer.application.universe-candidates-vault-ordering-test
-  (:require [cljs.test :refer-macros [deftest is use-fixtures]]
+  (:require [cljs.test :refer-macros [deftest is]]
             [hyperopen.portfolio.optimizer.application.universe-candidates :as universe-candidates]))
-
-(defn- reset-universe-candidates-cache-fixture
-  [f]
-  (universe-candidates/reset-universe-candidates-cache!)
-  (f)
-  (universe-candidates/reset-universe-candidates-cache!))
-
-(use-fixtures :each reset-universe-candidates-cache-fixture)
 
 (defn- market-keys
   [markets]

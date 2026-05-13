@@ -11,9 +11,6 @@
 (def vault-instrument-prefix
   ids/vault-instrument-prefix)
 
-(defonce vault-candidates-cache
-  (atom nil))
-
 (def ^:private normalized-text coercion/non-blank-text)
 
 (defn- raw-asset-id?
@@ -187,7 +184,7 @@
                (vault-row-signature row)))
            rows*)]))
 
-(defn- build-vault-candidates
+(defn vault-candidate-pool
   [rows]
   (->> rows
        (filter vault-row?)
@@ -195,9 +192,9 @@
        (keep vault-row->candidate)
        vec))
 
-(defn- memoized-vault-candidates
-  [rows]
-  (let [cache @vault-candidates-cache]
+(defn cached-vault-candidate-pool
+  [cache-atom rows]
+  (let [cache @cache-atom]
     (cond
       (and (map? cache)
            (identical? rows (:rows cache)))
@@ -208,24 +205,27 @@
         (if (and (map? cache)
                  (= rows-signature (:rows-signature cache)))
           (do
-            (reset! vault-candidates-cache (assoc cache
-                                                  :rows rows
-                                                  :rows-signature rows-signature))
+            (reset! cache-atom (assoc cache
+                                      :rows rows
+                                      :rows-signature rows-signature))
             (:candidates cache))
-          (let [candidates (build-vault-candidates rows)]
-            (reset! vault-candidates-cache {:rows rows
-                                            :rows-signature rows-signature
-                                            :candidates candidates})
+          (let [candidates (vault-candidate-pool rows)]
+            (reset! cache-atom {:rows rows
+                                :rows-signature rows-signature
+                                :candidates candidates})
             candidates))))))
 
-(defn reset-universe-candidates-cache!
-  []
-  (reset! vault-candidates-cache nil))
+(defn- vault-candidates-for-options
+  [rows opts]
+  (if-let [cache-atom (:vault-candidate-cache opts)]
+    (cached-vault-candidate-pool cache-atom rows)
+    (vault-candidate-pool rows)))
 
 (defn- candidate-vaults
-  [state selected-ids query]
-  (->> (memoized-vault-candidates
-        (get-in state [:vaults :merged-index-rows]))
+  [state selected-ids query opts]
+  (->> (vault-candidates-for-options
+        (get-in state [:vaults :merged-index-rows])
+        opts)
        (remove #(contains? selected-ids (:key %)))
        (filter #(vault-matches-query? query %))
        vec))
@@ -254,19 +254,19 @@
    (let [selected-ids (selected-instrument-ids universe)
          query* (or (normalized-text query) "")
          ranking (or (:ranking opts) :exact-spot)
-        markets (->> (asset-query/filter-and-sort-assets
-                      (get-in state [:asset-selector :markets])
-                      query*
-                      :volume
-                      :desc
-                      #{}
-                      false
-                      false
-                      :all)
-                     (filter #(usable-market? selected-ids %))
-                     vec)
-        vaults (candidate-vaults state selected-ids query*)
-        candidates (into (vec markets) vaults)]
+         markets (->> (asset-query/filter-and-sort-assets
+                       (get-in state [:asset-selector :markets])
+                       query*
+                       :volume
+                       :desc
+                       #{}
+                       false
+                       false
+                       :all)
+                      (filter #(usable-market? selected-ids %))
+                      vec)
+         vaults (candidate-vaults state selected-ids query* opts)
+         candidates (into (vec markets) vaults)]
      (->> (rank-candidates candidates query* ranking)
           (take default-candidate-limit)
           vec))))

@@ -207,6 +207,7 @@
             [hyperopen.portfolio.optimizer.application.scenario-workflow-test]
             [hyperopen.portfolio.optimizer.application.setup-readiness-test]
             [hyperopen.portfolio.optimizer.application.tracking-test]
+            [hyperopen.portfolio.optimizer.application.universe-candidates-cache-test]
             [hyperopen.portfolio.optimizer.application.universe-candidates-test]
             [hyperopen.portfolio.optimizer.application.universe-candidates-vault-ordering-test]
             [hyperopen.portfolio.optimizer.application.view-model-facade-test]
@@ -843,6 +844,7 @@
              'hyperopen.portfolio.optimizer.application.scenario-workflow-test
              'hyperopen.portfolio.optimizer.application.setup-readiness-test
              'hyperopen.portfolio.optimizer.application.tracking-test
+             'hyperopen.portfolio.optimizer.application.universe-candidates-cache-test
              'hyperopen.portfolio.optimizer.application.universe-candidates-test
              'hyperopen.portfolio.optimizer.application.universe-candidates-vault-ordering-test
              'hyperopen.portfolio.optimizer.application.view-model-facade-test
