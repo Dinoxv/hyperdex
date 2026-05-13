@@ -1,5 +1,6 @@
 (ns hyperopen.portfolio.optimizer.defaults
-  (:require [hyperopen.portfolio.optimizer.contracts :as contracts]))
+  (:require [hyperopen.portfolio.optimizer.application.black-litterman-editor-model :as bl-editor-model]
+            [hyperopen.portfolio.optimizer.contracts :as contracts]))
 
 (defn default-draft
   []
@@ -163,24 +164,7 @@
    :list-sort :updated-desc
    :universe-search-query ""
    :universe-search-active-index 0
-   :black-litterman-editor {:selected-kind :absolute
-                            :drafts {:absolute {:instrument-id nil
-                                                :return-text ""
-                                                :return-text-touched? false
-                                                :confidence :medium
-                                                :horizon :3m
-                                                :notes ""}
-                                     :relative {:instrument-id nil
-                                                :comparator-instrument-id nil
-                                                :direction :outperform
-                                                :return-text ""
-                                                :return-text-touched? false
-                                                :confidence :medium
-                                                :horizon :3m
-                                                :notes ""}}
-                            :editing-view-id nil
-                            :errors {}
-                            :clear-confirmation-open? false}
+   :black-litterman-editor (bl-editor-model/default-editor-state)
    :workspace-panel :setup
    :results-tab :recommendation
    :diagnostics-tab :conditioning

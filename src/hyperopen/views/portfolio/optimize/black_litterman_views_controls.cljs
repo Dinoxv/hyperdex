@@ -1,20 +1,12 @@
 (ns hyperopen.views.portfolio.optimize.black-litterman-views-controls
-  (:require [hyperopen.views.portfolio.optimize.black-litterman-views-model :as model]))
+  (:require [hyperopen.portfolio.optimizer.application.black-litterman-editor-model :as editor-model]
+            [hyperopen.views.portfolio.optimize.black-litterman-views-model :as model]))
 
-(def confidence-options
-  [[:low "LOW"]
-   [:medium "MEDIUM"]
-   [:high "HIGH"]])
+(def confidence-options editor-model/confidence-options)
 
-(def horizon-options
-  [[:1m "1M"]
-   [:3m "3M"]
-   [:6m "6M"]
-   [:1y "1Y"]])
+(def horizon-options editor-model/horizon-options)
 
-(def direction-options
-  [[:outperform "Outperform"]
-   [:underperform "Underperform"]])
+(def direction-options editor-model/direction-options)
 
 (def eyebrow-class
   ["font-mono" "text-[0.625rem]" "font-semibold" "uppercase" "tracking-[0.08em]" "text-trading-muted/70"])

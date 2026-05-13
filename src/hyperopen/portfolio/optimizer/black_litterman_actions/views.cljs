@@ -1,22 +1,19 @@
 (ns hyperopen.portfolio.optimizer.black-litterman-actions.views
-  (:require [hyperopen.portfolio.optimizer.black-litterman-actions.common :as common]
+  (:require [hyperopen.portfolio.optimizer.application.black-litterman-editor-model :as editor-model]
+            [hyperopen.portfolio.optimizer.black-litterman-actions.common :as common]
             [hyperopen.portfolio.optimizer.contracts :as contracts]))
 
 (defn view-primary-instrument-id
   [view]
-  (or (common/non-blank-text (:instrument-id view))
-      (common/non-blank-text (:long-instrument-id view))))
+  (editor-model/view-primary-id view))
 
 (defn view-comparator-instrument-id
   [view]
-  (or (common/non-blank-text (:comparator-instrument-id view))
-      (common/non-blank-text (:short-instrument-id view))))
+  (editor-model/view-comparator-id view))
 
 (defn- view-direction
   [view]
-  (or (:direction view)
-      (when (= :relative (:kind view))
-        :outperform)))
+  (editor-model/view-direction view))
 
 (defn view-instrument-ids
   [view]
@@ -28,63 +25,11 @@
 
 (defn- default-view
   [state kind id]
-  (let [ids (common/universe-instrument-ids state)
-        kind* (common/normalize-keyword-like kind)
-        confidence 0.5]
-    (case kind*
-      :absolute
-      (when-let [instrument-id (first ids)]
-        {:id id
-         :kind :absolute
-         :instrument-id instrument-id
-         :return 0.0
-         :confidence-level :medium
-         :confidence confidence
-         :confidence-variance (common/confidence-variance confidence)
-         :horizon :3m
-         :weights {instrument-id 1}})
-
-      :relative
-      (when (<= 2 (count ids))
-        (let [[long-id short-id] ids]
-          {:id id
-           :kind :relative
-           :instrument-id long-id
-           :comparator-instrument-id short-id
-           :direction :outperform
-           :long-instrument-id long-id
-           :short-instrument-id short-id
-           :return 0.0
-           :confidence-level :medium
-           :confidence confidence
-           :confidence-variance (common/confidence-variance confidence)
-           :horizon :3m
-           :weights {long-id 1
-                     short-id -1}}))
-
-      nil)))
+  (editor-model/default-view (common/draft-universe state) kind id))
 
 (defn- rebuild-weights
   [view]
-  (case (:kind view)
-    :absolute
-    (if-let [instrument-id (common/non-blank-text (:instrument-id view))]
-      (assoc view :weights {instrument-id 1})
-      view)
-
-    :relative
-    (let [instrument-id (view-primary-instrument-id view)
-          comparator-id (view-comparator-instrument-id view)
-          direction (common/normalize-direction (view-direction view))]
-      (if (and instrument-id comparator-id (not= instrument-id comparator-id))
-        (assoc view
-               :instrument-id instrument-id
-               :comparator-instrument-id comparator-id
-               :direction direction
-               :weights (common/relative-weights instrument-id comparator-id direction))
-        view))
-
-    view))
+  (editor-model/rebuild-weights view))
 
 (defn- replace-view
   [views view-id f]

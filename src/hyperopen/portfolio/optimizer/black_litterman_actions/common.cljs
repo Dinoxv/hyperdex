@@ -1,36 +1,24 @@
 (ns hyperopen.portfolio.optimizer.black-litterman-actions.common
-  (:require [hyperopen.portfolio.optimizer.contracts :as contracts]
+  (:require [hyperopen.portfolio.optimizer.application.black-litterman-editor-model :as editor-model]
+            [hyperopen.portfolio.optimizer.contracts :as contracts]
             [hyperopen.portfolio.optimizer.coercion :as coercion]))
 
-(def view-kinds
-  #{:absolute
-    :relative})
+(def view-kinds editor-model/view-kinds)
 
-(def max-active-views 10)
+(def max-active-views editor-model/max-active-views)
 
 (def editor-path
   contracts/ui-black-litterman-editor-path)
 
-(def numeric-parameter-keys
-  #{:return
-    :confidence})
+(def numeric-parameter-keys editor-model/numeric-parameter-keys)
 
-(def instrument-parameter-keys
-  #{:instrument-id
-    :comparator-instrument-id
-    :long-instrument-id
-    :short-instrument-id})
+(def instrument-parameter-keys editor-model/instrument-parameter-keys)
 
-(def confidence-weight-by-level
-  {:low 0.25
-   :medium 0.5
-   :high 0.75})
+(def confidence-weight-by-level editor-model/confidence-weight-by-level)
 
-(def horizons
-  #{:1m :3m :6m :1y})
+(def horizons editor-model/horizons)
 
-(def relative-directions
-  #{:outperform :underperform})
+(def relative-directions editor-model/relative-directions)
 
 (def normalize-keyword-like coercion/normalize-keyword-like)
 
@@ -38,11 +26,11 @@
 
 (def finite-number? coercion/finite-number?)
 
-(def parse-number-value coercion/parse-number)
+(def parse-number-value editor-model/parse-number-value)
 
-(def parse-percent-text coercion/parse-percent-text)
+(def parse-percent-text editor-model/parse-percent-text)
 
-(def decimal->percent-text coercion/decimal->percent-text)
+(def decimal->percent-text editor-model/decimal->percent-text)
 
 (defn save-draft-path-values
   [path-values]
@@ -85,116 +73,50 @@
 
 (defn confidence-variance
   [confidence]
-  (let [confidence* (-> (or confidence 0.5)
-                        (max 0.0)
-                        (min 1.0))]
-    (max 0.000001 (- 1.0 confidence*))))
+  (editor-model/confidence-variance confidence))
 
 (defn next-view-id
   [views]
-  (let [existing (set (keep :id views))]
-    (loop [idx (inc (count views))]
-      (let [id (str "bl_view_" idx)]
-        (if (contains? existing id)
-          (recur (inc idx))
-          id)))))
+  (editor-model/next-view-id views))
 
 (defn normalize-confidence-level
   [value]
-  (let [level (normalize-keyword-like value)]
-    (if (contains? confidence-weight-by-level level)
-      level
-      :medium)))
+  (editor-model/normalize-confidence-level value))
 
 (defn confidence-weight
   [value]
-  (cond
-    (contains? confidence-weight-by-level value)
-    (get confidence-weight-by-level value)
-
-    (keyword? value)
-    (get confidence-weight-by-level (normalize-confidence-level value))
-
-    (string? value)
-    (if-let [parsed (parse-number-value value)]
-      parsed
-      (get confidence-weight-by-level (normalize-confidence-level value)))
-
-    (finite-number? value)
-    value
-
-    :else
-    (get confidence-weight-by-level :medium)))
+  (editor-model/confidence-weight value))
 
 (defn confidence-level-from-view
   [view]
-  (or (:confidence-level view)
-      (let [confidence (or (:confidence view) 0.5)]
-        (cond
-          (<= confidence 0.25) :low
-          (<= confidence 0.5) :medium
-          :else :high))))
+  (editor-model/confidence-level-from-view view))
 
 (defn normalize-horizon
   [value]
-  (let [horizon (normalize-keyword-like value)]
-    (if (contains? horizons horizon)
-      horizon
-      :3m)))
+  (editor-model/normalize-horizon value))
 
 (defn normalize-direction
   [value]
-  (let [direction (normalize-keyword-like value)]
-    (if (contains? relative-directions direction)
-      direction
-      :outperform)))
+  (editor-model/normalize-direction value))
 
 (defn relative-weights
   [instrument-id comparator-id direction]
-  (case (normalize-direction direction)
-    :underperform {instrument-id -1
-                   comparator-id 1}
-    {instrument-id 1
-     comparator-id -1}))
+  (editor-model/relative-weights instrument-id comparator-id direction))
 
 (defn selected-kind
   [state]
-  (let [kind (normalize-keyword-like (get-in state (conj editor-path :selected-kind)))]
-    (if (contains? view-kinds kind)
-      kind
-      :absolute)))
+  (editor-model/selected-kind (get-in state editor-path)))
 
 (defn draft-defaults
   [state kind]
-  (let [ids (universe-instrument-ids state)
-        [first-id second-id] ids]
-    (case kind
-      :relative {:instrument-id first-id
-                 :comparator-instrument-id (or second-id first-id)
-                 :direction :outperform
-                 :return-text ""
-                 :return-text-touched? false
-                 :confidence :medium
-                 :horizon :3m
-                 :notes ""}
-      {:instrument-id first-id
-       :return-text ""
-       :return-text-touched? false
-       :confidence :medium
-       :horizon :3m
-       :notes ""})))
-
-(defn- drop-nil-values
-  [m]
-  (into {}
-        (remove (fn [[_ value]]
-                  (nil? value)))
-        m))
+  (editor-model/draft-defaults (draft-universe state) kind))
 
 (defn editor-draft
   [state kind]
-  (merge (draft-defaults state kind)
-         (drop-nil-values (get-in state (conj editor-path :drafts kind)))))
+  (editor-model/editor-draft
+   (draft-universe state)
+   (get-in state editor-path)
+   kind))
 
 (defn editor-draft-path
   [kind field]
@@ -202,18 +124,12 @@
 
 (defn trim-notes
   [value]
-  (let [text (str (or value ""))]
-    (subs text 0 (min 280 (count text)))))
+  (editor-model/trim-notes value))
 
 (defn normalized-draft-field
   [field value]
-  (case field
-    :confidence (normalize-confidence-level value)
-    :horizon (normalize-horizon value)
-    :direction (normalize-direction value)
-    :notes (trim-notes value)
-    value))
+  (editor-model/normalized-draft-field field value))
 
 (defn view-by-id
   [views view-id]
-  (some #(when (= view-id (:id %)) %) views))
+  (editor-model/view-by-id views view-id))
