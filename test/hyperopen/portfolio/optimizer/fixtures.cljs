@@ -1,5 +1,6 @@
 (ns hyperopen.portfolio.optimizer.fixtures
   (:require [hyperopen.portfolio.optimizer.application.request-builder :as request-builder]
+            [hyperopen.portfolio.optimizer.contracts :as contracts]
             [hyperopen.portfolio.optimizer.defaults :as defaults]))
 
 (def ^:private default-scenario-id
@@ -50,6 +51,30 @@
                (empty? overrides)))
     base
     (deep-merge-fixture base overrides)))
+
+(defn optimizer-path
+  [& segments]
+  (into contracts/optimizer-path segments))
+
+(defn optimizer-ui-path
+  [& segments]
+  (into contracts/optimizer-ui-path segments))
+
+(defn get-optimizer-in
+  [state path]
+  (get-in state (into contracts/optimizer-path path)))
+
+(defn get-optimizer-ui-in
+  [state path]
+  (get-in state (into contracts/optimizer-ui-path path)))
+
+(defn assoc-optimizer-in
+  [state path value]
+  (assoc-in state (into contracts/optimizer-path path) value))
+
+(defn assoc-optimizer-ui-in
+  [state path value]
+  (assoc-in state (into contracts/optimizer-ui-path path) value))
 
 (defn sample-universe
   ([]
@@ -418,39 +443,40 @@
    (let [draft (sample-draft)
          result (sample-solved-result)
          last-run (sample-last-successful-run {:result result})
-         summary (scenario-summary default-scenario-id draft result)]
+         summary (scenario-summary default-scenario-id draft result)
+         optimizer-state (-> (defaults/default-optimizer-state)
+                             (assoc :draft draft
+                                    :active-scenario {:loaded-id default-scenario-id
+                                                      :status :computed
+                                                      :read-only? false}
+                                    :scenario-index {:ordered-ids [default-scenario-id]
+                                                     :by-id {default-scenario-id summary}}
+                                    :last-successful-run last-run
+                                    :history-data (sample-history-data)
+                                    :tracking {:status :tracking
+                                               :scenario-id default-scenario-id
+                                               :updated-at-ms default-as-of-ms
+                                               :snapshots [{:timestamp-ms default-as-of-ms
+                                                            :drift-pct 0.01
+                                                            :tracking-error 0.02}]
+                                               :error nil}
+                                    :run-state {:status :succeeded
+                                                :run-id "fixture-run"
+                                                :scenario-id default-scenario-id
+                                                :request-signature (:request-signature last-run)
+                                                :started-at-ms 4500
+                                                :completed-at-ms default-as-of-ms
+                                                :error nil
+                                                :result result}))]
      (with-overrides
-      {:router {:path (str "/portfolio/optimize/" default-scenario-id)}
-       :portfolio-ui {:optimizer (defaults/default-optimizer-ui-state)}
-       :asset-selector {:markets (mapv asset-selector-market (sample-universe))
-                        :market-by-key (into {}
-                                             (map (fn [market]
-                                                    [(:key market) market]))
-                                             (mapv asset-selector-market
-                                                   (sample-universe)))}
-       :portfolio {:optimizer
-                   (-> (defaults/default-optimizer-state)
-                       (assoc :draft draft
-                              :active-scenario {:loaded-id default-scenario-id
-                                                :status :computed
-                                                :read-only? false}
-                              :scenario-index {:ordered-ids [default-scenario-id]
-                                               :by-id {default-scenario-id summary}}
-                              :last-successful-run last-run
-                              :history-data (sample-history-data)
-                              :tracking {:status :tracking
-                                         :scenario-id default-scenario-id
-                                         :updated-at-ms default-as-of-ms
-                                         :snapshots [{:timestamp-ms default-as-of-ms
-                                                      :drift-pct 0.01
-                                                      :tracking-error 0.02}]
-                                         :error nil}
-                              :run-state {:status :succeeded
-                                          :run-id "fixture-run"
-                                          :scenario-id default-scenario-id
-                                          :request-signature (:request-signature last-run)
-                                          :started-at-ms 4500
-                                          :completed-at-ms default-as-of-ms
-                                          :error nil
-                                          :result result}))}}
+      (-> {:router {:path (str "/portfolio/optimize/" default-scenario-id)}
+           :asset-selector {:markets (mapv asset-selector-market (sample-universe))
+                            :market-by-key (into {}
+                                                 (map (fn [market]
+                                                        [(:key market) market]))
+                                                 (mapv asset-selector-market
+                                                       (sample-universe)))}}
+          (assoc-in contracts/optimizer-ui-path
+                    (defaults/default-optimizer-ui-state))
+          (assoc-in contracts/optimizer-path optimizer-state))
       overrides))))

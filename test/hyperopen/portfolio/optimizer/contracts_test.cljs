@@ -246,11 +246,9 @@
                                {"perp:BTC" 0.6})))))
 
 (deftest result-payload-contract-accepts-real-solved-fixture-test
-  (let [payload (get-in (optimizer-fixtures/sample-scenario-state)
-                        [:portfolio
-                         :optimizer
-                         :last-successful-run
-                         :result])]
+  (let [payload (optimizer-fixtures/get-optimizer-in
+                 (optimizer-fixtures/sample-scenario-state)
+                 [:last-successful-run :result])]
     (is (= :solved (:status payload)))
     (is (s/valid? ::contracts/result-payload payload)
         (s/explain-str ::contracts/result-payload payload))))

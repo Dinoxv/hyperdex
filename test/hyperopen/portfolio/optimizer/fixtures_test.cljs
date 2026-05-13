@@ -92,20 +92,47 @@
            :result {:scenario-id "scenario-1"}
            :computed-at-ms 200}))))
 
+(deftest optimizer-state-helpers-use-canonical-roots-test
+  (let [state (fixtures/sample-scenario-state)
+        updated-state (-> state
+                          (fixtures/assoc-optimizer-in [:draft :name]
+                                                       "Helper Named Scenario")
+                          (fixtures/assoc-optimizer-ui-in [:results-tab]
+                                                          :tracking))]
+    (is (= [:portfolio :optimizer :draft]
+           (fixtures/optimizer-path :draft)))
+    (is (= [:portfolio-ui :optimizer :results-tab]
+           (fixtures/optimizer-ui-path :results-tab)))
+    (is (= "fixture-scenario"
+           (fixtures/get-optimizer-in state [:draft :id])))
+    (is (= :recommendation
+           (fixtures/get-optimizer-ui-in state [:results-tab])))
+    (is (= "Helper Named Scenario"
+           (fixtures/get-optimizer-in updated-state [:draft :name])))
+    (is (= :tracking
+           (fixtures/get-optimizer-ui-in updated-state [:results-tab])))))
+
 (deftest sample-scenario-state-is-route-and-view-ready-test
   (let [state (fixtures/sample-scenario-state)
         scenario-id "fixture-scenario"]
-    (is (= scenario-id (get-in state [:portfolio :optimizer :draft :id])))
-    (is (= scenario-id (get-in state [:portfolio :optimizer :active-scenario :loaded-id])))
-    (is (= scenario-id (get-in state [:portfolio :optimizer :last-successful-run :result :scenario-id])))
-    (is (= scenario-id (get-in state [:portfolio :optimizer :tracking :scenario-id])))
-    (is (= [scenario-id] (get-in state [:portfolio :optimizer :scenario-index :ordered-ids])))
+    (is (= scenario-id (fixtures/get-optimizer-in state [:draft :id])))
+    (is (= scenario-id (fixtures/get-optimizer-in state [:active-scenario :loaded-id])))
     (is (= scenario-id
-           (get-in state [:portfolio :optimizer :scenario-index :by-id scenario-id :id])))
+           (fixtures/get-optimizer-in state
+                                      [:last-successful-run :result :scenario-id])))
+    (is (= scenario-id (fixtures/get-optimizer-in state [:tracking :scenario-id])))
+    (is (= [scenario-id]
+           (fixtures/get-optimizer-in state [:scenario-index :ordered-ids])))
+    (is (= scenario-id
+           (fixtures/get-optimizer-in state
+                                      [:scenario-index :by-id scenario-id :id])))
     (is (= :recommendation
-           (get-in state [:portfolio-ui :optimizer :results-tab])))
+           (fixtures/get-optimizer-ui-in state [:results-tab])))
     (is (= ["perp:BTC" "perp:ETH" "spot:PURR"]
            (mapv :key (get-in state [:asset-selector :markets]))))
     (is (= :ready
-           (get-in state [:portfolio :optimizer :last-successful-run
-                          :result :rebalance-preview :status])))))
+           (fixtures/get-optimizer-in state
+                                      [:last-successful-run
+                                       :result
+                                       :rebalance-preview
+                                       :status])))))
