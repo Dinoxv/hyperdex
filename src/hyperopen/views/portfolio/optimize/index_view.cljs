@@ -1,19 +1,9 @@
 (ns hyperopen.views.portfolio.optimize.index-view
   (:require [clojure.string :as str]
+            [hyperopen.portfolio.optimizer.application.view-model :as view-model]
             [hyperopen.portfolio.routes :as portfolio-routes]
             [hyperopen.system :as app-system]
             [nexus.registry :as nxr]))
-
-(defn- scenario-index
-  [state]
-  (or (get-in state [:portfolio :optimizer :scenario-index])
-      {:ordered-ids []
-       :by-id {}}))
-
-(defn- scenario-summaries
-  [state]
-  (let [{:keys [ordered-ids by-id]} (scenario-index state)]
-    (keep #(get by-id %) ordered-ids)))
 
 (defn- title-label
   [value]
@@ -135,57 +125,57 @@
 
 (defn index-view
   [state]
-  (let [summaries (vec (scenario-summaries state))]
-  [:section {:class ["portfolio-optimizer-v4"
-                     "rounded-xl"
-                     "border"
-                     "border-base-300"
-                     "bg-base-100/95"
-                     "p-4"
-                     "text-trading-text"
-                     "shadow-sm"]
-             :data-role "portfolio-optimizer-index"
-             :data-parity-id "portfolio-optimizer-index"}
-   [:div {:class ["flex" "items-start" "justify-between" "gap-4"]}
-    [:div
-     [:p {:class ["text-[0.65rem]"
-                  "font-semibold"
-                  "uppercase"
-                  "tracking-[0.24em]"
-                  "text-trading-muted"]}
-      "Portfolio Optimizer"]
-     [:h1 {:class ["mt-2" "text-2xl" "font-semibold" "tracking-tight"]}
-      "Optimization Scenarios"]
-     [:p {:class ["mt-2" "max-w-2xl" "text-sm" "text-trading-muted"]}
-      "Local scenario board for saved, computed, executed, and partially executed optimizer runs."]]
-    [:a {:class ["btn" "btn-sm" "btn-primary"]
-         :href "/portfolio/optimize/new"
-         :on {:click [[:actions/navigate "/portfolio/optimize/new"]]}}
-     "New Scenario"]]
-   [:div {:class ["mt-4"
-                  "grid"
-                  "grid-cols-1"
-                  "gap-3"
-                  "lg:grid-cols-[260px_minmax(0,1fr)]"]}
-    [:aside {:class ["rounded-lg"
-                     "border"
-                     "border-base-300"
-                     "bg-base-200/60"
-                     "p-3"]
-             :data-role "portfolio-optimizer-scenario-filters"}
-     [:p {:class ["text-xs" "font-semibold" "uppercase" "tracking-[0.18em]" "text-trading-muted"]}
-      "Scenario Filters"]
-     [:p {:class ["mt-2" "text-sm" "text-trading-muted"]}
-      "Active, saved, executed, partial, and archived filters bind to optimizer-owned query params."]]
-    (if (seq summaries)
-      (scenario-board summaries)
-      [:div {:class ["rounded-lg"
-                     "border"
-                     "border-dashed"
-                     "border-base-300"
-                     "bg-base-200/40"
-                     "p-6"
-                     "text-sm"
-                     "text-trading-muted"]
-             :data-role "portfolio-optimizer-empty-scenarios"}
-       "No local optimizer scenarios are loaded yet."])]]))
+  (let [{:keys [scenario-summaries]} (view-model/index-model state)]
+    [:section {:class ["portfolio-optimizer-v4"
+                       "rounded-xl"
+                       "border"
+                       "border-base-300"
+                       "bg-base-100/95"
+                       "p-4"
+                       "text-trading-text"
+                       "shadow-sm"]
+               :data-role "portfolio-optimizer-index"
+               :data-parity-id "portfolio-optimizer-index"}
+     [:div {:class ["flex" "items-start" "justify-between" "gap-4"]}
+      [:div
+       [:p {:class ["text-[0.65rem]"
+                    "font-semibold"
+                    "uppercase"
+                    "tracking-[0.24em]"
+                    "text-trading-muted"]}
+        "Portfolio Optimizer"]
+       [:h1 {:class ["mt-2" "text-2xl" "font-semibold" "tracking-tight"]}
+        "Optimization Scenarios"]
+       [:p {:class ["mt-2" "max-w-2xl" "text-sm" "text-trading-muted"]}
+        "Local scenario board for saved, computed, executed, and partially executed optimizer runs."]]
+      [:a {:class ["btn" "btn-sm" "btn-primary"]
+           :href "/portfolio/optimize/new"
+           :on {:click [[:actions/navigate "/portfolio/optimize/new"]]}}
+       "New Scenario"]]
+     [:div {:class ["mt-4"
+                    "grid"
+                    "grid-cols-1"
+                    "gap-3"
+                    "lg:grid-cols-[260px_minmax(0,1fr)]"]}
+      [:aside {:class ["rounded-lg"
+                       "border"
+                       "border-base-300"
+                       "bg-base-200/60"
+                       "p-3"]
+               :data-role "portfolio-optimizer-scenario-filters"}
+       [:p {:class ["text-xs" "font-semibold" "uppercase" "tracking-[0.18em]" "text-trading-muted"]}
+        "Scenario Filters"]
+       [:p {:class ["mt-2" "text-sm" "text-trading-muted"]}
+        "Active, saved, executed, partial, and archived filters bind to optimizer-owned query params."]]
+      (if (seq scenario-summaries)
+        (scenario-board scenario-summaries)
+        [:div {:class ["rounded-lg"
+                       "border"
+                       "border-dashed"
+                       "border-base-300"
+                       "bg-base-200/40"
+                       "p-6"
+                       "text-sm"
+                       "text-trading-muted"]
+               :data-role "portfolio-optimizer-empty-scenarios"}
+         "No local optimizer scenarios are loaded yet."])]]))

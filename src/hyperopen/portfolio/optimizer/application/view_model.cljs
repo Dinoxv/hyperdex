@@ -1,9 +1,14 @@
 (ns hyperopen.portfolio.optimizer.application.view-model
   (:require [hyperopen.portfolio.optimizer.application.view-model.execution :as execution]
+            [hyperopen.portfolio.optimizer.application.view-model.index :as index]
             [hyperopen.portfolio.optimizer.application.view-model.scenario :as scenario]
             [hyperopen.portfolio.optimizer.application.view-model.tracking :as tracking]
             [hyperopen.portfolio.optimizer.application.view-model.universe :as universe]
             [hyperopen.portfolio.optimizer.application.view-model.workspace :as workspace]))
+
+(defn index-model
+  [state]
+  (index/index-model state))
 
 (defn route-mismatched?
   [state scenario-id]
