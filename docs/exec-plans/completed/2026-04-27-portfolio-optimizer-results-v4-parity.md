@@ -1,7 +1,8 @@
 ---
 owner: frontend
-status: active
+status: completed
 created: 2026-04-27
+completed: 2026-05-13
 source_of_truth: false
 local_scratch_refs:
   - bd: hyperopen-4pr0
@@ -10,7 +11,7 @@ local_scratch_refs:
 
 # Portfolio Optimizer Results V4 Parity
 
-This ExecPlan is a living document. The sections `Progress`, `Surprises & Discoveries`, `Decision Log`, and `Outcomes & Retrospective` must be kept current while work proceeds.
+This completed ExecPlan records historical implementation context for the Results V4 parity pass. New work should use a new active ExecPlan or a public issue instead of reopening this file as an implementation backlog.
 
 ## Context References
 
@@ -18,7 +19,7 @@ Public refs:
 - Direct maintainer request captured in this ExecPlan. No GitHub issue or PR is linked in this checkout.
 
 Repo artifacts:
-- Parent implementation context: `/hyperopen/docs/exec-plans/active/2026-04-26-portfolio-optimizer-v4-alignment.md`.
+- Parent implementation context: `/hyperopen/docs/exec-plans/completed/2026-04-26-portfolio-optimizer-v4-alignment.md`.
 
 Local scratch refs (non-authoritative):
 - Beads / `bd`: `hyperopen-4pr0` ("Align optimizer results page to v4 parity"), authoritative: false.
@@ -59,11 +60,12 @@ This is a layout and visual-system alignment pass. It does not change solver mat
 - [x] (2026-04-28 00:55Z) Created tracked issue `hyperopen-4pr0` for this focused results parity pass.
 - [x] (2026-04-28 00:55Z) Audited the current recommendation surface against `ResultsV4` in the designer JSX and captured mismatches in this plan.
 - [x] (2026-04-28 01:05Z) Implemented the first results parity slice: provenance/tabs/KPI order, three-rail recommendation body, allocation table restyle, frontier hero treatment, and compact diagnostics rail.
-- [ ] Await product/design review of the updated results route against the v4 Results artboard before moving this ExecPlan out of `active`.
+- [x] (2026-05-13 13:04Z) Closed this plan as completed historical implementation context. Any future design-review findings should be tracked in a new issue, PR review, or new active ExecPlan if they require implementation.
 
 ## Surprises & Discoveries
 - The largest remaining results mismatch was composition: the old surface duplicated assumptions/performance inside the body instead of letting provenance and KPI strips own those facts.
 - The existing result payload lacked current-portfolio return/volatility metrics, so the engine now emits `:current-expected-return`, `:current-volatility`, and `:current-performance` alongside target metrics for results-page comparison UI.
+- The remaining unchecked item was design-review status rather than implementation work, so keeping the plan under `active/` made the active implementation set misleading.
 
 ## Decision Log
 - Decision: Preserve existing optimizer result contracts and add current metrics without changing solver selection.
@@ -72,6 +74,9 @@ This is a layout and visual-system alignment pass. It does not change solver mat
 - Decision: Keep funding decomposition visible below allocation rather than remove it entirely.
   Rationale: V1 product requirements make funding auditable, while the v4 artboard prioritizes allocation/frontier/trust above the fold.
   Date/Author: 2026-04-28 / Codex
+- Decision: Move this ExecPlan from `active/` to `completed/`.
+  Rationale: Hyperopen planning rules define `active` as work being executed now. The implementation recorded here was already complete; future design-review feedback should start from a new durable work item instead of keeping historical implementation context active indefinitely.
+  Date/Author: 2026-05-13 / Codex
 
 ## Acceptance Criteria
 - Scenario detail renders `header -> provenance strip -> tabs -> KPI strip -> body` for recommendation scenarios.
@@ -90,4 +95,8 @@ This is a layout and visual-system alignment pass. It does not change solver mat
 - Browser cleanup after any browser-driven validation.
 
 ## Outcomes & Retrospective
-Pending final validation and review.
+The Results V4 parity implementation is closed as historical context. It delivered the first results-route parity slice: the recommendation surface moved toward the v4 hierarchy with provenance/tabs/KPI order, a three-rail body, allocation table restyling, a frontier hero treatment, and a compact diagnostics rail while preserving solver, persistence, and rebalance semantics.
+
+Any future product or design review can reference this file for implementation history, but follow-up work should be captured in a new active ExecPlan or public work item. Complexity increased modestly in the UI layer because the route gained more explicit v4 composition, but future complexity is reduced by not leaving stale implementation plans active.
+
+Revision note (2026-05-13 / Codex): Moved from `active/` to `completed/` during optimizer source-of-truth documentation cleanup. The move corrects plan lifecycle state only; it does not change optimizer runtime behavior.

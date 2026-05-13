@@ -1,7 +1,7 @@
 ---
 owner: architecture
 status: canonical
-last_reviewed: 2026-03-25
+last_reviewed: 2026-05-13
 review_cycle_days: 90
 source_of_truth: true
 ---
@@ -91,6 +91,19 @@ Dependency direction is intentional: domain -> application -> infrastructure. An
 - MUST keep account-surface stream-coverage and REST fallback ownership centralized in the account-surface policy/service seam; startup, websocket, and order modules must delegate instead of duplicating those rules.
 - MUST keep topic-specific websocket adapters thin: they may wire handlers and focused helper seams, but they must not grow parallel websocket runtime ownership for subscription truth or timer registries when canonical runtime/app runtime seams already exist.
 
+## Portfolio Optimizer Architecture (MUST)
+- MUST treat `/portfolio/optimize` as the canonical optimizer route family. The route shapes are `/portfolio/optimize` for the scenario index, `/portfolio/optimize/new` for setup, and `/portfolio/optimize/:scenario-id` for scenario detail. `/portfolio/optimizer` is not the route spelling.
+- MUST use `/hyperopen/src/hyperopen/portfolio/optimizer/BOUNDARY.md` as the optimizer source-of-truth map for ownership, dependency rules, stable seams, key tests, and where-to-change guidance.
+- MUST keep route parsing in `/hyperopen/src/hyperopen/portfolio/routes.cljs` and route dispatch in `/hyperopen/src/hyperopen/views/portfolio/optimize/view.cljs`.
+- MUST keep optimizer map contracts, schema versions, request signatures, state paths, and worker wire codecs centralized in `/hyperopen/src/hyperopen/portfolio/optimizer/contracts.cljs`.
+- MUST keep optimizer domain namespaces pure. Return, risk, objective, constraint, Black-Litterman, frontier, diagnostic, rebalance, and weight-cleaning rules belong under `/hyperopen/src/hyperopen/portfolio/optimizer/domain/**`.
+- MUST keep deterministic optimizer orchestration in `/hyperopen/src/hyperopen/portfolio/optimizer/application/**`, including request building, setup readiness, history alignment, pipeline workflow, scenario lifecycle, execution workflow, tracking, and view-model shaping.
+- MUST keep browser, network, IndexedDB, exchange-submit, worker-client, and websocket side effects in optimizer infrastructure or runtime effect adapters, not in optimizer domain/application policy.
+- MUST keep the optimizer worker entrypoint at `/hyperopen/src/hyperopen/portfolio/optimizer/worker.cljs` worker-safe. The worker may depend on pure optimizer domain/application code and worker-safe infrastructure such as solver and wire adapters.
+- MUST keep setup and scenario-detail rendering under `/hyperopen/src/hyperopen/views/portfolio/optimize/**`. Views may consume optimizer view models and emit optimizer actions, but they must not duplicate optimizer math, readiness, history-alignment, persistence, or worker semantics.
+- MUST scope optimizer-specific visual system overrides under the optimizer route surface, currently `/hyperopen/src/styles/surfaces/optimizer.css`, so non-optimizer portfolio routes keep their own visual contracts.
+- MUST follow `/hyperopen/docs/BROWSER_TESTING.md` for optimizer browser work: use focused Playwright for repeatable route or interaction assertions, Browser MCP only for exploratory inspection, and run browser cleanup before concluding browser QA.
+
 ## Domain-Driven Design Modeling Checklist
 - [ ] Yes/No: ubiquitous language is consistent in message/effect names.
 - [ ] Yes/No: new behavior is expressed as domain message/effect variants.
@@ -112,6 +125,7 @@ Dependency direction is intentional: domain -> application -> infrastructure. An
 - Reliability invariants and runtime rules: `/hyperopen/docs/RELIABILITY.md`
 - Security and signing invariants: `/hyperopen/docs/SECURITY.md`
 - Frontend interaction/runtime constraints: `/hyperopen/docs/FRONTEND.md`
+- Portfolio optimizer boundary and change map: `/hyperopen/src/hyperopen/portfolio/optimizer/BOUNDARY.md`
 - Design beliefs and rationale: `/hyperopen/docs/DESIGN.md`
 - Quality and testing standards: `/hyperopen/docs/QUALITY_SCORE.md`
 - Reindex map for prior AGENTS sections: `/hyperopen/docs/design-docs/agents-section-index.md`
