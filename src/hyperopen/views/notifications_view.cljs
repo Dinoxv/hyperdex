@@ -27,12 +27,18 @@
   (let [headline (normalize-toast-text (or (:headline toast)
                                            (:message toast)))
         subline (normalize-toast-text (:subline toast))
+        detail (normalize-toast-text (or (:detail toast)
+                                         (:body toast)))
         headline* (or headline subline)]
     (when (seq headline*)
       {:headline headline*
        :subline (when (and (seq subline)
                            (not= subline headline*))
-                  subline)})))
+                  subline)
+       :detail (when (and (seq detail)
+                          (not= detail headline*)
+                          (not= detail subline))
+                 detail)})))
 
 (defn- toast-entries
   [state]
@@ -80,7 +86,7 @@
 (defn- generic-toast-card
   [toast]
   (let [kind (or (:kind toast) :info)
-        {:keys [headline subline]} (toast-display-lines toast)
+        {:keys [headline subline detail]} (toast-display-lines toast)
         toast-id (:id toast)
         toast-kind (toast-kind-name kind)]
     (when (seq headline)
@@ -114,15 +120,26 @@
                      "font-semibold"
                      "leading-5"
                      "tracking-[0.01em]"
-                     "text-[#f4fbff]"]}
+                     "text-[#f4fbff]"]
+             :data-role "global-toast-headline"}
          headline]
         (when (seq subline)
           [:p {:class ["truncate"
                        "pt-0.5"
                        "text-xs"
                        "leading-4"
-                       "text-[#a9bac6]"]}
-           subline])]
+                       "text-[#a9bac6]"]
+               :data-role "global-toast-subline"}
+           subline])
+        (when (seq detail)
+          [:p {:class ["whitespace-normal"
+                       "break-words"
+                       "pt-1"
+                       "text-xs"
+                       "leading-4"
+                       "text-[#d6e1e7]"]
+               :data-role "global-toast-detail"}
+           detail])]
        [:div {:class ["ml-1" "flex" "shrink-0" "items-center" "self-stretch"]}
         [:button {:type "button"
                   :class ["global-toast-dismiss"

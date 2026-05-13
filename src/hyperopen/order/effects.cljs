@@ -7,6 +7,7 @@
             [hyperopen.api.promise-effects :as promise-effects]
             [hyperopen.api.projections :as api-projections]
             [hyperopen.telemetry :as telemetry]
+            [hyperopen.order.exchange-errors :as exchange-errors]
             [hyperopen.order.effects.spot-refresh :as spot-refresh]
             [hyperopen.account.history.position-margin :as position-margin]
             [hyperopen.account.history.position-tpsl :as position-tpsl]
@@ -133,7 +134,8 @@
 
 (defn- submit-order-error-message
   [exchange-response-error resp]
-  (str "Order placement failed: " (exchange-response-error resp)))
+  (exchange-errors/submit-error-toast-payload
+   (exchange-response-error resp)))
 
 (defn- cancel-order-error-message
   [exchange-response-error resp]
@@ -182,14 +184,13 @@
        :toast-message (submit-order-error-message exchange-response-error resp)}
 
       (pos? error-count)
-      (let [prefix (if partial?
-                     "Order placement partially failed: "
-                     "Order placement failed: ")
-            error-detail (str/join "; " status-errors)]
+      (let [error-detail (str/join "; " status-errors)]
         {:ok? false
          :success-count success-count
          :error-text error-detail
-         :toast-message (str prefix error-detail)})
+         :toast-message (exchange-errors/submit-error-toast-payload
+                         error-detail
+                         {:partial? partial?})})
 
       :else
       {:ok? true

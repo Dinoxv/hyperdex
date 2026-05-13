@@ -68,6 +68,28 @@
     (is (= [[:actions/dismiss-order-feedback-toast "cancel"]]
            (get-in dismiss-node [1 :on :click])))))
 
+(deftest notifications-view-renders-readable-generic-error-detail-test
+  (let [view-node (notifications-view/notifications-view
+                   {:ui {:toasts [{:id "reject"
+                                   :kind :error
+                                   :headline "Order not placed"
+                                   :subline "The exchange rejected this order."
+                                   :detail "Order could not be closed because there is insufficient liquidity."
+                                   :message "Order not placed: Order could not be closed because there is insufficient liquidity."}]}})
+        toast-node (hiccup/find-by-data-role view-node "global-toast")
+        headline-node (hiccup/find-by-data-role toast-node "global-toast-headline")
+        subline-node (hiccup/find-by-data-role toast-node "global-toast-subline")
+        detail-node (hiccup/find-by-data-role toast-node "global-toast-detail")]
+    (is (some? toast-node))
+    (is (= "error" (get-in toast-node [1 :data-toast-kind])))
+    (is (= "Order not placed" (hiccup/node-text headline-node)))
+    (is (= "The exchange rejected this order." (hiccup/node-text subline-node)))
+    (is (= "Order could not be closed because there is insufficient liquidity."
+           (hiccup/node-text detail-node)))
+    (is (not (contains? (hiccup/node-class-set detail-node) "truncate")))
+    (is (contains? (hiccup/node-class-set detail-node) "whitespace-normal"))
+    (is (contains? (hiccup/node-class-set detail-node) "break-words"))))
+
 (deftest notifications-view-renders-trade-confirmation-toast-variants-test
   (let [fills [(fill-prop "fill-1" :buy "HYPE" 0.25 44.20 1800000000000)
                (fill-prop "fill-2" :buy "HYPE" 0.30 44.30 1800000003300)

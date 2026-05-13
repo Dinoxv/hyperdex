@@ -167,6 +167,7 @@
             [hyperopen.leaderboard.preferences-test]
             [hyperopen.order.actions-test]
             [hyperopen.order.cancel-guard-test]
+            [hyperopen.order.exchange-errors-test]
             [hyperopen.order.feedback-runtime-test]
             [hyperopen.orderbook.actions-test]
             [hyperopen.orderbook.price-aggregation-test]
@@ -572,6 +573,7 @@
             [hyperopen.wallet.agent-runtime-concurrency-test]
             [hyperopen.wallet.agent-runtime-edge-test]
             [hyperopen.wallet.agent-runtime-test]
+            [hyperopen.wallet.agent-safety-test]
             [hyperopen.wallet.agent-session-test]
             [hyperopen.wallet.connection-runtime-test]
             [hyperopen.wallet.copy-feedback-runtime-test]
@@ -806,6 +808,7 @@
              'hyperopen.leaderboard.preferences-test
              'hyperopen.order.actions-test
              'hyperopen.order.cancel-guard-test
+             'hyperopen.order.exchange-errors-test
              'hyperopen.order.feedback-runtime-test
              'hyperopen.orderbook.actions-test
              'hyperopen.orderbook.price-aggregation-test
@@ -1211,6 +1214,7 @@
              'hyperopen.wallet.agent-runtime-concurrency-test
              'hyperopen.wallet.agent-runtime-edge-test
              'hyperopen.wallet.agent-runtime-test
+             'hyperopen.wallet.agent-safety-test
              'hyperopen.wallet.agent-session-test
              'hyperopen.wallet.connection-runtime-test
              'hyperopen.wallet.copy-feedback-runtime-test

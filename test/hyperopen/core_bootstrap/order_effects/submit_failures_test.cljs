@@ -26,7 +26,7 @@
             (fn [_store _address _action]
               (js/Promise.resolve {:status "ok"
                                    :response {:type "order"
-                                              :data {:statuses [{:error "IocCancelRejected"}]}}})))
+                                              :data {:statuses [{:error "Order could not be closed because there is insufficient liquidity."}]}}})))
       (set! nxr/dispatch
             (fn [_store _evt actions]
               (swap! dispatched conj actions)))
@@ -60,12 +60,14 @@
          (try
            (is (false? (get-in @store [:order-form-runtime :submitting?])))
            (is (str/includes? (or (get-in @store [:order-form-runtime :error]) "")
-                              "IocCancelRejected"))
+                              "Order could not be closed because there is insufficient liquidity."))
            (is (= :error (get-in @store [:ui :toast :kind])))
-           (is (str/includes? (or (get-in @store [:ui :toast :message]) "")
-                              "Order placement failed"))
-           (is (str/includes? (or (get-in @store [:ui :toast :message]) "")
-                              "IocCancelRejected"))
+           (is (= "Order not placed" (get-in @store [:ui :toast :headline])))
+           (is (= "The exchange rejected this order."
+                  (get-in @store [:ui :toast :subline])))
+           (is (= "Order could not be closed because there is insufficient liquidity."
+                  (get-in @store [:ui :toast :detail])))
+           (is (= false (get-in @store [:ui :toast :auto-timeout?])))
            (is (= [] @dispatched))
            (is (= [] @refresh-calls))
            (is (= [] @clearinghouse-calls))
@@ -132,8 +134,12 @@
            (is (str/includes? (or (get-in @store [:order-form-runtime :error]) "")
                               "IocCancelRejected"))
            (is (= :error (get-in @store [:ui :toast :kind])))
-           (is (str/includes? (or (get-in @store [:ui :toast :message]) "")
-                              "partially failed"))
+           (is (= "Order partially placed"
+                  (get-in @store [:ui :toast :headline])))
+           (is (= "Some order legs were rejected by the exchange."
+                  (get-in @store [:ui :toast :subline])))
+           (is (str/includes? (or (get-in @store [:ui :toast :detail]) "")
+                              "Order 2: IocCancelRejected"))
            (is (= [[[:actions/refresh-order-history]]]
                   @dispatched))
            (is (= 2 (count @refresh-calls)))
@@ -340,10 +346,10 @@
            (is (str/includes? (or (get-in @store [:order-form-runtime :error]) "")
                               "invalid tick"))
            (is (= :error (get-in @store [:ui :toast :kind])))
-           (is (str/includes? (or (get-in @store [:ui :toast :message]) "")
-                              "Order placement failed"))
-           (is (str/includes? (or (get-in @store [:ui :toast :message]) "")
-                              "invalid tick"))
+           (is (= "Order not placed"
+                  (get-in @store [:ui :toast :headline])))
+           (is (= "invalid tick"
+                  (get-in @store [:ui :toast :detail])))
            (finally
              (support/clear-order-feedback-toast-timeout!)
              (set! trading-api/submit-order! original-submit-order)

@@ -1,5 +1,6 @@
 (ns hyperopen.wallet.agent-safety
   (:require [hyperopen.api.trading :as trading]
+            [hyperopen.order.exchange-errors :as exchange-errors]
             [hyperopen.platform :as platform]))
 
 (def ^:private agent-safety-watch-key
@@ -37,18 +38,46 @@
    (get-in state [:wallet :agent :status])
    (get-in state [:wallet :agent :agent-address])])
 
+(defn- response-text
+  [resp]
+  (or (:response resp)
+      (:error resp)
+      (:message resp)))
+
+(defn- handle-schedule-cancel-response!
+  [store resp]
+  (if-let [volume-gate (exchange-errors/schedule-cancel-volume-gate
+                        (response-text resp))]
+    (do
+      (swap! store assoc-in [:wallet :agent :safety] volume-gate)
+      :volume-gated)
+    (do
+      (when (= "ok" (:status resp))
+        (swap! store update-in [:wallet :agent] dissoc :safety))
+      :ok)))
+
+(defn- submit-schedule-cancel!
+  [store owner-address cancel-at-ms]
+  (-> (trading/schedule-cancel! store owner-address cancel-at-ms)
+      (.then (partial handle-schedule-cancel-response! store))
+      (.catch (fn [_] :error))))
+
+(defn- refresh-allowed?
+  [store disposition]
+  (and (not= :volume-gated disposition)
+       (ready-owner-address @store)))
+
 (defn- schedule-next-refresh!
   [{:keys [ahead-ms now-ms-fn refresh-ms runtime set-timeout-fn store]}]
   (letfn [(refresh! []
             (swap! runtime assoc-in timer-path nil)
             (if-let [owner-address (ready-owner-address @store)]
-              (-> (trading/schedule-cancel! store
-                                            owner-address
-                                            (+ (now-ms-fn) ahead-ms))
-                  (.catch (fn [_] nil))
-                  (.finally
-                   (fn []
-                     (when (ready-owner-address @store)
+              (-> (submit-schedule-cancel! store
+                                           owner-address
+                                           (+ (now-ms-fn) ahead-ms))
+                  (.then
+                   (fn [disposition]
+                     (when (refresh-allowed? store disposition)
                        (schedule-next-refresh! {:ahead-ms ahead-ms
                                                 :now-ms-fn now-ms-fn
                                                 :refresh-ms refresh-ms
@@ -64,13 +93,12 @@
   [{:keys [ahead-ms now-ms-fn refresh-ms runtime set-timeout-fn store]}]
   (clear-refresh-timeout! runtime platform/clear-timeout!)
   (when-let [owner-address (ready-owner-address @store)]
-    (-> (trading/schedule-cancel! store
-                                  owner-address
-                                  (+ (now-ms-fn) ahead-ms))
-        (.catch (fn [_] nil))
-        (.finally
-         (fn []
-           (when (ready-owner-address @store)
+    (-> (submit-schedule-cancel! store
+                                 owner-address
+                                 (+ (now-ms-fn) ahead-ms))
+        (.then
+         (fn [disposition]
+           (when (refresh-allowed? store disposition)
              (schedule-next-refresh! {:ahead-ms ahead-ms
                                       :now-ms-fn now-ms-fn
                                       :refresh-ms refresh-ms
