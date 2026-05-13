@@ -1231,6 +1231,7 @@ test("named-dex close-position popover loads full market metadata before submit 
   page
 }) => {
   await visitRoute(page, "/trade");
+  await freezeAccountSurfaceSync(page, "0x1111111111111111111111111111111111111111");
   await seedReadyTradingSession(page);
   await waitForIdle(page, { quietMs: 150, timeoutMs: 4_000, pollMs: 50 });
   await seedDesktopPositionsTableState(page, [

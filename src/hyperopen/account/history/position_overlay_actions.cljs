@@ -22,6 +22,10 @@
              (position-margin/default-modal-state))
          :locale (get-in state [:ui :locale])))
 
+(defn- full-market-metadata-loaded?
+  [state]
+  (= :full (get-in state [:asset-selector :phase])))
+
 (defn open-position-tpsl-modal
   ([state position-data]
    [[:effects/save-many [[[:positions-ui :tpsl-modal]
@@ -70,21 +74,25 @@
 
 (defn open-position-reduce-popover
   ([state position-data]
-   [[:effects/save-many [[[:positions-ui :reduce-popover]
-                          (assoc (position-reduce/from-position-row position-data)
-                                 :locale (get-in state [:ui :locale]))]
-                         [[:positions-ui :tpsl-modal]
-                          (position-tpsl/default-modal-state)]
-                         [[:positions-ui :margin-modal]
-                          (position-margin/default-modal-state)]]]])
+   (cond-> [[:effects/save-many [[[:positions-ui :reduce-popover]
+                                  (assoc (position-reduce/from-position-row position-data)
+                                         :locale (get-in state [:ui :locale]))]
+                                 [[:positions-ui :tpsl-modal]
+                                  (position-tpsl/default-modal-state)]
+                                 [[:positions-ui :margin-modal]
+                                  (position-margin/default-modal-state)]]]]
+     (not (full-market-metadata-loaded? state))
+     (conj [:effects/fetch-asset-selector-markets])))
   ([state position-data trigger-bounds]
-   [[:effects/save-many [[[:positions-ui :reduce-popover]
-                          (assoc (position-reduce/from-position-row position-data trigger-bounds)
-                                 :locale (get-in state [:ui :locale]))]
-                         [[:positions-ui :tpsl-modal]
-                          (position-tpsl/default-modal-state)]
-                         [[:positions-ui :margin-modal]
-                          (position-margin/default-modal-state)]]]]))
+   (cond-> [[:effects/save-many [[[:positions-ui :reduce-popover]
+                                  (assoc (position-reduce/from-position-row position-data trigger-bounds)
+                                         :locale (get-in state [:ui :locale]))]
+                                 [[:positions-ui :tpsl-modal]
+                                  (position-tpsl/default-modal-state)]
+                                 [[:positions-ui :margin-modal]
+                                  (position-margin/default-modal-state)]]]]
+     (not (full-market-metadata-loaded? state))
+     (conj [:effects/fetch-asset-selector-markets]))))
 
 (defn close-position-reduce-popover [_state]
   [[:effects/save [:positions-ui :reduce-popover]

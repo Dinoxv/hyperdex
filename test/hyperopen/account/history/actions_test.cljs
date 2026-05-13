@@ -427,8 +427,8 @@
         closed-effects (history-actions/close-position-reduce-popover {})
         submit-effects (history-actions/submit-position-reduce-close {})
         close-all-effects (history-actions/trigger-close-all-positions {})]
-    (is (= :effects/save-many
-           (ffirst open-effects)))
+    (is (= [:effects/save-many [:effects/fetch-asset-selector-markets]]
+           [(ffirst open-effects) (second open-effects)]))
     (is (true? (:open? opened-popover)))
     (is (= "xyz:NVDA" (:coin opened-popover)))
     (is (= "10" (:mid-price opened-popover)))
