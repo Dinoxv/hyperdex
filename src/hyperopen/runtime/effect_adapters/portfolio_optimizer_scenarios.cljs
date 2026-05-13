@@ -1,5 +1,6 @@
 (ns hyperopen.runtime.effect-adapters.portfolio-optimizer-scenarios
   (:require [hyperopen.account.context :as account-context]
+            [hyperopen.portfolio.optimizer.application.scenario-operations :as scenario-operations]
             [hyperopen.portfolio.optimizer.application.scenario-workflow :as scenario-workflow]
             [hyperopen.portfolio.optimizer.contracts :as contracts]
             [hyperopen.portfolio.routes :as portfolio-routes]))
@@ -36,71 +37,11 @@
 
 (defn- operation-result-value
   [store operation]
-  (case (:operation/type operation)
-    :scenario-index
-    (get-in @store contracts/scenario-index-path)
-
-    :load
-    (when (map? (:loaded-scenario-record operation))
-      (:loaded-scenario-record operation))
-
-    :manual-tracking
-    (or (:scenario-record operation)
-        (:loaded-scenario-record operation))
-
-    (:save :archive :duplicate)
-    (:scenario-record operation)
-
-    nil))
+  (scenario-operations/result-value operation @store))
 
 (defn- fail-operation-result
   [operation state error completed-at-ms]
-  (let [scenario-id (:scenario-id operation)
-        started-at-ms (:started-at-ms operation)]
-    (case (:operation/type operation)
-      :scenario-index
-      (scenario-workflow/complete-index-load
-       {:state state
-        :started-at-ms started-at-ms
-        :completed-at-ms completed-at-ms
-        :error error})
-
-      :load
-      (scenario-workflow/fail-load
-       {:state state
-        :scenario-id scenario-id
-        :started-at-ms started-at-ms
-        :completed-at-ms completed-at-ms
-        :error error})
-
-      :save
-      (scenario-workflow/fail-save
-       {:state state
-        :scenario-id scenario-id
-        :started-at-ms started-at-ms
-        :completed-at-ms completed-at-ms
-        :error error})
-
-      :archive
-      (scenario-workflow/fail-archive
-       {:state state
-        :scenario-id scenario-id
-        :started-at-ms started-at-ms
-        :completed-at-ms completed-at-ms
-        :error error})
-
-      :duplicate
-      (scenario-workflow/fail-duplicate
-       {:state state
-        :scenario-id scenario-id
-        :started-at-ms started-at-ms
-        :completed-at-ms completed-at-ms
-        :error error})
-
-      :manual-tracking
-      (scenario-workflow/fail-manual-tracking
-       {:state state
-        :error error}))))
+  (scenario-operations/fail operation state error completed-at-ms))
 
 (defn- fail-operation!
   [env store operation error]
@@ -111,121 +52,25 @@
 
 (defn- complete-operation-result
   [operation state completed-at-ms]
-  (case (:operation/type operation)
-    :save
-    (scenario-workflow/complete-save
-     {:state state
-      :scenario-index (:scenario-index operation)
-      :scenario-record (:scenario-record operation)
-      :started-at-ms (:started-at-ms operation)
-      :completed-at-ms completed-at-ms})
-
-    :archive
-    (scenario-workflow/complete-archive
-     {:state state
-      :scenario-index (:scenario-index operation)
-      :scenario-record (:scenario-record operation)
-      :started-at-ms (:started-at-ms operation)
-      :completed-at-ms completed-at-ms})
-
-    :duplicate
-    (scenario-workflow/complete-duplicate
-     {:state state
-      :scenario-index (:scenario-index operation)
-      :scenario-record (:scenario-record operation)
-      :source-scenario-id (:scenario-id operation)
-      :started-at-ms (:started-at-ms operation)
-      :completed-at-ms completed-at-ms})
-
-    :manual-tracking
-    (scenario-workflow/complete-manual-tracking
-     {:state state
-      :scenario-index (:scenario-index operation)
-      :scenario-record (:scenario-record operation)})))
+  (scenario-operations/complete operation state completed-at-ms))
 
 (defn- continue-after-scenario-record
   [operation state command scenario-record completed-at-ms]
-  (case (:operation/type operation)
-    :load
-    (scenario-workflow/continue-load-after-record
-     {:state state
-      :scenario-id (:scenario-id command)
-      :scenario-record scenario-record
-      :started-at-ms (:started-at-ms operation)
-      :completed-at-ms completed-at-ms})
-
-    :archive
-    (scenario-workflow/continue-archive-after-record
-     {:state state
-      :address (:address operation)
-      :scenario-id (:scenario-id command)
-      :scenario-record scenario-record
-      :started-at-ms (:started-at-ms operation)
-      :completed-at-ms completed-at-ms})
-
-    :duplicate
-    (scenario-workflow/continue-duplicate-after-record
-     {:state state
-      :address (:address operation)
-      :scenario-id (:scenario-id command)
-      :duplicated-scenario-id (:duplicated-scenario-id operation)
-      :scenario-record scenario-record
-      :started-at-ms (:started-at-ms operation)
-      :completed-at-ms completed-at-ms})
-
-    :manual-tracking
-    (scenario-workflow/continue-manual-tracking-after-record
-     {:state state
-      :address (:address operation)
-      :scenario-id (:scenario-id command)
-      :scenario-record scenario-record
-      :updated-at-ms completed-at-ms})))
+  (scenario-operations/continue-after-scenario-record
+   operation
+   state
+   command
+   scenario-record
+   completed-at-ms))
 
 (defn- continue-after-scenario-index
   [operation state command loaded-index completed-at-ms]
-  (case (:operation/type operation)
-    :scenario-index
-    (scenario-workflow/complete-index-load
-     {:state state
-      :loaded-index loaded-index
-      :started-at-ms (:started-at-ms operation)
-      :completed-at-ms completed-at-ms})
-
-    :save
-    (scenario-workflow/continue-save-after-index
-     {:state state
-      :address (:address operation)
-      :scenario-id (:scenario-id operation)
-      :started-at-ms (:started-at-ms operation)
-      :loaded-index loaded-index})
-
-    :archive
-    (scenario-workflow/continue-archive-after-index
-     {:state state
-      :address (:address operation)
-      :scenario-id (:scenario-id operation)
-      :scenario-record (:loaded-scenario-record operation)
-      :started-at-ms (:started-at-ms operation)
-      :loaded-index loaded-index})
-
-    :duplicate
-    (scenario-workflow/continue-duplicate-after-index
-     {:state state
-      :address (:address operation)
-      :scenario-id (:scenario-id operation)
-      :duplicated-scenario-id (:duplicated-scenario-id operation)
-      :scenario-record (:loaded-scenario-record operation)
-      :started-at-ms (:started-at-ms operation)
-      :loaded-index loaded-index})
-
-    :manual-tracking
-    (scenario-workflow/continue-manual-tracking-after-index
-     {:state state
-      :address (:address operation)
-      :scenario-id (:scenario-id command)
-      :scenario-record (:loaded-scenario-record operation)
-      :loaded-index loaded-index
-      :updated-at-ms completed-at-ms})))
+  (scenario-operations/continue-after-scenario-index
+   operation
+   state
+   command
+   loaded-index
+   completed-at-ms))
 
 (defn- merge-result-context
   [operation result]

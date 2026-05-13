@@ -1,5 +1,6 @@
 (ns hyperopen.portfolio.optimizer.application.scenario-workflow-test
   (:require [cljs.test :refer-macros [deftest is]]
+            [hyperopen.portfolio.optimizer.application.scenario-operations :as operations]
             [hyperopen.portfolio.optimizer.application.scenario-workflow :as workflow]
             [hyperopen.portfolio.optimizer.fixtures :as fixtures]))
 
@@ -93,6 +94,62 @@
    :by-id {"scn_01" {:id "scn_01"
                      :name "Core Hedge"
                      :status :saved}}})
+
+(deftest operation-registry-continues-archive-after-loaded-record-test
+  (let [operation {:operation/type :archive
+                   :address address
+                   :scenario-id "scn_01"
+                   :started-at-ms 4000}
+        command {:command/type :optimizer.workflow/load-scenario
+                 :scenario-id "scn_01"}
+        result (operations/continue-after-scenario-record
+                operation
+                {:portfolio {:optimizer {}}}
+                command
+                scenario-record
+                4100)]
+    (is (= [{:command/type :optimizer.workflow/load-scenario-index
+             :address address
+             :scenario-id "scn_01"
+             :started-at-ms 4000
+             :source :archive}]
+           (:commands result)))))
+
+(deftest operation-registry-continues-save-after-loaded-index-test
+  (let [operation {:operation/type :save
+                   :address address
+                   :scenario-id "scn_01"
+                   :started-at-ms 3000}
+        command {:command/type :optimizer.workflow/load-scenario-index
+                 :address address}
+        result (operations/continue-after-scenario-index
+                operation
+                (save-state)
+                command
+                scenario-index
+                3100)]
+    (is (= [:optimizer.workflow/save-scenario
+            :optimizer.workflow/save-scenario-index]
+           (mapv :command/type (:commands result))))
+    (is (= "scn_01" (get-in result [:commands 0 :scenario-id])))
+    (is (= :save (get-in result [:commands 1 :source])))))
+
+(deftest operation-registry-fails-duplicate-operation-test
+  (let [operation {:operation/type :duplicate
+                   :scenario-id "scn_01"
+                   :started-at-ms 5000}
+        result (operations/fail operation
+                                {:portfolio {:optimizer {}}}
+                                {:message "boom"}
+                                5100)]
+    (is (= {:status :failed
+            :source-scenario-id "scn_01"
+            :duplicated-scenario-id nil
+            :started-at-ms 5000
+            :completed-at-ms 5100
+            :error {:message "boom"}}
+           (get-in result [:state :portfolio :optimizer :scenario-duplicate-state])))
+    (is (= [] (:commands result)))))
 
 (deftest begin-index-load-plans-address-scoped-index-load-test
   (let [result (workflow/begin-index-load {:state (save-state)
