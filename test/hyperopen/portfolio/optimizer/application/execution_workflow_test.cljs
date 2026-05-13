@@ -1,0 +1,96 @@
+(ns hyperopen.portfolio.optimizer.application.execution-workflow-test
+  (:require [cljs.test :refer-macros [deftest is]]
+            [hyperopen.portfolio.optimizer.application.execution-workflow :as workflow]))
+
+(def address "0xaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa")
+
+(def ledger
+  {:attempt-id "exec_1000"
+   :scenario-id "scn_submit"
+   :status :executed
+   :started-at-ms 1000
+   :completed-at-ms 1100
+   :rows [{:row-id "perp:BTC"
+           :status :submitted}]})
+
+(def scenario-record
+  {:schema-version 1
+   :id "scn_submit"
+   :name "Submit Scenario"
+   :address address
+   :status :saved
+   :config {:id "scn_submit"
+            :name "Submit Scenario"
+            :status :saved
+            :metadata {:dirty? false
+                       :updated-at-ms 900}}
+   :execution-ledger []
+   :updated-at-ms 900})
+
+(def scenario-index
+  {:ordered-ids ["scn_submit"]
+   :by-id {"scn_submit" {:id "scn_submit"
+                         :name "Submit Scenario"
+                         :status :saved
+                         :updated-at-ms 900}}})
+
+(deftest begin-ledger-persistence-plans-scenario-load-test
+  (let [result (workflow/begin-ledger-persistence {:state {:portfolio {:optimizer {}}}
+                                                  :address address
+                                                  :ledger ledger})]
+    (is (= {:state {:portfolio {:optimizer {}}}
+            :commands [{:command/type :optimizer.workflow/load-scenario
+                        :source :execution-ledger
+                        :scenario-id "scn_submit"}]}
+           result))))
+
+(deftest ledger-persistence-builds-ordered-save-commands-test
+  (let [after-record (workflow/continue-ledger-persistence-after-record
+                      {:state {:portfolio {:optimizer {:scenario-index scenario-index}}}
+                       :address address
+                       :ledger ledger
+                       :scenario-record scenario-record})
+        plan (workflow/continue-ledger-persistence-after-index
+              {:state (:state after-record)
+               :address address
+               :ledger ledger
+               :scenario-record scenario-record
+               :loaded-index scenario-index})
+        updated-record (:scenario-record plan)]
+    (is (= [{:command/type :optimizer.workflow/load-scenario-index
+             :source :execution-ledger
+             :address address
+             :scenario-id "scn_submit"}]
+           (:commands after-record)))
+    (is (= [:optimizer.workflow/save-scenario
+            :optimizer.workflow/save-scenario-index]
+           (mapv :command/type (:commands plan))))
+    (is (= :executed (:status updated-record)))
+    (is (= :executed (get-in updated-record [:config :status])))
+    (is (= [ledger] (:execution-ledger updated-record)))
+    (is (= :executed
+           (get-in plan [:scenario-index :by-id "scn_submit" :status])))))
+
+(deftest complete-ledger-persistence-updates-state-test
+  (let [updated-record (assoc scenario-record
+                              :status :executed
+                              :config (assoc (:config scenario-record)
+                                             :status :executed)
+                              :execution-ledger [ledger])
+        updated-index (assoc-in scenario-index
+                                [:by-id "scn_submit" :status]
+                                :executed)
+        result (workflow/complete-ledger-persistence
+                {:state {:portfolio {:optimizer {:scenario-index scenario-index
+                                                 :draft (:config scenario-record)
+                                                 :active-scenario {:loaded-id "scn_submit"
+                                                                   :status :saved}}}}
+                 :scenario-index updated-index
+                 :scenario-record updated-record})]
+    (is (= updated-index
+           (get-in result [:state :portfolio :optimizer :scenario-index])))
+    (is (= (:config updated-record)
+           (get-in result [:state :portfolio :optimizer :draft])))
+    (is (= :executed
+           (get-in result [:state :portfolio :optimizer :active-scenario :status])))
+    (is (= [] (:commands result)))))

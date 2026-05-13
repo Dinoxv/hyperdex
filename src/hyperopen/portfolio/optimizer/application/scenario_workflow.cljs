@@ -72,6 +72,10 @@
            :started-at-ms started-at-ms}
     source (assoc :source source)))
 
+(defn advance-command-result
+  [result]
+  (update result :commands #(vec (rest %))))
+
 (defn begin-index-load
   [{:keys [state address started-at-ms]}]
   (if address

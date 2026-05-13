@@ -59,8 +59,20 @@
             :optimizer.workflow/save-scenario-index]
            (mapv :command/type (:commands result))))
     (is (= ["scn_01" address]
-	            [(get-in result [:commands 0 :scenario-id])
-	             (get-in result [:commands 1 :address])]))))
+	                    [(get-in result [:commands 0 :scenario-id])
+	                     (get-in result [:commands 1 :address])]))))
+
+(deftest command-result-advancement-removes-completed-command-test
+  (let [result {:state {:portfolio {:optimizer {}}}
+                :commands [{:command/type :optimizer.workflow/save-scenario
+                            :scenario-id "scn_01"}
+                           {:command/type :optimizer.workflow/save-scenario-index
+                            :address address}]}
+        advanced (workflow/advance-command-result result)]
+    (is (= {:state {:portfolio {:optimizer {}}}
+            :commands [{:command/type :optimizer.workflow/save-scenario-index
+                        :address address}]}
+           advanced))))
 
 (def scenario-record
   {:schema-version 1

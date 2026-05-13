@@ -40,7 +40,13 @@ Local scratch refs (non-authoritative):
 - [x] (2026-05-12 16:35Z) Verified RED with `npm run test:runner:generate && npx shadow-cljs --force-spawn compile test`; Shadow failed because `hyperopen.portfolio.optimizer.application.history-workflow` was not available.
 - [x] (2026-05-12 16:54Z) Implemented pure workflow reducers for pipeline, history, scenario save, and worker run bridge; rewired the corresponding runtime adapters as interpreters.
 - [x] (2026-05-12 16:56Z) Ran `npm run test:runner:generate && npx shadow-cljs --force-spawn compile test && node out/test.js`; it passed with 3853 tests and 21285 assertions.
-- [ ] Run review and required validation gates.
+- [x] (2026-05-12 20:06Z) Resumed the plan in the current isolated worktree at `/Users/barry/.codex/worktrees/ac6d/hyperopen` to finish the remaining interpreter cleanup called out by the maintainer: nested Promise sequencing in `src/hyperopen/runtime/effect_adapters/portfolio_optimizer_scenarios.cljs` around line 95 and `src/hyperopen/runtime/effect_adapters/portfolio_optimizer/execution.cljs` around line 141.
+- [x] (2026-05-12 20:06Z) Ran the focused baseline command for scenario workflow, scenario adapter, execution planner, and execution adapter tests. The first attempt compiled but Node failed to start because this worktree had no installed `lucide` package under `node_modules`.
+- [x] (2026-05-12 20:06Z) Ran `npm ci` in the current worktree, then reran the focused baseline. It passed with 21 tests, 115 assertions, 0 failures, and 0 errors.
+- [x] (2026-05-12 20:08Z) Added RED tests for `scenario-workflow/advance-command-result` and the new `execution-workflow` command planning boundary. The focused command failed as intended because `hyperopen.portfolio.optimizer.application.execution-workflow` does not exist yet.
+- [x] (2026-05-12 20:16Z) Implemented the remaining command interpreters. Scenario persistence now advances through a single `interpret-result!` / `interpret-command!` path, and execution ledger persistence now uses `application/execution_workflow.cljs` for record/index command planning.
+- [x] (2026-05-12 20:16Z) Reran the focused command after implementation. It passed with 25 tests, 127 assertions, 0 failures, and 0 errors.
+- [x] (2026-05-12 20:25Z) Ran required validation gates. `npm run check` passed, `npm test` passed with 3,862 tests and 21,320 assertions, and `npm run test:websocket` passed with 524 tests and 3,043 assertions.
 
 ## Surprises & Discoveries
 
@@ -52,6 +58,8 @@ Local scratch refs (non-authoritative):
   Evidence: `portfolio_optimizer_scenarios.cljs` re-exports state helpers from `portfolio_optimizer_scenario_state.cljs`, while load, save, archive, duplicate, and manual-tracking functions sequence persistence calls inline.
 - Observation: The worker bridge has good behavioral tests, but the pure decision boundary is private and the global `last-run-request` dedupe can block same-signature retry after a failed run unless an explicit run id bypasses it.
   Evidence: Existing `request-run-dedupes-identical-in-flight-signature-test` covers in-flight dedupe, while the test explorer proposed `request-run-retries-identical-signature-after-failed-run-test` as missing coverage.
+- Observation: The earlier state-machine pass extracted pure scenario workflow functions, but the runtime scenario adapter still owns sequencing through nested `.then` blocks. Execution ledger persistence still constructs the record/index persistence plan inside `portfolio_optimizer/execution.cljs`.
+  Evidence: `portfolio_optimizer_scenarios.cljs` still nests `load-scenario!`, `load-tracking!`, `load-scenario-index!`, `save-scenario!`, and `save-scenario-index!` continuations. `portfolio_optimizer/execution.cljs` still loads the scenario, loads the index, appends the ledger, saves both records, and mutates persistence state inside `persist-execution-ledger!`.
 
 ## Decision Log
 
@@ -64,10 +72,13 @@ Local scratch refs (non-authoritative):
 - Decision: Treat this refactor as non-UI-facing for browser QA.
   Rationale: No view, CSS, browser storage, or interaction flow behavior is intended to change. Deterministic ClojureScript tests and required repo gates are the appropriate validation path.
   Date/Author: 2026-05-12 / Codex.
+- Decision: Continue the existing optimizer workflow-state-machine ExecPlan instead of creating a second active plan for the same cleanup.
+  Rationale: The current maintainer request is explicitly a continuation of this plan's unfinished interpreter cleanup. Updating the active plan avoids duplicate implementation artifacts and follows `docs/PLANS.md`.
+  Date/Author: 2026-05-12 / Codex.
 
 ## Outcomes & Retrospective
 
-Work is in progress. At completion, summarize which async decisions moved into pure reducers, which adapters remain as interpreters, whether complexity decreased or increased, and any remaining workflow debt intentionally left outside this pass.
+Complete. The optimizer workflow decisions named in this plan now live in pure workflow namespaces or small command planners, while runtime adapters interpret command maps and own only browser persistence, worker, order submission, and dispatch effects. The resumed cleanup specifically removed the branch-specific nested persistence planning from `portfolio_optimizer_scenarios.cljs` and `portfolio_optimizer/execution.cljs`. Overall complexity decreased at the behavior boundary because the state transitions and persistence order are now visible in tests as data, even though the adapters still necessarily contain Promise code to interpret effects. Remaining Promise chains are effect-level order submission or one-command interpreter calls, not hidden scenario or ledger planning.
 
 ## Context and Orientation
 
@@ -87,9 +98,38 @@ Fourth, preserve compatibility. Keep `run-portfolio-optimizer-pipeline-effect`, 
 
 Fifth, run validation. Because code changes touch optimizer runtime behavior, required gates are `npm run check`, `npm test`, and `npm run test:websocket`. If any browser-flow tooling changes unexpectedly, run the smallest relevant Playwright command, but none is planned.
 
+The resumed cleanup adds one final interpreter boundary pass. In `src/hyperopen/portfolio/optimizer/application/scenario_workflow.cljs`, add a small pure command-step helper that can advance a scenario persistence plan from one completed command to the next. It should not know about Promises, stores, or browser persistence APIs. In `src/hyperopen/runtime/effect_adapters/portfolio_optimizer_scenarios.cljs`, replace the nested Promise blocks with a single command interpreter that dispatches on `:command/type` and chains only by interpreting the next explicit command returned by the workflow layer. In `src/hyperopen/portfolio/optimizer/application/execution_workflow.cljs`, add pure helpers that build an execution ledger, apply ledger state, plan ledger persistence from a loaded scenario record and loaded index, and apply persistence success or failure. In `src/hyperopen/runtime/effect_adapters/portfolio_optimizer/execution.cljs`, keep order submission as an effect interpreter, but move scenario record/index planning out of the Promise callback and interpret the execution persistence commands explicitly.
+
 ## Concrete Steps
 
 All commands run from `/Users/barry/.codex/worktrees/3471/hyperopen`.
+
+The resumed cleanup commands run from `/Users/barry/.codex/worktrees/ac6d/hyperopen`.
+
+The focused baseline for the resumed cleanup is:
+
+    npm run test:runner:generate && npx shadow-cljs --force-spawn compile test && node out/test.js --test=hyperopen.portfolio.optimizer.application.scenario-workflow-test --test=hyperopen.runtime.effect-adapters.portfolio-optimizer-scenarios-test --test=hyperopen.portfolio.optimizer.application.execution-test --test=hyperopen.runtime.effect-adapters.portfolio-optimizer-execution-test
+
+Observed before installing dependencies in this worktree:
+
+    [:test] Build completed. (1631 files, 1630 compiled, 0 warnings, 20.25s)
+    Error: Cannot find module 'lucide/dist/esm/icons/external-link.js'
+
+After `npm ci`, observed focused baseline:
+
+    Ran 21 tests containing 115 assertions.
+    0 failures, 0 errors.
+
+The RED tests for the resumed cleanup should fail before implementation because there is no execution persistence workflow namespace or because the scenario interpreter helper does not yet expose the command advancement shape asserted by the tests. After implementation, the same focused command should pass before running the broader required gates.
+
+Observed RED validation:
+
+    The required namespace "hyperopen.portfolio.optimizer.application.execution-workflow" is not available, it was required by "hyperopen/portfolio/optimizer/application/execution_workflow_test.cljs".
+
+Observed focused GREEN validation:
+
+    Ran 25 tests containing 127 assertions.
+    0 failures, 0 errors.
 
 Install dependencies if the worktree has no usable `node_modules`:
 
@@ -139,6 +179,19 @@ Required final gates:
 
 Expected final result: each command exits with code 0. If a command fails for an unrelated pre-existing reason, record the exact output and residual risk before handoff.
 
+Observed final gates:
+
+    npm run check
+    Exit code 0. Shadow CLJS app, portfolio, portfolio-worker, portfolio-optimizer-worker, vault-detail-worker, and test compiles completed with 0 warnings.
+
+    npm test
+    Ran 3862 tests containing 21320 assertions.
+    0 failures, 0 errors.
+
+    npm run test:websocket
+    Ran 524 tests containing 3043 assertions.
+    0 failures, 0 errors.
+
 ## Validation and Acceptance
 
 Acceptance is met when the optimizer runtime adapters no longer own the main workflow decisions named in the user request. The decisions must be observable in pure tests: command maps describe wait, load, run, request bundle, persist scenario, post worker, and no-op stale message outcomes. The adapter tests must still pass, proving the existing public effect behavior did not change.
@@ -149,11 +202,15 @@ The history selection-prefetch workflow must still drain queued instruments sequ
 
 The scenario workflows must still persist records and indexes in the same order as today, but their next persistence steps must be represented by explicit pure commands before interpretation.
 
+The resumed cleanup is accepted when the named adapter hotspots no longer contain branch-specific nested Promise chains for scenario load/archive/duplicate/manual-tracking/save or execution ledger persistence. Adapters may still return Promises because they interpret browser persistence and order-submission effects, but the next operation to run must be visible as command data or a small interpreter dispatch, not hidden inside nested planner code in a Promise callback.
+
 ## Idempotence and Recovery
 
 The refactor is additive before adapter rewiring. If a new reducer test fails for the wrong reason, keep the test file and correct only the expected command shape before touching source. If rewiring an adapter causes an existing behavior regression, keep the new pure namespace and revert only the adapter hunk before applying a smaller interpreter change.
 
 Running `npm ci`, test generation, Shadow compilation, and Node tests is safe to repeat. Do not change persisted scenario record schemas, optimizer request contracts, worker wire schemas, or browser storage keys in this plan.
+
+The resumed cleanup is designed to be mechanically reversible by restoring only the affected adapter hunks if focused adapter tests fail. Do not delete the existing pure workflow modules while iterating; keep the state-machine tests as the guide for public behavior.
 
 ## Artifacts and Notes
 
@@ -177,6 +234,7 @@ Planned pure workflow modules:
     src/hyperopen/portfolio/optimizer/application/history_workflow.cljs
     src/hyperopen/portfolio/optimizer/application/scenario_workflow.cljs
     src/hyperopen/portfolio/optimizer/application/run_bridge_workflow.cljs
+    src/hyperopen/portfolio/optimizer/application/execution_workflow.cljs
 
 ## Interfaces and Dependencies
 
@@ -190,6 +248,10 @@ Commands are plain data. Interpreters may choose to return Promises, but reducer
 
 The command vocabulary is intentionally local. Pipeline commands include waiting for history idle, loading history, and requesting a worker run. History commands include requesting a history bundle. Scenario commands include loading and saving scenario persistence records and indexes. Run bridge commands include installing the worker handler and posting a worker run.
 
+For the resumed cleanup, scenario interpreter commands continue to use the existing `:optimizer.workflow/load-scenario`, `:optimizer.workflow/load-tracking`, `:optimizer.workflow/load-scenario-index`, `:optimizer.workflow/save-scenario`, and `:optimizer.workflow/save-scenario-index` maps. Execution ledger persistence should use the same command vocabulary where possible so the runtime adapter can reuse the same persistence interpreter shape.
+
 ## Plan Revision Notes
 
 2026-05-12 / Codex: Created the active plan from the maintainer request after inspecting the optimizer runtime adapters, existing tests, recent completed optimizer boundary plans, and subagent findings. The plan keeps public effect APIs stable and moves decision logic into small pure workflow namespaces.
+
+2026-05-12 / Codex: Resumed the active plan for the maintainer's "Finish workflow interpreter cleanup" request. The earlier state-machine pass extracted pure reducers but left nested Promise sequencing in the scenario and execution adapters. This revision narrows the remaining work to explicit command interpreter dispatch for those two adapter hotspots.

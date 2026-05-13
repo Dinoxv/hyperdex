@@ -1,29 +1,13 @@
 (ns hyperopen.runtime.effect-adapters.portfolio-optimizer.execution
   (:require [hyperopen.portfolio.optimizer.application.execution :as execution]
-            [hyperopen.portfolio.optimizer.application.scenario-records :as scenario-records]
-            [hyperopen.portfolio.optimizer.application.scenario-workflow :as scenario-workflow]
+            [hyperopen.portfolio.optimizer.application.execution-workflow :as execution-workflow]
             [hyperopen.portfolio.optimizer.contracts :as contracts]))
-
-(defn- begin-execution-state
-  [attempt started-at-ms]
-  {:status :submitting
-   :attempt attempt
-   :started-at-ms started-at-ms
-   :completed-at-ms nil
-   :history []
-   :error nil})
-
-(defn- runtime-error-message
-  [err]
-  (or (when (map? err) (:message err))
-      (some-> err .-message)
-      (str err)))
 
 (defn- mark-row-failed
   [row err]
   (assoc row
          :status :failed
-         :error {:message (runtime-error-message err)}))
+         :error {:message (execution-workflow/error-message err)}))
 
 (defn- submit-action!
   [submit-order! store address action]
@@ -95,34 +79,6 @@
    (js/Promise.resolve [])
    rows))
 
-(defn- execution-ledger
-  [attempt started-at-ms completed-at-ms rows]
-  {:attempt-id (str "exec_" started-at-ms)
-   :scenario-id (:scenario-id attempt)
-   :status (execution/final-ledger-status rows)
-   :started-at-ms started-at-ms
-   :completed-at-ms completed-at-ms
-   :rows rows})
-
-(defn- apply-execution-ledger
-  [state ledger]
-  (let [history (conj (vec (get-in state contracts/execution-history-path))
-                      ledger)
-        scenario-status (:status ledger)]
-    (cond-> (-> state
-                (assoc-in contracts/execution-path
-                          {:status scenario-status
-                           :attempt nil
-                           :history history
-                           :error (when (= :failed scenario-status)
-                                    {:message "Execution failed before any rows submitted."})})
-                (assoc-in contracts/execution-modal-submitting-path false)
-                (assoc-in contracts/execution-modal-error-path
-                          (when (= :failed scenario-status)
-                            "Execution failed before any rows submitted.")))
-      (contains? #{:executed :partially-executed} scenario-status)
-      (assoc-in contracts/active-scenario-status-path scenario-status))))
-
 (defn- refresh-after-execution!
   [dispatch! store address ledger]
   (when (and address
@@ -130,58 +86,129 @@
     (dispatch! store nil [[:actions/load-user-data address]
                           [:actions/refresh-order-history]])))
 
-(defn- apply-execution-ledger-persistence
-  [state scenario-index scenario-record]
-  (-> state
-      (assoc-in contracts/scenario-index-path scenario-index)
-      (assoc-in contracts/draft-path (:config scenario-record))
-      (assoc-in contracts/active-scenario-status-path
-                (:status scenario-record))))
+(defn- apply-persistence-result!
+  [store result]
+  (reset! store (:state result))
+  result)
+
+(declare interpret-ledger-persistence-result!)
+
+(defn- fail-ledger-persistence!
+  [store ledger err]
+  (apply-persistence-result!
+   store
+   (execution-workflow/fail-ledger-persistence
+    {:state @store
+     :error err}))
+  (js/Promise.resolve ledger))
+
+(defn- advance-command-result
+  [result]
+  (update result :commands #(vec (rest %))))
+
+(defn- merge-result-context
+  [operation result]
+  (merge operation
+         (select-keys result [:scenario-record :scenario-index])))
+
+(defn- interpret-ledger-persistence-command!
+  [env store ledger operation result command]
+  (let [{:keys [load-scenario!
+                load-scenario-index!
+                save-scenario!
+                save-scenario-index!]} env]
+    (case (:command/type command)
+      :optimizer.workflow/load-scenario
+      (-> (load-scenario! (:scenario-id command))
+          (.then (fn [scenario-record]
+                   (let [result* (execution-workflow/continue-ledger-persistence-after-record
+                                  {:state @store
+                                   :address (:address operation)
+                                   :ledger ledger
+                                   :scenario-record scenario-record})]
+                     (interpret-ledger-persistence-result!
+                      env
+                      store
+                      ledger
+                      (merge-result-context operation result*)
+                      result*))))
+          (.catch (fn [err]
+                    (fail-ledger-persistence! store ledger err))))
+
+      :optimizer.workflow/load-scenario-index
+      (-> (load-scenario-index! (:address command))
+          (.then (fn [loaded-index]
+                   (let [result* (execution-workflow/continue-ledger-persistence-after-index
+                                  {:state @store
+                                   :address (:address operation)
+                                   :ledger ledger
+                                   :scenario-record (:scenario-record operation)
+                                   :loaded-index loaded-index})]
+                     (interpret-ledger-persistence-result!
+                      env
+                      store
+                      ledger
+                      (merge-result-context operation result*)
+                      result*))))
+          (.catch (fn [err]
+                    (fail-ledger-persistence! store ledger err))))
+
+      :optimizer.workflow/save-scenario
+      (-> (save-scenario! (:scenario-id command)
+                          (:scenario-record command))
+          (.then (fn [_]
+                   (interpret-ledger-persistence-result!
+                    env
+                    store
+                    ledger
+                    operation
+                    (advance-command-result result))))
+          (.catch (fn [err]
+                    (fail-ledger-persistence! store ledger err))))
+
+      :optimizer.workflow/save-scenario-index
+      (let [operation* (assoc operation
+                              :scenario-index (:scenario-index command))]
+        (-> (save-scenario-index! (:address command)
+                                  (:scenario-index command))
+            (.then (fn [_]
+                     (interpret-ledger-persistence-result!
+                      env
+                      store
+                      ledger
+                      operation*
+                      (execution-workflow/complete-ledger-persistence
+                       {:state @store
+                        :scenario-index (:scenario-index operation*)
+                        :scenario-record (:scenario-record operation*)}))))
+            (.catch (fn [err]
+                      (fail-ledger-persistence! store ledger err)))))
+
+      (js/Promise.resolve ledger))))
+
+(defn- interpret-ledger-persistence-result!
+  [env store ledger operation result]
+  (let [result* (apply-persistence-result! store result)]
+    (if-let [command (first (:commands result*))]
+      (interpret-ledger-persistence-command! env
+                                             store
+                                             ledger
+                                             operation
+                                             result*
+                                             command)
+      (js/Promise.resolve ledger))))
 
 (defn- persist-execution-ledger!
-  [{:keys [load-scenario!
-           load-scenario-index!
-           save-scenario!
-           save-scenario-index!]}
+  [env store address ledger]
+  (interpret-ledger-persistence-result!
+   env
    store
-   address
-   ledger]
-  (let [scenario-id (:scenario-id ledger)]
-    (if-not (and address scenario-id)
-      (js/Promise.resolve ledger)
-      (let [persist-promise
-            (.then (load-scenario! scenario-id)
-                   (fn [scenario-record]
-                     (if-not (map? scenario-record)
-                       ledger
-                       (.then (load-scenario-index! address)
-                              (fn [loaded-index]
-                                (let [updated-record
-                                      (scenario-records/append-execution-ledger
-                                       scenario-record
-                                       ledger)
-                                      scenario-index
-	                                      (scenario-records/refresh-scenario-index-summary
-	                                       (or loaded-index
-	                                           (get-in @store
-	                                                   contracts/scenario-index-path)
-	                                           (scenario-workflow/default-scenario-index))
-                                       (scenario-records/scenario-summary updated-record))]
-                                  (-> (save-scenario! scenario-id updated-record)
-                                      (.then (fn [_]
-                                               (save-scenario-index! address scenario-index)))
-                                      (.then (fn [_]
-                                               (swap! store
-                                                      apply-execution-ledger-persistence
-                                                      scenario-index
-                                                      updated-record)
-                                               ledger)))))))))]
-        (.catch persist-promise
-                (fn [err]
-                  (swap! store assoc-in
-                         contracts/execution-persistence-error-path
-                         {:message (runtime-error-message err)})
-                  ledger))))))
+   ledger
+   {:address address}
+   (execution-workflow/begin-ledger-persistence
+    {:state @store
+     :address address
+     :ledger ledger})))
 
 (defn execute-portfolio-optimizer-plan-effect
   [env _ store plan]
@@ -207,21 +234,25 @@
                                  :error {:message "Connect your wallet before executing."})
                           %)
                        (:rows attempt))
-            ledger (execution-ledger attempt started-at-ms completed-at-ms rows)]
-        (swap! store apply-execution-ledger ledger)
+            ledger (execution-workflow/execution-ledger attempt
+                                                        started-at-ms
+                                                        completed-at-ms
+                                                        rows)]
+        (swap! store execution-workflow/apply-execution-ledger ledger)
         (js/Promise.resolve ledger))
       (do
         (swap! store assoc-in
                contracts/execution-path
-               (begin-execution-state attempt started-at-ms))
+               (execution-workflow/begin-execution-state attempt started-at-ms))
         (-> (submit-execution-rows! submit-order! store address (:rows attempt))
             (.then (fn [rows]
                      (let [completed-at-ms (now-ms-fn)
-                           ledger (execution-ledger attempt
-                                                    started-at-ms
-                                                    completed-at-ms
-                                                    rows)]
-                       (swap! store apply-execution-ledger ledger)
+                           ledger (execution-workflow/execution-ledger
+                                   attempt
+                                   started-at-ms
+                                   completed-at-ms
+                                   rows)]
+                       (swap! store execution-workflow/apply-execution-ledger ledger)
                        (refresh-after-execution! dispatch! store address ledger)
                        (persist-execution-ledger! persistence-env
                                                   store

@@ -192,6 +192,7 @@
             [hyperopen.portfolio.optimizer.application.current-portfolio-test]
             [hyperopen.portfolio.optimizer.application.engine-test]
             [hyperopen.portfolio.optimizer.application.execution-test]
+            [hyperopen.portfolio.optimizer.application.execution-workflow-test]
             [hyperopen.portfolio.optimizer.application.history-loader-test]
             [hyperopen.portfolio.optimizer.application.history-loader-vaults-test]
             [hyperopen.portfolio.optimizer.application.history-workflow-test]
@@ -825,6 +826,7 @@
              'hyperopen.portfolio.optimizer.application.current-portfolio-test
              'hyperopen.portfolio.optimizer.application.engine-test
              'hyperopen.portfolio.optimizer.application.execution-test
+             'hyperopen.portfolio.optimizer.application.execution-workflow-test
              'hyperopen.portfolio.optimizer.application.history-loader-test
              'hyperopen.portfolio.optimizer.application.history-loader-vaults-test
              'hyperopen.portfolio.optimizer.application.history-workflow-test

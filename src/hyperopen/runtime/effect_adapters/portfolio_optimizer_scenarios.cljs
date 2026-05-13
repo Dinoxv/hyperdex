@@ -32,242 +32,368 @@
   (reset! store (:state result))
   result)
 
-(defn- persist-scenario-plan!
-  [{:keys [address complete-fn result-value save-scenario! save-scenario-index! store]} plan]
-  (let [scenario-record (:scenario-record plan)
-        scenario-index (:scenario-index plan)
-        save-command (first (:commands plan))
-        save-index-command (second (:commands plan))]
-    (-> (save-scenario! (:scenario-id save-command) scenario-record)
-        (.then (fn [_]
-                 (save-scenario-index! address scenario-index)))
-        (.then (fn [_]
-                 (apply-result! store (complete-fn scenario-index scenario-record))
-                 (result-value scenario-record))))))
+(declare interpret-result!)
+
+(defn- operation-result-value
+  [store operation]
+  (case (:operation/type operation)
+    :scenario-index
+    (get-in @store contracts/scenario-index-path)
+
+    :load
+    (when (map? (:loaded-scenario-record operation))
+      (:loaded-scenario-record operation))
+
+    :manual-tracking
+    (or (:scenario-record operation)
+        (:loaded-scenario-record operation))
+
+    (:save :archive :duplicate)
+    (:scenario-record operation)
+
+    nil))
+
+(defn- fail-operation-result
+  [operation state error completed-at-ms]
+  (let [scenario-id (:scenario-id operation)
+        started-at-ms (:started-at-ms operation)]
+    (case (:operation/type operation)
+      :scenario-index
+      (scenario-workflow/complete-index-load
+       {:state state
+        :started-at-ms started-at-ms
+        :completed-at-ms completed-at-ms
+        :error error})
+
+      :load
+      (scenario-workflow/fail-load
+       {:state state
+        :scenario-id scenario-id
+        :started-at-ms started-at-ms
+        :completed-at-ms completed-at-ms
+        :error error})
+
+      :save
+      (scenario-workflow/fail-save
+       {:state state
+        :scenario-id scenario-id
+        :started-at-ms started-at-ms
+        :completed-at-ms completed-at-ms
+        :error error})
+
+      :archive
+      (scenario-workflow/fail-archive
+       {:state state
+        :scenario-id scenario-id
+        :started-at-ms started-at-ms
+        :completed-at-ms completed-at-ms
+        :error error})
+
+      :duplicate
+      (scenario-workflow/fail-duplicate
+       {:state state
+        :scenario-id scenario-id
+        :started-at-ms started-at-ms
+        :completed-at-ms completed-at-ms
+        :error error})
+
+      :manual-tracking
+      (scenario-workflow/fail-manual-tracking
+       {:state state
+        :error error}))))
+
+(defn- fail-operation!
+  [env store operation error]
+  (apply-result!
+   store
+   (fail-operation-result operation @store error ((env-fn env :now-ms))))
+  (js/Promise.resolve nil))
+
+(defn- complete-operation-result
+  [operation state completed-at-ms]
+  (case (:operation/type operation)
+    :save
+    (scenario-workflow/complete-save
+     {:state state
+      :scenario-index (:scenario-index operation)
+      :scenario-record (:scenario-record operation)
+      :started-at-ms (:started-at-ms operation)
+      :completed-at-ms completed-at-ms})
+
+    :archive
+    (scenario-workflow/complete-archive
+     {:state state
+      :scenario-index (:scenario-index operation)
+      :scenario-record (:scenario-record operation)
+      :started-at-ms (:started-at-ms operation)
+      :completed-at-ms completed-at-ms})
+
+    :duplicate
+    (scenario-workflow/complete-duplicate
+     {:state state
+      :scenario-index (:scenario-index operation)
+      :scenario-record (:scenario-record operation)
+      :source-scenario-id (:scenario-id operation)
+      :started-at-ms (:started-at-ms operation)
+      :completed-at-ms completed-at-ms})
+
+    :manual-tracking
+    (scenario-workflow/complete-manual-tracking
+     {:state state
+      :scenario-index (:scenario-index operation)
+      :scenario-record (:scenario-record operation)})))
+
+(defn- continue-after-scenario-record
+  [operation state command scenario-record completed-at-ms]
+  (case (:operation/type operation)
+    :load
+    (scenario-workflow/continue-load-after-record
+     {:state state
+      :scenario-id (:scenario-id command)
+      :scenario-record scenario-record
+      :started-at-ms (:started-at-ms operation)
+      :completed-at-ms completed-at-ms})
+
+    :archive
+    (scenario-workflow/continue-archive-after-record
+     {:state state
+      :address (:address operation)
+      :scenario-id (:scenario-id command)
+      :scenario-record scenario-record
+      :started-at-ms (:started-at-ms operation)
+      :completed-at-ms completed-at-ms})
+
+    :duplicate
+    (scenario-workflow/continue-duplicate-after-record
+     {:state state
+      :address (:address operation)
+      :scenario-id (:scenario-id command)
+      :duplicated-scenario-id (:duplicated-scenario-id operation)
+      :scenario-record scenario-record
+      :started-at-ms (:started-at-ms operation)
+      :completed-at-ms completed-at-ms})
+
+    :manual-tracking
+    (scenario-workflow/continue-manual-tracking-after-record
+     {:state state
+      :address (:address operation)
+      :scenario-id (:scenario-id command)
+      :scenario-record scenario-record
+      :updated-at-ms completed-at-ms})))
+
+(defn- continue-after-scenario-index
+  [operation state command loaded-index completed-at-ms]
+  (case (:operation/type operation)
+    :scenario-index
+    (scenario-workflow/complete-index-load
+     {:state state
+      :loaded-index loaded-index
+      :started-at-ms (:started-at-ms operation)
+      :completed-at-ms completed-at-ms})
+
+    :save
+    (scenario-workflow/continue-save-after-index
+     {:state state
+      :address (:address operation)
+      :scenario-id (:scenario-id operation)
+      :started-at-ms (:started-at-ms operation)
+      :loaded-index loaded-index})
+
+    :archive
+    (scenario-workflow/continue-archive-after-index
+     {:state state
+      :address (:address operation)
+      :scenario-id (:scenario-id operation)
+      :scenario-record (:loaded-scenario-record operation)
+      :started-at-ms (:started-at-ms operation)
+      :loaded-index loaded-index})
+
+    :duplicate
+    (scenario-workflow/continue-duplicate-after-index
+     {:state state
+      :address (:address operation)
+      :scenario-id (:scenario-id operation)
+      :duplicated-scenario-id (:duplicated-scenario-id operation)
+      :scenario-record (:loaded-scenario-record operation)
+      :started-at-ms (:started-at-ms operation)
+      :loaded-index loaded-index})
+
+    :manual-tracking
+    (scenario-workflow/continue-manual-tracking-after-index
+     {:state state
+      :address (:address operation)
+      :scenario-id (:scenario-id command)
+      :scenario-record (:loaded-scenario-record operation)
+      :loaded-index loaded-index
+      :updated-at-ms completed-at-ms})))
+
+(defn- merge-result-context
+  [operation result]
+  (merge operation
+         (select-keys result [:scenario-record :scenario-index])))
+
+(defn- interpret-command!
+  [env store operation result command]
+  (let [now-ms-fn (env-fn env :now-ms)]
+    (case (:command/type command)
+      :optimizer.workflow/load-scenario
+      (-> ((env-fn env :load-scenario!) (:scenario-id command))
+          (.then (fn [scenario-record]
+                   (let [completed-at-ms (now-ms-fn)
+                         operation* (assoc operation
+                                           :loaded-scenario-record scenario-record)
+                         result* (continue-after-scenario-record
+                                  operation*
+                                  @store
+                                  command
+                                  scenario-record
+                                  completed-at-ms)]
+                     (interpret-result! env store operation* result*))))
+          (.catch (fn [err]
+                    (fail-operation! env store operation err))))
+
+      :optimizer.workflow/load-tracking
+      (-> (load-tracking-record (env-fn env :load-tracking!)
+                                (:scenario-id command))
+          (.then (fn [tracking-record]
+                   (interpret-result!
+                    env
+                    store
+                    operation
+                    (scenario-workflow/complete-load-after-tracking
+                     {:state @store
+                      :scenario-id (:scenario-id command)
+                      :scenario-record (:loaded-scenario-record operation)
+                      :tracking-record tracking-record
+                      :started-at-ms (:started-at-ms operation)
+                      :completed-at-ms (now-ms-fn)})))))
+
+      :optimizer.workflow/load-scenario-index
+      (-> ((env-fn env :load-scenario-index!) (:address command))
+          (.then (fn [loaded-index]
+                   (let [completed-at-ms (now-ms-fn)
+                         result* (continue-after-scenario-index
+                                  operation
+                                  @store
+                                  command
+                                  loaded-index
+                                  completed-at-ms)]
+                     (interpret-result!
+                      env
+                      store
+                      (merge-result-context operation result*)
+                      result*))))
+          (.catch (fn [err]
+                    (fail-operation! env store operation err))))
+
+      :optimizer.workflow/save-scenario
+      (-> ((env-fn env :save-scenario!)
+           (:scenario-id command)
+           (:scenario-record command))
+          (.then (fn [_]
+                   (interpret-result!
+                    env
+                    store
+                    operation
+                    (scenario-workflow/advance-command-result result))))
+          (.catch (fn [err]
+                    (fail-operation! env store operation err))))
+
+      :optimizer.workflow/save-scenario-index
+      (let [operation* (assoc operation
+                              :scenario-index (:scenario-index command))]
+        (-> ((env-fn env :save-scenario-index!)
+             (:address command)
+             (:scenario-index command))
+            (.then (fn [_]
+                     (interpret-result!
+                      env
+                      store
+                      operation*
+                      (complete-operation-result operation*
+                                                 @store
+                                                 (now-ms-fn)))))
+            (.catch (fn [err]
+                      (fail-operation! env store operation* err)))))
+
+      (js/Promise.resolve nil))))
+
+(defn- interpret-result!
+  [env store operation result]
+  (let [result* (apply-result! store result)]
+    (if-let [command (first (:commands result*))]
+      (interpret-command! env store operation result* command)
+      (js/Promise.resolve (operation-result-value store operation)))))
 
 (defn load-portfolio-optimizer-scenario-index-effect
   [env store _opts]
   (let [state @store
         address (account-context/effective-account-address state)
-        now-ms-fn (env-fn env :now-ms)
-        load-scenario-index! (env-fn env :load-scenario-index!)
-        started-at-ms (now-ms-fn)
-        begin-result (scenario-workflow/begin-index-load
-                      {:state state
-                       :address address
-                       :started-at-ms started-at-ms})]
-    (apply-result! store begin-result)
-    (if-let [command (first (:commands begin-result))]
-      (-> (load-scenario-index! (:address command))
-          (.then (fn [loaded-index]
-                   (let [completed-at-ms (now-ms-fn)
-                         complete-result (scenario-workflow/complete-index-load
-                                          {:state @store
-                                           :loaded-index loaded-index
-                                           :started-at-ms started-at-ms
-                                           :completed-at-ms completed-at-ms})]
-                     (apply-result! store complete-result)
-                     (get-in @store contracts/scenario-index-path))))
-          (.catch (fn [err]
-                    (let [completed-at-ms (now-ms-fn)]
-                      (apply-result!
-                       store
-                       (scenario-workflow/complete-index-load
-                        {:state @store
-                         :started-at-ms started-at-ms
-                         :completed-at-ms completed-at-ms
-                         :error err})))
-                    nil)))
-      (js/Promise.resolve nil))))
+        started-at-ms ((env-fn env :now-ms))]
+    (interpret-result!
+     env
+     store
+     {:operation/type :scenario-index
+      :address address
+      :started-at-ms started-at-ms}
+     (scenario-workflow/begin-index-load
+      {:state state
+       :address address
+       :started-at-ms started-at-ms}))))
 
 (defn load-portfolio-optimizer-scenario-effect
   [env store scenario-id _opts]
-  (let [now-ms-fn (env-fn env :now-ms)
-        load-scenario! (env-fn env :load-scenario!)
-        load-tracking! (env-fn env :load-tracking!)
-        started-at-ms (now-ms-fn)
-        begin-result (scenario-workflow/begin-load
-                      {:state @store
-                       :scenario-id scenario-id
-                       :started-at-ms started-at-ms})]
-    (apply-result! store begin-result)
-    (if-let [command (first (:commands begin-result))]
-      (-> (load-scenario! (:scenario-id command))
-          (.then (fn [scenario-record]
-                   (let [completed-at-ms (now-ms-fn)
-                         after-record (scenario-workflow/continue-load-after-record
-                                       {:state @store
-                                        :scenario-id scenario-id
-                                        :scenario-record scenario-record
-                                        :started-at-ms started-at-ms
-                                        :completed-at-ms completed-at-ms})]
-                     (apply-result! store after-record)
-                     (if-let [_tracking-command (first (:commands after-record))]
-                       (-> (load-tracking-record load-tracking! scenario-id)
-                           (.then (fn [tracking-record]
-                                    (let [completed-at-ms* (now-ms-fn)]
-                                      (apply-result!
-                                       store
-                                       (scenario-workflow/complete-load-after-tracking
-                                        {:state @store
-                                         :scenario-id scenario-id
-                                         :scenario-record scenario-record
-                                         :tracking-record tracking-record
-                                         :started-at-ms started-at-ms
-                                         :completed-at-ms completed-at-ms*}))
-                                      scenario-record))))
-                       (js/Promise.resolve nil)))))
-          (.catch (fn [err]
-                    (let [completed-at-ms (now-ms-fn)]
-                      (apply-result!
-                       store
-                       (scenario-workflow/fail-load
-                        {:state @store
-                         :scenario-id scenario-id
-                         :started-at-ms started-at-ms
-                         :completed-at-ms completed-at-ms
-                         :error err})))
-                    nil)))
-      (js/Promise.resolve nil))))
+  (let [started-at-ms ((env-fn env :now-ms))]
+    (interpret-result!
+     env
+     store
+     {:operation/type :load
+      :scenario-id scenario-id
+      :started-at-ms started-at-ms}
+     (scenario-workflow/begin-load
+      {:state @store
+       :scenario-id scenario-id
+       :started-at-ms started-at-ms}))))
 
 (defn archive-portfolio-optimizer-scenario-effect
   [env store scenario-id _opts]
   (let [state @store
         address (account-context/effective-account-address state)
-        now-ms-fn (env-fn env :now-ms)
-        load-scenario! (env-fn env :load-scenario!)
-        load-scenario-index! (env-fn env :load-scenario-index!)
-        save-scenario! (env-fn env :save-scenario!)
-        save-scenario-index! (env-fn env :save-scenario-index!)
-        started-at-ms (now-ms-fn)
-        begin-result (scenario-workflow/begin-archive
-                      {:state state
-                       :address address
-                       :scenario-id scenario-id
-                       :started-at-ms started-at-ms})]
-    (apply-result! store begin-result)
-    (if-let [command (first (:commands begin-result))]
-      (-> (load-scenario! (:scenario-id command))
-          (.then (fn [scenario-record]
-                   (let [completed-at-ms (now-ms-fn)
-                         after-record (scenario-workflow/continue-archive-after-record
-                                       {:state @store
-                                        :address address
-                                        :scenario-id scenario-id
-                                        :scenario-record scenario-record
-                                        :started-at-ms started-at-ms
-                                        :completed-at-ms completed-at-ms})]
-                     (apply-result! store after-record)
-                     (if-let [_load-index-command (first (:commands after-record))]
-                       (-> (load-scenario-index! address)
-                           (.then (fn [loaded-index]
-                                    (let [plan (scenario-workflow/continue-archive-after-index
-                                                {:state @store
-                                                 :address address
-                                                 :scenario-id scenario-id
-                                                 :scenario-record scenario-record
-                                                 :started-at-ms started-at-ms
-                                                 :loaded-index loaded-index})]
-                                      (persist-scenario-plan!
-                                       {:address address
-                                        :store store
-                                        :save-scenario! save-scenario!
-                                        :save-scenario-index! save-scenario-index!
-                                        :result-value identity
-                                        :complete-fn
-                                        (fn [scenario-index archived-record]
-                                          (scenario-workflow/complete-archive
-                                           {:state @store
-                                            :scenario-index scenario-index
-                                            :scenario-record archived-record
-                                            :started-at-ms started-at-ms
-                                            :completed-at-ms (now-ms-fn)}))}
-                                       plan)))))
-                       (js/Promise.resolve nil)))))
-          (.catch (fn [err]
-                    (let [completed-at-ms (now-ms-fn)]
-                      (apply-result!
-                       store
-                       (scenario-workflow/fail-archive
-                        {:state @store
-                         :scenario-id scenario-id
-                         :started-at-ms started-at-ms
-                         :completed-at-ms completed-at-ms
-                         :error err})))
-                    nil)))
-      (js/Promise.resolve nil))))
+        started-at-ms ((env-fn env :now-ms))]
+    (interpret-result!
+     env
+     store
+     {:operation/type :archive
+      :address address
+      :scenario-id scenario-id
+      :started-at-ms started-at-ms}
+     (scenario-workflow/begin-archive
+      {:state state
+       :address address
+       :scenario-id scenario-id
+       :started-at-ms started-at-ms}))))
 
 (defn duplicate-portfolio-optimizer-scenario-effect
   [env store scenario-id _opts]
   (let [state @store
         address (account-context/effective-account-address state)
         now-ms-fn (env-fn env :now-ms)
-        load-scenario! (env-fn env :load-scenario!)
-        load-scenario-index! (env-fn env :load-scenario-index!)
-        save-scenario! (env-fn env :save-scenario!)
-        save-scenario-index! (env-fn env :save-scenario-index!)
         started-at-ms (now-ms-fn)
-        duplicated-scenario-id ((env-fn env :next-scenario-id) started-at-ms)
-        begin-result (scenario-workflow/begin-duplicate
-                      {:state state
-                       :address address
-                       :scenario-id scenario-id
-                       :duplicated-scenario-id duplicated-scenario-id
-                       :started-at-ms started-at-ms})]
-    (apply-result! store begin-result)
-    (if-let [command (first (:commands begin-result))]
-      (-> (load-scenario! (:scenario-id command))
-          (.then (fn [scenario-record]
-                   (let [completed-at-ms (now-ms-fn)
-                         after-record (scenario-workflow/continue-duplicate-after-record
-                                       {:state @store
-                                        :address address
-                                        :scenario-id scenario-id
-                                        :duplicated-scenario-id duplicated-scenario-id
-                                        :scenario-record scenario-record
-                                        :started-at-ms started-at-ms
-                                        :completed-at-ms completed-at-ms})]
-                     (apply-result! store after-record)
-                     (if-let [_load-index-command (first (:commands after-record))]
-                       (-> (load-scenario-index! address)
-                           (.then (fn [loaded-index]
-                                    (let [plan (scenario-workflow/continue-duplicate-after-index
-                                                {:state @store
-                                                 :address address
-                                                 :scenario-id scenario-id
-                                                 :duplicated-scenario-id duplicated-scenario-id
-                                                 :scenario-record scenario-record
-                                                 :started-at-ms started-at-ms
-                                                 :loaded-index loaded-index})]
-                                      (persist-scenario-plan!
-                                       {:address address
-                                        :store store
-                                        :save-scenario! save-scenario!
-                                        :save-scenario-index! save-scenario-index!
-                                        :result-value identity
-                                        :complete-fn
-                                        (fn [scenario-index duplicated-record]
-                                          (scenario-workflow/complete-duplicate
-                                           {:state @store
-                                            :scenario-index scenario-index
-                                            :scenario-record duplicated-record
-                                            :source-scenario-id scenario-id
-                                            :started-at-ms started-at-ms
-                                            :completed-at-ms (now-ms-fn)}))}
-                                       plan)))))
-                       (js/Promise.resolve nil)))))
-          (.catch (fn [err]
-                    (let [completed-at-ms (now-ms-fn)]
-                      (apply-result!
-                       store
-                       (scenario-workflow/fail-duplicate
-                        {:state @store
-                         :scenario-id scenario-id
-                         :started-at-ms started-at-ms
-                         :completed-at-ms completed-at-ms
-                         :error err})))
-                    nil)))
-      (js/Promise.resolve nil))))
+        duplicated-scenario-id ((env-fn env :next-scenario-id) started-at-ms)]
+    (interpret-result!
+     env
+     store
+     {:operation/type :duplicate
+      :address address
+      :scenario-id scenario-id
+      :duplicated-scenario-id duplicated-scenario-id
+      :started-at-ms started-at-ms}
+     (scenario-workflow/begin-duplicate
+      {:state state
+       :address address
+       :scenario-id scenario-id
+       :duplicated-scenario-id duplicated-scenario-id
+       :started-at-ms started-at-ms}))))
 
 (defn enable-portfolio-optimizer-manual-tracking-effect
   [env store]
@@ -275,111 +401,36 @@
         address (account-context/effective-account-address state)
         scenario-id (or (get-in state contracts/active-scenario-loaded-id-path)
                         (get-in state contracts/draft-id-path))
-        now-ms-fn (env-fn env :now-ms)
-        load-scenario! (env-fn env :load-scenario!)
-        load-scenario-index! (env-fn env :load-scenario-index!)
-        save-scenario! (env-fn env :save-scenario!)
-        save-scenario-index! (env-fn env :save-scenario-index!)
-        started-at-ms (now-ms-fn)
-        begin-result (scenario-workflow/begin-manual-tracking
-                      {:state state
-                       :address address
-                       :scenario-id scenario-id
-                       :started-at-ms started-at-ms})]
-    (apply-result! store begin-result)
-    (if-let [command (first (:commands begin-result))]
-      (-> (load-scenario! (:scenario-id command))
-          (.then (fn [scenario-record]
-                   (let [after-record (scenario-workflow/continue-manual-tracking-after-record
-                                       {:state @store
-                                        :address address
-                                        :scenario-id scenario-id
-                                        :scenario-record scenario-record
-                                        :updated-at-ms (now-ms-fn)})]
-                     (apply-result! store after-record)
-                     (if-let [_load-index-command (first (:commands after-record))]
-                       (-> (load-scenario-index! address)
-                           (.then (fn [loaded-index]
-                                    (let [plan (scenario-workflow/continue-manual-tracking-after-index
-                                                {:state @store
-                                                 :address address
-                                                 :scenario-id scenario-id
-                                                 :scenario-record scenario-record
-                                                 :loaded-index loaded-index
-                                                 :updated-at-ms (now-ms-fn)})]
-                                      (persist-scenario-plan!
-                                       {:address address
-                                        :store store
-                                        :save-scenario! save-scenario!
-                                        :save-scenario-index! save-scenario-index!
-                                        :result-value identity
-                                        :complete-fn
-                                        (fn [scenario-index updated-record]
-                                          (scenario-workflow/complete-manual-tracking
-                                           {:state @store
-                                            :scenario-index scenario-index
-                                            :scenario-record updated-record}))}
-                                       plan)))))
-                       (js/Promise.resolve scenario-record)))))
-          (.catch (fn [err]
-                    (apply-result!
-                     store
-                     (scenario-workflow/fail-manual-tracking
-                      {:state @store
-                       :error err}))
-                    nil)))
-      (js/Promise.resolve nil))))
+        started-at-ms ((env-fn env :now-ms))]
+    (interpret-result!
+     env
+     store
+     {:operation/type :manual-tracking
+      :address address
+      :scenario-id scenario-id
+      :started-at-ms started-at-ms}
+     (scenario-workflow/begin-manual-tracking
+      {:state state
+       :address address
+       :scenario-id scenario-id
+       :started-at-ms started-at-ms}))))
 
 (defn save-portfolio-optimizer-scenario-effect
   [env store opts]
   (let [opts* (or opts {})
         state @store
         address (account-context/effective-account-address state)
-        now-ms-fn (env-fn env :now-ms)
-        load-scenario-index! (env-fn env :load-scenario-index!)
-        save-scenario! (env-fn env :save-scenario!)
-        save-scenario-index! (env-fn env :save-scenario-index!)
-        started-at-ms (now-ms-fn)
-        scenario-id (current-scenario-id env state opts* started-at-ms)
-        begin-result (scenario-workflow/begin-save
-                      {:state state
-                       :address address
-                       :scenario-id scenario-id
-                       :started-at-ms started-at-ms})]
-    (apply-result! store begin-result)
-    (if-let [command (first (:commands begin-result))]
-      (-> (load-scenario-index! (:address command))
-          (.then (fn [loaded-index]
-                   (let [save-plan (scenario-workflow/continue-save-after-index
-                                    {:state @store
-                                     :address address
-                                     :scenario-id scenario-id
-                                     :started-at-ms started-at-ms
-                                     :loaded-index loaded-index})]
-                     (persist-scenario-plan!
-                      {:address address
-                       :store store
-                       :save-scenario! save-scenario!
-                       :save-scenario-index! save-scenario-index!
-                       :result-value identity
-                       :complete-fn
-                       (fn [scenario-index scenario-record]
-                         (scenario-workflow/complete-save
-                          {:state @store
-                           :scenario-index scenario-index
-                           :scenario-record scenario-record
-                           :started-at-ms started-at-ms
-                           :completed-at-ms (now-ms-fn)}))}
-                      save-plan))))
-          (.catch (fn [err]
-                    (let [completed-at-ms (now-ms-fn)]
-                      (apply-result!
-                       store
-                       (scenario-workflow/fail-save
-                        {:state @store
-                         :scenario-id scenario-id
-                         :started-at-ms started-at-ms
-                         :completed-at-ms completed-at-ms
-                         :error err})))
-                    nil)))
-      (js/Promise.resolve nil))))
+        started-at-ms ((env-fn env :now-ms))
+        scenario-id (current-scenario-id env state opts* started-at-ms)]
+    (interpret-result!
+     env
+     store
+     {:operation/type :save
+      :address address
+      :scenario-id scenario-id
+      :started-at-ms started-at-ms}
+     (scenario-workflow/begin-save
+      {:state state
+       :address address
+       :scenario-id scenario-id
+       :started-at-ms started-at-ms}))))
