@@ -1,5 +1,5 @@
 (ns hyperopen.views.portfolio.optimize.black-litterman-preview-chart
-  (:require [hyperopen.portfolio.optimizer.application.black-litterman-preview :as preview]
+  (:require [hyperopen.portfolio.optimizer.application.view-model :as optimizer-view-model]
             [hyperopen.views.portfolio.optimize.format :as opt-format]))
 
 (def ^:private eyebrow-class
@@ -257,7 +257,7 @@
    (black-litterman-preview-panel readiness nil))
   ([readiness opts]
    (let [preview (or (:preview opts)
-                     (preview/build-preview readiness))]
+                     (optimizer-view-model/black-litterman-preview-model readiness))]
      [:section {:class ["border" "border-base-300" "bg-base-100/90" "p-4"]
                 :data-role "portfolio-optimizer-black-litterman-preview-panel"}
       [:div {:class ["flex" "items-start" "justify-between" "gap-3"]}

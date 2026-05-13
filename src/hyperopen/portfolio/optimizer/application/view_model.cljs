@@ -1,7 +1,9 @@
 (ns hyperopen.portfolio.optimizer.application.view-model
-  (:require [hyperopen.portfolio.optimizer.application.view-model.execution :as execution]
+  (:require [hyperopen.portfolio.optimizer.application.view-model.black-litterman :as black-litterman]
+            [hyperopen.portfolio.optimizer.application.view-model.execution :as execution]
             [hyperopen.portfolio.optimizer.application.view-model.index :as index]
             [hyperopen.portfolio.optimizer.application.view-model.scenario :as scenario]
+            [hyperopen.portfolio.optimizer.application.view-model.setup :as setup]
             [hyperopen.portfolio.optimizer.application.view-model.tracking :as tracking]
             [hyperopen.portfolio.optimizer.application.view-model.universe :as universe]
             [hyperopen.portfolio.optimizer.application.view-model.workspace :as workspace]))
@@ -79,6 +81,24 @@
 (defn universe-panel-model
   [state draft]
   (universe/universe-panel-model state draft))
+
+(defn readiness-panel-model
+  [readiness history-load-state]
+  (setup/readiness-panel-model readiness history-load-state))
+
+(defn setup-summary-model
+  ([draft]
+   (setup/setup-summary-model draft))
+  ([draft formatters]
+   (setup/setup-summary-model draft formatters)))
+
+(defn black-litterman-preview-model
+  [readiness]
+  (black-litterman/build-preview readiness))
+
+(defn black-litterman-cards-model
+  [draft readiness preview formatters]
+  (black-litterman/cards-model draft readiness preview formatters))
 
 (defn tracking-model
   [state]

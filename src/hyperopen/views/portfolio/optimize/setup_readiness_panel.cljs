@@ -1,37 +1,10 @@
 (ns hyperopen.views.portfolio.optimize.setup-readiness-panel
-  (:require [hyperopen.portfolio.optimizer.application.setup-readiness :as setup-readiness]))
-
-(defn- warning-code-label
-  [warning]
-  (some-> (:code warning) name))
-
-(defn- warning-message
-  [readiness warning]
-  (or (:message warning)
-      (setup-readiness/warning-display-message (:request readiness) warning)
-      (warning-code-label warning)))
-
-(defn- readiness-copy
-  [readiness]
-  (case (:reason readiness)
-    :missing-universe "Select a universe before running."
-    :no-eligible-history "History starts loading as assets are included. Run Optimization retries anything still missing."
-    :incomplete-history "History is incomplete for this universe. Run Optimization retries anything still missing."
-    :history-loading "History is loading for the selected assets."
-    "Optimizer inputs are ready to run."))
-
-(defn- history-load-copy
-  [history-load-state readiness]
-  (case (:status history-load-state)
-    :loading "Loading optimizer history for the selected assets."
-    :succeeded "Optimizer history is loaded for the selected assets."
-    :failed "History load failed. Existing history, if any, is retained."
-    (readiness-copy readiness)))
+  (:require [hyperopen.portfolio.optimizer.application.view-model :as optimizer-view-model]))
 
 (defn readiness-panel
   [readiness history-load-state]
-  (let [warnings (vec (or (seq (:blocking-warnings readiness))
-                          (:warnings readiness)))]
+  (let [{:keys [copy error-message warnings]}
+        (optimizer-view-model/readiness-panel-model readiness history-load-state)]
     [:div {:class ["mt-4" "rounded-lg" "border" "border-base-300" "bg-base-200/40" "p-3"]
            :data-role "portfolio-optimizer-readiness-panel"}
      [:p {:class ["text-[0.65rem]"
@@ -41,8 +14,8 @@
                   "text-trading-muted"]}
       "Readiness"]
      [:p {:class ["mt-2" "text-xs" "text-trading-muted"]}
-      (history-load-copy history-load-state readiness)]
-     (when-let [error-message (get-in history-load-state [:error :message])]
+      copy]
+     (when error-message
        [:p {:class ["mt-3"
                     "rounded-md"
                     "border"
@@ -51,12 +24,12 @@
                     "px-2"
                     "py-1.5"
                     "text-xs"
-                    "text-error"]}
+                     "text-error"]}
         error-message])
      (when (seq warnings)
        (into
         [:div {:class ["mt-3" "space-y-2"]}]
-        (map (fn [warning]
+        (map (fn [{:keys [message code-label]}]
                [:div {:class ["rounded-md"
                               "border"
                               "border-warning/40"
@@ -67,13 +40,13 @@
                               "text-warning"]
                       :data-role "portfolio-optimizer-readiness-warning"}
                 [:p {:class ["font-semibold"]}
-                 (warning-message readiness warning)]
-                (when-let [code (warning-code-label warning)]
+                 message]
+                (when code-label
                   [:p {:class ["mt-1"
                                "font-mono"
                                "text-[0.65rem]"
                                "uppercase"
                                "tracking-[0.08em]"
                                "text-warning/80"]}
-                   code])])
+                   code-label])])
              warnings)))]))

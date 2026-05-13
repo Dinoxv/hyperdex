@@ -1,10 +1,14 @@
 (ns hyperopen.portfolio.optimizer.application.view-model.universe
-  (:require [hyperopen.portfolio.optimizer.application.universe-candidates :as universe-candidates]
+  (:require [clojure.string :as str]
+            [hyperopen.portfolio.optimizer.application.setup-readiness :as setup-readiness]
+            [hyperopen.portfolio.optimizer.application.universe-candidates :as universe-candidates]
             [hyperopen.portfolio.optimizer.coercion :as coercion]
             [hyperopen.portfolio.optimizer.contracts :as contracts]
-            [hyperopen.portfolio.optimizer.defaults :as optimizer-defaults]))
+            [hyperopen.portfolio.optimizer.defaults :as optimizer-defaults]
+            [hyperopen.portfolio.optimizer.ids :as ids]))
 
 (def ^:private normalized-text coercion/non-blank-text)
+(def ^:private finite-number coercion/parse-number)
 
 (def ^:private missing-history-warning-codes
   #{:missing-history-coin
@@ -45,6 +49,147 @@
     (get-in state (conj contracts/history-data-path
                         :candle-history-by-coin
                         (:coin instrument)))))
+
+(defn- compact-usd
+  [value]
+  (if-let [n (finite-number value)]
+    (cond
+      (>= n 1000000000) (str "$" (.toFixed (/ n 1000000000) 1) "B")
+      (>= n 1000000) (str "$" (.toFixed (/ n 1000000) 0) "M")
+      (>= n 1000) (str "$" (.toFixed (/ n 1000) 0) "K")
+      :else (str "$" (.toFixed n 0)))
+    "--"))
+
+(defn- raw-asset-id?
+  [value]
+  (let [text (normalized-text value)]
+    (boolean
+     (and text
+          (or (str/starts-with? text "@")
+              (re-matches #"\d+" text))))))
+
+(defn- vault-instrument?
+  [instrument]
+  (ids/vault-instrument? instrument))
+
+(defn- vault-address
+  [instrument]
+  (or (ids/normalize-vault-address (:vault-address instrument))
+      (ids/vault-address-from-value (:coin instrument))
+      (ids/vault-address-from-value (:instrument-id instrument))))
+
+(defn- hip3-instrument?
+  [instrument]
+  (boolean
+   (or (:dex instrument)
+       (:hip3? instrument)
+       (:hip3-eligible? instrument))))
+
+(defn- spot-instrument?
+  [instrument]
+  (= :spot (ids/normalize-market-type (:market-type instrument))))
+
+(defn- symbol-first?
+  [instrument]
+  (or (spot-instrument? instrument)
+      (hip3-instrument? instrument)
+      (raw-asset-id? (:coin instrument))))
+
+(defn- base-from-symbol
+  [symbol]
+  (let [symbol* (normalized-text symbol)]
+    (cond
+      (and symbol* (str/includes? symbol* "/"))
+      (normalized-text (first (str/split symbol* #"/" 2)))
+
+      (and symbol* (str/includes? symbol* "-"))
+      (normalized-text (first (str/split symbol* #"-" 2)))
+
+      :else nil)))
+
+(defn instrument-primary-label
+  [instrument]
+  (or (when (vault-instrument? instrument)
+        (or (normalized-text (:name instrument))
+            (normalized-text (:symbol instrument))
+            (vault-address instrument)))
+      (when (symbol-first? instrument)
+        (normalized-text (:symbol instrument)))
+      (when (raw-asset-id? (:coin instrument))
+        (or (normalized-text (:base instrument))
+            (base-from-symbol (:symbol instrument))))
+      (normalized-text (:coin instrument))
+      (normalized-text (:symbol instrument))
+      (normalized-text (:instrument-id instrument))
+      "--"))
+
+(defn instrument-base-label
+  [instrument]
+  (or (when (vault-instrument? instrument)
+        (vault-address instrument))
+      (normalized-text (:base instrument))
+      (base-from-symbol (:symbol instrument))
+      (when-not (raw-asset-id? (:coin instrument))
+        (normalized-text (:coin instrument)))))
+
+(defn- adv-label
+  [market]
+  (compact-usd (or (:volume24h market)
+                   (:volume market)
+                   (:openInterest market)
+                   (:tvl market))))
+
+(defn- liquidity-label
+  [market-or-instrument]
+  (let [value (or (:liquidity market-or-instrument)
+                  (:liquidity-label market-or-instrument)
+                  (:depth market-or-instrument))]
+    (or (when (= :vault (:market-type market-or-instrument))
+          "vault")
+        (normalized-text value)
+        (if-let [volume (finite-number (or (:volume24h market-or-instrument)
+                                           (:volume market-or-instrument)))]
+          (if (>= volume 50000000) "deep" "medium")
+          "medium"))))
+
+(declare selected-history-label)
+
+(defn selected-row-model
+  [state readiness history-load-state history-status-by-id instrument]
+  (let [instrument-id (:instrument-id instrument)
+        history-label (selected-history-label state
+                                              readiness
+                                              history-load-state
+                                              history-status-by-id
+                                              instrument)
+        primary-label (instrument-primary-label instrument)
+        {:keys [name base-label]} (universe-candidates/market-display instrument)
+        secondary-label (or (normalized-text (:name instrument))
+                            (normalized-text (:full-name instrument))
+                            (when (symbol-first? instrument)
+                              base-label)
+                            name)]
+    {:instrument instrument
+     :instrument-id instrument-id
+     :coin (:coin instrument)
+     :market-type (:market-type instrument)
+     :primary-label primary-label
+     :secondary-label secondary-label
+     :history-label history-label
+     :history-tone (if (= "sufficient" history-label) :long :warn)
+     :liquidity-label (liquidity-label instrument)}))
+
+(defn candidate-row-model
+  [market idx active-index]
+  (let [market-key (:key market)
+        {:keys [label name]} (universe-candidates/market-display market)]
+    {:market market
+     :market-key market-key
+     :market-type (:market-type market)
+     :active? (= idx active-index)
+     :label label
+     :name name
+     :adv-label (adv-label market)}))
 
 (defn selected-history-status
   [state readiness history-load-state history-status-by-id instrument]
@@ -124,7 +269,11 @@
          history-load-state* (or history-load-state
                                  (get-in state contracts/history-load-state-path)
                                  (optimizer-defaults/default-history-load-state))
-         history-status-by-id* (or history-status-by-id {})
+         history-status-by-id* (or history-status-by-id
+                                   (when readiness
+                                     (setup-readiness/history-status-by-instrument
+                                      readiness))
+                                   {})
          search-query (or (get-in state contracts/ui-universe-search-query-path) "")
          searching? (boolean (seq (normalized-text search-query)))
          query-candidates? (or searching?
@@ -138,16 +287,27 @@
          active-index (universe-candidates/active-index state markets)
          market-keys (if query-candidates?
                        (mapv :key markets)
-                       [])]
+                       [])
+         selected-rows (mapv #(selected-row-model state
+                                                  readiness
+                                                  history-load-state*
+                                                  history-status-by-id*
+                                                  %)
+                             universe)
+         candidate-rows (mapv #(candidate-row-model %1 %2 active-index)
+                              markets
+                              (range))]
      {:state state
       :draft draft
       :readiness readiness
       :history-load-state history-load-state*
       :history-status-by-id history-status-by-id*
       :universe universe
+      :selected-rows selected-rows
       :search-query search-query
       :searching? searching?
       :markets markets
+      :candidate-rows candidate-rows
       :active-index active-index
       :market-keys market-keys})))
 

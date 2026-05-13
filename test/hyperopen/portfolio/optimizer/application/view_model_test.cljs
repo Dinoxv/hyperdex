@@ -193,7 +193,10 @@
         candidate {:key "perp:ETH"
                    :market-type :perp
                    :coin "ETH"
-                   :symbol "ETH-USDC"}
+                   :symbol "ETH-USDC"
+                   :name "Ethereum"
+                   :volume24h 125000000
+                   :liquidity "deep"}
         candidate-markets-stub (fn
                                  ([_state _universe query]
                                   (swap! calls conj query)

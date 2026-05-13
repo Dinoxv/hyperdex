@@ -1,23 +1,13 @@
 (ns hyperopen.views.portfolio.optimize.setup-v4-sections
-  (:require [hyperopen.portfolio.optimizer.application.setup-readiness :as setup-readiness]
+  (:require [hyperopen.portfolio.optimizer.application.view-model :as optimizer-view-model]
             [hyperopen.views.portfolio.optimize.instrument-overrides-panel :as instrument-overrides-panel]
             [hyperopen.views.portfolio.optimize.setup-v4-constraint-controls :as constraint-controls]
             [hyperopen.views.portfolio.optimize.setup-v4-controls :as controls]
             [hyperopen.views.portfolio.optimize.setup-v4-model-controls :as model-controls]
             [hyperopen.views.portfolio.optimize.setup-v4-objective-controls :as objective-controls]
             [hyperopen.views.portfolio.optimize.setup-v4-setup-actions :as setup-actions]
-            [hyperopen.views.portfolio.optimize.setup-v4-summary :as setup-v4-summary]
             [hyperopen.views.portfolio.optimize.setup-v4-universe :as setup-v4-universe]
             [hyperopen.views.portfolio.optimize.setup-v4-use-my-views-workspace :as use-my-views-workspace]))
-
-(defn- active-preset
-  [draft]
-  (let [objective-kind (get-in draft [:objective :kind])
-        return-kind (get-in draft [:return-model :kind])]
-    (cond
-      (= :black-litterman return-kind) :use-my-views
-      (= :max-sharpe objective-kind) :risk-adjusted
-      :else :conservative)))
 
 (defn control-rail
   [{:keys [state draft highlighted-controls readiness history-load-state]}]
@@ -25,9 +15,7 @@
            :data-role "portfolio-optimizer-setup-control-rail"}
    (setup-v4-universe/universe-section state draft
                                        {:readiness readiness
-                                        :history-load-state history-load-state
-                                        :history-status-by-id (setup-readiness/history-status-by-instrument
-                                                               readiness)})
+                                        :history-load-state history-load-state})
    (objective-controls/objective-section draft highlighted-controls)
    (model-controls/model-section draft)
    (constraint-controls/constraints-section draft highlighted-controls)
@@ -39,7 +27,7 @@
      (instrument-overrides-panel/instrument-overrides-panel draft)]]])
 
 (defn- summary-row
-  [label title copy]
+  [{:keys [label title copy]}]
   [:div {:class ["grid" "grid-cols-[132px_minmax(0,1fr)]" "gap-4" "border-b"
                  "border-base-300" "px-4" "py-3"]}
    [:p {:class controls/eyebrow-class} label]
@@ -53,15 +41,15 @@
 
 (defn summary-pane
   [{:keys [draft readiness running? run-triggerable? saving-scenario? solved-run? result-path]}]
-  (let [preset (active-preset draft)
-        objective-kind (get-in draft [:objective :kind])
-        return-kind (get-in draft [:return-model :kind])
-        constraints (:constraints draft)
-        bl? (= :black-litterman return-kind)]
+  (let [{:keys [black-litterman? summary-rows]}
+        (optimizer-view-model/setup-summary-model
+         draft
+         {:labelize controls/labelize
+          :percent-label controls/percent-label})]
     (into
      [:main {:class ["optimizer-summary-pane" "space-y-4" "leading-4"]
              :data-role "portfolio-optimizer-setup-summary-pane"}]
-     (if bl?
+     (if black-litterman?
        [(use-my-views-workspace/use-my-views-workspace
          {:draft draft
           :readiness readiness
@@ -75,22 +63,10 @@
          [:p {:class controls/eyebrow-class} "Summary"]
          [:h2 {:class ["mt-2" "text-[0.875rem]" "font-medium" "tracking-[-0.01em]"]}
           "What this scenario will solve for"]]
-        [:section {:class ["border" "border-base-300" "bg-base-100/90"]
-                   :data-role "portfolio-optimizer-setup-summary-panel"}
-         (summary-row "Preset" (controls/labelize preset)
-                      "You can deviate from the preset below without changing the universe.")
-         (summary-row "Universe" (setup-v4-summary/universe-summary draft)
-                      "Selected instruments are optimized as one cross-margin book.")
-         (summary-row "Expected Returns" (controls/labelize return-kind)
-                      "Funding-adjusted return assumptions are kept separate from covariance.")
-         (summary-row "Objective" (controls/labelize objective-kind)
-                      "Objective remains separate from return model selection.")
-         (summary-row "Constraints"
-                      (str "gross <= " (or (:gross-max constraints) "--")
-                           " - cap <= " (controls/percent-label (:max-asset-weight constraints)))
-                      "Constraints are enforced before the recommendation is accepted.")
-         (summary-row "Horizon" "Annualized"
-                      "Displayed return and volatility metrics use the optimizer annualization convention.")]
+        (into
+         [:section {:class ["border" "border-base-300" "bg-base-100/90"]
+                    :data-role "portfolio-optimizer-setup-summary-panel"}]
+         (map summary-row summary-rows))
         [:div {:class ["space-y-2"]
                :data-role "portfolio-optimizer-model-assumptions-stack"}
          (setup-actions/model-assumptions-panel)
