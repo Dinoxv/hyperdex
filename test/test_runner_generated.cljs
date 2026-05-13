@@ -200,7 +200,7 @@
             [hyperopen.portfolio.optimizer.application.pipeline-workflow-test]
             [hyperopen.portfolio.optimizer.application.request-builder-test]
             [hyperopen.portfolio.optimizer.application.return-inputs-test]
-            [hyperopen.portfolio.optimizer.application.run-bridge-test]
+            [hyperopen.portfolio.optimizer.application.run-bridge-boundary-test]
             [hyperopen.portfolio.optimizer.application.run-bridge-workflow-test]
             [hyperopen.portfolio.optimizer.application.run-identity-test]
             [hyperopen.portfolio.optimizer.application.scenario-records-test]
@@ -234,6 +234,7 @@
             [hyperopen.portfolio.optimizer.infrastructure.history-client-test]
             [hyperopen.portfolio.optimizer.infrastructure.persistence-test]
             [hyperopen.portfolio.optimizer.infrastructure.prior-data-test]
+            [hyperopen.portfolio.optimizer.infrastructure.run-bridge-test]
             [hyperopen.portfolio.optimizer.infrastructure.solver-adapter-parity-test]
             [hyperopen.portfolio.optimizer.infrastructure.solver-adapter-test]
             [hyperopen.portfolio.optimizer.infrastructure.wire-test]
@@ -835,7 +836,7 @@
              'hyperopen.portfolio.optimizer.application.pipeline-workflow-test
              'hyperopen.portfolio.optimizer.application.request-builder-test
              'hyperopen.portfolio.optimizer.application.return-inputs-test
-             'hyperopen.portfolio.optimizer.application.run-bridge-test
+             'hyperopen.portfolio.optimizer.application.run-bridge-boundary-test
              'hyperopen.portfolio.optimizer.application.run-bridge-workflow-test
              'hyperopen.portfolio.optimizer.application.run-identity-test
              'hyperopen.portfolio.optimizer.application.scenario-records-test
@@ -869,6 +870,7 @@
              'hyperopen.portfolio.optimizer.infrastructure.history-client-test
              'hyperopen.portfolio.optimizer.infrastructure.persistence-test
              'hyperopen.portfolio.optimizer.infrastructure.prior-data-test
+             'hyperopen.portfolio.optimizer.infrastructure.run-bridge-test
              'hyperopen.portfolio.optimizer.infrastructure.solver-adapter-parity-test
              'hyperopen.portfolio.optimizer.infrastructure.solver-adapter-test
              'hyperopen.portfolio.optimizer.infrastructure.wire-test

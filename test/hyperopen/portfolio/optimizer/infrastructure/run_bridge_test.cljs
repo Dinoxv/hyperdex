@@ -1,7 +1,7 @@
-(ns hyperopen.portfolio.optimizer.application.run-bridge-test
+(ns hyperopen.portfolio.optimizer.infrastructure.run-bridge-test
   (:require [cljs.test :refer-macros [deftest is]]
-            [hyperopen.portfolio.optimizer.application.run-bridge :as run-bridge]
             [hyperopen.portfolio.optimizer.fixtures :as fixtures]
+            [hyperopen.portfolio.optimizer.infrastructure.run-bridge :as run-bridge]
             [hyperopen.portfolio.optimizer.infrastructure.worker-client :as worker-client]
             [hyperopen.system :as system]))
 

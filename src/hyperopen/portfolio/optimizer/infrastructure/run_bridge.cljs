@@ -1,4 +1,4 @@
-(ns hyperopen.portfolio.optimizer.application.run-bridge
+(ns hyperopen.portfolio.optimizer.infrastructure.run-bridge
   (:require [hyperopen.portfolio.optimizer.application.run-bridge-workflow :as workflow]
             [hyperopen.portfolio.optimizer.infrastructure.worker-client :as worker-client]
             [hyperopen.system :as system]))
