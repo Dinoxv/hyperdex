@@ -226,39 +226,26 @@
     :load-active-market-display-fn load-active-market-display}))
 
 (def api-submit-order order-adapters/api-submit-order)
-
 (def confirm-api-submit-order order-adapters/confirm-api-submit-order)
-
 (def api-cancel-order order-adapters/api-cancel-order)
-
 (def api-submit-position-tpsl order-adapters/api-submit-position-tpsl)
-
 (def api-submit-position-margin order-adapters/api-submit-position-margin)
-
 (def make-api-submit-order order-adapters/make-api-submit-order)
-
 (def make-api-cancel-order order-adapters/make-api-cancel-order)
-
 (def make-api-submit-position-tpsl order-adapters/make-api-submit-position-tpsl)
-
 (def make-api-submit-position-margin order-adapters/make-api-submit-position-margin)
-
 (def sync-active-asset-funding-predictability funding-adapters/sync-active-asset-funding-predictability)
 
+(def make-portfolio-optimizer-controller-resolver portfolio-optimizer-adapters/make-portfolio-optimizer-controller-resolver)
+(def make-run-portfolio-optimizer portfolio-optimizer-adapters/make-run-portfolio-optimizer)
+(def make-run-portfolio-optimizer-pipeline portfolio-optimizer-adapters/make-run-portfolio-optimizer-pipeline)
+(def run-portfolio-optimizer-effect portfolio-optimizer-adapters/run-portfolio-optimizer-effect)
 (def load-portfolio-optimizer-history-effect portfolio-optimizer-adapters/load-portfolio-optimizer-history-effect)
 (def run-portfolio-optimizer-pipeline-effect portfolio-optimizer-adapters/run-portfolio-optimizer-pipeline-effect)
-(def load-portfolio-optimizer-scenario-index-effect
-  portfolio-optimizer-adapters/load-portfolio-optimizer-scenario-index-effect)
-
-(def load-portfolio-optimizer-scenario-effect
-  portfolio-optimizer-adapters/load-portfolio-optimizer-scenario-effect)
-
-(def archive-portfolio-optimizer-scenario-effect
-  portfolio-optimizer-adapters/archive-portfolio-optimizer-scenario-effect)
-
-(def duplicate-portfolio-optimizer-scenario-effect
-  portfolio-optimizer-adapters/duplicate-portfolio-optimizer-scenario-effect)
-
+(def load-portfolio-optimizer-scenario-index-effect portfolio-optimizer-adapters/load-portfolio-optimizer-scenario-index-effect)
+(def load-portfolio-optimizer-scenario-effect portfolio-optimizer-adapters/load-portfolio-optimizer-scenario-effect)
+(def archive-portfolio-optimizer-scenario-effect portfolio-optimizer-adapters/archive-portfolio-optimizer-scenario-effect)
+(def duplicate-portfolio-optimizer-scenario-effect portfolio-optimizer-adapters/duplicate-portfolio-optimizer-scenario-effect)
 (def save-portfolio-optimizer-scenario-effect
   portfolio-optimizer-adapters/save-portfolio-optimizer-scenario-effect)
 (def execute-portfolio-optimizer-plan-effect portfolio-optimizer-adapters/execute-portfolio-optimizer-plan-effect)
@@ -496,5 +483,3 @@
           store
           request
           {:show-toast! show-order-feedback-toast!}]))
-
-(def run-portfolio-optimizer-effect portfolio-optimizer-adapters/run-portfolio-optimizer-effect)

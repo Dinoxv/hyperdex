@@ -68,19 +68,41 @@
    :load-tracking! *load-tracking!*
    :save-tracking! *save-tracking!*})
 
+(defn make-portfolio-optimizer-controller-resolver
+  [_runtime]
+  (run-bridge/make-controller-resolver))
+
+(defn- request-run-with-controller!
+  [controller store request request-signature opts]
+  (*request-run!*
+   (cond-> {:request request
+            :request-signature request-signature
+            :store store}
+     controller
+     (assoc :controller controller)
+     (contains? opts :computed-at-ms)
+     (assoc :computed-at-ms (:computed-at-ms opts))
+     (contains? opts :run-id)
+     (assoc :run-id (:run-id opts)))))
+
 (defn run-portfolio-optimizer-effect
   ([_ store request request-signature]
    (run-portfolio-optimizer-effect nil store request request-signature nil))
   ([_ store request request-signature opts]
-   (let [opts* (or opts {})]
-     (*request-run!*
-      (cond-> {:request request
-               :request-signature request-signature
-               :store store}
-        (contains? opts* :computed-at-ms)
-        (assoc :computed-at-ms (:computed-at-ms opts*))
-        (contains? opts* :run-id)
-        (assoc :run-id (:run-id opts*)))))))
+   (request-run-with-controller! nil store request request-signature (or opts {}))))
+
+(defn make-run-portfolio-optimizer
+  ([runtime]
+   (make-run-portfolio-optimizer
+    runtime
+    (make-portfolio-optimizer-controller-resolver runtime)))
+  ([_runtime controller-resolver]
+   (fn [_ store request request-signature & [opts]]
+     (request-run-with-controller! (controller-resolver store)
+                                   store
+                                   request
+                                   request-signature
+                                   (or opts {})))))
 
 (defn load-portfolio-optimizer-history-effect
   ([_ store]
@@ -92,16 +114,40 @@
     store
     opts)))
 
-(defn run-portfolio-optimizer-pipeline-effect
-  [_ store]
+(defn- run-portfolio-optimizer-pipeline-effect*
+  [controller-resolver _ store]
   (pipeline/run-portfolio-optimizer-pipeline-effect
    {:now-ms *now-ms*
     :next-run-id run-bridge/next-run-id
-    :request-run! *request-run!*
+    :request-run! (fn [payload]
+                    (*request-run!*
+                     (cond-> payload
+                       (and controller-resolver (:store payload))
+                       (assoc :controller
+                              (controller-resolver (:store payload))))))
     :load-history! (fn [store* opts]
                      (load-portfolio-optimizer-history-effect nil store* opts))}
    nil
    store))
+
+(defn run-portfolio-optimizer-pipeline-effect
+  [_ store]
+  (run-portfolio-optimizer-pipeline-effect*
+   (run-bridge/make-controller-resolver)
+   nil
+   store))
+
+(defn make-run-portfolio-optimizer-pipeline
+  ([runtime]
+   (make-run-portfolio-optimizer-pipeline
+    runtime
+    (make-portfolio-optimizer-controller-resolver runtime)))
+  ([_runtime controller-resolver]
+   (fn [_ store]
+     (run-portfolio-optimizer-pipeline-effect*
+      controller-resolver
+      nil
+      store))))
 
 (defn execute-portfolio-optimizer-plan-effect
   ([_ store plan]

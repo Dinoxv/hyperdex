@@ -48,3 +48,36 @@
                :computed-at-ms 123
                :store store}]
              @calls)))))
+
+(deftest runtime-bound-runner-passes-store-controller-to-run-bridge-test
+  (let [calls (atom [])
+        runtime (atom {})
+        store (atom {})
+        request {:scenario-id "scenario-1"}
+        signature {:scenario-id "scenario-1" :revision 1}]
+    (with-redefs [portfolio-optimizer-adapters/*request-run!*
+                  (fn [payload]
+                    (swap! calls conj payload)
+                    "run-1")]
+      (let [handler (portfolio-optimizer-adapters/make-run-portfolio-optimizer runtime)]
+        (is (= "run-1"
+               (handler :ctx
+                        store
+                        request
+                        signature
+                        {:computed-at-ms 123})))
+        (is (= "run-1"
+               (handler :ctx
+                        store
+                        request
+                        signature
+                        {:computed-at-ms 124})))
+        (is (= 2 (count @calls)))
+        (is (= {:request request
+                :request-signature signature
+                :computed-at-ms 123
+                :store store}
+               (dissoc (first @calls) :controller)))
+        (is (some? (:controller (first @calls))))
+        (is (identical? (:controller (first @calls))
+                        (:controller (second @calls))))))))

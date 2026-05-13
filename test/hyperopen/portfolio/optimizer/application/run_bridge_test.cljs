@@ -1,32 +1,45 @@
 (ns hyperopen.portfolio.optimizer.application.run-bridge-test
-  (:require [cljs.test :refer-macros [deftest is use-fixtures]]
+  (:require [cljs.test :refer-macros [deftest is]]
             [hyperopen.portfolio.optimizer.application.run-bridge :as run-bridge]
             [hyperopen.portfolio.optimizer.fixtures :as fixtures]
             [hyperopen.portfolio.optimizer.infrastructure.worker-client :as worker-client]
             [hyperopen.system :as system]))
 
-(use-fixtures :each
-  (fn [f]
-    (reset! run-bridge/last-run-request nil)
-    (f)
-    (reset! run-bridge/last-run-request nil)))
+(defn- fake-worker
+  []
+  (let [posted (atom [])
+        listeners (atom [])
+        worker #js {}]
+    (set! (.-postMessage worker)
+          (fn [message]
+            (swap! posted conj (js->clj message :keywordize-keys true))))
+    (set! (.-addEventListener worker)
+          (fn [event-name handler]
+            (swap! listeners conj {:event-name event-name
+                                   :handler handler})))
+    {:worker worker
+     :posted posted
+     :listeners listeners}))
+
+(defn- emit-worker-message!
+  [{:keys [listeners]} message]
+  (let [handler (:handler (first @listeners))]
+    (handler #js {:data (clj->js message)})))
 
 (deftest request-run-posts-worker-message-and-preserves-existing-success-test
-  (let [posted (atom [])
+  (let [{:keys [worker posted]} (fake-worker)
         store (atom {:portfolio {:optimizer {:last-successful-run
                                              (fixtures/sample-minimal-last-successful-run
                                               {:request-signature {:seed 0}
                                                :result {:old? true}})
                                              :run-state {:status :idle}}}})
-        fake-worker #js {}]
-    (set! (.-postMessage fake-worker)
-          (fn [message]
-            (swap! posted conj (js->clj message :keywordize-keys true))))
+        controller (run-bridge/make-controller {:store store
+                                                :worker-ref worker})]
     (with-redefs [system/store store
-                  worker-client/optimizer-worker fake-worker
                   run-bridge/next-run-id (fn [] "run-1")]
       (is (= "run-1"
-             (run-bridge/request-run! {:request {:scenario-id "scenario-1"}
+             (run-bridge/request-run! {:controller controller
+                                       :request {:scenario-id "scenario-1"}
                                        :request-signature {:seed 1}
                                        :computed-at-ms 100})))
       (is (= [{:id "run-1"
@@ -45,42 +58,75 @@
              (get-in @store [:portfolio :optimizer :last-successful-run :result]))))))
 
 (deftest request-run-dedupes-identical-in-flight-signature-test
-  (let [posted (atom [])
+  (let [{:keys [worker posted]} (fake-worker)
         store (atom {:portfolio {:optimizer {:run-state {:status :running
                                                          :run-id "run-1"
                                                          :request-signature {:seed 1}}}}})
-        fake-worker #js {}]
-    (set! (.-postMessage fake-worker)
-          (fn [message]
-            (swap! posted conj message)))
+        controller (run-bridge/make-controller {:store store
+                                                :worker-ref worker})]
+    (reset! (:last-run-request controller) {:request-signature {:seed 1}
+                                            :run-id "run-1"})
     (with-redefs [system/store store
-                  worker-client/optimizer-worker fake-worker
                   run-bridge/next-run-id (fn [] "run-2")]
-      (reset! run-bridge/last-run-request {:request-signature {:seed 1}
-                                           :run-id "run-1"})
       (is (nil? (run-bridge/request-run! {:request {:scenario-id "scenario-1"}
+                                          :controller controller
                                           :request-signature {:seed 1}
                                           :computed-at-ms 101})))
       (is (empty? @posted))
       (is (= "run-1"
              (get-in @store [:portfolio :optimizer :run-state :run-id]))))))
 
+(deftest request-run-dedupes-per-controller-not-globally-test
+  (let [worker-a (fake-worker)
+        worker-b (fake-worker)
+        store-a (atom {:portfolio {:optimizer {:run-state {:status :idle}}}})
+        store-b (atom {:portfolio {:optimizer {:run-state {:status :idle}}}})
+        controller-a (run-bridge/make-controller {:store store-a
+                                                  :worker-ref (:worker worker-a)})
+        controller-b (run-bridge/make-controller {:store store-b
+                                                  :worker-ref (:worker worker-b)})
+        run-ids (atom ["run-a-1" "run-a-2" "run-b-1"])]
+    (with-redefs [run-bridge/next-run-id (fn []
+                                           (let [run-id (first @run-ids)]
+                                             (swap! run-ids subvec 1)
+                                             run-id))]
+      (is (= "run-a-1"
+             (run-bridge/request-run! {:controller controller-a
+                                       :request {:scenario-id "scenario-a"}
+                                       :request-signature {:seed 7}
+                                       :computed-at-ms 100})))
+      (is (nil?
+           (run-bridge/request-run! {:controller controller-a
+                                     :request {:scenario-id "scenario-a"}
+                                     :request-signature {:seed 7}
+                                     :computed-at-ms 101})))
+      (is (= "run-b-1"
+             (run-bridge/request-run! {:controller controller-b
+                                       :request {:scenario-id "scenario-b"}
+                                       :request-signature {:seed 7}
+                                       :computed-at-ms 102})))
+      (is (= ["run-a-1"]
+             (mapv :id @(:posted worker-a))))
+      (is (= ["run-b-1"]
+             (mapv :id @(:posted worker-b))))
+      (is (= "run-a-1"
+             (get-in @store-a [:portfolio :optimizer :run-state :run-id])))
+      (is (= "run-b-1"
+             (get-in @store-b [:portfolio :optimizer :run-state :run-id]))))))
+
 (deftest request-run-uses-explicit-runtime-store-when-provided-test
-  (let [posted (atom [])
+  (let [{:keys [worker posted]} (fake-worker)
         explicit-store (atom {:portfolio {:optimizer {:run-state {:status :idle}}}})
         default-store (atom {:portfolio {:optimizer {:run-state {:status :default}}}})
-        fake-worker #js {}]
-    (set! (.-postMessage fake-worker)
-          (fn [message]
-            (swap! posted conj (js->clj message :keywordize-keys true))))
+        controller (run-bridge/make-controller {:store explicit-store
+                                                :worker-ref worker})]
     (with-redefs [system/store default-store
-                  worker-client/optimizer-worker fake-worker
                   run-bridge/next-run-id (fn [] "run-explicit")]
       (is (= "run-explicit"
-             (run-bridge/request-run! {:request {:scenario-id "scenario-explicit"}
+             (run-bridge/request-run! {:controller controller
+                                       :request {:scenario-id "scenario-explicit"}
                                        :request-signature {:seed :explicit}
-                                       :computed-at-ms 111
-                                       :store explicit-store})))
+                                       :computed-at-ms 111})))
       (is (= :running
              (get-in @explicit-store [:portfolio :optimizer :run-state :status])))
       (is (= :default
@@ -90,15 +136,42 @@
                :payload {:scenario-id "scenario-explicit"}}]
              @posted)))))
 
+(deftest worker-listener-updates-controller-store-only-test
+  (let [worker-a (fake-worker)
+        store-a (atom {:portfolio {:optimizer {:draft {:metadata {:dirty? true}}
+                                               :run-state {:status :idle}}}})
+        default-store (atom {:portfolio {:optimizer {:run-state {:status :default}}}})
+        controller-a (run-bridge/make-controller {:store store-a
+                                                  :worker-ref (:worker worker-a)})]
+    (with-redefs [system/store default-store
+                  run-bridge/next-run-id (fn [] "run-a-1")]
+      (is (= "run-a-1"
+             (run-bridge/request-run! {:controller controller-a
+                                       :request {:scenario-id "scenario-a"}
+                                       :request-signature {:seed :a}
+                                       :computed-at-ms 100})))
+      (is (= ["message"] (mapv :event-name @(:listeners worker-a))))
+      (emit-worker-message! worker-a
+                            {:id "run-a-1"
+                             :type "optimizer-result"
+                             :payload {:status "solved"
+                                       :scenario-id "scenario-a"}})
+      (is (= :succeeded
+             (get-in @store-a [:portfolio :optimizer :run-state :status])))
+      (is (= :default
+             (get-in @default-store [:portfolio :optimizer :run-state :status]))))))
+
 (deftest worker-result-updates-last-successful-run-and-clears-draft-dirty-flag-test
   (let [store (atom {:portfolio {:optimizer {:draft {:metadata {:dirty? true}}
                                              :run-state {:status :running
                                                          :run-id "run-1"
                                                          :scenario-id "scenario-1"
                                                          :request-signature {:seed 1}}
-                                             :last-successful-run {:result {:old? true}}}}})]
+                                             :last-successful-run {:result {:old? true}}}}})
+        controller (run-bridge/make-controller {:store store})]
     (with-redefs [system/store store]
-      (run-bridge/handle-worker-message! {:id "run-1"
+      (run-bridge/handle-worker-message! controller
+                                         {:id "run-1"
                                           :type "optimizer-result"
                                           :payload {:status :solved
                                                     :scenario-id "scenario-1"}}
@@ -139,9 +212,10 @@
                                      {"spot:PURR/USDC" 0.2}
                                      :target-weights-by-instrument
                                      {"perp:BTC" 0.35}
-                                     :warnings [{:code "missing-funding-history"}]}}))]
+                                     :warnings [{:code "missing-funding-history"}]}}))
+        controller (run-bridge/make-controller {:store store})]
     (with-redefs [system/store store]
-      (run-bridge/handle-worker-message! message {:computed-at-ms 250})
+      (run-bridge/handle-worker-message! controller message {:computed-at-ms 250})
       (is (= :succeeded
              (get-in @store [:portfolio :optimizer :run-state :status])))
       (is (= {:status :solved
@@ -163,9 +237,11 @@
                                                    :scenario-id "scenario-2"
                                                    :request-signature {:seed 2}}
                                        :last-successful-run {:result {:old? true}}}}}
-        store (atom state)]
+        store (atom state)
+        controller (run-bridge/make-controller {:store store})]
     (with-redefs [system/store store]
-      (run-bridge/handle-worker-message! {:id "run-1"
+      (run-bridge/handle-worker-message! controller
+                                         {:id "run-1"
                                           :type "optimizer-result"
                                           :payload {:status :solved
                                                     :scenario-id "scenario-1"}}
@@ -177,9 +253,11 @@
                                                          :run-id "run-1"
                                                          :scenario-id "scenario-1"
                                                          :request-signature {:seed 1}}
-                                             :last-successful-run {:result {:old? true}}}}})]
+                                             :last-successful-run {:result {:old? true}}}}})
+        controller (run-bridge/make-controller {:store store})]
     (with-redefs [system/store store]
-      (run-bridge/handle-worker-message! {:id "run-1"
+      (run-bridge/handle-worker-message! controller
+                                         {:id "run-1"
                                           :type "optimizer-error"
                                           :payload {:code :boom}}
                                          {:computed-at-ms 400})

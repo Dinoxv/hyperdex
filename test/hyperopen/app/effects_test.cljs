@@ -10,6 +10,9 @@
         disconnect-handler (fn [& _] nil)
         copy-handler (fn [& _] nil)
         copy-link-handler (fn [& _] nil)
+        optimizer-controller-resolver (fn [_store] nil)
+        optimizer-run-handler (fn [& _] nil)
+        optimizer-pipeline-handler (fn [& _] nil)
         submit-handler (fn [& _] nil)
         cancel-handler (fn [& _] nil)
         margin-handler (fn [& _] nil)]
@@ -33,6 +36,22 @@
                   (fn [runtime*]
                     (is (identical? runtime runtime*))
                     copy-link-handler)
+                  effect-adapters/make-portfolio-optimizer-controller-resolver
+                  (fn [runtime*]
+                    (is (identical? runtime runtime*))
+                    optimizer-controller-resolver)
+                  effect-adapters/make-run-portfolio-optimizer
+                  (fn [runtime* controller-resolver*]
+                    (is (identical? runtime runtime*))
+                    (is (identical? optimizer-controller-resolver
+                                    controller-resolver*))
+                    optimizer-run-handler)
+                  effect-adapters/make-run-portfolio-optimizer-pipeline
+                  (fn [runtime* controller-resolver*]
+                    (is (identical? runtime runtime*))
+                    (is (identical? optimizer-controller-resolver
+                                    controller-resolver*))
+                    optimizer-pipeline-handler)
                   effect-adapters/make-api-submit-order
                   (fn [runtime*]
                     (is (identical? runtime runtime*))
@@ -61,6 +80,10 @@
                         (get-in deps [:wallet :copy-wallet-address])))
         (is (identical? copy-link-handler
                         (get-in deps [:wallet :copy-spectate-link])))
+        (is (identical? optimizer-run-handler
+                        (get-in deps [:portfolio-optimizer :run-portfolio-optimizer])))
+        (is (identical? optimizer-pipeline-handler
+                        (get-in deps [:portfolio-optimizer :run-portfolio-optimizer-pipeline])))
         (is (identical? effect-adapters/api-fetch-predicted-fundings-effect
                         (get-in deps [:api :api-fetch-predicted-fundings])))
         (is (identical? submit-handler
