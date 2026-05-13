@@ -1,0 +1,97 @@
+(ns hyperopen.views.portfolio.optimize.frontier-overlay-model
+  (:require [clojure.string :as str]
+            [hyperopen.portfolio.optimizer.coercion :as coercion]
+            [hyperopen.portfolio.optimizer.ids :as ids]
+            [hyperopen.views.portfolio.optimize.format :as opt-format]))
+
+(def modes [:standalone :contribution :none])
+
+(def ^:private non-blank-text coercion/non-blank-text)
+
+(defn normalize-mode
+  [overlay-mode]
+  (if (some #{overlay-mode} modes)
+    overlay-mode
+    :standalone))
+
+(defn visible-points
+  [result overlay-mode]
+  (let [mode (normalize-mode overlay-mode)]
+    (if (contains? #{:standalone :contribution} mode)
+      (->> (get-in result [:frontier-overlays mode])
+           (filter #(and (opt-format/finite-number? (:volatility %))
+                         (opt-format/finite-number? (:expected-return %))))
+           vec)
+      [])))
+
+(defn all-points
+  [result]
+  (->> [:standalone :contribution]
+       (mapcat #(get-in result [:frontier-overlays %]))
+       (filter #(and (opt-format/finite-number? (:volatility %))
+                     (opt-format/finite-number? (:expected-return %))))
+       vec))
+
+(defn copy
+  [overlay-mode]
+  (case (normalize-mode overlay-mode)
+    :contribution
+    {:subtitle "Risk vs return — annualized frontier with contribution overlays"
+     :x-axis-prefix "Vol"
+     :y-axis-prefix "Ret"
+     :reading-text "Frontier points stay on the same risk / return scale. Overlay markers show signed volatility contribution on x and return contribution on y for each selected asset."
+     :legend-label "Signed contribution"}
+
+    :standalone
+    {:subtitle "Risk vs return — annualized frontier with standalone asset overlays"
+     :x-axis-prefix "Vol"
+     :y-axis-prefix "Ret"
+     :reading-text "Frontier points are feasible portfolios. Overlay markers show each selected asset as its own standalone risk / return point."
+     :legend-label "Standalone assets"}
+
+    {:subtitle "Risk vs return — annualized"
+     :x-axis-prefix "Vol"
+     :y-axis-prefix "Ret"
+     :reading-text "Each point is a feasible portfolio."
+     :legend-label nil}))
+
+(defn overlay-label
+  [point]
+  (or (:label point) (:instrument-id point)))
+
+(defn vault-point?
+  [point]
+  (or (= :vault (ids/normalize-market-type (:market-type point)))
+      (ids/vault-instrument-id? (:instrument-id point))))
+
+(defn- base-symbol
+  [value]
+  (some-> value
+          non-blank-text
+          (str/replace #"^.*:" "")
+          (str/split #"/|-" 2)
+          first
+          non-blank-text))
+
+(defn point-market
+  [point]
+  (let [instrument-id (non-blank-text (:instrument-id point))
+        label (non-blank-text (:label point))
+        [kind raw-coin] (when instrument-id
+                          (str/split instrument-id #":" 2))
+        coin (or (non-blank-text raw-coin)
+                 label)
+        base (or (base-symbol coin)
+                 (base-symbol label))
+        market-type (case kind
+                      "spot" :spot
+                      "perp" :perp
+                      nil)]
+    {:key instrument-id
+     :coin coin
+     :symbol (or (when (= :spot market-type) coin)
+                 (when (and base (not= coin base))
+                   (str base "-USDC"))
+                 base)
+     :base base
+     :market-type market-type}))

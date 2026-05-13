@@ -1,275 +1,37 @@
 (ns hyperopen.views.portfolio.optimize.frontier-overlay-markers
-  (:require ["lucide/dist/esm/icons/layers-2.js" :default lucide-layers-2-node]
-            [clojure.string :as str]
-            [hyperopen.portfolio.optimizer.coercion :as coercion]
-            [hyperopen.portfolio.optimizer.ids :as ids]
+  (:require [clojure.string :as str]
             [hyperopen.views.asset-icon :as asset-icon]
             [hyperopen.views.portfolio.optimize.frontier-callout :as frontier-callout]
-            [hyperopen.views.portfolio.optimize.format :as opt-format]))
+            [hyperopen.views.portfolio.optimize.frontier-overlay-model :as overlay-model]
+            [hyperopen.views.portfolio.optimize.frontier-vault-markers :as vault-markers]))
 
-(def modes [:standalone :contribution :none])
+(def modes overlay-model/modes)
+(def normalize-mode overlay-model/normalize-mode)
+(def visible-points overlay-model/visible-points)
+(def all-points overlay-model/all-points)
+(def copy overlay-model/copy)
 
 (def ^:private standalone-color "#8f96a3")
 (def ^:private contribution-color "#59a5c8")
-(def ^:private vault-accent "#35d7c7")
-(def ^:private vault-border "rgba(53, 215, 199, 0.72)")
-(def ^:private vault-text "#8ffcf1")
-(def ^:private vault-icon-size 22)
-(def ^:private vault-label-height 22)
-(def ^:private vault-gap 4)
-(def ^:private vault-leader-length 10)
-(def ^:private vault-label-padding-x 9)
-(def ^:private vault-label-min-width 48)
-
-(defn- lucide-node->hiccup
-  [node]
-  (let [tag-name (aget node 0)
-        attrs (js->clj (aget node 1) :keywordize-keys true)]
-    [(keyword tag-name) attrs]))
-
-(defn- vault-layers-icon
-  []
-  (into [:svg {:x -11
-               :y -11
-               :width 22
-               :height 22
-               :viewBox "0 0 24 24"
-               :fill "none"
-               :stroke "currentColor"
-               :stroke-width 1.65
-               :stroke-linecap "round"
-               :stroke-linejoin "round"
-               :aria-hidden true
-               :class "portfolio-frontier-vault-glyph"
-               :style {:color vault-text
-                       :filter (str "drop-shadow(0 0 2px rgba(143, 252, 241, 0.78)) "
-                                    "drop-shadow(0 0 8px rgba(53, 215, 199, 0.36))")}}]
-        (map lucide-node->hiccup
-             (array-seq lucide-layers-2-node))))
-
-(defn normalize-mode
-  [overlay-mode]
-  (if (some #{overlay-mode} modes)
-    overlay-mode
-    :standalone))
-
-(defn visible-points
-  [result overlay-mode]
-  (let [mode (normalize-mode overlay-mode)]
-    (if (contains? #{:standalone :contribution} mode)
-      (->> (get-in result [:frontier-overlays mode])
-           (filter #(and (opt-format/finite-number? (:volatility %))
-                         (opt-format/finite-number? (:expected-return %))))
-           vec)
-      [])))
-
-(defn all-points
-  [result]
-  (->> [:standalone :contribution]
-       (mapcat #(get-in result [:frontier-overlays %]))
-       (filter #(and (opt-format/finite-number? (:volatility %))
-                     (opt-format/finite-number? (:expected-return %))))
-       vec))
-
-(defn copy
-  [overlay-mode]
-  (case (normalize-mode overlay-mode)
-    :contribution
-    {:subtitle "Risk vs return — annualized frontier with contribution overlays"
-     :x-axis-prefix "Vol"
-     :y-axis-prefix "Ret"
-     :reading-text "Frontier points stay on the same risk / return scale. Overlay markers show signed volatility contribution on x and return contribution on y for each selected asset."
-     :legend-label "Signed contribution"}
-
-    :standalone
-    {:subtitle "Risk vs return — annualized frontier with standalone asset overlays"
-     :x-axis-prefix "Vol"
-     :y-axis-prefix "Ret"
-     :reading-text "Frontier points are feasible portfolios. Overlay markers show each selected asset as its own standalone risk / return point."
-     :legend-label "Standalone assets"}
-
-    {:subtitle "Risk vs return — annualized"
-     :x-axis-prefix "Vol"
-     :y-axis-prefix "Ret"
-     :reading-text "Each point is a feasible portfolio."
-     :legend-label nil}))
-
-(defn- overlay-label
-  [point]
-  (or (:label point) (:instrument-id point)))
-
-(defn- vault-point?
-  [point]
-  (or (= :vault (ids/normalize-market-type (:market-type point)))
-      (ids/vault-instrument-id? (:instrument-id point))))
-
-(def ^:private non-blank-text coercion/non-blank-text)
-
-(defn- base-symbol
-  [value]
-  (some-> value
-          non-blank-text
-          (str/replace #"^.*:" "")
-          (str/split #"/|-" 2)
-          first
-          non-blank-text))
-
-(defn- point-market
-  [point]
-  (let [instrument-id (non-blank-text (:instrument-id point))
-        label (non-blank-text (:label point))
-        [kind raw-coin] (when instrument-id
-                          (str/split instrument-id #":" 2))
-        coin (or (non-blank-text raw-coin)
-                 label)
-        base (or (base-symbol coin)
-                 (base-symbol label))
-        market-type (case kind
-                      "spot" :spot
-                      "perp" :perp
-                      nil)]
-    {:key instrument-id
-     :coin coin
-     :symbol (or (when (= :spot market-type) coin)
-                 (when (and base (not= coin base))
-                   (str base "-USDC"))
-                 base)
-     :base base
-     :market-type market-type}))
-
-(defn- ticker-like-token?
-  [token]
-  (boolean (re-matches #"[A-Z0-9]{2,6}" token)))
-
-(def ^:private generic-vault-words
-  #{"VAULT" "POOL" "FUND" "STRATEGY"})
-
-(def ^:private known-vault-short-codes
-  {"hyperliquidity provider" "HLP"
-   "hyperliquidity provider (hlp)" "HLP"})
-
-(def ^:private vowels
-  #{\A \E \I \O \U})
-
-(defn- short-code-value
-  [value]
-  (let [text (non-blank-text value)]
-    (when (and text
-               (re-matches #"[A-Za-z0-9]{2,6}" text))
-      (str/upper-case text))))
-
-(defn- first-abbreviation-match
-  [pattern text]
-  (some->> (re-seq pattern text)
-           (map second)
-           (filter seq)
-           first
-           str/upper-case))
-
-(defn- explicit-three-letter-abbreviation
-  [value]
-  (when-let [text (non-blank-text value)]
-    (first-abbreviation-match #"\(([A-Za-z]{3})\)" text)))
-
-(defn- known-vault-short-code
-  [value]
-  (when-let [text (non-blank-text value)]
-    (get known-vault-short-codes (str/lower-case text))))
-
-(defn- padded-code
-  [code]
-  (let [code* (str/upper-case (or code ""))]
-    (subs (str code* "VLT") 0 3)))
-
-(defn- compact-token-code
-  [token]
-  (let [token* (str/upper-case (or token ""))
-        first-char (first token*)
-        consonants (->> (rest token*)
-                        (remove vowels)
-                        (apply str))
-        skeleton (str first-char consonants)]
-    (padded-code
-     (if (>= (count skeleton) 3)
-       skeleton
-       token*))))
-
-(defn- vault-short-code
-  [point]
-  (or (some->> [(:abbreviation point)
-                (:short-name point)
-                (:ticker point)
-                (:symbol point)]
-               (keep short-code-value)
-               first)
-      (explicit-three-letter-abbreviation (overlay-label point))
-      (known-vault-short-code (overlay-label point))
-      (let [tokens (->> (or (overlay-label point) "")
-                        (re-seq #"[A-Za-z0-9]+")
-                        (map str/upper-case)
-                        vec)
-            tokens* (if (and (> (count tokens) 3)
-                             (ticker-like-token? (first tokens)))
-                      (subvec tokens 1)
-                      tokens)
-            code (cond
-                   (>= (count tokens*) 3)
-                   (->> tokens*
-                        (take 3)
-                        (map #(subs % 0 1))
-                        (apply str))
-
-                   (= 2 (count tokens*))
-                   (let [[first-token second-token] tokens*]
-                     (if (generic-vault-words second-token)
-                       (compact-token-code first-token)
-                       (str (subs first-token 0 1)
-                            (subs (compact-token-code second-token) 0 2))))
-
-                   (= 1 (count tokens*))
-                   (compact-token-code (first tokens*))
-
-                   :else "VAULT")]
-        (padded-code code))))
 
 (defn- marker-color
   [point default-color]
-  (if (vault-point? point)
-    vault-accent
+  (if (overlay-model/vault-point? point)
+    vault-markers/accent
     default-color))
-
-(defn- vault-marker-layout
-  [point]
-  (let [code (vault-short-code point)
-        label-width (max vault-label-min-width
-                         (+ (* 8 (count code))
-                            (* 2 vault-label-padding-x)))
-        icon-half (/ vault-icon-size 2)
-        label-half (/ vault-label-height 2)
-        leader-x1 (+ icon-half vault-gap)
-        leader-x2 (+ leader-x1 vault-leader-length)
-        label-x (+ leader-x2 vault-gap)]
-    {:code code
-     :icon-half icon-half
-     :label-half label-half
-     :leader-x1 leader-x1
-     :leader-x2 leader-x2
-     :label-x label-x
-     :label-width label-width
-     :full-width (+ vault-icon-size vault-gap vault-leader-length vault-gap label-width)}))
 
 (defn- marker-shell-attrs
   ([data-role label rows]
    (marker-shell-attrs data-role label rows nil))
   ([data-role label rows color]
-  {:data-role data-role
-   :role "img"
-   :tabIndex 0
-   :tabindex 0
-   :focusable "true"
-   :class ["portfolio-frontier-marker" "outline-none"]
-   :aria-label (frontier-callout/aria-label label rows)
-   :style (when color {:color color})}))
+   {:data-role data-role
+    :role "img"
+    :tabIndex 0
+    :tabindex 0
+    :focusable "true"
+    :class ["portfolio-frontier-marker" "outline-none"]
+    :aria-label (frontier-callout/aria-label label rows)
+    :style (when color {:color color})}))
 
 (defn- symbol-marker
   [data-role x y label color]
@@ -283,52 +45,56 @@
           :data-role data-role}
    label])
 
+(defn- vault-marker
+  [data-role x y point]
+  (let [{:keys [code label-half leader-x1 leader-x2 label-x label-width]}
+        (vault-markers/marker-layout point)]
+    [:g {:data-role data-role
+         :class ["portfolio-frontier-asset-icon-marker"
+                 "portfolio-frontier-vault-marker"]
+         :transform (str "translate(" x " " y ")")}
+     [:g {:data-role (str/replace data-role
+                                  "portfolio-optimizer-frontier-overlay-symbol"
+                                  "portfolio-optimizer-frontier-vault-icon")}
+      (vault-markers/layers-icon)]
+     [:line {:x1 leader-x1
+             :y1 0
+             :x2 leader-x2
+             :y2 0
+             :class "portfolio-frontier-vault-leader"
+             :stroke vault-markers/border
+             :strokeWidth 1
+             :strokeLinecap "round"}]
+     [:rect {:x label-x
+             :y (- label-half)
+             :width label-width
+             :height vault-markers/label-height
+             :rx 4
+             :class "portfolio-frontier-vault-label"
+             :fill "transparent"
+             :stroke vault-markers/border
+             :strokeWidth 1
+             :style {:filter "drop-shadow(0 0 4px rgba(53, 215, 199, 0.18))"}}]
+     [:text {:x (+ label-x (/ label-width 2))
+             :y 0
+             :fill vault-markers/text
+             :fontSize 12
+             :fontWeight 600
+             :letterSpacing "0.02em"
+             :dominant-baseline "middle"
+             :alignment-baseline "middle"
+             :text-anchor "middle"
+             :data-role (str/replace data-role
+                                     "portfolio-optimizer-frontier-overlay-symbol"
+                                     "portfolio-optimizer-frontier-vault-code")}
+      code]]))
+
 (defn- asset-marker
   [data-role x y point color]
-  (let [label (overlay-label point)]
-    (if (vault-point? point)
-      (let [{:keys [code label-half leader-x1 leader-x2 label-x label-width]}
-            (vault-marker-layout point)]
-        [:g {:data-role data-role
-             :class ["portfolio-frontier-asset-icon-marker"
-                     "portfolio-frontier-vault-marker"]
-             :transform (str "translate(" x " " y ")")}
-         [:g {:data-role (str/replace data-role
-                                      "portfolio-optimizer-frontier-overlay-symbol"
-                                      "portfolio-optimizer-frontier-vault-icon")}
-          (vault-layers-icon)]
-         [:line {:x1 leader-x1
-                 :y1 0
-                 :x2 leader-x2
-                 :y2 0
-                 :class "portfolio-frontier-vault-leader"
-                 :stroke vault-border
-                 :strokeWidth 1
-                 :strokeLinecap "round"}]
-         [:rect {:x label-x
-                 :y (- label-half)
-                 :width label-width
-                 :height vault-label-height
-                 :rx 4
-                 :class "portfolio-frontier-vault-label"
-                 :fill "transparent"
-                 :stroke vault-border
-                 :strokeWidth 1
-                 :style {:filter "drop-shadow(0 0 4px rgba(53, 215, 199, 0.18))"}}]
-         [:text {:x (+ label-x (/ label-width 2))
-                 :y 0
-                 :fill vault-text
-                 :fontSize 12
-                 :fontWeight 600
-                 :letterSpacing "0.02em"
-                 :dominant-baseline "middle"
-                 :alignment-baseline "middle"
-                 :text-anchor "middle"
-                 :data-role (str/replace data-role
-                                         "portfolio-optimizer-frontier-overlay-symbol"
-                                         "portfolio-optimizer-frontier-vault-code")}
-          code]])
-      (let [icon-url (asset-icon/market-icon-url (point-market point))]
+  (let [label (overlay-model/overlay-label point)]
+    (if (overlay-model/vault-point? point)
+      (vault-marker data-role x y point)
+      (let [icon-url (asset-icon/market-icon-url (overlay-model/point-market point))]
         (if (seq icon-url)
           [:g {:data-role data-role
                :class "portfolio-frontier-asset-icon-marker"}
@@ -350,12 +116,12 @@
 
 (defn- overlay-hitbox
   [data-role x y point]
-  (if (vault-point? point)
-    (let [{:keys [icon-half full-width]} (vault-marker-layout point)]
+  (if (overlay-model/vault-point? point)
+    (let [{:keys [icon-half full-width]} (vault-markers/marker-layout point)]
       [:rect {:x (- x icon-half)
               :y (- y icon-half)
               :width full-width
-              :height vault-icon-size
+              :height vault-markers/icon-size
               :rx 6
               :fill "transparent"
               :stroke "transparent"
@@ -367,7 +133,7 @@
   [{:keys [point-position x-domain y-domain point]}]
   (let [position (point-position x-domain y-domain point)
         {:keys [x y]} position
-        label (overlay-label point)
+        label (overlay-model/overlay-label point)
         rows (frontier-callout/point-rows
               point
               {:target-weight (:target-weight point)})]
@@ -404,7 +170,7 @@
       y
       point
       (marker-color point standalone-color))
-     (when-not (vault-point? point)
+     (when-not (overlay-model/vault-point? point)
        (frontier-callout/focus-ring x y 15))
      (overlay-hitbox
       (str "portfolio-optimizer-frontier-overlay-standalone-"
@@ -420,7 +186,7 @@
   [{:keys [point-position x-domain y-domain point]}]
   (let [position (point-position x-domain y-domain point)
         {:keys [x y]} position
-        label (overlay-label point)
+        label (overlay-model/overlay-label point)
         rows (frontier-callout/point-rows
               point
               {:return-label "Return Contribution"
@@ -459,7 +225,7 @@
       y
       point
       (marker-color point contribution-color))
-     (when-not (vault-point? point)
+     (when-not (overlay-model/vault-point? point)
        (frontier-callout/focus-ring x y 15))
      (overlay-hitbox
       (str "portfolio-optimizer-frontier-overlay-contribution-"
@@ -473,14 +239,14 @@
 
 (defn marker
   [{:keys [overlay-mode] :as opts}]
-  (case (normalize-mode overlay-mode)
+  (case (overlay-model/normalize-mode overlay-mode)
     :contribution (contribution-marker opts)
     :standalone (standalone-marker opts)
     nil))
 
 (defn callout
   [{:keys [overlay-mode] :as opts}]
-  (case (normalize-mode overlay-mode)
+  (case (overlay-model/normalize-mode overlay-mode)
     :contribution (contribution-callout opts)
     :standalone (standalone-callout opts)
     nil))
