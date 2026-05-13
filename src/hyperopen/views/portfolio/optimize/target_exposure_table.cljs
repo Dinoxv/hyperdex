@@ -148,7 +148,7 @@
         target-notional (* (or capital-usd 0) (or target-weight 0))
         delta (- (or target-weight 0) (or current-weight 0))
         binding? (contains? binding-instrument-ids instrument-id)]
-    [:tr {:class (cond-> []
+    [:tr {:class (cond-> ["optimizer-target-exposure-row" "optimizer-exposure-row"]
                   binding? (conj "bg-warning/10")
                   hidden? (conj "hidden"))
           :data-role (str "portfolio-optimizer-target-exposure-row-" idx)
@@ -174,7 +174,7 @@
         delta (- target-weight current-weight)
         binding? (some #(contains? binding-instrument-ids (:instrument-id %)) rows)
         expandable? (> (count rows) 1)]
-    [:tr {:class ["cursor-pointer"]
+    [:tr {:class ["optimizer-target-exposure-asset" "optimizer-exposure-row" "cursor-pointer"]
           :data-role (str "portfolio-optimizer-target-exposure-asset-"
                           (data-role-token asset))
           :data-target-sign (signed-label target-weight)}
@@ -218,7 +218,8 @@
                              :target-weight (or target-weight 0)})
                           (map vector ids current target))
         groups (group-by :asset rows)]
-    [:section {:class ["min-h-0" "border-r" "border-base-300" "bg-base-100/95" "leading-4"]
+    [:section {:class ["optimizer-target-exposure-table"
+                       "min-h-0" "border-r" "border-base-300" "bg-base-100/95" "leading-4"]
                :data-role "portfolio-optimizer-target-exposure-table"}
      [:div {:class ["flex" "items-center" "justify-between" "border-b" "border-base-300" "px-4" "py-3"]}
       [:div

@@ -25,7 +25,8 @@
                 editor-state]} (optimizer-view-model/workspace-model state route)
         infeasible-result (infeasible-panel/infeasible-result run-state)
         highlighted-controls (infeasible-panel/highlighted-control-keys infeasible-result)]
-    [:section {:class ["portfolio-optimizer-v4" "space-y-3" "pb-16" "leading-4" "text-trading-text"]
+    [:section {:class ["portfolio-optimizer-v4" "optimizer-setup-route-surface"
+                       "space-y-3" "pb-16" "leading-4" "text-trading-text"]
                :data-role "portfolio-optimizer-setup-route-surface"
                :data-scenario-id scenario-id}
      (setup-v4-header/setup-header {:draft draft
@@ -37,7 +38,8 @@
                                     :result-path result-path})
      (setup-v4-header/preset-row draft)
      (infeasible-panel/infeasible-banner infeasible-result highlighted-controls)
-     [:section {:class ["grid"
+     [:section {:class ["optimizer-setup-surface"
+                        "grid"
                         "grid-cols-1"
                         "gap-5"
                         "xl:gap-6"

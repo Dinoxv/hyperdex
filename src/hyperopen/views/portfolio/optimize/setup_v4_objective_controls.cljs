@@ -43,7 +43,8 @@
 (defn- objective-card
   [title subtitle selected? role action]
   [:button {:type "button"
-            :class (cond-> ["border" "border-base-300" "bg-base-200/20" "p-2"
+            :class (cond-> ["optimizer-choice-card" "optimizer-objective-card"
+                            "border" "border-base-300" "bg-base-200/20" "p-2"
                             "text-left" "transition-colors" "hover:border-warning/50"]
                      selected? (conj "border-warning/60" "bg-warning/10"))
             :aria-pressed (str selected?)

@@ -27,7 +27,7 @@
 
 (defn- kpi-card
   [label value]
-  [:div {:class ["rounded-lg" "border" "border-base-300" "bg-base-200/50" "p-3"]}
+  [:div {:class ["optimizer-summary-card" "rounded-lg" "border" "border-base-300" "bg-base-200/50" "p-3"]}
    [:p {:class ["text-[0.65rem]" "font-semibold" "uppercase" "tracking-[0.18em]" "text-trading-muted"]}
     label]
    [:p {:class ["mt-2" "text-lg" "font-semibold" "tabular-nums"]} value]])
@@ -47,8 +47,9 @@
 (defn- review-caution
   [preview]
   (let [reason-summary (blocked-reason-summary preview)]
-    [:section {:class ["rounded-xl"
-                       "border"
+     [:section {:class ["optimizer-results-panel"
+                        "rounded-xl"
+                        "border"
                        (if (seq reason-summary) "border-warning/50" "border-base-300")
                        (if (seq reason-summary) "bg-warning/10" "bg-base-100/95")
                        "p-4"]
@@ -63,7 +64,8 @@
 (defn- row-shell
   [attrs & cells]
   (into
-   [:div (merge {:class ["grid"
+   [:div (merge {:class ["optimizer-row"
+                         "grid"
                          "grid-cols-[minmax(8rem,1.1fr)_repeat(8,minmax(5rem,0.75fr))]"
                          "gap-3"
                          "rounded-lg"
@@ -82,7 +84,8 @@
         ready (count (filter #(= :ready (:status %)) rows))
         blocked (count (filter #(= :blocked (:status %)) rows))]
     (row-shell
-     {:class ["grid"
+     {:class ["optimizer-row"
+              "grid"
               "grid-cols-[minmax(8rem,1.1fr)_repeat(8,minmax(5rem,0.75fr))]"
               "gap-3"
               "rounded-lg"
@@ -126,7 +129,8 @@
         groups (group-by #(instrument-group-key labels-by-instrument
                                                 (:instrument-id %))
                          rows)]
-    [:section {:class ["rounded-xl" "border" "border-base-300" "bg-base-100/95" "p-4"]
+    [:section {:class ["optimizer-results-panel"
+                       "rounded-xl" "border" "border-base-300" "bg-base-100/95" "p-4"]
                :data-role "portfolio-optimizer-rebalance-preview"}
      [:p {:class ["text-[0.65rem]" "font-semibold" "uppercase" "tracking-[0.24em]" "text-trading-muted"]}
       "Trade Review"]
@@ -177,7 +181,8 @@
     (if (and (= :solved (:status result)) (map? preview))
       [:section {:class ["space-y-4"]
                  :data-role "portfolio-optimizer-rebalance-review-surface"}
-       [:section {:class ["rounded-xl" "border" "border-base-300" "bg-base-100/95" "p-4"]
+       [:section {:class ["optimizer-results-panel"
+                          "rounded-xl" "border" "border-base-300" "bg-base-100/95" "p-4"]
                   :data-role "portfolio-optimizer-rebalance-review-header"}
         [:div {:class ["flex" "flex-wrap" "items-start" "justify-between" "gap-3"]}
          [:div
@@ -186,7 +191,8 @@
           [:p {:class ["mt-2" "text-sm" "text-trading-muted"]}
            "Review target deltas, blocked rows, cost assumptions, and cross-margin impact before staging execution."]]
          [:button {:type "button"
-                   :class ["rounded-lg" "border" "border-primary/50" "bg-primary/10" "px-3" "py-2"
+                   :class ["optimizer-primary-action"
+                           "rounded-lg" "border" "border-primary/50" "bg-primary/10" "px-3" "py-2"
                            "text-left" "text-sm" "font-semibold" "text-primary"
                            "disabled:cursor-not-allowed" "disabled:border-base-300"
                            "disabled:bg-base-200/40" "disabled:text-trading-muted"]
@@ -206,7 +212,8 @@
         (trade-table preview labels-by-instrument)
         [:aside {:class ["space-y-4"]}
          (review-caution preview)
-         [:section {:class ["rounded-xl" "border" "border-base-300" "bg-base-100/95" "p-4"]
+         [:section {:class ["optimizer-results-panel"
+                            "rounded-xl" "border" "border-base-300" "bg-base-100/95" "p-4"]
                     :data-role "portfolio-optimizer-rebalance-margin-context"}
           [:p {:class ["text-[0.65rem]" "font-semibold" "uppercase" "tracking-[0.24em]" "text-trading-muted"]}
            "Margin Context"]
@@ -215,7 +222,8 @@
           [:div {:class ["mt-3" "grid" "grid-cols-1" "gap-2"]}
            (kpi-card "After Utilization" (opt-format/format-pct (get-in summary [:margin :after-utilization])))
            (kpi-card "Warning" (opt-format/keyword-label (get-in summary [:margin :warning])))]]]]]
-      [:section {:class ["rounded-xl" "border" "border-base-300" "bg-base-100/95" "p-4"]
+      [:section {:class ["optimizer-results-panel"
+                         "rounded-xl" "border" "border-base-300" "bg-base-100/95" "p-4"]
                  :data-role "portfolio-optimizer-rebalance-empty"}
        [:p {:class ["text-[0.65rem]" "font-semibold" "uppercase" "tracking-[0.24em]" "text-trading-muted"]}
         "Rebalance Preview"]

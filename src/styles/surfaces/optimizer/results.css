@@ -1,0 +1,133 @@
+@layer components {
+  .portfolio-optimizer-v4 .optimizer-scenario-surface {
+    background-color: var(--optimizer-bg);
+  }
+
+  .portfolio-optimizer-v4 .optimizer-scenario-header {
+    border-width: 0 0 1px 0;
+    border-radius: 0;
+    background-color: var(--optimizer-bg);
+  }
+
+  .portfolio-optimizer-v4 .optimizer-scenario-header h1 {
+    color: var(--optimizer-text);
+    font-size: 18px;
+    font-weight: 500;
+    letter-spacing: -0.01em;
+    line-height: 1.2;
+  }
+
+  .portfolio-optimizer-v4 .optimizer-status-tag {
+    border-color: var(--optimizer-border-strong);
+    border-radius: 2px;
+    background-color: var(--optimizer-bg);
+    color: var(--optimizer-text-2);
+  }
+
+  .portfolio-optimizer-v4
+    :is(
+      .optimizer-provenance-strip,
+      .optimizer-scenario-tabs,
+      .optimizer-scenario-kpi-strip
+    ) {
+    border-radius: 0;
+    background-color: var(--optimizer-surface-2);
+  }
+
+  .portfolio-optimizer-v4 .optimizer-scenario-tabs {
+    background-color: var(--optimizer-bg);
+    height: 32px;
+  }
+
+  .portfolio-optimizer-v4 .optimizer-scenario-tabs a {
+    min-height: 32px;
+    font-size: 11px;
+  }
+
+  .portfolio-optimizer-v4 .optimizer-scenario-kpi-strip {
+    background-color: var(--optimizer-bg);
+  }
+
+  .portfolio-optimizer-v4 .optimizer-kpi-card {
+    padding: 10px;
+  }
+
+  .portfolio-optimizer-v4 .optimizer-kpi-card p:first-child {
+    color: var(--optimizer-text-3);
+    font-size: 9.5px;
+    letter-spacing: 0.08em;
+  }
+
+  .portfolio-optimizer-v4 .optimizer-kpi-card p:nth-child(2) {
+    color: var(--optimizer-text);
+    font-size: 14px;
+    font-weight: 600;
+    letter-spacing: -0.02em;
+  }
+
+  .portfolio-optimizer-v4 .optimizer-kpi-card p:nth-child(3) {
+    font-size: 10.5px;
+  }
+
+  .portfolio-optimizer-v4 .optimizer-results-grid {
+    min-height: min(674px, calc(100vh - 236px));
+    overflow: hidden;
+    background-color: var(--optimizer-bg);
+  }
+
+  .portfolio-optimizer-v4
+    :is(.optimizer-results-left-panel, .optimizer-results-center-panel, .optimizer-results-right-panel) {
+    min-width: 0;
+  }
+
+  .portfolio-optimizer-v4
+    :is(.optimizer-results-left-panel, .optimizer-results-center-panel) {
+    background-color: var(--optimizer-bg);
+  }
+
+  .portfolio-optimizer-v4 .optimizer-target-exposure-table {
+    border-radius: 0;
+    background-color: var(--optimizer-bg);
+  }
+
+  .portfolio-optimizer-v4 .optimizer-target-exposure-table table th {
+    background-color: var(--optimizer-surface);
+    color: var(--optimizer-text-3);
+    font-size: 9.5px;
+    letter-spacing: 0.06em;
+    padding: 6px 10px;
+  }
+
+  .portfolio-optimizer-v4 .optimizer-target-exposure-table table td {
+    border-bottom: 1px solid var(--optimizer-border);
+    background-color: var(--optimizer-bg);
+    color: var(--optimizer-text);
+    padding: 6px 10px;
+  }
+
+  .portfolio-optimizer-v4 .optimizer-target-exposure-row td {
+    background-color: var(--optimizer-surface-2);
+  }
+
+  .portfolio-optimizer-v4 .optimizer-target-exposure-asset:hover td,
+  .portfolio-optimizer-v4 .optimizer-target-exposure-row:hover td {
+    background-color: var(--optimizer-surface-3);
+  }
+
+  .portfolio-optimizer-v4
+    :is(.optimizer-frontier-panel, .optimizer-trust-caution-panel) {
+    border-radius: 0;
+  }
+
+  .portfolio-optimizer-v4 .optimizer-trust-caution-panel {
+    background-color: var(--optimizer-surface);
+  }
+
+  .portfolio-optimizer-v4 .optimizer-trust-caution-panel > div:first-child {
+    padding: 12px 14px;
+  }
+
+  .portfolio-optimizer-v4 .optimizer-trust-caution-panel .optimizer-diagnostics-list > div {
+    padding: 10px;
+  }
+}

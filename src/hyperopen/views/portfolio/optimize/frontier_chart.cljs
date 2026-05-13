@@ -251,7 +251,8 @@
   [current-mode mode]
   (let [selected? (= current-mode mode)]
     [:button {:type "button"
-              :class (cond-> ["bg-transparent"
+              :class (cond-> ["optimizer-frontier-overlay-mode"
+                              "bg-transparent"
                               "text-center"
                               "whitespace-nowrap"
                               "px-3"
@@ -282,13 +283,14 @@
 
 (defn- constrain-frontier-control
   [constrain-frontier?]
-  [:label {:class ["flex" "items-center" "gap-2" "border" "border-base-300"
+  [:label {:class ["optimizer-constrain-frontier-control"
+                   "flex" "items-center" "gap-2" "border" "border-base-300"
                    "bg-base-100/90" "px-2.5" "py-1.5" "text-[0.68rem]"
                    "font-medium" "text-trading-muted" "transition-colors"
                    "hover:text-trading-text"]
            :data-role "portfolio-optimizer-constrain-frontier-control"}
    [:input {:type "checkbox"
-            :class ["h-3.5" "w-3.5" "accent-warning" "outline-none"]
+            :class ["optimizer-frontier-checkbox" "h-3.5" "w-3.5" "accent-warning" "outline-none"]
             :data-role "portfolio-optimizer-constrain-frontier-checkbox"
             :checked (true? constrain-frontier?)
             :on {:change [[:actions/set-portfolio-optimizer-constrain-frontier
@@ -334,7 +336,8 @@
         positions (map #(point-position x-domain* y-domain* %) points)
         target (objective-target draft (first points))]
      (when (seq points)
-       [:section {:class ["min-w-0" "overflow-hidden" "bg-transparent" "leading-4"]
+       [:section {:class ["optimizer-frontier-panel"
+                          "min-w-0" "overflow-hidden" "bg-transparent" "leading-4"]
                   :data-role "portfolio-optimizer-frontier-panel"}
         [:div {:class ["grid" "items-start" "gap-3" "lg:grid-cols-[minmax(0,1fr)_auto]"]
                :data-role "portfolio-optimizer-frontier-toolbar"}
@@ -347,7 +350,8 @@
            "Efficient Frontier"]
           [:p {:class ["mt-1" "text-xs" "text-trading-muted"]}
            subtitle]]
-         [:div {:class ["flex" "items-start" "justify-start" "gap-3" "lg:justify-end"]
+         [:div {:class ["optimizer-frontier-controls"
+                        "flex" "items-start" "justify-start" "gap-3" "lg:justify-end"]
                 :data-role "portfolio-optimizer-frontier-controls"}
           (constrain-frontier-control constrain-frontier?)
           [:div {:class ["min-w-[19.25rem]" "border" "border-base-300" "bg-base-100/90" "p-0.5"]
@@ -359,7 +363,8 @@
                  (map #(overlay-mode-button overlay-mode* %) frontier-overlays/modes))]
           [:p {:class ["font-mono" "text-[0.62rem]" "text-trading-muted/70"]}
            (str (count points) " points")]]]
-        [:div {:class ["relative" "mt-4" "overflow-hidden" "border" "border-base-300" "bg-base-100" "p-4"]
+        [:div {:class ["optimizer-frontier-chart-box"
+                       "relative" "mt-4" "overflow-hidden" "border" "border-base-300" "bg-base-100" "p-4"]
                :data-role "portfolio-optimizer-frontier-chart-box"}
          [:svg {:viewBox (str "0 0 " chart-width " " chart-height)
                 :class ["h-[23.75rem]" "w-full" "overflow-visible" "text-trading-text"]

@@ -18,13 +18,15 @@
 (defn use-my-views-workspace
   [{:keys [draft readiness running? run-triggerable? saving-scenario? solved-run? result-path]}]
   (let [preview (use-my-views-cards/preview readiness)]
-    [:section {:class ["space-y-4"] :data-role "portfolio-optimizer-setup-use-my-views-workspace"}
+    [:section {:class ["optimizer-use-my-views-workspace" "space-y-4"]
+               :data-role "portfolio-optimizer-setup-use-my-views-workspace"}
      [:div {:class ["space-y-4"] :data-role "portfolio-optimizer-setup-use-my-views-context"}
       [:div {:class ["px-1" "pt-2" "pb-1"]}
        [:p {:class controls/eyebrow-class} "Use my views"]
        [:h2 {:class ["mt-2" "text-[0.875rem]" "font-medium" "tracking-[-0.01em]"]}
         "What the model assumes and what your views change"]]
-      [:div {:class ["grid" "gap-3" "border" "border-base-300" "bg-base-100/90" "p-4"
+      [:div {:class ["optimizer-use-my-views-legend"
+                     "grid" "gap-3" "border" "border-base-300" "bg-base-100/90" "p-4"
                      "sm:grid-cols-2" "xl:grid-cols-3"]
              :data-role "portfolio-optimizer-setup-use-my-views-legend"}
        (use-my-views-legend-item
@@ -42,7 +44,8 @@
         ["bg-[#d4b558]"]
         "Combined output"
         "(posterior)")]
-      [:div {:class ["border" "border-base-300" "bg-base-200/10" "p-1.5"]
+      [:div {:class ["optimizer-use-my-views-chart-shell"
+                     "border" "border-base-300" "bg-base-200/10" "p-1.5"]
              :data-role "portfolio-optimizer-setup-use-my-views-chart-shell"}
        (black-litterman-preview-chart/black-litterman-preview-panel
         readiness

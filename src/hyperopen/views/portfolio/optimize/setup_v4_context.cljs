@@ -29,8 +29,9 @@
                             run-visible?
                             last-run-visible?
                             read-only-message)]
-    [:aside {:class ["min-h-0"] :data-role "portfolio-optimizer-right-rail"}
-     [:section {:class ["border" "border-base-300" "bg-base-100/90" "p-3"]
+    [:aside {:class ["optimizer-context-rail" "min-h-0"]
+             :data-role "portfolio-optimizer-right-rail"}
+     [:section {:class ["optimizer-setup-panel" "border" "border-base-300" "bg-base-100/90" "p-3"]
                 :data-role "portfolio-optimizer-assumptions-rail"}
       [:p {:class eyebrow-class}
        (if bl? "Edit views" "Why this preset is safe")]
@@ -47,7 +48,7 @@
          [:p {:class ["font-semibold" "text-warning"]}
           "Switch to Use my views to add beliefs and compare posterior output."]])]
      (when status-visible?
-       [:section {:class ["border-t" "border-base-300" "bg-base-100/90" "p-3"]
+       [:section {:class ["optimizer-setup-panel" "border-t" "border-base-300" "bg-base-100/90" "p-3"]
                   :data-role "portfolio-optimizer-trust-freshness-panel"}
         [:p {:class eyebrow-class} "Trust & Freshness"]
         [:p {:class ["mt-2" "text-[0.6875rem]" "leading-[1.45]" "text-trading-muted"]}

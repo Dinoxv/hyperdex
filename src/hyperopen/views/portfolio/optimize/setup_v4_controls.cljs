@@ -27,13 +27,13 @@
 
 (defn panel
   [role & children]
-  (into [:section {:class ["border" "border-base-300" "bg-base-100/90" "p-3"]
+  (into [:section {:class ["optimizer-setup-panel" "border" "border-base-300" "bg-base-100/90" "p-3"]
                    :data-role role}]
         children))
 
 (defn disclosure-panel
   [role & children]
-  (into [:details {:class ["border" "border-base-300" "bg-base-100/90" "p-3"]
+  (into [:details {:class ["optimizer-setup-panel" "border" "border-base-300" "bg-base-100/90" "p-3"]
                    :data-role role}]
         children))
 
@@ -65,7 +65,8 @@
                                     :end ["right-0"]
                                     ["left-1/2" "-translate-x-1/2"])]
      [:button {:type "button"
-               :class (cond-> ["group" "relative" "border-r" "border-base-300"
+               :class (cond-> ["optimizer-segment-button"
+                               "group" "relative" "border-r" "border-base-300"
                                "bg-transparent" "px-2" "py-1.5" "text-center"
                                "text-[0.65625rem]" "font-medium" "uppercase"
                                "tracking-[0.04em]" "text-trading-muted"

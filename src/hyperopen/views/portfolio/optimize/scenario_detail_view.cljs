@@ -43,7 +43,8 @@
         saving? (= :saving save-state)
         save-disabled? (or saving?
                            (not current-result?))]
-    [:header {:class ["border-b"
+    [:header {:class ["optimizer-scenario-header"
+                      "border-b"
                       "border-base-300"
                       "bg-base-100/95"
                       "px-5"
@@ -63,7 +64,8 @@
         [:span {:class ["text-[0.8125rem]" "text-trading-muted"]}
          (str "/ scenario id " scenario-id
               (when read-only? " · read-only"))]
-        [:span {:class ["rounded-full"
+        [:span {:class ["optimizer-status-tag"
+                        "rounded-full"
                         "border"
                         "border-base-300"
                         "bg-base-200/60"
@@ -90,7 +92,8 @@
                  :aria-label "More scenario actions"}
         "..."]
        [:button {:type "button"
-                 :class ["rounded-lg"
+                 :class ["optimizer-primary-action"
+                         "rounded-lg"
                          "border"
                          "border-base-300"
                          "bg-base-200/40"
@@ -127,7 +130,7 @@
 
 (defn- kpi-card
   [data-role label value delta]
-  [:div {:class ["border-r" "border-base-300" "px-3" "py-2.5" "last:border-r-0"]
+  [:div {:class ["optimizer-kpi-card" "border-r" "border-base-300" "px-3" "py-2.5" "last:border-r-0"]
          :data-role data-role}
    [:p {:class ["font-mono"
                 "text-[0.6rem]"
@@ -151,7 +154,8 @@
         target-vol (:volatility result*)
         gross (:gross-exposure diagnostics)
         net (:net-exposure diagnostics)]
-    [:section {:class ["grid" "grid-cols-2" "border-y" "border-base-300" "bg-base-100/95" "lg:grid-cols-5"]
+    [:section {:class ["optimizer-scenario-kpi-strip"
+                       "grid" "grid-cols-2" "border-y" "border-base-300" "bg-base-100/95" "lg:grid-cols-5"]
                :data-role "portfolio-optimizer-scenario-kpi-strip"}
      (kpi-card "portfolio-optimizer-scenario-kpi-volatility"
                "Volatility · current → target"
@@ -202,7 +206,8 @@
      [:span {:class ["ml-2"]}
       "Draft inputs differ from the last successful run. Rerun before using recommendation or rebalance output."]
      [:button {:type "button"
-               :class ["ml-3"
+               :class ["optimizer-primary-action"
+                       "ml-3"
                        "rounded-md"
                        "border"
                        "border-warning/50"
@@ -254,14 +259,16 @@
                              :on {:click (copy-scenario-link! scenario-id)}}
                     "Copy link"]]]]
       (into
-       [:section {:class ["flex" "flex-wrap" "items-stretch" "border-y" "border-base-300" "bg-base-200/40"]
+       [:section {:class ["optimizer-provenance-strip"
+                          "flex" "flex-wrap" "items-stretch" "border-y" "border-base-300" "bg-base-200/40"]
                   :data-role "portfolio-optimizer-provenance-strip"}]
        fields))))
 
 (defn- scenario-tabs
   [scenario-id selected-tab]
   (into
-   [:nav {:class ["flex" "h-8" "items-stretch" "border-b" "border-base-300" "bg-base-100/95" "pl-4"]
+   [:nav {:class ["optimizer-scenario-tabs"
+                  "flex" "h-8" "items-stretch" "border-b" "border-base-300" "bg-base-100/95" "pl-4"]
           :data-role "portfolio-optimizer-scenario-tabs"}]
    (map (fn [{:keys [key label data-role]}]
           [:a {:class (cond-> ["flex" "items-center" "border-b" "px-4" "text-[0.7rem]" "font-medium"]
@@ -379,7 +386,8 @@
                 selected-tab
                 result
                 stale?] :as model} (optimizer-view-model/scenario-detail-model state route)]
-    [:section {:class ["portfolio-optimizer-v4" "space-y-0" "leading-4" "text-trading-text"]
+    [:section {:class ["portfolio-optimizer-v4" "optimizer-scenario-surface"
+                       "space-y-0" "leading-4" "text-trading-text"]
                :data-role "portfolio-optimizer-scenario-detail-surface"
                :data-scenario-id scenario-id}
      (scenario-header model)

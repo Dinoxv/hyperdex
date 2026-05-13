@@ -12,7 +12,8 @@
         primary-label (instrument-display/primary-label instrument)
         secondary-token (or (instrument-display/base-label instrument)
                             (:coin instrument))]
-    [:div {:class ["flex" "items-center" "justify-between" "gap-3" "rounded-lg" "border"
+    [:div {:class ["optimizer-universe-row"
+                   "flex" "items-center" "justify-between" "gap-3" "rounded-lg" "border"
                    "border-base-300" "bg-base-200/40" "px-3" "py-2"]}
      [:div
       [:p {:class ["text-sm" "font-semibold"]} primary-label]
@@ -35,7 +36,8 @@
                             (:coin market)
                             market-key)
         active? (= idx active-index)]
-    [:div {:class ["flex" "items-center" "justify-between" "gap-3" "rounded-lg" "border"
+    [:div {:class ["optimizer-universe-candidate-row"
+                   "flex" "items-center" "justify-between" "gap-3" "rounded-lg" "border"
                    "border-base-300" "bg-base-200/30" "px-3" "py-2"]
            :data-role (str "portfolio-optimizer-universe-candidate-row-" market-key)
            :data-active (when active? "true")
@@ -47,7 +49,8 @@
       [:p {:class ["text-xs" "uppercase" "tracking-[0.14em]" "text-trading-muted"]}
        (str secondary-token " / " (name (:market-type market)))]]
      [:button {:type "button"
-               :class ["rounded-md" "border" "border-primary/50" "bg-primary/10" "px-2" "py-1"
+               :class ["optimizer-universe-add-button"
+                       "rounded-md" "border" "border-primary/50" "bg-primary/10" "px-2" "py-1"
                        "text-[0.65rem]" "font-semibold" "uppercase" "tracking-[0.14em]"
                        "text-primary"]
                :data-role (str "portfolio-optimizer-universe-add-" market-key)
@@ -61,7 +64,8 @@
                 markets
                 active-index
                 market-keys]} (optimizer-view-model/universe-panel-model state draft)]
-    [:section {:class ["rounded-xl" "border" "border-base-300" "bg-base-100/95" "p-4"]
+    [:section {:class ["optimizer-universe-panel"
+                       "rounded-xl" "border" "border-base-300" "bg-base-100/95" "p-4"]
                :data-role "portfolio-optimizer-universe-panel"}
      [:div {:class ["flex" "items-start" "justify-between" "gap-3"]}
       [:div
@@ -96,7 +100,7 @@
                     "text-trading-muted"]}
         "Manual Add"]
        [:input {:type "search"
-                :class search-input-class
+                :class (into ["optimizer-universe-search-field"] search-input-class)
                 :placeholder "Search BTC, ETH, spot:PURR/USDC, or vault..."
                 :data-role "portfolio-optimizer-universe-search-input"
                 :aria-controls "portfolio-optimizer-universe-search-results"

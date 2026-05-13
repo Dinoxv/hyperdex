@@ -1,0 +1,190 @@
+@layer components {
+  .portfolio-optimizer-v4 {
+    --optimizer-bg: #0a0b0d;
+    --optimizer-surface: #111316;
+    --optimizer-surface-2: #15181c;
+    --optimizer-surface-3: #1a1d22;
+    --optimizer-border: #1d2025;
+    --optimizer-border-strong: #292d33;
+    --optimizer-text: #e6e7ea;
+    --optimizer-text-2: #8a8f98;
+    --optimizer-text-3: #5a5f68;
+    --optimizer-accent: #d4b558;
+    --optimizer-accent-soft: rgb(212 181 88 / 0.06);
+    --optimizer-accent-strong: rgb(212 181 88 / 0.2);
+    --optimizer-accent-border: rgb(212 181 88 / 0.58);
+    --optimizer-long: #4ea674;
+    --optimizer-short: #c25b5b;
+    --optimizer-warn: #d49a3a;
+    --optimizer-info: #6b8db5;
+    background-color: var(--optimizer-bg);
+    color: var(--optimizer-text);
+    font-family: "Inter Variable", var(--font-ui-system);
+    font-size: 12px;
+    letter-spacing: -0.005em;
+    line-height: 1.4;
+  }
+
+  .portfolio-optimizer-v4 .border-base-300 {
+    border-color: var(--optimizer-border);
+  }
+
+  .portfolio-optimizer-v4 .text-trading-text {
+    color: var(--optimizer-text);
+  }
+
+  .portfolio-optimizer-v4 .text-trading-muted {
+    color: var(--optimizer-text-2);
+  }
+
+  .portfolio-optimizer-v4 .text-trading-muted\/70 {
+    color: var(--optimizer-text-3);
+  }
+
+  .portfolio-optimizer-v4 .text-trading-muted\/60 {
+    color: rgb(90 95 104 / 0.72);
+  }
+
+  .portfolio-optimizer-v4 .text-warning,
+  .portfolio-optimizer-v4 .text-primary {
+    color: var(--optimizer-accent);
+  }
+
+  .portfolio-optimizer-v4 .text-success,
+  .portfolio-optimizer-v4 .text-trading-green {
+    color: var(--optimizer-long);
+  }
+
+  .portfolio-optimizer-v4 .text-error,
+  .portfolio-optimizer-v4 .text-trading-red {
+    color: var(--optimizer-short);
+  }
+
+  .portfolio-optimizer-v4 .text-info {
+    color: var(--optimizer-info);
+  }
+
+  .portfolio-optimizer-v4 .bg-info {
+    background-color: var(--optimizer-info);
+  }
+
+  .portfolio-optimizer-v4 :is(.font-mono, .tabular-nums) {
+    font-family: "JetBrains Mono", var(--font-mono);
+    font-feature-settings: "tnum", "zero";
+    font-variant-numeric: tabular-nums;
+  }
+
+  .portfolio-optimizer-v4 :is(.rounded-xl, .rounded-lg, .rounded-md) {
+    border-radius: 2px;
+  }
+
+  .portfolio-optimizer-v4 .rounded-full {
+    border-radius: 9999px;
+  }
+
+  .portfolio-optimizer-v4 details:not([open]) > :not(summary) {
+    display: none;
+  }
+
+  .portfolio-optimizer-v4
+    :is(table, th, td, .optimizer-row, .optimizer-kpi-card, .optimizer-exposure-row) {
+    font-variant-numeric: tabular-nums;
+  }
+
+  .portfolio-optimizer-v4 :is(input, select, button) {
+    min-height: 26px;
+    border-radius: 2px;
+  }
+
+  .portfolio-optimizer-v4 :is(input, select) {
+    background-color: var(--optimizer-bg);
+    border-color: var(--optimizer-border-strong);
+    color: var(--optimizer-text);
+    height: 26px;
+  }
+
+  .portfolio-optimizer-v4 input::placeholder {
+    color: var(--optimizer-text-3);
+    opacity: 1;
+  }
+
+  .portfolio-optimizer-v4 :is(input, select):focus {
+    border-color: var(--optimizer-accent);
+    box-shadow: 0 0 0 1px rgba(212, 181, 88, 0.75);
+    outline: none;
+  }
+
+  .portfolio-optimizer-v4 button:not(:disabled):hover {
+    border-color: var(--optimizer-border-strong);
+    background-color: var(--optimizer-surface-3);
+  }
+
+  .portfolio-optimizer-v4 .optimizer-primary-action:not(:disabled) {
+    border-color: var(--optimizer-accent);
+    background-color: var(--optimizer-accent);
+    color: #1a1408;
+    font-weight: 600;
+  }
+
+  .portfolio-optimizer-v4 .optimizer-primary-action:not(:disabled):hover {
+    background-color: #e0c067;
+    border-color: #e0c067;
+  }
+
+  .portfolio-optimizer-v4 .optimizer-chip {
+    border-color: var(--optimizer-border-strong);
+    background-color: var(--optimizer-surface-2);
+    color: var(--optimizer-text-2);
+  }
+
+  .portfolio-optimizer-v4 .optimizer-chip[data-active="true"] {
+    border-color: var(--optimizer-accent-border);
+    background-color: var(--optimizer-accent-soft);
+    color: var(--optimizer-accent);
+  }
+
+  .portfolio-optimizer-v4 .optimizer-chip[data-tone="accent"] {
+    border-color: rgb(212 181 88 / 0.4);
+    color: var(--optimizer-accent);
+  }
+
+  .portfolio-optimizer-v4 .optimizer-chip[data-tone="info"] {
+    border-color: rgb(107 141 181 / 0.4);
+    color: var(--optimizer-info, #6b8db5);
+  }
+
+  .portfolio-optimizer-v4 .optimizer-chip[data-tone="long"] {
+    border-color: rgb(78 166 116 / 0.4);
+    color: var(--optimizer-long);
+  }
+
+  .portfolio-optimizer-v4 .optimizer-chip[data-tone="warn"] {
+    border-color: rgb(212 154 58 / 0.45);
+    color: var(--optimizer-warn, #d49a3a);
+  }
+
+  .portfolio-optimizer-v4 .optimizer-note {
+    background-color: var(--optimizer-surface);
+    border: 1px solid var(--optimizer-border);
+    border-left: 2px solid var(--optimizer-text-3);
+    color: var(--optimizer-text);
+    padding: 10px 12px;
+  }
+
+  .portfolio-optimizer-v4 .optimizer-note > p {
+    color: var(--optimizer-text-2);
+  }
+
+  .portfolio-optimizer-v4 .optimizer-note li {
+    position: relative;
+    padding-left: 14px;
+    color: var(--optimizer-text-2);
+  }
+
+  .portfolio-optimizer-v4 .optimizer-note li::before {
+    content: "·";
+    position: absolute;
+    left: 4px;
+    color: var(--optimizer-accent);
+  }
+}

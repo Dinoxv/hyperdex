@@ -16,9 +16,10 @@
      "portfolio-optimizer-return-risk-panel"
      (controls/disclosure-heading "03" "Return / Risk Model" (controls/labelize return-kind))
      [:div {:class ["mt-3" "space-y-3"] :data-role "portfolio-optimizer-setup-model-grid"}
-      [:div {:data-role "portfolio-optimizer-return-model-panel"}
+      [:div {:class ["optimizer-model-panel"]
+             :data-role "portfolio-optimizer-return-model-panel"}
        [:p {:class controls/eyebrow-class} "Expected returns"]
-       [:div {:class ["mt-2" "grid" "grid-cols-3" "border"
+       [:div {:class ["optimizer-model-segment-group" "mt-2" "grid" "grid-cols-3" "border"
                       "border-base-300"]}
         (controls/segmented-button "Historical" "Historical Mean" (:historical-mean model-help) :start (= :historical-mean return-kind)
                                    "portfolio-optimizer-return-model-historical-mean"
@@ -35,10 +36,12 @@
           :black-litterman "Black-Litterman stays here as a return-model mode, not an objective."
           :ew-mean "Exponentially weighted returns emphasize recent history."
           "Average of past returns. Simple and auditable for first runs.")]]
-      [:div {:data-role "portfolio-optimizer-setup-model-column"}
-       [:div {:data-role "portfolio-optimizer-risk-model-panel"}
+      [:div {:class ["optimizer-model-column"]
+             :data-role "portfolio-optimizer-setup-model-column"}
+       [:div {:class ["optimizer-model-panel"]
+              :data-role "portfolio-optimizer-risk-model-panel"}
         [:p {:class controls/eyebrow-class} "Risk model"]
-        [:div {:class ["mt-2" "grid" "grid-cols-2" "border"
+        [:div {:class ["optimizer-model-segment-group" "mt-2" "grid" "grid-cols-2" "border"
                        "border-base-300"]}
          (controls/segmented-button "Stabilized Covariance" "Diagonal Shrink" (:diagonal-shrink model-help) :start (= :diagonal-shrink risk-kind)
                                     "portfolio-optimizer-risk-model-diagonal-shrink"

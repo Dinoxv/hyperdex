@@ -54,7 +54,7 @@
   ([label tone]
    (tag label tone nil))
   ([label tone extra-class]
-   [:span {:class (cond-> ["border" "px-1.5" "py-[1px]" "font-mono"
+   [:span {:class (cond-> ["optimizer-chip" "border" "px-1.5" "py-[1px]" "font-mono"
                            "text-[0.53125rem]" "font-semibold" "uppercase"
                            "tracking-[0.12em]"]
                     (= tone :accent) (conj "border-warning/40" "text-warning")
@@ -94,7 +94,8 @@
                             (when (instrument-display/symbol-first? instrument)
                               base-label)
                             name)]
-    [:div {:class ["grid" "grid-cols-[18px_minmax(0,1fr)_42px_72px_48px_20px]"
+    [:div {:class ["optimizer-universe-row"
+                   "grid" "grid-cols-[18px_minmax(0,1fr)_42px_72px_48px_20px]"
                    "items-center" "gap-2" "border-b" "border-base-300"
                    "px-2" "py-1.5" "last:border-b-0" "hover:bg-base-200/30"]
            :data-role (str "portfolio-optimizer-universe-selected-row-" instrument-id)}
@@ -123,7 +124,8 @@
         market-type (:market-type market)
         active? (= idx active-index)
         {:keys [label name]} (universe-candidates/market-display market)]
-    [:div {:class ["grid" "grid-cols-[66px_minmax(0,1fr)_58px_42px_44px]"
+    [:div {:class ["optimizer-universe-candidate-row"
+                   "grid" "grid-cols-[66px_minmax(0,1fr)_58px_42px_44px]"
                    "items-center" "gap-2" "border-b" "border-base-300" "cursor-pointer" "px-2"
                    "py-1.5" "last:border-b-0" "hover:bg-base-200/30"]
            :data-role (str "portfolio-optimizer-universe-candidate-row-" market-key)
@@ -140,7 +142,8 @@
      [:span {:class ["font-mono" "text-[0.6rem]" "text-trading-muted" "text-right"]}
       (adv-label market)]
      [:button {:type "button"
-               :class ["text-right" "font-mono" "text-[0.65625rem]" "font-semibold"
+               :class ["optimizer-universe-add-button"
+                       "text-right" "font-mono" "text-[0.65625rem]" "font-semibold"
                        "text-warning" "hover:text-warning"]
                :data-role (str "portfolio-optimizer-universe-add-" market-key)
                :on {:click [[:actions/add-portfolio-optimizer-universe-instrument market-key]]}}
@@ -179,7 +182,8 @@
                  markets
                  active-index
                  market-keys]} (optimizer-view-model/universe-section-model state draft opts)]
-    [:section {:class ["border" "border-base-300" "bg-base-100/90" "p-3" "leading-4"]
+    [:section {:class ["optimizer-universe-panel" "optimizer-setup-panel"
+                       "border" "border-base-300" "bg-base-100/90" "p-3" "leading-4"]
                :data-role "portfolio-optimizer-universe-panel"}
      [:div {:class ["flex" "items-center" "justify-between" "gap-3" "border-b"
                     "border-base-300" "pb-2"]}
@@ -202,7 +206,8 @@
        [:span {:class ["sr-only"]} "Use Current Holdings"]]]
      [:div {:class ["sr-only"]} "Manual Add"]
      [:div {:class ["mt-3" "relative"]}
-      [:div {:class ["flex" "items-center" "gap-1.5" "border" "px-2"
+      [:div {:class ["optimizer-universe-search-shell"
+                     "flex" "items-center" "gap-1.5" "border" "px-2"
                      "portfolio-optimizer-universe-search-shell"
                      (if searching?
                        "border-warning/70"
@@ -210,12 +215,14 @@
                      "bg-transparent"]
               :data-role "portfolio-optimizer-universe-search-shell"
               :data-searching (when searching? "true")}
-       [:span {:class ["portfolio-optimizer-universe-search-affordance"
+       [:span {:class ["optimizer-universe-search-affordance"
+                       "portfolio-optimizer-universe-search-affordance"
                        "font-mono" "text-[0.65rem]" "text-trading-muted"]
                :data-role "portfolio-optimizer-universe-search-icon"}
         "⌕"]
        [:input {:type "search"
-                :class (into input-class ["portfolio-optimizer-universe-search-field"
+                :class (into input-class ["optimizer-universe-search-field"
+                                          "portfolio-optimizer-universe-search-field"
                                           "border-0" "bg-transparent" "px-0" "focus:border-0"])
                 :placeholder "Search ticker, name, or vault (e.g. TIA, AVAX, Solana, HLP...)"
                 :data-role "portfolio-optimizer-universe-search-input"
@@ -230,13 +237,16 @@
                                 market-keys]]}}]
        (when searching?
          [:button {:type "button"
-                   :class ["portfolio-optimizer-universe-search-affordance"
+                   :class ["optimizer-universe-search-affordance"
+                           "optimizer-universe-search-clear"
+                           "portfolio-optimizer-universe-search-affordance"
                            "font-mono" "text-xs" "text-trading-muted" "hover:text-warning"]
                    :aria-label "Clear universe search"
                    :data-role "portfolio-optimizer-universe-search-clear"
                    :on {:click [[:actions/set-portfolio-optimizer-universe-search-query ""]]}}
           "x"])
-       [:span {:class ["portfolio-optimizer-universe-search-add-hint"
+       [:span {:class ["optimizer-universe-search-add-hint"
+                       "portfolio-optimizer-universe-search-add-hint"
                        "border" "border-base-300"
                        "font-mono" "text-[0.55rem]" "text-trading-muted"]
                :data-role "portfolio-optimizer-universe-search-add-hint"}

@@ -3,7 +3,8 @@
 
 (defn model-assumptions-panel
   []
-  [:section {:class ["border" "border-base-300" "bg-base-100/90"]
+  [:section {:class ["optimizer-note" "optimizer-model-assumptions-note"
+                     "border" "border-base-300" "bg-base-100/90"]
              :data-role "portfolio-optimizer-model-assumptions-panel"
              :data-v4-note "true"}
    [:p {:class controls/eyebrow-class} "What this model assumes"]
@@ -34,13 +35,15 @@
         objective-copy (action-objective-label (get-in draft [:objective :kind]))
         model-copy (action-model-label (get-in draft [:return-model :kind])
                                        (get-in draft [:risk-model :kind]))]
-    [:section {:class ["relative" "z-[180]" "mt-2" "flex" "flex-col" "items-start" "gap-3"
+    [:section {:class ["optimizer-setup-actions"
+                       "relative" "z-[180]" "mt-2" "flex" "flex-col" "items-start" "gap-3"
                        "border" "border-base-300" "bg-[#101518]"
                        "px-7" "py-[14px]" "scroll-mb-12" "leading-4"
                        "sm:flex-row" "sm:flex-wrap" "sm:items-center" "sm:gap-4"]
                :data-role "portfolio-optimizer-setup-bottom-actions"}
      [:button {:type "button"
-               :class ["border" "border-warning/70" "bg-warning/80" "px-6" "py-2.5"
+               :class ["optimizer-primary-action"
+                       "border" "border-warning/70" "bg-warning/80" "px-6" "py-2.5"
                        "whitespace-nowrap" "text-[0.71875rem]" "font-semibold" "text-base-100"
                        "shadow-[0_0_0_1px_rgba(0,0,0,0.25)]"
                        "scroll-mb-12"

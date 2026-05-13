@@ -61,7 +61,7 @@
 
 (defn- summary-card
   [label value]
-  [:div {:class ["rounded-lg" "border" "border-base-300" "bg-base-200/50" "p-3"]}
+  [:div {:class ["optimizer-summary-card" "rounded-lg" "border" "border-base-300" "bg-base-200/50" "p-3"]}
    [:p {:class ["text-[0.65rem]" "font-semibold" "uppercase" "tracking-[0.18em]" "text-trading-muted"]}
     label]
    [:p {:class ["mt-2" "text-lg" "font-semibold" "tabular-nums"]}
@@ -69,7 +69,7 @@
 
 (defn- compact-fact
   [label value]
-  [:div {:class ["rounded-lg" "border" "border-base-300" "bg-base-200/50" "px-3" "py-2"]}
+  [:div {:class ["optimizer-summary-card" "rounded-lg" "border" "border-base-300" "bg-base-200/50" "px-3" "py-2"]}
    [:p {:class ["text-[0.6rem]" "font-semibold" "uppercase" "tracking-[0.18em]" "text-trading-muted"]}
     label]
    [:p {:class ["mt-1" "text-sm" "font-semibold" "tabular-nums"]}
@@ -77,7 +77,8 @@
 
 (defn- panel-shell
   [data-role title subtitle & children]
-  [:section {:class ["rounded-xl" "border" "border-base-300" "bg-base-100/95" "p-4"]
+  [:section {:class ["optimizer-results-panel"
+                     "rounded-xl" "border" "border-base-300" "bg-base-100/95" "p-4"]
              :data-role data-role}
    [:p {:class ["text-[0.65rem]" "font-semibold" "uppercase" "tracking-[0.24em]" "text-trading-muted"]}
     title]
@@ -94,7 +95,8 @@
 
 (defn- sensitivity-row
   [labels-by-instrument [instrument-id row]]
-  [:div {:class ["rounded-md" "border" "border-base-300" "bg-base-200/40" "p-2" "text-xs"]
+  [:div {:class ["optimizer-row"
+                 "rounded-md" "border" "border-base-300" "bg-base-200/40" "p-2" "text-xs"]
          :data-role (str "portfolio-optimizer-sensitivity-row-" instrument-id)}
    [:span {:class ["font-semibold"]} (instrument-label labels-by-instrument instrument-id)]
    [:span {:class ["ml-2" "text-trading-muted"]}
@@ -208,12 +210,14 @@
         universe-size (count (:instrument-ids result))
         conditioning-status (or (:status conditioning) :ok)
         weight-stability-status (if sensitivity-top :caution :ok)]
-    [:aside {:class ["min-h-0" "border-l" "border-base-300" "bg-base-100/95"]
+    [:aside {:class ["optimizer-trust-caution-panel"
+                     "min-h-0" "border-l" "border-base-300" "bg-base-100/95"]
              :data-role "portfolio-optimizer-trust-caution-panel"}
      [:div {:class ["border-b" "border-base-300" "px-4" "py-3"]}
       [:p {:class ["font-mono" "text-[0.62rem]" "uppercase" "tracking-[0.08em]" "text-trading-muted/70"]}
        "How much to trust this"]]
-     [:div {:data-role "portfolio-optimizer-diagnostics-panel"}
+     [:div {:class ["optimizer-diagnostics-list"]
+            :data-role "portfolio-optimizer-diagnostics-panel"}
       (trust-row {:label "Conditioning"
                   :status conditioning-status
                   :value (if (= :ok conditioning-status) "Healthy" (opt-format/keyword-label conditioning-status))
@@ -290,7 +294,8 @@
   [draft result]
   (let [objective-kind (or (get-in draft [:objective :kind])
                            (get-in result [:solver :objective-kind]))]
-    [:section {:class ["rounded-xl" "border" "border-base-300" "bg-base-100/95" "p-4"]
+    [:section {:class ["optimizer-results-panel"
+                       "rounded-xl" "border" "border-base-300" "bg-base-100/95" "p-4"]
                :data-role "portfolio-optimizer-assumptions-strip"}
      [:p {:class ["text-[0.65rem]" "font-semibold" "uppercase" "tracking-[0.24em]" "text-trading-muted"]}
       "Run Assumptions"]
@@ -340,7 +345,8 @@
                                     [(condition-caution
                                       (get-in result [:diagnostics :covariance-conditioning]))
                                      (preview-caution (:rebalance-preview result))])))]
-    [:section {:class ["rounded-xl" "border" "border-base-300" "bg-base-100/95" "p-4"]
+    [:section {:class ["optimizer-trust-caution-panel"
+                       "rounded-xl" "border" "border-base-300" "bg-base-100/95" "p-4"]
                :data-role "portfolio-optimizer-trust-caution-panel"}
      [:p {:class ["text-[0.65rem]" "font-semibold" "uppercase" "tracking-[0.24em]" "text-trading-muted"]}
       "Trust & Caution"]
@@ -363,7 +369,8 @@
 
 (defn- rebalance-row
   [labels-by-instrument row]
-  [:div {:class ["grid"
+  [:div {:class ["optimizer-row"
+                 "grid"
                  "grid-cols-[minmax(8rem,1.1fr)_repeat(8,minmax(5rem,0.75fr))]"
                  "gap-3"
                  "rounded-lg"
@@ -407,7 +414,8 @@
       (summary-card "Margin Warning"
                     (opt-format/keyword-label (get-in summary [:margin :warning])))]
      [:button {:type "button"
-               :class ["rounded-lg" "border" "border-primary/50" "bg-primary/10" "px-3" "py-2"
+               :class ["optimizer-primary-action"
+                       "rounded-lg" "border" "border-primary/50" "bg-primary/10" "px-3" "py-2"
                        "text-left" "text-sm" "font-semibold" "text-primary"
                        "disabled:cursor-not-allowed" "disabled:border-base-300"
                        "disabled:bg-base-200/40" "disabled:text-trading-muted"]
@@ -450,22 +458,22 @@
                                     frontier-overlay-mode :standalone}}]
    (let [result (enrich-result-labels (:result last-successful-run) draft)]
      (when (= :solved (:status result))
-       [:section {:class ["space-y-0" "leading-4"]
+       [:section {:class ["optimizer-results-surface" "space-y-0" "leading-4"]
                   :data-role "portfolio-optimizer-results-surface"}
         (stale-result-banner stale?)
-        [:div {:class ["grid" "grid-cols-1" "xl:grid-cols-[500px_minmax(0,1fr)_320px]"]
+        [:div {:class ["optimizer-results-grid" "grid" "grid-cols-1" "xl:grid-cols-[500px_minmax(0,1fr)_320px]"]
                :data-role "portfolio-optimizer-results-grid"}
-         [:div {:class ["min-h-0" "space-y-0"]
+         [:div {:class ["optimizer-results-left-panel" "min-h-0" "space-y-0"]
                 :data-role "portfolio-optimizer-results-left-panel"}
          (target-exposure-table/target-exposure-table result)]
-         [:div {:class ["min-h-0" "bg-base-100" "p-6"]
+         [:div {:class ["optimizer-results-center-panel" "min-h-0" "bg-base-100" "p-6"]
                 :data-role "portfolio-optimizer-results-center-panel"}
           (frontier-chart/frontier-chart
            draft
            result
            frontier-overlay-mode
            constrain-frontier?)]
-         [:div {:class ["min-h-0"]
+         [:div {:class ["optimizer-results-right-panel" "min-h-0"]
                 :data-role "portfolio-optimizer-results-right-panel"}
           (trust-diagnostics-rail result)]]
         (when include-rebalance?

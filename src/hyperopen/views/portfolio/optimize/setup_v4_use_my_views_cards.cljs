@@ -151,8 +151,10 @@
 
 (defn- card-shell
   [{:keys [role step label title copy accent? dim?]} rows]
-  [:section (cond-> {:class (cond-> ["views-trust-panel__box" "flex" "min-h-[15.5rem]" "flex-col"
+  [:section (cond-> {:class (cond-> ["optimizer-use-my-views-card"
+                                     "views-trust-panel__box" "flex" "min-h-[15.5rem]" "flex-col"
                                      "border" "border-base-300"]
+                              accent? (conj "optimizer-use-my-views-card--accent")
                               dim? (conj "opacity-50"))
                      :aria-labelledby (step-id step)
                      :data-role role}
@@ -171,7 +173,7 @@
 
 (defn- empty-row
   [role copy]
-  [:div {:class ["views-trust-panel__empty"]
+  [:div {:class ["optimizer-use-my-views-empty" "views-trust-panel__empty"]
          :data-role role}
    copy])
 
@@ -315,7 +317,7 @@
 
 (defn- output-note
   [copy]
-  [:aside {:class ["views-trust-panel__callout"]
+  [:aside {:class ["optimizer-use-my-views-note" "views-trust-panel__callout"]
            :role "note"
            :data-role "portfolio-optimizer-setup-use-my-views-card-combined-output-callout"}
    copy])
@@ -377,7 +379,8 @@
   [draft readiness preview]
   (let [views (active-views draft readiness)
         labels (labels-by-id draft readiness preview)]
-    [:div {:class ["grid" "grid-cols-1" "gap-3" "xl:grid-cols-3"]
+    [:div {:class ["optimizer-use-my-views-insight-cards"
+                   "grid" "grid-cols-1" "gap-3" "xl:grid-cols-3"]
            :data-role "portfolio-optimizer-setup-use-my-views-insight-cards"}
      (market-reference-card preview)
      (your-views-card views labels)

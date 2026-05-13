@@ -21,7 +21,7 @@
 
 (defn setup-header
   [{:keys [draft route]}]
-  [:header {:class ["border" "border-base-300" "bg-base-100/90" "px-3" "py-2"]
+  [:header {:class ["optimizer-setup-header" "border" "border-base-300" "bg-base-100/90" "px-3" "py-2"]
             :data-role "portfolio-optimizer-setup-header"}
    [:div {:class ["flex" "items-center" "justify-between" "gap-4"]}
     [:div {:class ["min-w-0"]}
@@ -31,7 +31,7 @@
        (route-title route)]
       [:span {:class ["text-[0.8125rem]" "text-trading-muted"]}
        "- configure your target portfolio"]
-      [:span {:class ["border" "border-base-300" "bg-base-200/40" "px-2" "py-0.5"
+      [:span {:class ["optimizer-status-tag" "border" "border-base-300" "bg-base-200/40" "px-2" "py-0.5"
                       "font-mono" "text-[0.6rem]" "font-semibold" "uppercase"
                       "tracking-[0.12em]" "text-trading-muted/70"]
               :data-role "portfolio-optimizer-setup-status-tag"}
@@ -53,7 +53,8 @@
   [draft preset title subtitle kicker]
   (let [selected? (= preset (active-preset draft))]
     [:button {:type "button"
-              :class (cond-> ["border" "border-base-300" "bg-base-100/70" "px-3" "py-2.5" "text-left"
+              :class (cond-> ["optimizer-choice-card" "optimizer-preset-card"
+                              "border" "border-base-300" "bg-base-100/70" "px-3" "py-2.5" "text-left"
                               "transition-colors" "hover:border-warning/50"]
                        selected? (conj "border-warning/70" "bg-warning/10"))
               :aria-pressed (str selected?)
@@ -75,7 +76,7 @@
 
 (defn preset-row
   [draft]
-  [:section {:class ["border" "border-base-300" "bg-base-100/80" "px-3" "py-2.5"]
+  [:section {:class ["optimizer-setup-preset-row" "border" "border-base-300" "bg-base-100/80" "px-3" "py-2.5"]
              :data-role "portfolio-optimizer-setup-preset-row"}
    [:div {:class ["grid" "grid-cols-1" "gap-2" "xl:grid-cols-[82px_minmax(0,1fr)]"]}
     [:p {:class (conj eyebrow-class "pt-1.5")} "Start with"]

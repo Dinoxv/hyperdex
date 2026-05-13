@@ -21,7 +21,8 @@
 
 (defn control-rail
   [{:keys [state draft highlighted-controls readiness history-load-state]}]
-  [:aside {:class ["min-h-0" "overflow-hidden"] :data-role "portfolio-optimizer-setup-control-rail"}
+  [:aside {:class ["optimizer-control-rail" "min-h-0" "overflow-hidden"]
+           :data-role "portfolio-optimizer-setup-control-rail"}
    (setup-v4-universe/universe-section state draft
                                        {:readiness readiness
                                         :history-load-state history-load-state
@@ -30,7 +31,7 @@
    (objective-controls/objective-section draft highlighted-controls)
    (model-controls/model-section draft)
    (constraint-controls/constraints-section draft highlighted-controls)
-   [:details {:class ["border" "border-base-300" "bg-base-100/90" "p-3"]
+   [:details {:class ["optimizer-setup-panel" "border" "border-base-300" "bg-base-100/90" "p-3"]
               :data-role "portfolio-optimizer-advanced-overrides-shell"}
     [:summary {:class (into ["cursor-pointer" "select-none"] controls/section-title-class)}
      "Advanced Overrides"]
@@ -58,7 +59,8 @@
         constraints (:constraints draft)
         bl? (= :black-litterman return-kind)]
     (into
-     [:main {:class ["space-y-4" "leading-4"] :data-role "portfolio-optimizer-setup-summary-pane"}]
+     [:main {:class ["optimizer-summary-pane" "space-y-4" "leading-4"]
+             :data-role "portfolio-optimizer-setup-summary-pane"}]
      (if bl?
        [(use-my-views-workspace/use-my-views-workspace
          {:draft draft

@@ -1,0 +1,85 @@
+import assert from "node:assert/strict";
+import fs from "node:fs";
+import path from "node:path";
+import { test } from "node:test";
+import { fileURLToPath } from "node:url";
+
+const repoRoot = path.resolve(
+  path.dirname(fileURLToPath(import.meta.url)),
+  "..",
+  "..",
+);
+
+const optimizerEntryPath = path.join(
+  repoRoot,
+  "src",
+  "styles",
+  "surfaces",
+  "optimizer.css",
+);
+
+const optimizerPartialDir = path.join(
+  repoRoot,
+  "src",
+  "styles",
+  "surfaces",
+  "optimizer",
+);
+
+const expectedPartials = [
+  "base.css",
+  "setup.css",
+  "results.css",
+  "universe.css",
+  "frontier.css",
+];
+
+const expectedEntryImports = expectedPartials.map(
+  (partial) => `./optimizer/${partial}`,
+);
+
+function significantLines(text) {
+  return text
+    .split(/\r?\n/u)
+    .map((line) => line.trim())
+    .filter(Boolean);
+}
+
+test("optimizer.css remains a focused import entrypoint", () => {
+  const optimizerCss = fs.readFileSync(optimizerEntryPath, "utf8");
+  const imports = significantLines(optimizerCss).map((line) => {
+    const match = /^@import\s+"([^"]+)";$/u.exec(line);
+    assert.ok(match, `expected optimizer.css to contain only import statements, received: ${line}`);
+    return match[1];
+  });
+
+  assert.deepEqual(imports, expectedEntryImports);
+});
+
+test("optimizer CSS partials are split by surface responsibility", () => {
+  const actualPartials = fs
+    .readdirSync(optimizerPartialDir)
+    .filter((fileName) => fileName.endsWith(".css"))
+    .sort();
+
+  assert.deepEqual(actualPartials, [...expectedPartials].sort());
+});
+
+test("optimizer CSS partials style semantic classes instead of data-role test hooks", () => {
+  for (const partial of expectedPartials) {
+    const partialPath = path.join(optimizerPartialDir, partial);
+    const css = fs.readFileSync(partialPath, "utf8");
+
+    assert.doesNotMatch(
+      css,
+      /\[data-role/u,
+      `${partial} should not style through data-role selectors`,
+    );
+
+    assert.doesNotMatch(
+      css,
+      /\[class\*=/u,
+      `${partial} should not use substring class selectors for optimizer chrome`,
+    );
+  }
+});
