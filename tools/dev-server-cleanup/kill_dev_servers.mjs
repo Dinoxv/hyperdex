@@ -32,13 +32,14 @@ export function parseProcessTable(stdout) {
     .filter(Boolean);
 }
 
-function commandMentionsCwd(command, cwd) {
-  return command.includes(cwd) || command.includes(`INIT_CWD=${cwd}`);
+function commandMentionsHyperopenCheckout(command) {
+  return /(?:^|\s)INIT_CWD=\S*\/hyperopen(?:\s|$)/.test(command)
+    || /\/hyperopen(?:\/|\s|$)/.test(command);
 }
 
-function isDevServerRoot(processInfo, cwd) {
+function isDevServerRoot(processInfo) {
   const { command } = processInfo;
-  if (!commandMentionsCwd(command, cwd)) {
+  if (!commandMentionsHyperopenCheckout(command)) {
     return false;
   }
   return DEV_SCRIPT_RE.test(command)
@@ -57,12 +58,12 @@ function childrenByParent(processes) {
 }
 
 export function collectKillTargets(processes, options) {
-  const { cwd, selfPid } = options;
+  const { selfPid } = options;
   const self = processes.find((processInfo) => processInfo.pid === selfPid);
   const selfPgid = self?.pgid;
   const children = childrenByParent(processes);
   const targets = new Map();
-  const queue = processes.filter((processInfo) => isDevServerRoot(processInfo, cwd));
+  const queue = processes.filter((processInfo) => isDevServerRoot(processInfo));
 
   while (queue.length > 0) {
     const processInfo = queue.shift();
@@ -125,7 +126,7 @@ async function main() {
   const groups = uniqueProcessGroups(targets);
 
   if (targets.length === 0) {
-    console.log("No Hyperopen dev server processes found for this worktree.");
+    console.log("No Hyperopen dev server processes found.");
     return;
   }
 

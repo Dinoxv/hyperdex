@@ -19,7 +19,7 @@ test("parseProcessTable reads pid metadata and preserves command text", () => {
   ]);
 });
 
-test("collectKillTargets selects repo dev server roots and descendants", () => {
+test("collectKillTargets selects Hyperopen dev server roots and descendants from any worktree", () => {
   const cwd = "/repo/hyperopen";
   const processes = [
     { pid: 201, ppid: 1, pgid: 201, command: `npm run dev INIT_CWD=${cwd}` },
@@ -27,12 +27,14 @@ test("collectKillTargets selects repo dev server roots and descendants", () => {
     { pid: 203, ppid: 201, pgid: 201, command: "npm exec shadow-cljs watch app" },
     { pid: 204, ppid: 203, pgid: 201, command: "/usr/bin/java clojure.main -m shadow.cljs.devtools.cli watch app" },
     { pid: 301, ppid: 1, pgid: 301, command: "npm run dev INIT_CWD=/other/hyperopen" },
-    { pid: 302, ppid: 301, pgid: 301, command: "npm exec shadow-cljs watch app" }
+    { pid: 302, ppid: 301, pgid: 301, command: "npm exec shadow-cljs watch app" },
+    { pid: 701, ppid: 1, pgid: 701, command: "npm run dev INIT_CWD=/other/project" },
+    { pid: 702, ppid: 701, pgid: 701, command: "npm exec shadow-cljs watch app" }
   ];
 
   const targets = collectKillTargets(processes, { cwd, selfPid: 999 });
 
-  assert.deepEqual(targets.map((process) => process.pid), [201, 202, 203, 204]);
+  assert.deepEqual(targets.map((process) => process.pid), [201, 202, 203, 204, 301, 302]);
 });
 
 test("collectKillTargets includes shadow server ports for the same process group", () => {
