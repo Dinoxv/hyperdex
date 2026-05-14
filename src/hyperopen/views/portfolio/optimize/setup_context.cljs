@@ -1,4 +1,4 @@
-(ns hyperopen.views.portfolio.optimize.setup-v4-context
+(ns hyperopen.views.portfolio.optimize.setup-context
   (:require [hyperopen.portfolio.routes :as portfolio-routes]
             [hyperopen.views.portfolio.optimize.black-litterman-views-panel :as black-litterman-views-panel]
             [hyperopen.views.portfolio.optimize.optimization-progress-panel :as optimization-progress-panel]

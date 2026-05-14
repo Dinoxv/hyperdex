@@ -1,4 +1,4 @@
-(ns hyperopen.views.portfolio.optimize.setup-v4-controls
+(ns hyperopen.views.portfolio.optimize.setup-controls
   (:require [clojure.string :as str]))
 
 (def eyebrow-class

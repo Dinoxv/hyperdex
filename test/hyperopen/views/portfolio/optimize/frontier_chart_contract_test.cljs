@@ -5,7 +5,7 @@
              :refer [click-actions collect-nodes collect-strings data-role-order drag-enter-actions
                      drag-start-actions index-of node-attr node-by-role solved-result text-node]]))
 
-(deftest results-panel-renders-v1-results-workspace-contract-test
+(deftest results-panel-renders-canonical-results-workspace-contract-test
   (let [draft {:objective {:kind :target-volatility}
                :metadata {:dirty? true}}
         view-node (results-panel/results-panel

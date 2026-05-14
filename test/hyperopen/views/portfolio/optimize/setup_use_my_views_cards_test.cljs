@@ -1,7 +1,7 @@
-(ns hyperopen.views.portfolio.optimize.setup-v4-use-my-views-cards-test
+(ns hyperopen.views.portfolio.optimize.setup-use-my-views-cards-test
   (:require [cljs.test :refer-macros [deftest is]]
             [clojure.string :as str]
-            [hyperopen.views.portfolio.optimize.setup-v4-use-my-views-cards :as use-my-views-cards]))
+            [hyperopen.views.portfolio.optimize.setup-use-my-views-cards :as use-my-views-cards]))
 
 (defn- node-children
   [node]

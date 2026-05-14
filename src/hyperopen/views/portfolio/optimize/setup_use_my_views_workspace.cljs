@@ -1,8 +1,8 @@
-(ns hyperopen.views.portfolio.optimize.setup-v4-use-my-views-workspace
+(ns hyperopen.views.portfolio.optimize.setup-use-my-views-workspace
   (:require [hyperopen.views.portfolio.optimize.black-litterman-preview-chart :as black-litterman-preview-chart]
-            [hyperopen.views.portfolio.optimize.setup-v4-controls :as controls]
-            [hyperopen.views.portfolio.optimize.setup-v4-setup-actions :as setup-actions]
-            [hyperopen.views.portfolio.optimize.setup-v4-use-my-views-cards :as use-my-views-cards]))
+            [hyperopen.views.portfolio.optimize.setup-controls :as controls]
+            [hyperopen.views.portfolio.optimize.setup-actions :as setup-actions]
+            [hyperopen.views.portfolio.optimize.setup-use-my-views-cards :as use-my-views-cards]))
 
 (defn- use-my-views-legend-item
   [role swatch-class label qualifier]

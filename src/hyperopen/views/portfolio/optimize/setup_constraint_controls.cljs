@@ -1,5 +1,5 @@
-(ns hyperopen.views.portfolio.optimize.setup-v4-constraint-controls
-  (:require [hyperopen.views.portfolio.optimize.setup-v4-controls :as controls]))
+(ns hyperopen.views.portfolio.optimize.setup-constraint-controls
+  (:require [hyperopen.views.portfolio.optimize.setup-controls :as controls]))
 
 (def ^:private constraint-help
   {:long-only? "Restricts target weights to zero or positive values. Turn this off when short or hedged perp exposure is allowed."

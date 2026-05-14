@@ -1,15 +1,15 @@
 @layer components {
-  .portfolio-optimizer-v4 .optimizer-universe-search-shell {
+  .portfolio-optimizer .optimizer-universe-search-shell {
     min-height: 34px;
     background-color: var(--optimizer-bg);
     color: var(--optimizer-text);
   }
 
-  .portfolio-optimizer-v4 .optimizer-universe-search-shell[data-searching="true"] {
+  .portfolio-optimizer .optimizer-universe-search-shell[data-searching="true"] {
     border-color: var(--optimizer-accent);
   }
 
-  .portfolio-optimizer-v4
+  .portfolio-optimizer
     .optimizer-universe-search-shell
     :is(
       .optimizer-universe-search-affordance,
@@ -19,7 +19,7 @@
     background-color: transparent;
   }
 
-  .portfolio-optimizer-v4
+  .portfolio-optimizer
     .optimizer-universe-search-shell
     .optimizer-universe-search-field {
     height: 30px;
@@ -29,7 +29,7 @@
     box-shadow: none;
   }
 
-  .portfolio-optimizer-v4
+  .portfolio-optimizer
     .optimizer-universe-search-shell
     .optimizer-universe-search-field:focus {
     background-color: transparent;
@@ -37,7 +37,7 @@
     box-shadow: 0 0 0 1px rgba(212, 181, 88, 0.75);
   }
 
-  .portfolio-optimizer-v4 .optimizer-universe-search-add-hint {
+  .portfolio-optimizer .optimizer-universe-search-add-hint {
     display: inline-flex;
     align-items: center;
     justify-content: center;
@@ -53,7 +53,7 @@
     white-space: nowrap;
   }
 
-  .portfolio-optimizer-v4
+  .portfolio-optimizer
     .optimizer-universe-search-shell
     .optimizer-universe-search-clear:not(:disabled):hover {
     background-color: transparent;
@@ -61,25 +61,25 @@
     color: var(--optimizer-accent);
   }
 
-  .portfolio-optimizer-v4 .optimizer-universe-add-button {
+  .portfolio-optimizer .optimizer-universe-add-button {
     border-color: transparent;
     background-color: transparent;
     color: var(--optimizer-accent);
   }
 
-  .portfolio-optimizer-v4 .optimizer-universe-candidate-row[data-active="true"] {
+  .portfolio-optimizer .optimizer-universe-candidate-row[data-active="true"] {
     background-color: rgb(212 181 88 / 0.05);
   }
 
-  .portfolio-optimizer-v4 .optimizer-universe-panel table td {
+  .portfolio-optimizer .optimizer-universe-panel table td {
     border-bottom: 1px solid var(--optimizer-border);
   }
 
-  .portfolio-optimizer-v4 .optimizer-universe-panel table tr:last-child td {
+  .portfolio-optimizer .optimizer-universe-panel table tr:last-child td {
     border-bottom: 0;
   }
 
-  .portfolio-optimizer-v4 .optimizer-universe-panel table tr:hover td {
+  .portfolio-optimizer .optimizer-universe-panel table tr:hover td {
     background-color: var(--optimizer-surface-2);
   }
 }

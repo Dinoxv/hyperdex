@@ -1,4 +1,4 @@
-(ns hyperopen.views.portfolio.optimize.setup-v4-summary
+(ns hyperopen.views.portfolio.optimize.setup-summary
   (:require [clojure.string :as str]
             [hyperopen.views.portfolio.optimize.instrument-display :as instrument-display]))
 

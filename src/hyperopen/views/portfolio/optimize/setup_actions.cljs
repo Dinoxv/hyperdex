@@ -1,12 +1,12 @@
-(ns hyperopen.views.portfolio.optimize.setup-v4-setup-actions
-  (:require [hyperopen.views.portfolio.optimize.setup-v4-controls :as controls]))
+(ns hyperopen.views.portfolio.optimize.setup-actions
+  (:require [hyperopen.views.portfolio.optimize.setup-controls :as controls]))
 
 (defn model-assumptions-panel
   []
   [:section {:class ["optimizer-note" "optimizer-model-assumptions-note"
                      "border" "border-base-300" "bg-base-100/90"]
              :data-role "portfolio-optimizer-model-assumptions-panel"
-             :data-v4-note "true"}
+             :data-optimizer-note "true"}
    [:p {:class controls/eyebrow-class} "What this model assumes"]
    [:ul {:class ["mt-1" "space-y-px" "text-[0.65625rem]" "leading-[1.32]" "text-trading-muted"]}
     [:li "Returns are roughly normal at the chosen horizon."]

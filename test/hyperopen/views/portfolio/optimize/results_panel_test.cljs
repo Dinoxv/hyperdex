@@ -4,7 +4,7 @@
             [hyperopen.views.portfolio.optimize.test-support
              :refer [click-actions collect-strings node-attr node-by-role solved-result]]))
 
-(deftest results-panel-renders-v1-results-workspace-shell-test
+(deftest results-panel-renders-canonical-results-workspace-shell-test
   (let [draft {:objective {:kind :target-volatility}
                :metadata {:dirty? true}}
         view-node (results-panel/results-panel

@@ -24,7 +24,7 @@ source_of_truth: true
   rebalance preview shaping, and weight cleanup.
 - Optimizer run orchestration, progress state, worker request dispatch, solver
   result payload shaping, tracking snapshots, and execution-preview workflow.
-- Optimizer-specific UI view models and v4 route surfaces. Views may render
+- Optimizer-specific UI view models and canonical route surfaces. Views may render
   optimizer state, but they must not become the source of optimizer math,
   readiness, history alignment, or persistence semantics.
 
@@ -142,7 +142,7 @@ source_of_truth: true
   `hyperopen.views.portfolio.optimize.view-test`,
   `hyperopen.views.portfolio.optimize.index-view-test`,
   `hyperopen.views.portfolio.optimize.setup-view-test`,
-  `hyperopen.views.portfolio.optimize.setup-v4-layout-test`,
+  `hyperopen.views.portfolio.optimize.setup-layout-test`,
   `hyperopen.views.portfolio.optimize.scenario-detail-view-test`,
   `hyperopen.views.portfolio.optimize.results-panel-test`,
   `hyperopen.views.portfolio.optimize.frontier-chart-contract-test`,
@@ -197,7 +197,7 @@ source_of_truth: true
   `domain.rebalance`, `application.execution*`, `application.orderbook-loader`,
   `application.tracking`, and the matching runtime effect adapter.
 - New setup route UI under `/portfolio/optimize/new`:
-  `views.portfolio.optimize.setup-view`, `workspace-view`, `setup-v4-*`, and
+  `views.portfolio.optimize.setup-view`, `workspace-view`, `setup-*`, and
   `src/styles/surfaces/optimizer.css`.
 - New scenario detail UI under `/portfolio/optimize/:scenario-id`:
   `views.portfolio.optimize.scenario-detail-view` plus the tab file

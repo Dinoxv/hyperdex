@@ -268,7 +268,7 @@
                                                         (get-in % [1 :data-role])))]
     (is (some? root-node))
     (is (= "portfolio-optimizer-route-frame" (get-in root-node [1 :data-role])))
-    (is (contains? (set (class-values root-node)) "portfolio-optimizer-v4"))
+    (is (contains? (set (class-values root-node)) "portfolio-optimizer"))
     (is (contains? (set (class-values root-node)) "w-full"))
     (is (not (contains? (set (class-values root-node)) "app-shell-gutter")))
     (is (not (contains? (set (class-values root-node)) "py-4")))

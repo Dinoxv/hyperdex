@@ -1,19 +1,19 @@
-(ns hyperopen.views.portfolio.optimize.setup-v4-sections
+(ns hyperopen.views.portfolio.optimize.setup-sections
   (:require [hyperopen.portfolio.optimizer.application.view-model :as optimizer-view-model]
             [hyperopen.views.portfolio.optimize.instrument-overrides-panel :as instrument-overrides-panel]
-            [hyperopen.views.portfolio.optimize.setup-v4-constraint-controls :as constraint-controls]
-            [hyperopen.views.portfolio.optimize.setup-v4-controls :as controls]
-            [hyperopen.views.portfolio.optimize.setup-v4-model-controls :as model-controls]
-            [hyperopen.views.portfolio.optimize.setup-v4-objective-controls :as objective-controls]
-            [hyperopen.views.portfolio.optimize.setup-v4-setup-actions :as setup-actions]
-            [hyperopen.views.portfolio.optimize.setup-v4-universe :as setup-v4-universe]
-            [hyperopen.views.portfolio.optimize.setup-v4-use-my-views-workspace :as use-my-views-workspace]))
+            [hyperopen.views.portfolio.optimize.setup-constraint-controls :as constraint-controls]
+            [hyperopen.views.portfolio.optimize.setup-controls :as controls]
+            [hyperopen.views.portfolio.optimize.setup-model-controls :as model-controls]
+            [hyperopen.views.portfolio.optimize.setup-objective-controls :as objective-controls]
+            [hyperopen.views.portfolio.optimize.setup-actions :as setup-actions]
+            [hyperopen.views.portfolio.optimize.setup-universe :as setup-universe]
+            [hyperopen.views.portfolio.optimize.setup-use-my-views-workspace :as use-my-views-workspace]))
 
 (defn control-rail
   [{:keys [state draft highlighted-controls readiness history-load-state]}]
   [:aside {:class ["optimizer-control-rail" "min-h-0" "overflow-hidden"]
            :data-role "portfolio-optimizer-setup-control-rail"}
-   (setup-v4-universe/universe-section state draft
+   (setup-universe/universe-section state draft
                                        {:readiness readiness
                                         :history-load-state history-load-state})
    (objective-controls/objective-section draft highlighted-controls)

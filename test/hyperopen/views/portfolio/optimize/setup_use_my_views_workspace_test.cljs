@@ -1,11 +1,11 @@
-(ns hyperopen.views.portfolio.optimize.setup-v4-use-my-views-workspace-test
+(ns hyperopen.views.portfolio.optimize.setup-use-my-views-workspace-test
   (:require [cljs.test :refer-macros [deftest is]]
             [clojure.string :as str]
-            [hyperopen.views.portfolio.optimize.setup-v4-sections :as setup-v4-sections]
-            [hyperopen.views.portfolio.optimize.setup-v4-layout-fixtures :refer [node-children find-first-node collect-strings node-by-role child-roles node-text click-actions input-actions keydown-actions day-start-ms summary-from-points class-token-set count-nodes btc-instrument eth-instrument black-litterman-ready-readiness black-litterman-ready-draft black-litterman-empty-readiness black-litterman-empty-draft candle-rows]]))
+            [hyperopen.views.portfolio.optimize.setup-sections :as setup-sections]
+            [hyperopen.views.portfolio.optimize.setup-layout-fixtures :refer [node-children find-first-node collect-strings node-by-role child-roles node-text click-actions input-actions keydown-actions day-start-ms summary-from-points class-token-set count-nodes btc-instrument eth-instrument black-litterman-ready-readiness black-litterman-ready-draft black-litterman-empty-readiness black-litterman-empty-draft candle-rows]]))
 
-(deftest setup-v4-black-litterman-summary-pane-uses-dedicated-center-workspace-contract-test
-  (let [view-node (setup-v4-sections/summary-pane
+(deftest setup-black-litterman-summary-pane-uses-dedicated-center-workspace-contract-test
+  (let [view-node (setup-sections/summary-pane
                    {:draft (black-litterman-ready-draft)
                     :readiness (black-litterman-ready-readiness)
                     :running? false
@@ -84,8 +84,8 @@
     (is (= [[:actions/save-portfolio-optimizer-scenario-from-current]]
            (click-actions save-button)))))
 
-(deftest setup-v4-black-litterman-insight-cards-render-empty-view-state-test
-  (let [view-node (setup-v4-sections/summary-pane
+(deftest setup-black-litterman-insight-cards-render-empty-view-state-test
+  (let [view-node (setup-sections/summary-pane
                    {:draft (black-litterman-empty-draft)
                     :readiness (black-litterman-empty-readiness)
                     :running? false

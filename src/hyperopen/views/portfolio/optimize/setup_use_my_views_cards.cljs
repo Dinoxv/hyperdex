@@ -1,4 +1,4 @@
-(ns hyperopen.views.portfolio.optimize.setup-v4-use-my-views-cards
+(ns hyperopen.views.portfolio.optimize.setup-use-my-views-cards
   (:require [hyperopen.portfolio.optimizer.application.view-model :as optimizer-view-model]
             [hyperopen.views.portfolio.optimize.format :as opt-format]))
 

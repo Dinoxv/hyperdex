@@ -1,10 +1,10 @@
-(ns hyperopen.views.portfolio.optimize.setup-v4-layout-test
+(ns hyperopen.views.portfolio.optimize.setup-layout-test
   (:require [cljs.test :refer-macros [deftest is]]
             [clojure.string :as str]
             [hyperopen.views.portfolio-view :as portfolio-view]
-            [hyperopen.views.portfolio.optimize.setup-v4-layout-fixtures :refer [node-children find-first-node collect-strings node-by-role child-roles node-text click-actions input-actions keydown-actions day-start-ms summary-from-points class-token-set count-nodes btc-instrument eth-instrument black-litterman-ready-readiness black-litterman-ready-draft black-litterman-empty-readiness black-litterman-empty-draft candle-rows]]))
+            [hyperopen.views.portfolio.optimize.setup-layout-fixtures :refer [node-children find-first-node collect-strings node-by-role child-roles node-text click-actions input-actions keydown-actions day-start-ms summary-from-points class-token-set count-nodes btc-instrument eth-instrument black-litterman-ready-readiness black-litterman-ready-draft black-litterman-empty-readiness black-litterman-empty-draft candle-rows]]))
 
-(deftest setup-new-route-uses-v4-grid-instead-of-old-left-rail-test
+(deftest setup-new-route-uses-canonical-grid-instead-of-old-left-rail-test
   (let [view-node (portfolio-view/portfolio-view
                    {:router {:path "/portfolio/optimize/new"}
                     :wallet {:address "0x1111111111111111111111111111111111111111"}})
@@ -27,7 +27,7 @@
     (is (contains? strings "Why this preset is safe"))
     (is (not (contains? strings "Execution Assumptions")))))
 
-(deftest setup-v4-universe-source-toggle-has-two-equal-options-test
+(deftest setup-universe-source-toggle-has-two-equal-options-test
   (let [view-node (portfolio-view/portfolio-view
                    {:router {:path "/portfolio/optimize/new"}
                     :wallet {:address "0x1111111111111111111111111111111111111111"}})
@@ -45,7 +45,7 @@
     (is (contains? strings "Custom"))
     (is (not (contains? strings "Index")))))
 
-(deftest setup-v4-control-rail-orders-objective-before-return-risk-model-test
+(deftest setup-control-rail-orders-objective-before-return-risk-model-test
   (let [view-node (portfolio-view/portfolio-view
                    {:router {:path "/portfolio/optimize/new"}
                     :portfolio {:optimizer
@@ -68,7 +68,7 @@
     (is (str/includes? (node-text (node-by-role view-node "portfolio-optimizer-return-risk-panel"))
                        "03Return / Risk Model"))))
 
-(deftest setup-v4-return-risk-and-constraints-panels-are-collapsed-disclosures-test
+(deftest setup-return-risk-and-constraints-panels-are-collapsed-disclosures-test
   (let [view-node (portfolio-view/portfolio-view
                    {:router {:path "/portfolio/optimize/new"}
                     :portfolio {:optimizer
@@ -93,7 +93,7 @@
     (is (some? (node-by-role constraints-panel
                               "portfolio-optimizer-constraint-gross-max-input")))))
 
-(deftest setup-v4-layout-preserves-optimizer-control-actions-test
+(deftest setup-layout-preserves-optimizer-control-actions-test
   (let [view-node (portfolio-view/portfolio-view
                    {:router {:path "/portfolio/optimize/new"}
                     :portfolio {:optimizer
@@ -138,7 +138,7 @@
             (node-by-role view-node
                           "portfolio-optimizer-constraint-gross-max-input"))))))
 
-(deftest setup-v4-return-risk-model-buttons-expose-tooltips-test
+(deftest setup-return-risk-model-buttons-expose-tooltips-test
   (let [view-node (portfolio-view/portfolio-view
                    {:router {:path "/portfolio/optimize/new"}
                     :portfolio {:optimizer
@@ -169,7 +169,7 @@
         (is (= "tooltip" (get-in tooltip [1 :role])))
         (is (= copy (node-text tooltip)))))))
 
-(deftest setup-v4-summary-renders-vault-names-instead-of-addresses-test
+(deftest setup-summary-renders-vault-names-instead-of-addresses-test
   (let [vault-address "0x2222222222222222222222222222222222222222"
         vault-id (str "vault:" vault-address)
         view-node (portfolio-view/portfolio-view
@@ -194,7 +194,7 @@
     (is (str/includes? summary-text "2 assets - BTC, Alpha Yield"))
     (is (not (str/includes? summary-text vault-id)))))
 
-(deftest setup-v4-run-action-renders-under-center-assumptions-panel-test
+(deftest setup-run-action-renders-under-center-assumptions-panel-test
   (let [view-node (portfolio-view/portfolio-view
                    {:router {:path "/portfolio/optimize/new"}
                     :portfolio {:optimizer
@@ -239,7 +239,7 @@
     (is (= [[:actions/save-portfolio-optimizer-scenario-from-current]]
            (click-actions save-button)))))
 
-(deftest setup-v4-constraints-explain-each-control-test
+(deftest setup-constraints-explain-each-control-test
   (let [view-node (portfolio-view/portfolio-view
                    {:router {:path "/portfolio/optimize/new"}
                     :portfolio {:optimizer

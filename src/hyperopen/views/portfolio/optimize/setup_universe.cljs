@@ -1,4 +1,4 @@
-(ns hyperopen.views.portfolio.optimize.setup-v4-universe
+(ns hyperopen.views.portfolio.optimize.setup-universe
   (:require [hyperopen.portfolio.optimizer.application.view-model :as optimizer-view-model]))
 
 (def ^:private eyebrow-class
@@ -26,7 +26,7 @@
                     (= tone :warn) (conj "border-warning/40" "text-warning")
                     (= tone :muted) (conj "border-base-300" "text-trading-muted")
                     extra-class (conj extra-class))
-           :data-v4-chip "true"
+           :data-optimizer-chip "true"
            :data-tone (name tone)}
     label]))
 

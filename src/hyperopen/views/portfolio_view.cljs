@@ -66,7 +66,7 @@
                                                     :sections next-sections})
                        next-sections)))]
     (if optimizer-route?
-      [:div {:class ["portfolio-optimizer-v4" "w-full"]
+      [:div {:class ["portfolio-optimizer" "w-full"]
              :style {:background-color "var(--optimizer-bg)"
                      :min-height "calc(100vh - 3.5rem)"
                      :padding-bottom "3.5rem"}

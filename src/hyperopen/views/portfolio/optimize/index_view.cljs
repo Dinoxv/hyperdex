@@ -126,7 +126,7 @@
 (defn index-view
   [state]
   (let [{:keys [scenario-summaries]} (view-model/index-model state)]
-    [:section {:class ["portfolio-optimizer-v4"
+    [:section {:class ["portfolio-optimizer"
                        "rounded-xl"
                        "border"
                        "border-base-300"

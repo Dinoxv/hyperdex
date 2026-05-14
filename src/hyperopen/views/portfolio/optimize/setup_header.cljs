@@ -1,4 +1,4 @@
-(ns hyperopen.views.portfolio.optimize.setup-v4-header)
+(ns hyperopen.views.portfolio.optimize.setup-header)
 
 (def ^:private eyebrow-class
   ["font-mono" "text-[0.625rem]" "font-semibold" "uppercase" "tracking-[0.08em]" "text-trading-muted/70"])

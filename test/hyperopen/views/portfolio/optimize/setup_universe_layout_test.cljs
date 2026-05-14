@@ -1,12 +1,12 @@
-(ns hyperopen.views.portfolio.optimize.setup-v4-universe-layout-test
+(ns hyperopen.views.portfolio.optimize.setup-universe-layout-test
   (:require [cljs.test :refer-macros [deftest is]]
             [clojure.string :as str]
             [hyperopen.portfolio.optimizer.application.universe-candidates :as universe-candidates]
-            [hyperopen.views.portfolio.optimize.setup-v4-universe :as setup-v4-universe]
+            [hyperopen.views.portfolio.optimize.setup-universe :as setup-universe]
             [hyperopen.views.portfolio-view :as portfolio-view]
-            [hyperopen.views.portfolio.optimize.setup-v4-layout-fixtures :refer [node-children find-first-node collect-strings node-by-role child-roles node-text click-actions input-actions keydown-actions day-start-ms summary-from-points class-token-set count-nodes btc-instrument eth-instrument black-litterman-ready-readiness black-litterman-ready-draft black-litterman-empty-readiness black-litterman-empty-draft candle-rows]]))
+            [hyperopen.views.portfolio.optimize.setup-layout-fixtures :refer [node-children find-first-node collect-strings node-by-role child-roles node-text click-actions input-actions keydown-actions day-start-ms summary-from-points class-token-set count-nodes btc-instrument eth-instrument black-litterman-ready-readiness black-litterman-ready-draft black-litterman-empty-readiness black-litterman-empty-draft candle-rows]]))
 
-(deftest setup-v4-universe-skips-candidate-search-while-query-empty-test
+(deftest setup-universe-skips-candidate-search-while-query-empty-test
   (let [calls (atom 0)
         view-node (with-redefs [universe-candidates/candidate-markets
                                 (fn
@@ -22,13 +22,13 @@
                                      :market-type :perp
                                      :coin "BTC"
                                      :symbol "BTC-USDC"}]))]
-                    (setup-v4-universe/universe-section
+                    (setup-universe/universe-section
                      {:portfolio-ui {:optimizer {:universe-search-query ""}}}
                      {:universe []}))]
     (is (= 0 @calls))
     (is (nil? (node-by-role view-node "portfolio-optimizer-universe-search-results")))))
 
-(deftest setup-v4-universe-search-renders-as-single-integrated-control-test
+(deftest setup-universe-search-renders-as-single-integrated-control-test
   (let [view-node (portfolio-view/portfolio-view
                    {:router {:path "/portfolio/optimize/new"}
                     :portfolio-ui {:optimizer {:universe-search-query "TIA"}}
@@ -60,7 +60,7 @@
     (is (not (contains? (class-token-set add-hint) "uppercase")))
     (is (not (contains? (class-token-set add-hint) "tracking-[0.1em]")))))
 
-(deftest setup-v4-universe-search-renders-vault-candidates-test
+(deftest setup-universe-search-renders-vault-candidates-test
   (let [vault-address "0x1111111111111111111111111111111111111111"
         view-node (portfolio-view/portfolio-view
                    {:router {:path "/portfolio/optimize/new"}
@@ -92,7 +92,7 @@
              (str "vault:" vault-address)]]
            (click-actions add-button)))))
 
-(deftest setup-v4-universe-search-candidates-do-not-render-history-status-chip-test
+(deftest setup-universe-search-candidates-do-not-render-history-status-chip-test
   (let [view-node (portfolio-view/portfolio-view
                    {:router {:path "/portfolio/optimize/new"}
                     :portfolio-ui {:optimizer {:universe-search-query "btc"}}
@@ -116,7 +116,7 @@
     (is (= [[:actions/add-portfolio-optimizer-universe-instrument "perp:BTC"]]
            (click-actions candidate-row)))))
 
-(deftest setup-v4-selected-universe-history-statuses-reflect-readiness-test
+(deftest setup-selected-universe-history-statuses-reflect-readiness-test
   (let [base-state {:router {:path "/portfolio/optimize/new"}
                     :portfolio {:optimizer
                                 {:draft {:universe [btc-instrument]
@@ -177,7 +177,7 @@
     (is (contains? insufficient-strings "insufficient"))
     (is (contains? sufficient-strings "sufficient"))))
 
-(deftest setup-v4-selected-vault-row-shows-shared-gap-when-loaded-history-is-misaligned-test
+(deftest setup-selected-vault-row-shows-shared-gap-when-loaded-history-is-misaligned-test
   (let [vault-a "0xaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
         vault-b "0xbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
         vault-a-id (str "vault:" vault-a)
@@ -219,7 +219,7 @@
     (is (str/includes? row-text "shared gap"))
     (is (not (str/includes? row-text "sufficient")))))
 
-(deftest setup-v4-universe-search-skips-blank-lookups-but-renders-nonblank-candidates-test
+(deftest setup-universe-search-skips-blank-lookups-but-renders-nonblank-candidates-test
   (let [vault-address "0xbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
         candidate-key (str "vault:" vault-address)
         calls (atom [])
@@ -239,13 +239,13 @@
                                   stub-candidates))
         blank-view (with-redefs [universe-candidates/candidate-markets
                                  candidate-markets-stub]
-                    (setup-v4-universe/universe-section
+                    (setup-universe/universe-section
                      {:portfolio-ui {:optimizer {:universe-search-query "   "}}}
                      {:universe []}))
         blank-input (node-by-role blank-view "portfolio-optimizer-universe-search-input")
         nonblank-view (with-redefs [universe-candidates/candidate-markets
                                     candidate-markets-stub]
-                       (setup-v4-universe/universe-section
+                       (setup-universe/universe-section
                         {:portfolio-ui {:optimizer {:universe-search-query "vault"}}}
                         {:universe []}))
         nonblank-input (node-by-role nonblank-view "portfolio-optimizer-universe-search-input")]

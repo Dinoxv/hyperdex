@@ -386,7 +386,7 @@
                 selected-tab
                 result
                 stale?] :as model} (optimizer-view-model/scenario-detail-model state route)]
-    [:section {:class ["portfolio-optimizer-v4" "optimizer-scenario-surface"
+    [:section {:class ["portfolio-optimizer" "optimizer-scenario-surface"
                        "space-y-0" "leading-4" "text-trading-text"]
                :data-role "portfolio-optimizer-scenario-detail-surface"
                :data-scenario-id scenario-id}

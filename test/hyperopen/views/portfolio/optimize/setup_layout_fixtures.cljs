@@ -1,4 +1,4 @@
-(ns hyperopen.views.portfolio.optimize.setup-v4-layout-fixtures)
+(ns hyperopen.views.portfolio.optimize.setup-layout-fixtures)
 
 (defn node-children
   [node]

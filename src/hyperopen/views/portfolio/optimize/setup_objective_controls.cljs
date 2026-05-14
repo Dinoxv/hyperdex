@@ -1,5 +1,5 @@
-(ns hyperopen.views.portfolio.optimize.setup-v4-objective-controls
-  (:require [hyperopen.views.portfolio.optimize.setup-v4-controls :as controls]))
+(ns hyperopen.views.portfolio.optimize.setup-objective-controls
+  (:require [hyperopen.views.portfolio.optimize.setup-controls :as controls]))
 
 (declare objective-card)
 

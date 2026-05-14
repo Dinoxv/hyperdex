@@ -1,5 +1,5 @@
-(ns hyperopen.views.portfolio.optimize.setup-v4-model-controls
-  (:require [hyperopen.views.portfolio.optimize.setup-v4-controls :as controls]))
+(ns hyperopen.views.portfolio.optimize.setup-model-controls
+  (:require [hyperopen.views.portfolio.optimize.setup-controls :as controls]))
 
 (def ^:private model-help
   {:historical-mean "Uses the arithmetic mean of historical returns for each selected asset."

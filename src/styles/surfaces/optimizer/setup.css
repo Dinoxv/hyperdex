@@ -1,53 +1,53 @@
 @layer components {
-  .portfolio-optimizer-v4 .optimizer-setup-route-surface {
+  .portfolio-optimizer .optimizer-setup-route-surface {
     background-color: var(--optimizer-bg);
   }
 
-  .portfolio-optimizer-v4
+  .portfolio-optimizer
     :is(.optimizer-setup-header, .optimizer-setup-preset-row) {
     background-color: var(--optimizer-bg);
   }
 
-  .portfolio-optimizer-v4 .optimizer-setup-surface {
+  .portfolio-optimizer .optimizer-setup-surface {
     background-color: var(--optimizer-bg);
     border: 1px solid var(--optimizer-border);
   }
 
-  .portfolio-optimizer-v4
+  .portfolio-optimizer
     :is(.optimizer-control-rail, .optimizer-context-rail) {
     background-color: var(--optimizer-surface);
   }
 
-  .portfolio-optimizer-v4 .optimizer-control-rail {
+  .portfolio-optimizer .optimizer-control-rail {
     border-right: 1px solid var(--optimizer-border);
   }
 
-  .portfolio-optimizer-v4 .optimizer-context-rail {
+  .portfolio-optimizer .optimizer-context-rail {
     border-left: 1px solid var(--optimizer-border);
   }
 
-  .portfolio-optimizer-v4 .optimizer-summary-pane {
+  .portfolio-optimizer .optimizer-summary-pane {
     background-color: transparent;
   }
 
-  .portfolio-optimizer-v4 .optimizer-control-rail > :is(section, details) {
+  .portfolio-optimizer .optimizer-control-rail > :is(section, details) {
     background-color: var(--optimizer-surface);
     border-width: 0 0 1px 0;
     border-color: var(--optimizer-border);
     border-radius: 0;
   }
 
-  .portfolio-optimizer-v4 .optimizer-control-rail > :is(section, details):last-child {
+  .portfolio-optimizer .optimizer-control-rail > :is(section, details):last-child {
     border-bottom-width: 0;
   }
 
-  .portfolio-optimizer-v4 .optimizer-choice-card[aria-pressed="true"] {
+  .portfolio-optimizer .optimizer-choice-card[aria-pressed="true"] {
     border-color: var(--optimizer-accent-border);
     background-color: var(--optimizer-accent-soft);
     color: var(--optimizer-text);
   }
 
-  .portfolio-optimizer-v4
+  .portfolio-optimizer
     .optimizer-model-segment-group
     .optimizer-segment-button[aria-pressed="true"] {
     border-color: var(--optimizer-border-strong);
@@ -55,41 +55,41 @@
     color: var(--optimizer-text);
   }
 
-  .portfolio-optimizer-v4 .optimizer-setup-actions {
+  .portfolio-optimizer .optimizer-setup-actions {
     background-color: #101518;
   }
 
-  .portfolio-optimizer-v4 .optimizer-model-assumptions-note {
+  .portfolio-optimizer .optimizer-model-assumptions-note {
     padding: 7px 12px;
   }
 
-  .portfolio-optimizer-v4 .optimizer-use-my-views-insight-cards {
+  .portfolio-optimizer .optimizer-use-my-views-insight-cards {
     display: grid;
     grid-template-columns: 1fr;
     gap: 12px;
   }
 
   @media (min-width: 960px) {
-    .portfolio-optimizer-v4 .optimizer-use-my-views-insight-cards {
+    .portfolio-optimizer .optimizer-use-my-views-insight-cards {
       grid-template-columns: minmax(0, 1.16fr) minmax(11rem, 0.68fr) minmax(0, 1.16fr);
     }
   }
 
-  .portfolio-optimizer-v4 .optimizer-use-my-views-card {
+  .portfolio-optimizer .optimizer-use-my-views-card {
     border-color: var(--optimizer-border);
     background-color: var(--optimizer-surface);
   }
 
-  .portfolio-optimizer-v4 .optimizer-use-my-views-card--accent {
+  .portfolio-optimizer .optimizer-use-my-views-card--accent {
     border-color: var(--optimizer-accent-border);
     background-color: color-mix(in srgb, var(--optimizer-accent) 4%, transparent);
   }
 
-  .portfolio-optimizer-v4 .views-trust-panel__box {
+  .portfolio-optimizer .views-trust-panel__box {
     padding: 14px;
   }
 
-  .portfolio-optimizer-v4 .views-trust-panel__eyebrow {
+  .portfolio-optimizer .views-trust-panel__eyebrow {
     color: var(--optimizer-text-3);
     font-family: "JetBrains Mono", var(--font-mono);
     font-size: 9.5px;
@@ -99,11 +99,11 @@
     text-transform: uppercase;
   }
 
-  .portfolio-optimizer-v4 .views-trust-panel__eyebrow--accent {
+  .portfolio-optimizer .views-trust-panel__eyebrow--accent {
     color: var(--optimizer-accent);
   }
 
-  .portfolio-optimizer-v4 .views-trust-panel__headline {
+  .portfolio-optimizer .views-trust-panel__headline {
     margin-top: 12px;
     color: var(--optimizer-text);
     font-size: 13px;
@@ -111,7 +111,7 @@
     line-height: 1.25;
   }
 
-  .portfolio-optimizer-v4 .views-trust-panel__description {
+  .portfolio-optimizer .views-trust-panel__description {
     margin-top: 10px;
     color: var(--optimizer-text-2);
     font-size: 11px;
@@ -119,7 +119,7 @@
     line-height: 1.55;
   }
 
-  .portfolio-optimizer-v4 .views-trust-panel__body {
+  .portfolio-optimizer .views-trust-panel__body {
     margin-top: 14px;
     display: grid;
     gap: 4px;
@@ -128,7 +128,7 @@
     line-height: 1.35;
   }
 
-  .portfolio-optimizer-v4 .views-trust-panel__row {
+  .portfolio-optimizer .views-trust-panel__row {
     display: grid;
     grid-template-columns: minmax(0, 1fr) auto;
     align-items: baseline;
@@ -136,7 +136,7 @@
     font-variant-numeric: tabular-nums;
   }
 
-  .portfolio-optimizer-v4 .views-trust-panel__empty {
+  .portfolio-optimizer .views-trust-panel__empty {
     color: var(--optimizer-text-2);
     font-family: "Inter Variable", var(--font-ui-system);
     font-size: 10.5px;
@@ -144,24 +144,24 @@
     line-height: 1.45;
   }
 
-  .portfolio-optimizer-v4 .views-trust-panel__value--prior {
+  .portfolio-optimizer .views-trust-panel__value--prior {
     color: var(--optimizer-info);
   }
 
-  .portfolio-optimizer-v4 .views-trust-panel__value--view {
+  .portfolio-optimizer .views-trust-panel__value--view {
     color: var(--optimizer-text-2);
   }
 
-  .portfolio-optimizer-v4 .views-trust-panel__confidence {
+  .portfolio-optimizer .views-trust-panel__confidence {
     color: var(--optimizer-text-3);
   }
 
-  .portfolio-optimizer-v4 .views-trust-panel__value--combined {
+  .portfolio-optimizer .views-trust-panel__value--combined {
     color: var(--optimizer-accent);
     font-weight: 600;
   }
 
-  .portfolio-optimizer-v4 .views-trust-panel__callout {
+  .portfolio-optimizer .views-trust-panel__callout {
     margin-top: 10px;
     border: 1px solid var(--optimizer-border);
     background-color: var(--optimizer-bg);
@@ -173,7 +173,7 @@
     line-height: 1.45;
   }
 
-  .portfolio-optimizer-v4
+  .portfolio-optimizer
     :is(.optimizer-use-my-views-note, .optimizer-use-my-views-empty) {
     border-color: var(--optimizer-border);
     background-color: var(--optimizer-bg);
