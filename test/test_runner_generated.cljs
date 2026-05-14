@@ -240,6 +240,7 @@
             [hyperopen.portfolio.optimizer.infrastructure.persistence-test]
             [hyperopen.portfolio.optimizer.infrastructure.prior-data-test]
             [hyperopen.portfolio.optimizer.infrastructure.run-bridge-test]
+            [hyperopen.portfolio.optimizer.infrastructure.solver-adapter-modules-test]
             [hyperopen.portfolio.optimizer.infrastructure.solver-adapter-parity-test]
             [hyperopen.portfolio.optimizer.infrastructure.solver-adapter-test]
             [hyperopen.portfolio.optimizer.infrastructure.wire-test]
@@ -882,6 +883,7 @@
              'hyperopen.portfolio.optimizer.infrastructure.persistence-test
              'hyperopen.portfolio.optimizer.infrastructure.prior-data-test
              'hyperopen.portfolio.optimizer.infrastructure.run-bridge-test
+             'hyperopen.portfolio.optimizer.infrastructure.solver-adapter-modules-test
              'hyperopen.portfolio.optimizer.infrastructure.solver-adapter-parity-test
              'hyperopen.portfolio.optimizer.infrastructure.solver-adapter-test
              'hyperopen.portfolio.optimizer.infrastructure.wire-test
